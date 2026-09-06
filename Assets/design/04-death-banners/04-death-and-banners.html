@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:wght@400;600&family=Sometype+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0E1103;min-height:100%;color:#EDEBE3;font-family:'Source Sans 3',sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#B8B6AC}a:hover{color:#EDEBE3}
+</style>
+</helmet>
+<div style="display:flex;flex-direction:column;gap:64px;padding:64px">
+
+<div style="display:flex;flex-direction:column;gap:16px" data-screen-label="Death beat">
+  <div style="display:flex;align-items:baseline;gap:24px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">The death beat</span><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">SIX FRAMES · 0 → 2.4 s TO LIVE INPUT · THREE VARIANTS OF FRAME 6</span></div>
+  <div style="display:grid;grid-template-columns:repeat(3,640px);gap:16px">
+    <sc-for list="{{ frames }}" as="f" hint-placeholder-count="8">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="position:relative;width:640px;height:360px;overflow:hidden;border:1px solid #454840;background:{{ f.bg }}">
+          <div style="position:absolute;left:0;top:{{ f.horizon }}px;width:640px;height:400px;background:{{ f.ground }};transform:rotate({{ f.tilt }}deg);transform-origin:left top"></div>
+          <div style="position:absolute;left:0;top:0;width:640px;height:360px;background:#0E1103;opacity:{{ f.black }}"></div>
+          <sc-if value="{{ f.hud }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;left:14px;top:312px;width:160px;display:flex;flex-direction:column;gap:3px"><div style="font-family:'Sometype Mono',monospace;font-weight:700;font-size:11px;color:#D9402F">{{ f.hp }}</div><div style="height:6px;background:#151808;border:1px solid #5C6056;box-sizing:border-box"><div style="height:100%;width:{{ f.hpPct }}%;background:#E3DFD2"></div></div></div>
+            <div style="position:absolute;left:0;top:0;width:640px;height:360px;box-sizing:border-box;border:{{ f.frame }}px solid #D9402F"></div>
+          </sc-if>
+          <sc-if value="{{ f.weapon }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;left:380px;top:{{ f.weaponY }}px;width:200px;height:160px;background:#1D2010;border:1px solid #454840;transform:rotate({{ f.weaponRot }}deg);transform-origin:right bottom"></div>
+          </sc-if>
+          <sc-if value="{{ f.text }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;left:0;top:140px;width:640px;display:flex;flex-direction:column;align-items:center;gap:8px">
+              <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;line-height:40px;text-transform:uppercase;letter-spacing:0.02em;color:#EDEBE3">{{ f.line1 }}</div>
+              <div style="font-size:14px;line-height:20px;color:#B8B6AC">{{ f.line2 }}</div>
+            </div>
+            <div style="position:absolute;left:0;bottom:40px;width:640px;display:flex;justify-content:center;gap:8px">
+              <sc-if value="{{ f.retry }}" hint-placeholder-val="{{ true }}"><div style="height:32px;padding:0 15px;display:flex;align-items:center;background:#2F3221;border:2px solid #8A8F84;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;text-transform:uppercase;letter-spacing:0.04em">Retry the rift</div></sc-if>
+              <div style="height:32px;padding:0 16px;box-sizing:border-box;display:flex;align-items:center;background:{{ f.retBg }};border:{{ f.retBorder }};border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;text-transform:uppercase;letter-spacing:0.04em;color:{{ f.retInk }}">Return to Anchor</div>
+            </div>
+          </sc-if>
+          <div style="position:absolute;left:12px;top:12px;font-family:'Sometype Mono',monospace;font-weight:700;font-size:13px;letter-spacing:0.08em;color:#EDEBE3;background:#0E1103;padding:2px 6px">{{ f.t }}</div>
+        </div>
+        <div style="font-size:14px;line-height:20px;color:#B8B6AC;text-wrap:pretty"><span style="color:#EDEBE3;font-weight:600">{{ f.title }}</span> {{ f.note }}</div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="font-size:14px;line-height:20px;color:#B8B6AC;max-width:1300px;text-wrap:pretty">Total 2.4 s from the killing hit to live input: 0.8 s fall (camera pitch −35°, roll +8°, height −1.1 m, cubic ease-out; desaturation 100→0 % over the same 0.8 s; weapon lowers over the first 0.4 s), 1.2 s black, 0.4 s fade. Input is live on the first visible frame of the fade (2.0 s), so the fade is the only part the player can skip; 2.4 s is the number if they do not. Cut to black is a hard cut (1 frame). Audio: the cut carries one low sound (asset unspecified); the room tone continues under the black, uninterrupted. Focus lands on RETRY THE RIFT; RETURN TO ANCHOR is secondary. The HUD names the beat in two lines and is not the beat: no red flash, no slow-motion, no blood overlay. Sound carries the hit; the frame carries the fall.</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:16px" data-screen-label="Banners">
+  <div style="display:flex;align-items:baseline;gap:24px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">Banners · one axis each</span><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">SHOWN AT HOLD · NEVER TWO ARRIVALS ON ONE FRAME · STAGGER 300 ms IN PRIORITY RIFT-COMPLETE → LEVEL-UP → WAVE-CLEAR · POSITIONS DISJOINT</span></div>
+  <div style="position:relative;width:1920px;height:1080px;overflow:hidden;background:repeating-linear-gradient(135deg,#2A2C27 0 14px,#303229 14px 28px);border:1px solid #454840">
+    <div style="position:absolute;left:0;top:0;width:1920px;height:640px;background:#393D2B"></div>
+    <div style="position:absolute;left:0;top:640px;width:1920px;height:440px;background:#2F3221"></div>
+
+    <div style="position:absolute;left:0;top:160px;width:1920px;display:flex;justify-content:center">
+      <div style="display:flex;align-items:center;gap:24px;height:64px;padding:0 32px;background:#151808;border-top:2px solid #E3DFD2;border-bottom:1px solid #454840">
+        <div style="display:flex;gap:4px"><div style="width:16px;height:8px;background:#B8B6AC"></div><div style="width:16px;height:8px;background:#B8B6AC"></div><div style="width:16px;height:8px;background:#E3DFD2"></div><div style="width:16px;height:8px;background:#454840"></div><div style="width:16px;height:8px;background:#454840"></div></div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;line-height:40px;text-transform:uppercase;letter-spacing:0.02em;color:#E3DFD2">Wave 3 clear</div>
+        <div style="font-family:'Sometype Mono',monospace;font-weight:500;font-size:16px;color:#B8B6AC">next in 00:20</div>
+      </div>
+    </div>
+    <div style="position:absolute;left:0;top:236px;width:1920px;text-align:center;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">WAVE CLEAR · TOP · SLIDES DOWN 16 px + FADE IN 160 ms · HOLD 1.6 s · SLIDES UP + FADE OUT 100 ms</div>
+
+    <div style="position:absolute;left:0;top:420px;width:1920px;height:120px;background:#151808;border-top:2px solid #2FBFA6;border-bottom:2px solid #2FBFA6;display:flex;align-items:center;justify-content:center;gap:40px">
+      <div style="width:24px;height:24px;background:#2FBFA6;transform:rotate(45deg)"></div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:64px;line-height:64px;text-transform:uppercase;letter-spacing:0.02em;color:#6ADFC9">Sunken carriage · closed</div>
+        <div style="font-size:16px;line-height:20px;color:#B8B6AC">The rift is sealed. Loot is on the ground.</div>
+      </div>
+      <div style="width:24px;height:24px;background:#2FBFA6;transform:rotate(45deg)"></div>
+    </div>
+    <div style="position:absolute;left:0;top:552px;width:1920px;text-align:center;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">RIFT COMPLETE · FULL-WIDTH BAND · TEAL RAILS AND NAME (RIFT-ORIGIN) · WIPES IN LEFT→RIGHT 240 ms · HOLD 2.4 s · WIPES OUT LEFT→RIGHT 160 ms</div>
+
+    <div style="position:absolute;right:40px;top:760px;display:flex;align-items:stretch;background:#151808;border:1px solid #454840;border-left:4px solid #E6B33A">
+      <div style="display:flex;flex-direction:column;justify-content:center;padding:16px 24px;gap:4px">
+        <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">LEVEL</div>
+        <div style="display:flex;align-items:baseline;gap:12px"><span style="font-family:'Sometype Mono',monospace;font-weight:700;font-size:48px;line-height:48px;color:#EDEBE3">14</span><span style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.02em;color:#E6B33A">+1 core point</span></div>
+        <div style="width:240px;height:4px;background:#454840"><div style="height:4px;width:8%;background:#E6B33A"></div></div>
+      </div>
+    </div>
+    <div style="position:absolute;right:40px;top:868px;width:600px;text-align:right;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">LEVEL UP · RIGHT EDGE ABOVE AMMO · SLIDES IN FROM RIGHT 16 px + FADE 160 ms · HOLD 2.0 s · SLIDES OUT RIGHT 100 ms · XP RAIL LIVES HERE AND ON PAUSE</div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px;width:1920px;font-size:14px;line-height:20px;color:#B8B6AC;text-wrap:pretty">
+    <div><span style="color:#EDEBE3;font-weight:600">Arrival rule.</span> Two banners never arrive on the same frame. When events coincide they queue and arrive 300 ms apart in priority order: rift-complete, level-up, wave-clear. Each keeps its own region (top plate y 160–224; band y 420–540; right plate y 760–856) so holds may overlap without collision. A wave-clear queued behind a rift-complete is dropped: the rift closing supersedes it.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Wave clear.</span> Centred plate at (x centred, 160), 64 tall, bg-1, 2 px sys-full top rail (transient status). Wave cells repeat the HUD's, display 700 40 in sys-full, countdown numeric 16. Axis: vertical. Never overlaps the crosshair box.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Rift complete.</span> The one banner allowed teal: it is a rift event. Full-width band 120 tall at y 420–540, bg-1, 2 px teal-1 rails top and bottom, two 24 px teal-1 diamonds, name display 700 64 in teal-2, one body line text-2. Axis: horizontal wipe. Crosshair is hidden for its hold; combat is over.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Level up.</span> Right-edge plate above the ammo block, 4 px gold-full left rail (reward), level numeric 700 48, reward line display 600 20 in gold, 240×4 XP rail showing progress into the new level. Axis: horizontal from the right edge. XP and level live here and on the pause header; never on the combat HUD.</div>
+  </div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const frames=[
+      {t:'0.00 s',title:'Killing hit.',note:'HUD at near-death: 38 health, frame pulsing. Hit lands; health drains to 0 at 0 ms. Weapon still raised.',bg:'#393D2B',ground:'#2F3221',horizon:213,tilt:0,black:0,hud:true,hp:'0',hpPct:0,frame:8,weapon:true,weaponY:200,weaponRot:0,text:false},
+      {t:'0.25 s',title:'Weapon lowers.',note:'Weapon drops out of frame over 0.4 s. HUD elements leave along their rail axes at 100 ms; the harm frame stays.',bg:'#393D2B',ground:'#2F3221',horizon:200,tilt:2,black:0,hud:true,hp:'0',hpPct:0,frame:8,weapon:true,weaponY:260,weaponRot:14,text:false},
+      {t:'0.80 s',title:'Camera down.',note:'Pitch −35°, roll +8°, height −1.1 m, cubic ease-out, done. Desaturation 100→0 over the same 0.8 s. Nothing left of the HUD.',bg:'#333531',ground:'#2A2C27',horizon:120,tilt:8,black:0,hud:false,hp:'',hpPct:0,frame:0,weapon:false,weaponY:0,weaponRot:0,text:false},
+      {t:'0.80 s',title:'Hard cut to black.',note:'One frame. No fade. Audio cue: one low sound on the cut (asset unspecified); the room tone continues under the black.',bg:'#0E1103',ground:'#0E1103',horizon:400,tilt:0,black:1,hud:false,hp:'',hpPct:0,frame:0,weapon:false,weaponY:0,weaponRot:0,text:false},
+      {t:'2.00 s',title:'Black holds 1.2 s.',note:'The pause is the beat. Nothing is drawn, nothing is loading on screen.',bg:'#0E1103',ground:'#0E1103',horizon:400,tilt:0,black:1,hud:false,hp:'',hpPct:0,frame:0,weapon:false,weaponY:0,weaponRot:0,text:false},
+      {t:'2.00–2.40 s',title:'Fade in · campaign.',note:'0.4 s linear fade onto bg-0, Anchor yard behind at 40 % value. Two lines: display 700 40 and body 14. Focus on RETRY on frame one; Enter / face-south confirms. Gear kept, unlimited retries. In a boss encounter line 2 ends "the encounter resets".',bg:'#1D2010',ground:'#151808',horizon:213,tilt:0,black:0,hud:false,hp:'',hpPct:0,frame:0,weapon:false,weaponY:0,weaponRot:0,text:true,line1:'Erased at Sunken carriage',line2:'Wave 4 of 5 · 3 m 12 s in · gear kept',retry:true,retBg:'#262918',retBorder:'1px solid #454840',retInk:'#B8B6AC'},
+      {t:'2.00–2.40 s',title:'Fade in · endgame.',note:'Same frame; line 2 carries the death budget as numerals, N of M remaining. Focus on RETRY. Boss variant: "Warden phase 2 · the encounter resets · 2 of 3 deaths remain".',bg:'#1D2010',ground:'#151808',horizon:213,tilt:0,black:0,hud:false,hp:'',hpPct:0,frame:0,weapon:false,weaponY:0,weaponRot:0,text:true,line1:'Erased at Sunken carriage',line2:'Wave 4 of 5 · 2 of 3 deaths remain · gear kept',retry:true,retBg:'#262918',retBorder:'1px solid #454840',retInk:'#B8B6AC'},
+      {t:'2.00–2.40 s',title:'Fade in · endgame terminal.',note:'Budget spent. Line 1 changes verb; line 2 states the consequence. RETURN TO ANCHOR is the only control and takes focus. No red: the frame is already the fact.',bg:'#1D2010',ground:'#151808',horizon:213,tilt:0,black:0,hud:false,hp:'',hpPct:0,frame:0,weapon:false,weaponY:0,weaponRot:0,text:true,line1:'Sunken carriage closes',line2:'0 of 3 deaths remain · the rift is lost · gear kept',retry:false,retBg:'#2F3221',retBorder:'2px solid #8A8F84',retInk:'#EDEBE3'}
+    ];
+    return {frames};
+  }
+}
+</script>
+</body>
+</html>

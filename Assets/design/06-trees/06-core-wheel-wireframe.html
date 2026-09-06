@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:wght@400;600&family=Sometype+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0E1103;min-height:100%;color:#EDEBE3;font-family:'Source Sans 3',sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#B8B6AC}a:hover{color:#EDEBE3}
+</style>
+</helmet>
+<div style="display:flex;flex-direction:column;gap:64px;padding:64px">
+
+<sc-for list="{{ views }}" as="v" hint-placeholder-count="2">
+<div style="display:flex;flex-direction:column;gap:16px" data-screen-label="{{ v.label }}">
+  <div style="display:flex;align-items:baseline;gap:24px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">{{ v.label }}</span><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">{{ v.sub }}</span></div>
+  <div style="position:relative;width:1920px;height:1080px;overflow:hidden;background:#1F210A;border:1px solid #454840">
+    <div style="position:absolute;left:0;top:0;width:1920px;height:640px;background:#3E413E"></div>
+    <div style="position:absolute;left:0;top:640px;width:1920px;height:440px;background:#1F210A"></div>
+    <div style="position:absolute;left:0;top:0;width:1920px;height:88px;background:#151808;border-bottom:1px solid #454840;display:flex;align-items:center;padding:0 40px;box-sizing:border-box;gap:40px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase;letter-spacing:0.02em">Progression</div>
+      <div style="display:flex;gap:8px">
+        <div style="height:44px;padding:0 24px;display:flex;align-items:center;background:#262918;border:1px solid #454840;border-top:2px solid #E3DFD2;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.04em">Core wheel</div>
+        <div style="height:44px;padding:0 24px;display:flex;align-items:center;background:#262918;border:1px solid #454840;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.04em;color:#B8B6AC">Doctrine board</div>
+      </div>
+      <div style="flex:1"></div>
+      <div style="display:flex;align-items:center;gap:16px;height:44px;padding:0 16px;background:#262918;border:1px solid #454840;border-radius:2px">
+        <span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">HELD</span><span style="font-family:'Sometype Mono',monospace;font-weight:700;font-size:24px;line-height:24px">41</span>
+        <div style="width:1px;height:24px;background:#454840"></div>
+        <span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">SPENT</span><span style="font-family:'Sometype Mono',monospace;font-weight:500;font-size:16px;color:#B8B6AC">24 / 65</span>
+      </div>
+      <div style="height:44px;padding:0 24px;display:flex;align-items:center;background:#262918;border:1px solid #454840;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.04em;color:#B8B6AC">Close</div>
+    </div>
+
+    <div style="position:absolute;left:40px;top:104px;display:flex;align-items:center;gap:8px;height:32px;z-index:2">
+      <div style="height:32px;width:32px;display:flex;align-items:center;justify-content:center;background:#262918;border:1px solid #454840;border-radius:2px"><div style="width:12px;height:2px;background:#B8B6AC"></div></div>
+      <div style="height:32px;width:32px;display:flex;align-items:center;justify-content:center;background:#262918;border:1px solid #454840;border-radius:2px;position:relative"><div style="width:12px;height:2px;background:#B8B6AC"></div><div style="position:absolute;width:2px;height:12px;background:#B8B6AC"></div></div>
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80;margin-left:8px">{{ v.zoomLabel }}</div>
+    </div>
+
+    <div style="position:absolute;left:40px;top:152px;width:1424px;height:888px;overflow:hidden;background:#151808;border:1px solid #454840">
+      <div style="position:absolute;left:{{ v.ox }}px;top:{{ v.oy }}px;width:1600px;height:1600px;transform:scale({{ v.scale }});transform-origin:left top">
+        <svg width="1600" height="1600" viewBox="0 0 1600 1600" style="position:absolute;left:0;top:0">
+          <g fill="none" stroke="#2F3221" stroke-width="1"><circle cx="800" cy="800" r="160"/><circle cx="800" cy="800" r="240"/><circle cx="800" cy="800" r="400"/><circle cx="800" cy="800" r="460"/><circle cx="800" cy="800" r="550"/></g>
+          <circle cx="800" cy="800" r="660" fill="none" stroke="#454840" stroke-width="2"/>
+          <sc-for list="{{ ticks }}" as="t" hint-placeholder-count="0"><line x1="{{ t.x1 }}" y1="{{ t.y1 }}" x2="{{ t.x2 }}" y2="{{ t.y2 }}" stroke="{{ t.ink }}" stroke-width="{{ t.w }}"/></sc-for>
+          <sc-for list="{{ bounds }}" as="b" hint-placeholder-count="0"><line x1="800" y1="800" x2="{{ b.x }}" y2="{{ b.y }}" stroke="#393D2B" stroke-width="1"/></sc-for>
+          <sc-for list="{{ lines }}" as="l" hint-placeholder-count="0"><line x1="{{ l.x1 }}" y1="{{ l.y1 }}" x2="{{ l.x2 }}" y2="{{ l.y2 }}" stroke="{{ l.ink }}" stroke-width="2"/></sc-for>
+          <sc-for list="{{ arcs }}" as="a" hint-placeholder-count="0"><path d="{{ a.d }}" fill="none" stroke="{{ a.ink }}" stroke-width="2"/></sc-for>
+          <circle cx="800" cy="800" r="40" fill="#E3DFD2"/><circle cx="800" cy="800" r="28" fill="#151808"/><circle cx="800" cy="800" r="8" fill="#E3DFD2"/>
+        </svg>
+        <sc-for list="{{ degs }}" as="d" hint-placeholder-count="0"><div style="position:absolute;left:{{ d.x }}px;top:{{ d.y }}px;transform:translate(-50%,-50%) rotate({{ d.rot }}deg);font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">{{ d.t }}</div></sc-for>
+        <sc-for list="{{ sectors }}" as="s" hint-placeholder-count="5"><div style="position:absolute;left:{{ s.x }}px;top:{{ s.y }}px;transform:translate(-50%,-50%) rotate({{ s.rot }}deg);font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;letter-spacing:0.08em;text-transform:uppercase;color:#8E8D80;white-space:nowrap;border-bottom:1px dashed #5C6056;padding-bottom:2px">{{ s.name }}</div></sc-for>
+        <sc-for list="{{ nodes }}" as="n" hint-placeholder-count="40">
+          <div style="position:absolute;left:{{ n.x }}px;top:{{ n.y }}px;width:{{ n.size }}px;height:{{ n.size }}px;transform:translate(-50%,-50%) rotate({{ n.rot }}deg);box-sizing:border-box;background:{{ n.bg }};border:{{ n.border }};border-radius:{{ n.radius }};display:flex;align-items:center;justify-content:center">
+            <sc-if value="{{ n.slot }}" hint-placeholder-val="{{ false }}"><div style="width:32px;height:32px;border:1px dashed {{ n.slotInk }};box-sizing:border-box;transform:rotate({{ n.unrot }}deg)"></div></sc-if>
+          </div>
+          <sc-if value="{{ n.gate }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;left:{{ n.gx }}px;top:{{ n.gy }}px;transform:translate(-50%,-50%) rotate({{ n.grot }}deg);display:flex;flex-wrap:wrap;gap:2px;width:{{ n.gw }}px;justify-content:center">
+              <sc-for list="{{ n.cells }}" as="c" hint-placeholder-count="3"><div style="width:{{ c.w }}px;height:6px;background:{{ c.bg }};border:1px solid {{ c.bd }};box-sizing:border-box"></div></sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ v.labels }}" hint-placeholder-val="{{ true }}"><sc-if value="{{ n.cost }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;left:{{ n.cx }}px;top:{{ n.cy }}px;transform:translate(-50%,-50%) rotate({{ n.lrot }}deg);font-family:'Sometype Mono',monospace;font-weight:500;font-size:11px;line-height:11px;color:{{ n.costInk }}">{{ n.cost }}</div>
+          </sc-if></sc-if>
+          <sc-if value="{{ v.labels }}" hint-placeholder-val="{{ true }}"><sc-if value="{{ n.label }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;left:{{ n.lx }}px;top:{{ n.ly }}px;transform:translate({{ n.ltx }},-50%) rotate({{ n.lrot }}deg);transform-origin:{{ n.lorigin }};font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;line-height:16px;text-transform:uppercase;letter-spacing:0.02em;color:{{ n.ink }};white-space:nowrap">{{ n.label }}</div>
+          </sc-if></sc-if>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="position:absolute;left:1488px;top:152px;width:392px;height:888px;display:flex;flex-direction:column;gap:16px">
+      <div style="background:#1D2010;border:1px solid #454840;border-left:4px solid #E3DFD2;padding:16px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">HELD · READY TO PLACE</span><span style="font-family:'Sometype Mono',monospace;font-weight:700;font-size:24px">41</span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px"><sc-for list="{{ held }}" as="h" hint-placeholder-count="41"><div style="width:16px;height:8px;background:#B8B6AC"></div></sc-for></div>
+        <div style="font-size:14px;line-height:20px;color:#B8B6AC;text-wrap:pretty">Held points carry between the wheel and the board and never expire. 24 placed of 65.</div>
+      </div>
+      <div style="background:#1D2010;border:1px solid #454840;padding:16px;display:flex;flex-direction:column;gap:12px;flex:1">
+        <div style="display:flex;align-items:center;gap:12px"><div style="width:32px;height:32px;border:1px dashed #5C6056;box-sizing:border-box"></div><div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">KINESIS · RING 2 · MINOR · LANE 3 · BEAD 1 OF 3</div></div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:24px;line-height:28px;text-transform:uppercase;letter-spacing:0.02em">Air control</div>
+        <div style="font-size:16px;line-height:24px;color:#EDEBE3;text-wrap:pretty">+4% airborne steering per bead. Three beads open the Notable at the lane end.</div>
+        <div style="height:1px;background:#454840"></div>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) auto 16px;gap:8px 16px;align-items:center;font-size:14px;color:#B8B6AC">
+          <span>Now</span><span style="font-family:'Sometype Mono',monospace;font-weight:500;font-size:16px;color:#EDEBE3;text-align:right">+0%</span><span></span>
+          <span>After</span><span style="font-family:'Sometype Mono',monospace;font-weight:500;font-size:16px;color:#EDEBE3;text-align:right">+4%</span><span style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:8px solid #E3DFD2"></span>
+        </div>
+        <div style="font-size:14px;line-height:20px;color:#B8B6AC;text-wrap:pretty">Reachable: the Kinesis gateway is spent. Stick toward it, or click the bead.</div>
+        <div style="flex:1"></div>
+        <div style="display:flex;gap:8px">
+          <div style="height:44px;flex:1;display:flex;align-items:center;justify-content:center;background:#E6B33A;border:1px solid #E6B33A;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;text-transform:uppercase;letter-spacing:0.04em;color:#0E1103">Buy bead · 1 pt</div>
+          <div style="height:44px;padding:0 24px;display:flex;align-items:center;background:repeating-linear-gradient(135deg,#1D2010 0 6px,#262918 6px 8px);border:1px solid #454840;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.04em;color:#5C5C52">Refund</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="font-size:14px;line-height:20px;color:#B8B6AC;max-width:1400px;text-wrap:pretty">{{ v.note }}</div>
+</div>
+</sc-for>
+
+<div style="display:flex;flex-direction:column;gap:16px;width:1920px" data-screen-label="Wheel rules">
+  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">Wheel geometry and rules</div>
+  <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px;font-size:14px;line-height:20px;color:#B8B6AC;text-wrap:pretty">
+    <div><span style="color:#EDEBE3;font-weight:600">Radii from the hub (authored px).</span> Hub 40 (ring 28 inner, 8 dot). Ring 1 Gateway at 160, 48 px square. Ring 2 lanes 240→400, three 24 px round beads at 260 / 330 / 400. Ring 3 Notable at 460, 40 px square; arcs between adjacent lane ends at r 460. Ring 4 Convergence at 550, 48 px diamond. Ring 5 Keystone at 660 on the rim, 64 px diamond. Diamonds are rotated so a corner points along their own radial; their radial half-extent is the half-diagonal (34 / 45 px) and label clearance is computed from it. Rim 2 px border-low at 660. The wheel is N sectors of 360/N°, N from the character's constellation data (five here; a sixth such as Elements is data, not a redesign). Sector n centre at −90° + n·360/N (000 = up); boundaries 1 px panel-1 at centre ± 180/N; lanes at centre ± 24° (clamped to ± (180/N − 12) so a sixth sector still clears its neighbour).</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Range card.</span> 72 tick marks every 5° on the rim: 8 px panel-1, every 15° 16 px border-low, sector boundaries 24 px text-2 with a degree label (036 · 108 · 180 · 252 · 324) in numeric 13 at r 690. Sector names sit outside the rim at r 700, 14° clockwise of the centre spoke so they never cross the keystone. Sector names shown are placeholders (dashed underline): the five constellations are the character's own, read from data at runtime. Nothing else is decoration.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Ink outward.</span> Spent nodes and their lanes are sys-full; a spent lane is inked from the hub to its last spent bead, then border-high to the next bead and border-mid beyond. Three-step ladder so unspent never reads as faded: unspent = panel-0 fill, 1 px border-mid, text-2 label; reachable = panel-1 fill, 2 px border-high, text-1 label; spent = sys-full fill. Lanes follow the same ladder: border-mid unspent, border-high reachable, sys-full spent. Rings 1 px panel-1, sector boundaries 1 px panel-2, rim 2 px border-low. Keystone taken = gold-full; its sibling Convergence route is painted, not removed. Notable arcs ink when both ends are spent. <span style="color:#EDEBE3;font-weight:600">Gate marks, drawn.</span> Convergence carries three 12×6 cells on its outward side, one per lane, filled sys-full when that lane's Notable is spent (its gate opens at three). Keystone carries a 16-cell tally, 6×6 cells in two rows of eight, filled sys-full per point spent in the sector toward its gate of 16. Both at 1.0 and 0.6; at 0.6 they are shape-only, no numerals. <span style="color:#EDEBE3;font-weight:600">Cost.</span> At 1.0 a numeric-11 cost sits 8 px past each node's label side, text-2: bead 1, Notable 2, Convergence 3, Keystone 5; Gateway 1. Off at 0.6.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Reading and input.</span> Labels run tangentially, centred on the node's angle, 12 px clear of the node's radial extent: Gateway and first-bead labels on the inward side (toward the hub, where no node sits), Notable and Keystone labels on the outward side; the Convergence label runs along the radial beside its diamond (46 px off the centre spoke, starting at r 550) so it shares no radial with the centre-lane Notable, its cost mirrored on the other side and its gate cells outward toward the Keystone; rotated to read upright on the lower half; only the first bead of a lane is labelled; at 0.6 labels drop and the icon slot carries the node, name in the detail rail. Stick: direction from the current node selects the nearest node within 60° of the stick angle; a tap of the stick steps one ring outward along the current lane. Zoom around the focused node, two levels only; the wheel never rotates.</div>
+  </div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const SYS='#E3DFD2',T2='#B8B6AC',BL='#454840',BM='#5C6056',P0='#262918',P1='#2F3221',GOLD='#E6B33A',HATCH='repeating-linear-gradient(135deg,#1D2010 0 6px,#262918 6px 8px)';
+    const C=800,rad=a=>a*Math.PI/180,px=(r,a)=>({x:C+r*Math.cos(rad(a)),y:C+r*Math.sin(rad(a))});
+    const names=['Kinesis','Ordnance','Sustain','Command','Rift'];
+    const ST={
+      spent:{bg:SYS,border:'1px solid '+SYS,ink:'#EDEBE3',slotInk:'#0E1103'},
+      reach:{bg:P1,border:'2px solid #8A8F84',ink:'#EDEBE3',slotInk:T2},
+      un:{bg:P0,border:'1px solid '+BM,ink:T2,slotInk:BM},
+      key:{bg:P0,border:'2px solid '+BM,ink:T2,slotInk:T2},
+      keyspent:{bg:GOLD,border:'1px solid '+GOLD,ink:'#EDEBE3',slotInk:'#0E1103'},
+      forfeit:{bg:HATCH,border:'1px solid '+BL,ink:'#5C5C52',slotInk:BL}
+    };
+    const nodes=[],lines=[],arcs=[],ticks=[],bounds=[],degs=[],sectors=[];
+    const N=names.length,SEC=360/N,HALF=SEC/2,LANE=Math.min(24,HALF-12);
+    const node=(r,a,size,shape,s,label,slot,side,cost,gate)=>{
+      const p=px(r,a);const st=ST[s];const diamond=shape==='diamond';
+      const rx=diamond?size*0.7071:size/2;const dir=side==='in'?-1:1;const lower=Math.sin(rad(a))>0.01;
+      const lrot=lower?a-90:a+90;
+      let gateOff=0,g=null;
+      if(gate){gateOff=14;const gp=px(r+rx+8,a);const cells=gate.cells.map(f=>({w:gate.w,bg:f?SYS:'transparent',bd:f?SYS:BM}));g={gate:true,gx:gp.x,gy:gp.y,grot:a+90,cells,gw:gate.w===6?62:40};}
+      let lp,cp,lrotF=lrot,ltx='-50%';
+      if(side==='beside'){const tx=-Math.sin(rad(a)),ty=Math.cos(rad(a));const off=rx+12;const p0=px(r,a);lp={x:p0.x+tx*off,y:p0.y+ty*off};const left=Math.cos(rad(a))<-0.01;lrotF=left?a+180:a;ltx=left?'-100%':'0';cp={x:p0.x-tx*(off+6),y:p0.y-ty*(off+6)};}
+      else{const lr=r+dir*(rx+12+8+(side==='out'?gateOff:0));lp=px(lr,a);cp=px(lr+dir*20,a);}
+      const rot=diamond?a+45:0;
+      nodes.push({x:p.x,y:p.y,size,rot,unrot:-rot,radius:shape==='round'?'50%':'2px',slot:!!slot,label:label||'',lx:lp.x,ly:lp.y,ltx,lrot:lrotF,lorigin:side==='beside'?(ltx==='0'?'left center':'right center'):'center center',cost:cost||'',cx:cp.x,cy:cp.y,costInk:T2,gate:false,...g,...st});
+    };
+    // ticks + boundaries + degree labels
+    for(let d=0;d<360;d+=5){const a=d-90;const major=Math.abs(((d-HALF)%SEC+SEC)%SEC)<0.01,mid=d%15===0;const len=major?24:(mid?16:8);const o=px(660,a),i=px(660-len,a);ticks.push({x1:i.x,y1:i.y,x2:o.x,y2:o.y,ink:major?T2:(mid?BL:P1),w:major?2:1});}
+    for(let n=0;n<N;n++){const a=n*SEC-90+HALF;const b=px(660,a);bounds.push(b);const dl=px(690,a);degs.push({x:dl.x,y:dl.y,rot:a+90,t:String(Math.round(n*SEC+HALF)).padStart(3,'0')});const c=n*SEC-90;const sp=px(700,c+14);sectors.push({x:sp.x,y:sp.y,rot:c+90,name:names[n]});}
+    // per sector content
+    const spentPlan={0:{gate:'spent',lanes:[[1,0,0],[3,3,3],[0,0,0]],notables:['un','spent','un'],conv:'un',key:'key'},1:{gate:'reach'},2:{gate:'reach'},3:{gate:'reach'},4:{gate:'reach'}};
+    const minorNames=[['Slide grip','Air control','Long stride'],['Tight group','Recoil','Feed'],['Thick skin','Second wind','Grit'],['Read','Mark','Call'],['Attune','Ward','Phase']];
+    const notableNames=[['Contact','Skim discipline','Landing'],['Cadence','Overwatch','Ammo economy'],['Bastion','Leech','Last stand'],['Ledger','Sightline','Rally'],['Riftglass','Suppress','Breach']];
+    const convNames=['Momentum bank','Heat sink','Grit reserve','Battle plan','Rift anchor'];
+    const keyNames=['Momentum lock','Full auto','Immovable','Overreach','Unwritten'];
+    for(let n=0;n<N;n++){
+      const c=n*SEC-90;const plan=spentPlan[n]||{gate:'reach'};const gateS=plan.gate;let sectorSpent=gateS==='spent'?1:0;
+      // hub -> gateway
+      const g=px(160,c),h=px(40,c);lines.push({x1:h.x,y1:h.y,x2:g.x,y2:g.y,ink:gateS==='spent'?SYS:(gateS==='reach'?'#8A8F84':BM)});
+      node(160,c,48,'square',gateS,names[n]+' gateway',true,'in','1');
+      const notP=[];
+      for(let l=0;l<3;l++){
+        const a=c+(l-1)*LANE;const beads=plan.lanes?plan.lanes[l]:[0,0,0];const spentCount=beads.filter(b=>b>0).length;sectorSpent+=spentCount;
+        const laneReach=gateS==='spent';
+        // lane segments
+        const s0=px(160,a),s1=px(240,a);lines.push({x1:g.x,y1:g.y,x2:s1.x,y2:s1.y,ink:spentCount>0?SYS:(laneReach?'#8A8F84':BM)});
+        const bp=[260,330,400];
+        for(let b=0;b<3;b++){
+          const p0=px(b===0?240:bp[b-1],a),p1=px(bp[b],a);
+          const isSpent=b<spentCount;lines.push({x1:p0.x,y1:p0.y,x2:p1.x,y2:p1.y,ink:isSpent?SYS:(laneReach&&b===spentCount?'#8A8F84':BM)});
+          node(bp[b],a,24,'round',isSpent?'spent':(laneReach&&b===spentCount?'reach':'un'),b===0?minorNames[n][l]:'',false,'in',b===0?'1':'');
+        }
+        const notS=plan.notables?plan.notables[l]:'un';const nS=(spentCount===3&&notS!=='spent')?'reach':notS;
+        const q0=px(400,a),q1=px(460,a);lines.push({x1:q0.x,y1:q0.y,x2:q1.x,y2:q1.y,ink:nS==='spent'?SYS:(nS==='reach'?'#8A8F84':BM)});
+        if(nS==='spent')sectorSpent+=2;node(460,a,40,'square',nS,notableNames[n][l],true,'out','2');notP.push({a,s:nS});
+      }
+      // arcs between adjacent lane ends
+      for(let l=0;l<2;l++){const a0=notP[l].a,a1=notP[l+1].a;const p0=px(460,a0),p1=px(460,a1);const both=notP[l].s==='spent'&&notP[l+1].s==='spent';arcs.push({d:`M${p0.x} ${p0.y} A460 460 0 0 1 ${p1.x} ${p1.y}`,ink:both?SYS:BM});}
+      // convergence + keystone
+      const convS=plan.conv||'un';const cv=px(550,c);const nt=px(460,c);lines.push({x1:nt.x,y1:nt.y,x2:cv.x,y2:cv.y,ink:convS==='spent'?SYS:BM});
+      node(550,c,48,'diamond',convS,convNames[n],true,'beside','3',{w:12,cells:notP.map(q=>q.s==='spent')});
+      const kp=px(660,c);lines.push({x1:cv.x,y1:cv.y,x2:kp.x,y2:kp.y,ink:BM});
+      node(660,c,64,'diamond',plan.key||'key',keyNames[n],true,'out','5',{w:6,cells:Array.from({length:16},(_,i)=>i<sectorSpent)});
+    }
+    const held=Array.from({length:41},(_,i)=>i);
+    const views=[
+      {label:'Core wheel · zoom 1.0',sub:'RANGE CARD · FIVE SECTORS OF 72° · RING = TIER · PANNED TO KINESIS',scale:1,ox:712-800,oy:820-800,labels:true,zoomLabel:'ZOOM 1.0 · FOCUSED ON KINESIS · WHEEL / BUMPERS · STICK SELECTS NEAREST',
+        note:'Authored on a 1600×1600 canvas with the hub at (800, 800); here the hub sits at board (712, 820) so the Kinesis sector, its three lanes, Notables, Convergence and Keystone fill the 888 px height with tangential labels outside each node. Kinesis gateway spent; lane 2 fully spent to its Notable (Skim discipline); lane 1 has one bead; lane 3 untouched but reachable. The other four gateways are reachable from the hub. Everything unspent is drawn at full border value. Convergence shows one of three lane cells filled; the Keystone tally shows 6 of 16 spent in Kinesis. Cost numerals sit past each label. Sector names are placeholders for the character\'s constellation data.'},
+      {label:'Core wheel · zoom 0.6',sub:'WHOLE WHEEL · LABELS OFF · ICONS CARRY THE NODES',scale:0.6,ox:712-800*0.6,oy:444-800*0.6,labels:false,zoomLabel:'ZOOM 0.6 · WHOLE WHEEL',
+        note:'At 0.6 the full 1320 px wheel (1410 with keystones) fits the 888 px board with the compass ticks and degree labels intact. Node labels drop; the 32 px icon slots and node shapes (square gateway, round bead, square notable, diamond convergence, large diamond keystone) carry rank; the detail rail carries the name. The spent Kinesis lane reads as the one inked spoke; gate cells and tallies remain as shapes, cost numerals drop.'}
+    ];
+    return {views,nodes,lines,arcs,ticks,bounds,degs,sectors,held};
+  }
+}
+</script>
+</body>
+</html>

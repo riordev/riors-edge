@@ -3,11 +3,18 @@
 #include "Misc/AutomationTest.h"
 #include "Attributes/BreakerAttributeAggregation.h"
 #include "Attributes/BreakerAttributeSet.h"
+#include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerCombatTypes.h"
 #include "Combat/BreakerDamageLibrary.h"
+#include "GameFramework/Actor.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Items/BreakerItemTypes.h"
+#include "Progression/BreakerBuildConditions.h"
+#include "Progression/BreakerClassDefinition.h"
+#include "Progression/BreakerProgressionComponent.h"
+#include "Progression/BreakerProgressionNode.h"
+#include "Progression/BreakerProgressionTree.h"
 #include "Progression/BreakerProgressionTypes.h"
 
 // ---------------------------------------------------------------------------
@@ -38,6 +45,42 @@ namespace BreakerDamagePoolTest
     UBreakerAttributeSet* PoolTestMakeAttributes()
     {
         return NewObject<UBreakerAttributeSet>(GetTransientPackage());
+    }
+
+    // An attacker whose progression component genuinely OWNS one
+    // target-conditional node, so its rider row is produced by the real
+    // RecalculateStats path. Same construction the TargetRiders suite uses;
+    // the tree is class-agnostic so no class lock is needed.
+    AActor* PoolTestMakeRiderAttacker(FName NodeId, EBreakerBuildCondition Condition, float PercentPerRank)
+    {
+        UBreakerProgressionNode* Node = NewObject<UBreakerProgressionNode>();
+        Node->NodeId = NodeId;
+        Node->MaxRank = 1;
+        Node->Currency = EBreakerPointCurrency::CorePoints;
+        FBreakerNodeEffect Effect;
+        Effect.StatTarget = EBreakerNodeStatTarget::Damage;
+        Effect.StatBucket = EBreakerNodeStatBucket::IncreasedPercent;
+        Effect.ValuePerRank = PercentPerRank;   // O2 PLACEHOLDER
+        Effect.Condition = Condition;
+        Node->Effects.Add(Effect);
+
+        AActor* Attacker = NewObject<AActor>();
+        UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>(Attacker);
+
+        UBreakerProgressionTree* Tree = NewObject<UBreakerProgressionTree>();
+        Tree->TreeId = TEXT("Test.PoolRiderTree");
+        Tree->Currency = EBreakerPointCurrency::CorePoints;
+        Tree->RequiredClass = EBreakerClassId::None;
+        Tree->Nodes.Add(Node);
+
+        UBreakerClassDefinition* Definition = NewObject<UBreakerClassDefinition>();
+        Definition->BranchTrees.Add(Tree);
+        Progression->ClassDefinition = Definition;
+
+        FBreakerProgressionState State;
+        State.CoreNodeRanks.Add({NodeId, 1});
+        Progression->LoadProgressionState(State);
+        return Attacker;
     }
 }
 
@@ -201,6 +244,11 @@ bool FBreakerDamagePoolFillSourcePoolsTest::RunTest(const FString& Parameters)
 
     UBreakerAttributeSet* Attributes = PoolTestMakeAttributes();
     FBreakerAttributeContribution Offer;
+    // A Flat bid on the weapon lane only, so the two lanes' flat factors
+    // differ: the split must carry it as its OWN factor, never folded into
+    // the Increased percent.
+    const float WeaponFlat = 0.15f;
+    Offer.AddFlat(EBreakerAggregatedAttribute::DamageMultiplier, WeaponFlat);
     Offer.AddIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier, 60.0f);
     Offer.AddIncreasedPercent(EBreakerAggregatedAttribute::AbilityDamageMultiplier, 20.0f);
     Offer.AddSharedIncreasedDamage(10.0f);
@@ -219,16 +267,29 @@ bool FBreakerDamagePoolFillSourcePoolsTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("The two lanes are genuinely different numbers"),
         !FMath::IsNearlyEqual(WeaponHit.SourceDamageMultiplier, AbilityHit.SourceDamageMultiplier, 0.001f));
 
-    // Both requests carry the split, and both recompose exactly. Ability
-    // submissions never carried one before this pass, which is why they could
-    // not take target-side riders at all.
+    // Both requests carry the split, and both recompose exactly through the
+    // three-factor identity the request states.
     for (const FBreakerDamageRequest& Request : {WeaponHit, AbilityHit})
     {
         TestTrue(TEXT("The request carries the source split"), Request.bHasSourceSplit);
         TestEqual(TEXT("The split recomposes to the composed multiplier"),
-            (1.0f + Request.SourceIncreasedPercent / 100.0f) * Request.SourceMoreProduct,
+            Request.SourceFlatFactor * (1.0f + Request.SourceIncreasedPercent / 100.0f) * Request.SourceMoreProduct,
             Request.SourceDamageMultiplier, 0.001f);
     }
+    // The flat layer is its own factor. The weapon lane carries base 1 plus
+    // the flat bid; the ability lane, which nothing bid Flat on, carries
+    // exactly 1. Neither lane's Increased percent contains the flat — the
+    // weapon lane reads 60 + 10 and nothing more.
+    TestEqual(TEXT("The weapon split carries 1 + f as its flat factor"),
+        WeaponHit.SourceFlatFactor, 1.0f + WeaponFlat, 0.0001f);
+    TestEqual(TEXT("The ability split carries a flat factor of exactly 1"),
+        AbilityHit.SourceFlatFactor, 1.0f, 0.0001f);
+    TestEqual(TEXT("The weapon split's Increased percent is the Increased sum alone (60 + 10)"),
+        WeaponHit.SourceIncreasedPercent, 70.0f, 0.001f);
+    TestEqual(TEXT("The ability split's Increased percent is its own sum (20 + 10)"),
+        AbilityHit.SourceIncreasedPercent, 30.0f, 0.001f);
+    TestEqual(TEXT("The weapon split's More product is the lane's clamped product"),
+        WeaponHit.SourceMoreProduct, 1.30f, 0.0001f);
     TestEqual(TEXT("The weapon request records its delivery"),
         static_cast<int32>(WeaponHit.Delivery), static_cast<int32>(EBreakerDamageDelivery::Weapon));
     TestEqual(TEXT("The ability request records its delivery"),
@@ -239,6 +300,7 @@ bool FBreakerDamagePoolFillSourcePoolsTest::RunTest(const FString& Parameters)
     FBreakerDamageRequest Hazard;
     UBreakerDamageLibrary::FillSourcePools(nullptr, EBreakerDamageDelivery::Weapon, Hazard);
     TestEqual(TEXT("No attribute set composes to the identity"), Hazard.SourceDamageMultiplier, 1.0f, 0.0001f);
+    TestEqual(TEXT("No attribute set carries a flat factor of 1"), Hazard.SourceFlatFactor, 1.0f, 0.0001f);
     TestFalse(TEXT("No attribute set carries no split"), Hazard.bHasSourceSplit);
 
     return true;
@@ -302,6 +364,50 @@ bool FBreakerDamagePoolFlatOrderTest::RunTest(const FString& Parameters)
         Result.RawDamage, (Base + Base * Flat) * (1.0f + Increased / 100.0f) * More, 0.01f);
     TestTrue(TEXT("RawDamage is not Base(1 + f + i/100)m"),
         !FMath::IsNearlyEqual(Result.RawDamage, Base * Defect, 0.05f));
+
+    // The same Offer, hit through ReceiveDamage from an attacker carrying a
+    // target-conditional Increased rider. The rider joins the ONE additive
+    // bucket, so the flat layer scales it: (1 + f)(1 + (i + R)/100) m. The
+    // shape that folds the flat into the Increased term and then adds the
+    // rider beside it, ((1 + f)(1 + i/100) + R/100) m, scales the rider by
+    // nothing and is the number that must not appear.
+    //
+    // TargetAtCloseRange: both bare actors sit at the origin, so the
+    // condition is satisfied through the real target-state read.
+    {
+        const float RiderPercent = 30.0f;   // O2 PLACEHOLDER
+        AActor* Attacker = PoolTestMakeRiderAttacker(TEXT("Test.PoolRider.CloseRange"),
+            EBreakerBuildCondition::TargetAtCloseRange, RiderPercent);
+        const UBreakerProgressionComponent* Progression = Attacker->FindComponentByClass<UBreakerProgressionComponent>();
+        TestNotNull(TEXT("The rider attacker owns a progression component"), Progression);
+        if (Progression)
+        {
+            TestEqual(TEXT("The rider attacker publishes exactly one rider row"),
+                Progression->GetTargetConditionRiders().Num(), 1);
+        }
+
+        AActor* VictimOwner = NewObject<AActor>();
+        UBreakerCombatComponent* VictimCombat = NewObject<UBreakerCombatComponent>(VictimOwner);
+        UBreakerAttributeSet* VictimAttributes = NewObject<UBreakerAttributeSet>();
+        VictimCombat->BindAttributes(VictimAttributes);
+
+        FBreakerDamageRequest RiderHit;
+        RiderHit.BaseDamage = Base;
+        RiderHit.DamageFamily = EBreakerDamageFamily::TrueDamage;
+        RiderHit.bCanCritical = false;
+        RiderHit.SetInstigator(Attacker);
+        UBreakerDamageLibrary::FillSourcePools(Attributes, EBreakerDamageDelivery::Weapon, RiderHit);
+        const FBreakerDamageResult RiderResult = VictimCombat->ReceiveDamage(RiderHit);
+
+        const float LawfulWithRider = Base * (1.0f + Flat) * (1.0f + (Increased + RiderPercent) / 100.0f) * More;
+        const float DefectWithRider = Base * ((1.0f + Flat) * (1.0f + Increased / 100.0f) + RiderPercent / 100.0f) * More;
+        TestTrue(TEXT("The rider fixture separates the law from the defect"),
+            !FMath::IsNearlyEqual(LawfulWithRider, DefectWithRider, 0.5f));
+        TestEqual(TEXT("A target rider is scaled by the flat layer: Base(1 + f)(1 + (i + R)/100)m"),
+            RiderResult.RawDamage, LawfulWithRider, 0.01f);
+        TestTrue(TEXT("A target rider is not added beside a folded flat: not Base((1 + f)(1 + i/100) + R/100)m"),
+            !FMath::IsNearlyEqual(RiderResult.RawDamage, DefectWithRider, 0.05f));
+    }
 
     // SHIPPED CONFIGURATION: the one gear line that bids Flat.
     const TArray<FBreakerAffixDefinition>& Pool = UBreakerAffixLibrary::GetSliceAffixPool();

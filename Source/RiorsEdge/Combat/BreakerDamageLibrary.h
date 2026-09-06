@@ -83,15 +83,17 @@ public:
     // fields itself; that is the difference between one rule and thirteen
     // copies of it, and the conformance scan enforces it.
     //
-    // Each lane's Increased sum is recovered by dividing the composed attribute
-    // by that lane's own post-clamp More product. The aggregator's fold is
-    // (Base + Flat) x (1 + Increased/100) x prod(More), so the division is
-    // exact — the same recovery UBreakerCombatComponent::ComposeDotSourcePower
-    // already performs for the tick path.
+    // The lane's three factors are read from the aggregator's own getters —
+    // ComposedFlatFactor, ComposedIncreasedPercent, ComposedMoreProduct — never
+    // recovered by division from the composed value. Compose is written as the
+    // product of those same three, so the request's split and its composed
+    // multiplier are one number in three parts and a flat bid on the lane
+    // (Added Damage) stays a flat factor instead of leaking into the
+    // Increased term the target-side rider adds to.
     //
     // A null attribute set (an enemy, a hazard, a bare test rig) leaves the
-    // request at the identity: multiplier 1.0, no split, delivery unchanged
-    // except as named.
+    // request at the identity: multiplier 1.0, flat factor 1.0, no split,
+    // delivery unchanged except as named.
     static void FillSourcePools(const class UBreakerAttributeSet* SourceAttributes,
         EBreakerDamageDelivery Delivery, FBreakerDamageRequest& Request);
 

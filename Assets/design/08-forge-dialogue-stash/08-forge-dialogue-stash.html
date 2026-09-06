@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:wght@400;600&family=Sometype+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0E1103;min-height:100%;color:#EDEBE3;font-family:'Source Sans 3',sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#B8B6AC}a:hover{color:#EDEBE3}
+</style>
+</helmet>
+<div style="display:flex;flex-direction:column;gap:64px;padding:64px">
+
+<sc-for list="{{ forgeViews }}" as="fv" hint-placeholder-count="3">
+<div style="display:flex;flex-direction:column;gap:16px" data-screen-label="{{ fv.label }}">
+  <div style="display:flex;align-items:baseline;gap:24px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">{{ fv.label }}</span><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">{{ fv.sub }}</span></div>
+  <div style="position:relative;width:1920px;height:1080px;overflow:hidden;background:#2A2118;border:1px solid #454840">
+    <div style="position:absolute;left:0;top:0;width:1920px;height:640px;background:#3B2E22"></div>
+    <div style="position:absolute;left:0;top:640px;width:1920px;height:440px;background:#2A2118"></div>
+    <div style="position:absolute;left:480px;top:560px;width:960px;height:120px;background:#4A3A2A;border:1px solid #5C4A38"></div>
+    <div style="position:absolute;left:720px;top:560px;width:480px;height:120px;background:#7A4418"></div>
+    <div style="position:absolute;left:640px;top:520px;width:640px;height:40px;background:#5E3A20"></div>
+    <div style="position:absolute;left:480px;top:690px;width:960px;text-align:center;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">FORGE BENCH · WARM KEY FROM ABOVE · ORANGE SPILL UNDER THE WORK · PLACEHOLDER</div>
+    <div style="position:absolute;left:800px;top:400px;width:320px;height:160px;background:#6B5A48;border:1px solid {{ fv.itemBorder }};display:flex;align-items:center;justify-content:center;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#5C5C52">ITEM · PHYSICAL · {{ fv.itemState }}</div>
+    <sc-if value="{{ fv.beam }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;left:958px;top:200px;width:4px;height:200px;background:#2FB8A6"></div></sc-if>
+    <div style="position:absolute;left:0;top:0;width:1920px;height:88px;background:#241105;border-bottom:1px solid #454840;display:flex;align-items:center;padding:0 40px;box-sizing:border-box;gap:40px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase;letter-spacing:0.02em">Forge</div>
+      <div style="display:flex;gap:8px">
+        <sc-for list="{{ fv.tabs }}" as="t" hint-placeholder-count="3"><div style="height:44px;padding:0 24px;display:flex;align-items:center;background:{{ t.bg }};border:{{ t.border }};border-top:2px solid {{ t.rail }};border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.04em;color:{{ t.ink }}">{{ t.label }}</div></sc-for>
+      </div>
+      <div style="flex:1"></div>
+      <div style="display:flex;align-items:center;gap:12px;height:44px;padding:0 16px;background:#362213;border:1px solid #454840;border-radius:2px"><div style="width:12px;height:12px;background:#E6B33A;transform:rotate(45deg)"></div><span style="font-family:'Sometype Mono',monospace;font-weight:700;font-size:24px;line-height:24px">4,860</span><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">SHARDS</span></div>
+      <div style="height:44px;padding:0 24px;display:flex;align-items:center;background:#362213;border:1px solid #454840;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.04em;color:#B8B6AC">Leave</div>
+    </div>
+    <div style="position:absolute;left:40px;top:128px;width:400px;background:#241105;border:1px solid #454840;border-left:4px solid #E3DFD2;box-sizing:border-box;padding:16px;display:flex;flex-direction:column;gap:12px">
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">ON THE BENCH</div>
+      <div style="display:flex;flex-direction:column;gap:4px"><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:24px;line-height:28px;text-transform:uppercase;letter-spacing:0.02em">Warden Carbine</div><div style="display:flex;align-items:center;gap:8px"><div style="display:flex;gap:2px"><div style="width:8px;height:8px;background:#B8B6AC"></div><div style="width:8px;height:8px;background:#B8B6AC"></div><div style="width:8px;height:8px;background:#B8B6AC"></div><div style="width:8px;height:8px;border:1px solid #5C6056;box-sizing:border-box"></div><div style="width:8px;height:8px;border:1px solid #5C6056;box-sizing:border-box"></div></div><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">EXCEPTIONAL · PRIMARY</span></div></div>
+      <div style="height:1px;background:#454840"></div>
+      <sc-for list="{{ fv.affixes }}" as="a" hint-placeholder-count="4">
+        <div style="display:grid;grid-template-columns:32px minmax(0,1fr) auto;gap:8px;align-items:center;font-size:14px;line-height:20px"><div style="height:20px;display:flex;align-items:center;justify-content:center;font-family:'Sometype Mono',monospace;font-size:11px;background:{{ a.badgeBg }};border:1px solid {{ a.badgeBd }};color:{{ a.badgeInk }}">{{ a.tier }}</div><span style="color:{{ a.ink }}">{{ a.text }}</span><span style="font-family:'Sometype Mono',monospace;font-weight:500;font-size:14px;color:{{ a.valInk }}">{{ a.val }}</span></div>
+      </sc-for>
+    </div>
+    <div style="position:absolute;left:1480px;top:128px;width:400px;background:#241105;border:1px solid #454840;box-sizing:border-box;padding:16px;display:flex;flex-direction:column;gap:12px">
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">{{ fv.verbMicro }}</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:32px;line-height:32px;text-transform:uppercase;letter-spacing:0.02em">{{ fv.verb }}</div>
+      <div style="font-size:16px;line-height:24px;color:#EDEBE3;text-wrap:pretty">{{ fv.verbLine }}</div>
+      <div style="height:1px;background:#454840"></div>
+      <sc-for list="{{ fv.steps }}" as="s" hint-placeholder-count="3">
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;font-size:14px;line-height:20px;color:#B8B6AC"><span>{{ s.k }}</span><span style="font-family:'Sometype Mono',monospace;font-weight:500;font-size:16px;color:#EDEBE3">{{ s.v }}</span></div>
+      </sc-for>
+      <sc-if value="{{ fv.picker }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <sc-for list="{{ fv.pick }}" as="p" hint-placeholder-count="3"><div style="height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 {{ p.pad }}px;box-sizing:border-box;background:{{ p.bg }};border:{{ p.border }};border-radius:2px;font-size:14px;color:{{ p.ink }}"><span>{{ p.text }}</span><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">{{ p.meta }}</span></div></sc-for>
+        </div>
+      </sc-if>
+      <div style="height:1px;background:#454840"></div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">COST</span><span style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;background:#E6B33A;transform:rotate(45deg);display:inline-block"></span><span style="font-family:'Sometype Mono',monospace;font-weight:700;font-size:24px;line-height:24px">{{ fv.cost }}</span></span></div>
+      <div style="height:56px;display:flex;align-items:center;justify-content:center;background:{{ fv.btnBg }};border:{{ fv.btnBorder }};border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:24px;text-transform:uppercase;letter-spacing:0.04em;color:{{ fv.btnInk }}">{{ fv.btn }}</div>
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80;text-align:center">HOLD 600 MS · PAD: HOLD A</div>
+    </div>
+    <div style="position:absolute;left:40px;bottom:40px;display:flex;gap:24px;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80"><span><span style="color:#B8B6AC">Q / E</span> VERB</span><span><span style="color:#B8B6AC">TAB</span> CHANGE ITEM</span><span><span style="color:#B8B6AC">ESC</span> LEAVE</span></div>
+  </div>
+  <div style="font-size:14px;line-height:20px;color:#B8B6AC;max-width:1920px;text-wrap:pretty">{{ fv.note }}</div>
+</div>
+</sc-for>
+
+<div style="display:flex;flex-direction:column;gap:16px" data-screen-label="Dialogue">
+  <div style="display:flex;align-items:baseline;gap:24px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">Dialogue · Anchor NPCs</span><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">THE SPEAKER STAYS IN FRAME · ONE PLATE, LOWER LEFT · CHOICES ARE THE CONTROL</span></div>
+  <div style="position:relative;width:1920px;height:1080px;overflow:hidden;background:#4E5240;border:1px solid #454840">
+    <div style="position:absolute;left:0;top:0;width:1920px;height:720px;background:#9AA39B"></div>
+    <div style="position:absolute;left:0;top:720px;width:1920px;height:360px;background:#4E5240"></div>
+    <div style="position:absolute;left:1100px;top:160px;width:240px;height:720px;background:#5A5647;border:1px solid #454840"></div>
+    <div style="position:absolute;left:1100px;top:900px;width:240px;text-align:center;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#2A2C27">NPC · QUARTERMASTER OKONJO · ANCHOR DAYLIGHT · PLACEHOLDER</div>
+    <div style="position:absolute;left:944px;top:80px;width:32px;height:32px;box-sizing:border-box;border:2px solid #E3DFD2;transform:translateX(-50%)"></div>
+    <div style="position:absolute;left:40px;top:568px;width:800px;background:#0C1B09;border:1px solid #454840;border-left:4px solid #E3DFD2;box-sizing:border-box;padding:24px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;align-items:baseline;gap:16px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:24px;line-height:24px;text-transform:uppercase;letter-spacing:0.02em">Okonjo</span><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">QUARTERMASTER · FERNHALL YARD</span></div>
+      <div style="font-size:20px;line-height:28px;color:#EDEBE3;text-wrap:pretty">Second slot's still open on that harness. I can issue you a Dash or a Cleanse. Neither one's coming back once it's bolted in.</div>
+      <div style="height:1px;background:#454840"></div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <sc-for list="{{ choices }}" as="c" hint-placeholder-count="3">
+          <div style="min-height:56px;display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:center;gap:16px;padding:0 {{ c.pad }}px;box-sizing:border-box;background:{{ c.bg }};border:{{ c.border }};border-left:{{ c.rail }};border-radius:2px">
+            <div style="font-family:'Sometype Mono',monospace;font-weight:700;font-size:16px;color:{{ c.ink }}">{{ c.n }}</div>
+            <div style="font-size:16px;line-height:22px;color:{{ c.ink }};padding:8px 0;text-wrap:pretty">{{ c.text }}</div>
+            <div style="display:flex;align-items:center;gap:8px"><sc-if value="{{ c.verb }}" hint-placeholder-val="{{ false }}"><div style="width:12px;height:12px;background:{{ c.verb }}"></div></sc-if><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">{{ c.meta }}</span></div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="position:absolute;left:40px;bottom:40px;display:flex;gap:24px;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80"><span><span style="color:#B8B6AC">1 – 3</span> CHOOSE</span><span><span style="color:#B8B6AC">F</span> HOLD TO STEP AWAY</span></div>
+    <div style="position:absolute;left:1480px;top:128px;width:400px;display:flex;flex-direction:column;gap:8px">
+      <sc-for list="{{ npcs }}" as="n" hint-placeholder-count="3"><div style="height:56px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;padding:0 16px;box-sizing:border-box;background:#0C1B09;border:1px solid #454840;border-left:4px solid {{ n.rail }};border-radius:2px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.02em;color:{{ n.ink }}">{{ n.name }}</span><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">{{ n.role }}</span></div></sc-for>
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#5C5C52;padding:0 16px">SHEET REFERENCE ONLY · NOT ON SCREEN</div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;width:1920px;font-size:14px;line-height:20px;color:#B8B6AC;text-wrap:pretty">
+    <div><span style="color:#EDEBE3;font-weight:600">A plate in the world.</span> The camera stays first-person; the NPC stands where they stand and the plate sits lower-left at (40, 568), 800 wide, bg-1 with a 4 px sys-full identity rail; the speaker keeps the frame's right two-thirds. No letterbox, no portrait, no shaded box across the bottom. A 32 px hollow square over the speaker's head is the only world mark. Speaker name display 700 24; role in numeric 13; line body 20/28, max four lines, then a page.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Choices are the control.</span> Numbered 1–3 in numeric 700 16, 56 px minimum rows, sys ladder from stage 5; focus = border-high + panel-1 + 4 px rail. A choice that commits (issues an ability, spends shards) carries its verb-colour 12 px square and a meta term; a plain reply carries none. Never a "goodbye" line: F held 600 ms steps away and the plate slides out along its rail axis, 16 px left, 120 ms. In 160 ms.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Three NPCs.</span> Okonjo (quartermaster: abilities, issue gear) rail sys; Vesna (forgemaster: opens the Forge) rail weapon-orange; Hale (rift warden: rift select, doctrine) rail text-2 with a teal name only when a rift is live in the line, per stage 3's boss-only rule extended to rift objects. Deleted: visual-novel box with portrait, typewriter text, cyan speaker tag, "Continue…" button.</div>
+  </div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:16px" data-screen-label="Stash">
+  <div style="display:flex;align-items:baseline;gap:24px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">Stash · 70 cells</span><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">ACCOUNT-WIDE · ANCHOR ONLY · BACKPACK ALONGSIDE FOR TRANSFER</span></div>
+  <div style="position:relative;width:1920px;height:1080px;overflow:hidden;background:#1F210A;border:1px solid #454840">
+    <div style="position:absolute;left:0;top:0;width:1920px;height:640px;background:#3E413E"></div>
+    <div style="position:absolute;left:0;top:640px;width:1920px;height:440px;background:#1F210A"></div>
+    <div style="position:absolute;left:1240px;top:560px;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#5C5C52">WORLD · ANCHOR · 40% VALUE · PLACEHOLDER</div>
+    <div style="position:absolute;left:0;top:0;width:1920px;height:88px;background:#1F1503;border-bottom:1px solid #454840;display:flex;align-items:center;padding:0 40px;box-sizing:border-box;gap:40px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase;letter-spacing:0.02em">Stash</div>
+      <div style="display:flex;gap:8px">
+        <div style="height:44px;padding:0 24px;display:flex;align-items:center;background:#302613;border:1px solid #454840;border-top:2px solid #E3DFD2;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.04em">All</div>
+        <sc-for list="{{ stashTabs }}" as="t" hint-placeholder-count="3"><div style="height:44px;padding:0 24px;display:flex;align-items:center;background:#302613;border:1px solid #454840;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.04em;color:#B8B6AC">{{ t }}</div></sc-for>
+      </div>
+      <div style="flex:1"></div>
+      <div style="display:flex;align-items:center;gap:12px;height:44px;padding:0 16px;background:#302613;border:1px solid #454840;border-radius:2px"><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">STASH</span><span style="font-family:'Sometype Mono',monospace;font-weight:700;font-size:24px;line-height:24px">47</span><span style="font-family:'Sometype Mono',monospace;font-size:16px;color:#B8B6AC">/ 70</span></div>
+      <div style="height:44px;padding:0 24px;display:flex;align-items:center;background:#302613;border:1px solid #454840;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.04em;color:#B8B6AC">Close</div>
+    </div>
+    <div style="position:absolute;left:40px;top:128px;display:flex;flex-direction:column;gap:8px">
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80;height:24px;display:flex;align-items:center">STASH · ACCOUNT · 10 × 7</div>
+      <div style="display:grid;grid-template-columns:repeat(10,112px);grid-auto-rows:112px;gap:4px">
+        <sc-for list="{{ stashCells }}" as="c" hint-placeholder-count="70"><div style="position:relative;box-sizing:border-box;background:{{ c.bg }};border:{{ c.border }};border-radius:2px;padding:8px;display:flex;flex-direction:column;justify-content:space-between"><sc-if value="{{ c.filled }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:2px"><sc-for list="{{ c.tally }}" as="t" hint-placeholder-count="5"><div style="width:6px;height:6px;background:{{ t.bg }};border:1px solid {{ t.bd }};box-sizing:border-box"></div></sc-for></div><div style="width:48px;height:48px;border:1px dashed #454840;box-sizing:border-box;align-self:center"></div><div style="font-family:'Sometype Mono',monospace;font-size:11px;letter-spacing:0.06em;color:#8E8D80">{{ c.slot }}</div></sc-if><sc-if value="{{ c.legend }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;right:8px;top:8px;width:10px;height:10px;background:#E6B33A;transform:rotate(45deg)"></div></sc-if></div></sc-for>
+      </div>
+    </div>
+    <div style="position:absolute;left:1240px;top:128px;display:flex;flex-direction:column;gap:8px">
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80;height:24px;display:flex;align-items:center">BACKPACK · KESS · 5 × 5</div>
+      <div style="display:grid;grid-template-columns:repeat(5,120px);grid-auto-rows:96px;gap:4px">
+        <sc-for list="{{ packCells }}" as="c" hint-placeholder-count="25"><div style="box-sizing:border-box;background:{{ c.bg }};border:{{ c.border }};border-radius:2px;padding:8px;display:flex;flex-direction:column;justify-content:space-between"><sc-if value="{{ c.filled }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:2px"><sc-for list="{{ c.tally }}" as="t" hint-placeholder-count="5"><div style="width:6px;height:6px;background:{{ t.bg }};border:1px solid {{ t.bd }};box-sizing:border-box"></div></sc-for></div><div style="font-family:'Sometype Mono',monospace;font-size:11px;letter-spacing:0.06em;color:#8E8D80">{{ c.slot }}</div></sc-if></div></sc-for>
+      </div>
+      <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;width:616px">
+        <div style="height:56px;display:flex;align-items:center;justify-content:center;background:#E3DFD2;border:1px solid #E3DFD2;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:24px;text-transform:uppercase;letter-spacing:0.04em;color:#170E00">Move to stash</div>
+        <div style="height:56px;display:flex;align-items:center;justify-content:center;background:repeating-linear-gradient(135deg,#271D0A 0 6px,#302613 6px 8px);border:1px solid #454840;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:24px;text-transform:uppercase;letter-spacing:0.04em;color:#5C5C52">Take to backpack</div>
+        <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80;text-align:center">DRAG OR X · PAD: X MOVES THE FOCUSED ITEM ACROSS</div>
+      </div>
+    </div>
+    <div style="position:absolute;left:40px;bottom:40px;display:flex;gap:24px;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80"><span><span style="color:#B8B6AC">R</span> SORT BY SLOT</span><span><span style="color:#B8B6AC">TAB</span> SIDE</span><span><span style="color:#B8B6AC">ESC</span> CLOSE</span></div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;width:1920px;font-size:14px;line-height:20px;color:#B8B6AC;text-wrap:pretty">
+    <div><span style="color:#EDEBE3;font-weight:600">Tint and world.</span> Stash panels are ochre (hue 85, chroma 0.04: bg-1 #1F1503, panel-0 #302613, panel-1 #392F1C); the Forge is clay (hue 45: panel-0 #362213, panel-1 #402B1C); dialogue is moss (hue 140: panel-0 #1C2C18, panel-1 #253521). Text, rails, accents unchanged. The Anchor scene shows at 40% value behind the stash modal. <span style="color:#EDEBE3;font-weight:600">Two grids, one modal.</span> Stash 10 × 7 at 112 px cells (1156 wide) left; the breaker's 5 × 5 backpack right at 120 × 96 so both fit 1080 with the item card floating over the focused cell (stage 5 card, unchanged). Cells: bg-1, 1 px border-low; filled cells carry the 5-cell rarity tally top-left, 48 px icon slot, slot word in numeric 11; Legendary carries the gold diamond top-right. Focused cell border-high + panel-1.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Rules.</span> Account-wide: every breaker sees the same 70; the counter is the honest one, 47 / 70. Anchor only: the Stash tab is painted (hatched, text-3) anywhere else, never hidden. Transfer is a move, not a copy; the target grid's first empty cell takes the item and the cell fills on frame one. Take to backpack is painted while the backpack is at 25. Sort by slot is the only sort; no filter for rarity, since the tally already reads at a glance.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Placed here, not in stage 5.</span> The stash is an Anchor room service like the Forge, so it lives on this sheet with the other Anchor screens; the inventory sheet's grid rules apply unchanged. Deleted from the current build: the shared "BANKED" list with a scroll bar; cyan rarity borders; a per-tab counter; a SORT dropdown.</div>
+  </div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const SYS='#E3DFD2',T2='#B8B6AC',BL='#454840',BM='#5C6056',BH='#8A8F84',P0='#362213',P1='#402B1C',MP0='#1C2C18',MP1='#253521',OP1='#392F1C',OB1='#1F1503',GOLD='#E6B33A',ORG='#E8842B',HATCH='repeating-linear-gradient(135deg,#1D2010 0 6px,#262918 6px 8px)';
+    const tabs=(on)=>['Temper','Reforge','Attune'].map((label,i)=>({label,bg:P0,border:'1px solid '+BL,rail:i===on?SYS:'transparent',ink:i===on?'#EDEBE3':T2}));
+    const af=(tier,text,val,hot)=>({tier,text,val,badgeBg:hot?SYS:'transparent',badgeBd:hot?SYS:BM,badgeInk:hot?'#0E1103':T2,ink:hot?'#EDEBE3':T2,valInk:hot?'#EDEBE3':T2});
+    const affixes=[af('T3','Reload speed','+18%'),af('T2','Magazine','+6'),af('T4','Damage to Warded','+22%'),af('T2','Critical chance','+4.1%')];
+    const pickRow=(text,meta,f)=>({text,meta,bg:f?P1:P0,border:f?'2px solid '+BH:'1px solid '+BL,pad:f?15:16,ink:'#EDEBE3'});
+    const forgeViews=[
+      {label:'Forge · Temper',sub:'RAISE ONE AFFIX TIER · THE ITEM HEATS ON THE BENCH · COST IN SHARDS',tabs:tabs(0),itemBorder:ORG,itemState:'HEATED · T3 → T4 ON RELEASE',beam:false,
+        affixes:[af('T3','Reload speed','+18%',true),af('T2','Magazine','+6'),af('T4','Damage to Warded','+22%'),af('T2','Critical chance','+4.1%')],
+        verbMicro:'TEMPER · PICK AN AFFIX ON THE CARD',verb:'Temper',verbLine:'Raise Reload speed from T3 to T4. The value rerolls inside the new tier. Nothing else on the item changes.',
+        steps:[{k:'Now',v:'T3 · +18%'},{k:'After',v:'T4 · 20–24%'},{k:'Tempers left on this item',v:'2 of 3'}],picker:false,pick:[],cost:'420',btn:'Hold to temper',btnBg:GOLD,btnBorder:'1px solid '+GOLD,btnInk:'#0E1103',
+        note:'The room: the bench and the carbine are the scene; the camera locks on the work and the two plates sit off it. Left plate (40, 128, 400 wide, sys identity rail) is the stage 5 item card, live; the affix you are working is the only highlighted row, and the item on the bench takes a weapon-orange border while heated. Right plate (1480, 128, 400 wide) is the verb: what changes, the before/after in numeric 16, the cost in shards beside the gold diamond that is the one currency everywhere, and a hold-to-commit control (600 ms, fill left-to-right in gold, snaps on frame one when complete). Header carries the three verbs as tabs with the active 2 px sys top rail and the shard balance. Q/E cycle the verb; Tab cycles the items on the bench.'},
+      {label:'Forge · Reforge',sub:'REROLL ONE AFFIX · THE OLD LINE STRIKES, THE NEW ONE INKS IN · TIER KEPT',tabs:tabs(1),itemBorder:ORG,itemState:'STRUCK · LINE 4 REROLLING',beam:false,
+        affixes:[af('T3','Reload speed','+18%'),af('T2','Magazine','+6'),af('T4','Damage to Warded','+22%'),{tier:'T2',text:'Critical chance',val:'+4.1%',badgeBg:'transparent',badgeBd:BM,badgeInk:T2,ink:'#5C5C52',valInk:'#5C5C52'}],
+        verbMicro:'REFORGE · PICK THE LINE TO STRIKE',verb:'Reforge',verbLine:'Strike Critical chance and draw a new suffix of the same tier from the Boots-legal pool. The pool is shown; the draw is not.',
+        steps:[{k:'Struck',v:'T2 · Critical chance'},{k:'Draws from',v:'T2 suffix pool · 6'}],picker:true,pick:[pickRow('Critical chance','T2 · STRUCK',true),pickRow('Magazine','T2'),pickRow('Reload speed','T3')],cost:'960',btn:'Hold to reforge',btnBg:GOLD,btnBorder:'1px solid '+GOLD,btnInk:'#0E1103',
+        note:'Same room, second verb. The struck line paints text-3 on the card (never fades) and the picker on the right lists the legal lines; the item on the bench takes the orange border while the line is struck. The result is not previewed: the pool size is stated so the odds are honest without a table. Motion on commit: the struck line slides 16 px left and out in 80 ms, the new line slides in from the rail in 160 ms and inks. Signatures on a Legendary and REWRITE lines on Aberrant/Unwritten are not reforgeable; they show in the picker painted.'},
+      {label:'Forge · Attune',sub:'BIND THE ITEM TO A RIFT · THE ONE PLACE TEAL TOUCHES THE FORGE',tabs:tabs(2),itemBorder:'#2FB8A6',itemState:'ATTUNED · SUNKEN CARRIAGE',beam:true,
+        affixes,verbMicro:'ATTUNE · CHOOSE A RIFT',verb:'Attune',verbLine:'Bind the carbine to Sunken Carriage. Inside that rift its affixes count one tier higher. Attunement replaces any previous one.',
+        steps:[{k:'Currently',v:'Unattuned'},{k:'Rifts cleared',v:'3'}],picker:true,pick:[pickRow('Sunken Carriage','T4 · CLEARED',true),pickRow('Fernhall Deep','T3 · CLEARED'),pickRow('Glasswork','T5 · CLEARED')],cost:'1,500',btn:'Hold to attune',btnBg:GOLD,btnBorder:'1px solid '+GOLD,btnInk:'#0E1103',
+        note:'Attune binds to a rift object, so the item on the bench takes the teal border and a 4 px teal beam from above lands on it: this is rift-origin phenomenon, the one legal use of the band in the Forge. Teal is never on the tabs, the picker, the button or the cost. The picker lists cleared rifts only; uncleared are not listed, since the player cannot attune to a place they have not been. Cost is the highest of the three verbs and is stated, not inferred. Insufficient shards: the button paints (hatch, text-3), the shard balance in the header goes harm-red for 600 ms on the attempt, and nothing else moves.'}
+    ];
+    const ch=(n,text,meta,verb,f)=>({n,text,meta,verb,bg:f?MP1:MP0,border:f?'2px solid '+BH:'1px solid '+BL,rail:f?'4px solid '+SYS:(f===false?'1px solid '+BL:'1px solid '+BL),pad:f?13:16,ink:'#EDEBE3'});
+    const choices=[ch('1','Bolt in Dash.','ISSUE · SLOT 2','#6FC3E8',true),ch('2','Bolt in Cleanse.','ISSUE · SLOT 2','#6FC3E8',false),ch('3','Leave it open for now.','',null,false)];
+    const npcs=[{name:'Okonjo',role:'QUARTERMASTER',rail:SYS,ink:'#EDEBE3'},{name:'Vesna',role:'FORGEMASTER',rail:ORG,ink:'#EDEBE3'},{name:'Hale',role:'RIFT WARDEN',rail:T2,ink:'#EDEBE3'}];
+    const stashTabs=['Weapons','Armour','Materials'];
+    const slots=['PRIMARY','SECONDARY','HELM','CHEST','GLOVES','BOOTS','CHARM'];
+    const tally=(r)=>Array.from({length:5},(_,i)=>({bg:i<r?T2:'transparent',bd:i<r?T2:BM}));
+    const cell=(i,filled,focus)=>({filled,legend:filled&&i%17===3,tally:tally(1+(i*7)%5),slot:slots[i%7],bg:focus?OP1:OB1,border:focus?'2px solid '+BH:'1px solid '+BL});
+    const stashCells=Array.from({length:70},(_,i)=>cell(i,i<47,i===12));
+    const packCells=Array.from({length:25},(_,i)=>cell(i,i<19,false));
+    return {forgeViews,choices,npcs,stashTabs,stashCells,packCells};
+  }
+}
+</script>
+</body>
+</html>

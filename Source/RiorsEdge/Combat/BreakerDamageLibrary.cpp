@@ -22,6 +22,7 @@ void UBreakerDamageLibrary::FillSourcePools(const UBreakerAttributeSet* SourceAt
     if (!SourceAttributes)
     {
         Request.SourceDamageMultiplier = 1.0f;
+        Request.SourceFlatFactor = 1.0f;
         Request.SourceIncreasedPercent = 0.0f;
         Request.SourceMoreProduct = 1.0f;
         Request.bHasSourceSplit = false;
@@ -37,17 +38,18 @@ void UBreakerDamageLibrary::FillSourcePools(const UBreakerAttributeSet* SourceAt
         : SourceAttributes->GetDamageMultiplier();
 
     Request.SourceDamageMultiplier = Composed;
-    // The split, so the target side can recompose honestly: a conditional
-    // Increased rider joins the additive half without becoming a second
-    // More, and — since O141 — the game's ONE target-gated More rider
-    // (Collapse) lawfully multiplies the More half at the hit, spending
-    // headroom under the one O34 ceiling rather than a slot. The lane's
-    // share of the shared pool is already inside Composed, which is why the
-    // shared argument is zero here: recovering it separately would add it
-    // twice.
-    Request.SourceMoreProduct = FMath::Max(
-        SourceAttributes->GetAttributeAggregator().ComposedMoreProduct(Lane), UE_SMALL_NUMBER);
-    Request.SourceIncreasedPercent = (Composed / Request.SourceMoreProduct - 1.0f) * 100.0f;
+    // The split, read factor by factor from the aggregator that composed the
+    // attribute, so the target side can recompose honestly: a conditional
+    // Increased rider joins the additive term under the flat factor without
+    // becoming a second More, and — per O141 — the game's ONE target-gated
+    // More rider (Collapse) lawfully multiplies the More factor at the hit,
+    // spending headroom under the one O34 ceiling rather than a slot. The
+    // lane's share of the shared pool is already inside the Increased sum;
+    // nothing here adds it again.
+    const FBreakerAttributeAggregator& Aggregator = SourceAttributes->GetAttributeAggregator();
+    Request.SourceFlatFactor = Aggregator.ComposedFlatFactor(Lane);
+    Request.SourceIncreasedPercent = Aggregator.ComposedIncreasedPercent(Lane);
+    Request.SourceMoreProduct = FMath::Max(Aggregator.ComposedMoreProduct(Lane), UE_SMALL_NUMBER);
     Request.bHasSourceSplit = true;
 }
 

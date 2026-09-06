@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:wght@400;600&family=Sometype+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0E1103;min-height:100%;color:#EDEBE3;font-family:'Source Sans 3',sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#B8B6AC}a:hover{color:#EDEBE3}
+</style>
+</helmet>
+<div style="display:flex;flex-direction:column;gap:64px;padding:64px">
+
+<div style="display:flex;flex-direction:column;gap:16px" data-screen-label="Nameplates at 12 m">
+  <div style="display:flex;align-items:baseline;gap:24px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">Nameplates · 12 m</span><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">1920×1080 · SCALE 1.0 · STANDARD, ELITE, CHAMPION, BOSS</span></div>
+  <div style="position:relative;width:1920px;height:1080px;overflow:hidden;background:repeating-linear-gradient(135deg,#2A2C27 0 14px,#303229 14px 28px);border:1px solid #454840">
+    <div style="position:absolute;left:0;top:0;width:1920px;height:640px;background:#393D2B"></div>
+    <div style="position:absolute;left:0;top:640px;width:1920px;height:440px;background:#2F3221"></div>
+
+    <sc-for list="{{ near }}" as="e" hint-placeholder-count="4">
+      <div style="position:absolute;left:{{ e.x }}px;top:{{ e.y }}px;width:{{ e.w }}px;display:flex;flex-direction:column;align-items:center;gap:6px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <sc-for list="{{ e.mods }}" as="m" hint-placeholder-count="0">
+            <div style="position:relative;width:16px;height:16px;display:flex;align-items:center;justify-content:center"><div style="{{ m.style }}"></div></div>
+          </sc-for>
+        </div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:{{ e.nameSize }}px;line-height:1;text-transform:uppercase;letter-spacing:0.02em;color:{{ e.nameInk }}">{{ e.name }}</div>
+        <div style="position:relative;width:100%;height:{{ e.barH }}px;background:#151808;border:1px solid #5C6056;box-sizing:border-box">
+          <div style="position:absolute;left:0;top:0;height:100%;width:{{ e.chip }}%;background:repeating-linear-gradient(135deg,#5E1F18 0 4px,#D9402F 4px 6px)"></div>
+          <div style="position:absolute;left:0;top:0;height:100%;width:{{ e.hp }}%;background:#E3DFD2"></div>
+          <div style="position:absolute;left:0;top:0;height:100%;width:{{ e.shield }}%;border-top:2px solid #B8B6AC;box-sizing:border-box"></div>
+          <sc-if value="{{ e.champion }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;left:-14px;top:50%;width:10px;height:10px;background:#E3DFD2;transform:translateY(-50%) rotate(45deg)"></div>
+            <div style="position:absolute;right:-14px;top:50%;width:10px;height:10px;background:#E3DFD2;transform:translateY(-50%) rotate(45deg)"></div>
+          </sc-if>
+        </div>
+      </div>
+      <div style="position:absolute;left:{{ e.bx }}px;top:{{ e.by }}px;width:{{ e.bw }}px;height:{{ e.bh }}px;background:#1D2010;border:1px solid #454840"></div>
+      <sc-if value="{{ e.elite }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;left:{{ e.hx }}px;top:{{ e.hy }}px;width:{{ e.hw }}px;height:{{ e.hh }}px;border:2px solid #E3DFD2;border-radius:50%;box-sizing:border-box"></div>
+      </sc-if>
+    </sc-for>
+
+    <div style="position:absolute;left:1120px;top:120px;width:640px;display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:32px;line-height:32px;text-transform:uppercase;letter-spacing:0.02em;color:#6ADFC9">Warden of the carriage</div>
+        <div style="display:flex;gap:8px"><div style="width:16px;height:16px;position:relative"><div style="position:absolute;left:2px;top:2px;width:12px;height:12px;border:2px solid #E3DFD2;box-sizing:border-box"></div></div><div style="width:16px;height:16px;position:relative"><div style="position:absolute;left:7px;top:0;width:2px;height:16px;background:#E3DFD2"></div><div style="position:absolute;left:0;top:7px;width:16px;height:2px;background:#E3DFD2"></div></div></div>
+      </div>
+      <div style="position:relative;width:100%;height:24px;background:#151808;border:2px solid #5C6056;box-sizing:border-box">
+        <div style="position:absolute;left:0;top:0;height:100%;width:71%;background:repeating-linear-gradient(135deg,#5E1F18 0 4px,#D9402F 4px 6px)"></div>
+        <div style="position:absolute;left:0;top:0;height:100%;width:62%;background:#E3DFD2"></div>
+        <div style="position:absolute;left:33.3%;top:-6px;width:4px;height:32px;background:#0E1103"></div>
+        <div style="position:absolute;left:66.6%;top:-6px;width:4px;height:32px;background:#0E1103"></div>
+        <div style="position:absolute;left:33.3%;top:-6px;width:4px;height:32px;border-left:1px solid #E3DFD2;border-right:1px solid #E3DFD2;box-sizing:border-box"></div>
+        <div style="position:absolute;left:66.6%;top:-6px;width:4px;height:32px;border-left:1px solid #E3DFD2;border-right:1px solid #E3DFD2;box-sizing:border-box"></div>
+      </div>
+      <div style="display:flex;gap:4px"><div style="width:24px;height:6px;background:#B8B6AC"></div><div style="width:24px;height:6px;background:#E3DFD2"></div><div style="width:24px;height:6px;background:#454840"></div></div>
+    </div>
+    <div style="position:absolute;left:1240px;top:230px;width:400px;height:420px;background:#1D2010;border:1px solid #454840"></div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px;width:1920px;font-size:14px;line-height:20px;color:#B8B6AC;text-wrap:pretty">
+    <div><span style="color:#EDEBE3;font-weight:600">Standard.</span> Bar 96×6 on bg-1, 1 px border-mid, sys-full fill, harm chip hatch. Name display 600 16 in text-2 above. Sits 12 px over the head. No rank label: the base has no mark.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Elite.</span> Standard plate plus a halo disc under the body: 2 px sys-full ellipse, width = body width × 1.6. Read at the feet, not the bar; survives occlusion of the head.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Champion.</span> Bar 160×8 with two 10 px diamonds flanking it, 4 px off the ends. Name 20 in text-1. Shield reads as a 2 px text-2 top line over the fill.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Boss.</span> World-space bar 640×24 anchored above the body, 2 px border, three phase segments split by 4×32 bg-0 marks with 1 px sys-full edges. Phase pips 24×6 below: done text-2, current sys-full, upcoming border-low. Name display 700 32 in teal-2 (rift-origin). Modifier marks right of the name. No bar at the top of the screen.</div>
+  </div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:16px" data-screen-label="Nameplates at 35 m">
+  <div style="display:flex;align-items:baseline;gap:24px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">Nameplates · 35 m</span><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">1920×1080 · SCALE 0.5 FLOOR · NAMES DROP, MARKS AND SILHOUETTE STAY</span></div>
+  <div style="position:relative;width:1920px;height:1080px;overflow:hidden;background:repeating-linear-gradient(135deg,#2A2C27 0 14px,#303229 14px 28px);border:1px solid #454840">
+    <div style="position:absolute;left:0;top:0;width:1920px;height:640px;background:#393D2B"></div>
+    <div style="position:absolute;left:0;top:640px;width:1920px;height:440px;background:#2F3221"></div>
+
+    <sc-for list="{{ far }}" as="e" hint-placeholder-count="4">
+      <div style="position:absolute;left:{{ e.x }}px;top:{{ e.y }}px;width:{{ e.w }}px;display:flex;flex-direction:column;align-items:center;gap:4px">
+        <div style="display:flex;align-items:center;gap:4px">
+          <sc-for list="{{ e.mods }}" as="m" hint-placeholder-count="0">
+            <div style="position:relative;width:16px;height:16px;display:flex;align-items:center;justify-content:center;transform:scale(0.75)"><div style="{{ m.style }}"></div></div>
+          </sc-for>
+        </div>
+        <div style="position:relative;width:100%;height:{{ e.barH }}px;background:#151808;border:1px solid #5C6056;box-sizing:border-box">
+          <div style="position:absolute;left:0;top:0;height:100%;width:{{ e.hp }}%;background:#E3DFD2"></div>
+          <sc-if value="{{ e.champion }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;left:-10px;top:50%;width:6px;height:6px;background:#E3DFD2;transform:translateY(-50%) rotate(45deg)"></div>
+            <div style="position:absolute;right:-10px;top:50%;width:6px;height:6px;background:#E3DFD2;transform:translateY(-50%) rotate(45deg)"></div>
+          </sc-if>
+        </div>
+      </div>
+      <div style="position:absolute;left:{{ e.bx }}px;top:{{ e.by }}px;width:{{ e.bw }}px;height:{{ e.bh }}px;background:#1D2010;border:1px solid #454840"></div>
+      <sc-if value="{{ e.elite }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;left:{{ e.hx }}px;top:{{ e.hy }}px;width:{{ e.hw }}px;height:{{ e.hh }}px;border:2px solid #E3DFD2;border-radius:50%;box-sizing:border-box"></div>
+      </sc-if>
+    </sc-for>
+
+    <div style="position:absolute;left:1200px;top:380px;width:320px;display:flex;flex-direction:column;gap:4px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;line-height:20px;text-transform:uppercase;letter-spacing:0.02em;color:#6ADFC9">Warden of the carriage</div>
+      <div style="position:relative;width:100%;height:12px;background:#151808;border:2px solid #5C6056;box-sizing:border-box">
+        <div style="position:absolute;left:0;top:0;height:100%;width:62%;background:#E3DFD2"></div>
+        <div style="position:absolute;left:33.3%;top:-4px;width:4px;height:16px;background:#0E1103"></div>
+        <div style="position:absolute;left:66.6%;top:-4px;width:4px;height:16px;background:#0E1103"></div>
+      </div>
+      <div style="display:flex;gap:4px"><div style="width:16px;height:4px;background:#B8B6AC"></div><div style="width:16px;height:4px;background:#E3DFD2"></div><div style="width:16px;height:4px;background:#454840"></div></div>
+    </div>
+    <div style="position:absolute;left:1260px;top:430px;width:200px;height:210px;background:#1D2010;border:1px solid #454840"></div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px;width:1920px;font-size:14px;line-height:20px;color:#B8B6AC;text-wrap:pretty">
+    <div><span style="color:#EDEBE3;font-weight:600">Scale rule, in pixels.</span> Plates scale from 1.0 at ≤12 m to a 0.5 floor at ≥35 m. Floor: no plate under 5 px tall; fill height inside the borders never under 3 px; boss bar never under 12 px with its 2 px border. Marks stay 12 px at the floor, spacing 4 px.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">What drops.</span> Names on Standard, Elite and Champion leave at 20 m. Chip hatch and shield line leave at 25 m: the bar is one fill. Modifier marks stay, at 12 px.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Occlusion and draw distance.</span> Plates hide with the body: if the head is occluded the plate is gone. The boss bar and name draw through occlusion. Maximum draw distance 60 m. Beyond it Standard and Elite draw nothing; Champion draws a 4×4 sys-full contact dot at head height; the boss draws its bar at the 0.5 floor with no name.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Supersedes and deletes.</span> Health-band ticks are deleted in favour of the chip hatch; this supersedes the eight-band rule. The three boss phase marks stay, heavier and independent of health bands. Teal on a name is boss-only; every other name is text-2 (Champion at 20 px). Also deleted: ELITE / CHAMPION labels, band-state text, a screen-top boss bar, per-enemy numbers.</div>
+  </div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:16px;width:1920px" data-screen-label="Modifier marks">
+  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">Modifier marks · 16 px cell, sys-full, drawn</div>
+  <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px">
+    <sc-for list="{{ modList }}" as="m" hint-placeholder-count="10">
+      <div style="background:#393D2B;border:1px solid #454840;padding:16px;display:flex;align-items:center;gap:16px">
+        <div style="position:relative;width:48px;height:48px;flex:none;display:flex;align-items:center;justify-content:center;background:#151808;border:1px solid #454840"><div style="position:relative;width:16px;height:16px;display:flex;align-items:center;justify-content:center;transform:scale(2)"><div style="{{ m.style }}"></div></div></div>
+        <div style="font-family:'Sometype Mono',monospace;font-size:13px;line-height:18px;color:#B8B6AC"><span style="color:#EDEBE3">{{ m.name }}</span><br>{{ m.desc }}</div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="font-size:14px;line-height:20px;color:#B8B6AC;max-width:1200px;text-wrap:pretty">Marks sit in a row above the name, 8 px apart at scale 1.0 and 4 px at the 0.5 floor, left to right in the order applied. Active state (Warding Aura on, Phasing out, Reflective window open) is a 2 px sys-full underline 2 px below the cell, never a fill inversion, so no hollow shape can become another mark's filled shape. Audit at 12 px: Warded (hollow square) vs Wakeful (dot in square) differ by the dot; Splitting (two horizontal bars) vs Phasing (two vertical bars) differ by orientation; Aura is the only ring; Volatile the only filled diamond; Fleetfoot the only triangle; Anchored the only stem; Reflective the only open chevron; Cascading the only stepped mass. A stripped modifier leaves in 100 ms along the row axis. No mark is ever coloured. Reading order on an enemy: body geometry is a modifier's first tell, the plate mark its second; the halo disc is rank (Elite), never a modifier.</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const S='#E3DFD2';
+    const M={
+      warded:{name:'WARDED',desc:'hollow square · damage cap per hit',style:`width:12px;height:12px;border:2px solid ${S};box-sizing:border-box`},
+      volatile:{name:'VOLATILE',desc:'filled diamond · explodes on death',style:`width:10px;height:10px;background:${S};transform:rotate(45deg)`},
+      fleetfoot:{name:'FLEETFOOT',desc:'right-pointing triangle · fast',style:`width:0;height:0;border-top:7px solid transparent;border-bottom:7px solid transparent;border-left:12px solid ${S}`},
+      anchored:{name:'ANCHORED',desc:'bar on a stem (inverted T) · cannot be displaced',style:''},
+      splitting:{name:'SPLITTING',desc:'two stacked bars · splits on death',style:`width:12px;height:12px;border-top:3px solid ${S};border-bottom:3px solid ${S};box-sizing:border-box`},
+      aura:{name:'WARDING AURA',desc:'ring · shields nearby allies',style:`width:14px;height:14px;border:2px solid ${S};border-radius:50%;box-sizing:border-box`},
+      reflective:{name:'REFLECTIVE',desc:'chevron · returns a share of damage',style:`width:9px;height:9px;border-left:3px solid ${S};border-top:3px solid ${S};transform:rotate(45deg) translate(2px,2px)`},
+      phasing:{name:'PHASING',desc:'two vertical bars, 6 px gap · periodically untargetable',style:`width:12px;height:12px;background:linear-gradient(${S},${S}) 0 0/3px 12px no-repeat,linear-gradient(${S},${S}) 9px 0/3px 12px no-repeat`},
+      cascading:{name:'CASCADING',desc:'three ascending steps · chains effects',style:`width:12px;height:12px;background:linear-gradient(${S},${S}) 0 100%/4px 4px no-repeat,linear-gradient(${S},${S}) 4px 100%/4px 8px no-repeat,linear-gradient(${S},${S}) 8px 100%/4px 12px no-repeat`},
+      wakeful:{name:'WAKEFUL',desc:'dot in a square · never surprised, no weak point from behind',style:`width:12px;height:12px;border:2px solid ${S};box-sizing:border-box;background:radial-gradient(circle,${S} 0 2px,transparent 2.5px)`}
+    };
+    M.anchored.style=`width:12px;height:12px;background:linear-gradient(${S},${S}) 0 100%/12px 3px no-repeat,linear-gradient(${S},${S}) 5px 0/2px 12px no-repeat`;
+    const modList=Object.values(M);
+    const near=[
+      {name:'Husk',nameSize:16,nameInk:'#B8B6AC',x:412,y:378,w:96,barH:6,hp:72,chip:90,shield:0,mods:[],bx:432,by:410,bw:56,bh:150,elite:false,champion:false},
+      {name:'Husk · warded',nameSize:16,nameInk:'#B8B6AC',x:642,y:320,w:96,barH:6,hp:100,chip:100,shield:40,mods:[M.warded,M.fleetfoot],bx:660,by:360,bw:60,bh:200,elite:true,champion:false,hx:626,hy:548,hw:128,hh:28},
+      {name:'Ironback',nameSize:20,nameInk:'#B8B6AC',x:900,y:300,w:160,barH:8,hp:45,chip:70,shield:60,mods:[M.volatile,M.reflective,M.aura],bx:940,by:350,bw:80,bh:230,elite:false,champion:true}
+    ];
+    const far=[
+      {x:236,y:512,w:48,barH:5,hp:72,mods:[],bx:246,by:526,bw:28,bh:75,elite:false,champion:false},
+      {x:356,y:500,w:48,barH:5,hp:100,mods:[M.warded,M.fleetfoot],bx:365,by:518,bw:30,bh:100,elite:true,champion:false,hx:348,hy:611,hw:64,hh:14},
+      {x:500,y:496,w:80,barH:5,hp:45,mods:[M.volatile,M.reflective,M.aura],bx:520,by:520,bw:40,bh:115,elite:false,champion:true},
+      {x:700,y:520,w:48,barH:5,hp:90,mods:[M.phasing],bx:710,by:534,bw:28,bh:75,elite:false,champion:false}
+    ];
+    return {near,far,modList};
+  }
+}
+</script>
+</body>
+</html>

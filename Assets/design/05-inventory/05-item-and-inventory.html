@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:wght@400;600&family=Sometype+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0E1103;min-height:100%;color:#EDEBE3;font-family:'Source Sans 3',sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#B8B6AC}a:hover{color:#EDEBE3}
+</style>
+</helmet>
+<div style="display:flex;flex-direction:column;gap:64px;padding:64px">
+
+<div style="display:flex;flex-direction:column;gap:16px" data-screen-label="Inventory">
+  <div style="display:flex;align-items:baseline;gap:24px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">Inventory · full-screen modal</span><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">1920×1080 · IN: SLIDES 16 px FROM THE LEFT RAIL 160 ms · OUT: 100 ms · NO IN-COMBAT ACCESS</span></div>
+  <div style="position:relative;width:1920px;height:1080px;overflow:hidden;background:#1F210A;border:1px solid #454840"><div style="position:absolute;left:0;top:0;width:1920px;height:640px;background:#3E413E"></div><div style="position:absolute;left:0;top:640px;width:1920px;height:440px;background:#1F210A"></div><div style="position:absolute;left:1240px;top:560px;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#5C5C52">WORLD · ANCHOR · 40% VALUE · PLACEHOLDER</div>
+    <div style="position:absolute;left:0;top:0;width:1920px;height:88px;background:#151808;border-bottom:1px solid #454840;display:flex;align-items:center;padding:0 40px;box-sizing:border-box;gap:40px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase;letter-spacing:0.02em">Loadout</div>
+      <div style="display:flex;gap:8px">
+        <div style="height:44px;padding:0 24px;display:flex;align-items:center;background:#262918;border:1px solid #454840;border-top:2px solid #E3DFD2;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.04em">Gear</div>
+        <div style="height:44px;padding:0 24px;display:flex;align-items:center;background:#262918;border:1px solid #454840;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.04em;color:#B8B6AC">Skills</div>
+        <div style="height:44px;padding:0 24px;display:flex;align-items:center;background:#262918;border:1px solid #454840;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.04em;color:#B8B6AC">Abilities</div>
+      </div>
+      <div style="flex:1"></div>
+      <div style="display:flex;gap:8px">
+        <div style="height:44px;display:flex;align-items:center;gap:12px;padding:0 16px;background:#262918;border:1px solid #454840;border-left:4px solid #E07AAE;border-radius:2px"><div style="display:flex;gap:2px"><div style="width:4px;height:12px;background:#E07AAE"></div><div style="width:4px;height:12px;background:#E07AAE"></div><div style="width:4px;height:12px;background:#E07AAE"></div><div style="width:4px;height:12px;background:#E07AAE"></div></div><span style="font-family:'Sometype Mono',monospace;font-weight:700;font-size:16px">3 / 3</span><span style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;text-transform:uppercase;letter-spacing:0.04em;color:#B8B6AC">Aberrant</span></div>
+        <div style="height:44px;display:flex;align-items:center;gap:12px;padding:0 16px;background:#262918;border:1px solid #454840;border-left:4px solid #454840;border-radius:2px"><div style="display:flex;gap:2px"><div style="width:4px;height:12px;background:#2FBFA6"></div><div style="width:4px;height:12px;background:#2FBFA6"></div><div style="width:4px;height:12px;background:#2FBFA6"></div><div style="width:4px;height:12px;background:#2FBFA6"></div><div style="width:4px;height:12px;background:#2FBFA6"></div></div><span style="font-family:'Sometype Mono',monospace;font-weight:700;font-size:16px">0 / 1</span><span style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;text-transform:uppercase;letter-spacing:0.04em;color:#B8B6AC">Unwritten</span></div>
+      </div>
+      <div style="height:44px;padding:0 24px;display:flex;align-items:center;background:#262918;border:1px solid #454840;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.04em;color:#B8B6AC">Close</div>
+    </div>
+
+    <div style="position:absolute;left:40px;top:128px;width:360px;height:912px;background:#151808;border:1px solid #454840;border-left:4px solid #E3DFD2;box-sizing:border-box;padding:16px;display:flex;flex-direction:column;gap:8px">
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80;padding-bottom:8px">EQUIPPED · 8</div>
+      <sc-for list="{{ slots }}" as="sl" hint-placeholder-count="8">
+        <div style="height:96px;display:flex;align-items:center;gap:12px;padding:0 12px 0 0;background:{{ sl.bg }};border:{{ sl.border }};border-radius:2px;box-sizing:border-box">
+          <div style="width:4px;height:100%;background:{{ sl.rail }}"></div>
+          <div style="width:64px;height:64px;background:{{ sl.tile }};border-radius:4px;flex:none"></div>
+          <div style="display:flex;flex-direction:column;gap:4px;min-width:0;flex:1">
+            <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">{{ sl.kind }}</div>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;line-height:24px;text-transform:uppercase;letter-spacing:0.02em;color:{{ sl.nameInk }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ sl.name }}</div>
+            <div style="display:flex;gap:2px"><sc-for list="{{ sl.tally }}" as="c" hint-placeholder-count="0"><div style="width:4px;height:12px;background:{{ sl.rail }}"></div></sc-for></div>
+          </div>
+          <div style="font-family:'Sometype Mono',monospace;font-weight:500;font-size:16px;color:#B8B6AC">{{ sl.ilvl }}</div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="position:absolute;left:424px;top:128px;width:1016px;height:912px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;align-items:center;gap:8px;height:44px">
+        <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80;margin-right:16px">BACKPACK · 14 / 25</div>
+        <div style="height:44px;padding:0 23px;display:flex;align-items:center;background:#2F3221;border:2px solid #8A8F84;border-top:2px solid #E3DFD2;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;text-transform:uppercase;letter-spacing:0.04em">All</div>
+        <div style="height:44px;padding:0 24px;display:flex;align-items:center;background:#262918;border:1px solid #454840;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;text-transform:uppercase;letter-spacing:0.04em;color:#B8B6AC">Armour</div>
+        <div style="height:44px;padding:0 24px;display:flex;align-items:center;background:#262918;border:1px solid #454840;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;text-transform:uppercase;letter-spacing:0.04em;color:#B8B6AC">Weapons</div>
+        <div style="height:44px;padding:0 24px;display:flex;align-items:center;background:#262918;border:1px solid #454840;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;text-transform:uppercase;letter-spacing:0.04em;color:#B8B6AC">Trinkets</div>
+        <div style="flex:1"></div>
+        <div style="height:44px;padding:0 24px;display:flex;align-items:center;background:repeating-linear-gradient(135deg,#1D2010 0 6px,#262918 6px 8px);border:1px solid #454840;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;text-transform:uppercase;letter-spacing:0.04em;color:#5C5C52">Salvage below Uncommon</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(5,160px);grid-auto-rows:128px;gap:8px">
+        <sc-for list="{{ grid }}" as="g" hint-placeholder-count="25">
+          <div style="position:relative;background:{{ g.bg }};border:{{ g.border }};border-radius:2px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;padding:8px 8px 8px 12px">
+            <div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:{{ g.rail }}"></div>
+            <div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="display:flex;gap:2px"><sc-for list="{{ g.tally }}" as="c" hint-placeholder-count="0"><div style="width:4px;height:12px;background:{{ g.rail }}"></div></sc-for></div><div style="width:12px;height:12px;background:{{ g.mark }};transform:rotate(45deg);margin:2px"></div></div>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;line-height:18px;text-transform:uppercase;letter-spacing:0.02em;color:{{ g.ink }}">{{ g.name }}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">{{ g.kind }}</span><span style="font-family:'Sometype Mono',monospace;font-weight:500;font-size:13px;color:#B8B6AC">{{ g.ilvl }}</span></div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="position:absolute;left:1464px;top:128px;width:416px;height:912px">
+      <div style="position:relative;width:416px;background:#1D2010;border:1px solid #454840;border-left:4px solid #E07AAE;box-sizing:border-box;padding:16px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="display:flex;gap:2px"><div style="width:4px;height:12px;background:#E07AAE"></div><div style="width:4px;height:12px;background:#E07AAE"></div><div style="width:4px;height:12px;background:#E07AAE"></div><div style="width:4px;height:12px;background:#E07AAE"></div></div>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:24px;line-height:28px;text-transform:uppercase;letter-spacing:0.02em">Slag-plate cuirass</div>
+            <div style="font-size:14px;line-height:20px;color:#B8B6AC">Aberrant · Focused · Body armour</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><div style="font-family:'Sometype Mono',monospace;font-weight:700;font-size:24px;line-height:24px">i61</div><div style="width:12px;height:12px;background:#E6B33A;transform:rotate(45deg);margin:4px"></div></div>
+        </div>
+        <div style="height:1px;background:#454840"></div>
+        <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">REWRITE</div>
+        <div style="font-size:14px;line-height:20px;color:#EDEBE3;text-wrap:pretty">While sliding, incoming damage is halved and the slide does not end on impact.</div>
+        <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC;margin-top:4px">PREFIXES</div>
+        <sc-for list="{{ prefixes }}" as="a" hint-placeholder-count="2">
+          <div style="display:grid;grid-template-columns:16px minmax(0,1fr) 72px 40px;align-items:center;gap:8px;height:24px">
+            <div style="{{ a.cmp }}"></div>
+            <div style="font-size:14px;color:#B8B6AC;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.text }}</div>
+            <div style="font-family:'Sometype Mono',monospace;font-weight:500;font-size:16px;text-align:right">{{ a.val }}</div>
+            <div style="height:20px;display:flex;align-items:center;justify-content:center;background:#393D2B;border-radius:2px;font-family:'Sometype Mono',monospace;font-weight:500;font-size:13px;color:#B8B6AC">{{ a.tier }}</div>
+          </div>
+        </sc-for>
+        <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC;margin-top:4px">SUFFIXES</div>
+        <sc-for list="{{ suffixes }}" as="a" hint-placeholder-count="2">
+          <div style="display:grid;grid-template-columns:16px minmax(0,1fr) 72px 40px;align-items:center;gap:8px;height:24px">
+            <div style="{{ a.cmp }}"></div>
+            <div style="font-size:14px;color:#B8B6AC;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.text }}</div>
+            <div style="font-family:'Sometype Mono',monospace;font-weight:500;font-size:16px;text-align:right">{{ a.val }}</div>
+            <div style="height:20px;display:flex;align-items:center;justify-content:center;background:#393D2B;border-radius:2px;font-family:'Sometype Mono',monospace;font-weight:500;font-size:13px;color:#B8B6AC">{{ a.tier }}</div>
+          </div>
+        </sc-for>
+        <div style="height:1px;background:#454840"></div>
+        <div style="display:flex;align-items:center;gap:16px;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">
+          <span>VS EQUIPPED</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:8px solid #E3DFD2"></span>UP</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #8E8D80"></span>DOWN</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;background:#5C6056"></span>SAME</span>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <div style="height:44px;flex:1;display:flex;align-items:center;justify-content:center;background:#E6B33A;border:1px solid #E6B33A;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;text-transform:uppercase;letter-spacing:0.04em;color:#0E1103">Equip · swap</div>
+          <div style="height:44px;padding:0 24px;display:flex;align-items:center;background:#262918;border:1px solid #454840;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.04em;color:#B8B6AC">Salvage</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px;width:1920px;font-size:14px;line-height:20px;color:#B8B6AC;text-wrap:pretty">
+    <div><span style="color:#EDEBE3;font-weight:600">Header · 88 tall, bg-1.</span> Title display 700 40. Tabs 44 tall. Active tab = 2 px sys-full top rail (status), rest fill. Focus = border-high 2 px + panel-1, independent of active: GEAR above is active-unfocused, ALL in the backpack bar is active-and-focused, so the two never read as one state. Equip-limit counters carry rail + tally + numeric count; at limit the count reads "3 / 3" and the counter becomes the control that opens the swap picker. The Unwritten counter carries its rarity in the tally cells only; its rail and border are border-low, because teal never touches a control's chrome.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Equipped · 360 wide, sys-full identity rail.</span> Eight 96 px rows: 4 px rarity rail, 64 px tile, kind micro-label, name display 600 20, tally, item level numeric 16. Empty slot: bg-2, kind label only, no dashed outline. Rarity colour appears once per row (rail + tally are one carrier at two sizes).</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Backpack · 5 × 5 = 25 cells of 160×128 (ruled).</span> Grid 832 wide, left-aligned in the 1016 px column; the remainder is breathing room, not a sixth column. Cell: rail, tally, name, kind, ilvl; the Legendary axis is a gold diamond top-right. Filter tabs 44 tall. "Salvage below Uncommon" is disabled-painted when nothing qualifies.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Item card · 416 wide.</span> Order is fixed: the prose line (header REWRITE on Aberrant and Unwritten; SIGNATURE only on a named Legendary), then prefixes, then suffixes; tier badges in one 40 px column; comparison in one 16 px column of drawn marks (up triangle sys-full, down triangle text-3, same square border-mid). No score anywhere. The card face is bg-2 at every rarity; only Unwritten adds a 1 px teal-1 frame. Primary action gold; Salvage secondary. Card-follows rule: the card shows the hovered item on mouse and the focused item on pad; comparison is against the equipped piece in the same slot; weapons compare to Primary unless Secondary holds focus. Stash (70 cells, account-wide, Anchor only) is delivered in stage 8 with the Forge, since it is reached the same way, through an Anchor NPC.</div>
+  </div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:16px" data-screen-label="Swap picker">
+  <div style="display:flex;align-items:baseline;gap:24px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">Equip-limit swap picker</span><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">OPENS FROM THE COUNTER OR FROM EQUIP AT LIMIT · 640 WIDE · SLIDES DOWN FROM ITS TOP RAIL</span></div>
+  <div style="position:relative;width:1920px;height:640px;overflow:hidden;background:#0E1103;border:1px solid #454840">
+    <div style="position:absolute;left:0;top:0;width:1920px;height:640px;background:repeating-linear-gradient(135deg,#0E1103 0 6px,#151808 6px 8px)"></div>
+    <div style="position:absolute;left:640px;top:64px;width:640px;background:#1D2010;border:1px solid #454840;border-top:2px solid #E07AAE;box-sizing:border-box;padding:24px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:32px;line-height:32px;text-transform:uppercase;letter-spacing:0.02em">Aberrant · 3 of 3 worn</div>
+        <div style="font-size:14px;color:#B8B6AC">Choose the piece that comes off.</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;height:64px;padding:0 12px;background:#151808;border:1px solid #454840;border-left:4px solid #E07AAE"><div style="width:40px;height:40px;background:#393D2B;border-radius:4px"></div><div style="flex:1;display:flex;flex-direction:column"><div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">INCOMING · BODY ARMOUR</div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.02em">Slag-plate cuirass</div></div><div style="font-family:'Sometype Mono',monospace;font-weight:500;font-size:16px;color:#B8B6AC">i61</div></div>
+      <div style="height:1px;background:#454840"></div>
+      <sc-for list="{{ swap }}" as="r" hint-placeholder-count="3">
+        <div style="display:flex;align-items:center;gap:12px;height:64px;padding:0 12px;box-sizing:border-box;background:{{ r.bg }};border:{{ r.border }};border-left:4px solid #E07AAE;border-radius:2px">
+          <div style="width:40px;height:40px;background:#393D2B;border-radius:4px"></div>
+          <div style="flex:1;display:flex;flex-direction:column"><div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">{{ r.kind }}</div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.02em">{{ r.name }}</div></div>
+          <div style="display:grid;grid-template-columns:16px auto;align-items:center;gap:6px"><div style="{{ r.cmp }}"></div><span style="font-family:'Sometype Mono',monospace;font-weight:500;font-size:16px;color:#B8B6AC">{{ r.ilvl }}</span></div>
+          <div style="height:32px;padding:0 16px;display:flex;align-items:center;background:{{ r.btnBg }};border:{{ r.btnBorder }};border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;text-transform:uppercase;letter-spacing:0.04em;color:{{ r.btnInk }}">{{ r.btn }}</div>
+        </div>
+      </sc-for>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px">
+        <div style="height:44px;padding:0 24px;display:flex;align-items:center;background:#262918;border:1px solid #454840;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.04em;color:#B8B6AC">Keep current</div>
+      </div>
+    </div>
+    <div style="position:absolute;left:1320px;top:64px;width:520px;font-size:14px;line-height:20px;color:#B8B6AC;text-wrap:pretty">The picker lists only the worn pieces of the limited rarity, lowest item level first, and pre-focuses the lowest. Each row compares the incoming piece against that row's slot with the same drawn marks as the card. A row whose slot does not match the incoming kind is still listed (the swap is by rarity, not slot) but its button reads Take off instead of Swap. Confirm snaps on frame one and the picker leaves upward along its top rail in 100 ms. Escape / face-east = Keep current. Which piece a swap removes is the equipment component's rule; the UI offers the list and a pre-focus, it never decides.</div>
+  </div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:16px;width:1920px" data-screen-label="Control states">
+  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">Every control · default / hover / pressed / focused / disabled-painted</div>
+  <div style="display:grid;grid-template-columns:200px repeat(5,minmax(0,1fr));gap:8px 16px;align-items:center;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">
+    <div></div><div>DEFAULT</div><div>HOVER</div><div>PRESSED</div><div>FOCUSED (GAMEPAD)</div><div>DISABLED · PAINTED</div>
+    <sc-for list="{{ controls }}" as="c" hint-placeholder-count="6">
+      <div style="color:#EDEBE3">{{ c.name }}</div>
+      <sc-for list="{{ c.states }}" as="st" hint-placeholder-count="5">
+        <div style="height:72px;display:flex;align-items:center;background:#0E1103">
+          <div style="height:{{ c.h }}px;width:{{ c.w }};padding:{{ st.pad }};box-sizing:border-box;display:flex;align-items:center;gap:12px;background:{{ st.bg }};border:{{ st.border }};border-left:{{ st.rail }};border-radius:{{ c.r }}px;transform:{{ st.tf }};font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;text-transform:uppercase;letter-spacing:0.04em;color:{{ st.ink }}">
+            <sc-if value="{{ c.tally }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:2px"><div style="width:4px;height:12px;background:{{ st.mark }}"></div><div style="width:4px;height:12px;background:{{ st.mark }}"></div><div style="width:4px;height:12px;background:{{ st.mark }}"></div></div></sc-if>
+            <sc-if value="{{ c.toggle }}" hint-placeholder-val="{{ false }}"><div style="width:16px;height:16px;background:{{ st.mark }}"></div></sc-if>
+            <span>{{ c.label }}</span>
+          </div>
+        </div>
+      </sc-for>
+    </sc-for>
+  </div>
+  <div style="font-size:14px;line-height:20px;color:#B8B6AC;max-width:1300px;text-wrap:pretty">Rules, not exceptions: hover = one panel step up and border-mid; pressed = one step down from rest, +1 px translate, 0 ms; focused = border-high 2 px and one step up (padding shrinks 1 px so the box does not move); disabled = 45° hatch bg-2/panel-0 at 6/2 px, text-4 ink, marks in border-low, border stays. A primary (gold) control has no hover step: its border goes gold-dim on hover, and pressed goes gold-dim fill with text-1. Rails never change with state.</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const R={standard:'#B8B6AC',uncommon:'#8FB865',exceptional:'#8B8FEC',aberrant:'#E07AAE',unwritten:'#2FBFA6'};
+    const T={standard:1,uncommon:2,exceptional:3,aberrant:4,unwritten:5};
+    const tally=n=>Array.from({length:n},(_,i)=>i);
+    const UP='width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:8px solid #E3DFD2';
+    const DN='width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #8E8D80';
+    const EQ='width:8px;height:8px;background:#5C6056;margin:0 4px';
+    const slot=(kind,name,rar,ilvl,sel)=>({kind,name:name||'Empty',rail:name?R[rar]:'#454840',tally:name?tally(T[rar]):[],ilvl:name?'i'+ilvl:'',tile:name?'#393D2B':'#1D2010',nameInk:name?'#EDEBE3':'#5C5C52',bg:sel?'#2F3221':(name?'#262918':'#1D2010'),border:sel?'2px solid #8A8F84':'1px solid #454840'});
+    const slots=[slot('HELMET','Ridge cap','uncommon',44),slot('BODY ARMOUR','Quarry vest','aberrant',52,true),slot('GLOVES','Bench mitts','exceptional',48),slot('WAIST',null),slot('BOOTS','Clinker treads','aberrant',55),slot('NECKLACE','Riftglass shard','aberrant',58),slot('PRIMARY','Issue rifle','standard',41),slot('SECONDARY',null)];
+    const names=['Slag-plate cuirass','Ridge cap','Tally gloves','Clinker treads','Kess\'s belt','Bore rifle','Field carbine','Quarry vest','Ballast boots','Range card','Spool','Drift shard','Tin helm','Coil'];
+    const rars=['aberrant','uncommon','exceptional','standard','exceptional','unwritten','standard','aberrant','uncommon','exceptional','standard','aberrant','standard','uncommon'];
+    const kinds=['BODY','HELMET','GLOVES','BOOTS','WAIST','PRIMARY','SECONDARY','BODY','BOOTS','TRINKET','TRINKET','NECKLACE','HELMET','TRINKET'];
+    const grid=[];
+    for(let i=0;i<25;i++){
+      if(i<14){const r=rars[i];const sel=i===0;grid.push({name:names[i],kind:kinds[i],rail:R[r],tally:tally(T[r]),ilvl:'i'+(40+((i*7)%22)),mark:(i===0||i===5)?'#E6B33A':'transparent',ink:'#EDEBE3',bg:sel?'#2F3221':'#262918',border:sel?'2px solid #8A8F84':(r==='unwritten'?'1px solid #2FBFA6':'1px solid #454840')});}
+      else grid.push({name:'',kind:'',rail:'transparent',tally:[],ilvl:'',mark:'transparent',ink:'#5C5C52',bg:'#151808',border:'1px solid #262918'});
+    }
+    const prefixes=[{cmp:UP,text:'Armour',val:'+184',tier:'T4'},{cmp:UP,text:'Health',val:'+120',tier:'T5'},{cmp:EQ,text:'Physical damage reduction',val:'+4.0%',tier:'T7'}];
+    const suffixes=[{cmp:DN,text:'Damage while sliding',val:'+9%',tier:'T6'},{cmp:UP,text:'Resource on hit taken',val:'+2',tier:'T3'}];
+    const swap=[
+      {kind:'BODY ARMOUR',name:'Quarry vest',ilvl:'i52',cmp:UP,bg:'#2F3221',border:'2px solid #8A8F84',btn:'Swap',btnBg:'#E6B33A',btnBorder:'1px solid #E6B33A',btnInk:'#0E1103'},
+      {kind:'BOOTS',name:'Clinker treads',ilvl:'i55',cmp:EQ,bg:'#262918',border:'1px solid #454840',btn:'Take off',btnBg:'#262918',btnBorder:'1px solid #454840',btnInk:'#B8B6AC'},
+      {kind:'NECKLACE',name:'Riftglass shard',ilvl:'i58',cmp:EQ,bg:'#262918',border:'1px solid #454840',btn:'Take off',btnBg:'#262918',btnBorder:'1px solid #454840',btnInk:'#B8B6AC'}
+    ];
+    const HATCH='repeating-linear-gradient(135deg,#1D2010 0 6px,#262918 6px 8px)';
+    const st=(rail,mark)=>[
+      {bg:'#262918',border:'1px solid #454840',rail:rail?'4px solid '+rail:'1px solid #454840',ink:'#B8B6AC',pad:'0 16px',tf:'none',mark:mark||'#B8B6AC'},
+      {bg:'#2F3221',border:'1px solid #5C6056',rail:rail?'4px solid '+rail:'1px solid #5C6056',ink:'#EDEBE3',pad:'0 16px',tf:'none',mark:mark||'#EDEBE3'},
+      {bg:'#1D2010',border:'1px solid #5C6056',rail:rail?'4px solid '+rail:'1px solid #5C6056',ink:'#EDEBE3',pad:'0 16px',tf:'translateY(1px)',mark:mark||'#EDEBE3'},
+      {bg:'#2F3221',border:'2px solid #8A8F84',rail:rail?'4px solid '+rail:'2px solid #8A8F84',ink:'#EDEBE3',pad:'0 15px',tf:'none',mark:mark||'#EDEBE3'},
+      {bg:HATCH,border:'1px solid #454840',rail:rail?'4px solid '+rail:'1px solid #454840',ink:'#5C5C52',pad:'0 16px',tf:'none',mark:'#454840'}
+    ];
+    const primary=[
+      {bg:'#E6B33A',border:'1px solid #E6B33A',rail:'1px solid #E6B33A',ink:'#0E1103',pad:'0 16px',tf:'none',mark:'#0E1103'},
+      {bg:'#E6B33A',border:'1px solid #6A5118',rail:'1px solid #6A5118',ink:'#0E1103',pad:'0 16px',tf:'none',mark:'#0E1103'},
+      {bg:'#6A5118',border:'1px solid #6A5118',rail:'1px solid #6A5118',ink:'#EDEBE3',pad:'0 16px',tf:'translateY(1px)',mark:'#EDEBE3'},
+      {bg:'#E6B33A',border:'2px solid #8A8F84',rail:'2px solid #8A8F84',ink:'#0E1103',pad:'0 15px',tf:'none',mark:'#0E1103'},
+      {bg:HATCH,border:'1px solid #454840',rail:'1px solid #454840',ink:'#5C5C52',pad:'0 16px',tf:'none',mark:'#454840'}
+    ];
+    const controls=[
+      {name:'Button',label:'Salvage',h:44,w:'auto',r:2,states:st(null)},
+      {name:'Primary button',label:'Equip',h:44,w:'auto',r:2,states:primary},
+      {name:'Tab',label:'Armour',h:44,w:'auto',r:2,states:st(null)},
+      {name:'List row · rarity',label:'Quarry vest',h:64,w:'100%',r:2,tally:true,states:st('#E07AAE','#E07AAE')},
+      {name:'Grid cell',label:'Ridge cap',h:64,w:'100%',r:2,tally:true,states:st('#8FB865','#8FB865')},
+      {name:'Limit counter',label:'3 / 3',h:44,w:'auto',r:2,tally:true,states:st('#E07AAE','#E07AAE')},
+      {name:'Toggle · on',label:'Invert',h:44,w:'auto',r:2,toggle:true,states:st(null,'#E3DFD2')}
+    ];
+    return {slots,grid,prefixes,suffixes,swap,controls};
+  }
+}
+</script>
+</body>
+</html>

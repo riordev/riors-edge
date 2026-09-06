@@ -301,20 +301,24 @@ void UBreakerCombatComponent::ApplyTargetConditionRiders(FBreakerDamageRequest& 
     if (FMath::IsNearlyZero(RiderPercent) && !bRiderMoreFired) return;
 
     // The recomposition: an Increased rider joins the source's ADDITIVE
-    // bucket exactly as before, and — since O141 — the ONE hit-time More
-    // rider (Collapse; TreeContent.OneHitTimeMore pins the population at one,
-    // and a second is a request to revisit the 1.30^3 ceiling, a different
-    // and larger ruling) multiplies the standing More product under the one
-    // O34 ceiling: HEADROOM, never a slot, the same law the outgoing window
-    // chain already spends by. The clamp cannot double-count because
+    // bucket, under the flat factor the source carried (O196: the flat layer
+    // multiplies the whole Increased bucket, riders included, never only the
+    // source's half of it), and — per O141 — the ONE hit-time More rider
+    // (Collapse; TreeContent.OneHitTimeMore pins the population at one, and a
+    // second is a request to revisit the 1.30^3 ceiling, a different and
+    // larger ruling) multiplies the standing More product under the one O34
+    // ceiling: HEADROOM, never a slot, the same law the outgoing window chain
+    // already spends by. The clamp cannot double-count because
     // SourceMoreProduct is the request's WHOLE prior More spend —
     // ApplyOutgoingModifiers folds the window chain into it as well as into
     // the composed value — so Ceiling/SourceMoreProduct is the true residual.
     // PaidRiderMore folds into SourceMoreProduct too, so the header's
-    // identity ((1 + (Inc + Riders)/100) x SourceMoreProduct ==
+    // identity (Flat x (1 + (Inc + Riders)/100) x SourceMoreProduct ==
     // SourceDamageMultiplier) stays literally true; nothing downstream reads
     // the split again, so this costs nothing and keeps the formula honest.
-    // Floored at zero so a hostile authored negative can never invert damage.
+    // Every factor is floored at zero so a hostile authored negative can never
+    // invert damage.
+    const float FlatFactor = FMath::Max(0.0f, Request.SourceFlatFactor);
     const float IncreasedFactor = FMath::Max(0.0f, 1.0f + (Request.SourceIncreasedPercent + RiderPercent) / 100.0f);
     const float StandingMore = FMath::Max(0.0f, Request.SourceMoreProduct);
     if (bRiderMoreFired)
@@ -337,7 +341,7 @@ void UBreakerCombatComponent::ApplyTargetConditionRiders(FBreakerDamageRequest& 
         }
         Request.SourceMoreProduct = StandingMore * PaidRiderMore;
     }
-    Request.SourceDamageMultiplier = IncreasedFactor * FMath::Max(0.0f, Request.SourceMoreProduct);
+    Request.SourceDamageMultiplier = FlatFactor * IncreasedFactor * FMath::Max(0.0f, Request.SourceMoreProduct);
 }
 
 void UBreakerCombatComponent::DispatchHitDealt(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result)
@@ -642,7 +646,7 @@ void UBreakerCombatComponent::ApplyOutgoingModifiers(FBreakerDamageRequest& Requ
     // Flat first, then the More product — resolution order step 1. The chain's
     // product is a More, so it lands in BOTH the composed convenience value
     // and the split's More half: a request carrying the Stage 6 source split
-    // must keep (1 + Increased/100) x MoreProduct == SourceDamageMultiplier
+    // must keep FlatFactor x (1 + Increased/100) x MoreProduct == SourceDamageMultiplier
     // through this pass, or the target-side recomposition would silently
     // shed (or double) the window. Harmless when the split is absent — the
     // default SourceMoreProduct is 1.0 and bHasSourceSplit stays false.

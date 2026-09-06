@@ -1,0 +1,35 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Rior's Edge · Death beat storyboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:wght@400;600&family=Sometype+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg0:#0E1103;--bg1:#151808;--bg2:#1D2010;--p0:#262918;--p1:#2F3221;--p2:#393D2B;--b-low:#454840;--b-mid:#5C6056;--b-high:#8A8F84;--t1:#EDEBE3;--t2:#B8B6AC;--t3:#8E8D80;--sys:#E3DFD2;--gold:#E6B33A;--harm:#D9402F;--teal1:#2FBFA6;--teal2:#6ADFC9;--display:'Barlow Condensed',sans-serif;--body:'Source Sans 3',sans-serif;--num:'Sometype Mono',monospace}
+html,body{margin:0;background:var(--bg0);color:var(--t1);font-family:var(--body)}
+.disp{font-family:var(--display);font-weight:700;text-transform:uppercase;letter-spacing:.02em}
+.num{font-family:var(--num)}
+.btn{height:44px;padding:0 24px;box-sizing:border-box;display:inline-flex;align-items:center;background:var(--p0);border:1px solid var(--b-low);border-radius:2px;font-family:var(--display);font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:.04em;color:var(--t2)}
+.btn.focus{background:var(--p1);border:2px solid var(--b-high);padding:0 23px;color:var(--t1)}
+
+.grid{display:grid;grid-template-columns:repeat(3,640px);gap:16px;padding:64px}
+.f{position:relative;width:640px;height:360px;overflow:hidden;border:1px solid var(--b-low)}
+.f .t{position:absolute;left:12px;top:12px;font-family:var(--num);font-weight:700;font-size:13px;letter-spacing:.08em;background:var(--bg0);padding:2px 6px}
+.cap{width:640px;font-size:14px;line-height:20px;color:var(--t2);margin-top:8px}.cap b{color:var(--t1)}
+.gnd{position:absolute;left:0;width:640px;height:400px;transform-origin:left top}
+.frame{position:absolute;inset:0;box-sizing:border-box;border:8px solid var(--harm)}
+.wpn{position:absolute;left:380px;width:200px;height:160px;background:var(--bg2);border:1px solid var(--b-low);transform-origin:right bottom}
+.death{position:absolute;left:0;top:140px;width:640px;display:flex;flex-direction:column;align-items:center;gap:8px}
+.death .l1{font-size:40px;line-height:40px}.death .l2{font-size:14px;line-height:20px;color:var(--t2)}
+.ctl{position:absolute;left:0;bottom:40px;width:640px;display:flex;justify-content:center;gap:8px}
+.ctl .btn{height:32px;font-size:14px;padding:0 16px}.ctl .btn.focus{padding:0 15px}
+.rule{padding:0 64px 64px;max-width:1300px;font-size:14px;line-height:20px;color:var(--t2)}
+</style></head><body>
+<div class="grid">
+<div><div class="f" style="background:var(--p2)"><div class="gnd" style="top:213px;background:var(--p1)"></div><div class="frame"></div><div class="wpn" style="top:200px"></div><div class="t">0.00 s</div></div><div class="cap"><b>Killing hit.</b> Health 38→0 at 0 ms. Harm frame pulsing. Weapon raised.</div></div>
+<div><div class="f" style="background:var(--p2)"><div class="gnd" style="top:200px;background:var(--p1);transform:rotate(2deg)"></div><div class="frame"></div><div class="wpn" style="top:260px;transform:rotate(14deg)"></div><div class="t">0.25 s</div></div><div class="cap"><b>Weapon lowers.</b> Out of frame over 0.4 s. HUD leaves along rail axes in 100 ms; the harm frame stays.</div></div>
+<div><div class="f" style="background:#333531"><div class="gnd" style="top:120px;background:#2A2C27;transform:rotate(8deg)"></div><div class="t">0.80 s</div></div><div class="cap"><b>Camera down.</b> Pitch −35°, roll +8°, height −1.1 m, cubic ease-out. Desaturation 100→0 over 0.8 s. No HUD.</div></div>
+<div><div class="f" style="background:var(--bg0)"><div class="t">0.80 s</div></div><div class="cap"><b>Hard cut to black.</b> One frame. Audio cue: one low sound on the cut (asset unspecified); room tone continues.</div></div>
+<div><div class="f" style="background:var(--bg0)"><div class="t">2.00 s</div></div><div class="cap"><b>Black holds 1.2 s.</b> Nothing drawn.</div></div>
+<div><div class="f" style="background:var(--bg2)"><div class="gnd" style="top:213px;background:var(--bg1)"></div><div class="death"><div class="disp l1">Erased at Sunken carriage</div><div class="l2">Wave 4 of 5 · 3 m 12 s in · gear kept</div></div><div class="ctl"><span class="btn focus">Retry the rift</span><span class="btn">Return to Anchor</span></div><div class="t">2.00–2.40 s</div></div><div class="cap"><b>Fade in · campaign.</b> 0.4 s linear; input live on frame one, focus on RETRY. Boss: line 2 ends "the encounter resets".</div></div>
+<div><div class="f" style="background:var(--bg2)"><div class="gnd" style="top:213px;background:var(--bg1)"></div><div class="death"><div class="disp l1">Erased at Sunken carriage</div><div class="l2">Wave 4 of 5 · 2 of 3 deaths remain · gear kept</div></div><div class="ctl"><span class="btn focus">Retry the rift</span><span class="btn">Return to Anchor</span></div><div class="t">2.00–2.40 s</div></div><div class="cap"><b>Fade in · endgame.</b> Death budget as numerals N of M.</div></div>
+<div><div class="f" style="background:var(--bg2)"><div class="gnd" style="top:213px;background:var(--bg1)"></div><div class="death"><div class="disp l1">Sunken carriage closes</div><div class="l2">0 of 3 deaths remain · the rift is lost · gear kept</div></div><div class="ctl"><span class="btn focus">Return to Anchor</span></div><div class="t">2.00–2.40 s</div></div><div class="cap"><b>Fade in · endgame terminal.</b> Budget spent; RETURN is the only control and takes focus.</div></div>
+</div>
+<div class="rule">Total 2.4 s from killing hit to live input: 0.8 s fall + 1.2 s black + 0.4 s fade. Input is live from 2.0 s (first visible frame); the fade is the only skippable part. Death text: display 700 40 sys text-1; line 2 body 400 14 text-2. Controls 32 tall in the 640 storyboard = 44 tall at 1080p. Focus = border-high 2 px + panel-1.</div>
+</body></html>

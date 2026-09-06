@@ -222,7 +222,20 @@ struct RIORSEDGE_API FBreakerAttributeAggregator
     const FBreakerAttributeContribution& GetContribution(EBreakerAttributeContributor Contributor) const;
 
     // The locked fold. Deterministic in the contributor enum's order.
+    //   Compose == ComposedFlatFactor x (1 + ComposedIncreasedPercent/100) x ComposedMoreProduct
+    // Compose is WRITTEN as that product of the three getters, so the four
+    // cannot drift: a caller that needs one layer on its own reads the getter
+    // and is guaranteed to hold the same number Compose folded.
     float Compose(EBreakerAggregatedAttribute Attribute) const;
+    // Base + sum(Flat) across every contributor, the first factor of the fold.
+    // A damage request carries this beside the Increased sum so a target-side
+    // Increased rider joins the additive bucket UNDER the flat layer — dividing
+    // the composed value by the More product alone recovers (1+f)(1+i/100),
+    // which is only the Increased factor when nothing bid Flat.
+    float ComposedFlatFactor(EBreakerAggregatedAttribute Attribute) const;
+    // sum(IncreasedPercent) across every contributor, in whole percent; the
+    // ONE additive bucket the rider pass adds to.
+    float ComposedIncreasedPercent(EBreakerAggregatedAttribute Attribute) const;
 
     // ---- The O3 More ceiling, enforced GLOBALLY --------------------------
     // Docs/Item-Foundation.md recorded this as an open hole in so many words:

@@ -8,26 +8,68 @@ Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 ## Direction (owner, 2026-09-05)
 No playtest until the core loop has more oomph. The next blocks are the ones that change what a trigger pull, a shield and a kill feel like: flat damage that is really the weapon's, a boss that fights back with a shield you break, and a Niagara pass with a sound for every verb. Content plumbing waits behind them.
 
-## Open questions for the owner
-- Owner question (loot & economy): LEDGER-3 grows the pool 27 → 56, but `PowerBand.AtCap` composes two hand-listed fixtures, so new rows move nothing until a fixture rolls them. Rule the measurement basis: keep the hand-listed fixture and add the new rows to it by name, or measure AtCap from a rolled best-in-slot at the cap's item level?
-- Owner question (persistence): a save carrying `Rule = Overflow` resolves to an empty rule and prints nothing on the item card. Blank, or a one-line "retired rule" label?
-
-## Cycle 8 — LEDGER-3 and the at-cap band (one build)
-- [ ] The second flat-into-Increased site (O196): `BreakerDamageLibrary.cpp` ~:48-51 derives the source's Increased half as `(Composed / More − 1) × 100`, which folds the flat layer in, so a target-side Increased rider is never multiplied by the flat. `FBreakerDamageRequest` carries a flat term; the rider site in `BreakerCombatComponent` recomposes `(Base + Flat)(1 + (Inc + R)/100)·More`. FIELD's files; `Pools.FlatOrder` gains the rider case.
+## Cycle 8b — LEDGER-3 and the at-cap band (one build; O200)
 - [ ] 29 new affix rows as data (Breadth: every row rolls on ≥1 slot, none MorePercent; per slot ≥2 offensive, ≥1 conditional, ≥1 weapon line, ≥1 ability line). Conditional flat Added Damage prefixes are legal data-only. Then re-measure `PowerBand.AtCap` on the ruled basis; the pin is deleted when it reads inside the band, never widened.
+## Design questions for the owner (the Stage 1 export vs the rulings)
+- (ui) Vitals: the export draws a max value after the health value; O199 draws none. Which?
+- (ui) Damage numbers 32/48 and magazine 48 in the export; you measured them down to 26/52 and 32 in play. Canvas or play?
+- (ui) Aggregation window 250 ms in the export; 120 ms in code after 180 ms merged two Sidearm shots. Which?
+- (ui) Crit colour: export gold; O179 makes gold the weak-point promise and code crit is orange. Which?
+- (ui) Absorbed hits: export prints a grey "0"; code prints the value muted with "ABSORBED −x %". Which?
+- (ui) XP rail on the combat HUD: export says never; the bottom rail ships. Keep or delete?
+- (ui) spec.md and the HTML mockups disagree in six places (camera drop 0.6 m vs 1.1 m, weapon lower 0.3 vs 0.4, banner sizes, equipment column 400 vs 360, card 560 vs 416, doctrine card size). Is spec.md canonical?
+- (enemies) Elite halo: O194 landed a ring beside the bar; the export puts a 2 px ellipse under the body. The coloured, count-scaled modifier disc at the feet is the export's "never" twice over. Retire the disc and light, or keep it as the body tell?
+- (bosses) The export retires the screen-top boss row for a world-space bar with phase pips; O156 says the row carries the phase. Amend O156?
+- (persistence) The death screen puts a RETRY THE RIFT / RETURN TO ANCHOR decision between black and respawn; O82/O193 respawn under black. Retry as a travel, or keep the teleport? Does an endgame death decrement the budget at runtime (nothing does today)?
+- (systems) One held/spent counter over a shared pool in the trees export; O111 has Core 65 and Doctrine 8. Two counters, or one pool?
+- (systems) The doctrine board makes a node reachable by a spent neighbour; code gates doctrine depth per tier on the benchmark pool (O86). Adjacency, tier gates, or both?
+- (loot & economy) Swap picker: "the component decides" and "the player picks one of three rows" cannot both hold. Reading: the component supplies the candidates and the pre-focus and validates the choice; the UI never computes the list. Yes?
+- (loot & economy) Forge: the export's "shards" vs O51's Riftglass; the export's REFORGE is code's ATTUNE; the export's ATTUNE binds an item to a cleared rift, which no system does; SALVAGE and RESPEC are live but absent from the export. Rule the verbs.
+- (npcs) The export names Okonjo, Vesna and Hale with rail colours; the game has Kess and the Quartermaster. Roster?
+- (ui) Pause LOADOUT is retired by ruling; the export shows it. Strike from the export?
 
 ## Cycle 9 — a boss that fights back (O198, FIELD-3; one build each)
 - [ ] The Warden's front is a shield pool of 15 % of its bearer's max health: frontal hits deplete it, it breaks with a tell and stays broken for the fight, the rear stays unarmoured. `FrontalArmor` mitigation is replaced, not stacked. The boss inherits the rule. Pinned on the shipped numbers: the level-1 rifle breaks a Warden's front in N rounds; the boss's in the O18 band.
 - [ ] Boss grammar as a pure header: telegraph → punish window → phase gate → add wave → arena change; the shield break is the first punish window.
 - [ ] Second boss: add-clear under pressure. Third: mobility and sustain. `Combat.PowerCurve.BossBand` holds for all three; O31 asserted per boss. Split across builds.
 
-## Cycle 10 — the Niagara and sound pass (GLASS-1, O179, O190, O193)
+## Cycle 10 — the HUD to the design system, pass 1 (one build)
+- [ ] Tokens: the olive palette, three borders, the text ramp, `System` bone split from `VerbMove` cyan (O179 keeps cyan on the movement verb; chrome moves to bone), accents with dims, teal-2 and rift-hot, the rarity ramp, rails 4/2, gutter 40. Fonts are their own editor-run commit; Source Sans 3 and Sometype Mono are not staged.
+- [ ] Drawing on data the HUD holds: vitals bottom-left 480 wide with the shield layer and the health chip (drain 0, hatch 400 ms, recover 600 ms); near-death 8→16 px frame and brackets under 20 %; abilities bottom-centre 64/88/64 with READY / COOLDOWN drain / LOCKED hatch; weapon bottom-right with the ammo rail at rest and the name only on swap; crosshair four ticks with spread 16→40 and ADS collapse; hit / kill / weak-point markers 80 / 200 / 320 ms; the damage-number timeline; zone name and `mm:ss` countdown top-left; quest one-liner; a hatch primitive.
+- [ ] Deletions the export orders: the minimap (O155 crossing declared: the `EnemyBlips` consumer goes, the producer stays), weapon name at rest, ability digits, resource state words, the screen-top encounter row, the armour meter. The XP rail waits on the question above.
+- [ ] Pins: pure timelines in `UI/BreakerHUDMath.h` (crosshair, chip, pulse, swap slide, damage numbers, countdown, tally) and `HUD.ShippedTokens`; `-BreakerCaptureHUD` with forced reload, swap and cooldown states.
+- Pass 2, own block: the interact/loot plate; a reload-fraction accessor in Weapons/; an ability verb on the definition for rail colours; wave cells need an encounter total (O120); the four non-Swift resource treatments; menu chrome to bone (GLASS-3).
+
+## Cycle 11 — nameplates to the design system, pass 1, and the death beat's numbers (one build)
+- [ ] `Combat/BreakerEnemyBarMath.h`: scale 1.0 at ≤12 m to 0.5 at ≥35 m, draw to 60 m, borders never scale, per-rank widths 96/160, pixel floors; the chip hatch on a per-enemy shown-health map (declared as a shared HUD member beside O155's four); the shield as a 2 px line along the top of the fill; band dividers off (state untouched, the O135 pin survives); Elite as a 2 px ellipse at the feet; Champion diamonds off both bar ends, Trash none; gold edge and gold labels gone; the ten modifier shapes above the bar at every range, words and letters gone. Pin `Combat.EnemyBarMath`; photograph the bar probe at 12 m and 35 m.
+- [ ] Death beat to spec.md's numbers (all O2): weapon lower 0.0–0.3 as its own field, camera drop 60 cm, hard cut at 0.8 (fade tail 0), black to 2.0, fade to 2.4. The test asserts the shipped timeline field by field.
+- Pass 2, own block, after the rulings above: the boss bar world-space with phase marks off the authored gates and pips; the occlusion trace and the >60 m rules; names from the O195 table; the active-modifier underline; the death screen and the rift retry; banners to the design with a priority queue.
+
+## Cycle 12 — the Niagara and sound pass (GLASS-1, O179, O190, O193)
 - [ ] Muzzle, impact, cast moment, death: the four `NS_<Moment>` slots filled (owner asset or Fab pack), verb-colour law kept. The muzzle flash returns here.
 - [ ] The sixth verb: `PlayPlayerDeath`, `player_death.wav` slot → synth fallback, one call site in the fatal-hit branch; the O193 beat's one low sound.
 - [ ] Hit feedback re-photographed: the "feedback needs to be better" frame from Part One-B, before and after.
 - [ ] Delete the drift (H1): wall-ride out of the specs, dead gameplay tags out of the ini; grep-empty.
 
-## Cycle 11 — the rest of DATA-4 (one library per commit; O186, O195)
+## Cycle 13 — the stash screen (one build; over LEDGER's landed plumbing)
+- [ ] Part One-X is stale: `StashCapacity` 70, `StashItems`, deposit and withdraw with the Anchor gate and O182, the crash-window reconcile and three pins all exist; only the tests call them. Append `Stash` to `EBreakerMenuScreen`, `BuildStashScreen` in its own TU (ALL / WEAPONS / ARMOUR; counter n/70; backpack n/25; MOVE TO STASH / TAKE TO BACKPACK), entered from an Anchor interactable on the F path, `-BreakerCaptureMenu=STASH`. Delete Part One-X's premise in the same commit. No MATERIALS tab: no material item exists.
+
+## Cycle 14 — menus, inventory and trees, value pass (one build; GLASS)
+- [ ] Main and pause plate 640 wide, item rows, focus rail, slide-in; settings row, slider and toggle values with every drawn row mapped to a live `UBreakerGameSettings` field (`Settings.Screen.ControlValues`) and rows with no field not drawn; class cards 360×200 with Swift's O176 open slot drawn; the create rail NAME / BODY / VOICE / FACE (BODY renamed from MODEL, still painted until the save fields exist); the forge tab strip keeps five verbs and says RIFTGLASS; the dialogue plate with speaker and role split from the one display string.
+- [ ] Inventory and trees: the world at 40 % behind menus, tab rail-on-active, equipment rows 64 with the dashed empty frame gone, the limit chip 44 tall, two-level zoom snap, node ladder colours (spent bone, reachable panel-1 with 2 px border-high), compare marks and the rarity tally as drawn geometry, the tier badge split out of the affix string. Frame-identical in structure before and after (`-BreakerCaptureMenu=INVENTORY|SKILLTREES`).
+- Then GLASS-3: `BuildInventoryScreen` and `BuildSkillTreesScreen` move to their own TUs unchanged (one build, identical frames), and each re-layout is its own cycle: the tri-zone inventory with the card rail; the card's REWRITE / SIGNATURE → prefixes → suffixes order (O67's forfeit needs LEDGER-4's field); the core wheel (needs the 11-node atlas as content under O103; `UI/BreakerCoreWheelMath.h` pinned against `06-core-wheel-geometry.json`, which is authoring input, not a runtime file); the doctrine lattice (needs edges and positions in progression.json and the O86 ruling above).
+
+## Plumbing the design asks for, in the order that unblocks the most
+1. Character save fields Model / Face / Voice (LEDGER, save version bump, O14): three create-rail controls and the class-select figures.
+2. `ViewBobScale` and `ScreenShakeScale` on settings with their two existing consumers (KIT reads, GLASS writes).
+3. `DamageNumberScale` and `NameplateScale` on settings; the nameplate scale touches an O155 member.
+4. Sprint / crouch / aim HOLD|TOGGLE in Movement/ and input, before any row is drawn.
+5. The ADS sensitivity consumer in the aim path (the row exists and is labelled a stub).
+6. Swap picker: `EquipItem(Item, DisplaceId)` and a candidate list from the component (LEDGER), then the modal, pinned by `UI.EquipLimit.SwapPicker`.
+7. NPC rail colour and hold-to-leave, after the roster is ruled, landing in `Data/dialogue.json`.
+- Not to build without a system and a ruling: subtitles, text scale, reduce-flash, Forge Attune-to-rift, a MATERIALS tab, pad glyphs, the gamepad toggle, the class-select yard with 3D figures (waits on O14 models).
+
+## Cycle 15 — the rest of DATA-4 (one library per commit; O186, O195)
 - [ ] Quests → `Data/quests.json` (`BreakerQuestContent.cpp` becomes a loader; 4 quests, the flag registry, `ValidateQuestContent` runs on the file).
 - [ ] Dialogue → `Data/dialogue.json` (`BreakerNPC.cpp` MakeXDialogue become loaders; ~26 nodes, ~70 choices; the lexicon test reads the file).
 - [ ] Abilities: only the numerics (`ResourceCost`, `CooldownSeconds`, `WindowDuration`, variant numbers) → `Data/abilities.json`; the registry, `AbilityClass` and tags stay a DataAsset (O186). The ~40 per-ability `O2 PLACEHOLDER` constants in the ability .cpp files are the real no-compile target and need their own item.
@@ -46,6 +88,7 @@ No playtest until the core loop has more oomph. The next blocks are the ones tha
 - [ ] Per-archetype weapon fire: `weapon_fire_<archetype>.wav` → `weapon_fire.wav` → synth.
 
 ## Later (infrastructure only when it unblocks a felt item this week)
+- The DoT twin of the flat fold: `ComposeDotSourcePower` (`BreakerCombatComponent.cpp` ~:513-518) recovers the Increased bucket from the composed value, so Increased-DoT is not multiplied by the flat. Same fix as the hit path, own item.
 - After the Boots-only MoveSpeed row: the Gloves `Core.MoveSpeed` roll in `Items.Equipment.AttributeContribution` (~BreakerItemTests.cpp:425) grants a slot a line it cannot roll; move it to Boots in the next build. The Sidearm lean on `Core.MoveSpeed` in `affixes.json` is inert (leans apply on weapon slots); delete the row when the leans are next touched.
 - The death beat's black is a camera fade and its teleport lands at the end of black; `HoldBlack`/`ReleaseBlack` on the game instance are the seam to move the teleport to the start of black and reveal through the arrival gate. Felt only if the respawn frame reads cold.
 - The boot's first front-end frame is still uncovered; only travels get the cover.
@@ -68,6 +111,10 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 
 ## Done (last three cycles; older is git)
 
+### Cycle 8
+- [x] The source damage pools carry the flat as its own factor: the aggregator exposes its three lanes, `FillSourcePools` reads them instead of dividing the composed value, and a target rider composes `(Base + Flat)(1 + (Inc + R)/100)·More`. The defect was live (Cadence's guaranteed Added Damage under ten shipped rider rows) and small. `Pools.FlatOrder` pins the rider case; no existing float moved.
+- [x] The Stage 1 design export lives at `Assets/design/` (eight sections); four censuses filed it as Cycles 10, 11, 13 and 14, the plumbing list, and sixteen questions. Five superseded canvases retired from `Assets/ui-reference/`.
+
 ### Cycle 7
 - [x] O196: the pipeline already composes (Base + ΣFlat) × (1 + ΣInc) × ΠMore and `Offense.AddedDamage` is a Flat row as a fraction of the weapon's item-level base. The one defect, the Overflow rule's flat-into-Increased rewrite, is deleted; the enum value stays for saves and resolves to no rule; the row is a Prefix. `Pools.FlatOrder` pins the order and the no-second-curve contribution. A second, subtler site in the damage library's pool split is the next block's first item.
 - [x] O199: a zero-max shield draws nothing on the vitals row; no max is drawn. `HUD.VitalsReadout` pins it.
@@ -78,8 +125,6 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - [x] Movement Speed is a Boots-only affix with a cap of 25 % (O192), landed as a data-only commit with no build.
 - [x] The quartermaster's stock is a row: `Data/class-kits.json`, five classes, read by `GetFallbackClassDefinition`; the catalogue partition test is the identical-output pin.
 
-### Cycle 5
-- [x] Every travel arrives under cover: a briefing pane for a rift, plain black otherwise, and the cover lifts only when the world is loaded AND 24 frames AND 0.9 s have passed, then a 0.35 s ramp (all O2, live as CVars). A 12 s watchdog lifts a cover whose travel the engine refused. `-BreakerCaptureArrival` photographs the first revealed frame and one second later: mean luminance 67 and 67, identical. Pinned by `Arrival.SettleHold`.
 
 
 

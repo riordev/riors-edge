@@ -1,0 +1,150 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Rior's Edge · Inventory, card, picker, controls</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:wght@400;600&family=Sometype+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg0:#0E1103;--bg1:#151808;--bg2:#1D2010;--p0:#262918;--p1:#2F3221;--p2:#393D2B;--b-low:#454840;--b-mid:#5C6056;--b-high:#8A8F84;--t1:#EDEBE3;--t2:#B8B6AC;--t3:#8E8D80;--t4:#5C5C52;--sys:#E3DFD2;--gold:#E6B33A;--gold-dim:#6A5118;--teal1:#2FBFA6;
+--r-standard:#B8B6AC;--r-uncommon:#8FB865;--r-exceptional:#8B8FEC;--r-aberrant:#E07AAE;--r-unwritten:#2FBFA6;
+--display:'Barlow Condensed',sans-serif;--body:'Source Sans 3',sans-serif;--num:'Sometype Mono',monospace;--hatch:repeating-linear-gradient(135deg,#1D2010 0 6px,#262918 6px 8px)}
+html,body{margin:0;background:var(--bg0);color:var(--t1);font-family:var(--body)}
+.disp{font-family:var(--display);font-weight:600;text-transform:uppercase;letter-spacing:.02em}
+.micro{font-family:var(--num);font-size:13px;letter-spacing:.08em;color:var(--t2)}
+.num{font-family:var(--num);font-weight:500}
+/* ---- controls: every interactive element uses .ctl + state classes ---- */
+.ctl{height:44px;padding:0 24px;box-sizing:border-box;display:inline-flex;align-items:center;gap:12px;background:var(--p0);border:1px solid var(--b-low);border-radius:2px;font-family:var(--display);font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:.04em;color:var(--t2);cursor:pointer;user-select:none}
+.ctl:hover,.ctl.hover{background:var(--p1);border-color:var(--b-mid);color:var(--t1)}
+.ctl:active,.ctl.pressed{background:var(--bg2);border-color:var(--b-mid);color:var(--t1);transform:translateY(1px)}
+.ctl:focus-visible,.ctl.focus{outline:0;background:var(--p1);border:2px solid var(--b-high);padding:0 23px;color:var(--t1)}
+.ctl.disabled,.ctl:disabled{background:var(--hatch);border-color:var(--b-low);color:var(--t4);pointer-events:none}
+.ctl.disabled .tally i{background:var(--b-low)}
+.ctl.active{border-top:2px solid var(--sys)}                  /* active tab: status rail, independent of focus */
+.ctl.primary{background:var(--gold);border-color:var(--gold);color:var(--bg0);font-weight:700}
+.ctl.primary:hover,.ctl.primary.hover{background:var(--gold);border-color:var(--gold-dim)}
+.ctl.primary:active,.ctl.primary.pressed{background:var(--gold-dim);color:var(--t1)}
+.ctl.primary:focus-visible,.ctl.primary.focus{border:2px solid var(--b-high)}
+.ctl.small{height:32px;font-size:16px;padding:0 16px}.ctl.small.focus{padding:0 15px}
+.tally{display:flex;gap:2px}.tally i{display:block;width:4px;height:12px;background:currentColor}
+.rail4{border-left:4px solid var(--rail,var(--b-low))}
+/* ---- layout ---- */
+.stage{position:relative;width:1920px;height:1080px;overflow:hidden;background:var(--bg0)}
+.hdr{position:absolute;left:0;top:0;width:1920px;height:88px;background:var(--bg1);border-bottom:1px solid var(--b-low);display:flex;align-items:center;padding:0 40px;box-sizing:border-box;gap:40px}
+.hdr h1{margin:0;font-family:var(--display);font-weight:700;font-size:40px;text-transform:uppercase;letter-spacing:.02em}
+.col{position:absolute;top:128px;height:912px;box-sizing:border-box}
+.equipped{left:40px;width:360px;background:var(--bg1);border:1px solid var(--b-low);border-left:4px solid var(--sys);padding:16px;display:flex;flex-direction:column;gap:8px}
+.slot{height:96px;display:flex;align-items:center;gap:12px;padding-right:12px;background:var(--p0);border:1px solid var(--b-low);border-radius:2px;box-sizing:border-box;cursor:pointer}
+.slot:hover{background:var(--p1);border-color:var(--b-mid)}.slot.focus{background:var(--p1);border:2px solid var(--b-high)}
+.slot.empty{background:var(--bg2)}.slot .r{width:4px;height:100%;background:var(--rail,var(--b-low));flex:none}
+.slot .tile{width:64px;height:64px;background:var(--p2);border-radius:4px;flex:none}.slot.empty .tile{background:var(--bg2)}
+.slot .n{font-family:var(--display);font-weight:600;font-size:20px;line-height:24px;text-transform:uppercase;letter-spacing:.02em}.slot.empty .n{color:var(--t4)}
+.slot .tally{color:var(--rail)}
+.pack{left:424px;width:1016px;display:flex;flex-direction:column;gap:16px}
+.bar{display:flex;align-items:center;gap:8px;height:44px}
+.grid{display:grid;grid-template-columns:repeat(5,160px);grid-auto-rows:128px;gap:8px}
+.cell{position:relative;background:var(--p0);border:1px solid var(--b-low);border-radius:2px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;padding:8px 8px 8px 12px;cursor:pointer;color:var(--rail,var(--b-low))}
+.cell::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--rail,transparent)}
+.cell:hover{background:var(--p1);border-color:var(--b-mid)}.cell.focus{background:var(--p1);border:2px solid var(--b-high)}
+.cell.unwritten{border-color:var(--teal1)}                    /* the top rarity's own frame */
+.cell.empty{background:var(--bg1);border-color:var(--p0);cursor:default}
+.cell .n{font-family:var(--display);font-weight:600;font-size:16px;line-height:18px;text-transform:uppercase;letter-spacing:.02em;color:var(--t1)}
+.cell .leg{width:12px;height:12px;background:var(--gold);transform:rotate(45deg);margin:2px}
+.card{position:absolute;left:1464px;top:128px;width:416px;background:var(--bg2);border:1px solid var(--b-low);border-left:4px solid var(--rail,var(--b-low));box-sizing:border-box;padding:16px;display:flex;flex-direction:column;gap:12px}
+.card.unwritten{border-color:var(--teal1);border-left-color:var(--teal1)}
+.card h2{margin:0;font-family:var(--display);font-weight:700;font-size:24px;line-height:28px;text-transform:uppercase;letter-spacing:.02em}
+.hr{height:1px;background:var(--b-low)}
+.aff{display:grid;grid-template-columns:16px minmax(0,1fr) 72px 40px;align-items:center;gap:8px;height:24px;font-size:14px;color:var(--t2)}
+.aff .v{font-family:var(--num);font-weight:500;font-size:16px;text-align:right;color:var(--t1)}
+.aff .t{height:20px;display:flex;align-items:center;justify-content:center;background:var(--p2);border-radius:2px;font-family:var(--num);font-size:13px}
+.up{width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:8px solid var(--sys)}
+.dn{width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid var(--t3)}
+.eq{width:8px;height:8px;background:var(--b-mid);margin:0 4px}
+.prose{font-size:14px;line-height:20px;color:var(--t1)}
+/* picker (modal) */
+.scrim{position:absolute;inset:0;background:repeating-linear-gradient(135deg,#0E1103 0 6px,#151808 6px 8px);display:none}
+.scrim.on{display:block}
+.picker{position:absolute;left:640px;top:220px;width:640px;background:var(--bg2);border:1px solid var(--b-low);border-top:2px solid var(--r-aberrant);box-sizing:border-box;padding:24px;display:flex;flex-direction:column;gap:16px}
+.row{display:flex;align-items:center;gap:12px;height:64px;padding:0 12px;box-sizing:border-box;background:var(--p0);border:1px solid var(--b-low);border-left:4px solid var(--r-aberrant);border-radius:2px}
+.row.focus{background:var(--p1);border:2px solid var(--b-high);border-left:4px solid var(--r-aberrant)}
+.row .tile{width:40px;height:40px;background:var(--p2);border-radius:4px}
+/* control sheet */
+.sheet{padding:64px;display:grid;grid-template-columns:200px repeat(5,minmax(0,1fr));gap:8px 16px;align-items:center;font-family:var(--num);font-size:13px;letter-spacing:.08em;color:var(--t3)}
+.sheet .lab{color:var(--t1)}
+.sw{position:fixed;left:16px;bottom:16px;display:flex;gap:8px;z-index:9}
+</style></head><body>
+<div class="stage" id="stage">
+  <div class="hdr"><h1>Loadout</h1>
+    <div style="display:flex;gap:8px"><span class="ctl active" tabindex="0">Gear</span><span class="ctl" tabindex="0">Skills</span><span class="ctl" tabindex="0">Abilities</span></div>
+    <div style="flex:1"></div>
+    <div style="display:flex;gap:8px">
+      <span class="ctl rail4" style="--rail:var(--r-aberrant);padding-left:16px" tabindex="0" onclick="picker(true)"><span class="tally" style="color:var(--r-aberrant)"><i></i><i></i><i></i><i></i></span><span class="num" style="font-weight:700;font-size:16px;color:var(--t1)">3 / 3</span><span style="font-size:16px">Aberrant</span></span>
+      <span class="ctl" style="padding-left:16px" tabindex="0"><span class="tally" style="color:var(--r-unwritten)"><i></i><i></i><i></i><i></i><i></i></span><span class="num" style="font-weight:700;font-size:16px;color:var(--t1)">0 / 1</span><span style="font-size:16px">Unwritten</span></span>
+    </div>
+    <span class="ctl" tabindex="0">Close</span>
+  </div>
+  <div class="col equipped">
+    <div class="micro" style="color:var(--t3);padding-bottom:8px">EQUIPPED · 8</div>
+    <div class="slot" style="--rail:var(--r-uncommon)"><div class="r"></div><div class="tile"></div><div style="flex:1;display:flex;flex-direction:column;gap:4px"><div class="micro">HELMET</div><div class="n">Ridge cap</div><div class="tally"><i></i><i></i></div></div><div class="num" style="color:var(--t2)">i44</div></div>
+    <div class="slot focus" style="--rail:var(--r-aberrant)"><div class="r"></div><div class="tile"></div><div style="flex:1;display:flex;flex-direction:column;gap:4px"><div class="micro">BODY ARMOUR</div><div class="n">Quarry vest</div><div class="tally"><i></i><i></i><i></i><i></i></div></div><div class="num" style="color:var(--t2)">i52</div></div>
+    <div class="slot" style="--rail:var(--r-exceptional)"><div class="r"></div><div class="tile"></div><div style="flex:1;display:flex;flex-direction:column;gap:4px"><div class="micro">GLOVES</div><div class="n">Bench mitts</div><div class="tally"><i></i><i></i><i></i></div></div><div class="num" style="color:var(--t2)">i48</div></div>
+    <div class="slot empty"><div class="r"></div><div class="tile"></div><div style="flex:1;display:flex;flex-direction:column;gap:4px"><div class="micro">WAIST</div><div class="n">Empty</div></div></div>
+    <div class="slot" style="--rail:var(--r-aberrant)"><div class="r"></div><div class="tile"></div><div style="flex:1;display:flex;flex-direction:column;gap:4px"><div class="micro">BOOTS</div><div class="n">Clinker treads</div><div class="tally"><i></i><i></i><i></i><i></i></div></div><div class="num" style="color:var(--t2)">i55</div></div>
+    <div class="slot" style="--rail:var(--r-aberrant)"><div class="r"></div><div class="tile"></div><div style="flex:1;display:flex;flex-direction:column;gap:4px"><div class="micro">NECKLACE</div><div class="n">Riftglass shard</div><div class="tally"><i></i><i></i><i></i><i></i></div></div><div class="num" style="color:var(--t2)">i58</div></div>
+    <div class="slot" style="--rail:var(--r-standard)"><div class="r"></div><div class="tile"></div><div style="flex:1;display:flex;flex-direction:column;gap:4px"><div class="micro">PRIMARY</div><div class="n">Issue rifle</div><div class="tally"><i></i></div></div><div class="num" style="color:var(--t2)">i41</div></div>
+    <div class="slot empty"><div class="r"></div><div class="tile"></div><div style="flex:1;display:flex;flex-direction:column;gap:4px"><div class="micro">SECONDARY</div><div class="n">Empty</div></div></div>
+  </div>
+  <div class="col pack">
+    <div class="bar"><span class="micro" style="color:var(--t3);margin-right:16px">BACKPACK · 14 / 25</span><span class="ctl small active focus">All</span><span class="ctl small" tabindex="0">Armour</span><span class="ctl small" tabindex="0">Weapons</span><span class="ctl small" tabindex="0">Trinkets</span><span style="flex:1"></span><span class="ctl small disabled">Salvage below Uncommon</span></div>
+    <div class="grid" id="grid"></div>
+  </div>
+  <div class="card" id="card" style="--rail:var(--r-aberrant)">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div style="display:flex;flex-direction:column;gap:4px"><div class="tally" style="color:var(--r-aberrant)"><i></i><i></i><i></i><i></i></div><h2>Slag-plate cuirass</h2><div style="font-size:14px;color:var(--t2)">Aberrant · Focused · Body armour</div></div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><div class="num" style="font-weight:700;font-size:24px">i61</div><div class="leg" style="width:12px;height:12px;background:var(--gold);transform:rotate(45deg);margin:4px"></div></div>
+    </div>
+    <div class="hr"></div>
+    <div class="micro">REWRITE</div>
+    <div class="prose">While sliding, incoming damage is halved and the slide does not end on impact.</div>
+    <div class="micro" style="margin-top:4px">PREFIXES</div>
+    <div class="aff"><div class="up"></div><div>Armour</div><div class="v">+184</div><div class="t">T4</div></div>
+    <div class="aff"><div class="up"></div><div>Health</div><div class="v">+120</div><div class="t">T5</div></div>
+    <div class="aff"><div class="eq"></div><div>Physical damage reduction</div><div class="v">+4.0%</div><div class="t">T7</div></div>
+    <div class="micro" style="margin-top:4px">SUFFIXES</div>
+    <div class="aff"><div class="dn"></div><div>Damage while sliding</div><div class="v">+9%</div><div class="t">T6</div></div>
+    <div class="aff"><div class="up"></div><div>Resource on hit taken</div><div class="v">+2</div><div class="t">T3</div></div>
+    <div class="hr"></div>
+    <div class="micro" style="color:var(--t3);display:flex;gap:16px;align-items:center"><span>VS EQUIPPED</span><span style="display:flex;gap:6px;align-items:center"><span class="up"></span>UP</span><span style="display:flex;gap:6px;align-items:center"><span class="dn"></span>DOWN</span><span style="display:flex;gap:6px;align-items:center"><span class="eq"></span>SAME</span></div>
+    <div style="display:flex;gap:8px;margin-top:4px"><span class="ctl primary" style="flex:1;justify-content:center" tabindex="0" onclick="picker(true)">Equip · swap</span><span class="ctl" tabindex="0">Salvage</span></div>
+  </div>
+  <div class="scrim" id="scrim">
+    <div class="picker">
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><div class="disp" style="font-weight:700;font-size:32px;line-height:32px">Aberrant · 3 of 3 worn</div><div style="font-size:14px;color:var(--t2)">Choose the piece that comes off.</div></div>
+      <div class="row" style="background:var(--bg1)"><div class="tile"></div><div style="flex:1"><div class="micro">INCOMING · BODY ARMOUR</div><div class="disp" style="font-size:20px">Slag-plate cuirass</div></div><div class="num" style="color:var(--t2)">i61</div></div>
+      <div class="hr"></div>
+      <div class="row focus"><div class="tile"></div><div style="flex:1"><div class="micro">BODY ARMOUR</div><div class="disp" style="font-size:20px">Quarry vest</div></div><div style="display:flex;gap:6px;align-items:center"><div class="up"></div><span class="num" style="color:var(--t2)">i52</span></div><span class="ctl small primary" onclick="picker(false)">Swap</span></div>
+      <div class="row"><div class="tile"></div><div style="flex:1"><div class="micro">BOOTS</div><div class="disp" style="font-size:20px">Clinker treads</div></div><div style="display:flex;gap:6px;align-items:center"><div class="eq"></div><span class="num" style="color:var(--t2)">i55</span></div><span class="ctl small" onclick="picker(false)">Take off</span></div>
+      <div class="row"><div class="tile"></div><div style="flex:1"><div class="micro">NECKLACE</div><div class="disp" style="font-size:20px">Riftglass shard</div></div><div style="display:flex;gap:6px;align-items:center"><div class="eq"></div><span class="num" style="color:var(--t2)">i58</span></div><span class="ctl small" onclick="picker(false)">Take off</span></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:8px"><span class="ctl" onclick="picker(false)">Keep current</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="sheet">
+  <div></div><div>DEFAULT</div><div>HOVER</div><div>PRESSED</div><div>FOCUSED (PAD)</div><div>DISABLED · PAINTED</div>
+  <div class="lab">Button</div><div><span class="ctl">Salvage</span></div><div><span class="ctl hover">Salvage</span></div><div><span class="ctl pressed">Salvage</span></div><div><span class="ctl focus">Salvage</span></div><div><span class="ctl disabled">Salvage</span></div>
+  <div class="lab">Primary</div><div><span class="ctl primary">Equip</span></div><div><span class="ctl primary hover">Equip</span></div><div><span class="ctl primary pressed">Equip</span></div><div><span class="ctl primary focus">Equip</span></div><div><span class="ctl disabled">Equip</span></div>
+  <div class="lab">Tab · active</div><div><span class="ctl active">Armour</span></div><div><span class="ctl active hover">Armour</span></div><div><span class="ctl active pressed">Armour</span></div><div><span class="ctl active focus">Armour</span></div><div><span class="ctl active disabled">Armour</span></div>
+  <div class="lab">Limit counter</div><div><span class="ctl rail4" style="--rail:var(--r-aberrant);padding-left:16px"><span class="tally" style="color:var(--r-aberrant)"><i></i><i></i><i></i><i></i></span>3 / 3</span></div><div><span class="ctl rail4 hover" style="--rail:var(--r-aberrant);padding-left:16px"><span class="tally" style="color:var(--r-aberrant)"><i></i><i></i><i></i><i></i></span>3 / 3</span></div><div><span class="ctl rail4 pressed" style="--rail:var(--r-aberrant);padding-left:16px"><span class="tally" style="color:var(--r-aberrant)"><i></i><i></i><i></i><i></i></span>3 / 3</span></div><div><span class="ctl rail4 focus" style="--rail:var(--r-aberrant);padding-left:16px"><span class="tally" style="color:var(--r-aberrant)"><i></i><i></i><i></i><i></i></span>3 / 3</span></div><div><span class="ctl rail4 disabled" style="--rail:var(--r-aberrant);padding-left:16px"><span class="tally"><i></i><i></i><i></i><i></i></span>3 / 3</span></div>
+  <div class="lab">List row</div><div><div class="row" style="border-left-color:var(--r-uncommon)"><div class="tile"></div><div class="disp" style="font-size:20px">Ridge cap</div></div></div><div><div class="row" style="border-left-color:var(--r-uncommon);background:var(--p1);border-color:var(--b-mid);border-left-color:var(--r-uncommon)"><div class="tile"></div><div class="disp" style="font-size:20px">Ridge cap</div></div></div><div><div class="row" style="border-left-color:var(--r-uncommon);background:var(--bg2);transform:translateY(1px)"><div class="tile"></div><div class="disp" style="font-size:20px">Ridge cap</div></div></div><div><div class="row focus" style="border-left-color:var(--r-uncommon)"><div class="tile"></div><div class="disp" style="font-size:20px">Ridge cap</div></div></div><div><div class="row" style="border-left-color:var(--r-uncommon);background:var(--hatch);color:var(--t4)"><div class="tile" style="background:var(--p0)"></div><div class="disp" style="font-size:20px">Ridge cap</div></div></div>
+</div>
+<div class="sw"><span class="ctl small" onclick="picker(true)">Open picker</span></div>
+<script>
+const items=[['Slag-plate cuirass','BODY','aberrant',61,1,1],['Ridge cap','HELMET','uncommon',44],['Tally gloves','GLOVES','exceptional',47],['Clinker treads','BOOTS','standard',54],["Kess's belt",'WAIST','exceptional',49],['Bore rifle','PRIMARY','unwritten',60,1],['Field carbine','SECONDARY','standard',43],['Quarry vest','BODY','aberrant',52],['Ballast boots','BOOTS','uncommon',45],['Range card','TRINKET','exceptional',50],['Spool','TRINKET','standard',41],['Drift shard','NECKLACE','aberrant',57],['Tin helm','HELMET','standard',40],['Coil','TRINKET','uncommon',46]];
+const T={standard:1,uncommon:2,exceptional:3,aberrant:4,unwritten:5};
+const g=document.getElementById('grid');let h='';
+for(let i=0;i<25;i++){const it=items[i];
+  if(!it){h+='<div class="cell empty"></div>';continue}
+  const [n,k,r,il,leg,foc]=it;
+  h+=`<div class="cell ${r}${foc?' focus':''}" style="--rail:var(--r-${r})" tabindex="0"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div class="tally">${'<i></i>'.repeat(T[r])}</div>${leg?'<div class="leg"></div>':'<div style="width:16px;height:16px"></div>'}</div><div class="n">${n}</div><div style="display:flex;justify-content:space-between"><span class="micro">${k}</span><span class="num" style="font-size:13px;color:var(--t2)">i${il}</span></div></div>`;}
+g.innerHTML=h;
+function picker(on){document.getElementById('scrim').classList.toggle('on',on)}
+/* Motion (engine): modal in 160 ms slide 16 px along its rail axis + fade, out 100 ms. Picker slides down from its top rail; leaves upward.
+   Card-follows: hovered item on mouse, focused item on pad; compare to same slot; weapons compare to Primary unless Secondary holds focus.
+   Which piece a swap removes is the equipment component's rule; this UI offers the list and a pre-focus only. */
+</script></body></html>

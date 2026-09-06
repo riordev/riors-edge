@@ -1,0 +1,49 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Rior's Edge · Banners</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:wght@400;600&family=Sometype+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg0:#0E1103;--bg1:#151808;--bg2:#1D2010;--p0:#262918;--p1:#2F3221;--p2:#393D2B;--b-low:#454840;--b-mid:#5C6056;--b-high:#8A8F84;--t1:#EDEBE3;--t2:#B8B6AC;--t3:#8E8D80;--sys:#E3DFD2;--gold:#E6B33A;--harm:#D9402F;--teal1:#2FBFA6;--teal2:#6ADFC9;--display:'Barlow Condensed',sans-serif;--body:'Source Sans 3',sans-serif;--num:'Sometype Mono',monospace}
+html,body{margin:0;background:var(--bg0);color:var(--t1);font-family:var(--body)}
+.disp{font-family:var(--display);font-weight:700;text-transform:uppercase;letter-spacing:.02em}
+.num{font-family:var(--num)}
+.btn{height:44px;padding:0 24px;box-sizing:border-box;display:inline-flex;align-items:center;background:var(--p0);border:1px solid var(--b-low);border-radius:2px;font-family:var(--display);font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:.04em;color:var(--t2)}
+.btn.focus{background:var(--p1);border:2px solid var(--b-high);padding:0 23px;color:var(--t1)}
+
+.stage{position:relative;width:1920px;height:1080px;overflow:hidden;background:repeating-linear-gradient(135deg,#2A2C27 0 14px,#303229 14px 28px)}
+.sky{position:absolute;inset:0 0 auto 0;height:640px;background:var(--p2)}.ground{position:absolute;left:0;top:640px;width:1920px;height:440px;background:var(--p1)}
+.b{position:absolute;transition:transform .16s cubic-bezier(.2,.7,.2,1),opacity .16s linear}
+.b.out{transition-duration:.1s;opacity:0;pointer-events:none}
+/* wave clear: top, vertical axis */
+.wave{left:0;top:160px;width:1920px;display:flex;justify-content:center}
+.wave.out{transform:translateY(-16px)}
+.wave .plate{display:flex;align-items:center;gap:24px;height:64px;padding:0 32px;background:var(--bg1);border-top:2px solid var(--sys);border-bottom:1px solid var(--b-low)}
+.cells{display:flex;gap:4px}.cells i{display:block;width:16px;height:8px;background:var(--b-low)}.cells i.d{background:var(--t2)}.cells i.n{background:var(--sys)}
+.wave .h{font-size:40px;line-height:40px;color:var(--sys)}.wave .c{font-family:var(--num);font-size:16px;color:var(--t2)}
+/* rift complete: band, horizontal wipe */
+.rift{left:0;top:420px;width:1920px;height:120px;background:var(--bg1);border-top:2px solid var(--teal1);border-bottom:2px solid var(--teal1);display:flex;align-items:center;justify-content:center;gap:40px;clip-path:inset(0 0 0 0);transition:clip-path .24s cubic-bezier(.2,.7,.2,1)}
+.rift.out{transition-duration:.16s;clip-path:inset(0 0 0 100%);opacity:1}
+.rift .dia{width:24px;height:24px;background:var(--teal1);transform:rotate(45deg)}
+.rift .h{font-size:64px;line-height:64px;color:var(--teal2)}.rift .s{font-size:16px;line-height:20px;color:var(--t2);text-align:center}
+/* level up: right edge, horizontal from right */
+.lvl{right:40px;top:760px;display:flex;background:var(--bg1);border:1px solid var(--b-low);border-left:4px solid var(--gold)}
+.lvl.out{transform:translateX(16px)}
+.lvl .in{display:flex;flex-direction:column;justify-content:center;padding:16px 24px;gap:4px}
+.lvl .k{font-family:var(--num);font-size:13px;letter-spacing:.08em;color:var(--t2)}
+.lvl .n{font-family:var(--num);font-weight:700;font-size:48px;line-height:48px}
+.lvl .r{font-family:var(--display);font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:.02em;color:var(--gold)}
+.lvl .xp{width:240px;height:4px;background:var(--b-low)}.lvl .xp i{display:block;height:4px;background:var(--gold)}
+.sw{position:fixed;left:16px;bottom:16px;display:flex;gap:8px;z-index:9}
+.sw .btn{cursor:pointer;height:44px;font-size:16px}
+</style></head><body>
+<div class="stage">
+<div class="sky"></div><div class="ground"></div>
+<div class="b wave out" id="wave"><div class="plate"><div class="cells"><i class="d"></i><i class="d"></i><i class="n"></i><i></i><i></i></div><div class="disp h">Wave 3 clear</div><div class="c">next in 00:20</div></div></div>
+<div class="b rift out" id="rift"><div class="dia"></div><div><div class="disp h">Sunken carriage · closed</div><div class="s">The rift is sealed. Loot is on the ground.</div></div><div class="dia"></div></div>
+<div class="b lvl out" id="lvl"><div class="in"><div class="k">LEVEL</div><div style="display:flex;align-items:baseline;gap:12px"><span class="n">14</span><span class="r">+1 core point</span></div><div class="xp"><i style="width:8%"></i></div></div></div>
+</div>
+<div class="sw"><span class="btn" onclick="fire(['wave'])">Wave clear</span><span class="btn" onclick="fire(['rift'])">Rift complete</span><span class="btn" onclick="fire(['lvl'])">Level up</span><span class="btn focus" onclick="fire(['rift','lvl','wave'])">All at once (staggered)</span></div>
+<script>
+// arrival rule: never two on one frame; 300 ms stagger in priority rift > lvl > wave. Holds: wave 1.6 s, rift 2.4 s, lvl 2.0 s. A wave-clear queued behind a rift-complete is dropped.
+const HOLD={wave:1600,rift:2400,lvl:2000},PRI=['rift','lvl','wave'];
+function fire(ids){const q=PRI.filter(i=>ids.includes(i));if(q.includes('rift'))q.splice(q.indexOf('wave')>=0?q.indexOf('wave'):q.length,1);
+  q.forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);el.classList.remove('out');setTimeout(()=>el.classList.add('out'),HOLD[id]+160)},i*300));}
+</script></body></html>

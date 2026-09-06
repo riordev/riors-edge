@@ -243,13 +243,15 @@ private:
     // Reads the instigator's published rider table and cached SELF conditions,
     // supplies the target half from GetOwner(), and — only when a rider fired
     // AND the request carries the source split — recomposes
-    //   Effective = (1 + (SourceIncreasedPercent + RiderPercent)/100) x SourceMoreProduct
+    //   Effective = SourceFlatFactor x (1 + (SourceIncreasedPercent + RiderPercent)/100) x SourceMoreProduct
     // where an Increased rider joins the SAME additive bucket as every other
-    // Increased line, and — since O141 — the ONE hit-time More rider
-    // (Collapse) has already been folded into SourceMoreProduct under the
-    // one O34 ceiling (headroom, never a slot), so the identity above stays
-    // literally true. Any other request resolves bit-identically to before
-    // this existed (test-pinned).
+    // Increased line and is therefore scaled by the flat layer exactly as
+    // they are (O196: (Base + ΣFlat) x (1 + ΣInc/100) x ΠMore, riders inside
+    // ΣInc), and — per O141 — the ONE hit-time More rider (Collapse) is
+    // folded into SourceMoreProduct under the one O34 ceiling (headroom,
+    // never a slot), so the identity above stays literally true. Any other
+    // request resolves bit-identically to a request with no split
+    // (test-pinned).
     void ApplyTargetConditionRiders(FBreakerDamageRequest& Request) const;
     void DispatchHitDealt(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result);
 

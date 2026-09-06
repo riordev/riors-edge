@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Rior's Edge · HUD 1920×1080</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:wght@400;600&family=Sometype+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* ---- tokens ---- */
+:root{
+  --bg0:#0E1103;--bg1:#151808;--bg2:#1D2010;
+  --p0:#262918;--p1:#2F3221;--p2:#393D2B;
+  --b-low:#454840;--b-mid:#5C6056;--b-high:#8A8F84;
+  --t1:#EDEBE3;--t2:#B8B6AC;--t3:#8E8D80;--t4:#5C5C52;
+  --sys:#E3DFD2;--sys-dim:#6E6C62;
+  --wpn:#E8842B;--wpn-dim:#6B3E14;
+  --gold:#E6B33A;--gold-dim:#6A5118;
+  --harm:#D9402F;--harm-dim:#5E1F18;
+  --ult:#A98BEA;--ult-dim:#463367;
+  --verb-move:#6FC3E8;
+  --teal0:#1E8F7C;--teal1:#2FBFA6;--teal2:#6ADFC9;--rift-hot:#35E8FF;
+  --r-standard:#B8B6AC;--r-uncommon:#8FB865;--r-exceptional:#8B8FEC;--r-aberrant:#E07AAE;--r-unwritten:#2FBFA6;
+  --display:'Barlow Condensed',sans-serif;--body:'Source Sans 3',sans-serif;--num:'Sometype Mono',monospace;
+}
+html,body{margin:0;background:var(--bg0);color:var(--t1);font-family:var(--body)}
+.stage{position:relative;width:1920px;height:1080px;overflow:hidden;background:repeating-linear-gradient(135deg,#2A2C27 0 14px,#303229 14px 28px)}
+.sky{position:absolute;inset:0 0 auto 0;height:640px;background:var(--p2)}
+.ground{position:absolute;left:0;top:640px;width:1920px;height:440px;background:var(--p1)}
+.abs{position:absolute}
+.num{font-family:var(--num);font-weight:500}
+.numb{font-family:var(--num);font-weight:700}
+.disp{font-family:var(--display);font-weight:600;text-transform:uppercase;letter-spacing:.02em}
+.micro{font-family:var(--num);font-size:13px;letter-spacing:.08em}
+
+/* enemies (placeholders + minimal bar) */
+.enemy{position:absolute;background:var(--bg2);border:1px solid var(--b-low)}
+.ebar{position:absolute;height:6px;background:var(--bg1);border:1px solid var(--b-mid);box-sizing:border-box}
+.ebar i{display:block;height:100%;background:var(--sys)}
+.dmg{position:absolute;font-family:var(--num);font-weight:700;line-height:1}
+.dmg.wpn{color:var(--wpn);font-size:32px}.dmg.crit{color:var(--gold);font-size:48px}.dmg.zero{color:var(--t3);font-size:32px}.dmg.rift{color:var(--rift-hot);font-size:32px}
+
+/* near-death frame */
+.frame{position:absolute;inset:0;box-sizing:border-box;border:8px solid var(--harm);display:none;animation:pulse 1.6s ease-in-out infinite}
+.bracket{position:absolute;width:64px;height:64px;display:none}
+.bracket.tl{left:24px;top:24px;border-left:4px solid var(--harm);border-top:4px solid var(--harm)}
+.bracket.tr{right:24px;top:24px;border-right:4px solid var(--harm);border-top:4px solid var(--harm)}
+.bracket.bl{left:24px;bottom:24px;border-left:4px solid var(--harm);border-bottom:4px solid var(--harm)}
+.bracket.br{right:24px;bottom:24px;border-right:4px solid var(--harm);border-bottom:4px solid var(--harm)}
+.stage.death .frame,.stage.death .bracket{display:block}
+@keyframes pulse{0%,100%{border-width:8px}50%{border-width:16px}}
+
+/* crosshair 40×40 at (940,520) */
+.xh{position:absolute;left:940px;top:520px;width:40px;height:40px}
+.xh .t{position:absolute;background:var(--sys)}
+.xh .n{left:19px;top:0;width:2px;height:12px}.xh .s{left:19px;bottom:0;width:2px;height:12px}
+.xh .w{top:19px;left:0;width:12px;height:2px}.xh .e{top:19px;right:0;width:12px;height:2px}
+.hit{position:absolute;width:12px;height:2px;display:none}
+.hit.a{left:4px;top:4px;transform:rotate(45deg);transform-origin:left center}
+.hit.b{right:4px;top:4px;transform:rotate(-45deg);transform-origin:right center}
+.hit.c{left:4px;bottom:4px;transform:rotate(-45deg);transform-origin:left center}
+.hit.d{right:4px;bottom:4px;transform:rotate(45deg);transform-origin:right center}
+.stage.fight .hit{display:block;background:var(--wpn)}          /* hit: 80 ms */
+.stage.death .hit{display:block;background:var(--gold)}         /* weak-point kill: 320 ms (+8px diamond in engine) */
+
+/* encounter top-left (40,40) */
+.enc{position:absolute;left:40px;top:40px;display:flex;flex-direction:column;gap:8px}
+.enc .rift{font-size:24px;line-height:28px;color:var(--sys)}
+.waves{display:flex;gap:4px}.waves i{display:block;width:16px;height:8px;background:var(--b-low)}
+.waves i.done{background:var(--t2)}.waves i.now{background:var(--sys)}
+.count{font-size:16px;line-height:16px;color:var(--t2)}
+
+/* quest top-right */
+.quest{position:absolute;right:40px;top:40px;width:320px;text-align:right;font-size:14px;line-height:20px;color:var(--t2)}
+
+/* interact / loot plate (world space) */
+.plate{position:absolute;display:none;align-items:center;gap:8px;height:40px;padding-right:12px;background:var(--bg1);border:1px solid var(--b-low);border-left:4px solid var(--r-standard)}
+.plate .key{width:32px;height:32px;margin-left:4px;background:var(--p2);border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:var(--num);font-weight:700;font-size:16px}
+.plate .tally{display:flex;gap:2px}.plate .tally i{display:block;width:4px;height:12px;background:currentColor}
+.plate .name{font-family:var(--display);font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:.02em}
+
+/* vitals bottom-left (40,936) 480 wide */
+.vitals{position:absolute;left:40px;top:936px;width:480px;display:flex;flex-direction:column;gap:8px}
+.hpnum{display:flex;align-items:baseline;gap:8px}
+.hpnum b{font-family:var(--num);font-weight:700;font-size:32px;line-height:32px;color:var(--sys)}
+.hpnum span{font-family:var(--num);font-size:13px;letter-spacing:.08em;color:var(--t2)}
+.stage.death .hpnum b{color:var(--harm)}
+.shield{height:6px;background:var(--bg1);border:1px solid var(--b-mid);box-sizing:border-box}.shield i{display:block;height:100%;background:var(--t2)}
+.hp{position:relative;height:16px;background:var(--bg1);border:1px solid var(--b-mid);box-sizing:border-box}
+.hp .chip{position:absolute;left:0;top:0;height:100%;background:repeating-linear-gradient(135deg,var(--harm-dim) 0 4px,var(--harm) 4px 6px)}
+.hp .fill{position:absolute;left:0;top:0;height:100%;background:var(--sys)}
+.hp .low{position:absolute;left:20%;top:0;width:1px;height:100%;background:var(--bg0)}
+.res{position:relative;height:8px;margin-top:4px;background:var(--bg1);border:1px solid var(--b-low);box-sizing:border-box}
+.res .fill{position:absolute;left:0;top:0;height:100%;background:var(--t2)}
+.res .notch{position:absolute;left:70%;top:-4px;width:1px;height:14px;background:var(--t2)}
+.res .mark{position:absolute;top:-6px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid var(--t2);margin-left:-6px}
+.res .bank{position:absolute;right:-1px;top:-1px;width:8px;height:8px;background:var(--gold);display:none}
+.stage.death .res .fill,.stage.death .res .mark{background:var(--sys);border-top-color:var(--sys)}
+.stage.death .res .bank{display:block}
+
+/* abilities bottom-centre (844,936) 232 wide */
+.abil{position:absolute;left:844px;top:936px;width:232px;display:flex;align-items:flex-end;justify-content:center;gap:8px}
+.tile{position:relative;width:64px;height:64px;box-sizing:border-box;background:var(--bg1);border:1px solid var(--b-mid);border-radius:2px;overflow:hidden}
+.tile .cd{position:absolute;left:0;bottom:0;width:100%;height:0;background:var(--p2)}          /* drains bottom-up */
+.tile .rail{position:absolute;left:0;top:0;width:100%;height:2px}
+.tile .key{position:absolute;right:6px;top:6px;font-family:var(--num);font-weight:700;font-size:13px;line-height:13px;color:var(--t2)}
+.tile .mark{position:absolute;left:24px;top:28px;width:16px;height:16px;background:var(--t3)}
+.tile.ult{width:88px;height:88px}.tile.ult .rail{height:4px;background:var(--ult)}
+.tile.ult .key{right:8px;top:10px}.tile.ult .mark{left:32px;top:36px;width:24px;height:24px}
+.tile.ready{background:var(--verb)}.tile.ready .mark,.tile.ready .key{background:var(--bg0);color:var(--bg0)}
+.tile.ready .mark{background:var(--bg0)}
+.tile.locked{background:repeating-linear-gradient(135deg,var(--bg2) 0 6px,var(--p0) 6px 8px)}
+.tile.locked .rail,.tile.locked .mark{background:var(--b-low)}.tile.locked .key{color:var(--t4)}
+.tile.move{--verb:var(--verb-move)}.tile.wpn{--verb:var(--wpn)}.tile.gold{--verb:var(--gold)}.tile.ult{--verb:var(--ult)}
+.tile .rail{background:var(--verb)}
+
+/* ammo bottom-right */
+.ammo{position:absolute;right:40px;top:944px;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.ammo .n{display:flex;align-items:baseline;gap:12px}
+.ammo .mag{font-family:var(--num);font-weight:700;font-size:48px;line-height:48px;color:var(--sys)}
+.ammo .mag.low{color:var(--wpn)}
+.ammo .rsv{font-family:var(--num);font-size:24px;line-height:24px;color:var(--t2)}
+.rail{width:240px;height:4px;background:var(--b-low)}.rail i{display:block;height:4px;background:var(--sys)}  /* magazine fill at rest */
+.rail.reloading i{background:var(--wpn)}                                                                        /* reload progress */
+
+/* switcher (not part of HUD) */
+.sw{position:fixed;left:16px;bottom:16px;display:flex;gap:8px;z-index:9}
+.sw button{height:44px;padding:0 16px;background:var(--p0);border:1px solid var(--b-low);border-radius:2px;color:var(--t1);font-family:var(--display);font-weight:600;font-size:16px;text-transform:uppercase;letter-spacing:.04em;cursor:pointer}
+.sw button:hover{background:var(--p1);border-color:var(--b-mid)}
+.sw button.on{background:var(--p1);border:2px solid var(--b-high)}
+</style>
+</head>
+<body>
+<div class="stage calm" id="stage">
+  <div class="sky"></div><div class="ground"></div>
+
+  <div id="world"></div>
+
+  <div class="frame"></div>
+  <div class="bracket tl"></div><div class="bracket tr"></div><div class="bracket bl"></div><div class="bracket br"></div>
+
+  <div class="xh"><div class="t n"></div><div class="t s"></div><div class="t w"></div><div class="t e"></div>
+    <div class="hit a"></div><div class="hit b"></div><div class="hit c"></div><div class="hit d"></div></div>
+
+  <div class="enc"><div class="disp rift" id="rift"></div><div style="display:flex;align-items:center;gap:16px"><div class="waves" id="waves"></div><div class="num count" id="count"></div></div></div>
+  <div class="quest" id="quest"></div>
+
+  <div class="plate" id="plate"><div class="key" id="plateKey">F</div><div class="tally" id="tally"></div><div class="name" id="plateName"></div></div>
+
+  <div class="vitals">
+    <div class="hpnum"><b id="hp"></b><span>/ <span id="hpMax"></span></span></div>
+    <div class="shield"><i id="shield"></i></div>
+    <div class="hp"><div class="chip" id="chip"></div><div class="fill" id="hpFill"></div><div class="low"></div></div>
+    <div class="res"><div class="fill" id="resFill"></div><div class="notch"></div><div class="mark" id="resMark"></div><div class="bank"></div></div>
+  </div>
+
+  <div class="abil">
+    <div class="tile move" id="a1"><div class="cd"></div><div class="rail"></div><div class="key">1</div><div class="mark"></div></div>
+    <div class="tile ult" id="ult"><div class="cd"></div><div class="rail"></div><div class="key">Q</div><div class="mark"></div></div>
+    <div class="tile wpn" id="a2"><div class="cd"></div><div class="rail"></div><div class="key">2</div><div class="mark"></div></div>
+  </div>
+
+  <div class="ammo"><div class="n"><span class="mag" id="mag"></span><span class="rsv" id="rsv"></span></div><div class="rail" id="rail"><i id="railFill"></i></div></div>
+</div>
+
+<div class="sw"><button data-s="calm" class="on">Calm</button><button data-s="fight">Mid-fight</button><button data-s="death">Near death</button></div>
+
+<script>
+const STATES={
+  calm:{rift:'Anchor · Fernhall yard',waves:[],count:'',quest:'Kess wants the rifle back. Find her at the forge.',
+    plate:{x:1010,y:600,rail:'var(--r-standard)',tally:1,name:'Kess'},
+    hp:240,hpMax:240,shield:100,chip:0,res:12,
+    a1:{cd:0},a2:{cd:0},ult:{cd:65},mag:28,rsv:120,rail:{fill:100,reload:false},enemies:[],dmg:[]},
+  fight:{rift:'Rift · Sunken carriage',waves:['done','done','now','','' ],count:'00:42',quest:'Hold the yard until the rift closes.',
+    plate:{x:1440,y:590,rail:'var(--r-exceptional)',tally:3,name:'Body armour'},
+    hp:164,hpMax:240,shield:40,chip:80,res:52,
+    a1:{cd:0},a2:{cd:62},ult:{cd:30},mag:9,rsv:96,rail:{fill:45,reload:true},
+    enemies:[[560,420,56,150,64],[1180,380,90,230,88],[1420,470,40,100,30]],
+    dmg:[['wpn',1232,300,'148'],['crit',1290,250,'312'],['zero',584,380,'0']]},
+  death:{rift:'Rift · Sunken carriage',waves:['done','done','done','now',''],count:'00:07',quest:'Hold the yard until the rift closes.',
+    plate:null,hp:38,hpMax:240,shield:0,chip:44,res:100,
+    a1:{cd:20},a2:{cd:0},ult:{cd:0},mag:3,rsv:42,rail:{fill:10,reload:false},
+    enemies:[[880,330,120,300,92],[1300,440,60,160,55]],dmg:[['wpn',1010,280,'96']]}
+};
+const $=id=>document.getElementById(id);
+function tile(el,cd){el.classList.toggle('ready',cd===0);el.querySelector('.cd').style.height=cd+'%';}
+function apply(name){
+  const s=STATES[name],st=$('stage');st.className='stage '+name;
+  document.querySelectorAll('.sw button').forEach(b=>b.classList.toggle('on',b.dataset.s===name));
+  $('rift').textContent=s.rift;$('count').textContent=s.count;$('quest').textContent=s.quest;
+  $('waves').innerHTML=s.waves.map(w=>`<i class="${w}"></i>`).join('');
+  $('world').innerHTML=s.enemies.map(([x,y,w,h,hp])=>`<div class="enemy" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px"></div><div class="ebar" style="left:${x}px;top:${y-16}px;width:${w}px"><i style="width:${hp}%"></i></div>`).join('')
+    +s.dmg.map(([k,x,y,v])=>`<div class="dmg ${k}" style="left:${x}px;top:${y}px">${v}</div>`).join('');
+  const p=$('plate');if(s.plate){p.style.display='flex';p.style.left=s.plate.x+'px';p.style.top=s.plate.y+'px';p.style.borderLeftColor=s.plate.rail;p.style.color=s.plate.rail;$('tally').innerHTML='<i></i>'.repeat(s.plate.tally);$('plateName').textContent=s.plate.name;}else p.style.display='none';
+  $('hp').textContent=s.hp;$('hpMax').textContent=s.hpMax;$('shield').style.width=s.shield+'%';$('chip').style.width=s.chip+'%';$('hpFill').style.width=(s.hp/s.hpMax*100)+'%';
+  $('resFill').style.width=s.res+'%';$('resMark').style.left=s.res+'%';
+  tile($('a1'),s.a1.cd);tile($('a2'),s.a2.cd);tile($('ult'),s.ult.cd);
+  $('mag').textContent=s.mag;$('mag').classList.toggle('low',s.mag/30<0.25);$('rsv').textContent=s.rsv;
+  $('rail').classList.toggle('reloading',s.rail.reload);$('railFill').style.width=s.rail.fill+'%';
+  localStorage.setItem('re-hud-state',name);
+}
+document.querySelectorAll('.sw button').forEach(b=>b.onclick=()=>apply(b.dataset.s));
+apply(localStorage.getItem('re-hud-state')||'calm');
+</script>
+</body>
+</html>

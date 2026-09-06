@@ -40,23 +40,28 @@ struct RIORSEDGE_API FBreakerDamageRequest
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FGameplayTagContainer SourceTags;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float SourceDamageMultiplier = 1.0f;
     // ---- STAGE 6: the source split (Hook-And-Condition-Vocabulary §3.3) ----
-    // SourceDamageMultiplier arrives ALREADY COMPOSED as
-    // (1 + Increased/100) x MoreProduct, which is fine until the TARGET side
-    // wants to add a target-conditional Increased line: folding a rider into
-    // the composed value would make it a second More in everything but name,
-    // outside the O3 budget and against the one-additive-bucket law. So the
-    // request may carry the two halves separately. SourceDamageMultiplier
-    // STAYS, as the composed convenience value every existing call site and
-    // test keeps reading; the split is additive information.
+    // SourceDamageMultiplier arrives ALREADY COMPOSED, and the request carries
+    // its three factors beside it. The identity is
+    //   SourceDamageMultiplier == SourceFlatFactor x (1 + SourceIncreasedPercent/100) x SourceMoreProduct
+    // — the law's (Base + ΣFlat) x (1 + ΣInc/100) x ΠMore with the lane's base
+    // of 1.0 inside SourceFlatFactor. The split exists because the TARGET side
+    // adds target-conditional Increased lines (O196 riders) and they must join
+    // the ONE additive bucket, under the flat layer and outside the More
+    // product: folding a rider into the composed value would make it a second
+    // More in everything but name, and adding it beside a flat factor that has
+    // been folded into the Increased term would scale the rider by nothing
+    // where the law scales it by (1 + f). SourceDamageMultiplier STAYS, as the
+    // composed convenience value every existing call site and test keeps
+    // reading; the split is additive information.
     //
     // bHasSourceSplit is the presence flag: only a submission site that
     // actually snapshotted the split sets it, and ReceiveDamage recomposes
     // ONLY when it is set AND a rider fired — otherwise the request resolves
     // bit-identically to a request that never heard of the split. Every live
-    // submission fills it through FillSourcePools — the O54 pass routed the
-    // ability sites too. DoT tick requests stay composed-only: a tick's
-    // multiplier is the application-time snapshot and its halves were never
-    // carried.
+    // submission fills it through FillSourcePools, ability sites included. DoT
+    // tick requests stay composed-only: a tick's multiplier is the
+    // application-time snapshot and its factors are not carried.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float SourceFlatFactor = 1.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float SourceIncreasedPercent = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float SourceMoreProduct = 1.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHasSourceSplit = false;

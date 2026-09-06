@@ -1,0 +1,186 @@
+{
+  "$schema": "riors-edge/core-wheel-geometry/v1",
+  "canvas": {
+    "authoredPx": 1600,
+    "hub": [
+      800,
+      800
+    ],
+    "zoomLevels": [
+      1,
+      0.6
+    ],
+    "rotates": false
+  },
+  "sectors": {
+    "count": "N from character constellation data (5 shown)",
+    "sectorDeg": "360/N",
+    "centerDeg": "-90 + n*360/N (000 = up, clockwise)",
+    "boundaryDeg": "center ± 180/N",
+    "laneOffsetDeg": "min(24, 180/N − 12)",
+    "namesArePlaceholders": true
+  },
+  "hub": {
+    "outerR": 40,
+    "innerR": 28,
+    "dotR": 8
+  },
+  "rings": [
+    {
+      "ring": 1,
+      "name": "Gateway",
+      "radius": 160,
+      "shape": "square",
+      "size": 48,
+      "iconSlot": 32,
+      "perSector": 1,
+      "cost": 1,
+      "labelSide": "in"
+    },
+    {
+      "ring": 2,
+      "name": "Minor bead",
+      "radii": [
+        260,
+        330,
+        400
+      ],
+      "laneStart": 240,
+      "laneEnd": 400,
+      "shape": "round",
+      "size": 24,
+      "perSector": 9,
+      "cost": 1,
+      "labelSide": "in",
+      "labelOnlyFirstBead": true
+    },
+    {
+      "ring": 3,
+      "name": "Notable",
+      "radius": 460,
+      "shape": "square",
+      "size": 40,
+      "iconSlot": 32,
+      "perSector": 3,
+      "cost": 2,
+      "labelSide": "out",
+      "arcsBetweenAdjacentLanes": {
+        "radius": 460,
+        "inkWhen": "both ends spent"
+      }
+    },
+    {
+      "ring": 4,
+      "name": "Convergence",
+      "radius": 550,
+      "shape": "diamond",
+      "size": 48,
+      "radialHalfExtent": 34,
+      "iconSlot": 32,
+      "perSector": 1,
+      "cost": 3,
+      "labelSide": "beside",
+      "gate": {
+        "type": "cells",
+        "count": 3,
+        "cellPx": [
+          12,
+          6
+        ],
+        "gapPx": 2,
+        "fillsWhen": "lane Notable spent",
+        "offsetFromNodeEdgePx": 8,
+        "side": "out"
+      },
+      "labelRule": "radial orientation, offset perpendicular to spoke by halfExtent+12, anchored at node radius; cost mirrored on opposite side"
+    },
+    {
+      "ring": 5,
+      "name": "Keystone",
+      "radius": 660,
+      "shape": "diamond",
+      "size": 64,
+      "radialHalfExtent": 45,
+      "iconSlot": 32,
+      "perSector": 1,
+      "cost": 5,
+      "labelSide": "out",
+      "gate": {
+        "type": "tally",
+        "count": 16,
+        "rows": 2,
+        "cellPx": [
+          6,
+          6
+        ],
+        "gapPx": 2,
+        "fillsWhen": "per point spent in sector",
+        "offsetFromNodeEdgePx": 8
+      }
+    }
+  ],
+  "rim": {
+    "radius": 660,
+    "strokePx": 2,
+    "ticks": {
+      "everyDeg": 5,
+      "minorLenPx": 8,
+      "midEveryDeg": 15,
+      "midLenPx": 16,
+      "boundaryLenPx": 24
+    },
+    "degreeLabelRadius": 690,
+    "sectorNameRadius": 700,
+    "sectorNameOffsetDeg": 14
+  },
+  "diamonds": {
+    "rotationDeg": "angle + 45 (corner points along its radial)"
+  },
+  "labels": {
+    "orientation": "tangential",
+    "clearancePx": 12,
+    "gateClearanceExtraPx": 14,
+    "uprightRule": "rotate a−90 when sin(a)>0 else a+90",
+    "font": {
+      "family": "Barlow Condensed",
+      "weight": 600,
+      "sizePx": 16,
+      "case": "upper"
+    },
+    "cost": {
+      "font": "Sometype Mono 500 11px",
+      "offsetPastLabelPx": 20
+    },
+    "visibleAtZoom": [
+      1
+    ]
+  },
+  "ink": {
+    "unspent": {
+      "fill": "panel-0",
+      "border": "1px border-mid",
+      "label": "text-2"
+    },
+    "reachable": {
+      "fill": "panel-1",
+      "border": "2px border-high",
+      "label": "text-1"
+    },
+    "spent": {
+      "fill": "sys-full"
+    },
+    "keystoneTaken": {
+      "fill": "gold-full"
+    },
+    "forfeit": "hatch, never faded",
+    "lanes": "same ladder; inked from hub to last spent bead"
+  },
+  "input": {
+    "stick": {
+      "select": "nearest node within 60° of stick angle from current node",
+      "tap": "step one ring outward along current lane"
+    },
+    "zoom": "around focused node, two levels",
+    "bumpers": "cycle sectors"
+  }
+}

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;600&family=Sometype+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0E1103;min-height:100%;color:#EDEBE3;font-family:'Source Sans 3',sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#B8B6AC}a:hover{color:#EDEBE3}
+@keyframes hudPulse{0%,100%{border-width:8px}50%{border-width:16px}}
+</style>
+</helmet>
+<div style="display:flex;flex-direction:column;gap:64px;padding:64px">
+<sc-for list="{{ states }}" as="s" hint-placeholder-count="3">
+<div style="display:flex;flex-direction:column;gap:16px" data-screen-label="{{ s.label }}">
+  <div style="display:flex;align-items:baseline;gap:24px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">{{ s.label }}</span><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">{{ s.sub }}</span></div>
+  <div style="position:relative;width:1920px;height:1080px;overflow:hidden;flex:none;background:repeating-linear-gradient(135deg,#2A2C27 0 14px,#303229 14px 28px);border:1px solid #454840">
+    <div style="position:absolute;left:0;top:0;width:1920px;height:640px;background:#393D2B;opacity:1"></div>
+    <div style="position:absolute;left:0;top:640px;width:1920px;height:440px;background:#2F3221"></div>
+    <div style="position:absolute;left:800px;top:520px;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">GAMEPLAY FRAME · FIRST PERSON · 1920×1080</div>
+
+    <sc-for list="{{ s.enemies }}" as="e" hint-placeholder-count="0">
+      <div style="position:absolute;left:{{ e.x }}px;top:{{ e.y }}px;width:{{ e.w }}px;height:{{ e.h }}px;background:#1D2010;border:1px solid #454840"></div>
+      <div style="position:absolute;left:{{ e.x }}px;top:{{ e.by }}px;width:{{ e.w }}px;height:6px;background:#151808;border:1px solid #5C6056;box-sizing:border-box"><div style="height:100%;width:{{ e.hp }}%;background:#E3DFD2"></div></div>
+    </sc-for>
+
+    <sc-for list="{{ s.numbers }}" as="n" hint-placeholder-count="0">
+      <div style="position:absolute;left:{{ n.x }}px;top:{{ n.y }}px;font-family:'Sometype Mono',monospace;font-weight:700;font-size:{{ n.size }}px;line-height:1;color:{{ n.color }}">{{ n.v }}</div>
+    </sc-for>
+
+    <sc-if value="{{ s.lowHealth }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:0;top:0;width:1920px;height:1080px;box-sizing:border-box;border:8px solid #D9402F;animation:hudPulse 1.6s ease-in-out infinite"></div>
+      <div style="position:absolute;left:24px;top:24px;width:64px;height:64px;border-left:4px solid #D9402F;border-top:4px solid #D9402F"></div>
+      <div style="position:absolute;right:24px;top:24px;width:64px;height:64px;border-right:4px solid #D9402F;border-top:4px solid #D9402F"></div>
+      <div style="position:absolute;left:24px;bottom:24px;width:64px;height:64px;border-left:4px solid #D9402F;border-bottom:4px solid #D9402F"></div>
+      <div style="position:absolute;right:24px;bottom:24px;width:64px;height:64px;border-right:4px solid #D9402F;border-bottom:4px solid #D9402F"></div>
+    </sc-if>
+
+    <div style="position:absolute;left:940px;top:520px;width:40px;height:40px">
+      <div style="position:absolute;left:19px;top:0;width:2px;height:12px;background:#E3DFD2"></div>
+      <div style="position:absolute;left:19px;bottom:0;width:2px;height:12px;background:#E3DFD2"></div>
+      <div style="position:absolute;top:19px;left:0;height:2px;width:12px;background:#E3DFD2"></div>
+      <div style="position:absolute;top:19px;right:0;height:2px;width:12px;background:#E3DFD2"></div>
+      <sc-if value="{{ s.hit }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;left:4px;top:4px;width:12px;height:2px;background:{{ s.hitColor }};transform:rotate(45deg);transform-origin:left center"></div>
+        <div style="position:absolute;right:4px;top:4px;width:12px;height:2px;background:{{ s.hitColor }};transform:rotate(-45deg);transform-origin:right center"></div>
+        <div style="position:absolute;left:4px;bottom:4px;width:12px;height:2px;background:{{ s.hitColor }};transform:rotate(-45deg);transform-origin:left center"></div>
+        <div style="position:absolute;right:4px;bottom:4px;width:12px;height:2px;background:{{ s.hitColor }};transform:rotate(45deg);transform-origin:right center"></div>
+      </sc-if>
+    </div>
+
+    <div style="position:absolute;left:40px;top:40px;display:flex;flex-direction:column;gap:8px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:24px;line-height:28px;text-transform:uppercase;letter-spacing:0.02em;color:#E3DFD2">{{ s.rift }}</div>
+      <div style="display:flex;align-items:center;gap:16px">
+        <div style="display:flex;gap:4px"><sc-for list="{{ s.waves }}" as="w" hint-placeholder-count="0"><div style="width:16px;height:8px;background:{{ w }}"></div></sc-for></div>
+        <div style="font-family:'Sometype Mono',monospace;font-weight:500;font-size:16px;line-height:16px;color:#B8B6AC">{{ s.countdown }}</div>
+      </div>
+    </div>
+
+    <div style="position:absolute;right:40px;top:40px;width:320px;display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+      <div style="font-size:14px;line-height:20px;color:#B8B6AC;text-align:right">{{ s.quest }}</div>
+    </div>
+
+    <sc-if value="{{ s.interact }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:{{ s.interactX }}px;top:{{ s.interactY }}px;display:flex;align-items:center;gap:8px;height:40px;padding:0 12px 0 0;background:#151808;border:1px solid #454840;border-left:4px solid {{ s.interactRail }}">
+        <div style="width:32px;height:32px;margin-left:4px;background:#393D2B;border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:'Sometype Mono',monospace;font-weight:700;font-size:16px;color:#EDEBE3">F</div>
+        <div style="display:flex;gap:2px"><sc-for list="{{ s.interactTally }}" as="t" hint-placeholder-count="0"><div style="width:4px;height:12px;background:{{ s.interactRail }}"></div></sc-for></div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.02em;color:#EDEBE3">{{ s.interactText }}</div>
+      </div>
+    </sc-if>
+
+    <div style="position:absolute;left:40px;top:936px;width:480px;display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:baseline;gap:8px"><span style="font-family:'Sometype Mono',monospace;font-weight:700;font-size:32px;line-height:32px;color:{{ s.hpInk }}">{{ s.hp }}</span><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">/ {{ s.hpMax }}</span></div>
+      <div style="height:6px;background:#151808;border:1px solid #5C6056;box-sizing:border-box"><div style="height:100%;width:{{ s.shield }}%;background:#B8B6AC"></div></div>
+      <div style="position:relative;height:16px;background:#151808;border:1px solid #5C6056;box-sizing:border-box">
+        <div style="position:absolute;left:0;top:0;height:100%;width:{{ s.chip }}%;background:repeating-linear-gradient(135deg,#5E1F18 0 4px,#D9402F 4px 6px)"></div>
+        <div style="position:absolute;left:0;top:0;height:100%;width:{{ s.hpPct }}%;background:#E3DFD2"></div>
+        <div style="position:absolute;left:20%;top:0;width:1px;height:100%;background:#0E1103"></div>
+      </div>
+      <div style="position:relative;height:8px;margin-top:4px;background:#151808;border:1px solid #454840;box-sizing:border-box">
+        <div style="position:absolute;left:0;top:0;height:100%;width:{{ s.mom }}%;background:{{ s.momInk }}"></div>
+        <div style="position:absolute;left:70%;top:-4px;width:1px;height:14px;background:#B8B6AC"></div>
+        <div style="position:absolute;left:{{ s.mom }}%;top:-6px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid {{ s.momInk }};transform:translateX(-6px)"></div>
+        <sc-if value="{{ s.banked }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;right:-1px;top:-1px;width:8px;height:8px;background:#E6B33A"></div></sc-if>
+      </div>
+    </div>
+
+    <div style="position:absolute;left:844px;top:936px;width:232px;display:flex;align-items:flex-end;justify-content:center;gap:8px">
+      <sc-for list="{{ s.abilities }}" as="a" hint-placeholder-count="2">
+        <div style="position:relative;width:64px;height:64px;box-sizing:border-box;background:{{ a.bg }};border:1px solid #5C6056;border-radius:2px;overflow:hidden">
+          <div style="position:absolute;left:0;bottom:0;width:100%;height:{{ a.cd }}%;background:#393D2B"></div>
+          <div style="position:absolute;left:0;top:0;width:100%;height:100%;background:{{ a.paint }}"></div>
+          <div style="position:absolute;left:0;top:0;width:100%;height:2px;background:{{ a.verb }}"></div>
+          <div style="position:absolute;right:6px;top:6px;font-family:'Sometype Mono',monospace;font-weight:700;font-size:13px;line-height:13px;color:{{ a.ink }}">{{ a.key }}</div>
+          <div style="position:absolute;left:24px;top:28px;width:16px;height:16px;background:{{ a.mark }}"></div>
+        </div>
+        <sc-if value="{{ a.first }}" hint-placeholder-val="{{ false }}">
+          <div style="position:relative;width:88px;height:88px;box-sizing:border-box;background:#151808;border:1px solid #5C6056;border-radius:2px;overflow:hidden">
+            <div style="position:absolute;left:0;bottom:0;width:100%;height:{{ s.ultFill }}%;background:{{ s.ultFillInk }}"></div>
+            <div style="position:absolute;left:0;top:0;width:100%;height:4px;background:#A98BEA"></div>
+            <div style="position:absolute;right:8px;top:10px;font-family:'Sometype Mono',monospace;font-weight:700;font-size:13px;line-height:13px;color:{{ s.ultInk }}">Q</div>
+            <div style="position:absolute;left:32px;top:36px;width:24px;height:24px;background:{{ s.ultMark }}"></div>
+          </div>
+        </sc-if>
+      </sc-for>
+    </div>
+
+    <div style="position:absolute;right:40px;top:944px;display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+      <div style="display:flex;align-items:baseline;gap:12px">
+        <span style="font-family:'Sometype Mono',monospace;font-weight:700;font-size:48px;line-height:48px;color:{{ s.magInk }}">{{ s.mag }}</span>
+        <span style="font-family:'Sometype Mono',monospace;font-weight:500;font-size:24px;line-height:24px;color:#B8B6AC">{{ s.reserve }}</span>
+      </div>
+      <div style="width:240px;height:4px;background:#454840"><div style="height:4px;width:{{ s.railFill }}%;background:{{ s.railInk }}"></div></div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;width:1920px;font-size:14px;line-height:20px;color:#B8B6AC;text-wrap:pretty">
+    <div><span style="color:#EDEBE3;font-weight:600">Vitals · am I about to die.</span> Health 480×16 at (40, 1010), shield 480×6 above, value in numeric 32 above that. Chip is a harm hatch that drains at once and recovers over 600 ms. Under 20 % the harm frame paints the screen edge and pulses 8→16 px over 1.6 s (flat, width only) with fixed corner brackets: readable while airborne, no colour-only signal.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Class resource · can I do the thing.</span> Momentum track 480×8 under health. State is a triangle mark at the fill edge: settled sits left of the notch, building moves toward it, banked passes the 70 % notch and a gold cell appears at the end. No word.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Abilities · is my ability up.</span> Bottom centre, 232 px wide at (844, 936): ability 1 (64 px), ultimate (88 px), ability 2 (64 px), 8 px gaps, bottoms on the 40 px gutter. Ready = full tile in the verb colour with a bg-0 mark and key. Cooldown = panel-2 fill draining bottom-up, no digits, mark in text-3. Ultimate charges the same way and goes full violet when ready. Locked = painted hatch. Verb colour otherwise lives only on the 2 px top rail and the mark. Cooldown is a fill rising from the bottom in border-low. Locked is painted hatch, not faded.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Weapon · can I keep firing.</span> Magazine 48 px numeric, reserve 24 px, right-aligned at (1880, 944). The 240×4 rail under the number shows magazine fill in bone at rest; during a reload it becomes the reload progress in weapon orange, 0→100 left to right. Magazine digits turn orange under 25 %. Weapon name appears only on swap, so it is absent here.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Centre · did that shot connect.</span> Crosshair four 2×12 bone ticks, 40 px box, 16 px gap. Hit marker is four diagonal ticks in weapon orange, 80 ms. Kill confirm the same ticks in bone, 200 ms; weak-point kill in gold. Damage numbers world-space at impact: orange weapon, gold crit at 48 px, grey zero for absorbed.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Periphery · where am I, what is that.</span> Rift name display 24 and wave cells 16×8 top-left (40, 40); countdown in numeric 16. Quest one line 14 px top-right. XP and level are not on the combat HUD: they live in the pause screen header and the level-up banner (stage 4). Interact prompt and loot labels are world-space plates with a 4 px rarity rail and tally. <span style="color:#EDEBE3">Deleted:</span> minimap (accepted; enemy state is read off the enemy), XP rail, centred health bar with end numbers, ability squares of equal rank, BANKED/SETTLED words, GRID 20M, boxed resource, all cyan chrome.</div>
+  </div>
+</div>
+</sc-for>
+
+<div style="display:flex;flex-direction:column;gap:16px;width:1920px" data-screen-label="Marks and crosshair">
+  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">Crosshair states and confirm marks</div>
+  <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:16px">
+    <div style="background:#393D2B;border:1px solid #454840;padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px">
+      <div style="position:relative;width:40px;height:40px"><div style="position:absolute;left:19px;top:0;width:2px;height:12px;background:#E3DFD2"></div><div style="position:absolute;left:19px;bottom:0;width:2px;height:12px;background:#E3DFD2"></div><div style="position:absolute;top:19px;left:0;height:2px;width:12px;background:#E3DFD2"></div><div style="position:absolute;top:19px;right:0;height:2px;width:12px;background:#E3DFD2"></div></div>
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;line-height:20px;color:#EDEBE3;text-align:center">REST<br><span style="color:#B8B6AC">4 ticks 2×12 · gap 16 · bone</span></div>
+    </div>
+    <div style="background:#393D2B;border:1px solid #454840;padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px">
+      <div style="position:relative;width:64px;height:64px;margin:-12px"><div style="position:absolute;left:31px;top:0;width:2px;height:12px;background:#E3DFD2"></div><div style="position:absolute;left:31px;bottom:0;width:2px;height:12px;background:#E3DFD2"></div><div style="position:absolute;top:31px;left:0;height:2px;width:12px;background:#E3DFD2"></div><div style="position:absolute;top:31px;right:0;height:2px;width:12px;background:#E3DFD2"></div></div>
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;line-height:20px;color:#EDEBE3;text-align:center">SPREAD<br><span style="color:#B8B6AC">gap 16→40 with move/fire · 60 ms out, 200 ms back</span></div>
+    </div>
+    <div style="background:#393D2B;border:1px solid #454840;padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px">
+      <div style="position:relative;width:40px;height:40px"><div style="position:absolute;left:8px;top:8px;width:24px;height:24px;box-sizing:border-box;border:1px solid #E3DFD2;border-radius:50%"></div><div style="position:absolute;left:19px;top:19px;width:2px;height:2px;background:#E3DFD2"></div></div>
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;line-height:20px;color:#EDEBE3;text-align:center">ADS<br><span style="color:#B8B6AC">2 px dot + 24 px 1 px ring · ticks collapse in 80 ms</span></div>
+    </div>
+    <div style="background:#393D2B;border:1px solid #454840;padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px">
+      <div style="position:relative;width:40px;height:40px"><div style="position:absolute;left:4px;top:4px;width:12px;height:2px;background:#E8842B;transform:rotate(45deg);transform-origin:left center"></div><div style="position:absolute;right:4px;top:4px;width:12px;height:2px;background:#E8842B;transform:rotate(-45deg);transform-origin:right center"></div><div style="position:absolute;left:4px;bottom:4px;width:12px;height:2px;background:#E8842B;transform:rotate(-45deg);transform-origin:left center"></div><div style="position:absolute;right:4px;bottom:4px;width:12px;height:2px;background:#E8842B;transform:rotate(45deg);transform-origin:right center"></div></div>
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;line-height:20px;color:#EDEBE3;text-align:center">HIT<br><span style="color:#B8B6AC">4 diagonals 12×2 · wpn-full #E8842B · 80 ms</span></div>
+    </div>
+    <div style="background:#393D2B;border:1px solid #454840;padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px">
+      <div style="position:relative;width:40px;height:40px"><div style="position:absolute;left:4px;top:4px;width:12px;height:2px;background:#E3DFD2;transform:rotate(45deg);transform-origin:left center"></div><div style="position:absolute;right:4px;top:4px;width:12px;height:2px;background:#E3DFD2;transform:rotate(-45deg);transform-origin:right center"></div><div style="position:absolute;left:4px;bottom:4px;width:12px;height:2px;background:#E3DFD2;transform:rotate(-45deg);transform-origin:left center"></div><div style="position:absolute;right:4px;bottom:4px;width:12px;height:2px;background:#E3DFD2;transform:rotate(45deg);transform-origin:right center"></div><div style="position:absolute;left:17px;top:17px;width:6px;height:6px;background:#E3DFD2"></div></div>
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;line-height:20px;color:#EDEBE3;text-align:center">KILL<br><span style="color:#B8B6AC">diagonals + 6 px centre square · bone · 200 ms</span></div>
+    </div>
+    <div style="background:#393D2B;border:1px solid #454840;padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px">
+      <div style="position:relative;width:40px;height:40px"><div style="position:absolute;left:2px;top:2px;width:16px;height:2px;background:#E6B33A;transform:rotate(45deg);transform-origin:left center"></div><div style="position:absolute;right:2px;top:2px;width:16px;height:2px;background:#E6B33A;transform:rotate(-45deg);transform-origin:right center"></div><div style="position:absolute;left:2px;bottom:2px;width:16px;height:2px;background:#E6B33A;transform:rotate(-45deg);transform-origin:left center"></div><div style="position:absolute;right:2px;bottom:2px;width:16px;height:2px;background:#E6B33A;transform:rotate(45deg);transform-origin:right center"></div><div style="position:absolute;left:16px;top:16px;width:8px;height:8px;background:#E6B33A;transform:rotate(45deg)"></div></div>
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;line-height:20px;color:#EDEBE3;text-align:center">WEAK-POINT KILL<br><span style="color:#B8B6AC">diagonals 16×2 + 8 px diamond · gold-full #E6B33A · 320 ms</span></div>
+    </div>
+  </div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:16px;width:1920px" data-screen-label="Resource tracks">
+  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">Class resource · five behaviours, one 480×8 footprint</div>
+  <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px">
+    <div style="background:#393D2B;border:1px solid #454840;padding:24px 24px 16px;display:flex;flex-direction:column;gap:16px">
+      <div style="position:relative;height:8px;background:#151808;border:1px solid #454840;box-sizing:border-box"><div style="position:absolute;left:0;top:0;height:100%;width:52%;background:#B8B6AC"></div><div style="position:absolute;left:70%;top:-4px;width:1px;height:14px;background:#B8B6AC"></div><div style="position:absolute;left:52%;top:-6px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #B8B6AC;transform:translateX(-6px)"></div></div>
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;line-height:20px;color:#B8B6AC"><span style="color:#EDEBE3">SWIFT · MOMENTUM · continuous</span><br>Fill in text-2, triangle at the edge. Notch at 70 %: past it the fill turns bone and a gold cell appears at the end. Decays when still.</div>
+    </div>
+    <div style="background:#393D2B;border:1px solid #454840;padding:24px 24px 16px;display:flex;flex-direction:column;gap:16px">
+      <div style="position:relative;height:8px;background:#151808;border:1px solid #454840;box-sizing:border-box"><div style="position:absolute;left:85%;top:0;height:100%;width:15%;background:repeating-linear-gradient(135deg,#5E1F18 0 3px,#151808 3px 5px)"></div><div style="position:absolute;left:0;top:0;height:100%;width:78%;background:#E8842B"></div></div>
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;line-height:20px;color:#B8B6AC"><span style="color:#EDEBE3">GUNSMITH · HEAT · with overheat</span><br>Fill in wpn-full. Last 15 % is a harm hatch zone. Overheated: fill goes harm-full and drains at once; a 2 px harm rail appears on the ammo block until cool.</div>
+    </div>
+    <div style="background:#393D2B;border:1px solid #454840;padding:24px 24px 16px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;gap:4px;height:8px"><div style="flex:1;background:#E3DFD2"></div><div style="flex:1;background:#E3DFD2"></div><div style="flex:1;background:#151808;border:1px solid #454840;box-sizing:border-box;position:relative"><div style="position:absolute;left:0;top:0;height:100%;width:40%;background:#6E6C62"></div></div><div style="flex:1;background:#151808;border:1px solid #454840;box-sizing:border-box"></div></div>
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;line-height:20px;color:#B8B6AC"><span style="color:#EDEBE3">CASTER · MANA · discrete charges</span><br>4 cells, 4 px gaps. Full cell bone; the recharging cell fills in sys-dim left to right; empty cells keep the border. Spends whole cells.</div>
+    </div>
+    <div style="background:#393D2B;border:1px solid #454840;padding:24px 24px 16px;display:flex;flex-direction:column;gap:16px">
+      <div style="position:relative;height:8px;background:#151808;border:1px solid #454840;box-sizing:border-box"><div style="position:absolute;left:0;top:0;height:100%;width:64%;background:#B8B6AC"></div><div style="position:absolute;left:64%;top:0;height:100%;width:12%;background:#6E6C62"></div></div>
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;line-height:20px;color:#B8B6AC"><span style="color:#EDEBE3">SUPPORT · CHARGE · pool</span><br>Fill in text-2. Held, not spent alone: a sys-dim segment ahead of the fill shows what allies are contributing this second. Drains only on cast.</div>
+    </div>
+    <div style="background:#393D2B;border:1px solid #454840;padding:24px 24px 16px;display:flex;flex-direction:column;gap:16px">
+      <div style="position:relative;height:8px;background:#151808;border:1px solid #454840;box-sizing:border-box"><div style="position:absolute;left:0;top:0;height:100%;width:66.6%;background:#B8B6AC"></div><div style="position:absolute;left:33.3%;top:-2px;width:2px;height:12px;background:#E3DFD2"></div><div style="position:absolute;left:66.6%;top:-2px;width:2px;height:12px;background:#E3DFD2"></div></div>
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;line-height:20px;color:#B8B6AC"><span style="color:#EDEBE3">TANK · GRIT · stepped</span><br>Earned by taking hits. Two 2 px bone step marks divide three tiers; the fill snaps to a tier boundary and holds. Spent as a whole tier.</div>
+    </div>
+  </div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:16px;width:1920px" data-screen-label="Gamepad glyphs">
+  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">Key labels · keyboard and gamepad</div>
+  <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:16px">
+    <div style="background:#393D2B;border:1px solid #454840;padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px">
+      <div style="display:flex;gap:16px;align-items:center"><div style="font-family:'Sometype Mono',monospace;font-weight:700;font-size:13px;color:#EDEBE3">1</div><div style="width:20px;height:8px;background:#E3DFD2"></div></div>
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;line-height:20px;color:#B8B6AC;text-align:center"><span style="color:#EDEBE3">ABILITY 1</span><br>keyboard 1 · left bumper: 20×8 bar</div>
+    </div>
+    <div style="background:#393D2B;border:1px solid #454840;padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px">
+      <div style="display:flex;gap:16px;align-items:center"><div style="font-family:'Sometype Mono',monospace;font-weight:700;font-size:13px;color:#EDEBE3">2</div><div style="width:20px;height:8px;background:#E3DFD2;position:relative"><div style="position:absolute;right:0;top:-4px;width:4px;height:16px;background:#E3DFD2"></div></div></div>
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;line-height:20px;color:#B8B6AC;text-align:center"><span style="color:#EDEBE3">ABILITY 2</span><br>keyboard 2 · right bumper: bar with right end cap</div>
+    </div>
+    <div style="background:#393D2B;border:1px solid #454840;padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px">
+      <div style="display:flex;gap:16px;align-items:center"><div style="font-family:'Sometype Mono',monospace;font-weight:700;font-size:13px;color:#EDEBE3">Q</div><div style="display:flex;gap:2px"><div style="width:20px;height:8px;background:#E3DFD2"></div><div style="width:20px;height:8px;background:#E3DFD2;position:relative"><div style="position:absolute;right:0;top:-4px;width:4px;height:16px;background:#E3DFD2"></div></div></div></div>
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;line-height:20px;color:#B8B6AC;text-align:center"><span style="color:#EDEBE3">ULTIMATE</span><br>keyboard Q · both bumpers, 2 px apart</div>
+    </div>
+    <div style="background:#393D2B;border:1px solid #454840;padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px">
+      <div style="display:flex;gap:16px;align-items:center"><div style="font-family:'Sometype Mono',monospace;font-weight:700;font-size:13px;color:#EDEBE3">R</div><div style="position:relative;width:20px;height:20px;box-sizing:border-box;border:2px solid #E3DFD2;border-radius:50%"><div style="position:absolute;left:2px;top:6px;width:4px;height:4px;background:#E3DFD2"></div></div></div>
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;line-height:20px;color:#B8B6AC;text-align:center"><span style="color:#EDEBE3">RELOAD</span><br>keyboard R · face-west: 20 px ring, dot at 9 o'clock</div>
+    </div>
+    <div style="background:#393D2B;border:1px solid #454840;padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px">
+      <div style="display:flex;gap:16px;align-items:center"><div style="font-family:'Sometype Mono',monospace;font-weight:700;font-size:13px;color:#EDEBE3">F</div><div style="position:relative;width:20px;height:20px;box-sizing:border-box;border:2px solid #E3DFD2;border-radius:50%"><div style="position:absolute;left:6px;top:10px;width:4px;height:4px;background:#E3DFD2"></div></div></div>
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;line-height:20px;color:#B8B6AC;text-align:center"><span style="color:#EDEBE3">INTERACT</span><br>keyboard F · face-south: ring, dot at 6 o'clock</div>
+    </div>
+    <div style="background:#393D2B;border:1px solid #454840;padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px">
+      <div style="display:flex;gap:16px;align-items:center"><div style="font-family:'Sometype Mono',monospace;font-weight:700;font-size:13px;color:#EDEBE3">SPACE</div><div style="position:relative;width:20px;height:20px;box-sizing:border-box;border:2px solid #E3DFD2;border-radius:50%"><div style="position:absolute;left:10px;top:2px;width:4px;height:4px;background:#E3DFD2"></div></div></div>
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;line-height:20px;color:#B8B6AC;text-align:center"><span style="color:#EDEBE3">JUMP</span><br>keyboard SPACE · face-north: ring, dot at 12. Face-east = dot at 3. Triggers = bar with 2 px underline. Stick click = ring inside ring.</div>
+    </div>
+  </div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const BONE='#E3DFD2', LOCK='repeating-linear-gradient(135deg,#1D2010 0 6px,#262918 6px 8px)', NONE='transparent';
+    const ab=(key,verb,cd,locked)=>({key,first:key==='1',verb:locked?'#454840':verb,cd,bg:(!locked&&cd===0)?verb:'#151808',paint:locked?LOCK:NONE,mark:locked?'#454840':(cd>0?'#8E8D80':'#0E1103'),ink:locked?'#5C5C52':(cd>0?'#B8B6AC':'#0E1103')});
+    const calm={label:'Calm',sub:'ANCHOR · NO COMBAT · MOMENTUM SETTLED',enemies:[],numbers:[],lowHealth:false,hit:false,hitColor:'#E8842B',
+      rift:'Anchor · Fernhall yard',waves:[],countdown:'',quest:'Kess wants the rifle back. Find her at the forge.',xp:38,
+      interact:true,interactX:1010,interactY:600,interactRail:'#B8B6AC',interactTally:[1],interactText:'Kess',
+      hp:'240',hpMax:'240',hpPct:100,hpInk:BONE,shield:100,chip:0,mom:12,momInk:'#B8B6AC',banked:false,
+      abilities:[ab('1','#6FC3E8',0,false),ab('2','#E8842B',0,false)],ultFill:35,ultFillInk:'#393D2B',ultMark:'#8E8D80',ultInk:'#B8B6AC',
+      mag:'28',reserve:'120',magInk:BONE,railFill:100,railInk:BONE};
+    const fight={label:'Mid-fight · airborne',sub:'THREE ENEMIES · ABILITY 2 ON COOLDOWN · RELOADING · MOMENTUM BUILDING',
+      enemies:[{x:560,y:420,w:56,h:150,by:404,hp:64},{x:1180,y:380,w:90,h:230,by:360,hp:88},{x:1420,y:470,w:40,h:100,by:458,hp:30}],
+      numbers:[{x:1232,y:300,v:'148',size:32,color:'#E8842B'},{x:1290,y:250,v:'312',size:48,color:'#E6B33A'},{x:584,y:380,v:'0',size:32,color:'#8E8D80'}],
+      lowHealth:false,hit:true,hitColor:'#E8842B',rift:'Rift · Sunken carriage',waves:['#B8B6AC','#B8B6AC','#E3DFD2','#454840','#454840'],countdown:'00:42',
+      quest:'Hold the yard until the rift closes.',xp:41,interact:true,interactX:1440,interactY:590,interactRail:'#8B8FEC',interactTally:[1,2,3],interactText:'Body armour',
+      hp:'164',hpMax:'240',hpPct:68,hpInk:BONE,shield:40,chip:80,mom:52,momInk:'#B8B6AC',banked:false,
+      abilities:[ab('1','#6FC3E8',0,false),ab('2','#E8842B',62,false)],ultFill:70,ultFillInk:'#393D2B',ultMark:'#8E8D80',ultInk:'#B8B6AC',
+      mag:'9',reserve:'96',magInk:'#E8842B',railFill:45,railInk:'#E8842B'};
+    const death={label:'Near death',sub:'UNDER 20 % · ULTIMATE READY · MOMENTUM BANKED',
+      enemies:[{x:880,y:330,w:120,h:300,by:306,hp:92},{x:1300,y:440,w:60,h:160,by:424,hp:55}],
+      numbers:[{x:1010,y:280,v:'96',size:32,color:'#E8842B'}],lowHealth:true,hit:true,hitColor:'#E6B33A',
+      rift:'Rift · Sunken carriage',waves:['#B8B6AC','#B8B6AC','#B8B6AC','#E3DFD2','#454840'],countdown:'00:07',
+      quest:'Hold the yard until the rift closes.',xp:41,interact:false,interactX:0,interactY:0,interactRail:'#B8B6AC',interactTally:[],interactText:'',
+      hp:'38',hpMax:'240',hpPct:16,hpInk:'#D9402F',shield:0,chip:44,mom:100,momInk:'#E3DFD2',banked:true,
+      abilities:[ab('1','#6FC3E8',20,false),ab('2','#E8842B',0,false)],ultFill:100,ultFillInk:'#A98BEA',ultMark:'#0E1103',ultInk:'#0E1103',
+      mag:'3',reserve:'42',magInk:'#E8842B',railFill:10,railInk:BONE};
+    return {states:[calm,fight,death]};
+  }
+}
+</script>
+</body>
+</html>

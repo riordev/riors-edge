@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:wght@400;600&family=Sometype+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0E1103;min-height:100%;color:#EDEBE3;font-family:'Source Sans 3',sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#B8B6AC}a:hover{color:#EDEBE3}
+</style>
+</helmet>
+<div style="display:flex;flex-direction:column;gap:64px;padding:64px">
+
+<div style="display:flex;flex-direction:column;gap:16px" data-screen-label="Main menu">
+  <div style="display:flex;align-items:baseline;gap:24px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">Main menu</span><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">1920×1080 · SCENE BEHIND · ONE COLUMN, LEFT · FOCUS ON PLAY</span></div>
+  <div style="position:relative;width:1920px;height:1080px;overflow:hidden;background:repeating-linear-gradient(135deg,#2A2C27 0 14px,#303229 14px 28px);border:1px solid #454840">
+    <div style="position:absolute;left:0;top:0;width:1920px;height:1080px;background:#393D2B"></div>
+    <div style="position:absolute;left:0;top:700px;width:1920px;height:380px;background:#2F3221"></div>
+    <div style="position:absolute;left:1040px;top:560px;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">ANCHOR · FERNHALL YARD · LIVE SCENE, SLOW DOLLY</div>
+    <div style="position:absolute;left:0;top:0;width:640px;height:1080px;background:#151808;border-right:1px solid #454840;box-sizing:border-box;padding:96px 0 40px 96px;display:flex;flex-direction:column">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="width:48px;height:8px;background:#E3DFD2"></div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:96px;line-height:88px;text-transform:uppercase;letter-spacing:0.02em;margin-top:16px">Rior's<br>Edge</div>
+        <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80;margin-top:8px">BUILD 1.0.0 · BREAKER: KESS · SWIFT 14</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:88px;width:400px">
+        <sc-for list="{{ mainItems }}" as="m" hint-placeholder-count="5">
+          <div style="height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 {{ m.pad }}px;box-sizing:border-box;background:{{ m.bg }};border:{{ m.border }};border-left:{{ m.rail }};border-radius:2px">
+            <span style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:24px;text-transform:uppercase;letter-spacing:0.04em;color:{{ m.ink }}">{{ m.label }}</span>
+            <span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">{{ m.meta }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="flex:1"></div>
+      <div style="display:flex;gap:24px;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80"><span><span style="color:#B8B6AC">ENTER</span> SELECT</span><span><span style="color:#B8B6AC">ESC</span> QUIT</span></div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;width:1920px;font-size:14px;line-height:20px;color:#B8B6AC;text-wrap:pretty">
+    <div><span style="color:#EDEBE3;font-weight:600">One plate, left.</span> 640 wide bg-1 with a 1 px border-low right edge; the live scene owns the other 1280. Title display 700 96/88; a 48×8 sys-full mark above it, the only ornament. Items 56 tall, display 600 24, meta in numeric 13 right-aligned (last breaker, save time). Focus on PLAY at open. Items slide in from the left rail, 16 px, 160 ms, staggered 30 ms.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Rails.</span> The focused item carries a 4 px sys-full left rail plus border-high and panel-1; hover is a step only. No hover glow, no press sound in the visuals. QUIT is a plain item; it confirms once in a 480 px modal.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Deleted.</span> Centred title over a striped void; three-line lore; PRESS ANY KEY splash (the menu is the first frame); centred button stack; hexagon logo glyph; build string in the corner reads as a footer, now it is part of the plate.</div>
+  </div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:16px" data-screen-label="Pause">
+  <div style="display:flex;align-items:baseline;gap:24px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">Pause</span><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">SAME PLATE AS MAIN · GAME FROZEN BEHIND · XP AND LEVEL LIVE HERE</span></div>
+  <div style="position:relative;width:1920px;height:1080px;overflow:hidden;background:repeating-linear-gradient(135deg,#2A2C27 0 14px,#303229 14px 28px);border:1px solid #454840">
+    <div style="position:absolute;left:0;top:0;width:1920px;height:640px;background:#393D2B"></div>
+    <div style="position:absolute;left:0;top:640px;width:1920px;height:440px;background:#2F3221"></div>
+    <div style="position:absolute;left:0;top:0;width:1920px;height:1080px;background:repeating-linear-gradient(135deg,#0E1103 0 6px,transparent 6px 8px)"></div>
+    <div style="position:absolute;left:0;top:0;width:640px;height:1080px;background:#151808;border-right:1px solid #454840;box-sizing:border-box;padding:96px 0 40px 96px;display:flex;flex-direction:column">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:64px;line-height:64px;text-transform:uppercase;letter-spacing:0.02em">Paused</div>
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80;margin-top:12px">RIFT · SUNKEN CARRIAGE · WAVE 3 OF 5</div>
+      <div style="margin-top:40px;width:400px;display:flex;flex-direction:column;gap:8px;padding:16px;background:#1D2010;border:1px solid #454840;box-sizing:border-box">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.02em">Kess · Swift</span><span style="display:flex;align-items:baseline;gap:8px"><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">LEVEL</span><span style="font-family:'Sometype Mono',monospace;font-weight:700;font-size:24px">14</span></span></div>
+        <div style="height:4px;background:#454840"><div style="height:4px;width:38%;background:#B8B6AC"></div></div>
+        <div style="display:flex;justify-content:space-between;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80"><span>2 840 / 7 500 XP</span><span>3 HELD POINTS</span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:24px;width:400px">
+        <sc-for list="{{ pauseItems }}" as="m" hint-placeholder-count="6">
+          <div style="height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 {{ m.pad }}px;box-sizing:border-box;background:{{ m.bg }};border:{{ m.border }};border-left:{{ m.rail }};border-radius:2px">
+            <span style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:24px;text-transform:uppercase;letter-spacing:0.04em;color:{{ m.ink }}">{{ m.label }}</span>
+            <span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">{{ m.meta }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="flex:1"></div>
+      <div style="display:flex;gap:24px;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80"><span><span style="color:#B8B6AC">ESC</span> RESUME</span><span><span style="color:#B8B6AC">TAB</span> LOADOUT</span></div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;width:1920px;font-size:14px;line-height:20px;color:#B8B6AC;text-wrap:pretty">
+    <div><span style="color:#EDEBE3;font-weight:600">Same plate, same axis.</span> The pause plate is the main plate with a different header, so returning to title is a content change, not a screen change. The frozen game is hatched (bg-0 stripes at 6/2 px), not blurred or darkened by alpha.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">XP and level live here.</span> One 400 px card: breaker name and class, level in numeric 700 24, a 400×4 XP rail in text-2, XP numerals and held points in micro. Held points are the same word as on the tree so the player links them.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Deleted.</span> The centred 720 px box; a cyan focus outline; DEV entries visible in release; RETURN TO TITLE without a confirm; in-combat inventory (LOADOUT here is blocked mid-fight and painted).</div>
+  </div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:16px" data-screen-label="Settings">
+  <div style="display:flex;align-items:baseline;gap:24px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">Settings · input, keybinds, accessibility</span><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">DENSE · IDENTICAL FROM TITLE AND PAUSE · THE KEY DISPLAY IS THE CONTROL</span></div>
+  <div style="position:relative;width:1920px;height:1080px;overflow:hidden;background:#1F210A;border:1px solid #454840">
+    <div style="position:absolute;left:0;top:0;width:1920px;height:640px;background:#3E413E"></div>
+    <div style="position:absolute;left:0;top:640px;width:1920px;height:440px;background:#1F210A"></div>
+    <div style="position:absolute;left:0;top:88px;width:1920px;height:992px;background:#0E1103"></div>
+    <div style="position:absolute;left:0;top:0;width:1920px;height:88px;background:#151808;border-bottom:1px solid #454840;display:flex;align-items:center;padding:0 40px;box-sizing:border-box;gap:40px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase;letter-spacing:0.02em">Settings</div>
+      <div style="display:flex;gap:8px">
+        <sc-for list="{{ settingsTabs }}" as="t" hint-placeholder-count="5">
+          <div style="height:44px;padding:0 24px;display:flex;align-items:center;background:#262918;border:1px solid #454840;border-top:2px solid {{ t.rail }};border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.04em;color:{{ t.ink }}">{{ t.label }}</div>
+        </sc-for>
+      </div>
+      <div style="flex:1"></div>
+      <div style="height:44px;padding:0 24px;display:flex;align-items:center;background:#262918;border:1px solid #454840;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.04em;color:#B8B6AC">Defaults</div>
+      <div style="height:44px;padding:0 24px;display:flex;align-items:center;background:#262918;border:1px solid #454840;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.04em;color:#B8B6AC">Back</div>
+    </div>
+    <div style="position:absolute;left:40px;top:128px;width:720px;display:flex;flex-direction:column;gap:0">
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80;height:32px;display:flex;align-items:center">KEYBINDS · CLICK THE KEY, PRESS A KEY</div>
+      <sc-for list="{{ binds }}" as="b" hint-placeholder-count="10">
+        <div style="height:56px;display:grid;grid-template-columns:168px 144px 144px minmax(0,1fr);align-items:center;gap:16px;border-top:1px solid #262918">
+          <div style="font-size:16px;color:#EDEBE3">{{ b.label }}</div>
+          <div style="height:44px;display:flex;align-items:center;justify-content:center;box-sizing:border-box;background:{{ b.bg }};border:{{ b.border }};border-radius:2px;font-family:'Sometype Mono',monospace;font-weight:700;font-size:16px;color:{{ b.ink }};position:relative">{{ b.key }}<sc-if value="{{ b.conflict }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;right:6px;top:6px;width:12px;height:12px;display:flex;flex-direction:column;align-items:center;justify-content:space-between"><div style="width:2px;height:7px;background:#D9402F"></div><div style="width:2px;height:2px;background:#D9402F"></div></div><div style="position:absolute;left:8px;right:8px;bottom:6px;height:2px;background:#D9402F"></div></sc-if></div>
+          <div style="height:44px;display:flex;align-items:center;justify-content:center;gap:8px;box-sizing:border-box;background:#262918;border:1px solid #454840;border-radius:2px"><div style="{{ b.padGlyph }}"></div><div style="{{ b.padGlyph2 }}"></div></div>
+          <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">{{ b.note }}</div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="position:absolute;left:800px;top:128px;width:520px;display:flex;flex-direction:column;gap:0">
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80;height:32px;display:flex;align-items:center">LOOK</div>
+      <sc-for list="{{ sliders }}" as="s" hint-placeholder-count="5">
+        <div style="height:56px;display:grid;grid-template-columns:168px minmax(0,1fr) 80px;align-items:center;gap:16px;border-top:1px solid #262918">
+          <div style="font-size:16px;color:#EDEBE3">{{ s.label }}</div>
+          <div style="position:relative;height:44px;display:flex;align-items:center"><div style="width:100%;height:4px;background:#454840"></div><div style="position:absolute;left:0;top:20px;height:4px;width:{{ s.pct }}%;background:#B8B6AC"></div><div style="position:absolute;left:{{ s.pct }}%;top:14px;width:16px;height:16px;background:#E3DFD2;transform:translateX(-8px)"></div></div>
+          <div style="font-family:'Sometype Mono',monospace;font-weight:500;font-size:16px;text-align:right">{{ s.val }}</div>
+        </div>
+      </sc-for>
+      <div style="height:56px;display:grid;grid-template-columns:168px minmax(0,1fr) 80px;align-items:center;gap:16px;border-top:1px solid #262918">
+        <div style="font-size:16px;color:#EDEBE3">Invert vertical</div>
+        <div style="display:flex;align-items:center;gap:12px"><div style="width:44px;height:24px;box-sizing:border-box;background:#151808;border:1px solid #5C6056;position:relative"><div style="position:absolute;left:2px;top:2px;width:18px;height:18px;background:#8E8D80"></div></div><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">OFF</span></div>
+        <div></div>
+      </div>
+      <div style="height:56px;display:grid;grid-template-columns:168px minmax(0,1fr) 80px;align-items:center;gap:16px;border-top:1px solid #262918">
+        <div style="font-size:16px;color:#EDEBE3">Gamepad</div>
+        <div style="display:flex;align-items:center;gap:12px"><div style="width:44px;height:24px;box-sizing:border-box;background:#151808;border:1px solid #5C6056;position:relative"><div style="position:absolute;right:2px;top:2px;width:18px;height:18px;background:#E3DFD2"></div></div><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">ON · CONNECTED</span></div>
+        <div></div>
+      </div>
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80;height:32px;display:flex;align-items:center;margin-top:24px">VIDEO · FOV HERE · DISPLAY AND AUDIO UNDER THEIR TABS</div>
+      <div style="height:56px;display:grid;grid-template-columns:168px minmax(0,1fr) 80px;align-items:center;gap:16px;border-top:1px solid #262918">
+        <div style="font-size:16px;color:#EDEBE3">Field of view</div>
+        <div style="position:relative;height:44px;display:flex;align-items:center"><div style="width:100%;height:4px;background:#454840"></div><div style="position:absolute;left:0;top:20px;height:4px;width:45%;background:#B8B6AC"></div><div style="position:absolute;left:45%;top:14px;width:16px;height:16px;background:#E3DFD2;transform:translateX(-8px)"></div></div>
+        <div style="font-family:'Sometype Mono',monospace;font-weight:500;font-size:16px;text-align:right">96</div>
+      </div>
+    </div>
+    <div style="position:absolute;left:1360px;top:128px;width:520px;display:flex;flex-direction:column;gap:0">
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80;height:32px;display:flex;align-items:center">ACCESSIBILITY</div>
+      <sc-for list="{{ accSegs }}" as="s" hint-placeholder-count="4">
+        <div style="height:56px;display:grid;grid-template-columns:168px minmax(0,1fr);align-items:center;gap:16px;border-top:1px solid #262918">
+          <div style="font-size:16px;color:#EDEBE3">{{ s.label }}</div>
+          <div style="display:flex;gap:4px"><sc-for list="{{ s.opts }}" as="o" hint-placeholder-count="2"><div style="height:44px;padding:0 16px;display:flex;align-items:center;box-sizing:border-box;background:{{ o.bg }};border:{{ o.border }};border-radius:2px;font-family:'Sometype Mono',monospace;font-weight:500;font-size:13px;letter-spacing:0.08em;color:{{ o.ink }}">{{ o.label }}</div></sc-for></div>
+        </div>
+      </sc-for>
+      <sc-for list="{{ accSliders }}" as="s" hint-placeholder-count="3">
+        <div style="height:56px;display:grid;grid-template-columns:168px minmax(0,1fr) 80px;align-items:center;gap:16px;border-top:1px solid #262918">
+          <div style="font-size:16px;color:#EDEBE3">{{ s.label }}</div>
+          <div style="position:relative;height:44px;display:flex;align-items:center"><div style="width:100%;height:4px;background:#454840"></div><div style="position:absolute;left:0;top:20px;height:4px;width:{{ s.pct }}%;background:#B8B6AC"></div><div style="position:absolute;left:{{ s.pct }}%;top:14px;width:16px;height:16px;background:#E3DFD2;transform:translateX(-8px)"></div></div>
+          <div style="font-family:'Sometype Mono',monospace;font-weight:500;font-size:16px;text-align:right">{{ s.val }}</div>
+        </div>
+      </sc-for>
+      <sc-for list="{{ accToggles }}" as="s" hint-placeholder-count="3">
+        <div style="height:56px;display:grid;grid-template-columns:168px minmax(0,1fr) 80px;align-items:center;gap:16px;border-top:1px solid #262918">
+          <div style="font-size:16px;color:#EDEBE3">{{ s.label }}</div>
+          <div style="display:flex;align-items:center;gap:12px"><div style="width:44px;height:24px;box-sizing:border-box;background:#151808;border:1px solid #5C6056;position:relative"><div style="position:absolute;left:{{ s.x }}px;top:2px;width:18px;height:18px;background:{{ s.knob }}"></div></div><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">{{ s.state }}</span></div>
+          <div></div>
+        </div>
+      </sc-for>
+      <div style="height:56px;display:grid;grid-template-columns:168px minmax(0,1fr);align-items:center;gap:16px;border-top:1px solid #262918">
+        <div style="font-size:16px;color:#EDEBE3">Damage number size</div>
+        <div style="display:flex;gap:4px"><div style="height:44px;padding:0 16px;display:flex;align-items:center;box-sizing:border-box;background:#262918;border:1px solid #454840;border-radius:2px;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">SMALL</div><div style="height:44px;padding:0 16px;display:flex;align-items:center;box-sizing:border-box;background:#E3DFD2;border:1px solid #E3DFD2;border-radius:2px;font-family:'Sometype Mono',monospace;font-weight:700;font-size:13px;letter-spacing:0.08em;color:#0E1103">STANDARD</div><div style="height:44px;padding:0 16px;display:flex;align-items:center;box-sizing:border-box;background:#262918;border:1px solid #454840;border-radius:2px;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">LARGE</div></div>
+      </div>
+      
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;width:1920px;font-size:14px;line-height:20px;color:#B8B6AC;text-wrap:pretty">
+    <div><span style="color:#EDEBE3;font-weight:600">World behind.</span> From pause the frozen scene shows at 40% value in the 40 px gutters and under the header; the settings sheet itself is opaque bg-0. From the title, the yard dolly shows the same way. <span style="color:#EDEBE3;font-weight:600">Three columns, all sections visible.</span> Keybinds take the left column whole; look and FOV in the middle; accessibility on the right. Header tabs jump; they do not hide. Rows 56 tall on 1 px panel-0 rules, label column 240, control, value column 96 in numeric 16. Sliders: 4 px track border-low, fill text-2, 16 px square thumb sys-full. Toggles 44×24 with an 18 px knob: sys-full on, text-3 off, state also in the micro label. Selects are segmented rows; the chosen segment is a sys-full fill with bg-0 ink.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Accessibility.</span> Hold/toggle for sprint, crouch and aim as two-segment rows; view-bob, screen-shake and text scale as sliders (0–100%, 100–150%); subtitles on/off with a size segment; larger nameplates toggle (scales the stage 3 plate 1.5×, min sizes unchanged); reduce-flash toggle, which calms the near-death frame pulse to a static 8 px frame and removes banner snap. Three columns of 720 / 520 / 520: keybinds; look and FOV; accessibility. Display modes and audio live under their own tabs (same row grammar). Tallest column is accessibility at 32 + 12 × 56 = 704 px, so every row fits 1080 at 56 px. <span style="color:#EDEBE3;font-weight:600">Keybinds.</span> The key display is the control: 160×44, numeric 700 16. Click it and it goes to the focused state with a blinking 2 px underline; the next key takes it. A conflict paints both bindings' key text harm-full and adds a drawn 12 px exclamation mark top-right plus a 2 px harm underline in the cell, so the state is carried by geometry as well as colour. Second column is the pad glyph as drawn geometry; unbound reads as an empty border-low box, never a word. Analog axes show "AXIS" in text-3 and are not rebindable here.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Deleted.</span> Left sidebar with STUB badges; cyan slider fills; chevron glyphs; MULTI-KEY explanations in prose; three tabs for eleven settings.</div>
+  </div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:16px" data-screen-label="Class select">
+  <div style="display:flex;align-items:baseline;gap:24px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">Class select</span><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">THE ONE CINEMATIC SCREEN · FIVE FIGURES IN THE YARD · THE RESOURCE TRACK IS THE CLASS</span></div>
+  <div style="position:relative;width:1920px;height:1080px;overflow:hidden;background:#4E5240;border:1px solid #454840">
+    <div style="position:absolute;left:0;top:0;width:1920px;height:720px;background:#9AA39B"></div>
+    <div style="position:absolute;left:0;top:720px;width:1920px;height:360px;background:#4E5240"></div>
+    <div style="position:absolute;left:60px;top:780px;width:440px;height:90px;background:#6B6F5A"></div>
+    <div style="position:absolute;left:1240px;top:40px;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#4E5240">WORLD · FERNHALL YARD · DAYLIGHT · SELECTED FIGURE KEY-LIT · PLACEHOLDER</div>
+    <sc-for list="{{ classes }}" as="c" hint-placeholder-count="5">
+      <div style="position:absolute;left:{{ c.fx }}px;top:{{ c.fy }}px;width:{{ c.fw }}px;height:{{ c.fh }}px;background:{{ c.figBg }};border:1px solid #454840"></div>
+      <div style="position:absolute;left:{{ c.fx }}px;top:{{ c.ly }}px;width:{{ c.fw }}px;text-align:center;white-space:nowrap;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#3A3C35">FIGURE · {{ c.name }} · PLACEHOLDER</div>
+      <sc-if value="{{ c.sel }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;left:{{ c.hx }}px;top:820px;width:{{ c.hw }}px;height:16px;background:#8A8577;border-top:2px solid #E3DFD2;box-sizing:border-box"></div></sc-if>
+    </sc-for>
+    <div style="position:absolute;left:40px;top:40px;display:flex;flex-direction:column;gap:8px;background:#0A1923;border:1px solid #454840;border-left:4px solid #E3DFD2;padding:16px 24px 16px 20px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:64px;line-height:64px;text-transform:uppercase;letter-spacing:0.02em">Choose a breaker</div>
+      <div style="font-size:16px;color:#B8B6AC">Class is permanent. The resource is the class.</div>
+    </div>
+    <div style="position:absolute;left:40px;bottom:40px;width:1840px;display:flex;gap:8px">
+      <sc-for list="{{ classes }}" as="c" hint-placeholder-count="5">
+        <div style="flex:1;height:200px;box-sizing:border-box;background:{{ c.bg }};border:{{ c.border }};border-radius:2px;padding:16px;display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:32px;line-height:32px;text-transform:uppercase;letter-spacing:0.02em;color:{{ c.ink }}">{{ c.name }}</span><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">{{ c.res }}</span></div>
+          <div style="position:relative;height:8px;background:#0A1923;border:1px solid #454840;box-sizing:border-box"><sc-for list="{{ c.track }}" as="seg" hint-placeholder-count="0"><div style="position:absolute;left:{{ seg.x }}%;top:0;height:100%;width:{{ seg.w }}%;background:{{ seg.ink }}"></div></sc-for></div>
+          <div style="font-size:14px;line-height:20px;color:#B8B6AC;text-wrap:pretty">{{ c.line }}</div>
+          <div style="flex:1"></div>
+          <div style="display:flex;gap:8px">
+            <sc-for list="{{ c.slots }}" as="s" hint-placeholder-count="3"><div style="width:40px;height:40px;box-sizing:border-box;background:{{ s.bg }};border:{{ s.border }};border-top:2px solid {{ s.verb }};border-radius:2px"></div></sc-for>
+            <div style="flex:1"></div>
+            <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80;align-self:flex-end">{{ c.slotNote }}</div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;width:1920px;font-size:14px;line-height:20px;color:#B8B6AC;text-wrap:pretty">
+    <div><span style="color:#EDEBE3;font-weight:600">Cinematic means the figures, not the chrome.</span> The title sits on an opaque bg-1 plate (tinted) with the sys identity rail so it holds contrast over daylight. Five full-body renders stand in the yard in Anchor daylight (flat placeholders here), the chosen one key-lit and 1.2×, stepped forward onto a lit floor plate (240×16, #8A8577 with a 2 px sys top edge) — no ring, since the ring is the Elite halo in stage 3; the others hold in shadow. The camera dollies slowly; the cards are the only UI. Card 5 across at 360×200 each, bg-1; chosen card is focused (border-high + panel-1); its figure is the selection, the card is the reading.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Tint.</span> The cards and header take the selected class's verb hue at chroma 0.04 on the panel steps (Swift: movement hue 225, bg-1 #0A1923, panel-0 #1B2A34, panel-1 #24333D); text, rails and accents unchanged; the tint re-steps 160 ms on selection change. <span style="color:#EDEBE3;font-weight:600">The resource is the class.</span> Each card shows its 8 px track in the behaviour from the HUD sheet (continuous, heat, charges, pool, stepped), one body line, and the ability slot row: two 40 px slots plus ultimate as 40 px tiles with verb rails. No stat bars, no role icons.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Resource names.</span> Momentum (Swift) is from the brief. Mana, Scrap, Grit and Charge are INFERRED from the class lines and must be verified against the class spec before transcription; the track behaviours (continuous, pool, heat, stepped, charges) are the design, the words are placeholders. <span style="color:#EDEBE3;font-weight:600">Swift's empty slot is the feature.</span> Swift shows one filled slot and one open frame with a sys-full 2 px top rail and the note "SLOT 2 · YOURS": an open slot at full border value with an intent rail reads as a choice held, not a lock. Every other class shows two filled slots. Deleted: the list of five boxes; CLASS LOCKED banner in cyan; doctrine name strings; the empty grey silhouette in a dashed box.</div>
+  </div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:16px" data-screen-label="Character create">
+  <div style="display:flex;align-items:baseline;gap:24px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">Character create · Swift</span><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">AFTER CLASS · NAME, BODY, VOICE · ENLIST</span></div>
+  <div style="position:relative;width:1920px;height:1080px;overflow:hidden;background:#2A2C27;border:1px solid #454840">
+    <div style="position:absolute;left:0;top:0;width:1920px;height:720px;background:#333531"></div>
+    <div style="position:absolute;left:0;top:720px;width:1920px;height:360px;background:#262918"></div>
+    <div style="position:absolute;left:760px;top:200px;width:200px;height:640px;background:#1D2010;border:1px solid #454840"></div>
+    <div style="position:absolute;left:720px;top:824px;width:280px;height:16px;background:#8A8577;border-top:2px solid #E3DFD2;box-sizing:border-box"></div>
+    <div style="position:absolute;left:760px;top:860px;width:200px;text-align:center;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#5C5C52">FIGURE · SWIFT · LIVE</div>
+    <div style="position:absolute;left:1280px;top:0;width:640px;height:1080px;background:#151808;border-left:1px solid #454840;box-sizing:border-box;padding:96px 96px 40px 64px;display:flex;flex-direction:column;gap:24px">
+      <div style="display:flex;flex-direction:column;gap:8px"><div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">SWIFT · MOMENTUM</div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:64px;line-height:64px;text-transform:uppercase;letter-spacing:0.02em">Enlist</div></div>
+      <div style="display:flex;flex-direction:column;gap:8px"><div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">NAME</div><div style="height:56px;display:flex;align-items:center;padding:0 15px;box-sizing:border-box;background:#2F3221;border:2px solid #8A8F84;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:24px;text-transform:uppercase;letter-spacing:0.02em">Kess<span style="display:inline-block;width:2px;height:24px;background:#E3DFD2;margin-left:2px;vertical-align:middle"></span></div></div>
+      <div style="display:flex;flex-direction:column;gap:8px"><div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">BODY</div><div style="display:flex;gap:4px"><div style="height:44px;flex:1;display:flex;align-items:center;justify-content:center;background:#E3DFD2;border:1px solid #E3DFD2;border-radius:2px;font-family:'Sometype Mono',monospace;font-weight:700;font-size:13px;letter-spacing:0.08em;color:#0E1103">A</div><div style="height:44px;flex:1;display:flex;align-items:center;justify-content:center;background:#262918;border:1px solid #454840;border-radius:2px;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">B</div><div style="height:44px;flex:1;display:flex;align-items:center;justify-content:center;background:#262918;border:1px solid #454840;border-radius:2px;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">C</div><div style="height:44px;flex:1;display:flex;align-items:center;justify-content:center;background:#262918;border:1px solid #454840;border-radius:2px;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">D</div></div></div>
+      <div style="display:flex;flex-direction:column;gap:8px"><div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">FACE</div><div style="display:flex;gap:4px"><sc-for list="{{ faces }}" as="f" hint-placeholder-count="6"><div style="width:64px;height:64px;box-sizing:border-box;background:{{ f.bg }};border:{{ f.border }};border-radius:2px"></div></sc-for></div></div>
+      <div style="display:flex;flex-direction:column;gap:8px"><div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">VOICE</div><div style="display:flex;gap:4px"><div style="height:44px;flex:1;display:flex;align-items:center;justify-content:center;background:#262918;border:1px solid #454840;border-radius:2px;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">LOW</div><div style="height:44px;flex:1;display:flex;align-items:center;justify-content:center;background:#E3DFD2;border:1px solid #E3DFD2;border-radius:2px;font-family:'Sometype Mono',monospace;font-weight:700;font-size:13px;letter-spacing:0.08em;color:#0E1103">MID</div><div style="height:44px;flex:1;display:flex;align-items:center;justify-content:center;background:#262918;border:1px solid #454840;border-radius:2px;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">DRY</div></div></div>
+      <div style="display:flex;flex-direction:column;gap:8px"><div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">ABILITIES · AT ENLIST</div><div style="display:flex;gap:8px;align-items:center"><div style="width:56px;height:56px;box-sizing:border-box;background:#151808;border:1px solid #5C6056;border-top:2px solid #6FC3E8;border-radius:2px;display:flex;align-items:center;justify-content:center"><div style="width:16px;height:16px;background:#6FC3E8"></div></div><div style="width:72px;height:72px;box-sizing:border-box;background:#151808;border:1px solid #5C6056;border-top:4px solid #A98BEA;border-radius:2px;display:flex;align-items:center;justify-content:center"><div style="width:24px;height:24px;background:#A98BEA"></div></div><div style="width:56px;height:56px;box-sizing:border-box;background:#1D2010;border:1px solid #5C6056;border-top:2px solid #E3DFD2;border-radius:2px"></div><div style="font-size:14px;line-height:20px;color:#B8B6AC;margin-left:8px;text-wrap:pretty">Skim, the ultimate, and a second slot you fill at the quartermaster. The frame is yours from the first minute.</div></div></div>
+      <div style="flex:1"></div>
+      <div style="display:grid;grid-template-columns:auto auto;gap:4px 24px;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80"><span>CLASS</span><span style="color:#EDEBE3;text-align:right">SWIFT</span><span>RESOURCE</span><span style="color:#EDEBE3;text-align:right">MOMENTUM</span><span>GEAR</span><span style="color:#EDEBE3;text-align:right">ISSUE RIFLE · STASH OPEN</span></div>
+      <div style="height:56px;display:flex;align-items:center;justify-content:center;background:#E6B33A;border:1px solid #E6B33A;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:24px;text-transform:uppercase;letter-spacing:0.04em;color:#0E1103">Enlist Kess</div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;width:1920px;font-size:14px;line-height:20px;color:#B8B6AC;text-wrap:pretty">
+    <div><span style="color:#EDEBE3;font-weight:600">The figure stays in the yard.</span> The chosen class's render holds centre-left on its lit floor plate; every change on the right plate lands on it live. The plate is 640 wide bg-1 on the right so the figure and the form never overlap.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Form.</span> Sections in micro labels; the name field is the focused state with a 2 px sys-full caret; segmented choices use sys-full fill for the chosen segment; face tiles 64 px (renders). The ability row repeats the HUD's tiles at rest so the player sees the equipment they will wear.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">The empty slot, again.</span> The third tile is an open frame with a sys-full rail and a line of copy that makes it a promise. ENLIST names the breaker; it is the one gold control on the screen. Deleted: STUB badges, "runtime primitive" placeholder text, doctrine strings on the cards, monospace prose.</div>
+  </div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:16px;width:1920px" data-screen-label="Menu control states">
+  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">Menu controls · default / hover / pressed / focused / disabled-painted</div>
+  <div style="display:grid;grid-template-columns:200px repeat(5,minmax(0,1fr));gap:8px 16px;align-items:center;font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">
+    <div></div><div>DEFAULT</div><div>HOVER</div><div>PRESSED</div><div>FOCUSED · PAD</div><div>DISABLED · PAINTED</div>
+    <sc-for list="{{ ctrlRows }}" as="r" hint-placeholder-count="7">
+      <div style="color:#B8B6AC">{{ r.name }}</div>
+      <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="5">
+        <div style="height:56px;display:flex;align-items:center;gap:12px;padding:0 {{ c.pad }}px;box-sizing:border-box;background:{{ c.bg }};border:{{ c.border }};border-left:{{ c.rail }};border-top:{{ c.top }};border-radius:2px;font-family:{{ c.font }};font-weight:{{ c.weight }};font-size:{{ c.size }}px;text-transform:uppercase;letter-spacing:0.04em;color:{{ c.ink }}">
+          <sc-if value="{{ c.knob }}" hint-placeholder-val="{{ false }}"><div style="width:44px;height:24px;box-sizing:border-box;background:#151808;border:1px solid {{ c.knobBd }};position:relative"><div style="position:absolute;left:{{ c.knobX }}px;top:2px;width:18px;height:18px;background:{{ c.knobInk }}"></div></div></sc-if>
+          <sc-if value="{{ c.track }}" hint-placeholder-val="{{ false }}"><div style="position:relative;flex:1;height:44px;display:flex;align-items:center"><div style="width:100%;height:4px;background:{{ c.trackBg }}"></div><div style="position:absolute;left:0;top:20px;height:4px;width:45%;background:{{ c.trackFill }}"></div><div style="position:absolute;left:45%;top:{{ c.thumbTop }}px;width:{{ c.thumb }}px;height:{{ c.thumb }}px;background:{{ c.thumbInk }};transform:translateX(-50%)"></div></div></sc-if>
+          <span>{{ c.label }}</span>
+        </div>
+      </sc-for>
+    </sc-for>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;font-size:14px;line-height:20px;color:#B8B6AC;text-wrap:pretty">
+    <div><span style="color:#EDEBE3;font-weight:600">Ladder, inherited from stage 5.</span> Default panel-0 / 1 px border-low. Hover one step: panel-1, border stays. Pressed: panel-2 fill, 1 px border-high, no offset. Focused: 2 px border-high AND panel-1, plus the 4 px sys-full left rail on list items; on tabs the 2 px top rail is the active mark and focus is border-high + step, so both read apart when focus is elsewhere. Disabled: hatch fill, text-3 ink, geometry unchanged.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Per control.</span> Slider thumb 16 px sys-full at rest, 20 px on hover, 20 px with border-high on focus; disabled thumb text-3 on a hatched row. Toggle knob sys-full on / text-3 off, disabled knob border-low. Key display is focus-capturing: focused state adds a blinking 2 px underline. Segmented: chosen = sys-full fill, bg-0 ink; focus travels between segments as border-high + step without moving the fill.</div>
+    <div><span style="color:#EDEBE3;font-weight:600">Timing.</span> Hover and focus steps are immediate. Pressed holds while down; release returns over 80 ms. List focus rail slides 4 px in from the left, 120 ms. Nothing scales.</div>
+  </div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const SYS='#E3DFD2',T2='#B8B6AC',BL='#454840',BM='#5C6056',P0='#262918',P1='#2F3221',HATCH='repeating-linear-gradient(135deg,#1D2010 0 6px,#262918 6px 8px)';
+    const item=(label,meta,s)=>({label,meta,bg:s==='focus'?P1:(s==='off'?HATCH:P0),border:s==='focus'?'2px solid #8A8F84':'1px solid '+BL,rail:s==='focus'?'4px solid '+SYS:(s==='off'?'1px solid '+BL:'1px solid '+BL),pad:s==='focus'?15:16,ink:s==='off'?'#5C5C52':(s==='focus'?'#EDEBE3':T2)});
+    const mainItems=[item('Play','KESS · 7 H AGO','focus'),item('Breakers','2 OF 5'),item('Settings',''),item('Credits',''),item('Quit','')];
+    const pauseItems=[item('Resume','','focus'),item('Loadout','IN COMBAT','off'),item('Progression','3 HELD'),item('Settings',''),item('Return to Anchor','ENDS THE RIFT'),item('Quit to desktop','')];
+    const settingsTabs=[['Input',true],['Keybinds',false],['Video',false],['Audio',false],['Accessibility',false]].map(([label,on])=>({label,rail:on?SYS:'transparent',ink:on?'#EDEBE3':T2}));
+    const sliders=[{label:'Look sensitivity',pct:42,val:'1.00'},{label:'ADS sensitivity',pct:30,val:'0.80×'},{label:'Aim assist',pct:60,val:'60%'}];
+    const ring=(pos)=>`position:relative;width:20px;height:20px;box-sizing:border-box;border:2px solid ${SYS};border-radius:50%;background:radial-gradient(circle at ${pos},${SYS} 0 2px,transparent 2.5px)`;
+    const bar=`width:20px;height:8px;background:${SYS}`,barCap=`width:20px;height:8px;background:${SYS};box-shadow:16px -4px 0 0 transparent;border-right:4px solid ${SYS}`,trig=`width:20px;height:8px;background:${SYS};border-bottom:2px solid #151808;box-shadow:0 2px 0 0 ${SYS}`,none='width:0;height:0';
+    const key=(label,k,pad,pad2,note,s)=>({label,key:k,padGlyph:pad,padGlyph2:pad2||none,note,bg:s==='focus'?P1:(s==='axis'?'#151808':P0),border:s==='focus'?'2px solid #8A8F84':'1px solid '+(s==='axis'?BL:BM),ink:s==='axis'?'#8E8D80':(s==='conflict'?'#D9402F':'#EDEBE3'),conflict:s==='conflict'});
+    const binds=[key('Move','W A S D',`width:20px;height:20px;box-sizing:border-box;border:2px solid ${SYS};border-radius:50%;background:radial-gradient(circle,${SYS} 0 3px,transparent 3.5px)`,null,'LEFT STICK · AXIS','axis'),key('Look','AXIS',`width:20px;height:20px;box-sizing:border-box;border:2px solid ${SYS};border-radius:50%`,null,'RIGHT STICK · AXIS','axis'),key('Jump','SPACE',ring('50% 15%'),null,''),key('Sprint','L SHIFT',`width:20px;height:20px;box-sizing:border-box;border:2px solid ${SYS};border-radius:50%;background:radial-gradient(circle,${SYS} 0 3px,transparent 3.5px)`,null,'LEFT STICK CLICK'),key('Dash','Q',ring('85% 50%'),null,''),key('Slide','L CTRL',ring('50% 85%'),null,'HOLD CROUCH'),key('Fire','LMB',trig,null,'RIGHT TRIGGER'),key('Aim','RMB',trig,null,'LEFT TRIGGER'),key('Reload','R',ring('15% 50%'),null,''),key('Interact','F',ring('50% 85%'),null,'HOLD'),key('Ability 1','1',bar,null,'LEFT BUMPER','focus'),key('Ability 2','2',barCap,null,'RIGHT BUMPER'),key('Ultimate','2',bar,barCap,'BOTH BUMPERS','conflict')];
+    const seg=(opts,on)=>opts.map((label,i)=>({label,bg:i===on?SYS:P0,border:'1px solid '+(i===on?SYS:BL),ink:i===on?'#0E1103':T2}));
+    const selects=[{label:'Window',opts:seg(['FULLSCREEN','BORDERLESS','WINDOWED'],1)},{label:'Frame cap',opts:seg(['60','120','144','OFF'],3)},{label:'Vertical sync',opts:seg(['OFF','ON'],0)}];
+    const audio=[{label:'Master',pct:80,val:'80'},{label:'Effects',pct:100,val:'100'},{label:'Music',pct:45,val:'45'}];
+    const accSegs=[{label:'Sprint',opts:seg(['HOLD','TOGGLE'],1)},{label:'Crouch',opts:seg(['HOLD','TOGGLE'],0)},{label:'Aim',opts:seg(['HOLD','TOGGLE'],0)},{label:'Subtitle size',opts:seg(['SMALL','STANDARD','LARGE'],1)}];
+    const accSliders=[{label:'View bob',pct:60,val:'60%'},{label:'Screen shake',pct:40,val:'40%'},{label:'Text scale',pct:0,val:'100%'}];
+    const tg=(label,on)=>({label,x:on?22:2,knob:on?SYS:'#8E8D80',state:on?'ON':'OFF'});
+    const accToggles=[tg('Subtitles',true),tg('Larger nameplates',false),tg('Reduce flash',false)];
+    const slot=(verb,filled)=>({verb,bg:filled?'#0A1923':'#12212B',border:'1px solid '+BM});
+    const C=(name,res,line,track,slots,slotNote,sel,i)=>({name,res,line,track,slots,slotNote,sel,bg:sel?'#24333D':'#0A1923',border:sel?'2px solid #8A8F84':'1px solid '+BL,ink:'#EDEBE3',figBg:sel?'#8A8577':'#3A3A33',fx:200+i*340,fy:sel?300:380,fw:sel?160:120,fh:sel?520:440,ly:sel?272:352,hx:200+i*340-40,hw:240});
+    const classes=[
+      C('Swift','MOMENTUM','Speed is the build. Movement generates power; standing still spends it.',[{x:0,w:52,ink:T2},{x:70,w:0.5,ink:SYS}],[slot('#6FC3E8',true),slot(SYS,false),slot('#A98BEA',true)],'SLOT 2 · YOURS',true,0),
+      C('Caster','MANA · INFERRED','Mana is the cooldown. Statuses, reactions, ability-driven combat.',[{x:0,w:23,ink:SYS},{x:25,w:23,ink:SYS},{x:50,w:23,ink:'#6E6C62'}],[slot('#6FC3E8',true),slot('#E6B33A',true),slot('#A98BEA',true)],'',false,1),
+      C('Gunsmith','SCRAP · INFERRED','Deployables and weapon mastery. The gun is the character.',[{x:0,w:78,ink:'#E8842B'}],[slot('#E8842B',true),slot('#E8842B',true),slot('#A98BEA',true)],'',false,2),
+      C('Tank','GRIT · INFERRED','Mitigation becomes fuel. Hold the line and be paid for it.',[{x:0,w:66,ink:T2}],[slot('#D9402F',true),slot('#E6B33A',true),slot('#A98BEA',true)],'',false,3),
+      C('Support','CHARGE · INFERRED','Amplify, sustain, control; solo viable, never a second seat.',[{x:0,w:64,ink:T2},{x:64,w:12,ink:'#6E6C62'}],[slot('#E6B33A',true),slot('#6FC3E8',true),slot('#A98BEA',true)],'',false,4)
+    ];
+    const faces=[0,1,2,3,4,5].map(i=>({bg:i===1?P1:P0,border:i===1?'2px solid #8A8F84':'1px solid '+BL}));
+    const BH='#8A8F84',P2='#393D2B',T3='#8E8D80',OFF='#5C5C52';
+    const base={pad:16,rail:'1px solid '+BL,top:'1px solid '+BL,font:"'Barlow Condensed',sans-serif",weight:600,size:20,knob:false,track:false};
+    const states=(over)=>[
+      {bg:P0,border:'1px solid '+BL,ink:T2},
+      {bg:P1,border:'1px solid '+BL,ink:'#EDEBE3'},
+      {bg:P2,border:'1px solid '+BH,ink:'#EDEBE3'},
+      {bg:P1,border:'2px solid '+BH,ink:'#EDEBE3',pad:15},
+      {bg:HATCH,border:'1px solid '+BL,ink:OFF}
+    ].map((s,i)=>({...base,...s,rail:s.border,top:s.border,...(over?over(i,s):{})}));
+    const row=(name,label,over)=>({name,cells:states(over).map(c=>({...c,label}))});
+    const ctrlRows=[
+      row('List item','Progression',(i,s)=>i===3?{rail:'4px solid '+SYS,pad:13}:{}),
+      row('Tab · active','Keybinds',(i,s)=>({top:i===4?s.border:'2px solid '+SYS})),
+      row('Tab · inactive','Video'),
+      row('Button · gold','Enlist',(i,s)=>i===4?{}:{bg:i===2?'#C9992C':(i===1||i===3?'#F0C24F':'#E6B33A'),border:i===3?'2px solid #0E1103':'1px solid #E6B33A',ink:'#0E1103',weight:700}),
+      row('Key display','Space',(i)=>({font:"'Sometype Mono',monospace",weight:700,size:16,border:i===3?'2px solid '+BH:(i===4?'1px solid '+BL:'1px solid '+BM)})),
+      row('Segment · chosen','Mid',(i,s)=>i===4?{font:"'Sometype Mono',monospace",size:13}:{bg:i===2?'#C9C6BA':SYS,border:i===3?'2px solid #0E1103':'1px solid '+SYS,ink:'#0E1103',weight:700,font:"'Sometype Mono',monospace",size:13}),
+      row('Toggle','',(i,s)=>({knob:true,knobBd:i===4?BL:(i===3?BH:BM),knobX:i===4?2:22,knobInk:i===4?BL:SYS,bg:i===0?'transparent':s.bg,border:i===0?'1px solid transparent':s.border})),
+      row('Slider','',(i,s)=>({track:true,trackBg:BL,trackFill:i===4?OFF:T2,thumb:i===0||i===4?16:20,thumbTop:i===0||i===4?14:12,thumbInk:i===4?OFF:SYS,bg:i===0?'transparent':s.bg,border:i===0?'1px solid transparent':s.border,pad:12}))
+    ];
+    return {mainItems,pauseItems,settingsTabs,sliders,binds,selects,audio,classes,faces,ctrlRows,accSegs,accSliders,accToggles};
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:wght@400;600&family=Sometype+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0E1103;min-height:100%;color:#EDEBE3;font-family:'Source Sans 3',sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#B8B6AC}a:hover{color:#EDEBE3}
+</style>
+</helmet>
+<div style="display:flex;flex-direction:column;gap:64px;padding:64px">
+
+<div style="display:flex;flex-direction:column;gap:16px;width:1920px" data-screen-label="Node states">
+  <div style="display:flex;align-items:baseline;gap:24px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">Node states · wireframe</span><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">LAYOUT AND STATE ONLY · 32 px ICON SLOTS EMPTY · NO ATMOSPHERE</span></div>
+  <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:16px">
+    <sc-for list="{{ states }}" as="s" hint-placeholder-count="6">
+      <div style="background:#151808;border:1px solid #454840;padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px">
+        <div style="position:relative;width:{{ s.size }}px;height:{{ s.size }}px;box-sizing:border-box;background:{{ s.bg }};border:{{ s.border }};border-radius:2px;display:flex;align-items:center;justify-content:center;transform:rotate({{ s.rot }}deg)"><div style="width:32px;height:32px;border:1px dashed {{ s.slot }};box-sizing:border-box;transform:rotate({{ s.unrot }}deg)"></div></div>
+        <div style="display:flex;gap:4px"><sc-for list="{{ s.ranks }}" as="r" hint-placeholder-count="0"><div style="width:12px;height:6px;background:{{ r }}"></div></sc-for></div>
+        <div style="font-family:'Sometype Mono',monospace;font-size:13px;line-height:18px;letter-spacing:0.04em;color:#B8B6AC;text-align:center"><span style="color:#EDEBE3">{{ s.name }}</span><br>{{ s.desc }}</div>
+      </div>
+    </sc-for>
+  </div>
+</div>
+
+<sc-for list="{{ views }}" as="v" hint-placeholder-count="4">
+<div style="display:flex;flex-direction:column;gap:16px" data-screen-label="{{ v.label }}">
+  <div style="display:flex;align-items:baseline;gap:24px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">{{ v.label }}</span><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">{{ v.sub }}</span></div>
+  <div style="position:relative;width:1920px;height:1080px;overflow:hidden;background:#1F210A;border:1px solid #454840">
+    <div style="position:absolute;left:0;top:0;width:1920px;height:640px;background:#3E413E"></div>
+    <div style="position:absolute;left:0;top:640px;width:1920px;height:440px;background:#1F210A"></div>
+    <div style="position:absolute;left:0;top:0;width:1920px;height:88px;background:#151808;border-bottom:1px solid #454840;display:flex;align-items:center;padding:0 40px;box-sizing:border-box;gap:40px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase;letter-spacing:0.02em">Progression</div>
+      <div style="display:flex;gap:8px">
+        <div style="height:44px;padding:0 24px;display:flex;align-items:center;background:#262918;border:1px solid #454840;border-top:2px solid {{ v.coreRail }};border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.04em;color:{{ v.coreInk }}">Core tree</div>
+        <div style="height:44px;padding:0 24px;display:flex;align-items:center;background:#262918;border:1px solid #454840;border-top:2px solid {{ v.docRail }};border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.04em;color:{{ v.docInk }}">Doctrine board</div>
+      </div>
+      <div style="flex:1"></div>
+      <div style="display:flex;align-items:center;gap:16px;height:44px;padding:0 16px;background:#262918;border:1px solid #454840;border-radius:2px">
+        <span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">HELD</span><span style="font-family:'Sometype Mono',monospace;font-weight:700;font-size:24px;line-height:24px">41</span>
+        <div style="width:1px;height:24px;background:#454840"></div>
+        <span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">SPENT</span><span style="font-family:'Sometype Mono',monospace;font-weight:500;font-size:16px;color:#B8B6AC">24 / 65</span>
+      </div>
+      <div style="height:44px;padding:0 24px;display:flex;align-items:center;background:#262918;border:1px solid #454840;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.04em;color:#B8B6AC">Close</div>
+    </div>
+
+    <div style="position:absolute;left:40px;top:104px;display:flex;align-items:center;gap:8px;height:32px;z-index:2">
+      <div style="height:32px;width:32px;display:flex;align-items:center;justify-content:center;background:#262918;border:1px solid #454840;border-radius:2px"><div style="width:12px;height:2px;background:#B8B6AC"></div></div>
+      <div style="height:32px;width:32px;display:flex;align-items:center;justify-content:center;background:#262918;border:1px solid #454840;border-radius:2px;position:relative"><div style="width:12px;height:2px;background:#B8B6AC"></div><div style="position:absolute;width:2px;height:12px;background:#B8B6AC"></div></div>
+      <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80;margin-left:8px">{{ v.zoomLabel }}</div>
+    </div>
+
+    <div style="position:absolute;left:40px;top:152px;width:1424px;height:888px;overflow:hidden;background:#151808;border:1px solid #454840;background-image:radial-gradient(#262918 1px,transparent 1.5px);background-size:{{ v.dot }}px {{ v.dot }}px">
+      <div style="position:absolute;left:{{ v.panX }}px;top:{{ v.panY }}px;width:1424px;height:888px;transform:scale({{ v.scale }});transform-origin:left top">
+        <sc-if value="{{ v.core }}" hint-placeholder-val="{{ true }}">
+          <sc-for list="{{ tiers }}" as="t" hint-placeholder-count="5">
+            <div style="position:absolute;left:0;top:{{ t.y }}px;width:2400px;height:160px;border-top:1px solid #454840;box-sizing:border-box">
+              <div style="position:absolute;left:16px;top:12px;display:flex;flex-direction:column;gap:4px"><div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;color:#B8B6AC">{{ t.name }}</div><div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">{{ t.req }}</div></div>
+            </div>
+          </sc-for>
+        </sc-if>
+        <sc-for list="{{ v.edges }}" as="e" hint-placeholder-count="0"><div style="position:absolute;left:{{ e.x }}px;top:{{ e.y }}px;width:{{ e.w }}px;height:{{ e.h }}px;background:{{ e.ink }}"></div></sc-for>
+        <sc-for list="{{ v.nodes }}" as="n" hint-placeholder-count="10">
+          <div style="position:absolute;left:{{ n.x }}px;top:{{ n.y }}px;width:{{ n.w }}px;height:{{ n.h }}px;box-sizing:border-box;background:{{ n.bg }};border:{{ n.border }};border-radius:2px;display:flex;align-items:center;gap:12px;padding:{{ n.pad }};transform:rotate({{ n.rot }}deg)">
+            <div style="width:32px;height:32px;flex:none;border:1px dashed {{ n.slot }};box-sizing:border-box;transform:rotate({{ n.unrot }}deg)"></div>
+            <sc-if value="{{ n.text }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:2px;min-width:0;flex:1">
+                <div style="display:flex;justify-content:space-between;gap:8px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:{{ v.nameSize }}px;line-height:1.1;text-transform:uppercase;letter-spacing:0.02em;color:{{ n.ink }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ n.name }}</span><span style="font-family:'Sometype Mono',monospace;font-weight:700;font-size:{{ v.valSize }}px;line-height:1.1;color:{{ n.ink }};white-space:nowrap">{{ n.val }}</span></div>
+                <sc-if value="{{ v.body }}" hint-placeholder-val="{{ true }}"><sc-if value="{{ n.body }}" hint-placeholder-val="{{ false }}"><div style="font-size:14px;line-height:18px;color:{{ n.bodyInk }};text-wrap:pretty">{{ n.body }}</div></sc-if></sc-if>
+                <div style="display:flex;gap:4px"><sc-for list="{{ n.ranks }}" as="r" hint-placeholder-count="0"><div style="width:12px;height:6px;background:{{ r }}"></div></sc-for></div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="position:absolute;left:1488px;top:152px;width:392px;height:888px;display:flex;flex-direction:column;gap:16px">
+      <div style="background:#1D2010;border:1px solid #454840;border-left:4px solid #E3DFD2;padding:16px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">HELD · READY TO PLACE</span><span style="font-family:'Sometype Mono',monospace;font-weight:700;font-size:24px">41</span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px"><sc-for list="{{ held }}" as="h" hint-placeholder-count="41"><div style="width:16px;height:8px;background:#B8B6AC"></div></sc-for></div>
+        <div style="font-size:14px;line-height:20px;color:#B8B6AC;text-wrap:pretty">Held points carry between boards and never expire. 24 placed of a 65 cap. Refund is per node or all, one Riftglass at the Forge.</div>
+      </div>
+      <div style="background:#1D2010;border:1px solid #454840;padding:16px;display:flex;flex-direction:column;gap:12px;flex:1">
+        <div style="display:flex;align-items:center;gap:12px"><div style="width:32px;height:32px;border:1px dashed #5C6056;box-sizing:border-box"></div><div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#B8B6AC">{{ v.dKind }}</div></div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:24px;line-height:28px;text-transform:uppercase;letter-spacing:0.02em">{{ v.dName }}</div>
+        <div style="font-size:16px;line-height:24px;color:#EDEBE3;text-wrap:pretty">{{ v.dBody }}</div>
+        <div style="height:1px;background:#454840"></div>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) auto 16px;gap:8px 16px;align-items:center;font-size:14px;color:#B8B6AC">
+          <span>Now</span><span style="font-family:'Sometype Mono',monospace;font-weight:500;font-size:16px;color:#EDEBE3;text-align:right">{{ v.now }}</span><span></span>
+          <span>After</span><span style="font-family:'Sometype Mono',monospace;font-weight:500;font-size:16px;color:#EDEBE3;text-align:right">{{ v.after }}</span><span style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:8px solid #E3DFD2"></span>
+        </div>
+        <div style="font-size:14px;line-height:20px;color:#B8B6AC;text-wrap:pretty">{{ v.dReq }}</div>
+        <div style="flex:1"></div>
+        <div style="display:flex;gap:8px">
+          <div style="height:44px;flex:1;display:flex;align-items:center;justify-content:center;background:{{ v.buyBg }};border:1px solid {{ v.buyBorder }};border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;text-transform:uppercase;letter-spacing:0.04em;color:{{ v.buyInk }}">{{ v.buy }}</div>
+          <div style="height:44px;padding:0 24px;display:flex;align-items:center;background:{{ v.refBg }};border:1px solid #454840;border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;text-transform:uppercase;letter-spacing:0.04em;color:{{ v.refInk }}">Refund</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="font-size:14px;line-height:20px;color:#B8B6AC;max-width:1400px;text-wrap:pretty">{{ v.note }}</div>
+</div>
+</sc-for>
+
+<div style="display:flex;flex-direction:column;gap:16px;width:1920px" data-screen-label="Buy and refund flow">
+  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:40px;text-transform:uppercase">Buy / refund flow · side panel, four moments</div>
+  <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px">
+    <sc-for list="{{ flow }}" as="f" hint-placeholder-count="4">
+      <div style="background:#1D2010;border:1px solid #454840;padding:16px;display:flex;flex-direction:column;gap:12px;min-height:280px">
+        <div style="font-family:'Sometype Mono',monospace;font-size:13px;letter-spacing:0.08em;color:#8E8D80">{{ f.step }}</div>
+        <div style="display:flex;align-items:center;gap:12px"><div style="width:32px;height:32px;border:1px dashed #5C6056;box-sizing:border-box"></div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:24px;text-transform:uppercase">Thick skin</div></div>
+        <div style="display:flex;gap:4px"><sc-for list="{{ f.ranks }}" as="r" hint-placeholder-count="0"><div style="width:12px;height:6px;background:{{ r }}"></div></sc-for></div>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 16px;font-size:14px;color:#B8B6AC"><span>Health now</span><span style="font-family:'Sometype Mono',monospace;color:#EDEBE3;text-align:right">{{ f.now }}</span><span>After</span><span style="font-family:'Sometype Mono',monospace;color:#EDEBE3;text-align:right">{{ f.after }}</span><span>Held</span><span style="font-family:'Sometype Mono',monospace;color:#EDEBE3;text-align:right">{{ f.held }}</span></div>
+        <div style="flex:1"></div>
+        <div style="display:flex;gap:8px">
+          <div style="height:44px;flex:1;display:flex;align-items:center;justify-content:center;box-sizing:border-box;background:{{ f.buyBg }};border:{{ f.buyBorder }};border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;text-transform:uppercase;letter-spacing:0.04em;color:{{ f.buyInk }}">{{ f.buy }}</div>
+          <div style="height:44px;padding:0 16px;display:flex;align-items:center;box-sizing:border-box;background:{{ f.refBg }};border:{{ f.refBorder }};border-radius:2px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;text-transform:uppercase;letter-spacing:0.04em;color:{{ f.refInk }}">Refund</div>
+        </div>
+        <div style="font-size:14px;line-height:20px;color:#B8B6AC;text-wrap:pretty">{{ f.note }}</div>
+      </div>
+    </sc-for>
+  </div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const SYS='#E3DFD2',T2='#B8B6AC',T3='#8E8D80',BL='#454840',BM='#5C6056',P0='#262918',BG1='#151808',HATCH='repeating-linear-gradient(135deg,#1D2010 0 6px,#262918 6px 8px)',GOLD='#E6B33A';
+    const cells=(n,max,s)=>Array.from({length:max},(_,i)=>i<n?SYS:(s==='reach'?BM:BL));
+    const ST={
+      unspent:{bg:P0,border:'1px solid '+BL,ink:T2,slot:BL,bodyInk:T3},
+      reach:{bg:P0,border:'1px solid '+BM,ink:'#EDEBE3',slot:T2,bodyInk:T2},
+      spent:{bg:SYS,border:'1px solid '+SYS,ink:'#0E1103',slot:'#0E1103',bodyInk:'#262918'},
+      forfeit:{bg:HATCH,border:'1px solid '+BL,ink:'#5C5C52',slot:BL,bodyInk:'#5C5C52'},
+      keystone:{bg:P0,border:'2px solid '+BM,ink:'#EDEBE3',slot:T2,bodyInk:T2},
+      keyspent:{bg:GOLD,border:'1px solid '+GOLD,ink:'#0E1103',slot:'#0E1103',bodyInk:'#262918'}
+    };
+    const states=[
+      {name:'UNSPENT',desc:'not yet reachable · full-value ink, never faded',size:64,rot:0,unrot:0,ranks:cells(0,2,'un'),...ST.unspent},
+      {name:'REACHABLE',desc:'buyable now · border-mid, text-1',size:64,rot:0,unrot:0,ranks:cells(0,2,'reach'),...ST.reach},
+      {name:'SPENT',desc:'sys-full fill · bg-0 ink · ranks lit',size:64,rot:0,unrot:0,ranks:cells(2,2),...ST.spent},
+      {name:'REFUSED / FORFEIT',desc:'painted hatch · text-4 · sibling keystone taken',size:64,rot:0,unrot:0,ranks:[],...ST.forfeit},
+      {name:'KEYSTONE',desc:'64 px diamond · 2 px border · reachable',size:64,rot:45,unrot:-45,ranks:[],...ST.keystone},
+      {name:'KEYSTONE · TAKEN',desc:'gold-full fill (reward family) · forfeits its sibling',size:64,rot:45,unrot:-45,ranks:[],...ST.keyspent}
+    ];
+    const tiers=[1,2,3,4,5].map((n,i)=>({name:'Tier '+['I','II','III','IV','V'][i],req:i===0?'OPEN':(6*i)+' SPENT HERE',y:i*160+16}));
+    const col=i=>176+i*208;
+    const N=(name,val,c,tier,s,r,max,body)=>({name,val,x:col(c),y:tier*160+56,w:192,h:80,pad:'0 12px',rot:0,unrot:0,text:true,body,ranks:max?cells(r,max,s):[],...ST[s]});
+    const K=(name,c,s)=>({name,val:'',x:col(c)+64,y:4*160+56+8,w:64,h:64,pad:'0',rot:45,unrot:-45,text:false,ranks:[],...ST[s]});
+    const core=[
+      N('Steady hand','+8%',0,0,'spent',2,2),N('Long stride','+6%',1,0,'spent',1,1),N('Thick skin','+40',2,0,'reach',1,3),N('Cold barrel','+8%',3,0,'reach',0,1),N('Deep breath','+12%',4,0,'unspent',0,1),
+      N('Second wind','20%',1,1,'spent',1,1),N('Thick skin · II','+40',2,1,'reach',0,1),N('Recoil control','−10%',3,1,'unspent',0,1),
+      N('Follow-through','+1',1,2,'unspent',0,1),N('Thick skin · III','+40',2,2,'unspent',0,1),N('Glass cannon','+25%',3,2,'unspent',0,1),
+      N('Overreach','+30%',0,3,'unspent',0,1),N('Anchor','+40%',4,3,'unspent',0,1),
+      K('Momentum lock',1,'keyspent'),K('Bank run',3,'forfeit')
+    ];
+    const cE=[];const stem=(c,t0,t1,ink)=>cE.push({x:col(c)+95,y:t0*160+56+80,w:2,h:(t1-t0)*160-80,ink});
+    stem(2,0,1,T2);stem(2,1,2,BL);stem(1,0,1,SYS);stem(1,1,2,BL);stem(0,0,1,T2);stem(3,0,1,BM);stem(3,1,2,BL);
+    cE.push({x:col(0)+95,y:216,w:2,h:240,ink:BL},{x:col(4)+95,y:136,w:2,h:400,ink:BL},{x:col(1)+95,y:456,w:2,h:240,ink:SYS},{x:col(3)+95,y:456,w:2,h:240,ink:BL});
+    const D=(name,val,x,y,kind,s,body)=>{const big=kind==='rule';return{name,val,x,y,w:big?288:192,h:big?96:56,pad:big?'0 16px':'0 12px',rot:0,unrot:0,text:true,body:big?body:'',ranks:[],...ST[s]};};
+    const doc=[
+      D('Slide dmg','+8%',96,96,'pct','spent'),D('Air control','+10%',96,192,'pct','spent'),
+      D('Contact','',336,80,'rule','spent','Landing on an enemy from a slide counts as a weak-point hit.'),
+      D('Crit chance','+4%',336,240,'pct','reach'),D('Reload','+6%',576,240,'pct','reach'),
+      D('Read the room','',672,80,'rule','reach','The first shot after a dash cannot miss; it deals no crit.'),
+      D('Move speed','+3%',96,336,'pct','reach'),D('Health','+30',336,336,'pct','unspent'),
+      D('Landing','',576,400,'rule','unspent','Hard landings refund the ability spent in the air.'),
+      D('Crit dmg','+12%',1008,240,'pct','unspent'),D('Dash CD','−0.4 s',1200,240,'pct','unspent'),
+      D('Sightline','',912,432,'rule','unspent','Marked targets stay marked through cover for 2 s.'),
+      D('Armour','+24',1200,320,'pct','unspent'),D('Ability dmg','+5%',1200,400,'pct','unspent'),
+      D('Mag size','+2',576,560,'pct','unspent'),D('Weak-point','+9%',912,592,'pct','unspent'),
+      D('Momentum gain','+6%',96,528,'pct','unspent'),D('Shield','+20',336,528,'pct','unspent'),
+      D('Bank run','',1152,560,'rule','unspent','Banked Momentum is not spent by Hard Stop.'),
+      D('Slide length','+12%',576,720,'pct','unspent'),D('Resource regen','+0.4/s',912,720,'pct','unspent'),D('Crit chance','+4%',1152,720,'pct','unspent')
+    ];
+    const dE=[];const link=(a,b,ink)=>{const A=doc[a],B=doc[b];const ax=A.x+A.w/2,ay=A.y+A.h/2,bx=B.x+B.w/2,by=B.y+B.h/2;dE.push({x:Math.min(ax,bx),y:ay-1,w:Math.abs(bx-ax),h:2,ink},{x:bx-1,y:Math.min(ay,by),w:2,h:Math.abs(by-ay),ink});};
+    link(0,1,SYS);link(0,2,SYS);link(1,3,T2);link(2,5,T2);link(3,4,T2);link(1,6,T2);link(3,7,BL);link(4,8,BL);link(5,9,BL);link(9,10,BL);link(9,11,BL);link(10,12,BL);link(12,13,BL);link(8,14,BL);link(11,15,BL);link(6,16,BL);link(7,17,BL);link(13,18,BL);link(14,19,BL);link(15,20,BL);link(18,21,BL);
+    const held=Array.from({length:41},(_,i)=>i);
+    const dc={dKind:'CORE · TIER I · RANK 1 OF 3',dName:'Thick skin',dBody:'+40 health per rank.',now:'240',after:'280',dReq:'Rank 2 sits in Tier II and opens at 6 points spent on this board.',buy:'Buy rank · 1 pt',buyBg:GOLD,buyBorder:GOLD,buyInk:'#0E1103',refBg:HATCH,refInk:'#5C5C52'};
+    const dd={dKind:'DOCTRINE · RULE REWRITE · 2 PT',dName:'Read the room',dBody:'The first shot after a dash cannot miss; it deals no crit.',now:'—',after:'Rule on',dReq:'Adjacent to Contact (spent). Refundable while nothing beyond it is spent.',buy:'Buy · 2 pt',buyBg:GOLD,buyBorder:GOLD,buyInk:'#0E1103',refBg:HATCH,refInk:'#5C5C52'};
+    const hdr=(c)=>c?{coreRail:SYS,coreInk:'#EDEBE3',docRail:'transparent',docInk:T2}:{coreRail:'transparent',coreInk:T2,docRail:SYS,docInk:'#EDEBE3'};
+    const views=[
+      {label:'Core tree · zoom 1.0',sub:'TAB 1 · FIVE TIER BANDS · ROW = RANK · TWO KEYSTONES IN TIER V',core:true,nodes:core,edges:cE,scale:1,panX:0,panY:0,dot:48,nameSize:16,valSize:16,body:true,zoomLabel:'ZOOM 1.0 · WHEEL / BUMPERS · DRAG / STICK TO PAN',...hdr(true),...dc,
+        note:'Board 1424×888 at (40, 152) on a 48 px dot grid; side panel 392 wide at (1488, 152), never moves. Bands 160 px; label column 160; node columns on a 208 px pitch. Node 192×80: 32 px icon slot (empty), name, value in numeric, rank cells 12×6. A 3-rank node is three stacked nodes joined by a 2 px stem, one per band: row = rank. Keystones are 64 px diamonds in Tier V; taking one paints the other forfeited. Edge ink: border-low unreachable, text-2 reachable, sys-full spent.'},
+      {label:'Core tree · zoom 0.6',sub:'SAME BOARD · BODY OFF · NAME 28 / VALUE 28 AUTHORED (~17 px ON SCREEN)',core:true,nodes:core,edges:cE,scale:0.6,panX:40,panY:24,dot:29,nameSize:28,valSize:28,body:false,zoomLabel:'ZOOM 0.6',...hdr(true),...dc,
+        note:'Zoom is around the cursor / focused node, two steps only (1.0, 0.6). At 0.6 the whole board fits; text steps up so nothing renders under 16 px on screen; borders re-snap to 1 px. The pan offset here is (40, 24) to show the board does not have to sit at origin.'},
+      {label:'Doctrine board · zoom 1.0',sub:'TAB 2 · ADJACENCY LATTICE · SIZE = TYPE',core:false,nodes:doc,edges:dE,scale:1,panX:0,panY:0,dot:48,nameSize:16,valSize:16,body:true,zoomLabel:'ZOOM 1.0',...hdr(false),...dd,
+        note:'Rule-rewrite cards 288×96 with a body line; percentage one-liners 192×56. Orthogonal 2 px edges at node centres. A node is reachable when any spent neighbour touches it. The board holds ~22 nodes per doctrine; a build takes 7–9, so most of it stays unspent by design and reads as ground not taken, at full ink.'},
+      {label:'Doctrine board · zoom 0.6',sub:'SAME LATTICE · BODIES OFF',core:false,nodes:doc,edges:dE,scale:0.6,panX:0,panY:0,dot:29,nameSize:26,valSize:26,body:false,zoomLabel:'ZOOM 0.6',...hdr(false),...dd,
+        note:'At 0.6 the cards keep name only and one-liners keep name and value. The spent cluster and its reachable rim are the reading; the side panel supplies the body.'}
+    ];
+    const flow=[
+      {step:'1 · FOCUS A REACHABLE NODE',ranks:cells(1,3,'reach'),now:'240',after:'280',held:'41',buy:'Buy rank · 1 pt',buyBg:GOLD,buyBorder:'1px solid '+GOLD,buyInk:'#0E1103',refBg:HATCH,refBorder:'1px solid '+BL,refInk:'#5C5C52',note:'Buy is primary. Refund painted because rank 1 already supports rank 2? No: rank 1 is spent and nothing depends on it, so Refund would be live. Shown painted here because the focused row is the unspent rank 2.'},
+      {step:'2 · CONFIRM · FRAME ONE',ranks:cells(2,3),now:'280',after:'320',held:'40',buy:'Buy rank · 1 pt',buyBg:GOLD,buyBorder:'1px solid '+GOLD,buyInk:'#0E1103',refBg:P0,refBorder:'1px solid '+BL,refInk:T2,note:'Purchase snaps: node fill, rank cell and held count change on the same frame; a 2 px sys-full outer edge on the node decays over 240 ms. No sound of coins, no particle. Refund becomes live.'},
+      {step:'3 · REFUND · HOLD 400 ms',ranks:cells(2,3),now:'280',after:'240',held:'40',buy:'Buy rank · 1 pt',buyBg:P0,buyBorder:'1px solid '+BL,buyInk:T2,refBg:'#2F3221',refBorder:'2px solid #8A8F84',refInk:'#EDEBE3',note:'Refund is a hold, not a click: the button fills left to right in panel-2 over 400 ms; release early cancels. After shows the loss with a down triangle. If a dependent node is spent, Refund is painted and the body names the dependant.'},
+      {step:'4 · REFUND ALL · CONFIRM',ranks:cells(0,3,'reach'),now:'240',after:'200',held:'65',buy:'Refund all · 1 Riftglass',buyBg:'#D9402F',buyBorder:'1px solid #D9402F',buyInk:'#EDEBE3',refBg:P0,refBorder:'1px solid '+BL,refInk:T2,note:'Refund all lives in the header; it opens a 640 px confirm with the cost in the one currency and the wallet line. The confirm button is harm-full (destructive), the only red control in the system. Escape keeps everything.'}
+    ];
+    flow[0].note='Panel shows now / after with a drawn up-mark and the held count. Buy is the gold primary. Refund is painted here because the focused rank is not yet spent.';
+    return {states,tiers,views,held,flow};
+  }
+}
+</script>
+</body>
+</html>

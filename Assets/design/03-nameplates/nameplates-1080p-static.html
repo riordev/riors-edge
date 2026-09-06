@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Rior's Edge · Nameplates and boss bar</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Sometype+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg0:#0E1103;--bg1:#151808;--bg2:#1D2010;--p1:#2F3221;--p2:#393D2B;--b-low:#454840;--b-mid:#5C6056;--t2:#B8B6AC;--sys:#E3DFD2;--harm:#D9402F;--harm-dim:#5E1F18;--teal2:#6ADFC9;--display:'Barlow Condensed',sans-serif;--num:'Sometype Mono',monospace}
+html,body{margin:0;background:var(--bg0);color:#EDEBE3;font-family:var(--display)}
+.stage{position:relative;width:1920px;height:1080px;overflow:hidden;background:repeating-linear-gradient(135deg,#2A2C27 0 14px,#303229 14px 28px)}
+.sky{position:absolute;inset:0 0 auto 0;height:640px;background:var(--p2)}.ground{position:absolute;left:0;top:640px;width:1920px;height:440px;background:var(--p1)}
+.body{position:absolute;background:var(--bg2);border:1px solid var(--b-low)}
+.halo{position:absolute;border:2px solid var(--sys);border-radius:50%;box-sizing:border-box}
+/* plate: scale via --s (1.0 near, 0.5 floor) */
+.plate{position:absolute;display:flex;flex-direction:column;align-items:center;gap:calc(6px*var(--s,1))}
+.mods{display:flex;gap:calc(8px*var(--s,1))}
+.mod{position:relative;width:16px;height:16px;display:flex;align-items:center;justify-content:center;transform:scale(calc(.5 + .5*var(--s,1)))}
+.mod.active::after{content:"";position:absolute;left:0;right:0;bottom:-4px;height:2px;background:var(--sys)}
+.name{font-weight:600;text-transform:uppercase;letter-spacing:.02em;line-height:1;color:var(--t2)}
+.plate.far .name{display:none}
+.bar{position:relative;width:100%;background:var(--bg1);border:1px solid var(--b-mid);box-sizing:border-box}
+.bar .chip{position:absolute;left:0;top:0;height:100%;background:repeating-linear-gradient(135deg,var(--harm-dim) 0 4px,var(--harm) 4px 6px)}
+.bar .fill{position:absolute;left:0;top:0;height:100%;background:var(--sys)}
+.bar .shield{position:absolute;left:0;top:0;height:100%;border-top:2px solid var(--t2);box-sizing:border-box}
+.plate.far .chip,.plate.far .shield{display:none}
+.standard .bar{height:6px}.standard .name{font-size:16px}
+.champion .bar{height:8px}.champion .name{font-size:20px}
+.champion .bar::before,.champion .bar::after{content:"";position:absolute;top:50%;width:10px;height:10px;background:var(--sys);transform:translateY(-50%) rotate(45deg)}
+.champion .bar::before{left:-14px}.champion .bar::after{right:-14px}
+.plate.far.standard .bar{height:5px}.plate.far.champion .bar{height:5px}
+.plate.far.champion .bar::before,.plate.far.champion .bar::after{width:6px;height:6px}.plate.far.champion .bar::before{left:-10px}.plate.far.champion .bar::after{right:-10px}
+/* boss */
+.boss{position:absolute;display:flex;flex-direction:column;gap:8px}
+.boss .head{display:flex;align-items:baseline;justify-content:space-between}
+.boss .name{font-weight:700;font-size:32px;color:var(--teal2);display:block}
+.boss .bar{height:24px;border-width:2px}
+.boss .phase{position:absolute;top:-6px;width:4px;height:32px;background:var(--bg0);border-left:1px solid var(--sys);border-right:1px solid var(--sys);box-sizing:border-box}
+.boss .pips{display:flex;gap:4px}.boss .pips i{display:block;width:24px;height:6px;background:var(--b-low)}.boss .pips i.done{background:var(--t2)}.boss .pips i.now{background:var(--sys)}
+.boss.far{gap:4px}.boss.far .name{font-size:20px}.boss.far .bar{height:12px}.boss.far .phase{top:-4px;height:16px}.boss.far .pips i{width:16px;height:4px}
+/* marks (16 px cell, sys-full) */
+.m-warded{width:12px;height:12px;border:2px solid var(--sys);box-sizing:border-box}
+.m-volatile{width:10px;height:10px;background:var(--sys);transform:rotate(45deg)}
+.m-fleetfoot{width:0;height:0;border-top:7px solid transparent;border-bottom:7px solid transparent;border-left:12px solid var(--sys)}
+.m-anchored{width:12px;height:12px;background:linear-gradient(var(--sys),var(--sys)) 0 100%/12px 3px no-repeat,linear-gradient(var(--sys),var(--sys)) 5px 0/2px 12px no-repeat}
+.m-splitting{width:12px;height:12px;border-top:3px solid var(--sys);border-bottom:3px solid var(--sys);box-sizing:border-box}
+.m-aura{width:14px;height:14px;border:2px solid var(--sys);border-radius:50%;box-sizing:border-box}
+.m-reflective{width:9px;height:9px;border-left:3px solid var(--sys);border-top:3px solid var(--sys);transform:rotate(45deg) translate(2px,2px)}
+.m-phasing{width:12px;height:12px;background:linear-gradient(var(--sys),var(--sys)) 0 0/3px 12px no-repeat,linear-gradient(var(--sys),var(--sys)) 9px 0/3px 12px no-repeat}
+.m-cascading{width:12px;height:12px;background:linear-gradient(var(--sys),var(--sys)) 0 100%/4px 4px no-repeat,linear-gradient(var(--sys),var(--sys)) 4px 100%/4px 8px no-repeat,linear-gradient(var(--sys),var(--sys)) 8px 100%/4px 12px no-repeat}
+.m-wakeful{width:12px;height:12px;border:2px solid var(--sys);box-sizing:border-box;background:radial-gradient(circle,var(--sys) 0 2px,transparent 2.5px)}
+.sw{position:fixed;left:16px;bottom:16px;display:flex;gap:8px;z-index:9}
+.sw button{height:44px;padding:0 16px;background:#262918;border:1px solid var(--b-low);border-radius:2px;color:#EDEBE3;font-family:var(--display);font-weight:600;font-size:16px;text-transform:uppercase;letter-spacing:.04em;cursor:pointer}
+.sw button.on{background:var(--p1);border:2px solid #8A8F84}
+.view{display:none}.view.on{display:block}
+</style></head><body>
+<div class="stage view on" id="near">
+  <div class="sky"></div><div class="ground"></div>
+  <div class="body" style="left:432px;top:410px;width:56px;height:150px"></div>
+  <div class="plate standard" style="left:412px;top:378px;width:96px"><div class="mods"></div><div class="name">Husk</div><div class="bar"><div class="chip" style="width:90%"></div><div class="fill" style="width:72%"></div></div></div>
+  <div class="body" style="left:660px;top:360px;width:60px;height:200px"></div><div class="halo" style="left:626px;top:548px;width:128px;height:28px"></div>
+  <div class="plate standard" style="left:642px;top:320px;width:96px"><div class="mods"><div class="mod"><div class="m-warded"></div></div><div class="mod"><div class="m-fleetfoot"></div></div></div><div class="name">Husk · warded</div><div class="bar"><div class="fill" style="width:100%"></div><div class="shield" style="width:40%"></div></div></div>
+  <div class="body" style="left:940px;top:350px;width:80px;height:230px"></div>
+  <div class="plate champion" style="left:900px;top:300px;width:160px"><div class="mods"><div class="mod"><div class="m-volatile"></div></div><div class="mod"><div class="m-reflective"></div></div><div class="mod active"><div class="m-aura"></div></div></div><div class="name">Ironback</div><div class="bar"><div class="chip" style="width:70%"></div><div class="fill" style="width:45%"></div><div class="shield" style="width:60%"></div></div></div>
+  <div class="body" style="left:1240px;top:230px;width:400px;height:420px"></div>
+  <div class="boss" style="left:1120px;top:120px;width:640px"><div class="head"><span class="name">Warden of the carriage</span><div class="mods"><div class="mod"><div class="m-warded"></div></div><div class="mod"><div class="m-anchored"></div></div></div></div><div class="bar"><div class="chip" style="width:71%"></div><div class="fill" style="width:62%"></div><div class="phase" style="left:33.3%"></div><div class="phase" style="left:66.6%"></div></div><div class="pips"><i class="done"></i><i class="now"></i><i></i></div></div>
+</div>
+<div class="stage view" id="far">
+  <div class="sky"></div><div class="ground"></div>
+  <div class="body" style="left:246px;top:526px;width:28px;height:75px"></div>
+  <div class="plate standard far" style="--s:.5;left:236px;top:512px;width:48px"><div class="mods"></div><div class="bar"><div class="fill" style="width:72%"></div></div></div>
+  <div class="body" style="left:365px;top:518px;width:30px;height:100px"></div><div class="halo" style="left:348px;top:611px;width:64px;height:14px"></div>
+  <div class="plate standard far" style="--s:.5;left:356px;top:496px;width:48px"><div class="mods"><div class="mod"><div class="m-warded"></div></div><div class="mod"><div class="m-fleetfoot"></div></div></div><div class="bar"><div class="fill" style="width:100%"></div></div></div>
+  <div class="body" style="left:520px;top:520px;width:40px;height:115px"></div>
+  <div class="plate champion far" style="--s:.5;left:500px;top:492px;width:80px"><div class="mods"><div class="mod"><div class="m-volatile"></div></div><div class="mod"><div class="m-reflective"></div></div><div class="mod"><div class="m-aura"></div></div></div><div class="bar"><div class="fill" style="width:45%"></div></div></div>
+  <div class="body" style="left:710px;top:534px;width:28px;height:75px"></div>
+  <div class="plate standard far" style="--s:.5;left:700px;top:516px;width:48px"><div class="mods"><div class="mod active"><div class="m-phasing"></div></div></div><div class="bar"><div class="fill" style="width:90%"></div></div></div>
+  <div class="body" style="left:1260px;top:430px;width:200px;height:210px"></div>
+  <div class="boss far" style="left:1200px;top:380px;width:320px"><div class="head"><span class="name">Warden of the carriage</span></div><div class="bar"><div class="fill" style="width:62%"></div><div class="phase" style="left:33.3%"></div><div class="phase" style="left:66.6%"></div></div><div class="pips"><i class="done"></i><i class="now"></i><i></i></div></div>
+</div>
+<div class="sw"><button data-v="near" class="on">12 m</button><button data-v="far">35 m</button></div>
+<script>
+const go=v=>{document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id===v));document.querySelectorAll('.sw button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));localStorage.setItem('re-np-view',v)};
+document.querySelectorAll('.sw button').forEach(b=>b.onclick=()=>go(b.dataset.v));go(localStorage.getItem('re-np-view')||'near');
+</script></body></html>

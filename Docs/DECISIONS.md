@@ -363,4 +363,8 @@ Numbers are permanent and never reused.
 
 **O198** — A shield breaks. The Warden's frontal shield is a pool of 15 % of its bearer's max health that absorbs frontal damage until it breaks, then is gone for the fight; flanking still finds the unarmoured rear. The boss's shield follows the same rule.
 
-**O199** — The vitals row is shield current beside health current and draws no max. A zero-max shield draws nothing: no track, no number..
+**O199** — The vitals row is shield current beside health current and draws no max. A zero-max shield draws nothing: no track, no number.
+
+**O200** — The at-cap power band is measured from a rolled best-in-slot at the cap's item level, re-rolled from the live affix table each run; the hand-listed baseline fixture measures baseline viability only. A row that never rolls is a row the measurement never sees, by design.
+
+**O201** — A save carrying a rule that no longer exists resolves to no rule and prints nothing; the fix for a real save is a migration that re-rolls from the current table, never a label..

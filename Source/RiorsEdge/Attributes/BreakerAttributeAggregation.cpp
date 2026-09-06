@@ -128,21 +128,41 @@ float FBreakerAttributeAggregator::Compose(EBreakerAggregatedAttribute Attribute
     const int32 Index = AttributeIndex(Attribute);
     if (Index == INDEX_NONE) return 0.0f;
 
+    // Each factor comes from the ONE function that owns it — the More factor
+    // from the O3/O34 clamp, the flat and Increased sums from their own fixed-
+    // order folds — so what Compose folds in and what a damage request carries
+    // as its split can never be two different numbers. The multiplication
+    // order is the law's: flat, then Increased, then More.
+    return ComposedFlatFactor(Attribute) * (1.0f + ComposedIncreasedPercent(Attribute) / 100.0f) * ComposedMoreProduct(Attribute);
+}
+
+float FBreakerAttributeAggregator::ComposedFlatFactor(EBreakerAggregatedAttribute Attribute) const
+{
+    const int32 Index = AttributeIndex(Attribute);
+    if (Index == INDEX_NONE) return 0.0f;
+
     float Flat = 0.0f;
-    float IncreasedPercent = 0.0f;
     // Fixed order over the contributor enum: the result cannot depend on the
     // sequence in which the layers happened to recalculate.
     for (int32 Contributor = 0; Contributor < ContributorCount; ++Contributor)
     {
-        const FBreakerAttributeContribution& Contribution = Contributions[Contributor];
-        Flat += Contribution.GetFlat(Attribute);
-        IncreasedPercent += Contribution.GetIncreasedPercent(Attribute);
+        Flat += Contributions[Contributor].GetFlat(Attribute);
     }
+    return Bases[Index] + Flat;
+}
 
-    // The More factor comes from the ONE function that owns the O3/O34 clamp,
-    // so what Compose folds in and what the combat chain budgets against can
-    // never be two different numbers.
-    return (Bases[Index] + Flat) * (1.0f + IncreasedPercent / 100.0f) * ComposedMoreProduct(Attribute);
+float FBreakerAttributeAggregator::ComposedIncreasedPercent(EBreakerAggregatedAttribute Attribute) const
+{
+    const int32 Index = AttributeIndex(Attribute);
+    if (Index == INDEX_NONE) return 0.0f;
+
+    float IncreasedPercent = 0.0f;
+    // Same fixed order as the flat fold, for the same reason.
+    for (int32 Contributor = 0; Contributor < ContributorCount; ++Contributor)
+    {
+        IncreasedPercent += Contributions[Contributor].GetIncreasedPercent(Attribute);
+    }
+    return IncreasedPercent;
 }
 
 float FBreakerAttributeAggregator::ComposedMoreProduct(EBreakerAggregatedAttribute Attribute) const
