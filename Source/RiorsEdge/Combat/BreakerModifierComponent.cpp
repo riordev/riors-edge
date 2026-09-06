@@ -4,14 +4,8 @@
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerZoneActor.h"
-#include "Components/CapsuleComponent.h"
-#include "Components/PointLightComponent.h"
-#include "Components/StaticMeshComponent.h"
-#include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
-#include "Materials/MaterialInstanceDynamic.h"
-#include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
 
 namespace BreakerModifierRuntime
@@ -104,9 +98,9 @@ FString UBreakerEnemyModifierComponent::GetBanner() const
 
 void UBreakerEnemyModifierComponent::OnRep_Modifiers()
 {
-    // Clients rebuild the tell from the replicated list. They never run
-    // membership, damage or spawning.
-    RefreshHalo();
+    // Clients read the tell off the replicated list every frame (the
+    // nameplate's marks); nothing is rebuilt here. They never run membership,
+    // damage or spawning.
     OnModifiersChanged.Broadcast();
 }
 
@@ -140,81 +134,6 @@ void UBreakerEnemyModifierComponent::ApplyPersistentModifiers()
     // has nothing to be immune to and is recorded rather than faked. The half
     // that IS live is the slow on hit, applied in NotifyAttackLanded — and that
     // half is the whole design anyway: §1.2 says the slow is the punish.
-
-    RefreshHalo();
-}
-
-void UBreakerEnemyModifierComponent::RefreshHalo()
-{
-    if (!bShowHalo || !GetOwner() || !GetOwner()->GetRootComponent()) return;
-
-    const bool bWanted = !Modifiers.IsEmpty();
-    if (!Halo && bWanted)
-    {
-        // Runtime-created rather than a constructor subobject: an unmodified
-        // trash mob is the overwhelmingly common case and must not pay for two
-        // components it will never show.
-        Halo = NewObject<UStaticMeshComponent>(GetOwner(), TEXT("BreakerModifierHalo"));
-        if (Halo)
-        {
-            Halo->SetupAttachment(GetOwner()->GetRootComponent());
-            Halo->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-            Halo->SetCastShadow(false);
-            // A GROUND DISC, not a sphere. The halo was an engine sphere in the
-            // opaque BasicShapeMaterial — a solid ball larger than the body, so
-            // every modifier-bearer was a floating orb with its whole silhouette
-            // (primitives then, the mech cast now) hidden inside. The colour and
-            // grows-with-count language survives on the project's proven
-            // at-range idiom instead — the ground ring (Provoke, deployables) —
-            // and the body stays visible above it.
-            if (UStaticMesh* Disc = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder")))
-            {
-                Halo->SetStaticMesh(Disc);
-            }
-            if (UMaterialInterface* Base = LoadObject<UMaterialInterface>(
-                nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")))
-            {
-                HaloMaterial = UMaterialInstanceDynamic::Create(Base, Halo);
-                if (HaloMaterial) Halo->SetMaterial(0, HaloMaterial);
-            }
-            Halo->RegisterComponent();
-        }
-
-        HaloLight = NewObject<UPointLightComponent>(GetOwner(), TEXT("BreakerModifierHaloLight"));
-        if (HaloLight)
-        {
-            HaloLight->SetupAttachment(GetOwner()->GetRootComponent());
-            HaloLight->SetCastShadows(false);
-            HaloLight->SetAttenuationRadius(HaloLightRadius);
-            HaloLight->RegisterComponent();
-        }
-    }
-    if (!Halo) return;
-
-    Halo->SetVisibility(bWanted, true);
-    if (HaloLight) HaloLight->SetVisibility(bWanted, true);
-    if (!bWanted) return;
-
-    // Colour comes from the FIRST modifier and the SIZE from the count, so an
-    // enemy carrying three reads as bigger and more dangerous at range before
-    // any of the three names is legible. The count widens the DISC; a 4 cm
-    // slab at the feet, dropped to the capsule's bottom so it sits on the
-    // ground whatever the owner's capsule height is.
-    const FLinearColor Color = UBreakerEnemyModifierLibrary::GetModifierColor(Modifiers[0]);
-    const float Scale = HaloBaseScale + HaloScalePerModifier * static_cast<float>(Modifiers.Num() - 1);
-    Halo->SetRelativeScale3D(FVector(Scale, Scale, 0.04f));
-    float FeetDrop = 0.0f;
-    if (const UCapsuleComponent* Capsule = Cast<UCapsuleComponent>(GetOwner()->GetRootComponent()))
-    {
-        FeetDrop = Capsule->GetUnscaledCapsuleHalfHeight() - 3.0f;
-    }
-    Halo->SetRelativeLocation(FVector(0.0f, 0.0f, -FeetDrop));
-    if (HaloMaterial) HaloMaterial->SetVectorParameterValue(TEXT("Color"), Color);
-    if (HaloLight)
-    {
-        HaloLight->SetLightColor(Color);
-        HaloLight->SetIntensity(HaloLightIntensity);
-    }
 }
 
 void UBreakerEnemyModifierComponent::AdvanceModifiers(float DeltaSeconds)
@@ -226,15 +145,6 @@ void UBreakerEnemyModifierComponent::AdvanceModifiers(float DeltaSeconds)
     if (FuseRemaining > 0.0f)
     {
         FuseRemaining -= DeltaSeconds;
-        if (HaloMaterial && FuseTotal > 0.0f)
-        {
-            // Strobe: a square wave rather than a sine, because a hard on/off
-            // reads as "about to go off" and a smooth pulse reads as ambience.
-            const float Elapsed = FuseTotal - FMath::Max(FuseRemaining, 0.0f);
-            const bool bBright = FMath::Fmod(Elapsed * FMath::Max(FuseStrobeHz, 0.1f), 1.0f) < 0.5f;
-            const FLinearColor Fuse = UBreakerEnemyModifierLibrary::GetModifierColor(EBreakerEnemyModifier::Volatile);
-            HaloMaterial->SetVectorParameterValue(TEXT("Color"), bBright ? Fuse : Fuse * 0.15f);
-        }
         if (FuseRemaining <= 0.0f)
         {
             FuseRemaining = -1.0f;
@@ -488,11 +398,14 @@ void UBreakerEnemyModifierComponent::NotifyOwnerDied()
     {
         FuseTotal = FMath::Max(0.0f, Params.VolatileFuseSeconds);
         FuseRemaining = FuseTotal;
-        // The corpse's halo has to stay visible through the fuse or the
-        // detonation is unannounced. The enemy hides its BODY on death; the
-        // halo is this component's and it deliberately survives.
-        if (Halo) Halo->SetVisibility(true, true);
-        if (HaloLight) HaloLight->SetVisibility(true, true);
+        // BEHAVIOURAL GAP, RECORDED, NOT FAKED. The fuse has no visual tell:
+        // the enemy hides its body on death, the nameplate goes with the live
+        // health it reads, and the coloured disc and light that strobed
+        // through the fuse are retired (O203: marks are system-colour
+        // geometry on the plate; O129: no colour on the body). Until the
+        // Niagara pass gives the corpse a fuse emitter, a Volatile detonation
+        // is announced only by the mark the enemy carried while alive. The
+        // countdown itself is untouched.
         // A zero fuse is a legal authoring choice and must detonate now rather
         // than wait a frame for a clock that will never tick again.
         if (FuseTotal <= 0.0f)
@@ -508,8 +421,6 @@ void UBreakerEnemyModifierComponent::NotifyOwnerDied()
 void UBreakerEnemyModifierComponent::DetonateVolatile()
 {
     if (!GetWorld() || !GetOwner() || !GetOwner()->HasAuthority()) return;
-    if (Halo) Halo->SetVisibility(false, true);
-    if (HaloLight) HaloLight->SetVisibility(false, true);
 
     const FVector Center = GetOwner()->GetActorLocation();
     const float Full = UBreakerEnemyModifierLibrary::GetVolatileDetonationDamage(OwnerAttackDamage(), Params);

@@ -10,36 +10,26 @@
 namespace BreakerGameModeTestHelpers
 {
     // A bare NewObject<ABreakerEnemy>() never runs BeginPlay and is never
-    // registered into a world, so two presentation/GAS side effects that are
-    // harmless on a real SpawnActor'd enemy are unsafe here:
-    //   1. RefreshHalo() (Combat/BreakerModifierComponent.cpp) unconditionally
-    //      RegisterComponent()s a halo mesh the instant any modifier is
-    //      granted, which asserts with no owning world. bShowHalo turns that
-    //      off — a presentation concern this test does not exercise anyway.
-    //   2. Warded's shield write (SetModifierShield -> the GAS-GENERATED
-    //      Attributes->SetMaxShield) goes through
-    //      FActiveGameplayEffectsContainer, which asserts with no live
-    //      AbilitySystemComponent owner (InitAbilityActorInfo, which only
-    //      BeginPlay calls). There is no test-safe way to satisfy that from
-    //      outside a world, so the fix is to never roll Warded here: every
-    //      test below grants an EXACT, hand-picked modifier
-    //      (ConfigureWithExactModifiers) instead of the seeded random roll
-    //      (ConfigureWithModifiers) SpawnCombatEncounter actually uses.
-    //      Fleetfoot is chosen because ApplyPersistentModifiers' Fleetfoot
-    //      branch only ever touches this enemy's own MoveSpeed/WeaveStrength
-    //      fields — no Attributes, no GAS. This is a TEST-RIG adaptation:
-    //      which modifier lands is irrelevant to what is under test here
-    //      (rank promotion and kill-bucket classification depend on RANK and
-    //      COUNT, never on which specific modifier was granted), and in the
-    //      shipped game every enemy IS SpawnActor'd first, so
-    //      ConfigureWithModifiers's random Warded roll is safe there.
+    // registered into a world, so one GAS side effect that is harmless on a
+    // real SpawnActor'd enemy is unsafe here: Warded's shield write
+    // (SetModifierShield -> the GAS-GENERATED Attributes->SetMaxShield) goes
+    // through FActiveGameplayEffectsContainer, which asserts with no live
+    // AbilitySystemComponent owner (InitAbilityActorInfo, which only
+    // BeginPlay calls). There is no test-safe way to satisfy that from
+    // outside a world, so the fix is to never roll Warded here: every test
+    // below grants an EXACT, hand-picked modifier (ConfigureWithExactModifiers)
+    // instead of the seeded random roll (ConfigureWithModifiers)
+    // SpawnCombatEncounter actually uses. Fleetfoot is chosen because
+    // ApplyPersistentModifiers' Fleetfoot branch only ever touches this
+    // enemy's own MoveSpeed/WeaveStrength fields — no Attributes, no GAS. This
+    // is a TEST-RIG adaptation: which modifier lands is irrelevant to what is
+    // under test here (rank promotion and kill-bucket classification depend
+    // on RANK and COUNT, never on which specific modifier was granted), and
+    // in the shipped game every enemy IS SpawnActor'd first, so
+    // ConfigureWithModifiers's random Warded roll is safe there.
     void PrepareEnemyForModifierGrant(ABreakerEnemy* Enemy)
     {
-        if (!Enemy) return;
-        if (UBreakerEnemyModifierComponent* Modifiers = Enemy->GetModifierComponent())
-        {
-            Modifiers->bShowHalo = false;
-        }
+        (void)Enemy;
     }
 
     const TArray<EBreakerEnemyModifier>& SafeSingleModifier()

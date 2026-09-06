@@ -135,8 +135,8 @@ namespace
                 {
                     Enemy->ConfigureWithExactModifiers({
                         EBreakerEnemyModifier::Warded,
-                        EBreakerEnemyModifier::Volatile,
-                        EBreakerEnemyModifier::Reflective });
+                        EBreakerEnemyModifier::Fleetfoot,
+                        EBreakerEnemyModifier::Volatile });
                 }
                 Enemy->SetMonsterRank(Ranks[Row]);
                 Enemy->DebugPoseHealthFraction(Fractions[Column]);

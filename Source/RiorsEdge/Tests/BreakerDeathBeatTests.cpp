@@ -18,6 +18,7 @@ bool FBreakerDeathBeatTimelineTest::RunTest(const FString& Parameters)
     using namespace BreakerDeathBeat;
     const FBreakerDeathBeatTimeline Timeline;   // the shipped defaults
     const float Lower = Timeline.LowerAndDropSeconds;
+    const float WeaponLower = Timeline.WeaponLowerSeconds;
     const float TeleportAt = TeleportAtSeconds(Timeline);
     const float Total = TotalSeconds(Timeline);
     constexpr float Step = 1.0f / 120.0f;
@@ -64,6 +65,8 @@ bool FBreakerDeathBeatTimelineTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("At Lower: camera at full drop"), S.CameraDropCm, Timeline.CameraDropCm);
         TestEqual(TEXT("At Lower: colour gone"), S.Saturation, 0.0f);
         TestEqual(TEXT("At Lower: fade complete"), S.FadeAlpha, 1.0f);
+        TestEqual(TEXT("At Lower: the phase is Black"),
+            static_cast<int32>(S.Phase), static_cast<int32>(EBreakerDeathBeatPhase::Black));
         // And the fall itself is a monotone glide, not a snap.
         float LastLower = -1.0f;
         bool bLowerMonotone = true;
@@ -74,11 +77,21 @@ bool FBreakerDeathBeatTimelineTest::RunTest(const FString& Parameters)
             LastLower = L;
         }
         TestTrue(TEXT("Falling: the weapon only ever lowers"), bLowerMonotone);
-        TestTrue(TEXT("Falling: mid-fall is neither ready nor holstered"),
-            Sample(Timeline, Lower * 0.5f).WeaponLowerFraction > 0.0f
-            && Sample(Timeline, Lower * 0.5f).WeaponLowerFraction < 1.0f);
-        TestEqual(TEXT("Falling: the black waits for the tail of the fall"),
-            Sample(Timeline, Lower * (1.0f - FallingFadeTailFraction) * 0.5f).FadeAlpha, 0.0f);
+        // The weapon runs on its own short clock and finishes first.
+        TestTrue(TEXT("Falling: mid-lower is neither ready nor holstered"),
+            Sample(Timeline, WeaponLower * 0.5f).WeaponLowerFraction > 0.0f
+            && Sample(Timeline, WeaponLower * 0.5f).WeaponLowerFraction < 1.0f);
+        TestEqual(TEXT("At WeaponLower: weapon holstered"),
+            Sample(Timeline, WeaponLower).WeaponLowerFraction, 1.0f);
+        TestTrue(TEXT("At WeaponLower: the camera drop is still running"),
+            Sample(Timeline, WeaponLower).CameraDropCm < Timeline.CameraDropCm);
+        // The cut to black is hard: no fade anywhere in the fall.
+        bool bNoFadeInFall = true;
+        for (float T = 0.0f; T < Lower; T += Step)
+        {
+            if (Sample(Timeline, T).FadeAlpha != 0.0f) bNoFadeInFall = false;
+        }
+        TestTrue(TEXT("Falling: fade stays 0 for the whole fall"), bNoFadeInFall);
     }
 
     // (d) Black: full fade, input off, HUD hidden, for the whole stretch.
@@ -140,16 +153,19 @@ bool FBreakerDeathBeatTimelineTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Idle: input on"), Idle.bInputEnabled);
     }
 
-    // (i) Shipped configuration: the character's CDO carries the default
-    // timeline, field by field.
+    // (i) Shipped configuration: the character's CDO carries the spec's
+    // timeline (O193, O202), field by field, as literals.
     {
         const FBreakerDeathBeatTimeline& Shipped = GetDefault<ABreakerCharacter>()->DeathBeat;
-        TestEqual(TEXT("Shipped LowerAndDropSeconds"), Shipped.LowerAndDropSeconds, Timeline.LowerAndDropSeconds);
-        TestEqual(TEXT("Shipped BlackSeconds"), Shipped.BlackSeconds, Timeline.BlackSeconds);
-        TestEqual(TEXT("Shipped FadeInSeconds"), Shipped.FadeInSeconds, Timeline.FadeInSeconds);
-        TestEqual(TEXT("Shipped CameraDropCm"), Shipped.CameraDropCm, Timeline.CameraDropCm);
-        TestEqual(TEXT("Shipped CameraRollDegrees"), Shipped.CameraRollDegrees, Timeline.CameraRollDegrees);
-        TestEqual(TEXT("Shipped CameraPitchDegrees"), Shipped.CameraPitchDegrees, Timeline.CameraPitchDegrees);
+        TestEqual(TEXT("Shipped WeaponLowerSeconds == 0.3"), Shipped.WeaponLowerSeconds, 0.3f);
+        TestEqual(TEXT("Shipped LowerAndDropSeconds == 0.8"), Shipped.LowerAndDropSeconds, 0.8f);
+        TestEqual(TEXT("Shipped BlackSeconds == 1.2"), Shipped.BlackSeconds, 1.2f);
+        TestEqual(TEXT("Shipped FadeInSeconds == 0.4"), Shipped.FadeInSeconds, 0.4f);
+        TestEqual(TEXT("Shipped CameraDropCm == 60"), Shipped.CameraDropCm, 60.0f);
+        TestEqual(TEXT("Shipped CameraPitchDegrees == -12"), Shipped.CameraPitchDegrees, -12.0f);
+        TestEqual(TEXT("Shipped CameraRollDegrees matches the default"), Shipped.CameraRollDegrees, Timeline.CameraRollDegrees);
+        TestEqual(TEXT("Shipped TeleportAt == 2.0"), TeleportAtSeconds(Shipped), 2.0f);
+        TestEqual(TEXT("Shipped Total == 2.4"), TotalSeconds(Shipped), 2.4f);
     }
 
     return true;

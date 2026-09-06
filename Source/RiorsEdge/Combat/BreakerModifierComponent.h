@@ -8,9 +8,6 @@
 
 class ABreakerZoneActor;
 class UBreakerCombatComponent;
-class UMaterialInstanceDynamic;
-class UPointLightComponent;
-class UStaticMeshComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FBreakerModifiersChanged);
 
@@ -26,15 +23,18 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FBreakerModifiersChanged);
 // O27 invariant made structural rather than promised, and the test suite
 // asserts the library half of it directly.
 //
-// WHAT IT REPLICATES. The modifier list, so a client can draw the halo and
-// print the banner without asking the server what this enemy is. Membership,
-// damage, spawning, blinks and reflects are SERVER ONLY.
+// WHAT IT REPLICATES. The modifier list, so a client can draw the nameplate's
+// marks and print the banner without asking the server what this enemy is.
+// Membership, damage, spawning, blinks and reflects are SERVER ONLY.
 //
 // ANNOUNCEMENT IS A REQUIREMENT, NOT A NICETY. Encounter-Design §1.2's first
 // test is that a modifier is identifiable from 20 m in untextured graybox
-// within 1.5s. An unannounced modifier is an unfair death, not a challenge, so
-// granting modifiers ALWAYS builds the halo and ALWAYS publishes the banner
-// that ABreakerEnemy::GetEnemyStateLabel prefixes onto its state readout.
+// within 1.5s. An unannounced modifier is an unfair death, not a challenge.
+// The announcement is the nameplate's (O203): one drawn mark per modifier in
+// the system colour, Combat/BreakerEnemyBarMath.h's MarkFor, read off
+// GetModifiers every frame. This component owns no presentation — no mesh,
+// no light, no colour on the body (O129) — so a modifier is a rule and a
+// list entry, and nothing else has to be built for a client to see it.
 UCLASS(ClassGroup=Combat, BlueprintType, meta=(BlueprintSpawnableComponent))
 class RIORSEDGE_API UBreakerEnemyModifierComponent : public UActorComponent
 {
@@ -112,17 +112,6 @@ public:
     // Every tunable, in one authored block. O2 PLACEHOLDER throughout.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Modifiers") FBreakerEnemyModifierParams Params;
 
-    // Presentation. The halo is a translucent sphere the size of the owner plus
-    // a point light, both coloured by the FIRST modifier and both built from
-    // engine primitives, so the tell survives with zero art (§1.2 test 1).
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Modifiers|Presentation") bool bShowHalo = true;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Modifiers|Presentation", meta=(ClampMin="0")) float HaloScalePerModifier = 0.55f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Modifiers|Presentation", meta=(ClampMin="0")) float HaloBaseScale = 1.65f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Modifiers|Presentation", meta=(ClampMin="0")) float HaloLightIntensity = 2200.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Modifiers|Presentation", meta=(ClampMin="0")) float HaloLightRadius = 700.0f;
-    // The Volatile fuse strobe: how many times the halo pulses across the fuse.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Modifiers|Presentation", meta=(ClampMin="0")) float FuseStrobeHz = 6.0f;
-
 protected:
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
@@ -130,10 +119,9 @@ protected:
     UFUNCTION() void HandleOwnerDamaged(const FBreakerHitContext& Hit);
 
     // Re-applies every persistent, self-targeted consequence of the current
-    // set: the ward, the speed change, the halo. Idempotent, because the
-    // chassis can be rebuilt under it at any time.
+    // set: the ward and the speed change. Idempotent, because the chassis can
+    // be rebuilt under it at any time.
     void ApplyPersistentModifiers();
-    void RefreshHalo();
 
     void TickWard(float DeltaSeconds);
     void TickAura(float DeltaSeconds);
@@ -150,12 +138,6 @@ private:
     UBreakerCombatComponent* OwnerCombat() const;
     float OwnerMaxHealth() const;
     float OwnerAttackDamage() const;
-
-    // Runtime-created so the component owns its own tell without forcing every
-    // enemy class to declare two more subobjects it may never use.
-    UPROPERTY() TObjectPtr<UStaticMeshComponent> Halo;
-    UPROPERTY() TObjectPtr<UPointLightComponent> HaloLight;
-    UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> HaloMaterial;
 
     TWeakObjectPtr<AActor> TrackedTarget;
     // Everyone currently carrying this enemy's aura entry, so the entry is

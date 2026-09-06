@@ -25,16 +25,20 @@ struct RIORSEDGE_API FBreakerDeathBeatTimeline
 {
     GENERATED_BODY()
 
-    // The visible half of dying: weapon down, camera down and over, colour
-    // out. Everything eases together over this one span.
+    // The weapon finishes lowering here, well before the camera has finished
+    // dropping: the gun is the first thing to give up.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Death Beat", meta=(ClampMin="0.05")) float WeaponLowerSeconds = 0.3f;   // O2 PLACEHOLDER
+    // The visible half of dying: the camera drops and tilts while the colour
+    // drains, easing over this span. At its end the frame cuts hard to black.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Death Beat", meta=(ClampMin="0.05")) float LowerAndDropSeconds = 0.8f;   // O2 PLACEHOLDER
     // Full black. The teleport lands at the end of it, under cover.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Death Beat", meta=(ClampMin="0.0")) float BlackSeconds = 1.2f;   // O2 PLACEHOLDER
     // Black to world at the tileset start. Input is live from its first sample.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Death Beat", meta=(ClampMin="0.05")) float FadeInSeconds = 0.4f;   // O2 PLACEHOLDER
     // How far the eye sinks toward the floor at full drop.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Death Beat", meta=(ClampMin="0")) float CameraDropCm = 18.0f;   // O2 PLACEHOLDER
-    // The head lolls: a roll about the view axis and a pitch toward the ground.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Death Beat", meta=(ClampMin="0")) float CameraDropCm = 60.0f;   // O2 PLACEHOLDER
+    // The head lolls: a roll about the view axis and a pitch toward the
+    // ground. No spec line names the roll; its figure is O2 in full.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Death Beat", meta=(ClampMin="-45", ClampMax="45")) float CameraRollDegrees = 9.0f;   // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Death Beat", meta=(ClampMin="-45", ClampMax="45")) float CameraPitchDegrees = -12.0f;   // O2 PLACEHOLDER
 };
@@ -69,10 +73,6 @@ struct FBreakerDeathBeatSample
 
 namespace BreakerDeathBeat
 {
-    // The black closes over the tail of the fall rather than snapping at its
-    // end: the last quarter of LowerAndDropSeconds carries the fade to black.
-    constexpr float FallingFadeTailFraction = 0.25f;   // O2 PLACEHOLDER
-
     // When the pawn is put back at the tileset start: the end of the black,
     // which is also the first FadeIn instant.
     inline float TeleportAtSeconds(const FBreakerDeathBeatTimeline& Timeline)
@@ -98,19 +98,21 @@ namespace BreakerDeathBeat
 
         if (Elapsed < Lower)
         {
-            // FALLING: one smoothstep drives the weapon, the camera and the
-            // colour together, so nothing arrives before anything else.
+            // FALLING: the weapon lowers on its own short clock and is
+            // holstered at WeaponLowerSeconds while the camera drop, the
+            // tilt and the colour drain keep easing to LowerAndDropSeconds.
+            // The fade stays at 0 for the whole fall: the cut to black at
+            // Lower is hard, not a tail.
             Out.Phase = EBreakerDeathBeatPhase::Falling;
+            const float WeaponLower = FMath::Max(Timeline.WeaponLowerSeconds, UE_KINDA_SMALL_NUMBER);
+            Out.WeaponLowerFraction = FMath::SmoothStep(0.0f, 1.0f, FMath::Clamp(Elapsed / WeaponLower, 0.0f, 1.0f));
             const float T = FMath::Clamp(Elapsed / Lower, 0.0f, 1.0f);
             const float Eased = FMath::SmoothStep(0.0f, 1.0f, T);
-            Out.WeaponLowerFraction = Eased;
             Out.CameraDropCm = Timeline.CameraDropCm * Eased;
             Out.CameraRollDegrees = Timeline.CameraRollDegrees * Eased;
             Out.CameraPitchDegrees = Timeline.CameraPitchDegrees * Eased;
             Out.Saturation = 1.0f - Eased;
-            const float TailStart = 1.0f - FallingFadeTailFraction;
-            Out.FadeAlpha = T <= TailStart ? 0.0f
-                : FMath::Clamp((T - TailStart) / FMath::Max(FallingFadeTailFraction, UE_KINDA_SMALL_NUMBER), 0.0f, 1.0f);
+            Out.FadeAlpha = 0.0f;
             Out.bInputEnabled = false;
             Out.bHudVisible = true;
             return Out;
