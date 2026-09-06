@@ -137,8 +137,8 @@ namespace BreakerInventoryLayout
     inline constexpr float MinCharacterColumn = 320.0f;
     inline constexpr float MinEquipmentColumn = 280.0f;
     // One equipment row: a 44px icon square (the system's minimum hit target)
-    // plus its two stacked text lines and 12px of interior padding.
-    inline constexpr float EquipRowHeight = 68.0f;
+    // plus its two stacked text lines and 10px of interior padding.
+    inline constexpr float EquipRowHeight = 64.0f;   // O2 PLACEHOLDER
 
     struct FColumns
     {
@@ -398,6 +398,46 @@ namespace BreakerInventoryLayout
             return FString::Printf(TEXT("LIMIT FULL %d/%d"), Preview.RarityCount, Preview.RarityLimit);
         }
         return Preview.bSlotOccupied ? TEXT("EQUIP · REPLACES") : TEXT("EQUIP · SLOT EMPTY");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MENU LAYOUT — text rules shared by more than one screen, world-free so they
+// can be asserted with no widget. Nothing here decides a game rule.
+// ---------------------------------------------------------------------------
+namespace BreakerMenuLayout
+{
+    // THE SPEAKER PLATE'S TWO LINES. Data/dialogue.json labels an NPC as one
+    // string, "KESS — FORGE KEEPER": the name, an em dash with a space either
+    // side, the role. The plate prints the name at display size and the role
+    // as a tracked caption, so the one string splits here — on the FIRST
+    // " — " only, so a role that itself carries a dash keeps it. A label with
+    // no dash is all name and no role. Both halves are trimmed.
+    inline void SplitSpeakerLine(const FString& Display, FString& OutSpeaker, FString& OutRole)
+    {
+        static const TCHAR Separator[] = { TEXT(' '), TCHAR(0x2014), TEXT(' '), TEXT('\0') };  // U+2014 EM DASH
+        const int32 At = Display.Find(Separator, ESearchCase::CaseSensitive, ESearchDir::FromStart);
+        if (At == INDEX_NONE)
+        {
+            OutSpeaker = Display.TrimStartAndEnd();
+            OutRole.Reset();
+            return;
+        }
+        OutSpeaker = Display.Left(At).TrimStartAndEnd();
+        OutRole = Display.Mid(At + 3).TrimStartAndEnd();
+    }
+
+    // THE LEVEL CAPTION, in exactly the HUD's words (UI/BreakerPlaytestHUD.cpp
+    // draws the same sentence under its XP rule): the level, four spaces, and
+    // either the XP still owed to the next level through FormatDamage's
+    // abbreviation or MAX at the cap. One function so the pause plate and the
+    // HUD cannot drift apart; O210 puts the plate's copy beside the rule.
+    inline FString LevelCaption(int32 Level, float Fraction, int32 ToNext)
+    {
+        const int32 Remaining = FMath::Max(0, ToNext - FMath::RoundToInt(Fraction * static_cast<float>(ToNext)));
+        return ToNext > 0
+            ? FString::Printf(TEXT("LV %d    %s"), Level, *BreakerUI::FormatDamage(static_cast<float>(Remaining)))
+            : FString::Printf(TEXT("LV %d    MAX"), Level);
     }
 }
 

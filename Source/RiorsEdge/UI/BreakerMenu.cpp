@@ -76,6 +76,11 @@ namespace
     const FLinearColor PanelRaised = BreakerUI::Panel10;    // cards, rows, slots
     const FLinearColor PanelHover = BreakerUI::Panel20;     // headers, selected
     const FLinearColor Cyan = BreakerUI::Cyan;              // player / system
+    // THE SYSTEM ACCENT: focus rails, the active tab's top rail, the spent
+    // rung on a tree, the better-mark on a card. One alias so the token pass
+    // that gives the system its own colour flips a single line, not every
+    // call site that today happens to read cyan.
+    const FLinearColor Sys = BreakerUI::System;
     const FLinearColor Primary = BreakerUI::TextPrimary;
     const FLinearColor SoftText = BreakerUI::TextSecondary;
     const FLinearColor Muted = BreakerUI::TextMuted;
@@ -422,6 +427,48 @@ namespace
         return Rows;
     }
 
+    // -----------------------------------------------------------------------
+    // Fitting a line to a known width.
+    //
+    // A text block clips at its allotted edge, so a label that runs past the
+    // box it was given loses its tail. Where the box is a fixed number known
+    // before layout — the left plate's interior, an item's face, a kit tile —
+    // the label's size is walked DOWN one pixel at a time until the measured
+    // run fits, the same rule the HUD's FitSpecPixels follows. Measuring text
+    // against a font is the sanctioned pattern (MeasureChipWidth): nothing
+    // here reads an allotted size, so there is no layout feedback loop.
+    // -----------------------------------------------------------------------
+    float BreakerMenuTextWidth(const FString& Text, const FSlateFontInfo& Font)
+    {
+        if (Text.IsEmpty()) return 0.0f;
+        if (FSlateApplication::IsInitialized() && FSlateApplication::Get().GetRenderer())
+        {
+            const TSharedRef<FSlateFontMeasure> Measure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
+            return static_cast<float>(Measure->Measure(Text, Font).X);
+        }
+        // Headless: nothing is on screen. Erring wide only sets a smaller face
+        // in a frame nobody photographs.
+        return Text.Len() * (Font.Size * 0.72f);
+    }
+
+    // The largest size in [MinPixels, DesiredPixels] at which TEXT, set in the
+    // font MakeFont(size) yields, fits MaxWidth. Returns 0 when even MinPixels
+    // does not fit, so a caller can choose a different shape (a second line)
+    // rather than a smaller face. The type scale is small integers and the
+    // walk is bounded by (Desired - Min): a handful of measures at worst,
+    // usually exactly one.
+    template <typename FontMaker>
+    int32 BreakerMenuFitPixels(const FString& Text, int32 DesiredPixels, float MaxWidth, int32 MinPixels, FontMaker MakeFont)
+    {
+        if (Text.IsEmpty()) return DesiredPixels;
+        if (MaxWidth <= 0.0f) return 0;
+        for (int32 Pixels = DesiredPixels; Pixels >= MinPixels; --Pixels)
+        {
+            if (BreakerMenuTextWidth(Text, MakeFont(Pixels)) <= MaxWidth) return Pixels;
+        }
+        return 0;
+    }
+
     struct FWideScreenMetrics
     {
         float PanelWidth = 1760.0f;
@@ -519,21 +566,18 @@ namespace
             SLATE_DEFAULT_SLOT(FArguments, Content)
         SLATE_END_ARGS()
 
-        // Zoom limits. Below MinZoom the 11px caption floor stops being
-        // readable at all, so there is no point offering it; above MaxZoom a
-        // 48px marker is bigger than a HUD ability square and the board stops
-        // being a map.
-        static constexpr float MinZoom = 0.5f;
-        static constexpr float MaxZoom = 2.0f;
-        // One wheel notch. 1.15 is roughly seven notches across the whole
-        // range, which is enough travel to feel continuous and few enough that
-        // a player can get back to 1.00 by counting.
-        static constexpr float ZoomStep = 1.15f;
+        // TWO LEVELS, not a continuum. NEAR is 1:1, the reading zoom; FAR is
+        // the overview spec 06 rules at 0.6 (O202). A wheel notch or the
+        // button pair jumps between them; nothing in between exists, so a
+        // player can never be parked at a zoom where the captions are almost
+        // legible.
+        static constexpr float NearZoom = 1.0f;
+        static constexpr float FarZoom = 0.6f;    // O2 PLACEHOLDER
 
         void Construct(const FArguments& InArgs)
         {
             BoardSize = InArgs._BoardSize;
-            DefaultZoom = FMath::Clamp(InArgs._InitialZoom, MinZoom, MaxZoom);
+            DefaultZoom = InArgs._InitialZoom < NearZoom ? FarZoom : NearZoom;
             Zoom = DefaultZoom;
             Pan = InArgs._InitialPan;
             OnViewChanged = InArgs._OnViewChanged;
@@ -558,13 +602,11 @@ namespace
             ZoomAbout(View * 0.5f, Notches);
         }
 
-        // Back to the view the board OPENED on, which for a board wider than
-        // its window is the zoom that fits it — not a bare 1.00, which would
-        // "reset" a COMPARE ALL board to a state where a third of it is off
-        // the right edge.
+        // Back to NEAR at the origin. A board always opens at 1:1 (see
+        // BoardOpeningZoom below) so this is also the view it opened on.
         void ResetView()
         {
-            Zoom = DefaultZoom;
+            Zoom = NearZoom;
             Pan = FVector2D::ZeroVector;
             ClampPan();
             ApplyTransform();
@@ -652,7 +694,9 @@ namespace
         void ZoomAbout(const FVector2D& LocalPoint, float Notches)
         {
             const float Previous = Zoom;
-            Zoom = FMath::Clamp(Zoom * FMath::Pow(ZoomStep, Notches), MinZoom, MaxZoom);
+            // Wheel up (or +) is NEAR, wheel down (or -) is FAR. Two levels,
+            // so the notch count does not matter — only its sign.
+            Zoom = Notches > 0.0f ? NearZoom : FarZoom;
             if (FMath::IsNearlyEqual(Previous, Zoom)) return;
             // Keep the board point under LocalPoint exactly where it is:
             //   board = (Local - Pan) / Previous, and Pan' = Local - Zoom*board.
@@ -702,19 +746,23 @@ namespace
         FOnBoardViewChanged OnViewChanged;
     };
 
-    // A board always OPENS at 1:1, even when it is wider than the window.
+    // A board always OPENS at 1:1 (NEAR), even when it is wider than the
+    // window.
     //
     // Opening at a fit-to-width zoom was tried and photographed: COMPARE ALL
     // is about 2600px of board in a 1300px column, so fitting it means 0.5x,
-    // and 0.5x of the 11px caption floor is 5px of unreadable type — FIELDPLATE
-    // 02 says never below 11px and it means it. Zooming out to find your
-    // bearings is a deliberate act the player takes; it is not a state to hand
-    // them on arrival. RESET VIEW returns here.
-    inline constexpr float BoardOpeningZoom = 1.0f;
+    // and 0.5x of the 11px caption floor is 5px of unreadable type. The FAR
+    // level is 0.6 because spec 06 rules it (O202), and it is RECORDED here
+    // that 0.6 puts the 11px captions at 6.6px — under FIELDPLATE 02's floor.
+    // FAR is an overview the player chooses to find their bearings; it is not
+    // a state to hand them on arrival, and it is not a reading zoom. RESET
+    // VIEW returns here.
+    inline constexpr float BoardOpeningZoom = SBreakerBoardViewport::NearZoom;
 
     // The board's view controls. The wheel and the drag are the real verbs;
     // these exist because a gesture nobody knows about is not a feature, and
     // because a trackpad without a wheel still has to be able to zoom.
+    // FAR and NEAR are the pair; RESET is NEAR at the origin.
     TSharedRef<SWidget> MakeBoardViewControls(const TSharedPtr<SBreakerBoardViewport>& Viewport)
     {
         TWeakPtr<SBreakerBoardViewport> Weak = Viewport;
@@ -747,11 +795,11 @@ namespace
             ]
             + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, BreakerUI::Space8, 0.0f)
             [
-                MakeStep(TEXT("-"), -1.0f)
+                MakeStep(TEXT("FAR"), -1.0f)
             ]
             + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
             [
-                MakeStep(TEXT("+"), 1.0f)
+                MakeStep(TEXT("NEAR"), 1.0f)
             ]
             + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
             [
@@ -1139,9 +1187,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildFrame(const FText& Title, const FText& Su
     return SNew(SOverlay)
         + SOverlay::Slot()
         [
+            // The world stays under the screen at 40%: a scrim, not a wall.
+            // The full-bleed screen shell (BreakerScreenShell) stays opaque.
             SNew(SBorder)
             .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
-            .BorderBackgroundColor(Background)
+            .BorderBackgroundColor(BreakerUI::Alpha(Background, 0.6f))   // O2 PLACEHOLDER
         ]
         + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(BreakerUI::Space40)
         [
@@ -1220,9 +1270,10 @@ TSharedRef<SWidget> SBreakerMenu::BuildZonedFrame(const FText& Title, const FTex
     return SNew(SOverlay)
         + SOverlay::Slot()
         [
+            // The world at 40% under the plate, as BuildFrame draws it.
             SNew(SBorder)
             .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
-            .BorderBackgroundColor(Background)
+            .BorderBackgroundColor(BreakerUI::Alpha(Background, 0.6f))   // O2 PLACEHOLDER
         ]
         + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(BreakerUI::Space40)
         [
@@ -1239,29 +1290,38 @@ TSharedRef<SWidget> SBreakerMenu::BuildScreenTabs(EBreakerMenuScreen ActiveScree
     auto AddTab = [this, &Tabs, ActiveScreen](const FString& Label, EBreakerMenuScreen Target)
     {
         const bool bActive = ActiveScreen == Target;
-        // Selected carries the 2px accent border; unselected keeps the same
-        // geometry on a neutral 1px ring. Never a teal underline — teal is a
-        // noun in this system, and a tab is not a rift object.
+        // Every tab sits on the same 1px rest ring; the active one carries a
+        // 2px system rail along its top edge and the others carry the same
+        // 2px of nothing, so the strip's geometry never moves with the
+        // selection. Never a teal underline — teal is a noun in this system,
+        // and a tab is not a rift object.
         Tabs->AddSlot().AutoWidth().Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
         [
-            BorderWrap(
-                SNew(SButton)
-                .ButtonColorAndOpacity(bActive ? PanelHover : Panel)
-                .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
-                .OnClicked(FOnClicked::CreateLambda([this, Target, bActive]()
-                {
-                    if (!bActive)
+            SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight()
+            [
+                SNew(SBox).HeightOverride(BreakerUI::BorderSelected)[SolidBlock(bActive ? Sys : Transparent)]
+            ]
+            + SVerticalBox::Slot().AutoHeight()
+            [
+                BorderWrap(
+                    SNew(SButton)
+                    .ButtonColorAndOpacity(bActive ? PanelHover : Panel)
+                    .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
+                    .OnClicked(FOnClicked::CreateLambda([this, Target, bActive]()
                     {
-                        if (Target == EBreakerMenuScreen::SkillTrees) SkillTreeStatus = FText::GetEmpty();
-                        Rebuild(Target);
-                    }
-                    return FReply::Handled();
-                }))
-                [
-                    MenuText(FText::FromString(Label), BreakerUI::TypeCaption, bActive ? Primary : Muted, true)
-                ],
-                bActive ? Cyan : BorderEmphasis,
-                bActive ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
+                        if (!bActive)
+                        {
+                            if (Target == EBreakerMenuScreen::SkillTrees) SkillTreeStatus = FText::GetEmpty();
+                            Rebuild(Target);
+                        }
+                        return FReply::Handled();
+                    }))
+                    [
+                        MenuText(FText::FromString(Label), BreakerUI::TypeCaption, bActive ? Primary : Muted, true)
+                    ],
+                    BorderRest, BreakerUI::BorderThin)
+            ]
         ];
     };
     // GEAR / SKILLS rather than EQUIPMENT / SKILL TREES. The header is one row
@@ -1445,13 +1505,140 @@ void SBreakerMenu::EnsureRosterLoaded()
     }
 }
 
+namespace
+{
+    // ---- The left plate ---------------------------------------------------
+    // The title and pause screens share one shape: a 640-wide plate pinned
+    // to the left edge on bg/base, a 1px rest divider on its right, the
+    // system mark, the title, then whatever the screen offers. The world (or
+    // the attract scene) stays visible to the right of it. Fixed width, so
+    // nothing the screen offers can move the plate.
+    constexpr float BreakerMenuLeftPlateWidth = 640.0f;   // O2 PLACEHOLDER
+    constexpr int32 BreakerMenuLeftPlateTitleSize = 96;   // O2 PLACEHOLDER
+    // The smallest face the title may shrink to before it is the wrong
+    // title rather than a tight one.
+    constexpr int32 BreakerMenuLeftPlateTitleMinSize = 56;   // O2 PLACEHOLDER
+    // The plate's padding: 96 left and top, 40 right and bottom.
+    constexpr float BreakerMenuLeftPlatePadLeft = 96.0f;                  // O2 PLACEHOLDER
+    constexpr float BreakerMenuLeftPlatePadTop = 96.0f;                   // O2 PLACEHOLDER
+    constexpr float BreakerMenuLeftPlatePadRight = BreakerUI::Space40;    // O2 PLACEHOLDER
+    constexpr float BreakerMenuLeftPlatePadBottom = BreakerUI::Space40;   // O2 PLACEHOLDER
+    // What is left for the title and the content once the padding and the
+    // 1px rest divider are paid: 640 - 1 - 96 - 40 = 503.
+    constexpr float BreakerMenuLeftPlateInterior = BreakerMenuLeftPlateWidth - BreakerUI::BorderThin
+        - BreakerMenuLeftPlatePadLeft - BreakerMenuLeftPlatePadRight;
+
+    TSharedRef<SWidget> BreakerMenuLeftPlate(const FString& Title, const TSharedRef<SWidget>& Content)
+    {
+        // The title spans the whole interior — never the items' 400 — and
+        // shrinks to fit it: RIOR'S EDGE at 96 on the display face runs past
+        // 503 and lost its tail; PAUSED at 96 fits without shrinking.
+        const int32 TitleSize = FMath::Max(BreakerMenuLeftPlateTitleMinSize,
+            BreakerMenuFitPixels(Title, BreakerMenuLeftPlateTitleSize, BreakerMenuLeftPlateInterior,
+                BreakerMenuLeftPlateTitleMinSize, [](int32 Pixels) { return BreakerDisplayFont(Pixels, true); }));
+        return SNew(SBox).WidthOverride(BreakerMenuLeftPlateWidth)
+        [
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().FillWidth(1.0f)
+            [
+                SNew(SBorder)
+                .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                .BorderBackgroundColor(BreakerUI::BgBase)
+                .Padding(FMargin(BreakerMenuLeftPlatePadLeft, BreakerMenuLeftPlatePadTop,
+                    BreakerMenuLeftPlatePadRight, BreakerMenuLeftPlatePadBottom))
+                [
+                    SNew(SVerticalBox)
+                    + SVerticalBox::Slot().AutoHeight()
+                    [
+                        // The system mark: a 48x8 bar, drawn, never a glyph.
+                        SNew(SBox).WidthOverride(48.0f).HeightOverride(8.0f).HAlign(HAlign_Left)[SolidBlock(Sys)]  // 07-menus: the 48x8 system mark
+                    ]
+                    + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Fill).Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)
+                    [
+                        MenuText(FText::FromString(Title), TitleSize, Primary, true)
+                    ]
+                    + SVerticalBox::Slot().FillHeight(1.0f)[Content]
+                ]
+            ]
+            + SHorizontalBox::Slot().AutoWidth()
+            [
+                SNew(SBox).WidthOverride(BreakerUI::BorderThin)[SolidBlock(BorderRest)]
+            ]
+        ];
+    }
+
+    // ---- One item on the left plate ----------------------------------------
+    // 400x56. Focused or primary: a 4px system rail on the left edge inside
+    // an emphasis ring on a raised face. At rest: the plate face inside a 1px
+    // rest ring, and the same 4px of face where the rail would be, so the
+    // label never moves between the two states.
+    constexpr float BreakerMenuVerbItemWidth = 400.0f;    // O2 PLACEHOLDER
+    constexpr float BreakerMenuVerbItemHeight = 56.0f;    // O2 PLACEHOLDER
+    constexpr float BreakerMenuVerbItemRail = 4.0f;       // O2 PLACEHOLDER
+    constexpr int32 BreakerMenuVerbItemSize = 24;         // O2 PLACEHOLDER
+    constexpr int32 BreakerMenuVerbItemMinSize = BreakerUI::TypeBody;   // O2 PLACEHOLDER
+    // The label's own room: the item less the two 1px rings, the 4px rail,
+    // and the button's content padding (Space24 - 4 on the rail side, Space24
+    // on the other) — 400 - 2 - 4 - 20 - 24 = 350.
+    constexpr float BreakerMenuVerbItemLabelWidth = BreakerMenuVerbItemWidth - 2.0f * BreakerUI::BorderThin
+        - BreakerMenuVerbItemRail - (BreakerUI::Space24 - BreakerMenuVerbItemRail) - BreakerUI::Space24;
+
+    TSharedRef<SWidget> BreakerMenuVerbItem(const FString& Label, const FOnClicked& OnClicked, bool bFocused)
+    {
+        const FLinearColor Face = bFocused ? PanelRaised : Panel;
+        // A long verb shrinks to its 350 rather than clipping: DEV —
+        // BREAKPOINT SANDBOX at 24 on the display face runs a few pixels past
+        // it and lost its tail.
+        const int32 LabelSize = FMath::Max(BreakerMenuVerbItemMinSize,
+            BreakerMenuFitPixels(Label, BreakerMenuVerbItemSize, BreakerMenuVerbItemLabelWidth, BreakerMenuVerbItemMinSize,
+                [bFocused](int32 Pixels) { return BreakerDisplayFont(Pixels, bFocused); }));
+        return SNew(SBox).WidthOverride(BreakerMenuVerbItemWidth).HeightOverride(BreakerMenuVerbItemHeight)
+        [
+            BorderWrap(
+                SNew(SHorizontalBox)
+                + SHorizontalBox::Slot().AutoWidth()
+                [
+                    SNew(SBox).WidthOverride(BreakerMenuVerbItemRail)[SolidBlock(bFocused ? Sys : Face)]
+                ]
+                + SHorizontalBox::Slot().FillWidth(1.0f)
+                [
+                    // The ring needs an OPAQUE face inside it: BorderWrap's
+                    // SBorder paints its colour across the whole rect and the
+                    // padding only insets the child, so a see-through button
+                    // renders as a solid slab of ring colour — which is
+                    // exactly how the first capture photographed PLAY.
+                    SNew(SBorder)
+                    .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                    .BorderBackgroundColor(Face)
+                    .Padding(FMargin(0.0f))
+                    [
+                        SNew(SButton)
+                        .ButtonStyle(FCoreStyle::Get(), "NoBorder")
+                        .ContentPadding(FMargin(BreakerUI::Space24 - BreakerMenuVerbItemRail, 0.0f, BreakerUI::Space24, 0.0f))
+                        .HAlign(HAlign_Fill)
+                        .VAlign(VAlign_Center)
+                        .OnClicked(OnClicked)
+                        [
+                            SNew(STextBlock)
+                                .Text(FText::FromString(Label))
+                                .Justification(ETextJustify::Left)
+                                .ColorAndOpacity(bFocused ? Primary : SoftText)
+                                .Font(BreakerDisplayFont(LabelSize, bFocused))
+                        ]
+                    ]
+                ],
+                bFocused ? BorderEmphasis : BorderRest)
+        ];
+    }
+}
+
 TSharedRef<SWidget> SBreakerMenu::BuildMainScreen()
 {
     // The reference's front door (screen_frontdoor_attract): a full-bleed
     // night scene — the hatched field, a black skyline standing on the ground
-    // line, the road band under it — with the identity stack centred over
-    // everything. The SAME scene carries both states: before the key the
-    // bottom offers PRESS ANY KEY; after it, PLAY / SETTINGS / QUIT stand in
+    // line, the road band under it — with the identity stack on the left
+    // plate over it. The SAME scene carries both states: before the key the
+    // plate offers PRESS ANY KEY; after it, PLAY / SETTINGS / QUIT stand in
     // the same place. The reveal changes what is offered, never where you
     // are — the old version swapped a centred plate for a different centred
     // plate and two thirds of the screen never existed.
@@ -1521,21 +1708,17 @@ TSharedRef<SWidget> SBreakerMenu::BuildMainScreen()
         + SVerticalBox::Slot().FillHeight(236.0f)[SolidBlock(BreakerUI::BgVoid)];
 
     // ---- The identity stack ------------------------------------------------
+    // The title itself is the left plate's (BreakerMenuLeftPlate draws the
+    // mark and RIOR'S EDGE at 96); this stack is what sits under it.
     TSharedRef<SVerticalBox> Stack = SNew(SVerticalBox);
-    Stack->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space24)
+    Stack->AddSlot().AutoHeight().HAlign(HAlign_Left).Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)
     [
         // The breakers insignia, the real texture — never tinted.
         BreakerMark(TEXT("/Game/Breaker/UI/Marks/T_InsigniaBreakers.T_InsigniaBreakers"), 40.0f)
     ];
-    Stack->AddSlot().AutoHeight().HAlign(HAlign_Center)
-    [
-        // The loading spec's display scale for an area name; the title is the
-        // biggest thing the game ever sets.
-        MenuText(FText::FromString(TEXT("RIOR'S EDGE")), 100, Primary, true)
-    ];
     auto AddKickerLine = [&Stack](const TCHAR* Line, const FLinearColor& Color, float TopPad)
     {
-        Stack->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, TopPad, 0.0f, 0.0f)
+        Stack->AddSlot().AutoHeight().HAlign(HAlign_Left).Padding(0.0f, TopPad, 0.0f, 0.0f)
         [
             BreakerMonoText(FText::FromString(Line), 13, Color, 0.22f)
         ];
@@ -1552,7 +1735,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildMainScreen()
         // player-input path, but a title screen with no clickable way forward
         // is unrecoverable if focus is wrong, and that is a bad thing to be
         // certain about without having looked.
-        Offer->AddSlot().AutoHeight().HAlign(HAlign_Center)
+        Offer->AddSlot().AutoHeight().HAlign(HAlign_Left)
         [
             SNew(SButton)
             .ButtonStyle(FCoreStyle::Get(), "NoBorder")
@@ -1574,35 +1757,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildMainScreen()
         // BREAKER CLASS used to sit here and have MOVED to the pause menu,
         // where they belong: they act on a character, and at the title screen
         // there is not one yet.
-        auto AddVerb = [this, &Offer](const TCHAR* Label, const FOnClicked& OnClicked, bool bPrimaryVerb)
+        auto AddVerb = [&Offer](const TCHAR* Label, const FOnClicked& OnClicked, bool bPrimaryVerb)
         {
-            Offer->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space12)
+            Offer->AddSlot().AutoHeight().HAlign(HAlign_Left).Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space12)
             [
-                SNew(SBox).WidthOverride(300.0f).HeightOverride(47.0f)
-                [
-                    // The ring needs an OPAQUE face inside it: BorderWrap's
-                    // SBorder paints its colour across the whole rect and the
-                    // padding only insets the child, so a see-through button
-                    // renders as a solid slab of ring colour — which is
-                    // exactly how the first capture photographed PLAY.
-                    BorderWrap(
-                        SNew(SBorder)
-                        .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
-                        .BorderBackgroundColor(BreakerUI::BgBase)
-                        .Padding(FMargin(0.0f))
-                        [
-                            SNew(SButton)
-                            .ButtonStyle(FCoreStyle::Get(), "NoBorder")
-                            .HAlign(HAlign_Center)
-                            .VAlign(VAlign_Center)
-                            .OnClicked(OnClicked)
-                            [
-                                MenuText(FText::FromString(Label), BreakerUI::TypeH2,
-                                    bPrimaryVerb ? Primary : SoftText, bPrimaryVerb)
-                            ]
-                        ],
-                        bPrimaryVerb ? Cyan : BorderEmphasis)
-                ]
+                BreakerMenuVerbItem(Label, OnClicked, bPrimaryVerb)
             ];
         };
         AddVerb(TEXT("PLAY"), FOnClicked::CreateLambda([this]()
@@ -1651,75 +1810,137 @@ TSharedRef<SWidget> SBreakerMenu::BuildMainScreen()
             : FString::Printf(TEXT(" · %s"), NetModeName);
     }
 
+    // The plate's column: the kickers under the title, the offer 40 below
+    // them, and the build line pinned to the plate's bottom edge.
+    const TSharedRef<SWidget> PlateContent = SNew(SVerticalBox)
+        + SVerticalBox::Slot().AutoHeight()[Stack]
+        + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space40, 0.0f, 0.0f)[Offer]
+        + SVerticalBox::Slot().FillHeight(1.0f)[SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))]
+        + SVerticalBox::Slot().AutoHeight()
+        [
+            BreakerMonoText(FText::FromString(BuildLine), BreakerUI::TypeCaption, Disabled, 0.16f)
+        ];
+
     return SNew(SOverlay)
         + SOverlay::Slot()[SolidBlock(BreakerUI::BgBase)]
         + SOverlay::Slot()[Scene]
-        + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(0.0f, 0.0f, 0.0f, 76.0f)
+        + SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Fill)
         [
-            Stack
-        ]
-        + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.0f, 0.0f, 0.0f, 88.0f)
-        [
-            Offer
-        ]
-        + SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Bottom)
-            .Padding(BreakerUI::Space40, 0.0f, 0.0f, BreakerUI::Space24)
-        [
-            BreakerMonoText(FText::FromString(BuildLine), BreakerUI::TypeCaption, Disabled, 0.16f)
+            BreakerMenuLeftPlate(TEXT("RIOR'S EDGE"), PlateContent)
         ];
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildPauseScreen()
 {
+    // The same left plate as the title, over the world at 40%. The items are
+    // the title's item maker, so RESUME here and PLAY there are one shape.
+    // No slide-in: the plate is placed, not animated. No hatch on
+    // the field: Slate has no hatch primitive, and the title's canvas hatch
+    // is 178 segments this screen would pay on every rebuild — recorded here
+    // rather than faked with a tiled texture.
     TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
-    auto AddButton = [&Body](const TSharedRef<SWidget>& Button)
+    Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space24, 0.0f, BreakerUI::Space40)
+    [
+        BreakerMonoText(FText::FromString(TEXT("PLAYTEST GYM / SESSION ACTIVE")), 13, Muted, 0.22f)
+    ];
+    auto AddButton = [&Body](const TCHAR* Label, const FOnClicked& OnClicked, bool bPrimary)
     {
-        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 10.0f)[Button];
+        Body->AddSlot().AutoHeight().HAlign(HAlign_Left).Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space12)
+        [
+            BreakerMenuVerbItem(Label, OnClicked, bPrimary)
+        ];
     };
-    AddButton(MakeButton(FText::FromString(TEXT("RESUME")), FOnClicked::CreateLambda([this]()
+    AddButton(TEXT("RESUME"), FOnClicked::CreateLambda([this]()
     {
         if (Character.IsValid()) Character->ResumeFromMenu();
         return FReply::Handled();
-    }), true));
+    }), true);
     // LOADOUT is gone from this column by ruling (2026-08-17): the archetype
     // picker let players conjure any gun without owning one. INVENTORY is the
     // loadout now — the weapon you carry is the weapon item you equip.
-    AddButton(MakeButton(FText::FromString(TEXT("INVENTORY")), FOnClicked::CreateLambda([this]()
+    AddButton(TEXT("INVENTORY"), FOnClicked::CreateLambda([this]()
     {
         Rebuild(EBreakerMenuScreen::Inventory);
         return FReply::Handled();
-    })));
+    }), false);
     // SKILL TREES intentionally absent: the INVENTORY screen's tab strip owns
     // that route now.
-    AddButton(MakeButton(FText::FromString(TEXT("SETTINGS")), FOnClicked::CreateLambda([this]()
+    AddButton(TEXT("SETTINGS"), FOnClicked::CreateLambda([this]()
     {
         Rebuild(EBreakerMenuScreen::Settings);
         return FReply::Handled();
-    })));
+    }), false);
     // The breakpoint sandbox. DEV is in the label rather than implied by
     // placement, because this button changes the character and the world, not
     // preferences — a playtester who clicks it should know they are stepping
     // out of the game's rules before the screen opens.
-    AddButton(MakeButton(FText::FromString(TEXT("DEV — BREAKPOINT SANDBOX")), FOnClicked::CreateLambda([this]()
+    AddButton(TEXT("DEV — BREAKPOINT SANDBOX"), FOnClicked::CreateLambda([this]()
     {
         Rebuild(EBreakerMenuScreen::DevSandbox);
         return FReply::Handled();
-    })));
-    AddButton(MakeButton(FText::FromString(TEXT("RETURN TO TITLE")), FOnClicked::CreateLambda([this]()
+    }), false);
+    AddButton(TEXT("RETURN TO TITLE"), FOnClicked::CreateLambda([this]()
     {
         if (Character.IsValid()) Character->ReturnToTitleMenu();
         return FReply::Handled();
-    })));
-    AddButton(MakeButton(FText::FromString(TEXT("QUIT TO DESKTOP")), FOnClicked::CreateLambda([this]()
+    }), false);
+    AddButton(TEXT("QUIT TO DESKTOP"), FOnClicked::CreateLambda([this]()
     {
         if (Character.IsValid()) Character->QuitFromMenu();
         return FReply::Handled();
-    })));
-    Body->AddSlot().AutoHeight().Padding(0.0f, 16.0f, 0.0f, 0.0f)
+    }), false);
+
+    // ---- The XP plate (O210) ------------------------------------------------
+    // The level, the rule, and the HUD's own caption under it, read from the
+    // progression component — never a second opinion about XP. 400 wide, the
+    // items' width, so the column keeps one right edge.
+    const UBreakerProgressionComponent* Progression = Character.IsValid() ? Character->GetProgression() : nullptr;
+    const int32 Level = Progression ? Progression->GetCharacterLevel() : 0;
+    const float Fraction = Progression ? FMath::Clamp(Progression->GetLevelProgressFraction(), 0.0f, 1.0f) : 0.0f;
+    const int32 ToNext = Progression ? Progression->GetXpToNextLevel() : 0;
+    Body->AddSlot().AutoHeight().HAlign(HAlign_Left).Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)
+    [
+        SNew(SBox).WidthOverride(400.0f)  // 07-menus: the XP plate
+        [
+            SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight()
+            [
+                BreakerMonoText(FText::FromString(FString::Printf(TEXT("LV %d"), Level)), 24 /* 07-menus */, Primary, 0.0f)
+            ]
+            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+            [
+                // The rule: an 8px bar, the earned fraction in the system
+                // colour over the hover face. Ratio-split slots from a value
+                // known before layout, never an allotted size.
+                SNew(SBox).HeightOverride(8.0f)  // 07-menus: the XP rail
+                [
+                    SNew(SHorizontalBox)
+                    + SHorizontalBox::Slot().FillWidth(FMath::Max(0.01f, Fraction))[SolidBlock(Sys)]
+                    + SHorizontalBox::Slot().FillWidth(FMath::Max(0.01f, 1.0f - Fraction))[SolidBlock(PanelHover)]
+                ]
+            ]
+            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+            [
+                BreakerMonoText(FText::FromString(BreakerMenuLayout::LevelCaption(Level, Fraction, ToNext)),
+                    BreakerUI::TypeCaption, Muted, 0.16f)
+            ]
+        ]
+    ];
+    Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
     [
         MenuText(FText::FromString(TEXT("ESC  RESUME")), 10, SoftText)
     ];
-    return BuildFrame(FText::FromString(TEXT("PAUSED")), FText::FromString(TEXT("PLAYTEST GYM / SESSION ACTIVE")), Body);
+    return SNew(SOverlay)
+        + SOverlay::Slot()
+        [
+            SNew(SBorder)
+            .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+            .BorderBackgroundColor(BreakerUI::Alpha(Background, 0.6f))   // O2 PLACEHOLDER
+        ]
+        + SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Fill)
+        [
+            BreakerMenuLeftPlate(TEXT("PAUSED"), Body)
+        ];
 }
 
 // ---------------------------------------------------------------------------
@@ -1805,16 +2026,17 @@ namespace
     constexpr float BreakerSettingsSidebarWidth = 300.0f;  // 299 face + 1px divider
     constexpr float BreakerSettingsNavRowHeight = 44.0f;   // every row 44 minimum
     constexpr float BreakerSettingsContentPad = 40.0f;     // pane margin, both sides
-    constexpr float BreakerSettingsLabelWidth = 332.0f;    // labels at x340, controls at x672
-    constexpr float BreakerSettingsControlHeight = 44.0f;
+    constexpr float BreakerSettingsLabelWidth = 168.0f;    // O2 PLACEHOLDER — the control edge sits 168 in from the label
+    constexpr float BreakerSettingsControlHeight = 56.0f;  // O2 PLACEHOLDER — every control row 56; the key cap itself stays 44
     // README caps the track at 460; the plate draws 380 with the value column
     // reading at track-end + 16, and the plate is what the build is held
     // against.
     constexpr float BreakerSettingsSliderWidth = 380.0f;
     constexpr float BreakerSettingsValueWidth = 64.0f;     // fixed mono readout column
     constexpr float BreakerSettingsDropdownWidth = 260.0f; // plate: x672-931
-    constexpr float BreakerSettingsKeyBoxWidth = 110.0f;   // plate: x672-781
+    constexpr float BreakerSettingsKeyBoxWidth = 144.0f;   // O2 PLACEHOLDER — holds "SCROLL LOCK" at mono 16
     constexpr float BreakerSettingsDefaultWidth = 87.0f;   // plate: x1791-1878
+    constexpr int32 BreakerSettingsKeyCapSize = 16;        // O2 PLACEHOLDER — the key cap's mono size
     // 73px row pitch on the plate: 14 above the 44px control, 14 below, then
     // the 1px divider.
     constexpr float BreakerSettingsRowPad = 14.0f;
@@ -1907,16 +2129,43 @@ namespace
         return SNew(SBox).WidthOverride(12.0f).HeightOverride(8.0f)[Canvas];
     }
 
-    // The refusal mark drawn beside a clash badge. The plate draws a warning
-    // triangle; Slate's flat brushes cannot fill a triangle, so this is a
-    // harm-red diamond (the file's existing drawn-diamond vocabulary) until a
-    // mark texture exists. The WORDS beside it are what carry the refusal —
-    // red alone is never a refusal.
+    // The same caret pointing UP: the card's better-mark.
+    TSharedRef<SWidget> BreakerDrawnCaretUp(const FLinearColor& Color)
+    {
+        TSharedRef<SCanvas> Canvas = SNew(SCanvas);
+        AddCanvasSegment(Canvas, FVector2D(1.0, 6.0), FVector2D(6.0, 1.0), Color, 2.0f);
+        AddCanvasSegment(Canvas, FVector2D(6.0, 1.0), FVector2D(11.0, 6.0), Color, 2.0f);
+        return SNew(SBox).WidthOverride(12.0f).HeightOverride(8.0f)[Canvas];
+    }
+
+    // The refusal mark drawn beside a clash badge: an exclamation in a 12x12
+    // tile — a 2x7 stroke, a 1px gap, a 2x2 point — drawn, never a glyph.
+    // The WORDS beside it are what carry the refusal — red alone is never a
+    // refusal.
     TSharedRef<SWidget> BreakerWarnMark(const FLinearColor& Color = Harm)
     {
         return SNew(SBox).WidthOverride(12.0f).HeightOverride(12.0f).HAlign(HAlign_Center).VAlign(VAlign_Center)
         [
-            RotateFortyFive(SNew(SBox).WidthOverride(7.0f).HeightOverride(7.0f)[SolidBlock(Color)])
+            SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+            [
+                SNew(SBox).WidthOverride(2.0f).HeightOverride(7.0f)[SolidBlock(Color)]
+            ]
+            + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 1.0f, 0.0f, 0.0f)
+            [
+                SNew(SBox).WidthOverride(2.0f).HeightOverride(2.0f)[SolidBlock(Color)]
+            ]
+        ];
+    }
+
+    // The riftglass mark: a 12px gold diamond beside every riftglass figure,
+    // so the currency reads as itself wherever it is printed. Gold is the
+    // spend colour; the diamond is the file's drawn-diamond vocabulary.
+    TSharedRef<SWidget> BreakerRiftglassMark()
+    {
+        return SNew(SBox).WidthOverride(12.0f).HeightOverride(12.0f).HAlign(HAlign_Center).VAlign(VAlign_Center)
+        [
+            RotateFortyFive(SNew(SBox).WidthOverride(7.0f).HeightOverride(7.0f)[SolidBlock(Amber)])
         ];
     }
 
@@ -2146,11 +2395,11 @@ namespace
     DECLARE_DELEGATE_OneParam(FBreakerOnPick, int32);
 
     // ---- FIELDPLATE slider ------------------------------------------------
-    // README: 6px track, 14x20 drawn thumb (a rectangle, not a circle), value
+    // A 4px track and a 16x16 drawn thumb (a square, not a circle), value
     // right-aligned in a fixed 64px mono column. A custom leaf widget rather
     // than a restyled SSlider because the reference fills the travelled half
-    // of the track in system cyan and SSlider has no filled segment — the
-    // fill is half of what the control says at a glance.
+    // of the track in the system colour and SSlider has no filled segment —
+    // the fill is half of what the control says at a glance.
     class SBreakerFieldplateSlider : public SLeafWidget
     {
     public:
@@ -2162,9 +2411,9 @@ namespace
             SLATE_EVENT(FSimpleDelegate, OnCaptureEnd)
         SLATE_END_ARGS()
 
-        static constexpr float TrackHeight = 6.0f;
-        static constexpr float ThumbWidth = 14.0f;
-        static constexpr float ThumbHeight = 20.0f;
+        static constexpr float TrackHeight = 4.0f;    // O2 PLACEHOLDER
+        static constexpr float ThumbWidth = 16.0f;    // O2 PLACEHOLDER
+        static constexpr float ThumbHeight = 16.0f;   // O2 PLACEHOLDER
 
         void Construct(const FArguments& InArgs)
         {
@@ -2175,7 +2424,7 @@ namespace
 
         virtual FVector2D ComputeDesiredSize(float) const override
         {
-            // The whole 44px strip is the hit target, not the 6px bar.
+            // The whole control strip is the hit target, not the 4px bar.
             return FVector2D(BreakerSettingsSliderWidth, BreakerSettingsControlHeight);
         }
 
@@ -2190,7 +2439,7 @@ namespace
             const float ThumbX = Span * Value;
 
             // Untravelled track, the travelled span over it, then the thumb —
-            // a cyan 14x20 rectangle with the panel face inset 1px.
+            // a 16x16 system-colour square with the panel face inset 1px.
             FSlateDrawElement::MakeBox(OutDrawElements, LayerId,
                 AllottedGeometry.ToPaintGeometry(FVector2f(Size.X, TrackHeight),
                     FSlateLayoutTransform(FVector2f(0.0f, TrackY))),
@@ -2198,12 +2447,12 @@ namespace
             FSlateDrawElement::MakeBox(OutDrawElements, LayerId + 1,
                 AllottedGeometry.ToPaintGeometry(FVector2f(ThumbX + ThumbWidth * 0.5f, TrackHeight),
                     FSlateLayoutTransform(FVector2f(0.0f, TrackY))),
-                Brush, ESlateDrawEffect::None, Cyan);
+                Brush, ESlateDrawEffect::None, Sys);
             const float ThumbY = Size.Y * 0.5f - ThumbHeight * 0.5f;
             FSlateDrawElement::MakeBox(OutDrawElements, LayerId + 2,
                 AllottedGeometry.ToPaintGeometry(FVector2f(ThumbWidth, ThumbHeight),
                     FSlateLayoutTransform(FVector2f(ThumbX, ThumbY))),
-                Brush, ESlateDrawEffect::None, Cyan);
+                Brush, ESlateDrawEffect::None, Sys);
             FSlateDrawElement::MakeBox(OutDrawElements, LayerId + 3,
                 AllottedGeometry.ToPaintGeometry(FVector2f(ThumbWidth - 2.0f, ThumbHeight - 2.0f),
                     FSlateLayoutTransform(FVector2f(ThumbX + 1.0f, ThumbY + 1.0f))),
@@ -2259,12 +2508,12 @@ namespace
     };
 
     // ---- FIELDPLATE toggle ------------------------------------------------
-    // README: 52x26 plate, 20x20 knob translating 24px in 120ms, and the word
+    // A 44x24 plate, an 18x18 knob translating 18px in 120ms, and the word
     // ON or OFF ALWAYS sits beside it — colour is never alone. The word is
     // the row's job (it needs a live text handle); this widget is the plate
-    // and the knob. The README's 2px radius is not drawable with the flat
-    // WhiteBrush this file draws with; the whole menu is square today and the
-    // toggle stays consistent with it.
+    // and the knob. A corner radius is not drawable with the flat WhiteBrush
+    // this file draws with; the whole menu is square today and the toggle
+    // stays consistent with it.
     class SBreakerFieldplateToggle : public SCompoundWidget
     {
     public:
@@ -2275,11 +2524,12 @@ namespace
             SLATE_EVENT(FBreakerOnToggle, OnToggled)
         SLATE_END_ARGS()
 
-        static constexpr float PlateWidth = 52.0f;
-        static constexpr float PlateHeight = 26.0f;
-        static constexpr float KnobSize = 20.0f;
-        // 1px border + 3 inset + 20 knob + 24 travel + 3 inset + 1px = 52.
-        static constexpr float KnobTravel = 24.0f;
+        static constexpr float PlateWidth = 44.0f;    // O2 PLACEHOLDER
+        static constexpr float PlateHeight = 24.0f;   // O2 PLACEHOLDER
+        static constexpr float KnobSize = 18.0f;      // O2 PLACEHOLDER
+        // 1px border + 2 inset + 18 knob + 18 travel + 2 inset + 1px = 42;
+        // the plate is 44 so the knob clears the ring by one pixel each end.
+        static constexpr float KnobTravel = 18.0f;
         static constexpr float TravelSeconds = 0.12f;
 
         void Construct(const FArguments& InArgs)
@@ -2302,7 +2552,7 @@ namespace
 
             ChildSlot
             [
-                // The 44px hit target the row demands, holding the 26px plate.
+                // The row-height hit target, holding the 24px plate.
                 SNew(SBox).WidthOverride(PlateWidth).HeightOverride(BreakerSettingsControlHeight).VAlign(VAlign_Center)
                 [
                     SNew(SBox).HeightOverride(PlateHeight)
@@ -2310,7 +2560,7 @@ namespace
                         BorderWrap(
                             SNew(SOverlay)
                             + SOverlay::Slot()[SolidBlock(BreakerUI::BgRaised)]
-                            + SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Center).Padding(3.0f, 0.0f, 0.0f, 0.0f)
+                            + SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Center).Padding(2.0f, 0.0f, 0.0f, 0.0f)
                             [
                                 Knob.ToSharedRef()
                             ],
@@ -2742,7 +2992,7 @@ TSharedRef<SWidget> SBreakerMenu::MakeKeybindRow(FName Action, const TMap<FName,
     const bool bOverridden = Model && Model->KeybindOverrides.Contains(Action);
 
     // What the key cap says. SHORT display names throughout — the cap is a
-    // fixed 110px box (see the budget note below), and only the keyboard/mouse
+    // fixed 144px box (see the budget note below), and only the keyboard/mouse
     // half: joining every default including the gamepad names produced strings
     // like "GAMEPAD LEFT THUMBSTICK 2D-AXIS  MOUSE XY 2D-AXIS" and the row
     // clipped them on the left.
@@ -2750,7 +3000,7 @@ TSharedRef<SWidget> SBreakerMenu::MakeKeybindRow(FName Action, const TMap<FName,
     FString CompositeList;
     if (bComposite)
     {
-        // The CAP shows only the first key — the full list cannot fit a 110px
+        // The CAP shows only the first key — the full list cannot fit a 144px
         // box (the first capture photographed "USE XY 2D-AX" clipped at both
         // ends) — and the BADGE carries the whole list beside its reason,
         // where there is a screen-half of room. Axis suffixes come off the
@@ -2798,12 +3048,12 @@ TSharedRef<SWidget> SBreakerMenu::MakeKeybindRow(FName Action, const TMap<FName,
 
     // ---- THE KEY CAP, and its width budget --------------------------------
     // The key display IS the control (README: no BIND button; click arms).
-    // The cap is the plate's fixed 110px box, so the strings in it are SHORT
-    // display names — GetDisplayName(false): LMB, RMB, SPACE. MEASURED, not
-    // derived: IBM Plex Mono rendered "LEFT SHIFT" at ~98px (~9.8px per glyph
-    // at size 13 — wider than the metrics tables suggest), which is why the
-    // cap is mono 12 on a 2px pad: 11 glyphs ("SCROLL LOCK", the widest short
-    // name the desk produces) ≈ 100px against 110 - 2px ring - 4px pad = 104.
+    // The cap is a fixed 144px box, so the strings in it are SHORT display
+    // names — GetDisplayName(false): LMB, RMB, SPACE. MEASURED, not derived:
+    // IBM Plex Mono rendered "LEFT SHIFT" at ~98px (~9.8px per glyph at size
+    // 13 — wider than the metrics tables suggest), so mono 16 is budgeted at
+    // ~12px a glyph: 11 glyphs ("SCROLL LOCK", the widest short name the
+    // desk produces) ≈ 132px against 144 - 2px ring - 4px pad = 138.
     // The cap never says "PRESS A KEY…": listening is the blinking gold frame
     // plus the status line, which has room for whole sentences. Long key
     // names stay in the status line too, where they fit.
@@ -2833,7 +3083,7 @@ TSharedRef<SWidget> SBreakerMenu::MakeKeybindRow(FName Action, const TMap<FName,
         // text to disabled. Never a missing control, never opacity.
         Row->AddSlot().AutoWidth().VAlign(VAlign_Center)
         [
-            SNew(SBox).WidthOverride(BreakerSettingsKeyBoxWidth).HeightOverride(BreakerSettingsControlHeight)
+            SNew(SBox).WidthOverride(BreakerSettingsKeyBoxWidth).HeightOverride(BreakerUI::MinHitTarget)
             [
                 BorderWrap(
                     SNew(SBorder)
@@ -2846,7 +3096,7 @@ TSharedRef<SWidget> SBreakerMenu::MakeKeybindRow(FName Action, const TMap<FName,
                             .Text(FText::FromString(KeyLabel))
                             .Justification(ETextJustify::Center)
                             .ColorAndOpacity(Disabled)
-                            .Font(BreakerMonoFont(BreakerUI::TypeCaption))
+                            .Font(BreakerMonoFont(BreakerSettingsKeyCapSize))
                     ],
                     BorderRest)
             ]
@@ -2865,8 +3115,10 @@ TSharedRef<SWidget> SBreakerMenu::MakeKeybindRow(FName Action, const TMap<FName,
         // against the plate's 18263A) and spends ~32px of hidden style
         // padding, which is what clipped "LEFT SHIFT" inside a box whose
         // arithmetic said it fit. With the style chrome gone the interior is
-        // 110 - 2px ring - 8px pad = 100px — 11 glyphs at mono 13, clearing
-        // "SCROLL LOCK", the widest short name the desk produces.
+        // 144 - 2px ring - 4px pad = 138px against 11 glyphs at mono 16
+        // (~12px a glyph, ~132px) for "SCROLL LOCK", the widest short name
+        // the desk produces. Six pixels of slack: READ THE FRAME before
+        // trusting it.
         const TSharedRef<SWidget> Cap =
             SNew(SBorder)
             .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
@@ -2892,21 +3144,33 @@ TSharedRef<SWidget> SBreakerMenu::MakeKeybindRow(FName Action, const TMap<FName,
                         .Text(FText::FromString(KeyLabel))
                         .Justification(ETextJustify::Center)
                         .ColorAndOpacity(CapColor)
-                        .Font(BreakerMonoFont(12))
+                        .Font(BreakerMonoFont(BreakerSettingsKeyCapSize))
                 ]
             ];
 
         // The frame carries the state: gold blink while listening (README's
         // 1s step), harm-deep while a named clash waits for its second press,
-        // emphasis ring at rest.
+        // emphasis ring at rest. Under the frame a 2px underline says the
+        // same thing a second way — system colour while listening, harm
+        // while a clash waits, nothing at rest — so neither state is a blink
+        // alone.
         TSharedRef<SWidget> Framed = bPending
             ? BorderWrap(Cap, HarmDeep)
             : (bListening
                 ? StaticCastSharedRef<SWidget>(SNew(SBreakerBlinkBorder).OnColor(Amber).OffColor(BorderEmphasis)[Cap])
                 : BorderWrap(Cap, BorderEmphasis));
+        const FLinearColor Underline = bListening ? Sys : (bPending ? Harm : Transparent);
         Row->AddSlot().AutoWidth().VAlign(VAlign_Center)
         [
-            SNew(SBox).WidthOverride(BreakerSettingsKeyBoxWidth).HeightOverride(BreakerSettingsControlHeight)[Framed]
+            SNew(SBox).WidthOverride(BreakerSettingsKeyBoxWidth).HeightOverride(BreakerUI::MinHitTarget)
+            [
+                SNew(SVerticalBox)
+                + SVerticalBox::Slot().FillHeight(1.0f)[Framed]
+                + SVerticalBox::Slot().AutoHeight()
+                [
+                    SNew(SBox).HeightOverride(BreakerUI::BorderSelected)[SolidBlock(Underline)]
+                ]
+            ]
         ];
     }
 
@@ -3679,7 +3943,10 @@ namespace
         return Tier < 0 ? TEXT("T-1") : FString::Printf(TEXT("T%d"), Tier);
     }
 
-    // One affix as the player reads it: "+5.0% Movement Speed  T4".
+    // One affix as the player reads it: "+5.0% Movement Speed". The tier is
+    // NOT on this string: it is the badge column beside it (MakeAffixLines),
+    // so every tier sits on one straight edge instead of trailing the name
+    // wherever the name happened to end.
     //
     // VALUE FIRST, which is the reference's own order ("+22% slide speed") and
     // is also what makes the line survive a narrow card: the value is short and
@@ -3697,9 +3964,15 @@ namespace
         // printed as percentages, because that is what they mean.
         const bool bPercentStyleFlat = Definition &&
             (Definition->StatTarget == EBreakerStatTarget::CriticalChance || Definition->StatTarget == EBreakerStatTarget::CriticalDamage);
-        return FString::Printf(TEXT("+%.1f%s %s  %s"), Affix.Value,
-            bPercent || bPercentStyleFlat ? TEXT("%") : TEXT(""), *Name, *TierLabel(Affix.Tier));
+        return FString::Printf(TEXT("+%.1f%s %s"), Affix.Value,
+            bPercent || bPercentStyleFlat ? TEXT("%") : TEXT(""), *Name);
     }
+
+    // The tier badge's column on an affix line. 32 holds "T-1" at caption
+    // size with room; it is spent from the name's wrap width, NOT from
+    // AffixTailWidth, so the delta columns keep the edge the readability
+    // budget was solved against.
+    constexpr float BreakerMenuAffixTierColumn = 32.0f;   // O2 PLACEHOLDER
 
     // DescribeItem (a printf blob of item level plus every affix on one string)
     // is GONE with the equipment column's rebuild: the reference's equipment
@@ -3728,31 +4001,48 @@ namespace
     TSharedRef<SWidget> MakeAffixLines(const FBreakerItemInstance& Item, const TArray<FBreakerAffixComparison>& Deltas,
         float CardWidth)
     {
-        const float NameWrap = BreakerInventoryLayout::AffixNameWrapWidth(CardWidth);
+        const float NameWrap = BreakerInventoryLayout::AffixNameWrapWidth(CardWidth) - BreakerMenuAffixTierColumn;
         TSharedRef<SVerticalBox> Lines = SNew(SVerticalBox);
         for (int32 Index = 0; Index < Item.Affixes.Num(); ++Index)
         {
-            FString Glyph;
+            // THE MARK IS GEOMETRY in the 14px box: an up-chevron in the
+            // system colour for better, the dropdown caret in muted for
+            // worse, an 8x8 emphasis ring for parity, nothing when there is
+            // nothing to compare against. The ASCII Delta*Glyph tokens and
+            // BreakerInventoryLayout::DeltaGlyph stay as the rule's
+            // asserted form; this is the drawn one.
+            TSharedRef<SWidget> Mark = SNew(SSpacer).Size(FVector2D(1.0f, 1.0f));
             FString Magnitude;
             FLinearColor GlyphColor = Muted;
             if (Deltas.IsValidIndex(Index))
             {
                 const FBreakerAffixComparison& Comparison = Deltas[Index];
-                Glyph = BreakerInventoryLayout::DeltaGlyph(Comparison.Delta);
                 Magnitude = BreakerInventoryLayout::FormatDelta(Comparison);
                 switch (Comparison.Delta)
                 {
-                    case EBreakerAffixDelta::Better: GlyphColor = Cyan; break;
-                    case EBreakerAffixDelta::Worse:  GlyphColor = Harm; break;
-                    default:                         GlyphColor = Muted; break;
+                    case EBreakerAffixDelta::Better:
+                        GlyphColor = Sys;
+                        Mark = BreakerDrawnCaretUp(Sys);
+                        break;
+                    case EBreakerAffixDelta::Worse:
+                        GlyphColor = Muted;
+                        Mark = BreakerDrawnCaret(Muted);
+                        break;
+                    default:
+                        GlyphColor = Muted;
+                        Mark = SNew(SBox).WidthOverride(8.0f).HeightOverride(8.0f)
+                        [
+                            BorderWrap(SNew(SSpacer).Size(FVector2D(1.0f, 1.0f)), BorderEmphasis)
+                        ];
+                        break;
                 }
             }
             Lines->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)
             [
                 SNew(SHorizontalBox)
-                // VAlign_Top on the two right columns: when the name takes a
-                // second line the glyph and its magnitude stay with the FIRST
-                // line, which is the one carrying the stat.
+                // VAlign_Top on the right columns: when the name takes a
+                // second line the tier, the mark and its magnitude stay with
+                // the FIRST line, which is the one carrying the stat.
                 + SHorizontalBox::Slot().FillWidth(1.0f)
                 [
                     MenuWrappedText(FText::FromString(DescribeAffix(Item.Affixes[Index])),
@@ -3760,9 +4050,16 @@ namespace
                 ]
                 + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top)
                 [
-                    SNew(SBox).WidthOverride(BreakerUI::DeltaGlyphColumn)
+                    // The tier badge, on one straight edge for every line.
+                    MenuValueColumn(FText::FromString(TierLabel(Item.Affixes[Index].Tier)), BreakerMenuAffixTierColumn,
+                        BreakerUI::TypeCaption, Muted)
+                ]
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top)
+                [
+                    SNew(SBox).WidthOverride(BreakerUI::DeltaGlyphColumn).HeightOverride(BreakerUI::DeltaGlyphColumn)
+                        .HAlign(HAlign_Center).VAlign(VAlign_Center)
                     [
-                        MenuText(FText::FromString(Glyph), BreakerUI::TypeCaption, GlyphColor, true)
+                        Mark
                     ]
                 ]
                 + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top)
@@ -3827,34 +4124,24 @@ namespace
             ? BreakerUI::RarityColor(Rarity) : Muted;
     }
 
-    // A dashed hairline running DOWN. Mirror of DashedLine; the pair is what an
-    // empty slot's border is made of, since Slate has no dash pattern.
-    TSharedRef<SWidget> DashedColumn(float Height, const FLinearColor& Color, float Dash = 6.0f, float Gap = 6.0f)
+    // The rarity tally: five 8x8 boxes at a 2px gap, the first rank+1 filled
+    // in the rarity's colour and the rest in the rest ring. The rank is the
+    // enum's own order (Standard 0 .. Anomalous 4), which is append-only.
+    TSharedRef<SWidget> BreakerMenuMakeRarityTally(EBreakerItemRarity Rarity)
     {
-        TSharedRef<SVerticalBox> Column = SNew(SVerticalBox);
-        const int32 Count = FMath::Clamp(FMath::CeilToInt(Height / (Dash + Gap)), 1, 240);
-        for (int32 Index = 0; Index < Count; ++Index)
+        const int32 Filled = static_cast<int32>(Rarity) + 1;
+        TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
+        for (int32 Index = 0; Index < 5; ++Index)
         {
-            Column->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, Gap)
+            Row->AddSlot().AutoWidth().Padding(0.0f, 0.0f, Index < 4 ? 2.0f : 0.0f, 0.0f)
             [
-                SNew(SBox).HeightOverride(Dash)[SolidBlock(Color)]
+                SNew(SBox).WidthOverride(8.0f).HeightOverride(8.0f)   // O2 PLACEHOLDER
+                [
+                    SolidBlock(Index < Filled ? BreakerUI::RarityColor(Rarity) : BorderRest)
+                ]
             ];
         }
-        return Column;
-    }
-
-    // The dashed ring an EMPTY slot keeps: "empty slots keep full geometry with
-    // a dashed border and the slot name — the doll never looks broken, only
-    // unfinished". Four runs at known pixel sizes, never an allotted one.
-    TSharedRef<SWidget> DashedFrame(float Width, float Height, const FLinearColor& Color, const TSharedRef<SWidget>& Inner,
-        const FMargin& ContentPadding = FMargin(BreakerUI::Space16, BreakerUI::Space8))
-    {
-        return SNew(SOverlay)
-            + SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top)[DashedLine(Width, Color)]
-            + SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Bottom)[DashedLine(Width, Color)]
-            + SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top)[DashedColumn(Height, Color)]
-            + SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top)[DashedColumn(Height, Color)]
-            + SOverlay::Slot().Padding(ContentPadding)[Inner];
+        return Row;
     }
 
     // The five rarity beams, as the empty backpack draws them: one vertical
@@ -3950,7 +4237,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                     Accent)
             ];
 
-        // An EMPTY slot keeps full geometry, a dashed border and its own name.
+        // An EMPTY slot keeps the filled row's full geometry — the plate
+        // face inside a 1px rest ring on the emphasis rail — and its own
+        // name over the word EMPTY. The doll never looks broken, only
+        // unfinished, and it does so in the same shape as a filled row rather
+        // than a dashed one that read as a different kind of thing.
         if (!bHasItem)
         {
             TSharedRef<SWidget> EmptyBody =
@@ -3974,8 +4265,16 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                 .BorderBackgroundColor(Background)
                 .Padding(FMargin(BreakerUI::BorderSelected))
                 [
-                    DashedFrame(EquipmentColumnWidth - 2.0f * BreakerUI::BorderSelected,
-                        BreakerInventoryLayout::EquipRowHeight, BorderEmphasis, EmptyBody)
+                    MakeRarityCard(
+                        SNew(SBorder)
+                        .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                        .BorderBackgroundColor(Panel)
+                        .Padding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
+                        .VAlign(VAlign_Center)
+                        [
+                            EmptyBody
+                        ],
+                        EBreakerItemRarity::Standard, /*bHasItem=*/false)
                 ];
             EquipSlotOutlines.Add(Slot, EmptyOutline);
             return SNew(SBox).HeightOverride(BreakerInventoryLayout::EquipRowHeight + 2.0f * BreakerUI::BorderSelected)[EmptyOutline];
@@ -4379,12 +4678,25 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                                             BreakerInventoryLayout::ItemLevelColumn, BreakerUI::TypeCaption, Primary)
                                     ]
                                 ]
-                                // LINE TWO: rarity and slot.
+                                // LINE TWO: the rarity tally, then rarity and
+                                // slot in words. The tally is five 8x8 boxes
+                                // at a 2px gap, rank+1 of them filled in the
+                                // rarity's colour and the rest in the rest
+                                // ring — so STANDARD reads one box and
+                                // UNWRITTEN five before the word is read.
                                 + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
                                 [
-                                    MenuWrappedText(FText::FromString(ItemRarityAndSlot(Item)), BreakerUI::TypeCaption,
-                                        RarityTagColor(Item.Rarity),
-                                        BreakerInventoryLayout::CardContentWidth(BackpackCardWidth), true)
+                                    SNew(SHorizontalBox)
+                                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
+                                    [
+                                        BreakerMenuMakeRarityTally(Item.Rarity)
+                                    ]
+                                    + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+                                    [
+                                        MenuWrappedText(FText::FromString(ItemRarityAndSlot(Item)), BreakerUI::TypeCaption,
+                                            RarityTagColor(Item.Rarity),
+                                            BreakerInventoryLayout::CardContentWidth(BackpackCardWidth) - 5.0f * 8.0f - 4.0f * 2.0f - BreakerUI::Space8, true)
+                                    ]
                                 ]
                                 + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
                                 [
@@ -4689,16 +5001,25 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
 
     auto MakeLimitChip = [](const FString& Label, int32 Count, int32 Limit, const FLinearColor& Rail, bool bFullBorder) -> TSharedRef<SWidget>
     {
-        return MakePlate(
-            SNew(SVerticalBox)
-            + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(Label), BreakerUI::TypeCaption, Muted, true)]
-            + SVerticalBox::Slot().AutoHeight()
-            [
-                MenuText(FText::FromString(FString::Printf(TEXT("%d/%d"), Count, Limit)), BreakerUI::TypeH2,
-                    Count >= Limit ? Rail : Primary, true)
-            ],
-            PanelRaised, Rail, FMargin(BreakerUI::Space16, BreakerUI::Space4), false,
-            bFullBorder ? Rail : BreakerUI::BorderRest);
+        // One 44px row: the label and the count side by side at mono 16, so
+        // the chip sits at the header's control height rather than stacking
+        // two lines above it.
+        return SNew(SBox).HeightOverride(BreakerUI::MinHitTarget)
+        [
+            MakePlate(
+                SNew(SHorizontalBox)
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                [
+                    BreakerMonoText(FText::FromString(Label), 16, Muted, 0.16f)   // O2 PLACEHOLDER
+                ]
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
+                [
+                    BreakerMonoText(FText::FromString(FString::Printf(TEXT("%d/%d"), Count, Limit)), 16,
+                        Count >= Limit ? Rail : Primary, 0.0f)
+                ],
+                PanelRaised, Rail, FMargin(BreakerUI::Space16, 0.0f), false,
+                bFullBorder ? Rail : BreakerUI::BorderRest)
+        ];
     };
 
     TSharedRef<SHorizontalBox> HeaderRight = SNew(SHorizontalBox);
@@ -5400,11 +5721,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
     // The reference's ENLIST A BREAKER: "choose a resource — the resource is
     // the class". Five full-height class columns on the left, THE BREAKER
     // rail on the right with the name, the summary and the gold arm/confirm
-    // ENLIST. What the rail shows that no data pays — MODEL (O14's Human and
-    // Effigy), FACE, VOICE — is painted disabled with the STUB mark, the
+    // ENLIST. What the rail shows that no data pays — BODY (O14's Human and
+    // Effigy), VOICE, FACE — is painted disabled with the STUB mark, the
     // GAMEPLAY/ACCESSIBILITY ruling again: no field exists anywhere in
     // Source, and a live control over nothing would be the quiet lie. OWED:
-    // model, face and voice fields on the character save, their own commit.
+    // body, face and voice fields on the character save, their own commit.
     const FBreakerClassBlurb* Selected = FindClassBlurb(PendingCreateClass);
     const bool bSelectedImplemented = Selected && ClassHasImplementedKit(Selected->ClassId);
 
@@ -5438,12 +5759,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
         TSharedRef<SVerticalBox> Card = SNew(SVerticalBox);
         Card->AddSlot().AutoHeight()
         [
-            MenuText(FText::FromString(Blurb.Name), BreakerUI::TypeH2, Head, true)
+            MenuText(FText::FromString(Blurb.Name), 32, Head, true)   // O2 PLACEHOLDER
         ];
         Card->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
         [
-            BreakerMonoText(FText::FromString(Blurb.Resource), BreakerUI::TypeCaption,
-                bCardSelected ? Cyan : Copy, 0.16f)
+            BreakerMonoText(FText::FromString(Blurb.Resource), 13,   // O2 PLACEHOLDER
+                bCardSelected ? Sys : Copy, 0.16f)
         ];
         // The resource bar at its out-of-combat rest: an illustration of the
         // behaviour caption under it, never a measurement, cyan only on the
@@ -5479,6 +5800,126 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
                 .WrapTextAt(CardCopyWrap)
                 .Font(BreakerBodyFont(BreakerUI::TypeBody))
         ];
+
+        // ---- The kit row: three 40px tiles, one per ability slot -----------
+        // Each tile names the DEFAULT ability the class is handed for that
+        // slot (UBreakerAbilityDefinition::DefaultAbilityIdForSlot, resolved
+        // through the fallback registry) under a 2px emphasis rail. The tile
+        // carries NO VERB: the definition has no action a card could take
+        // — no preview, no equip before the character exists — so it is a
+        // label, not a button, and says so by having no ring. Swift's second
+        // slot is None by O176 and is drawn as what it is: an open frame in
+        // the system colour, captioned SLOT 2 · YOURS. Any other None is an
+        // empty tile with no caption — nothing to name, nothing named.
+        {
+            static const EBreakerAbilitySlot KitSlots[] =
+            {
+                EBreakerAbilitySlot::ClassAbilityOne,
+                EBreakerAbilitySlot::ClassAbilityTwo,
+                EBreakerAbilitySlot::Ultimate,
+            };
+            const int32 KitSlotCount = UE_ARRAY_COUNT(KitSlots);
+            TSharedRef<SHorizontalBox> KitRow = SNew(SHorizontalBox);
+            for (int32 SlotIndex = 0; SlotIndex < KitSlotCount; ++SlotIndex)
+            {
+                const EBreakerAbilitySlot KitSlot = KitSlots[SlotIndex];
+                const FName DefaultId = UBreakerAbilityDefinition::DefaultAbilityIdForSlot(Blurb.ClassId, KitSlot);
+                const UBreakerAbilityDefinition* Definition = DefaultId.IsNone()
+                    ? nullptr : UBreakerAbilityDefinition::FindFallback(DefaultId);
+                const bool bOpenSlot = Definition == nullptr
+                    && Blurb.ClassId == EBreakerClassId::Swift && KitSlot == EBreakerAbilitySlot::ClassAbilityTwo;
+
+                TSharedRef<SWidget> Tile = SNew(SSpacer).Size(FVector2D(1.0f, 1.0f));
+                if (Definition)
+                {
+                    Tile = SNew(SVerticalBox)
+                        + SVerticalBox::Slot().AutoHeight()
+                        [
+                            SNew(SBox).HeightOverride(BreakerUI::BorderSelected)[SolidBlock(BorderEmphasis)]
+                        ]
+                        + SVerticalBox::Slot().FillHeight(1.0f).VAlign(VAlign_Center)
+                        [
+                            SNew(SBorder)
+                            .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                            .BorderBackgroundColor(bCardSelected ? PanelRaised : Panel)
+                            .Padding(FMargin(BreakerUI::Space8, 0.0f))
+                            .VAlign(VAlign_Center)
+                            [
+                                SNew(STextBlock)
+                                    .Text(FText::FromString(Definition->DisplayName.ToString().ToUpper()))
+                                    .ColorAndOpacity(Copy)
+                                    .WrapTextAt(FMath::Max(40.0f, (CardCopyWrap - 2.0f * BreakerUI::Space8) / 3.0f - 2.0f * BreakerUI::Space8))
+                                    .Font(BreakerMonoFont(BreakerUI::TypeCaption, 0.16f))
+                            ]
+                        ];
+                }
+                else if (bOpenSlot)
+                {
+                    // The caption's room is arithmetic on the card width the
+                    // screen already derived: a third of the row less the two
+                    // 8px gaps, less the frame's 1px ring and the 8px face
+                    // padding either side. On a 1920 frame that is ~52px, and
+                    // SLOT 2 · YOURS on the mono face needs ~118 at 11: it
+                    // photographed as "SLOT :". The caption shrinks to fit
+                    // down to 9px; below that it drops the dot and stands as
+                    // two lines, SLOT 2 over YOURS, each fitted on its own.
+                    constexpr int32 OpenSlotCaptionMinSize = 9;   // O2 PLACEHOLDER
+                    const float TileWidth = (CardCopyWrap - 2.0f * BreakerUI::Space8) / 3.0f;
+                    const float CaptionWidth = TileWidth - 2.0f * BreakerUI::BorderThin - 2.0f * BreakerUI::Space8;
+                    const auto CaptionFont = [](int32 Pixels) { return BreakerMonoFont(Pixels, 0.16f); };
+                    const FLinearColor CaptionColor = bCardSelected ? Primary : Copy;
+                    const int32 OneLineSize = BreakerMenuFitPixels(TEXT("SLOT 2 · YOURS"), BreakerUI::TypeCaption,
+                        CaptionWidth, OpenSlotCaptionMinSize, CaptionFont);
+
+                    TSharedRef<SWidget> Caption = SNew(SSpacer).Size(FVector2D(1.0f, 1.0f));
+                    if (OneLineSize > 0)
+                    {
+                        Caption = BreakerMonoText(FText::FromString(TEXT("SLOT 2 · YOURS")), OneLineSize, CaptionColor, 0.16f);
+                    }
+                    else
+                    {
+                        const int32 TopSize = FMath::Max(OpenSlotCaptionMinSize, BreakerMenuFitPixels(TEXT("SLOT 2"),
+                            BreakerUI::TypeCaption, CaptionWidth, OpenSlotCaptionMinSize, CaptionFont));
+                        const int32 BottomSize = FMath::Max(OpenSlotCaptionMinSize, BreakerMenuFitPixels(TEXT("YOURS"),
+                            BreakerUI::TypeCaption, CaptionWidth, OpenSlotCaptionMinSize, CaptionFont));
+                        Caption = SNew(SVerticalBox)
+                            + SVerticalBox::Slot().AutoHeight()
+                            [
+                                BreakerMonoText(FText::FromString(TEXT("SLOT 2")), TopSize, CaptionColor, 0.16f)
+                            ]
+                            + SVerticalBox::Slot().AutoHeight()
+                            [
+                                BreakerMonoText(FText::FromString(TEXT("YOURS")), BottomSize, CaptionColor, 0.16f)
+                            ];
+                    }
+
+                    Tile = SNew(SVerticalBox)
+                        + SVerticalBox::Slot().AutoHeight()
+                        [
+                            SNew(SBox).HeightOverride(BreakerUI::BorderSelected)[SolidBlock(Sys)]
+                        ]
+                        + SVerticalBox::Slot().FillHeight(1.0f)
+                        [
+                            BorderWrap(
+                                SNew(SBorder)
+                                .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                                .BorderBackgroundColor(Panel)
+                                .Padding(FMargin(BreakerUI::Space8, 0.0f))
+                                .VAlign(VAlign_Center)
+                                [
+                                    Caption
+                                ],
+                                BorderEmphasis)
+                        ];
+                }
+                KitRow->AddSlot().FillWidth(1.0f).Padding(0.0f, 0.0f, SlotIndex + 1 < KitSlotCount ? BreakerUI::Space8 : 0.0f, 0.0f)
+                [
+                    SNew(SBox).HeightOverride(40.0f)[Tile]   // O2 PLACEHOLDER
+                ];
+            }
+            Card->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)[KitRow];
+        }
+
         if (!bImplemented)
         {
             // O39, in words: a painted-quiet card with no reason reads as a
@@ -5607,9 +6048,10 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
         ]
     ];
 
-    // MODEL / FACE / VOICE, painted disabled behind the STUB mark until the
-    // save carries them.
-    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)[MakeStubCaption(TEXT("MODEL"))];
+    // BODY / VOICE / FACE, painted disabled behind the STUB mark until the
+    // save carries them. The rail reads NAME / BODY / VOICE / FACE: the two
+    // choices with a word for a value sit together, the picture row last.
+    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)[MakeStubCaption(TEXT("BODY"))];
     Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
     [
         SNew(SHorizontalBox)
@@ -5617,6 +6059,20 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
         + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
         [
             BreakerSettingsDisabledButton(TEXT("EFFIGY"), 100.0f)
+        ]
+    ];
+    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)[MakeStubCaption(TEXT("VOICE"))];
+    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+    [
+        SNew(SHorizontalBox)
+        + SHorizontalBox::Slot().AutoWidth()[BreakerSettingsDisabledButton(TEXT("LOW"), 76.0f)]
+        + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
+        [
+            BreakerSettingsDisabledButton(TEXT("MID"), 76.0f)
+        ]
+        + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
+        [
+            BreakerSettingsDisabledButton(TEXT("DRY"), 76.0f)
         ]
     ];
     Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)[MakeStubCaption(TEXT("FACE"))];
@@ -5641,20 +6097,6 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
         }
         Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)[Faces];
     }
-    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)[MakeStubCaption(TEXT("VOICE"))];
-    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
-    [
-        SNew(SHorizontalBox)
-        + SHorizontalBox::Slot().AutoWidth()[BreakerSettingsDisabledButton(TEXT("LOW"), 76.0f)]
-        + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
-        [
-            BreakerSettingsDisabledButton(TEXT("MID"), 76.0f)
-        ]
-        + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
-        [
-            BreakerSettingsDisabledButton(TEXT("DRY"), 76.0f)
-        ]
-    ];
 
     // BODY PREVIEW: the dashed box holding the drawn figure — a runtime
     // primitive shown as itself, in words.
@@ -5738,7 +6180,10 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
     [
         bReady
             ? StaticCastSharedRef<SWidget>(
-                SNew(SBox).HeightOverride(47.0f)
+                // 56, the same height as its painted-disabled twin below
+                // (BreakerSettingsControlHeight), so arming never moves the
+                // rail.
+                SNew(SBox).HeightOverride(56.0f)   // O2 PLACEHOLDER
                 [
                     BorderWrap(
                         SNew(SBorder)
@@ -5806,7 +6251,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
                         ],
                         Amber)
                 ])
-            : BreakerSettingsDisabledButton(TEXT("ENLIST"), 333.0f)
+            : SNew(SBox).HeightOverride(56.0f)[BreakerSettingsDisabledButton(TEXT("ENLIST"), 333.0f)]   // O2 PLACEHOLDER
     ];
 
     const TSharedRef<SWidget> Body = SNew(SHorizontalBox)
@@ -6453,14 +6898,57 @@ namespace
         return Kind == ESkillMarkerKind::Convergence || Kind == ESkillMarkerKind::Keystone;
     }
 
-    // How heavy the marker's own ring is. A keystone always carries rail
-    // weight, so it reads as the most important shape on the board even
-    // locked; everything else uses the ordinary selected/rest border weights.
+    // How heavy the marker's own ring is. A keystone and a convergence carry
+    // the 2px emphasis ring at every state, so they read as the important
+    // shapes on the board even locked; everything else takes 2px when it is
+    // spent or reachable and 1px at rest.
     float MarkerRingThickness(ESkillMarkerKind Kind, bool bOwnedOrPurchasable)
     {
-        if (Kind == ESkillMarkerKind::Keystone) return BreakerUI::RailThickness;
+        if (Kind == ESkillMarkerKind::Keystone) return BreakerUI::BorderSelected;
         if (Kind == ESkillMarkerKind::Convergence) return BreakerUI::BorderSelected;
         return bOwnedOrPurchasable ? BreakerUI::BorderSelected : BreakerUI::BorderThin;
+    }
+
+    // -----------------------------------------------------------------------
+    // THE LADDER (O204): one rung colouring for every board and the rail.
+    //   spent      — system fill (a taken keystone is a gold fill), the mark
+    //                inside in bg/base so it still reads on the fill
+    //   reachable  — raised fill, emphasis ring, primary mark
+    //   refused    — a keystone on a branch the character has not committed
+    //                to: disabled fill, emphasis ring, the existing WORDS
+    //                say why. A hatch was asked for; Slate has no hatch
+    //                primitive and a per-marker canvas of segments would be
+    //                the board's heaviest element, so the fill carries it —
+    //                recorded here, not faked.
+    //   locked     — raised fill, emphasis ring, muted mark
+    // Gold stays on the BUY button; it is not a rung colour.
+    // -----------------------------------------------------------------------
+    struct FBreakerMenuSkillRung
+    {
+        FLinearColor Fill;
+        FLinearColor Ring;
+        FLinearColor Core;
+    };
+
+    FBreakerMenuSkillRung BreakerMenuSkillLadderRung(ESkillMarkerKind Kind, bool bOwned, bool bPurchasable, bool bRefused)
+    {
+        if (bOwned)
+        {
+            const FLinearColor Fill = Kind == ESkillMarkerKind::Keystone ? Amber : Sys;
+            return { Fill, Fill, BreakerUI::BgBase };
+        }
+        if (bRefused) return { Disabled, BorderEmphasis, Muted };
+        return { PanelRaised, BorderEmphasis, bPurchasable ? Primary : Muted };
+    }
+
+    // The refusal SkillNodeIsPurchasable mirrors from the component: a
+    // cornerstone on a branch the character has not committed to. Read from
+    // the same two fields, so the rung and the words cannot disagree.
+    bool BreakerMenuSkillKeystoneRefused(const UBreakerProgressionComponent* Progression, const UBreakerProgressionTree* Tree,
+        const UBreakerProgressionNode* Node)
+    {
+        return Progression && Tree && Node && Node->bCornerstone
+            && Progression->GetProgressionState().CommittedBranch != Tree->TreeId;
     }
 
     // -----------------------------------------------------------------------
@@ -6707,8 +7195,12 @@ namespace
     // grow vertically without ever moving the board.
     TSharedRef<SWidget> MakeSkillDetailCard(const FSkillNodeView& View)
     {
-        const FLinearColor Rail = View.bOwned ? BreakerUI::Cyan
-            : (View.bPurchasable ? BreakerUI::Gold : BreakerUI::BorderEmphasis);
+        // The rail is the ladder's rung: spent in the system colour (a taken
+        // keystone in gold), everything else on the emphasis ring. Gold for
+        // "reachable" is not on the rail; gold stays on the BUY button.
+        // Kind carries a "  ·  CORNERSTONE" tail on authored cornerstones.
+        const bool bKeystone = View.Kind.StartsWith(MarkerKindLabel(ESkillMarkerKind::Keystone));
+        const FLinearColor Rail = View.bOwned ? (bKeystone ? Amber : Sys) : BorderEmphasis;
 
         TSharedRef<SVerticalBox> Column = SNew(SVerticalBox);
         Column->AddSlot().AutoHeight()
@@ -6847,7 +7339,7 @@ namespace
         const int32 Committed = ClassSpent + CoreSpent;
         Column->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, BreakerUI::Space8)
         [
-            MenuText(FText::FromString(FString::Printf(TEXT("%d POINTS COMMITTED  ·  CLASS %d · CORE %d"), Committed, ClassSpent, CoreSpent)),
+            MenuText(FText::FromString(FString::Printf(TEXT("%d POINTS COMMITTED  ·  DOCTRINE %d · CORE %d"), Committed, ClassSpent, CoreSpent)),
                 BreakerUI::TypeCaption, BreakerUI::Gold, true)
         ];
 
@@ -7364,19 +7856,21 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     AddCanvasSegment(Canvas, FVector2D(TrunkX, TierTop + BreakerUI::Space8),
                         FVector2D(NodeX, NodeY - Size * 0.5f), bOwned ? Cyan : PanelHover);
 
-                    const FLinearColor Fill = (bOwned || bPurchasable) ? PanelHover : PanelRaised;
-                    // Gold is the only border colour that means "spend now".
-                    // Locked takes border/emphasis rather than border/rest:
-                    // rest sits one value step off the plate face, which on a
-                    // 44px shape against the board ground is invisible, and an
-                    // invisible ring around a dark fill is what made the whole
-                    // locked tier read as a row of holes.
-                    const FLinearColor Ring = bOwned ? Cyan : (bPurchasable ? Amber : BorderEmphasis);
-                    const FLinearColor CoreColor = bOwned ? Cyan : (bPurchasable ? Amber : Muted);
+                    // The ladder's rung (BreakerMenuSkillLadderRung). Locked takes
+                    // border/emphasis rather than border/rest: rest sits one
+                    // value step off the plate face, which on a 44px shape
+                    // against the board ground is invisible, and an invisible
+                    // ring around a dark fill is what made the whole locked
+                    // tier read as a row of holes.
+                    const FBreakerMenuSkillRung Rung = BreakerMenuSkillLadderRung(Kind, bOwned, bPurchasable,
+                        BreakerMenuSkillKeystoneRefused(Progression, Tree, Node));
+                    const FLinearColor Fill = Rung.Fill;
+                    const FLinearColor Ring = Rung.Ring;
+                    const FLinearColor CoreColor = Rung.Core;
 
                     TSharedRef<SWidget> Inner = CentreLabel.IsEmpty()
                         ? MakeMarkerCore(Kind, CoreColor, Fill, Size)
-                        : MakeMarkerLabel(CentreLabel, bOwned ? Cyan : Muted);
+                        : MakeMarkerLabel(CentreLabel, CoreColor);
 
                     const FSkillNodeView View = MakeSkillNodeView(Node, Rank, bPurchasable, LockReason, Spent, Snapshot);
                     TSharedRef<SWidget> Marker = WireMarker(Tree, Node, View, bPurchasable, LockReason, Fill, Ring, RingThickness, Inner);
@@ -7642,11 +8136,13 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 const ESkillMarkerKind Kind = ClassifyNode(Node);
                 const FSkillNodeView View = MakeSkillNodeView(Node, Rank, bPurchasable, LockReason, TreeSpent, Snapshot);
 
-                const FLinearColor Fill = (bOwned || bPurchasable) ? PanelHover : PanelRaised;
-                const FLinearColor Ring = bOwned ? Cyan : (bPurchasable ? Amber : BorderEmphasis);
+                const FBreakerMenuSkillRung Rung = BreakerMenuSkillLadderRung(Kind, bOwned, bPurchasable,
+                    BreakerMenuSkillKeystoneRefused(Progression, CoreTree, Node));
+                const FLinearColor Fill = Rung.Fill;
+                const FLinearColor Ring = Rung.Ring;
                 TSharedRef<SWidget> Marker = WireMarker(CoreTree, Node, View, bPurchasable, LockReason, Fill, Ring,
                     MarkerRingThickness(Kind, bOwned || bPurchasable),
-                    MakeMarkerCore(Kind, bOwned ? Cyan : (bPurchasable ? Amber : Muted), Fill, 44.0f));
+                    MakeMarkerCore(Kind, Rung.Core, Fill, 44.0f));
                 if (MarkerIsDiamond(Kind)) Marker = RotateFortyFive(Marker);
 
                 const FString StateText = bMaxed
@@ -7845,10 +8341,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 const bool bOwned = Rank > 0;
                 const ESkillMarkerKind Kind = ClassifyNode(Node);
 
-                const FLinearColor Fill = (bOwned || bPurchasable) ? PanelHover : PanelRaised;
-                const FLinearColor Ring = bOwned ? Cyan : (bPurchasable ? Amber : BorderEmphasis);
+                const FBreakerMenuSkillRung Rung = BreakerMenuSkillLadderRung(Kind, bOwned, bPurchasable,
+                    BreakerMenuSkillKeystoneRefused(Progression, CoreTree, Node));
+                const FLinearColor Fill = Rung.Fill;
+                const FLinearColor Ring = Rung.Ring;
                 const float RingThickness = MarkerRingThickness(Kind, bOwned || bPurchasable);
-                const FLinearColor CoreColor = bOwned ? Cyan : (bPurchasable ? Amber : Muted);
+                const FLinearColor CoreColor = Rung.Core;
                 const FSkillNodeView View = MakeSkillNodeView(Node, Rank, bPurchasable, LockReason, TreeSpent, Snapshot);
 
                 // The cluster grid is a glance, not the path board: every kind
@@ -7858,7 +8356,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 // keystone had — the map should not repeat it thirty times.
                 TSharedRef<SWidget> Chip = WireMarker(CoreTree, Node, View, bPurchasable, LockReason, Fill, Ring, RingThickness,
                     Node->MaxRank > 1
-                        ? MakeMarkerLabel(FString::FromInt(Rank), bOwned ? Cyan : Muted)
+                        ? MakeMarkerLabel(FString::FromInt(Rank), CoreColor)
                         : MakeMarkerCore(Kind, CoreColor, Fill, ChipSize));
                 if (MarkerIsDiamond(Kind)) Chip = RotateFortyFive(Chip);
 
@@ -8236,11 +8734,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
     HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center)[BuildScreenTabs(EBreakerMenuScreen::SkillTrees)];
     HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space24, 0.0f, 0.0f, 0.0f)[BoardTabs];
     HeaderRight->AddSlot().FillWidth(1.0f)[SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))];
-    // Two counters as separate railed chips — class cyan, core gold — so the
-    // two currencies are never read as one pool.
+    // Two counters as separate railed chips — doctrine on the system rail,
+    // core on gold (O204) — so the two currencies are never read as one pool.
     HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
     [
-        MakePointChip(TEXT("CLASS POINTS"), UnspentClass, ClassSpent, Cyan)
+        MakePointChip(TEXT("DOCTRINE POINTS"), UnspentClass, ClassSpent, Sys)
     ];
     HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space16, 0.0f)
     [
@@ -8586,6 +9084,16 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
         // the changing-label trap the file keeps re-finding.
         VerbStrip->AddSlot().AutoWidth()
         [
+            SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight()
+            [
+                // The active verb carries a 2px system rail along its top;
+                // the others carry the same 2px of nothing, so the strip
+                // never moves with the selection.
+                SNew(SBox).HeightOverride(BreakerUI::BorderSelected)[SolidBlock(bActive ? Sys : Transparent)]
+            ]
+            + SVerticalBox::Slot().AutoHeight()
+            [
             SNew(SBox).HeightOverride(56.0f)
             [
                 SNew(SBorder)
@@ -8625,6 +9133,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
                         ]
                     ]
                 ]
+            ]
             ]
         ];
     }
@@ -8903,10 +9412,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
                 ]
                 + SHorizontalBox::Slot().FillWidth(1.0f).HAlign(HAlign_Center)
                 [
+                    // AFTER, at mono 16 like NOW on the right: the two
+                    // numbers the verb is about read at the same weight.
                     bRowSelected
                         ? BreakerMonoText(FText::FromString(FString::Printf(TEXT("LANDS ON %s"),
-                            *FormatMagnitude(Definition, NextPoint))), BreakerUI::TypeCaption, Amber, 0.16f)
-                        : BreakerMonoText(FText::GetEmpty(), BreakerUI::TypeCaption, Muted, 0.16f)
+                            *FormatMagnitude(Definition, NextPoint))), 16, Amber, 0.0f)   // O2 PLACEHOLDER
+                        : BreakerMonoText(FText::GetEmpty(), 16, Muted, 0.0f)
                 ]
                 + SHorizontalBox::Slot().AutoWidth()
                 [
@@ -8943,11 +9454,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
                 [
                     SNew(SBox).WidthOverride(84.0f).HAlign(HAlign_Fill)
                     [
+                        // NOW, at mono 16.
                         SNew(STextBlock)
                             .Text(FText::FromString(FormatMagnitude(Definition, Current)))
                             .Justification(ETextJustify::Right)
                             .ColorAndOpacity(bAtCeiling && bTemperView ? Disabled : Primary)
-                            .Font(BreakerMonoFont(BreakerUI::TypeBody))
+                            .Font(BreakerMonoFont(16))   // O2 PLACEHOLDER
                     ]
                 ];
 
@@ -9363,10 +9875,16 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
             + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
             [
                 SNew(SHorizontalBox)
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
+                [
+                    // The riftglass mark beside the figure, as the wallet
+                    // in the header draws it: one currency, one mark.
+                    BreakerRiftglassMark()
+                ]
                 + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
                 [
                     BreakerMonoText(FText::FromString(CostLead.IsEmpty() ? TEXT("—") : CostLead),
-                        BreakerUI::TypeH2, CostLead.IsEmpty() ? Muted : Primary, 0.0f)
+                        24, CostLead.IsEmpty() ? Muted : Primary, 0.0f)   // O2 PLACEHOLDER
                 ]
                 + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom).Padding(BreakerUI::Space8, 0.0f, 0.0f, 2.0f)
                 [
@@ -9406,8 +9924,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
 
     // The header: the NPC's name is the title — the Forge is a person you
     // walked up to, and « goes back to the conversation when there is one.
-    // The wallet reads in teal: Riftglass is matter pried out of the world
-    // (the pack colours it as the world-object it is), never chrome.
+    // The wallet reads in primary ink behind the gold riftglass mark: gold
+    // is the spend colour, and teal on a header figure was chrome — the
+    // adjectival use the teal law forbids.
     const FString NpcName = DialogueNPC.IsValid() ? DialogueNPC->GetDisplayName().ToString().ToUpper() : FString(TEXT("KESS"));
     return BreakerScreenShell(*NpcName, *NpcName,
         BreakerMonoText(FText::FromString(TEXT("THE FORGE · REACHED THROUGH DIALOGUE")),
@@ -9419,8 +9938,16 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
         ]
         + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
         [
-            BreakerMonoText(FText::FromString(BreakerUI::FormatTicker(static_cast<float>(Wallet.Get()))),
-                BreakerUI::TypeH2, BreakerUI::TealAnomalous, 0.0f)
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
+            [
+                BreakerRiftglassMark()
+            ]
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+            [
+                BreakerMonoText(FText::FromString(BreakerUI::FormatTicker(static_cast<float>(Wallet.Get()))),
+                    24, Primary, 0.0f)   // O2 PLACEHOLDER
+            ]
         ],
         FOnClicked::CreateLambda([this]()
         {
@@ -10025,21 +10552,42 @@ TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()
         return SNew(SBox);
     }
 
+    // The speaker plate. The NPC's label is one string, "KESS — FORGE
+    // KEEPER"; BreakerMenuLayout::SplitSpeakerLine gives the plate its two
+    // lines — the name at 24 on the display face, the role as a tracked
+    // caption. The line wraps at a width settled from the plate's own 800:
+    // the frame's 24px pad each side and the plate's 5px of rail and ring,
+    // never an allotted size.
+    constexpr float DialoguePanelWidth = 800.0f;   // O2 PLACEHOLDER
+    const float SpeakerLineWrap = DialoguePanelWidth - 2.0f * BreakerUI::Space24
+        - (BreakerUI::RailThickness + 2.0f * BreakerUI::BorderThin);
+    FString Speaker;
+    FString Role;
+    BreakerMenuLayout::SplitSpeakerLine(NPC->GetDisplayName().ToString(), Speaker, Role);
+    TSharedRef<SVerticalBox> SpeakerHead = SNew(SVerticalBox);
+    SpeakerHead->AddSlot().AutoHeight()
+    [
+        MenuText(FText::FromString(Speaker.ToUpper()), 24, Primary, true)   // O2 PLACEHOLDER
+    ];
+    if (!Role.IsEmpty())
+    {
+        SpeakerHead->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+        [
+            BreakerMonoText(FText::FromString(Role.ToUpper()), 13, Muted, 0.16f)   // O2 PLACEHOLDER
+        ];
+    }
+
     TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
     Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space24)
     [
         MakePlate(
             SNew(SVerticalBox)
-            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)[MenuText(NPC->GetDisplayName(), BreakerUI::TypeCaption, Muted, true)]
+            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)[SpeakerHead]
             + SVerticalBox::Slot().AutoHeight()
             [
-                SNew(STextBlock)
-                .Text(FText::FromString(Node.SpeakerLine))
-                .ColorAndOpacity(SoftText)
-                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), BreakerUI::TypeBody))
-                .AutoWrapText(true)
+                MenuWrappedText(FText::FromString(Node.SpeakerLine), BreakerUI::TypeH2, SoftText, SpeakerLineWrap)
             ],
-            PanelRaised, Cyan, FMargin(BreakerUI::Space24, BreakerUI::Space16))
+            BreakerUI::BgBase, Sys, FMargin(BreakerUI::Space24, BreakerUI::Space24))
     ];
 
     // Gated entries: a choice can require a flag or be hidden by one. Iterating
@@ -10058,10 +10606,14 @@ TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()
         const EBreakerDialogueAction Action = Choice.Action;
         Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
         [
+            SNew(SBox).MinDesiredHeight(56.0f)   // O2 PLACEHOLDER
+            [
             BorderWrap(
             SNew(SButton)
             .ButtonColorAndOpacity(Panel)
             .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
+            .HAlign(HAlign_Fill)
+            .VAlign(VAlign_Center)
             .OnClicked(FOnClicked::CreateLambda([this, NextNodeId, QuestFlag, Action]()
             {
                 if (Character.IsValid())
@@ -10098,17 +10650,33 @@ TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()
                 return FReply::Handled();
             }))
             [
-                MenuText(FText::FromString(FString::Printf(TEXT("%d.  %s"), ChoiceNumber, *Choice.Text)), BreakerUI::TypeBody, SoftText, true)
+                // The number in its own 32px mono column, the words beside
+                // it: the column is what keeps ten choices' text on one
+                // straight edge.
+                SNew(SHorizontalBox)
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                [
+                    SNew(SBox).WidthOverride(32.0f).HAlign(HAlign_Fill)   // O2 PLACEHOLDER
+                    [
+                        BreakerMonoText(FText::FromString(FString::Printf(TEXT("%d"), ChoiceNumber)), 16, Muted, 0.0f)
+                    ]
+                ]
+                + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+                [
+                    MenuWrappedText(FText::FromString(Choice.Text), BreakerUI::TypeBody, SoftText,
+                        SpeakerLineWrap - 32.0f - 2.0f * BreakerUI::Space16, true)
+                ]
             ],
             BorderEmphasis)
+            ]
         ];
     }
 
     Body->AddSlot().AutoHeight().Padding(0.0f, 14.0f, 0.0f, 0.0f)
     [
-        MenuText(FText::FromString(TEXT("Choices marked [Leave] end the conversation  |  ESC to walk away")), 9, SoftText)
+        MenuText(FText::FromString(TEXT("Choices marked [Leave] end the conversation  |  ESC to walk away")), BreakerUI::TypeCaption, SoftText)
     ];
-    return BuildFrame(FText::FromString(TEXT("CONVERSATION")), NPC->GetDisplayName(), Body, 780.0f);
+    return BuildFrame(FText::FromString(TEXT("CONVERSATION")), NPC->GetDisplayName(), Body, DialoguePanelWidth);
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildTravelScreen()

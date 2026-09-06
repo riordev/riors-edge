@@ -1,6 +1,8 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
 #include "Input/BreakerInputConfig.h"
 #include "InputAction.h"
 #include "Settings/BreakerGameSettings.h"
@@ -340,6 +342,95 @@ bool FBreakerSettingsScreenControlValuesTest::RunTest(const FString& Parameters)
     // cannot leave the model in a state no chip represents.
     TestEqual(TEXT("Windowed is the last window mode"),
         static_cast<int32>(EBreakerWindowMode::Windowed), 2);
+
+    // ---- THE SHIPPED WALK ----------------------------------------------------
+    // One default-constructed model, walked row by row in the order the screen
+    // draws them: every value the screen would show on a fresh install, and
+    // the proof that each survives its own clamp and its own slider remap
+    // unchanged — a default the clamp rewrote would light the wrong control
+    // on the very first open.
+    UBreakerGameSettings* Fresh = NewObject<UBreakerGameSettings>(GetTransientPackage());
+    if (!Fresh) { AddError(TEXT("Could not create a settings object")); return false; }
+    // INPUT: Look sensitivity / ADS sensitivity / Invert vertical.
+    TestEqual(TEXT("Look sensitivity ships at 1.0"), Fresh->MouseSensitivity, 1.0f);
+    TestEqual(TEXT("Look sensitivity's default survives its clamp"),
+        UBreakerGameSettingsLibrary::ClampMouseSensitivity(Fresh->MouseSensitivity), Fresh->MouseSensitivity);
+    TestEqual(TEXT("Look sensitivity's handle round-trips from the default"),
+        0.2f + ((Fresh->MouseSensitivity - 0.2f) / 1.8f) * 1.8f, Fresh->MouseSensitivity);
+    TestEqual(TEXT("ADS sensitivity ships at 1.0x"), Fresh->ScopedSensitivityMultiplier, 1.0f);
+    TestEqual(TEXT("ADS sensitivity's default survives its clamp"),
+        UBreakerGameSettingsLibrary::ClampScopedSensitivityMultiplier(Fresh->ScopedSensitivityMultiplier),
+        Fresh->ScopedSensitivityMultiplier);
+    TestFalse(TEXT("Invert vertical ships OFF"), Fresh->bInvertVerticalLook);
+    // VIDEO: Field of view / Window mode / Frame rate cap / Vertical sync.
+    TestEqual(TEXT("Field of view ships at 90"), Fresh->FieldOfView, 90.0f);
+    TestEqual(TEXT("Field of view's default survives its clamp"),
+        UBreakerGameSettingsLibrary::ClampFOV(Fresh->FieldOfView), Fresh->FieldOfView);
+    TestEqual(TEXT("Field of view's handle round-trips from the default"),
+        70.0f + ((Fresh->FieldOfView - 70.0f) / 50.0f) * 50.0f, Fresh->FieldOfView);
+    TestEqual(TEXT("Window mode ships Windowed"),
+        static_cast<int32>(Fresh->WindowMode), static_cast<int32>(EBreakerWindowMode::Windowed));
+    TestEqual(TEXT("Frame rate cap ships uncapped"), Fresh->FrameRateCapFPS, 0.0f);
+    TestEqual(TEXT("The uncapped default is one of the strip's own chips"),
+        UBreakerGameSettingsLibrary::ClampFrameRateCap(Fresh->FrameRateCapFPS), 0.0f);
+    TestFalse(TEXT("Vertical sync ships OFF"), Fresh->bVSyncEnabled);
+    // AUDIO: Master / Effects / Music.
+    TestEqual(TEXT("Master volume ships at 1.0"), Fresh->MasterVolume, 1.0f);
+    TestEqual(TEXT("Effects volume ships at 1.0"), Fresh->EffectsVolume, 1.0f);
+    TestEqual(TEXT("Music volume ships at 1.0"), Fresh->MusicVolume, 1.0f);
+    TestEqual(TEXT("A full volume survives its clamp"),
+        UBreakerGameSettingsLibrary::ClampVolume(Fresh->MasterVolume), Fresh->MasterVolume);
+
+    // ---- THE ROW ROSTER, by source scan ----------------------------------------
+    // The ten rows above are the whole screen. Every label the builder hands
+    // BreakerSettingsRow (or the audio pane's AddVolumeRow, which forwards to
+    // it) must be one of them, and each must be drawn exactly once: a row
+    // added without a walk here is a control this suite says nothing about,
+    // and a row drawn twice is a control that writes one field from two
+    // places. A source scan, because the labels are literals inside a Slate
+    // tree no test can hold.
+    static const TCHAR* ShippedRows[] =
+    {
+        TEXT("Look sensitivity"), TEXT("ADS sensitivity"), TEXT("Invert vertical"),
+        TEXT("Field of view"), TEXT("Window mode"), TEXT("Frame rate cap"), TEXT("Vertical sync"),
+        TEXT("Master volume"), TEXT("Effects volume"), TEXT("Music volume"),
+    };
+    const FString MenuPath = FPaths::Combine(FPaths::ProjectDir(),
+        TEXT("Source"), TEXT("RiorsEdge"), TEXT("UI"), TEXT("BreakerMenu.cpp"));
+    FString Menu;
+    if (FFileHelper::LoadFileToString(Menu, *MenuPath))
+    {
+        TMap<FString, int32> Seen;
+        auto Scan = [&Menu, &Seen](const TCHAR* Opener)
+        {
+            const FString Open(Opener);
+            int32 At = Menu.Find(Open, ESearchCase::CaseSensitive, ESearchDir::FromStart, 0);
+            while (At != INDEX_NONE)
+            {
+                const int32 Start = At + Open.Len();
+                const int32 End = Menu.Find(TEXT("\""), ESearchCase::CaseSensitive, ESearchDir::FromStart, Start);
+                if (End == INDEX_NONE) break;
+                Seen.FindOrAdd(Menu.Mid(Start, End - Start)) += 1;
+                At = Menu.Find(Open, ESearchCase::CaseSensitive, ESearchDir::FromStart, End);
+            }
+        };
+        Scan(TEXT("BreakerSettingsRow(TEXT(\""));
+        Scan(TEXT("AddVolumeRow(TEXT(\""));
+        for (const TPair<FString, int32>& Pair : Seen)
+        {
+            bool bShipped = false;
+            for (const TCHAR* Row : ShippedRows) bShipped |= Pair.Key == Row;
+            TestTrue(FString::Printf(TEXT("Settings row '%s' is one of the ten this suite walks"), *Pair.Key), bShipped);
+        }
+        for (const TCHAR* Row : ShippedRows)
+        {
+            TestEqual(FString::Printf(TEXT("Settings row '%s' is drawn exactly once"), Row), Seen.FindRef(Row), 1);
+        }
+    }
+    else
+    {
+        AddInfo(TEXT("Menu source not present (packaged build?); the row roster scan was skipped."));
+    }
 
     return true;
 }

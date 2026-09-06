@@ -4,6 +4,7 @@
 #include "UI/BreakerMenu.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Items/BreakerItemTypes.h"
+#include "Interaction/BreakerNPC.h"
 
 // ---------------------------------------------------------------------------
 // INVENTORY LAYOUT — the loadout screen's rules, exercised without a screen.
@@ -548,6 +549,73 @@ bool FBreakerTealSealedClusterTest::RunTest(const FString& Parameters)
         BreakerUI::IsReservedTeal(BreakerUI::TealAnomalous));
     TestFalse(TEXT("The system accent is not reserved teal"),
         BreakerUI::IsReservedTeal(BreakerUI::Cyan));
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// MENU LAYOUT — the two text rules BreakerMenuLayout carries for the dialogue
+// plate and the pause plate, exercised with no widget.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerMenuLayoutSplitSpeakerLineTest,
+    "RiorsEdge.UI.MenuLayout.SplitSpeakerLine",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerMenuLayoutSplitSpeakerLineTest::RunTest(const FString& Parameters)
+{
+    // The em dash the data uses, built from its codepoint so the test cannot
+    // pass on a hyphen the file happened to hold instead.
+    const FString EmDash = FString::Chr(TCHAR(0x2014));
+    FString Speaker;
+    FString Role;
+
+    // Name and role split on the first " — ".
+    BreakerMenuLayout::SplitSpeakerLine(TEXT("KESS ") + EmDash + TEXT(" FORGE KEEPER"), Speaker, Role);
+    TestEqual(TEXT("KESS is the speaker"), Speaker, FString(TEXT("KESS")));
+    TestEqual(TEXT("FORGE KEEPER is the role"), Role, FString(TEXT("FORGE KEEPER")));
+
+    // No dash: the whole label is the name, and there is no role.
+    BreakerMenuLayout::SplitSpeakerLine(TEXT("QUARTERMASTER"), Speaker, Role);
+    TestEqual(TEXT("An undashed label is all speaker"), Speaker, FString(TEXT("QUARTERMASTER")));
+    TestTrue(TEXT("An undashed label has no role"), Role.IsEmpty());
+
+    // Only the FIRST dash splits; a role that carries one keeps it.
+    BreakerMenuLayout::SplitSpeakerLine(TEXT("A ") + EmDash + TEXT(" B ") + EmDash + TEXT(" C"), Speaker, Role);
+    TestEqual(TEXT("The split is on the first dash"), Speaker, FString(TEXT("A")));
+    TestEqual(TEXT("The role keeps its own dash"), Role, TEXT("B ") + EmDash + TEXT(" C"));
+
+    // Both halves are trimmed, and a bare hyphen is not the separator.
+    BreakerMenuLayout::SplitSpeakerLine(TEXT("  KESS   ") + EmDash + TEXT("   KEEPER  "), Speaker, Role);
+    TestEqual(TEXT("The speaker is trimmed"), Speaker, FString(TEXT("KESS")));
+    TestEqual(TEXT("The role is trimmed"), Role, FString(TEXT("KEEPER")));
+    BreakerMenuLayout::SplitSpeakerLine(TEXT("KESS - KEEPER"), Speaker, Role);
+    TestEqual(TEXT("A hyphen does not split"), Speaker, FString(TEXT("KESS - KEEPER")));
+    TestTrue(TEXT("A hyphen leaves no role"), Role.IsEmpty());
+
+    // Every label the shipped data carries yields a speaker: a row whose
+    // displayName began with the dash would print an empty name over its
+    // role, and nothing else would notice.
+    const FBreakerDialogueData& Data = ABreakerNPC::GetDialogueData();
+    TestTrue(TEXT("Data/dialogue.json loaded at least one NPC"), Data.Npcs.Num() > 0);
+    for (const FBreakerDialogueRow& Row : Data.Npcs)
+    {
+        BreakerMenuLayout::SplitSpeakerLine(Row.DisplayName, Speaker, Role);
+        TestFalse(FString::Printf(TEXT("%s's displayName yields a speaker"), *Row.Id.ToString()), Speaker.IsEmpty());
+    }
+
+    // THE LEVEL CAPTION, in the HUD's exact words: the XP still owed through
+    // FormatDamage, four spaces after the level, MAX at the cap. Asserted
+    // against the HUD's own expression for the sub-10k case (FormatDamage
+    // only abbreviates from 10 000 up, so 1 200 owed prints as "1 200" with a
+    // thin space, not "1.2k") and as a literal where it does abbreviate.
+    const int32 Owed = 2000 - FMath::RoundToInt(0.4f * 2000.0f);
+    TestEqual(TEXT("LV 7 with 2000 to next at 0.4 prints the HUD's figure"),
+        BreakerMenuLayout::LevelCaption(7, 0.4f, 2000),
+        FString::Printf(TEXT("LV %d    %s"), 7, *BreakerUI::FormatDamage(static_cast<float>(Owed))));
+    TestEqual(TEXT("LV 7 with 20000 to next at 0.4 abbreviates"),
+        BreakerMenuLayout::LevelCaption(7, 0.4f, 20000), FString(TEXT("LV 7    12.0k")));
+    TestEqual(TEXT("The cap prints MAX"),
+        BreakerMenuLayout::LevelCaption(60, 1.0f, 0), FString(TEXT("LV 60    MAX")));
     return true;
 }
 
