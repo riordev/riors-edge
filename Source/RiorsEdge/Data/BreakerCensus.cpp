@@ -1,12 +1,14 @@
 #include "Data/BreakerCensus.h"
 
 #include "Dom/JsonValue.h"
+#include "Interaction/BreakerNPC.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Policies/PrettyJsonPrintPolicy.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "Progression/BreakerProgressionNode.h"
 #include "Progression/BreakerProgressionTree.h"
 #include "Progression/BreakerProgressionTypes.h"
+#include "Save/BreakerQuestContent.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
 
@@ -185,6 +187,108 @@ namespace
         Writer.WriteValue(TEXT("pairedAffixId"), Affix.PairedAffixId.IsNone() ? FString() : Affix.PairedAffixId.ToString());
         Writer.WriteObjectEnd();
     }
+
+    // NAME_None is "" in every data file; the loaders read "" back as None.
+    FString BreakerCensusNameOrEmpty(FName Name)
+    {
+        return Name.IsNone() ? FString() : Name.ToString();
+    }
+
+    void BreakerCensusNameArray(FBreakerCensusWriter& Writer, const TCHAR* Field, const TArray<FName>& Names)
+    {
+        Writer.WriteArrayStart(Field);
+        for (const FName& Name : Names)
+        {
+            // An lvalue on purpose: the const FString& overload is the one
+            // that puts every array element on its own line.
+            const FString Value = Name.ToString();
+            Writer.WriteValue(Value);
+        }
+        Writer.WriteArrayEnd();
+    }
+
+    void BreakerCensusQuestRow(FBreakerCensusWriter& Writer, const FBreakerQuestDefinition& Quest)
+    {
+        Writer.WriteObjectStart();
+        Writer.WriteValue(TEXT("id"), Quest.QuestId.ToString());
+        Writer.WriteValue(TEXT("title"), Quest.Title);
+        Writer.WriteValue(TEXT("giver"), Quest.Giver);
+        Writer.WriteValue(TEXT("offeredFlag"), BreakerCensusNameOrEmpty(Quest.OfferedFlag));
+        Writer.WriteValue(TEXT("acceptedFlag"), BreakerCensusNameOrEmpty(Quest.AcceptedFlag));
+        Writer.WriteValue(TEXT("turnedInFlag"), BreakerCensusNameOrEmpty(Quest.TurnedInFlag));
+        Writer.WriteArrayStart(TEXT("objectives"));
+        for (const FBreakerQuestObjective& Objective : Quest.Objectives)
+        {
+            Writer.WriteObjectStart();
+            Writer.WriteValue(TEXT("id"), Objective.ObjectiveId.ToString());
+            Writer.WriteValue(TEXT("text"), Objective.Text);
+            Writer.WriteValue(TEXT("completionFlag"), BreakerCensusNameOrEmpty(Objective.CompletionFlag));
+            Writer.WriteValue(TEXT("progressCounter"), BreakerCensusNameOrEmpty(Objective.ProgressCounter));
+            Writer.WriteValue(TEXT("requiredCount"), Objective.RequiredCount);
+            Writer.WriteValue(TEXT("requiresEliteKill"), Objective.bRequiresEliteKill);
+            Writer.WriteObjectEnd();
+        }
+        Writer.WriteArrayEnd();
+        Writer.WriteObjectStart(TEXT("reward"));
+        Writer.WriteValue(TEXT("itemCount"), Quest.Reward.ItemCount);
+        Writer.WriteValue(TEXT("minimumRarity"), BreakerCensusEnumName(Quest.Reward.MinimumRarity));
+        Writer.WriteValue(TEXT("itemLevel"), Quest.Reward.ItemLevel);
+        Writer.WriteObjectEnd();
+        Writer.WriteObjectEnd();
+    }
+
+    void BreakerCensusDialogueChoice(FBreakerCensusWriter& Writer, const FBreakerDialogueChoice& Choice)
+    {
+        Writer.WriteObjectStart();
+        Writer.WriteValue(TEXT("text"), Choice.Text);
+        Writer.WriteValue(TEXT("nextNodeId"), BreakerCensusNameOrEmpty(Choice.NextNodeId));
+        Writer.WriteValue(TEXT("setsQuestFlag"), BreakerCensusNameOrEmpty(Choice.SetsQuestFlag));
+        BreakerCensusNameArray(Writer, TEXT("requiredFlags"), Choice.RequiredFlags);
+        BreakerCensusNameArray(Writer, TEXT("blockedByFlags"), Choice.BlockedByFlags);
+        Writer.WriteValue(TEXT("action"), BreakerCensusEnumName(Choice.Action));
+        Writer.WriteObjectEnd();
+    }
+
+    void BreakerCensusDialogueNode(FBreakerCensusWriter& Writer, const FBreakerDialogueNode& Node)
+    {
+        Writer.WriteObjectStart();
+        Writer.WriteValue(TEXT("nodeId"), Node.NodeId.ToString());
+        Writer.WriteValue(TEXT("speakerLine"), Node.SpeakerLine);
+        BreakerCensusNameArray(Writer, TEXT("requiredFlags"), Node.RequiredFlags);
+        BreakerCensusNameArray(Writer, TEXT("blockedByFlags"), Node.BlockedByFlags);
+        Writer.WriteArrayStart(TEXT("choices"));
+        for (const FBreakerDialogueChoice& Choice : Node.Choices)
+        {
+            BreakerCensusDialogueChoice(Writer, Choice);
+        }
+        Writer.WriteArrayEnd();
+        Writer.WriteObjectEnd();
+    }
+
+    void BreakerCensusDialogueRow(FBreakerCensusWriter& Writer, const FBreakerDialogueRow& Row)
+    {
+        Writer.WriteObjectStart();
+        Writer.WriteValue(TEXT("id"), Row.Id.ToString());
+        Writer.WriteValue(TEXT("displayName"), Row.DisplayName);
+        Writer.WriteValue(TEXT("startNodeId"), BreakerCensusNameOrEmpty(Row.StartNodeId));
+        Writer.WriteArrayStart(TEXT("nodes"));
+        for (const FBreakerDialogueNode& Node : Row.Nodes)
+        {
+            BreakerCensusDialogueNode(Writer, Node);
+        }
+        Writer.WriteArrayEnd();
+        Writer.WriteArrayStart(TEXT("entries"));
+        for (const FBreakerDialogueEntry& Entry : Row.Entries)
+        {
+            Writer.WriteObjectStart();
+            Writer.WriteValue(TEXT("startNodeId"), BreakerCensusNameOrEmpty(Entry.StartNodeId));
+            BreakerCensusNameArray(Writer, TEXT("requiredFlags"), Entry.RequiredFlags);
+            BreakerCensusNameArray(Writer, TEXT("blockedByFlags"), Entry.BlockedByFlags);
+            Writer.WriteObjectEnd();
+        }
+        Writer.WriteArrayEnd();
+        Writer.WriteObjectEnd();
+    }
 }
 
 FString BreakerCensus::Serialize(const TSharedRef<FJsonObject>& Census)
@@ -235,6 +339,53 @@ FString BreakerCensus::ExportAffixes(const FBreakerAffixLibraryData& Data)
     }
     Writer->WriteObjectEnd();
 
+    Writer->WriteObjectEnd();
+    Writer->Close();
+    BreakerCensusFinish(Out);
+    return Out;
+}
+
+FString BreakerCensus::QuestsRelativePath()
+{
+    return UBreakerQuestLibrary::DataRelativePath();
+}
+
+FString BreakerCensus::ExportQuests(const TArray<FBreakerQuestDefinition>& Quests, const TArray<FName>& Flags)
+{
+    FString Out;
+    TSharedRef<FBreakerCensusWriter> Writer = TJsonWriterFactory<TCHAR, TPrettyJsonPrintPolicy<TCHAR>>::Create(&Out);
+
+    Writer->WriteObjectStart();
+    BreakerCensusNameArray(*Writer, TEXT("flags"), Flags);
+    Writer->WriteArrayStart(TEXT("quests"));
+    for (const FBreakerQuestDefinition& Quest : Quests)
+    {
+        BreakerCensusQuestRow(*Writer, Quest);
+    }
+    Writer->WriteArrayEnd();
+    Writer->WriteObjectEnd();
+    Writer->Close();
+    BreakerCensusFinish(Out);
+    return Out;
+}
+
+FString BreakerCensus::DialogueRelativePath()
+{
+    return ABreakerNPC::DialogueRelativePath();
+}
+
+FString BreakerCensus::ExportDialogue(const FBreakerDialogueData& Data)
+{
+    FString Out;
+    TSharedRef<FBreakerCensusWriter> Writer = TJsonWriterFactory<TCHAR, TPrettyJsonPrintPolicy<TCHAR>>::Create(&Out);
+
+    Writer->WriteObjectStart();
+    Writer->WriteArrayStart(TEXT("npcs"));
+    for (const FBreakerDialogueRow& Row : Data.Npcs)
+    {
+        BreakerCensusDialogueRow(*Writer, Row);
+    }
+    Writer->WriteArrayEnd();
     Writer->WriteObjectEnd();
     Writer->Close();
     BreakerCensusFinish(Out);

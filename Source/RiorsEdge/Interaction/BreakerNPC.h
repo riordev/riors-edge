@@ -80,9 +80,29 @@ struct RIORSEDGE_API FBreakerDialogueEntry
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FName StartNodeId = NAME_None;
 };
 
+// One NPC's conversation as Data/dialogue.json holds it: who they are on the
+// label, the node the conversation opens on, the node list and the entry
+// overrides. Asset references (body mesh, idle) are not here; those are
+// wiring the spawner owns.
+struct FBreakerDialogueRow
+{
+    FName Id = NAME_None;
+    FString DisplayName;
+    FName StartNodeId = NAME_None;
+    TArray<FBreakerDialogueNode> Nodes;
+    TArray<FBreakerDialogueEntry> Entries;
+};
+
+// Everything Data/dialogue.json holds, as the loader read it. The census
+// re-exports this struct and RiorsEdge.Data.Dialogue.Fresh pins the committed
+// file to that export.
+struct FBreakerDialogueData
+{
+    TArray<FBreakerDialogueRow> Npcs;
+};
+
 // A friendly, talkable actor: the groundwork for vendors, the Forge Keeper,
-// and quest givers. Dialogue is a flat node list navigated by id so it can
-// later move into Data Assets without changing the runtime.
+// and quest givers. Dialogue is a flat node list navigated by id.
 UCLASS(Blueprintable)
 class RIORSEDGE_API ABreakerNPC : public AActor
 {
@@ -139,9 +159,21 @@ public:
     // idle keeps a person from standing in a T-pose.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="NPC") FSoftObjectPath BodyIdleAnimation;
 
-    // Zero-setup placeholder conversations for the gym camp. The content is
-    // split out of the spawners so automation can validate and walk it with no
-    // world — a conversation that needs an actor cannot be unit-tested.
+    // ---- The conversations, as data (O186) --------------------------------
+    // Both Anchor NPCs' dialogue lives in Data/dialogue.json. The loader reads
+    // it once, validates it (every field present, every action an
+    // EBreakerDialogueAction, npc ids unique, node ids unique per npc) and
+    // serves it by row; the graph rules (every node has an exit, every link
+    // resolves) stay in ValidateDialogue. A file that fails validation loads
+    // as EMPTY behind an ensure, never as a nearest fit.
+    static FString DialogueRelativePath();
+    static const FBreakerDialogueData& GetDialogueData();
+    // Every complaint the loader raised, or empty.
+    static const TArray<FString>& GetDialogueErrors();
+
+    // The two rows by id, as copies, so automation can validate and walk a
+    // conversation with no world — a conversation that needs an actor cannot
+    // be unit-tested.
     static TArray<FBreakerDialogueNode> MakeForgeKeeperDialogue();
     static TArray<FBreakerDialogueEntry> MakeForgeKeeperEntries();
     static TArray<FBreakerDialogueNode> MakeQuartermasterDialogue();

@@ -59,6 +59,10 @@ bool FBreakerActOneLexiconTest::RunTest(const FString& Parameters)
     };
     GatherDialogue(TEXT("Kess"), ABreakerNPC::MakeForgeKeeperDialogue());
     GatherDialogue(TEXT("Quartermaster"), ABreakerNPC::MakeQuartermasterDialogue());
+    for (const FBreakerDialogueRow& Row : ABreakerNPC::GetDialogueData().Npcs)
+    {
+        Strings.Emplace(FString::Printf(TEXT("%s displayName"), *Row.Id.ToString()), Row.DisplayName);
+    }
 
     TestTrue(TEXT("There are strings to sweep"), Strings.Num() > 0);
     for (const TPair<FString, FString>& Entry : Strings)

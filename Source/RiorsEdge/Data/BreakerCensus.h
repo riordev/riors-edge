@@ -5,6 +5,8 @@
 
 class UBreakerProgressionTree;
 struct FBreakerAffixLibraryData;
+struct FBreakerDialogueData;
+struct FBreakerQuestDefinition;
 
 // The census: every built tree and the progression vocabulary, as JSON, and
 // the affix library re-serialised from what the game loaded.
@@ -43,4 +45,23 @@ namespace BreakerCensus
     // overload prints the shortest form, which is what a data file a human
     // edits has to contain. Same printer, same line-ending rule as Serialize.
     RIORSEDGE_API FString ExportAffixes(const FBreakerAffixLibraryData& Data);
+
+    // Data/quests.json, the path the quest library loads from.
+    RIORSEDGE_API FString QuestsRelativePath();
+
+    // The flag registry and the quest chain as their data file: "flags" in
+    // registry order, then "quests" in chain order with each quest's
+    // objectives and reward. NAME_None prints as "", integers through the
+    // integer writer, the reward rarity by enum name. Same printer, same
+    // line-ending rule as ExportAffixes.
+    RIORSEDGE_API FString ExportQuests(const TArray<FBreakerQuestDefinition>& Quests, const TArray<FName>& Flags);
+
+    // Data/dialogue.json, the path the NPC dialogue loads from.
+    RIORSEDGE_API FString DialogueRelativePath();
+
+    // Both NPCs' conversations as their data file: one "npcs" row per NPC
+    // with its nodes, each node's choices, and its entry overrides, all in
+    // authoring order. The file carries em dashes; the caller writes it UTF-8
+    // without BOM and the writer leaves characters above 0x7F unescaped.
+    RIORSEDGE_API FString ExportDialogue(const FBreakerDialogueData& Data);
 }

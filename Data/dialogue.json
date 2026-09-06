@@ -1,0 +1,811 @@
+{
+	"npcs": [
+		{
+			"id": "ForgeKeeper",
+			"displayName": "KESS — FORGE KEEPER",
+			"startNodeId": "Start",
+			"nodes": [
+				{
+					"nodeId": "Start",
+					"speakerLine": "The Forge is cold today. Bring me something worth heating.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "What do you do here?",
+							"nextNodeId": "Role",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "Open the Forge.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "OpenForge"
+						},
+						{
+							"text": "The Quartermaster's contract is closed.",
+							"nextNodeId": "Contract",
+							"setsQuestFlag": "",
+							"requiredFlags": [
+								"Quest.FirstContract.TurnedIn"
+							],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "What would heat the Forge?",
+							"nextNodeId": "Salvage",
+							"setsQuestFlag": "Quest.KessSalvage.Offered",
+							"requiredFlags": [
+								"Quest.FirstContract.TurnedIn"
+							],
+							"blockedByFlags": [
+								"Quest.KessSalvage.Accepted"
+							],
+							"action": "None"
+						},
+						{
+							"text": "Still gathering your feedstock.",
+							"nextNodeId": "SalvageProgress",
+							"setsQuestFlag": "",
+							"requiredFlags": [
+								"Quest.KessSalvage.Accepted"
+							],
+							"blockedByFlags": [
+								"Quest.KessSalvage.TurnedIn"
+							],
+							"action": "None"
+						},
+						{
+							"text": "You're an Effigy, aren't you?",
+							"nextNodeId": "Effigy",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [
+								"Quest.AskedKessAboutRior"
+							],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] Another time.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Role",
+					"speakerLine": "Respecs. Crafting. Tier work, when you find gear worth the risk. The Forge handles every change you'll ever make to yourself — remember that.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "I'll bring you something.",
+							"nextNodeId": "Start",
+							"setsQuestFlag": "Quest.MetForgeKeeper",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] Good to know.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Contract",
+					"speakerLine": "So I heard. The Quartermaster counts what comes back, and this time the count was right. That buys you a hearing here, when you have something to bring.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "[Leave] I'll remember that.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Effigy",
+					"speakerLine": "...Yes. Built before the militia captured the shipment. I remember being manufactured. Ask me what you actually came to ask, or don't.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "Did you ever meet Rior?",
+							"nextNodeId": "Rior",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] Sorry. None of my business.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Rior",
+					"speakerLine": "(A long pause. The Forge hums.) ...Bring me something worth heating, Breaker.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "[Leave] ...Understood.",
+							"nextNodeId": "",
+							"setsQuestFlag": "Quest.AskedKessAboutRior",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Returned",
+					"speakerLine": "(The Forge is still cold. Kess does not look up.) You came back. That's more than most.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "What do you do here?",
+							"nextNodeId": "Role",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "Open the Forge.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "OpenForge"
+						},
+						{
+							"text": "The Quartermaster's contract is closed.",
+							"nextNodeId": "Contract",
+							"setsQuestFlag": "",
+							"requiredFlags": [
+								"Quest.FirstContract.TurnedIn"
+							],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "What would heat the Forge?",
+							"nextNodeId": "Salvage",
+							"setsQuestFlag": "Quest.KessSalvage.Offered",
+							"requiredFlags": [
+								"Quest.FirstContract.TurnedIn"
+							],
+							"blockedByFlags": [
+								"Quest.KessSalvage.Accepted"
+							],
+							"action": "None"
+						},
+						{
+							"text": "Still gathering your feedstock.",
+							"nextNodeId": "SalvageProgress",
+							"setsQuestFlag": "",
+							"requiredFlags": [
+								"Quest.KessSalvage.Accepted"
+							],
+							"blockedByFlags": [
+								"Quest.KessSalvage.TurnedIn"
+							],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] Another time.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Salvage",
+					"speakerLine": "(Kess turns a cold crucible with one hand.) Feedstock. Vestige residue burns, and the spill carries more of it than the ground can rot. Six of them. Bring me what's left when they drop — I'll know the weight when you walk in.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "You'll have it.",
+							"nextNodeId": "",
+							"setsQuestFlag": "Quest.KessSalvage.Accepted",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] Not today.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "SalvageProgress",
+					"speakerLine": "Not the weight yet. Six carcasses' worth. The Forge has waited years — it can wait an afternoon.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "[Leave] Working on it.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "SalvageTurnIn",
+					"speakerLine": "(Kess does not weigh anything. Kess already knows.) That's the weight. The Forge takes it. ...It's warmer in here now. Remember that, next time you find something worth heating.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "The Forge eats first.",
+							"nextNodeId": "",
+							"setsQuestFlag": "Quest.KessSalvage.TurnedIn",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] Later.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Warm",
+					"speakerLine": "(The Forge is lit. Low, but lit.) You did that. Now find me something worth it.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "What do you do here?",
+							"nextNodeId": "Role",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "Open the Forge.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "OpenForge"
+						},
+						{
+							"text": "You're an Effigy, aren't you?",
+							"nextNodeId": "Effigy",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [
+								"Quest.AskedKessAboutRior"
+							],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] Another time.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				}
+			],
+			"entries": [
+				{
+					"startNodeId": "SalvageTurnIn",
+					"requiredFlags": [
+						"Quest.KessSalvage.Accepted",
+						"Quest.KessSalvage.FeedstockTaken"
+					],
+					"blockedByFlags": [
+						"Quest.KessSalvage.TurnedIn"
+					]
+				},
+				{
+					"startNodeId": "Warm",
+					"requiredFlags": [
+						"Quest.KessSalvage.TurnedIn"
+					],
+					"blockedByFlags": []
+				},
+				{
+					"startNodeId": "Returned",
+					"requiredFlags": [
+						"Quest.AskedKessAboutRior"
+					],
+					"blockedByFlags": []
+				}
+			]
+		},
+		{
+			"id": "Quartermaster",
+			"displayName": "QUARTERMASTER",
+			"startNodeId": "Start",
+			"nodes": [
+				{
+					"nodeId": "Start",
+					"speakerLine": "Ammo's on the shelf, gear's in the crates. You breaking things or buying things?",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "Show me what you've got.",
+							"nextNodeId": "Vendor",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "Anything need doing around here?",
+							"nextNodeId": "Job",
+							"setsQuestFlag": "Quest.FirstContract.Offered",
+							"requiredFlags": [],
+							"blockedByFlags": [
+								"Quest.FirstContract.Accepted"
+							],
+							"action": "None"
+						},
+						{
+							"text": "Still working on that spill.",
+							"nextNodeId": "Progress",
+							"setsQuestFlag": "",
+							"requiredFlags": [
+								"Quest.FirstContract.Accepted"
+							],
+							"blockedByFlags": [
+								"Quest.FirstContract.TurnedIn"
+							],
+							"action": "None"
+						},
+						{
+							"text": "Got another contract?",
+							"nextNodeId": "Pattern",
+							"setsQuestFlag": "Quest.Pattern.Offered",
+							"requiredFlags": [
+								"Quest.KessSalvage.TurnedIn"
+							],
+							"blockedByFlags": [
+								"Quest.Pattern.Accepted"
+							],
+							"action": "None"
+						},
+						{
+							"text": "Still counting your marked.",
+							"nextNodeId": "PatternProgress",
+							"setsQuestFlag": "",
+							"requiredFlags": [
+								"Quest.Pattern.Accepted"
+							],
+							"blockedByFlags": [
+								"Quest.Pattern.TurnedIn"
+							],
+							"action": "None"
+						},
+						{
+							"text": "What's this about a bad rift?",
+							"nextNodeId": "Deeper",
+							"setsQuestFlag": "Quest.Deeper.Offered",
+							"requiredFlags": [
+								"Quest.Pattern.TurnedIn"
+							],
+							"blockedByFlags": [
+								"Quest.Deeper.Accepted"
+							],
+							"action": "None"
+						},
+						{
+							"text": "Still sweeping the source.",
+							"nextNodeId": "DeeperProgress",
+							"setsQuestFlag": "",
+							"requiredFlags": [
+								"Quest.Deeper.Accepted"
+							],
+							"blockedByFlags": [
+								"Quest.Deeper.TurnedIn"
+							],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] Just passing through.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Vendor",
+					"speakerLine": "Requisitions, then. Anything your class is cleared for, I can sign out — one token a piece, and I don't take Riftglass for it. Rift work earns the tokens; I just hold the keys.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "Show me the requisition list.",
+							"nextNodeId": "",
+							"setsQuestFlag": "Quest.CheckedVendor",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "OpenQuartermaster"
+						},
+						{
+							"text": "[Leave] I'll check back.",
+							"nextNodeId": "",
+							"setsQuestFlag": "Quest.CheckedVendor",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Job",
+					"speakerLine": "The spill out past the pad keeps regrouping. Thin it out, and put that elite down while you're at it. I count what comes back — that's the job.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "Consider it done.",
+							"nextNodeId": "",
+							"setsQuestFlag": "Quest.FirstContract.Accepted",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] Not my problem yet.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Progress",
+					"speakerLine": "Count's not right yet. The spill's still moving and that elite's still upright. Come back when both of those stop being true.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "[Leave] Working on it.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "ReadyTurnIn",
+					"speakerLine": "Count's right. Spill's thinned and the elite's down. You did the job and you came back to say so, which is rarer than the first part.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "That's the job.",
+							"nextNodeId": "",
+							"setsQuestFlag": "Quest.FirstContract.TurnedIn",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] Later.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Done",
+					"speakerLine": "Contract's closed and you've been paid. There'll be more — the spill always comes back. Ammo's still on the shelf.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "Anything else need doing?",
+							"nextNodeId": "Start",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] I'll be around.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Pattern",
+					"speakerLine": "Second contract. The spill keeps regrouping — same ground, same hours — and the marked ones are up front now, every time. Three of them, down. I want to see if the next count sheet reads different.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "Consider it done.",
+							"nextNodeId": "",
+							"setsQuestFlag": "Quest.Pattern.Accepted",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] Not yet.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "PatternProgress",
+					"speakerLine": "Count's short. The marked don't fall easy — that's why the contract says three and not thirty. Come back when the sheet's full.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "[Leave] Working on it.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "PatternTurnIn",
+					"speakerLine": "Count's right. Three marked, three down. ...Off the record: spills drift. This one doesn't. Same ground, every time, like something's taking a measurement. The sheet doesn't have a box for that, so it's going down as weather.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "That's the job.",
+							"nextNodeId": "",
+							"setsQuestFlag": "Quest.Pattern.TurnedIn",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] Later.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "PatternDone",
+					"speakerLine": "Contract's closed, paid in full. Sheet still says weather. Weather doesn't hold formation.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "Anything else need doing?",
+							"nextNodeId": "Start",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] I'll be around.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Deeper",
+					"speakerLine": "Last one on my sheet, and I don't love writing it. Command flagged a rift out past the far ground — didn't close clean, their words. Everything it lets through comes up marked. Sweep it: five of the marked, and whatever's biggest goes down first.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "Consider it done.",
+							"nextNodeId": "",
+							"setsQuestFlag": "Quest.Deeper.Accepted",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] Not yet.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "DeeperProgress",
+					"speakerLine": "Sweep's not done. Five of the marked, and the count's honest or it's nothing. Same as always — I count what comes back.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "[Leave] Working on it.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "DeeperTurnIn",
+					"speakerLine": "Five down, and you walked back in to say so. Good count. ...That rift's still out there. Didn't close clean — Command's words, not mine. It's gone up the chain, and what goes up the chain comes back down with a name and a Breaker attached. Sleep while you can.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "That's the job.",
+							"nextNodeId": "",
+							"setsQuestFlag": "Quest.Deeper.TurnedIn",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] Later.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "DeeperDone",
+					"speakerLine": "Sheet's clear. First time since you signed in. Restock while it lasts — when that name comes back down the chain, it'll be yours.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "Anything else need doing?",
+							"nextNodeId": "Start",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] I'll be around.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				}
+			],
+			"entries": [
+				{
+					"startNodeId": "DeeperDone",
+					"requiredFlags": [
+						"Quest.Deeper.TurnedIn"
+					],
+					"blockedByFlags": []
+				},
+				{
+					"startNodeId": "DeeperTurnIn",
+					"requiredFlags": [
+						"Quest.Deeper.Accepted",
+						"Quest.Deeper.SweepDone"
+					],
+					"blockedByFlags": [
+						"Quest.Deeper.TurnedIn"
+					]
+				},
+				{
+					"startNodeId": "PatternDone",
+					"requiredFlags": [
+						"Quest.Pattern.TurnedIn"
+					],
+					"blockedByFlags": [
+						"Quest.Deeper.Offered"
+					]
+				},
+				{
+					"startNodeId": "PatternTurnIn",
+					"requiredFlags": [
+						"Quest.Pattern.Accepted",
+						"Quest.Pattern.MarkedDown"
+					],
+					"blockedByFlags": [
+						"Quest.Pattern.TurnedIn"
+					]
+				},
+				{
+					"startNodeId": "Done",
+					"requiredFlags": [
+						"Quest.FirstContract.TurnedIn"
+					],
+					"blockedByFlags": [
+						"Quest.Pattern.Offered"
+					]
+				},
+				{
+					"startNodeId": "ReadyTurnIn",
+					"requiredFlags": [
+						"Quest.FirstContract.SpillThinned",
+						"Quest.FirstContract.EliteDown"
+					],
+					"blockedByFlags": [
+						"Quest.FirstContract.TurnedIn"
+					]
+				}
+			]
+		}
+	]
+}

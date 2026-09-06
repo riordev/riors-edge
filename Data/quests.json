@@ -1,0 +1,130 @@
+{
+	"flags": [
+		"Quest.MetForgeKeeper",
+		"Quest.AskedKessAboutRior",
+		"Quest.CheckedVendor",
+		"Quest.FirstContract.Offered",
+		"Quest.FirstContract.Accepted",
+		"Quest.FirstContract.SpillThinned",
+		"Quest.FirstContract.EliteDown",
+		"Quest.FirstContract.TurnedIn",
+		"Quest.KessSalvage.Offered",
+		"Quest.KessSalvage.Accepted",
+		"Quest.KessSalvage.FeedstockTaken",
+		"Quest.KessSalvage.TurnedIn",
+		"Quest.Pattern.Offered",
+		"Quest.Pattern.Accepted",
+		"Quest.Pattern.MarkedDown",
+		"Quest.Pattern.TurnedIn",
+		"Quest.Deeper.Offered",
+		"Quest.Deeper.Accepted",
+		"Quest.Deeper.SweepDone",
+		"Quest.Deeper.TurnedIn"
+	],
+	"quests": [
+		{
+			"id": "Quest.FirstContract",
+			"title": "THIN THE SPILL",
+			"giver": "QUARTERMASTER",
+			"offeredFlag": "Quest.FirstContract.Offered",
+			"acceptedFlag": "Quest.FirstContract.Accepted",
+			"turnedInFlag": "Quest.FirstContract.TurnedIn",
+			"objectives": [
+				{
+					"id": "Thin",
+					"text": "Thin the spill past the pad",
+					"completionFlag": "Quest.FirstContract.SpillThinned",
+					"progressCounter": "Quest.FirstContract.Kills",
+					"requiredCount": 5,
+					"requiresEliteKill": false
+				},
+				{
+					"id": "Elite",
+					"text": "Put the elite down",
+					"completionFlag": "Quest.FirstContract.EliteDown",
+					"progressCounter": "Quest.FirstContract.EliteKills",
+					"requiredCount": 1,
+					"requiresEliteKill": true
+				}
+			],
+			"reward":
+			{
+				"itemCount": 1,
+				"minimumRarity": "Exceptional",
+				"itemLevel": 1
+			}
+		},
+		{
+			"id": "Quest.KessSalvage",
+			"title": "FEED THE FORGE",
+			"giver": "FORGE KEEPER",
+			"offeredFlag": "Quest.KessSalvage.Offered",
+			"acceptedFlag": "Quest.KessSalvage.Accepted",
+			"turnedInFlag": "Quest.KessSalvage.TurnedIn",
+			"objectives": [
+				{
+					"id": "Feedstock",
+					"text": "Take feedstock from the spill",
+					"completionFlag": "Quest.KessSalvage.FeedstockTaken",
+					"progressCounter": "Quest.KessSalvage.Kills",
+					"requiredCount": 6,
+					"requiresEliteKill": false
+				}
+			],
+			"reward":
+			{
+				"itemCount": 1,
+				"minimumRarity": "Exceptional",
+				"itemLevel": 1
+			}
+		},
+		{
+			"id": "Quest.Pattern",
+			"title": "THE PATTERN",
+			"giver": "QUARTERMASTER",
+			"offeredFlag": "Quest.Pattern.Offered",
+			"acceptedFlag": "Quest.Pattern.Accepted",
+			"turnedInFlag": "Quest.Pattern.TurnedIn",
+			"objectives": [
+				{
+					"id": "Marked",
+					"text": "Put the marked ones down",
+					"completionFlag": "Quest.Pattern.MarkedDown",
+					"progressCounter": "Quest.Pattern.EliteKills",
+					"requiredCount": 3,
+					"requiresEliteKill": true
+				}
+			],
+			"reward":
+			{
+				"itemCount": 1,
+				"minimumRarity": "Exceptional",
+				"itemLevel": 1
+			}
+		},
+		{
+			"id": "Quest.Deeper",
+			"title": "DEEPER",
+			"giver": "QUARTERMASTER",
+			"offeredFlag": "Quest.Deeper.Offered",
+			"acceptedFlag": "Quest.Deeper.Accepted",
+			"turnedInFlag": "Quest.Deeper.TurnedIn",
+			"objectives": [
+				{
+					"id": "Sweep",
+					"text": "Sweep the source of the spill",
+					"completionFlag": "Quest.Deeper.SweepDone",
+					"progressCounter": "Quest.Deeper.EliteKills",
+					"requiredCount": 5,
+					"requiresEliteKill": true
+				}
+			],
+			"reward":
+			{
+				"itemCount": 2,
+				"minimumRarity": "Exceptional",
+				"itemLevel": 1
+			}
+		}
+	]
+}

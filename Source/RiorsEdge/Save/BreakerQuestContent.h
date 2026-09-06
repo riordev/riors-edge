@@ -22,6 +22,11 @@
 //
 // Names below are FROZEN once shipped. Renaming one is a save migration, not an
 // edit — see UBreakerSaveGame::MigrateQuestFlagsV1ToV2 for what that costs.
+//
+// These externs are the C++ spellings the journal, the character and the
+// tests use to name a flag. The registry itself is the "flags" list in
+// Data/quests.json, and the quest and dialogue files reference flags by the
+// same strings; GetRegisteredFlags reads the file, not this list.
 namespace BreakerQuestFlags
 {
     // Anchor camp, shipped in version 1. Spellings preserved exactly so an
@@ -153,9 +158,20 @@ class RIORSEDGE_API UBreakerQuestLibrary : public UBlueprintFunctionLibrary
     GENERATED_BODY()
 
 public:
-    // Zero-setup convention: the slice plays with no content assets, so the
-    // quest list is a C++ fallback registry exactly like the tree, affix,
-    // ability and class registries. Data Assets replace it one-for-one later.
+    // ---- The registry, as data (O186) -------------------------------------
+    // The flag registry and the quest chain live in Data/quests.json. This
+    // class LOADS it once, validates it (ids unique, every quest and objective
+    // flag non-empty and listed in "flags", a counted objective carries its
+    // counter, the reward rarity resolves) and serves the chain in file order,
+    // which is play order: the HUD tracker follows the first live quest. A
+    // file that fails validation loads as an EMPTY registry behind an ensure,
+    // never as a nearest fit.
+    static FString DataRelativePath();
+    // Every complaint the loader raised, or empty. RiorsEdge.Data.Quests.Fresh
+    // reads this first so a broken file names its breaks instead of failing a
+    // byte comparison.
+    static const TArray<FString>& GetDataErrors();
+
     static const TArray<FBreakerQuestDefinition>& GetFallbackQuests();
     static bool FindQuest(FName QuestId, FBreakerQuestDefinition& OutQuest);
 
@@ -172,13 +188,16 @@ public:
     UFUNCTION(BlueprintPure, Category="Quest")
     static bool PassesFlagConditions(const TArray<FName>& RequiredFlags, const TArray<FName>& BlockedByFlags, const FBreakerQuestFlagSet& Flags);
 
-    // Every flag this build knows about. The registry from the header comment.
+    // Every flag this build knows about: the "flags" list of Data/quests.json,
+    // in file order. The progress counters are not in it — they are counter
+    // identifiers, not gates — so IsRegisteredFlag refuses them.
     static const TArray<FName>& GetRegisteredFlags();
     static bool IsRegisteredFlag(FName Flag);
 
-    // Fails when quest content or fallback dialogue references a flag that is
-    // not registered — i.e. when someone typed one. Automation calls it; that
-    // is what turns a silent no-op into a red test.
+    // Fails when either data file did not load clean, or when quest content or
+    // dialogue references a flag that is not registered — i.e. when someone
+    // typed one. Automation calls it; that is what turns a silent no-op into
+    // a red test.
     static bool ValidateQuestContent(FString& OutError);
 
     // Advances every counted objective of every ACTIVE quest for one kill.

@@ -1,11 +1,13 @@
 #include "Data/BreakerCensusCommandlet.h"
 
 #include "Data/BreakerCensus.h"
+#include "Interaction/BreakerNPC.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "Progression/BreakerProgressionTree.h"
+#include "Save/BreakerQuestContent.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogBreakerCensus, Log, All);
 
@@ -66,5 +68,63 @@ int32 UBreakerCensusCommandlet::Main(const FString& Params)
     UE_LOG(LogBreakerCensus, Display, TEXT("wrote %s: %d slice, %d aberrant, %d anomalous, %d downside, %d elemental, %d leans across %d archetypes, %d caps"),
         *AffixPath, Affixes.Slice.Num(), Affixes.Aberrant.Num(), Affixes.Anomalous.Num(), Affixes.Downsides.Num(),
         Affixes.Elemental.AffixId.IsNone() ? 0 : 1, LeanRows, Affixes.Leans.Num(), Affixes.Caps.Num());
+
+    // The quest registry, by the same rule: a dirty load is an EMPTY registry
+    // and is never written back over the file.
+    const TArray<FString>& QuestErrors = UBreakerQuestLibrary::GetDataErrors();
+    if (!QuestErrors.IsEmpty())
+    {
+        for (const FString& Error : QuestErrors)
+        {
+            UE_LOG(LogBreakerCensus, Error, TEXT("%s"), *Error);
+        }
+        UE_LOG(LogBreakerCensus, Error, TEXT("%s did not load clean; not rewriting it"), *BreakerCensus::QuestsRelativePath());
+        return 1;
+    }
+    const TArray<FBreakerQuestDefinition>& Quests = UBreakerQuestLibrary::GetFallbackQuests();
+    const TArray<FName>& Flags = UBreakerQuestLibrary::GetRegisteredFlags();
+    const FString QuestJson = BreakerCensus::ExportQuests(Quests, Flags);
+    const FString QuestPath = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / BreakerCensus::QuestsRelativePath());
+    if (!FFileHelper::SaveStringToFile(QuestJson, *QuestPath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
+    {
+        UE_LOG(LogBreakerCensus, Error, TEXT("could not write %s"), *QuestPath);
+        return 1;
+    }
+    int32 ObjectiveCount = 0;
+    for (const FBreakerQuestDefinition& Quest : Quests) { ObjectiveCount += Quest.Objectives.Num(); }
+    UE_LOG(LogBreakerCensus, Display, TEXT("wrote %s: %d quests, %d objectives, %d flags"),
+        *QuestPath, Quests.Num(), ObjectiveCount, Flags.Num());
+
+    // The dialogue, last. The file carries em dashes, so it is written UTF-8
+    // without BOM like the others and the writer leaves them unescaped.
+    const TArray<FString>& DialogueErrors = ABreakerNPC::GetDialogueErrors();
+    if (!DialogueErrors.IsEmpty())
+    {
+        for (const FString& Error : DialogueErrors)
+        {
+            UE_LOG(LogBreakerCensus, Error, TEXT("%s"), *Error);
+        }
+        UE_LOG(LogBreakerCensus, Error, TEXT("%s did not load clean; not rewriting it"), *BreakerCensus::DialogueRelativePath());
+        return 1;
+    }
+    const FBreakerDialogueData& Dialogue = ABreakerNPC::GetDialogueData();
+    const FString DialogueJson = BreakerCensus::ExportDialogue(Dialogue);
+    const FString DialoguePath = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / BreakerCensus::DialogueRelativePath());
+    if (!FFileHelper::SaveStringToFile(DialogueJson, *DialoguePath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
+    {
+        UE_LOG(LogBreakerCensus, Error, TEXT("could not write %s"), *DialoguePath);
+        return 1;
+    }
+    int32 DialogueNodes = 0;
+    int32 DialogueChoices = 0;
+    int32 DialogueEntries = 0;
+    for (const FBreakerDialogueRow& Row : Dialogue.Npcs)
+    {
+        DialogueNodes += Row.Nodes.Num();
+        DialogueEntries += Row.Entries.Num();
+        for (const FBreakerDialogueNode& Node : Row.Nodes) { DialogueChoices += Node.Choices.Num(); }
+    }
+    UE_LOG(LogBreakerCensus, Display, TEXT("wrote %s: %d npcs, %d nodes, %d choices, %d entries"),
+        *DialoguePath, Dialogue.Npcs.Num(), DialogueNodes, DialogueChoices, DialogueEntries);
     return 0;
 }

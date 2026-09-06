@@ -1,5 +1,8 @@
 #include "Save/BreakerQuestContent.h"
 
+#include "Data/BreakerDataFile.h"
+#include "Dom/JsonObject.h"
+#include "Dom/JsonValue.h"
 #include "Interaction/BreakerNPC.h"
 
 namespace BreakerQuestFlags
@@ -36,32 +39,296 @@ namespace BreakerQuestFlags
     const FName DeeperEliteCounter(TEXT("Quest.Deeper.EliteKills"));
 }
 
+// ---------------------------------------------------------------------------
+// THE LOADER — Data/quests.json into the flag registry and the quest list.
+// ---------------------------------------------------------------------------
+// The file is the registry. "flags" is the list ValidateQuestContent checks
+// every authored reference against, and "quests" is the chain in play order.
+// A row that fails any check below fails the WHOLE load: both lists come back
+// empty behind an ensure, because a registry that dropped one flag and served
+// the rest would turn an authored gate into a silent, permanent no-op — the
+// exact failure the registry exists to catch.
+namespace
+{
+    using BreakerDataFile::FBreakerDataErrors;
+
+    struct FBreakerQuestLoad
+    {
+        TArray<FName> Flags;
+        TArray<FBreakerQuestDefinition> Quests;
+        TArray<FString> Errors;
+    };
+
+    bool BreakerQuestReadString(const FJsonObject& Row, const TCHAR* Field, const FString& Where, FString& Out, FBreakerDataErrors& Errors)
+    {
+        if (!Row.TryGetStringField(Field, Out))
+        {
+            Errors.Add(FString::Printf(TEXT("%s: \"%s\" is missing or not a string"), *Where, Field));
+            return false;
+        }
+        return true;
+    }
+
+    // A flag reference: non-empty, and listed in the file's own "flags".
+    bool BreakerQuestReadFlag(const FJsonObject& Row, const TCHAR* Field, const FString& Where, const TArray<FName>& Registry, FName& Out, FBreakerDataErrors& Errors)
+    {
+        FString Name;
+        if (!BreakerQuestReadString(Row, Field, Where, Name, Errors))
+        {
+            return false;
+        }
+        if (Name.IsEmpty())
+        {
+            Errors.Add(FString::Printf(TEXT("%s: \"%s\" is empty"), *Where, Field));
+            return false;
+        }
+        Out = FName(*Name);
+        if (!Registry.Contains(Out))
+        {
+            Errors.Add(FString::Printf(TEXT("%s: \"%s\" names \"%s\", which is not in \"flags\""), *Where, Field, *Name));
+            return false;
+        }
+        return true;
+    }
+
+    bool BreakerQuestReadInt(const FJsonObject& Row, const TCHAR* Field, const FString& Where, int32& Out, FBreakerDataErrors& Errors)
+    {
+        double Value = 0.0;
+        if (!Row.TryGetNumberField(Field, Value) || FMath::TruncToDouble(Value) != Value)
+        {
+            Errors.Add(FString::Printf(TEXT("%s: \"%s\" is missing or not an integer"), *Where, Field));
+            return false;
+        }
+        Out = static_cast<int32>(Value);
+        return true;
+    }
+
+    bool BreakerQuestReadObjective(const FJsonObject& Row, const FString& QuestId, const TArray<FName>& Registry, FBreakerQuestObjective& Out, FBreakerDataErrors& Errors)
+    {
+        FString Id;
+        if (!Row.TryGetStringField(TEXT("id"), Id) || Id.IsEmpty())
+        {
+            Errors.Add(FString::Printf(TEXT("%s: an objective has no \"id\""), *QuestId));
+            return false;
+        }
+        Out.ObjectiveId = FName(*Id);
+        const FString Where = QuestId + TEXT(".") + Id;
+
+        bool bOk = BreakerQuestReadString(Row, TEXT("text"), Where, Out.Text, Errors);
+        bOk = BreakerQuestReadFlag(Row, TEXT("completionFlag"), Where, Registry, Out.CompletionFlag, Errors) && bOk;
+
+        FString Counter;
+        bOk = BreakerQuestReadString(Row, TEXT("progressCounter"), Where, Counter, Errors) && bOk;
+        Out.ProgressCounter = Counter.IsEmpty() ? NAME_None : FName(*Counter);
+
+        if (BreakerQuestReadInt(Row, TEXT("requiredCount"), Where, Out.RequiredCount, Errors))
+        {
+            if (Out.RequiredCount < 0)
+            {
+                Errors.Add(FString::Printf(TEXT("%s: \"requiredCount\" %d is negative"), *Where, Out.RequiredCount));
+                bOk = false;
+            }
+            // A counted objective advances through its counter; without one the
+            // count could never be reached.
+            if (Out.RequiredCount > 0 && Out.ProgressCounter.IsNone())
+            {
+                Errors.Add(FString::Printf(TEXT("%s: \"requiredCount\" is %d but \"progressCounter\" is empty"), *Where, Out.RequiredCount));
+                bOk = false;
+            }
+        }
+        else
+        {
+            bOk = false;
+        }
+
+        if (!Row.TryGetBoolField(TEXT("requiresEliteKill"), Out.bRequiresEliteKill))
+        {
+            Errors.Add(FString::Printf(TEXT("%s: \"requiresEliteKill\" is missing or not a bool"), *Where));
+            bOk = false;
+        }
+        return bOk;
+    }
+
+    bool BreakerQuestReadReward(const FJsonObject& Row, const FString& QuestId, FBreakerQuestReward& Out, FBreakerDataErrors& Errors)
+    {
+        const FString Where = QuestId + TEXT(".reward");
+        bool bOk = BreakerQuestReadInt(Row, TEXT("itemCount"), Where, Out.ItemCount, Errors);
+
+        FString Rarity;
+        if (!Row.TryGetStringField(TEXT("minimumRarity"), Rarity) || !BreakerDataFile::ParseEnum(Rarity, Out.MinimumRarity))
+        {
+            Errors.Add(FString::Printf(TEXT("%s: \"minimumRarity\" is \"%s\", not an EBreakerItemRarity"), *Where, *Rarity));
+            bOk = false;
+        }
+
+        bOk = BreakerQuestReadInt(Row, TEXT("itemLevel"), Where, Out.ItemLevel, Errors) && bOk;
+        return bOk;
+    }
+
+    // One row into one definition. Returns false with every field-level
+    // complaint recorded, not just the first.
+    bool BreakerQuestReadRow(const FJsonObject& Row, const TArray<FName>& Registry, FBreakerQuestDefinition& Out, FBreakerDataErrors& Errors)
+    {
+        FString Id;
+        if (!Row.TryGetStringField(TEXT("id"), Id) || Id.IsEmpty())
+        {
+            Errors.Add(TEXT("a quest row has no \"id\""));
+            return false;
+        }
+        Out.QuestId = FName(*Id);
+
+        bool bOk = BreakerQuestReadString(Row, TEXT("title"), Id, Out.Title, Errors);
+        bOk = BreakerQuestReadString(Row, TEXT("giver"), Id, Out.Giver, Errors) && bOk;
+        bOk = BreakerQuestReadFlag(Row, TEXT("offeredFlag"), Id, Registry, Out.OfferedFlag, Errors) && bOk;
+        bOk = BreakerQuestReadFlag(Row, TEXT("acceptedFlag"), Id, Registry, Out.AcceptedFlag, Errors) && bOk;
+        bOk = BreakerQuestReadFlag(Row, TEXT("turnedInFlag"), Id, Registry, Out.TurnedInFlag, Errors) && bOk;
+
+        Out.Objectives.Reset();
+        const TArray<TSharedPtr<FJsonValue>>* Objectives = nullptr;
+        if (!Row.TryGetArrayField(TEXT("objectives"), Objectives))
+        {
+            Errors.Add(FString::Printf(TEXT("%s: \"objectives\" is missing or not an array"), *Id));
+            bOk = false;
+        }
+        else
+        {
+            for (const TSharedPtr<FJsonValue>& Value : *Objectives)
+            {
+                const TSharedPtr<FJsonObject>* ObjectiveObject = nullptr;
+                if (!Value.IsValid() || !Value->TryGetObject(ObjectiveObject))
+                {
+                    Errors.Add(FString::Printf(TEXT("%s: an \"objectives\" entry is not an object"), *Id));
+                    bOk = false;
+                    continue;
+                }
+                FBreakerQuestObjective Objective;
+                if (!BreakerQuestReadObjective(**ObjectiveObject, Id, Registry, Objective, Errors))
+                {
+                    bOk = false;
+                    continue;
+                }
+                if (Out.Objectives.ContainsByPredicate([&Objective](const FBreakerQuestObjective& Other) { return Other.ObjectiveId == Objective.ObjectiveId; }))
+                {
+                    Errors.Add(FString::Printf(TEXT("%s: objective \"%s\" appears twice"), *Id, *Objective.ObjectiveId.ToString()));
+                    bOk = false;
+                    continue;
+                }
+                Out.Objectives.Add(Objective);
+            }
+        }
+
+        const TSharedPtr<FJsonObject>* RewardObject = nullptr;
+        if (!Row.TryGetObjectField(TEXT("reward"), RewardObject))
+        {
+            Errors.Add(FString::Printf(TEXT("%s: \"reward\" is missing or not an object"), *Id));
+            bOk = false;
+        }
+        else
+        {
+            bOk = BreakerQuestReadReward(**RewardObject, Id, Out.Reward, Errors) && bOk;
+        }
+        return bOk;
+    }
+
+    FBreakerQuestLoad BreakerQuestLoadData()
+    {
+        FBreakerQuestLoad Load;
+        FBreakerDataErrors Errors;
+        TArray<FName> Flags;
+        TArray<FBreakerQuestDefinition> Quests;
+        const FString File = UBreakerQuestLibrary::DataRelativePath();
+
+        const TSharedPtr<FJsonObject> Root = BreakerDataFile::Load(File, Errors);
+        if (Root.IsValid())
+        {
+            // ---- flags -----------------------------------------------------
+            const TArray<TSharedPtr<FJsonValue>>* FlagValues = nullptr;
+            if (!Root->TryGetArrayField(TEXT("flags"), FlagValues))
+            {
+                Errors.Add(FString::Printf(TEXT("%s: no \"flags\" array"), *File));
+            }
+            else
+            {
+                for (const TSharedPtr<FJsonValue>& Value : *FlagValues)
+                {
+                    FString Name;
+                    if (!Value.IsValid() || !Value->TryGetString(Name) || Name.IsEmpty())
+                    {
+                        Errors.Add(FString::Printf(TEXT("%s: a \"flags\" entry is not a name"), *File));
+                        continue;
+                    }
+                    const FName Flag(*Name);
+                    if (Flags.Contains(Flag))
+                    {
+                        Errors.Add(FString::Printf(TEXT("flags: \"%s\" appears twice"), *Name));
+                        continue;
+                    }
+                    Flags.Add(Flag);
+                }
+            }
+
+            // ---- quests ----------------------------------------------------
+            const TArray<TSharedPtr<FJsonValue>>* RowValues = nullptr;
+            if (!Root->TryGetArrayField(TEXT("quests"), RowValues))
+            {
+                Errors.Add(FString::Printf(TEXT("%s: no \"quests\" array"), *File));
+            }
+            else
+            {
+                for (const TSharedPtr<FJsonValue>& Value : *RowValues)
+                {
+                    const TSharedPtr<FJsonObject>* RowObject = nullptr;
+                    if (!Value.IsValid() || !Value->TryGetObject(RowObject))
+                    {
+                        Errors.Add(FString::Printf(TEXT("%s: a \"quests\" entry is not an object"), *File));
+                        continue;
+                    }
+                    FBreakerQuestDefinition Quest;
+                    if (!BreakerQuestReadRow(**RowObject, Flags, Quest, Errors))
+                    {
+                        continue;
+                    }
+                    if (Quests.ContainsByPredicate([&Quest](const FBreakerQuestDefinition& Other) { return Other.QuestId == Quest.QuestId; }))
+                    {
+                        Errors.Add(FString::Printf(TEXT("%s: id appears twice"), *Quest.QuestId.ToString()));
+                        continue;
+                    }
+                    Quests.Add(Quest);
+                }
+            }
+        }
+
+        if (!Errors.IsClean())
+        {
+            Load.Errors = Errors.Messages;
+            ensureMsgf(false, TEXT("%s failed to load; the quest registry is EMPTY.\n%s"), *File, *Errors.Join());
+            return Load;
+        }
+        Load.Flags = MoveTemp(Flags);
+        Load.Quests = MoveTemp(Quests);
+        return Load;
+    }
+
+    const FBreakerQuestLoad& BreakerQuestLoaded()
+    {
+        static const FBreakerQuestLoad Load = BreakerQuestLoadData();
+        return Load;
+    }
+}
+
+FString UBreakerQuestLibrary::DataRelativePath()
+{
+    return TEXT("Data/quests.json");
+}
+
+const TArray<FString>& UBreakerQuestLibrary::GetDataErrors()
+{
+    return BreakerQuestLoaded().Errors;
+}
+
 const TArray<FName>& UBreakerQuestLibrary::GetRegisteredFlags()
 {
-    static const TArray<FName> Registered =
-    {
-        BreakerQuestFlags::MetForgeKeeper,
-        BreakerQuestFlags::AskedKessAboutRior,
-        BreakerQuestFlags::CheckedVendor,
-        BreakerQuestFlags::FirstContractOffered,
-        BreakerQuestFlags::FirstContractAccepted,
-        BreakerQuestFlags::FirstContractSpillThinned,
-        BreakerQuestFlags::FirstContractEliteDown,
-        BreakerQuestFlags::FirstContractTurnedIn,
-        BreakerQuestFlags::KessSalvageOffered,
-        BreakerQuestFlags::KessSalvageAccepted,
-        BreakerQuestFlags::KessSalvageFeedstock,
-        BreakerQuestFlags::KessSalvageTurnedIn,
-        BreakerQuestFlags::PatternOffered,
-        BreakerQuestFlags::PatternAccepted,
-        BreakerQuestFlags::PatternMarkedDown,
-        BreakerQuestFlags::PatternTurnedIn,
-        BreakerQuestFlags::DeeperOffered,
-        BreakerQuestFlags::DeeperAccepted,
-        BreakerQuestFlags::DeeperSweepDone,
-        BreakerQuestFlags::DeeperTurnedIn,
-    };
-    return Registered;
+    return BreakerQuestLoaded().Flags;
 }
 
 bool UBreakerQuestLibrary::IsRegisteredFlag(FName Flag)
@@ -71,143 +338,7 @@ bool UBreakerQuestLibrary::IsRegisteredFlag(FName Flag)
 
 const TArray<FBreakerQuestDefinition>& UBreakerQuestLibrary::GetFallbackQuests()
 {
-    static const TArray<FBreakerQuestDefinition> Quests = []
-    {
-        FBreakerQuestDefinition Contract;
-        Contract.QuestId = TEXT("Quest.FirstContract");
-        Contract.Title = TEXT("THIN THE SPILL");
-        Contract.Giver = TEXT("QUARTERMASTER");
-        Contract.OfferedFlag = BreakerQuestFlags::FirstContractOffered;
-        Contract.AcceptedFlag = BreakerQuestFlags::FirstContractAccepted;
-        Contract.TurnedInFlag = BreakerQuestFlags::FirstContractTurnedIn;
-
-        FBreakerQuestObjective Thin;
-        Thin.ObjectiveId = TEXT("Thin");
-        Thin.Text = TEXT("Thin the spill past the pad");
-        Thin.CompletionFlag = BreakerQuestFlags::FirstContractSpillThinned;
-        Thin.ProgressCounter = BreakerQuestFlags::FirstContractKillCounter;
-        // O2 PLACEHOLDER, but not an arbitrary one: the encounter the contract
-        // NAMES ("the spill out past the pad") spawns exactly three melee and
-        // two LATTICE ranged alongside its elite. An objective the named
-        // encounter cannot satisfy in one pass would send the player to wave
-        // mode to finish a story beat.
-        Thin.RequiredCount = 5;
-        Contract.Objectives.Add(Thin);
-
-        FBreakerQuestObjective Elite;
-        Elite.ObjectiveId = TEXT("Elite");
-        Elite.Text = TEXT("Put the elite down");
-        Elite.CompletionFlag = BreakerQuestFlags::FirstContractEliteDown;
-        Elite.ProgressCounter = BreakerQuestFlags::FirstContractEliteCounter;
-        Elite.RequiredCount = 1; // O2 PLACEHOLDER — the encounter spawns exactly one elite.
-        Elite.bRequiresEliteKill = true;
-        Contract.Objectives.Add(Elite);
-
-        Contract.Reward.ItemCount = 1;                                    // O2 PLACEHOLDER
-        Contract.Reward.MinimumRarity = EBreakerItemRarity::Exceptional;  // O2 PLACEHOLDER
-        Contract.Reward.ItemLevel = 1;                                    // O2 PLACEHOLDER
-
-        // ---- Q2: FEED THE FORGE (Kess, after the first contract closes) ----
-        // Kess's first ask. The chain gate lives on her offer choice
-        // (requires FirstContractTurnedIn), not here — a definition stays a
-        // flat description of the work, and the dialogue decides who may hear
-        // about it. Registry order is chain order: the HUD tracker follows the
-        // first live quest, so the list must read in the order players play it.
-        FBreakerQuestDefinition Salvage;
-        Salvage.QuestId = TEXT("Quest.KessSalvage");
-        Salvage.Title = TEXT("FEED THE FORGE");
-        // "FORGE KEEPER", not the display name "KESS — FORGE KEEPER": the
-        // tracker prints "RETURN TO THE <GIVER>" and the em-dash form does not
-        // survive that sentence.
-        Salvage.Giver = TEXT("FORGE KEEPER");
-        Salvage.OfferedFlag = BreakerQuestFlags::KessSalvageOffered;
-        Salvage.AcceptedFlag = BreakerQuestFlags::KessSalvageAccepted;
-        Salvage.TurnedInFlag = BreakerQuestFlags::KessSalvageTurnedIn;
-        {
-            FBreakerQuestObjective Feedstock;
-            Feedstock.ObjectiveId = TEXT("Feedstock");
-            Feedstock.Text = TEXT("Take feedstock from the spill");
-            Feedstock.CompletionFlag = BreakerQuestFlags::KessSalvageFeedstock;
-            Feedstock.ProgressCounter = BreakerQuestFlags::KessSalvageKillCounter;
-            // O2 PLACEHOLDER, checked against content like the first
-            // contract's 5: the named encounter fields three melee, two
-            // LATTICE and one elite, and every rank feeds an uncounted-rank
-            // objective — so 6 is exactly one full pass of the spill.
-            Feedstock.RequiredCount = 6;
-            Salvage.Objectives.Add(Feedstock);
-        }
-        Salvage.Reward.ItemCount = 1;                                     // O2 PLACEHOLDER
-        Salvage.Reward.MinimumRarity = EBreakerItemRarity::Exceptional;   // O2 PLACEHOLDER
-        Salvage.Reward.ItemLevel = 1;                                     // O2 PLACEHOLDER
-
-        // ---- Q3: THE PATTERN (Quartermaster, after Kess's salvage) ---------
-        FBreakerQuestDefinition Pattern;
-        Pattern.QuestId = TEXT("Quest.Pattern");
-        Pattern.Title = TEXT("THE PATTERN");
-        Pattern.Giver = TEXT("QUARTERMASTER");
-        Pattern.OfferedFlag = BreakerQuestFlags::PatternOffered;
-        Pattern.AcceptedFlag = BreakerQuestFlags::PatternAccepted;
-        Pattern.TurnedInFlag = BreakerQuestFlags::PatternTurnedIn;
-        {
-            FBreakerQuestObjective Marked;
-            Marked.ObjectiveId = TEXT("Marked");
-            Marked.Text = TEXT("Put the marked ones down");
-            Marked.CompletionFlag = BreakerQuestFlags::PatternMarkedDown;
-            Marked.ProgressCounter = BreakerQuestFlags::PatternEliteCounter;
-            // O2 PLACEHOLDER. One elite stands per regroup of the named
-            // ground, so 3 is three returns to the same spill — which IS the
-            // fiction ("same ground, every time"), not a grind bolted onto it.
-            // Wave play pays it too: the director promotes an elite from wave
-            // 4 on.
-            Marked.RequiredCount = 3;
-            Marked.bRequiresEliteKill = true;
-            Pattern.Objectives.Add(Marked);
-        }
-        Pattern.Reward.ItemCount = 1;                                     // O2 PLACEHOLDER
-        Pattern.Reward.MinimumRarity = EBreakerItemRarity::Exceptional;   // O2 PLACEHOLDER
-        Pattern.Reward.ItemLevel = 1;                                     // O2 PLACEHOLDER
-
-        // ---- Q4: DEEPER (Quartermaster, the Act I capstone) ----------------
-        // The brief asked for a boss clear. The kill tracker's only
-        // discrimination is elite-or-above (HandleQuestKill collapses rank to
-        // one bool), so a boss-only objective cannot be honestly counted
-        // today — the honest fallback is a high elite-or-above count, and the
-        // Field Marshal PAYS INTO it when killed, since anything above elite
-        // counts for an elite objective. When rank reaches the notify API,
-        // this objective can tighten without a save migration: the flag names
-        // stay.
-        FBreakerQuestDefinition Deeper;
-        Deeper.QuestId = TEXT("Quest.Deeper");
-        Deeper.Title = TEXT("DEEPER");
-        Deeper.Giver = TEXT("QUARTERMASTER");
-        Deeper.OfferedFlag = BreakerQuestFlags::DeeperOffered;
-        Deeper.AcceptedFlag = BreakerQuestFlags::DeeperAccepted;
-        Deeper.TurnedInFlag = BreakerQuestFlags::DeeperTurnedIn;
-        {
-            FBreakerQuestObjective Sweep;
-            Sweep.ObjectiveId = TEXT("Sweep");
-            Sweep.Text = TEXT("Sweep the source of the spill");
-            Sweep.CompletionFlag = BreakerQuestFlags::DeeperSweepDone;
-            Sweep.ProgressCounter = BreakerQuestFlags::DeeperEliteCounter;
-            // O2 PLACEHOLDER. Five elite-or-above: the field elite, wave
-            // promotions, and the Field Marshal all feed it, so the capstone
-            // is heavier than Q3 without demanding any one source.
-            Sweep.RequiredCount = 5;
-            Sweep.bRequiresEliteKill = true;
-            Deeper.Objectives.Add(Sweep);
-        }
-        // The capstone pays best-in-chain by COUNT, not rarity: Aberrant and
-        // Anomalous are the endgame chase (the teaching order puts Aberrant
-        // limits at A2-10), so an Act I camp contract has no business printing
-        // either. Two Exceptionals is heavier than every prior link without
-        // spending a rarity the campaign has not introduced.
-        Deeper.Reward.ItemCount = 2;                                      // O2 PLACEHOLDER
-        Deeper.Reward.MinimumRarity = EBreakerItemRarity::Exceptional;    // O2 PLACEHOLDER
-        Deeper.Reward.ItemLevel = 1;                                      // O2 PLACEHOLDER
-
-        return TArray<FBreakerQuestDefinition>{ Contract, Salvage, Pattern, Deeper };
-    }();
-    return Quests;
+    return BreakerQuestLoaded().Quests;
 }
 
 bool UBreakerQuestLibrary::FindQuest(FName QuestId, FBreakerQuestDefinition& OutQuest)
@@ -304,6 +435,17 @@ namespace
 bool UBreakerQuestLibrary::ValidateQuestContent(FString& OutError)
 {
     OutError.Reset();
+
+    // A file that did not load clean served EMPTY content, and empty content
+    // references nothing: every check below would pass. The loaders' own
+    // complaints are the validation result in that case.
+    TArray<FString> LoadErrors = GetDataErrors();
+    LoadErrors.Append(ABreakerNPC::GetDialogueErrors());
+    if (!LoadErrors.IsEmpty())
+    {
+        OutError = FString::Join(LoadErrors, TEXT("\n"));
+        return false;
+    }
 
     TArray<FName> Referenced;
     for (const FBreakerQuestDefinition& Quest : GetFallbackQuests())

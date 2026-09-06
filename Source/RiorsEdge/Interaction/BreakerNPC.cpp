@@ -6,6 +6,9 @@
 #include "Components/PointLightComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Data/BreakerDataFile.h"
+#include "Dom/JsonObject.h"
+#include "Dom/JsonValue.h"
 #include "Engine/SkeletalMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
@@ -287,38 +290,306 @@ bool ABreakerNPC::ValidateDialogue(FString& OutError) const
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// THE LOADER — Data/dialogue.json into one row per NPC.
+// ---------------------------------------------------------------------------
+// The file is the conversation. Every node, choice and entry override of both
+// Anchor NPCs is a row here, and the flags they gate on are the same strings
+// Data/quests.json registers; ValidateQuestContent checks that the two files
+// agree. A row that fails any check below fails the WHOLE load: the data
+// comes back empty behind an ensure, because a conversation that dropped one
+// choice and served the rest could strand a player on a node with no exit.
 namespace
 {
-    FBreakerDialogueChoice MakeChoice(const TCHAR* Text, FName NextNodeId = NAME_None, FName SetsQuestFlag = NAME_None,
-        std::initializer_list<FName> RequiredFlags = {}, std::initializer_list<FName> BlockedByFlags = {},
-        EBreakerDialogueAction Action = EBreakerDialogueAction::None)
+    using BreakerDataFile::FBreakerDataErrors;
+
+    const TCHAR* const BreakerDialogueForgeKeeperId = TEXT("ForgeKeeper");
+    const TCHAR* const BreakerDialogueQuartermasterId = TEXT("Quartermaster");
+
+    struct FBreakerDialogueLoad
     {
-        FBreakerDialogueChoice Choice;
-        Choice.Text = Text;
-        Choice.NextNodeId = NextNodeId;
-        Choice.SetsQuestFlag = SetsQuestFlag;
-        Choice.Action = Action;
-        Choice.RequiredFlags = RequiredFlags;
-        Choice.BlockedByFlags = BlockedByFlags;
-        return Choice;
+        FBreakerDialogueData Data;
+        TArray<FString> Errors;
+    };
+
+    bool BreakerDialogueReadString(const FJsonObject& Row, const TCHAR* Field, const FString& Where, FString& Out, FBreakerDataErrors& Errors)
+    {
+        if (!Row.TryGetStringField(Field, Out))
+        {
+            Errors.Add(FString::Printf(TEXT("%s: \"%s\" is missing or not a string"), *Where, Field));
+            return false;
+        }
+        return true;
     }
 
-    FBreakerDialogueNode MakeNode(FName NodeId, const TCHAR* Line, std::initializer_list<FBreakerDialogueChoice> Choices)
+    // A name field; "" reads as NAME_None.
+    bool BreakerDialogueReadName(const FJsonObject& Row, const TCHAR* Field, const FString& Where, FName& Out, FBreakerDataErrors& Errors)
     {
-        FBreakerDialogueNode Node;
-        Node.NodeId = NodeId;
-        Node.SpeakerLine = Line;
-        Node.Choices = Choices;
-        return Node;
+        FString Name;
+        if (!BreakerDialogueReadString(Row, Field, Where, Name, Errors))
+        {
+            return false;
+        }
+        Out = Name.IsEmpty() ? NAME_None : FName(*Name);
+        return true;
     }
 
-    FBreakerDialogueEntry MakeEntry(FName StartNodeId, std::initializer_list<FName> RequiredFlags, std::initializer_list<FName> BlockedByFlags = {})
+    bool BreakerDialogueReadNames(const FJsonObject& Row, const TCHAR* Field, const FString& Where, TArray<FName>& Out, FBreakerDataErrors& Errors)
     {
-        FBreakerDialogueEntry Entry;
-        Entry.StartNodeId = StartNodeId;
-        Entry.RequiredFlags = RequiredFlags;
-        Entry.BlockedByFlags = BlockedByFlags;
-        return Entry;
+        Out.Reset();
+        const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
+        if (!Row.TryGetArrayField(Field, Values))
+        {
+            Errors.Add(FString::Printf(TEXT("%s: \"%s\" is missing or not an array"), *Where, Field));
+            return false;
+        }
+        bool bOk = true;
+        for (const TSharedPtr<FJsonValue>& Value : *Values)
+        {
+            FString Name;
+            if (!Value.IsValid() || !Value->TryGetString(Name) || Name.IsEmpty())
+            {
+                Errors.Add(FString::Printf(TEXT("%s: a \"%s\" entry is not a flag name"), *Where, Field));
+                bOk = false;
+                continue;
+            }
+            Out.Add(FName(*Name));
+        }
+        return bOk;
+    }
+
+    bool BreakerDialogueReadChoice(const FJsonObject& Row, const FString& Where, FBreakerDialogueChoice& Out, FBreakerDataErrors& Errors)
+    {
+        bool bOk = BreakerDialogueReadString(Row, TEXT("text"), Where, Out.Text, Errors);
+        if (bOk && Out.Text.IsEmpty())
+        {
+            Errors.Add(FString::Printf(TEXT("%s: a choice has empty \"text\""), *Where));
+            bOk = false;
+        }
+        bOk = BreakerDialogueReadName(Row, TEXT("nextNodeId"), Where, Out.NextNodeId, Errors) && bOk;
+        bOk = BreakerDialogueReadName(Row, TEXT("setsQuestFlag"), Where, Out.SetsQuestFlag, Errors) && bOk;
+        bOk = BreakerDialogueReadNames(Row, TEXT("requiredFlags"), Where, Out.RequiredFlags, Errors) && bOk;
+        bOk = BreakerDialogueReadNames(Row, TEXT("blockedByFlags"), Where, Out.BlockedByFlags, Errors) && bOk;
+
+        FString Action;
+        if (!Row.TryGetStringField(TEXT("action"), Action) || !BreakerDataFile::ParseEnum(Action, Out.Action))
+        {
+            Errors.Add(FString::Printf(TEXT("%s: \"action\" is \"%s\", not an EBreakerDialogueAction"), *Where, *Action));
+            bOk = false;
+        }
+        return bOk;
+    }
+
+    bool BreakerDialogueReadNode(const FJsonObject& Row, const FString& NpcId, FBreakerDialogueNode& Out, FBreakerDataErrors& Errors)
+    {
+        FString Id;
+        if (!Row.TryGetStringField(TEXT("nodeId"), Id) || Id.IsEmpty())
+        {
+            Errors.Add(FString::Printf(TEXT("%s: a node has no \"nodeId\""), *NpcId));
+            return false;
+        }
+        Out.NodeId = FName(*Id);
+        const FString Where = NpcId + TEXT(".") + Id;
+
+        bool bOk = BreakerDialogueReadString(Row, TEXT("speakerLine"), Where, Out.SpeakerLine, Errors);
+        bOk = BreakerDialogueReadNames(Row, TEXT("requiredFlags"), Where, Out.RequiredFlags, Errors) && bOk;
+        bOk = BreakerDialogueReadNames(Row, TEXT("blockedByFlags"), Where, Out.BlockedByFlags, Errors) && bOk;
+
+        Out.Choices.Reset();
+        const TArray<TSharedPtr<FJsonValue>>* Choices = nullptr;
+        if (!Row.TryGetArrayField(TEXT("choices"), Choices))
+        {
+            Errors.Add(FString::Printf(TEXT("%s: \"choices\" is missing or not an array"), *Where));
+            return false;
+        }
+        for (const TSharedPtr<FJsonValue>& Value : *Choices)
+        {
+            const TSharedPtr<FJsonObject>* ChoiceObject = nullptr;
+            if (!Value.IsValid() || !Value->TryGetObject(ChoiceObject))
+            {
+                Errors.Add(FString::Printf(TEXT("%s: a \"choices\" entry is not an object"), *Where));
+                bOk = false;
+                continue;
+            }
+            FBreakerDialogueChoice Choice;
+            if (!BreakerDialogueReadChoice(**ChoiceObject, Where, Choice, Errors))
+            {
+                bOk = false;
+                continue;
+            }
+            Out.Choices.Add(Choice);
+        }
+        return bOk;
+    }
+
+    bool BreakerDialogueReadEntry(const FJsonObject& Row, const FString& NpcId, FBreakerDialogueEntry& Out, FBreakerDataErrors& Errors)
+    {
+        const FString Where = NpcId + TEXT(".entries");
+        bool bOk = BreakerDialogueReadName(Row, TEXT("startNodeId"), Where, Out.StartNodeId, Errors);
+        if (bOk && Out.StartNodeId.IsNone())
+        {
+            Errors.Add(FString::Printf(TEXT("%s: an entry has empty \"startNodeId\""), *Where));
+            bOk = false;
+        }
+        bOk = BreakerDialogueReadNames(Row, TEXT("requiredFlags"), Where, Out.RequiredFlags, Errors) && bOk;
+        bOk = BreakerDialogueReadNames(Row, TEXT("blockedByFlags"), Where, Out.BlockedByFlags, Errors) && bOk;
+        return bOk;
+    }
+
+    // One npc row. Returns false with every field-level complaint recorded,
+    // not just the first.
+    bool BreakerDialogueReadNpc(const FJsonObject& Row, FBreakerDialogueRow& Out, FBreakerDataErrors& Errors)
+    {
+        FString Id;
+        if (!Row.TryGetStringField(TEXT("id"), Id) || Id.IsEmpty())
+        {
+            Errors.Add(TEXT("an npc row has no \"id\""));
+            return false;
+        }
+        Out.Id = FName(*Id);
+
+        bool bOk = BreakerDialogueReadString(Row, TEXT("displayName"), Id, Out.DisplayName, Errors);
+        if (bOk && Out.DisplayName.IsEmpty())
+        {
+            Errors.Add(FString::Printf(TEXT("%s: \"displayName\" is empty"), *Id));
+            bOk = false;
+        }
+        bOk = BreakerDialogueReadName(Row, TEXT("startNodeId"), Id, Out.StartNodeId, Errors) && bOk;
+        if (Out.StartNodeId.IsNone())
+        {
+            Errors.Add(FString::Printf(TEXT("%s: \"startNodeId\" is empty"), *Id));
+            bOk = false;
+        }
+
+        Out.Nodes.Reset();
+        const TArray<TSharedPtr<FJsonValue>>* Nodes = nullptr;
+        if (!Row.TryGetArrayField(TEXT("nodes"), Nodes))
+        {
+            Errors.Add(FString::Printf(TEXT("%s: \"nodes\" is missing or not an array"), *Id));
+            bOk = false;
+        }
+        else
+        {
+            for (const TSharedPtr<FJsonValue>& Value : *Nodes)
+            {
+                const TSharedPtr<FJsonObject>* NodeObject = nullptr;
+                if (!Value.IsValid() || !Value->TryGetObject(NodeObject))
+                {
+                    Errors.Add(FString::Printf(TEXT("%s: a \"nodes\" entry is not an object"), *Id));
+                    bOk = false;
+                    continue;
+                }
+                FBreakerDialogueNode Node;
+                if (!BreakerDialogueReadNode(**NodeObject, Id, Node, Errors))
+                {
+                    bOk = false;
+                    continue;
+                }
+                if (Out.Nodes.ContainsByPredicate([&Node](const FBreakerDialogueNode& Other) { return Other.NodeId == Node.NodeId; }))
+                {
+                    Errors.Add(FString::Printf(TEXT("%s: node \"%s\" appears twice"), *Id, *Node.NodeId.ToString()));
+                    bOk = false;
+                    continue;
+                }
+                Out.Nodes.Add(Node);
+            }
+        }
+
+        Out.Entries.Reset();
+        const TArray<TSharedPtr<FJsonValue>>* Entries = nullptr;
+        if (!Row.TryGetArrayField(TEXT("entries"), Entries))
+        {
+            Errors.Add(FString::Printf(TEXT("%s: \"entries\" is missing or not an array"), *Id));
+            bOk = false;
+        }
+        else
+        {
+            for (const TSharedPtr<FJsonValue>& Value : *Entries)
+            {
+                const TSharedPtr<FJsonObject>* EntryObject = nullptr;
+                if (!Value.IsValid() || !Value->TryGetObject(EntryObject))
+                {
+                    Errors.Add(FString::Printf(TEXT("%s: an \"entries\" entry is not an object"), *Id));
+                    bOk = false;
+                    continue;
+                }
+                FBreakerDialogueEntry Entry;
+                if (!BreakerDialogueReadEntry(**EntryObject, Id, Entry, Errors))
+                {
+                    bOk = false;
+                    continue;
+                }
+                Out.Entries.Add(Entry);
+            }
+        }
+        return bOk;
+    }
+
+    FBreakerDialogueLoad BreakerDialogueLoadData()
+    {
+        FBreakerDialogueLoad Load;
+        FBreakerDataErrors Errors;
+        FBreakerDialogueData Data;
+        const FString File = ABreakerNPC::DialogueRelativePath();
+
+        const TSharedPtr<FJsonObject> Root = BreakerDataFile::Load(File, Errors);
+        if (Root.IsValid())
+        {
+            const TArray<TSharedPtr<FJsonValue>>* RowValues = nullptr;
+            if (!Root->TryGetArrayField(TEXT("npcs"), RowValues))
+            {
+                Errors.Add(FString::Printf(TEXT("%s: no \"npcs\" array"), *File));
+            }
+            else
+            {
+                for (const TSharedPtr<FJsonValue>& Value : *RowValues)
+                {
+                    const TSharedPtr<FJsonObject>* RowObject = nullptr;
+                    if (!Value.IsValid() || !Value->TryGetObject(RowObject))
+                    {
+                        Errors.Add(FString::Printf(TEXT("%s: an \"npcs\" entry is not an object"), *File));
+                        continue;
+                    }
+                    FBreakerDialogueRow Row;
+                    if (!BreakerDialogueReadNpc(**RowObject, Row, Errors))
+                    {
+                        continue;
+                    }
+                    if (Data.Npcs.ContainsByPredicate([&Row](const FBreakerDialogueRow& Other) { return Other.Id == Row.Id; }))
+                    {
+                        Errors.Add(FString::Printf(TEXT("%s: id appears twice"), *Row.Id.ToString()));
+                        continue;
+                    }
+                    Data.Npcs.Add(Row);
+                }
+            }
+        }
+
+        if (!Errors.IsClean())
+        {
+            Load.Errors = Errors.Messages;
+            ensureMsgf(false, TEXT("%s failed to load; the dialogue is EMPTY.\n%s"), *File, *Errors.Join());
+            return Load;
+        }
+        Load.Data = MoveTemp(Data);
+        return Load;
+    }
+
+    const FBreakerDialogueLoad& BreakerDialogueLoaded()
+    {
+        static const FBreakerDialogueLoad Load = BreakerDialogueLoadData();
+        return Load;
+    }
+
+    // The row by id, or an empty row: a dirty load serves nothing, and the
+    // callers' emptiness is what the tests then report.
+    const FBreakerDialogueRow& BreakerDialogueRowById(const TCHAR* Id)
+    {
+        static const FBreakerDialogueRow Empty;
+        const FName Key(Id);
+        const FBreakerDialogueRow* Row = BreakerDialogueLoaded().Data.Npcs.FindByPredicate(
+            [Key](const FBreakerDialogueRow& Candidate) { return Candidate.Id == Key; });
+        return Row ? *Row : Empty;
     }
 
     ABreakerNPC* SpawnNPC(UWorld* World, const FVector& Location, const FRotator& Rotation)
@@ -330,243 +601,50 @@ namespace
     }
 }
 
+FString ABreakerNPC::DialogueRelativePath()
+{
+    return TEXT("Data/dialogue.json");
+}
+
+const FBreakerDialogueData& ABreakerNPC::GetDialogueData()
+{
+    return BreakerDialogueLoaded().Data;
+}
+
+const TArray<FString>& ABreakerNPC::GetDialogueErrors()
+{
+    return BreakerDialogueLoaded().Errors;
+}
+
 TArray<FBreakerDialogueNode> ABreakerNPC::MakeForgeKeeperDialogue()
 {
-    using namespace BreakerQuestFlags;
-    return
-    {
-        MakeNode(TEXT("Start"), TEXT("The Forge is cold today. Bring me something worth heating."),
-        {
-            MakeChoice(TEXT("What do you do here?"), TEXT("Role")),
-            // O42/content-and-modes: the Forge is an Anchor interaction and this
-            // is now the only way to it, on every entry state Kess has. No node
-            // id or quest flag moves — BreakerQuestLoopTests walks this dialogue
-            // and the salvage chain reads its flags.
-            MakeChoice(TEXT("Open the Forge."), NAME_None, NAME_None, {}, {},
-                EBreakerDialogueAction::OpenForge),
-            // Gated: Kess only acknowledges the contract once it is closed, and
-            // this is the smallest possible proof that a flag changes what an
-            // NPC says.
-            MakeChoice(TEXT("The Quartermaster's contract is closed."), TEXT("Contract"), NAME_None, { FirstContractTurnedIn }),
-            // The chain's second link: Kess only asks once the first contract
-            // proved the player comes back. Blocks on her own acceptance.
-            MakeChoice(TEXT("What would heat the Forge?"), TEXT("Salvage"), KessSalvageOffered, { FirstContractTurnedIn }, { KessSalvageAccepted }),
-            MakeChoice(TEXT("Still gathering your feedstock."), TEXT("SalvageProgress"), NAME_None, { KessSalvageAccepted }, { KessSalvageTurnedIn }),
-            MakeChoice(TEXT("You're an Effigy, aren't you?"), TEXT("Effigy"), NAME_None, {}, { AskedKessAboutRior }),
-            MakeChoice(TEXT("[Leave] Another time.")),
-        }),
-        MakeNode(TEXT("Role"), TEXT("Respecs. Crafting. Tier work, when you find gear worth the risk. The Forge handles every change you'll ever make to yourself — remember that."),
-        {
-            MakeChoice(TEXT("I'll bring you something."), TEXT("Start"), MetForgeKeeper),
-            MakeChoice(TEXT("[Leave] Good to know.")),
-        }),
-        MakeNode(TEXT("Contract"), TEXT("So I heard. The Quartermaster counts what comes back, and this time the count was right. That buys you a hearing here, when you have something to bring."),
-        {
-            MakeChoice(TEXT("[Leave] I'll remember that.")),
-        }),
-        MakeNode(TEXT("Effigy"), TEXT("...Yes. Built before the militia captured the shipment. I remember being manufactured. Ask me what you actually came to ask, or don't."),
-        {
-            MakeChoice(TEXT("Did you ever meet Rior?"), TEXT("Rior")),
-            MakeChoice(TEXT("[Leave] Sorry. None of my business.")),
-        }),
-        MakeNode(TEXT("Rior"), TEXT("(A long pause. The Forge hums.) ...Bring me something worth heating, Breaker."),
-        {
-            MakeChoice(TEXT("[Leave] ...Understood."), NAME_None, AskedKessAboutRior),
-        }),
-        // Entry target: what Kess opens with once the question has been asked.
-        MakeNode(TEXT("Returned"), TEXT("(The Forge is still cold. Kess does not look up.) You came back. That's more than most."),
-        {
-            MakeChoice(TEXT("What do you do here?"), TEXT("Role")),
-            // O42/content-and-modes: the Forge is an Anchor interaction and this
-            // is now the only way to it, on every entry state Kess has. No node
-            // id or quest flag moves — BreakerQuestLoopTests walks this dialogue
-            // and the salvage chain reads its flags.
-            MakeChoice(TEXT("Open the Forge."), NAME_None, NAME_None, {}, {},
-                EBreakerDialogueAction::OpenForge),
-            MakeChoice(TEXT("The Quartermaster's contract is closed."), TEXT("Contract"), NAME_None, { FirstContractTurnedIn }),
-            MakeChoice(TEXT("What would heat the Forge?"), TEXT("Salvage"), KessSalvageOffered, { FirstContractTurnedIn }, { KessSalvageAccepted }),
-            MakeChoice(TEXT("Still gathering your feedstock."), TEXT("SalvageProgress"), NAME_None, { KessSalvageAccepted }, { KessSalvageTurnedIn }),
-            MakeChoice(TEXT("[Leave] Another time.")),
-        }),
-
-        // ---- Q2: FEED THE FORGE --------------------------------------------
-        MakeNode(TEXT("Salvage"), TEXT("(Kess turns a cold crucible with one hand.) Feedstock. Vestige residue burns, and the spill carries more of it than the ground can rot. Six of them. Bring me what's left when they drop — I'll know the weight when you walk in."),
-        {
-            MakeChoice(TEXT("You'll have it."), NAME_None, KessSalvageAccepted),
-            MakeChoice(TEXT("[Leave] Not today.")),
-        }),
-        MakeNode(TEXT("SalvageProgress"), TEXT("Not the weight yet. Six carcasses' worth. The Forge has waited years — it can wait an afternoon."),
-        {
-            MakeChoice(TEXT("[Leave] Working on it.")),
-        }),
-        // Entry target: the turn-in. She said she'd know the weight; she does.
-        MakeNode(TEXT("SalvageTurnIn"), TEXT("(Kess does not weigh anything. Kess already knows.) That's the weight. The Forge takes it. ...It's warmer in here now. Remember that, next time you find something worth heating."),
-        {
-            MakeChoice(TEXT("The Forge eats first."), NAME_None, KessSalvageTurnedIn),
-            MakeChoice(TEXT("[Leave] Later.")),
-        }),
-        // Entry target after the salvage closes: her opening line stops being
-        // "the Forge is cold", because it stopped being true and she is the
-        // one character who would never say a false thing about the Forge.
-        MakeNode(TEXT("Warm"), TEXT("(The Forge is lit. Low, but lit.) You did that. Now find me something worth it."),
-        {
-            MakeChoice(TEXT("What do you do here?"), TEXT("Role")),
-            // O42/content-and-modes: the Forge is an Anchor interaction and this
-            // is now the only way to it, on every entry state Kess has. No node
-            // id or quest flag moves — BreakerQuestLoopTests walks this dialogue
-            // and the salvage chain reads its flags.
-            MakeChoice(TEXT("Open the Forge."), NAME_None, NAME_None, {}, {},
-                EBreakerDialogueAction::OpenForge),
-            MakeChoice(TEXT("You're an Effigy, aren't you?"), TEXT("Effigy"), NAME_None, {}, { AskedKessAboutRior }),
-            MakeChoice(TEXT("[Leave] Another time.")),
-        }),
-    };
+    return BreakerDialogueRowById(BreakerDialogueForgeKeeperId).Nodes;
 }
 
 TArray<FBreakerDialogueEntry> ABreakerNPC::MakeForgeKeeperEntries()
 {
-    using namespace BreakerQuestFlags;
-    return
-    {
-        // Most progressed first, same rule as the Quartermaster's.
-        MakeEntry(TEXT("SalvageTurnIn"), { KessSalvageAccepted, KessSalvageFeedstock }, { KessSalvageTurnedIn }),
-        MakeEntry(TEXT("Warm"), { KessSalvageTurnedIn }),
-        MakeEntry(TEXT("Returned"), { AskedKessAboutRior }),
-    };
+    return BreakerDialogueRowById(BreakerDialogueForgeKeeperId).Entries;
 }
 
 TArray<FBreakerDialogueNode> ABreakerNPC::MakeQuartermasterDialogue()
 {
-    using namespace BreakerQuestFlags;
-    return
-    {
-        MakeNode(TEXT("Start"), TEXT("Ammo's on the shelf, gear's in the crates. You breaking things or buying things?"),
-        {
-            MakeChoice(TEXT("Show me what you've got."), TEXT("Vendor")),
-            // Offering and accepting are two different flags on purpose: a
-            // contract the player heard and walked away from is a different
-            // state from one never mentioned, and the quest object reads both.
-            MakeChoice(TEXT("Anything need doing around here?"), TEXT("Job"), FirstContractOffered, {}, { FirstContractAccepted }),
-            MakeChoice(TEXT("Still working on that spill."), TEXT("Progress"), NAME_None, { FirstContractAccepted }, { FirstContractTurnedIn }),
-            // The chain gates, each one line: an offer requires the PREVIOUS
-            // quest's turn-in and blocks on its own acceptance, so the chain
-            // order is authored exactly once per link.
-            MakeChoice(TEXT("Got another contract?"), TEXT("Pattern"), PatternOffered, { KessSalvageTurnedIn }, { PatternAccepted }),
-            MakeChoice(TEXT("Still counting your marked."), TEXT("PatternProgress"), NAME_None, { PatternAccepted }, { PatternTurnedIn }),
-            MakeChoice(TEXT("What's this about a bad rift?"), TEXT("Deeper"), DeeperOffered, { PatternTurnedIn }, { DeeperAccepted }),
-            MakeChoice(TEXT("Still sweeping the source."), TEXT("DeeperProgress"), NAME_None, { DeeperAccepted }, { DeeperTurnedIn }),
-            MakeChoice(TEXT("[Leave] Just passing through.")),
-        }),
-        // O100. THE NODE ID AND THE FLAG ARE LOAD-BEARING and are deliberately
-        // unchanged: BreakerQuestLoopTests walks this dialogue through
-        // ValidateDialogue / GetVisibleChoices / ResolveStartNodeId, and
-        // CheckedVendor is a registered quest flag two contracts read. The body
-        // text and the first choice's destination are what moved.
-        MakeNode(TEXT("Vendor"), TEXT("Requisitions, then. Anything your class is cleared for, I can sign out — one token a piece, and I don't take Riftglass for it. Rift work earns the tokens; I just hold the keys."),
-        {
-            MakeChoice(TEXT("Show me the requisition list."), NAME_None, CheckedVendor, {}, {},
-                EBreakerDialogueAction::OpenQuartermaster),
-            MakeChoice(TEXT("[Leave] I'll check back."), NAME_None, CheckedVendor),
-        }),
-        MakeNode(TEXT("Job"), TEXT("The spill out past the pad keeps regrouping. Thin it out, and put that elite down while you're at it. I count what comes back — that's the job."),
-        {
-            MakeChoice(TEXT("Consider it done."), NAME_None, FirstContractAccepted),
-            MakeChoice(TEXT("[Leave] Not my problem yet.")),
-        }),
-        MakeNode(TEXT("Progress"), TEXT("Count's not right yet. The spill's still moving and that elite's still upright. Come back when both of those stop being true."),
-        {
-            MakeChoice(TEXT("[Leave] Working on it.")),
-        }),
-        // Entry target: the turn-in. Reached by walking up, not by hunting for
-        // a menu option — that is what per-NPC entry state buys.
-        MakeNode(TEXT("ReadyTurnIn"), TEXT("Count's right. Spill's thinned and the elite's down. You did the job and you came back to say so, which is rarer than the first part."),
-        {
-            MakeChoice(TEXT("That's the job."), NAME_None, FirstContractTurnedIn),
-            MakeChoice(TEXT("[Leave] Later.")),
-        }),
-        MakeNode(TEXT("Done"), TEXT("Contract's closed and you've been paid. There'll be more — the spill always comes back. Ammo's still on the shelf."),
-        {
-            // Every closed-contract node routes back to Start, because the
-            // entry overrides OPEN on these nodes: without the route, a player
-            // who lands here could never reach the next offer.
-            MakeChoice(TEXT("Anything else need doing?"), TEXT("Start")),
-            MakeChoice(TEXT("[Leave] I'll be around.")),
-        }),
-
-        // ---- Q3: THE PATTERN ------------------------------------------------
-        MakeNode(TEXT("Pattern"), TEXT("Second contract. The spill keeps regrouping — same ground, same hours — and the marked ones are up front now, every time. Three of them, down. I want to see if the next count sheet reads different."),
-        {
-            MakeChoice(TEXT("Consider it done."), NAME_None, PatternAccepted),
-            MakeChoice(TEXT("[Leave] Not yet.")),
-        }),
-        MakeNode(TEXT("PatternProgress"), TEXT("Count's short. The marked don't fall easy — that's why the contract says three and not thirty. Come back when the sheet's full."),
-        {
-            MakeChoice(TEXT("[Leave] Working on it.")),
-        }),
-        // Her first unease. In HER register: no theory, no rift talk — a count
-        // sheet that will not add up, filed under the only box it fits.
-        MakeNode(TEXT("PatternTurnIn"), TEXT("Count's right. Three marked, three down. ...Off the record: spills drift. This one doesn't. Same ground, every time, like something's taking a measurement. The sheet doesn't have a box for that, so it's going down as weather."),
-        {
-            MakeChoice(TEXT("That's the job."), NAME_None, PatternTurnedIn),
-            MakeChoice(TEXT("[Leave] Later.")),
-        }),
-        MakeNode(TEXT("PatternDone"), TEXT("Contract's closed, paid in full. Sheet still says weather. Weather doesn't hold formation."),
-        {
-            MakeChoice(TEXT("Anything else need doing?"), TEXT("Start")),
-            MakeChoice(TEXT("[Leave] I'll be around.")),
-        }),
-
-        // ---- Q4: DEEPER -----------------------------------------------------
-        // Seeds Act II in the only register that doesn't overreach: a rift
-        // that "didn't close clean" — Command's words, which she repeats and
-        // declines to interpret. Nothing is named.
-        MakeNode(TEXT("Deeper"), TEXT("Last one on my sheet, and I don't love writing it. Command flagged a rift out past the far ground — didn't close clean, their words. Everything it lets through comes up marked. Sweep it: five of the marked, and whatever's biggest goes down first."),
-        {
-            MakeChoice(TEXT("Consider it done."), NAME_None, DeeperAccepted),
-            MakeChoice(TEXT("[Leave] Not yet.")),
-        }),
-        MakeNode(TEXT("DeeperProgress"), TEXT("Sweep's not done. Five of the marked, and the count's honest or it's nothing. Same as always — I count what comes back."),
-        {
-            MakeChoice(TEXT("[Leave] Working on it.")),
-        }),
-        MakeNode(TEXT("DeeperTurnIn"), TEXT("Five down, and you walked back in to say so. Good count. ...That rift's still out there. Didn't close clean — Command's words, not mine. It's gone up the chain, and what goes up the chain comes back down with a name and a Breaker attached. Sleep while you can."),
-        {
-            MakeChoice(TEXT("That's the job."), NAME_None, DeeperTurnedIn),
-            MakeChoice(TEXT("[Leave] Later.")),
-        }),
-        MakeNode(TEXT("DeeperDone"), TEXT("Sheet's clear. First time since you signed in. Restock while it lasts — when that name comes back down the chain, it'll be yours."),
-        {
-            MakeChoice(TEXT("Anything else need doing?"), TEXT("Start")),
-            MakeChoice(TEXT("[Leave] I'll be around.")),
-        }),
-    };
+    return BreakerDialogueRowById(BreakerDialogueQuartermasterId).Nodes;
 }
 
 TArray<FBreakerDialogueEntry> ABreakerNPC::MakeQuartermasterEntries()
 {
-    using namespace BreakerQuestFlags;
-    return
-    {
-        // Most progressed first. The closed-contract greetings additionally
-        // block on the NEXT quest being in play, so a mid-chain player gets
-        // the ordinary Start (where the live progress line is) rather than a
-        // stale closure line.
-        MakeEntry(TEXT("DeeperDone"), { DeeperTurnedIn }),
-        MakeEntry(TEXT("DeeperTurnIn"), { DeeperAccepted, DeeperSweepDone }, { DeeperTurnedIn }),
-        MakeEntry(TEXT("PatternDone"), { PatternTurnedIn }, { DeeperOffered }),
-        MakeEntry(TEXT("PatternTurnIn"), { PatternAccepted, PatternMarkedDown }, { PatternTurnedIn }),
-        MakeEntry(TEXT("Done"), { FirstContractTurnedIn }, { PatternOffered }),
-        MakeEntry(TEXT("ReadyTurnIn"), { FirstContractSpillThinned, FirstContractEliteDown }, { FirstContractTurnedIn }),
-    };
+    return BreakerDialogueRowById(BreakerDialogueQuartermasterId).Entries;
 }
 
 ABreakerNPC* ABreakerNPC::SpawnForgeKeeper(UWorld* World, const FVector& Location, const FRotator& Rotation)
 {
     ABreakerNPC* NPC = SpawnNPC(World, Location, Rotation);
     if (!NPC) return nullptr;
-    NPC->DisplayName = FText::FromString(TEXT("KESS — FORGE KEEPER"));
-    NPC->DialogueNodes = MakeForgeKeeperDialogue();
-    NPC->EntryOverrides = MakeForgeKeeperEntries();
+    const FBreakerDialogueRow& Row = BreakerDialogueRowById(BreakerDialogueForgeKeeperId);
+    NPC->DisplayName = FText::FromString(Row.DisplayName);
+    NPC->StartNodeId = Row.StartNodeId;
+    NPC->DialogueNodes = Row.Nodes;
+    NPC->EntryOverrides = Row.Entries;
     // The blockout's own Kess, by name (ruled).
     // KESS = Superhero_Female_FullBody, recorded in Assets/npcs/
     // LICENSE-NOTE.txt with the one-body-family ruling; her blockout statue
@@ -583,9 +661,11 @@ ABreakerNPC* ABreakerNPC::SpawnQuartermaster(UWorld* World, const FVector& Locat
 {
     ABreakerNPC* NPC = SpawnNPC(World, Location, Rotation);
     if (!NPC) return nullptr;
-    NPC->DisplayName = FText::FromString(TEXT("QUARTERMASTER"));
-    NPC->DialogueNodes = MakeQuartermasterDialogue();
-    NPC->EntryOverrides = MakeQuartermasterEntries();
+    const FBreakerDialogueRow& Row = BreakerDialogueRowById(BreakerDialogueQuartermasterId);
+    NPC->DisplayName = FText::FromString(Row.DisplayName);
+    NPC->StartNodeId = Row.StartNodeId;
+    NPC->DialogueNodes = Row.Nodes;
+    NPC->EntryOverrides = Row.Entries;
     // The Quartermaster wears the male base at a plain idle — the second of
     // the pack's two bodies, distinct from Kess at a glance.
     NPC->BodyMeshAsset = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/npcs/Superhero_Male_FullBody/SkeletalMeshes/SuperHero_Male.SuperHero_Male"));

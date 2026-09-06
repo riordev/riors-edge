@@ -2,9 +2,11 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Data/BreakerCensus.h"
+#include "Interaction/BreakerNPC.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "Progression/BreakerProgressionTree.h"
+#include "Save/BreakerQuestContent.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -117,6 +119,142 @@ bool FBreakerAffixesFreshTest::RunTest(const FString& Parameters)
         AddError(FString::Printf(
             TEXT("%s is not in canonical form against what the library loaded. ")
             TEXT("Run `bash Scripts/ue-census.sh` and commit Data/affixes.json in the same change."),
+            *Path));
+        return false;
+    }
+    return true;
+}
+
+// THE COMMITTED QUEST FILE IS THE LOADED REGISTRY, OR THIS IS RED.
+//
+// Data/quests.json is what UBreakerQuestLibrary loads: the flag registry and
+// the Act I chain. Same pin as the affix file — one canonical spelling, so a
+// diff on it is always a change of content — plus the shipped configuration:
+// the chain in play order, the registry at its full size, and the progress
+// counters kept OUT of it (they are counter identifiers, not gates).
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerQuestsFreshTest,
+    "RiorsEdge.Data.Quests.Fresh",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerQuestsFreshTest::RunTest(const FString& Parameters)
+{
+    const TArray<FString>& LoadErrors = UBreakerQuestLibrary::GetDataErrors();
+    for (const FString& Error : LoadErrors)
+    {
+        AddError(Error);
+    }
+    if (!LoadErrors.IsEmpty())
+    {
+        return false;
+    }
+
+    const TArray<FBreakerQuestDefinition>& Quests = UBreakerQuestLibrary::GetFallbackQuests();
+    const TArray<FName>& Flags = UBreakerQuestLibrary::GetRegisteredFlags();
+
+    TestEqual(TEXT("The Act I chain is four quests"), Quests.Num(), 4);
+    const TArray<FName> ChainOrder = { TEXT("Quest.FirstContract"), TEXT("Quest.KessSalvage"), TEXT("Quest.Pattern"), TEXT("Quest.Deeper") };
+    for (int32 Index = 0; Index < ChainOrder.Num() && Index < Quests.Num(); ++Index)
+    {
+        TestEqual(TEXT("File order is chain order"), Quests[Index].QuestId, ChainOrder[Index]);
+    }
+    int32 ObjectiveCount = 0;
+    for (const FBreakerQuestDefinition& Quest : Quests) { ObjectiveCount += Quest.Objectives.Num(); }
+    TestEqual(TEXT("Five objectives across the chain"), ObjectiveCount, 5);
+    TestEqual(TEXT("Twenty registered flags"), Flags.Num(), 20);
+    TestTrue(TEXT("A quest flag is registered"), UBreakerQuestLibrary::IsRegisteredFlag(BreakerQuestFlags::FirstContractTurnedIn));
+    TestFalse(TEXT("A progress counter is not a registered flag"), UBreakerQuestLibrary::IsRegisteredFlag(BreakerQuestFlags::FirstContractKillCounter));
+    AddInfo(FString::Printf(TEXT("Quest registry: %d quests, %d objectives, %d flags"), Quests.Num(), ObjectiveCount, Flags.Num()));
+
+    const FString Fresh = BreakerCensus::ExportQuests(Quests, Flags);
+
+    const FString Path = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / BreakerCensus::QuestsRelativePath());
+    FString Committed;
+    if (!FFileHelper::LoadFileToString(Committed, *Path))
+    {
+        AddError(FString::Printf(TEXT("%s is missing. Run `bash Scripts/ue-census.sh` and commit the file."), *Path));
+        return false;
+    }
+    Committed.ReplaceInline(TEXT("\r\n"), TEXT("\n"));
+
+    if (Committed != Fresh)
+    {
+        AddError(FString::Printf(
+            TEXT("%s is not in canonical form against what the library loaded. ")
+            TEXT("Run `bash Scripts/ue-census.sh` and commit Data/quests.json in the same change."),
+            *Path));
+        return false;
+    }
+    return true;
+}
+
+// THE COMMITTED DIALOGUE FILE IS THE LOADED CONVERSATION, OR THIS IS RED.
+//
+// Data/dialogue.json is what ABreakerNPC loads for both Anchor NPCs. Same pin
+// as the other two data files, plus the shipped configuration: the two rows
+// by id and the node, choice and entry counts the walkers in
+// BreakerQuestLoopTests exercise.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerDialogueFreshTest,
+    "RiorsEdge.Data.Dialogue.Fresh",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerDialogueFreshTest::RunTest(const FString& Parameters)
+{
+    const TArray<FString>& LoadErrors = ABreakerNPC::GetDialogueErrors();
+    for (const FString& Error : LoadErrors)
+    {
+        AddError(Error);
+    }
+    if (!LoadErrors.IsEmpty())
+    {
+        return false;
+    }
+
+    const FBreakerDialogueData& Data = ABreakerNPC::GetDialogueData();
+    TestEqual(TEXT("Two npcs"), Data.Npcs.Num(), 2);
+    const FBreakerDialogueRow* Kess = Data.Npcs.FindByPredicate([](const FBreakerDialogueRow& Row) { return Row.Id == FName(TEXT("ForgeKeeper")); });
+    const FBreakerDialogueRow* Quartermaster = Data.Npcs.FindByPredicate([](const FBreakerDialogueRow& Row) { return Row.Id == FName(TEXT("Quartermaster")); });
+    if (!Kess || !Quartermaster)
+    {
+        AddError(TEXT("ForgeKeeper and Quartermaster are the two rows"));
+        return false;
+    }
+    TestEqual(TEXT("Kess has ten nodes"), Kess->Nodes.Num(), 10);
+    TestEqual(TEXT("Kess has three entries"), Kess->Entries.Num(), 3);
+    TestEqual(TEXT("The Quartermaster has fourteen nodes"), Quartermaster->Nodes.Num(), 14);
+    TestEqual(TEXT("The Quartermaster has six entries"), Quartermaster->Entries.Num(), 6);
+
+    int32 NodeCount = 0;
+    int32 ChoiceCount = 0;
+    int32 EntryCount = 0;
+    for (const FBreakerDialogueRow& Row : Data.Npcs)
+    {
+        NodeCount += Row.Nodes.Num();
+        EntryCount += Row.Entries.Num();
+        for (const FBreakerDialogueNode& Node : Row.Nodes) { ChoiceCount += Node.Choices.Num(); }
+    }
+    TestEqual(TEXT("Twenty-four nodes"), NodeCount, 24);
+    TestEqual(TEXT("Fifty-nine choices"), ChoiceCount, 59);
+    TestEqual(TEXT("Nine entries"), EntryCount, 9);
+    AddInfo(FString::Printf(TEXT("Dialogue: %d npcs, %d nodes, %d choices, %d entries"), Data.Npcs.Num(), NodeCount, ChoiceCount, EntryCount));
+
+    const FString Fresh = BreakerCensus::ExportDialogue(Data);
+
+    const FString Path = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / BreakerCensus::DialogueRelativePath());
+    FString Committed;
+    if (!FFileHelper::LoadFileToString(Committed, *Path))
+    {
+        AddError(FString::Printf(TEXT("%s is missing. Run `bash Scripts/ue-census.sh` and commit the file."), *Path));
+        return false;
+    }
+    Committed.ReplaceInline(TEXT("\r\n"), TEXT("\n"));
+
+    if (Committed != Fresh)
+    {
+        AddError(FString::Printf(
+            TEXT("%s is not in canonical form against what the NPCs loaded. ")
+            TEXT("Run `bash Scripts/ue-census.sh` and commit Data/dialogue.json in the same change."),
             *Path));
         return false;
     }
