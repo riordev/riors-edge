@@ -385,4 +385,16 @@ Numbers are permanent and never reused.
 
 **O209** — The Anchor's NPCs are Kess and the Quartermaster until the story names more; a designed name with no dialogue row is not an NPC.
 
-**O210** — XP and level leave the combat HUD once the pause plate carries them; the pause screen has no LOADOUT row..
+**O210** — XP and level leave the combat HUD once the pause plate carries them; the pause screen has no LOADOUT row.
+
+**O211** — The Core wheel is one tree shared by every class, its points level-driven; Doctrine is class-specific, committed at its story beat, its points story-driven. Class flavour on the Core is a lit recommendation, never a lock; the hub is the only start.
+
+**O212** — The wheel has five domain sectors — movement, weapon, defence, ability, elements — each holding its constellations as wedges. A constellation with a silent node is drawn dark and unselectable until its plumbing exists; the wheel never hides a sector.
+
+**O213** — No bead is a travel node: every rank carries a magnitude. Core respec is free until level N and costs Riftglass after; Doctrine respec stays the Forge's.
+
+**O214** — Act I ends on The Holdfast, a Vestige mass, and no Altered commands before Act II; the Field Marshal is Act II's. The Boss beat names The Holdfast the day its class exists and stays unnamed until then.
+
+**O215** — Doctrine commitment is sited at the first Kess turn-in and never gated on it: the Forge accepts a commitment at any point after the class lock (O86).
+
+**O216** — Act I's givers are the Quartermaster and Kess; Command enters the story when it has a dialogue row (O209)..

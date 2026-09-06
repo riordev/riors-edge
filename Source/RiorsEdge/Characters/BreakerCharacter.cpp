@@ -49,6 +49,7 @@
 #include "Game/BreakerGameInstance.h"
 #include "Save/BreakerQuestJournal.h"
 #include "Save/BreakerQuestContent.h"
+#include "Save/BreakerMissionContent.h"
 #include "Combat/BreakerEnemy.h"
 #include "Items/BreakerLootLibrary.h"
 #include "Interaction/BreakerNPC.h"
@@ -360,10 +361,33 @@ void ABreakerCharacter::BeginPlay()
     if (Quests && HasAuthority())
     {
         Quests->OnPersistRequested.AddWeakLambda(this, [this]() { SaveGameState(); });
-        Quests->OnFlagSet.AddWeakLambda(this, [this](FName Flag) { GrantQuestRewardForFlag(Flag); });
+        // Every flag re-reads the mission position: a turn-in that reaches a
+        // doctrine Unlock beat pays it here, in the same call that set the
+        // flag, before the journal's write-through persists it (O43).
+        Quests->OnFlagSet.AddWeakLambda(this, [this](FName Flag)
+        {
+            GrantQuestRewardForFlag(Flag);
+            if (Progression && Quests) Progression->SettleDoctrineEntitlement(Quests->GetState());
+        });
         if (Combat) Combat->OnKillDealt.AddDynamic(this, &ThisClass::HandleQuestKill);
     }
     if (HasAuthority()) LoadGameState();
+    // THE ARRIVAL SEAM. The journal is restored now, and the session still
+    // holds where the travel point sent us, so a Travel beat that is current
+    // for this destination completes here. Then the doctrine entitlement is
+    // settled against the restored flags, which is what brings a save from
+    // before the mission seams existed, or one that reached an Unlock beat
+    // on another box, current the first time it opens.
+    if (Quests && Progression && HasAuthority())
+    {
+        const UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>();
+        const FName Destination = Session ? Session->PendingDestinationId : NAME_None;
+        for (const FName& Flag : UBreakerMissionLibrary::ArrivalFlagsFor(Destination, Quests->GetState()))
+        {
+            Quests->SetFlag(Flag);
+        }
+        Progression->SettleDoctrineEntitlement(Quests->GetState());
+    }
     if (Weapon && Equipment && HasAuthority()) Weapon->SyncArchetypesToEquipment();
     // Build the blockout for whatever the save restored. Before this the proxy
     // was only ever rebuilt on a 1/2 keypress, so a fresh session showed the

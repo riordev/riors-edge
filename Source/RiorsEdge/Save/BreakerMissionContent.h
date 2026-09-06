@@ -2,7 +2,10 @@
 
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "Save/BreakerQuestJournal.h"
 #include "BreakerMissionContent.generated.h"
+
+struct FBreakerRiftDefinition;
 
 // THE STORY MISSIONS, AS DATA (O186).
 //
@@ -137,4 +140,42 @@ public:
     // Fails when this file, the quest registry or the dialogue did not load
     // clean. Automation calls it.
     static bool ValidateMissionContent(FString& OutError);
+
+    // ---- PROGRESS, AS PURE FUNCTIONS OVER THE JOURNAL'S FLAGS -------------
+    // A mission's position is derived from the flag set every time it is
+    // asked, never stored: the save holds flags and counters, and these are
+    // the lens that reads them back as a place in the story. World-free so
+    // the rule is tested on a bare FBreakerQuestFlagSet.
+
+    // The flags a beat completes on. Dialogue, Travel, Boss and Return carry
+    // theirs; an Encounter completes on every named objective's completion
+    // flag; a Reward completes on its quest's turn-in flag (the Return before
+    // it sets the same flag, so a Reward is done the moment its Return is); an
+    // Unlock carries none and is complete the moment it is reached.
+    static TArray<FName> BeatCompletionFlags(const FBreakerMissionBeat& Beat);
+
+    // The length of the leading run of beats whose flags are all held. A beat
+    // completed out of order does not count until every beat before it is
+    // done -- order is the gate (O186), and a flag set early waits for it.
+    static int32 BeatsCompleted(const FBreakerMissionDefinition& Mission, const FBreakerQuestFlagSet& Flags);
+    // The first beat not yet complete, or null once the mission is done.
+    static const FBreakerMissionBeat* CurrentBeat(const FBreakerMissionDefinition& Mission, const FBreakerQuestFlagSet& Flags);
+
+    // O43: doctrine points are granted by mission beats, not by level. The
+    // sum of doctrinePoints over every reached Unlock beat across every
+    // mission; the component settles it against LevelDoctrinePointsGranted.
+    static int32 DoctrinePointEntitlement(const FBreakerQuestFlagSet& Flags);
+
+    // THE TWO SEAMS. Both gate on the beat being CURRENT -- the same rule
+    // UBreakerQuestLibrary::NotifyEnemyKilled applies to an objective: work
+    // done before the story asks for it does not pre-complete the ask.
+    // Arriving at a destination completes a Travel beat to it that is current
+    // now; finishing a rift completes a Boss beat in that rift that is current
+    // now. Each returns the flags to set, possibly several when more than one
+    // mission is waiting on the same event, and the caller sets them.
+    static TArray<FName> ArrivalFlagsFor(FName DestinationId, const FBreakerQuestFlagSet& Flags);
+    // A rift definition carries no id, only its name, so the beat's rift is
+    // matched the way the validator matches it: the yard's definition from
+    // UBreakerZoneBuilder::FernhallRiftFor, compared by AreaName.
+    static TArray<FName> RiftCompletionFlagsFor(const FBreakerRiftDefinition& Rift, const FBreakerQuestFlagSet& Flags);
 };

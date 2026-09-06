@@ -7,6 +7,7 @@
 #include "GameFramework/PlayerStart.h"
 #include "Interaction/BreakerTravelPoint.h"
 #include "Interaction/BreakerRiftDoor.h"
+#include "Save/BreakerMissionContent.h"
 
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerTargetDummy.h"
@@ -228,6 +229,21 @@ void ABreakerGameMode::CompleteRiftRun(APawn* Player)
     UE_LOG(LogTemp, Display, TEXT("[Rift] run complete: %s (area level %d, %s)"),
         *Rift.AreaName.ToString(), Rift.EffectiveAreaLevel(),
         Rift.Tier == EBreakerRiftTier::Campaign ? TEXT("campaign") : TEXT("endgame"));
+    // THE BOSS SEAM. A Boss beat that is current in this rift completes on the
+    // run, written into the player's journal before the broadcast so every
+    // listener reads the story where the run left it. The flag is also the
+    // Sweep objective's completion flag; SetFlag is monotonic, so whichever
+    // of the two sets it first, the other is a no-op.
+    if (const ABreakerCharacter* Breaker = Cast<ABreakerCharacter>(Player))
+    {
+        if (UBreakerQuestJournal* Journal = Breaker->GetQuestJournal())
+        {
+            for (const FName& Flag : UBreakerMissionLibrary::RiftCompletionFlagsFor(Rift, Journal->GetState()))
+            {
+                Journal->SetFlag(Flag);
+            }
+        }
+    }
     OnRiftCompleted.Broadcast(Rift, Player);
 }
 

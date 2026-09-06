@@ -378,51 +378,35 @@ public:
     // so a reader searching for the old entitlement finds why it is gone rather
     // than finding nothing.
     static constexpr int32 ClassPointCapLevel = 0;
-    // ---- THE ADVANCE-ON-MILESTONES PATTERN, NAMED (its third use) ---------
+    // ---- THE ADVANCE-ON-MILESTONES PATTERN, NAMED ------------------------
     //
-    // Three separate entitlements now have the same shape and it is a pattern
-    // rather than a coincidence: SliceCorePointGrant's opening lump (O43),
-    // O100's ability tokens, and now O111's doctrine points. Each is authored
-    // as a set of MILESTONES that the campaign will eventually own, paid in the
-    // interim against LEVELS that stand in for them, settled against a
-    // cumulative counter so the swap costs nothing and nobody is paid twice.
-    //
-    // The three parts, and all three are load-bearing:
-    //   A MILESTONE TABLE, so the schedule is data rather than a series of
-    //   event handlers. An event-shaped grant cannot survive a curve retune
-    //   that moves a character three levels at once.
-    //   A CUMULATIVE COUNTER in the save, so the entitlement is a FUNCTION OF
-    //   LEVEL minus what has already been paid, not a thing that fires.
-    //   AN ADVANCE FLAG, in the comment rather than in code: these levels are
-    //   placeholders for milestones, and when the campaign lands the levels are
-    //   replaced and the counter means no character is paid twice.
-    //
-    // MilestoneEntitlement below is the shared implementation. A fourth use
-    // calls it; it does not copy it.
+    // Two entitlements share one shape: SliceCorePointGrant's opening lump
+    // (O43) and O100's ability tokens. Each is a set of MILESTONES paid
+    // against LEVELS that stand in for them, settled against a cumulative
+    // counter in the save so the entitlement is a FUNCTION OF LEVEL minus
+    // what has already been paid, never a thing that fires -- an event-shaped
+    // grant cannot survive a curve retune that moves a character three
+    // levels at once, and the counter is what rules out paying twice.
 
     // O111: the doctrine pool. Eight points, its OWN currency, paid two at a
-    // time at four benchmarks -- one per act plus the finale.
-    //
-    // The campaign is post-slice, so the finale has no event to fire on and
-    // level 50 stands in for it, exactly as the ability tokens' levels stand in
-    // for their milestones. That is the advance above, third use.
+    // time at four main-story benchmarks, one per act (O43). A benchmark is
+    // an Unlock beat carrying doctrinePoints in Data/missions.json; the
+    // entitlement is UBreakerMissionLibrary::DoctrinePointEntitlement over
+    // the journal's flags, and the component settles it against
+    // State.LevelDoctrinePointsGranted on the counter shape above. NO LEVEL
+    // PAYS A DOCTRINE POINT. The file's per-act sum is held to
+    // DoctrinePointsPerBenchmark and its total to DoctrinePointGrant by the
+    // mission validator; the acts not yet authored are the campaign's gap,
+    // counted by the grant minus the file's sum.
     //
     // TWO AT A TIME IS THE SPIKE, and it is the reason the number is two rather
     // than one or four: two points buys exactly one travel node plus one payoff
     // node, so every benchmark delivers precisely one new legible thing, four
     // times. One would deliver half a thing; four would deliver a shopping trip.
-    static constexpr int32 DoctrineBenchmarkLevels[] = {10, 25, 40, 50};
+    static constexpr int32 DoctrineBenchmarkCount = 4;
     static constexpr int32 DoctrinePointsPerBenchmark = 2;
-    static constexpr int32 DoctrinePointGrant =
-        UE_ARRAY_COUNT(DoctrineBenchmarkLevels) * DoctrinePointsPerBenchmark;
+    static constexpr int32 DoctrinePointGrant = DoctrineBenchmarkCount * DoctrinePointsPerBenchmark;
 
-    // How many doctrine points a character of this level has earned in total.
-    // The component pays the difference against State.LevelDoctrinePointsGranted.
-    static int32 DoctrinePointEntitlement(int32 CharacterLevel);
-
-    // Milestones reached, times the per-milestone payout. The shared half of
-    // the pattern above; see AbilityTokenEntitlement and DoctrinePointEntitlement.
-    static int32 MilestoneEntitlement(int32 CharacterLevel, const int32* Levels, int32 Count, int32 PerMilestone);
     static constexpr int32 CorePointCapLevel = 50;
     // O111's Core pool, WHOLE: one point per level to CorePointCapLevel, plus
     // the world-content grants. This is the number every Core tree is measured

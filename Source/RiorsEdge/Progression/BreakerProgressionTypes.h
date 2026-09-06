@@ -800,14 +800,13 @@ struct RIORSEDGE_API FBreakerProgressionState
     // retune that LOWERS the entitlement claws nothing back.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 UnspentAbilityTokens = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 AbilityTokensGranted = 0;
-    // O111's doctrine points, settled the same way as the two counters above.
-    //
-    // IT WAS DELIBERATELY ABSENT UNTIL NOW, and the reason it is here is that
-    // the ruling changed underneath it: the pool used to be paid WHOLE at
-    // commitment, which is an event with nothing to settle against. It is now
-    // two points at each of four benchmarks, which is an entitlement -- and an
-    // entitlement without a cumulative counter cannot survive a curve retune
-    // that moves a character past two benchmarks at once.
+    // O111's doctrine points ever paid, settled the same way as the two
+    // counters above but against the story rather than the level (O43): the
+    // entitlement is the sum of every reached doctrine Unlock beat in
+    // Data/missions.json, and the component pays the positive difference. The
+    // counter is what lets a journal that reaches two benchmarks in one load
+    // pay once each, and what keeps a character paid under an earlier rule
+    // from being paid again. The name is the serialized field's and stays.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 LevelDoctrinePointsGranted = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 SaveVersion = 1;
 };

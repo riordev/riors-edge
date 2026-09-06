@@ -11,19 +11,22 @@ Push hard on today's build; the owner is out and reads the report. Cycles run in
 ## Direction (owner, 2026-09-05)
 No playtest until the core loop has more oomph. The next blocks are the ones that change what a trigger pull, a shield and a kill feel like: flat damage that is really the weapon's, a boss that fights back with a shield you break, and a Niagara pass with a sound for every verb. Content plumbing waits behind them.
 
-## Story questions for the owner
-- (story) Which body ends Act I? The deleted campaign table made it a Vestige mass, "The Holdfast", with no Altered before Act II; the only boss built is the Field Marshal, an Act II Altered commander. The act-one draft's Boss beat carries an empty boss id until you name it.
-- (story) Is doctrine commitment gated on the first Kess beat (the KessSalvage turn-in), or merely sited there?
-- (story) Command's giver is "Commander Aluko" as a placeholder in the story source; under O209 a giver with no dialogue row is not an NPC. Name, or leave Act I to the Quartermaster and Kess?
-
 ## Cycle 11b — HUD pass 2 (one build)
 - [ ] The interact/loot plate (40 tall, rarity rail and tally, key tile); a reload-fraction accessor in Weapons/ so the ammo rail shows progress; an ability verb on the definition for rail colours; wave cells need an encounter total (O120); the four non-Swift resource treatments; menu chrome to bone (`Sys` already is System; the remaining `Cyan` chrome reads in the menu, the stash screen and the loading screen); the kit-tile names on the class cards clip ("SIDEAR", "ANCHOF") — the fit helper serves them; the XP rail leaves the combat HUD (O210, the pause plate carries it).
 
 ## Cycle 12b — nameplates pass 2 (one build)
 - [ ] The boss bar world-space 640×24 with phase marks off the authored gates and pips (O156); the occlusion trace and the >60 m rules (Champion contact dot, boss bar at floor); names from the O195 table; the active-modifier underline; banners to the design with a priority queue; the death screen and the rift retry (O82 amended).
 
-## Cycle 16 — the mission seams (one build)
-- [ ] The three mission seams: an arrival flag written on travel (`Mission.<id>.Arrived`), rift completion → the quest flag the Boss beat names, and the flag-driven doctrine entitlement replacing the level benchmarks (`LevelPointEntitlement` moves with it). Then the mission tracker reads the current beat.
+## Cycle 16d — the mission tracker (UI, one build)
+- [ ] The HUD's quest line reads the current beat (`UBreakerMissionLibrary::CurrentBeat`): Dialogue → SPEAK TO THE <GIVER>, Travel → the destination, Encounter → the objective counter, Return → RETURN TO THE <GIVER>. Needs an NPC display name for Dialogue beats and a destination label for Travel (O195 territory).
+
+## Cycle 16c — the Core wheel under O211–O213 (LEDGER/DATA, then GLASS)
+- [ ] The travel ring goes: 153 one-point beads with no magnitude of their own leave `Core.Slice` (O213: every rank carries a magnitude); Core budget and the offered-to-spendable floor re-measured after; ids never move (O103), so the beads are retired rows, not renumbered ones.
+- [ ] Five domain sectors on the wheel — movement, weapon, defence, ability, elements — each constellation assigned to one as a wedge, as data on the tree (a `sector` field per constellation in progression.json); the wheel draws every sector always (O212).
+- [ ] A constellation with a silent node draws dark and unselectable until its plumbing exists (O212): the census already counts silent nodes; the wheel reads that per constellation.
+- [ ] Class flavour on the Core is a lit recommendation, never a lock (O211): any class gate on a Core node goes; a per-class highlight may stay.
+- [ ] Core respec free until level N, Riftglass after (O213); N is unruled — O2 PLACEHOLDER until the owner names it; Doctrine respec stays the Forge's.
+- Owner input: the level N in O213.
 
 ## Cycle 16b — two more bosses (FIELD-3)
 - [ ] Second boss: add-clear under pressure. Third: mobility and sustain. `Combat.PowerCurve.BossBand` holds for all three; O31 asserted per boss. One build each.
@@ -55,6 +58,8 @@ No playtest until the core loop has more oomph. The next blocks are the ones tha
 - [ ] Per-archetype weapon fire: `weapon_fire_<archetype>.wav` → `weapon_fire.wav` → synth.
 
 ## Later (infrastructure only when it unblocks a felt item this week)
+- Two expected reds carry the campaign's absence: `KeystoneAtShippedBudget` and `NodePurchaseFlow` assert doctrine purchases at the full pool, and the shipped entitlement is two of eight until acts two, three and the finale carry their Unlock beats. Both pinned with that delete condition; never widened.
+- Arrival and rift-completion flags are set only when the beat is current (the kill-counter rule). If arrival should count unconditionally, drop the flag-set argument on the two seams.
 - The enemy chip re-arm inside a hold reads `GetSecondsSinceDamage() <= DeltaSeconds`; settled chips are not pruned (they hold the last fraction) and the map is bounded by live enemies in range.
 - An occluded, unfocused enemy still draws its bar; only its marks and the BOSS word yield. Say if the bar should yield too.
 - The Chevron mark as specified is a corner bracket; BarsVertical sits one unit off centre. Both drawn as the sheet says.
@@ -94,6 +99,9 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - Four Niagara systems at `/Game/Breaker/FX/NS_<Moment>` with a `Color` user parameter, or a free Fab VFX pack placed there
 
 ## Done (last three cycles; older is git)
+
+### Cycle 16 — the mission seams, 544 / 5 / 0
+- [x] A mission plays end to end in code: the character sets the mission's arrival flag when it arrives at a Travel beat's destination, the game mode sets the Boss beat's flag when its rift completes, and doctrine points are paid from the journal by reached Unlock beats instead of character levels (`SettleDoctrineEntitlement`; `DoctrineBenchmarkLevels` is gone; the counter keeps its name and a paid character keeps its points). `Missions.Progress` walks act one's twenty beats. Two tests that raised a character to 50 for the full doctrine pool are expected red until the other three acts exist.
 
 ### Cycles 11, 12, 15, 16 — one build, one suite, 545 / 3 / 0
 - [x] The HUD to the design system, pass 1: the olive palette with System bone split from the movement-verb cyan, three borders, the text ramp, rails 4/2, gutter 40; vitals bottom-left with the max after the value (O199) and a health chip; near-death frame and brackets; abilities bottom-centre with READY / drain / hatch; weapon bottom-right with the ammo rail and the name only on swap; a four-tick crosshair with spread and ADS collapse; hit / kill / weak-point markers; zone name and mm:ss countdown; a quest one-liner; the minimap, the screen-top encounter row, the armour meter, ability digits, resource words and the weapon name at rest deleted. Seven pure pins in `UI/BreakerHUDMath.h`.

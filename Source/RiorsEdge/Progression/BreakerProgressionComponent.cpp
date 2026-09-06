@@ -6,6 +6,7 @@
 #include "Items/BreakerEquipmentComponent.h"
 #include "Progression/BreakerRiftRewardMath.h"
 #include "Save/BreakerAccountSave.h"
+#include "Save/BreakerMissionContent.h"
 
 #include "Attributes/BreakerAttributeAggregation.h"
 
@@ -754,37 +755,37 @@ void UBreakerProgressionComponent::GrantLevelPointEntitlement()
     // O111: NO LEVEL PAYS A CLASS POINT. UnspentClassPoints and
     // LevelClassPointsGranted survive as save fields because they are
     // serialized; the v5 -> v6 step zeroes them and nothing writes them again.
+    // O43: NO LEVEL PAYS A DOCTRINE POINT EITHER. The doctrine pool is the
+    // story's -- SettleDoctrineEntitlement below, against the journal.
     const int32 CoreEntitled = FMath::Min(State.CharacterLevel, UBreakerProgressionLibrary::CorePointCapLevel);
     const int32 CoreOwed = CoreEntitled - State.LevelCorePointsGranted;
-    bool bPaid = false;
-    if (CoreOwed > 0)
-    {
-        State.UnspentCorePoints += CoreOwed;
-        State.LevelCorePointsGranted = CoreEntitled;
-        bPaid = true;
-    }
+    if (CoreOwed <= 0) return;
+    State.UnspentCorePoints += CoreOwed;
+    State.LevelCorePointsGranted = CoreEntitled;
+    OnProgressionChanged.Broadcast();
+}
 
-    // O111's doctrine points, on the same cumulative shape and for the same
-    // reason. Paid whether or not a doctrine is committed: the points are the
-    // character's, the commitment only decides which board can spend them, and
-    // withholding them until commitment would make the benchmark a thing that
-    // silently did nothing for a player who had not chosen yet.
+void UBreakerProgressionComponent::SettleDoctrineEntitlement(const FBreakerQuestFlagSet& Flags)
+{
+    if (GetOwner() && !GetOwner()->HasAuthority()) return;
+    // O111's doctrine points, on the level entitlements' cumulative shape and
+    // for the same reason, settled against the STORY: the sum of every
+    // reached doctrine Unlock beat, minus what has already been paid. Paid
+    // whether or not a doctrine is committed (O215): the points are the
+    // character's, the commitment only decides which board can spend them,
+    // and withholding them until commitment would make the benchmark a thing
+    // that silently did nothing for a player who had not chosen yet.
     //
-    // THE ONE ORDERING TRAP HERE. This runs before the doctrine is necessarily
-    // chosen, so a character can hold doctrine points with no committed branch.
+    // A character can therefore hold doctrine points with no committed branch.
     // That is correct and is what the Forge screen shows; what must never
-    // happen is the reverse -- a committed character who was paid twice -- and
-    // the counter is what rules that out, not this ordering.
-    const int32 DoctrineEntitled = UBreakerProgressionLibrary::DoctrinePointEntitlement(State.CharacterLevel);
-    const int32 DoctrineOwed = DoctrineEntitled - State.LevelDoctrinePointsGranted;
-    if (DoctrineOwed > 0)
-    {
-        State.UnspentDoctrinePoints += DoctrineOwed;
-        State.LevelDoctrinePointsGranted = DoctrineEntitled;
-        bPaid = true;
-    }
-
-    if (!bPaid) return;
+    // happen is the reverse -- a character paid twice for one benchmark --
+    // and the counter rules that out. A counter ABOVE the entitlement is a
+    // character paid under an earlier rule and keeps what it holds.
+    const int32 Entitled = UBreakerMissionLibrary::DoctrinePointEntitlement(Flags);
+    const int32 Owed = Entitled - State.LevelDoctrinePointsGranted;
+    if (Owed <= 0) return;
+    State.UnspentDoctrinePoints += Owed;
+    State.LevelDoctrinePointsGranted = Entitled;
     OnProgressionChanged.Broadcast();
 }
 

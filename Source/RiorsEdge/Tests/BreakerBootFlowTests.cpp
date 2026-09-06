@@ -257,21 +257,16 @@ bool FBreakerLevelPointEntitlementTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("The retired class pool is still empty at the cap"),
         Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints_Retired), 0);
 
-    // AND LEVELLING NOW PAYS THE DOCTRINE POOL, WHICH IT USED NOT TO. This read
-    // "levelling alone never pays a doctrine point", which was the commitment-
-    // lump rule: eight points arrived at the Forge and levels paid nothing. The
-    // pool is now an entitlement -- two points at each of four benchmarks -- so
-    // a character at the cap has passed all four and holds the whole eight
-    // WITHOUT having committed to anything. That is deliberate: the points are
-    // the character's, and commitment only decides which board can spend them.
-    TestEqual(TEXT("A capped character has passed every doctrine benchmark"),
-        Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),
-        UBreakerProgressionLibrary::DoctrinePointGrant);
-    // Paid ONCE. The counter is the whole reason the entitlement can be a
-    // function of level rather than an event, so it is asserted beside it.
-    TestEqual(TEXT("...and the counter says so, so no benchmark can pay twice"),
-        Progression->GetProgressionState().LevelDoctrinePointsGranted,
-        UBreakerProgressionLibrary::DoctrinePointGrant);
+    // AND NO LEVEL PAYS A DOCTRINE POINT (O43). The pool is the story's: two
+    // points at each of four main-story benchmarks, granted by mission beats
+    // and settled against the journal's flags (RiorsEdge.Missions.Progress).
+    // A character at the cap with no flags has reached no benchmark and holds
+    // nothing, and the counter says nothing was paid -- so the first benchmark
+    // it does reach pays exactly two.
+    TestEqual(TEXT("A capped character with no story holds no doctrine points"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
+    TestEqual(TEXT("...and the counter says no benchmark has paid"),
+        Progression->GetProgressionState().LevelDoctrinePointsGranted, 0);
     return true;
 }
 

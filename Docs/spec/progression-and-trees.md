@@ -154,6 +154,14 @@ on every build rather than something rediscovered later.
 
 ### The Core tree
 
+**The wheel is one tree every class shares, its points level-driven (O211).**
+Five domain sectors — movement, weapon, defence, ability, elements — hold their
+constellations as wedges and the wheel never hides a sector; a constellation
+with a silent node draws dark and unselectable until its plumbing exists
+(O212). Class flavour on the Core is a lit recommendation, never a lock. No
+bead is a travel node: every rank carries a magnitude. Core respec is free
+until level N and costs Riftglass after; Doctrine respec stays the Forge's (O213).
+
 Five constellations ship. Elements is designed and lands with the resistance
 step rather than being cut.
 

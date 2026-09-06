@@ -178,8 +178,8 @@ of the vocabulary until it has one.
 
 **Doctrine points are eight in all**: two per main-story benchmark, four
 benchmarks, granted by Unlock beats (O43, O86 as amended). A settled counter
-means no character is paid twice. The validator holds the file's total at eight
-(O111).
+means no character is paid twice. The validator holds each authored act to one
+benchmark and the file's total to eight (O111).
 
 **Commitment to a doctrine is a Forge interaction (O86)**, and the mission that
 first sends the player to Kess is its natural site.

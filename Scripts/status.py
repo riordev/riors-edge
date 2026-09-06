@@ -522,28 +522,14 @@ def parse_point_budgets():
                 "constant must be fixed rather than defaulted around" % name)
         return int(m.group(1))
 
-    # THE DOCTRINE GRANT IS DERIVED IN C++ AND SO IT IS DERIVED HERE.
-    #
-    # It was `= 8;` and is now `= UE_ARRAY_COUNT(DoctrineBenchmarkLevels) *
-    # DoctrinePointsPerBenchmark`, because the pool stopped being a lump and
-    # became four benchmarks paying two each. This parser refused outright when
-    # the literal disappeared -- which is the behaviour it was written for, and
-    # is why the change was caught in the same run that made it rather than by a
-    # report quietly falling back to a stale 8.
-    #
-    # Recomputed the same way the header computes it: count the milestones,
-    # multiply by the payout. A hard-coded 8 here would be the transcription
-    # defect this function exists to prevent, one level further down.
-    m = re.search(r"DoctrineBenchmarkLevels\[\]\s*=\s*{([^}]*)}", text)
-    if not m:
-        raise ParseError(
-            "cannot read DoctrineBenchmarkLevels from BreakerProgressionLibrary.h - "
-            "the doctrine grant is derived from the milestone table, so the table "
-            "must be readable rather than the total restated here")
-    benchmarks = [v for v in re.findall(r"\d+", m.group(1))]
-    if not benchmarks:
-        raise ParseError("DoctrineBenchmarkLevels is empty - a pool with no milestone pays nothing")
-    doctrine = len(benchmarks) * literal("DoctrinePointsPerBenchmark")
+    # THE DOCTRINE GRANT IS DERIVED IN C++ AND SO IT IS DERIVED HERE:
+    # `DoctrinePointGrant = DoctrineBenchmarkCount * DoctrinePointsPerBenchmark`,
+    # four main-story benchmarks paying two each (O43/O111). Recomputed from the
+    # two literals the header multiplies rather than read as a total, so a
+    # hard-coded 8 here cannot outlive a ruling that moves either factor.
+    doctrine = literal("DoctrineBenchmarkCount") * literal("DoctrinePointsPerBenchmark")
+    if doctrine <= 0:
+        raise ParseError("the doctrine grant is zero - a pool with no benchmark pays nothing")
 
     return literal("CorePointCapLevel") + literal("CoreWorldPointGrant"), doctrine
 

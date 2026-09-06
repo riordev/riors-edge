@@ -755,6 +755,133 @@ bool UBreakerMissionLibrary::ParseMissionsJson(const FString& Json, FBreakerMiss
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// PROGRESS. Every function below is a pure read of a flag set.
+// ---------------------------------------------------------------------------
+namespace
+{
+    const FBreakerQuestDefinition* BreakerMissionFindQuest(FName QuestId)
+    {
+        return UBreakerQuestLibrary::GetFallbackQuests().FindByPredicate(
+            [QuestId](const FBreakerQuestDefinition& Candidate) { return Candidate.QuestId == QuestId; });
+    }
+
+    const FBreakerMissionRift* BreakerMissionFindRift(FName RiftId)
+    {
+        return UBreakerMissionLibrary::GetRifts().FindByPredicate(
+            [RiftId](const FBreakerMissionRift& Candidate) { return Candidate.RiftId == RiftId; });
+    }
+}
+
+TArray<FName> UBreakerMissionLibrary::BeatCompletionFlags(const FBreakerMissionBeat& Beat)
+{
+    TArray<FName> Out;
+    switch (Beat.Kind)
+    {
+    case EBreakerMissionBeatKind::Dialogue:
+    case EBreakerMissionBeatKind::Travel:
+    case EBreakerMissionBeatKind::Boss:
+    case EBreakerMissionBeatKind::Return:
+        Out.Add(Beat.CompletesOn);
+        break;
+
+    case EBreakerMissionBeatKind::Encounter:
+        if (const FBreakerQuestDefinition* Quest = BreakerMissionFindQuest(Beat.Quest))
+        {
+            for (const FName& ObjectiveId : Beat.Objectives)
+            {
+                const FBreakerQuestObjective* Objective = Quest->Objectives.FindByPredicate(
+                    [ObjectiveId](const FBreakerQuestObjective& Candidate) { return Candidate.ObjectiveId == ObjectiveId; });
+                if (Objective) Out.Add(Objective->CompletionFlag);
+            }
+        }
+        break;
+
+    case EBreakerMissionBeatKind::Reward:
+        if (const FBreakerQuestDefinition* Quest = BreakerMissionFindQuest(Beat.Quest))
+        {
+            Out.Add(Quest->TurnedInFlag);
+        }
+        break;
+
+    case EBreakerMissionBeatKind::Unlock:
+        // Complete when reached: the grant IS the beat.
+        break;
+    }
+    return Out;
+}
+
+int32 UBreakerMissionLibrary::BeatsCompleted(const FBreakerMissionDefinition& Mission, const FBreakerQuestFlagSet& Flags)
+{
+    int32 Completed = 0;
+    for (const FBreakerMissionBeat& Beat : Mission.Beats)
+    {
+        if (!Flags.HasAll(BeatCompletionFlags(Beat))) break;
+        ++Completed;
+    }
+    return Completed;
+}
+
+const FBreakerMissionBeat* UBreakerMissionLibrary::CurrentBeat(const FBreakerMissionDefinition& Mission, const FBreakerQuestFlagSet& Flags)
+{
+    const int32 Completed = BeatsCompleted(Mission, Flags);
+    return Mission.Beats.IsValidIndex(Completed) ? &Mission.Beats[Completed] : nullptr;
+}
+
+int32 UBreakerMissionLibrary::DoctrinePointEntitlement(const FBreakerQuestFlagSet& Flags)
+{
+    int32 Entitled = 0;
+    for (const FBreakerMissionDefinition& Mission : GetMissions())
+    {
+        // An Unlock is complete when reached, so "reached" and "inside the
+        // completed run" are the same test.
+        const int32 Completed = BeatsCompleted(Mission, Flags);
+        for (int32 Index = 0; Index < Completed; ++Index)
+        {
+            const FBreakerMissionBeat& Beat = Mission.Beats[Index];
+            if (Beat.Kind == EBreakerMissionBeatKind::Unlock) Entitled += Beat.DoctrinePoints;
+        }
+    }
+    return Entitled;
+}
+
+TArray<FName> UBreakerMissionLibrary::ArrivalFlagsFor(FName DestinationId, const FBreakerQuestFlagSet& Flags)
+{
+    TArray<FName> Out;
+    if (DestinationId.IsNone()) return Out;
+    for (const FBreakerMissionDefinition& Mission : GetMissions())
+    {
+        // Current only. Standing in Fernhall before the Quartermaster has
+        // given the job does not count as having gone there for it; the
+        // beat completes on the next arrival, once it is the beat in play.
+        const FBreakerMissionBeat* Beat = CurrentBeat(Mission, Flags);
+        if (Beat && Beat->Kind == EBreakerMissionBeatKind::Travel && Beat->Destination == DestinationId)
+        {
+            Out.Add(Beat->CompletesOn);
+        }
+    }
+    return Out;
+}
+
+TArray<FName> UBreakerMissionLibrary::RiftCompletionFlagsFor(const FBreakerRiftDefinition& Rift, const FBreakerQuestFlagSet& Flags)
+{
+    TArray<FName> Out;
+    for (const FBreakerMissionDefinition& Mission : GetMissions())
+    {
+        // Current only, as above: clearing the substation before Deeper is
+        // accepted is a run, not the sweep the story asked for.
+        const FBreakerMissionBeat* Beat = CurrentBeat(Mission, Flags);
+        if (!Beat || Beat->Kind != EBreakerMissionBeatKind::Boss) continue;
+        const FBreakerMissionRift* BeatRift = BreakerMissionFindRift(Beat->Rift);
+        if (!BeatRift) continue;
+        if (UBreakerZoneBuilder::FernhallRiftFor(BeatRift->Yard).AreaName.EqualTo(Rift.AreaName))
+        {
+            Out.Add(Beat->CompletesOn);
+        }
+    }
+    return Out;
+}
+
 bool UBreakerMissionLibrary::ValidateMissionContent(FString& OutError)
 {
     OutError.Reset();

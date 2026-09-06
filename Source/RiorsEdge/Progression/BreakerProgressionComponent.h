@@ -12,6 +12,7 @@ class UBreakerClassDefinition;
 class UBreakerProgressionNode;
 class UBreakerProgressionTree;
 struct FBreakerRiftDefinition;
+struct FBreakerQuestFlagSet;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FBreakerProgressionChanged);
 // NewLevel, and how many levels arrived at once — a single kill can cross more
@@ -277,6 +278,15 @@ public:
     // brought current the first time it opens.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Progression|XP")
     void GrantLevelPointEntitlement();
+    // O43/O111: the doctrine pool's settle, on the same cumulative shape but
+    // against the STORY rather than the level. Pays the positive difference
+    // between UBreakerMissionLibrary::DoctrinePointEntitlement over the
+    // journal's flags and LevelDoctrinePointsGranted into the unspent pool.
+    // Monotonic: a character already paid keeps its points. Called from the
+    // character after the journal is restored and on every flag set, so an
+    // Unlock beat pays the moment it is reached and a save from before the
+    // seams existed is brought current the first time it opens.
+    void SettleDoctrineEntitlement(const FBreakerQuestFlagSet& Flags);
     // Seeds the slice budget whenever the point economy is empty (no ranks in
     // either currency and nothing unspent), and locks Swift only if no class
     // is chosen — so both a new gym pawn and an existing save written before
