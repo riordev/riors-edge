@@ -581,6 +581,585 @@
 			"pairedAffixId": ""
 		},
 		{
+			"id": "Ability.AirborneDamage",
+			"pool": "slice",
+			"displayName": "Ability Dmg while Airborne",
+			"category": "Prefix",
+			"target": "AbilityDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Boots",
+				"Helmet",
+				"Necklace",
+				"Primary"
+			],
+			"valueAtT12": 5,
+			"valueAtT1": 48,
+			"rollWeight": 45,
+			"condition": "Airborne",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Ability.SlidingDamage",
+			"pool": "slice",
+			"displayName": "Ability Dmg while Sliding",
+			"category": "Prefix",
+			"target": "AbilityDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Boots",
+				"Waist",
+				"BodyArmour",
+				"Secondary"
+			],
+			"valueAtT12": 5,
+			"valueAtT1": 48,
+			"rollWeight": 45,
+			"condition": "Sliding",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Ability.RedlineDamage",
+			"pool": "slice",
+			"displayName": "Ability Damage at Redline",
+			"category": "Suffix",
+			"target": "AbilityDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Necklace",
+				"BodyArmour",
+				"Helmet",
+				"Primary"
+			],
+			"valueAtT12": 4.5,
+			"valueAtT1": 44,
+			"rollWeight": 45,
+			"condition": "Redline",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Ability.DashDamage",
+			"pool": "slice",
+			"displayName": "Ability Dmg after Dashing",
+			"category": "Suffix",
+			"target": "AbilityDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Gloves",
+				"Waist",
+				"Necklace",
+				"Secondary"
+			],
+			"valueAtT12": 5,
+			"valueAtT1": 48,
+			"rollWeight": 45,
+			"condition": "RecentlyDashed",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Offense.GroundedDamage",
+			"pool": "slice",
+			"displayName": "Damage while Grounded",
+			"category": "Prefix",
+			"target": "WeaponDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"BodyArmour",
+				"Waist",
+				"Gloves",
+				"Boots"
+			],
+			"valueAtT12": 4,
+			"valueAtT1": 40,
+			"rollWeight": 45,
+			"condition": "Grounded",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Ability.GroundedDamage",
+			"pool": "slice",
+			"displayName": "Ability Dmg while Grounded",
+			"category": "Prefix",
+			"target": "AbilityDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"BodyArmour",
+				"Waist",
+				"Gloves",
+				"Helmet"
+			],
+			"valueAtT12": 4,
+			"valueAtT1": 40,
+			"rollWeight": 45,
+			"condition": "Grounded",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Offense.AimedDamage",
+			"pool": "slice",
+			"displayName": "Damage while Aiming",
+			"category": "Prefix",
+			"target": "WeaponDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Helmet",
+				"Gloves",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 4,
+			"valueAtT1": 40,
+			"rollWeight": 45,
+			"condition": "Aiming",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Offense.SteadyDamage",
+			"pool": "slice",
+			"displayName": "Damage while Stationary",
+			"category": "Suffix",
+			"target": "WeaponDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Helmet",
+				"Necklace",
+				"Primary",
+				"Waist"
+			],
+			"valueAtT12": 5,
+			"valueAtT1": 48,
+			"rollWeight": 40,
+			"condition": "Stationary",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Ability.SteadyDamage",
+			"pool": "slice",
+			"displayName": "Ability Dmg while Still",
+			"category": "Suffix",
+			"target": "AbilityDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Helmet",
+				"Necklace",
+				"Waist",
+				"Secondary"
+			],
+			"valueAtT12": 5,
+			"valueAtT1": 48,
+			"rollWeight": 40,
+			"condition": "Stationary",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Offense.FullVigourDamage",
+			"pool": "slice",
+			"displayName": "Damage at Full Vigour",
+			"category": "Suffix",
+			"target": "WeaponDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"BodyArmour",
+				"Helmet",
+				"Necklace",
+				"Waist"
+			],
+			"valueAtT12": 3.5,
+			"valueAtT1": 36,
+			"rollWeight": 50,
+			"condition": "HealthHigh",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Ability.FullVigourDamage",
+			"pool": "slice",
+			"displayName": "Ability Dmg at Full Vigour",
+			"category": "Suffix",
+			"target": "AbilityDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"BodyArmour",
+				"Gloves",
+				"Necklace",
+				"Boots"
+			],
+			"valueAtT12": 3.5,
+			"valueAtT1": 36,
+			"rollWeight": 50,
+			"condition": "HealthHigh",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Offense.LastStand",
+			"pool": "slice",
+			"displayName": "Damage at Low Health",
+			"category": "Prefix",
+			"target": "SharedDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Helmet",
+				"BodyArmour",
+				"Gloves",
+				"Boots",
+				"Necklace",
+				"Waist"
+			],
+			"valueAtT12": 3,
+			"valueAtT1": 30,
+			"rollWeight": 40,
+			"condition": "HealthLow",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Ability.ReserveDamage",
+			"pool": "slice",
+			"displayName": "Ability Dmg at Low Reserve",
+			"category": "Prefix",
+			"target": "AbilityDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Helmet",
+				"Gloves",
+				"Necklace",
+				"Waist",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 5,
+			"valueAtT1": 48,
+			"rollWeight": 45,
+			"condition": "ResourceLow",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Offense.DepletedDamage",
+			"pool": "slice",
+			"displayName": "Damage while Depleted",
+			"category": "Prefix",
+			"target": "WeaponDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Gloves",
+				"Waist",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 6,
+			"valueAtT1": 48,
+			"rollWeight": 40,
+			"condition": "ResourceDepleted",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Offense.LedgeDamage",
+			"pool": "slice",
+			"displayName": "Damage after a Ledge",
+			"category": "Suffix",
+			"target": "WeaponDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Boots",
+				"Gloves",
+				"Waist",
+				"Secondary"
+			],
+			"valueAtT12": 5,
+			"valueAtT1": 48,
+			"rollWeight": 45,
+			"condition": "RecentlyLedgeTraversed",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Offense.AirborneAddedDamage",
+			"pool": "slice",
+			"displayName": "Added Dmg while Airborne",
+			"category": "Prefix",
+			"target": "AddedDamage",
+			"bucket": "Flat",
+			"slots": [
+				"Boots",
+				"Helmet",
+				"Necklace",
+				"Primary"
+			],
+			"valueAtT12": 1.5,
+			"valueAtT1": 16,
+			"rollWeight": 45,
+			"condition": "Airborne",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Offense.SlidingAddedDamage",
+			"pool": "slice",
+			"displayName": "Added Damage while Sliding",
+			"category": "Prefix",
+			"target": "AddedDamage",
+			"bucket": "Flat",
+			"slots": [
+				"Boots",
+				"Waist",
+				"BodyArmour",
+				"Secondary"
+			],
+			"valueAtT12": 1.5,
+			"valueAtT1": 16,
+			"rollWeight": 45,
+			"condition": "Sliding",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Offense.RedlineAddedDamage",
+			"pool": "slice",
+			"displayName": "Added Damage at Redline",
+			"category": "Prefix",
+			"target": "AddedDamage",
+			"bucket": "Flat",
+			"slots": [
+				"Necklace",
+				"BodyArmour",
+				"Helmet",
+				"Primary"
+			],
+			"valueAtT12": 1.5,
+			"valueAtT1": 16,
+			"rollWeight": 45,
+			"condition": "Redline",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Offense.DashAddedDamage",
+			"pool": "slice",
+			"displayName": "Added Damage after Dashing",
+			"category": "Prefix",
+			"target": "AddedDamage",
+			"bucket": "Flat",
+			"slots": [
+				"Gloves",
+				"Waist",
+				"Necklace",
+				"Secondary"
+			],
+			"valueAtT12": 1.5,
+			"valueAtT1": 16,
+			"rollWeight": 45,
+			"condition": "RecentlyDashed",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Offense.GroundedAddedDamage",
+			"pool": "slice",
+			"displayName": "Added Dmg while Grounded",
+			"category": "Prefix",
+			"target": "AddedDamage",
+			"bucket": "Flat",
+			"slots": [
+				"BodyArmour",
+				"Boots",
+				"Waist",
+				"Gloves"
+			],
+			"valueAtT12": 1.5,
+			"valueAtT1": 16,
+			"rollWeight": 45,
+			"condition": "Grounded",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Crit.AirborneChance",
+			"pool": "slice",
+			"displayName": "Crit Chance while Airborne",
+			"category": "Prefix",
+			"target": "CriticalChance",
+			"bucket": "Flat",
+			"slots": [
+				"Helmet",
+				"Necklace",
+				"Primary",
+				"Boots"
+			],
+			"valueAtT12": 1.5,
+			"valueAtT1": 14,
+			"rollWeight": 40,
+			"condition": "Airborne",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Crit.AimedChance",
+			"pool": "slice",
+			"displayName": "Crit Chance while Aiming",
+			"category": "Prefix",
+			"target": "CriticalChance",
+			"bucket": "Flat",
+			"slots": [
+				"Helmet",
+				"Gloves",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 1.5,
+			"valueAtT1": 14,
+			"rollWeight": 40,
+			"condition": "Aiming",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Crit.RedlineDamage",
+			"pool": "slice",
+			"displayName": "Critical Damage at Redline",
+			"category": "Suffix",
+			"target": "CriticalDamage",
+			"bucket": "Flat",
+			"slots": [
+				"Helmet",
+				"Necklace",
+				"Primary",
+				"Gloves"
+			],
+			"valueAtT12": 8,
+			"valueAtT1": 60,
+			"rollWeight": 40,
+			"condition": "Redline",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Crit.DashDamage",
+			"pool": "slice",
+			"displayName": "Crit Damage after Dashing",
+			"category": "Suffix",
+			"target": "CriticalDamage",
+			"bucket": "Flat",
+			"slots": [
+				"Gloves",
+				"Waist",
+				"Secondary",
+				"Necklace"
+			],
+			"valueAtT12": 8,
+			"valueAtT1": 60,
+			"rollWeight": 40,
+			"condition": "RecentlyDashed",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Weapon.RedlineFireRate",
+			"pool": "slice",
+			"displayName": "Fire Rate at Redline",
+			"category": "Suffix",
+			"target": "FireRate",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 3,
+			"valueAtT1": 30,
+			"rollWeight": 40,
+			"condition": "Redline",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Weapon.DashFireRate",
+			"pool": "slice",
+			"displayName": "Fire Rate after Dashing",
+			"category": "Suffix",
+			"target": "FireRate",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 3,
+			"valueAtT1": 30,
+			"rollWeight": 40,
+			"condition": "RecentlyDashed",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Offense.SharedAirborne",
+			"pool": "slice",
+			"displayName": "Damage while Airborne",
+			"category": "Prefix",
+			"target": "SharedDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Boots",
+				"Helmet",
+				"Necklace"
+			],
+			"valueAtT12": 2.5,
+			"valueAtT1": 24,
+			"rollWeight": 45,
+			"condition": "Airborne",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Offense.SharedDash",
+			"pool": "slice",
+			"displayName": "Damage after Dashing",
+			"category": "Suffix",
+			"target": "SharedDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Gloves",
+				"Waist",
+				"Secondary"
+			],
+			"valueAtT12": 2.5,
+			"valueAtT1": 24,
+			"rollWeight": 45,
+			"condition": "RecentlyDashed",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Core.GroundedArmour",
+			"pool": "slice",
+			"displayName": "Armour while Grounded",
+			"category": "Suffix",
+			"target": "Armour",
+			"bucket": "Flat",
+			"slots": [
+				"Helmet",
+				"BodyArmour",
+				"Gloves",
+				"Boots",
+				"Waist"
+			],
+			"valueAtT12": 9,
+			"valueAtT1": 110,
+			"rollWeight": 60,
+			"condition": "Grounded",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
 			"id": "Aberrant.Riftburn",
 			"pool": "aberrant",
 			"displayName": "Riftburn",

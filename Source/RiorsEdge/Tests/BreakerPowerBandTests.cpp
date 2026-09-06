@@ -8,6 +8,7 @@
 #include "Items/BreakerAffixLibrary.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Items/BreakerItemRules.h"
+#include "Items/BreakerLootLibrary.h"
 #include "Progression/BreakerBuildConditions.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
@@ -661,19 +662,161 @@ namespace BreakerPowerBandTest
         return State;
     }
 
+    // -----------------------------------------------------------------------
+    // O200: THE OPTIMIZED SIDE OF THE AT-CAP BAND IS ROLLED, NOT TYPED.
+    // -----------------------------------------------------------------------
+    // OptimizedLoadout above is a hand-written piece list at one hand-picked
+    // tier. It stays as the fixture for RuleBandImpact and ConditionalDamage,
+    // where the question is "what does one rewrite do to a KNOWN build". For
+    // the band itself it is the wrong instrument: it can only ever hold the
+    // lines somebody thought of, at a tier somebody chose, so widening the
+    // pool cannot move it and the band cannot read the content.
+    //
+    // This helper builds the optimized side the way the game builds one: for
+    // each of the eight slots it rolls candidates through the real loot
+    // pipeline (UBreakerLootLibrary::RollItem, deterministic under a seed) at
+    // the band's item level, and keeps per slot the candidate that composes
+    // highest by the band's own metric — Compose({Candidate}, OptimizedRanks(),
+    // MeasurementState()).Total, one piece against the same tree and the same
+    // rotation state the band is measured in. Nothing here hand-sets a tier or
+    // a value; a legendary or a rolled rule that comes out of the pipeline is
+    // let through because the game grants it at that rarity.
+    //
+    // THE EQUIP CAPS ARE HONOURED, not approximated: at most one Anomalous and
+    // three Aberrant pieces are worn at once (EquipLimitForRarity), the rest
+    // are Exceptional. Every slot is rolled at all three rarities, and the
+    // capped rarities are handed to the slots where they buy the most over
+    // that slot's best Exceptional — greedy, one slot at a time, per-slot
+    // totals rather than a joint optimum, which is stated so nobody reads
+    // "best in slot" as "best loadout". Only ONE slot rolls Anomalous at all,
+    // so a legendary (its own equip axis, O37) cannot stack a second Anomalous
+    // beside it here. Cadence occupies both hands (the slot rule EquipItem
+    // enforces), so a Cadence Primary ejects the Secondary from this loadout
+    // exactly as it would from a worn one.
+    //
+    // THE DENOMINATOR DOES NOT MOVE: O200 leaves the baseline as the band's
+    // existing definition (BaselineLoadout at BaselineTierFor, the realistically
+    // decent roll two tiers under item level). Rolling both sides would make
+    // the band a ratio of two lotteries; rolling the optimized side alone makes
+    // it "what the pipeline can produce over what a decent drop is".
+    //
+    // The seed and the candidate count are the band's fixture inputs. Same
+    // seed, same content, same answer; a different seed is a different
+    // measurement and is reported as one. 64 candidates per slot per rarity is
+    // enough that every slot sees most of its pool at every rarity; the whole
+    // fold is a few thousand composes and runs inside the suite's budget.
+    constexpr int32 RolledBestInSlotSeed = 200;           // O2 PLACEHOLDER (O200)
+    constexpr int32 RolledBestInSlotCandidates = 64;      // O2 PLACEHOLDER (O200)
+
+    TArray<FBreakerItemInstance> BreakerPowerBandRolledBestInSlot(int32 ItemLevel, int32 Seed, int32 CandidatesPerSlot)
+    {
+        const FBreakerBuildConditionState State = MeasurementState();
+        const TArray<FBreakerNodeRank> Ranks = OptimizedRanks();
+
+        constexpr int32 SlotCount = static_cast<int32>(EBreakerEquipSlot::Count);
+        // Index 0 is the uncapped rarity every slot falls back to; the capped
+        // rarities follow in the order they are handed out (rarest first).
+        const EBreakerItemRarity Rarities[] = {
+            EBreakerItemRarity::Exceptional,
+            EBreakerItemRarity::Anomalous,
+            EBreakerItemRarity::Aberrant,
+        };
+        constexpr int32 RarityCount = UE_ARRAY_COUNT(Rarities);
+
+        struct FBest
+        {
+            FBreakerItemInstance Item;
+            float Total = -1.0f;
+        };
+        FBest Best[SlotCount][RarityCount];
+
+        for (int32 SlotIndex = 0; SlotIndex < SlotCount; ++SlotIndex)
+        {
+            const EBreakerEquipSlot Slot = static_cast<EBreakerEquipSlot>(SlotIndex);
+            for (int32 RarityIndex = 0; RarityIndex < RarityCount; ++RarityIndex)
+            {
+                for (int32 Candidate = 0; Candidate < CandidatesPerSlot; ++Candidate)
+                {
+                    // One seed per (slot, rarity, candidate), derived rather than
+                    // sequential so a change to CandidatesPerSlot re-seeds only
+                    // the candidates it adds.
+                    const uint32 Salt = HashCombine(
+                        HashCombine(static_cast<uint32>(Seed), static_cast<uint32>(SlotIndex)),
+                        static_cast<uint32>(RarityIndex * CandidatesPerSlot + Candidate));
+                    FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(
+                        TEXT("PowerBand"), Slot, Rarities[RarityIndex], ItemLevel, static_cast<int32>(Salt));
+                    const float Total = Compose({Item}, Ranks, State).Total;
+                    if (Total > Best[SlotIndex][RarityIndex].Total)
+                    {
+                        Best[SlotIndex][RarityIndex].Item = MoveTemp(Item);
+                        Best[SlotIndex][RarityIndex].Total = Total;
+                    }
+                }
+            }
+        }
+
+        // The caps: hand each capped rarity to the slots where it buys the most
+        // over that slot's Exceptional, up to the shipped limit, never to a slot
+        // where it buys nothing.
+        int32 Choice[SlotCount] = {};
+        auto Promote = [&](int32 RarityIndex)
+        {
+            const int32 Limit = UBreakerEquipmentComponent::EquipLimitForRarity(Rarities[RarityIndex]);
+            for (int32 Picked = 0; Picked < Limit; ++Picked)
+            {
+                int32 BestSlot = INDEX_NONE;
+                float BestGain = 0.0f;
+                for (int32 SlotIndex = 0; SlotIndex < SlotCount; ++SlotIndex)
+                {
+                    if (Choice[SlotIndex] != 0) continue;
+                    const float Gain = Best[SlotIndex][RarityIndex].Total - Best[SlotIndex][0].Total;
+                    if (Gain > BestGain)
+                    {
+                        BestGain = Gain;
+                        BestSlot = SlotIndex;
+                    }
+                }
+                if (BestSlot == INDEX_NONE) return;
+                Choice[BestSlot] = RarityIndex;
+            }
+        };
+        for (int32 RarityIndex = 1; RarityIndex < RarityCount; ++RarityIndex) Promote(RarityIndex);
+
+        TArray<FBreakerItemInstance> Loadout;
+        for (int32 SlotIndex = 0; SlotIndex < SlotCount; ++SlotIndex)
+        {
+            Loadout.Add(Best[SlotIndex][Choice[SlotIndex]].Item);
+        }
+
+        // The one slot rule the pipeline can hand back: Cadence occupies both
+        // hands, so the Secondary leaves, as EquipItem would make it.
+        const bool bCadence = Loadout.ContainsByPredicate(
+            [](const FBreakerItemInstance& Item) { return Item.Rule == EBreakerItemRule::Cadence; });
+        if (bCadence)
+        {
+            Loadout.RemoveAll([](const FBreakerItemInstance& Item) { return Item.Slot == EBreakerEquipSlot::Secondary; });
+        }
+        return Loadout;
+    }
+
     // THE BAND ITSELF, so that nothing has to transcribe it. Declared in
     // BreakerPowerBandFixture.h and used by two tests: PowerBand.AtCap emits
     // what this returns, and Combat.PowerCurve.BossOptimized divides by what
     // this returns. Neither keeps a copy, which is the whole point -- the copy
     // that used to live in BossOptimized went stale the first time the band
     // moved and claimed in a comment that it could not.
+    //
+    // O200: the numerator is the rolled best-in-slot loadout above, under the
+    // equip caps, off the live affix table. The denominator is unchanged --
+    // O200 leaves it as the band's existing definition.
     float AtCapBand()
     {
         const FBreakerBuildConditionState State = MeasurementState();
         const FComposedBuild Baseline = Compose(
             BaselineLoadout(AtCapItemLevel, BaselineTierFor(AtCapItemLevel)), BaselineRanks(), State);
         const FComposedBuild Optimized = Compose(
-            OptimizedLoadout(AtCapItemLevel, OptimizedTierFor(AtCapItemLevel)), OptimizedRanks(), State);
+            BreakerPowerBandRolledBestInSlot(AtCapItemLevel, RolledBestInSlotSeed, RolledBestInSlotCandidates),
+            OptimizedRanks(), State);
         return Optimized.Total / Baseline.Total;
     }
 
@@ -959,7 +1102,11 @@ bool FBreakerPowerBandAtCapTest::RunTest(const FString& Parameters)
 
     const FBreakerBuildConditionState State = MeasurementState();
     const FComposedBuild Baseline = Compose(BaselineLoadout(AtCapItemLevel, BaselineTier), BaselineRanks(), State);
-    const FComposedBuild Optimized = Compose(OptimizedLoadout(AtCapItemLevel, OptimizedTier), OptimizedRanks(), State);
+    // O200: the SAME rolled loadout AtCapBand() composes, so the layer report
+    // below describes the build whose ratio is emitted and not a different one.
+    const FComposedBuild Optimized = Compose(
+        BreakerPowerBandRolledBestInSlot(AtCapItemLevel, RolledBestInSlotSeed, RolledBestInSlotCandidates),
+        OptimizedRanks(), State);
 
     // The layer-by-layer report. Logged rather than only asserted, because the
     // arithmetic is the deliverable: a future tuning pass needs to see WHICH
@@ -1027,6 +1174,144 @@ bool FBreakerPowerBandAtCapTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Accumulation is a floor, not the band: removing it widens the band, never narrows it"),
         RatioWithoutAccumulation >= Ratio);
 
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// O200: THE ROLLED OPTIMIZED SIDE IS A LOADOUT THE GAME WOULD LET YOU WEAR.
+// ---------------------------------------------------------------------------
+// The band's numerator now comes out of the loot pipeline, so the thing to
+// prove is not a number but LEGALITY: that nothing in the helper grants what
+// the game does not. Every piece obeys the equip caps, the per-item category
+// caps, and the tier floor item level sets; every line resolves against a
+// real pool; and the same seed reproduces the same loadout to the bit, which
+// is what makes the emitted band a measurement rather than a draw. The band
+// itself is printed here and asserted only in PowerBand.AtCap, whose pin
+// carries it.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerPowerBandRolledBestInSlotTest,
+    "RiorsEdge.Progression.PowerBand.RolledBestInSlotIsGameLegal",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerPowerBandRolledBestInSlotTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerPowerBandTest;
+
+    const TArray<FBreakerItemInstance> Loadout =
+        BreakerPowerBandRolledBestInSlot(AtCapItemLevel, RolledBestInSlotSeed, RolledBestInSlotCandidates);
+    constexpr int32 SlotCount = static_cast<int32>(EBreakerEquipSlot::Count);
+
+    // Eight pieces, one per slot -- or seven, when and only when a Cadence
+    // Primary has ejected the Secondary as the slot rule says it must.
+    const bool bCadence = Loadout.ContainsByPredicate(
+        [](const FBreakerItemInstance& Item) { return Item.Rule == EBreakerItemRule::Cadence; });
+    const bool bHasSecondary = Loadout.ContainsByPredicate(
+        [](const FBreakerItemInstance& Item) { return Item.Slot == EBreakerEquipSlot::Secondary; });
+    TestEqual(TEXT("One piece per slot (Cadence ejects the Secondary)"),
+        Loadout.Num(), bCadence ? SlotCount - 1 : SlotCount);
+    TestTrue(TEXT("A Cadence Primary is never worn beside a Secondary"), !(bCadence && bHasSecondary));
+    TSet<EBreakerEquipSlot> SlotsSeen;
+    for (const FBreakerItemInstance& Item : Loadout)
+    {
+        TestTrue(TEXT("Every piece is a valid item"), Item.IsValid());
+        TestFalse(TEXT("No slot is worn twice"), SlotsSeen.Contains(Item.Slot));
+        SlotsSeen.Add(Item.Slot);
+        TestEqual(TEXT("Every piece is at the band's item level"), Item.ItemLevel, AtCapItemLevel);
+    }
+
+    // The shipped equip caps, read from the component rather than restated.
+    // Legendaries are counted INTO the Anomalous tally here on purpose: the
+    // helper rolls exactly one slot Anomalous, so the stricter reading holds
+    // and a legendary can never ride in as a second Anomalous piece.
+    int32 AnomalousCount = 0;
+    int32 AberrantCount = 0;
+    for (const FBreakerItemInstance& Item : Loadout)
+    {
+        if (Item.Rarity == EBreakerItemRarity::Anomalous) ++AnomalousCount;
+        if (Item.Rarity == EBreakerItemRarity::Aberrant) ++AberrantCount;
+    }
+    TestTrue(*FString::Printf(TEXT("At most %d Anomalous piece(s) worn (found %d)"),
+        UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Anomalous), AnomalousCount),
+        AnomalousCount <= UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Anomalous));
+    TestTrue(*FString::Printf(TEXT("At most %d Aberrant pieces worn (found %d)"),
+        UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Aberrant), AberrantCount),
+        AberrantCount <= UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Aberrant));
+
+    // Per-item shape and tier floor. The floor is what a level-50 drop can
+    // produce: BestTierForItemLevel, with the one exception the pipeline
+    // itself grants -- an Aberrant's FIRST line is Focused, one tier better,
+    // still under the rarity cap. Anything past that is a tier nobody rolled.
+    const int32 BestTier = UBreakerAffixLibrary::BestTierForItemLevel(AtCapItemLevel);
+    const TArray<FBreakerAffixDefinition>& Pool = UBreakerAffixLibrary::GetSliceAffixPool();
+    for (const FBreakerItemInstance& Item : Loadout)
+    {
+        const FString Context = UEnum::GetValueAsString(Item.Slot);
+        TestTrue(*(Context + TEXT(" holds at most four prefixes")),
+            UBreakerLootLibrary::CountAffixesOfCategory(Item, EBreakerAffixCategory::Prefix) <= 4);
+        TestTrue(*(Context + TEXT(" holds at most four suffixes")),
+            UBreakerLootLibrary::CountAffixesOfCategory(Item, EBreakerAffixCategory::Suffix) <= 4);
+        TestTrue(*(Context + TEXT(" carries at least one line")), Item.Affixes.Num() > 0);
+        for (int32 Index = 0; Index < Item.Affixes.Num(); ++Index)
+        {
+            const FBreakerRolledAffix& Rolled = Item.Affixes[Index];
+            const bool bFocusedLine = Item.Rarity == EBreakerItemRarity::Aberrant && Index == 0;
+            const int32 Floor = bFocusedLine
+                ? FMath::Max(BestTier - 1, UBreakerAffixLibrary::TierCapForRarity(Item.Rarity))
+                : BestTier;
+            TestTrue(*FString::Printf(TEXT("%s: %s at T%d is a tier a level-%d drop can produce (floor T%d)"),
+                *Context, *Rolled.AffixId.ToString(), Rolled.Tier, AtCapItemLevel, Floor), Rolled.Tier >= Floor);
+            TestNotNull(*FString::Printf(TEXT("%s: %s resolves against a real pool"), *Context, *Rolled.AffixId.ToString()),
+                UBreakerAffixLibrary::FindAffix(Pool, Rolled.AffixId));
+        }
+    }
+
+    // The same seed reproduces the same loadout, line for line, and so the
+    // same Total. The GUID is the only field the roll does not derive from
+    // the seed and nothing in the band reads it.
+    const TArray<FBreakerItemInstance> Again =
+        BreakerPowerBandRolledBestInSlot(AtCapItemLevel, RolledBestInSlotSeed, RolledBestInSlotCandidates);
+    TestEqual(TEXT("The seed reproduces the piece count"), Again.Num(), Loadout.Num());
+    for (int32 PieceIndex = 0; PieceIndex < FMath::Min(Again.Num(), Loadout.Num()); ++PieceIndex)
+    {
+        const FBreakerItemInstance& A = Loadout[PieceIndex];
+        const FBreakerItemInstance& B = Again[PieceIndex];
+        TestEqual(TEXT("The seed reproduces the slot"), static_cast<int32>(A.Slot), static_cast<int32>(B.Slot));
+        TestEqual(TEXT("The seed reproduces the rarity"), static_cast<int32>(A.Rarity), static_cast<int32>(B.Rarity));
+        TestEqual(TEXT("The seed reproduces the rule"), static_cast<int32>(A.Rule), static_cast<int32>(B.Rule));
+        TestEqual(TEXT("The seed reproduces the legendary"), A.LegendaryId, B.LegendaryId);
+        TestEqual(TEXT("The seed reproduces the line count"), A.Affixes.Num(), B.Affixes.Num());
+        for (int32 Index = 0; Index < FMath::Min(A.Affixes.Num(), B.Affixes.Num()); ++Index)
+        {
+            TestEqual(TEXT("The seed reproduces the line"), A.Affixes[Index].AffixId, B.Affixes[Index].AffixId);
+            TestEqual(TEXT("The seed reproduces the tier"), A.Affixes[Index].Tier, B.Affixes[Index].Tier);
+            TestEqual(TEXT("The seed reproduces the value"), A.Affixes[Index].Value, B.Affixes[Index].Value, 0.0f);
+        }
+    }
+    const FBreakerBuildConditionState State = MeasurementState();
+    const float TotalOnce = Compose(Loadout, OptimizedRanks(), State).Total;
+    const float TotalAgain = Compose(Again, OptimizedRanks(), State).Total;
+    TestEqual(TEXT("The seed reproduces the composed Total"), TotalOnce, TotalAgain, 0.0f);
+
+    // What was picked, piece by piece, and the band it composes to -- printed
+    // so the suite log says which slot bought what; the number is asserted by
+    // PowerBand.AtCap, never here.
+    for (const FBreakerItemInstance& Item : Loadout)
+    {
+        TArray<FString> Lines;
+        for (const FBreakerRolledAffix& Rolled : Item.Affixes)
+        {
+            Lines.Add(FString::Printf(TEXT("%s T%d %.1f"), *Rolled.AffixId.ToString(), Rolled.Tier, Rolled.Value));
+        }
+        AddInfo(FString::Printf(TEXT("ROLLED BIS  %-10s %-11s %s%s| %s"),
+            *UEnum::GetValueAsString(Item.Slot).Replace(TEXT("EBreakerEquipSlot::"), TEXT("")),
+            *UEnum::GetValueAsString(Item.Rarity).Replace(TEXT("EBreakerItemRarity::"), TEXT("")),
+            Item.IsLegendary() ? *FString::Printf(TEXT("%s "), *Item.LegendaryId.ToString()) : TEXT(""),
+            Item.HasRule() ? *FString::Printf(TEXT("rule %s "), *UEnum::GetValueAsString(Item.Rule).Replace(TEXT("EBreakerItemRule::"), TEXT(""))) : TEXT(""),
+            *FString::Join(Lines, TEXT(", "))));
+    }
+    AddInfo(FString::Printf(TEXT("ROLLED BIS  seed %d, %d candidates per slot per rarity, ilvl %d => AT-CAP BAND %.2fx (O36 target %.0f-%.0fx)"),
+        RolledBestInSlotSeed, RolledBestInSlotCandidates, AtCapItemLevel, AtCapBand(), AtCapBandMinimum, AtCapBandMaximum));
     return true;
 }
 
