@@ -4,15 +4,19 @@
 #include "Items/BreakerItemTypes.h"
 
 // ---------------------------------------------------------------------------
-// FIELDPLATE — the one place UI values live.
+// The design system's tokens — the one place UI values live.
 //
-// Transcribed from Docs/Design/UI-Style-Guide-Fieldplate.md. Both the canvas
-// HUD (ABreakerPlaytestHUD) and the Slate front end (SBreakerMenu) read these
-// tokens, which is the whole point: a colour that exists twice drifts.
+// Transcribed from Assets/design/01-tokens/spec.md (palette, borders, rails,
+// grid) and Assets/design/02-hud/spec.md (the combat HUD's geometry). Both the
+// canvas HUD (ABreakerPlaytestHUD) and the Slate front end (SBreakerMenu) read
+// these tokens, which is the whole point: a colour that exists twice drifts.
 //
 // The design canvas authors colour in sRGB hex, so every token converts once
 // through FromSRGBColor. Do NOT hand-author linear values here — they will not
 // match the canvas, and the canvas is the authority.
+//
+// Geometry marked `// 02-hud` is the HUD sheet's own number; `// O2
+// PLACEHOLDER` is a guess the owner has not yet felt.
 // ---------------------------------------------------------------------------
 namespace BreakerUI
 {
@@ -29,44 +33,60 @@ namespace BreakerUI
         return FLinearColor(Color.R, Color.G, Color.B, A);
     }
 
-    // --- Background ramp ---------------------------------------------------
-    inline const FLinearColor BgVoid = Hex(0x060B12);   // screen field, scrim
-    inline const FLinearColor BgBase = Hex(0x0A111C);   // default ground
-    inline const FLinearColor BgRaised = Hex(0x0F1826); // zone separation
+    // --- Background ramp (olive, hue 118) ----------------------------------
+    inline const FLinearColor BgVoid = Hex(0x0E1103);   // bg-0: screen field, scrim
+    inline const FLinearColor BgBase = Hex(0x151808);   // bg-1: default ground
+    inline const FLinearColor BgRaised = Hex(0x1D2010); // bg-2: zone separation
 
     // --- Panel ramp --------------------------------------------------------
-    inline const FLinearColor Panel00 = Hex(0x131E2E);  // plate face
-    inline const FLinearColor Panel10 = Hex(0x18263A);  // cards, rows, slots
-    inline const FLinearColor Panel20 = Hex(0x1F3047);  // hover, headers
+    inline const FLinearColor Panel00 = Hex(0x262918);  // plate face
+    inline const FLinearColor Panel10 = Hex(0x2F3221);  // cards, rows, slots
+    inline const FLinearColor Panel20 = Hex(0x393D2B);  // hover, headers, drains
 
     // --- Borders -----------------------------------------------------------
-    // There is no 2px neutral border in the system: 1px rest, 1px emphasis,
-    // 2px only when it carries an accent, 3px only for a rail.
-    inline const FLinearColor BorderRest = Hex(0x1F3047);
-    inline const FLinearColor BorderEmphasis = Hex(0x2A3E58);
+    // Three weights of neutral border: low at rest, mid for emphasis, high for
+    // focus. Thickness is a separate axis (1px rest, 2px only when it carries
+    // an accent or focus; rails are 4px identity / 2px status).
+    inline const FLinearColor BorderRest = Hex(0x454840);      // border-low
+    inline const FLinearColor BorderEmphasis = Hex(0x5C6056); // border-mid
+    inline const FLinearColor BorderHigh = Hex(0x8A8F84);     // border-high
 
     // --- Text --------------------------------------------------------------
-    inline const FLinearColor TextPrimary = Hex(0xE6EDF5);
-    inline const FLinearColor TextSecondary = Hex(0x9FB0C4);
-    inline const FLinearColor TextMuted = Hex(0x63768C);
-    inline const FLinearColor TextDisabled = Hex(0x3E4C5E);
+    inline const FLinearColor TextPrimary = Hex(0xEDEBE3);   // text-1
+    inline const FLinearColor TextSecondary = Hex(0xB8B6AC); // text-2
+    inline const FLinearColor TextMuted = Hex(0x8E8D80);     // text-3
+    inline const FLinearColor TextDisabled = Hex(0x5C5C52);  // text-4
 
     // --- Function accents --------------------------------------------------
-    inline const FLinearColor Cyan = Hex(0x4FD8F5);       // player / system
-    inline const FLinearColor Orange = Hex(0xFF8A3D);     // weapon / heat
-    inline const FLinearColor OrangeDeep = Hex(0xC25A1E);
-    inline const FLinearColor Gold = Hex(0xFFC64A);       // reward / weak point
-    inline const FLinearColor GoldDeep = Hex(0xB98212);
-    inline const FLinearColor Harm = Hex(0xFF4040);
-    inline const FLinearColor HarmDeep = Hex(0xC22A2A);
-    inline const FLinearColor Violet = Hex(0xB866FF);     // ultimates
-    inline const FLinearColor RiftDamage = Hex(0xA8FBFF); // damage numbers only
+    // SYSTEM is bone: the player's own readouts, chrome, the crosshair, the
+    // kill mark. It is deliberately not a hue, so every hue below can mean one
+    // verb and nothing else.
+    inline const FLinearColor System = Hex(0xE3DFD2);
+    inline const FLinearColor SystemDim = Hex(0x6E6C62);
+    // Cyan is the MOVEMENT VERB (O179: movement and cleansing), and only that.
+    // `Cyan` remains as a name for the movement verb so the menu's chrome
+    // keeps compiling; those chrome reads move to System when the menu's front
+    // end moves to System. A new site that wants "the system accent" takes
+    // System; a new site that wants "movement" takes VerbMove. Neither takes
+    // Cyan.
+    inline const FLinearColor VerbMove = Hex(0x6FC3E8);
+    inline const FLinearColor Cyan = VerbMove;
+    inline const FLinearColor Orange = Hex(0xE8842B);     // weapon / heat
+    inline const FLinearColor OrangeDeep = Hex(0x6B3E14);
+    inline const FLinearColor Gold = Hex(0xE6B33A);       // reward / weak point
+    inline const FLinearColor GoldDeep = Hex(0x6A5118);
+    inline const FLinearColor Harm = Hex(0xD9402F);
+    inline const FLinearColor HarmDeep = Hex(0x5E1F18);
+    inline const FLinearColor Violet = Hex(0xA98BEA);     // ultimates
+    inline const FLinearColor VioletDim = Hex(0x463367);
+    inline const FLinearColor RiftDamage = Hex(0x35E8FF); // damage numbers only (rift-hot)
 
     // --- Teal object law ---------------------------------------------------
     // Legal on rift geometry, suppression hardware, and Anomalous items.
     // Never on chrome: buttons, rails, focus rings, tracks, tooltips.
-    inline const FLinearColor TealHardware = Hex(0x08B8A8);
-    inline const FLinearColor TealAnomalous = Hex(0x26F2D9);
+    inline const FLinearColor TealHardware = Hex(0x1E8F7C);
+    inline const FLinearColor TealAnomalous = Hex(0x2FBFA6);
+    inline const FLinearColor TealName = Hex(0x6ADFC9);   // top-rarity name text
 
     // TEAL IS A NOUN, NEVER AN ADJECTIVE, and this is the predicate a teal
     // assertion is written against. It does not make the LAW asserted: a
@@ -85,15 +105,19 @@ namespace BreakerUI
     // nothing the screen did not already state.
     inline bool IsReservedTeal(const FLinearColor& Colour)
     {
-        return Colour.Equals(TealHardware, 0.001f) || Colour.Equals(TealAnomalous, 0.001f);
+        return Colour.Equals(TealHardware, 0.001f)
+            || Colour.Equals(TealAnomalous, 0.001f)
+            || Colour.Equals(TealName, 0.001f);
     }
 
     // --- Rarity ramp -------------------------------------------------------
-    inline const FLinearColor RarityStandard = Hex(0xDCE4EE);
-    inline const FLinearColor RarityUncommon = Hex(0x408CFF);
-    inline const FLinearColor RarityExceptional = Hex(0xB866FF);
-    inline const FLinearColor RarityAberrant = Hex(0xFF4040);
-    inline const FLinearColor RarityAnomalous = Hex(0x26F2D9);
+    inline const FLinearColor RarityStandard = Hex(0xB8B6AC);
+    inline const FLinearColor RarityUncommon = Hex(0x8FB865);
+    inline const FLinearColor RarityExceptional = Hex(0x8B8FEC);
+    inline const FLinearColor RarityAberrant = Hex(0xE07AAE);
+    // Identical to TealAnomalous by construction: the top rarity IS the teal
+    // noun, and tests assert the two agree.
+    inline const FLinearColor RarityAnomalous = Hex(0x2FBFA6);
 
     inline FLinearColor RarityColor(EBreakerItemRarity Rarity)
     {
@@ -143,20 +167,21 @@ namespace BreakerUI
     inline constexpr float DeltaGlyphColumn = 14.0f;
 
     // --- Spacing scale -----------------------------------------------------
-    // 4 / 8 / 16 / 24 / 40 / 64. 12 and 32 are not tokens; where the HUD spec
-    // names a 12px interior pad it says so itself and uses HudClusterPad.
+    // 4 / 8 / 12 / 16 / 24 / 40 / 64, the token sheet's grid.
     inline constexpr float Space4 = 4.0f;
     inline constexpr float Space8 = 8.0f;
-    // 12 IS A TOKEN. art-and-ui states the scale as 4/8/12/16/24/40/64 and
-    // this file did not carry it: 8 to 16 is too coarse for a dense row gap,
-    // and a scale the declaring file does not declare is not a scale.
     inline constexpr float Space12 = 12.0f;
     inline constexpr float Space16 = 16.0f;
     inline constexpr float Space24 = 24.0f;
     inline constexpr float Space40 = 40.0f;
     inline constexpr float Space64 = 64.0f;
 
+    // The menu's plate rail. The front end still draws 3px; it moves to the
+    // 4/2 pair below when the menu split lands.
     inline constexpr float RailThickness = 3.0f;
+    // Identity rail 4px left, status rail 2px top (01-tokens).
+    inline constexpr float HudRailIdentity = 4.0f;   // 01-tokens
+    inline constexpr float HudRailStatus = 2.0f;     // 01-tokens
     inline constexpr float BorderThin = 1.0f;
     inline constexpr float BorderSelected = 2.0f;
     inline constexpr float MinHitTarget = 44.0f;
@@ -180,135 +205,140 @@ namespace BreakerUI
         return SpecPixels / CanvasFontPixels;
     }
 
-    // --- HUD geometry (spec pixels at 1920x1080) ---------------------------
-    inline constexpr float HudSafeMargin = 48.0f;
-    inline constexpr float HudClusterWidth = 440.0f;
-    inline constexpr float HudClusterHeight = 184.0f;
-    inline constexpr float HudClusterPad = 12.0f;
-    inline constexpr float HudClusterRowGap = 10.0f;
-    inline constexpr float HudAbilitySquare = 56.0f;
-    inline constexpr float HudAbilityGap = 8.0f;    // HUD v2
-    inline constexpr float HudAbilityRadius = 4.0f;
-    inline constexpr float HudVitalsWidth = 420.0f;
-    inline constexpr float HudShieldBarHeight = 11.0f;
-    inline constexpr float HudHealthBarHeight = 8.0f;
-    inline constexpr float HudValueColumnWidth = 84.0f;
-    inline constexpr float HudArmorChipWidth = 18.0f;
-    inline constexpr float HudArmorChipHeight = 5.0f;
-    inline constexpr float HudMomentumTrackHeight = 12.0f;
-    // --- HUD v2 (Assets/ui-reference/HUD v2.dc.html) -----------------------
-    // What the player CONTROLS sits bottom-left in a 340 stack; what the player
-    // IS sits centred at the bottom. Neither carries a plate: on a moving image
-    // the readouts are the shapes and the housing only added weight.
-    inline constexpr float HudV2StackWidth = 340.0f;
-    inline constexpr float HudV2StackRowGap = 10.0f;
-    inline constexpr float HudV2StatusDot = 9.0f;
-    inline constexpr float HudV2StatusRowGap = 5.0f;
-    inline constexpr float HudV2StatusPixels = 12.0f;
-    // 3px is the ONLY rail weight in this corner, and it is the momentum state
-    // indicator as well as chrome -- a 2px line here would be a fifth border
-    // weight carrying no meaning.
-    inline constexpr float HudV2MomentumTrack = 7.0f;
-    inline constexpr float HudV2MomentumRail = 3.0f;
-    inline constexpr float HudV2MomentumRailGap = 10.0f;
-    inline constexpr float HudV2MomentumWordPixels = 16.0f;
-    // 58 + 12 + 232 + 12 + 58 = 372. Neither value carries a max or a label.
-    inline constexpr float HudV2VitalsWidth = 372.0f;
-    inline constexpr float HudV2VitalsBar = 232.0f;
-    inline constexpr float HudV2VitalsValueColumn = 58.0f;
-    inline constexpr float HudV2VitalsGap = 12.0f;
-    inline constexpr float HudV2VitalsValuePixels = 17.0f;
-    inline constexpr float HudV2ShieldBar = 9.0f;
-    inline constexpr float HudV2HealthBar = 6.0f;
-    inline constexpr float HudV2VitalsBarGap = 3.0f;
-    inline constexpr float HudV2VitalsBottom = 56.0f;
-    // Armour is the one readout that could be mistaken for the momentum track,
-    // so it is a single outlined three-cell meter in shield cyan rather than
-    // loose gold blocks -- nothing else in this corner uses gold.
-    inline constexpr float HudV2ArmorWidth = 88.0f;
-    inline constexpr float HudV2ArmorHeight = 11.0f;
-    inline constexpr float HudV2XpHeight = 4.0f;
-    inline constexpr float HudV2WaveUnderline = 2.0f;
-    inline constexpr float HudV2WaveWidth = 280.0f;
+    // --- HUD geometry (spec pixels at 1920x1080, origin top-left) ----------
+    // Positions never change between states; only content does (02-hud).
+    inline constexpr float HudSafeMargin = 40.0f;             // 02-hud gutter
+
+    // Vitals — bottom-left, 480 wide at (40, 936).
+    inline constexpr float HudVitalsLeft = 40.0f;             // 02-hud
+    inline constexpr float HudVitalsTop = 936.0f;             // 02-hud
+    inline constexpr float HudVitalsWidth = 480.0f;           // 02-hud
+    inline constexpr float HudVitalsValuePixels = 32.0f;      // 02-hud
+    inline constexpr float HudVitalsMaxPixels = 13.0f;        // 02-hud
+    inline constexpr float HudVitalsMaxGap = 8.0f;            // 02-hud
+    inline constexpr float HudShieldTop = 976.0f;             // 02-hud
+    inline constexpr float HudShieldHeight = 6.0f;            // 02-hud
+    inline constexpr float HudHealthTop = 990.0f;             // 02-hud
+    inline constexpr float HudHealthHeight = 16.0f;           // 02-hud
+    inline constexpr float HudResourceTop = 1010.0f;          // 02-hud
+    inline constexpr float HudResourceHeight = 8.0f;          // 02-hud
+    inline constexpr float HudResourceNotchFraction = 0.70f;  // 02-hud
+    inline constexpr float HudResourceNotchHeight = 14.0f;    // 02-hud
+    inline constexpr float HudResourceMarkWidth = 12.0f;      // 02-hud
+    inline constexpr float HudResourceMarkHeight = 8.0f;      // 02-hud
+    inline constexpr float HudResourceBankedCell = 8.0f;      // 02-hud
+    // The health chip: fill drains at once, the hatched chip holds, then
+    // recovers linearly. Hatch harm-dim/harm-full at 4/2.
+    inline constexpr float HudHealthChipHoldSeconds = 0.400f;    // 02-hud
+    inline constexpr float HudHealthChipRecoverSeconds = 0.600f; // 02-hud
+    inline constexpr float HudHealthChipHatchPeriod = 6.0f;      // 02-hud (4 + 2)
+    inline constexpr float HudHealthChipHatchStripe = 4.0f;      // 02-hud
+    // Under this fraction the value goes harm, the bar carries its tick, and
+    // the near-death frame shows. One number, three reads.
+    inline constexpr float HudHealthLowFraction = 0.20f;      // 02-hud
+
+    // Near-death frame — full screen, border pulsing 8→16→8 over 1.6 s;
+    // corner brackets 64×64, 4px L-shapes at 24px from each corner.
+    inline constexpr float HudNearDeathFrameMin = 8.0f;       // 02-hud
+    inline constexpr float HudNearDeathFrameMax = 16.0f;      // 02-hud
+    inline constexpr float HudNearDeathPulseSeconds = 1.6f;   // 02-hud
+    inline constexpr float HudNearDeathBracketSize = 64.0f;   // 02-hud
+    inline constexpr float HudNearDeathBracketStroke = 4.0f;  // 02-hud
+    inline constexpr float HudNearDeathBracketInset = 24.0f;  // 02-hud
+
+    // Abilities — bottom-centre, 232 wide at (844, 936), bottoms on y = 1024.
+    inline constexpr float HudAbilityTile = 64.0f;            // 02-hud
+    inline constexpr float HudUltimateTile = 88.0f;           // 02-hud
+    inline constexpr float HudAbilityOneX = 844.0f;           // 02-hud
+    inline constexpr float HudUltimateX = 916.0f;             // 02-hud
+    inline constexpr float HudAbilityTwoX = 1012.0f;          // 02-hud
+    inline constexpr float HudAbilityBottom = 1024.0f;        // 02-hud
+    inline constexpr float HudAbilityMark = 16.0f;            // 02-hud
+    inline constexpr float HudUltimateMark = 24.0f;           // 02-hud
+    inline constexpr float HudAbilityKeyPixels = 13.0f;       // 02-hud
+    inline constexpr float HudAbilityKeyInset = 6.0f;         // 02-hud
+    inline constexpr float HudUltimateKeyInsetX = 8.0f;       // 02-hud
+    inline constexpr float HudUltimateKeyInsetY = 10.0f;      // 02-hud
+
+    // Weapon — bottom-right, right edge x = 1880.
+    inline constexpr float HudWeaponRight = 1880.0f;          // 02-hud
+    inline constexpr float HudMagazineTop = 944.0f;           // 02-hud
+    inline constexpr float HudReserveGap = 12.0f;             // 02-hud
+    inline constexpr float HudAmmoRailX = 1640.0f;            // 02-hud
+    inline constexpr float HudAmmoRailY = 1000.0f;            // 02-hud
+    inline constexpr float HudAmmoRailWidth = 240.0f;         // 02-hud
+    inline constexpr float HudAmmoRailHeight = 4.0f;          // 02-hud
+    inline constexpr float HudMagazineLowFraction = 0.25f;    // 02-hud
+    inline constexpr float HudWeaponNamePixels = 20.0f;       // 02-hud
+    inline constexpr float HudWeaponSwapSeconds = 1.2f;       // 02-hud
+    inline constexpr float HudWeaponSwapSlidePixels = 16.0f;  // 02-hud
+    // Magazine and reserve sizes BELOW the sheet's 48/24 on the owner's
+    // direct feedback after seeing them rendered (O207: play sizes stand).
+    inline constexpr float HudMagazinePixels = 32.0f;         // O207, sheet 48
+    inline constexpr float HudReservePixels = 15.0f;          // O207, sheet 24
+
+    // Crosshair — 40×40 box, four ticks 2×12, gap 16; spread opens the gap to
+    // 40 (60 ms out, 200 ms back); ADS collapses the ticks (80 ms) to a 2×2
+    // dot inside a 24px ring.
+    inline constexpr float HudCrosshairBox = 40.0f;               // 02-hud
+    inline constexpr float HudCrosshairTickLength = 12.0f;        // 02-hud
+    inline constexpr float HudCrosshairTickWidth = 2.0f;          // 02-hud
+    inline constexpr float HudCrosshairGapRest = 16.0f;           // 02-hud
+    inline constexpr float HudCrosshairGapSpread = 40.0f;         // 02-hud
+    inline constexpr float HudCrosshairSpreadOutSeconds = 0.06f;  // 02-hud
+    inline constexpr float HudCrosshairSpreadBackSeconds = 0.20f; // 02-hud
+    inline constexpr float HudCrosshairAdsSeconds = 0.08f;        // 02-hud
+    inline constexpr float HudCrosshairAdsDot = 2.0f;             // 02-hud
+    inline constexpr float HudCrosshairAdsRing = 24.0f;           // 02-hud
+    // The cone half-angle at which the gap reads fully open. The sheet says
+    // "with movement/fire" and names no angle; this is the number that maps
+    // the weapon's honest spread onto the 16→40 travel.
+    inline constexpr float HudCrosshairFullSpreadDegrees = 6.0f;  // O2 PLACEHOLDER
+
+    // Crosshair marks: hit 80 ms, kill 200 ms, weak-point kill 320 ms.
+    inline constexpr float HudHitMarkSeconds = 0.08f;         // 02-hud
+    inline constexpr float HudKillMarkSeconds = 0.20f;        // 02-hud
+    inline constexpr float HudWeakPointMarkSeconds = 0.32f;   // 02-hud
+    inline constexpr float HudHitDiagonal = 12.0f;            // 02-hud
+    inline constexpr float HudWeakPointDiagonal = 16.0f;      // 02-hud
+    inline constexpr float HudKillSquare = 6.0f;              // 02-hud
+    inline constexpr float HudWeakPointDiamond = 8.0f;        // 02-hud
+
+    // Periphery: zone name at (40, 40) display 24; countdown numeric 16 on the
+    // line beneath; quest line right edge 1880, top 40, max 320 wide, body 14.
+    inline constexpr float HudZoneLeft = 40.0f;               // 02-hud
+    inline constexpr float HudZoneTop = 40.0f;                // 02-hud
+    inline constexpr float HudZonePixels = 24.0f;             // 02-hud
+    inline constexpr float HudCountdownTop = 76.0f;           // 02-hud (the wave-cell row)
+    inline constexpr float HudCountdownPixels = 16.0f;        // 02-hud
+    inline constexpr float HudQuestTrackerWidth = 320.0f;     // 02-hud
+    inline constexpr float HudQuestLineTop = 40.0f;           // 02-hud
+    inline constexpr float HudQuestLinePixels = 14.0f;        // 02-hud
+
+    // The hatch: flat 135° stripes, A for 6px then B for 2px (period 8).
+    inline constexpr float HudHatchPeriod = 8.0f;             // 01-tokens
+    inline constexpr float HudHatchStripe = 6.0f;             // 01-tokens
+
+    // The effect column above the vitals: one dot and one value per line.
+    inline constexpr float HudV2StatusDot = 9.0f;             // O2 PLACEHOLDER
+    inline constexpr float HudV2StatusRowGap = 5.0f;          // O2 PLACEHOLDER
+    inline constexpr float HudV2StatusPixels = 12.0f;         // O2 PLACEHOLDER
+    // The experience rail's height; O210 places the rail on the pause plate.
+    inline constexpr float HudV2XpHeight = 4.0f;              // O2 PLACEHOLDER
 
     inline constexpr float HudEnemyBarWidth = 180.0f;
     inline constexpr float HudEnemyBarHeight = 8.0f;
-    // --- Combat cluster type sizes ----------------------------------------
-    // Tokens rather than literals at the call site, because these three are
-    // the sizes the owner has actually asked to move and the next request
-    // should be a one-line edit in one place.
-    //
-    // All three sit BELOW the HUD spec's authored figures (17 / 44 / 18), on
-    // the owner's direct feedback after seeing them rendered: the state word
-    // and the magazine were "a little too big and disjointed on both ends".
-    // The spec's numbers were authored on a design canvas and never looked at
-    // in-engine; these were.
-    inline constexpr float HudResourceStatePixels = 13.0f;   // spec 17
-    inline constexpr float HudMagazinePixels = 32.0f;        // spec 44
-    inline constexpr float HudReservePixels = 15.0f;         // spec 18
 
-    inline constexpr float HudCrosshairBox = 80.0f;
-
-    // --- Minimap (UI-HUD-Spec section 6) -----------------------------------
-    // LANDSCAPE, and that is the whole design decision. Level-Design section 5
-    // gives the field a 25000 cm long axis against roughly 8000 cm of occupied
-    // width, with every station strung along the spawn-forward axis. A square
-    // minimap over that field spends most of its area on empty flank, so the
-    // plate is 320x176 — a 1.82:1 window whose long side is the field's long
-    // side, and the map is FIELD-ALIGNED (forward = right) rather than
-    // rotating, because a rotating map throws that alignment away every time
-    // the player turns.
-    //
-    // Both dimensions are on the 8px grid (40 and 22 cells).
-    inline constexpr float HudMinimapWidth = 320.0f;
-    inline constexpr float HudMinimapHeight = 176.0f;
-    // Centimetres of world per SPEC pixel. 56 puts the half-window at 8960 cm
-    // forward and 4928 cm lateral, which is chosen so the encounter pocket
-    // (8500 cm out) is on the map from the safe ring rather than one pixel off
-    // its edge, and so one 8px grid step is 448 cm — near enough a combat
-    // pocket's quarter-radius to be a usable unit.
-    inline constexpr float HudMinimapCmPerPixel = 56.0f;
-    // Graticule pitch, in world cm. The combat pocket radius, so the grid is a
-    // statement about fighting distance rather than an arbitrary ruler.
-    inline constexpr float HudMinimapGridCm = 2000.0f;
-    inline constexpr float HudMinimapBlipSize = 5.0f;
-    inline constexpr float HudMinimapPlayerSize = 9.0f;
-
-    // --- Quest tracker (directly below the minimap) -------------------------
-    // Same width as the minimap so the two read as one top-right column, gap
-    // on the 8px grid. Row height fits an 11px caption line with breathing
-    // room; the title row takes its own measured height.
-    inline constexpr float HudQuestTrackerWidth = 320.0f;    // O2 PLACEHOLDER
-    inline constexpr float HudQuestTrackerGap = 8.0f;        // O2 PLACEHOLDER
-    inline constexpr float HudQuestTrackerPad = 12.0f;       // O2 PLACEHOLDER
-    inline constexpr float HudQuestTrackerRowHeight = 16.0f; // O2 PLACEHOLDER
-    inline constexpr float HudQuestTitlePixels = 13.0f;      // O2 PLACEHOLDER
-    inline constexpr float HudQuestLinePixels = 11.0f;       // O2 PLACEHOLDER
-    // Reserved right-hand column for an objective's "4/8" counter, measured
-    // against the widest realistic counter so the objective text has a stable
-    // fit limit rather than a per-frame one.
-    inline constexpr float HudQuestCounterColumn = 44.0f;    // O2 PLACEHOLDER
-
-    // Damage number sizes, section 4 of the HUD spec.
-    // The spec's 40/64/80 were authored for a 1920x1080 mock viewed at desk
+    // Damage number sizes.
+    // The sheet's sizes were authored for a 1920x1080 mock viewed at desk
     // distance. In the game they cover the target you are shooting at, which
-    // is worse than illegible — the owner called them too big on sight. Cut
-    // ~35% while keeping the crit/weak-point/body HIERARCHY intact, since the
-    // relative sizes are what carry the information.
-    //
-    // HELD HERE, deliberately, on the SECOND "too large" report (2026-08-14).
-    // These three are the only thing that separates a body shot from a weak
-    // point from a crit at a glance, and they had already been cut once. What
-    // changed between the two reports was not the type — it was O29, which put
-    // item level at 120 and roughly doubled affix values, so a number that was
-    // three digits when these sizes were chosen is now five or six. A six-digit
-    // number carrying two THIN SPACES is eight glyphs wide; at the crit size
-    // that is most of the target. The problem is WIDTH, and width is a
-    // formatting question, so the fix is FormatDamage below rather than a third
-    // cut that would eventually collapse the hierarchy into one size.
-    inline constexpr float DamageBodyPixels = 26.0f;   // SPEC: 40
-    inline constexpr float DamageCritPixels = 52.0f;   // SPEC: 80
-    inline constexpr float DamageWeakPointPixels = 40.0f; // SPEC: 64
+    // is worse than illegible — the owner called them too big on sight, twice,
+    // and O207 rules the play measurement stands: 26 body, 52 crit. The
+    // relative sizes are what carry the information, so the HIERARCHY is kept
+    // and the width problem is solved by FormatDamage below, not by a third cut.
+    inline constexpr float DamageBodyPixels = 26.0f;      // O207
+    inline constexpr float DamageCritPixels = 52.0f;      // O207
+    inline constexpr float DamageWeakPointPixels = 40.0f; // O207
     // DoT ticks sit BELOW the body size: they are bookkeeping, not an event,
     // and at body size a three-target Bleed drowned the gunfire it rode over.
     inline constexpr float DamageDoTPixels = 16.0f;    // O2 PLACEHOLDER
@@ -331,10 +361,14 @@ namespace BreakerUI
     inline constexpr float UltimateStepDownSeconds = 3.0f;
 
     // --- Motion (seconds) --------------------------------------------------
-    inline constexpr float MotionDamagePop = 0.04f;
-    inline constexpr float MotionDamageRise = 0.52f;
-    inline constexpr float MotionCritHold = 0.06f;
-    inline constexpr float DamageRisePixels = 40.0f;
+    // The damage-number timeline (02-hud): pop 60 ms, settle 120 ms, rise
+    // 24px over 700 ms, fade over the last 300 ms; a crit holds 400 ms longer.
+    inline constexpr float MotionDamagePop = 0.06f;      // 02-hud
+    inline constexpr float MotionDamageSettle = 0.12f;   // 02-hud
+    inline constexpr float MotionDamageRise = 0.70f;     // 02-hud
+    inline constexpr float MotionDamageFade = 0.30f;     // 02-hud
+    inline constexpr float MotionCritHold = 0.40f;       // 02-hud (extra lifetime)
+    inline constexpr float DamageRisePixels = 24.0f;     // 02-hud
 
     // Thousands take a space, never a comma: at 40px a comma collapses into a
     // dot. U+2009 THIN SPACE, as the spec asks: the canvas HUD now draws
@@ -356,25 +390,27 @@ namespace BreakerUI
     }
 
     // --- The vitals row (O199) ----------------------------------------------
-    // Shield current beside health current, and no max on either: the number
-    // that matters mid-fight is the one you have left. A character with no
-    // shield pool at all draws no shield — no track, no number — so the row
-    // never shows a dead "0" beside a bar that can never fill. The column
-    // stays reserved either way so the health number does not move when a
-    // shield is gained or lost.
+    // Health current in the large numeric with the health MAX after it in the
+    // small numeric; shield current in the small numeric, drawn only when a
+    // shield pool exists. A character with no shield pool at all draws no
+    // shield — no track, no number — so the row never shows a dead "0" beside
+    // a bar that can never fill. Positions are fixed either way, so the health
+    // number does not move when a shield is gained or lost.
     struct FVitalsRow
     {
         FString ShieldText;
         bool bDrawShield = false;
         FString HealthText;
+        FString MaxText;
     };
 
-    inline FVitalsRow FormatVitalsRow(float Shield, float MaxShield, float Health)
+    inline FVitalsRow FormatVitalsRow(float Shield, float MaxShield, float Health, float MaxHealth)
     {
         FVitalsRow Row;
         Row.bDrawShield = MaxShield > 0.0f;
         Row.ShieldText = Row.bDrawShield ? FormatTicker(Shield) : FString();
         Row.HealthText = FormatTicker(Health);
+        Row.MaxText = FormatTicker(MaxHealth);
         return Row;
     }
 

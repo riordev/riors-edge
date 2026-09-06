@@ -8,6 +8,9 @@
 // The class-resource row's resolved description. Pure, header-only, and the
 // only part of the cluster that is testable without a viewport.
 #include "UI/BreakerHUDResourceRow.h"
+// The HUD sheet's timelines, world-free: crosshair spread, the health chip,
+// the near-death pulse, the damage-number frame, the swap slide.
+#include "UI/BreakerHUDMath.h"
 // Full include, not a forward declaration: FBreakerShotResult is a UFUNCTION
 // parameter, so UHT needs the complete type (same reason
 // BreakerMomentumComponent.h includes it).
@@ -53,11 +56,12 @@ struct FBreakerHUDDamageNumber
     bool bSecondary = false;
     // Per-class-of-hit lifetime, latched at push: DoT ticks die fast so they
     // never spam over gunfire, kills hold longest.
-    float Lifetime = 0.56f;
+    float Lifetime = BreakerUI::MotionDamageRise;
 };
 
-// One enemy, reduced to what the minimap needs. Collected during the enemy
-// health-bar pass so the minimap costs no second actor iteration.
+// One enemy, reduced to a map blip. Collected during the enemy health-bar
+// pass. Nothing on the HUD reads it; the fill continues until a consumer
+// returns (see EnemyBlips below).
 struct FBreakerHUDMapBlip
 {
     FVector World = FVector::ZeroVector;
@@ -65,9 +69,9 @@ struct FBreakerHUDMapBlip
     bool bBoss = false;
 };
 
-// Which edge carries a plate's 3px rail. Left is identity — which system owns
-// this panel; Top is transient status, reserved for events and alerts.
-// FIELDPLATE §03: one rail per plate, a plate with two rails has no meaning.
+// Which edge carries a plate's rail. Left is identity — which system owns
+// this panel; Top is transient status, reserved for events and alerts. One
+// rail per plate: a plate with two rails has no meaning.
 enum class EBreakerRail : uint8
 {
     Left,
@@ -128,32 +132,29 @@ private:
     void EnsureAbilityBinding(const ABreakerCharacter* Character);
 
     void DrawDefenseFeedback(const FVector2D& Center);
-    // Crosshair kill confirm: an eight-point burst, distinct from the hit
-    // ticks by geometry (through-centre strokes, expanding) as well as colour.
-    void DrawKillConfirm(const FVector2D& Center);
-    // Stepped screen-edge bands in the harm accent when health runs low.
-    // Solid fills only — FIELDPLATE has no gradients, so the "vignette" is
-    // two nested full-bleed frames, and urgency is a blink, not a fade.
-    void DrawLowHealthCue(const ABreakerCharacter* Character);
+    // The near-death frame: a full-screen harm border pulsing 8→16 px under
+    // 20 % health, with four corner brackets that do not pulse.
+    void DrawNearDeathFrame(const ABreakerCharacter* Character);
     // Returns the height it consumed, so the stack above it knows where it ends.
     float DrawStatusReadout(const ABreakerCharacter* Character, float X, float BottomY, float Width);
-    void DrawVitalsCentred(const ABreakerCharacter* Character);
-    // Returns the stack's top edge, so ability windows can sit above it.
-    float DrawFieldStack(const ABreakerCharacter* Character, float X, float BottomY, float Width);
-    // §2's class-resource slot, in two halves: which resource this character
+    // Vitals, bottom-left: value + max, the shield layer, the health bar with
+    // its chip and 20 % tick, and the resource track beneath.
+    void DrawVitals(const ABreakerCharacter* Character);
+    // The three ability tiles, bottom-centre: 64 / 88 / 64.
+    void DrawAbilityCluster(const ABreakerCharacter* Character);
+    // Magazine, reserve, the ammo rail at rest, and the name only on a swap.
+    void DrawWeaponReadout(const ABreakerCharacter* Character);
+    // The class-resource slot, in two halves: which resource this character
     // has (one component read, no lookup, no iteration) and how the resolved
-    // row is painted into the fixed 12px track.
+    // row is painted into the fixed 8px track.
     static BreakerHUD::FResourceRow ResolveResourceRow(const ABreakerCharacter* Character);
     void DrawResourceTrack(const BreakerHUD::FResourceRow& Row, float X, float Y, float Width, float Height);
-    // The encounter readout (was DrawWaveBanner): which encounter, how much
-    // remains, and — only over a KNOWN total, per O120 — the pack bar.
-    void DrawEncounterReadout(const FVector2D& Center);
-    // The live boss, resolved for the readout's boss row and cached across the
-    // encounter. Only ever consulted when the game mode already says a boss is
-    // alive, so the actor scan behind it runs about once per encounter rather
-    // than once per frame. Weak, because the boss dying is the normal exit.
-    const class ABreakerBossEnemy* ResolveEncounterBoss();
-    TWeakObjectPtr<const class ABreakerBossEnemy> CachedEncounterBoss;
+    // Top-left: the zone name and the mm:ss countdown to the next wave.
+    void DrawZoneLine(const ABreakerCharacter* Character);
+    // Top-right: the tracked quest as one right-aligned line.
+    void DrawQuestLine(const ABreakerCharacter* Character);
+    // The crosshair's hit / kill / weak-point marks, on the arrival clock.
+    void DrawCrosshairMarks(const FVector2D& Center);
     // ---- Density instruments (see DrawHUD) --------------------------------
     bool bHudStressSpawned = false;
     double HudCostWindowStart = 0.0;
@@ -161,18 +162,7 @@ private:
     double HudCostMaxMs = 0.0;
     double HudCostBarsMs = 0.0;
     double HudCostNumbersMs = 0.0;
-    double HudCostMapMs = 0.0;
     int32 HudCostFrames = 0;
-    // Top-right field plate. Cheap by construction: it consumes EnemyBlips,
-    // which DrawEnemyHealthBars has already filled from the one enemy
-    // iteration the HUD was making anyway, and allocates nothing per frame.
-    void DrawMinimap(const ABreakerCharacter* Character, float X, float Y, float Width, float Height);
-    // Compact quest panel directly below the minimap, on EVERY map: the active
-    // quest's name and, by state, either a directive line (Offered / ready to
-    // turn in) or its objectives with live counters. Reads the pawn's
-    // UBreakerQuestJournal through the pure quest-library helpers, so it can
-    // never disagree with the dialogue system about a quest's state.
-    void DrawQuestTracker(const ABreakerCharacter* Character, float X, float Y, float Width);
     // Top-left playtest chrome: key legend, the F3 diagnostics plate, world
     // diagnostic labels, and the report-copied toast. Factored out because the
     // Anchor's trimmed HUD keeps exactly this block and nothing else of the
@@ -278,6 +268,45 @@ private:
     // only until the next was focused. Per-enemy now, pruned every frame by
     // the same clock that reads it, so it cannot grow.
     TMap<TWeakObjectPtr<const class ABreakerEnemy>, double> FocusBarReleaseTimes;
+    // The health each enemy's bar is SHOWING, for the chip hatch on a drop.
+    //
+    // DECLARED CROSSING (FIELD -> GLASS), the fourth member O155 names.
+    // Written and read only by Combat/BreakerEnemyHealthBars.cpp, which owns
+    // the bar; pruned by the same pass that prunes FocusBarReleaseTimes, so it
+    // cannot grow. The chip's arithmetic is BreakerHUDMath's so the player's
+    // bar and the enemy's bar cannot disagree about a hold or a recovery.
+    TMap<TWeakObjectPtr<const class ABreakerEnemy>, BreakerHUDMath::FHealthChip> ShownEnemyHealth;
+
+    // --- Crosshair state ----------------------------------------------------
+    // The tick gap in spec pixels, following the weapon's cone through
+    // BreakerHUDMath::CrosshairGapFollow. Persisted so the 60/200 ms travel is
+    // a rate, not a snap.
+    float CrosshairGapPx = BreakerUI::HudCrosshairGapRest;
+    // When the aim state last flipped, for the 80 ms ADS collapse.
+    double AdsChangeTime = -1000.0;
+    bool bWasAiming = false;
+
+    // --- The player's own health chip ---------------------------------------
+    BreakerHUDMath::FHealthChip HealthChip;
+    // The health fraction drawn last frame, so a drop is detected by the HUD
+    // rather than needing a seam from Combat/.
+    float HealthShownFraction = 1.0f;
+
+    // --- The weapon name on swap -------------------------------------------
+    // Latched on the falling edge of IsSwapping(): the name that arrived.
+    double SwapStartTime = -1000.0;
+    bool bWasSwapping = false;
+    FString SwapName;
+
+    // Latched from the session's PendingRift each frame it is set, so the line
+    // survives the frame the rift is torn down.
+    FString ZoneName;
+
+    // -BreakerCaptureHUD forcing: which of reload / swap / cooldown the current
+    // preview phase holds on, so a capture run photographs all three.
+    int32 PreviewPhase = 0;
+    float PreviewCooldownFraction = 0.0f;
+    bool bPreviewReload = false;
 
     UPROPERTY() TObjectPtr<ABreakerTracerRenderer> TracerRenderer;
     UPROPERTY() TObjectPtr<ABreakerSoundDirector> SoundDirector;
@@ -321,17 +350,18 @@ private:
     // the two can never disagree about how a number enters the pool.
     void PushDamageNumber(const FBreakerHUDDamageNumber& Number);
 
-    // Filled once per frame by DrawEnemyHealthBars, consumed by DrawMinimap.
-    // A member rather than a local so the allocation happens on the first few
-    // frames and never again: DrawHUD runs every frame and a TArray built in
-    // it is a per-frame allocation by definition.
+    // Filled once per frame by DrawEnemyHealthBars. A member rather than a
+    // local so the allocation happens on the first few frames and never
+    // again: DrawHUD runs every frame and a TArray built in it is a per-frame
+    // allocation by definition.
     //
     // THE TWO HALVES HAVE DIFFERENT OWNERS (O155). The fill is the COMBAT
-    // lane's, in Combat/BreakerEnemyHealthBars.cpp; the read is the UI lane's,
-    // in DrawMinimap below. This is the shared surface the split left behind —
-    // a producer/consumer contract that is a member variable, so there is no
-    // header to publish and no compile error when it breaks. Changing its
-    // shape, its meaning or its fill order is a declared crossing.
+    // lane's, in Combat/BreakerEnemyHealthBars.cpp. NOTHING READS IT: the
+    // minimap that consumed it was deleted (02-hud: enemy state is read off
+    // the enemy), and this is the consumer end of that crossing, GLASS ->
+    // FIELD. The fill continues until a consumer returns, because stopping it
+    // is the producer's edit, not this lane's. Changing its shape, its meaning
+    // or its fill order remains a declared crossing.
     TArray<FBreakerHUDMapBlip> EnemyBlips;
     // Screen-space rectangles (CentreX, TopY, Width, Height) already claimed by
     // an enemy label this frame, so a second enemy projecting to nearly the
@@ -354,9 +384,9 @@ private:
     float UIScale = 1.0f;
     float S(float SpecPixels) const { return SpecPixels * UIScale; }
 
-    // Flat fill, 1px border, one 3px rail. No gradient, no blur, no radius:
-    // Canvas cannot round a corner and the system's 2px radius is below the
-    // threshold where its absence reads as wrong.
+    // Flat fill, 1px border, one 4px identity rail. No gradient, no blur, no
+    // radius: Canvas cannot round a corner and the system's 2px radius is
+    // below the threshold where its absence reads as wrong.
     // A transparent Face means "the HUD's default plate face" (bg/base at the
     // readability alpha) rather than an actual transparent plate.
     void DrawPlate(float X, float Y, float Width, float Height, const FLinearColor& Rail,
@@ -395,14 +425,18 @@ private:
     // is tinted toward the number's own hue so it never reads as grey mud.
     void DrawOutlinedNumber(const FString& Text, float CenterX, float Y, const FLinearColor& Face, float SpecPixels, float TextAlpha);
 
-    void DrawCrosshair(const FVector2D& Center, const FLinearColor& Color, float Size, float Thickness);
+    // The four-tick crosshair with its spread gap, blending to the ADS dot
+    // and ring. Sizes are already scaled by the caller.
+    void DrawCrosshair(const FVector2D& Center, float GapPx, float AdsBlend);
     void DrawTrack(float X, float Y, float Width, float Height, float Fraction, const FLinearColor& Fill, const FLinearColor& Track);
-    // Hard-edged clockwise sweep from 12 o'clock, clipped to the square's own
-    // boundary so it never spills past the plate edge.
-    void DrawCooldownWedge(float X, float Y, float Size, float CoveredFraction, const FLinearColor& Color);
+    // Flat 135° stripes: A for HudHatchStripe of every HudHatchPeriod, B for
+    // the rest. The only texture the system has; it means disabled, locked,
+    // or the chip of a value that was just lost.
+    void DrawHatch(float X, float Y, float Width, float Height, const FLinearColor& A, const FLinearColor& B,
+        float Period, float Stripe);
     // Code-drawn stand-ins for the commissioned ability marks, built to the
     // icon spec's construction notes. One stroke weight, one hue, no text.
     void DrawAbilityGlyph(const class UBreakerAbilityDefinition* Definition, float CenterX, float CenterY, float BoxSize, const FLinearColor& Color);
     void DrawAbilitySlot(const ABreakerCharacter* Character, const UBreakerAbilityComponent* Abilities,
-        EBreakerAbilitySlot Slot, const FString& KeyHint, float X, float Y, float Size, const FLinearColor& Accent);
+        EBreakerAbilitySlot Slot, const FString& KeyHint, float X, float Y, float Size, float MarkSize, const FLinearColor& Accent);
 };
