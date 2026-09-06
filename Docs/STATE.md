@@ -17,14 +17,14 @@ measurement without judging it.
 | Node tags with no consumer | ceiling | 139 of 205 declared | ceiling 143 | ok |
 | Conditions no content authors | ceiling | 12 of 26 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 3 of 18 | ceiling 0 | **OUT** |
-| Asserted invariants with no test | ceiling | 38 of 109 asserted across 7 specs | ceiling 42, target 20 | ok |
+| Asserted invariants with no test | ceiling | 40 of 111 asserted across 7 specs | ceiling 42, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 2.25 worst tree | floor 3.0 | **OUT** |
 | Trees sitting exactly on the offered-to-spendable floor | ceiling | 9 of 16 | no pin — measurement only | — |
 | Node-shape composition, per tree | band | 57 % ranked minors, all trees | no pin — measurement only | — |
 | Scaffolding nodes | ceiling | 33 of 445 authored | ceiling 50 | ok |
 | Conditions that can never be true | ceiling | 5.0 | ceiling 5, target 1 | ok |
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
-| Build variance band, at cap | band | 6.01 | band 8.0–10.0 | **OUT** |
+| Build variance band, at cap | band | 6.38 | band 8.0–10.0 | **OUT** |
 | Build variance band, endgame | band | 14.46 | band 12.0–20.0 | ok |
 | Ability lane throughput against weapon lane, at cap | band | 0.62 | band 0.85–1.15 | **OUT** |
 | Ability lane throughput against weapon lane, endgame | band | 0.36 | no pin — measurement only | — |
@@ -34,10 +34,10 @@ measurement without judging it.
 
 ## Tests
 
-- passing: 528
+- passing: 534
 - expected red: 3
 - **unexpected red: 0**
-- asserted invariants with no test: 38
+- asserted invariants with no test: 40
 
 Expected-red, unexpected-red and unimplemented are three different states.
 A test that was never written is the worst of the three: it looks asserted.
@@ -159,7 +159,7 @@ A generation hook nothing calls is a resource bar that sits at zero forever. Tes
 
 ## Asserted invariants with no test
 
-**ceiling** · 38 of 109 asserted across 7 specs · ceiling 42, target 20
+**ceiling** · 40 of 111 asserted across 7 specs · ceiling 42, target 20
 
 A named test that was never written looks asserted and is not. This is worse than a red test, and it is the reason this section exists.
 
@@ -194,6 +194,8 @@ A named test that was never written looks asserted and is not. This is worse tha
 - Game.CoverRegistry.IsLayoutLegal  —  content-and-modes.md
 - Game.Tiles.MovementContract  —  content-and-modes.md
 - Encounter.Revive.PressurePause  —  content-and-modes.md
+- Data.Missions.Fresh  —  content-and-modes.md
+- Missions.PointBudgets  —  content-and-modes.md
 - Progression.RuleBandImpact.MinorStack  —  items-and-crafting.md
 - Progression.PowerBand.Singular  —  items-and-crafting.md
 - Progression.PowerBand.AbilityLaneMore  —  power-and-scaling.md

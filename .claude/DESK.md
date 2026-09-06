@@ -5,18 +5,16 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
+## Direction (owner, 2026-09-06)
+Push hard on today's build; the owner is out and reads the report. Cycles run in parallel on disjoint files, one build, one suite, one commit per cycle. The affix system is updated as Cycle 13 lands. A story-mission schema is drafted now so the campaign can be fleshed out. The owner's frame to check every system against: characters pick a doctrine (sub-class) a couple of levels in and unlock doctrine points through the main story quest; a Core tree every class shares scales on its own; the doctrine tree is class-specific. A current inventory of abilities, ultimates, doctrines, affixes and their scaling is owed, with each marked live, stub or unreachable.
+
 ## Direction (owner, 2026-09-05)
 No playtest until the core loop has more oomph. The next blocks are the ones that change what a trigger pull, a shield and a kill feel like: flat damage that is really the weapon's, a boss that fights back with a shield you break, and a Niagara pass with a sound for every verb. Content plumbing waits behind them.
 
-## Cycle 9 — a boss that fights back (O198, FIELD-3; one build)
-- [ ] The Warden's front is a shield pool of 15 % of its bearer's max health: frontal hits deplete it, it breaks with a tell and stays broken for the fight, the rear stays unarmoured. `FrontalArmor` mitigation is replaced, not stacked. The boss inherits the rule. Pinned on the shipped numbers: the level-1 rifle breaks a Warden's front in N rounds; the boss's in the O18 band.
-- [ ] Boss grammar as a pure header: telegraph → punish window → phase gate → add wave → arena change; the shield break is the first punish window.
-
-## Cycle 10 — the Niagara and sound pass (GLASS-1, O179, O190, O193)
-- [ ] Muzzle, impact, cast moment, death: the four `NS_<Moment>` slots filled (owner asset or Fab pack), verb-colour law kept. The muzzle flash returns here.
-- [ ] The sixth verb: `PlayPlayerDeath`, `player_death.wav` slot → synth fallback, one call site in the fatal-hit branch; the O193 beat's one low sound.
-- [ ] Hit feedback re-photographed: the "feedback needs to be better" frame from Part One-B, before and after.
-- [ ] Delete the drift (H1): wall-ride out of the specs, dead gameplay tags out of the ini; grep-empty.
+## Story questions for the owner
+- (story) Which body ends Act I? The deleted campaign table made it a Vestige mass, "The Holdfast", with no Altered before Act II; the only boss built is the Field Marshal, an Act II Altered commander. The act-one draft's Boss beat carries an empty boss id until you name it.
+- (story) Is doctrine commitment gated on the first Kess beat (the KessSalvage turn-in), or merely sited there?
+- (story) Command's giver is "Commander Aluko" as a placeholder in the story source; under O209 a giver with no dialogue row is not an NPC. Name, or leave Act I to the Quartermaster and Kess?
 
 ## Cycle 11 — the HUD to the design system, pass 1 (one build)
 - [ ] Tokens: the olive palette, three borders, the text ramp, `System` bone split from `VerbMove` cyan (O179 keeps cyan on the movement verb; chrome moves to bone), accents with dims, teal-2 and rift-hot, the rarity ramp, rails 4/2, gutter 40. Fonts are their own editor-run commit; Source Sans 3 and Sometype Mono are not staged.
@@ -30,22 +28,18 @@ No playtest until the core loop has more oomph. The next blocks are the ones tha
 - [ ] Death beat to spec.md's numbers (all O2): weapon lower 0.0–0.3 as its own field, camera drop 60 cm, hard cut at 0.8 (fade tail 0), black to 2.0, fade to 2.4. The test asserts the shipped timeline field by field.
 - Pass 2, own block (ruled: O156, O82, O203): the boss bar world-space with phase marks off the authored gates and pips; the occlusion trace and the >60 m rules; names from the O195 table; the active-modifier underline; the death screen and the rift retry; banners to the design with a priority queue.
 
-## Cycle 13 — LEDGER-3 and the at-cap band (one build; O200)
-- [ ] 29 new affix rows as data (Breadth: every row rolls on ≥1 slot, none MorePercent; per slot ≥2 offensive, ≥1 conditional, ≥1 weapon line, ≥1 ability line). Conditional flat Added Damage prefixes are legal data-only. Then re-measure `PowerBand.AtCap` on the ruled basis; the pin is deleted when it reads inside the band, never widened.
-## Cycle 14 — the stash screen (one build; over LEDGER's landed plumbing)
-- [ ] Part One-X is stale: `StashCapacity` 70, `StashItems`, deposit and withdraw with the Anchor gate and O182, the crash-window reconcile and three pins all exist; only the tests call them. Append `Stash` to `EBreakerMenuScreen`, `BuildStashScreen` in its own TU (ALL / WEAPONS / ARMOUR; counter n/70; backpack n/25; MOVE TO STASH / TAKE TO BACKPACK), entered from an Anchor interactable on the F path, `-BreakerCaptureMenu=STASH`. Delete Part One-X's premise in the same commit. No MATERIALS tab: no material item exists.
-
 ## Cycle 15 — menus, inventory and trees, value pass (one build; GLASS)
 - [ ] Main and pause plate 640 wide, item rows, focus rail, slide-in; settings row, slider and toggle values with every drawn row mapped to a live `UBreakerGameSettings` field (`Settings.Screen.ControlValues`) and rows with no field not drawn; class cards 360×200 with Swift's O176 open slot drawn; the create rail NAME / BODY / VOICE / FACE (BODY renamed from MODEL, still painted until the save fields exist); the forge tab strip keeps five verbs and says RIFTGLASS (O206); the pause plate carries XP and level and the combat rail goes (O210); the dialogue plate with speaker and role split from the one display string.
 - [ ] Inventory and trees: the world at 40 % behind menus, tab rail-on-active, equipment rows 64 with the dashed empty frame gone, the limit chip 44 tall, two-level zoom snap, node ladder colours (spent bone, reachable panel-1 with 2 px border-high), compare marks and the rarity tally as drawn geometry, the tier badge split out of the affix string. Frame-identical in structure before and after (`-BreakerCaptureMenu=INVENTORY|SKILLTREES`).
 - Then GLASS-3: `BuildInventoryScreen` and `BuildSkillTreesScreen` move to their own TUs unchanged (one build, identical frames), and each re-layout is its own cycle: the tri-zone inventory with the card rail; the card's REWRITE / SIGNATURE → prefixes → suffixes order (O67's forfeit needs LEDGER-4's field); the core wheel (needs the 11-node atlas as content under O103; `UI/BreakerCoreWheelMath.h` pinned against `06-core-wheel-geometry.json`, which is authoring input, not a runtime file); the doctrine lattice (links between spent nodes only, O204; edges and positions in progression.json).
 
-## Cycle 16 — two more bosses (FIELD-3)
+## Cycle 16 — the story-mission schema (doc + data, no build)
+- [ ] `Data/missions.json` (the act-one draft: 13 beats over the four quests, boss id empty until named), `Save/BreakerMissionContent` loader + validator (ids unique; every flag registered; every npc/node, rift, quest id resolves; beats ordered; Σ doctrine points == 8; every corePoint a known source), census export, `Data.Missions.Fresh` and `Missions.PointBudgets`. Then the three seams: an arrival flag on travel, rift completion → flag, and the flag-driven doctrine entitlement replacing the level benchmarks (`LevelPointEntitlement` moves with it).
+
+## Cycle 16b — two more bosses (FIELD-3)
 - [ ] Second boss: add-clear under pressure. Third: mobility and sustain. `Combat.PowerCurve.BossBand` holds for all three; O31 asserted per boss. One build each.
 
-## Cycle 17 — the rest of DATA-4 (one library per commit; O186, O195)
-- [ ] Quests → `Data/quests.json` (`BreakerQuestContent.cpp` becomes a loader; 4 quests, the flag registry, `ValidateQuestContent` runs on the file).
-- [ ] Dialogue → `Data/dialogue.json` (`BreakerNPC.cpp` MakeXDialogue become loaders; ~26 nodes, ~70 choices; the lexicon test reads the file).
+## Cycle 17 — the ability numerics to data (O186)
 - [ ] Abilities: only the numerics (`ResourceCost`, `CooldownSeconds`, `WindowDuration`, variant numbers) → `Data/abilities.json`; the registry, `AbilityClass` and tags stay a DataAsset (O186). The ~40 per-ability `O2 PLACEHOLDER` constants in the ability .cpp files are the real no-compile target and need their own item.
 
 ## Plumbing the design asks for, in the order that unblocks the most
@@ -72,6 +66,15 @@ No playtest until the core loop has more oomph. The next blocks are the ones tha
 - [ ] Per-archetype weapon fire: `weapon_fire_<archetype>.wav` → `weapon_fire.wav` → synth.
 
 ## Later (infrastructure only when it unblocks a felt item this week)
+- The Warden's front re-arms on every `OnVitalsRestored`, so a Wakeful revive gives a second front and a second punish window. If "gone for the fight" should survive a Wakeful rise, that is a ruling.
+- The front break exposes the weak point but does not raise the apparatus; the player who broke the front stands at the front. Whether the break should also run the raise is an owner call. `EnterPhase` clears `bOrderRaiseActive` without closing the apparatus (a gate crossed mid-raise leaves the weak point open).
+- `AggregateStats` adds every conditional line's raw value to the HUD's conditional-damage figure regardless of target or bucket; the new conditional Armour, crit and fire-rate rows inflate it.
+- Deposit/withdraw return a bool and log the reason; the stash screen re-derives the refusal line. A result enum on the component (LEDGER) is the fix.
+- The HUD paints every travel point's overhead prompt in rift teal; the stash point's prompt inherits it (GLASS, the HUD pass).
+- `GatherDialogueFlags` / `GatherEntryFlags` in `BreakerQuestContent.cpp` carry no Breaker prefix (pre-existing).
+- `player_death.wav` is not in the shipped-samples list until a sample is authored; the synth is the floor.
+- The content spec's rule "The campaign is post-slice" now sits beside a Story missions section in present tense. Keep the rule or delete it.
+- `Offense.WallRideDamage` is a dead row (its condition is never true); delete it when the leans are next touched.
 - The DoT twin of the flat fold: `ComposeDotSourcePower` (`BreakerCombatComponent.cpp` ~:513-518) recovers the Increased bucket from the composed value, so Increased-DoT is not multiplied by the flat. Same fix as the hit path, own item.
 - After the Boots-only MoveSpeed row: the Gloves `Core.MoveSpeed` roll in `Items.Equipment.AttributeContribution` (~BreakerItemTests.cpp:425) grants a slot a line it cannot roll; move it to Boots in the next build. The Sidearm lean on `Core.MoveSpeed` in `affixes.json` is inert (leans apply on weapon slots); delete the row when the leans are next touched.
 - The death beat's black is a camera fade and its teleport lands at the end of black; `HoldBlack`/`ReleaseBlack` on the game instance are the seam to move the teleport to the start of black and reveal through the arrival gate. Felt only if the respawn frame reads cold.
@@ -95,14 +98,15 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 
 ## Done (last three cycles; older is git)
 
-### Cycle 8
-- [x] The source damage pools carry the flat as its own factor: the aggregator exposes its three lanes, `FillSourcePools` reads them instead of dividing the composed value, and a target rider composes `(Base + Flat)(1 + (Inc + R)/100)·More`. The defect was live (Cadence's guaranteed Added Damage under ten shipped rider rows) and small. `Pools.FlatOrder` pins the rider case; no existing float moved.
-- [x] The Stage 1 design export lives at `Assets/design/` (eight sections); four censuses filed it as Cycles 10, 11, 13 and 14, the plumbing list, and sixteen questions. Five superseded canvases retired from `Assets/ui-reference/`.
+### Cycles 9, 10, 13, 14, 16 (schema), 17 (quests, dialogue) — one build, one suite, 534 / 3 / 0
+- [x] O198: the Warden's front is a pool of 15 % of max health that breaks for the fight; FrontalArmor is gone; the boss inherits it. Level-1 rifle: Warden front in 5 rounds (0.4 s), boss front in 37 rounds (3.6 s), inside O18's 15 % of the band. Boss grammar as a pure header: telegraph → punish window → phase gate → add wave → arena change derived from the shipped numbers; the front break opens the first punish window (2.5 s, O2). `Warden.FrontBreaks`, `Boss.Grammar`.
+- [x] O190 recipe at `Content/Breaker/FX/README.md`; the four NS_ assets stay Owner-only and the code side was done in Cycle 2. O193 sixth verb `PlayPlayerDeath` on the beat's cut (0.8 s), synth 110→55 Hz. H1: wall-ride out of the specs; the tag ini holds only the three requested `Status.*` tags.
+- [x] LEDGER-3: 56 slice rows (29 new, all conditional lines against existing plumbing); AtCap measured on a rolled best-in-slot (O200): 6.38× against 8–10×, pin kept and rewritten to the basis. `RolledBestInSlotIsGameLegal`.
+- [x] The stash screen over LEDGER's landed plumbing: an Anchor stash point on the F path, 10×7 / 5×5, ALL / WEAPONS / ARMOUR, Necklace under ARMOUR, painted verbs outside the Anchor and at the caps; `-BreakerCaptureMenu=STASH` photographed. Part One-X deleted from ORDERS.
+- [x] Story missions: the schema is a spec section (beat vocabulary, one flag registry, doctrine points two per main-story benchmark by Unlock beats: O43 and O86 amended); the data and loader are the next Cycle 16 item.
+- [x] Quests and dialogue are data: `Data/quests.json` (4 quests, 5 objectives, 20 flags) and `Data/dialogue.json` (Kess and the Quartermaster, 24 nodes, 59 choices, 9 entries), loaders with validators, exports byte-identical, every deleted literal accounted for. Two libraries in one commit because they share the census export TU.
 
-### Cycle 7
-- [x] O196: the pipeline already composes (Base + ΣFlat) × (1 + ΣInc) × ΠMore and `Offense.AddedDamage` is a Flat row as a fraction of the weapon's item-level base. The one defect, the Overflow rule's flat-into-Increased rewrite, is deleted; the enum value stays for saves and resolves to no rule; the row is a Prefix. `Pools.FlatOrder` pins the order and the no-second-curve contribution. A second, subtler site in the damage library's pool split is the next block's first item.
-- [x] O199: a zero-max shield draws nothing on the vitals row; no max is drawn. `HUD.VitalsReadout` pins it.
-- [x] The Gloves `Core.MoveSpeed` test roll is on Boots; the inert Sidearm lean row is gone; the export still matches byte for byte.
+
 
 ### Cycle 6
 - [x] Affixes are data: `Data/affixes.json` (27 slice / 8 aberrant / 5 anomalous / 3 downside / 1 elemental, 26 leans, caps) through the first runtime loader `Data/BreakerDataFile`; the library is a loader with a validator, signatures unchanged; the commandlet's export matches the file byte for byte; status.py reads it; Data/ is staged.

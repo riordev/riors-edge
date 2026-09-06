@@ -69,7 +69,7 @@ Numbers are permanent and never reused.
 
 **O42** — The authored Anchor map eventually replaces the runtime hub builder; runtime lighting stands in the interim and any authored light supersedes it.
 
-**O43** — One Core Point per level through 50, and no other per-level point. The slice's opening grant is an advance on that entitlement, not a separate pool. Doctrine Points are not on a ladder at all: all eight arrive at commitment, at the Forge.
+**O43** — One Core Point per level through 50, and no other per-level point. The slice's opening grant is an advance on that entitlement, not a separate pool. Doctrine Points are not on the level ladder: they arrive two at a time on four main-story benchmarks, eight in all, granted by mission beats.
 
 **O45** — All five classes ship playable.
 
@@ -153,7 +153,7 @@ Numbers are permanent and never reused.
 
 **O85** — The nameplate policy is a per-mode asset from day one.
 
-**O86** — Commitment is to a **doctrine**: one per character, changed only at the Forge. IT DELIVERS IN TWO HALVES ON DIFFERENT CLOCKS, and conflating them made the board promise what it could not pay. THE PRESENTATION LANDS AT COMMITMENT — free, immediate, whole: the title, the character sheet, how you read to other players in the Anchor. A Caster committed to Void Whisperer *is* a Void Whisperer from that moment, having spent nothing. THE MECHANICS UNFOLD ON THE BENCHMARKS. Under O111 the pool pays two points at each of four, and a keystone needs six invested plus its own two, so no character holds a doctrine keystone before the last benchmark at the level cap — the capstone lands at campaign completion by design, and the doctrine is identity first and capstone last. Anything on the commitment screen promising the keystone is lying to every character below the cap.
+**O86** — Commitment is to a **doctrine**: one per character, changed only at the Forge. IT DELIVERS IN TWO HALVES ON DIFFERENT CLOCKS, and conflating them made the board promise what it could not pay. THE PRESENTATION LANDS AT COMMITMENT — free, immediate, whole: the title, the character sheet, how you read to other players in the Anchor. A Caster committed to Void Whisperer *is* a Void Whisperer from that moment, having spent nothing. THE MECHANICS UNFOLD ON THE BENCHMARKS. Under O111 the pool pays two points at each of four main-story benchmarks (mission Unlock beats, not levels), and a keystone needs six invested plus its own two, so no character holds a doctrine keystone before the last benchmark at the level cap — the capstone lands at campaign completion by design, and the doctrine is identity first and capstone last. Anything on the commitment screen promising the keystone is lying to every character below the cap.
 
 **O87** — A top-tier item carries one major rewrite plus generic affixes stronger than an ordinary item's, so it sits on par with a good Aberrant rather than above it.
 
@@ -339,7 +339,7 @@ Numbers are permanent and never reused.
 
 **O186** — A DATA lane owns `Data/`, the loader and the validator. Tabular content is JSON, the source of truth for the game, the tests and the census alike; DataAssets are for asset-referencing tables only. A library migrates in one commit with its output pinned identical; a magnitude change is done when it needs no compile.
 
-**O187** — Gameplay tags are defined natively at their first consumer; the ini declares nothing no consumer requests. The twenty unreferenced tags go.
+**O187** — Gameplay tags are defined natively at their first consumer; the ini declares nothing no consumer requests. The unreferenced tags go.
 
 **O188** — An account lives on its player's machine. The host holds the host's account only; a remote pawn's wallet is seeded from and written back to its owning client's account across the connection. The smoke's shared pool is a defect; GROUND-5 builds the seam.
 

@@ -148,6 +148,51 @@ player alive is the machine that would keep an Altered lucid, and the militia's
 standing order is to shoot Altered on sight. That contradiction is what the
 building is, and the space should stage it physically rather than explain it.
 
+### Story missions
+
+A mission is a chapter of the main story: an ordered list of beats under one
+id, tied to the quests it advances. It lives as data under the content
+library rule (O186) with a validator, a census export and a byte-for-byte pin.
+No beat carries text. A title lives on the quest row and a line on the
+dialogue node; every string has one home (O195).
+
+**Missions, quests and dialogue share one flag registry.** A beat completes
+when its flag is set. Every gate is derived from beat order — the previous
+beat's completion — and is never authored on the beat.
+
+**The beat vocabulary is closed.** Each kind names what it plays as and what
+it consumes:
+
+| Beat | Plays as | Completes on |
+|---|---|---|
+| **Dialogue** | an NPC and an entry node | the choice's flag |
+| **Travel** | a destination in the travel registry | arrival |
+| **Encounter** | a rift by id, with the quest objectives it counts | the objectives' flags |
+| **Boss** | a rift and a boss | the rift's completion |
+| **Return** | a dialogue whose flag is the quest's turn-in; the tracker's verb is RETURN TO THE GIVER | the turn-in flag |
+| **Reward** | the quest's reward | turn-in |
+| **Unlock** | doctrine points, a Core world point by source id, or an ability token | the grant |
+
+Discover — reach a yard — is the one kind with no runtime event, and stays out
+of the vocabulary until it has one.
+
+**Doctrine points are eight in all**: two per main-story benchmark, four
+benchmarks, granted by Unlock beats (O43, O86 as amended). A settled counter
+means no character is paid twice. The validator holds the file's total at eight
+(O111).
+
+**Commitment to a doctrine is a Forge interaction (O86)**, and the mission that
+first sends the player to Kess is its natural site.
+
+**Rifts are named by id** in the file and resolve to the yard's rift
+definition. A mission's act must match the world-point sources it grants.
+
+**How a mission plays.** The prompt sits on the NPC. The Anchor gate opens
+onto the arrival cover. The rift door admits the player; the waves carry
+themselves with the countdown; the tracker holds one line. The rift-complete
+banner closes the encounter. Death during a boss encounter resets it to its
+start (O82). The return is a dialogue, and its turn-in pays the reward.
+
 ## Boundaries
 
 This spec owns places, modes, encounter composition and the spatial grammar.
@@ -173,6 +218,8 @@ It does not own:
 | Every procedural tile publishes a satisfiable movement contract | `Game.Tiles.MovementContract` |
 | Group content grants no progression point | `Progression.WorldPoints.SoloReachable` |
 | Spawn pressure pauses while a revive is in progress | `Encounter.Revive.PressurePause` |
+| The mission file equals its export; one mission per act id; every flag registered; every npc, node, rift and quest id resolves; beats ordered with no Return before its Encounter | `Data.Missions.Fresh` |
+| Doctrine points across the file sum to eight; every Core point is a known source, used once, within the cap of fifteen | `Missions.PointBudgets` |
 
 ## Open
 

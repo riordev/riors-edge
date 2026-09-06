@@ -241,10 +241,10 @@ Two pools and no third. **Core is 65**: one Core Point per level to 50, plus
 roughly fifteen from world content across the campaign. The slice's opening
 grant is an advance on that entitlement rather than a separate pool.
 
-**Doctrine is 8**, paid whole at commitment and only at the Forge. It has no
-per-level entitlement to advance against and no counter to settle up, which is
-why a respec zeroes the wallet rather than refunding it — the points belong to
-the commitment, not to the character.
+**Doctrine is 8**, paid two at a time on four main-story benchmarks, which are
+mission Unlock beats rather than levels; a settled counter means no character is
+paid twice. A respec zeroes the wallet rather than refunding it — the points
+belong to the commitment, not to the character.
 
 ## Boundaries
 
