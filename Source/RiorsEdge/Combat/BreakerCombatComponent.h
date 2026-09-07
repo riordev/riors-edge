@@ -38,6 +38,12 @@ class RIORSEDGE_API UBreakerCombatComponent : public UActorComponent
     GENERATED_BODY()
 
 public:
+    bool ApplyStagger(float Seconds);
+    void GrantStaggerImmunity(float Seconds);
+    bool IsStaggered() const;
+    bool IsStaggerImmune() const;
+    float GetStaggerRemaining() const;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Combat|Stagger", meta=(ClampMin="0", ClampMax="1")) float StaggerResistance = 0.0f; // O2
     // Momentum Transfer: only this attacker's next eligible melee spends the window.
     void ArmMeleeDefenseSuppression(AActor* Attacker, float DurationSeconds);
     UBreakerCombatComponent();
@@ -287,6 +293,11 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Defense", meta=(ClampMin="0")) float DodgeResourceRefund = 5.0f;   // O2 PLACEHOLDER
 
 private:
+    UPROPERTY(Replicated) bool bStaggerActive = false;
+    double StaggerEndTime = 0;
+    double StaggerImmunityEndTime = 0;
+    FTimerHandle StaggerTimer;
+    void EndStagger();
     bool HasParryPermission() const;
     float ParryClock() const;
     void ClearParryWindows();

@@ -178,6 +178,7 @@ FVector UBreakerCharacterMovementComponent::NewFallVelocity(const FVector& Initi
 
 bool UBreakerCharacterMovementComponent::DoJump(bool bReplayingMoves, float DeltaTime)
 {
+    if (IsOwnerStaggered()) return false;
     // JumpHoldWindow makes the engine call DoJump on every held frame and
     // re-floor Velocity.Z at JumpZVelocity, which is a constant-speed rise —
     // exactly the floaty segment this pass removes. One impulse per press: the
@@ -318,8 +319,15 @@ void UBreakerCharacterMovementComponent::RefreshJumpGrant()
 
 void UBreakerCharacterMovementComponent::ProcessLanded(const FHitResult& Hit, float remainingTime, int32 Iterations)
 {
+    UBreakerCombatComponent* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    const bool bAuthority = GetOwner() && GetOwner()->HasAuthority();
+    const double SinceLaunch = GetWorld() ? GetWorld()->GetTimeSeconds() - OwnBlastLaunchTime : -1.0;
+    const bool bProtectedLanding = bAuthority && bOwnBlastRecoveryPending && HasKineticRecovery()
+        && Combat && !Combat->IsDead() && SinceLaunch >= 0.0 && SinceLaunch <= KineticRecoveryLandingWindowSeconds;
+    if (bAuthority) ClearBlastRecovery();
     const float FallDistance = bTrackingResourceFall && UpdatedComponent
         ? FMath::Max(0.0f, ResourceFallPeakZ - UpdatedComponent->GetComponentLocation().Z) : 0.0f;
+    LastLandedFallDistanceCm = FallDistance;
     bTrackingResourceFall = false;
     // Super zeroes the fall, so the impact has to be read first.
     const float ImpactSpeed = FMath::Max(-Velocity.Z, 0.0f);
@@ -340,6 +348,27 @@ void UBreakerCharacterMovementComponent::ProcessLanded(const FHitResult& Hit, fl
     bJumpCutArmed = false;
 
     Super::ProcessLanded(Hit, remainingTime, Iterations);
+    if (bAuthority && Combat && !Combat->IsDead())
+    {
+        if (bProtectedLanding) Combat->GrantStaggerImmunity(KineticRecoveryImmunitySeconds);
+        else if (const UBreakerAttributeSet* Attributes = GetAttributes())
+        {
+            const float Fraction = FMath::Clamp((FallDistance - FMath::Max(0.0f, SafeFallDistanceCm))
+                / 100.0f * FMath::Max(0.0f, FallDamageHealthFractionPerMeter), 0.0f, 1.0f);
+            if (Fraction > 0.0f)
+            {
+                // Environmental landing harm has no offensive source or proc.
+                // Shields absorb it, but armor, dodge and block cannot erase it.
+                FBreakerDamageRequest Fall;
+                Fall.BaseDamage = Attributes->GetMaxHealth() * Fraction;
+                Fall.DamageFamily = EBreakerDamageFamily::TrueDamage;
+                Fall.bCanCritical = false;
+                Fall.bCanBeAvoided = false;
+                Fall.ProcCoefficient = 0.0f;
+                Combat->ReceiveDamage(Fall);
+            }
+        }
+    }
     if (GetOwner() && GetOwner()->HasAuthority())
         if (UBreakerMomentumComponent* Momentum = GetOwner()->FindComponentByClass<UBreakerMomentumComponent>())
             Momentum->NotifyLongFallLanding(FallDistance);
@@ -454,8 +483,48 @@ float UBreakerCharacterMovementComponent::GetGroundedSpeedCap() const
     return bWantsToSprint ? GetSprintSpeedCap() : GetWalkSpeedCap();
 }
 
+float UBreakerCharacterMovementComponent::GetMaxAcceleration() const
+{
+    return IsOwnerStaggered() ? 0.0f : Super::GetMaxAcceleration();
+}
+
+bool UBreakerCharacterMovementComponent::IsOwnerStaggered() const
+{
+    const auto* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    return Combat && Combat->IsStaggered();
+}
+
+bool UBreakerCharacterMovementComponent::HasKineticRecovery() const
+{
+    const auto* Progression = GetProgression();
+    return Progression && Progression->GetProgressionState().PermanentClass == EBreakerClassId::Tank
+        && Progression->GetNodeRank(TEXT("Tank.Demolitionist.KineticRecovery"), EBreakerPointCurrency::DoctrinePoints) > 0;
+}
+
+void UBreakerCharacterMovementComponent::ClearBlastRecovery()
+{
+    bOwnBlastRecoveryPending = false;
+}
+
+void UBreakerCharacterMovementComponent::Launch(FVector const& LaunchVel)
+{
+    ClearBlastRecovery();
+    Super::Launch(LaunchVel);
+}
+
+void UBreakerCharacterMovementComponent::NotifyOwnBlastLaunch()
+{
+    auto* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !GetWorld() || !Combat || Combat->IsDead()
+        || !HasKineticRecovery() || PendingLaunchVelocity.Z <= 0.0f) return;
+    bOwnBlastRecoveryPending = true;
+    OwnBlastLaunchTime = GetWorld()->GetTimeSeconds();
+    Combat->OnDeath.AddUniqueDynamic(this, &ThisClass::ClearBlastRecovery);
+}
+
 float UBreakerCharacterMovementComponent::GetMaxSpeed() const
 {
+    if (IsOwnerStaggered()) return 0.0f;
     if (bSliding)
     {
         return FMath::Max(SprintSpeed * GetComposedSlideSpeedMultiplier(), Velocity.Size2D());
@@ -538,6 +607,7 @@ FVector UBreakerCharacterMovementComponent::RedirectHorizontalVelocity(const FVe
 
 bool UBreakerCharacterMovementComponent::TryRedirect(const FVector& Direction)
 {
+    if (IsOwnerStaggered()) return false;
     const FVector Heading = Direction.GetSafeNormal2D();
     if (Heading.IsNearlyZero())
     {
@@ -703,6 +773,7 @@ void UBreakerCharacterMovementComponent::SetSlideRequested(bool bEnabled)
 
 bool UBreakerCharacterMovementComponent::CanUseDash() const
 {
+    if (IsOwnerStaggered()) return false;
     const UBreakerProgressionComponent* Progression = GetProgression();
     return Progression && Progression->GetProgressionState().PermanentClass == EBreakerClassId::Swift;
 }
@@ -710,6 +781,7 @@ bool UBreakerCharacterMovementComponent::CanUseDash() const
 void UBreakerCharacterMovementComponent::OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode)
 {
     Super::OnMovementModeChanged(PreviousMovementMode, PreviousCustomMode);
+    if (!IsFalling()) ClearBlastRecovery();
     bTrackingResourceFall = IsFalling() && UpdatedComponent != nullptr;
     if (bTrackingResourceFall)
     {
@@ -733,6 +805,15 @@ void UBreakerCharacterMovementComponent::OnTeleported()
 
 void UBreakerCharacterMovementComponent::PerformMovement(float DeltaTime)
 {
+    if (IsOwnerStaggered())
+    {
+        bWantsToSprint = false;
+        EndSlide();
+        if (IsTraversingLedge() || bWantsLedgeTraversal || bHasPendingTraversal) InvalidateTraversalContinuity();
+        Acceleration = FVector::ZeroVector;
+        Velocity.X = Velocity.Y = 0.0f;
+        BoostedSpeedCeiling = 0.0f;
+    }
     // This entry runs both local physics and authoritative remote movement;
     // actor Tick alone would miss server moves received between ticks.
     if (bTrackingResourceFall && UpdatedComponent)
@@ -812,6 +893,7 @@ bool UBreakerCharacterMovementComponent::TryDash(const FVector& RequestedDirecti
 
 bool UBreakerCharacterMovementComponent::BeginSlide()
 {
+    if (IsOwnerStaggered()) return false;
     if (bSliding || !IsMovingOnGround() || Velocity.Size2D() < SlideEntrySpeed || !CharacterOwner)
     {
         return false;
@@ -1154,6 +1236,7 @@ void UBreakerCharacterMovementComponent::NotifyLedgeTraversalCompleted()
 
 void UBreakerCharacterMovementComponent::InvalidateTraversalContinuity()
 {
+    ClearBlastRecovery();
     ++TraversalInvalidationSerial;
     bWantsLedgeTraversal = false;
     bHasPendingTraversal = false;
@@ -1241,6 +1324,7 @@ float UBreakerCharacterMovementComponent::GetLedgeTraversalStrideSpeed() const
 
 bool UBreakerCharacterMovementComponent::TryBeginLedgeTraversal()
 {
+    if (IsOwnerStaggered()) return false;
     if (IsTraversingLedge())
     {
         return false;
@@ -1280,6 +1364,8 @@ void UBreakerCharacterMovementComponent::UpdateCharacterStateBeforeMovement(floa
 
 void UBreakerCharacterMovementComponent::BeginLedgeTraversal(const FBreakerLedgeTraversal& Traversal)
 {
+    if (IsOwnerStaggered()) return;
+    ClearBlastRecovery();
     if (Traversal.Verb == EBreakerLedgeVerb::None || !UpdatedComponent)
     {
         return;

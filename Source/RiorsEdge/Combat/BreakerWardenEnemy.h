@@ -45,6 +45,7 @@ class RIORSEDGE_API ABreakerWardenEnemy : public ABreakerEnemy
     GENERATED_BODY()
 
 public:
+    virtual void InterruptCombatAction() override;
     ABreakerWardenEnemy();
 
     UFUNCTION(BlueprintPure, Category="Enemy|Warden") bool IsSweeping() const { return bSweepWindup; }
@@ -94,6 +95,9 @@ public:
     // authors 34 slam against 26 sweep.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Warden|Slam", meta=(ClampMin="0"))
     float SlamDamageRelativeToSweep = 1.31f;   // O2 PLACEHOLDER
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Warden|Slam", meta=(ClampMin="0"))
+    float SlamStaggerSeconds = 0.5f; // O2 PLACEHOLDER: successful slam interruption.
 
     // Phase 3 of the boss reuses the slam and leaves a hazard behind it. Off
     // for a plain Warden: §1.2 puts lingering hazards behind the Cascading

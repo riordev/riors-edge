@@ -3393,7 +3393,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetTankDemolitionistTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_Fragmentation.GetTag());
     Tree->Nodes.Add(Node);
 
-    // D5. WAITING ON: UBreakerAbility_GroundZero's stagger application.
+    // D5. The accepted landing blast applies the shared interrupt state.
     Node = MakeNode(TEXT("Tank.Demolitionist.Concussion"), TEXT("Concussion"),
         TEXT("Ground Zero staggers for 2.0s instead of 1.5 (R2: 2.5s), and now staggers enemies caught mid-air."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Tank.Demolitionist.Bootstraps"));
@@ -3420,8 +3420,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetTankDemolitionistTree()
 
     // D8. "Grants T6 Ground Zero" is not authored. The from-any-jump clause
     // is restated ON the node so the O13 "never required" rule is visible
-    // where a player reads it (treatment's own instruction). WAITING ON:
-    // UBreakerAbility_GroundZero's fall-distance cap and cast gate.
+    // where a player reads it. Ground Zero reads actual landed fall distance.
     Node = MakeNode(TEXT("Tank.Demolitionist.TerminalDescent"), TEXT("Terminal Descent"),
         TEXT("Ground Zero's fall scaling caps at 25 m instead of 12 — and it casts from ANY airborne state, a plain jump included."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 3, 1, 2);
     AddPrerequisite(Node, TEXT("Tank.Demolitionist.Concussion"));
@@ -3440,8 +3439,8 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetTankDemolitionistTree()
     Tree->Nodes.Add(Node);
 
     // D10. Makes the rocket-jump LAND cleanly without making it free: takeoff
-    // damage untouched, O13 floor intact. WAITING ON: the landing event and a
-    // launched-by-own-explosive timestamp.
+    // damage untouched, O13 floor intact. The movement component consumes
+    // an owned launch only at its authoritative landing.
     Node = MakeNode(TEXT("Tank.Demolitionist.KineticRecovery"), TEXT("Kinetic Recovery"),
         TEXT("Landing within 3s of your own blast launch cancels fall damage and grants 1.5s of stagger immunity. The takeoff still costs."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Tank.Demolitionist.Bootstraps"));

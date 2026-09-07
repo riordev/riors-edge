@@ -1464,6 +1464,8 @@ FString UBreakerWeaponComponent::GetArchetypeName() const
 void UBreakerWeaponComponent::StartFire()
 {
     if (!GetOwner()) return;
+    const auto* Combat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>();
+    if (Combat && Combat->IsStaggered()) return;
     // A new trigger press wins over sprint on both the predicting client and authority.
     if (UBreakerCharacterMovementComponent* Movement = GetOwner()->FindComponentByClass<UBreakerCharacterMovementComponent>())
     {
@@ -1553,6 +1555,8 @@ void UBreakerWeaponComponent::StopFire()
 void UBreakerWeaponComponent::StartReload()
 {
     if (!GetOwner()) return;
+    const auto* Combat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>();
+    if (Combat && Combat->IsStaggered()) return;
     if (!GetOwner()->HasAuthority())
     {
         ServerStartReload();
@@ -1665,6 +1669,8 @@ void UBreakerWeaponComponent::ServerSetAiming_Implementation(bool bNewAiming) { 
 
 bool UBreakerWeaponComponent::CanFire() const
 {
+    const auto* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    if (Combat && Combat->IsStaggered()) return false;
     const UBreakerCharacterMovementComponent* Movement = GetOwner()
         ? GetOwner()->FindComponentByClass<UBreakerCharacterMovementComponent>() : nullptr;
     if (Movement && Movement->IsSprinting()) return false;

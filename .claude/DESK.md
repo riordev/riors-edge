@@ -5,12 +5,11 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
-## Cycle — Tank Kinetic Recovery and real stagger
-- [ ] Implement O80 binary interrupt, resistance and per-enemy immunity through existing combat and enemy classes.
-- [ ] Make Ground Zero interrupt actual enemy actions and give the Warden slam a real player-facing stagger payload.
-- [ ] Apply ordinary fall harm and consume an owned Breach launch landing within three seconds for Kinetic Recovery's fall protection and 1.5-second stagger immunity; preserve takeoff self-damage.
-- [ ] Verify actual falls, launches, telegraph interruption and immunity/refusal cases; review, build, census, full suite and Rift loop.
-Remaining repairs include Support aura/element nodes, Tank recovery, ability balance, rarity identities, other weapon poses and audible combat polish. Rifle imported materials, fixed magazine/stock reload gesture and the native additive fire layer remain art/animation work; remote clients still lack a reload clock.
+## Cycle — Support Metronome and Conduit
+- [ ] Apply real per-holder weapon-hit ramps and purchased ally clauses with independent owned cleanup.
+- [ ] Make Conduit Downbeat count actual buff recipients and keep flat damage in the weapon lane.
+- [ ] Verify actual casts, overlap, proc weights, expiry and death; review, build, census and full suite.
+Remaining repairs include Support element nodes, ability balance, rarity identities, other weapon poses and audible combat polish.
 ## Playtest queue (owner, 2026-09-07)
 Continue through the entire repair list in tested batches without stopping after each commit for a playtest. After repairs, execute the content phase below (owner instruction, 2026-09-07).
 - (ui, npcs, systems) Reduce menu density and clipping; repair NPC interaction flow, ability assignment and point spending; present Core as the authored tree rather than a node cloud; update the dev sandbox. Finish silent nodes and Caster progression.
@@ -21,7 +20,7 @@ Continue through the entire repair list in tested batches without stopping after
 - (visuals, sound, enemies) Improve arms and weapon models, integrate weakpoints, add subtle enemy names, and make one weapon/ability/enemy/boss visually polished. Add audible combat feedback. Replace colored ability borders with placeholder icons, radial cooldown recovery and numeric timers; hide irrelevant Riftglass. Smooth the death screen and mouse handoff.
 
 ## Repair dependencies found in runtime review
-- Support's Attunement/Sympathetic require distinct element conversion/buildup consumers. Tank Kinetic Recovery requires actual fall-damage and stagger recipients; neither can be completed by a timestamp-only patch.
+- Support's Attunement/Sympathetic require distinct element conversion/buildup consumers. Tank Kinetic Recovery now consumes actual owned blast landings and protects against real fall harm and stagger.
 - Doctrine progression now has all four authored benchmarks across three acts and pays 8/8 through the physical finale at level50. The real mission probe verifies actions/reloads but uses an explicit XP fixture at the final gate; normal campaign leveling pace remains unvalidated.
 - New special loot now respects its final affix budget. Existing saved items remain unchanged; a migration still needs to be designed.
 
@@ -106,6 +105,8 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - Four Niagara systems at `/Game/Breaker/FX/NS_<Moment>` with a `Color` user parameter, or a free Fab VFX pack placed there
 
 ## Done (last three cycles; older is git)
+- **Tank landing and stagger:** Binary timed interruption with resistance and immunity cancels actual enemy windups and interruptible player channels. Ground Zero waits for physical landing and scales from measured fall distance with the purchased Terminal Descent cap. Ordinary falls damage shields/health; owned Breach landings within three seconds preserve takeoff self-damage while granting Kinetic fall protection and 1.5-second stagger immunity. Foreign launches, teleport, death and respec refuse stale protection. Build/census clean; **654 tests, 651 passed, 3 known failures, 0 unexpected**. Physical fall fixtures use real rolled shield gear and retain original resource/damage assertions. Native Rift loop PASS:24kills,2015XP,217Glass. Warden slam delivery inspected, not separately exercised by automation. STATE unchanged under host-Python quarantine.
+
 - **Support Cadence and Section (2026-09-07):** Living player aura and self-first copy, walking-speed footprint and Section sprint follow, stationary Baton, owned overlapping windows and strongest reload/swap tempo. Conducting shortens actual recipient cooldowns; self detach-tail and Downbeat duration survive re-entry and extension. Charge upkeep belongs to the maintaining caster rather than receiving Supports. Exit, expiry, cancellation and death remove only the owning cast. Six editable numeric keys bring the registry to 141. Build/census clean; **651 tests, 648 pass, 3 known, 0 unexpected**. Corrected isolated fixture clocks and purchased prerequisite ranks within the authored eight-point budget. Native Rift loop **PASS: 24 kills, 2015 XP, 211 Glass**. Both captures inspected; opaque fill rejected and replaced by a boundary ring. Actual Conduit Downbeat activation has inspection-only coverage; broader Metronome ally clauses and element nodes remain. STATE unchanged under host-Python quarantine.
 - **Caster Void and Sequence:** Void is a timed, non-damaging armour/healing debuff with normal avoidance/immunity, refresh, Chain, consumption and expiry. Real Siphon hits and Fracture's third cycle position apply it. Purchased Sequence rewards three distinct applications on one target, with per-target cooldown, weakest-proc scaling and suspension/death/respec guards; unrelated progression updates preserve a rotation. Status/resource tuning and node numbers are readable data. Build/census clean; **649 tests, 646 passed, 3 known failures, 0 unexpected**. Real status, ability/projectile and Sequence tests pass; native Rift loop passes 24 kills, 2015 XP and 202 Riftglass retained. STATE unchanged under host-Python quarantine.
 - **Primary accuracy, Pierce and traversal:** Sustained accuracy reduces accumulated bloom in actual shots and HUD prediction. Pierce uses whole tier steps across drops, Prolific, Temper, Reforge and Attune, excludes rockets and respects total penetration travel. Existing wall-ride item IDs now pay after real completed vault/mantle. Forge uses exact roll bands and wraps long names. Build/census clean (64 ordinary affixes); **646 tests, 643 passed, 3 known failures, 0 unexpected**. Corrected an exhausted endgame test target without changing damage assertions. Forge capture inspected after repairing the observed clipped label; STATE unchanged under host-Python quarantine.

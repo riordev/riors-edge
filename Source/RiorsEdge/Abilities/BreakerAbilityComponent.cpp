@@ -580,8 +580,28 @@ void UBreakerAbilityComponent::RefreshGrants()
     BuildLoadoutSignature(CachedLoadoutSignature);
 }
 
+void UBreakerAbilityComponent::InterruptActiveActions()
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+    UAbilitySystemComponent* ASC = GetAbilitySystem();
+    if (!ASC) return;
+    TArray<FGameplayAbilitySpecHandle> Pending;
+    for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+    {
+        const UBreakerGameplayAbility* Ability = Cast<UBreakerGameplayAbility>(Spec.Ability);
+        if (Spec.IsActive() && Ability && Ability->IsStaggerInterruptible()) Pending.Add(Spec.Handle);
+    }
+    // End callbacks may mutate the granted list or interrupt again. Snapshot
+    // handles and re-check each current spec before invoking its cleanup.
+    for (const FGameplayAbilitySpecHandle Handle : Pending)
+        if (const FGameplayAbilitySpec* Spec = ASC->FindAbilitySpecFromHandle(Handle); Spec && Spec->IsActive())
+            ASC->CancelAbilityHandle(Handle);
+}
+
 bool UBreakerAbilityComponent::TryActivateSlot(EBreakerAbilitySlot Slot)
 {
+    const UBreakerCombatComponent* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    if (Combat && Combat->IsStaggered()) return false;
     const FBreakerGrantedAbility* Granted = GrantedBySlot.Find(Slot);
     UAbilitySystemComponent* ASC = GetAbilitySystem();
     if (!ASC)

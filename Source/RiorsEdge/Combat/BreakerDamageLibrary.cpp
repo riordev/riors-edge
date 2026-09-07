@@ -104,7 +104,7 @@ FBreakerDamageResult UBreakerDamageLibrary::ResolveDamage(const FBreakerDamageRe
     // DoTs. Dodge fully evades; block reduces.
     if (!Request.bIsDamageOverTime)
     {
-        if (Defense.DodgeChance > 0.0f)
+        if (Request.bCanBeAvoided && Defense.DodgeChance > 0.0f)
         {
             FRandomStream DodgeRandom(HashCombine(static_cast<uint32>(Request.RandomSeed), 0xD0D6Eu));
             Result.bDodged = DodgeRandom.FRand() < FMath::Clamp(Defense.DodgeChance, 0.0f, 1.0f);
@@ -115,7 +115,7 @@ FBreakerDamageResult UBreakerDamageLibrary::ResolveDamage(const FBreakerDamageRe
             Result.RemainingHealth = FMath::Max(0.0f, Defense.Health);
             return Result;
         }
-        if (Defense.BlockChance > 0.0f)
+        if (Request.bCanBeAvoided && Defense.BlockChance > 0.0f)
         {
             FRandomStream BlockRandom(HashCombine(static_cast<uint32>(Request.RandomSeed), 0xB10Cu));
             Result.bBlocked = BlockRandom.FRand() < FMath::Clamp(Defense.BlockChance, 0.0f, 1.0f);

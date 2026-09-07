@@ -37,6 +37,7 @@ namespace BreakerWardenDetail
 
 ABreakerWardenEnemy::ABreakerWardenEnemy()
 {
+    if (Combat) Combat->StaggerResistance = 0.5f; // O2: high resistance, not immunity.
     // The heavy wears George (owner's mech-cast ruling, O2 mapping); the boss
     // inherits it, which reads correctly at boss scale until it earns its own
     // body. The shield stays the puzzle — it never depended on the torso.
@@ -206,6 +207,15 @@ float ABreakerWardenEnemy::GetSweepDamage() const
 float ABreakerWardenEnemy::GetSlamDamage() const
 {
     return AttackDamage * FMath::Max(0.0f, SlamDamageRelativeToSweep);
+}
+
+void ABreakerWardenEnemy::InterruptCombatAction()
+{
+    Super::InterruptCombatAction();
+    bSweepWindup = false;
+    bSlamWindup = false;
+    UpdateSweepTelegraph(0.0f);
+    UpdateSlamTelegraph(0.0f, false);
 }
 
 void ABreakerWardenEnemy::SetBodyVisible(bool bVisible)
@@ -383,7 +393,9 @@ void ABreakerWardenEnemy::ResolveSlam()
         Damage.SourceLocation = Center;
         Damage.bHasSourceLocation = true;
         Damage.SetInstigator(this);
-        TargetCombat->ReceiveDamage(Damage);
+        const FBreakerDamageResult Result = TargetCombat->ReceiveDamage(Damage);
+        if (!Result.bDodged && Result.HealthDamage + Result.ShieldDamage > 0 && !TargetCombat->IsDead())
+            TargetCombat->ApplyStagger(SlamStaggerSeconds);
 
         if (UBreakerEnemyModifierComponent* Mods = GetModifierComponent())
         {

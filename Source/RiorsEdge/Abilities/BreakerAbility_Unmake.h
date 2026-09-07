@@ -53,6 +53,7 @@ class RIORSEDGE_API UBreakerAbility_Unmake : public UBreakerCasterAbility
 
 public:
     UBreakerAbility_Unmake();
+    virtual bool IsStaggerInterruptible() const override { return true; }
 
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
     virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;

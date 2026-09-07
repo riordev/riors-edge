@@ -210,11 +210,28 @@ element model. It does not own:
 | Every damage submission passes through the outgoing-modifier chain | `Combat.Ceiling.AbilitySubmissionConformance` |
 | A reaction applies no status, and no target takes two inside one interval | `Combat.Elements.ReactionMatrix` |
 
-## Open
+## Stagger and landing
 
-- Whether a stagger and interrupt model is built as a binary state with a
-  resistance stat and a per-enemy immunity flag. Four systems already assume
-  one exists.
+Stagger is an authoritative binary interrupt. Resistance scales its duration
+by `1 - resistance`, with resistance clamped to 0–1. Each enemy can explicitly
+opt into immunity. Overlapping staggers keep the later expiry. Death and
+revival clear the state. Warden has 0.5 resistance and its successful slam
+applies 0.5 seconds of stagger (O2 tuning).
+
+Stagger stops held fire, enemy attack windups and active channels, pending
+placements and plunges. It blocks new movement actions, attacks and casts;
+gravity continues. Existing timed buffs and deployed objects remain active.
+
+Ordinary falls are safe through six metres. Each excess metre deals 5% of
+maximum health, capped at 100% per landing (O2 tuning). This environmental
+damage has no attacker, crit or proc, ignores armor and avoidance, and is
+absorbed by shields before health. Kinetic Recovery cancels this landing
+damage after an owned Breach launch within three seconds and grants 1.5
+seconds of stagger immunity. Foreign launches, teleports, traversal and death
+invalidate the launch; a later class or node change cannot retain protection.
+
+## Open questions
+
 - Lag-compensation tolerance: how far back the server rewinds to validate a
   shot. Deferred rather than answered, because the current topology makes it a
   small-number-of-players problem.

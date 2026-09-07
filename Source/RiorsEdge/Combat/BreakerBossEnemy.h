@@ -64,6 +64,7 @@ class RIORSEDGE_API ABreakerBossEnemy : public ABreakerWardenEnemy
     GENERATED_BODY()
 
 public:
+    virtual void InterruptCombatAction() override;
     ABreakerBossEnemy();
     virtual void ApplyBodyMesh() override;
 

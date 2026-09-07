@@ -20,6 +20,9 @@
 #include "Items/BreakerEquipmentComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Abilities/BreakerAbilityComponent.h"
+#include "Weapons/BreakerWeaponComponent.h"
+#include "TimerManager.h"
 
 UBreakerCombatComponent::UBreakerCombatComponent()
 {
@@ -57,6 +60,53 @@ void UBreakerCombatComponent::GetLifetimeReplicatedProps(TArray<FLifetimePropert
     DOREPLIFETIME_CONDITION(UBreakerCombatComponent, ParryWindowEnd, COND_OwnerOnly);
     DOREPLIFETIME_CONDITION(UBreakerCombatComponent, ParryCooldownEnd, COND_OwnerOnly);
     DOREPLIFETIME_CONDITION(UBreakerCombatComponent, ParryCounterEnd, COND_OwnerOnly);
+    DOREPLIFETIME(UBreakerCombatComponent, bStaggerActive);
+}
+
+float UBreakerCombatComponent::GetStaggerRemaining() const
+{
+    return GetWorld() && bStaggerActive ? FMath::Max(0.0, StaggerEndTime - GetWorld()->GetTimeSeconds()) : 0.0f;
+}
+
+bool UBreakerCombatComponent::IsStaggered() const
+{
+    return bStaggerActive && (!GetOwner() || !GetOwner()->HasAuthority() || GetStaggerRemaining() > 0);
+}
+
+bool UBreakerCombatComponent::IsStaggerImmune() const
+{
+    const ABreakerEnemy* Enemy = Cast<ABreakerEnemy>(GetOwner());
+    return (Enemy && Enemy->bStaggerImmune) || (GetWorld() && GetWorld()->GetTimeSeconds() < StaggerImmunityEndTime);
+}
+
+void UBreakerCombatComponent::GrantStaggerImmunity(float Seconds)
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !GetWorld() || !FMath::IsFinite(Seconds) || Seconds <= 0 || IsDead()) return;
+    StaggerImmunityEndTime = FMath::Max(StaggerImmunityEndTime, GetWorld()->GetTimeSeconds() + Seconds);
+}
+
+bool UBreakerCombatComponent::ApplyStagger(float Seconds)
+{
+    AActor* Owner = GetOwner();
+    if (!Owner || !Owner->HasAuthority() || Owner->IsActorBeingDestroyed() || !GetWorld() || IsDead()
+        || IsStaggerImmune() || !FMath::IsFinite(Seconds) || Seconds <= 0 || !FMath::IsFinite(StaggerResistance)) return false;
+    const float Duration = Seconds * (1.0f - FMath::Clamp(StaggerResistance, 0.0f, 1.0f));
+    if (Duration <= 0) return false;
+    StaggerEndTime = FMath::Max(StaggerEndTime, GetWorld()->GetTimeSeconds() + Duration);
+    bStaggerActive = true;
+    GetWorld()->GetTimerManager().SetTimer(StaggerTimer, this, &ThisClass::EndStagger, GetStaggerRemaining(), false);
+    if (auto* Weapon = Owner->FindComponentByClass<UBreakerWeaponComponent>()) Weapon->StopFire();
+    if (auto* Enemy = Cast<ABreakerEnemy>(Owner)) Enemy->InterruptCombatAction();
+    if (auto* Abilities = Owner->FindComponentByClass<UBreakerAbilityComponent>()) Abilities->InterruptActiveActions();
+    if (IsValid(Owner) && !Owner->IsActorBeingDestroyed()) Owner->ForceNetUpdate();
+    return true;
+}
+
+void UBreakerCombatComponent::EndStagger()
+{
+    bStaggerActive = false;
+    StaggerEndTime = 0;
+    if (GetOwner()) GetOwner()->ForceNetUpdate();
 }
 
 float UBreakerCombatComponent::ParryClock() const
@@ -76,11 +126,11 @@ bool UBreakerCombatComponent::HasParryPermission() const
 
 bool UBreakerCombatComponent::IsParryAvailable() const
 {
-    return HasParryPermission() && !IsDead() && GetParryCooldownRemaining() <= 0.0f;
+    return HasParryPermission() && !IsDead() && !IsStaggered() && GetParryCooldownRemaining() <= 0.0f;
 }
 bool UBreakerCombatComponent::IsParryActive() const
 {
-    return HasParryPermission() && !IsDead() && ParryWindowEnd > ParryClock();
+    return HasParryPermission() && !IsDead() && !IsStaggered() && ParryWindowEnd > ParryClock();
 }
 bool UBreakerCombatComponent::IsParryCounterActive() const
 {
@@ -388,6 +438,9 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     {
         bDeathBroadcast = true;
         ClearParryWindows();
+        EndStagger();
+        StaggerImmunityEndTime = 0;
+        if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(StaggerTimer);
         OnDeath.Broadcast();
     }
     DispatchHitDealt(Request, Result);
@@ -938,6 +991,9 @@ void UBreakerCombatComponent::AddClassResource(float Amount)
 void UBreakerCombatComponent::RestoreVitals()
 {
     if (!Attributes || !GetOwner() || !GetOwner()->HasAuthority()) return;
+    EndStagger();
+    StaggerImmunityEndTime = 0;
+    if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(StaggerTimer);
     // Same null-safe route as the damage and healing paths, and for the same
     // reason: the generated setters ensure() with no ability system, which made
     // the reset path unexercisable in automation exactly like the resource one.

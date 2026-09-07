@@ -54,6 +54,7 @@ public:
     UBreakerCharacterMovementComponent();
 
     virtual float GetMaxSpeed() const override;
+    virtual float GetMaxAcceleration() const override;
     virtual void BeginPlay() override;
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
     // Weight hooks. All three are engine extension points, so the heavier fall
@@ -65,6 +66,10 @@ public:
     virtual void ProcessLanded(const FHitResult& Hit, float remainingTime, int32 Iterations) override;
     virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) override;
     virtual void OnTeleported() override;
+    virtual void Launch(FVector const& LaunchVel) override;
+    // Called after the owner's Breach charge queues its actual launch.
+    void NotifyOwnBlastLaunch();
+    float GetLastLandedFallDistanceCm() const { return LastLandedFallDistanceCm; }
     virtual void PerformMovement(float DeltaTime) override;
     // The ledge traversal's execution home (the custom prediction mode). The
     // old execution was pawn-side SetActorLocation in MOVE_Flying — zero
@@ -337,6 +342,10 @@ public:
     // arrival ramps down to LandingMinimumSpeedScale. A queued slide owns its
     // own landing and is exempt. OLD: no landing behaviour whatsoever.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="0")) float LandingHeavyFallSpeed = 950.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight|Fall Damage", meta=(ClampMin="0")) float SafeFallDistanceCm = 600.0f; // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight|Fall Damage", meta=(ClampMin="0")) float FallDamageHealthFractionPerMeter = 0.05f; // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight|Kinetic Recovery", meta=(ClampMin="0")) float KineticRecoveryLandingWindowSeconds = 3.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight|Kinetic Recovery", meta=(ClampMin="0")) float KineticRecoveryImmunitySeconds = 1.5f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="1")) float LandingMaxFallSpeed = 2400.0f;   // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="0", ClampMax="1")) float LandingMinimumSpeedScale = 0.78f;   // O2 PLACEHOLDER
 
@@ -529,6 +538,12 @@ public:
     static float LandingSpeedScale(float ImpactSpeed, float HeavyFallSpeed, float MaxImpactSpeed, float MinimumScale);
 
 private:
+    bool IsOwnerStaggered() const;
+    bool HasKineticRecovery() const;
+    UFUNCTION() void ClearBlastRecovery();
+    bool bOwnBlastRecoveryPending = false;
+    double OwnBlastLaunchTime = 0.0;
+    float LastLandedFallDistanceCm = 0.0f;
     bool bTrackingResourceFall = false;
     float ResourceFallPeakZ = 0.0f;
     FVector ResourceFallLastLocation = FVector::ZeroVector;

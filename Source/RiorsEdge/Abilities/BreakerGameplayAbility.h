@@ -40,6 +40,12 @@ class RIORSEDGE_API UBreakerGameplayAbility : public UGameplayAbility
 
 public:
     UBreakerGameplayAbility();
+    // Timed buffs are not interrupted merely because their caster staggers.
+    // Channels and pending casts opt in explicitly.
+    virtual bool IsStaggerInterruptible() const { return false; }
+    virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+        const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr,
+        FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 
     // Resolved definition: the explicitly assigned asset if present, otherwise
     // the C++ fallback registry entry for FallbackAbilityId.

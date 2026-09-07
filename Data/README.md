@@ -67,6 +67,24 @@ Downbeat's active Conduit doubles the bonus above 1, producing 1.5 at these
 defaults. `ConductingTailSeconds` is 2. All are O2 placeholder values in
 `abilities.json`, loaded once per process.
 
+## Tank landing and stagger
+
+Ground Zero resolves its hit when the plunge physically lands. Its damage
+reads measured fall distance, with the ordinary 12-metre cap extended to
+25 metres by Terminal Descent. The two distance keys in `abilities.json`
+replace the previous fall-speed proxy.
+
+Ordinary fall harm is currently tuned on the Character Movement component:
+`SafeFallDistanceCm` (600) and `FallDamageHealthFractionPerMeter` (0.05).
+These are O2 defaults; the fall deals shield-first environmental damage.
+Kinetic Recovery's authored timing is three seconds to land and 1.5 seconds
+of stagger immunity. It does not reduce the blast's takeoff self-hit.
+
+`StaggerResistance` lives on Combat components, from 0 to 1; it shortens
+stagger duration. Enemies also have an explicit `bStaggerImmune` switch.
+Warden's `SlamStaggerSeconds` is 0.5 (O2). These component defaults currently
+require an editor property change or C++ rebuild rather than a JSON edit.
+
 ## Gunsmith placement timing
 
 `BaseDeployCastSeconds` in the Turret, Ammo Crate, Mine Cluster and Disruptor

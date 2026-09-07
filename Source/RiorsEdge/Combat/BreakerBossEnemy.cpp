@@ -321,6 +321,7 @@ void ABreakerBossEnemy::SetBodyVisible(bool bVisible)
 void ABreakerBossEnemy::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+    if (Combat && Combat->IsStaggered()) return;
     if (!HasAuthority() || IsDeadEnemy() || !GetWorld()) return;
 
     UpdatePhase();
@@ -348,6 +349,18 @@ void ABreakerBossEnemy::Tick(float DeltaSeconds)
             SpawnDeployAdds(GetActorLocation() + PendingOrderOffset);
         }
     }
+}
+
+void ABreakerBossEnemy::InterruptCombatAction()
+{
+    Super::InterruptCombatAction();
+    bOrderRaiseActive = false;
+    OrderRaiseElapsed = 0;
+    ActiveOrder = EBreakerBossOrder::None;
+    TimeSinceLastOrder = 0;
+    DeploySpawnCountdown = -1;
+    UpdateApparatus(0);
+    SetApparatusExposed(UBreakerBossPhaseLibrary::IsPunishWindowOpen(Phase, false, FrontBreakWindowRemaining));
 }
 
 void ABreakerBossEnemy::UpdatePhase()

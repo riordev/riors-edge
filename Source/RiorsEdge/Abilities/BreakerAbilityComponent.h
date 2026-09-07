@@ -72,6 +72,7 @@ class RIORSEDGE_API UBreakerAbilityComponent : public UActorComponent
     GENERATED_BODY()
 
 public:
+    void InterruptActiveActions();
     UBreakerAbilityComponent();
     virtual void BeginPlay() override;
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;

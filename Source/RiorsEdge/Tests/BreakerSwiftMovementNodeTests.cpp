@@ -9,6 +9,8 @@
 #include "Components/CapsuleComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Items/BreakerEquipmentComponent.h"
+#include "Items/BreakerLootLibrary.h"
 #include "Movement/BreakerCharacterMovementComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
@@ -70,8 +72,23 @@ bool FBreakerSwiftMovementNodesRuntimeTest::RunTest(const FString& Parameters)
     Box->SetCollisionResponseToAllChannels(ECR_Block); Box->RegisterComponent();
     Floor->SetActorLocation(FVector(0, 0, -10));
     const float HalfHeight = Player->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+    FBreakerItemInstance ShieldItem;
+    for (int32 Seed = 1; Seed <= 256; ++Seed)
+    {
+        ShieldItem = UBreakerLootLibrary::RollItem(TEXT("Swift.LandingShield"), EBreakerEquipSlot::BodyArmour, EBreakerItemRarity::Standard, 1, Seed);
+        if (ShieldItem.ArmourArchetype == EBreakerArmourArchetype::Shield) break;
+    }
+    // A real level-one shield base lets the cap case survive lethal-height
+    // environmental damage. Unrelated affix bonuses are excluded from income.
+    for (auto& Affix : ShieldItem.Affixes) Affix.Value = 0;
+    Player->GetEquipment()->BindAttributes(Player->GetAttributes());
+    if (!TestTrue(TEXT("actual rolled Shield body equips"), Player->GetEquipment()->EquipItem(ShieldItem))) return false;
+    if (!TestTrue(TEXT("gear supplies positive shield before fall"), Player->GetAttributes()->GetMaxShield() > 0)) return false;
     auto Fall = [&](float Distance, bool bTeleportNearGround)
     {
+        // Each living fall starts with restored real pools; the explicit corpse
+        // case below remains dead and must still receive zero Momentum.
+        if (!Player->GetCombat()->IsDead()) Player->GetCombat()->RestoreVitals();
         Movement->SetMovementMode(MOVE_None);
         Player->SetActorLocation(FVector(0, 0, HalfHeight + Distance), false, nullptr, ETeleportType::TeleportPhysics);
         Movement->Velocity = FVector::ZeroVector;
@@ -104,6 +121,8 @@ bool FBreakerSwiftMovementNodesRuntimeTest::RunTest(const FString& Parameters)
     if (!Buy(TEXT("Swift.Kinetic.Landing"))) return false;
     TestTrue(TEXT("rank two pays larger actual fall conversion"), FMath::IsNearlyEqual(Fall(1000, false), 12.0f, 0.2f));
     TestEqual(TEXT("very long fall respects rank-two per-landing cap"), Fall(4000, false), 30.0f);
+    TestFalse(TEXT("shielded cap case survives its actual landing"), Player->GetCombat()->IsDead());
+    TestEqual(TEXT("very long fall consumes the real shield pool"), Player->GetAttributes()->GetShield(), 0.0f);
     FBreakerDamageRequest Kill; Kill.BaseDamage = 100000; Kill.bCanCritical = false;
     Player->GetCombat()->ReceiveDamage(Kill);
     TestTrue(TEXT("corpse fixture actually died"), Player->GetCombat()->IsDead());

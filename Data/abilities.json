@@ -451,11 +451,11 @@
 				"BlastRadiusCm": 600,
 				"WeaponDamageCoefficient": 1.8,
 				"UnarmedDamage": 50,
-				"FullPowerFallSpeed": 1200,
+				"FullPowerFallDistanceCm": 1200,
 				"MinimumPowerFraction": 0.4,
 				"StaggerSeconds": 1.5,
 				"SlamDownSpeed": 2200,
-				"TerminalDescentPowerCap": 1.44
+				"TerminalDescentFallDistanceCm": 2500
 			},
 			"variants": []
 		},

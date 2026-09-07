@@ -1,6 +1,7 @@
 #include "Combat/BreakerRangedEnemy.h"
 
 #include "Combat/BreakerBodyPaint.h"
+#include "Combat/BreakerCombatComponent.h"
 
 #include "AI/BreakerLocomotionMath.h"
 #include "Characters/BreakerCharacter.h"
@@ -248,6 +249,7 @@ void ABreakerRangedEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float 
 
 bool ABreakerRangedEnemy::CommandVolley()
 {
+    if (Combat && Combat->IsStaggered()) return false;
     if (!GetWorld() || !HasAuthority() || IsDeadEnemy()) return false;
     // Already committed: a doubled order must not restart the wind-up, because
     // restarting it would RESET the tell the player is already reading and
@@ -390,6 +392,14 @@ bool ABreakerRangedEnemy::ChooseCoverGoal(const AActor* Player, FVector& OutGoal
 FVector ABreakerRangedEnemy::GetMuzzleLocation() const
 {
     return EmitterVisual ? EmitterVisual->GetComponentLocation() : GetActorLocation();
+}
+
+void ABreakerRangedEnemy::InterruptCombatAction()
+{
+    Super::InterruptCombatAction();
+    bWindingUp = false;
+    WindupStartTime = -1000.0;
+    UpdateTelegraph(0.0f);
 }
 
 void ABreakerRangedEnemy::SetBodyVisible(bool bVisible)

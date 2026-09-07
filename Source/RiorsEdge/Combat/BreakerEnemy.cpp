@@ -842,6 +842,7 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
         return;
     }
 
+    if (Combat && Combat->IsStaggered()) { StateLabel = TEXT("STAGGERED"); return; }
     ABreakerCharacter* NearestPlayer = nullptr;
     float NearestDistanceSq = TNumericLimits<float>::Max();
     for (TActorIterator<ABreakerCharacter> It(GetWorld()); It; ++It)
@@ -1094,6 +1095,19 @@ void ABreakerEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float Distan
         OutSpeedScale = LungeWindupMoveScale;
         StateLabel = TEXT("WIND-UP");
     }
+}
+
+void ABreakerEnemy::InterruptCombatAction()
+{
+    if (Mover) { Mover->StopMovementImmediately(); Mover->ConsumeInputVector(); }
+    if (auto* EnemyController = Cast<ABreakerEnemyController>(GetController())) EnemyController->StopChase();
+    bLungeWindingUp = false;
+    LungeStartTime = -1000.0;
+    LungeWindupStartTime = -1000.0;
+    LungeLockedDirection = FVector::ZeroVector;
+    LastAttackTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0;
+    if (WeakPointVisual) WeakPointVisual->SetRelativeScale3D(FVector(WeakPointBaseScale));
+    StateLabel = TEXT("STAGGERED");
 }
 
 void ABreakerEnemy::PerformAttack(APawn* TargetPawn)

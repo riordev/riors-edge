@@ -5,6 +5,7 @@
 #include "Abilities/BreakerAbilityTags.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
+#include "Combat/BreakerCombatComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Weapons/BreakerWeaponComponent.h"
 
@@ -37,6 +38,15 @@ UBreakerGameplayAbility::UBreakerGameplayAbility()
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
     CostGameplayEffectClass = UBreakerAbilityCostEffect::StaticClass();
     CooldownGameplayEffectClass = UBreakerAbilityCooldownEffect::StaticClass();
+}
+
+bool UBreakerGameplayAbility::CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+    const FGameplayTagContainer* SourceTags, const FGameplayTagContainer* TargetTags, FGameplayTagContainer* OptionalRelevantTags) const
+{
+    const AActor* Avatar = ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
+    const UBreakerCombatComponent* Combat = Avatar ? Avatar->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    if (Combat && Combat->IsStaggered()) return false;
+    return Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags);
 }
 
 const UBreakerAbilityDefinition* UBreakerGameplayAbility::GetAbilityDefinition() const

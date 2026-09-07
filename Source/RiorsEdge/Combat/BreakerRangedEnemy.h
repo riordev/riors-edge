@@ -31,6 +31,7 @@ class RIORSEDGE_API ABreakerRangedEnemy : public ABreakerEnemy
     GENERATED_BODY()
 
 public:
+    virtual void InterruptCombatAction() override;
     virtual bool IsRangedForTelemetry() const override { return true; }
 
     ABreakerRangedEnemy();

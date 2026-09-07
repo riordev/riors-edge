@@ -19,6 +19,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
 #include "Items/BreakerEquipmentComponent.h"
+#include "Movement/BreakerCharacterMovementComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "TimerManager.h"
@@ -141,7 +142,8 @@ namespace BreakerTankAbilityLocal
     // struct resolves bit-identically to the pre-node helper.
     float BreakerTankRadialDamage(UWorld* World, ABreakerCharacter* Character, const FVector& Center,
         float RadiusCm, float BaseDamage, float EdgeFraction, bool bApplyFalloff,
-        const FBreakerTankBlastMods& Mods = FBreakerTankBlastMods())
+        const FBreakerTankBlastMods& Mods = FBreakerTankBlastMods(),
+        TArray<TWeakObjectPtr<UBreakerCombatComponent>>* DamagedTargets = nullptr)
     {
         if (!World || BaseDamage <= 0.0f) return 0.0f;
         const UBreakerAttributeSet* SourceAttributes = Character ? Character->GetAttributes() : nullptr;
@@ -198,6 +200,8 @@ namespace BreakerTankAbilityLocal
             if (OwnerCombat) OwnerCombat->ApplyOutgoingModifiers(Damage);
             const FBreakerDamageResult Result = TargetCombat->ReceiveDamage(Damage);
             TotalApplied += Result.HealthDamage + Result.ShieldDamage;
+            if (DamagedTargets && !Result.bDodged && Result.HealthDamage + Result.ShieldDamage > 0 && !TargetCombat->IsDead())
+                DamagedTargets->Add(TargetCombat);
 
             // D4 Fragmentation: enemies this blast KILLED detonate for a
             // portion of their own health. Collected here, paid below.
@@ -965,6 +969,7 @@ void UBreakerAbility_BreachCharge::Detonate(FVector BlastLocation)
         Away.Normalize();
         const float Proximity = 1.0f - FMath::Clamp(SelfDistance / BlastRadiusCm, 0.0f, 1.0f);
         Character->LaunchCharacter(Away * KnockbackImpulse * FMath::Max(0.4f, Proximity), true, true);
+        if (UBreakerCharacterMovementComponent* Movement = Character->GetBreakerMovement()) Movement->NotifyOwnBlastLaunch();
 
         // D3 BRACED FOR IMPACT: self-damage reduction 50% -> 65% (R2: 80%, the
         // branch ceiling — NEVER 100). Lowering the self-hit LOWERS the Grit it
@@ -1009,30 +1014,31 @@ void UBreakerAbility_GroundZero::ActivateAbility(const FGameplayAbilitySpecHandl
         return;
     }
 
-    using namespace BreakerTankAbilityLocal;
-
-    // NEAREST HONEST fall scaling (see the header): current downward speed
-    // stands in for fall distance. A normal jump's fall reaches the minimum
-    // fraction, so the verb is fully usable from ordinary geometry (§T6).
-    // D8 TERMINAL DESCENT raises the CAP (12 m -> 25 m, expressed through the
-    // speed stand-in as the TerminalDescentPowerCap ceiling); its
-    // from-any-airborne-state clause is already structural — the IsFalling
-    // gate above admits a plain jump, exactly as O13 requires.
-    const bool bTerminalDescent = BreakerTankHasNode(Character, BreakerNodeTags::Node_D_TerminalDescent.GetTag());
-    const float PowerCeiling = bTerminalDescent ? FMath::Max(1.0f, TerminalDescentPowerCap) : 1.0f;
-    const float DownSpeed = FMath::Max(0.0f, -Movement->Velocity.Z);
-    const float Power = FMath::Clamp(DownSpeed / FullPowerFallSpeed, MinimumPowerFraction, PowerCeiling);
-
     // The slam itself: drive the Tank hard into the ground.
+    Character->LandedDelegate.AddUniqueDynamic(this, &ThisClass::HandlePlungeLanded);
     Character->LaunchCharacter(FVector(0.0f, 0.0f, -SlamDownSpeed), false, true);
+}
 
-    // Damage resolves at the floor under the Tank, now — waiting for a landing
-    // event would need a landing hook this ability does not own.
-    FHitResult FloorHit;
-    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(BreakerGroundZero), false, Character);
-    const FVector Start = Character->GetActorLocation();
-    const FVector Center = World->LineTraceSingleByChannel(FloorHit, Start, Start - FVector(0, 0, 2000.0f), ECC_Visibility, QueryParams)
-        ? FloorHit.ImpactPoint : Start;
+void UBreakerAbility_GroundZero::HandlePlungeLanded(const FHitResult& Hit)
+{
+    using namespace BreakerTankAbilityLocal;
+    ABreakerCharacter* Character = GetBreakerCharacter();
+    UWorld* World = Character ? Character->GetWorld() : nullptr;
+    if (!World || !IsActive()) return;
+    Character->LandedDelegate.RemoveDynamic(this, &ThisClass::HandlePlungeLanded);
+    const UBreakerCombatComponent* OwnCombat = Character->FindComponentByClass<UBreakerCombatComponent>();
+    if (!OwnCombat || OwnCombat->IsDead())
+    {
+        EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+        return;
+    }
+    const FVector Center = Hit.ImpactPoint;
+    const UBreakerCharacterMovementComponent* Movement = Character->GetBreakerMovement();
+    const float FallDistance = Movement ? Movement->GetLastLandedFallDistanceCm() : 0.0f;
+    const bool bTerminalDescent = BreakerTankHasNode(Character, BreakerNodeTags::Node_D_TerminalDescent.GetTag());
+    const float BaseDistance = FMath::Max(1.0f, FullPowerFallDistanceCm);
+    const float CapDistance = bTerminalDescent ? FMath::Max(BaseDistance, TerminalDescentFallDistanceCm) : BaseDistance;
+    const float Power = FMath::Max(MinimumPowerFraction, FMath::Clamp(FallDistance, 0.0f, CapDistance) / BaseDistance);
 
     // The Demolitionist blast payload, shared with Breach Charge through the
     // one radial seam. Ground Zero has no self-damage side, so D9's radius
@@ -1055,7 +1061,8 @@ void UBreakerAbility_GroundZero::ActivateAbility(const FGameplayAbilitySpecHandl
     }
 
     const float BaseDamage = BreakerTankAbilityLocal::BreakerTankAbilityBaseDamage(Character, WeaponDamageCoefficient, UnarmedDamage) * Power;
-    BreakerTankAbilityLocal::BreakerTankRadialDamage(World, Character, Center, EnemyRadius, BaseDamage, 0.5f, /*bApplyFalloff=*/true, Mods);
+    TArray<TWeakObjectPtr<UBreakerCombatComponent>> DamagedTargets;
+    BreakerTankAbilityLocal::BreakerTankRadialDamage(World, Character, Center, EnemyRadius, BaseDamage, 0.5f, /*bApplyFalloff=*/true, Mods, &DamagedTargets);
     // The same flash as Breach Charge, sharing the radial seam's geometry --
     // the slam's Power scales damage, not reach, so the flash honestly does
     // not scale with it.
@@ -1067,28 +1074,20 @@ void UBreakerAbility_GroundZero::ActivateAbility(const FGameplayAbilitySpecHandl
     const int32 ConcussionRank = BreakerTankNodeRank(Character, TEXT("Tank.Demolitionist.Concussion"));
     const float EffectiveStagger = ConcussionRank >= 2 ? 2.5f : (ConcussionRank == 1 ? 2.0f : StaggerSeconds);   // node text
 
-    // NEAREST HONEST STAGGER (see the header): a full stop through the public
-    // movement-profile mutator, restored on a timer. Not a real stagger.
-    for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
-    {
-        ABreakerEnemy* Enemy = *It;
-        if (!Enemy) continue;
-        const UBreakerCombatComponent* EnemyCombat = Enemy->FindComponentByClass<UBreakerCombatComponent>();
-        if (!EnemyCombat || EnemyCombat->IsDead()) continue;
-        if (FVector::DistSquared(Center, Enemy->GetActorLocation()) > EnemyRadius * EnemyRadius) continue;
-        Enemy->ApplyModifierMovementProfile(0.0f, -1.0f);
-        TWeakObjectPtr<ABreakerEnemy> WeakEnemy(Enemy);
-        FTimerHandle RestoreTimer;
-        World->GetTimerManager().SetTimer(RestoreTimer, FTimerDelegate::CreateLambda([WeakEnemy]()
-        {
-            if (ABreakerEnemy* Restored = WeakEnemy.Get())
-            {
-                Restored->ApplyModifierMovementProfile(1.0f, -1.0f);
-            }
-        }), EffectiveStagger, false);
-    }
+    // Shared O80 interrupt state preserves unrelated movement modifiers.
+    for (const TWeakObjectPtr<UBreakerCombatComponent>& Target : DamagedTargets)
+        if (UBreakerCombatComponent* EnemyCombat = Target.Get(); EnemyCombat && !EnemyCombat->IsDead())
+            EnemyCombat->ApplyStagger(EffectiveStagger);
 
-    EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+    if (IsActive()) EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+}
+
+void UBreakerAbility_GroundZero::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+    const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
+{
+    if (ABreakerCharacter* Character = GetBreakerCharacter())
+        Character->LandedDelegate.RemoveDynamic(this, &ThisClass::HandlePlungeLanded);
+    Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
 // ---------------------------------------------------------------------------

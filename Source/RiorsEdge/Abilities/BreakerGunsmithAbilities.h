@@ -158,6 +158,7 @@ class RIORSEDGE_API UBreakerGunsmithDeployAbility : public UBreakerGameplayAbili
 
 public:
     UBreakerGunsmithDeployAbility();
+    virtual bool IsStaggerInterruptible() const override { return true; }
 
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 

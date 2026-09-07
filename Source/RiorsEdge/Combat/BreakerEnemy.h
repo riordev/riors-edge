@@ -49,6 +49,8 @@ public:
     ABreakerEnemy();
     virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
     virtual void Tick(float DeltaSeconds) override;
+    virtual void InterruptCombatAction();
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Stagger") bool bStaggerImmune = false;
     UFUNCTION(BlueprintCallable, Category="Enemy") void ConfigureEncounter(const FVector& NewLeashOrigin, float NewPatrolPhase);
     // Elite modifier: bigger, hits harder, and its drops are never below
     // Exceptional. The health and damage numbers are NOT written here any

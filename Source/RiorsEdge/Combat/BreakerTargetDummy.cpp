@@ -132,6 +132,7 @@ FString ABreakerTargetDummy::GetProfileLabel() const
 void ABreakerTargetDummy::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+    if (Combat && Combat->IsStaggered()) return;
     if (Profile != EBreakerTargetProfile::Moving || !HasAuthority()) return;
     MotionPhase += DeltaSeconds * 1.4f;
     SetActorLocation(MotionOrigin + FVector(0.0f, FMath::Sin(MotionPhase) * 260.0f, 0.0f), false);

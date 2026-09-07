@@ -27,6 +27,7 @@ class RIORSEDGE_API UBreakerAbility_Siphon : public UBreakerCasterAbility
 
 public:
     UBreakerAbility_Siphon();
+    virtual bool IsStaggerInterruptible() const override { return true; }
     float EffectiveBreakThreshold(const AActor* OwnerActor) const;
 
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;

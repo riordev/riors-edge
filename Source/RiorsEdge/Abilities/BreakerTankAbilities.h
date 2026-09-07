@@ -184,15 +184,9 @@ private:
 // T6 Ground Zero (§2 T6, Demolitionist): usable only while airborne; slams
 // down, radial damage scaled by fall, applies Stagger.
 //
-// TWO NEAREST-HONEST SUBSTITUTIONS, recorded:
-//  * "scaled by fall distance (cap 12 m)" reads the CURRENT DOWNWARD SPEED
-//    instead — fall distance is not tracked anywhere and inventing a tracker
-//    for one ability is a bigger lie than reading the honest kin quantity.
-//  * ApplyStagger does not exist (Class-Kits-Unbuilt §5.3). The nearest
-//    primitive is a full movement stop through the enemy's public
-//    movement-profile mutator, restored on a timer. A stop is not a stagger —
-//    no animation break, no attack interruption — and that difference stands
-//    recorded here until a real stagger lands.
+// Actual descent distance scales damage, capped at 12m or Terminal's 25m.
+// Damage and real O80 stagger resolve on the actual landing. Interrupting
+// the pending descent removes its payload without stopping fall physics.
 UCLASS()
 class RIORSEDGE_API UBreakerAbility_GroundZero : public UBreakerGameplayAbility
 {
@@ -200,23 +194,24 @@ class RIORSEDGE_API UBreakerAbility_GroundZero : public UBreakerGameplayAbility
 
 public:
     UBreakerAbility_GroundZero();
+    virtual bool IsStaggerInterruptible() const override { return true; }
+    virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+        const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="0")) float BlastRadiusCm = 600.0f;   // §T6: 6 m
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="0")) float WeaponDamageCoefficient = 1.8f;   // O2 PLACEHOLDER
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="0")) float UnarmedDamage = 50.0f;   // O2 PLACEHOLDER
-    // Downward speed that maps to full damage; a normal jump's fall reaches a
-    // meaningful fraction, which is what makes rocket-jumping expressive
+    // Measured descent that maps to full damage; short jumps retain the
+    // authored minimum while longer drops reward the actual height gained
     // rather than mandatory (§T6).
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="1")) float FullPowerFallSpeed = 1200.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="1")) float FullPowerFallDistanceCm = 1200.0f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="0", ClampMax="1")) float MinimumPowerFraction = 0.4f;   // O2 PLACEHOLDER
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="0")) float StaggerSeconds = 1.5f;   // §T6
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="0")) float SlamDownSpeed = 2200.0f;   // O2 PLACEHOLDER
-    // D8 TERMINAL DESCENT's raised power ceiling under the speed stand-in:
-    // sqrt(25/12) ~= 1.44 — the fall speed a 25 m drop reaches relative to the
-    // 12 m cap's, so the node's "cap 25 m instead of 12" survives the honest
-    // kin quantity. O2 PLACEHOLDER like the rest of the scaling.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="1")) float TerminalDescentPowerCap = 1.44f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="1")) float TerminalDescentFallDistanceCm = 2500.0f;
+private:
+    UFUNCTION() void HandlePlungeLanded(const FHitResult& Hit);
 };
 
 // HOLD (§2.1 ultimate): 100 Grit, no cooldown, 10s. Caps the damage any single

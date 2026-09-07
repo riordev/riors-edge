@@ -109,6 +109,8 @@ struct RIORSEDGE_API FBreakerDamageRequest
     // alive and never dereferences a stale pointer. Optional: hazards and
     // tests leave it null.
     UPROPERTY(BlueprintReadWrite) TWeakObjectPtr<AActor> Instigator = nullptr;
+    // Environmental falls cannot be dodged/blocked; all existing hits opt in.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bCanBeAvoided = true;
 
     void SetInstigator(AActor* InInstigator) { Instigator = InInstigator; }
 };
