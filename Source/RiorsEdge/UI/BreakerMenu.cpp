@@ -1,5 +1,6 @@
 #include "UI/BreakerMenu.h"
 #include "UI/BreakerCoreBoardLayout.h"
+#include "UI/BreakerDoctrineBoardLayout.h"
 #include "UI/BreakerSandboxModel.h"
 #include "EngineUtils.h"
 #include "Audio/BreakerSoundDirector.h"
@@ -576,27 +577,25 @@ namespace
         SLATE_BEGIN_ARGS(SBreakerBoardViewport)
             : _BoardSize(FVector2D(1000.0f, 800.0f))
             , _InitialZoom(1.0f)
+            , _FitOnOpen(false)
             , _InitialPan(FVector2D::ZeroVector)
             {}
             SLATE_ARGUMENT(FVector2D, BoardSize)
             SLATE_ARGUMENT(float, InitialZoom)
+            SLATE_ARGUMENT(bool, FitOnOpen)
             SLATE_ARGUMENT(FVector2D, InitialPan)
             SLATE_EVENT(FOnBoardViewChanged, OnViewChanged)
             SLATE_DEFAULT_SLOT(FArguments, Content)
         SLATE_END_ARGS()
 
-        // TWO LEVELS, not a continuum. NEAR is 1:1, the reading zoom; FAR is
-        // the overview spec 06 rules at 0.6 (O202). A wheel notch or the
-        // button pair jumps between them; nothing in between exists, so a
-        // player can never be parked at a zoom where the captions are almost
-        // legible.
+        // Two views: the complete board and 1:1 detail.
         static constexpr float NearZoom = 1.0f;
-        static constexpr float FarZoom = 0.6f;    // O2 PLACEHOLDER
 
         void Construct(const FArguments& InArgs)
         {
             BoardSize = InArgs._BoardSize;
-            DefaultZoom = InArgs._InitialZoom < NearZoom ? FarZoom : NearZoom;
+            bFitOnOpen = InArgs._FitOnOpen;
+            DefaultZoom = FMath::Clamp(InArgs._InitialZoom, 0.1f, NearZoom);
             Zoom = DefaultZoom;
             Pan = InArgs._InitialPan;
             OnViewChanged = InArgs._OnViewChanged;
@@ -610,6 +609,20 @@ namespace
             ApplyTransform();
         }
 
+        virtual void Tick(const FGeometry& AllottedGeometry, const double CurrentTime, const float DeltaTime) override
+        {
+            SCompoundWidget::Tick(AllottedGeometry, CurrentTime, DeltaTime);
+            if (bFitOnOpen && AllottedGeometry.GetLocalSize().GetMin() > 1)
+            {
+                bFitOnOpen = false;
+                const FVector2D View = AllottedGeometry.GetLocalSize();
+                Zoom = FMath::Min(1.0f, static_cast<float>(FMath::Min(View.X / BoardSize.X, View.Y / BoardSize.Y)));
+                Pan = (View - BoardSize * Zoom) * 0.5f;
+                ApplyTransform();
+                Notify();
+            }
+        }
+
         float GetZoom() const { return Zoom; }
 
         // The two button controls. They zoom about the middle of the viewport,
@@ -621,12 +634,11 @@ namespace
             ZoomAbout(View * 0.5f, Notches);
         }
 
-        // Back to NEAR at the origin. A board always opens at 1:1 (see
-        // BoardOpeningZoom below) so this is also the view it opened on.
+        // Restore the complete board in the current viewport.
         void ResetView()
         {
-            Zoom = NearZoom;
-            Pan = FVector2D::ZeroVector;
+            Zoom = FitZoom();
+            Pan = (GetViewSize() - BoardSize * Zoom) * 0.5f;
             ClampPan();
             ApplyTransform();
             Notify();
@@ -710,12 +722,18 @@ namespace
             return FVector2D(FMath::Max(1.0f, static_cast<float>(View.X)), FMath::Max(1.0f, static_cast<float>(View.Y)));
         }
 
+        float FitZoom() const
+        {
+            const FVector2D View = GetViewSize();
+            return FMath::Min(1.0f, static_cast<float>(FMath::Min(View.X / BoardSize.X, View.Y / BoardSize.Y)));
+        }
+
         void ZoomAbout(const FVector2D& LocalPoint, float Notches)
         {
             const float Previous = Zoom;
             // Wheel up (or +) is NEAR, wheel down (or -) is FAR. Two levels,
             // so the notch count does not matter — only its sign.
-            Zoom = Notches > 0.0f ? NearZoom : FarZoom;
+            Zoom = Notches > 0.0f ? NearZoom : FitZoom();
             if (FMath::IsNearlyEqual(Previous, Zoom)) return;
             // Keep the board point under LocalPoint exactly where it is:
             //   board = (Local - Pan) / Previous, and Pan' = Local - Zoom*board.
@@ -762,26 +780,11 @@ namespace
         float Zoom = 1.0f;
         float DefaultZoom = 1.0f;
         bool bDragging = false;
+        bool bFitOnOpen = false;
         FOnBoardViewChanged OnViewChanged;
     };
 
-    // A board always OPENS at 1:1 (NEAR), even when it is wider than the
-    // window.
-    //
-    // Opening at a fit-to-width zoom was tried and photographed: COMPARE ALL
-    // is about 2600px of board in a 1300px column, so fitting it means 0.5x,
-    // and 0.5x of the 11px caption floor is 5px of unreadable type. The FAR
-    // level is 0.6 because spec 06 rules it (O202), and it is RECORDED here
-    // that 0.6 puts the 11px captions at 6.6px — under FIELDPLATE 02's floor.
-    // FAR is an overview the player chooses to find their bearings; it is not
-    // a state to hand them on arrival, and it is not a reading zoom. RESET
-    // VIEW returns here.
-    inline constexpr float BoardOpeningZoom = SBreakerBoardViewport::NearZoom;
-
-    // The board's view controls. The wheel and the drag are the real verbs;
-    // these exist because a gesture nobody knows about is not a feature, and
-    // because a trackpad without a wheel still has to be able to zoom.
-    // FAR and NEAR are the pair; RESET is NEAR at the origin.
+    // Mouse wheel and buttons switch between overview and detail; dragging pans.
     TSharedRef<SWidget> MakeBoardViewControls(const TSharedPtr<SBreakerBoardViewport>& Viewport)
     {
         TWeakPtr<SBreakerBoardViewport> Weak = Viewport;
@@ -7937,7 +7940,7 @@ namespace
             + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
             [
                 SNew(STextBlock)
-                .Text(FText::FromString(TEXT("Hover a marker to read its full detail here. This column never changes width, so the board does not move when it fills.")))
+                .Text(FText::FromString(TEXT("Hover a node to inspect its effect, requirements and next rank.")))
                 .ColorAndOpacity(BreakerUI::TextSecondary)
                 .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), BreakerUI::TypeBody))
                 .AutoWrapText(true)
@@ -8156,436 +8159,92 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             BreakerUI::Panel00, BreakerUI::BorderEmphasis, FMargin(BreakerUI::Space24, BreakerUI::Space24));
     };
 
-    // ---- Class board: PATHS, not a card grid -------------------------------
+    // Doctrine wheels preserve authored prerequisites and the existing purchase path.
     auto BuildClassBoard = [&]() -> TSharedRef<SWidget>
     {
-        if (ClassTrees.IsEmpty())
+        if (VisibleTrees.IsEmpty()) return MakeEmptyBoard(TEXT("Choose a class to view its doctrines."));
+        TArray<BreakerDoctrineBoardLayout::FLayout> Layouts;
+        float BoardWidth = 0.0f, BoardHeight = 0.0f;
+        for (const UBreakerProgressionTree* Tree : VisibleTrees)
         {
-            return MakeEmptyBoard(TEXT("[ NO CLASS BRANCHES ]\n\nLock a Breaker class, or register class branch trees,\nand the path board draws here."));
+            Layouts.Add(BreakerDoctrineBoardLayout::Build(Tree));
+            BoardWidth += Layouts.Last().Size.X + BreakerUI::Space40;
+            BoardHeight = FMath::Max(BoardHeight, Layouts.Last().Size.Y);
         }
-
-        // Only the SELECTED branch is drawn (SkillBranchIndex == -1 draws them
-        // all side by side to compare). One branch at a time is what buys the
-        // board the width it needs to be readable — the whole reason it felt
-        // cramped was three columns of full-detail nodes fighting for 1200px.
-        // VisibleTrees is that selection, resolved once above so the footer
-        // count cannot disagree with the board.
-        const TArray<const UBreakerProgressionTree*>& Drawn = VisibleTrees;
-
-        const float TopPad = 28.0f;
-
-        TArray<int32> Tiers;
-        for (const UBreakerProgressionTree* Tree : Drawn)
-        {
-            for (const UBreakerProgressionNode* Node : Tree->Nodes)
-            {
-                if (Node) Tiers.AddUnique(Node->Tier);
-            }
-        }
-        Tiers.Sort();
-        if (Tiers.Num() == 0)
-        {
-            return MakeEmptyBoard(TEXT("[ NO NODES AUTHORED ]\n\nThis branch carries no nodes yet."));
-        }
-
-        TArray<int32> BranchSpent;
-        TArray<int32> BranchTotal;
-        TArray<int32> BranchWidest;
-        int32 WidestTierRow = 1;
-        bool bAnyRightLabel = false;
-        for (const UBreakerProgressionTree* Tree : Drawn)
-        {
-            int32 Spent = 0;
-            int32 Total = 0;
-            ProgressionTreeInvestment(Progression, Tree, Spent, Total);
-            BranchSpent.Add(Spent);
-            BranchTotal.Add(Total);
-
-            int32 Widest = 1;
-            for (const int32 Tier : Tiers)
-            {
-                int32 Count = 0;
-                for (const UBreakerProgressionNode* Node : Tree->Nodes)
-                {
-                    if (!Node || Node->Tier != Tier) continue;
-                    ++Count;
-                    if (MarkerLabelsRight(ClassifyNode(Node))) bAnyRightLabel = true;
-                }
-                Widest = FMath::Max(Widest, Count);
-            }
-            BranchWidest.Add(Widest);
-            WidestTierRow = FMath::Max(WidestTierRow, Widest);
-        }
-
-        // The tier gutter is MEASURED against the longest sentence it will
-        // actually print, not set to a number and hoped over. The owner's
-        // screenshot read `AT 2` where the label says `OPENS AT 2`: the gutter
-        // was 76px against copy that needed more, so the first two words fell
-        // outside the slot. Shortening the words again would only move the
-        // same cliff, so the width is derived from the widest gate on this
-        // board — `OPENS AT 120` costs the gutter nothing on a board whose
-        // gates are single digits.
-        int32 WidestGate = 0;
-        for (const UBreakerProgressionTree* Tree : Drawn)
-        {
-            for (const UBreakerProgressionNode* Node : Tree->Nodes)
-            {
-                if (Node) WidestGate = FMath::Max(WidestGate, Node->RequiredTreeInvestment);
-            }
-        }
-        const float GutterWidth = FMath::Max(104.0f,
-            FMath::CeilToFloat(MarkerTextWidth(FString::Printf(TEXT("OPENS AT %d"), WidestGate))
-                + 3.0f * BreakerUI::Space8));
-
-        // Node pitch is derived from the KNOWN board viewport (the viewport
-        // read at the top of this function), never from an allotted size, so
-        // there is no layout feedback loop. The clamp is what keeps the label
-        // block from ever being narrower than the copy it must hold.
-        const float AvailableField = FMath::Max(320.0f, Metrics.BoardViewWidth - GutterWidth);
-        const float NodeSpacing = FMath::Clamp(AvailableField / FMath::Max(1, Drawn.Num() * WidestTierRow), 168.0f, 320.0f);
-        const float LabelWidth = FMath::Max(150.0f, NodeSpacing - BreakerUI::Space24);
-        // 96 of label under a 64px marker plus breathing room, so a label can
-        // no longer run down through the tier hairline beneath it — which is
-        // exactly what "numbers clip" looked like on the board.
-        // Four lines, not three: a keystone now prints a KEYSTONE caption above
-        // its name, and a Canvas slot does not clip an overflowing child — it
-        // would have overprinted the tier hairline below instead of truncating,
-        // which is the harder defect to recognise as a defect.
-        const float LabelHeight = 114.0f;
-        const float TierHeight = 216.0f;
-
-        TArray<float> ColumnWidth;
-        for (int32 Index = 0; Index < Drawn.Num(); ++Index)
-        {
-            // Column is sized to the widest tier row it must hold, so the
-            // labels of neighbouring nodes cannot collide.
-            ColumnWidth.Add(FMath::Max(NodeSpacing + LabelWidth, BranchWidest[Index] * NodeSpacing));
-        }
-
-        float FieldWidth = GutterWidth;
-        for (const float Width : ColumnWidth) FieldWidth += Width;
-        // Convergence/Keystone labels sit to the right of their marker, so the
-        // board is a label wider than the field — but only when a node on this
-        // board actually labels right. It used to reserve the margin
-        // unconditionally, which pushed the board wider than the panel and
-        // clipped it against the scroll box for no reason at all.
-        const float BoardWidth = FieldWidth + (bAnyRightLabel ? LabelWidth + BreakerUI::Space16 : 0.0f);
-        const float BoardHeight = TopPad + Tiers.Num() * TierHeight + 40.0f;
-
+        BoardWidth -= BreakerUI::Space40;
         TSharedRef<SCanvas> Canvas = SNew(SCanvas);
-
-        // Tier gates: one dashed hairline across the field, labelled ONCE in
-        // the 76px gutter, so a gate label can never land on node copy.
-        for (int32 TierIndex = 0; TierIndex < Tiers.Num(); ++TierIndex)
+        float OffsetX = 0.0f;
+        for (int32 Index = 0; Index < VisibleTrees.Num(); ++Index)
         {
-            const float TierTop = TopPad + TierIndex * TierHeight;
-            int32 Gate = 0;
-            bool bGateMet = true;
-            for (int32 BranchIndex = 0; BranchIndex < Drawn.Num(); ++BranchIndex)
+            const UBreakerProgressionTree* Tree = VisibleTrees[Index];
+            const auto& Layout = Layouts[Index];
+            const FVector2D Offset(OffsetX, (BoardHeight - Layout.Size.Y) * 0.5f);
+            int32 Spent = 0, Total = 0;
+            ProgressionTreeInvestment(Progression, Tree, Spent, Total);
+            // A quiet outer frame groups the doctrine; only prerequisite edges connect nodes.
+            const float Radius = FMath::Min(Layout.Size.X, Layout.Size.Y) * 0.5f - 18.0f;
+            for (int32 Segment = 0; Segment < 72; ++Segment)
+                AddCanvasSegment(Canvas, Offset + BreakerCoreBoard::Polar(Layout.Hub, Radius, Segment * 5.0f),
+                    Offset + BreakerCoreBoard::Polar(Layout.Hub, Radius, (Segment + 1) * 5.0f), BorderEmphasis, 2.0f);
+            for (const auto& Edge : Layout.Edges)
             {
-                for (const UBreakerProgressionNode* Node : Drawn[BranchIndex]->Nodes)
-                {
-                    if (!Node || Node->Tier != Tiers[TierIndex]) continue;
-                    Gate = FMath::Max(Gate, Node->RequiredTreeInvestment);
-                    if (BranchSpent[BranchIndex] < Node->RequiredTreeInvestment) bGateMet = false;
-                }
+                const FVector2D A = Offset + Layout.Centers[Edge.A], B = Offset + Layout.Centers[Edge.B];
+                const FVector2D Direction = (B - A).GetSafeNormal();
+                const bool bOwned = ProgressionGetNodeRank(Progression, Edge.A, Tree->Currency) > 0
+                    && ProgressionGetNodeRank(Progression, Edge.B, Tree->Currency) > 0;
+                AddCanvasSegment(Canvas, A + Direction * 32.0f, B - Direction * 32.0f,
+                    bOwned ? Cyan : Muted, bOwned ? 3.0f : 2.0f);
             }
-
-            Canvas->AddSlot()
-                .Position(FVector2D(GutterWidth, TierTop))
-                .Size(FVector2D(FieldWidth - GutterWidth, 1.0f))
-                [
-                    DashedLine(FieldWidth - GutterWidth, BorderEmphasis)
-                ];
-            {
-                // The tier's ENTRY REQUIREMENT, stated once for the whole row.
-                //
-                // This used to read "GATE 2" while every locked marker beneath
-                // it read "GATE 0/2" — the same word for the tier's cost and
-                // for one node's progress toward it, stacked vertically. The
-                // gutter now says what OPENS the tier; the markers say only
-                // what is true of themselves.
-                TSharedRef<SVerticalBox> GutterLabel = SNew(SVerticalBox);
-                GutterLabel->AddSlot().AutoHeight()
-                [
-                    MenuText(FText::FromString(FString::Printf(TEXT("TIER %d"), Tiers[TierIndex])), BreakerUI::TypeCaption, Muted, true)
-                ];
-                if (Gate > 0)
-                {
-                    GutterLabel->AddSlot().AutoHeight()
-                    [
-                        MenuText(FText::FromString(bGateMet
-                                ? FString(TEXT("OPEN"))
-                                : FString::Printf(TEXT("OPENS AT %d"), Gate)),
-                            BreakerUI::TypeCaption, bGateMet ? Cyan : Amber, true)
-                    ];
-                }
-                Canvas->AddSlot()
-                    .Position(FVector2D(0.0f, TierTop + BreakerUI::Space8))
-                    .Size(FVector2D(GutterWidth - BreakerUI::Space8, 40.0f))
-                    [
-                        GutterLabel
-                    ];
-            }
-        }
-
-        float ColumnX = GutterWidth;
-        for (int32 BranchIndex = 0; BranchIndex < Drawn.Num(); ++BranchIndex)
-        {
-            const UBreakerProgressionTree* Tree = Drawn[BranchIndex];
-            const float TrunkX = ColumnX + ColumnWidth[BranchIndex] * 0.5f;
-            const int32 Spent = BranchSpent[BranchIndex];
-
-            for (int32 TierIndex = 0; TierIndex < Tiers.Num(); ++TierIndex)
-            {
-                const float TierTop = TopPad + TierIndex * TierHeight;
-
-                TArray<const UBreakerProgressionNode*> TierNodes;
-                for (const UBreakerProgressionNode* Node : Tree->Nodes)
-                {
-                    if (Node && Node->Tier == Tiers[TierIndex]) TierNodes.Add(Node);
-                }
-
-                bool bRouteOwned = false;
-                for (const UBreakerProgressionNode* Node : TierNodes)
-                {
-                    if (ProgressionGetNodeRank(Progression, Node->NodeId, Node->Currency) > 0) bRouteOwned = true;
-                }
-
-                // The trunk: one 2px line per branch running the full height,
-                // cyan where the route is owned and panel/20 where it is not.
-                AddCanvasSegment(Canvas, FVector2D(TrunkX, TierTop), FVector2D(TrunkX, TierTop + TierHeight),
-                    bRouteOwned ? Cyan : PanelHover);
-
-                for (int32 NodeIndex = 0; NodeIndex < TierNodes.Num(); ++NodeIndex)
-                {
-                    const UBreakerProgressionNode* Node = TierNodes[NodeIndex];
-                    const ESkillMarkerKind Kind = ClassifyNode(Node);
-                    const float NodeX = TrunkX + (NodeIndex - (TierNodes.Num() - 1) * 0.5f) * NodeSpacing;
-                    const float NodeY = TierTop + 76.0f;
-
-                    const int32 Rank = ProgressionGetNodeRank(Progression, Node->NodeId, Node->Currency);
-                    FString LockReason;
-                    FString ShortReason;
-                    bool bTierGated = false;
-                    const bool bPurchasable = SkillNodeIsPurchasable(Progression, Tree, Node, Spent, LockReason, &ShortReason, &bTierGated);
-                    const bool bOwned = Rank > 0;
-                    const bool bMaxed = Rank >= Node->MaxRank;
-
-                    // The ring is measured before the marker, because the
-                    // marker's edge length depends on it: a 2px ring eats 4px
-                    // of the box the rank text has to live in, and a 1px ring
-                    // eats 2. Two markers of the same kind on the same board
-                    // can therefore be different sizes, which is correct — the
-                    // spec's numbers are the floor, not the answer.
-                    const float RingThickness = MarkerRingThickness(Kind, bOwned || bPurchasable);
-                    // Multi-rank Minors carry their rank inside the marker;
-                    // every other kind carries a filled core in its state
-                    // colour, so no marker is ever an empty box.
-                    const FString CentreLabel = (Kind == ESkillMarkerKind::Minor)
-                        ? FString::Printf(TEXT("%d/%d"), Rank, Node->MaxRank)
-                        : FString();
-                    const float Size = MarkerSizeForLabel(MarkerBaseSize(Kind), RingThickness, CentreLabel);
-
-                    // 2px diagonal dropping from the trunk to the marker.
-                    AddCanvasSegment(Canvas, FVector2D(TrunkX, TierTop + BreakerUI::Space8),
-                        FVector2D(NodeX, NodeY - Size * 0.5f), bOwned ? Cyan : PanelHover);
-
-                    // The ladder's rung (BreakerMenuSkillLadderRung). Locked takes
-                    // border/emphasis rather than border/rest: rest sits one
-                    // value step off the plate face, which on a 44px shape
-                    // against the board ground is invisible, and an invisible
-                    // ring around a dark fill is what made the whole locked
-                    // tier read as a row of holes.
-                    const FBreakerMenuSkillRung Rung = BreakerMenuSkillLadderRung(Kind, bOwned, bPurchasable,
-                        BreakerMenuSkillKeystoneRefused(Progression, Tree, Node));
-                    const FLinearColor Fill = Rung.Fill;
-                    const FLinearColor Ring = Rung.Ring;
-                    const FLinearColor CoreColor = Rung.Core;
-
-                    TSharedRef<SWidget> Inner = CentreLabel.IsEmpty()
-                        ? MakeMarkerCore(Kind, CoreColor, Fill, Size)
-                        : MakeMarkerLabel(CentreLabel, CoreColor);
-
-                    const FSkillNodeView View = MakeSkillNodeView(Node, Rank, bPurchasable, LockReason, Spent, Snapshot);
-                    TSharedRef<SWidget> Marker = WireMarker(Tree, Node, View, bPurchasable, LockReason, Fill, Ring, RingThickness, Inner);
-                    if (MarkerIsDiamond(Kind)) Marker = RotateFortyFive(Marker);
-
-                    Canvas->AddSlot()
-                        .Position(FVector2D(NodeX - Size * 0.5f, NodeY - Size * 0.5f))
-                        .Size(FVector2D(Size, Size))
-                        [
-                            Marker
-                        ];
-
-                    // Name, number and state sit as plain text near the
-                    // marker — not inside a card.
-                    const FString NodeName = Node->DisplayName.IsEmpty() ? Node->NodeId.ToString().ToUpper() : Node->DisplayName.ToString().ToUpper();
-                    // The SHORT reason on the board; the full sentence is on
-                    // the rail. A wrapped four-line lock reason in a fixed
-                    // label box is what used to overrun into the tier beneath.
-                    //
-                    // A node held ONLY by its tier's entry requirement prints
-                    // nothing here. The gutter states that requirement once
-                    // per tier; repeating it under every marker in the tier
-                    // was noise that looked like information, and the muted
-                    // marker already says "not yet". Node-specific reasons
-                    // (a prerequisite by name, points you cannot afford) still
-                    // print, because those ARE about this node.
-                    // KEYSTONES ARE THE EXCEPTION to the tier-gate suppression
-                    // above. Owner: "i dont see keystones in the skill trees".
-                    // A tier-gated keystone printed the EMPTY string, so the
-                    // single most important node on a branch was the only one
-                    // that said nothing at all about itself — no name for what
-                    // it is, no reason it is locked. The tier hairline argument
-                    // does not apply here, because the reason is not the shared
-                    // tier: it is commitment, which is a per-branch choice the
-                    // player has to be told about somewhere on the board.
-                    const bool bIsKeystone = (Kind == ESkillMarkerKind::Keystone);
-                    const FString StateLine = bMaxed
-                        ? FString(TEXT("MAXED"))
-                        : (bPurchasable
-                            ? FString::Printf(TEXT("%d PT -> RANK %d"), Node->CostPerRank, Rank + 1)
-                            : (bOwned ? RankLabel(Rank, Node->MaxRank)
-                                      : ((bTierGated && !bIsKeystone) ? FString() : ShortReason)));
-                    const FLinearColor StateColor = bMaxed ? Cyan : (bPurchasable ? Amber : (bOwned ? Cyan : Muted));
-
-                    TSharedRef<SVerticalBox> Label = SNew(SVerticalBox);
-                    // The word itself, on the board. It existed only inside
-                    // MakeSkillDetailCard, which is reachable ONLY by hovering
-                    // the marker — so the board never once said "keystone" to a
-                    // player who was looking at it rather than pointing at it.
-                    // Amber even while locked, deliberately: this caption is
-                    // what the eye is meant to find when scanning a branch, and
-                    // muting it would restore the problem it exists to solve.
-                    if (bIsKeystone)
-                    {
-                        Label->AddSlot().AutoHeight()
-                        [
-                            SNew(STextBlock)
-                            .Text(FText::FromString(TEXT("KEYSTONE")))
-                            .ColorAndOpacity(Amber)
-                            .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), BreakerUI::TypeCaption))
-                        ];
-                    }
-                    Label->AddSlot().AutoHeight()
-                    [
-                        SNew(STextBlock)
-                        .Text(FText::FromString(NodeName))
-                        .ColorAndOpacity((bOwned || bPurchasable) ? Primary : Disabled)
-                        .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), BreakerUI::TypeCaption))
-                        .AutoWrapText(true)
-                    ];
-                    Label->AddSlot().AutoHeight()
-                    [
-                        SNew(STextBlock)
-                        // The effect as a number, so the board is readable
-                        // without hovering anything.
-                        .Text(FText::FromString(CompactEffectLine(Node)))
-                        .ColorAndOpacity((bOwned || bPurchasable) ? SoftText : Disabled)
-                        .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), BreakerUI::TypeCaption))
-                        .AutoWrapText(true)
-                    ];
-                    if (!StateLine.IsEmpty())
-                    {
-                        Label->AddSlot().AutoHeight()
-                        [
-                            SNew(STextBlock)
-                            .Text(FText::FromString(StateLine))
-                            .ColorAndOpacity(StateColor)
-                            .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), BreakerUI::TypeCaption))
-                            .AutoWrapText(true)
-                        ];
-                    }
-
-                    // Convergence and Keystone label to the RIGHT, so the
-                    // trunk never runs through their text.
-                    const bool bLabelRight = MarkerLabelsRight(Kind);
-                    Canvas->AddSlot()
-                        .Position(bLabelRight
-                            ? FVector2D(NodeX + Size * 0.5f + BreakerUI::Space16, NodeY - LabelHeight * 0.5f)
-                            : FVector2D(NodeX - LabelWidth * 0.5f, NodeY + Size * 0.5f + BreakerUI::Space8))
-                        .Size(FVector2D(LabelWidth, LabelHeight))
-                        [
-                            Label
-                        ];
-                }
-            }
-            ColumnX += ColumnWidth[BranchIndex];
-        }
-
-        // 60px branch header strip above the path field. It rides INSIDE the
-        // horizontal scroll with the board, so a scrolled column still knows
-        // which branch it belongs to.
-        TSharedRef<SHorizontalBox> BranchStrip = SNew(SHorizontalBox);
-        BranchStrip->AddSlot().AutoWidth()
-        [
-            SNew(SBox).WidthOverride(GutterWidth)[SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))]
-        ];
-        for (int32 BranchIndex = 0; BranchIndex < Drawn.Num(); ++BranchIndex)
-        {
-            const UBreakerProgressionTree* Tree = Drawn[BranchIndex];
-            const FString BranchName = TreeSelectorLabel(Tree);
-            BranchStrip->AddSlot().AutoWidth()
-            [
-                SNew(SBox).WidthOverride(ColumnWidth[BranchIndex]).Padding(FMargin(0.0f, 0.0f, BreakerUI::Space8, 0.0f))
-                [
-                    MakePlate(
-                        SNew(SHorizontalBox)
-                        + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
-                        [
-                            MenuText(FText::FromString(BranchName), BreakerUI::TypeH2, BranchSpent[BranchIndex] > 0 ? Primary : SoftText, true)
-                        ]
-                        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-                        [
-                            MenuText(FText::FromString(FString::Printf(TEXT("%d / %d INVESTED"), BranchSpent[BranchIndex], BranchTotal[BranchIndex])),
-                                BreakerUI::TypeCaption, Muted, true)
-                        ],
-                        BreakerUI::BgRaised, BranchSpent[BranchIndex] > 0 ? Cyan : BorderEmphasis,
-                        FMargin(BreakerUI::Space16, BreakerUI::Space8))
-                ]
-            ];
-        }
-
-        // The board is ZOOMED AND PANNED, not scrolled. The two nested scroll
-        // boxes that used to live here are gone: they fought each other for
-        // the wheel, which is the most likely reading of "scrolling in the
-        // tree is off by a little bit", and neither of them could make a board
-        // wider than the panel legible — it could only be dragged past.
-        //
-        // The branch header strip rides INSIDE the transform with the columns
-        // it labels, so a panned column still knows which branch it belongs
-        // to, and it zooms with them rather than sliding out of register.
-        const float StripHeight = 60.0f + BreakerUI::Space8;
-        TSharedPtr<SBreakerBoardViewport> Viewport;
-        SAssignNew(Viewport, SBreakerBoardViewport)
-            .BoardSize(FVector2D(BoardWidth, BoardHeight + StripHeight))
-            .InitialZoom(SkillBoardZoom > 0.0f ? SkillBoardZoom : BoardOpeningZoom)
-            .InitialPan(SkillBoardPan)
-            .OnViewChanged(FOnBoardViewChanged::CreateSP(this, &SBreakerMenu::HandleBoardViewChanged))
+            Canvas->AddSlot().Position(Offset + Layout.Hub - FVector2D(100, 42)).Size(FVector2D(200, 84))
             [
                 SNew(SVerticalBox)
-                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
-                [
-                    SNew(SBox).HeightOverride(60.0f)[BranchStrip]
-                ]
-                + SVerticalBox::Slot().AutoHeight()
-                [
-                    SNew(SBox).HeightOverride(BoardHeight)[Canvas]
-                ]
+                + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+                [MenuWrappedText(FText::FromString(TreeSelectorLabel(Tree)), 20, Primary, 200, true)]
+                + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0, 8, 0, 0)
+                [MenuText(FText::FromString(FString::Printf(TEXT("%d POINTS INVESTED"), Spent)), 12, Amber, true)]
             ];
-
+            for (const UBreakerProgressionNode* Node : Tree->Nodes)
+            {
+                if (!Node || !Layout.Centers.Contains(Node->NodeId)) continue;
+                const FVector2D Center = Offset + Layout.Centers[Node->NodeId];
+                const int32 Rank = ProgressionGetNodeRank(Progression, Node->NodeId, Node->Currency);
+                FString LockReason;
+                const bool bPurchasable = SkillNodeIsPurchasable(Progression, Tree, Node, Spent, LockReason);
+                const bool bOwned = Rank > 0;
+                const ESkillMarkerKind Kind = ClassifyNode(Node);
+                const bool bKeystone = Kind == ESkillMarkerKind::Keystone;
+                const float Size = bKeystone ? 64.0f : 48.0f;
+                const FBreakerMenuSkillRung Rung = BreakerMenuSkillLadderRung(Kind, bOwned, bPurchasable,
+                    BreakerMenuSkillKeystoneRefused(Progression, Tree, Node));
+                const FSkillNodeView View = MakeSkillNodeView(Node, Rank, bPurchasable, LockReason, Spent, Snapshot);
+                const FLinearColor Ring = bOwned ? Cyan : bPurchasable ? Amber : Muted;
+                TSharedRef<SWidget> Marker = WireMarker(Tree, Node, View, bPurchasable, LockReason,
+                    Rung.Fill, Ring, 2.0f, MakeMarkerCore(Kind, bOwned || bPurchasable ? Rung.Core : SoftText, Rung.Fill, Size));
+                if (MarkerIsDiamond(Kind)) Marker = RotateFortyFive(Marker);
+                Canvas->AddSlot().Position(Center - FVector2D(Size * 0.5f)).Size(FVector2D(Size))[Marker];
+                Canvas->AddSlot().Position(Center + FVector2D(-40, Size * 0.5f + 10)).Size(FVector2D(80, 26))
+                [SNew(SBox).HAlign(HAlign_Center)
+                    [MenuText(FText::FromString(FString::Printf(TEXT("%d / %d"), Rank, Node->MaxRank)), 14, bKeystone ? Amber : SoftText, true)]];
+            }
+            OffsetX += Layout.Size.X + BreakerUI::Space40;
+        }
+        const float ViewHeight = FMath::Max(320.0f, Metrics.PanelHeight - 330.0f);
+        const float OpeningZoom = FMath::Min(1.0f, FMath::Min(Metrics.BoardViewWidth / BoardWidth, ViewHeight / BoardHeight));
+        const FVector2D OpeningPan(FMath::Max(0.0f, (Metrics.BoardViewWidth - BoardWidth * OpeningZoom) * 0.5f), 0.0f);
+        TSharedPtr<SBreakerBoardViewport> Viewport;
+        SAssignNew(Viewport, SBreakerBoardViewport)
+            .BoardSize(FVector2D(BoardWidth, BoardHeight))
+            .FitOnOpen(SkillBoardZoom <= 0.0f)
+            .InitialZoom(SkillBoardZoom > 0.0f ? SkillBoardZoom : OpeningZoom)
+            .InitialPan(SkillBoardZoom > 0.0f ? SkillBoardPan : OpeningPan)
+            .OnViewChanged(FOnBoardViewChanged::CreateSP(this, &SBreakerMenu::HandleBoardViewChanged))
+            [SNew(SBox).WidthOverride(BoardWidth).HeightOverride(BoardHeight)
+                [SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush"))).BorderBackgroundColor(Panel).Padding(0)[Canvas]]];
         return SNew(SVerticalBox)
-            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
-            [
-                MakeBoardViewControls(Viewport)
-            ]
+            + SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, BreakerUI::Space8)[MakeBoardViewControls(Viewport)]
             + SVerticalBox::Slot().FillHeight(1.0f)
-            [
-                Viewport.ToSharedRef()
-            ];
+                [SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush"))).BorderBackgroundColor(Panel).Padding(0)[Viewport.ToSharedRef()]];
     };
-
     // ---- Core board: the spatial constellation map -------------------------
     auto BuildCoreBoard = [&]() -> TSharedRef<SWidget>
     {
@@ -8612,9 +8271,10 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         {
             for (int32 Sector = 0; Sector < Layout.Sectors.Num(); ++Sector)
             {
-                const float Angle = -90.0f + Sector * 360.0f / Layout.Sectors.Num();
-                AddCanvasSegment(Canvas, BreakerCoreBoard::Polar(Layout.Hub, 100.0f, Angle - 180.0f / Layout.Sectors.Num()),
-                    BreakerCoreBoard::Polar(Layout.Hub, 660.0f, Angle - 180.0f / Layout.Sectors.Num()), BorderRest, 1.0f);
+                const FVector2D Angles = BreakerCoreBoard::SectorAngles(Layout, Layout.Sectors[Sector]);
+                const float Angle = Angles.X;
+                AddCanvasSegment(Canvas, BreakerCoreBoard::Polar(Layout.Hub, 100.0f, Angles.Y),
+                    BreakerCoreBoard::Polar(Layout.Hub, 690.0f, Angles.Y), BorderRest, 1.0f);
                 AddLabel(BreakerCoreBoard::Polar(Layout.Hub, 155.0f, Angle), FVector2D(180, 36),
                     MenuText(FText::FromString(Layout.Sectors[Sector].ToString().ToUpper()), 18, Muted, true));
             }
@@ -8622,14 +8282,14 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         for (const FName Entry : Layout.Entries)
         {
             const bool bOwned = ProgressionGetNodeRank(Progression, Entry, CoreTree->Currency) > 0;
-            DrawLink(Layout.Hub, Layout.Centers[Entry], bOwned ? Cyan : BorderRest, bOwned ? 3.0f : 2.0f);
+            DrawLink(Layout.Hub, Layout.Centers[Entry], bOwned ? Cyan : BorderEmphasis, bOwned ? 3.0f : 2.0f);
         }
         for (const FBreakerNodeEdge& Edge : Layout.Edges)
         {
             const bool bOwnedA = ProgressionGetNodeRank(Progression, Edge.A, CoreTree->Currency) > 0;
             const bool bOwnedB = ProgressionGetNodeRank(Progression, Edge.B, CoreTree->Currency) > 0;
             DrawLink(Layout.Centers[Edge.A], Layout.Centers[Edge.B],
-                bOwnedA && bOwnedB ? Cyan : (bOwnedA || bOwnedB ? Muted : BorderRest), bOwnedA && bOwnedB ? 3.0f : 2.0f);
+                bOwnedA && bOwnedB ? Cyan : (bOwnedA || bOwnedB ? Muted : BorderEmphasis), bOwnedA && bOwnedB ? 3.0f : 2.0f);
         }
         AddLabel(Layout.Hub, FVector2D(76, 52),
             MakePlate(MenuText(FText::FromString(TEXT("CORE")), 16, Primary, true), PanelRaised, Amber, FMargin(8)));
@@ -8685,12 +8345,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             }
         }
         TSharedPtr<SBreakerBoardViewport> Viewport;
-        const float OpeningZoom = bFocused ? 1.0f : 0.6f;
-        const FVector2D OpeningPan = bFocused ? FVector2D::ZeroVector
-            : FVector2D(FMath::Max(0.0f, (Metrics.BoardViewWidth - Layout.Size.X * OpeningZoom) * 0.5f),
-                FMath::Max(320.0f, Metrics.PanelHeight - 272.0f) * 0.5f - Layout.Hub.Y * OpeningZoom);
+        const float ViewHeight = FMath::Max(320.0f, Metrics.PanelHeight - 272.0f);
+        const float OpeningZoom = FMath::Min(1.0f, FMath::Min(Metrics.BoardViewWidth / Layout.Size.X, ViewHeight / Layout.Size.Y));
+        const FVector2D OpeningPan(FMath::Max(0.0f, (Metrics.BoardViewWidth - Layout.Size.X * OpeningZoom) * 0.5f), 0.0f);
         SAssignNew(Viewport, SBreakerBoardViewport)
             .BoardSize(Layout.Size)
+            .FitOnOpen(SkillBoardZoom <= 0.0f)
             .InitialZoom(SkillBoardZoom > 0.0f ? SkillBoardZoom : OpeningZoom)
             .InitialPan(SkillBoardZoom > 0.0f ? SkillBoardPan : OpeningPan)
             .OnViewChanged(FOnBoardViewChanged::CreateSP(this, &SBreakerMenu::HandleBoardViewChanged))
@@ -8735,6 +8395,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
     // the owner asked for — the COMMIT control below is two-step (arm, then
     // confirm) because the choice is permanent outside the Forge.
     TSharedRef<SHorizontalBox> BranchChips = SNew(SHorizontalBox);
+    TSharedRef<SHorizontalBox> CommitControls = SNew(SHorizontalBox);
     if (!bCoreBoard && ClassTrees.Num() > 0)
     {
         auto AddBranchChip = [this, &BranchChips](const FString& Label, const FString& Sub, int32 Index, bool bActive)
@@ -8789,7 +8450,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             if (Committed != NAME_None)
             {
                 const bool bThisBranch = SelectedBranch && Committed == SelectedBranch->TreeId;
-                BranchChips->AddSlot().AutoWidth().Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
+                CommitControls->AddSlot().AutoWidth().Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
                 [
                     BorderWrap(
                         SNew(SBox).Padding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
@@ -8814,7 +8475,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             else if (SelectedBranch)
             {
                 const bool bArmed = PendingCommitBranch == SelectedBranch->TreeId;
-                BranchChips->AddSlot().AutoWidth().Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
+                CommitControls->AddSlot().AutoWidth().Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
                 [
                     BorderWrap(
                         SNew(SButton)
@@ -9058,28 +8719,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         BoardColumn->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
         [
             MakePlate(
-                SNew(SHorizontalBox)
-                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-                [
-                    MenuText(FText::FromString(TEXT("BRANCH")), BreakerUI::TypeCaption, Muted, true)
-                ]
-                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
-                [
-                    BranchChips
-                ]
-                + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).HAlign(HAlign_Right)
-                [
-                    // Said out loud, because the screen must not imply a
-                    // commitment the save has no field for. Clipped for the
-                    // same reason the footer is: a class with more branches
-                    // than Swift's three must push this note off rather than
-                    // print it through the chips.
-                    SNew(SBox).Clipping(EWidgetClipping::ClipToBounds)
-                    .HAlign(HAlign_Right)
-                    [
-                        MenuText(FText::FromString(TEXT("BROWSING — NO SUBCLASS IS COMMITTED")), BreakerUI::TypeCaption, Muted, true)
-                    ]
-                ],
+                SNew(SVerticalBox)
+                + SVerticalBox::Slot().AutoHeight()[BranchChips]
+                + SVerticalBox::Slot().AutoHeight().Padding(0, BreakerUI::Space8, 0, 0)[CommitControls],
                 BreakerUI::BgRaised, Cyan, FMargin(BreakerUI::Space16, BreakerUI::Space8))
         ];
     }

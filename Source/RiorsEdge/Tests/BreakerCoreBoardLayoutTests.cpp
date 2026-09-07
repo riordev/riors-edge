@@ -16,6 +16,12 @@ bool FBreakerCoreBoardLayoutTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Every shipped node appears"), Overview.Centers.Num(), 117);
     TestEqual(TEXT("Every actual edge appears"), Overview.Edges.Num(), 171);
     TestEqual(TEXT("Every virtual hub entry appears"), Overview.Entries.Num(), 12);
+    TArray<FVector2D> OverviewPoints;
+    Overview.Centers.GenerateValueArray(OverviewPoints);
+    for (int32 Index = 0; Index < OverviewPoints.Num(); ++Index)
+        for (int32 Other = Index + 1; Other < OverviewPoints.Num(); ++Other)
+            TestTrue(TEXT("Overview nodes have visible breathing room beyond diamond footprint"),
+                FVector2D::Distance(OverviewPoints[Index], OverviewPoints[Other]) >= 48.0f);
     auto Overlaps = [](FVector2D A, FVector2D B, FVector2D Size)
     {
         return FMath::Abs(A.X - B.X) < Size.X && FMath::Abs(A.Y - B.Y) < Size.Y;
@@ -26,6 +32,10 @@ bool FBreakerCoreBoardLayoutTest::RunTest(const FString& Parameters)
     for (int32 Index = 0; Index < Overview.Wedges.Num(); ++Index)
     {
         const BreakerCoreBoard::FWedge& Wedge = Overview.Wedges[Index];
+        const FVector2D Cluster = BreakerCoreBoard::Polar(Overview.Hub, 520, Wedge.AngleDegrees);
+        for (FName Id : Wedge.Nodes)
+            TestTrue(TEXT("Each constellation stays a compact circular cluster"),
+                FVector2D::Distance(Cluster, Overview.Centers[Id]) <= 110.01f);
         const FVector2D Label = BreakerCoreBoard::Polar(Overview.Hub, BreakerCoreBoard::OverviewLabelRadius, Wedge.AngleDegrees);
         for (int32 Other = Index + 1; Other < Overview.Wedges.Num(); ++Other)
             TestFalse(TEXT("Overview focus targets never overlap"), Overlaps(Label,
@@ -49,6 +59,8 @@ bool FBreakerCoreBoardLayoutTest::RunTest(const FString& Parameters)
                 // Diamonds have a larger axis-aligned footprint than their 44px square.
                 TestFalse(TEXT("Full-size focus purchase targets never overlap"),
                     Overlaps(Points[Point], Points[Other], FVector2D(63, 63)));
+                TestFalse(TEXT("Focused name and state blocks retain their own space"),
+                    Overlaps(Points[Point], Points[Other], FVector2D(176, 120)));
             }
         }
     }
