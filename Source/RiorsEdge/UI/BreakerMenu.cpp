@@ -4732,11 +4732,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                     Accent)
             ];
 
-        // An EMPTY slot keeps the filled row's full geometry — the plate
-        // face inside a 1px rest ring on the emphasis rail — and its own
-        // name over the word EMPTY. The doll never looks broken, only
-        // unfinished, and it does so in the same shape as a filled row rather
-        // than a dashed one that read as a different kind of thing.
+        // Vacant slots retain the plate, icon well and centered slot name.
+        // The unused space communicates vacancy without a repeated label.
         if (!bHasItem)
         {
             TSharedRef<SWidget> EmptyBody =
@@ -4744,12 +4741,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                 + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[Icon]
                 + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
                 [
-                    SNew(SVerticalBox)
-                    + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(SlotName(Slot)), BreakerUI::TypeCaption, Muted, true)]
-                    + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
-                    [
-                        MenuText(FText::FromString(TEXT("EMPTY")), BreakerUI::TypeH2, Disabled, true)
-                    ]
+                    MenuText(FText::FromString(SlotName(Slot)), BreakerUI::TypeCaption, Muted, true)
                 ];
 
             // The doomed-piece outline is registered for empty slots too: a
@@ -5465,7 +5457,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         ]
         + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
         [
-            MenuText(FText::FromString(TEXT("EMPTY · ENEMY KILLS DROP ROLLED ITEMS")), BreakerUI::TypeCaption, Muted, true)
+            MenuText(FText::FromString(TEXT("ENEMY KILLS DROP ROLLED ITEMS")), BreakerUI::TypeCaption, Muted, true)
         ];
 
     BackpackColumn->AddSlot().AutoHeight().Padding(0, 0, 0, BreakerUI::Space8)[CleanupRow];
