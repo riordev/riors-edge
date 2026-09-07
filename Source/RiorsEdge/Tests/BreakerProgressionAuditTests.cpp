@@ -6,6 +6,7 @@
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Progression/BreakerBuildConditions.h"
 #include "Progression/BreakerClassDefinition.h"
+#include "Progression/BreakerCoreWheelMath.h"
 #include "Progression/BreakerExperience.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
@@ -318,9 +319,32 @@ bool FBreakerCoreConstellationFieldTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Velocity carries its full atlas wheel"), CountByConstellation.FindRef(TEXT("Velocity")), 10);
     // Re-pinned per atlas pair, the tree-count convention: pair B added the
     // VECTOR and ARC wheels (7 -> 9), pair C RESERVOIR (9 -> 10), pairs D-F
-    // the rest — and the RING adds Travel as a thirteenth group whose 153
-    // trio picks all carry the Core.Travel. prefix.
-    TestEqual(TEXT("Twelve wheels plus Travel are represented"), CountByConstellation.Num(), 13);
+    // the rest. O213 deletes the Travel group: the wheel is its twelve
+    // constellations and nothing else.
+    TestEqual(TEXT("Twelve wheels are represented, and no Travel group (O213)"), CountByConstellation.Num(), 12);
+
+    // O212: five domain sectors, each holding its constellations as wedges.
+    // Every constellation maps to exactly one of the five (NAME_None is a
+    // failure, never a sector), every sector holds at least one wedge, and
+    // the sector vocabulary is exactly five names.
+    const TArray<FName> Sectors = {BreakerCoreWheel::SectorMovement, BreakerCoreWheel::SectorWeapon,
+        BreakerCoreWheel::SectorDefence, BreakerCoreWheel::SectorAbility, BreakerCoreWheel::SectorElements};
+    TestEqual(TEXT("The wheel has exactly five sectors (O212)"), Sectors.Num(), BreakerCoreWheel::SectorCount);
+    TestEqual(TEXT("The five sector names are distinct"), TSet<FName>(Sectors).Num(), BreakerCoreWheel::SectorCount);
+    TMap<FName, int32> WedgesPerSector;
+    for (const TPair<FName, int32>& Pair : CountByConstellation)
+    {
+        const FName Sector = BreakerCoreSectorOf(Pair.Key);
+        TestFalse(*(Pair.Key.ToString() + TEXT(" maps to a sector, not NAME_None (O212)")), Sector.IsNone());
+        TestTrue(*(Pair.Key.ToString() + TEXT(" maps to one of the five sectors")), Sectors.Contains(Sector));
+        WedgesPerSector.FindOrAdd(Sector)++;
+    }
+    for (const FName& Sector : Sectors)
+    {
+        TestTrue(*(Sector.ToString() + TEXT(" holds at least one wedge; the wheel never hides a sector (O212)")),
+            WedgesPerSector.FindRef(Sector) > 0);
+    }
+    TestTrue(TEXT("An unknown constellation has no sector"), BreakerCoreSectorOf(TEXT("Travel")).IsNone());
 
     // Class branch nodes are not a constellation and must stay None.
     for (const UBreakerProgressionTree* Tree : {UBreakerProgressionLibrary::GetSwiftKineticTree(),
@@ -377,8 +401,8 @@ bool FBreakerSpentPointsPerfTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Doctrine spend adds on top of core spend"), Progression->GetSpentPoints(), 7.0f, 0.0001f);
 
     // Respec one currency: its running total resets to zero and the other is
-    // untouched.
-    TestTrue(TEXT("Core respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure));
+    // untouched. The Core respec is free at this fixture's level (O213).
+    TestTrue(TEXT("Core respec succeeds"), Progression->RespecCore(Failure));
     // Still two pools, so a Core respec still leaves the doctrine total alone.
     TestEqual(TEXT("Core respec zeroes only the core running total"), Progression->GetSpentPoints(), 1.0f, 0.0001f);
 
@@ -396,13 +420,25 @@ bool FBreakerSpentPointsPerfTest::RunTest(const FString& Parameters)
     Loaded.PermanentClass = EBreakerClassId::Swift;
     Loaded.CoreNodeRanks.Add({TEXT("Core.Precision.Sightline"), 1});    // real, cost 1
     Loaded.DoctrineNodeRanks.Add({TEXT("Some.Removed.Node"), 3});          // unknown: dropped, +3 credited
+    // THE SHIPPED CASE: a travel bead a save bought before O213 deleted the
+    // Core.Travel.* ids. Dropped and credited exactly like the hand-made id
+    // above — one Core point back, no rank left — so the first real deletion
+    // this repair was written ahead of is what it is measured against.
+    Loaded.CoreNodeRanks.Add({TEXT("Core.Travel.Ring0P1Weapon"), 1});   // deleted (O213): dropped, +1 Core credited
     const int32 DoctrineWalletBefore = Loaded.UnspentDoctrinePoints;
+    const int32 CoreWalletBefore = Loaded.UnspentCorePoints;
     Progression->LoadProgressionState(Loaded);
     TestEqual(TEXT("the resolving row alone is charged"), Progression->GetSpentPoints(), 1.0f, 0.0001f);
     TestEqual(TEXT("the unknown row is gone from the loaded state"),
         Progression->GetNodeRank(TEXT("Some.Removed.Node"), EBreakerPointCurrency::DoctrinePoints), 0);
     TestEqual(TEXT("its ranks came back as doctrine points, at the fallback cost"),
         Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), DoctrineWalletBefore + 3);
+    TestEqual(TEXT("the deleted travel bead leaves no rank"),
+        Progression->GetNodeRank(TEXT("Core.Travel.Ring0P1Weapon"), EBreakerPointCurrency::CorePoints), 0);
+    // The loaded state is not fresh (a Core rank resolves), so no slice lump
+    // and no level entitlement land on top: the wallet moves by the credit alone.
+    TestEqual(TEXT("the deleted travel bead's point comes back as one Core point"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints), CoreWalletBefore + 1);
     return true;
 }
 

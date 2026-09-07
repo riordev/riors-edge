@@ -322,7 +322,7 @@ bool FBreakerRiftglassFoldShippedConfigurationTest::RunTest(const FString& Param
     TestEqual(TEXT("a default save is the oldest version"), Save->SaveVersion, 1);
     TestFalse(TEXT("a default save is unfolded"), Save->bRiftglassFoldedToAccount);
     TestFalse(TEXT("a default save carries no id"), Save->CharacterId.IsValid());
-    TestEqual(TEXT("the head version carries the receipt"), UBreakerSaveGame::CurrentSaveVersion, 8);
+    TestEqual(TEXT("the head version carries the receipt"), UBreakerSaveGame::CurrentSaveVersion, 9);
 
     UBreakerAccountSave* Account = NewObject<UBreakerAccountSave>();
     TestEqual(TEXT("a fresh account is at the swept version"), Account->AccountVersion, 2);

@@ -1,6 +1,9 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "GameFramework/Actor.h"
+#include "Items/BreakerEquipmentComponent.h"
+#include "Progression/BreakerCoreWheelMath.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "Progression/BreakerExperience.h"
@@ -95,14 +98,17 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
     // Swift pins below moved: the number rises by exactly the wheels authored
     // in each commit and says so in that commit's diff. PRECISION and VOLLEY
     // went from four and five nodes to ten each (30 -> 41); the remaining
-    // five pairs raise it to the atlas's 117 wheel nodes, then travel to 168.
+    // five pairs raise it to the atlas's 117 wheel nodes. O213 then rules
+    // that no bead is a travel node, so the 153 Core.Travel.* picks are gone
+    // and the wheel is exactly its twelve wheels: nine of ten nodes and three
+    // hubless of nine.
     const UBreakerProgressionTree* Core = UBreakerProgressionLibrary::GetCoreSliceTree();
-    TestEqual(TEXT("Core ships the wheels plus the ring's 51 trios"), Core->Nodes.Num(), 270);
+    TestEqual(TEXT("Core ships its twelve wheels and nothing between them (O213)"), Core->Nodes.Num(), 117);
 
-    // THE RING'S GRAPH IS VALID DATA: every edge endpoint and every entry
-    // resolves to a real node — the edge builder derives its strings in
-    // loops while the trio calls are literal, and this is what keeps the two
-    // from drifting apart silently.
+    // THE WHEEL'S GRAPH IS VALID DATA: every edge endpoint and every entry
+    // resolves to a real node. The edges are exactly the wheels' own — six
+    // rim links, six rim-to-inner links and three inner-to-hub links per
+    // hubbed wheel (15 x 9), twelve per hubless wheel (12 x 3): 171.
     int32 EdgeCount = 0;
     for (const FBreakerNodeEdge& Edge : Core->AdjacencyEdges)
     {
@@ -110,13 +116,25 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
         TestNotNull(*(Edge.A.ToString() + TEXT(" (edge A) resolves")), Core->FindNode(Edge.A));
         TestNotNull(*(Edge.B.ToString() + TEXT(" (edge B) resolves")), Core->FindNode(Edge.B));
     }
-    TestTrue(TEXT("The ring carries its edges"), EdgeCount > 200);
-    TestEqual(TEXT("Three entries, ungated"), Core->EntryNodeIds.Num(), 3);
+    TestEqual(TEXT("The wheels carry exactly their own edges"), EdgeCount, 171);
+    // O211: the hub is the only start, and the hub is virtual — every wheel's
+    // rim 0 touches it, so every wheel is an entry and there is no centre
+    // node to buy.
+    TestEqual(TEXT("Twelve entries, one per wheel, ungated"), Core->EntryNodeIds.Num(), 12);
     for (const FName& Entry : Core->EntryNodeIds)
     {
         TestNotNull(*(Entry.ToString() + TEXT(" (entry) resolves")), Core->FindNode(Entry));
     }
     TestEqual(TEXT("Core slice spends Core Points"), Core->Currency, EBreakerPointCurrency::CorePoints);
+    // O213: no bead is a travel node, and every rank carries a magnitude. The
+    // deleted ids are never reused (O103): nothing may begin Core.Travel.
+    for (const UBreakerProgressionNode* Node : Core->Nodes)
+    {
+        const FString Context = Node->NodeId.ToString();
+        TestFalse(*(Context + TEXT(" is not a travel bead (O213)")), Context.StartsWith(TEXT("Core.Travel.")));
+        TestTrue(*(Context + TEXT(" carries a magnitude: an effect, a tag or an ability (O213)")),
+            Node->Effects.Num() > 0 || Node->GrantedTags.Num() > 0 || Node->GrantedAbilityIds.Num() > 0);
+    }
 
     // SWIFT BRANCH SIZE AND CEILING, RE-PINNED DELIBERATELY (was 10 / 11 / 10,
     // and "every Swift node is tier 1-3").
@@ -234,7 +252,10 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerNodePurchaseFlowTest::RunTest(const FString& Parameters)
 {
-    UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>();
+    // Owned, because the Core respec at the foot of this test is paid
+    // through a wallet on the owner (O213), and an ownerless component holds
+    // no wallet to pay from.
+    UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>(NewObject<AActor>());
     UBreakerProgressionTree* Core = UBreakerProgressionLibrary::GetCoreSliceTree();
     UBreakerProgressionTree* Kinetic = UBreakerProgressionLibrary::GetSwiftKineticTree();
 
@@ -306,9 +327,20 @@ bool FBreakerNodePurchaseFlowTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("...and core points are untouched"), Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints), CoreBeforeDoctrine);
     TestEqual(TEXT("Slide speed reflects the class node"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.12f, 0.0001f);
 
-    // Respec clears effects and refunds every point of that currency.
-    TestFalse(TEXT("Respec away from a Forge is rejected"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, false, Failure));
-    TestTrue(TEXT("Respec at a Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure));
+    // Respec clears effects and refunds every point of that currency. The
+    // Forge gate is Doctrine's (O213); the Core respec is a level rule and a
+    // wallet, exercised by RiorsEdge.Progression.CoreRespec.FreeThenRiftglass.
+    // This fixture is at the cap, past the free level, with no wallet: the
+    // Core respec is bought through the Forge path, which routes to the same
+    // rule, so the ranks stand until the price is paid.
+    TestFalse(TEXT("Doctrine respec away from a Forge is rejected"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, false, Failure));
+    TestFalse(TEXT("A Core respec past the free level with no wallet is refused"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure));
+    TestEqual(TEXT("A refused Core respec leaves the ranks standing"), Progression->GetNodeRank(TEXT("Core.Precision.Sightline"), EBreakerPointCurrency::CorePoints), 1);
+    // Pay the price the way the game pays it: through the owner's wallet.
+    UBreakerEquipmentComponent* Wallet = NewObject<UBreakerEquipmentComponent>(Progression->GetOwner());
+    Wallet->GrantForgeCurrency(BreakerCoreRespecCost(Progression->GetCharacterLevel()).Amount);
+    TestTrue(TEXT("The Core respec succeeds once the price is held"), Progression->RespecCore(Failure));
+    TestEqual(TEXT("The Core respec debits exactly its price"), Wallet->GetForgeWallet().Get(), 0);
     // Fifty, not the slice's twelve: this fixture now levels to the cap to
     // reach the doctrine benchmarks, and Core pays one per level on the way.
     TestEqual(TEXT("Core points are fully refunded"),

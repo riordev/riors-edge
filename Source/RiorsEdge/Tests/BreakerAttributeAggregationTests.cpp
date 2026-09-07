@@ -362,16 +362,12 @@ bool FBreakerDamageNodeRaisesWeaponDamageTest::RunTest(const FString& Parameters
     UBreakerProgressionTree* Core = UBreakerProgressionLibrary::GetCoreSliceTree();
     Progression->ApplySliceDefaultsIfFresh();
     FText Failure;
-    // ATLAS SHAPE (Phase 4): single purchases summing in the one bucket —
-    // reached THROUGH THE RING: entry at Sightline, the run to VOLLEY walked
-    // on Ability picks, which never touch the DamageMultiplier attribute
-    // this test is watching.
-    TestTrue(TEXT("The entry purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Sightline"), Failure));
-    TestTrue(TEXT("Travel 1 purchases"), Progression->PurchaseNode(Core, TEXT("Core.Travel.Ring0P1Ability"), Failure));
-    TestTrue(TEXT("Travel 2 purchases"), Progression->PurchaseNode(Core, TEXT("Core.Travel.Ring0P2Ability"), Failure));
-    TestTrue(TEXT("Travel 3 purchases"), Progression->PurchaseNode(Core, TEXT("Core.Travel.Ring0P3Ability"), Failure));
-    TestEqual(TEXT("The path moved no weapon damage"), Attributes->GetDamageMultiplier(), 1.0f, 0.0001f);
-    TestTrue(TEXT("The damage rim purchases"), Progression->PurchaseNode(Core, TEXT("Core.Volley.Cyclic"), Failure));
+    // ATLAS SHAPE: single purchases summing in the one bucket. VOLLEY is
+    // entered at its own rim 0 from the virtual hub (O211), so nothing is
+    // bought on the way and the DamageMultiplier attribute this test watches
+    // starts neutral.
+    TestEqual(TEXT("Nothing is bought to reach a wheel"), Attributes->GetDamageMultiplier(), 1.0f, 0.0001f);
+    TestTrue(TEXT("The damage rim purchases as an entry"), Progression->PurchaseNode(Core, TEXT("Core.Volley.Cyclic"), Failure));
 
     TestEqual(TEXT("A purchased damage node moves the attribute"), Attributes->GetDamageMultiplier(), 1.03f, 0.0001f);
     TestEqual(TEXT("A purchased damage node moves the damage a weapon would deal"), WeaponDamageFor(Attributes), 103.0f, 0.001f);

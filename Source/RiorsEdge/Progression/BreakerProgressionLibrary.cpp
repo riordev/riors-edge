@@ -340,71 +340,6 @@ namespace
         AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::MorePercent, PercentAboveOne, Condition);
     }
 
-    // One travel POSITION of the atlas's ring: THREE sibling nodes sharing
-    // the slot, mutually exclusive, one point each — the spec's three-way
-    // chooser, priced by O56's band edge read backwards (a shared line at
-    // 40-50% of a specific pool's value). A position OFFERS one spendable
-    // point from three options, which is exactly how Scripts/status.py
-    // counts it: the parser reads THIS helper by name, three nodes per call
-    // and one offered point per trio — rename it and the census refuses.
-    // Ids are <Base>Weapon / <Base>Ability / <Base>All. All O2 PLACEHOLDER.
-    void BreakerMakeTravelTrio(UBreakerProgressionTree* Tree, const TCHAR* BaseId)
-    {
-        const FString Base(BaseId);
-        const FName WeaponId(*(Base + TEXT("Weapon")));
-        const FName AbilityId(*(Base + TEXT("Ability")));
-        const FName AllId(*(Base + TEXT("All")));
-        struct FBreakerTravelPick
-        {
-            FName Id; const TCHAR* Name; const TCHAR* Desc;
-            EBreakerNodeStatTarget Target; float Value; FName OtherA; FName OtherB;
-        };
-        const FBreakerTravelPick Picks[3] = {
-            { WeaponId,  TEXT("Weapon Damage"),  TEXT("Travel. Your shots hit harder. One pick per stop, and picking again means the Forge."), EBreakerNodeStatTarget::WeaponDamage, 15.0f, AbilityId, AllId },
-            { AbilityId, TEXT("Ability Damage"), TEXT("Travel. Your abilities hit harder. One pick per stop, and picking again means the Forge."), EBreakerNodeStatTarget::AbilityDamage, 15.0f, WeaponId, AllId },
-            { AllId,     TEXT("All Damage"),     TEXT("Travel. Everything you deliver arrives heavier. One pick per stop, and picking again means the Forge."), EBreakerNodeStatTarget::Damage, 6.0f, WeaponId, AbilityId },
-        };
-        for (const FBreakerTravelPick& Pick : Picks)
-        {
-            UBreakerProgressionNode* Node = MakeNode(Pick.Id, Pick.Name, Pick.Desc,
-                EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Travel"));
-            AddEffect(Node, Pick.Target, EBreakerNodeStatBucket::IncreasedPercent, Pick.Value); // O2 PLACEHOLDER
-            Node->MutuallyExclusiveNodeIds.Add(Pick.OtherA);
-            Node->MutuallyExclusiveNodeIds.Add(Pick.OtherB);
-            Tree->Nodes.Add(Node);
-        }
-    }
-
-    // Adds the undirected edges linking two travel POSITIONS (or a position
-    // and a wheel node): every sibling of one end touches every sibling of
-    // the other, because at most one sibling per position is ever owned.
-    void BreakerLinkTravel(UBreakerProgressionTree* Tree, const FString& FromBase, const FString& ToBase)
-    {
-        static const TCHAR* Suffixes[3] = { TEXT("Weapon"), TEXT("Ability"), TEXT("All") };
-        for (const TCHAR* From : Suffixes)
-        {
-            for (const TCHAR* To : Suffixes)
-            {
-                FBreakerNodeEdge Edge;
-                Edge.A = FName(*(FromBase + From));
-                Edge.B = FName(*(ToBase + To));
-                Tree->AdjacencyEdges.Add(Edge);
-            }
-        }
-    }
-
-    void BreakerLinkNodeToTravel(UBreakerProgressionTree* Tree, FName WheelNode, const FString& TravelBase)
-    {
-        static const TCHAR* Suffixes[3] = { TEXT("Weapon"), TEXT("Ability"), TEXT("All") };
-        for (const TCHAR* Suffix : Suffixes)
-        {
-            FBreakerNodeEdge Edge;
-            Edge.A = WheelNode;
-            Edge.B = FName(*(TravelBase + Suffix));
-            Tree->AdjacencyEdges.Add(Edge);
-        }
-    }
-
     void BreakerLinkNodes(UBreakerProgressionTree* Tree, FName A, FName B)
     {
         FBreakerNodeEdge Edge;
@@ -492,11 +427,12 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     // pairs. Per wheel: six 1-point rims, three 2-point inners each gated on
     // two adjacent rims (AND — the stated gate), one 3-point hub Convergence
     // gated on all three inners. MaxRank = 1 on every Core node. RIMS CARRY
-    // NO PREREQUISITES: the spec's ring adjacency (rim[j] <-> rim[j+1],
-    // travel runs, three entries) is either-neighbor traversal, which the
-    // AND-only prerequisite vocabulary cannot express — so rims are freely
-    // purchasable until that traversal is ruled and given plumbing, and the
-    // gates authored here are exactly the ones the spec states, no more.
+    // NO PREREQUISITES: the spec's rim adjacency (rim[j] <-> rim[j+1], every
+    // wheel entered at its rim 0 from the virtual hub) is either-neighbor
+    // traversal, which the AND-only prerequisite vocabulary cannot express —
+    // it is carried by the wheel's AdjacencyEdges and EntryNodeIds at the
+    // foot of this function, and the gates authored here are exactly the
+    // ones the spec states, no more.
     // Tier 1/2/3 on rim/inner/hub is board layout; GateForTier's investment
     // gates (0/2/4) are strictly weaker than the prerequisite chains and
     // never bite. Every magnitude is O2 PLACEHOLDER.
@@ -1476,12 +1412,14 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     // would be a pure-upside keystone. It lands with the resistance step.
 
     // =======================================================================
-    // THE RING (owner ruling): connectivity as data, travel as content.
+    // THE WHEEL (O211-O213): connectivity as data, every bead a magnitude.
     // Twelve wheels in atlas order; each wheel's rims in the spec's rim
     // order, because rim adjacency and the inner gates both key off it.
-    // 51 travel positions (12 ring runs of 3, 3 chords of 5), each a
-    // three-way mutually-exclusive trio. Entries: rim 0 of PRECISION (0),
-    // RESERVOIR (4), BULWARK (8), ungated.
+    // The hub is the only start (O211), and the hub is VIRTUAL: there is no
+    // centre node to buy. Every wheel's inner rim touches it, so every
+    // wheel's rim 0 is an entry, ungated, and a wedge is entered from the
+    // centre rather than walked to along a ring. No bead is a travel node
+    // (O213): connectivity between wheels is the hub, never a purchase.
     // =======================================================================
     {
         struct FBreakerWheelMap { const TCHAR* Rims[6]; const TCHAR* Inners[3]; const TCHAR* Hub; };
@@ -1530,65 +1468,15 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
             }
         }
 
-        // The 51 travel positions, LITERAL on purpose: Scripts/status.py's
-        // census reads BreakerMakeTravelTrio calls by name and cannot see a
-        // loop. The link loops below re-derive the same base strings; the
-        // integrity test validates every edge endpoint resolves, so the two
-        // cannot drift silently.
-        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring0P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring0P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring0P3"));
-        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring1P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring1P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring1P3"));
-        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring2P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring2P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring2P3"));
-        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring3P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring3P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring3P3"));
-        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring4P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring4P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring4P3"));
-        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring5P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring5P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring5P3"));
-        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring6P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring6P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring6P3"));
-        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring7P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring7P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring7P3"));
-        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring8P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring8P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring8P3"));
-        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring9P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring9P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring9P3"));
-        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring10P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring10P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring10P3"));
-        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring11P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring11P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring11P3"));
-        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord0P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord0P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord0P3"));
-        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord0P4")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord0P5"));
-        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord1P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord1P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord1P3"));
-        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord1P4")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord1P5"));
-        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord2P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord2P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord2P3"));
-        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord2P4")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord2P5"));
-
-        // Ring runs: three travel positions between adjacent wheels' rim 0,
-        // enterable from either end (every edge here is undirected).
-        for (int32 WheelIndex = 0; WheelIndex < 12; ++WheelIndex)
+        // The entries: every wheel's rim 0, read from the same table the
+        // edges are drawn from so a wheel cannot be authored without a way
+        // in. The Core.Travel.* ids that used to sit between the wheels are
+        // DELETED, never renumbered (O103): a save carrying one is dropped
+        // and credited on load, and no id below may ever reuse the prefix.
+        for (const FBreakerWheelMap& Wheel : WheelMap)
         {
-            TArray<FString> Bases;
-            for (int32 Position = 1; Position <= 3; ++Position)
-            {
-                Bases.Add(FString::Printf(TEXT("Core.Travel.Ring%dP%d"), WheelIndex, Position));
-            }
-            BreakerLinkNodeToTravel(Tree, FName(WheelMap[WheelIndex].Rims[0]), Bases[0]);
-            BreakerLinkTravel(Tree, Bases[0], Bases[1]);
-            BreakerLinkTravel(Tree, Bases[1], Bases[2]);
-            BreakerLinkNodeToTravel(Tree, FName(WheelMap[(WheelIndex + 1) % 12].Rims[0]), Bases[2]);
+            Tree->EntryNodeIds.Add(FName(Wheel.Rims[0]));
         }
-
-        // Chords: five positions across the board, wheels 0-6, 2-8, 4-10.
-        const int32 ChordEnds[3][2] = { {0, 6}, {2, 8}, {4, 10} };
-        for (int32 ChordIndex = 0; ChordIndex < 3; ++ChordIndex)
-        {
-            TArray<FString> Bases;
-            for (int32 Position = 1; Position <= 5; ++Position)
-            {
-                Bases.Add(FString::Printf(TEXT("Core.Travel.Chord%dP%d"), ChordIndex, Position));
-            }
-            BreakerLinkNodeToTravel(Tree, FName(WheelMap[ChordEnds[ChordIndex][0]].Rims[0]), Bases[0]);
-            for (int32 Position = 0; Position < 4; ++Position)
-            {
-                BreakerLinkTravel(Tree, Bases[Position], Bases[Position + 1]);
-            }
-            BreakerLinkNodeToTravel(Tree, FName(WheelMap[ChordEnds[ChordIndex][1]].Rims[0]), Bases[4]);
-        }
-
-        Tree->EntryNodeIds.Add(TEXT("Core.Precision.Sightline"));
-        Tree->EntryNodeIds.Add(TEXT("Core.Reservoir.Draw"));
-        Tree->EntryNodeIds.Add(TEXT("Core.Bulwark.SetStance"));
     }
 
     return Tree;

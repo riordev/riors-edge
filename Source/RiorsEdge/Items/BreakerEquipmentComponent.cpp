@@ -688,6 +688,15 @@ void UBreakerEquipmentComponent::CreditForgeCurrency(const FBreakerForgeWallet& 
     OnEquipmentChanged.Broadcast();
 }
 
+bool UBreakerEquipmentComponent::SpendForgeCurrency(const FBreakerForgeCost& Cost)
+{
+    if (!HasAttributeAuthority()) return false;
+    if (!ForgeWallet.Spend(Cost)) return false;
+    // A free cost spends nothing and moves nothing; no change to announce.
+    if (!Cost.IsFree()) OnEquipmentChanged.Broadcast();
+    return true;
+}
+
 bool UBreakerEquipmentComponent::SalvageFromBackpack(const FGuid& ItemId)
 {
     if (!HasAttributeAuthority()) return false;

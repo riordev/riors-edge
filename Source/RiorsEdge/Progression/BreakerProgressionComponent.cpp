@@ -4,6 +4,7 @@
 #include "Game/BreakerGameMode.h"
 #include "Game/BreakerRiftDefinition.h"
 #include "Items/BreakerEquipmentComponent.h"
+#include "Progression/BreakerCoreWheelMath.h"
 #include "Progression/BreakerRiftRewardMath.h"
 #include "Save/BreakerAccountSave.h"
 #include "Save/BreakerMissionContent.h"
@@ -476,14 +477,8 @@ bool UBreakerProgressionComponent::EquipAbility(EBreakerAbilitySlot Slot, FName 
     return true;
 }
 
-bool UBreakerProgressionComponent::RespecAtForge(EBreakerPointCurrency Currency, bool bIsAtForge, FText& OutFailureReason)
+void UBreakerProgressionComponent::ClearAndRefund(EBreakerPointCurrency Currency)
 {
-    if (!bIsAtForge)
-    {
-        OutFailureReason = LOCTEXT("ForgeRequired", "Respecs are only available at a Forge.");
-        return false;
-    }
-
     TArray<FBreakerNodeRank>& Ranks = RanksFor(Currency);
     const int32 Refunded = GetRefundValue(Currency);
     Ranks.Reset();
@@ -503,9 +498,66 @@ bool UBreakerProgressionComponent::RespecAtForge(EBreakerPointCurrency Currency,
     // this used to guard against is closed at the other end now: the grant is a
     // function of level settled against a counter, so there is no event to
     // repeat.
-    if (Currency == EBreakerPointCurrency::DoctrinePoints) State.UnspentDoctrinePoints += Refunded;
-    else if (Currency == EBreakerPointCurrency::ClassPoints_Retired) State.UnspentClassPoints += Refunded;
-    else State.UnspentCorePoints += Refunded;
+    WalletFor(Currency) += Refunded;
+}
+
+bool UBreakerProgressionComponent::RespecCore(FText& OutFailureReason)
+{
+    // O213: free until N, Riftglass after. The price is read at the
+    // character's level from the pure function; the debit is the wallet's
+    // own atomic Spend through the owner's equipment component, found the
+    // way the rift payout finds it. Refuse BEFORE clearing: a respec that
+    // cleared ranks and then failed to charge would be a free respec with a
+    // refusal message, and one that charged and then failed to clear would
+    // be a lost-currency report.
+    const FBreakerForgeCost Cost = BreakerCoreRespecCost(State.CharacterLevel);
+    if (!Cost.IsFree())
+    {
+        UBreakerEquipmentComponent* Equipment = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>() : nullptr;
+        if (!Equipment)
+        {
+            // A pawn with no wallet cannot pay, and a respec that waived the
+            // price because nothing could hold it would be the price silently
+            // not existing on that pawn.
+            OutFailureReason = LOCTEXT("CoreRespecNoWallet", "No Riftglass wallet is held, so the respec cannot be paid for.");
+            return false;
+        }
+        if (!Equipment->SpendForgeCurrency(Cost))
+        {
+            OutFailureReason = FText::Format(LOCTEXT("CoreRespecUnaffordable", "A Core respec costs {0} {1} at this level."),
+                FText::AsNumber(Cost.Amount), FText::FromString(BreakerForge::CurrencyDisplayName));
+            return false;
+        }
+    }
+    ClearAndRefund(EBreakerPointCurrency::CorePoints);
+    // A respec refunds what was PAID; the granted rank was never paid for
+    // (cost 0, seeded), so the clear above must not be how a Swift loses its
+    // class verb. Re-seed before the recalculation.
+    SeedGrantedNodes();
+    // Cleared ranks must clear their effects, tags and verb grants included.
+    RecalculateStats();
+    OnProgressionChanged.Broadcast();
+    OutFailureReason = FText::GetEmpty();
+    return true;
+}
+
+bool UBreakerProgressionComponent::RespecAtForge(EBreakerPointCurrency Currency, bool bIsAtForge, FText& OutFailureReason)
+{
+    // O213: the Forge gate is Doctrine's. A Core respec asked for here is
+    // routed to its own rule — level and wallet, not the Forge — so the
+    // callers that predate RespecCore keep working and cannot bypass the
+    // price by naming the Forge.
+    if (Currency == EBreakerPointCurrency::CorePoints)
+    {
+        return RespecCore(OutFailureReason);
+    }
+    if (!bIsAtForge)
+    {
+        OutFailureReason = LOCTEXT("ForgeRequired", "Respecs are only available at a Forge.");
+        return false;
+    }
+
+    ClearAndRefund(Currency);
     // The commitment clear moved off the retired currency with the nodes it
     // governs. Left where it was it would be unreachable -- nothing calls a
     // respec of a pool nothing spends -- and a committed character could never

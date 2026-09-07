@@ -95,7 +95,18 @@ public:
     // this per node to decide enabled/disabled state and its tooltip reason.
     UFUNCTION(BlueprintCallable, Category="Progression") bool CanPurchaseNode(const UBreakerProgressionTree* Tree, FName NodeId, FText& OutFailureReason) const;
     UFUNCTION(BlueprintCallable, Category="Progression") bool EquipAbility(EBreakerAbilitySlot Slot, FName AbilityId, FText& OutFailureReason);
+    // The Forge's respec: Doctrine, gated on standing at one (O213: Doctrine
+    // respec stays the Forge's). Called with CorePoints it routes to
+    // RespecCore below and ignores bIsAtForge — the Core's price is a level
+    // rule and a wallet, never a place — so every existing caller keeps
+    // working while the Forge gate stays Doctrine's alone.
     UFUNCTION(BlueprintCallable, Category="Progression") bool RespecAtForge(EBreakerPointCurrency Currency, bool bIsAtForge, FText& OutFailureReason);
+    // O213: the Core respec. Free below BreakerCoreWheel::CoreRespecFreeUntilLevel,
+    // one Riftglass price at or above it (BreakerCoreRespecCost at the
+    // character's level), debited through the owner's equipment component
+    // before anything is cleared. A refused debit clears nothing and costs
+    // nothing; a paid one refunds every Core point and clears every Core rank.
+    UFUNCTION(BlueprintCallable, Category="Progression") bool RespecCore(FText& OutFailureReason);
     // O37 subclass commitment: one-way (refuses if State.CommittedBranch is
     // already set), and BranchTreeId must name a class branch tree this
     // character can actually spend in (Core's RequiredClass==None trees do
@@ -391,6 +402,12 @@ private:
     // to be rebuilt on a transition. Called from the tick; only recalculates
     // when the active set actually moved.
     void RefreshBuildConditions();
+    // The refund body both respecs share: clears the currency's ranks and
+    // refunds the running total into its wallet. Nothing else — each caller
+    // re-seeds, recalculates and broadcasts once, after its own clears (the
+    // Doctrine loadout and commitment in RespecAtForge), so a listener sees
+    // one changed state rather than two.
+    void ClearAndRefund(EBreakerPointCurrency Currency);
     int32 GetRefundValue(EBreakerPointCurrency Currency) const;
     const UBreakerProgressionNode* FindOwnedNodeDefinition(FName NodeId, EBreakerPointCurrency Currency) const;
     void CollectKnownNodes(TArray<const UBreakerProgressionNode*>& OutNodes, EBreakerPointCurrency Currency) const;

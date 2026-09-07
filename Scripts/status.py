@@ -206,25 +206,6 @@ def parse_nodes(lib_text):
                 node["cornerstone"] = True
         nodes.append(node)
 
-    # The ring's travel positions: BreakerMakeTravelTrio authors THREE
-    # mutually-exclusive sibling nodes per literal call — Weapon (+15% weapon),
-    # Ability (+15% ability), All (+6% shared). The helper is read BY NAME, so
-    # the trio picks are visible to every census here, carrying the exclusive
-    # group that lets the offered count below price a position at ONE point
-    # rather than three. Renaming the helper breaks this parse loudly (the
-    # node-count floor refuses), never silently.
-    TRAVEL_PICKS = (("Weapon", "WeaponDamage"), ("Ability", "AbilityDamage"), ("All", "Damage"))
-    for m in re.finditer(r'BreakerMakeTravelTrio\(Tree,\s*TEXT\("([^"]+)"\)\)', lib_text):
-        base = m.group(1)
-        i = line_of(m.start())
-        for suffix, target in TRAVEL_PICKS:
-            nodes.append({
-                "id": base + suffix, "tier": 1, "ranks": 1, "cost": 1,
-                "tree": tree_of(i), "line": i + 1,
-                "effects": [target], "tags": [], "cornerstone": False,
-                "conditions": [], "more": False, "exclusive": base,
-            })
-
     if len(nodes) < 100:
         raise ParseError(
             f"{LIB}: parsed only {len(nodes)} nodes. The MakeNode signature changed; "

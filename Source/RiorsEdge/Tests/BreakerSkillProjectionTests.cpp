@@ -107,13 +107,10 @@ bool FBreakerSkillProjectionPurchaseTest::RunTest(const FString& Parameters)
 
     FRig Rig = MakeRig();
     FText Reason;
-    // ATLAS SHAPE (Phase 4): every Core node is a single purchase, reached
-    // through the ring — entry at Sightline, the run to VOLLEY walked on
-    // Ability picks so the weapon-damage projection under test stays clean.
-    Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Precision.Sightline"), Reason);
-    Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Travel.Ring0P1Ability"), Reason);
-    Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Travel.Ring0P2Ability"), Reason);
-    Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Travel.Ring0P3Ability"), Reason);
+    // ATLAS SHAPE: every Core node is a single purchase, and VOLLEY is
+    // entered at its own rim 0 from the virtual hub (O211) — nothing is
+    // bought to reach it, so the weapon-damage projection under test starts
+    // from the live number with no path spend in it.
 
     const FBreakerSkillSnapshot Snapshot = BreakerSkillProjection::MakeSnapshot(Rig.Progression, Rig.Attributes);
     const TArray<FBreakerStatLine> OneRank = BreakerSkillProjection::ProjectPurchase(Snapshot, TEXT("Core.Volley.Cyclic"), 1);

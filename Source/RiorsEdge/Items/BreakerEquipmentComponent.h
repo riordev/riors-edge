@@ -193,6 +193,12 @@ public:
     // for a rolled grant (e.g. UBreakerDropTableLibrary::RollCurrencyDrop off
     // a kill). GrantForgeCurrency remains the flat-amount form.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment|Forge") void CreditForgeCurrency(const FBreakerForgeWallet& Yield);
+    // Debits a cost through the wallet's own atomic Spend: false and NOTHING
+    // taken when the wallet is short or this is not the authority. The one
+    // spend seam for a price that is not a Forge verb — the Core respec
+    // (O213) pays here — so a second wallet-debit rule cannot appear beside
+    // the Forge's.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment|Forge") bool SpendForgeCurrency(const FBreakerForgeCost& Cost);
     // Destroys a backpack item and pays its salvage value into the wallet. This
     // is the ONLY currency source, which is what gives the discard pile a
     // purpose it did not have: DiscardFromBackpack still exists and still pays
