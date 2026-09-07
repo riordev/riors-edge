@@ -147,9 +147,9 @@
 				"TickIntervalSeconds": 1,
 				"ZoneDamagePerTick": 0,
 				"FlatArmorReduction": 40,
-				"PoisonDamagePerTick": 5,
+				"PoisonDamagePerTick": 2.5,
 				"PoisonDuration": 4,
-				"PoisonTickInterval": 1,
+				"PoisonTickInterval": 0.5,
 				"MaximumRangeCm": 2500,
 				"HalfHeightCm": 250
 			},

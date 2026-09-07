@@ -96,7 +96,8 @@
     BREAKER_STRING(AbilitiesMove, "abilities.move", "") \
     BREAKER_STRING(SettingsAudioDescription, "settings.audio.description", "") \
     BREAKER_STRING(SettingsAudioTest, "settings.audio.test", "") \
-    BREAKER_STRING(SettingsAudioMusicUnavailable, "settings.audio.musicUnavailable", "")
+    BREAKER_STRING(SettingsAudioMusicUnavailable, "settings.audio.musicUnavailable", "") \
+    BREAKER_STRING(CoreOverviewHint, "core.overviewHint", "")
 
 // The enumerator is an index into the loaded table and nothing else: it is
 // never serialized, so the list may be reordered freely. The key string is

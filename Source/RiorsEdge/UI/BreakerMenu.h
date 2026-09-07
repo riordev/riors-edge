@@ -266,11 +266,6 @@ namespace BreakerInventoryLayout
     // the 1px ring on both sides, and 16px of interior pad on both sides.
     inline constexpr float CardChrome =
         BreakerUI::RailThickness + 2.0f * BreakerUI::BorderThin + 2.0f * BreakerUI::Space16;
-    // Line one's right-hand furniture: the item-level column, its gap, and the
-    // clearance the discard X needs in the overlay above the card.
-    inline constexpr float ItemLevelColumn = 56.0f;
-    inline constexpr float DiscardClearance = 22.0f;
-
     // THE RULE THIS SCREEN IS NOW HELD TO: a card is only worth drawing at a
     // width where the longest stat name fits on one line beside its delta.
     inline constexpr float MinAffixColumnWidth = LongestAffixNameChars * CaptionAdvance;
@@ -311,13 +306,10 @@ namespace BreakerInventoryLayout
         return FMath::Max(80.0f, CardContentWidth(CardWidth) - AffixTailWidth);
     }
 
-    // Where the item name on line one wraps: clear of the item level AND of the
-    // discard X floating over the card's top-right corner. The name collided
-    // with both before this existed.
+    // Metadata and discard occupy their own row; the title uses the full interior.
     inline float CardTitleWrapWidth(float CardWidth)
     {
-        return FMath::Max(64.0f,
-            CardContentWidth(CardWidth) - ItemLevelColumn - BreakerUI::Space8 - DiscardClearance);
+        return CardContentWidth(CardWidth);
     }
 
     // WEAR ORDER, and it is the reference's PROSE order: "head to foot, then

@@ -47,6 +47,8 @@ struct RIORSEDGE_API FBreakerZoneSpec
     // refreshes through the ordinary UBreakerStatusComponent rules, so a zone
     // does not need its own stacking policy.
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bAppliesStatus = false;
+    // Opt-in immediate application; damage still waits for the status tick clock.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bApplyStatusOnEntry = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FBreakerStatusApplicationSpec StatusSpec;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerDamageFamily StatusFamily = EBreakerDamageFamily::Physical;
 
@@ -183,6 +185,7 @@ protected:
 
 private:
     void DeliverTick();
+    void ApplyStatusToOccupant(AActor* Occupant) const;
     void UpdateMembership();
     void ApplyArmorStrip(AActor* Occupant) const;
     void ReleaseArmorStrip(AActor* Occupant) const;

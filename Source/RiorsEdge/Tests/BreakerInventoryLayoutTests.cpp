@@ -347,15 +347,11 @@ bool FBreakerInventoryLayoutReadabilityTest::RunTest(const FString& Parameters)
         }
     }
 
-    // LINE ONE MUST NOT COLLIDE. The title's wrap width has both the item-level
-    // column and the discard X's clearance subtracted out of it, so the name
-    // can never be arranged into the space either of them occupies — which is
-    // exactly what "GLOVES" running into "i50" and the red X was.
+    // The title has its own row; metadata and discard cannot consume its width.
     for (const float CardWidth : { MinReadableCardWidth, 300.0f, 348.0f, 460.0f })
     {
-        TestTrue(FString::Printf(TEXT("the title clears the level and the X at %.0f"), CardWidth),
-            CardTitleWrapWidth(CardWidth)
-                <= CardContentWidth(CardWidth) - ItemLevelColumn - DiscardClearance + 0.01f);
+        TestEqual(FString::Printf(TEXT("the title uses the full interior at %.0f"), CardWidth),
+            CardTitleWrapWidth(CardWidth), CardContentWidth(CardWidth));
         TestTrue(FString::Printf(TEXT("the title still has room to say something at %.0f"), CardWidth),
             CardTitleWrapWidth(CardWidth) > 0.0f);
     }

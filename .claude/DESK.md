@@ -92,6 +92,11 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 
 ## Done (last three cycles; older is git)
 
+### Connected Core, cooldown icons, Rot feedback and inventory headers — 581 / 5 / 0
+- [x] Core overview draws all117nodes171edges12entries in5sectors; focused constellations retain actual purchase handlers and clear paths. Opaque board, fitted overview, readable labels, accurate focused purchase count and unclipped Back. Graph geometry and hit targets tested; CORE/COREPRECISION captures inspected.
+- [x] Neutral ability tiles use glyph icons, clockwise radial recovery and numeric cooldown; plain DoT numbers brighter at20px. Forced half-cooldown capture inspected; existing preview banners are fixture content, not a completed gameplay run.
+- [x] Rot applies poison on entry and ticks2.5damage/.5s per stack, preserving5baseDPS while advancing initial feedback/stack ramp. Runtime entry/noinstantdamage/exit-tail test passes. Inventory separates level/discard row from full-width title; equipment refusal capture inspected.
+- [x] Final build clean; all586tests completed:581passed/5existing expected/0unexpected. PowerShell reconciliation under Python quarantine; STATE unchanged. Static captures do not establish hands-on feel or multiplayer correctness.
 ### Recovery, movement, Cleave/DoT reliability and audio routing — 578 / 5 / 0
 - [x] Living authority players recover 2 HP/s after four seconds without dealing/taking damage; no passive proc payouts. Real registered player tick, incoming interruption, dead/non-player exclusion and frame crossing tested. Sprint stride blends 360→720 cm, halving full-speed cadence while retaining walking. Dash entry and gear cooldown display are Swift-only; map reachability and client dash networking still need gameplay validation.
 - [x] Cleave no longer treats its target as an occluder; range 300→450 cm (O2). World tests cover actual enemy collision, intervening wall and out-of-range refusal. Statuses pay elapsed ticks only within lifetime, safely re-find after damage callbacks; zone lifetime and cylindrical broad-phase bounds corrected. Rot startup delay/feel and damage-number clarity remain queued.
@@ -104,8 +109,3 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - [x] Dialogue top-row/numpad choices share the mouse dispatcher and ignore key repeats. Vendor Escape returns to dialogue rather than the pause menu.
 - [x] New fire cancels sprint; new sprint cancels held fire, with a CanFire guard. Sprint travels with saved moves; correction replay preserves current intent without replaying weapon RPCs. Component tests cover both input orders and saved flags; real multiplayer corrections and dialogue key input still need hands-on validation.
 - [x] Build and suite pass, 576 declarations accounted for through the local PowerShell audit. A test-prefix collision was detected and corrected before accepting the full run. Python status generation remains unavailable under the machine rule; STATE is unchanged. One helper Python editing invocation violated that rule and was disclosed; subsequent work used PowerShell/apply_patch.
-
-### Equipment feedback and return to gameplay — 567 / 5 / 0
-- [x] Equipment requirements appear before a cap swap; inventory and swap confirmation report the component's actual refusal. `Items.Requirements.GateAtEntry` verifies level refusal, unchanged inventory, legal equipment, invalid swaps and stale items with owned progression components. Ten strings are table-backed.
-- [x] Menu resume retains the launch policy that delivers the first capture click to gameplay. Death/NPC mouse handoff still needs hands-on play; this is not a claim that every focus problem is fixed.
-- [x] `-BreakerCaptureMenu=INVENTORY -BreakerCaptureBoard=EQUIPREQUIREMENT` shows a seeded level-11 item and the real refusal at level 1; both 1920×1080 frames read. The empty default inventory required an added fixture and a second successful build/suite. All 572 declarations started and completed, reconciled through the machine-approved PowerShell port; Python remains quarantined, so generated STATE is unchanged.

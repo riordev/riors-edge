@@ -1195,8 +1195,8 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
         else if (Number->bFromDoT)
         {
             // A DoT tick that crits or lands a weak point keeps its accent
-            // above — those reads outrank the source. A plain tick recedes.
-            Face = BreakerUI::TextMuted;
+            // above — those reads outrank the source. Plain ticks stay legible.
+            Face = BreakerUI::TextSecondary;
             SizePixels = BreakerUI::DamageDoTPixels;
         }
 
@@ -2480,6 +2480,9 @@ void ABreakerPlaytestHUD::TickCapturePreview(const ABreakerCharacter* Character)
     PreviewReloadFraction = bPreviewReload ? FMath::Frac(static_cast<float>(Now) / 2.0f) : 0.0f;
     PreviewCooldownFraction = PreviewPhase == 2
         ? 0.25f + 0.5f * FMath::Frac(static_cast<float>(Now) / 2.0f) : 0.0f;
+    float ForcedCooldown = 0.0f;
+    if (FParse::Value(FCommandLine::Get(), TEXT("BreakerCaptureCooldown="), ForcedCooldown))
+        PreviewCooldownFraction = FMath::Clamp(ForcedCooldown, 0.0f, 1.0f);
     bPreviewLootPlate = PreviewPhase == 3;
     if (PreviewPhase == 1 && Now - SwapStartTime >= BreakerUI::HudWeaponSwapSeconds + 0.4f)
     {
@@ -2992,6 +2995,20 @@ void ABreakerPlaytestHUD::DrawTriangle(const FVector2D& A, const FVector2D& B, c
     Canvas->DrawItem(Item);
 }
 
+void ABreakerPlaytestHUD::DrawAbilityRecoveryDisc(const FVector2D& Center, float Radius, float Fraction, const FLinearColor& Color)
+{
+    constexpr int32 Segments = 64; // O2 PLACEHOLDER: smooth at the small HUD icon size.
+    const float Fill = FMath::Clamp(Fraction, 0.0f, 1.0f);
+    const int32 Count = FMath::CeilToInt(Fill * Segments);
+    for (int32 Index = 0; Index < Count; ++Index)
+    {
+        const float Start = static_cast<float>(Index) / Segments;
+        const float End = FMath::Min(static_cast<float>(Index + 1) / Segments, Fill);
+        DrawTriangle(Center, Center + BreakerHUDMath::AbilityRadialPoint(Start) * Radius,
+            Center + BreakerHUDMath::AbilityRadialPoint(End) * Radius, Color);
+    }
+}
+
 void ABreakerPlaytestHUD::DrawShearedBlock(float X, float Y, float Width, float Height, float Shear, const FLinearColor& Color)
 {
     const FVector2D TopLeft(X + Shear, Y);
@@ -3233,20 +3250,9 @@ void ABreakerPlaytestHUD::DrawAbilityGlyph(const UBreakerAbilityDefinition* Defi
 }
 
 // --------------------------------------------------------------------------
-// One ability tile, three states carried by fill and texture, never by
-// brightness (02-hud):
-//   READY     the whole tile in the verb colour; mark and key in bg-0.
-//   COOLDOWN  tile bg-1; a panel-2 block drains bottom-up, its height the
-//             remaining fraction; mark text-3, key text-2. NO DIGITS.
-//   LOCKED    hatch bg-2 / panel-0; rail and mark border-low; key text-4.
-// The ultimate charges the other way: its panel-2 block RISES as the
-// cooldown spends, read as 1 − Remaining/Duration off the same two values.
-// The component exposes no charge value of its own; if an ultimate ever
-// charges by something other than time, this line is what lies.
-//
-// Unaffordable is a state the sheet does not draw. The struck hex stays,
-// lower-centre on its own opaque chip, because a resource-gated cast that
-// looked READY would be a worse lie than an undrawn state.
+// Placeholder icons keep the ability glyph inside neutral tiles. Cooldowns
+// recover their icon color clockwise from twelve and show seconds remaining.
+// Locked and unaffordable slots remain gray; the latter keeps its resource mark.
 // --------------------------------------------------------------------------
 void ABreakerPlaytestHUD::DrawAbilitySlot(const ABreakerCharacter* Character, const UBreakerAbilityComponent* Abilities,
     EBreakerAbilitySlot Slot, const FString& KeyHint, float X, float Y, float Size, float MarkSize, const FLinearColor& Accent)
@@ -3267,39 +3273,20 @@ void ABreakerPlaytestHUD::DrawAbilitySlot(const ABreakerCharacter* Character, co
     const bool bReady = bGranted && !bOnCooldown && bAffordable;
     const UBreakerAbilityDefinition* Definition = bGranted ? Abilities->GetDefinitionForSlot(Slot) : nullptr;
 
-    // --- The tile ---------------------------------------------------------------
-    FLinearColor MarkColor = BreakerUI::TextMuted;
-    FLinearColor KeyColor = BreakerUI::TextSecondary;
-    if (!bGranted)
+    // Neutral tile, distinct placeholder glyph, and clockwise recovery color.
+    // Color belongs to the icon face; no status rail or colored outer border.
+    const FLinearColor MarkColor = bGranted ? BreakerUI::TextPrimary : BreakerUI::TextDisabled;
+    const FLinearColor KeyColor = bGranted ? BreakerUI::TextSecondary : BreakerUI::TextDisabled;
+    DrawRect(BreakerUI::BgBase, X, Y, Size, Size);
+    DrawBorder(X, Y, Size, Size, BreakerUI::BorderRest, S(BreakerUI::BorderThin));
+    const FVector2D IconCenter(X + Size * 0.5f, Y + Size * 0.43f);
+    const float IconRadius = Size * 0.30f; // O2 PLACEHOLDER: leaves key and countdown space.
+    DrawAbilityRecoveryDisc(IconCenter, IconRadius, 1.0f, BreakerUI::Panel20);
+    if (bGranted && (bReady || bOnCooldown))
     {
-        DrawHatch(X, Y, Size, Size, BreakerUI::BgRaised, BreakerUI::Panel00, BreakerUI::HudHatchPeriod, BreakerUI::HudHatchStripe);
-        MarkColor = BreakerUI::BorderRest;
-        KeyColor = BreakerUI::TextDisabled;
+        const float Recovery = bOnCooldown ? BreakerHUDMath::AbilityRecoveryFraction(Remaining, Duration) : 1.0f;
+        DrawAbilityRecoveryDisc(IconCenter, IconRadius, Recovery, BreakerUI::Alpha(Accent, 0.65f));
     }
-    else if (bReady)
-    {
-        DrawRect(Accent, X, Y, Size, Size);
-        MarkColor = BreakerUI::BgVoid;
-        KeyColor = BreakerUI::BgVoid;
-    }
-    else
-    {
-        DrawRect(BreakerUI::BgBase, X, Y, Size, Size);
-        if (bOnCooldown)
-        {
-            const float Drain = BreakerHUDMath::AbilityDrainHeight(Remaining, Duration, Size);
-            const float Block = bUltimate ? Size - Drain : Drain;
-            if (Block > 0.0f) DrawRect(BreakerUI::Panel20, X, Y + Size - Block, Size, Block);
-        }
-    }
-
-    // The rail along the top: 2 px status in the verb colour, 4 px identity
-    // in violet for the ultimate; border-low when locked. Invisible on READY
-    // because the tile already IS the colour.
-    const float Rail = S(bUltimate ? BreakerUI::HudRailIdentity : BreakerUI::HudRailStatus);
-    if (!bReady) DrawRect(bGranted ? Accent : BreakerUI::BorderRest, X, Y, Size, Rail);
-    DrawBorder(X, Y, Size, Size, BreakerUI::BorderEmphasis, S(BreakerUI::BorderThin));
-
     // Activation flash: the only feedback that fires for an ability which
     // changes no visible state, so it runs whatever else the tile shows.
     const int32 SlotIndex = static_cast<int32>(Slot);
@@ -3313,12 +3300,17 @@ void ABreakerPlaytestHUD::DrawAbilitySlot(const ABreakerCharacter* Character, co
         }
     }
 
-    // The mark, at the sheet's offset: (24, 28) in a 64 tile for a 16 mark,
-    // (32, 36) in the 88 for a 24 — centred, four pixels low. Drawn to the
-    // icon spec's construction notes; never a word.
-    const float MarkX = X + (Size - MarkSize) * 0.5f;
-    const float MarkY = Y + (Size - MarkSize) * 0.5f + S(BreakerUI::Space4);
-    DrawAbilityGlyph(Definition, MarkX + MarkSize * 0.5f, MarkY + MarkSize * 0.5f, MarkSize, MarkColor);
+    // Reuse the ability's distinct glyph as the placeholder icon.
+    const float IconMarkSize = FMath::Max(MarkSize, Size * 0.36f); // O2 PLACEHOLDER
+    DrawAbilityGlyph(Definition, IconCenter.X, IconCenter.Y, IconMarkSize, MarkColor);
+    if (bOnCooldown)
+    {
+        const FString Countdown = BreakerHUDMath::AbilityCooldownText(Remaining);
+        const float Pixels = bUltimate ? 16.0f : 14.0f; // O2 PLACEHOLDER
+        const FVector2D TextSize = MeasureSpecText(Countdown, Pixels);
+        DrawSpecText(Countdown, X + (Size - TextSize.X) * 0.5f, Y + Size - TextSize.Y - S(3.0f),
+            BreakerUI::TextPrimary, Pixels);
+    }
 
     // Unaffordable: the struck hex, lower-centre on its own opaque chip. No
     // sweep — nothing is filling, so waiting will not fix it.

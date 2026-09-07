@@ -339,7 +339,7 @@ namespace BreakerUI
     inline constexpr float DamageWeakPointPixels = 40.0f; // O207
     // DoT ticks sit BELOW the body size: they are bookkeeping, not an event,
     // and at body size a three-target Bleed drowned the gunfire it rode over.
-    inline constexpr float DamageDoTPixels = 16.0f;    // O2 PLACEHOLDER
+    inline constexpr float DamageDoTPixels = 20.0f;    // O2 PLACEHOLDER
     // Killing blows multiply whatever size their kind already earned: a kill
     // is the heaviest read of its own family, never a fourth colour.
     inline constexpr float DamageKillScale = 1.25f;    // O2 PLACEHOLDER

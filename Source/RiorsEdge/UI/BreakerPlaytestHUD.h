@@ -411,6 +411,7 @@ private:
         EBreakerRail RailEdge = EBreakerRail::Left, const FLinearColor& Face = FLinearColor::Transparent);
     void DrawBorder(float X, float Y, float Width, float Height, const FLinearColor& Color, float Thickness);
     void DrawTriangle(const FVector2D& A, const FVector2D& B, const FVector2D& C, const FLinearColor& Color);
+    void DrawAbilityRecoveryDisc(const FVector2D& Center, float Radius, float Fraction, const FLinearColor& Color);
     // Chevron-cut block: a rectangle sheared along its top edge. The momentum
     // track changes texture, not just colour, between states.
     void DrawShearedBlock(float X, float Y, float Width, float Height, float Shear, const FLinearColor& Color);

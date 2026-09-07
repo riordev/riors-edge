@@ -60,9 +60,9 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float FlatArmorReduction = 40.0f;
     // O2 PLACEHOLDER: the Poison payload. No doc supplies these. Per-tick
     // damage is the item-level-1 number and rides the weapon scalar (O35).
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float PoisonDamagePerTick = 5.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float PoisonDamagePerTick = 2.5f;   // O2 PLACEHOLDER
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float PoisonDuration = 4.0f;   // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0.05")) float PoisonTickInterval = 1.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0.05")) float PoisonTickInterval = 0.5f;
     // How far out the puddle can be placed. O2 PLACEHOLDER.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float MaximumRangeCm = 2500.0f;
     // Vertical reach of the volume; see FBreakerZoneSpec::HalfHeightCm.

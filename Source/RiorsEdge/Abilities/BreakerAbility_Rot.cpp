@@ -118,6 +118,7 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     // Poison from a Rot cast inside a damage window keeps that strength for
     // its whole life, and a window opened later changes nothing.
     Spec.bAppliesStatus = true;
+    Spec.bApplyStatusOnEntry = true;
     Spec.StatusFamily = EBreakerDamageFamily::Physical;
     Spec.StatusSpec.StatusTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Poison"), false);
     // O35: the authored per-tick number is the item-level-1 value.

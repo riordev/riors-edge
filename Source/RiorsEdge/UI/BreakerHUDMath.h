@@ -27,6 +27,25 @@
 // ---------------------------------------------------------------------------
 namespace BreakerHUDMath
 {
+    inline float AbilityRecoveryFraction(float Remaining, float Duration)
+    {
+        return Duration > UE_SMALL_NUMBER ? 1.0f - FMath::Clamp(Remaining / Duration, 0.0f, 1.0f) : 1.0f;
+    }
+
+    // Screen coordinates: twelve o'clock first, then clockwise.
+    inline FVector2D AbilityRadialPoint(float Fraction)
+    {
+        const float Angle = FMath::Clamp(Fraction, 0.0f, 1.0f) * 2.0f * UE_PI - UE_HALF_PI;
+        return FVector2D(FMath::Cos(Angle), FMath::Sin(Angle));
+    }
+
+    inline FString AbilityCooldownText(float Remaining)
+    {
+        if (Remaining <= 0.0f) return FString();
+        if (Remaining >= 10.0f) return FString::FromInt(FMath::CeilToInt(Remaining));
+        // Round up so an active cooldown never says zero.
+        return FString::Printf(TEXT("%.1f"), FMath::CeilToFloat(Remaining * 10.0f) / 10.0f);
+    }
     // --- Crosshair ----------------------------------------------------------
     // The gap the ticks are heading for, from the weapon's honest cone. Rest
     // at zero spread, fully open at HudCrosshairFullSpreadDegrees, linear

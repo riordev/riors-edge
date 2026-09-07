@@ -1,6 +1,7 @@
 #include "Misc/AutomationTest.h"
 #include "Misc/ScopeExit.h"
 #include "Abilities/BreakerAbility_Cleave.h"
+#include "Abilities/BreakerAbility_Rot.h"
 #include "Abilities/BreakerMeleeSweep.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Combat/BreakerCombatComponent.h"
@@ -145,4 +146,44 @@ bool FBreakerZoneLifetimeAndBoundsTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerRotEntryPoisonTest,
+    "RiorsEdge.Abilities.RotEntryPoison", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerRotEntryPoisonTest::RunTest(const FString& Parameters)
+{
+    UWorld* World = BreakerTargetingWorld();
+    if (!TestNotNull(TEXT("Rot world"), World)) return false;
+    ON_SCOPE_EXIT { World->DestroyWorld(false); };
+    const UBreakerAbility_Rot* Rot = GetDefault<UBreakerAbility_Rot>();
+    TestEqual(TEXT("Poison retains five base damage per second per stack"), Rot->PoisonDamagePerTick / Rot->PoisonTickInterval, 5.0f);
+    TestEqual(TEXT("Poison now ticks every half second"), Rot->PoisonTickInterval, 0.5f);
+    FBreakerDamageSubject Target = BreakerMakeDamageSubject(World, FVector(100, 0, 0));
+    ABreakerZoneActor* Zone = World->SpawnActor<ABreakerZoneActor>();
+    FBreakerZoneSpec Spec;
+    TestFalse(TEXT("Other zones retain delayed application unless opted in"), Spec.bApplyStatusOnEntry);
+    Spec.bAppliesStatus = true;
+    Spec.bApplyStatusOnEntry = true;
+    Spec.Duration = Rot->DurationSeconds;
+    Spec.TickInterval = Rot->TickIntervalSeconds;
+    Spec.StatusSpec.StatusTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Poison"));
+    Spec.StatusSpec.BaseDamagePerTick = Rot->PoisonDamagePerTick;
+    Spec.StatusSpec.Duration = Rot->PoisonDuration;
+    Spec.StatusSpec.TickInterval = Rot->PoisonTickInterval;
+    Zone->ConfigureZone(Spec, nullptr);
+    if (!TestTrue(TEXT("Placement immediately applies poison to an occupant"), Target.Status->HasStatus(Spec.StatusSpec.StatusTag))) return false;
+    TestEqual(TEXT("Application does not deal an instant extra hit"), Target.Attributes->GetHealth(), 100.0f);
+    for (int32 Frame = 0; Frame < 4; ++Frame) Zone->AdvanceZone(0.1f);
+    TestEqual(TEXT("Membership scans do not add stacks every frame"), Target.Status->GetActiveStatuses()[0].Stacks, 1);
+    Target.Status->AdvanceStatuses(0.25f);
+    TestEqual(TEXT("First damage respects the poison clock"), Target.Attributes->GetHealth(), 100.0f);
+    Target.Status->AdvanceStatuses(0.25f);
+    TestTrue(TEXT("Damage arrives by half a second instead of two seconds"), Target.Attributes->GetHealth() < 100.0f);
+    const float AfterFirstTick = Target.Attributes->GetHealth();
+    Target.Actor->SetActorLocation(FVector(2000, 0, 0));
+    Zone->AdvanceZone(0.1f);
+    TestEqual(TEXT("Leaving releases zone occupancy"), Zone->GetOccupantCount(), 0);
+    Target.Status->AdvanceStatuses(0.5f);
+    TestTrue(TEXT("Brief contact leaves the ordinary poison tail"), Target.Attributes->GetHealth() < AfterFirstTick);
+    return true;
+}
 #endif

@@ -112,6 +112,7 @@ void ABreakerZoneActor::ConfigureZone(const FBreakerZoneSpec& InSpec, AActor* In
     // spec is not a footprint anyone chose, and automation constructs zones
     // with no world for the renderer to live in.
     if (GetWorld()) SubmitRimEffect();
+    if (Spec.bApplyStatusOnEntry && RemainingDuration > 0.0f) UpdateMembership();
 }
 
 void ABreakerZoneActor::RefreshDuration(float NewDuration)
@@ -216,6 +217,7 @@ void ABreakerZoneActor::UpdateMembership()
         if (bAlready) continue;
         Occupants.Add(Candidate);
         ApplyArmorStrip(Candidate);
+        if (Spec.bApplyStatusOnEntry && (RemainingDuration > 0.0f || bExpiryPaused)) ApplyStatusToOccupant(Candidate);
         OnOccupantEntered.Broadcast(Candidate);
     }
 }
@@ -273,17 +275,19 @@ void ABreakerZoneActor::DeliverTick()
             Combat->ReceiveDamage(Request);
         }
 
-        if (Spec.bAppliesStatus && Spec.StatusSpec.Duration > 0.0f)
-        {
-            if (UBreakerStatusComponent* Status = Occupant->FindComponentByClass<UBreakerStatusComponent>())
-            {
-                Status->ApplyStatus(Spec.StatusSpec, Spec.StatusFamily, Caster);
-            }
-        }
+        ApplyStatusToOccupant(Occupant);
         ++OccupantIndex;
     }
 }
 
+void ABreakerZoneActor::ApplyStatusToOccupant(AActor* Occupant) const
+{
+    if (!IsValid(Occupant) || !Spec.bAppliesStatus || Spec.StatusSpec.Duration <= 0.0f) return;
+    if (UBreakerStatusComponent* Status = Occupant->FindComponentByClass<UBreakerStatusComponent>())
+    {
+        Status->ApplyStatus(Spec.StatusSpec, Spec.StatusFamily, ZoneInstigator.Get());
+    }
+}
 FName ABreakerZoneActor::ArmorKey() const
 {
     // Keyed by TAG, deliberately not by instance: two overlapping Rots must
