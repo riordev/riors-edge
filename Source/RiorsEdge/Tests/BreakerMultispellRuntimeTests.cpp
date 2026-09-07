@@ -162,23 +162,54 @@ bool FBreakerMultispellPurchasedRuntimeTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("positions have distinct status identities"), Carried[0].Spec.StatusTag != Carried[1].Spec.StatusTag);
     HitProjectile(Double, Target);
     TestEqual(TEXT("both statuses reach the real target"), Status->GetDistinctStatusTypeCount(), 2);
+    const FGameplayTag RotTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"));
+    auto EarnRot = [&]()
+    {
+        FBreakerDamageRequest ApplyingHit;
+        ApplyingHit.BaseDamage = Status->GetEntropyThreshold();
+        ApplyingHit.DamageFamily = EBreakerDamageFamily::Elemental;
+        ApplyingHit.Element = EBreakerElement::Entropy;
+        ApplyingHit.ElementalFraction = 1;
+        ApplyingHit.bCanCritical = false;
+        ApplyingHit.SetInstigator(Caster);
+        const auto Result = Combat->ReceiveDamage(ApplyingHit);
+        TestTrue(TEXT("real applying hit pays health damage"), Result.HealthDamage > 0);
+        return TestTrue(TEXT("accepted Entropy hit earns real Rot"), Status->HasStatus(RotTag));
+    };
+    if (!EarnRot()) return false;
     Caster->GetAttributes()->ApplyClassResource(100.0f);
     const float BeforeBurst = Attributes->GetHealth();
     TestTrue(TEXT("baseline Resonance activates"), ASC->TryActivateAbility(Resonance));
     TestEqual(TEXT("baseline consumes statuses"), Status->GetDistinctStatusTypeCount(), 0);
     TestTrue(TEXT("baseline burst deals damage"), Attributes->GetHealth() < BeforeBurst);
+    const float BaselineDetonationDamage = BeforeBurst - Attributes->GetHealth();
+    TestFalse(TEXT("normal consumption removes earned Rot"), Status->HasStatus(RotTag));
+    const float AfterConsumption = Attributes->GetHealth();
+    Status->AdvanceStatuses(10);
+    TestEqual(TEXT("consumed Rot has no deferred payment"), Attributes->GetHealth(), AfterConsumption);
 
     if (!Buy(TEXT("Caster.Multispell.Payment")) || !Buy(TEXT("Caster.Multispell.Resonance"))) return false;
     for (const FBreakerCarriedStatus& Entry : Carried) Status->ApplyStatus(Entry.Spec, Entry.DamageFamily, Caster);
     if (!TestEqual(TEXT("both statuses reapplied before rewrite"), Status->GetActiveStatuses().Num(), 2)) return false;
+    if (!EarnRot()) return false;
+    const auto* RotBefore = Status->GetActiveStatuses().FindByPredicate([RotTag](const auto& Active) { return Active.Spec.StatusTag == RotTag; });
+    if (!RotBefore) return false;
+    const float RotDurationBefore = RotBefore->RemainingDuration;
+    const float RotBudgetBefore = RotBefore->UnpaidDamageBudget;
     const float DurationBefore = Status->GetActiveStatuses()[0].RemainingDuration;
     Caster->GetAttributes()->ApplyClassResource(100.0f);
     const float BeforeRewriteBurst = Attributes->GetHealth();
     TestTrue(TEXT("purchased Resonance activates"), ASC->TryActivateAbility(Resonance));
-    if (!TestEqual(TEXT("purchased Resonance preserves both types"), Status->GetDistinctStatusTypeCount(), 2)) return false;
+    if (!TestEqual(TEXT("purchased Resonance preserves physical types and earned Rot"), Status->GetDistinctStatusTypeCount(), 3)) return false;
     TestEqual(TEXT("surviving status duration is halved"), Status->GetActiveStatuses()[0].RemainingDuration, DurationBefore * 0.5f);
     TestEqual(TEXT("rewrite retains the same detonation damage"), BeforeRewriteBurst - Attributes->GetHealth(),
-        BeforeBurst - BeforeRewriteBurst, 0.01f);
+        BaselineDetonationDamage, 0.01f);
+    const auto* RotAfter = Status->GetActiveStatuses().FindByPredicate([RotTag](const auto& Active) { return Active.Spec.StatusTag == RotTag; });
+    if (!TestNotNull(TEXT("preserved Rot is not consumed by Wither"), RotAfter)) return false;
+    TestEqual(TEXT("earned Rot duration is halved"), RotAfter->RemainingDuration, RotDurationBefore * .5f);
+    TestEqual(TEXT("earned Rot keeps only half its scheduled budget"), RotAfter->UnpaidDamageBudget, RotBudgetBefore * .5f);
+    TestEqual(TEXT("untyped detonation adds no Void buildup"), Status->GetVoidBuildup(), 0.0f);
+    TestFalse(TEXT("untyped detonation cannot fabricate Erased"), Status->HasStatus(FGameplayTag::RequestGameplayTag(TEXT("Status.Erased"))));
     if (!Buy(TEXT("Caster.Multispell.Cycle"))) return false;
     TestTrue(TEXT("Second purchased Cycle rank immediately enables next-status preview"), Cycle->CanPreviewAhead());
     const FGameplayTag Predicted = Cycle->PeekNext(1);

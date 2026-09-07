@@ -99,6 +99,10 @@ Damage and membership continue. That window ending, owner death or loss of
 the keystone releases the pause; later ultimates cannot rearm an old zone.
 Refreshing a zone placed before the window does not acquire this pause.
 
+Resonance deals an untyped Elemental detonation based on status count. It does
+not apply elemental buildup or reactions. Its preservation node halves status
+durations instead of consuming them; this also reduces unpaid Rot damage.
+
 ### The five loops
 
 | Class | Resource | Shape | Spends on |

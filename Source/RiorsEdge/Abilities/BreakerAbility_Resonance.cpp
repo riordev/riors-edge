@@ -117,11 +117,10 @@ void UBreakerAbility_Resonance::ActivateAbility(const FGameplayAbilitySpecHandle
     {
         FBreakerDamageRequest Damage;
         Damage.BaseDamage = BaseDamage;
-        // O5: Elemental stays the pipeline family until the resistance model
-        // lands; Void is carried on the type tag so nothing needs rewriting
-        // when Rift/Entropy/Void resistances arrive.
+        // This count-based detonation is untyped Elemental damage. It does not
+        // apply Void: MS8 preserves and shortens Rot, rather than consuming it
+        // through a Wither reaction after the duration rewrite.
         Damage.DamageFamily = EBreakerDamageFamily::Elemental;
-        Damage.DamageTypeTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Void"), false);
         Damage.SourceTags.AddTag(BreakerAbilityTags::Ability_Class_Caster_Resonance.GetTag());
         Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
         Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;

@@ -2412,7 +2412,11 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
         // The first hit's bleed seeds from the raw pellet sequence value —
         // exactly the material the pre-channel code used, so an unchannelled
         // build's bleed rolls do not move either.
-        ApplyBleedOnHit(Definition, HitActor, SourceAttributes, LevelScalar, EnemiesStruck == 0 ? PelletSeed : DamageSeed);
+        const bool bAcceptedStatusHit = !HitDamage.bDodged && !HitDamage.bParried
+            && !HitDamage.bKilled && !TargetCombat->IsDead()
+            && HitDamage.HealthDamage + HitDamage.ShieldDamage > 0.0f;
+        if (bAcceptedStatusHit)
+            ApplyBleedOnHit(Definition, HitActor, SourceAttributes, LevelScalar, EnemiesStruck == 0 ? PelletSeed : DamageSeed);
 
         // SPREAD ON PIERCE (KIT-3; O186; combat.md's proc coefficient law).
         // Declared crossing Weapons -> Combat: the weapon reads the target's
@@ -2430,7 +2434,7 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
         // and ApplyStatus then scales Duration by the applier's StatusDuration
         // lane at the door, so a build with that lane pays it twice on a
         // spread copy. The door is Combat's; the fold-in belongs there.
-        if (EnemiesStruck == 0)
+        if (EnemiesStruck == 0 && bAcceptedStatusHit)
         {
             if (const UBreakerStatusComponent* FirstBodyStatus = HitActor->FindComponentByClass<UBreakerStatusComponent>())
             {
@@ -2443,7 +2447,7 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
                 }
             }
         }
-        else if (!bRicochetLeg && !PierceSpreadSpecs.IsEmpty())
+        else if (EnemiesStruck > 0 && bAcceptedStatusHit && !bRicochetLeg && !PierceSpreadSpecs.IsEmpty())
         {
             if (UBreakerStatusComponent* PiercedStatus = HitActor->FindComponentByClass<UBreakerStatusComponent>())
             {
@@ -2509,7 +2513,9 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
             Shot.DamageResult.bCritical |= ArcDamage.bCritical;
             Shot.DamageResult.bShieldBroken |= ArcDamage.bShieldBroken;
             Shot.DamageResult.bKilled |= ArcDamage.bKilled;
-            ApplyBleedOnHit(Definition, Target, SourceAttributes, LevelScalar, ArcSeed);
+            if (!ArcDamage.bDodged && !ArcDamage.bParried && !ArcDamage.bKilled
+                && !TargetCombat->IsDead() && ArcDamage.HealthDamage + ArcDamage.ShieldDamage > 0.0f)
+                ApplyBleedOnHit(Definition, Target, SourceAttributes, LevelScalar, ArcSeed);
 
             StruckActors.Add(Target);
             ArcOrigin = ArcImpact;

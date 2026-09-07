@@ -9,10 +9,10 @@ Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 - [x] Repair Cascade silent echoes and cancel queued echoes when its originating ultimate ends; include targets spawned during the window.
 - [x] Implement Long Dark's zone-expiry pause during its originating Unmake window; actual purchased/paid casts retain damage and membership and release on expiry, cancel, death and respec without later rearming.
 - [ ] Finish explicit Caster elemental cycle delivery without duplicating a hit or bypassing proc safeguards; resolve Resonance delivery.
-- [ ] Audit remaining live silent nodes and validate reachable purchased behavior.
+- [ ] Replace Hold's percentage substitute with its actual per-hit cap, then finish remaining live node gaps.
 - [ ] Finish ability-versus-weapon balance with sustained actual delivery; retain existing parity findings until their conditions are resolved.
 - [x] Repair Cleave wall-only occlusion and reject Bleed on avoided/lethal hits; actual paid casts cover aligned enemies, wall, dodge, purchased parry and lethal melee income.
-- [ ] Repair hitscan Bleed and pierce status payloads on avoided hits; validate scoped/unscoped and remaining combat feedback.
+- [x] Reject hitscan Bleed and pierce Poison payloads on avoided hits; actual purchased Threshold/Pierce/Chain and paid shots preserve accepted originals/copies. Live aim checks confirm stationary first-shot accuracy, increased moving-ADS spread, movement cost and release recovery.
 
 ## Completed element implementation (steps 1–2, O221–O225)
 - [x] Add explicit element identity, accepted-hit buildup and chassis-scaled thresholds; Entropy applies Rot with damage snapshotted from the applying hit.
@@ -44,7 +44,7 @@ The owner will playtest after the remaining Entropy pass is finished. Continue i
 - (visuals, sound, enemies) Improve arms and weapon models, integrate weakpoints, add subtle enemy names, and make one weapon/ability/enemy/boss visually polished. Add audible combat feedback. Replace colored ability borders with placeholder icons, radial cooldown recovery and numeric timers; hide irrelevant Riftglass. Smooth the death screen and mouse handoff.
 
 ## Repair dependencies found in runtime review
-- Step3: Resonance still labels its independent detonation with retired Status.Void while Element is None; define its actual elemental delivery alongside Caster cycle/echo repairs. Tank incoming resource now uses the actual hit proc coefficient, including proc-zero reactions.
+- Resonance is an untyped Elemental status-count detonation; its purchased preservation keeps earned Rot at half remaining duration/budget without triggering Wither. Tank incoming resource uses the actual hit proc coefficient, including proc-zero reactions.
 - Step3: two-position Fracture currently overwrites adjacent element selections; Cascade draws the next physical status and skips elemental buildup entries. Finish explicit split-budget delivery without duplicating direct damage or bypassing zero-proc safeguards before adding elemental cycle positions.
 - Support Attunement and Sympathetic deliver Entropy through actual maintained buffs; Void/Rift choices wait for their element pipelines. Tank Kinetic Recovery consumes actual owned blast landings and protects against real fall harm and stagger.
 - Doctrine progression now has all four authored benchmarks across three acts and pays 8/8 through the physical finale at level50. The real mission probe verifies actions/reloads but uses an explicit XP fixture at the final gate; normal campaign leveling pace remains unvalidated.
