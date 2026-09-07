@@ -212,6 +212,7 @@ public:
     // Every magnitude here is O2 PLACEHOLDER and none has been walked.
     UFUNCTION(BlueprintPure, Category="Waves")
     static FBreakerWaveBudgetParams MakeRiftWaveBudget(int32 BossWave);
+    static FBreakerWaveBudgetParams MakeBreachWaveBudget();
 
     UFUNCTION(BlueprintPure, Category="Waves") static int32 GetWaveBudget(int32 Wave, const FBreakerWaveBudgetParams& Params);
     UFUNCTION(BlueprintPure, Category="Waves") static EBreakerWaveKind GetWaveKind(int32 Wave, const FBreakerWaveBudgetParams& Params);

@@ -747,9 +747,328 @@
 							"action": "None"
 						}
 					]
+				},
+				{
+					"nodeId": "AlteredContactLead",
+					"speakerLine": "New contact at the Fernhall rail trench. One, moving badly. The patrol says it does not look like the others. Get eyes on it before anything else comes through.",
+					"requiredFlags": [
+						"Quest.Deeper.TurnedIn"
+					],
+					"blockedByFlags": [
+						"Quest.AlteredContact.Accepted"
+					],
+					"choices": [
+						{
+							"text": "Show me the assignment.",
+							"nextNodeId": "AlteredContactOffer",
+							"setsQuestFlag": "Quest.AlteredContact.Offered",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] Later.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "AlteredContactOffer",
+					"speakerLine": "Past the rail span, in the trench. One contact. Find out what we are dealing with, then bring the report back yourself.",
+					"requiredFlags": [
+						"Quest.Deeper.TurnedIn"
+					],
+					"blockedByFlags": [
+						"Quest.AlteredContact.Accepted"
+					],
+					"choices": [
+						{
+							"text": "I will investigate.",
+							"nextNodeId": "",
+							"setsQuestFlag": "Quest.AlteredContact.Accepted",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] Later.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "AlteredContactProgress",
+					"speakerLine": "The rail trench. I need the contact accounted for, not another count from the spill.",
+					"requiredFlags": [
+						"Quest.AlteredContact.Accepted"
+					],
+					"blockedByFlags": [
+						"Quest.AlteredContact.ContactDown"
+					],
+					"choices": [
+						{
+							"text": "[Leave] Later.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "AlteredContactTurnIn",
+					"speakerLine": "A uniform. Rank markings, repairs. Not ours. ...No, I do not have an explanation ready. Leave the details in the report. Every one of them.",
+					"requiredFlags": [
+						"Quest.AlteredContact.Accepted",
+						"Quest.AlteredContact.ContactDown"
+					],
+					"blockedByFlags": [
+						"Quest.AlteredContact.TurnedIn"
+					],
+					"choices": [
+						{
+							"text": "It was wounded. It still came at me.",
+							"nextNodeId": "",
+							"setsQuestFlag": "Quest.AlteredContact.TurnedIn",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] Later.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "BreachLead",
+					"speakerLine": "The opening beyond the rail trench is holding steady. More shapes on the other side, moving together. That contact came from somewhere. We need to see where.",
+					"requiredFlags": [
+						"Quest.AlteredContact.TurnedIn"
+					],
+					"blockedByFlags": [
+						"Quest.Breach.Accepted"
+					],
+					"choices": [
+						{
+							"text": "Give me the route.",
+							"nextNodeId": "BreachOffer",
+							"setsQuestFlag": "Quest.Breach.Offered",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] Later.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "BreachOffer",
+					"speakerLine": "Take the Breach door beyond the rail trench. Clear a way through the marshalling ground and put its commander down. Then come back. We are done calling this weather.",
+					"requiredFlags": [
+						"Quest.AlteredContact.TurnedIn"
+					],
+					"blockedByFlags": [
+						"Quest.Breach.Accepted"
+					],
+					"choices": [
+						{
+							"text": "I am going in.",
+							"nextNodeId": "",
+							"setsQuestFlag": "Quest.Breach.Accepted",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] Later.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "BreachProgress",
+					"speakerLine": "The Breach, beyond the rail trench. Its commander is the objective. Clearing another local rift will not do this job.",
+					"requiredFlags": [
+						"Quest.Breach.Accepted"
+					],
+					"blockedByFlags": [
+						"Quest.Breach.MarshalDown"
+					],
+					"choices": [
+						{
+							"text": "[Leave] Later.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "BreachTurnIn",
+					"speakerLine": "A field commander. Positions, signals, orders. Somebody on the other side knows how a fight works. Your report goes up intact. Your requisition is here; take it before they find another commander.",
+					"requiredFlags": [
+						"Quest.Breach.Accepted",
+						"Quest.Breach.MarshalDown"
+					],
+					"blockedByFlags": [
+						"Quest.Breach.TurnedIn"
+					],
+					"choices": [
+						{
+							"text": "The marshalling ground is clear.",
+							"nextNodeId": "",
+							"setsQuestFlag": "Quest.Breach.TurnedIn",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] Later.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "BreachDone",
+					"speakerLine": "The Breach is open for another sweep if you need one. You already earned the requisition. For now, restock and make something of what you learned.",
+					"requiredFlags": [
+						"Quest.Breach.TurnedIn"
+					],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "Show me the regular board.",
+							"nextNodeId": "Start",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] Later.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
 				}
 			],
 			"entries": [
+				{
+					"startNodeId": "BreachDone",
+					"requiredFlags": [
+						"Quest.Breach.TurnedIn"
+					],
+					"blockedByFlags": []
+				},
+				{
+					"startNodeId": "BreachTurnIn",
+					"requiredFlags": [
+						"Quest.Breach.Accepted",
+						"Quest.Breach.MarshalDown"
+					],
+					"blockedByFlags": [
+						"Quest.Breach.TurnedIn"
+					]
+				},
+				{
+					"startNodeId": "BreachProgress",
+					"requiredFlags": [
+						"Quest.Breach.Accepted"
+					],
+					"blockedByFlags": [
+						"Quest.Breach.MarshalDown"
+					]
+				},
+				{
+					"startNodeId": "BreachOffer",
+					"requiredFlags": [
+						"Quest.AlteredContact.TurnedIn",
+						"Quest.Breach.Offered"
+					],
+					"blockedByFlags": [
+						"Quest.Breach.Accepted"
+					]
+				},
+				{
+					"startNodeId": "BreachLead",
+					"requiredFlags": [
+						"Quest.AlteredContact.TurnedIn"
+					],
+					"blockedByFlags": [
+						"Quest.Breach.Offered"
+					]
+				},
+				{
+					"startNodeId": "AlteredContactTurnIn",
+					"requiredFlags": [
+						"Quest.AlteredContact.Accepted",
+						"Quest.AlteredContact.ContactDown"
+					],
+					"blockedByFlags": [
+						"Quest.AlteredContact.TurnedIn"
+					]
+				},
+				{
+					"startNodeId": "AlteredContactProgress",
+					"requiredFlags": [
+						"Quest.AlteredContact.Accepted"
+					],
+					"blockedByFlags": [
+						"Quest.AlteredContact.ContactDown"
+					]
+				},
+				{
+					"startNodeId": "AlteredContactOffer",
+					"requiredFlags": [
+						"Quest.Deeper.TurnedIn",
+						"Quest.AlteredContact.Offered"
+					],
+					"blockedByFlags": [
+						"Quest.AlteredContact.Accepted"
+					]
+				},
+				{
+					"startNodeId": "AlteredContactLead",
+					"requiredFlags": [
+						"Quest.Deeper.TurnedIn"
+					],
+					"blockedByFlags": [
+						"Quest.AlteredContact.Offered"
+					]
+				},
 				{
 					"startNodeId": "DeeperDone",
 					"requiredFlags": [

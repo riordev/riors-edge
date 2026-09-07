@@ -19,6 +19,12 @@ private:
     bool TickProbe(float DeltaSeconds);
     bool Finish(bool bPassed, const TCHAR* Reason);
     bool SelectTravel(class ABreakerCharacter* Player, FName Destination);
+    bool TickActTwo(class ABreakerCharacter* Player, class ABreakerGameMode* Mode);
+    bool SelectDialogueFlag(class ABreakerCharacter* Player, FName Flag);
+    bool bActTwo = false;
+    bool bSawMarshal = false;
+    int32 BreachMaximumWave = 0;
+    FName LastCampaignBeat;
     FTSTicker::FDelegateHandle Ticker;
     TWeakObjectPtr<UWorld> DepartedWorld;
     double StartedAt = 0;
@@ -31,4 +37,8 @@ private:
     int32 GlassBeforePurse = 0;
     bool bWatchingCompletion = false;
     bool bSawHoldfast = false;
+    bool bContactPhotoTaken = false;
+    bool bMarshalPhotoTaken = false;
+    int32 PhotoDelay = 0;
+    FString PendingPhoto;
 };

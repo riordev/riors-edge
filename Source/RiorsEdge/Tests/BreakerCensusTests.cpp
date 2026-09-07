@@ -157,7 +157,7 @@ bool FBreakerQuestsFreshTest::RunTest(const FString& Parameters)
     const TArray<FBreakerQuestDefinition>& Quests = UBreakerQuestLibrary::GetFallbackQuests();
     const TArray<FName>& Flags = UBreakerQuestLibrary::GetRegisteredFlags();
 
-    TestEqual(TEXT("The Act I chain is four quests"), Quests.Num(), 4);
+    TestEqual(TEXT("Act I and Act II author six quests"), Quests.Num(), 6);
     const TArray<FName> ChainOrder = { TEXT("Quest.FirstContract"), TEXT("Quest.KessSalvage"), TEXT("Quest.Pattern"), TEXT("Quest.Deeper") };
     for (int32 Index = 0; Index < ChainOrder.Num() && Index < Quests.Num(); ++Index)
     {
@@ -165,8 +165,8 @@ bool FBreakerQuestsFreshTest::RunTest(const FString& Parameters)
     }
     int32 ObjectiveCount = 0;
     for (const FBreakerQuestDefinition& Quest : Quests) { ObjectiveCount += Quest.Objectives.Num(); }
-    TestEqual(TEXT("Five objectives across the chain"), ObjectiveCount, 5);
-    TestEqual(TEXT("Twenty registered flags"), Flags.Num(), 20);
+    TestEqual(TEXT("Seven objectives across both chapters"), ObjectiveCount, 7);
+    TestEqual(TEXT("Twenty-eight registered flags"), Flags.Num(), 28);
     TestTrue(TEXT("A quest flag is registered"), UBreakerQuestLibrary::IsRegisteredFlag(BreakerQuestFlags::FirstContractTurnedIn));
     TestFalse(TEXT("A progress counter is not a registered flag"), UBreakerQuestLibrary::IsRegisteredFlag(BreakerQuestFlags::FirstContractKillCounter));
     AddInfo(FString::Printf(TEXT("Quest registry: %d quests, %d objectives, %d flags"), Quests.Num(), ObjectiveCount, Flags.Num()));
@@ -227,8 +227,8 @@ bool FBreakerDialogueFreshTest::RunTest(const FString& Parameters)
     }
     TestEqual(TEXT("Kess has ten nodes"), Kess->Nodes.Num(), 10);
     TestEqual(TEXT("Kess has three entries"), Kess->Entries.Num(), 3);
-    TestEqual(TEXT("The Quartermaster has fourteen nodes"), Quartermaster->Nodes.Num(), 14);
-    TestEqual(TEXT("The Quartermaster has six entries"), Quartermaster->Entries.Num(), 6);
+    TestEqual(TEXT("The Quartermaster has twenty-three nodes"), Quartermaster->Nodes.Num(), 23);
+    TestEqual(TEXT("The Quartermaster has fifteen entries"), Quartermaster->Entries.Num(), 15);
 
     int32 NodeCount = 0;
     int32 ChoiceCount = 0;
@@ -239,9 +239,9 @@ bool FBreakerDialogueFreshTest::RunTest(const FString& Parameters)
         EntryCount += Row.Entries.Num();
         for (const FBreakerDialogueNode& Node : Row.Nodes) { ChoiceCount += Node.Choices.Num(); }
     }
-    TestEqual(TEXT("Twenty-four nodes"), NodeCount, 24);
-    TestEqual(TEXT("Fifty-nine choices"), ChoiceCount, 59);
-    TestEqual(TEXT("Nine entries"), EntryCount, 9);
+    TestEqual(TEXT("Thirty-three nodes"), NodeCount, 33);
+    TestEqual(TEXT("Seventy-five choices"), ChoiceCount, 75);
+    TestEqual(TEXT("Eighteen entries"), EntryCount, 18);
     AddInfo(FString::Printf(TEXT("Dialogue: %d npcs, %d nodes, %d choices, %d entries"), Data.Npcs.Num(), NodeCount, ChoiceCount, EntryCount));
 
     const FString Fresh = BreakerCensus::ExportDialogue(Data);
@@ -294,13 +294,15 @@ bool FBreakerMissionsFreshTest::RunTest(const FString& Parameters)
     const TArray<FBreakerMissionRift>& Rifts = UBreakerMissionLibrary::GetRifts();
     const TArray<FBreakerMissionDefinition>& Missions = UBreakerMissionLibrary::GetMissions();
 
-    TestEqual(TEXT("Two rifts"), Rifts.Num(), 2);
-    TestEqual(TEXT("One mission, act one"), Missions.Num(), 1);
-    if (Missions.Num() != 1)
-    {
-        return false;
-    }
-    const FBreakerMissionDefinition& ActOne = Missions[0];
+    TestEqual(TEXT("Three authored rifts"), Rifts.Num(), 3);
+    TestEqual(TEXT("Two authored missions"), Missions.Num(), 2);
+    const FBreakerMissionDefinition* First = Missions.FindByPredicate([](const FBreakerMissionDefinition& Mission) { return Mission.MissionId == TEXT("Act1.Fernhall"); });
+    const FBreakerMissionDefinition* Second = Missions.FindByPredicate([](const FBreakerMissionDefinition& Mission) { return Mission.MissionId == TEXT("Act2.Breach"); });
+    if (!TestNotNull(TEXT("Original Act I retained"), First) || !TestNotNull(TEXT("Authored Act II retained"), Second)) return false;
+    TestEqual(TEXT("Breach remains act two"), Second->Act, 2);
+    TestEqual(TEXT("Breach has two earned quests"), Second->Quests.Num(), 2);
+    TestEqual(TEXT("Breach has eleven authored beats"), Second->Beats.Num(), 11);
+    const FBreakerMissionDefinition& ActOne = *First;
     TestEqual(TEXT("The mission is Act1.Fernhall"), ActOne.MissionId, FName(TEXT("Act1.Fernhall")));
     TestEqual(TEXT("It is act one"), ActOne.Act, 1);
     TestEqual(TEXT("It runs the four-quest chain"), ActOne.Quests.Num(), 4);
@@ -319,8 +321,8 @@ bool FBreakerMissionsFreshTest::RunTest(const FString& Parameters)
         if (!Beat.CorePoint.IsNone()) { CorePoints.Add(Beat.CorePoint); }
         if (Beat.Kind == EBreakerMissionBeatKind::Boss && Beat.Boss.IsNone()) { ++UnnamedBosses; }
     }
-    // One act authored, one benchmark paid. The remaining benchmarks are the
-    // unauthored acts' gap, counted here rather than granted early.
+    // Act I still pays one benchmark. Later chapter grants are checked in the
+    // dedicated Act II flow test rather than added to this Act I subtotal.
     TestEqual(TEXT("Act one pays one benchmark of doctrine points"), DoctrineSum, UBreakerProgressionLibrary::DoctrinePointsPerBenchmark);
     TestTrue(TEXT("The file stays within the whole doctrine grant"), DoctrineSum <= UBreakerProgressionLibrary::DoctrinePointGrant);
     TestEqual(TEXT("Two Core points"), CorePoints.Num(), 2);

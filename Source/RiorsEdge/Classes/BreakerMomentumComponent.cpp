@@ -404,6 +404,26 @@ void UBreakerMomentumComponent::GrantMomentum(float Amount)
     RefreshState();
 }
 
+float UBreakerMomentumComponent::GetEffectiveAirborneCreditSeconds() const
+{
+    const int32 Rank = IsActiveForOwner() ? GetFrenzyNodeRank(TEXT("Swift.Kinetic.ReadTheRoom")) : 0;
+    return FMath::Max(AirborneCreditSeconds, Rank >= 2 ? ReadTheRoomRankTwoSeconds : Rank == 1 ? ReadTheRoomRankOneSeconds : AirborneCreditSeconds);
+}
+
+void UBreakerMomentumComponent::NotifyLongFallLanding(float DistanceCm)
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || IsInSafeZone() || !FMath::IsFinite(DistanceCm)) return;
+    const UBreakerCombatComponent* Combat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>();
+    if (!Combat || Combat->IsDead()) return;
+    const int32 Rank = GetFrenzyNodeRank(TEXT("Swift.Kinetic.Landing"));
+    if (Rank <= 0) return;
+    const float Meters = FMath::Max(0.0f, DistanceCm - LandingMinimumDistanceCm) / 100.0f;
+    // A discrete landing conversion, capped per actual arrival rather than
+    // paying every airborne tick. The resource bank still clamps at its max.
+    GrantMomentum(FMath::Clamp(Meters * (Rank >= 2 ? LandingRankTwoPerMeter : LandingRankOnePerMeter),
+        0.0f, FMath::Max(0.0f, Rank >= 2 ? LandingRankTwoCap : LandingRankOneCap)));
+}
+
 void UBreakerMomentumComponent::RefreshState()
 {
     const EBreakerMomentumState NewState = StateForFraction(GetMomentumFraction());
@@ -576,7 +596,8 @@ void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
     const bool bSliding = Movement->IsSliding();
     const bool bTraversing = Movement->IsTraversingLedge();
 
-    AirborneCreditRemaining = TickAirborneCredit(AirborneCreditRemaining, bAirborne, bTraversing, DeltaTime, AirborneCreditSeconds);
+    const float CreditedAirborneSeconds = bAirborne ? FMath::Clamp(AirborneCreditRemaining, 0.0f, DeltaTime) : 0.0f;
+    AirborneCreditRemaining = TickAirborneCredit(AirborneCreditRemaining, bAirborne, bTraversing, DeltaTime, GetEffectiveAirborneCreditSeconds());
 
     // K9 Momentum Shield rides the loop tick because this is the one place
     // that knows both the band and the posture. CachedState is last tick's
@@ -627,7 +648,7 @@ void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
     {
         Rate += GroundSpeedRate(Speed, ThresholdSpeed, UpperSpeed, GroundRateAtThreshold, GroundRateAtUpperSpeed);
     }
-    if (bAirborne && AirborneCreditRemaining > 0.0f) Rate += AirborneRate;
+    if (bAirborne && CreditedAirborneSeconds > 0.0f) Rate += AirborneRate * CreditedAirborneSeconds / DeltaTime;
     if (bSliding && Speed >= ThresholdSpeed) Rate += SlideRate;
 
     // An active loop override (Overdrive) multiplies both the generated rate

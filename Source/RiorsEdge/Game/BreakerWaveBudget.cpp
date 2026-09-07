@@ -45,6 +45,22 @@ FBreakerWaveBudgetParams UBreakerWaveBudgetLibrary::MakeRiftWaveBudget(int32 Bos
     return Params;
 }
 
+FBreakerWaveBudgetParams UBreakerWaveBudgetLibrary::MakeBreachWaveBudget()
+{
+    FBreakerWaveBudgetParams Params = MakeRiftWaveBudget(4);
+    // O2 authored Act II sequence: break the armoured line, push a flanker,
+    // then dismantle the combined formation before its commander arrives.
+    Params.BudgetBase = 8;
+    Params.BudgetPerWave = 6;
+    Params.WardenFromWave = 1;
+    Params.SkirmisherFromWave = 2;
+    Params.LatticeFromWave = 3;
+    Params.WavesPerElite = 3;
+    Params.ModifierCarrierFromWave = 3;
+    Params.VarietyEnforcedFromWave = 1;
+    return Params;
+}
+
 int32 UBreakerWaveBudgetLibrary::GetWaveBudget(int32 Wave, const FBreakerWaveBudgetParams& Params)
 {
     if (Wave <= 0) return 0;

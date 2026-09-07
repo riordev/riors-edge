@@ -298,7 +298,7 @@ bool FBreakerQuestChainTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Quartermaster opens on the capstone turn-in"), Quartermaster->ResolveStartNodeId(Journal->GetState()), FName(TEXT("DeeperTurnIn")));
     Journal->SetFlag(Deeper.TurnedInFlag);
     TestEqual(TEXT("Q4 closed"), StateOf(Deeper), EBreakerQuestState::Complete);
-    TestEqual(TEXT("The sheet is clear"), Quartermaster->ResolveStartNodeId(Journal->GetState()), FName(TEXT("DeeperDone")));
+    TestEqual(TEXT("Act I completion opens the Act II investigation"), Quartermaster->ResolveStartNodeId(Journal->GetState()), FName(TEXT("AlteredContactLead")));
 
     // The whole chain is flags, so the whole chain round-trips for free.
     UBreakerQuestJournal* Reloaded = NewObject<UBreakerQuestJournal>();

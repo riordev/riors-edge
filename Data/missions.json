@@ -8,6 +8,10 @@
 		{
 			"id": "fernhall.substation",
 			"yard": "substation"
+		},
+		{
+			"id": "breach.marshalling",
+			"yard": "breach"
 		}
 	],
 	"missions": [
@@ -148,6 +152,87 @@
 					"id": "ActOneBoss",
 					"kind": "Unlock",
 					"corePoint": "ActOneBoss"
+				},
+				{
+					"id": "Doctrine",
+					"kind": "Unlock",
+					"doctrinePoints": 2
+				}
+			]
+		},
+		{
+			"id": "Act2.Breach",
+			"act": 2,
+			"title": "",
+			"quests": [
+				"Quest.AlteredContact",
+				"Quest.Breach"
+			],
+			"beats": [
+				{
+					"id": "ContactOrders",
+					"kind": "Dialogue",
+					"npc": "Quartermaster",
+					"node": "AlteredContactOffer",
+					"completesOn": "Quest.AlteredContact.Accepted"
+				},
+				{
+					"id": "Travel",
+					"kind": "Travel",
+					"destination": "Fernhall",
+					"completesOn": "Mission.Act2.Breach.Arrived"
+				},
+				{
+					"id": "Contact",
+					"kind": "Encounter",
+					"worldEncounter": "fernhall.altered_contact",
+					"quest": "Quest.AlteredContact",
+					"objectives": [
+						"Contact"
+					]
+				},
+				{
+					"id": "ContactReport",
+					"kind": "Return",
+					"npc": "Quartermaster",
+					"node": "AlteredContactTurnIn",
+					"completesOn": "Quest.AlteredContact.TurnedIn"
+				},
+				{
+					"id": "ContactReward",
+					"kind": "Reward",
+					"quest": "Quest.AlteredContact"
+				},
+				{
+					"id": "BreachOrders",
+					"kind": "Dialogue",
+					"npc": "Quartermaster",
+					"node": "BreachOffer",
+					"completesOn": "Quest.Breach.Accepted"
+				},
+				{
+					"id": "Marshal",
+					"kind": "Boss",
+					"rift": "breach.marshalling",
+					"boss": "FieldMarshal",
+					"completesOn": "Quest.Breach.MarshalDown"
+				},
+				{
+					"id": "BreachReturn",
+					"kind": "Return",
+					"npc": "Quartermaster",
+					"node": "BreachTurnIn",
+					"completesOn": "Quest.Breach.TurnedIn"
+				},
+				{
+					"id": "BreachReward",
+					"kind": "Reward",
+					"quest": "Quest.Breach"
+				},
+				{
+					"id": "ActTwoBoss",
+					"kind": "Unlock",
+					"corePoint": "ActTwoBoss"
 				},
 				{
 					"id": "Doctrine",

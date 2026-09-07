@@ -63,6 +63,9 @@ public:
     virtual FVector NewFallVelocity(const FVector& InitialVelocity, const FVector& Gravity, float DeltaTime) const override;
     virtual bool DoJump(bool bReplayingMoves, float DeltaTime) override;
     virtual void ProcessLanded(const FHitResult& Hit, float remainingTime, int32 Iterations) override;
+    virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) override;
+    virtual void OnTeleported() override;
+    virtual void PerformMovement(float DeltaTime) override;
     // The ledge traversal's execution home (the custom prediction mode). The
     // old execution was pawn-side SetActorLocation in MOVE_Flying — zero
     // impact for a listen-server host and a hard rubber-band for any remote
@@ -524,6 +527,9 @@ public:
     static float LandingSpeedScale(float ImpactSpeed, float HeavyFallSpeed, float MaxImpactSpeed, float MinimumScale);
 
 private:
+    bool bTrackingResourceFall = false;
+    float ResourceFallPeakZ = 0.0f;
+    FVector ResourceFallLastLocation = FVector::ZeroVector;
     struct FSpeedMultiplierEntry
     {
         float Multiplier = 1.0f;

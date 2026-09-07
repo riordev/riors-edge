@@ -3,6 +3,10 @@
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerHoldfastEnemy.h"
+#include "Combat/BreakerBossEnemy.h"
+#include "Interaction/BreakerNPC.h"
+#include "Save/BreakerMissionContent.h"
+#include "Save/BreakerQuestJournal.h"
 #include "Game/BreakerGameInstance.h"
 #include "Game/BreakerGameMode.h"
 #include "Game/BreakerZoneBuilder.h"
@@ -19,6 +23,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
+#include "UnrealClient.h"
 
 bool UBreakerLoopProbe::ShouldCreateSubsystem(UObject* Outer) const
 {
@@ -46,6 +51,8 @@ void UBreakerLoopProbe::Initialize(FSubsystemCollectionBase& Collection)
         return;
     }
     StartedAt = FPlatformTime::Seconds();
+    bActTwo = FParse::Param(FCommandLine::Get(), TEXT("BreakerActTwoLoop"));
+    if (bActTwo) UE_LOG(LogTemp, Display, TEXT("[LoopProbe] Act I + II earned-path mode: no seeded flags/points; authored visible dialogue choices, accelerated real kills, real travel. Not a Slate input test."));
     UE_LOG(LogTemp, Display, TEXT("[LoopProbe] isolated saves: %s"), *FPaths::ProjectSavedDir());
     Ticker = FTSTicker::GetCoreTicker().AddTicker(
         FTickerDelegate::CreateUObject(this, &UBreakerLoopProbe::TickProbe), 1.0f);
@@ -80,9 +87,148 @@ bool UBreakerLoopProbe::SelectTravel(ABreakerCharacter* Player, FName Destinatio
     return false;
 }
 
+bool UBreakerLoopProbe::SelectDialogueFlag(ABreakerCharacter* Player, FName Flag)
+{
+    UBreakerQuestJournal* Journal = Player->GetQuestJournal();
+    if (!Journal) return false;
+    // Find a reachable path using the same visibility conditions the menu
+    // uses. Only choices on that path are committed through its character API.
+    struct FSearch { FName Node; FBreakerQuestFlagSet Flags; TArray<FBreakerDialogueChoice> Path; };
+    for (TActorIterator<ABreakerNPC> It(Player->GetWorld()); It; ++It)
+    {
+        TArray<FSearch> Queue;
+        FSearch Start; Start.Node = It->ResolveStartNodeId(Journal->GetState()); Start.Flags = Journal->GetState(); Queue.Add(Start);
+        TSet<FName> Visited;
+        for (int32 Index = 0; Index < Queue.Num() && Index < 100; ++Index)
+        {
+            const FSearch Search = Queue[Index];
+            if (Visited.Contains(Search.Node)) continue;
+            Visited.Add(Search.Node);
+            FBreakerDialogueNode Node;
+            if (!It->FindDialogueNode(Search.Node, Node)) continue;
+            TArray<FBreakerDialogueChoice> Choices; It->GetVisibleChoices(Node, Search.Flags, Choices);
+            for (const FBreakerDialogueChoice& Choice : Choices)
+            {
+                FSearch Next = Search; Next.Path.Add(Choice); Next.Flags.Add(Choice.SetsQuestFlag);
+                if (Choice.SetsQuestFlag == Flag)
+                {
+                    for (const FBreakerDialogueChoice& Selected : Next.Path)
+                    {
+                        Player->AddQuestFlag(Selected.SetsQuestFlag);
+                        UE_LOG(LogTemp, Display, TEXT("[LoopProbe] dialogue %s: %s -> %s"), *It->GetDisplayName().ToString(), *Selected.Text, *Selected.SetsQuestFlag.ToString());
+                    }
+                    return Journal->HasFlag(Flag);
+                }
+                if (Choice.Action == EBreakerDialogueAction::None && !Choice.NextNodeId.IsNone())
+                { Next.Node = Choice.NextNodeId; Queue.Add(MoveTemp(Next)); }
+            }
+        }
+    }
+    return false;
+}
+
+bool UBreakerLoopProbe::TickActTwo(ABreakerCharacter* Player, ABreakerGameMode* Mode)
+{
+    if (PhotoDelay > 0)
+    {
+        if (--PhotoDelay == 1) FScreenshotRequest::RequestScreenshot(PendingPhoto, true, false);
+        return true;
+    }
+    UWorld* World = Player->GetWorld();
+    UBreakerQuestJournal* Journal = Player->GetQuestJournal();
+    UBreakerGameInstance* Session = Cast<UBreakerGameInstance>(GetGameInstance());
+    if (!Journal || !Session) return Finish(false, TEXT("Campaign journal/session missing"));
+    const FBreakerMissionBeat* Beat = nullptr;
+    for (const FBreakerMissionDefinition& Mission : UBreakerMissionLibrary::GetMissions())
+    {
+        if (Mission.Act > 2) continue;
+        Beat = UBreakerMissionLibrary::CurrentBeat(Mission, Journal->GetState());
+        if (Beat) break;
+    }
+    if (!Beat)
+    {
+        const FBreakerProgressionState& Progress = Player->GetProgression()->GetProgressionState();
+        const bool bCorrect = UBreakerGameInstance::IsAnchorMap(World) && bSawMarshal && BreachMaximumWave == 4
+            && Journal->HasFlag(TEXT("Quest.Breach.TurnedIn"))
+            && UBreakerMissionLibrary::DoctrinePointEntitlement(Journal->GetState()) == 4
+            && Progress.LevelDoctrinePointsGranted == 4 && Progress.UnspentDoctrinePoints == 4;
+        return Finish(bCorrect, TEXT("Earned Act I + II: real dialogue/deaths/travel, dedicated contact, four-wave Field Marshal and exactly four cumulative Doctrine points"));
+    }
+    if (LastCampaignBeat != Beat->BeatId)
+    {
+        LastCampaignBeat = Beat->BeatId; ++Stage;
+        UE_LOG(LogTemp, Display, TEXT("[LoopProbe] campaign beat %s, earned Doctrine=%d"), *Beat->BeatId.ToString(), Player->GetProgression()->GetProgressionState().LevelDoctrinePointsGranted);
+    }
+    const bool bDialogue = Beat->Kind == EBreakerMissionBeatKind::Dialogue || Beat->Kind == EBreakerMissionBeatKind::Return;
+    if (bDialogue)
+    {
+        if (!UBreakerGameInstance::IsAnchorMap(World))
+            return SelectTravel(Player, ABreakerTravelPoint::HubDestinationId) ? true : Finish(false, TEXT("Campaign cannot return to Anchor"));
+        return SelectDialogueFlag(Player, Beat->CompletesOn) ? true : Finish(false, TEXT("Campaign dialogue completion flag is not reachable through visible choices"));
+    }
+    if (Beat->Kind == EBreakerMissionBeatKind::Travel)
+        return SelectTravel(Player, Beat->Destination) ? true : Finish(false, TEXT("Campaign destination unavailable"));
+    if (!UBreakerGameInstance::IsFernhallMap(World))
+        return SelectTravel(Player, ABreakerTravelPoint::FernhallDestinationId) ? true : Finish(false, TEXT("Campaign cannot reach Fernhall"));
+    if (Beat->Kind == EBreakerMissionBeatKind::Boss && !Mode->IsRiftInstance())
+    {
+        for (TActorIterator<ABreakerRiftDoor> It(World); It; ++It)
+            if (It->Rift.EncounterId == Beat->Rift)
+            {
+                DepartedWorld = World;
+                return It->SelectDestination(ABreakerTravelPoint::RiftDestinationId, Player) ? true : Finish(false, TEXT("Campaign boss door refused"));
+            }
+        return Finish(false, TEXT("Campaign boss door missing"));
+    }
+    if (Beat->Kind == EBreakerMissionBeatKind::Boss && Mode->IsRiftRunCompleted())
+        return Finish(false, TEXT("Actual boss completion did not advance its mission beat"));
+    if (Mode->IsRiftInstance() && Session->PendingRift.EncounterId == FName(TEXT("breach.marshalling")))
+        BreachMaximumWave = FMath::Max(BreachMaximumWave, Mode->GetCurrentWave());
+    TArray<ABreakerEnemy*> Living;
+    for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
+    {
+        if (It->IsDeadEnemy()) continue;
+        if (!Beat->WorldEncounter.IsNone() && !It->ActorHasTag(TEXT("Fernhall.AlteredContact"))) continue;
+        Living.Add(*It);
+    }
+    for (ABreakerEnemy* Enemy : Living)
+    {
+        const bool bContact = Enemy->ActorHasTag(TEXT("Fernhall.AlteredContact"));
+        const bool bMarshal = Session->PendingRift.EncounterId == FName(TEXT("breach.marshalling"))
+            && Enemy->GetClass() == ABreakerBossEnemy::ClassForBossName(TEXT("FieldMarshal")).Get();
+        if (FParse::Param(FCommandLine::Get(), TEXT("BreakerActTwoPhotos"))
+            && ((bContact && !bContactPhotoTaken) || (bMarshal && !bMarshalPhotoTaken)))
+        {
+            bContactPhotoTaken |= bContact;
+            bMarshalPhotoTaken |= bMarshal;
+            const FVector Target = Enemy->GetActorLocation();
+            const FVector Toward = (Target - Player->GetActorLocation()).GetSafeNormal2D();
+            const FVector At = Target - Toward * 900.0f + FVector(0, 0, 70);
+            const FRotator Facing = (Target - At).Rotation();
+            Player->TeleportTo(At, Facing);
+            if (AController* Controller = Player->GetController()) Controller->SetControlRotation(Facing);
+            const FString Directory = FPaths::ProjectSavedDir() / TEXT("Screenshots");
+            IFileManager::Get().MakeDirectory(*Directory, true);
+            PendingPhoto = Directory / (bContact ? TEXT("acttwo-contact.png") : TEXT("acttwo-marshal.png"));
+            PhotoDelay = 2;
+            return true;
+        }
+        if (Session->PendingRift.EncounterId == FName(TEXT("breach.marshalling"))
+            && Enemy->GetClass() == ABreakerBossEnemy::ClassForBossName(TEXT("FieldMarshal")).Get()) bSawMarshal = true;
+        FBreakerDamageRequest Hit; Hit.BaseDamage = 100000000; Hit.bCanCritical = false; Hit.bBypassShield = true; Hit.SetInstigator(Player);
+        Enemy->FindComponentByClass<UBreakerCombatComponent>()->ReceiveDamage(Hit);
+        if (Enemy->IsDeadEnemy()) ++KilledEnemies;
+    }
+    // Finite field populations legitimately require another visit for some
+    // objectives. Travel back out and in; never manufacture elite kills.
+    if (Living.IsEmpty() && !Mode->IsRiftInstance() && Beat->WorldEncounter.IsNone())
+        return SelectTravel(Player, ABreakerTravelPoint::HubDestinationId) ? true : Finish(false, TEXT("Finite encounter revisit unavailable"));
+    return true;
+}
+
 bool UBreakerLoopProbe::TickProbe(float DeltaSeconds)
 {
-    if (FPlatformTime::Seconds() - StartedAt > 150.0)
+    if (FPlatformTime::Seconds() - StartedAt > (bActTwo ? 250.0 : 150.0))
         return Finish(false, TEXT("Travel/combat progression timed out"));
     UBreakerGameInstance* Session = Cast<UBreakerGameInstance>(GetGameInstance());
     UWorld* World = Session ? Session->GetWorld() : nullptr;
@@ -93,6 +239,11 @@ bool UBreakerLoopProbe::TickProbe(float DeltaSeconds)
     if (!Mode || !Player) return true;
     if (DepartedWorld.Get() == World) return true;
     Player->ResumeFromMenu();
+    if (bActTwo)
+    {
+        if (Stage == 0 && !UBreakerGameInstance::IsAnchorMap(World)) return true;
+        return TickActTwo(Player, Mode);
+    }
 
     if (Stage == 0)
     {

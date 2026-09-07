@@ -157,7 +157,14 @@ namespace
             break;
 
         case EBreakerMissionBeatKind::Encounter:
-            bOk = BreakerMissionReadName(Row, TEXT("rift"), Where, Out.Rift, Errors);
+            if (Row.HasField(TEXT("rift")) == Row.HasField(TEXT("worldEncounter")))
+            {
+                Errors.Add(Where + TEXT(": an Encounter names exactly one of rift or worldEncounter"));
+                bOk = false;
+            }
+            else if (Row.HasField(TEXT("worldEncounter")))
+                bOk = BreakerMissionReadName(Row, TEXT("worldEncounter"), Where, Out.WorldEncounter, Errors);
+            else bOk = BreakerMissionReadName(Row, TEXT("rift"), Where, Out.Rift, Errors);
             bOk = BreakerMissionReadName(Row, TEXT("quest"), Where, Out.Quest, Errors) && bOk;
             bOk = BreakerMissionReadNameArray(Row, TEXT("objectives"), Where, Out.Objectives, Errors) && bOk;
             if (bOk && Out.Objectives.IsEmpty())
@@ -165,7 +172,7 @@ namespace
                 Errors.Add(FString::Printf(TEXT("%s: an Encounter counts no objectives"), *Where));
                 bOk = false;
             }
-            bOk = BreakerMissionRefuseExtraFields(Row, { TEXT("id"), TEXT("kind"), TEXT("rift"), TEXT("quest"), TEXT("objectives") }, Where, Errors) && bOk;
+            bOk = BreakerMissionRefuseExtraFields(Row, { TEXT("id"), TEXT("kind"), TEXT("rift"), TEXT("worldEncounter"), TEXT("quest"), TEXT("objectives") }, Where, Errors) && bOk;
             break;
 
         case EBreakerMissionBeatKind::Boss:
@@ -452,7 +459,9 @@ namespace
 
                 case EBreakerMissionBeatKind::Encounter:
                 {
-                    BreakerMissionCheckRiftId(Beat.Rift, Where, Data, Errors);
+                    if (Beat.WorldEncounter.IsNone()) BreakerMissionCheckRiftId(Beat.Rift, Where, Data, Errors);
+                    else if (Beat.WorldEncounter != FName(TEXT("fernhall.altered_contact")))
+                        Errors.Add(Where + TEXT(": worldEncounter has no authored field encounter"));
                     if (const FBreakerQuestDefinition* Quest = BreakerMissionCheckQuest(Beat.Quest, Where, Mission, Registry, Errors))
                     {
                         for (const FName& ObjectiveId : Beat.Objectives)
@@ -461,6 +470,10 @@ namespace
                             {
                                 Errors.Add(FString::Printf(TEXT("%s: objective \"%s\" is not an objective of \"%s\""), *Where, *ObjectiveId.ToString(), *Beat.Quest.ToString()));
                             }
+                            if (!Beat.WorldEncounter.IsNone())
+                                for (const FBreakerQuestObjective& Objective : Quest->Objectives)
+                                    if (Objective.ObjectiveId == ObjectiveId && (Objective.RequiredCount != 0 || !Objective.ProgressCounter.IsNone()))
+                                        Errors.Add(Where + TEXT(": a dedicated world encounter uses manual objectives, never generic kill counters"));
                         }
                     }
                     break;
@@ -983,6 +996,26 @@ TArray<FName> UBreakerMissionLibrary::ArrivalFlagsFor(FName DestinationId, const
         }
     }
     return Out;
+}
+
+TArray<FName> UBreakerMissionLibrary::WorldEncounterCompletionFlagsFor(FName EncounterId, const FBreakerQuestFlagSet& Flags)
+{
+    TArray<FName> Result;
+    if (EncounterId.IsNone()) return Result;
+    for (const FBreakerMissionDefinition& Mission : GetMissions())
+    {
+        const FBreakerMissionBeat* Beat = CurrentBeat(Mission, Flags);
+        if (!Beat || Beat->Kind != EBreakerMissionBeatKind::Encounter || Beat->WorldEncounter != EncounterId) continue;
+        if (const FBreakerQuestDefinition* Quest = BreakerMissionFindQuest(Beat->Quest))
+        {
+            if (!Flags.Has(Quest->AcceptedFlag) || Flags.Has(Quest->TurnedInFlag)) continue;
+            for (const FBreakerQuestObjective& Objective : Quest->Objectives)
+                if (Beat->Objectives.Contains(Objective.ObjectiveId) && Objective.RequiredCount == 0
+                    && Objective.ProgressCounter.IsNone() && !Flags.Has(Objective.CompletionFlag))
+                    Result.AddUnique(Objective.CompletionFlag);
+        }
+    }
+    return Result;
 }
 
 FName UBreakerMissionLibrary::BossForRift(const FBreakerRiftDefinition& Rift)

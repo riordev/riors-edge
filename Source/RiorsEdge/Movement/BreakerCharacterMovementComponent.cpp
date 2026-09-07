@@ -1,4 +1,5 @@
 #include "Movement/BreakerCharacterMovementComponent.h"
+#include "Classes/BreakerMomentumComponent.h"
 
 #include "Attributes/BreakerAttributeSet.h"
 #include "Items/BreakerEquipmentComponent.h"
@@ -316,6 +317,9 @@ void UBreakerCharacterMovementComponent::RefreshJumpGrant()
 
 void UBreakerCharacterMovementComponent::ProcessLanded(const FHitResult& Hit, float remainingTime, int32 Iterations)
 {
+    const float FallDistance = bTrackingResourceFall && UpdatedComponent
+        ? FMath::Max(0.0f, ResourceFallPeakZ - UpdatedComponent->GetComponentLocation().Z) : 0.0f;
+    bTrackingResourceFall = false;
     // Super zeroes the fall, so the impact has to be read first.
     const float ImpactSpeed = FMath::Max(-Velocity.Z, 0.0f);
     // A queued slide owns its landing: scrubbing speed here would drop the
@@ -335,6 +339,9 @@ void UBreakerCharacterMovementComponent::ProcessLanded(const FHitResult& Hit, fl
     bJumpCutArmed = false;
 
     Super::ProcessLanded(Hit, remainingTime, Iterations);
+    if (GetOwner() && GetOwner()->HasAuthority())
+        if (UBreakerMomentumComponent* Momentum = GetOwner()->FindComponentByClass<UBreakerMomentumComponent>())
+            Momentum->NotifyLongFallLanding(FallDistance);
 
     if (ImpactSpeed >= LandingHeavyFallSpeed)
     {
@@ -697,6 +704,47 @@ bool UBreakerCharacterMovementComponent::CanUseDash() const
 {
     const UBreakerProgressionComponent* Progression = GetProgression();
     return Progression && Progression->GetProgressionState().PermanentClass == EBreakerClassId::Swift;
+}
+
+void UBreakerCharacterMovementComponent::OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode)
+{
+    Super::OnMovementModeChanged(PreviousMovementMode, PreviousCustomMode);
+    bTrackingResourceFall = IsFalling() && UpdatedComponent != nullptr;
+    if (bTrackingResourceFall)
+    {
+        ResourceFallLastLocation = UpdatedComponent->GetComponentLocation();
+        ResourceFallPeakZ = ResourceFallLastLocation.Z;
+    }
+}
+
+void UBreakerCharacterMovementComponent::OnTeleported()
+{
+    Super::OnTeleported();
+    // Only distance travelled AFTER the teleport can earn a landing credit.
+    bTrackingResourceFall = IsFalling() && UpdatedComponent != nullptr;
+    if (bTrackingResourceFall)
+    {
+        ResourceFallLastLocation = UpdatedComponent->GetComponentLocation();
+        ResourceFallPeakZ = ResourceFallLastLocation.Z;
+    }
+}
+
+void UBreakerCharacterMovementComponent::PerformMovement(float DeltaTime)
+{
+    // This entry runs both local physics and authoritative remote movement;
+    // actor Tick alone would miss server moves received between ticks.
+    if (bTrackingResourceFall && UpdatedComponent)
+    {
+        const FVector CurrentLocation = UpdatedComponent->GetComponentLocation();
+        if (!CurrentLocation.Equals(ResourceFallLastLocation, 1.0f)) ResourceFallPeakZ = CurrentLocation.Z;
+        ResourceFallPeakZ = FMath::Max(ResourceFallPeakZ, CurrentLocation.Z);
+    }
+    Super::PerformMovement(DeltaTime);
+    if (bTrackingResourceFall && UpdatedComponent)
+    {
+        ResourceFallLastLocation = UpdatedComponent->GetComponentLocation();
+        ResourceFallPeakZ = FMath::Max(ResourceFallPeakZ, ResourceFallLastLocation.Z);
+    }
 }
 
 bool UBreakerCharacterMovementComponent::TryDash(const FVector& RequestedDirection)

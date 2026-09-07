@@ -65,6 +65,16 @@ public:
     // owner via the same IsActiveForOwner() gate as the rest of this loop.
     // Observable the same way the Mana side is observable: through GetMomentum().
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Momentum") void GrantMomentum(float Amount);
+    float GetEffectiveAirborneCreditSeconds() const;
+    void NotifyLongFallLanding(float DistanceCm);
+    // O2 PLACEHOLDER: authored node windows and one-landing conversion caps.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float ReadTheRoomRankOneSeconds = 4.5f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float ReadTheRoomRankTwoSeconds = 6.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float LandingMinimumDistanceCm = 600.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float LandingRankOnePerMeter = 2.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float LandingRankTwoPerMeter = 3.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float LandingRankOneCap = 20.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float LandingRankTwoCap = 30.0f;
 
     // Loop overrides (Class-Kits §1.2 ULTIMATE). A named, temporary rewrite of
     // the loop itself rather than of a magnitude: decay can be suspended and

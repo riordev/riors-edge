@@ -60,6 +60,8 @@ struct FBreakerMissionBeat
     FName Destination = NAME_None;
     // Encounter, Boss.
     FName Rift = NAME_None;
+    // Encounter only: a dedicated field encounter, mutually exclusive with Rift.
+    FName WorldEncounter = NAME_None;
     // Encounter, Reward.
     FName Quest = NAME_None;
     // Encounter.
@@ -195,6 +197,7 @@ public:
     // now. Each returns the flags to set, possibly several when more than one
     // mission is waiting on the same event, and the caller sets them.
     static TArray<FName> ArrivalFlagsFor(FName DestinationId, const FBreakerQuestFlagSet& Flags);
+    static TArray<FName> WorldEncounterCompletionFlagsFor(FName EncounterId, const FBreakerQuestFlagSet& Flags);
     // Match the authored yard's stable EncounterId. Display names are copy,
     // and unnamed/dev definitions cannot satisfy a story encounter.
     static TArray<FName> RiftCompletionFlagsFor(const FBreakerRiftDefinition& Rift, const FBreakerQuestFlagSet& Flags);

@@ -372,6 +372,15 @@ FBreakerRiftDefinition UBreakerZoneBuilder::FernhallRiftFor(FName Yard)
     // their own entry cost and are not authored here.
     Rift.Tier = EBreakerRiftTier::Campaign;
 
+    if (Yard == FName(TEXT("breach")))
+    {
+        Rift.EncounterId = TEXT("breach.marshalling");
+        Rift.AreaName = FText::FromString(TEXT("Breach Marshalling Yard"));
+        Rift.AreaLine = FText::FromString(TEXT("Beyond the altered contact, the Field Marshal gathers the breach forces."));
+        Rift.AreaLevel = 20; // O2 PLACEHOLDER, Act II encounter tuning.
+        return Rift;
+    }
+
     if (Yard == FName(TEXT("substation")))
     {
         Rift.EncounterId = TEXT("fernhall.substation");

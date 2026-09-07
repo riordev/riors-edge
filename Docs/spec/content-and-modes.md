@@ -225,6 +225,27 @@ It does not own:
 | The mission file equals its export; one mission per act id; every flag registered; every npc, node, rift and quest id resolves; beats ordered with no Return before its Encounter | `Data.Missions.Fresh` |
 | Doctrine points across the file sum to eight; every Core point is a known source, used once, within the cap of fifteen | `Missions.PointBudgets` |
 
+## Current campaign implementation (2026-09-07)
+
+Act II follows the Act I return: accept the Quartermaster's investigation,
+find the wounded Drudge beyond Fernhall's rail trench, defeat that specific
+contact, and report back. The report opens a separate Breach job and its
+physical entrance. Ordinary patrol kills cannot complete the contact objective.
+
+The Breach uses stable encounter ID `breach.marshalling`. Its four encounters
+introduce a Warden line, a flanker, a combined formation, then the actual Field
+Marshal. Only the matching active boss's real death can set its story flag;
+the developer close-Rift instrument awards no story completion. Returning and
+turning in the job earns two more Doctrine points, for four cumulative points.
+Later campaign benchmarks remain unfinished.
+
+`Scripts/ue-loop-probe.ps1 -ActTwo` exercises the authored dialogue choices,
+damage/death callbacks and actual map travel from a fresh isolated save.
+`-Photos` additionally renders the contact and Marshal. Damage is accelerated;
+this validates progression and persistence, not ordinary combat pacing or mouse
+interaction. The Rift interior currently reuses Fernhall geometry; distinct
+authored interior spaces remain content work.
+
 ## Open
 
 - Where Anomalies, Raids, Dungeons and Conquest sit relative to the five canon

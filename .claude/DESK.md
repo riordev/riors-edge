@@ -5,12 +5,13 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
-## Cycle — two-target Lead, final special-loot budgets and stable Rift identity
-- [x] Wire purchased two-target Lead through timed state, weapon hits and both HUD marks.
-- [x] Reserve special affixes, paired bills and legendary signatures inside the final rarity budget; preserve ordinary rolls and existing saved items.
-- [x] Identify authored Rifts by stable encounter IDs rather than display copy.
-- [x] Inspected both mannequin meshes: neither has an isolated arm-only section. A dedicated/extracted arms mesh is still needed.
-Remaining repair work includes the other silent nodes, campaign doctrine reachability, ability/weapon balance, broader clipping, arms/weapon/weakpoint art, audible combat polish and the full rarity identities.
+## Cycle — earned Act II progression and Swift movement nodes
+- [x] Connect the authored wounded-contact investigation to a dedicated finite Fernhall enemy and real death credit.
+- [x] Open the Breach through the Quartermaster job; stage its armoured line, flanker, combined formation and actual Field Marshal.
+- [x] Award the next two doctrine points only through the completed Act II return/turn-in.
+- [x] Wire Read the Room airborne credit and Landing momentum through actual movement and purchases.
+- [x] Review, build, census, run the full suite and validate the playable flow before landing.
+Remaining repair work includes the other silent nodes, later campaign doctrine reachability, ability/weapon balance, broader clipping, arms/weapon/weakpoint art, audible combat polish and the full rarity identities.
 
 ## Playtest queue (owner, 2026-09-07)
 Continue through the entire repair list in tested batches without stopping after each commit for a playtest. After repairs, execute the content phase below (owner instruction, 2026-09-07).
@@ -23,8 +24,8 @@ Continue through the entire repair list in tested batches without stopping after
 
 ## Repair dependencies found in runtime review
 - Sequence requires three distinct applications, but Caster has only Bleed and Poison. Void is not an applied status. A third functional status or a revised node contract is required; do not fake the third tag.
-- Doctrine progression awards only 2/8. Remaining earned benchmarks need the authored Breach/Field Marshal, Survivor/Erased Earth, and alternate-self finale gameplay. Mission validation must support the separate Act III finale and stable encounter identities before extending content; replaying Fernhall must not counterfeit later completion.
-- Special loot currently exceeds its final affix budget because special lines, paired bills and legendary signatures append after generic filling. Reserve these before filling; preserve existing saved items until migration is explicitly designed.
+- Doctrine progression now awards 4/8 through Acts I and II. Remaining earned benchmarks need Survivor/Erased Earth and alternate-self finale gameplay. Mission validation must support the separate Act III finale and stable encounter identities before extending content; replaying Fernhall must not counterfeit later completion.
+- New special loot now respects its final affix budget. Existing saved items remain unchanged; a migration still needs to be designed.
 
 ## Content phase after the repair list (owner, 2026-09-07)
 - [ ] Author more distinct Fernhall spaces and improve layout/content density.
@@ -107,6 +108,12 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - Four Niagara systems at `/Game/Breaker/FX/NS_<Moment>` with a `Color` user parameter, or a free Fab VFX pack placed there
 
 ## Done (last three cycles; older is git)
+### Earned Act II progression and Swift movement — 611 / 5 / 0
+- [x] Dedicated wounded Drudge investigation, actual-death objective, Quartermaster report/orders, restored Breach entrance and four-wave Field Marshal job now earn the next two Doctrine points. Stable encounter identity and verified active-boss death prevent developer completion from awarding story progress.
+- [x] Swift Read the Room and Landing use purchased ranks and actual movement. Ground-only credit refill, continuous fall distance, teleport/traversal resets and once-per-landing gains are tested.
+- [x] Fixed two real integration failures: offer-node gates hid their own dialogue choices, and silently restored journals did not refresh the physical entrance. Added visible-choice and same-journal save-restore regressions.
+- [x] Final build/census and616tests:611passed/5known/0unexpected. Fresh isolated fully earned Act I-II run passed111kills, actual travel/contact/Marshal/return and exactly4Doctrine points. Damage accelerated; no combat-feel or Slate-input claim. Contact and Marshal frames inspected; Marshal solid shield panel remains visual repair. STATE unchanged.
+
 ### Two-target Lead, special loot budgets and Rift identity — 604 / 5 / 0
 - [x] Purchased Lead retains two independently timed targets and renders both diamonds; weapon hits honor both, Ledger refunds once per cast, Mark Economy preserves lifetime/refund identity. Actual GAS/weapon tests plus shipped enemy geometry; live Fernhall capture shows both marks.
 - [x] Lead now targets the weapon collision channel and rejects scenery/dead combat targets. Live capture found the mismatch hidden by the old synthetic fixture. Capture probe purchases nodes and casts normally under isolated saves.
@@ -119,10 +126,3 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - [x] Chain copies the newest accepted status without recursive spread/double duration scaling and excludes player teammates. Momentum Transfer uses successful Closequarter arrival and only the matching next eligible melee hit. Seven new ability numbers are editable; Chain reach remains editor-only.
 - [x] Build and all607tests complete:602passed/5existing expected/0unexpected. New fixtures respect actual prerequisites, eight doctrine points, resource costs and GAS activation. Canonical census clean; STATE unchanged under quarantine. No pins widened.
 - [x] Rifle-arm prototype photographed and reverted because its torso intruded into the camera; art item remains open.
-
-### Held input, six Caster nodes and Refractor — 599 / 5 / 0
-- [x] Menus/death clear fire, aim, sprint and slide intent. Death confirmation uses Slate, preserves focused Return/navigation and prevents duplicate travel. Wider death buttons and wrapped NPC speaker text inspected in actual Anchor captures.
-- [x] Purchased Close, Debt, Bloodprice, Patience, Drain and Variance now affect combat/resource events, with editable O2 tuning. Runtime purchases and actual Siphon interruption tested; campaign entitlement remains 2/8.
-- [x] Refractor is a reachable named Unwritten necklace: each hitscan pellet's first successful crit-eligible enemy hit may fork to two visible targets for 60% normal nonweak damage, trading away hitscan critical strikes. Real roll/equip/damage/exclusion/O104 tests; no recursive forks or weapon statuses. Generic OnHit listeners still see proc-zero fork damage. Projectile weapons unchanged.
-- [x] All inventory rule cards now print their canonical perk/forfeit descriptions. Refractor card inspected with full text and affixes; no claim runtime beams photographed. Special-item damage permission reflected in intent docs; rarity migration remains open.
-- [x] Final build, canonical census and all604tests complete:599passed/5existing expected/0unexpected. Corrected isolated-world context/reflected-event fixtures and expanded exact legendary population assertions; no damage bands/pins widened. STATE unchanged under Python quarantine.

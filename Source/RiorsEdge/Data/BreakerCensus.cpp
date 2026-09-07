@@ -333,7 +333,8 @@ namespace
             Writer.WriteValue(TEXT("completesOn"), BreakerCensusNameOrEmpty(Beat.CompletesOn));
             break;
         case EBreakerMissionBeatKind::Encounter:
-            Writer.WriteValue(TEXT("rift"), BreakerCensusNameOrEmpty(Beat.Rift));
+            if (!Beat.WorldEncounter.IsNone()) Writer.WriteValue(TEXT("worldEncounter"), Beat.WorldEncounter.ToString());
+            else Writer.WriteValue(TEXT("rift"), BreakerCensusNameOrEmpty(Beat.Rift));
             Writer.WriteValue(TEXT("quest"), BreakerCensusNameOrEmpty(Beat.Quest));
             BreakerCensusNameArray(Writer, TEXT("objectives"), Beat.Objectives);
             break;

@@ -10,6 +10,9 @@
 #include "Interaction/BreakerTravelPoint.h"
 #include "Interaction/BreakerRiftDoor.h"
 #include "Save/BreakerMissionContent.h"
+#include "Combat/BreakerCombatComponent.h"
+#include "Attributes/BreakerAttributeSet.h"
+#include "AbilitySystemComponent.h"
 
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerTargetDummy.h"
@@ -79,6 +82,9 @@ void ABreakerGameMode::Tick(float DeltaSeconds)
     TickSupplyCrate(DeltaSeconds);
     TickWaveAdvance(DeltaSeconds);
     TickCrowdSampler(DeltaSeconds);
+    if (bFernhallMissionReady && GetWorld() && GetWorld()->GetFirstPlayerController())
+        BindFernhallMissionJournal(GetWorld()->GetFirstPlayerController()->GetPawn());
+    ApplyAlteredContactWound();
 }
 
 void ABreakerGameMode::EndPlay(const EEndPlayReason::Type Reason)
@@ -195,6 +201,12 @@ void ABreakerGameMode::MarkRiftTerminator(ABreakerEnemy* Enemy)
 
 void ABreakerGameMode::HandleRiftTerminatorDefeated(ABreakerEnemy* Terminator)
 {
+    const UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>();
+    const FName AuthoredBoss = Session ? UBreakerMissionLibrary::BossForRift(Session->PendingRift) : NAME_None;
+    const UBreakerCombatComponent* BossCombat = Terminator ? Terminator->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    const bool bConfirmed = Terminator && Terminator == ActiveBoss && BossCombat && BossCombat->IsDead()
+        && !AuthoredBoss.IsNone() && Terminator->GetClass() == ABreakerBossEnemy::ClassForBossName(AuthoredBoss).Get();
+    TGuardValue<bool> VerifiedDeath(bVerifiedStoryBossDeath, bConfirmed);
     // THE CONSUME SIDE OF O168. FIELD's raise says "the thing holding this open
     // died" and knows nothing about rifts; this is where that becomes a
     // completion. The player is read here rather than carried on the raise,
@@ -234,12 +246,13 @@ void ABreakerGameMode::CompleteRiftRun(APawn* Player)
     UE_LOG(LogTemp, Display, TEXT("[Rift] run complete: %s (area level %d, %s)"),
         *Rift.AreaName.ToString(), Rift.EffectiveAreaLevel(),
         Rift.Tier == EBreakerRiftTier::Campaign ? TEXT("campaign") : TEXT("endgame"));
-    // THE BOSS SEAM. A Boss beat that is current in this rift completes on the
-    // run, written into the player's journal before the broadcast so every
+    // THE BOSS SEAM. A Boss beat requires the actual matching boss death,
+    // not merely a dev close or an unrelated marked terminator. Written into
+    // the player's journal before the broadcast so every
     // listener reads the story where the run left it. The flag is also the
     // Sweep objective's completion flag; SetFlag is monotonic, so whichever
     // of the two sets it first, the other is a no-op.
-    if (const ABreakerCharacter* Breaker = Cast<ABreakerCharacter>(Player))
+    if (const ABreakerCharacter* Breaker = bVerifiedStoryBossDeath ? Cast<ABreakerCharacter>(Player) : nullptr)
     {
         if (UBreakerQuestJournal* Journal = Breaker->GetQuestJournal())
         {
@@ -255,6 +268,13 @@ void ABreakerGameMode::CompleteRiftRun(APawn* Player)
 void ABreakerGameMode::HandleRiftEntryRequested(const FBreakerRiftDefinition& Rift, APawn* RequestingPawn)
 {
     if (!RequestingPawn) return;
+    if (Rift.EncounterId == FName(TEXT("breach.marshalling")))
+    {
+        const ABreakerCharacter* Character = Cast<ABreakerCharacter>(RequestingPawn);
+        const UBreakerQuestJournal* Journal = Character ? Character->GetQuestJournal() : nullptr;
+        if (!Journal || !Journal->HasFlag(TEXT("Quest.AlteredContact.TurnedIn"))
+            || !Journal->HasFlag(TEXT("Quest.Breach.Accepted"))) return;
+    }
     UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>();
     if (!Session) return;
 
@@ -618,6 +638,17 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
         if (!bRiftInstance)
         {
             SpawnFernhallEncounters(Markers);
+            FVector2D Origin, Forward;
+            if (UBreakerZoneBuilder::YardFrame(Markers, TEXT("substation"), Origin, Forward))
+            {
+                const FBreakerCoverFieldParams Field = UBreakerZoneBuilder::FernhallFieldParams(TEXT("substation"));
+                const FVector Direction(Forward.X, Forward.Y, 0);
+                AlteredContactPosition = FVector(Origin.X, Origin.Y, 0)
+                    + Direction * FMath::Lerp(Field.BandNearCm, Field.BandFarCm, 0.85f);
+                BreachDoorPosition = AlteredContactPosition + Direction * 450.0f;
+                bFernhallMissionReady = true;
+                BindFernhallMissionJournal(NewPlayer->GetPawn());
+            }
         }
         else
         {
@@ -641,6 +672,8 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
             // its own game mode carrying the gym's defaults, untouched.
             WaveBudget = UBreakerWaveBudgetLibrary::MakeRiftWaveBudget(RiftBossWave);
             const UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>();
+            if (Session && Session->PendingRift.EncounterId == FName(TEXT("breach.marshalling")))
+                WaveBudget = UBreakerWaveBudgetLibrary::MakeBreachWaveBudget();
             UE_LOG(LogTemp, Display,
                 TEXT("[Rift] instance built: %s, area level %d, boss on wave %d."),
                 Session ? *Session->PendingRift.AreaName.ToString() : TEXT("<unnamed>"),
@@ -3380,6 +3413,117 @@ ABreakerSkirmisherEnemy* ABreakerGameMode::SpawnSkirmisherNearCover(const FVecto
     return Skirmisher;
 }
 
+
+void ABreakerGameMode::BindFernhallMissionJournal(APawn* Pawn)
+{
+    ABreakerCharacter* Character = Cast<ABreakerCharacter>(Pawn);
+    UBreakerQuestJournal* Journal = Character ? Character->GetQuestJournal() : nullptr;
+    if (!Journal) return;
+    if (Journal == FernhallMissionJournal.Get())
+    {
+        // Save restoration intentionally emits no new-flag events. Startup
+        // may bind before Character BeginPlay restores this same journal.
+        if (FernhallObservedFlagCount != Journal->GetFlags().Num()) RefreshFernhallMission();
+        return;
+    }
+    if (FernhallMissionJournal.IsValid()) FernhallMissionJournal->OnFlagSet.RemoveAll(this);
+    FernhallMissionJournal = Journal;
+    Journal->OnFlagSet.AddUObject(this, &ABreakerGameMode::RefreshFernhallMission);
+    RefreshFernhallMission();
+}
+
+void ABreakerGameMode::RefreshFernhallMission(FName ChangedFlag)
+{
+    UBreakerQuestJournal* Journal = FernhallMissionJournal.Get();
+    UWorld* World = GetWorld();
+    if (!bFernhallMissionReady || !Journal || !World || !HasAuthority()) return;
+    FernhallObservedFlagCount = Journal->GetFlags().Num();
+    const bool bContactCurrent = Journal->HasFlag(TEXT("Quest.Deeper.TurnedIn"))
+        && !UBreakerMissionLibrary::WorldEncounterCompletionFlagsFor(
+            TEXT("fernhall.altered_contact"), Journal->GetState()).IsEmpty();
+    if (bContactCurrent && !AlteredContact.IsValid() && !bAlteredContactDeathConsumed)
+    {
+        FHitResult Floor;
+        FCollisionQueryParams Query(SCENE_QUERY_STAT(AlteredContactFloor), false);
+        if (World->LineTraceSingleByObjectType(Floor, AlteredContactPosition + FVector(0, 0, 3000),
+            AlteredContactPosition - FVector(0, 0, 3000), FCollisionObjectQueryParams(ECC_WorldStatic), Query)
+            && Floor.ImpactNormal.Z >= 0.7f)
+        {
+            FActorSpawnParameters Parameters;
+            Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+            ABreakerAlteredEnemy* Contact = World->SpawnActor<ABreakerAlteredEnemy>(
+                ABreakerAlteredEnemy::StaticClass(), Floor.ImpactPoint + FVector(0, 0, 200), FRotator::ZeroRotator, Parameters);
+            if (Contact)
+            {
+                UCapsuleComponent* Capsule = Contact->FindComponentByClass<UCapsuleComponent>();
+                if (!Capsule) { Contact->Destroy(); return; }
+                const FVector At = Floor.ImpactPoint + FVector(0, 0, Capsule->GetScaledCapsuleHalfHeight() + 2);
+                Query.AddIgnoredActor(Contact);
+                if (World->OverlapBlockingTestByChannel(At, FQuat::Identity, ECC_Pawn,
+                    FCollisionShape::MakeCapsule(Capsule->GetScaledCapsuleRadius(), Capsule->GetScaledCapsuleHalfHeight()), Query))
+                    Contact->Destroy();
+                else
+                {
+                    Contact->SetActorLocation(At);
+                    Contact->ConfigureWave(16); // O2 Act II contact band; finite, outside the wave controller.
+                    Contact->ConfigureEncounter(At, 0);
+                    Contact->Tags.Add(TEXT("Fernhall.AlteredContact"));
+                    AlteredContact = Contact;
+                    UE_LOG(LogTemp, Display, TEXT("[Mission] dedicated Fernhall contact spawned at %s"), *At.ToString());
+                    bAlteredContactWoundApplied = false;
+                    ApplyAlteredContactWound();
+                    if (UBreakerCombatComponent* Combat = Contact->FindComponentByClass<UBreakerCombatComponent>())
+                        Combat->OnDeath.AddDynamic(this, &ABreakerGameMode::HandleAlteredContactDeath);
+                }
+            }
+        }
+    }
+    if (!BreachDoor.IsValid() && Journal->HasFlag(TEXT("Quest.AlteredContact.TurnedIn"))
+        && Journal->HasFlag(TEXT("Quest.Breach.Accepted")))
+    {
+        FHitResult Floor;
+        if (World->LineTraceSingleByObjectType(Floor, BreachDoorPosition + FVector(0, 0, 3000),
+            BreachDoorPosition - FVector(0, 0, 3000), FCollisionObjectQueryParams(ECC_WorldStatic))
+            && Floor.ImpactNormal.Z >= 0.7f)
+        {
+            ABreakerRiftDoor* Door = World->SpawnActor<ABreakerRiftDoor>(ABreakerRiftDoor::StaticClass(),
+                FTransform(FRotator::ZeroRotator, Floor.ImpactPoint + FVector(0, 0, 100)));
+            if (Door)
+            {
+                Door->Rift = UBreakerZoneBuilder::FernhallRiftFor(TEXT("breach"));
+                Door->OnRiftEntryRequested.AddUObject(this, &ABreakerGameMode::HandleRiftEntryRequested);
+                BreachDoor = Door;
+                UE_LOG(LogTemp, Display, TEXT("[Mission] earned Breach entrance restored at %s"), *Door->GetActorLocation().ToString());
+            }
+        }
+    }
+}
+
+void ABreakerGameMode::ApplyAlteredContactWound()
+{
+    ABreakerAlteredEnemy* Contact = AlteredContact.Get();
+    if (!Contact || !Contact->HasActorBegunPlay() || bAlteredContactWoundApplied || bAlteredContactDeathConsumed) return;
+    // Initial map construction can precede BeginPlay, which restores the
+    // chassis. Apply once after that restore; never heal subsequent damage.
+    if (UAbilitySystemComponent* ASC = Contact->GetAbilitySystemComponent())
+    {
+        bAlteredContactWoundApplied = true;
+        const float Health = ASC->GetNumericAttribute(UBreakerAttributeSet::GetHealthAttribute());
+        ASC->SetNumericAttributeBase(UBreakerAttributeSet::GetHealthAttribute(),
+            FMath::Min(Health, Contact->GetMonsterMaxHealth() * 0.35f));
+    }
+}
+
+void ABreakerGameMode::HandleAlteredContactDeath()
+{
+    UBreakerQuestJournal* Journal = FernhallMissionJournal.Get();
+    const ABreakerAlteredEnemy* Contact = AlteredContact.Get();
+    const UBreakerCombatComponent* Combat = Contact ? Contact->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    if (!HasAuthority() || !Journal || bAlteredContactDeathConsumed || !Combat || !Combat->IsDead()) return;
+    bAlteredContactDeathConsumed = true;
+    for (FName Flag : UBreakerMissionLibrary::WorldEncounterCompletionFlagsFor(
+        TEXT("fernhall.altered_contact"), Journal->GetState())) Journal->SetFlag(Flag);
+}
 
 void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Markers)
 {

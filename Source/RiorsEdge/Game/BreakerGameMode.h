@@ -504,6 +504,19 @@ public:
 
 private:
     void SpawnFernhallEncounters(const FBreakerZoneMarkers& Markers);
+    void BindFernhallMissionJournal(APawn* Pawn);
+    void RefreshFernhallMission(FName ChangedFlag = NAME_None);
+    UFUNCTION() void HandleAlteredContactDeath();
+    TWeakObjectPtr<class UBreakerQuestJournal> FernhallMissionJournal;
+    TWeakObjectPtr<class ABreakerAlteredEnemy> AlteredContact;
+    TWeakObjectPtr<class ABreakerRiftDoor> BreachDoor;
+    FVector AlteredContactPosition = FVector::ZeroVector;
+    FVector BreachDoorPosition = FVector::ZeroVector;
+    bool bFernhallMissionReady = false;
+    int32 FernhallObservedFlagCount = INDEX_NONE;
+    bool bAlteredContactDeathConsumed = false;
+    bool bAlteredContactWoundApplied = false;
+    void ApplyAlteredContactWound();
     FFieldFrame Frame;
     bool bFieldFrameSet = false;
     void BuildFieldFrame(const APawn* Pawn);
@@ -623,6 +636,9 @@ private:
     // and honestly a new run — which is why no idempotence counter is needed
     // anywhere downstream.
     bool bRiftRunCompleted = false;
+    // Scoped only around the actual authored boss's death callback. A dev
+    // completion may pay its ordinary purse but never fabricates story evidence.
+    bool bVerifiedStoryBossDeath = false;
     // THIS WORLD IS A RIFT INSTANCE (Part One-Q). Fernhall's geometry with a
     // PendingRift set is a different INSTANCE of the same tileset, which is
     // what an instanced rift is: same ground, separate run. The flag is what

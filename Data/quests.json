@@ -19,7 +19,15 @@
 		"Quest.Deeper.Offered",
 		"Quest.Deeper.Accepted",
 		"Quest.Deeper.SweepDone",
-		"Quest.Deeper.TurnedIn"
+		"Quest.Deeper.TurnedIn",
+		"Quest.AlteredContact.Offered",
+		"Quest.AlteredContact.Accepted",
+		"Quest.AlteredContact.ContactDown",
+		"Quest.AlteredContact.TurnedIn",
+		"Quest.Breach.Offered",
+		"Quest.Breach.Accepted",
+		"Quest.Breach.MarshalDown",
+		"Quest.Breach.TurnedIn"
 	],
 	"quests": [
 		{
@@ -124,6 +132,54 @@
 				"itemCount": 2,
 				"minimumRarity": "Exceptional",
 				"itemLevel": 1
+			}
+		},
+		{
+			"id": "Quest.AlteredContact",
+			"title": "A DIFFERENT UNIFORM",
+			"giver": "QUARTERMASTER",
+			"offeredFlag": "Quest.AlteredContact.Offered",
+			"acceptedFlag": "Quest.AlteredContact.Accepted",
+			"turnedInFlag": "Quest.AlteredContact.TurnedIn",
+			"objectives": [
+				{
+					"id": "Contact",
+					"text": "Investigate the lone contact at the Fernhall rail trench",
+					"completionFlag": "Quest.AlteredContact.ContactDown",
+					"progressCounter": "",
+					"requiredCount": 0,
+					"requiresEliteKill": false
+				}
+			],
+			"reward":
+			{
+				"itemCount": 1,
+				"minimumRarity": "Exceptional",
+				"itemLevel": 16
+			}
+		},
+		{
+			"id": "Quest.Breach",
+			"title": "THE BREACH",
+			"giver": "QUARTERMASTER",
+			"offeredFlag": "Quest.Breach.Offered",
+			"acceptedFlag": "Quest.Breach.Accepted",
+			"turnedInFlag": "Quest.Breach.TurnedIn",
+			"objectives": [
+				{
+					"id": "Marshal",
+					"text": "Enter the Breach and defeat the Field Marshal",
+					"completionFlag": "Quest.Breach.MarshalDown",
+					"progressCounter": "",
+					"requiredCount": 0,
+					"requiresEliteKill": false
+				}
+			],
+			"reward":
+			{
+				"itemCount": 2,
+				"minimumRarity": "Exceptional",
+				"itemLevel": 20
 			}
 		}
 	]

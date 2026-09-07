@@ -208,6 +208,16 @@ branch that most wants to aim. The threshold comes down, or aim-down-sights
 states are exempt from it, or both. A permanent class whose most natural
 playstyle disables its own resource is a mistake the player cannot take back.
 
+## Swift movement nodes (2026-09-07)
+
+Swift's Read the Room now extends airborne resource credit from three seconds
+to 4.5/6 seconds at ranks 1/2. Only returning to real ground refills it;
+buying a rank while airborne does not. Landing measures the continuous fall
+from its peak and grants 2/3 Momentum per metre beyond six metres, capped at
+20/30 per landing. Teleports and traversal reset the measured fall. These are
+editable Momentum-component O2 defaults, tested through real movement and
+node purchases; they are not yet playtest-balanced values.
+
 ## Open
 
 - Whether Momentum's generation threshold is a deliberate tension or a trap.
