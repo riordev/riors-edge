@@ -5,6 +5,7 @@
 #include "BreakerAbilityStateComponent.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerWindowEnded, FName, WindowKey);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FBreakerMaintainedRecipientsChanged);
 
 // SI-9 (Ability-Implementation-Spec §2.5). Eleven abilities and a dozen tree
 // nodes need "a named state that lasts N seconds" or "a counter per target that
@@ -60,6 +61,12 @@ public:
     void StartOwnedWindow(FName Key, FName OwnerKey, float Duration);
     void CloseOwnedWindow(FName Key, FName OwnerKey);
     float GetOwnedWindowRemaining(FName Key, FName OwnerKey) const;
+
+    // Caster-owned membership; multiple maintained buffs count a living holder once.
+    void SetMaintainedBuffRecipients(FName OwnerKey, const TArray<AActor*>& Recipients);
+    void ClearMaintainedBuffRecipients(FName OwnerKey);
+    int32 GetMaintainedBuffRecipientCount() const;
+    UPROPERTY() FBreakerMaintainedRecipientsChanged OnMaintainedBuffRecipientsChanged;
     // One scalar carried by the window itself, so a state that rewrites a rule
     // can also carry the rule's magnitude without a second registry. Unmake is
     // the first user: it opens a window whose payload is the cost scalar every
@@ -130,6 +137,7 @@ private:
     };
     TMap<FName, FWindowState> Windows;
     TMap<FName, TMap<FName, float>> OwnedWindows;
+    TMap<FName, TArray<TWeakObjectPtr<AActor>>> MaintainedBuffRecipients;
 
     // Shares the component's Clock, so the mark expires on exactly the same
     // schedule as the window that opened it.

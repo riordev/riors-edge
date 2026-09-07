@@ -67,6 +67,13 @@ Downbeat's active Conduit doubles the bonus above 1, producing 1.5 at these
 defaults. `ConductingTailSeconds` is 2. All are O2 placeholder values in
 `abilities.json`, loaded once per process.
 
+## Support Metronome
+
+Metronome's `RecipientRadiusCm` selects recipients at cast, currently 500 cm
+(O2). `FlatDamagePerStack`, `MaximumStacks` and `StreakGapSeconds` tune each
+holder's independent weapon ramp. Conduit's `DownbeatFlatDamagePerBuffedTarget`
+uses the live unique count of your Cadence and Metronome recipients.
+
 ## Tank landing and stagger
 
 Ground Zero resolves its hit when the plunge physically lands. Its damage

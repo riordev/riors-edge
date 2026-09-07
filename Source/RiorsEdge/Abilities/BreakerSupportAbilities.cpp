@@ -243,7 +243,7 @@ void UBreakerSupportAbility::RefreshBuffUptime(ABreakerCharacter* Character)
     const UBreakerAbilityStateComponent* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>();
     if (!Charge || !State) return;
     // A BOOL by construction: two live buffs pay exactly what one pays.
-    const bool bAnyBuff = State->IsWindowActive(UBreakerAbility_Metronome::WindowKey());
+    const bool bAnyBuff = false; // Maintained source keys own generation; receiving a buff earns no upkeep.
     Charge->SetAnyBuffActive(bAnyBuff);
 }
 
@@ -674,6 +674,9 @@ void UBreakerAbility_Cadence::RefreshAura()
         RefreshBuffUptime(Recipient);
     }
     InsideRecipients = MoveTemp(Inside);
+    TArray<AActor*> LiveHolders;
+    for (const auto& Held : Recipients) if (auto* Recipient = Held.Get()) LiveHolders.Add(Recipient);
+    if (auto* State = UBreakerAbilityStateComponent::FindOrAdd(Character)) State->SetMaintainedBuffRecipients(TempoOwnerKey, LiveHolders);
     if (auto* Charge = Character->FindComponentByClass<UBreakerChargeComponent>())
         Charge->SetMaintainedBuffActive(TempoOwnerKey, !Recipients.IsEmpty());
     // Owned window expiry is the payload clock too: Continuance extensions
@@ -708,7 +711,7 @@ void UBreakerAbility_Cadence::EndAbility(const FGameplayAbilitySpecHandle Handle
             if (auto* Charge = Character->FindComponentByClass<UBreakerChargeComponent>()) Charge->SetMaintainedBuffActive(TempoOwnerKey, false);
             Character->GetCombat()->OnDeath.RemoveDynamic(this, &ThisClass::HandleCadenceDeath);
             if (auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>())
-                bReappliedWhileLive = State->GetOwnedWindowRemaining(WindowKey(), TempoOwnerKey) > .1f;
+                { bReappliedWhileLive = !bWasCancelled && State->GetOwnedWindowRemaining(WindowKey(), TempoOwnerKey) > .1f; State->ClearMaintainedBuffRecipients(TempoOwnerKey); }
         }
         const auto Previous = Recipients.Array();
         for (const auto& Held : Previous) if (auto* Recipient = Held.Get()) RemoveRecipient(Recipient);
@@ -728,7 +731,6 @@ UBreakerAbility_Metronome::UBreakerAbility_Metronome()
 {
     FallbackAbilityId = TEXT("Support.Metronome");
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
-    // CO4 Rehearsal: re-applying a live buff must be a legal cast.
     bRetriggerInstancedAbility = true;
 }
 
@@ -737,97 +739,128 @@ FName UBreakerAbility_Metronome::OutgoingModifierKey() { return TEXT("Metronome"
 
 void UBreakerAbility_Metronome::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
-    const UBreakerAbilityDefinition* Definition = GetAbilityDefinition();
     ABreakerCharacter* Character = GetBreakerCharacter();
     UWorld* World = Character ? Character->GetWorld() : nullptr;
-    UBreakerCombatComponent* Combat = Character ? Character->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
-    if (!World || !Combat || !CommitAbility(Handle, ActorInfo, ActivationInfo))
+    UBreakerChargeComponent* Charge = Character ? Character->FindComponentByClass<UBreakerChargeComponent>() : nullptr;
+    const bool bResonantAtCast = Charge && Charge->GetChargeBand() == EBreakerChargeBand::Resonant;
+    const float PaidCost = GetResourceCost();
+    if (!World || Character->GetCombat()->IsDead() || !CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return;
     }
-
-    UBreakerChargeComponent* Charge = Character->FindComponentByClass<UBreakerChargeComponent>();
-
-    // CO4 REHEARSAL: a re-application refreshes STACKS INTACT and refunds part
-    // of the cost (R2: larger). Without the node a re-cast resets the ramp,
-    // exactly as before.
     const int32 RehearsalRank = SupportNodeRank(Character, TEXT("Support.Conductor.Rehearsal"));
-    const bool bRehearsalRefresh = RehearsalRank > 0 && bReappliedWhileLive;
-    if (bRehearsalRefresh && Charge)
-    {
-        Charge->GrantCharge(GetResourceCost() * (RehearsalRank >= 2 ? 0.5f : 0.25f));   // O2 PLACEHOLDER
-    }
+    const bool bRefresh = RehearsalRank > 0 && bReappliedWhileLive && World->GetTimeSeconds() < RehearsalUntil;
+    if (bRefresh && Charge) Charge->GrantCharge(PaidCost * (RehearsalRank >= 2 ? .5f : .25f)); // O2 PLACEHOLDER
     bReappliedWhileLive = false;
-
-    // CO1 DOWNBEAT DISCIPLINE and CO9 STANDING OVATION, the Cadence twins.
+    const UBreakerAbilityDefinition* Definition = GetAbilityDefinition();
     float Duration = Definition ? Definition->WindowDuration : 8.0f;
-    const int32 DisciplineRank = SupportNodeRank(Character, TEXT("Support.Conductor.DownbeatDiscipline"));
-    if (DisciplineRank > 0) Duration += DisciplineRank >= 2 ? 4.0f : 2.0f;   // O2 PLACEHOLDER
-    if (SupportHasNode(Character, BreakerNodeTags::Node_CO_StandingOvation.GetTag())
-        && Charge && Charge->GetChargeBand() == EBreakerChargeBand::Resonant)
-    {
-        Duration *= 1.5f;   // O2 PLACEHOLDER
-    }
-
-    if (UBreakerAbilityStateComponent* State = UBreakerAbilityStateComponent::FindOrAdd(Character))
-    {
-        State->StartWindow(WindowKey(), Duration);
-    }
-    RefreshBuffUptime(Character);
-    if (!bRehearsalRefresh)
-    {
-        Stacks = 0;
-        LastHitTime = -1000.0;
-    }
-    BoundCombat = Combat;
-    Combat->OnHitDealt.AddDynamic(this, &UBreakerAbility_Metronome::HandleHitDealt);
+    if (bResonantAtCast && SupportHasNode(Character, BreakerNodeTags::Node_CO_StandingOvation.GetTag())) Duration *= 1.5f; // O2 PLACEHOLDER
+    const int32 Discipline = SupportNodeRank(Character, TEXT("Support.Conductor.DownbeatDiscipline"));
+    float SelfTail = Discipline >= 2 ? 4.0f : Discipline == 1 ? 2.0f : 0.0f; // O2 PLACEHOLDER
+    if (bResonantAtCast && SupportHasNode(Character, BreakerNodeTags::Node_CO_StandingOvation.GetTag())) SelfTail *= 1.5f;
+    RampOwnerKey = FName(*FString::Printf(TEXT("Metronome.%u"), GetUniqueID()));
     bMetronomeActive = true;
+    for (TActorIterator<ABreakerCharacter> It(World); It; ++It)
+    {
+        ABreakerCharacter* Holder = *It;
+        if (!Holder || Holder->IsActorBeingDestroyed() || !Holder->GetCombat() || Holder->GetCombat()->IsDead()) continue;
+        if (Holder != Character && FVector::DistSquared(Holder->GetActorLocation(), Character->GetActorLocation()) > FMath::Square(RecipientRadiusCm)) continue;
+        FHolderRamp Ramp;
+        if (bRefresh) if (const auto* Previous = RehearsalRamps.Find(Holder)) Ramp = *Previous;
+        Holders.Add(Holder, Ramp);
+        auto* State = UBreakerAbilityStateComponent::FindOrAdd(Holder);
+        State->StartOwnedWindow(WindowKey(), RampOwnerKey, Duration + (Holder == Character ? SelfTail : 0));
+        State->OnWindowEnded.AddUniqueDynamic(this, &ThisClass::HandleMetronomeWindowEnded);
+        Holder->GetCombat()->OnHitDealt.AddUniqueDynamic(this, &ThisClass::HandleHitDealt);
+        Holder->GetCombat()->OnDeath.AddUniqueDynamic(this, &ThisClass::HandleMetronomeDeath);
+    }
+    RehearsalRamps.Reset();
+    RefreshHolders();
     BreakerSupportAbilityLocal::BreakerSupportCastFlash(Character, BreakerUI::Cyan, 40.0f);
-    World->GetTimerManager().SetTimer(WindowTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { CloseMetronome(); }), Duration, false);
+    World->GetTimerManager().SetTimer(WindowTimer, this, &ThisClass::RefreshHolders, .05f, true);
+}
+
+void UBreakerAbility_Metronome::RemoveHolder(ABreakerCharacter* Holder)
+{
+    if (!Holder) return;
+    Holders.Remove(Holder);
+    if (auto* Combat = Holder->GetCombat())
+    {
+        Combat->OnHitDealt.RemoveDynamic(this, &ThisClass::HandleHitDealt);
+        Combat->OnDeath.RemoveDynamic(this, &ThisClass::HandleMetronomeDeath);
+        Combat->PopWeaponFlatDamage(RampOwnerKey);
+    }
+    if (auto* State = Holder->FindComponentByClass<UBreakerAbilityStateComponent>())
+    {
+        State->OnWindowEnded.RemoveDynamic(this, &ThisClass::HandleMetronomeWindowEnded);
+        State->CloseOwnedWindow(WindowKey(), RampOwnerKey);
+    }
+    RefreshBuffUptime(Holder);
+}
+
+void UBreakerAbility_Metronome::RefreshHolders()
+{
+    if (!bMetronomeActive || bRefreshingHolders) return;
+    TGuardValue<bool> Guard(bRefreshingHolders, true);
+    ABreakerCharacter* Character = GetBreakerCharacter();
+    if (!Character || Character->IsActorBeingDestroyed() || Character->GetCombat()->IsDead()) { CloseMetronome(); return; }
+    const double Now = GetWorld()->GetTimeSeconds();
+    const int32 Tempo = SupportNodeRank(Character, TEXT("Support.Conductor.Tempo"));
+    const auto* SourceState = Character->FindComponentByClass<UBreakerAbilityStateComponent>();
+    const bool bDownbeat = SupportHasNode(Character, FGameplayTag::RequestGameplayTag(TEXT("Keystone.Support.Downbeat"), false))
+        && SourceState && SourceState->IsWindowActive(ConduitWindowKey());
+    TArray<TWeakObjectPtr<ABreakerCharacter>> Previous;
+    Holders.GetKeys(Previous);
+    TArray<AActor*> Living;
+    for (const auto& Weak : Previous)
+    {
+        ABreakerCharacter* Holder = Weak.Get();
+        if (!Holder) { Holders.Remove(Weak); continue; }
+        auto* State = Holder->FindComponentByClass<UBreakerAbilityStateComponent>();
+        if (Holder->IsActorBeingDestroyed() || Holder->GetCombat()->IsDead() || !State || State->GetOwnedWindowRemaining(WindowKey(), RampOwnerKey) <= 0)
+        { RemoveHolder(Holder); continue; }
+        FHolderRamp* Ramp = Holders.Find(Weak);
+        const bool bTempo = Tempo >= 2 || (Tempo == 1 && Holder == Character);
+        const float Gap = StreakGapSeconds * (bTempo ? 1.5f : 1.0f); // O2 PLACEHOLDER
+        if (Now - Ramp->LastHitTime >= Gap) Ramp->Stacks = 0;
+        Ramp->Stacks = FMath::Min(Ramp->Stacks, static_cast<float>(MaximumStacks + (bTempo ? 3 : 0))); // O2 PLACEHOLDER
+        Holder->GetCombat()->PushWeaponFlatDamage(RampOwnerKey, FlatDamagePerStack * Ramp->Stacks * (bDownbeat ? 2.0f : 1.0f));
+        Living.Add(Holder);
+        RefreshBuffUptime(Holder);
+    }
+    if (auto* State = UBreakerAbilityStateComponent::FindOrAdd(Character)) State->SetMaintainedBuffRecipients(RampOwnerKey, Living);
+    if (auto* Charge = Character->FindComponentByClass<UBreakerChargeComponent>()) Charge->SetMaintainedBuffActive(RampOwnerKey, !Living.IsEmpty());
+    if (Holders.IsEmpty()) CloseMetronome();
 }
 
 void UBreakerAbility_Metronome::HandleHitDealt(const FBreakerHitContext& Hit)
 {
-    if (!bMetronomeActive) return;
-    UWorld* World = GetWorld();
-    if (!World) return;
+    if (!bMetronomeActive || Hit.Result.bDodged || Hit.Result.HealthDamage + Hit.Result.ShieldDamage <= 0
+        || !FMath::IsFinite(Hit.ProcCoefficient) || Hit.ProcCoefficient <= 0) return;
     ABreakerCharacter* Character = GetBreakerCharacter();
-    // CO8 COUNTERPOINT: the ramp climbs from ANY damage the buffed target
-    // deals — ticks included, at their own cadence. WITHOUT it, DoT ticks do
-    // not count (§U4 authors weapon hits; a bleed climbing the ramp on its own
-    // was over-generous). RECORDED LIMIT: the hit context cannot tell a weapon
-    // hit from an ability hit, so that finer cut waits on a context tag.
+    ABreakerCharacter* Holder = Cast<ABreakerCharacter>(Hit.Instigator);
+    if (!Character || !Holder || !Holders.Contains(Holder)) return;
     const bool bCounterpoint = SupportHasNode(Character, BreakerNodeTags::Node_CO_Counterpoint.GetTag());
-    if (Hit.bFromDoT && !bCounterpoint) return;
-    const double Now = World->GetTimeSeconds();
-    // §U4: a full second without a hit resets the ramp. PER HOLDER — solo the
-    // Support's own ramp is the only one, and it is not shared or averaged.
-    // CO5 TEMPO: the ramp stacks higher and resets slower for YOU specifically
-    // (R2's everyone-you-buffed clause waits on a party existing).
-    const int32 TempoRank = SupportNodeRank(Character, TEXT("Support.Conductor.Tempo"));
-    const float EffectiveGap = TempoRank > 0 ? StreakGapSeconds * 1.5f : StreakGapSeconds;   // O2 PLACEHOLDER
-    const int32 EffectiveMaxStacks = TempoRank > 0 ? MaximumStacks + 3 : MaximumStacks;      // O2 PLACEHOLDER
-    if (Now - LastHitTime > EffectiveGap)
-    {
-        Stacks = 0;
-    }
-    LastHitTime = Now;
-    Stacks = FMath::Min(Stacks + 1, EffectiveMaxStacks);
-    if (UBreakerCombatComponent* Combat = BoundCombat.Get())
-    {
-        // Re-pushing the key replaces the entry, so the ramp reads as one
-        // growing flat contribution, never a stack of modifiers.
-        Combat->PushOutgoingModifier(OutgoingModifierKey(), FlatDamagePerStack * Stacks, 1.0f, EffectiveGap);
-    }
+    const FGameplayTag AbilityTag = FGameplayTag::RequestGameplayTag(TEXT("Ability"), false);
+    const FGameplayTag MeleeTag = FGameplayTag::RequestGameplayTag(TEXT("Damage.Melee"), false);
+    if (!bCounterpoint && (Hit.bFromDoT || Hit.Delivery != EBreakerDamageDelivery::Weapon
+        || Hit.SourceTags.HasTag(AbilityTag) || Hit.SourceTags.HasTagExact(MeleeTag))) return;
+    RefreshHolders();
+    FHolderRamp* Ramp = Holders.Find(Holder);
+    if (!Ramp) return;
+    const int32 Tempo = SupportNodeRank(Character, TEXT("Support.Conductor.Tempo"));
+    const bool bTempo = Tempo >= 2 || (Tempo == 1 && Holder == Character);
+    Ramp->LastHitTime = GetWorld()->GetTimeSeconds();
+    Ramp->Stacks = FMath::Min(Ramp->Stacks + FMath::Clamp(Hit.ProcCoefficient, 0.0f, 1.0f), static_cast<float>(MaximumStacks + (bTempo ? 3 : 0)));
+    RefreshHolders();
 }
 
+void UBreakerAbility_Metronome::HandleMetronomeDeath() { RefreshHolders(); }
+void UBreakerAbility_Metronome::HandleMetronomeWindowEnded(FName Key) { if (Key == WindowKey()) RefreshHolders(); }
 void UBreakerAbility_Metronome::CloseMetronome()
 {
-    if (CurrentActorInfo)
-    {
-        EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
-    }
+    if (CurrentActorInfo && IsActive()) EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UBreakerAbility_Metronome::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
@@ -835,26 +868,32 @@ void UBreakerAbility_Metronome::EndAbility(const FGameplayAbilitySpecHandle Hand
     if (bMetronomeActive)
     {
         bMetronomeActive = false;
-        if (UBreakerCombatComponent* Combat = BoundCombat.Get())
+        RehearsalRamps.Reset(); bReappliedWhileLive = false; RehearsalUntil = 0;
+        ABreakerCharacter* Character = GetBreakerCharacter();
+        TArray<TWeakObjectPtr<ABreakerCharacter>> Previous;
+        Holders.GetKeys(Previous);
+        for (const auto& Weak : Previous)
         {
-            Combat->OnHitDealt.RemoveDynamic(this, &UBreakerAbility_Metronome::HandleHitDealt);
-            Combat->RemoveOutgoingModifier(OutgoingModifierKey());
-        }
-        BoundCombat.Reset();
-        if (ABreakerCharacter* Character = GetBreakerCharacter())
-        {
-            if (UBreakerAbilityStateComponent* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>())
+            if (ABreakerCharacter* Holder = Weak.Get())
             {
-                // CO4's re-application detection, the Cadence twin.
-                bReappliedWhileLive = State->GetWindowRemaining(WindowKey()) > 0.1f;
-                State->CloseWindow(WindowKey());
+                if (Character && !Character->GetCombat()->IsDead() && !Holder->GetCombat()->IsDead())
+                    if (auto* State = Holder->FindComponentByClass<UBreakerAbilityStateComponent>())
+                        if (const float Remaining = State->GetOwnedWindowRemaining(WindowKey(), RampOwnerKey); !bWasCancelled && Remaining > .1f)
+                        {
+                            RehearsalRamps.Add(Weak, Holders.FindChecked(Weak));
+                            bReappliedWhileLive = true;
+                            RehearsalUntil = FMath::Max(RehearsalUntil, GetWorld()->GetTimeSeconds() + Remaining);
+                        }
+                RemoveHolder(Holder);
             }
-            RefreshBuffUptime(Character);
         }
-        if (UWorld* World = GetWorld())
+        Holders.Reset();
+        if (Character)
         {
-            World->GetTimerManager().ClearTimer(WindowTimer);
+            if (auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>()) State->ClearMaintainedBuffRecipients(RampOwnerKey);
+            if (auto* Charge = Character->FindComponentByClass<UBreakerChargeComponent>()) Charge->SetMaintainedBuffActive(RampOwnerKey, false);
         }
+        if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(WindowTimer);
     }
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
@@ -862,7 +901,6 @@ void UBreakerAbility_Metronome::EndAbility(const FGameplayAbilitySpecHandle Hand
 // ---------------------------------------------------------------------------
 // U5 — MARK
 // ---------------------------------------------------------------------------
-
 UBreakerAbility_Mark::UBreakerAbility_Mark()
 {
     FallbackAbilityId = TEXT("Support.Mark");
@@ -1086,6 +1124,7 @@ void UBreakerAbility_Mark::HandleHitDealt(const FBreakerHitContext& Hit)
                 Charge->ConsumeBloodDebt();
                 FBreakerDamageRequest Settlement;
                 Settlement.BaseDamage = Debt;
+                Settlement.SourceTags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Ability.Class.Support.Mark"), false));
                 Settlement.DamageFamily = EBreakerDamageFamily::Physical;
                 Settlement.bCanCritical = false;
                 Settlement.ProcCoefficient = 0.0f;
@@ -1430,6 +1469,7 @@ void UBreakerAbility_Conduit::ActivateAbility(const FGameplayAbilitySpecHandle H
         State->StartWindowWithPayload(ConduitWindowKey(), Duration, Variant.AbilityCostMultiplier);
     }
     bConduitActive = true;
+    Character->GetCombat()->OnDeath.AddUniqueDynamic(this, &ThisClass::HandleConduitDeath);
     World->GetTimerManager().SetTimer(WindowTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { CloseConduit(); }), Duration, false);
     // The ultimates' violet ignition (Overdrive's precedent), feet-anchored.
     if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World))
@@ -1460,10 +1500,14 @@ void UBreakerAbility_Conduit::ActivateAbility(const FGameplayAbilitySpecHandle H
     {
         // §3.1 DOWNBEAT: free casts stay; live Cadence doubles tempo bonuses
         // while this window is active. Every buffed target adds FLAT damage — solo,
-        // one buffed target: the Support.
+        // the live unique holders published by this caster determine the count.
         if (UBreakerCombatComponent* Combat = Character->FindComponentByClass<UBreakerCombatComponent>())
         {
-            Combat->PushOutgoingModifier(DownbeatModifierKey(), DownbeatFlatDamagePerBuffedTarget, 1.0f, Duration);
+            DownbeatOwnerKey = FName(*FString::Printf(TEXT("Conduit.Downbeat.%u"), GetUniqueID()));
+            if (auto* State = UBreakerAbilityStateComponent::FindOrAdd(Character))
+                State->OnMaintainedBuffRecipientsChanged.AddUniqueDynamic(this, &ThisClass::RefreshDownbeat);
+            RefreshDownbeat();
+            World->GetTimerManager().SetTimer(DownbeatTimer, this, &ThisClass::RefreshDownbeat, .05f, true);
         }
     }
     else if (bBlackout)
@@ -1490,6 +1534,19 @@ void UBreakerAbility_Conduit::ActivateAbility(const FGameplayAbilitySpecHandle H
     }
 }
 
+void UBreakerAbility_Conduit::RefreshDownbeat()
+{
+    if (!bConduitActive) return;
+    ABreakerCharacter* Character = GetBreakerCharacter();
+    if (!Character || Character->IsActorBeingDestroyed() || Character->GetCombat()->IsDead()) { CloseConduit(); return; }
+    const auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>();
+    const bool bEnabled = State && State->IsWindowActive(ConduitWindowKey())
+        && SupportHasNode(Character, FGameplayTag::RequestGameplayTag(TEXT("Keystone.Support.Downbeat"), false));
+    Character->GetCombat()->PushWeaponFlatDamage(DownbeatOwnerKey,
+        bEnabled ? DownbeatFlatDamagePerBuffedTarget * State->GetMaintainedBuffRecipientCount() : 0.0f);
+}
+
+void UBreakerAbility_Conduit::HandleConduitDeath() { CloseConduit(); }
 void UBreakerAbility_Conduit::HandleTriagePulse()
 {
     ABreakerCharacter* Character = GetBreakerCharacter();
@@ -1533,11 +1590,13 @@ void UBreakerAbility_Conduit::EndAbility(const FGameplayAbilitySpecHandle Handle
         {
             if (UBreakerAbilityStateComponent* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>())
             {
+                State->OnMaintainedBuffRecipientsChanged.RemoveDynamic(this, &ThisClass::RefreshDownbeat);
                 State->CloseWindow(ConduitWindowKey());
             }
             if (UBreakerCombatComponent* Combat = Character->FindComponentByClass<UBreakerCombatComponent>())
             {
-                Combat->RemoveOutgoingModifier(DownbeatModifierKey());
+                Combat->PopWeaponFlatDamage(DownbeatOwnerKey);
+                Combat->OnDeath.RemoveDynamic(this, &ThisClass::HandleConduitDeath);
             }
         }
         for (const TWeakObjectPtr<AActor>& Target : BlackoutTargets)
@@ -1564,6 +1623,7 @@ void UBreakerAbility_Conduit::EndAbility(const FGameplayAbilitySpecHandle Handle
         {
             World->GetTimerManager().ClearTimer(WindowTimer);
             World->GetTimerManager().ClearTimer(TriageTimer);
+            World->GetTimerManager().ClearTimer(DownbeatTimer);
         }
     }
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);

@@ -261,6 +261,21 @@ Tempo uses the strongest active reload and swap bonuses separately. Reloads
 and swaps capture their duration when they begin; aura changes affect the
 next action. Reloading transfers ammunition without creating rounds.
 
+Metronome selects living players within 500 cm when cast, always including
+its caster (O2 radius). Each selected holder keeps a separate ramp for the
+buff duration; later movement does not change this cast's membership.
+Successful weapon shots advance the ramp by proc coefficient. Ability and
+melee hits require Counterpoint, which also accepts damaging status ticks.
+Zero damage and zero proc do not advance or sustain a streak. Tempo improves
+the caster's cap and reset gap at rank one and all recipients at rank two.
+Rehearsal refreshes surviving holders without discarding their ramps.
+
+Metronome and Downbeat flat bonuses add before weapon Increased and More,
+including distinct maintaining sources. They exclude ability, melee and DoT
+requests, even when those requests use the weapon damage pool. Conduit's
+Downbeat counts unique living recipients of the caster's active Conductor
+buffs, and doubles Cadence's tempo bonus and Metronome's flat bonus while live.
+
 ## Open
 
 - Whether Momentum's generation threshold is a deliberate tension or a trap.

@@ -3655,8 +3655,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSupportConductorTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_Rehearsal.GetTag());
     Tree->Nodes.Add(Node);
 
-    // CO5. The self-first rule as a loop bonus. WAITING ON:
-    // UBreakerAbility_Metronome's stack cap and reset window.
+    // CO5. Rank one improves the caster's ramp; rank two improves every holder.
     Node = MakeNode(TEXT("Support.Conductor.Tempo"), TEXT("Tempo"),
         TEXT("Metronome stacks higher and resets slower for you specifically (R2: for everyone you buffed)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Support.Conductor.Sustain"));
@@ -3683,8 +3682,8 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSupportConductorTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_Conducting.GetTag());
     Tree->Nodes.Add(Node);
 
-    // CO8. "Grants U4 Metronome" is not authored. WAITING ON:
-    // UBreakerAbility_Metronome's stack accrual sources.
+    // CO8. Actual damaging ability hits and ticks advance each holder's ramp
+    // at their proc coefficient; this node does not grant the ability itself.
     Node = MakeNode(TEXT("Support.Conductor.Counterpoint"), TEXT("Counterpoint"),
         TEXT("Metronome stacks from ANY damage the buffed target deals — abilities, ticks at proc coefficient, deployables — not weapon hits alone."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 3, 1, 2);
     AddPrerequisite(Node, TEXT("Support.Conductor.Tempo"));

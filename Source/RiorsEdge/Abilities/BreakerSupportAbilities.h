@@ -181,16 +181,24 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Metronome", meta=(ClampMin="0")) float FlatDamagePerStack = 2.0f;   // O2 PLACEHOLDER
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Metronome", meta=(ClampMin="1")) int32 MaximumStacks = 5;   // O2 PLACEHOLDER ("to a cap", §U4)
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Metronome", meta=(ClampMin="0.1")) float StreakGapSeconds = 1.0f;   // §U4: resets on a full second without a hit
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Metronome", meta=(ClampMin="0")) float RecipientRadiusCm = 500.0f; // O2 PLACEHOLDER, cast-time snapshot
 
 private:
     UFUNCTION() void HandleHitDealt(const FBreakerHitContext& Hit);
+    UFUNCTION() void HandleMetronomeDeath();
+    UFUNCTION() void HandleMetronomeWindowEnded(FName Key);
+    void RefreshHolders();
+    void RemoveHolder(ABreakerCharacter* Holder);
     void CloseMetronome();
 
     FTimerHandle WindowTimer;
-    TWeakObjectPtr<UBreakerCombatComponent> BoundCombat;
     bool bMetronomeActive = false;
-    int32 Stacks = 0;
-    double LastHitTime = -1000.0;
+    bool bRefreshingHolders = false;
+    struct FHolderRamp { float Stacks = 0; double LastHitTime = -1000; };
+    TMap<TWeakObjectPtr<ABreakerCharacter>, FHolderRamp> Holders;
+    TMap<TWeakObjectPtr<ABreakerCharacter>, FHolderRamp> RehearsalRamps;
+    FName RampOwnerKey;
+    double RehearsalUntil = 0;
     // CO4 Rehearsal: a re-application refreshes stacks-intact and refunds.
     bool bReappliedWhileLive = false;
 };
@@ -337,11 +345,15 @@ public:
 
 private:
     UFUNCTION() void HandleBlackoutHit(const FBreakerHitContext& Hit);
+    UFUNCTION() void RefreshDownbeat();
+    UFUNCTION() void HandleConduitDeath();
     void HandleTriagePulse();
     void CloseConduit();
 
     FTimerHandle WindowTimer;
     FTimerHandle TriageTimer;
+    FTimerHandle DownbeatTimer;
+    FName DownbeatOwnerKey;
     TWeakObjectPtr<UBreakerCombatComponent> BoundCombat;
     TArray<TWeakObjectPtr<AActor>> BlackoutTargets;
     bool bConduitActive = false;

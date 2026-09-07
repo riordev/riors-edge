@@ -8,6 +8,38 @@ UBreakerAbilityStateComponent::UBreakerAbilityStateComponent()
     PrimaryComponentTick.bCanEverTick = true;
 }
 
+void UBreakerAbilityStateComponent::SetMaintainedBuffRecipients(FName OwnerKey, const TArray<AActor*>& Recipients)
+{
+    if (OwnerKey.IsNone()) return;
+    auto& Held = MaintainedBuffRecipients.FindOrAdd(OwnerKey);
+    const auto Previous = Held;
+    Held.Reset();
+    for (AActor* Recipient : Recipients)
+        if (IsValid(Recipient)) Held.AddUnique(Recipient);
+    const bool bChanged = Previous != Held;
+    if (Held.IsEmpty()) MaintainedBuffRecipients.Remove(OwnerKey);
+    if (bChanged) OnMaintainedBuffRecipientsChanged.Broadcast();
+}
+
+void UBreakerAbilityStateComponent::ClearMaintainedBuffRecipients(FName OwnerKey)
+{
+    if (MaintainedBuffRecipients.Remove(OwnerKey) > 0) OnMaintainedBuffRecipientsChanged.Broadcast();
+}
+
+int32 UBreakerAbilityStateComponent::GetMaintainedBuffRecipientCount() const
+{
+    const AActor* Source = GetOwner();
+    const auto* SourceCombat = Source ? Source->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    if (!IsValid(Source) || Source->IsActorBeingDestroyed() || (SourceCombat && SourceCombat->IsDead())) return 0;
+    TSet<AActor*> Unique;
+    for (const auto& Buff : MaintainedBuffRecipients)
+        for (const auto& Held : Buff.Value)
+            if (AActor* Recipient = Held.Get(); IsValid(Recipient) && !Recipient->IsActorBeingDestroyed())
+                if (const auto* Combat = Recipient->FindComponentByClass<UBreakerCombatComponent>(); Combat && !Combat->IsDead())
+                    Unique.Add(Recipient);
+    return Unique.Num();
+}
+
 UBreakerAbilityStateComponent* UBreakerAbilityStateComponent::FindOrAdd(AActor* Owner)
 {
     if (!Owner)

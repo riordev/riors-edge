@@ -206,6 +206,7 @@ Every lane permitted to touch outgoing player damage.
 | Lane | Bucket / cap |
 |---|---|
 | Flat | Summed first |
+| Maintained weapon flat | Metronome and Conduit source contributions add to shot base before Increased/More; ability-tagged, melee and DoT requests excluded |
 | Increased — Weapon | One additive bucket, no cap of its own |
 | Increased — Ability | One additive bucket, no cap of its own |
 | Increased — Shared | Joins whichever of the two applies |

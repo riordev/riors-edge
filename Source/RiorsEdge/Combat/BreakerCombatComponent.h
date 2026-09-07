@@ -106,6 +106,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="Combat|Outgoing")
     void RemoveOutgoingModifier(FName Key);
 
+    // Maintained weapon buffs own their keys and remove them on expiry/death.
+    void PushWeaponFlatDamage(FName Key, float FlatBonus);
+    void PopWeaponFlatDamage(FName Key);
+
     // Adds the composed flat bonus to BaseDamage and folds the More product
     // into SourceDamageMultiplier. O34: the chain's product counts against the
     // SAME aggregator-derived budget as the attribute-side Mores — total
@@ -327,6 +331,7 @@ private:
     void DispatchHitDealt(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result);
 
     UPROPERTY() TArray<FBreakerOutgoingModifier> OutgoingModifiers;
+    TMap<FName, float> WeaponFlatDamage;
     // Keyed so a pusher removes exactly its own entry. No expiry: an incoming
     // modifier reflects a state (Overcast, a defensive window) whose owner is
     // responsible for removing it, and a silently expiring defence is worse

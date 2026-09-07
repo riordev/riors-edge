@@ -5,11 +5,11 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
-## Cycle — Support Metronome and Conduit
-- [ ] Apply real per-holder weapon-hit ramps and purchased ally clauses with independent owned cleanup.
-- [ ] Make Conduit Downbeat count actual buff recipients and keep flat damage in the weapon lane.
-- [ ] Verify actual casts, overlap, proc weights, expiry and death; review, build, census and full suite.
-Remaining repairs include Support element nodes, ability balance, rarity identities, other weapon poses and audible combat polish.
+## Cycle — Support Painted and Mark routing
+- [ ] Route real marked-target damage by source, purchased Painted rank and proc weight, including rank-two allies.
+- [ ] Restrict Blood Debt settlement to real weapon hits and prevent recursive Charge credit.
+- [ ] Preserve mark transfer/kill cleanup and prove actual casts, rank purchases, allied hits and cancellation; build, census and suite.
+Remaining repairs include Triage/Attending, Support element nodes, ability balance, rarity identities, other weapon poses and audible combat polish.
 ## Playtest queue (owner, 2026-09-07)
 Continue through the entire repair list in tested batches without stopping after each commit for a playtest. After repairs, execute the content phase below (owner instruction, 2026-09-07).
 - (ui, npcs, systems) Reduce menu density and clipping; repair NPC interaction flow, ability assignment and point spending; present Core as the authored tree rather than a node cloud; update the dev sandbox. Finish silent nodes and Caster progression.
@@ -105,6 +105,8 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - Four Niagara systems at `/Game/Breaker/FX/NS_<Moment>` with a `Color` user parameter, or a free Fab VFX pack placed there
 
 ## Done (last three cycles; older is git)
+- **Support Metronome and Conduit:** Cast-time500cm living-player snapshot, independent proc-weighted weapon ramps, purchased Tempo ally behavior and Counterpoint damage sources. Owned cleanup and Rehearsal preserve live reapplication while refusing canceled caches; receiving buffs grants no upkeep. Conduit counts actual unique living holders and updates its weapon flat immediately on membership changes; bonus doubling composes correctly. Raw weapon flat excludes abilities, melee and DoT requests. One new editable radius key brings numeric registry to142. Build/census clean; **655 tests,652passed,3known,0unexpected**. New runtime test retains timing/value assertions after fixing an observed Conduit timer-order lag. Native Rift PASS24kills,2015XP,186Glass. Triage/Painted/Attending and element nodes remain unfinished. STATE unchanged under host-Python quarantine.
+
 - **Tank landing and stagger:** Binary timed interruption with resistance and immunity cancels actual enemy windups and interruptible player channels. Ground Zero waits for physical landing and scales from measured fall distance with the purchased Terminal Descent cap. Ordinary falls damage shields/health; owned Breach landings within three seconds preserve takeoff self-damage while granting Kinetic fall protection and 1.5-second stagger immunity. Foreign launches, teleport, death and respec refuse stale protection. Build/census clean; **654 tests, 651 passed, 3 known failures, 0 unexpected**. Physical fall fixtures use real rolled shield gear and retain original resource/damage assertions. Native Rift loop PASS:24kills,2015XP,217Glass. Warden slam delivery inspected, not separately exercised by automation. STATE unchanged under host-Python quarantine.
 
 - **Support Cadence and Section (2026-09-07):** Living player aura and self-first copy, walking-speed footprint and Section sprint follow, stationary Baton, owned overlapping windows and strongest reload/swap tempo. Conducting shortens actual recipient cooldowns; self detach-tail and Downbeat duration survive re-entry and extension. Charge upkeep belongs to the maintaining caster rather than receiving Supports. Exit, expiry, cancellation and death remove only the owning cast. Six editable numeric keys bring the registry to 141. Build/census clean; **651 tests, 648 pass, 3 known, 0 unexpected**. Corrected isolated fixture clocks and purchased prerequisite ranks within the authored eight-point budget. Native Rift loop **PASS: 24 kills, 2015 XP, 211 Glass**. Both captures inspected; opaque fill rejected and replaced by a boundary ring. Actual Conduit Downbeat activation has inspection-only coverage; broader Metronome ally clauses and element nodes remain. STATE unchanged under host-Python quarantine.

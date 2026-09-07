@@ -553,7 +553,8 @@
 			{
 				"FlatDamagePerStack": 2,
 				"MaximumStacks": 5,
-				"StreakGapSeconds": 1
+				"StreakGapSeconds": 1,
+				"RecipientRadiusCm": 500
 			},
 			"variants": []
 		},

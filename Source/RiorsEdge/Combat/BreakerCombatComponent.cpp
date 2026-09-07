@@ -936,13 +936,30 @@ FBreakerHealResult UBreakerCombatComponent::ApplyHealingAmount(float Amount, AAc
     return ApplyHealing(Request);
 }
 
+void UBreakerCombatComponent::PushWeaponFlatDamage(FName Key, float FlatBonus)
+{
+    if (Key.IsNone() || !FMath::IsFinite(FlatBonus)) return;
+    WeaponFlatDamage.Add(Key, FMath::Max(0.0f, FlatBonus));
+}
+
+void UBreakerCombatComponent::PopWeaponFlatDamage(FName Key)
+{
+    WeaponFlatDamage.Remove(Key);
+}
+
 void UBreakerCombatComponent::ApplyOutgoingModifiers(FBreakerDamageRequest& Request)
 {
     PruneExpiredOutgoingModifiers();
-    if (OutgoingModifiers.IsEmpty()) return;
+    if (OutgoingModifiers.IsEmpty() && WeaponFlatDamage.IsEmpty()) return;
 
     float Flat = 0.0f;
     for (const FBreakerOutgoingModifier& Modifier : OutgoingModifiers) Flat += Modifier.FlatBonus;
+    const FGameplayTag AbilitySource = FGameplayTag::RequestGameplayTag(TEXT("Ability"), false);
+    const FGameplayTag MeleeSource = FGameplayTag::RequestGameplayTag(TEXT("Damage.Melee"), false);
+    if (Request.Delivery == EBreakerDamageDelivery::Weapon
+        && !Request.bIsDamageOverTime
+        && !Request.SourceTags.HasTag(AbilitySource) && !Request.SourceTags.HasTag(MeleeSource))
+        for (const auto& Entry : WeaponFlatDamage) Flat += Entry.Value;
 
     // Flat first, then the More product — resolution order step 1. The chain's
     // product is a More, so it lands in BOTH the composed convenience value
