@@ -267,6 +267,11 @@ FBreakerViewmodelLayout BreakerViewmodel::ArchetypeLayout(EBreakerWeaponArchetyp
         L.SupportHandCm = FVector(34.0f, 0.0f, -3.5f);
         L.FiringHandCm = FVector(-1.0f, 0.0f, -7.0f);
         L.MuzzleCm = FVector(61.5f, 0.0f, 2.5f);
+        // O2 first-person fit: keep the shoulder cuts below/behind the camera
+        // instead of holding the entire third-person arm pose 46 cm forward.
+        L.HipOffsetCm = FVector(26.0f, 12.0f, -15.0f);
+        L.AdsForwardCm = 34.0f;
+        L.SightHeightCm = 11.5f;
         break;
     }
 
@@ -307,6 +312,13 @@ FBreakerViewmodelLayout BreakerViewmodel::ArchetypeLayout(EBreakerWeaponArchetyp
         }
     }
 
+    if (Archetype == EBreakerWeaponArchetype::Rifle)
+    {
+        L.NamedMeshPath = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/weapons/sci-fi/Gun_Rifle.Gun_Rifle"));
+        // Measured from LOD0 geometry by BreakerArms: this pack's thin muzzle
+        // faces -X, unlike the gun-pack meshes used by the other archetypes.
+        L.NamedMeshRotation = FRotator(0.0f, 180.0f, 0.0f);
+    }
     return L;
 }
 

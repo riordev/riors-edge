@@ -202,4 +202,30 @@ bool FBreakerNamedWeaponFacesForwardTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerRifleMuzzleGeometryTest,
+    "RiorsEdge.Weapons.NamedGun.RifleMuzzleMatchesGeometry",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FBreakerRifleMuzzleGeometryTest::RunTest(const FString& Parameters)
+{
+    const FBreakerViewmodelLayout Layout = BreakerViewmodel::ArchetypeLayout(EBreakerWeaponArchetype::Rifle);
+    UStaticMesh* Mesh = Cast<UStaticMesh>(Layout.NamedMeshPath.TryLoad());
+    if (!TestNotNull(TEXT("shipped rifle"), Mesh)) return false;
+    const FStaticMeshRenderData* Render = Mesh->GetRenderData();
+    if (!TestTrue(TEXT("rifle LOD0 geometry available to editor test"), Render && Render->LODResources.Num() > 0)) return false;
+    const FPositionVertexBuffer& Vertices = Render->LODResources[0].VertexBuffers.PositionVertexBuffer;
+    const FBox Bounds = Mesh->GetBoundingBox();
+    const double CapEnd = Bounds.Min.X + Bounds.GetSize().X * 0.02;
+    FVector Sum = FVector::ZeroVector;
+    int32 Count = 0;
+    for (uint32 Index = 0; Index < Vertices.GetNumVertices(); ++Index)
+    {
+        const FVector Position(Vertices.VertexPosition(Index));
+        if (Position.X <= CapEnd) { Sum += Position; ++Count; }
+    }
+    if (!TestTrue(TEXT("actual front cap contains vertices"), Count > 0)) return false;
+    TestTrue(TEXT("packaged muzzle datum still matches shipped geometry after reimport"),
+        (Sum / Count).Equals(BreakerViewmodel::RifleMuzzleMeshCm, 0.01));
+    return true;
+}
+
 #endif

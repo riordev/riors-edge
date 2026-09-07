@@ -21,6 +21,7 @@ class UBreakerProgressionComponent;
 class UBreakerCombatComponent;
 class UStaticMeshComponent;
 class UPointLightComponent;
+class UBreakerFirstPersonArms;
 class UBreakerPlaytestComponent;
 class UBreakerEquipmentComponent;
 class UBreakerMomentumComponent;
@@ -60,6 +61,7 @@ public:
     UFUNCTION(BlueprintPure, Category="Combat") UBreakerCombatComponent* GetCombat() const { return Combat; }
     UFUNCTION(BlueprintPure, Category="Combat") float GetSecondsSinceCombat() const;
     UFUNCTION(BlueprintPure, Category="Weapon") UBreakerWeaponComponent* GetWeapon() const { return Weapon; }
+    bool TryGetViewmodelMuzzle(FVector& OutLocation) const;
     UFUNCTION(BlueprintPure, Category="Equipment") UBreakerEquipmentComponent* GetEquipment() const { return Equipment; }
     UFUNCTION(BlueprintPure, Category="Progression") UBreakerProgressionComponent* GetProgression() const { return Progression; }
     UFUNCTION(BlueprintPure, Category="Momentum") UBreakerMomentumComponent* GetMomentum() const { return Momentum; }
@@ -191,6 +193,7 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Presentation") TObjectPtr<UStaticMeshComponent> RightArmVisual;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Presentation") TObjectPtr<UStaticMeshComponent> LeftGloveVisual;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Presentation") TObjectPtr<UStaticMeshComponent> RightGloveVisual;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Presentation") TObjectPtr<UBreakerFirstPersonArms> FirstPersonArms;
 
     // --- Viewmodel blockout tuning (O2) ---------------------------------
     // The default layout table lives in BreakerViewmodelRig.cpp; this map

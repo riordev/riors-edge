@@ -167,6 +167,9 @@ struct RIORSEDGE_API FBreakerViewmodelLayout
 
 namespace BreakerViewmodel
 {
+    // Measured from Gun_Rifle LOD0's -X front cap by BreakerArms. Kept in
+    // source space so packaged gameplay never reads discarded CPU vertices.
+    inline const FVector RifleMuzzleMeshCm(-74.340, -0.031, 14.771);
     // ---- Palette -------------------------------------------------------
     // Militia hardware, per Art-And-Modelling-Plan.md §3.1 and Pillar 3.
     // Desaturated steel and olive polymer; hazard amber appears on exactly one

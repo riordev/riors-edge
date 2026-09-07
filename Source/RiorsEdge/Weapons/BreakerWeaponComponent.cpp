@@ -1,4 +1,5 @@
 #include "Weapons/BreakerWeaponComponent.h"
+#include "Characters/BreakerCharacter.h"
 
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Abilities/BreakerAbilityStateComponent.h"
@@ -2713,6 +2714,9 @@ int32 UBreakerWeaponComponent::GetEffectiveMagazineSize() const
 
 FVector UBreakerWeaponComponent::GetVisualMuzzleLocation() const
 {
+    FVector PresentedMuzzle;
+    if (const ABreakerCharacter* Character = Cast<ABreakerCharacter>(GetOwner()))
+        if (Character->TryGetViewmodelMuzzle(PresentedMuzzle)) return PresentedMuzzle;
     FVector ViewLocation;
     FRotator ViewRotation;
     GetViewPoint(ViewLocation, ViewRotation);

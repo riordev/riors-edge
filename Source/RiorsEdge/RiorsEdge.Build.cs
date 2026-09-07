@@ -29,6 +29,9 @@ public class RiorsEdge : ModuleRules
             // fonts it saves with the asset registry. Editor-only, like the
             // command itself.
             PrivateDependencyModuleNames.Add("AssetRegistry");
+            // Arms-only skeletal asset authoring; never linked into the game target.
+            PrivateDependencyModuleNames.AddRange(new[] { "MeshDescription", "StaticMeshDescription",
+                "SkeletalMeshDescription", "SkeletalMeshUtilitiesCommon", "MeshUtilities" });
         }
     }
 }

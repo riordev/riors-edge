@@ -1,4 +1,5 @@
 #include "Characters/BreakerCharacter.h"
+#include "Characters/BreakerFirstPersonArms.h"
 #include "Combat/BreakerStatusCycleComponent.h"
 
 #include "AbilitySystemComponent.h"
@@ -185,6 +186,8 @@ ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer
     RightArmVisual = MakeLimbPart(TEXT("RightArmVisual"));
     LeftGloveVisual = MakeLimbPart(TEXT("LeftGloveVisual"));
     RightGloveVisual = MakeLimbPart(TEXT("RightGloveVisual"));
+    FirstPersonArms = CreateDefaultSubobject<UBreakerFirstPersonArms>(TEXT("FirstPersonArms"));
+    FirstPersonArms->SetupAttachment(PrototypeWeaponVisual);
 }
 
 UAbilitySystemComponent* ABreakerCharacter::GetAbilitySystemComponent() const { return AbilitySystem; }
@@ -1116,6 +1119,13 @@ FVector ABreakerCharacter::GetWeaponRestLocation() const
     return ActiveLayout.HipOffsetCm;
 }
 
+bool ABreakerCharacter::TryGetViewmodelMuzzle(FVector& OutLocation) const
+{
+    if (!bViewmodelBuilt || !PrototypeMuzzleFlash) return false;
+    OutLocation = PrototypeMuzzleFlash->GetComponentLocation();
+    return !OutLocation.ContainsNaN();
+}
+
 void ABreakerCharacter::UpdateViewmodelKick()
 {
     // The weapon component owns the spring; the character only reads it onto
@@ -1217,7 +1227,9 @@ void ABreakerCharacter::UpdateViewmodelKick()
     // reach. Re-posed on the REST pose only, never on the kick: a recoiling gun
     // takes the hands with it, so compensating for the spring would decouple
     // them and the recoil would stop reading.
-    if (bViewmodelBuilt && !Rest.Equals(PosedArmRestLocation, 0.01f))
+    if (FirstPersonArms) FirstPersonArms->UpdateWeaponPose(Weapon);
+    if (bViewmodelBuilt && !(FirstPersonArms && FirstPersonArms->IsConfigured())
+        && !Rest.Equals(PosedArmRestLocation, 0.01f))
     {
         PosedArmRestLocation = Rest;
         PoseArm(LeftArmVisual, LeftGloveVisual, SupportShoulderAnchorCm, ActiveLayout.SupportHandCm);
@@ -1226,13 +1238,11 @@ void ABreakerCharacter::UpdateViewmodelKick()
 }
 void ABreakerCharacter::HandleReloadInput()
 {
+    const bool bWasReloading = Weapon && Weapon->IsReloading();
     if (Weapon) Weapon->StartReload();
     OnReloadInput();
-    // The body reloads on the press. PLACEHOLDER honesty: this plays even
-    // when StartReload refuses (full magazine, mid-swap) — syncing to the
-    // weapon's real reload state wants a started-reload broadcast the
-    // component does not have yet.
-    if (!bWeaponsHolstered) PlayBodyAction(ReloadMontage);
+    if (!bWeaponsHolstered && Weapon && !bWasReloading && Weapon->IsReloading())
+        PlayBodyAction(ReloadMontage);
 }
 
 void ABreakerCharacter::EquipPrimaryWeapon()
@@ -1271,6 +1281,33 @@ namespace
 
 void ABreakerCharacter::StartViewmodelCaptureCycle()
 {
+    FString RiflePose;
+    if (FParse::Value(FCommandLine::Get(), TEXT("BreakerCaptureRifle="), RiflePose) && Weapon)
+    {
+        RiflePose = RiflePose.ToUpper();
+        if (RiflePose == TEXT("HIP") || RiflePose == TEXT("ADS")
+            || RiflePose == TEXT("FIRE") || RiflePose == TEXT("RELOAD"))
+        {
+            // Isolated capture runs use actual equip/fire/reload verbs. Repeating
+            // reload cycles lets the existing screenshot reel catch different
+            // phases without freezing or fabricating the ammunition state.
+            GetWorldTimerManager().SetTimer(ViewmodelFireTimer,
+                FTimerDelegate::CreateWeakLambda(this, [this, RiflePose]()
+            {
+                if (!Weapon || bWeaponsHolstered || (Combat && Combat->IsDead())) return;
+                Weapon->SetSlotArchetype(1, EBreakerWeaponArchetype::Rifle);
+                Weapon->EquipSlot(1);
+                Weapon->SetAiming(RiflePose == TEXT("ADS"));
+                if (RiflePose == TEXT("FIRE") || RiflePose == TEXT("RELOAD"))
+                {
+                    Weapon->StopFire();
+                    if (RiflePose == TEXT("RELOAD") && !Weapon->IsReloading()) Weapon->StartReload();
+                    if (!Weapon->IsReloading()) Weapon->StartFire();
+                }
+            }), 0.2f, true, 1.0f);
+            return;
+        }
+    }
     // -BreakerCycleWeapons=<seconds> walks the equipped archetype through the
     // whole enum on a timer. It exists for exactly one reason: the screenshot
     // harness photographs an idle standing player, so without it a capture run
@@ -1432,6 +1469,9 @@ void ABreakerCharacter::ApplyWeaponPresentation()
 
 void ABreakerCharacter::RebuildViewmodelParts()
 {
+    if (FirstPersonArms) FirstPersonArms->DeactivateArms(PrototypeWeaponVisual);
+    if (PrototypeMuzzleFlash)
+        PrototypeMuzzleFlash->AttachToComponent(PrototypeWeaponVisual, FAttachmentTransformRules::KeepWorldTransform);
     // Loaded here rather than held as constructor references because a part's
     // SHAPE changes with the archetype and the constructor cannot know it.
     UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
@@ -1466,6 +1506,12 @@ void ABreakerCharacter::RebuildViewmodelParts()
                 FVector(ActiveLayout.MuzzleCm.X * 0.5f, 0.0f, -4.0f),
                 ActiveLayout.NamedMeshRotation.Quaternion(),
                 FitScale, FitLocation);
+            if (ActiveLayout.NamedMeshPath.GetAssetName() == TEXT("Gun_Rifle"))
+            {
+                // O2 fitted grip offset. Bounds-only centering put the fingers
+                // in the open stock behind the grip in the reload capture.
+                FitLocation = ActiveLayout.FiringHandCm;
+            }
             NamedWeaponVisual->SetRelativeScale3D(FVector(FitScale));
             NamedWeaponVisual->SetRelativeLocation(FitLocation);
             NamedWeaponVisual->SetRelativeRotation(ActiveLayout.NamedMeshRotation);
@@ -1483,6 +1529,18 @@ void ABreakerCharacter::RebuildViewmodelParts()
         }
         PoseArm(LeftArmVisual, LeftGloveVisual, SupportShoulderAnchorCm, ActiveLayout.SupportHandCm);
         PoseArm(RightArmVisual, RightGloveVisual, FiringShoulderAnchorCm, ActiveLayout.FiringHandCm);
+        if (PresentedArchetype == EBreakerWeaponArchetype::Rifle && FirstPersonArms
+            && FirstPersonArms->Configure(NamedWeaponVisual, ActiveLayout.FiringHandCm, ActiveLayout.SupportHandCm))
+        {
+            for (UStaticMeshComponent* Limb : {LeftArmVisual.Get(), RightArmVisual.Get(), LeftGloveVisual.Get(), RightGloveVisual.Get()})
+                if (Limb) Limb->SetVisibility(false);
+            if (PrototypeMuzzleFlash)
+            {
+                PrototypeMuzzleFlash->AttachToComponent(NamedWeaponVisual, FAttachmentTransformRules::KeepWorldTransform);
+                if (ActiveLayout.NamedMeshPath.GetAssetName() == TEXT("Gun_Rifle"))
+                    PrototypeMuzzleFlash->SetRelativeLocation(BreakerViewmodel::RifleMuzzleMeshCm);
+            }
+        }
         return;
     }
 
