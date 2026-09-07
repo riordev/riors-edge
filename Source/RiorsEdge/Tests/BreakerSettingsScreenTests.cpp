@@ -362,6 +362,23 @@ bool FBreakerSettingsScreenControlValuesTest::RunTest(const FString& Parameters)
         UBreakerGameSettingsLibrary::ClampScopedSensitivityMultiplier(Fresh->ScopedSensitivityMultiplier),
         Fresh->ScopedSensitivityMultiplier);
     TestFalse(TEXT("Invert vertical ships OFF"), Fresh->bInvertVerticalLook);
+    // INPUT MODES and FEEL — the six fields the desk's plumbing pass adds.
+    // Modelled and persisted now; their rows join the roster below when
+    // they are drawn. Each default is the behaviour the game had before the
+    // field existed, and each numeric one survives its own clamp.
+    TestTrue(TEXT("Sprint ships as a toggle"), Fresh->bSprintToggle);
+    TestFalse(TEXT("Aim ships as a hold"), Fresh->bAimToggle);
+    TestEqual(TEXT("View bob ships at 1.0"), Fresh->ViewBobScale, 1.0f);
+    TestEqual(TEXT("View bob's default survives its clamp"),
+        UBreakerGameSettingsLibrary::ClampViewBobScale(Fresh->ViewBobScale), Fresh->ViewBobScale);
+    TestEqual(TEXT("Screen shake ships at 1.0"), Fresh->ScreenShakeScale, 1.0f);
+    TestEqual(TEXT("Screen shake's default survives its clamp"),
+        UBreakerGameSettingsLibrary::ClampScreenShakeScale(Fresh->ScreenShakeScale), Fresh->ScreenShakeScale);
+    TestEqual(TEXT("Damage numbers ship at 1.0"), Fresh->DamageNumberScale, 1.0f);
+    TestEqual(TEXT("Damage numbers' default survives its clamp"),
+        UBreakerGameSettingsLibrary::ClampDamageNumberScale(Fresh->DamageNumberScale), Fresh->DamageNumberScale);
+    TestFalse(TEXT("Larger nameplates ship OFF"), Fresh->bLargerNameplates);
+    TestEqual(TEXT("The larger nameplate is one authored step up"), UBreakerGameSettings::LargerNameplateScale, 1.5f);
     // VIDEO: Field of view / Window mode / Frame rate cap / Vertical sync.
     TestEqual(TEXT("Field of view ships at 90"), Fresh->FieldOfView, 90.0f);
     TestEqual(TEXT("Field of view's default survives its clamp"),
@@ -394,6 +411,8 @@ bool FBreakerSettingsScreenControlValuesTest::RunTest(const FString& Parameters)
         TEXT("Look sensitivity"), TEXT("ADS sensitivity"), TEXT("Invert vertical"),
         TEXT("Field of view"), TEXT("Window mode"), TEXT("Frame rate cap"), TEXT("Vertical sync"),
         TEXT("Master volume"), TEXT("Effects volume"), TEXT("Music volume"),
+        TEXT("Sprint"), TEXT("Aim"), TEXT("View bob"), TEXT("Screen shake"),
+        TEXT("Larger nameplates"), TEXT("Damage number size"),
     };
     const FString MenuPath = FPaths::Combine(FPaths::ProjectDir(),
         TEXT("Source"), TEXT("RiorsEdge"), TEXT("UI"), TEXT("BreakerMenu.cpp"));

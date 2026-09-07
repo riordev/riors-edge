@@ -606,9 +606,11 @@ private:
     TSharedRef<SWidget> BuildSettingsKeybindSection();
     TSharedRef<SWidget> BuildSettingsVideoSection();
     TSharedRef<SWidget> BuildSettingsAudioSection();
+    TSharedRef<SWidget> BuildSettingsAccessibilitySection();
     // Which settings pane the sidebar has open: 0 INPUT, 1 KEYBINDS, 2 VIDEO,
-    // 3 AUDIO. A member rather than a screen value for the same reason
-    // CharacterSheetTab is: switching panes must not change the back target.
+    // 3 AUDIO, 4 ACCESSIBILITY. A member rather than a screen value for the
+    // same reason CharacterSheetTab is: switching panes must not change the
+    // back target.
     int32 SettingsPane = 0;
     // One keybind row: label, THE KEY CONTROL, conflict badge, DEFAULT.
     // Four columns, not five. The separate BIND button is gone — owner: "this
@@ -674,6 +676,12 @@ private:
     // Create-screen state.
     EBreakerClassId PendingCreateClass = EBreakerClassId::None;
     FText PendingCreateName;
+    // O14's body, voice and face, handed to the roster's CreateCharacter as
+    // chosen. Defaults are the roster's own defaults, so a player who never
+    // touches the rail gets the body every character had before the choice.
+    EBreakerPlayerModel PendingCreateModel = EBreakerPlayerModel::Human;
+    EBreakerPlayerVoice PendingCreateVoice = EBreakerPlayerVoice::Mid;
+    uint8 PendingCreateFace = 0;
     // ENLIST is arm-then-confirm — class choice is permanent — in the same
     // two-click shape every destructive control in this file uses. Any class
     // or navigation interaction disarms it.

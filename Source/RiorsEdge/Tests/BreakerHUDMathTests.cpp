@@ -2,6 +2,8 @@
 
 #include "Misc/AutomationTest.h"
 #include "Attributes/BreakerAttributeSet.h"
+#include "Game/BreakerGameMode.h"
+#include "Game/BreakerWaveBudget.h"
 #include "UI/BreakerDamageFeed.h"
 #include "UI/BreakerHUDMath.h"
 #include "UI/BreakerUIStyle.h"
@@ -332,6 +334,94 @@ bool FBreakerHUDRarityTallyTest::RunTest(const FString& Parameters)
         && RarityTallyCells(EBreakerItemRarity::Uncommon) < RarityTallyCells(EBreakerItemRarity::Exceptional)
         && RarityTallyCells(EBreakerItemRarity::Exceptional) < RarityTallyCells(EBreakerItemRarity::Aberrant)
         && RarityTallyCells(EBreakerItemRarity::Aberrant) < RarityTallyCells(EBreakerItemRarity::Anomalous));
+    return true;
+}
+
+// --------------------------------------------------------------------------
+// The interact plate: 40 tall, the key tile 32 at rail + 4, the tally
+// 4n + 2(n - 1), the width a function of the name and nothing else.
+// --------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerHUDInteractPlateTest,
+    "RiorsEdge.UI.HUD.InteractPlate",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerHUDInteractPlateTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerHUDMath;
+
+    const FInteractPlateLayout Keyed = InteractPlateLayout(100.0f, 1, true);
+    TestEqual(TEXT("The plate is 40 tall"), Keyed.Height, 40.0f);
+    TestEqual(TEXT("The rail is the identity rail"), Keyed.RailWidth, BreakerUI::HudRailIdentity);
+    TestTrue(TEXT("The key tile is drawn"), Keyed.bKeyTile);
+    TestEqual(TEXT("The key tile is 32"), Keyed.KeySize, 32.0f);
+    TestEqual(TEXT("The key tile sits at rail + 4"), Keyed.KeyX, Keyed.RailWidth + 4.0f);
+    TestTrue(TEXT("The tally follows the key"), Keyed.TallyX > Keyed.KeyX + Keyed.KeySize);
+    TestTrue(TEXT("The name follows the tally"), Keyed.NameX > Keyed.TallyX + Keyed.TallyWidth);
+    TestTrue(TEXT("The name fits inside the plate"), Keyed.Width >= Keyed.NameX + 100.0f);
+    TestEqual(TEXT("Tally cells are 4 wide"), Keyed.TallyCellWidth, 4.0f);
+    TestEqual(TEXT("Tally cells are 12 tall"), Keyed.TallyCellHeight, 12.0f);
+    TestEqual(TEXT("Tally cells sit 2 apart"), Keyed.TallyGap, 2.0f);
+    TestTrue(TEXT("The tally is centred on the plate"),
+        FMath::IsNearlyEqual(Keyed.TallyY + Keyed.TallyCellHeight * 0.5f, Keyed.Height * 0.5f, BreakerHUDMathTolerance));
+
+    // Tally width 4n + 2(n - 1) for one to five cells.
+    for (int32 Cells = 1; Cells <= 5; ++Cells)
+    {
+        TestEqual(*FString::Printf(TEXT("%d cells measure 4n + 2(n - 1)"), Cells),
+            InteractPlateLayout(100.0f, Cells, true).TallyWidth, 4.0f * Cells + 2.0f * (Cells - 1));
+    }
+    TestEqual(TEXT("No cells is no tally"), InteractPlateLayout(100.0f, 0, true).TallyWidth, 0.0f);
+
+    // Width is monotone in the name's width.
+    float Previous = 0.0f;
+    for (float NameWidth = 0.0f; NameWidth <= 400.0f; NameWidth += 25.0f)
+    {
+        const float Width = InteractPlateLayout(NameWidth, 3, true).Width;
+        TestTrue(*FString::Printf(TEXT("A wider name is a wider plate at %.0f"), NameWidth), Width > Previous);
+        Previous = Width;
+    }
+
+    // Removing the key tile removes exactly its 32 and one 8 gap.
+    const FInteractPlateLayout Unkeyed = InteractPlateLayout(100.0f, 1, false);
+    TestFalse(TEXT("No key tile"), Unkeyed.bKeyTile);
+    TestEqual(TEXT("No key tile removes exactly 40"), Keyed.Width - Unkeyed.Width, 40.0f);
+    TestEqual(TEXT("Without the key the tally starts at rail + 4"), Unkeyed.TallyX, Unkeyed.RailWidth + 4.0f);
+    TestEqual(TEXT("The height does not depend on the key"), Unkeyed.Height, Keyed.Height);
+    return true;
+}
+
+// --------------------------------------------------------------------------
+// Wave cells (O120): cells only where a total is authored. The rift run's
+// total is its boss wave; the gym authors no run and draws none.
+// --------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerHUDWaveCellsTest,
+    "RiorsEdge.UI.HUD.WaveCells",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerHUDWaveCellsTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerHUDMath;
+
+    TestEqual(TEXT("No rift set draws no cells, whatever the gym's interval"), WaveCellTotal(false, 12), 0);
+    TestEqual(TEXT("A rift set draws its boss wave's worth"), WaveCellTotal(true, 3), 3);
+    TestEqual(TEXT("A nonsense interval draws none"), WaveCellTotal(true, -1), 0);
+
+    // Shipped: the rift budget the game mode builds carries the game mode's
+    // own RiftBossWave. The property is not public and Game/ is not this
+    // lane's, so the default is read through reflection rather than retyped.
+    const ABreakerGameMode* DefaultMode = GetDefault<ABreakerGameMode>();
+    if (!TestNotNull(TEXT("The game mode has a default object"), DefaultMode)) return false;
+    const FIntProperty* RiftBossWaveProperty = FindFProperty<FIntProperty>(ABreakerGameMode::StaticClass(), TEXT("RiftBossWave"));
+    if (!TestNotNull(TEXT("The game mode carries RiftBossWave"), RiftBossWaveProperty)) return false;
+    const int32 RiftBossWave = RiftBossWaveProperty->GetPropertyValue_InContainer(DefaultMode);
+    TestEqual(TEXT("The shipped rift bosses on wave 3"), RiftBossWave, 3);
+    const FBreakerWaveBudgetParams Rift = UBreakerWaveBudgetLibrary::MakeRiftWaveBudget(RiftBossWave);
+    TestEqual(TEXT("The rift budget's interval is the boss wave"), Rift.BossWaveInterval, RiftBossWave);
+    TestEqual(TEXT("MakeRiftWaveBudget(3) bosses every 3"), UBreakerWaveBudgetLibrary::MakeRiftWaveBudget(3).BossWaveInterval, 3);
+    TestEqual(TEXT("The shipped rift row is three cells"), WaveCellTotal(true, Rift.BossWaveInterval), 3);
+    TestEqual(TEXT("The shipped gym row is empty"), WaveCellTotal(false, FBreakerWaveBudgetParams().BossWaveInterval), 0);
     return true;
 }
 

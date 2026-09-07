@@ -16,6 +16,7 @@
 // name, which is what a card's line one wants.
 #include "Items/BreakerItemRules.h"
 #include "Progression/BreakerClassDefinition.h"
+#include "Progression/BreakerCoreWheelMath.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionNode.h"
 #include "Progression/BreakerProgressionTree.h"
@@ -75,7 +76,10 @@ namespace
     const FLinearColor Panel = BreakerUI::Panel00;          // plate face
     const FLinearColor PanelRaised = BreakerUI::Panel10;    // cards, rows, slots
     const FLinearColor PanelHover = BreakerUI::Panel20;     // headers, selected
-    const FLinearColor Cyan = BreakerUI::Cyan;              // player / system
+    // The menu's chrome is the SYSTEM accent (O179: cyan is the movement
+    // verb and nothing else). The alias is named for the sheet's tone and
+    // resolves to the SYSTEM token at every chrome site.
+    const FLinearColor Cyan = BreakerUI::System;            // player / system
     // THE SYSTEM ACCENT: focus rails, the active tab's top rail, the spent
     // rung on a tree, the better-mark on a card. One alias so the token pass
     // that gives the system its own colour flips a single line, not every
@@ -1989,7 +1993,7 @@ namespace
         return SNew(SVerticalBox)
             + SVerticalBox::Slot().AutoHeight()
             [
-                MenuText(FText::FromString(Label), BreakerUI::TypeCaption, BreakerUI::Cyan, true)
+                MenuText(FText::FromString(Label), BreakerUI::TypeCaption, BreakerUI::System, true)
             ]
             + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, BreakerUI::Space16)
             [
@@ -2869,12 +2873,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildSettingsInputSection()
     Section->AddSlot().AutoHeight()[BreakerSettingsDivider()];
 
     // The plate's name for this row is ADS; the model keeps
-    // ScopedSensitivityMultiplier and the honesty line stays until the aim
-    // path reads it.
+    // ScopedSensitivityMultiplier, and the pawn reads it through
+    // ApplyProfileFeel, pushed here on every change.
     Section->AddSlot().AutoHeight().Padding(0.0f, BreakerSettingsRowPad)
     [
-        BreakerSettingsRow(TEXT("ADS sensitivity"),
-            TEXT("MULTIPLIER OF LOOK — SAVED, NOT YET READ BY THE AIM PATH"),
+        BreakerSettingsRow(TEXT("ADS sensitivity"), FString(),
             SNew(SBox).WidthOverride(BreakerSettingsSliderWidth)
             [
                 SNew(SBreakerFieldplateSlider)
@@ -2887,6 +2890,10 @@ TSharedRef<SWidget> SBreakerMenu::BuildSettingsInputSection()
                     if (!Live) return;
                     Live->ScopedSensitivityMultiplier =
                         UBreakerGameSettingsLibrary::ClampScopedSensitivityMultiplier(0.1f + Value * 2.9f);
+                    if (Character.IsValid())
+                    {
+                        Character->ApplyProfileFeel(*Live);
+                    }
                     if (ScopedReadout.IsValid())
                     {
                         ScopedReadout->SetText(FText::FromString(FString::Printf(TEXT("%.2fx"), Live->ScopedSensitivityMultiplier)));
@@ -3552,6 +3559,229 @@ TSharedRef<SWidget> SBreakerMenu::BuildSettingsAudioSection()
     return Section;
 }
 
+TSharedRef<SWidget> SBreakerMenu::BuildSettingsAccessibilitySection()
+{
+    // The sheet's six rows (design 07-menus), every label verbatim. Each one
+    // writes a model field that a pawn already reads: sprint and aim mode
+    // through BreakerInputMode::NextEngaged, bob and shake through the
+    // viewmodel and the camera, nameplate size and damage number size through
+    // the HUD's draw. The pawn's copy is pushed by ApplyProfileFeel on every
+    // change so a row is FELT, not merely stored.
+    UBreakerGameSettings* Model = GameSettings.Get();
+    TSharedRef<SVerticalBox> Section = SNew(SVerticalBox);
+    Section->AddSlot().AutoHeight()
+    [
+        BreakerSettingsPaneHeader(TEXT("ACCESSIBILITY"), TEXT("Hold or toggle, motion, and size. Applied live."))
+    ];
+    if (!Model) return Section;
+
+    auto PushFeel = [this]()
+    {
+        UBreakerGameSettings* Live = GameSettings.Get();
+        if (Live && Character.IsValid()) Character->ApplyProfileFeel(*Live);
+    };
+
+    // ---- Sprint / Aim: HOLD or TOGGLE ----------------------------------------
+    // A closed two-word set, so it takes the dropdown the video pane uses for
+    // its closed sets rather than a toggle: a toggle would make one of the two
+    // words the OFF state, and neither is.
+    static const TArray<FString> ModeOptions = { TEXT("HOLD"), TEXT("TOGGLE") };
+    Section->AddSlot().AutoHeight().Padding(0.0f, BreakerSettingsRowPad)
+    [
+        BreakerSettingsRow(TEXT("Sprint"), FString(),
+            SNew(SBreakerFieldplateDropdown)
+            .Options(ModeOptions)
+            .SelectedIndex(Model->bSprintToggle ? 1 : 0)
+            .OnPicked(FBreakerOnPick::CreateLambda([this, PushFeel](int32 Index)
+            {
+                if (UBreakerGameSettings* Live = GameSettings.Get())
+                {
+                    Live->bSprintToggle = Index == 1;
+                    Live->Save();
+                }
+                PushFeel();
+                Rebuild(EBreakerMenuScreen::Settings);
+            })),
+            SNew(SBox).WidthOverride(BreakerSettingsValueWidth))
+    ];
+    Section->AddSlot().AutoHeight()[BreakerSettingsDivider()];
+
+    Section->AddSlot().AutoHeight().Padding(0.0f, BreakerSettingsRowPad)
+    [
+        BreakerSettingsRow(TEXT("Aim"), FString(),
+            SNew(SBreakerFieldplateDropdown)
+            .Options(ModeOptions)
+            .SelectedIndex(Model->bAimToggle ? 1 : 0)
+            .OnPicked(FBreakerOnPick::CreateLambda([this, PushFeel](int32 Index)
+            {
+                if (UBreakerGameSettings* Live = GameSettings.Get())
+                {
+                    Live->bAimToggle = Index == 1;
+                    Live->Save();
+                }
+                PushFeel();
+                Rebuild(EBreakerMenuScreen::Settings);
+            })),
+            SNew(SBox).WidthOverride(BreakerSettingsValueWidth))
+    ];
+    Section->AddSlot().AutoHeight()[BreakerSettingsDivider()];
+
+    // ---- View bob / Screen shake: 0..100% of the authored amount --------------
+    // Readouts built first and captured by value, for the reason the input
+    // pane states.
+    TSharedPtr<STextBlock> BobReadout;
+    const TSharedRef<SWidget> BobValue =
+        SNew(SBox).WidthOverride(BreakerSettingsValueWidth).HAlign(HAlign_Fill)
+        [
+            SAssignNew(BobReadout, STextBlock)
+                .Text(FText::FromString(FString::Printf(TEXT("%.0f%%"), Model->ViewBobScale * 100.0f)))
+                .Justification(ETextJustify::Right)
+                .ColorAndOpacity(Primary)
+                .Font(BreakerMonoFont(BreakerUI::TypeBody))
+        ];
+    Section->AddSlot().AutoHeight().Padding(0.0f, BreakerSettingsRowPad)
+    [
+        BreakerSettingsRow(TEXT("View bob"), FString(),
+            SNew(SBox).WidthOverride(BreakerSettingsSliderWidth)
+            [
+                SNew(SBreakerFieldplateSlider)
+                // 0 .. 1, the range ClampViewBobScale enforces.
+                .Value(Model->ViewBobScale)
+                .OnValueChanged(FOnFloatValueChanged::CreateLambda([this, BobReadout, PushFeel](float Value)
+                {
+                    UBreakerGameSettings* Live = GameSettings.Get();
+                    if (!Live) return;
+                    Live->ViewBobScale = UBreakerGameSettingsLibrary::ClampViewBobScale(Value);
+                    PushFeel();
+                    if (BobReadout.IsValid())
+                    {
+                        BobReadout->SetText(FText::FromString(FString::Printf(TEXT("%.0f%%"), Live->ViewBobScale * 100.0f)));
+                    }
+                }))
+                .OnCaptureEnd(FSimpleDelegate::CreateLambda([this]() { if (GameSettings.IsValid()) GameSettings->Save(); }))
+            ],
+            BobValue)
+    ];
+    Section->AddSlot().AutoHeight()[BreakerSettingsDivider()];
+
+    TSharedPtr<STextBlock> ShakeReadout;
+    const TSharedRef<SWidget> ShakeValue =
+        SNew(SBox).WidthOverride(BreakerSettingsValueWidth).HAlign(HAlign_Fill)
+        [
+            SAssignNew(ShakeReadout, STextBlock)
+                .Text(FText::FromString(FString::Printf(TEXT("%.0f%%"), Model->ScreenShakeScale * 100.0f)))
+                .Justification(ETextJustify::Right)
+                .ColorAndOpacity(Primary)
+                .Font(BreakerMonoFont(BreakerUI::TypeBody))
+        ];
+    Section->AddSlot().AutoHeight().Padding(0.0f, BreakerSettingsRowPad)
+    [
+        BreakerSettingsRow(TEXT("Screen shake"), FString(),
+            SNew(SBox).WidthOverride(BreakerSettingsSliderWidth)
+            [
+                SNew(SBreakerFieldplateSlider)
+                // 0 .. 1, the range ClampScreenShakeScale enforces.
+                .Value(Model->ScreenShakeScale)
+                .OnValueChanged(FOnFloatValueChanged::CreateLambda([this, ShakeReadout, PushFeel](float Value)
+                {
+                    UBreakerGameSettings* Live = GameSettings.Get();
+                    if (!Live) return;
+                    Live->ScreenShakeScale = UBreakerGameSettingsLibrary::ClampScreenShakeScale(Value);
+                    PushFeel();
+                    if (ShakeReadout.IsValid())
+                    {
+                        ShakeReadout->SetText(FText::FromString(FString::Printf(TEXT("%.0f%%"), Live->ScreenShakeScale * 100.0f)));
+                    }
+                }))
+                .OnCaptureEnd(FSimpleDelegate::CreateLambda([this]() { if (GameSettings.IsValid()) GameSettings->Save(); }))
+            ],
+            ShakeValue)
+    ];
+    Section->AddSlot().AutoHeight()[BreakerSettingsDivider()];
+
+    // ---- Larger nameplates: a switch, one authored step up -------------------
+    // The word IS the state — colour is never alone.
+    TSharedPtr<STextBlock> NameplateWord;
+    const TSharedRef<SWidget> NameplateWordWidget =
+        SAssignNew(NameplateWord, STextBlock)
+            .Text(FText::FromString(Model->bLargerNameplates ? TEXT("ON") : TEXT("OFF")))
+            .ColorAndOpacity(Model->bLargerNameplates ? SoftText : Muted)
+            .Font(BreakerMonoFont(BreakerUI::TypeCaption, 0.16f));
+    Section->AddSlot().AutoHeight().Padding(0.0f, BreakerSettingsRowPad)
+    [
+        BreakerSettingsRow(TEXT("Larger nameplates"), FString(),
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+            [
+                SNew(SBreakerFieldplateToggle)
+                .IsOn(Model->bLargerNameplates)
+                .OnToggled(FBreakerOnToggle::CreateLambda([this, NameplateWord, PushFeel](bool bOn)
+                {
+                    UBreakerGameSettings* Live = GameSettings.Get();
+                    if (!Live) return;
+                    Live->bLargerNameplates = bOn;
+                    Live->Save();
+                    PushFeel();
+                    if (NameplateWord.IsValid())
+                    {
+                        NameplateWord->SetText(FText::FromString(bOn ? TEXT("ON") : TEXT("OFF")));
+                        NameplateWord->SetColorAndOpacity(bOn ? SoftText : Muted);
+                    }
+                }))
+            ]
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
+            [
+                NameplateWordWidget
+            ],
+            SNew(SBox).WidthOverride(BreakerSettingsValueWidth))
+    ];
+    Section->AddSlot().AutoHeight()[BreakerSettingsDivider()];
+
+    // ---- Damage number size: three authored steps -----------------------------
+    // SMALL / STANDARD / LARGE over 0.75 / 1.0 / 1.5, every step inside
+    // ClampDamageNumberScale's [0.5, 2.0]. A hand-edited ini can hold any
+    // clamped value, so an unlisted one is shown as its own row rather than
+    // lighting the wrong one — the frame-cap rule.
+    TArray<FString> SizeLabels = { TEXT("SMALL"), TEXT("STANDARD"), TEXT("LARGE") };
+    TArray<float> SizeValues = { 0.75f, 1.0f, 1.5f };   // O2 PLACEHOLDER
+    int32 SizeIndex = INDEX_NONE;
+    for (int32 Index = 0; Index < SizeValues.Num(); ++Index)
+    {
+        if (FMath::IsNearlyEqual(Model->DamageNumberScale, SizeValues[Index]))
+        {
+            SizeIndex = Index;
+            break;
+        }
+    }
+    if (SizeIndex == INDEX_NONE)
+    {
+        SizeLabels.Add(FString::Printf(TEXT("%.0f%%"), Model->DamageNumberScale * 100.0f));
+        SizeValues.Add(Model->DamageNumberScale);
+        SizeIndex = SizeValues.Num() - 1;
+    }
+    Section->AddSlot().AutoHeight().Padding(0.0f, BreakerSettingsRowPad)
+    [
+        BreakerSettingsRow(TEXT("Damage number size"), FString(),
+            SNew(SBreakerFieldplateDropdown)
+            .Options(SizeLabels)
+            .SelectedIndex(SizeIndex)
+            .OnPicked(FBreakerOnPick::CreateLambda([this, SizeValues, PushFeel](int32 Index)
+            {
+                if (UBreakerGameSettings* Live = GameSettings.Get())
+                {
+                    Live->DamageNumberScale = UBreakerGameSettingsLibrary::ClampDamageNumberScale(
+                        SizeValues.IsValidIndex(Index) ? SizeValues[Index] : 1.0f);
+                    Live->Save();
+                }
+                PushFeel();
+                Rebuild(EBreakerMenuScreen::Settings);
+            })),
+            SNew(SBox).WidthOverride(BreakerSettingsValueWidth))
+    ];
+    Section->AddSlot().AutoHeight()[BreakerSettingsDivider()];
+    return Section;
+}
+
 TSharedRef<SWidget> SBreakerMenu::BuildSettingsScreen()
 {
     EnsureSettingsLoaded();
@@ -3562,15 +3792,15 @@ TSharedRef<SWidget> SBreakerMenu::BuildSettingsScreen()
           SettingsPane == 1 ? BuildSettingsKeybindSection()
         : SettingsPane == 2 ? BuildSettingsVideoSection()
         : SettingsPane == 3 ? BuildSettingsAudioSection()
+        : SettingsPane == 4 ? BuildSettingsAccessibilitySection()
         : BuildSettingsInputSection();
 
     // ---- Sidebar navigation ------------------------------------------------
     // 44px rows, active row on the plate face behind a 3px cyan rail, group
-    // captions in tracked mono. The reference lists GAMEPLAY and
-    // ACCESSIBILITY as well; neither has a model behind it yet, so both are
-    // painted disabled with the STUB mark rather than drawn live over nothing
-    // — a nav entry that opens an empty pane would be reachable content
-    // nothing pays for.
+    // captions in tracked mono. The reference lists GAMEPLAY as well; it has
+    // no model behind it yet, so it is painted disabled with the STUB mark
+    // rather than drawn live over nothing — a nav entry that opens an empty
+    // pane would be reachable content nothing pays for.
     auto MakeNavGroup = [](const FString& Label) -> TSharedRef<SWidget>
     {
         return SNew(SBox).Padding(FMargin(BreakerSettingsContentPad, BreakerUI::Space24, BreakerUI::Space24, BreakerUI::Space8))
@@ -3638,7 +3868,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSettingsScreen()
     Nav->AddSlot().AutoHeight()[MakeNavRow(TEXT("GAMEPLAY"), INDEX_NONE, false, true)];
     Nav->AddSlot().AutoHeight()[MakeNavGroup(TEXT("PRESENT"))];
     Nav->AddSlot().AutoHeight()[MakeNavRow(TEXT("VIDEO"), 2, true, false)];
-    Nav->AddSlot().AutoHeight()[MakeNavRow(TEXT("ACCESSIBILITY"), INDEX_NONE, false, true)];
+    Nav->AddSlot().AutoHeight()[MakeNavRow(TEXT("ACCESSIBILITY"), 4, true, false)];
     // AUDIO opens and its sliders save; the STUB mark stays until the values
     // route to a sound path (see BuildSettingsAudioSection).
     Nav->AddSlot().AutoHeight()[MakeNavRow(TEXT("AUDIO"), 3, true, true)];
@@ -5648,6 +5878,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterSelectScreen()
                     {
                         PendingCreateClass = EBreakerClassId::None;
                         PendingCreateName = FText::GetEmpty();
+                        PendingCreateModel = EBreakerPlayerModel::Human;
+                        PendingCreateVoice = EBreakerPlayerVoice::Mid;
+                        PendingCreateFace = 0;
                         CharacterScreenStatus = FText::GetEmpty();
                         Rebuild(EBreakerMenuScreen::CharacterCreate);
                         return FReply::Handled();
@@ -5720,12 +5953,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
 
     // The reference's ENLIST A BREAKER: "choose a resource — the resource is
     // the class". Five full-height class columns on the left, THE BREAKER
-    // rail on the right with the name, the summary and the gold arm/confirm
-    // ENLIST. What the rail shows that no data pays — BODY (O14's Human and
-    // Effigy), VOICE, FACE — is painted disabled with the STUB mark, the
-    // GAMEPLAY/ACCESSIBILITY ruling again: no field exists anywhere in
-    // Source, and a live control over nothing would be the quiet lie. OWED:
-    // body, face and voice fields on the character save, their own commit.
+    // rail on the right with the name, BODY (O14's Human and Effigy), VOICE,
+    // FACE, the summary and the gold arm/confirm ENLIST. The three choices
+    // are stamped onto the save by the roster's CreateCharacter.
     const FBreakerClassBlurb* Selected = FindClassBlurb(PendingCreateClass);
     const bool bSelectedImplemented = Selected && ClassHasImplementedKit(Selected->ClassId);
 
@@ -5832,6 +6062,48 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
                 TSharedRef<SWidget> Tile = SNew(SSpacer).Size(FVector2D(1.0f, 1.0f));
                 if (Definition)
                 {
+                    // The name takes the open slot's caption shape (below):
+                    // fitted into the tile's measured room down to 9px, and
+                    // below that split at its space into two lines, each
+                    // fitted on its own. Never Slate-wrapped — the wrap width
+                    // was a guess at the tile and broke a name mid-word.
+                    constexpr int32 KitNameMinSize = 9;   // O2 PLACEHOLDER
+                    const float TileWidth = (CardCopyWrap - 2.0f * BreakerUI::Space8) / 3.0f;
+                    const float NameWidth = TileWidth - 2.0f * BreakerUI::BorderThin - 2.0f * BreakerUI::Space8;
+                    const auto CaptionFont = [](int32 Pixels) { return BreakerMonoFont(Pixels, 0.16f); };
+                    const FString Name = Definition->DisplayName.ToString().ToUpper();
+                    const int32 OneLineSize = BreakerMenuFitPixels(Name, BreakerUI::TypeCaption, NameWidth, KitNameMinSize, CaptionFont);
+
+                    TSharedRef<SWidget> NameWidget = SNew(SSpacer).Size(FVector2D(1.0f, 1.0f));
+                    if (OneLineSize > 0)
+                    {
+                        NameWidget = BreakerMonoText(FText::FromString(Name), OneLineSize, Copy, 0.16f);
+                    }
+                    else
+                    {
+                        int32 Space = INDEX_NONE;
+                        Name.FindChar(TEXT(' '), Space);
+                        const FString Top = Space > 0 ? Name.Left(Space) : Name;
+                        const FString Bottom = Space > 0 ? Name.Mid(Space + 1) : FString();
+                        const int32 TopSize = FMath::Max(KitNameMinSize, BreakerMenuFitPixels(Top,
+                            BreakerUI::TypeCaption, NameWidth, KitNameMinSize, CaptionFont));
+                        TSharedRef<SVerticalBox> Lines = SNew(SVerticalBox)
+                            + SVerticalBox::Slot().AutoHeight()
+                            [
+                                BreakerMonoText(FText::FromString(Top), TopSize, Copy, 0.16f)
+                            ];
+                        if (!Bottom.IsEmpty())
+                        {
+                            const int32 BottomSize = FMath::Max(KitNameMinSize, BreakerMenuFitPixels(Bottom,
+                                BreakerUI::TypeCaption, NameWidth, KitNameMinSize, CaptionFont));
+                            Lines->AddSlot().AutoHeight()
+                            [
+                                BreakerMonoText(FText::FromString(Bottom), BottomSize, Copy, 0.16f)
+                            ];
+                        }
+                        NameWidget = Lines;
+                    }
+
                     Tile = SNew(SVerticalBox)
                         + SVerticalBox::Slot().AutoHeight()
                         [
@@ -5845,11 +6117,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
                             .Padding(FMargin(BreakerUI::Space8, 0.0f))
                             .VAlign(VAlign_Center)
                             [
-                                SNew(STextBlock)
-                                    .Text(FText::FromString(Definition->DisplayName.ToString().ToUpper()))
-                                    .ColorAndOpacity(Copy)
-                                    .WrapTextAt(FMath::Max(40.0f, (CardCopyWrap - 2.0f * BreakerUI::Space8) / 3.0f - 2.0f * BreakerUI::Space8))
-                                    .Font(BreakerMonoFont(BreakerUI::TypeCaption, 0.16f))
+                                NameWidget
                             ]
                         ];
                 }
@@ -6013,14 +6281,34 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
     {
         return BreakerMonoText(FText::FromString(Label), BreakerUI::TypeCaption, Muted, 0.16f);
     };
-    auto MakeStubCaption = [&MakeRailCaption](const TCHAR* Label) -> TSharedRef<SWidget>
+    // One segment of a closed choice: the ghost button's geometry, the chosen
+    // one on the plate face with primary text so the word and the fill say
+    // the same thing. Any choice disarms ENLIST, like every other interaction
+    // on the screen.
+    auto MakeChoiceSegment = [this](const TCHAR* Label, float Width, bool bChosen, TFunction<void()> Choose) -> TSharedRef<SWidget>
     {
-        return SNew(SHorizontalBox)
-            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[MakeRailCaption(Label)]
-            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
-            [
-                BreakerSettingsStubMark()
-            ];
+        return SNew(SBox).WidthOverride(Width).HeightOverride(BreakerSettingsControlHeight)
+        [
+            BorderWrap(
+                SNew(SButton)
+                .ButtonStyle(FCoreStyle::Get(), "NoBorder")
+                .ButtonColorAndOpacity(bChosen ? Panel : Transparent)
+                .ContentPadding(FMargin(BreakerUI::Space8, 0.0f))
+                .HAlign(HAlign_Center)
+                .VAlign(VAlign_Center)
+                .OnClicked(FOnClicked::CreateLambda([this, Choose]()
+                {
+                    Choose();
+                    PendingEnlistArm = false;
+                    Rebuild(EBreakerMenuScreen::CharacterCreate);
+                    return FReply::Handled();
+                }))
+                [
+                    BreakerMonoText(FText::FromString(Label), BreakerUI::TypeCaption, bChosen ? Primary : SoftText, 0.16f)
+                ],
+                bChosen ? BorderEmphasis : BorderRest,
+                bChosen ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
+        ];
     };
 
     TSharedRef<SVerticalBox> Rail = SNew(SVerticalBox);
@@ -6048,50 +6336,78 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
         ]
     ];
 
-    // BODY / VOICE / FACE, painted disabled behind the STUB mark until the
-    // save carries them. The rail reads NAME / BODY / VOICE / FACE: the two
+    // BODY / VOICE / FACE, each a closed choice written to the pending
+    // create state. The rail reads NAME / BODY / VOICE / FACE: the two
     // choices with a word for a value sit together, the picture row last.
-    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)[MakeStubCaption(TEXT("BODY"))];
+    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)[MakeRailCaption(TEXT("BODY"))];
     Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
     [
         SNew(SHorizontalBox)
-        + SHorizontalBox::Slot().AutoWidth()[BreakerSettingsDisabledButton(TEXT("HUMAN"), 100.0f)]
+        + SHorizontalBox::Slot().AutoWidth()
+        [
+            MakeChoiceSegment(TEXT("HUMAN"), 100.0f, PendingCreateModel == EBreakerPlayerModel::Human,
+                [this]() { PendingCreateModel = EBreakerPlayerModel::Human; })
+        ]
         + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
         [
-            BreakerSettingsDisabledButton(TEXT("EFFIGY"), 100.0f)
+            MakeChoiceSegment(TEXT("EFFIGY"), 100.0f, PendingCreateModel == EBreakerPlayerModel::Effigy,
+                [this]() { PendingCreateModel = EBreakerPlayerModel::Effigy; })
         ]
     ];
-    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)[MakeStubCaption(TEXT("VOICE"))];
+    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)[MakeRailCaption(TEXT("VOICE"))];
     Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
     [
         SNew(SHorizontalBox)
-        + SHorizontalBox::Slot().AutoWidth()[BreakerSettingsDisabledButton(TEXT("LOW"), 76.0f)]
-        + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
+        + SHorizontalBox::Slot().AutoWidth()
         [
-            BreakerSettingsDisabledButton(TEXT("MID"), 76.0f)
+            MakeChoiceSegment(TEXT("LOW"), 76.0f, PendingCreateVoice == EBreakerPlayerVoice::Low,
+                [this]() { PendingCreateVoice = EBreakerPlayerVoice::Low; })
         ]
         + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
         [
-            BreakerSettingsDisabledButton(TEXT("DRY"), 76.0f)
+            MakeChoiceSegment(TEXT("MID"), 76.0f, PendingCreateVoice == EBreakerPlayerVoice::Mid,
+                [this]() { PendingCreateVoice = EBreakerPlayerVoice::Mid; })
+        ]
+        + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
+        [
+            MakeChoiceSegment(TEXT("DRY"), 76.0f, PendingCreateVoice == EBreakerPlayerVoice::Dry,
+                [this]() { PendingCreateVoice = EBreakerPlayerVoice::Dry; })
         ]
     ];
-    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)[MakeStubCaption(TEXT("FACE"))];
+    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)[MakeRailCaption(TEXT("FACE"))];
     {
+        // Five tiles, FaceIndex 0..4 — the save's own count (O2 PLACEHOLDER
+        // until the faces are drawn). Each tile carries its number so the
+        // chosen one is named, not only ringed.
+        constexpr int32 FaceCount = 5;
         TSharedRef<SHorizontalBox> Faces = SNew(SHorizontalBox);
-        for (int32 Index = 0; Index < 6; ++Index)
+        for (int32 Index = 0; Index < FaceCount; ++Index)
         {
-            Faces->AddSlot().AutoWidth().Padding(0.0f, 0.0f, Index < 5 ? BreakerUI::Space8 : 0.0f, 0.0f)
+            const bool bChosen = PendingCreateFace == Index;
+            Faces->AddSlot().AutoWidth().Padding(0.0f, 0.0f, Index + 1 < FaceCount ? BreakerUI::Space8 : 0.0f, 0.0f)
             [
                 SNew(SBox).WidthOverride(40.0f).HeightOverride(36.0f)
                 [
                     BorderWrap(
-                        SNew(SBorder)
-                        .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
-                        .BorderBackgroundColor(BreakerUI::BgRaised)
+                        SNew(SButton)
+                        .ButtonStyle(FCoreStyle::Get(), "NoBorder")
+                        .ButtonColorAndOpacity(bChosen ? Panel : BreakerUI::BgRaised)
+                        .ContentPadding(FMargin(0.0f))
+                        .HAlign(HAlign_Center)
+                        .VAlign(VAlign_Center)
+                        .OnClicked(FOnClicked::CreateLambda([this, Index]()
+                        {
+                            PendingCreateFace = static_cast<uint8>(Index);
+                            PendingEnlistArm = false;
+                            Rebuild(EBreakerMenuScreen::CharacterCreate);
+                            return FReply::Handled();
+                        }))
                         [
-                            SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))
+                            BreakerMonoText(FText::FromString(FString::FromInt(Index + 1)),
+                                BreakerUI::TypeCaption, bChosen ? Primary : Muted, 0.16f)
                         ],
-                        BorderRest)
+                        bChosen ? BorderEmphasis : BorderRest,
+                        bChosen ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
                 ]
             ];
         }
@@ -6217,7 +6533,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
                                 }
                                 FText Failure;
                                 const FGuid Created = Roster->CreateCharacter(
-                                    PendingCreateName.ToString(), PendingCreateClass, Failure);
+                                    PendingCreateName.ToString(), PendingCreateClass, Failure,
+                                    PendingCreateModel, PendingCreateVoice, PendingCreateFace);
                                 if (!Created.IsValid())
                                 {
                                     // The roster's own reason, verbatim — it
@@ -6230,6 +6547,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
                                 SelectedCharacterId = Created;
                                 PendingCreateClass = EBreakerClassId::None;
                                 PendingCreateName = FText::GetEmpty();
+                                PendingCreateModel = EBreakerPlayerModel::Human;
+                                PendingCreateVoice = EBreakerPlayerVoice::Mid;
+                                PendingCreateFace = 0;
                                 CharacterScreenStatus = FText::GetEmpty();
                                 Rebuild(EBreakerMenuScreen::CharacterSelect);
                                 return FReply::Handled();
@@ -6501,11 +6821,15 @@ namespace
             OutFailureReason = FText::FromString(TEXT("No progression component."));
             return false;
         }
-        // A REAL ANSWER NOW. This passed true unconditionally, with a comment
-        // deferring the gate until the hub existed; the hub exists, and the
-        // Forge screen is reachable only through Kess, so arriving here means
-        // the player is standing at one. The flag is set by that door and by
-        // nothing else, which is what makes the refusal path reachable.
+        // O213: the Core's respec is priced by level, not gated by place —
+        // free below BreakerCoreWheel::CoreRespecFreeUntilLevel, Riftglass
+        // after — so it takes RespecCore and never reads bIsAtForge. Doctrine
+        // stays the Forge's (O43): the flag is set by that door and by nothing
+        // else, which is what makes the refusal path reachable.
+        if (Currency == EBreakerPointCurrency::CorePoints)
+        {
+            return Progression->RespecCore(OutFailureReason);
+        }
         return Progression->RespecAtForge(Currency, bIsAtForge, OutFailureReason);
     }
 
@@ -7218,7 +7542,7 @@ namespace
         Column->AddSlot().AutoHeight()
         [
             SNew(SHorizontalBox)
-            + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(View.RankLine), BreakerUI::TypeCaption, View.bOwned ? BreakerUI::Cyan : BreakerUI::TextMuted, true)]
+            + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(View.RankLine), BreakerUI::TypeCaption, View.bOwned ? BreakerUI::System : BreakerUI::TextMuted, true)]
             + SHorizontalBox::Slot().AutoWidth()[MenuText(FText::FromString(View.CostLine), BreakerUI::TypeCaption, BreakerUI::TextMuted, true)]
         ];
         Column->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, BreakerUI::Space8)
@@ -7292,7 +7616,7 @@ namespace
             Column->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
             [
                 MenuText(FText::FromString(View.ActionLine), BreakerUI::TypeCaption,
-                    View.bMaxed ? BreakerUI::Cyan : (View.bPurchasable ? BreakerUI::Gold : BreakerUI::Harm), true)
+                    View.bMaxed ? BreakerUI::System : (View.bPurchasable ? BreakerUI::Gold : BreakerUI::Harm), true)
             ];
         }
         return MakePlate(Column, BreakerUI::Panel10, Rail, FMargin(BreakerUI::Space16, BreakerUI::Space16));
@@ -7358,7 +7682,7 @@ namespace
             if (!bAlwaysShow && bAtIdentity) continue;
 
             const FLinearColor ValueColor = Index == 0 ? BreakerUI::Orange
-                : (Index < 5 ? BreakerUI::TextPrimary : BreakerUI::Cyan);
+                : (Index < 5 ? BreakerUI::TextPrimary : BreakerUI::System);
             AddRow(Line.bTreeOnly ? Line.Label + TEXT(" (TREE)") : Line.Label,
                 BreakerSkillProjection::FormatStat(Line.Before, Line.Format),
                 ValueColor, BreakerUI::TextMuted);
@@ -8064,6 +8388,31 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         int32 TreeTotal = 0;
         ProgressionTreeInvestment(Progression, CoreTree, TreeSpent, TreeTotal);
 
+        // O212: a constellation holding a silent node is drawn dark and its
+        // chips cannot be bought from this screen. Derived from the tree by
+        // BreakerCoreDarkConstellations, never listed here. GAP, RECORDED AT
+        // THE SITE: UBreakerProgressionComponent::PurchaseNode does not read
+        // this set, so the refusal lives in the widget — a dark chip is a
+        // painted marker with no button, not a button that says no.
+        const TSet<FName> DarkConstellations = BreakerCoreDarkConstellations(CoreTree);
+        auto MakeSealedMarker = [](const FLinearColor& Fill, const FLinearColor& Ring, float RingThickness,
+            const TSharedRef<SWidget>& Inner) -> TSharedRef<SWidget>
+        {
+            // The same geometry as WireMarker with the interaction gone.
+            // Painted, never faded.
+            return BorderWrap(
+                SNew(SBorder)
+                .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                .BorderBackgroundColor(Fill)
+                .Padding(FMargin(0.0f))
+                .HAlign(HAlign_Center)
+                .VAlign(VAlign_Center)
+                [
+                    Inner
+                ],
+                Ring, RingThickness);
+        };
+
         // ---- Expanded constellation ------------------------------------
         // Owner: "the constellations dont expand like they should I dont see
         // any layers or details to them". The map was the WHOLE surface: seven
@@ -8090,6 +8439,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 return A.NodeId.LexicalLess(B.NodeId);
             });
 
+            const bool bExpandedSealed = DarkConstellations.Contains(SkillExpandedConstellation);
             TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
             Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
             [
@@ -8109,7 +8459,13 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 ]
                 + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
                 [
-                    MenuText(FText::FromString(ConstellationName), BreakerUI::TypeH2, Primary, true)
+                    MenuText(FText::FromString(ConstellationName), BreakerUI::TypeH2,
+                        bExpandedSealed ? BreakerUI::TealHardware : Primary, true)
+                ]
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
+                [
+                    MenuText(FText::FromString(bExpandedSealed ? TEXT("SEALED") : TEXT("")), BreakerUI::TypeCaption,
+                        BreakerInventoryLayout::SkillClusterSealedLabelColour(), true)
                 ]
             ];
 
@@ -8130,7 +8486,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
 
                 const int32 Rank = ProgressionGetNodeRank(Progression, Node->NodeId, Node->Currency);
                 FString LockReason;
-                const bool bPurchasable = SkillNodeIsPurchasable(Progression, CoreTree, Node, TreeSpent, LockReason);
+                bool bPurchasable = SkillNodeIsPurchasable(Progression, CoreTree, Node, TreeSpent, LockReason);
+                if (bExpandedSealed && bPurchasable)
+                {
+                    bPurchasable = false;
+                    LockReason = TEXT("SEALED");
+                }
                 const bool bOwned = Rank > 0;
                 const bool bMaxed = Rank >= Node->MaxRank;
                 const ESkillMarkerKind Kind = ClassifyNode(Node);
@@ -8140,9 +8501,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     BreakerMenuSkillKeystoneRefused(Progression, CoreTree, Node));
                 const FLinearColor Fill = Rung.Fill;
                 const FLinearColor Ring = Rung.Ring;
-                TSharedRef<SWidget> Marker = WireMarker(CoreTree, Node, View, bPurchasable, LockReason, Fill, Ring,
-                    MarkerRingThickness(Kind, bOwned || bPurchasable),
-                    MakeMarkerCore(Kind, Rung.Core, Fill, 44.0f));
+                const float ExpandedRingThickness = MarkerRingThickness(Kind, bOwned || bPurchasable);
+                TSharedRef<SWidget> Marker = bExpandedSealed
+                    ? MakeSealedMarker(Fill, Ring, ExpandedRingThickness, MakeMarkerCore(Kind, Rung.Core, Fill, 44.0f))
+                    : WireMarker(CoreTree, Node, View, bPurchasable, LockReason, Fill, Ring, ExpandedRingThickness,
+                        MakeMarkerCore(Kind, Rung.Core, Fill, 44.0f));
                 if (MarkerIsDiamond(Kind)) Marker = RotateFortyFive(Marker);
 
                 const FString StateText = bMaxed
@@ -8193,82 +8556,89 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             return MakePlate(Body, PanelRaised, Cyan, FMargin(BreakerUI::Space24, BreakerUI::Space16), false, BreakerUI::BorderRest);
         }
 
-        struct FConstellationCluster
+        // ---- The five sectors (O212) ---------------------------------------
+        // One plate per sector, every sector always drawn. A sector holds its
+        // constellations as wedges: the wedge list is the tree's own distinct
+        // Constellation names and which sector each is a wedge of is
+        // BreakerCoreSectorOf — nothing on this board is a literal. A
+        // constellation the table cannot place lands in a sixth plate that
+        // says UNMAPPED rather than vanishing (the audit test asserts it never
+        // happens on the shipped tree; the plate is for the day it does).
+        struct FConstellationWedge
         {
             FString Name;
             FName Constellation;
-            FVector2D Centre = FVector2D::ZeroVector;
-            bool bHub = false;
             bool bSealed = false;
             TArray<const UBreakerProgressionNode*> Nodes;
         };
-
-        TArray<FConstellationCluster> Clusters;
-        auto AddCluster = [&Clusters](const TCHAR* Name, FName Constellation, float X, float Y, bool bHub, bool bSealed)
+        struct FSectorCluster
         {
-            FConstellationCluster Cluster;
-            Cluster.Name = FString(Name).ToUpper();
-            Cluster.Constellation = Constellation;
-            Cluster.Centre = FVector2D(X, Y);
-            Cluster.bHub = bHub;
-            Cluster.bSealed = bSealed;
-            Clusters.Add(MoveTemp(Cluster));
+            FString Name;
+            FName Sector;
+            FVector2D Centre = FVector2D::ZeroVector;
+            bool bSealed = false;
+            TArray<FConstellationWedge> Wedges;
         };
-        // Kinesis is the hub; the other clusters sit around it. Elements is
-        // sealed below centre; Velocity (the O27 addition the prefix map used
-        // to sweep into UNMAPPED) takes the centre-north slot.
-        AddCluster(TEXT("Kinesis"), TEXT("Kinesis"), 520.0f, 350.0f, true, false);
-        AddCluster(TEXT("Precision"), TEXT("Precision"), 190.0f, 130.0f, false, false);
-        AddCluster(TEXT("Volley"), TEXT("Volley"), 850.0f, 130.0f, false, false);
-        AddCluster(TEXT("Velocity"), TEXT("Velocity"), 520.0f, 130.0f, false, false);
-        AddCluster(TEXT("Affliction"), TEXT("Affliction"), 190.0f, 570.0f, false, false);
-        AddCluster(TEXT("Bulwark"), TEXT("Bulwark"), 850.0f, 570.0f, false, false);
-        AddCluster(TEXT("Elements"), TEXT("Elements"), 520.0f, 660.0f, false, true);
 
-        // Constellation membership is the node's own Constellation field now
-        // (populated for every Core node, asserted non-None by
-        // RiorsEdge.Progression.CoreConstellationField) — the prefix
-        // inference this replaced is what drew VELOCITY under an UNMAPPED
-        // heading.
-        TSet<FName> Claimed;
-        for (FConstellationCluster& Cluster : Clusters)
+        TArray<FSectorCluster> Clusters;
+        for (const FName& Sector : { BreakerCoreWheel::SectorMovement, BreakerCoreWheel::SectorWeapon,
+                                     BreakerCoreWheel::SectorDefence, BreakerCoreWheel::SectorAbility,
+                                     BreakerCoreWheel::SectorElements })
         {
-            for (const UBreakerProgressionNode* Node : CoreTree->Nodes)
-            {
-                if (!Node || Node->Constellation != Cluster.Constellation) continue;
-                Cluster.Nodes.Add(Node);
-                Claimed.Add(Node->NodeId);
-            }
-            Cluster.Nodes.Sort([](const UBreakerProgressionNode& A, const UBreakerProgressionNode& B) { return A.Tier < B.Tier; });
+            FSectorCluster Cluster;
+            Cluster.Name = Sector.ToString().ToUpper();
+            Cluster.Sector = Sector;
+            Clusters.Add(MoveTemp(Cluster));
         }
+
+        TArray<FName> Constellations;
+        for (const UBreakerProgressionNode* Node : CoreTree->Nodes)
         {
-            // A node whose constellation names no cluster above must never
-            // silently vanish off the map — it lands here, loudly.
-            FConstellationCluster Other;
-            Other.Name = TEXT("UNMAPPED");
-            Other.Centre = FVector2D(190.0f, 350.0f);
+            // A node with no constellation (asserted non-None by
+            // RiorsEdge.Progression.CoreConstellationField) still gets a
+            // wedge, under NAME_None, so it cannot silently leave the map.
+            if (Node) Constellations.AddUnique(Node->Constellation);
+        }
+        Constellations.Sort(FNameLexicalLess());
+        for (const FName& Constellation : Constellations)
+        {
+            FConstellationWedge Wedge;
+            Wedge.Name = Constellation.IsNone() ? FString(TEXT("UNMAPPED")) : Constellation.ToString().ToUpper();
+            Wedge.Constellation = Constellation;
+            Wedge.bSealed = DarkConstellations.Contains(Constellation);
             for (const UBreakerProgressionNode* Node : CoreTree->Nodes)
             {
-                if (Node && !Claimed.Contains(Node->NodeId)) Other.Nodes.Add(Node);
+                if (Node && Node->Constellation == Constellation) Wedge.Nodes.Add(Node);
             }
-            if (Other.Nodes.Num() > 0) Clusters.Add(MoveTemp(Other));
+            Wedge.Nodes.Sort([](const UBreakerProgressionNode& A, const UBreakerProgressionNode& B) { return A.Tier < B.Tier; });
+
+            const FName Sector = BreakerCoreSectorOf(Constellation);
+            FSectorCluster* Home = Sector.IsNone() ? nullptr
+                : Clusters.FindByPredicate([Sector](const FSectorCluster& Cluster) { return Cluster.Sector == Sector; });
+            if (!Home)
+            {
+                if (!Clusters.Last().Sector.IsNone())
+                {
+                    FSectorCluster Other;
+                    Other.Name = TEXT("UNMAPPED");
+                    Clusters.Add(MoveTemp(Other));
+                }
+                Home = &Clusters.Last();
+            }
+            Home->Wedges.Add(MoveTemp(Wedge));
+        }
+        for (FSectorCluster& Cluster : Clusters)
+        {
+            // A sector is sealed when every wedge it holds is dark; a sector
+            // with nothing in it is empty, not sealed, and says which below.
+            Cluster.bSealed = Cluster.Wedges.Num() > 0;
+            for (const FConstellationWedge& Wedge : Cluster.Wedges) Cluster.bSealed &= Wedge.bSealed;
         }
 
         const float BoardWidth = 1060.0f;
-        // Grows with the plates. The plate positions are authored against a
-        // fixed canvas, so making plates taller pushed the lowest one (ELEMENTS,
-        // at the bottom of the map) through the board's own bottom edge — its
-        // chip grid and node count were cut off, which was visible in capture.
-        // +96 covers the OPEN CONSTELLATION control's 56 plus headroom for the
-        // half-plate that hangs below the lowest authored centre. PlateHeight
-        // itself is computed further down (it needs the cluster contents), so
-        // this cannot read it directly.
-        const float BoardHeight = 800.0f + 96.0f;
         const float PlateWidth = 300.0f;
-        // A cluster's chips wrap at six per row inside a 300px plate, so the
-        // plate has to be tall enough for however many rows that makes. The
-        // old flat 156 assumed one row and a wide cluster's chips ran straight
-        // out through the plate's right edge.
+        // A wedge's chips wrap at six per row inside a 300px plate, so the
+        // plate has to be tall enough for however many rows that makes.
         const int32 ChipsPerRow = 6;
         // The chip is MEASURED, not guessed. It was 30 and clipped a `0` into
         // a bracket; the previous pass moved it to 36 and the clip went away
@@ -8284,119 +8654,62 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             ChipSize = FMath::Max(ChipSize, MarkerSizeForLabel(36.0f,
                 BreakerUI::BorderSelected, FString::FromInt(Node->MaxRank)));
         }
-        int32 WidestClusterRows = 1;
-        for (const FConstellationCluster& Cluster : Clusters)
+        // The plate's height is arithmetic on its contents, and every plate on
+        // the board takes the tallest one so the grid keeps one row pitch. A
+        // Canvas slot does not clip an overflowing child, so getting this wrong
+        // overprints the plate below rather than truncating visibly — the
+        // failure mode that is hardest to recognise as one.
+        const float CaptionLine = 20.0f;                        // O2 PLACEHOLDER — one TypeCaption line
+        const float PlateHeader = 108.0f;                       // O2 PLACEHOLDER — title, sealed line, padding
+        auto WedgeHeight = [ChipSize, ChipsPerRow, CaptionLine](const FConstellationWedge& Wedge) -> float
         {
-            WidestClusterRows = FMath::Max(WidestClusterRows,
-                FMath::DivideAndRoundUp(FMath::Max(1, Cluster.Nodes.Num()), ChipsPerRow));
+            const int32 Rows = FMath::DivideAndRoundUp(FMath::Max(1, Wedge.Nodes.Num()), ChipsPerRow);
+            // Name line, chip rows, status line, the OPEN CONSTELLATION control.
+            return BreakerUI::Space8 + CaptionLine + BreakerUI::Space8
+                + Rows * (ChipSize + BreakerUI::Space8)
+                + CaptionLine + BreakerUI::Space8 + BreakerUI::MinHitTarget;
+        };
+        float PlateHeight = PlateHeader + CaptionLine;
+        for (const FSectorCluster& Cluster : Clusters)
+        {
+            float Height = PlateHeader;
+            for (const FConstellationWedge& Wedge : Cluster.Wedges) Height += WedgeHeight(Wedge);
+            PlateHeight = FMath::Max(PlateHeight, Height);
         }
-        // +56 for the OPEN CONSTELLATION control. A Canvas slot does not clip an
-        // overflowing child, so getting this wrong overprints the plate below
-        // rather than truncating visibly — the failure mode that is hardest to
-        // recognise as one.
-        const float PlateHeight = 108.0f + 56.0f + WidestClusterRows * (ChipSize + BreakerUI::Space8);
+        // Three plates a row, positioned from the plate height rather than
+        // against an authored canvas, so a taller plate moves the row under
+        // it instead of running through the board's bottom edge.
+        const int32 PlatesPerRow = 3;
+        const float PlateGap = BreakerUI::Space24;
+        for (int32 Index = 0; Index < Clusters.Num(); ++Index)
+        {
+            const int32 Column = Index % PlatesPerRow;
+            const int32 Row = Index / PlatesPerRow;
+            Clusters[Index].Centre = FVector2D(
+                190.0f + Column * 330.0f,
+                PlateGap + PlateHeight * 0.5f + Row * (PlateHeight + PlateGap));
+        }
+        const int32 PlateRows = FMath::DivideAndRoundUp(Clusters.Num(), PlatesPerRow);
+        const float BoardHeight = PlateGap + PlateRows * (PlateHeight + PlateGap);
 
         TSharedRef<SCanvas> Canvas = SNew(SCanvas);
 
-        auto ClusterHasOwned = [Progression](const FConstellationCluster& Cluster)
+        for (const FSectorCluster& Cluster : Clusters)
         {
-            for (const UBreakerProgressionNode* Node : Cluster.Nodes)
-            {
-                if (ProgressionGetNodeRank(Progression, Node->NodeId, Node->Currency) > 0) return true;
-            }
-            return false;
-        };
-
-        // Convergence lines radiate from the hub. Drawn first so the plates
-        // paint over them.
-        const bool bHubOwned = ClusterHasOwned(Clusters[0]);
-        for (int32 Index = 1; Index < Clusters.Num(); ++Index)
-        {
-            const bool bLinked = bHubOwned && ClusterHasOwned(Clusters[Index]);
-            AddCanvasSegment(Canvas, Clusters[0].Centre, Clusters[Index].Centre, bLinked ? Cyan : PanelHover);
-        }
-
-        for (const FConstellationCluster& Cluster : Clusters)
-        {
-            int32 ClusterPurchasable = 0;
-            // Fixed six-per-row grid, built as rows of an SHorizontalBox. NOT
-            // an SWrapBox: a wrap box sized off its allotted width is the
-            // pattern that caused the historical layout oscillation, and the
-            // row count here is arithmetic on a known chip count instead.
-            TSharedRef<SVerticalBox> Grid = SNew(SVerticalBox);
-            TSharedPtr<SHorizontalBox> ChipRow;
-            int32 ChipIndex = 0;
-            for (const UBreakerProgressionNode* Node : Cluster.Nodes)
-            {
-                if (ChipIndex % ChipsPerRow == 0)
-                {
-                    ChipRow = SNew(SHorizontalBox);
-                    Grid->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)[ChipRow.ToSharedRef()];
-                }
-                ++ChipIndex;
-                const int32 Rank = ProgressionGetNodeRank(Progression, Node->NodeId, Node->Currency);
-                FString LockReason;
-                const bool bPurchasable = SkillNodeIsPurchasable(Progression, CoreTree, Node, TreeSpent, LockReason);
-                if (bPurchasable) ++ClusterPurchasable;
-                const bool bOwned = Rank > 0;
-                const ESkillMarkerKind Kind = ClassifyNode(Node);
-
-                const FBreakerMenuSkillRung Rung = BreakerMenuSkillLadderRung(Kind, bOwned, bPurchasable,
-                    BreakerMenuSkillKeystoneRefused(Progression, CoreTree, Node));
-                const FLinearColor Fill = Rung.Fill;
-                const FLinearColor Ring = Rung.Ring;
-                const float RingThickness = MarkerRingThickness(Kind, bOwned || bPurchasable);
-                const FLinearColor CoreColor = Rung.Core;
-                const FSkillNodeView View = MakeSkillNodeView(Node, Rank, bPurchasable, LockReason, TreeSpent, Snapshot);
-
-                // The cluster grid is a glance, not the path board: every kind
-                // draws at one compact size here, keeping its silhouette AND
-                // its centre mark. Without the mark a single-rank chip is an
-                // empty black box, which is the same defect the path board's
-                // keystone had — the map should not repeat it thirty times.
-                TSharedRef<SWidget> Chip = WireMarker(CoreTree, Node, View, bPurchasable, LockReason, Fill, Ring, RingThickness,
-                    Node->MaxRank > 1
-                        ? MakeMarkerLabel(FString::FromInt(Rank), CoreColor)
-                        : MakeMarkerCore(Kind, CoreColor, Fill, ChipSize));
-                if (MarkerIsDiamond(Kind)) Chip = RotateFortyFive(Chip);
-
-                ChipRow->AddSlot().AutoWidth().Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
-                [
-                    SNew(SBox).WidthOverride(ChipSize).HeightOverride(ChipSize)[Chip]
-                ];
-            }
-
-            // These both returned suppression teal for the sealed cluster, on the
-            // reasoning that a rift is a world object. The reasoning is the
-            // adjectival use the teal law forbids: a rail and a border are chrome
-            // describing a panel, and both are named on the forbidden list
-            // whatever the panel is about. The word SEALED below is the carrier,
-            // and it was already there — the tint was saying nothing twice.
-            const FLinearColor Rail = BreakerInventoryLayout::SkillClusterRailColour(Cluster.bSealed, Cluster.bHub);
+            // Neither the rail nor the border reads suppression teal for a
+            // sealed cluster: a rail and a border are chrome describing a
+            // panel, which is the adjectival use the teal law forbids. The
+            // word SEALED below is the carrier. The hub is a start, not a
+            // constellation (O211), so the rail's hub input is always false.
+            const FLinearColor Rail = BreakerInventoryLayout::SkillClusterRailColour(Cluster.bSealed, /*bHub=*/false);
             const FLinearColor Border = BreakerInventoryLayout::SkillClusterBorderColour(Cluster.bSealed);
 
             TSharedRef<SVerticalBox> Inner = SNew(SVerticalBox);
             Inner->AddSlot().AutoHeight()
             [
-                SNew(SHorizontalBox)
-                + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
-                [
-                    MenuText(FText::FromString(Cluster.Name), BreakerUI::TypeH2,
-                        Cluster.bSealed ? BreakerUI::TealHardware : Primary, true)
-                ]
-                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-                [
-                    MenuText(FText::FromString(Cluster.bHub ? TEXT("HUB") : TEXT("")), BreakerUI::TypeCaption, Cyan, true)
-                ]
+                MenuText(FText::FromString(Cluster.Name), BreakerUI::TypeH2,
+                    Cluster.bSealed ? BreakerUI::TealHardware : Primary, true)
             ];
-            // SEALED IS A PROPERTY OF THE CONSTELLATION, NOT OF ITS EMPTINESS.
-            // Both sealed lines used to live inside the `Num() == 0` branch, and
-            // Elements has six authored nodes — so the plate rendered teal, with
-            // the teal reserved for sealed hardware, and never once said the
-            // word SEALED or named Rift / Entropy / Void. It read as an ordinary
-            // constellation coloured differently for no stated reason. O38 makes
-            // Elements post-slice, so being sealed is exactly what a player most
-            // needs told about it.
             if (Cluster.bSealed)
             {
                 Inner->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
@@ -8404,46 +8717,115 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     MenuText(FText::FromString(TEXT("SEALED")), BreakerUI::TypeCaption,
                         BreakerInventoryLayout::SkillClusterSealedLabelColour(), true)
                 ];
-                Inner->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+            }
+            if (Cluster.Wedges.Num() == 0)
+            {
+                // The empty plate's own words — the same line the old map used
+                // for a constellation with nothing in it.
+                Inner->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
                 [
-                    MenuText(FText::FromString(TEXT("RIFT / ENTROPY / VOID")), BreakerUI::TypeCaption, Muted, true)
+                    MenuText(FText::FromString(TEXT("NO NODES AUTHORED")), BreakerUI::TypeCaption, Muted, true)
                 ];
             }
-            if (Cluster.Nodes.Num() == 0)
+
+            for (const FConstellationWedge& Wedge : Cluster.Wedges)
             {
-                if (!Cluster.bSealed)
+                int32 WedgePurchasable = 0;
+                // Fixed six-per-row grid, built as rows of an SHorizontalBox.
+                // NOT an SWrapBox: a wrap box sized off its allotted width is
+                // the pattern that caused the historical layout oscillation,
+                // and the row count here is arithmetic on a known chip count.
+                TSharedRef<SVerticalBox> Grid = SNew(SVerticalBox);
+                TSharedPtr<SHorizontalBox> ChipRow;
+                int32 ChipIndex = 0;
+                for (const UBreakerProgressionNode* Node : Wedge.Nodes)
                 {
-                    Inner->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+                    if (ChipIndex % ChipsPerRow == 0)
+                    {
+                        ChipRow = SNew(SHorizontalBox);
+                        Grid->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)[ChipRow.ToSharedRef()];
+                    }
+                    ++ChipIndex;
+                    const int32 Rank = ProgressionGetNodeRank(Progression, Node->NodeId, Node->Currency);
+                    FString LockReason;
+                    bool bPurchasable = SkillNodeIsPurchasable(Progression, CoreTree, Node, TreeSpent, LockReason);
+                    if (Wedge.bSealed && bPurchasable)
+                    {
+                        bPurchasable = false;
+                        LockReason = TEXT("SEALED");
+                    }
+                    if (bPurchasable) ++WedgePurchasable;
+                    const bool bOwned = Rank > 0;
+                    const ESkillMarkerKind Kind = ClassifyNode(Node);
+
+                    const FBreakerMenuSkillRung Rung = BreakerMenuSkillLadderRung(Kind, bOwned, bPurchasable,
+                        BreakerMenuSkillKeystoneRefused(Progression, CoreTree, Node));
+                    const FLinearColor Fill = Rung.Fill;
+                    const FLinearColor Ring = Rung.Ring;
+                    const float RingThickness = MarkerRingThickness(Kind, bOwned || bPurchasable);
+                    const FLinearColor CoreColor = Rung.Core;
+                    const FSkillNodeView View = MakeSkillNodeView(Node, Rank, bPurchasable, LockReason, TreeSpent, Snapshot);
+
+                    // The wedge grid is a glance, not the path board: every
+                    // kind draws at one compact size here, keeping its
+                    // silhouette AND its centre mark. A dark wedge's chips are
+                    // the same geometry with no button under them.
+                    const TSharedRef<SWidget> Mark = Node->MaxRank > 1
+                        ? MakeMarkerLabel(FString::FromInt(Rank), CoreColor)
+                        : MakeMarkerCore(Kind, CoreColor, Fill, ChipSize);
+                    TSharedRef<SWidget> Chip = Wedge.bSealed
+                        ? MakeSealedMarker(Fill, Ring, RingThickness, Mark)
+                        : WireMarker(CoreTree, Node, View, bPurchasable, LockReason, Fill, Ring, RingThickness, Mark);
+                    if (MarkerIsDiamond(Kind)) Chip = RotateFortyFive(Chip);
+
+                    ChipRow->AddSlot().AutoWidth().Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
                     [
-                        MenuText(FText::FromString(TEXT("NO NODES AUTHORED")), BreakerUI::TypeCaption, Muted, true)
+                        SNew(SBox).WidthOverride(ChipSize).HeightOverride(ChipSize)[Chip]
                     ];
                 }
-            }
-            else
-            {
-                Inner->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, BreakerUI::Space8)[Grid];
+
+                Inner->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+                [
+                    SNew(SBox).HeightOverride(CaptionLine)
+                    [
+                        MenuText(FText::FromString(Wedge.Name), BreakerUI::TypeCaption,
+                            Wedge.bSealed ? BreakerUI::TealHardware : SoftText, true)
+                    ]
+                ];
+                Inner->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)[Grid];
                 Inner->AddSlot().AutoHeight()
                 [
-                    MenuText(FText::FromString(FString::Printf(TEXT("%d NODES · %d PURCHASABLE"), Cluster.Nodes.Num(), ClusterPurchasable)),
-                        BreakerUI::TypeCaption, ClusterPurchasable > 0 ? Amber : Muted, true)
+                    SNew(SBox).HeightOverride(CaptionLine)
+                    [
+                        Wedge.bSealed
+                            ? MenuText(FText::FromString(TEXT("SEALED")), BreakerUI::TypeCaption,
+                                BreakerInventoryLayout::SkillClusterSealedLabelColour(), true)
+                            : MenuText(FText::FromString(FString::Printf(TEXT("%d NODES · %d PURCHASABLE"), Wedge.Nodes.Num(), WedgePurchasable)),
+                                BreakerUI::TypeCaption, WedgePurchasable > 0 ? Amber : Muted, true)
+                    ]
                 ];
                 // The affordance, stated. A plate that opens has to say so —
                 // the chips are individually clickable to BUY, so nothing about
                 // the plate previously suggested it was itself a way in.
-                const FName ClusterId = Cluster.Constellation;
-                Inner->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
-                [
-                    SNew(SBox).HeightOverride(BreakerUI::MinHitTarget)
+                // A wedge with no constellation name has nothing to open —
+                // NAME_None is the expanded view's own "closed" value.
+                const FName WedgeId = Wedge.Constellation;
+                if (!WedgeId.IsNone())
+                {
+                    Inner->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
                     [
-                        MakeButton(FText::FromString(TEXT("OPEN CONSTELLATION")),
-                            FOnClicked::CreateLambda([this, ClusterId]()
-                            {
-                                SkillExpandedConstellation = ClusterId;
-                                Rebuild(EBreakerMenuScreen::SkillTrees);
-                                return FReply::Handled();
-                            }), false)
-                    ]
-                ];
+                        SNew(SBox).HeightOverride(BreakerUI::MinHitTarget)
+                        [
+                            MakeButton(FText::FromString(TEXT("OPEN CONSTELLATION")),
+                                FOnClicked::CreateLambda([this, WedgeId]()
+                                {
+                                    SkillExpandedConstellation = WedgeId;
+                                    Rebuild(EBreakerMenuScreen::SkillTrees);
+                                    return FReply::Handled();
+                                }), false)
+                        ]
+                    ];
+                }
             }
 
             Canvas->AddSlot()
@@ -8476,7 +8858,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                         SNew(SHorizontalBox)
                         + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
                         [
-                            MenuText(FText::FromString(TEXT("CORE CONSTELLATIONS — KINESIS AT THE HUB")), BreakerUI::TypeH2, Primary, true)
+                            MenuText(FText::FromString(TEXT("CORE CONSTELLATIONS")), BreakerUI::TypeH2, Primary, true)
                         ]
                         + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
                         [
@@ -9777,10 +10159,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
         else
         {
             // ---- RESPEC --------------------------------------------------
-            // The one verb that acts on the CHARACTER, not the bench — and
-            // the reason the Forge is its only door (O43: doctrine changes at
-            // the Forge; the respec API refuses anywhere else).
-            AddKicker(TEXT("RESPEC"), TEXT("· FORGE ONLY"),
+            // The one verb that acts on the CHARACTER, not the bench. Doctrine
+            // is the Forge's alone (O43: doctrine changes at the Forge; the
+            // respec API refuses anywhere else) and its row carries the
+            // kicker. The Core's respec is priced by level, not by place
+            // (O213), and the skill screen offers it too.
+            AddKicker(TEXT("RESPEC"), TEXT(""),
                 TEXT("Refunds a whole pool to be respent. Arm, then confirm."));
             auto AddRespecRow = [&](const TCHAR* Label, const TCHAR* Caption, EBreakerPointCurrency Currency, int32 ArmIndex)
             {
@@ -9820,9 +10204,13 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
                                     if (Progression)
                                     {
                                         FText Failure;
-                                        // The standing shim again: proximity
-                                        // gating arrives with the hub.
-                                        if (Progression->RespecAtForge(Currency, /*bIsAtForge=*/true, Failure))
+                                        // Core takes O213's level price through
+                                        // RespecCore; Doctrine takes the Forge
+                                        // door, and this screen IS the Forge.
+                                        const bool bRefunded = Currency == EBreakerPointCurrency::CorePoints
+                                            ? Progression->RespecCore(Failure)
+                                            : Progression->RespecAtForge(Currency, /*bIsAtForge=*/true, Failure);
+                                        if (bRefunded)
                                         {
                                             ForgeStatus = FText::FromString(TEXT("RESPEC: DONE. The pool is yours to respend."));
                                             if (Character.IsValid()) Character->SaveGameState();
@@ -9845,8 +10233,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
                     ]
                 ];
             };
-            AddRespecRow(TEXT("CORE POINTS"), TEXT("REFUNDS EVERY SPENT CORE POINT"),
-                EBreakerPointCurrency::CorePoints, 0);
+            // The Core caption prints O213's price from the one place it is
+            // defined; a literal here would be a second copy of the number.
+            const FString CoreRespecCaption = FString::Printf(
+                TEXT("REFUNDS EVERY SPENT CORE POINT · FREE UNTIL LEVEL %d · %d RIFTGLASS AFTER"),
+                BreakerCoreWheel::CoreRespecFreeUntilLevel, BreakerCoreWheel::CoreRespecRiftglass);
+            AddRespecRow(TEXT("CORE POINTS"), *CoreRespecCaption, EBreakerPointCurrency::CorePoints, 0);
             AddRespecRow(TEXT("DOCTRINE POINTS"), TEXT("REFUNDS THE DOCTRINE SPEND · THE COMMITMENT ITSELF STAYS"),
                 EBreakerPointCurrency::DoctrinePoints, 1);
         }
@@ -11501,7 +11893,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterSheetScreen()
 
             Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space12)
             [
-                Row(TEXT("EFFECTIVE HEALTH POOL"), BreakerUI::FormatDamage(Ehp), BreakerUI::Cyan,
+                Row(TEXT("EFFECTIVE HEALTH POOL"), BreakerUI::FormatDamage(Ehp), BreakerUI::System,
                     TEXT("Raw incoming damage the pool absorbs once armour is applied. Health plus shield, both behind the same mitigation step."))
             ];
             Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
@@ -11510,7 +11902,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterSheetScreen()
             ];
             Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
             [
-                Row(TEXT("SHIELD"), FString::Printf(TEXT("%s / %s"), *BreakerUI::FormatTicker(Shield), *BreakerUI::FormatTicker(Attributes->GetMaxShield())), BreakerUI::Cyan, FString())
+                Row(TEXT("SHIELD"), FString::Printf(TEXT("%s / %s"), *BreakerUI::FormatTicker(Shield), *BreakerUI::FormatTicker(Attributes->GetMaxShield())), BreakerUI::System, FString())
             ];
             Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
             [

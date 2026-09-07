@@ -39,10 +39,13 @@
 // derives, never writes). The journal type itself comes through
 // BreakerQuestContent.h's own include.
 #include "Save/BreakerQuestContent.h"
+// The mission tracker: the current beat's line outranks the quest line (O195).
+#include "Save/BreakerMissionContent.h"
+// The player's profile: damage-number scale and the larger-nameplate switch.
+#include "Settings/BreakerGameSettings.h"
 #include "EngineUtils.h"
 #include "AbilitySystemComponent.h"
 #include "Items/BreakerItemTypes.h"
-#include "Items/BreakerAffixLibrary.h"
 #include "GameFramework/PlayerController.h"
 #include "Camera/PlayerCameraManager.h"
 // The resource mark and the momentum track's chevron blocks are triangles;
@@ -151,15 +154,11 @@ namespace BreakerHUD
     static constexpr float DamagePopScale = 1.15f;
     static constexpr float DamageCritPopScale = 1.4f;
 
-    // How long the rift-completion banner holds. Longer than the level-up
-    // because it ends a RUN rather than a level, and the player has just
-    // stopped shooting and can read. O2 PLACEHOLDER.
-    static constexpr float RiftCompleteBannerSeconds = 4.5f;
-    // How long the level-up banner holds. Presentation, not balance.
-    static constexpr float LevelUpBannerSeconds = 3.2f;   // O2 PLACEHOLDER
-    // Banner leaves like a panel: 120ms linear out, FIELDPLATE §04.
-    static constexpr float LevelUpOutSeconds = 0.12f;
-    static constexpr float LevelUpRailBlinkSeconds = 0.25f; // O2 PLACEHOLDER
+    // The banners' holds, ins, out and rectangles are BreakerBannerQueue's
+    // (04-death-banners). The label and title sizes on the plate. O2 PLACEHOLDER.
+    static constexpr float BannerLabelPixels = 11.0f;
+    static constexpr float BannerTitlePixels = 24.0f;
+    static constexpr float BannerLinePixels = 13.0f;
 
     // THE ULTIMATE'S IGNITION FLASH. Brief on purpose, and its peak sits
     // deliberately below the low-health cue's 0.45-0.75 so a wash can never be
@@ -180,10 +179,12 @@ namespace BreakerHUD
     static const FName OverdriveWindow(TEXT("Window.Swift.Overdrive"));
 
     // Ultimates carry violet; the Swift windows carry the movement verb.
-    // O179 colours by VERB and the definition carries no verb yet — an
-    // ability verb on the definition is plumbing the desk owes — so every
-    // non-ultimate window reads as movement, which is right for Swift's kit
-    // and wrong for a weapon-economy window the day one exists.
+    // O179 colours by VERB. The definition carries one (see the ability
+    // tiles' rails), but a window is keyed by its state TAG and nothing on
+    // the state component names the definition that opened it, so this
+    // cannot reach the verb without a seam from Abilities/. Every
+    // non-ultimate window therefore reads as movement, which is right for
+    // Swift's kit and wrong for a weapon-economy window the day one exists.
     static FLinearColor WindowColor(const FString& ShortKey)
     {
         return ShortKey.Equals(TEXT("Overdrive"), ESearchCase::IgnoreCase)
@@ -202,53 +203,41 @@ namespace BreakerHUD
         return Text;
     }
 
-    // Loot pickup rules.
+    // Loot pickup rules: every drop inside this range gets its plate. An
+    // item's affix lines are read in the backpack, not off the ground, so no
+    // plate opens a popup.
     static constexpr float PickupChipDistance = 1500.0f;
-    static constexpr float PickupPopupDistance = 800.0f;
-    // cos(3 degrees): the popup only opens when the player is genuinely
-    // looking at the drop, not merely facing its half of the room.
-    static constexpr float PickupPopupCosine = 0.99863f;
 
+    // The plate's name size and the key tile's glyph size. O2 PLACEHOLDER.
+    static constexpr float InteractPlateNamePixels = 14.0f;
+
+    // The one non-loot interactable the prompt plates this frame, in F's own
+    // precedence (loot > travel > talk): null when a pickup is nearer, or
+    // when nothing is in reach. The over-actor labels skip this actor so the
+    // plate and the label never print the same name at the same anchor.
+    static const AActor* BreakerHUDPlatedInteractable(const ABreakerCharacter* Character)
+    {
+        if (!Character) return nullptr;
 #if BREAKER_HAS_LOOT_PICKUP
-    // Only compiled alongside the pickup drawing that uses them: unreferenced
-    // static functions are a warning, and warnings are errors here.
-    static FString TierLabel(int32 Tier)
-    {
-        return Tier < 0 ? TEXT("T-1") : FString::Printf(TEXT("T%d"), Tier);
+        if (Character->FindNearbyPickup()) return nullptr;
+#endif
+        if (const AActor* Travel = Character->FindNearbyTravelPoint()) return Travel;
+        return Character->FindNearbyNPC();
     }
+}
 
-    // Same formatting rules as SBreakerMenu::DescribeItem, returned per line
-    // so the Canvas popup can lay them out itself.
-    static TArray<FString> DescribeItemLines(const FBreakerItemInstance& Item)
-    {
-        const TArray<FBreakerAffixDefinition>& Pool = UBreakerAffixLibrary::GetSliceAffixPool();
-        TArray<FString> Lines;
-        for (const FBreakerRolledAffix& Affix : Item.Affixes)
-        {
-            const FBreakerAffixDefinition* Definition = UBreakerAffixLibrary::FindAffix(Pool, Affix.AffixId);
-            const FString Name = Definition ? Definition->DisplayName.ToString() : Affix.AffixId.ToString();
-            const bool bPercent = Definition && Definition->StatBucket != EBreakerStatBucket::Flat;
-            const bool bPercentStyleFlat = Definition &&
-                (Definition->StatTarget == EBreakerStatTarget::CriticalChance || Definition->StatTarget == EBreakerStatTarget::CriticalDamage);
-            Lines.Add(FString::Printf(TEXT("%s  +%.1f%s  %s"), *Name, Affix.Value,
-                bPercent || bPercentStyleFlat ? TEXT("%") : TEXT(""), *TierLabel(Affix.Tier)));
-        }
-        return Lines;
-    }
+void ABreakerPlaytestHUD::BeginPlay()
+{
+    Super::BeginPlay();
+    // One profile object per HUD life, read from the same ini the settings
+    // screen writes. Re-read on the menu's close edge in DrawHUD.
+    Profile = NewObject<UBreakerGameSettings>(this);
+    Profile->LoadOrDefaults();
+}
 
-    static FString RarityLabel(EBreakerItemRarity Rarity)
-    {
-        switch (Rarity)
-        {
-            case EBreakerItemRarity::Uncommon:    return TEXT("UNCOMMON");
-            case EBreakerItemRarity::Exceptional: return TEXT("EXCEPTIONAL");
-            case EBreakerItemRarity::Aberrant:    return TEXT("ABERRANT");
-            // O50: display name only. The enumerator is serialized and stays.
-            case EBreakerItemRarity::Anomalous:   return TEXT("UNWRITTEN");
-            default:                              return TEXT("STANDARD");
-        }
-    }
-#endif // BREAKER_HAS_LOOT_PICKUP
+float ABreakerPlaytestHUD::NameplateScale() const
+{
+    return Profile && Profile->bLargerNameplates ? UBreakerGameSettings::LargerNameplateScale : 1.0f;
 }
 
 void ABreakerPlaytestHUD::DrawHUD()
@@ -322,8 +311,12 @@ void ABreakerPlaytestHUD::DrawHUD()
     const bool bHudCostLogging = FParse::Param(FCommandLine::Get(), TEXT("BreakerHUDCost"));
     const double HudDrawStart = FPlatformTime::Seconds();
     // Everything below, ability callouts included, is suppressed while the
-    // pause/inventory menu owns the screen.
-    if (Character->IsMenuOpen()) return;
+    // pause/inventory menu owns the screen. The menu is the only writer of
+    // the profile, so its open -> closed edge is when the profile is re-read.
+    const bool bMenuOpen = Character->IsMenuOpen();
+    if (bMenuWasOpen && !bMenuOpen && Profile) Profile->LoadOrDefaults();
+    bMenuWasOpen = bMenuOpen;
+    if (bMenuOpen) return;
 
     // --- ANCHOR TRIM, AMENDED BY RULING -----------------------------------
     // The original trim reasoned: the Anchor is a social space, weapons are
@@ -355,8 +348,7 @@ void ABreakerPlaytestHUD::DrawHUD()
                 S(BreakerUI::HudVitalsLeft), S(BreakerUI::HudVitalsTop) - S(20.0f), BreakerUI::Gold, 12.0f);
         }
         DrawQuestLine(Character);
-        DrawExperienceRail(Character);
-        DrawLevelUpBanner(Center);
+        DrawBanners(Center);
         // Who can be talked to and where the way out is, readable from
         // anywhere on the plaza — the Anchor's whole verb set, floating over
         // the actors that own it.
@@ -470,12 +462,9 @@ void ABreakerPlaytestHUD::DrawHUD()
 
     // --- Centre: feedback only, nothing persistent ------------------------
     DrawSkimBurst(Center);
-    DrawExperienceRail(Character);
-    DrawLevelUpBanner(Center);
-    // The loop's ending. Drawn after the level-up because the two co-occur and
-    // the later draw wins a collision — they are placed apart so they cannot,
-    // but the order states which one would.
-    DrawRiftCompleteBanner(Center);
+    // The event banners, one pass: rift complete, level up, wave clear, in
+    // priority order at staggered arrivals, each in its own rectangle.
+    DrawBanners(Center);
     DrawDefenseFeedback(Center);
     DrawInteractPrompt(Character, Center);
     if (const UBreakerCombatComponent* PlayerCombat = Character->GetCombat(); PlayerCombat && PlayerCombat->GetSecondsSinceDamage() < 0.28f)
@@ -769,16 +758,23 @@ void ABreakerPlaytestHUD::DrawAbilityCluster(const ABreakerCharacter* Character)
     const float Tile = S(BreakerUI::HudAbilityTile);
     const float Ultimate = S(BreakerUI::HudUltimateTile);
 
-    // Ability 1 carries the movement verb; ability 2's rail is "verb by kind"
-    // and the definition carries no verb (plumbing the desk owes), so it
-    // reads as movement too, which is right for Swift's kit and nothing
-    // else's. Recorded here rather than guessed per class.
+    // Each rail is the granted definition's VERB (O179), never the slot's:
+    // Swift's Skim is movement-cyan, Lead beside it is reward-gold. The
+    // ultimate slot is violet whatever it holds; an ungranted slot has no
+    // definition and takes the resting border through the same function.
+    const auto RailFor = [Abilities](EBreakerAbilitySlot Slot)
+    {
+        const UBreakerAbilityDefinition* Definition = Abilities && Abilities->IsSlotGranted(Slot)
+            ? Abilities->GetDefinitionForSlot(Slot) : nullptr;
+        return BreakerHUDMath::AbilityRailColor(Definition ? Definition->Verb : EBreakerAbilityVerb::None,
+            Slot == EBreakerAbilitySlot::Ultimate);
+    };
     DrawAbilitySlot(Character, Abilities, EBreakerAbilitySlot::ClassAbilityOne, TEXT("E"),
-        S(BreakerUI::HudAbilityOneX), Bottom - Tile, Tile, S(BreakerUI::HudAbilityMark), BreakerUI::VerbMove);
+        S(BreakerUI::HudAbilityOneX), Bottom - Tile, Tile, S(BreakerUI::HudAbilityMark), RailFor(EBreakerAbilitySlot::ClassAbilityOne));
     DrawAbilitySlot(Character, Abilities, EBreakerAbilitySlot::Ultimate, TEXT("G"),
-        S(BreakerUI::HudUltimateX), Bottom - Ultimate, Ultimate, S(BreakerUI::HudUltimateMark), BreakerUI::Violet);
+        S(BreakerUI::HudUltimateX), Bottom - Ultimate, Ultimate, S(BreakerUI::HudUltimateMark), RailFor(EBreakerAbilitySlot::Ultimate));
     DrawAbilitySlot(Character, Abilities, EBreakerAbilitySlot::ClassAbilityTwo, TEXT("T"),
-        S(BreakerUI::HudAbilityTwoX), Bottom - Tile, Tile, S(BreakerUI::HudAbilityMark), BreakerUI::VerbMove);
+        S(BreakerUI::HudAbilityTwoX), Bottom - Tile, Tile, S(BreakerUI::HudAbilityMark), RailFor(EBreakerAbilitySlot::ClassAbilityTwo));
 
     if (Abilities && Abilities->GetGrantedCount() == 0)
     {
@@ -817,19 +813,21 @@ void ABreakerPlaytestHUD::DrawWeaponReadout(const ABreakerCharacter* Character)
         MagazineTop + MagazineSize.Y - ReserveSize.Y, BreakerUI::TextSecondary, BreakerUI::HudReservePixels);
 
     // The ammo rail. At rest it is the magazine's fill in bone. During a reload
-    // the sheet wants progress 0→100 left to right in weapon orange — and the
-    // component exposes no reload fraction (the accessor in Weapons/ is the
-    // plumbing the desk owes), so the rail states RELOADING as a full orange bar rather
-    // than faking a progress off the definition's base duration, which affixes
-    // already move.
+    // it is the reload's progress 0→100 left to right in weapon orange, read
+    // off the reload timer's own clock so every affix and aura that moves the
+    // duration moves the bar. The component answers -1 when it has the state
+    // and not the clock — a non-authority client sees bReloading replicate
+    // and never sets the timer — and the rail then states RELOADING as a full
+    // orange bar rather than a progress it cannot know.
     const float RailX = S(BreakerUI::HudAmmoRailX);
     const float RailY = S(BreakerUI::HudAmmoRailY);
     const float RailW = S(BreakerUI::HudAmmoRailWidth);
     const float RailH = S(BreakerUI::HudAmmoRailHeight);
     const float MagazineFraction = Capacity > 0
         ? FMath::Clamp(static_cast<float>(Magazine) / static_cast<float>(Capacity), 0.0f, 1.0f) : 0.0f;
-    DrawTrack(RailX, RailY, RailW, RailH,
-        bReloading ? 1.0f : MagazineFraction,
+    const float ReloadFraction = bPreviewReloading ? PreviewReloadFraction : Weapon->GetReloadFraction();
+    const float RailFraction = !bReloading ? MagazineFraction : (ReloadFraction >= 0.0f ? ReloadFraction : 1.0f);
+    DrawTrack(RailX, RailY, RailW, RailH, RailFraction,
         bReloading ? BreakerUI::Orange : BreakerUI::System, BreakerUI::BorderRest);
 
     // The name on swap. Latched on the FALLING edge of IsSwapping, when the
@@ -911,7 +909,9 @@ void ABreakerPlaytestHUD::DrawResourceTrack(const BreakerHUD::FResourceRow& Row,
 
     const bool bBanked = Row.bActive && Row.BorderPixels >= 2.0f && Row.Fraction >= 0.0f;
     const bool bDebt = Row.Track == BreakerHUD::EResourceTrack::Signed && Row.Fraction < 0.0f;
-    const FLinearColor Fill = bDebt ? BreakerUI::Harm : bBanked ? BreakerUI::System : BreakerUI::TextSecondary;
+    // The loud states own the fill; beneath them the row's own resting fill
+    // (Scrap's weapon orange, text-2 for the rest).
+    const FLinearColor Fill = bDebt ? BreakerUI::Harm : bBanked ? BreakerUI::System : Row.FillColor;
     const float Magnitude = FMath::Clamp(FMath::Abs(Row.Fraction), 0.0f, 1.0f);
     const float FillW = Width * Magnitude;
 
@@ -960,6 +960,13 @@ void ABreakerPlaytestHUD::DrawResourceTrack(const BreakerHUD::FResourceRow& Row,
     const float NotchH = S(BreakerUI::HudResourceNotchHeight);
     DrawRect(BreakerUI::BorderHigh, X + Width * BreakerUI::HudResourceNotchFraction, Y + (Height - NotchH) * 0.5f,
         FMath::Max(S(1.0f), 1.0f), NotchH);
+    // The row's own band edges (Grit's thirds), the same 1×14 mark, so a band
+    // reads off the bar without its word.
+    for (const float Mark : Row.StepMarks)
+    {
+        DrawRect(BreakerUI::BorderHigh, X + Width * FMath::Clamp(Mark, 0.0f, 1.0f), Y + (Height - NotchH) * 0.5f,
+            FMath::Max(S(1.0f), 1.0f), NotchH);
+    }
 
     // Banked: the gold cell at the right end.
     if (bBanked)
@@ -972,10 +979,12 @@ void ABreakerPlaytestHUD::DrawResourceTrack(const BreakerHUD::FResourceRow& Row,
 }
 
 // --------------------------------------------------------------------------
-// Top-left: the zone name at (40, 40) and, on the wave-cell row beneath, the
-// mm:ss countdown to the next wave — empty out of combat, empty when nothing
-// is counting. The wave cells themselves wait on an encounter total (O120);
-// the countdown sits where they would start.
+// Top-left: the zone name at (40, 40) and the wave-cell row beneath at
+// (40, 76): one 16×8 cell per wave of the run (O120: only where a total is
+// authored — a rift run's total is its boss wave; the gym has none and draws
+// none), done in text-2, the current wave in bone, the rest in the resting
+// border. The mm:ss countdown to the next wave sits right of the cells —
+// empty out of combat, empty when nothing is counting.
 //
 // The name is the session's PendingRift.AreaName, latched each frame it is
 // set so the line survives the frame the rift is torn down. A gym with no
@@ -986,9 +995,11 @@ void ABreakerPlaytestHUD::DrawResourceTrack(const BreakerHUD::FResourceRow& Row,
 void ABreakerPlaytestHUD::DrawZoneLine(const ABreakerCharacter* Character)
 {
     if (!Character || !Canvas) return;
+    bool bRiftSet = false;
     if (const UBreakerGameInstance* Session = GetWorld() ? GetWorld()->GetGameInstance<UBreakerGameInstance>() : nullptr)
     {
-        if (Session->PendingRift.IsSet()) ZoneName = Session->PendingRift.AreaName.ToString().ToUpper();
+        bRiftSet = Session->PendingRift.IsSet();
+        if (bRiftSet) ZoneName = Session->PendingRift.AreaName.ToString().ToUpper();
     }
     if (!ZoneName.IsEmpty())
     {
@@ -996,11 +1007,49 @@ void ABreakerPlaytestHUD::DrawZoneLine(const ABreakerCharacter* Character)
     }
 
     const ABreakerGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<ABreakerGameMode>() : nullptr;
+    float CountdownX = S(BreakerUI::HudZoneLeft);
+    const int32 CellTotal = GameMode
+        ? BreakerHUDMath::WaveCellTotal(bRiftSet, GameMode->WaveBudget.BossWaveInterval) : 0;
+    if (CellTotal > 0)
+    {
+        // Cell geometry: 16×8 at a 4 gap, the countdown 16 past the last cell.
+        // O2 PLACEHOLDER, the sheet's row with no felt number yet.
+        const float CellW = S(16.0f);
+        const float CellH = S(8.0f);
+        const float CellGap = S(4.0f);
+        const int32 CurrentWave = GameMode->GetCurrentWave();
+        float CellX = S(BreakerUI::HudZoneLeft);
+        // The row's vertical centre sits on the countdown numeral's centre.
+        const float CellY = S(BreakerUI::HudCountdownTop) + (S(BreakerUI::HudCountdownPixels) - CellH) * 0.5f;
+        for (int32 Wave = 1; Wave <= CellTotal; ++Wave)
+        {
+            const FLinearColor Cell = Wave < CurrentWave ? BreakerUI::TextSecondary
+                : Wave == CurrentWave ? BreakerUI::System : BreakerUI::BorderRest;
+            DrawRect(Cell, CellX, CellY, CellW, CellH);
+            CellX += CellW + CellGap;
+        }
+        CountdownX = CellX - CellGap + S(16.0f);
+    }
+
     const float Remaining = GameMode ? GameMode->GetWaveAdvanceRemaining() : -1.0f;
+    // THE WAVE CLEAR is the countdown's <0 -> >0 edge: the mode starts
+    // counting to the next wave the moment the current one is emptied, so the
+    // wave that just ended is GetCurrentWave() (a real value, O120). The
+    // countdown before wave 1 is not a clear and enqueues nothing. The LAST
+    // wave produces no edge — nothing counts after the boss wave — and that
+    // is the rift-complete moment, banner'd from OnRiftCompleted instead.
+    // The row's own text is the mm:ss countdown and nothing else, so nothing
+    // here duplicates the banner and nothing is dropped.
+    if (LastWaveAdvanceRemaining < 0.0f && Remaining > 0.0f && GameMode && GameMode->GetCurrentWave() > 0)
+    {
+        EnqueueBanner(EBreakerBannerKind::WaveClear,
+            FString::Printf(TEXT("WAVE %d CLEAR"), GameMode->GetCurrentWave()), FString());
+    }
+    LastWaveAdvanceRemaining = Remaining;
     const FString Countdown = BreakerHUDMath::FormatCountdown(Remaining);
     if (!Countdown.IsEmpty())
     {
-        DrawSpecText(Countdown, S(BreakerUI::HudZoneLeft), S(BreakerUI::HudCountdownTop),
+        DrawSpecText(Countdown, CountdownX, S(BreakerUI::HudCountdownTop),
             BreakerUI::TextSecondary, BreakerUI::HudCountdownPixels);
     }
 }
@@ -1012,12 +1061,19 @@ void ABreakerPlaytestHUD::DrawZoneLine(const ABreakerCharacter* Character)
 // DERIVED, never stored: quest state is a pure function of the journal's flag
 // set (Save/BreakerQuestContent.h), so this line asks ComputeQuestState and
 // the counters and can never disagree with the dialogue system about where a
-// quest stands. The strings are the tracker's own;
-// no new player-facing words (O195).
+// quest stands. The strings are the tracker's own, and the two verbs are
+// UBreakerMissionLibrary's; no new player-facing words (O195).
 //
-//   Offered       -> "SPEAK TO THE <GIVER>"
+// THE MISSION FIRST. A mission's current beat (Save/BreakerMissionContent.h)
+// is the story's ask, and its TrackerLine outranks the quest's own state: a
+// Travel beat says where to go when no quest says anything. A beat whose
+// line is empty (Reward, Unlock) falls through to the quest line below. At a
+// fresh save the first beat is a Dialogue and is current before its quest is
+// Offered, so SPEAK TO THE QUARTERMASTER shows from the first frame.
+//
+//   Offered       -> SpeakToVerb over the giver
 //   Active        -> the first unfinished objective, with its counter
-//   ReadyToTurnIn -> "RETURN TO THE <GIVER>"
+//   ReadyToTurnIn -> ReturnToVerb over the giver
 // NotOffered and Complete draw nothing — an empty corner is the truthful
 // state, not a placeholder's.
 // --------------------------------------------------------------------------
@@ -1025,6 +1081,21 @@ void ABreakerPlaytestHUD::DrawQuestLine(const ABreakerCharacter* Character)
 {
     const UBreakerQuestJournal* Journal = Character ? Character->GetQuestJournal() : nullptr;
     if (!Journal || !Canvas) return;
+
+    // Fitted into the 320 rather than trusted to be short; never wrapped.
+    const float Right = S(BreakerUI::HudWeaponRight);
+    const float Limit = S(BreakerUI::HudQuestTrackerWidth);
+
+    for (const FBreakerMissionDefinition& Mission : UBreakerMissionLibrary::GetMissions())
+    {
+        const FBreakerMissionBeat* Beat = UBreakerMissionLibrary::CurrentBeat(Mission, Journal->GetState());
+        if (!Beat) continue;
+        const FString BeatLine = UBreakerMissionLibrary::TrackerLine(*Beat, Journal->GetState());
+        if (BeatLine.IsEmpty()) continue;
+        DrawSpecTextRight(BeatLine, Right, S(BreakerUI::HudQuestLineTop), BreakerUI::TextSecondary,
+            FitSpecPixels(BeatLine, BreakerUI::HudQuestLinePixels, Limit, 11.0f));
+        return;
+    }
 
     // The first quest that is live in any form is the tracked one. The slice
     // ships one quest; when the campaign ships more, "first live" is still the
@@ -1047,11 +1118,11 @@ void ABreakerPlaytestHUD::DrawQuestLine(const ABreakerCharacter* Character)
     FString Line;
     if (TrackedState == EBreakerQuestState::Offered)
     {
-        Line = FString::Printf(TEXT("SPEAK TO THE %s"), *Tracked->Giver.ToUpper());
+        Line = FString::Printf(UBreakerMissionLibrary::SpeakToVerb, *Tracked->Giver.ToUpper());
     }
     else if (TrackedState == EBreakerQuestState::ReadyToTurnIn)
     {
-        Line = FString::Printf(TEXT("RETURN TO THE %s"), *Tracked->Giver.ToUpper());
+        Line = FString::Printf(UBreakerMissionLibrary::ReturnToVerb, *Tracked->Giver.ToUpper());
     }
     else
     {
@@ -1069,9 +1140,6 @@ void ABreakerPlaytestHUD::DrawQuestLine(const ABreakerCharacter* Character)
     }
     if (Line.IsEmpty()) return;
 
-    // Fitted into the 320 rather than trusted to be short; never wrapped.
-    const float Right = S(BreakerUI::HudWeaponRight);
-    const float Limit = S(BreakerUI::HudQuestTrackerWidth);
     DrawSpecTextRight(Line, Right, S(BreakerUI::HudQuestLineTop), BreakerUI::TextSecondary,
         FitSpecPixels(Line, BreakerUI::HudQuestLinePixels, Limit, 11.0f));
 }
@@ -1171,6 +1239,9 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
         {
             SizePixels *= BreakerHUD::DamageSecondaryScale;
         }
+        // The profile's slider, last, over the whole hierarchy: it scales the
+        // read, never the ranking between kinds.
+        if (Profile) SizePixels *= Profile->DamageNumberScale;
         // Stack offset scales with the number's OWN size, so a 52px crit and a
         // 26px body hit in the same cluster separate by proportionate amounts
         // instead of both by a flat 8px. Taken before the pop, or a number
@@ -1251,11 +1322,11 @@ void ABreakerPlaytestHUD::DrawInteractPrompt(const ABreakerCharacter* Character,
 #if BREAKER_HAS_LOOT_PICKUP
     if (Character->FindNearbyPickup())
     {
-        // A REFUSED PICKUP HAS TO SAY WHY, and this prompt's own rule already
-        // demanded it: the precedence above is restated here "so the prompt can
-        // never advertise a verb the key would not perform". O183 made a full
-        // backpack REFUSE — TryPickup returns false and the drop stays on the
-        // ground — so F TAKE over a full backpack was advertising exactly that.
+        // The key rides the plate over the drop (DrawLootPickups puts the
+        // tile on the one F would take). What is left to say here is the
+        // refusal: O183 made a full backpack REFUSE — TryPickup returns false
+        // and the drop stays on the ground — so the plate carries no key over
+        // a full bag and this line says why.
         //
         // SAID BEFORE THE PRESS, NOT AFTER IT. The character discards
         // TryPickup's bool, so there is no refusal event to react to without a
@@ -1274,24 +1345,72 @@ void ABreakerPlaytestHUD::DrawInteractPrompt(const ABreakerCharacter* Character,
                 FString::Printf(TEXT("BACKPACK FULL  %d/%d"), Carried, UBreakerEquipmentComponent::BackpackCapacity),
                 Center.X, Center.Y + S(90.0f), BreakerUI::Orange, 14.0f);
         }
-        else
-        {
-            DrawSpecTextCentered(TEXT("F  TAKE"), Center.X, Center.Y + S(90.0f), BreakerUI::System, 14.0f);
-        }
         return;
     }
 #endif
+    // The plate over the travel point or the NPC: rail text-2 (neither is a
+    // rarity), one cell, the key tile, and the prompt's own words. Anchored
+    // where the over-actor label would have been — that label yields to it.
     if (const ABreakerTravelPoint* Travel = Character->FindNearbyTravelPoint())
     {
-        DrawSpecTextCentered(FString::Printf(TEXT("F  %s"), *Travel->GetPromptLabel().ToString().ToUpper()),
-            Center.X, Center.Y + S(90.0f), BreakerUI::System, 14.0f);
+        const FVector Projected = Project(Travel->GetActorLocation() + FVector(0.0f, 0.0f, 260.0f), false);
+        if (Projected.Z <= 0.0f) return;
+        DrawInteractPlate(Projected.X, Projected.Y, BreakerUI::TextSecondary, 1,
+            Travel->GetPromptLabel().ToString().ToUpper(), true);
         return;
     }
     if (const ABreakerNPC* NearbyNPC = Character->FindNearbyNPC())
     {
-        DrawSpecTextCentered(FString::Printf(TEXT("F  TALK — %s"), *NearbyNPC->GetDisplayName().ToString().ToUpper()),
-            Center.X, Center.Y + S(90.0f), BreakerUI::System, 14.0f);
+        const FVector Projected = Project(NearbyNPC->GetActorLocation() + FVector(0.0f, 0.0f, 150.0f), false);
+        if (Projected.Z <= 0.0f) return;
+        DrawInteractPlate(Projected.X, Projected.Y, BreakerUI::TextSecondary, 1,
+            FString::Printf(TEXT("TALK — %s"), *NearbyNPC->GetDisplayName().ToString().ToUpper()), true);
     }
+}
+
+// --------------------------------------------------------------------------
+// One plate over a thing F acts on. Geometry is BreakerHUDMath's
+// InteractPlateLayout in spec pixels, scaled once here; the name is measured
+// before the plate is sized, so nothing reads its own arrangement.
+// --------------------------------------------------------------------------
+void ABreakerPlaytestHUD::DrawInteractPlate(float CenterX, float BottomY, const FLinearColor& Rail, int32 TallyCells,
+    const FString& Name, bool bKeyTile)
+{
+    if (!Canvas) return;
+    const FVector2D NameSize = MeasureSpecText(Name, BreakerHUD::InteractPlateNamePixels);
+    const BreakerHUDMath::FInteractPlateLayout Layout = BreakerHUDMath::InteractPlateLayout(
+        NameSize.X / FMath::Max(UIScale, UE_KINDA_SMALL_NUMBER), TallyCells, bKeyTile);
+    const float W = S(Layout.Width);
+    const float H = S(Layout.Height);
+    const float X = CenterX - W * 0.5f;
+    const float Y = BottomY - H;
+    DrawPlate(X, Y, W, H, Rail);
+
+    // The key tile: a bone square with the key struck out of it in void, so
+    // the affordance reads as the system's and not the item's.
+    if (Layout.bKeyTile)
+    {
+        const float KeySize = S(Layout.KeySize);
+        const float KeyX = X + S(Layout.KeyX);
+        const float KeyY = Y + (H - KeySize) * 0.5f;
+        DrawRect(BreakerUI::System, KeyX, KeyY, KeySize, KeySize);
+        const FVector2D KeyGlyph = MeasureSpecText(TEXT("F"), BreakerUI::HudAbilityKeyPixels);
+        DrawSpecTextCentered(TEXT("F"), KeyX + KeySize * 0.5f, KeyY + (KeySize - KeyGlyph.Y) * 0.5f,
+            BreakerUI::BgVoid, BreakerUI::HudAbilityKeyPixels);
+    }
+
+    // The tally, in the rail's colour: the count is the second read of the
+    // rarity when the colour is not.
+    const float CellW = S(Layout.TallyCellWidth);
+    const float CellH = S(Layout.TallyCellHeight);
+    const float CellStep = S(Layout.TallyCellWidth + Layout.TallyGap);
+    for (int32 Cell = 0; Cell < FMath::Max(TallyCells, 0); ++Cell)
+    {
+        DrawRect(Rail, X + S(Layout.TallyX) + CellStep * Cell, Y + S(Layout.TallyY), CellW, CellH);
+    }
+
+    DrawSpecText(Name, X + S(Layout.NameX), Y + (H - NameSize.Y) * 0.5f, BreakerUI::TextPrimary,
+        BreakerHUD::InteractPlateNamePixels);
 }
 
 void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Character)
@@ -1314,11 +1433,14 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
         const float Alpha = FMath::Clamp((Distance - 1200.0f) / (LabelMaxDistance - 1200.0f), 0.0f, 1.0f);
         return FMath::Lerp(1.0f, 0.65f, Alpha);
     };
+    // The actor the prompt plates this frame keeps its label off: the plate
+    // sits on the same anchor and says the same name with the key on it.
+    const AActor* Plated = BreakerHUD::BreakerHUDPlatedInteractable(Character);
 
     for (TActorIterator<ABreakerNPC> It(World); It; ++It)
     {
         const ABreakerNPC* NPC = *It;
-        if (!NPC) continue;
+        if (!NPC || NPC == Plated) continue;
         const float Distance = FVector::Distance(ViewerLocation, NPC->GetActorLocation());
         if (Distance > LabelMaxDistance) continue;
         // Above the head sphere (rel Z 92 + radius), same idiom as the enemy
@@ -1340,7 +1462,7 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
     for (TActorIterator<ABreakerTravelPoint> It(World); It; ++It)
     {
         const ABreakerTravelPoint* TravelPoint = *It;
-        if (!TravelPoint) continue;
+        if (!TravelPoint || TravelPoint == Plated) continue;
         const float Distance = FVector::Distance(ViewerLocation, TravelPoint->GetActorLocation());
         if (Distance > LabelMaxDistance) continue;
         // Anchored at the marker, not the beacon tip: the 14 m column already
@@ -1396,108 +1518,64 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
 }
 
 // --------------------------------------------------------------------------
-// INTEGRATION: loot pickup chips and hover popup.
-// Compiles to nothing until Items/BreakerLootPickup.h exists.
+// Loot: one plate per drop in range — rarity on the rail and the tally, the
+// name — and the key tile only on the one F would take, and not even that
+// over a full backpack (the refusal line in DrawInteractPrompt says why). The
+// pickup loop compiles to nothing until Items/BreakerLootPickup.h exists; the
+// capture preview's plate is drawn either way.
 // --------------------------------------------------------------------------
 void ABreakerPlaytestHUD::DrawLootPickups(const ABreakerCharacter* Character)
 {
+    if (!Character || !Canvas) return;
 #if BREAKER_HAS_LOOT_PICKUP
     UWorld* World = GetWorld();
-    if (!World || !Character || !PlayerOwner || !PlayerOwner->PlayerCameraManager) return;
-
-    const FVector CameraLocation = PlayerOwner->PlayerCameraManager->GetCameraLocation();
-    const FVector CameraForward = PlayerOwner->PlayerCameraManager->GetCameraRotation().Vector();
-
-    const ABreakerLootPickup* Focused = nullptr;
-    float FocusedDot = -1.0f;
-
-    for (TActorIterator<ABreakerLootPickup> It(World); It; ++It)
+    if (World && PlayerOwner && PlayerOwner->PlayerCameraManager)
     {
-        const ABreakerLootPickup* Pickup = *It;
-        if (!Pickup) continue;
+        const FVector CameraLocation = PlayerOwner->PlayerCameraManager->GetCameraLocation();
+        // F's own answer to "which one", so the tile can never sit on a drop
+        // the key would not take.
+        const ABreakerLootPickup* Nearest = Character->FindNearbyPickup();
+        const UBreakerEquipmentComponent* Equipment = Character->GetEquipment();
+        const bool bBackpackFull = Equipment
+            && Equipment->GetBackpack().Num() >= UBreakerEquipmentComponent::BackpackCapacity;
 
-        const FVector ToPickup = Pickup->GetActorLocation() - CameraLocation;
-        const float Distance = ToPickup.Size();
-        if (Distance > BreakerHUD::PickupChipDistance || Distance <= UE_SMALL_NUMBER) continue;
-
-        const FBreakerItemInstance& Item = Pickup->GetItem();
-        const FLinearColor Accent = BreakerUI::RarityColor(Item.Rarity);
-
-        // The single best-aligned pickup inside the popup range wins the
-        // panel; everything else stays a chip. Only one popup, ever.
-        const float Dot = static_cast<float>(FVector::DotProduct(ToPickup / Distance, CameraForward));
-        if (Distance <= BreakerHUD::PickupPopupDistance && Dot >= BreakerHUD::PickupPopupCosine && Dot > FocusedDot)
+        for (TActorIterator<ABreakerLootPickup> It(World); It; ++It)
         {
-            Focused = Pickup;
-            FocusedDot = Dot;
-            continue;
-        }
+            const ABreakerLootPickup* Pickup = *It;
+            if (!Pickup) continue;
+            const float Distance = static_cast<float>(FVector::Dist(Pickup->GetActorLocation(), CameraLocation));
+            if (Distance > BreakerHUD::PickupChipDistance) continue;
+            const FVector Projected = Project(Pickup->GetActorLocation() + FVector(0.0f, 0.0f, 40.0f), false);
+            if (Projected.Z <= 0.0f) continue;
 
-        const FVector Projected = Project(Pickup->GetActorLocation() + FVector(0.0f, 0.0f, 40.0f), false);
-        if (Projected.Z <= 0.0f) continue;
-
-        // Chip anatomy: panel face, rarity on the 3px rail and the name only.
-        const FString Label = Pickup->GetDisplayLabel().ToString().ToUpper();
-        const FVector2D LabelSize = MeasureSpecText(Label, 11.0f);
-        const float ChipW = LabelSize.X + S(BreakerUI::Space16) + S(BreakerUI::HudRailIdentity);
-        const float ChipH = LabelSize.Y + S(BreakerUI::Space8);
-        const float ChipX = Projected.X - ChipW * 0.5f;
-        const float ChipY = Projected.Y - ChipH * 0.5f;
-        DrawRect(BreakerHUD::PlateFace, ChipX, ChipY, ChipW, ChipH);
-        DrawRect(Accent, ChipX, ChipY, S(BreakerUI::HudRailIdentity), ChipH);
-        DrawSpecText(Label, ChipX + S(BreakerUI::HudRailIdentity) + S(BreakerUI::Space8), ChipY + S(BreakerUI::Space4), Accent, 11.0f);
-    }
-
-    if (Focused)
-    {
-        const FVector Projected = Project(Focused->GetActorLocation() + FVector(0.0f, 0.0f, 50.0f), false);
-        if (Projected.Z <= 0.0f) return;
-
-        const FBreakerItemInstance& Item = Focused->GetItem();
-        const FLinearColor Accent = BreakerUI::RarityColor(Item.Rarity);
-        const TArray<FString> AffixLines = BreakerHUD::DescribeItemLines(Item);
-
-        // AUDIT (2026-08-14): the panel was a fixed 300px and every line inside
-        // it was drawn at its own measured width with nothing checking the two
-        // agreed. Item names and affix lines are generated content — an
-        // Anomalous name plus a tier suffix is not bounded by anything — so
-        // this is the same fixed-gutter defect with the collision against the
-        // panel edge instead of against a sibling. Measured: the panel is sized
-        // from its widest line, with 300 as a MINIMUM so a two-affix Standard
-        // drop does not draw a narrow sliver.
-        const FString TitleLine = Focused->GetDisplayLabel().ToString();
-        const FString MetaLine = FString::Printf(TEXT("%s · i%d · F TAKE"),
-            *BreakerHUD::RarityLabel(Item.Rarity), Item.ItemLevel);
-        float WidestLine = FMath::Max(MeasureSpecText(TitleLine, 20.0f).X, MeasureSpecText(MetaLine, 11.0f).X);
-        for (const FString& Line : AffixLines)
-        {
-            WidestLine = FMath::Max(WidestLine, MeasureSpecText(Line, 13.0f).X);
-        }
-        const float PanelW = FMath::Max(S(300.0f), WidestLine + S(BreakerUI::Space16) * 2.0f);
-        const float PanelH = S(64.0f) + AffixLines.Num() * S(16.0f) + S(24.0f);
-        const float PanelX = FMath::Clamp(Projected.X - PanelW * 0.5f, S(8.0f), Canvas->ClipX - PanelW - S(8.0f));
-        const float PanelY = FMath::Clamp(Projected.Y - PanelH - S(12.0f), S(8.0f), Canvas->ClipY - PanelH - S(8.0f));
-
-        DrawPlate(PanelX, PanelY, PanelW, PanelH, Accent);
-        // Anomalous is the one rarity that also gets a full border, because it
-        // is the only tier that is also a world object class.
-        if (BreakerUI::RarityGetsFullBorder(Item.Rarity))
-        {
-            DrawBorder(PanelX, PanelY, PanelW, PanelH, Accent, S(1.0f));
-        }
-
-        const float TextX = PanelX + S(BreakerUI::Space16);
-        DrawSpecText(TitleLine, TextX, PanelY + S(BreakerUI::Space16), Accent, 20.0f);
-        DrawSpecText(MetaLine, TextX, PanelY + S(44.0f), BreakerUI::TextMuted, 11.0f);
-
-        float LineY = PanelY + S(64.0f);
-        for (const FString& Line : AffixLines)
-        {
-            DrawSpecText(Line, TextX, LineY, BreakerUI::TextSecondary, 13.0f);
-            LineY += S(16.0f);
+            const FBreakerItemInstance& Item = Pickup->GetItem();
+            DrawInteractPlate(Projected.X, Projected.Y, BreakerUI::RarityColor(Item.Rarity),
+                BreakerHUDMath::RarityTallyCells(Item.Rarity), Pickup->GetDisplayLabel().ToString().ToUpper(),
+                Pickup == Nearest && !bBackpackFull);
         }
     }
 #endif
+
+    // -BreakerCaptureHUD: the harness cannot make a drop fall, so the fourth
+    // phase plates a fabricated Aberrant six metres ahead. Preview-only; the
+    // label is the pickup's own shape (rarity then slot, both enumerator
+    // names), so no word is authored here.
+    if (IsCapturePreview() && bPreviewLootPlate)
+    {
+        FBreakerItemInstance Preview;
+        Preview.Rarity = EBreakerItemRarity::Aberrant;
+        Preview.Slot = EBreakerEquipSlot::BodyArmour;
+        const FString Label = FString::Printf(TEXT("%s %s"),
+            *StaticEnum<EBreakerItemRarity>()->GetNameStringByValue(static_cast<int64>(Preview.Rarity)).ToUpper(),
+            *StaticEnum<EBreakerEquipSlot>()->GetNameStringByValue(static_cast<int64>(Preview.Slot)).ToUpper());
+        const FVector Ahead = Character->GetActorLocation() + Character->GetActorForwardVector() * 600.0f;
+        const FVector Projected = Project(Ahead + FVector(0.0f, 0.0f, 40.0f), false);
+        if (Projected.Z > 0.0f)
+        {
+            DrawInteractPlate(Projected.X, Projected.Y, BreakerUI::RarityColor(Preview.Rarity),
+                BreakerHUDMath::RarityTallyCells(Preview.Rarity), Label, true);
+        }
+    }
 }
 
 void ABreakerPlaytestHUD::EnsureDamageBinding(const ABreakerCharacter* Character)
@@ -1533,58 +1611,6 @@ void ABreakerPlaytestHUD::EnsureWeaponBinding(const ABreakerCharacter* Character
     BoundWeapon = Weapon;
 }
 
-// --------------------------------------------------------------------------
-// HUD v2 — levelling sits LOWER than the vitals: a full-width 4px gold rule
-// pinned to the very bottom edge, with the level and the raw numbers above it.
-// Progress is visible without ever competing for a corner, and 4px is thin
-// enough to stay out of the read entirely until it moves.
-// --------------------------------------------------------------------------
-void ABreakerPlaytestHUD::DrawExperienceRail(const ABreakerCharacter* Character)
-{
-    const UBreakerProgressionComponent* Progression = Character ? Character->GetProgression() : nullptr;
-    if (!Progression || !Canvas) return;
-
-    const int32 Level = Progression->GetCharacterLevel();
-    const float Fraction = Progression->GetLevelProgressFraction();
-    const int32 ToNext = Progression->GetXpToNextLevel();
-
-    const float RailH = S(BreakerUI::HudV2XpHeight);
-    const float RailY = Canvas->ClipY - RailH;
-
-    // THE BOTTOM EDGE IS SHARED, AND HARM WINS IT. The damage flash and the
-    // low-health bands are full-bleed by rule -- no inset, stated at their own
-    // sites -- so they paint these same four pixels and are drawn after this.
-    // That is the intended order rather than a collision: the first question
-    // the HUD has to answer is "am I about to die", and levelling is explicitly
-    // the readout that never competes. The rule is covered for the 0.28s of a
-    // flash, and for as long as a character is actually dying. Do not inset the
-    // harm bands to make this visible underneath them.
-
-    // While the level-up banner is live the rule joins the event: the fill
-    // blinks between gold and bone on a metronome (a blink, never a fade --
-    // the motion is mechanical). Same geometry, so nothing shifts.
-    const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
-    const float BannerAge = static_cast<float>(Now - LevelUpTime);
-    const bool bCelebrating = LevelUpShownLevel > 0
-        && BannerAge >= 0.0f && BannerAge < BreakerHUD::LevelUpBannerSeconds;
-    const bool bBlinkOn = bCelebrating
-        && FMath::Fmod(BannerAge, BreakerHUD::LevelUpRailBlinkSeconds) < BreakerHUD::LevelUpRailBlinkSeconds * 0.5f;
-
-    DrawRect(BreakerUI::Panel00, 0.0f, RailY, Canvas->ClipX, RailH);
-    DrawRect(bBlinkOn ? BreakerUI::System : BreakerUI::Gold,
-        0.0f, RailY, Canvas->ClipX * FMath::Clamp(Fraction, 0.0f, 1.0f), RailH);
-
-    // At the cap the rule reads full and the caption says so, rather than a
-    // full bar beside a number that will never move again.
-    const int32 Remaining = FMath::Max(0, ToNext - FMath::RoundToInt(Fraction * static_cast<float>(ToNext)));
-    const FString Caption = ToNext > 0
-        ? FString::Printf(TEXT("LV %d    %s"), Level, *BreakerUI::FormatDamage(static_cast<float>(Remaining)))
-        : FString::Printf(TEXT("LV %d    MAX"), Level);
-    const FVector2D CaptionSize = MeasureSpecText(Caption, 11.0f);
-    DrawSpecTextCentered(Caption, Canvas->ClipX * 0.5f, RailY - S(BreakerUI::Space4) - CaptionSize.Y,
-        bCelebrating ? BreakerUI::Gold : BreakerUI::TextMuted, 11.0f);
-}
-
 void ABreakerPlaytestHUD::EnsureRiftBinding()
 {
     UWorld* World = GetWorld();
@@ -1603,134 +1629,86 @@ void ABreakerPlaytestHUD::HandleRiftCompleted(const FBreakerRiftDefinition& Rift
     // broadcast once and every listener sees it, so a HUD must confirm the run
     // was ITS player's before it announces one.
     if (Player && PlayerOwner && PlayerOwner->GetPawn() != Player) return;
-    RiftCompleteTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
     // LATCHED, not looked up later. The session's PendingRift is cleared by
     // the teardown this banner outlives, so reading it at draw time would
     // print an empty name on the frame that matters most.
-    RiftCompleteName = Rift.AreaName;
-    RiftCompleteLine = Rift.AreaLine;
-}
-
-void ABreakerPlaytestHUD::DrawRiftCompleteBanner(const FVector2D& Center)
-{
-    if (RiftCompleteTime <= 0.0 || !Canvas) return;
-    const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
-    const float Age = static_cast<float>(Now - RiftCompleteTime);
-    if (Age < 0.0f || Age >= BreakerHUD::RiftCompleteBannerSeconds) return;
-
-    // THE ENDING. Same event treatment as the level-up plate — snap in, plate
-    // never fades, 120ms text out — but RIFT-TEAL rather than gold, and that is
-    // O19 rather than taste: teal is the reserved noun for rift geometry, and a
-    // run completing is the one event that IS a rift fact. Gold is the reward
-    // family and would claim this banner was the payout, which it is not.
     //
     // NO REWARD NUMBERS. LEDGER owns what was paid and binds the same seam; a
-    // figure here would be a second owner of one question, and I would need a
-    // seam from them to state it truthfully rather than recompute it.
-    const float OutStart = BreakerHUD::RiftCompleteBannerSeconds - BreakerHUD::LevelUpOutSeconds;
-    const float Fade = Age <= OutStart ? 1.0f
-        : 1.0f - (Age - OutStart) / BreakerHUD::LevelUpOutSeconds;
-
-    const FString Title = RiftCompleteName.IsEmpty()
-        ? FString(TEXT("RIFT CLEARED")) : RiftCompleteName.ToString().ToUpper();
-    const FString Line = RiftCompleteLine.ToString();
-
-    constexpr float TitlePixels = 24.0f;   // O2 PLACEHOLDER
-    constexpr float LinePixels = 12.0f;    // O2 PLACEHOLDER
-    const FVector2D LabelSize = MeasureSpecText(TEXT("RUN COMPLETE"), 11.0f);
-    const FVector2D TitleSize = MeasureSpecText(Title, TitlePixels);
-    const FVector2D LineSize = Line.IsEmpty() ? FVector2D::ZeroVector : MeasureSpecText(Line, LinePixels);
-
-    const float Pad = S(BreakerUI::Space16);
-    const float ContentW = FMath::Max3(LabelSize.X, TitleSize.X, LineSize.X);
-    const float PlateW = FMath::Max(S(300.0f), ContentW + Pad * 2.0f);
-    const float PlateH = S(BreakerUI::HudRailStatus) + Pad
-        + LabelSize.Y + S(BreakerUI::Space4) + TitleSize.Y
-        + (Line.IsEmpty() ? 0.0f : S(BreakerUI::Space8) + LineSize.Y) + Pad;
-    const float PlateX = Center.X - PlateW * 0.5f;
-    // BELOW centre, and the level-up plate is why. A run that ends very often
-    // levels the player, so the two banners genuinely co-occur — and the
-    // level-up owns Center.Y - 190. Two plates in one slot is the collision
-    // this project keeps finding; giving them different halves of the screen
-    // costs nothing and cannot overlap at any resolution.
-    const float PlateY = Center.Y + S(120.0f);
-
-    DrawPlate(PlateX, PlateY, PlateW, PlateH, BreakerUI::TealAnomalous, EBreakerRail::Top);
-    if (Age < 0.26f) DrawBorder(PlateX, PlateY, PlateW, PlateH, BreakerUI::TealAnomalous, S(1.0f));
-
-    float LineY = PlateY + S(BreakerUI::HudRailStatus) + Pad;
-    DrawSpecTextCentered(TEXT("RUN COMPLETE"), Center.X, LineY, BreakerUI::TealAnomalous, 11.0f, Fade);
-    LineY += LabelSize.Y + S(BreakerUI::Space4);
-    DrawSpecTextCentered(Title, Center.X, LineY, BreakerUI::TextPrimary, TitlePixels, Fade);
-    if (!Line.IsEmpty())
-    {
-        LineY += TitleSize.Y + S(BreakerUI::Space8);
-        DrawSpecTextCentered(Line, Center.X, LineY, BreakerUI::TextMuted, LinePixels, Fade);
-    }
+    // figure here would be a second owner of one question.
+    EnqueueBanner(EBreakerBannerKind::RiftComplete,
+        Rift.AreaName.IsEmpty() ? FString(TEXT("RIFT CLEARED")) : Rift.AreaName.ToString().ToUpper(),
+        Rift.AreaLine.ToString());
 }
 
-void ABreakerPlaytestHUD::DrawLevelUpBanner(const FVector2D& Center)
+void ABreakerPlaytestHUD::EnqueueBanner(EBreakerBannerKind Kind, const FString& Title, const FString& Line)
 {
-    if (LevelUpShownLevel <= 0 || !Canvas) return;
+    FBreakerBanner& Banner = Banners.AddDefaulted_GetRef();
+    Banner.Kind = Kind;
+    Banner.Title = Title;
+    Banner.Line = Line;
+    // ArriveAt stays unscheduled: DrawBanners orders every banner enqueued
+    // since the last frame by priority before assigning arrivals.
+}
+
+// --------------------------------------------------------------------------
+// The event banners (04-death-banners, O202). One rectangle per kind, all
+// three disjoint, so the co-occurring rift-complete and level-up cannot
+// collide at any resolution. Sys ink on the bg-1 plate, a 4 px identity rail
+// on the left — system bone, reward gold only for the level. In and out are
+// SLIDES along the kind's axis, never a fade: the plate leaves the way it
+// came, whole. Arrivals are staggered by the queue, higher priority first.
+// --------------------------------------------------------------------------
+void ABreakerPlaytestHUD::DrawBanners(const FVector2D& Center)
+{
+    if (Banners.IsEmpty() || !Canvas) return;
     const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
-    const float Age = static_cast<float>(Now - LevelUpTime);
-    if (Age < 0.0f || Age >= BreakerHUD::LevelUpBannerSeconds) return;
+    BreakerBannerQueue::ScheduleArrival(Banners, Now);
+    BreakerBannerQueue::Prune(Banners, Now);
 
-    // The EVENT treatment. A level is the single most earned moment in the
-    // loop and it gets a real plate: gold top rail (transient status, reward
-    // family), the level stated large, and the point grant stated explicitly
-    // so the player learns what they were just paid without opening a menu.
-    // In is a snap — frame one is the full banner, purchase-confirm style,
-    // because the commit must feel mechanical. Out is a 120ms linear fade,
-    // the panel-out motion, so leaving costs less than arriving. No layout
-    // shift: the plate is sized from its measured content and nothing else
-    // on the screen moves for it.
-    const float OutStart = BreakerHUD::LevelUpBannerSeconds - BreakerHUD::LevelUpOutSeconds;
-    const float Fade = Age <= OutStart ? 1.0f
-        : 1.0f - (Age - OutStart) / BreakerHUD::LevelUpOutSeconds;
-
-    const FString Title = LevelUpShownGain > 1
-        ? FString::Printf(TEXT("LEVEL %d  (+%d)"), LevelUpShownLevel, LevelUpShownGain)
-        : FString::Printf(TEXT("LEVEL %d"), LevelUpShownLevel);
-    // The grant line: "+1 CLASS   +1 CORE". Both halves are optional past
-    // their caps; past both, the level still deserves its banner.
-    FString Grant;
-    if (LevelUpClassGain > 0) Grant = FString::Printf(TEXT("+%d CLASS"), LevelUpClassGain);
-    if (LevelUpCoreGain > 0)
+    for (const FBreakerBanner& Banner : Banners)
     {
-        if (!Grant.IsEmpty()) Grant += TEXT("   ");
-        Grant += FString::Printf(TEXT("+%d CORE"), LevelUpCoreGain);
+        const float Age = static_cast<float>(Now - Banner.ArriveAt);
+        if (!BreakerBannerQueue::IsShowing(Banner.Kind, Age)) continue;
+
+        const BreakerBannerQueue::FRect Rect = BreakerBannerQueue::RectFor(Banner.Kind);
+        const FVector2D Axis = BreakerBannerQueue::SlideAxisFor(Banner.Kind);
+        const float Displacement = BreakerBannerQueue::SlideDisplacementFor(Banner.Kind, Age);
+        // The sheet's rectangles are 1080p pixels; the rift band is authored
+        // full width and follows the canvas edge rather than the 1920.
+        const bool bFullWidth = Banner.Kind == EBreakerBannerKind::RiftComplete;
+        const float PlateX = (bFullWidth ? 0.0f : S(Rect.X)) - Axis.X * S(Displacement);
+        const float PlateY = S(Rect.Y) - Axis.Y * S(Displacement);
+        const float PlateW = bFullWidth ? Canvas->ClipX : S(Rect.W);
+        const float PlateH = S(Rect.H);
+        const float CenterX = PlateX + PlateW * 0.5f;
+
+        const FLinearColor Rail = BreakerBannerQueue::RailIsGold(Banner.Kind) ? BreakerUI::Gold : BreakerUI::System;
+        DrawPlate(PlateX, PlateY, PlateW, PlateH, Rail, EBreakerRail::Left);
+
+        // The label names the event in the rail's colour; the title is the
+        // thing itself; the line is what it paid or where it was. Stacked and
+        // centred vertically inside the fixed plate, never sizing it.
+        const TCHAR* Label = Banner.Kind == EBreakerBannerKind::RiftComplete ? TEXT("RUN COMPLETE")
+            : Banner.Kind == EBreakerBannerKind::LevelUp ? TEXT("LEVEL UP") : nullptr;
+        const FVector2D LabelSize = Label ? MeasureSpecText(Label, BreakerHUD::BannerLabelPixels) : FVector2D::ZeroVector;
+        const FVector2D TitleSize = MeasureSpecText(Banner.Title, BreakerHUD::BannerTitlePixels);
+        const FVector2D LineSize = Banner.Line.IsEmpty() ? FVector2D::ZeroVector
+            : MeasureSpecText(Banner.Line, BreakerHUD::BannerLinePixels);
+        const float ContentH = (Label ? LabelSize.Y + S(BreakerUI::Space4) : 0.0f) + TitleSize.Y
+            + (Banner.Line.IsEmpty() ? 0.0f : S(BreakerUI::Space8) + LineSize.Y);
+        float LineY = PlateY + (PlateH - ContentH) * 0.5f;
+        if (Label)
+        {
+            DrawSpecTextCentered(Label, CenterX, LineY, Rail, BreakerHUD::BannerLabelPixels);
+            LineY += LabelSize.Y + S(BreakerUI::Space4);
+        }
+        DrawSpecTextCentered(Banner.Title, CenterX, LineY, BreakerUI::System, BreakerHUD::BannerTitlePixels);
+        if (!Banner.Line.IsEmpty())
+        {
+            LineY += TitleSize.Y + S(BreakerUI::Space8);
+            DrawSpecTextCentered(Banner.Line, CenterX, LineY, BreakerUI::TextMuted, BreakerHUD::BannerLinePixels);
+        }
     }
-    if (Grant.IsEmpty()) Grant = TEXT("POINT CAP REACHED");
-
-    constexpr float TitlePixels = 24.0f;   // O2 PLACEHOLDER
-    constexpr float GrantPixels = 13.0f;   // O2 PLACEHOLDER
-    const FVector2D LabelSize = MeasureSpecText(TEXT("LEVEL UP"), 11.0f);
-    const FVector2D TitleSize = MeasureSpecText(Title, TitlePixels);
-    const FVector2D GrantSize = MeasureSpecText(Grant, GrantPixels);
-
-    const float Pad = S(BreakerUI::Space16);
-    const float ContentW = FMath::Max3(LabelSize.X, TitleSize.X, GrantSize.X);
-    const float PlateW = FMath::Max(S(260.0f), ContentW + Pad * 2.0f);
-    const float PlateH = S(BreakerUI::HudRailStatus) + Pad
-        + LabelSize.Y + S(BreakerUI::Space4) + TitleSize.Y + S(BreakerUI::Space8) + GrantSize.Y + Pad;
-    const float PlateX = Center.X - PlateW * 0.5f;
-    const float PlateY = Center.Y - S(190.0f);
-
-    // The plate never fades — FIELDPLATE plates do not lower opacity — so the
-    // out is carried by the text and the banner's plate leaves on its last
-    // frame whole, like a plate being unbolted rather than dissolving.
-    DrawPlate(PlateX, PlateY, PlateW, PlateH, BreakerUI::Gold, EBreakerRail::Top);
-    // Purchase-confirm language: the border snaps to gold on frame one, no
-    // ease in, and decays back to the resting border over 260ms.
-    if (Age < 0.26f) DrawBorder(PlateX, PlateY, PlateW, PlateH, BreakerUI::Gold, S(1.0f));
-
-    float LineY = PlateY + S(BreakerUI::HudRailStatus) + Pad;
-    DrawSpecTextCentered(TEXT("LEVEL UP"), Center.X, LineY, BreakerUI::Gold, 11.0f, Fade);
-    LineY += LabelSize.Y + S(BreakerUI::Space4);
-    DrawSpecTextCentered(Title, Center.X, LineY, BreakerUI::TextPrimary, TitlePixels, Fade);
-    LineY += TitleSize.Y + S(BreakerUI::Space8);
-    DrawSpecTextCentered(Grant, Center.X, LineY, BreakerUI::Gold, GrantPixels, Fade);
 }
 
 void ABreakerPlaytestHUD::EnsureProgressionBinding(const ABreakerCharacter* Character)
@@ -1744,23 +1722,33 @@ void ABreakerPlaytestHUD::EnsureProgressionBinding(const ABreakerCharacter* Char
 
 void ABreakerPlaytestHUD::HandleLevelGained(int32 NewLevel, int32 LevelsGained)
 {
-    LevelUpTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
-    LevelUpShownLevel = NewLevel;
-    // Carried so the banner can say "+2 LEVELS" rather than lying by one: a
-    // single kill can cross more than one level early on, and a tell that says
-    // "level 2" when the player reached 4 is worse than no tell.
-    LevelUpShownGain = LevelsGained;
+    // The title carries the gain so the banner says "(+2)" rather than lying
+    // by one: a single kill can cross more than one level early on, and a
+    // tell that says "level 2" when the player reached 4 is worse than none.
+    const FString Title = LevelsGained > 1
+        ? FString::Printf(TEXT("LEVEL %d  (+%d)"), NewLevel, LevelsGained)
+        : FString::Printf(TEXT("LEVEL %d"), NewLevel);
     // What this level-up actually PAID, computed the same way the progression
     // component grants it (one point per level up to each currency's cap), so
     // the banner states the grant instead of leaving the player to discover
-    // it in a menu. A level past a cap claims nothing.
+    // it in a menu. A level past a cap claims nothing; past both, the level
+    // still deserves its banner.
     const int32 PrevLevel = NewLevel - LevelsGained;
-    LevelUpClassGain = FMath::Max(0,
+    const int32 ClassGain = FMath::Max(0,
         FMath::Min(NewLevel, UBreakerProgressionLibrary::ClassPointCapLevel)
         - FMath::Min(PrevLevel, UBreakerProgressionLibrary::ClassPointCapLevel));
-    LevelUpCoreGain = FMath::Max(0,
+    const int32 CoreGain = FMath::Max(0,
         FMath::Min(NewLevel, UBreakerProgressionLibrary::CorePointCapLevel)
         - FMath::Min(PrevLevel, UBreakerProgressionLibrary::CorePointCapLevel));
+    FString Grant;
+    if (ClassGain > 0) Grant = FString::Printf(TEXT("+%d CLASS"), ClassGain);
+    if (CoreGain > 0)
+    {
+        if (!Grant.IsEmpty()) Grant += TEXT("   ");
+        Grant += FString::Printf(TEXT("+%d CORE"), CoreGain);
+    }
+    if (Grant.IsEmpty()) Grant = TEXT("POINT CAP REACHED");
+    EnqueueBanner(EBreakerBannerKind::LevelUp, Title, Grant);
 }
 
 void ABreakerPlaytestHUD::EnsureAbilityBinding(const ABreakerCharacter* Character)
@@ -2492,13 +2480,16 @@ void ABreakerPlaytestHUD::TickCapturePreview(const ABreakerCharacter* Character)
         BreakerHUDMath::DamageNumberLifetime(true), BreakerHUD::DamageDoTLifetime, BreakerHUD::DamageKillLifetime);
 
     // THE FORCED STATES, cycling every two seconds so a multi-frame capture
-    // photographs each: a reload (the rail and the word), a swap (the name
-    // sliding), a cooldown (the drain). Set every frame, not on the seeding
-    // cadence, because they are states rather than events.
-    PreviewPhase = FMath::Abs(FMath::FloorToInt(static_cast<float>(Now) / 2.0f)) % 3;
+    // photographs each: a reload (the rail ramping and the word), a swap (the
+    // name sliding), a cooldown (the drain), a loot plate over a fabricated
+    // drop. Set every frame, not on the seeding cadence, because they are
+    // states rather than events.
+    PreviewPhase = FMath::Abs(FMath::FloorToInt(static_cast<float>(Now) / 2.0f)) % 4;
     bPreviewReload = PreviewPhase == 0;
+    PreviewReloadFraction = bPreviewReload ? FMath::Frac(static_cast<float>(Now) / 2.0f) : 0.0f;
     PreviewCooldownFraction = PreviewPhase == 2
         ? 0.25f + 0.5f * FMath::Frac(static_cast<float>(Now) / 2.0f) : 0.0f;
+    bPreviewLootPlate = PreviewPhase == 3;
     if (PreviewPhase == 1 && Now - SwapStartTime >= BreakerUI::HudWeaponSwapSeconds + 0.4f)
     {
         SwapStartTime = Now;
@@ -2573,18 +2564,17 @@ void ABreakerPlaytestHUD::TickCapturePreview(const ABreakerCharacter* Character)
         }
     }
 
-    // The crosshair kill confirm and the level-up moment, fabricated on the
-    // same cadence so a multi-shot capture run photographs both mid-event.
+    // The crosshair kill confirm and the three banners, fabricated on the
+    // same cadence so a multi-shot capture run photographs them mid-event.
+    // All three at once, so the frame shows the stagger and the disjoint
+    // rectangles; re-seeded only once the queue has emptied itself.
     LastKillConfirmTime = Now;
     bKillConfirmWeakPoint = false;
-    const float BannerAge = static_cast<float>(Now - LevelUpTime);
-    if (BannerAge < 0.0f || BannerAge > BreakerHUD::LevelUpBannerSeconds + 2.0f)
+    if (Banners.IsEmpty())
     {
-        LevelUpTime = Now;
-        LevelUpShownLevel = 12;
-        LevelUpShownGain = 1;
-        LevelUpClassGain = 1;
-        LevelUpCoreGain = 1;
+        EnqueueBanner(EBreakerBannerKind::WaveClear, TEXT("WAVE 3 CLEAR"), FString());
+        EnqueueBanner(EBreakerBannerKind::LevelUp, TEXT("LEVEL 12"), TEXT("+1 CLASS   +1 CORE"));
+        EnqueueBanner(EBreakerBannerKind::RiftComplete, TEXT("FERNHALL"), TEXT("RIFT CLEARED"));
     }
 }
 

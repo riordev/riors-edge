@@ -1,6 +1,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
+// The verb enum is the only thing this header wants from the definition. An
+// opaque `enum class` declaration cannot name enumerators, so the switch in
+// AbilityRailColor needs the complete type; the definition header carries no
+// world and no UI, so the timelines here stay as world-free as they were.
+#include "Abilities/BreakerAbilityDefinition.h"
 #include "Items/BreakerItemTypes.h"
 #include "UI/BreakerUIStyle.h"
 
@@ -189,6 +194,22 @@ namespace BreakerHUDMath
         return TileHeight * FMath::Clamp(Remaining / Duration, 0.0f, 1.0f);
     }
 
+    // The rail an ability tile carries (O179): colour by VERB, never by slot
+    // or class. The ultimate slot is violet whatever its verb; a definition
+    // that has not said its verb (None) gets the resting border, not a guess.
+    inline FLinearColor AbilityRailColor(EBreakerAbilityVerb Verb, bool bUltimate)
+    {
+        if (bUltimate) return BreakerUI::Violet;
+        switch (Verb)
+        {
+            case EBreakerAbilityVerb::Movement: return BreakerUI::VerbMove;
+            case EBreakerAbilityVerb::Weapon:   return BreakerUI::Orange;
+            case EBreakerAbilityVerb::Reward:   return BreakerUI::Gold;
+            case EBreakerAbilityVerb::Taunt:    return BreakerUI::Harm;
+            default:                            return BreakerUI::BorderRest;
+        }
+    }
+
     // --- The rarity tally ---------------------------------------------------
     // Cells lit on a loot plate's tally, one per tier. Rarity carried by rail
     // AND tally, so the count is the second read when the colour is not.
@@ -202,6 +223,70 @@ namespace BreakerHUDMath
             case EBreakerItemRarity::Anomalous:   return 5;
             default:                              return 1;
         }
+    }
+
+    // --- The interact plate ---------------------------------------------------
+    // One plate over the thing F would act on: a 4px identity rail, the key
+    // tile (32, only on the one F would take), the tally (4×12 cells at a 2
+    // gap), the name, a 12 right pad. 40 tall. Every offset is a function of
+    // the name's measured width and the cell count, so the plate is sized
+    // before anything is drawn and cannot read its own arrangement. Spec
+    // pixels; the caller scales. O2 PLACEHOLDER, every number.
+    struct FInteractPlateLayout
+    {
+        float Height = 40.0f;
+        float RailWidth = 4.0f;
+        bool bKeyTile = false;
+        float KeyX = 0.0f;
+        float KeySize = 32.0f;
+        float TallyX = 0.0f;
+        float TallyY = 0.0f;
+        float TallyCellWidth = 4.0f;
+        float TallyCellHeight = 12.0f;
+        float TallyGap = 2.0f;
+        float TallyWidth = 0.0f;
+        float NameX = 0.0f;
+        float Width = 0.0f;
+    };
+
+    inline FInteractPlateLayout InteractPlateLayout(float NameWidth, int32 TallyCells, bool bKeyTile)
+    {
+        constexpr float Gap = 4.0f;        // rail to first element
+        constexpr float ElementGap = 8.0f; // between key, tally and name
+        constexpr float RightPad = 12.0f;
+        FInteractPlateLayout L;
+        L.bKeyTile = bKeyTile;
+        float X = L.RailWidth + Gap;
+        if (bKeyTile)
+        {
+            L.KeyX = X;
+            X += L.KeySize + ElementGap;
+        }
+        const int32 Cells = FMath::Max(TallyCells, 0);
+        L.TallyX = X;
+        L.TallyY = (L.Height - L.TallyCellHeight) * 0.5f;
+        L.TallyWidth = Cells > 0 ? L.TallyCellWidth * Cells + L.TallyGap * (Cells - 1) : 0.0f;
+        if (Cells > 0) X += L.TallyWidth + ElementGap;
+        L.NameX = X;
+        L.Width = X + FMath::Max(NameWidth, 0.0f) + RightPad;
+        return L;
+    }
+
+    // --- Step marks on the resource track ---------------------------------
+    // Grit's three bands are equal thirds of the bar, so the track carries a
+    // mark at each band edge and the band is readable without the word.
+    inline TArray<float> GritStepMarks()
+    {
+        return { 1.0f / 3.0f, 2.0f / 3.0f };
+    }
+
+    // --- Wave cells -------------------------------------------------------
+    // O120: cells are drawn only where a total is authored. A rift run has one
+    // — its boss wave — so the row shows that many cells; the gym has no run
+    // and shows none. The interval is the rift budget's BossWaveInterval.
+    inline int32 WaveCellTotal(bool bRiftSet, int32 BossWaveInterval)
+    {
+        return bRiftSet ? FMath::Max(BossWaveInterval, 0) : 0;
     }
 
     // --- The magazine --------------------------------------------------------

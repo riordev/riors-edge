@@ -323,8 +323,6 @@ namespace BreakerUI
     inline constexpr float HudV2StatusDot = 9.0f;             // O2 PLACEHOLDER
     inline constexpr float HudV2StatusRowGap = 5.0f;          // O2 PLACEHOLDER
     inline constexpr float HudV2StatusPixels = 12.0f;         // O2 PLACEHOLDER
-    // The experience rail's height; O210 places the rail on the pause plate.
-    inline constexpr float HudV2XpHeight = 4.0f;              // O2 PLACEHOLDER
 
     inline constexpr float HudEnemyBarWidth = 180.0f;
     inline constexpr float HudEnemyBarHeight = 8.0f;

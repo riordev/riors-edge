@@ -5,6 +5,7 @@
 #include "Classes/BreakerGritComponent.h"
 #include "Classes/BreakerMomentumComponent.h"
 #include "Classes/BreakerScrapComponent.h"
+#include "UI/BreakerHUDMath.h"
 #include "UI/BreakerUIStyle.h"
 
 // ---------------------------------------------------------------------------
@@ -59,6 +60,13 @@ namespace BreakerHUD
         // resource owns its frame.
         FLinearColor BorderColor = BreakerUI::BorderEmphasis;
         float BorderPixels = 1.0f;
+        // Fractions along the track where a band edge is marked, so the band
+        // is readable off the bar without the word. Empty for a resource with
+        // no authored band edges.
+        TArray<float> StepMarks;
+        // The fill's resting colour. The track's loud states (banked, debt)
+        // still own the fill; this is what draws beneath them.
+        FLinearColor FillColor = BreakerUI::TextSecondary;
         // False when no class resource applies. The label/state word still
         // render (in text/disabled) so the row is never a blank strip.
         bool bActive = false;
@@ -118,6 +126,10 @@ namespace BreakerHUD
         Row.bActive = true;
         Row.Label = TEXT("MANA");
         Row.Track = EResourceTrack::Signed;
+        // Caster's cells (O120: one per authored cast) are not drawn: nothing
+        // on the Mana component states a cast count or a cell total, and a
+        // cell row divided by the pool would be a total nobody authored.
+        // Recorded here, not faked with StepMarks.
 
         const float Floor = FMath::Min(0.0f, OvercastFloor);
         if (Mana < 0.0f)
@@ -149,6 +161,9 @@ namespace BreakerHUD
         Row.bActive = true;
         Row.Label = TEXT("SCRAP");
         Row.Fraction = FMath::Clamp(ScrapFraction, 0.0f, 1.0f);
+        // Scrap is working capital for weapons and deployables, so its fill
+        // is the weapon verb's orange (O179).
+        Row.FillColor = BreakerUI::Orange;
         switch (State)
         {
         case EBreakerScrapState::Surplus:
@@ -180,6 +195,7 @@ namespace BreakerHUD
         Row.bActive = true;
         Row.Label = TEXT("GRIT");
         Row.Fraction = FMath::Clamp(GritFraction, 0.0f, 1.0f);
+        Row.StepMarks = BreakerHUDMath::GritStepMarks();
         switch (Band)
         {
         case EBreakerGritBand::Ironclad:
@@ -213,6 +229,9 @@ namespace BreakerHUD
         Row.bActive = true;
         Row.Label = TEXT("CHARGE");
         Row.Fraction = FMath::Clamp(ChargeFraction, 0.0f, 1.0f);
+        // The ally segment — the share of Charge an ally's hits paid in — is
+        // not drawn: the Charge component states one pool and no per-source
+        // split, and there is no party layer to split it by. Recorded here.
         switch (Band)
         {
         case EBreakerChargeBand::Resonant:

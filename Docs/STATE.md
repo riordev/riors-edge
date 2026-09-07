@@ -11,7 +11,7 @@ measurement without judging it.
 
 | Section | Direction | Value | Pin | State |
 |---|---|---|---|---|
-| Silent nodes | ceiling | 33 of 445 authored | ceiling 54 | ok |
+| Silent nodes | ceiling | 33 of 292 authored | ceiling 54 | ok |
 | Stat targets with no aggregation lane | ceiling | 1 of 34 | ceiling 6 | ok |
 | Aggregation lanes carrying nothing | ceiling | 0 of 32 lanes | ceiling 9 | ok |
 | Node tags with no consumer | ceiling | 139 of 205 declared | ceiling 143 | ok |
@@ -20,21 +20,21 @@ measurement without judging it.
 | Asserted invariants with no test | ceiling | 38 of 111 asserted across 7 specs | ceiling 42, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 2.25 worst tree | floor 3.0 | **OUT** |
 | Trees sitting exactly on the offered-to-spendable floor | ceiling | 9 of 16 | no pin — measurement only | — |
-| Node-shape composition, per tree | band | 57 % ranked minors, all trees | no pin — measurement only | — |
-| Scaffolding nodes | ceiling | 33 of 445 authored | ceiling 50 | ok |
+| Node-shape composition, per tree | band | 34 % ranked minors, all trees | no pin — measurement only | — |
+| Scaffolding nodes | ceiling | 33 of 292 authored | ceiling 50 | ok |
 | Conditions that can never be true | ceiling | 5.0 | ceiling 5, target 1 | ok |
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
-| Build variance band, at cap | band | 6.38 | band 8.0–10.0 | **OUT** |
-| Build variance band, endgame | band | 14.46 | band 12.0–20.0 | ok |
-| Ability lane throughput against weapon lane, at cap | band | 0.62 | band 0.85–1.15 | **OUT** |
-| Ability lane throughput against weapon lane, endgame | band | 0.36 | no pin — measurement only | — |
+| Build variance band, at cap | band | 5.63 | band 8.0–10.0 | **OUT** |
+| Build variance band, endgame | band | 13.89 | band 12.0–20.0 | ok |
+| Ability lane throughput against weapon lane, at cap | band | 0.54 | band 0.85–1.15 | **OUT** |
+| Ability lane throughput against weapon lane, endgame | band | 0.31 | no pin — measurement only | — |
 | Monster damage growth against gear defence growth | ceiling | 0.63 | ceiling 1.0 | ok |
-| Worst single rewrite step on an optimized build | ceiling | 1.45 | ceiling 1.5 | ok |
+| Worst single rewrite step on an optimized build | ceiling | 1.47 | ceiling 1.5 | ok |
 | World Core Point sources with no trigger | ceiling | 14.0 | ceiling 14, target 0 | ok |
 
 ## Tests
 
-- passing: 544
+- passing: 560
 - expected red: 5
 - **unexpected red: 0**
 - asserted invariants with no test: 38
@@ -52,7 +52,7 @@ A test that was never written is the worst of the three: it looks asserted.
 
 ## Silent nodes
 
-**ceiling** · 33 of 445 authored · ceiling 54
+**ceiling** · 33 of 292 authored · ceiling 54
 
 Authored, purchasable, costs a point, and produces no observable change. Counted against BOTH consumption axes — tag and node id.
 
@@ -213,7 +213,7 @@ Most of a build should be refusal. A CEILING here would lock the trees at their 
 - GetCasterMultispellTree: 9 nodes, 18 points offered, 2.25x budget
 - GetCasterSpellbladeTree: 9 nodes, 18 points offered, 2.25x budget
 - GetCasterVoidWhispererTree: 9 nodes, 18 points offered, 2.25x budget
-- GetCoreSliceTree: 270 nodes, 222 points offered, 3.42x budget
+- GetCoreSliceTree: 117 nodes, 171 points offered, 2.63x budget
 - GetGunsmithArmoryTree: 12 nodes, 24 points offered, 3.0x budget
 - GetGunsmithFieldTechTree: 12 nodes, 24 points offered, 3.0x budget
 - GetGunsmithTinkererTree: 12 nodes, 24 points offered, 3.0x budget
@@ -245,14 +245,14 @@ A tree here is one node-price change away from red, and the floor section report
 
 ## Node-shape composition, per tree
 
-**band** · 57 % ranked minors, all trees · no pin — measurement only
+**band** · 34 % ranked minors, all trees · no pin — measurement only
 
 A tree that is almost entirely notable-shaped has nothing to fill a constellation with between the interesting picks. Of these, 33 are SCAFFOLDING — no stat line, no condition, and no rule anything reads — a strict subset of the silent nodes above, where the remainder are shaped and merely unpaid. UNPINNED pending a re-derived band: 60% ranked minors means 60% unconditional stat lines, and O76 gives raw percentages to affixes outright, so the authored 55-65 target cannot be reached without breaking another rule. Until it is re-derived this section reports and judges nothing.
 
 - GetCasterMultispellTree: 11% ranked minor, 78% notable, 11% convergence/keystone
 - GetCasterSpellbladeTree: 0% ranked minor, 89% notable, 11% convergence/keystone
 - GetCasterVoidWhispererTree: 11% ranked minor, 78% notable, 11% convergence/keystone
-- GetCoreSliceTree: 89% ranked minor, 8% notable, 3% convergence/keystone
+- GetCoreSliceTree: 74% ranked minor, 19% notable, 8% convergence/keystone
 - GetGunsmithArmoryTree: 0% ranked minor, 92% notable, 8% convergence/keystone
 - GetGunsmithFieldTechTree: 0% ranked minor, 92% notable, 8% convergence/keystone
 - GetGunsmithTinkererTree: 0% ranked minor, 92% notable, 8% convergence/keystone
@@ -268,7 +268,7 @@ A tree that is almost entirely notable-shaped has nothing to fill a constellatio
 
 ## Scaffolding nodes
 
-**ceiling** · 33 of 445 authored · ceiling 50
+**ceiling** · 33 of 292 authored · ceiling 50
 
 No stat line, no condition, and no rule anything reads. A STRICT SUBSET of the silent nodes: the difference is the silent nodes that ARE shaped and merely point at an unpaid target, which is a wiring problem where this is an authoring one.
 

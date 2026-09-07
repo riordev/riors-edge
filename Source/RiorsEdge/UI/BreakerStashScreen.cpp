@@ -137,7 +137,7 @@ namespace
                 BreakerStashText(FText::FromString(Label), BreakerUI::TypeCaption,
                     bActive ? BreakerUI::TextPrimary : BreakerUI::TextMuted, true)
             ],
-            bActive ? BreakerUI::Cyan : BreakerUI::BorderEmphasis,
+            bActive ? BreakerUI::System : BreakerUI::BorderEmphasis,
             bActive ? BreakerUI::BorderSelected : BreakerUI::BorderThin);
     }
 

@@ -108,6 +108,31 @@ bool FBreakerHUDResourceRowTest::RunTest(const FString& Parameters)
             ResolveManaRow(-5.0f, 100.0f, 0.0f).Fraction, -1.0f);
     }
 
+    // --- Step marks and fills --------------------------------------------
+    // Grit's bands are thirds, so the track marks both edges; Scrap fills in
+    // the weapon verb's orange (O179). Every other row keeps the text-2 fill
+    // and no marks, so nothing else on the track moved.
+    {
+        const FResourceRow Grit = ResolveGritRow(0.5f, EBreakerGritBand::Braced);
+        TestEqual(TEXT("Grit marks two band edges"), Grit.StepMarks.Num(), 2);
+        if (Grit.StepMarks.Num() == 2)
+        {
+            TestEqual(TEXT("Grit's first mark is a third"), Grit.StepMarks[0], 1.0f / 3.0f, 0.0001f);
+            TestEqual(TEXT("Grit's second mark is two thirds"), Grit.StepMarks[1], 2.0f / 3.0f, 0.0001f);
+        }
+        TestTrue(TEXT("Grit keeps the text-2 fill"), Grit.FillColor.Equals(BreakerUI::TextSecondary));
+
+        const FResourceRow Scrap = ResolveScrapRow(0.5f, EBreakerScrapState::Stocked);
+        TestTrue(TEXT("Scrap fills orange"), Scrap.FillColor.Equals(BreakerUI::Orange));
+        TestEqual(TEXT("Scrap marks no band edge"), Scrap.StepMarks.Num(), 0);
+
+        TestEqual(TEXT("Momentum marks nothing"), ResolveMomentumRow(0.5f, EBreakerMomentumState::Running).StepMarks.Num(), 0);
+        TestTrue(TEXT("Momentum keeps the text-2 fill"),
+            ResolveMomentumRow(0.5f, EBreakerMomentumState::Running).FillColor.Equals(BreakerUI::TextSecondary));
+        TestEqual(TEXT("Mana marks nothing: its cells have no authored total"), ResolveManaRow(60.0f, 100.0f, -20.0f).StepMarks.Num(), 0);
+        TestEqual(TEXT("Charge marks nothing: its ally segment has no source"), ResolveChargeRow(0.5f, EBreakerChargeBand::Attuned).StepMarks.Num(), 0);
+    }
+
     return true;
 }
 

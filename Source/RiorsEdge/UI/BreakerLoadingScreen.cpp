@@ -122,7 +122,7 @@ void SBreakerLoadingScreen::Construct(const FArguments& InArgs)
             [
                 SAssignNew(BlinkBlock, SBorder)
                 .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
-                .BorderBackgroundColor(BreakerUI::Cyan)
+                .BorderBackgroundColor(BreakerUI::System)
                 [
                     SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))
                 ]
@@ -311,14 +311,14 @@ EActiveTimerReturnType SBreakerLoadingScreen::Animate(double CurrentTime, float)
             BreakerLatticePeriod) / BreakerLatticePeriod;
         const float Breathe = BreakerEaseInOut(1.0f - FMath::Abs(Phase * 2.0f - 1.0f));
         LatticeCells[Index]->SetBorderBackgroundColor(
-            FMath::Lerp(BreakerUI::Panel10, BreakerUI::Cyan, Breathe));
+            FMath::Lerp(BreakerUI::Panel10, BreakerUI::System, Breathe));
     }
 
     // The cursor block: the 1s step — visible for the first half-second.
     if (BlinkBlock.IsValid())
     {
         const bool bLit = FMath::Fmod(Elapsed, 1.0f) < 0.5f;
-        BlinkBlock->SetBorderBackgroundColor(bLit ? BreakerUI::Cyan
+        BlinkBlock->SetBorderBackgroundColor(bLit ? BreakerUI::System
             : FLinearColor(0.0f, 0.0f, 0.0f, 0.0f));
     }
 

@@ -11,6 +11,8 @@
 // The HUD sheet's timelines, world-free: crosshair spread, the health chip,
 // the near-death pulse, the damage-number frame, the swap slide.
 #include "UI/BreakerHUDMath.h"
+// The event banners' queue, world-free: kinds, rectangles, holds, the stagger.
+#include "UI/BreakerBannerQueue.h"
 // Full include, not a forward declaration: FBreakerShotResult is a UFUNCTION
 // parameter, so UHT needs the complete type (same reason
 // BreakerMomentumComponent.h includes it).
@@ -23,6 +25,7 @@ class ABreakerTracerRenderer;
 class UBreakerAbilityComponent;
 class UBreakerAbilityStateComponent;
 class UBreakerCombatComponent;
+class UBreakerGameSettings;
 class UBreakerWeaponComponent;
 
 // One floating damage number. Also plain: it outlives the target it came from.
@@ -84,21 +87,40 @@ class RIORSEDGE_API ABreakerPlaytestHUD : public AHUD
     GENERATED_BODY()
 
 public:
+    virtual void BeginPlay() override;
     virtual void DrawHUD() override;
 
+    // DECLARED CROSSING (GLASS -> FIELD): the nameplate TU reads this. The
+    // profile's larger-nameplates switch as a multiplier: one authored step
+    // up (UBreakerGameSettings::LargerNameplateScale) or 1.
+    float NameplateScale() const;
+
 private:
+    // The player's profile, loaded once here and re-read on the pause menu's
+    // open -> closed edge, which is the only place it is edited.
+    UPROPERTY(Transient) TObjectPtr<UBreakerGameSettings> Profile;
+    bool bMenuWasOpen = false;
+
     // Bound once to the player's combat component; dodge and block are
     // instantaneous results, so they have to be latched when broadcast
     // rather than polled from a persistent state.
     UFUNCTION() void HandlePlayerDamageReceived(const FBreakerDamageResult& Result);
     UFUNCTION() void HandleLevelGained(int32 NewLevel, int32 LevelsGained);
     void EnsureProgressionBinding(const ABreakerCharacter* Character);
-    // The experience rail: a thin bar under the combat cluster carrying the
-    // level, the fraction into it, and the XP remaining. Progression that only
-    // exists in a save file is progression the player cannot feel.
-    void DrawExperienceRail(const ABreakerCharacter* Character);
-    void DrawLevelUpBanner(const FVector2D& Center);
+    // Levelling is the pause plate's (O210); the field carries only the
+    // level-up banner, through the queue below.
     void EnsureDamageBinding(const ABreakerCharacter* Character);
+
+    // THE BANNERS (04-death-banners, O202). Every event banner — rift
+    // complete, level up, wave clear — is enqueued here and drawn by one pass
+    // in priority order at staggered arrivals. Strings are latched at
+    // enqueue: a rift's name is cleared by the teardown its banner outlives.
+    TArray<FBreakerBanner> Banners;
+    void EnqueueBanner(EBreakerBannerKind Kind, const FString& Title, const FString& Line);
+    void DrawBanners(const FVector2D& Center);
+    // The wave countdown seen last frame: a wave clear is the <0 -> >0 edge
+    // of GetWaveAdvanceRemaining(), the moment the next wave starts counting.
+    float LastWaveAdvanceRemaining = -1.0f;
 
     // THE LOOP'S ENDING, MARKED. `OnRiftCompleted` is GROUND's published seam
     // (declared in Game/BreakerRiftDefinition.h so a consumer needs that header
@@ -109,13 +131,7 @@ private:
     // rebind on their component.
     void EnsureRiftBinding();
     void HandleRiftCompleted(const struct FBreakerRiftDefinition& Rift, APawn* Player);
-    void DrawRiftCompleteBanner(const FVector2D& Center);
     TWeakObjectPtr<class ABreakerGameMode> BoundRiftMode;
-    double RiftCompleteTime = -1000.0;
-    // Latched from the definition at completion, not looked up afterwards: the
-    // session's PendingRift is cleared by the teardown this banner outlives.
-    FText RiftCompleteName;
-    FText RiftCompleteLine;
 
     // Same bind/rebind discipline for shots: the tracer trail is the only
     // record of a hitscan line, and polling GetLastShot() would miss every
@@ -172,9 +188,16 @@ private:
     // shot and hands it to a world-space pooled renderer, spawned lazily on
     // the first shot and never replicated; see BreakerTracerRenderer.h.
     ABreakerTracerRenderer* GetTracerRenderer();
-    // The centre-screen interact prompt, resolving loot > travel > talk in
-    // exactly F's own precedence.
+    // The interact prompt, resolving loot > travel > talk in exactly F's own
+    // precedence. Loot's plate is DrawLootPickups' (the key tile on the one
+    // F would take); this draws the plate over the NPC or travel point, and
+    // the BACKPACK FULL line when the loot refusal has to be said.
     void DrawInteractPrompt(const ABreakerCharacter* Character, const FVector2D& Center);
+    // One plate over a thing F acts on, to BreakerHUDMath::InteractPlateLayout:
+    // rail, key tile (only when bKeyTile), tally cells in the rail colour, the
+    // name. Centred on CenterX with its bottom edge on BottomY, screen pixels.
+    void DrawInteractPlate(float CenterX, float BottomY, const FLinearColor& Rail, int32 TallyCells,
+        const FString& Name, bool bKeyTile);
     // The game's three sounds ride the same two events the visuals already
     // ride (OnShot, OnHitDealt), through the same lazily-spawned cosmetic
     // sibling; see BreakerSoundDirector.h.
@@ -216,17 +239,6 @@ private:
 
     UPROPERTY() TObjectPtr<UBreakerCombatComponent> BoundCombat;
     UPROPERTY() TObjectPtr<class UBreakerProgressionComponent> BoundProgression;
-    // Latched from OnLevelGained. A level-up is the single most earned moment
-    // in the progression loop and it gets its own banner rather than sharing
-    // the ability callout, which retires itself after three shows.
-    double LevelUpTime = -1000.0;
-    int32 LevelUpShownLevel = 0;
-    int32 LevelUpShownGain = 0;
-    // What the level actually granted, stated on the banner: "+1 CLASS +1
-    // CORE". Computed from the cap levels at the moment the event fired, so a
-    // level past a cap never claims a point it did not pay.
-    int32 LevelUpClassGain = 0;
-    int32 LevelUpCoreGain = 0;
     UPROPERTY() TObjectPtr<UBreakerWeaponComponent> BoundWeapon;
     UPROPERTY() TObjectPtr<UBreakerAbilityComponent> BoundAbilities;
     double LastDodgeTime = -1000.0;
@@ -302,11 +314,17 @@ private:
     // survives the frame the rift is torn down.
     FString ZoneName;
 
-    // -BreakerCaptureHUD forcing: which of reload / swap / cooldown the current
-    // preview phase holds on, so a capture run photographs all three.
+    // -BreakerCaptureHUD forcing: which of reload / swap / cooldown / loot
+    // plate the current preview phase holds on, so a capture run photographs
+    // all four.
     int32 PreviewPhase = 0;
     float PreviewCooldownFraction = 0.0f;
     bool bPreviewReload = false;
+    // The reload's ramp while the preview holds it, 0..1 over the phase.
+    float PreviewReloadFraction = 0.0f;
+    // The loot plate over a fabricated Aberrant drop ahead of the player,
+    // preview-only: the harness cannot make a drop fall.
+    bool bPreviewLootPlate = false;
 
     UPROPERTY() TObjectPtr<ABreakerTracerRenderer> TracerRenderer;
     UPROPERTY() TObjectPtr<ABreakerSoundDirector> SoundDirector;
