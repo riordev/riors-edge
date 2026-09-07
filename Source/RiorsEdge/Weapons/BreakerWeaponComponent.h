@@ -11,7 +11,16 @@ class UBreakerAttributeSet;
 class UBreakerWeaponDefinition;
 class UBreakerProgressionComponent;
 class UBreakerMomentumComponent;
+struct FBreakerItemInstance;
 enum class EBreakerMomentumState : uint8;
+
+// Item-card base values, before affixes/build modifiers. Zero projectiles means
+// the input is not a valid weapon item.
+struct FBreakerWeaponBaseDamagePreview
+{
+    float DamagePerProjectile = 0.0f;
+    int32 ProjectileCount = 0;
+};
 
 // ---------------------------------------------------------------------------
 // The composed projectile channels one trigger pull fires with (owner ruling
@@ -309,6 +318,9 @@ public:
     // active definition's Damage, scaled to the equipped item level. For a
     // multi-pellet weapon this is still PER PELLET, exactly as Damage was.
     UFUNCTION(BlueprintPure, Category="Weapon|Damage") float GetScaledBaseDamage() const;
+    // Candidates use their own archetype and item level. The currently held
+    // item's exact identity also honors an authored active definition override.
+    FBreakerWeaponBaseDamagePreview GetItemBaseDamagePreview(const FBreakerItemInstance& Item) const;
     // The whole trigger pull: GetScaledBaseDamage() times the active
     // definition's PelletsPerShot. THIS is the number a melee/blast
     // weapon-coefficient means by "weapon damage" — the per-pellet base reads

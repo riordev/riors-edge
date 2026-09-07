@@ -984,6 +984,64 @@ bool FBreakerWeaponArchetypeOrderingAcrossLevelsTest::RunTest(const FString& Par
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerWeaponItemBasePreviewTest,
+    "RiorsEdge.Weapons.ItemBasePreview",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerWeaponItemBasePreviewTest::RunTest(const FString& Parameters)
+{
+    AActor* Owner = NewObject<AActor>();
+    UBreakerWeaponComponent* Weapon = NewObject<UBreakerWeaponComponent>(Owner);
+    UBreakerEquipmentComponent* Equipment = NewObject<UBreakerEquipmentComponent>(Owner);
+    Weapon->ItemLevelDamageGrowth = 0.05f;
+    FBreakerItemInstance Item;
+    Item.ItemId = FGuid::NewGuid();
+    Item.Slot = EBreakerEquipSlot::Primary;
+    Item.Rarity = EBreakerItemRarity::Exceptional;
+
+    for (int32 Archetype = 0; Archetype < static_cast<int32>(EBreakerWeaponArchetype::Count); ++Archetype)
+    {
+        Item.WeaponArchetype = static_cast<EBreakerWeaponArchetype>(Archetype);
+        for (const int32 Level : {1, 20, 50})
+        {
+            Item.ItemLevel = Level;
+            const UBreakerWeaponDefinition* Before = Weapon->GetActiveDefinition();
+            const float BeforeDamage = Weapon->GetScaledBaseDamage();
+            const FBreakerWeaponBaseDamagePreview Preview = Weapon->GetItemBaseDamagePreview(Item);
+            TestTrue(TEXT("Preview keeps active definition"), Weapon->GetActiveDefinition() == Before);
+            TestEqual(TEXT("Preview keeps active damage"), Weapon->GetScaledBaseDamage(), BeforeDamage);
+            TestTrue(TEXT("Fixture equips candidate"), Equipment->EquipItem(Item));
+            Weapon->EquipArchetype(Item.WeaponArchetype);
+            TestEqual(TEXT("Candidate base equals runtime after equip"), Preview.DamagePerProjectile, Weapon->GetScaledBaseDamage(), 0.001f);
+            TestEqual(TEXT("Candidate pellet total equals runtime blast"), Preview.DamagePerProjectile * Preview.ProjectileCount,
+                Weapon->GetScaledFullBlastDamage(), 0.001f);
+            if (Item.WeaponArchetype == EBreakerWeaponArchetype::Shotgun)
+            {
+                TestEqual(TEXT("Shotgun presents eight separate pellets"), Preview.ProjectileCount, 8);
+            }
+        }
+    }
+
+    Weapon->WeaponDefinition = NewObject<UBreakerWeaponDefinition>(Weapon);
+    Weapon->WeaponDefinition->Damage = 37.0f;
+    Weapon->WeaponDefinition->PelletsPerShot = 3;
+    const FBreakerWeaponBaseDamagePreview HeldPreview = Weapon->GetItemBaseDamagePreview(Item);
+    TestEqual(TEXT("Exact held item honors custom runtime definition"), HeldPreview.DamagePerProjectile, Weapon->GetScaledBaseDamage());
+    TestEqual(TEXT("Custom held pellet count"), HeldPreview.ProjectileCount, 3);
+    FBreakerItemInstance Candidate = Item;
+    Candidate.ItemId = FGuid::NewGuid();
+    Candidate.WeaponArchetype = EBreakerWeaponArchetype::Shotgun;
+    TestEqual(TEXT("Other candidate does not inherit held override"), Weapon->GetItemBaseDamagePreview(Candidate).ProjectileCount, 8);
+    Candidate.Slot = EBreakerEquipSlot::Helmet;
+    TestEqual(TEXT("Armour has no weapon preview"), Weapon->GetItemBaseDamagePreview(Candidate).ProjectileCount, 0);
+    Candidate.Slot = EBreakerEquipSlot::Primary;
+    Candidate.WeaponArchetype = EBreakerWeaponArchetype::Count;
+    TestEqual(TEXT("Invalid archetype is refused"), Weapon->GetItemBaseDamagePreview(Candidate).ProjectileCount, 0);
+    TestEqual(TEXT("Invalid item is refused"), Weapon->GetItemBaseDamagePreview(FBreakerItemInstance()).ProjectileCount, 0);
+    return true;
+}
+
 // How item level actually reaches the weapon, and what an unequipped weapon is.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerWeaponEquippedItemLevelTest,

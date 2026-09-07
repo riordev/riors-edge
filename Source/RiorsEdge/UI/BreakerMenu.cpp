@@ -1026,6 +1026,21 @@ void SBreakerMenu::ShowScreenForCapture(EBreakerMenuScreen Screen)
                 if (Character->GetAbilities()) Character->GetAbilities()->RefreshGrants();
             }
         }
+        else if (Board == TEXT("GEARDAMAGE"))
+        {
+            Screen = EBreakerMenuScreen::Inventory;
+            if (Character.IsValid() && Character->GetEquipment())
+            {
+                for (const EBreakerWeaponArchetype Archetype : { EBreakerWeaponArchetype::Rifle, EBreakerWeaponArchetype::Shotgun })
+                {
+                    FBreakerItemInstance Rolled = UBreakerLootLibrary::RollItem(
+                        TEXT("CaptureWeaponDamage"), EBreakerEquipSlot::Primary,
+                        EBreakerItemRarity::Exceptional, 11, 1887);
+                    Rolled.WeaponArchetype = Archetype;
+                    Character->GetEquipment()->AddToBackpack(Rolled);
+                }
+            }
+        }
         else if (Board == TEXT("EQUIPREQUIREMENT"))
         {
             // Seeded capture fixture for the reported level-11 item refusal.
@@ -4404,8 +4419,20 @@ namespace
         return Lines;
     }
 
+    // Candidate base damage shares the firing component's definition and scaling.
+    TSharedRef<SWidget> MakeWeaponBaseDamageLine(const FBreakerItemInstance& Item,
+        const UBreakerWeaponComponent* Weapon, float WrapWidth)
+    {
+        if (!Weapon || !Item.IsWeapon()) return SNew(SSpacer).Size(FVector2D::ZeroVector);
+        const FBreakerWeaponBaseDamagePreview Preview = Weapon->GetItemBaseDamagePreview(Item);
+        if (Preview.ProjectileCount <= 0) return SNew(SSpacer).Size(FVector2D::ZeroVector);
+        const FString Text = Preview.ProjectileCount > 1
+            ? BreakerStrings::Format(EBreakerStringKey::WeaponBasePellets, Preview.DamagePerProjectile, Preview.ProjectileCount)
+            : BreakerStrings::Format(EBreakerStringKey::WeaponBaseDamage, Preview.DamagePerProjectile);
+        return MenuWrappedText(FText::FromString(Text), BreakerUI::TypeCaption, Primary, WrapWidth, true);
+    }
+
     // WHAT THE CARD CALLS THIS ITEM.
-    //
     // The reference's line one is "name plus item level — the two things
     // scanned first", and its sample names ("Riftstep Greaves") are authored
     // copy. FBreakerItemInstance has no display name: the only named items in
@@ -4612,26 +4639,6 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
             return SNew(SBox).HeightOverride(BreakerInventoryLayout::EquipRowHeight + 2.0f * BreakerUI::BorderSelected)[EmptyOutline];
         }
 
-        // The right stack: item level, and the rarity tag repeated under it for
-        // the two capped tiers ("on an equipped card the rarity tag repeats
-        // under the item level"). 96 is sized to ANOMALOUS, the longest tag,
-        // not to the first one that happened to be on screen.
-        constexpr float EquipRightColumn = 96.0f;
-        TSharedRef<SVerticalBox> RightStack = SNew(SVerticalBox);
-        RightStack->AddSlot().AutoHeight()
-        [
-            MenuValueColumn(FText::FromString(FString::Printf(TEXT("i%d"), Item.ItemLevel)),
-                EquipRightColumn, BreakerUI::TypeCaption, Primary)
-        ];
-        if (Item.Rarity == EBreakerItemRarity::Aberrant || Item.Rarity == EBreakerItemRarity::Anomalous)
-        {
-            RightStack->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
-            [
-                MenuValueColumn(FText::FromString(RarityName(Item.Rarity)),
-                    EquipRightColumn, BreakerUI::TypeCaption, RarityColor(Item.Rarity))
-            ];
-        }
-
         // The doomed-piece outline. It sits OUTSIDE the card's own ring so the
         // rarity ring is never overwritten, and it rests on the screen field
         // colour, which reads as nothing until a hovered backpack card names
@@ -4666,22 +4673,35 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                         [
                             // Rarity on the rail and the NAME ONLY. The face
                             // stays panel/10 at every tier. Wrapped at the room
-                            // left after the icon square, the right stack and
+                            // left after the icon square and
                             // the plate's own chrome — "BODY ARMOUR" at H2 is
                             // wider than it looks.
                             MenuWrappedText(FText::FromString(ItemDisplayName(Item)), BreakerUI::TypeH2,
                                 RarityColor(Item.Rarity),
-                                FMath::Max(80.0f, EquipmentColumnWidth - BreakerUI::MinHitTarget - EquipRightColumn
+                                FMath::Max(80.0f, EquipmentColumnWidth - BreakerUI::MinHitTarget
                                     - BreakerInventoryLayout::CardChrome - BreakerUI::Space16), true)
                         ]
+                        + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+                        [
+                            MenuWrappedText(FText::FromString(FString::Printf(TEXT("i%d · %s"), Item.ItemLevel,
+                                *RarityName(Item.Rarity))), BreakerUI::TypeCaption, RarityTagColor(Item.Rarity),
+                                FMath::Max(80.0f, EquipmentColumnWidth - BreakerUI::MinHitTarget
+                                    - BreakerInventoryLayout::CardChrome - BreakerUI::Space16))
+                        ]
+                        + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+                        [
+                            MakeWeaponBaseDamageLine(Item, Character.IsValid() ? Character->GetWeapon() : nullptr,
+                                FMath::Max(80.0f, EquipmentColumnWidth - BreakerUI::MinHitTarget
+                                    - BreakerInventoryLayout::CardChrome - BreakerUI::Space16))
+                        ]
                     ]
-                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[RightStack]
+
                 ],
                 Item.Rarity, true)
             ];
 
         EquipSlotOutlines.Add(Slot, Outline);
-        return SNew(SBox).HeightOverride(BreakerInventoryLayout::EquipRowHeight + 2.0f * BreakerUI::BorderSelected)[Outline];
+        return SNew(SBox).MinDesiredHeight(BreakerInventoryLayout::EquipRowHeight + 2.0f * BreakerUI::BorderSelected)[Outline];
     };
 
     // ---- Character column, 560 wide (reference, ZONES) --------------------
@@ -5059,6 +5079,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                                             RarityTagColor(Item.Rarity),
                                             BreakerInventoryLayout::CardContentWidth(BackpackCardWidth) - 5.0f * 8.0f - 4.0f * 2.0f - BreakerUI::Space8, true)
                                     ]
+                                ]
+                                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+                                [
+                                    MakeWeaponBaseDamageLine(Item, Character.IsValid() ? Character->GetWeapon() : nullptr,
+                                        BreakerInventoryLayout::CardContentWidth(BackpackCardWidth))
                                 ]
                                 + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
                                 [

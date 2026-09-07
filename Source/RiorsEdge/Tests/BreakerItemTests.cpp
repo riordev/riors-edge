@@ -287,7 +287,7 @@ bool FBreakerLootRollTest::RunTest(const FString& Parameters)
     {
         const FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(TEXT("Test"), EBreakerEquipSlot::Boots, EBreakerItemRarity::Exceptional, 30, Seed);
         TestTrue(TEXT("Item is valid"), Item.IsValid());
-        TestTrue(TEXT("Affix count within Exceptional range"), Item.Affixes.Num() >= 3 && Item.Affixes.Num() <= 5);
+        TestTrue(TEXT("Affix count within Exceptional range"), Item.Affixes.Num() >= 4 && Item.Affixes.Num() <= 6);
         TestTrue(TEXT("Prefix cap holds"), UBreakerLootLibrary::CountAffixesOfCategory(Item, EBreakerAffixCategory::Prefix) <= 4);
         TestTrue(TEXT("Suffix cap holds"), UBreakerLootLibrary::CountAffixesOfCategory(Item, EBreakerAffixCategory::Suffix) <= 4);
 
@@ -340,12 +340,68 @@ bool FBreakerLootRollTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Weapon Damage can roll on an allowed slot"), bRolledOnPrimary);
     }
 
-    // Standard items must stay fodder: 1-2 affixes, tiers no better than T3.
+    // New Standard rolls carry more lines while retaining the T4 rarity cap.
     const FBreakerItemInstance White = UBreakerLootLibrary::RollItem(TEXT("Test"), EBreakerEquipSlot::Helmet, EBreakerItemRarity::Standard, 50, 7);
-    TestTrue(TEXT("Standard affix count"), White.Affixes.Num() >= 1 && White.Affixes.Num() <= 2);
+    TestTrue(TEXT("Standard affix count"), White.Affixes.Num() >= 3 && White.Affixes.Num() <= 4);
     for (const FBreakerRolledAffix& Affix : White.Affixes)
     {
-        TestTrue(TEXT("Standard tier cap"), Affix.Tier >= 3);
+        TestTrue(TEXT("Standard tier cap"), Affix.Tier >= 4);
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerCommonRarityRollCoverageTest,
+    "RiorsEdge.Items.Loot.CommonRaritySlotCoverage",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerCommonRarityRollCoverageTest::RunTest(const FString& Parameters)
+{
+    struct FExpected { EBreakerItemRarity Rarity; int32 Minimum; int32 Maximum; int32 Cap; };
+    const FExpected Expectations[] = {
+        { EBreakerItemRarity::Standard, 3, 4, 4 },
+        { EBreakerItemRarity::Uncommon, 4, 5, 2 },
+        { EBreakerItemRarity::Exceptional, 4, 6, -1 }
+    };
+    TestEqual(TEXT("Coverage includes all eight shipped equipment slots"), static_cast<int32>(EBreakerEquipSlot::Count), 8);
+    for (const FExpected& Expected : Expectations)
+    {
+        TestEqual(TEXT("Rarity retains its tier ceiling"), UBreakerAffixLibrary::TierCapForRarity(Expected.Rarity), Expected.Cap);
+        for (int32 SlotIndex = 0; SlotIndex < static_cast<int32>(EBreakerEquipSlot::Count); ++SlotIndex)
+        {
+            const EBreakerEquipSlot Slot = static_cast<EBreakerEquipSlot>(SlotIndex);
+            int32 Smallest = MAX_int32, Largest = 0;
+            for (const int32 Level : { 1, 30, 120 })
+                for (int32 Seed = 0; Seed < 64; ++Seed)
+                {
+                    const FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(TEXT("Coverage"), Slot, Expected.Rarity, Level, Seed);
+                    const FString Case = FString::Printf(TEXT("slot%d rarity%d ilvl%d seed%d"), SlotIndex,
+                        static_cast<int32>(Expected.Rarity), Level, Seed);
+                    TestTrue(*(Case + TEXT(" has the requested affix count")),
+                        Item.Affixes.Num() >= Expected.Minimum && Item.Affixes.Num() <= Expected.Maximum);
+                    Smallest = FMath::Min(Smallest, Item.Affixes.Num());
+                    Largest = FMath::Max(Largest, Item.Affixes.Num());
+                    TestTrue(*(Case + TEXT(" respects four prefixes")),
+                        UBreakerLootLibrary::CountAffixesOfCategory(Item, EBreakerAffixCategory::Prefix) <= 4);
+                    TestTrue(*(Case + TEXT(" respects four suffixes")),
+                        UBreakerLootLibrary::CountAffixesOfCategory(Item, EBreakerAffixCategory::Suffix) <= 4);
+                    TSet<FName> Seen;
+                    const int32 BestTier = FMath::Max(Expected.Cap, UBreakerAffixLibrary::BestTierForItemLevel(Level));
+                    for (const FBreakerRolledAffix& Affix : Item.Affixes)
+                    {
+                        TestFalse(*(Case + TEXT(" has no duplicate affix")), Seen.Contains(Affix.AffixId));
+                        Seen.Add(Affix.AffixId);
+                        TestTrue(*(Case + TEXT(" respects item level and rarity tier gates")),
+                            Affix.Tier >= BestTier && Affix.Tier <= UBreakerAffixLibrary::WorstTier);
+                        const FBreakerAffixDefinition* Definition = UBreakerAffixLibrary::FindAffix(
+                            UBreakerAffixLibrary::GetSliceAffixPool(), Affix.AffixId);
+                        if (TestNotNull(*(Case + TEXT(" resolves authored affix")), Definition))
+                            TestTrue(*(Case + TEXT(" uses slot-legal affix")), Definition->AllowsSlot(Slot));
+                    }
+                }
+            TestEqual(TEXT("Every slot can roll the rarity minimum"), Smallest, Expected.Minimum);
+            TestEqual(TEXT("Every slot can fill the rarity maximum"), Largest, Expected.Maximum);
+        }
     }
     return true;
 }

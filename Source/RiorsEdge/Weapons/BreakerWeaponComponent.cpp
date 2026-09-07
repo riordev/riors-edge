@@ -684,6 +684,30 @@ float UBreakerWeaponComponent::GetScaledBaseDamage() const
     return FBreakerWeaponMath::WeaponBaseDamage(Definition->Damage, GetEquippedItemLevel(), ItemLevelDamageGrowth);
 }
 
+FBreakerWeaponBaseDamagePreview UBreakerWeaponComponent::GetItemBaseDamagePreview(const FBreakerItemInstance& Item) const
+{
+    FBreakerWeaponBaseDamagePreview Preview;
+    if (!Item.IsValid() || !Item.IsWeapon()
+        || static_cast<uint8>(Item.WeaponArchetype) >= static_cast<uint8>(EBreakerWeaponArchetype::Count))
+    {
+        return Preview;
+    }
+
+    const UBreakerWeaponDefinition* Definition = GetPrototypeDefinition(Item.WeaponArchetype);
+    const AActor* Owner = GetOwner();
+    const UBreakerEquipmentComponent* Equipment = Owner ? Owner->FindComponentByClass<UBreakerEquipmentComponent>() : nullptr;
+    FBreakerItemInstance HeldItem;
+    const EBreakerEquipSlot HeldSlot = CurrentSlot == 2 ? EBreakerEquipSlot::Secondary : EBreakerEquipSlot::Primary;
+    if (WeaponDefinition && Equipment && Equipment->GetEquippedItem(HeldSlot, HeldItem)
+        && HeldItem.ItemId == Item.ItemId && Item.WeaponArchetype == CurrentArchetype)
+    {
+        Definition = ResolveDefinition();
+    }
+    Preview.DamagePerProjectile = FBreakerWeaponMath::WeaponBaseDamage(Definition->Damage, Item.ItemLevel, ItemLevelDamageGrowth);
+    Preview.ProjectileCount = FMath::Max(1, Definition->PelletsPerShot);
+    return Preview;
+}
+
 float UBreakerWeaponComponent::GetScaledFullBlastDamage() const
 {
     // Per-pellet scaled base times the pellet count — see the declaration for

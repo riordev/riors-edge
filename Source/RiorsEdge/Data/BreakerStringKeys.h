@@ -97,7 +97,9 @@
     BREAKER_STRING(SettingsAudioDescription, "settings.audio.description", "") \
     BREAKER_STRING(SettingsAudioTest, "settings.audio.test", "") \
     BREAKER_STRING(SettingsAudioMusicUnavailable, "settings.audio.musicUnavailable", "") \
-    BREAKER_STRING(CoreOverviewHint, "core.overviewHint", "")
+    BREAKER_STRING(CoreOverviewHint, "core.overviewHint", "") \
+    BREAKER_STRING(WeaponBaseDamage, "equipment.weaponBaseDamage", "%.1f") \
+    BREAKER_STRING(WeaponBasePellets, "equipment.weaponBasePellets", "%.1f%d")
 
 // The enumerator is an index into the loaded table and nothing else: it is
 // never serialized, so the list may be reordered freely. The key string is

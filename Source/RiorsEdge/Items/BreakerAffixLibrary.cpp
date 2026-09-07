@@ -81,9 +81,9 @@ void UBreakerAffixLibrary::AffixCountRangeForRarity(EBreakerItemRarity Rarity, i
 {
     switch (Rarity)
     {
-    case EBreakerItemRarity::Standard:    OutMinimum = 1; OutMaximum = 2; break;
-    case EBreakerItemRarity::Uncommon:    OutMinimum = 2; OutMaximum = 3; break;
-    case EBreakerItemRarity::Exceptional: OutMinimum = 3; OutMaximum = 5; break;
+    case EBreakerItemRarity::Standard:    OutMinimum = 3; OutMaximum = 4; break;
+    case EBreakerItemRarity::Uncommon:    OutMinimum = 4; OutMaximum = 5; break;
+    case EBreakerItemRarity::Exceptional: OutMinimum = 4; OutMaximum = 6; break;
     case EBreakerItemRarity::Aberrant:    OutMinimum = 4; OutMaximum = 6; break;
     case EBreakerItemRarity::Anomalous:   OutMinimum = 5; OutMaximum = 6; break;
     default:                              OutMinimum = 1; OutMaximum = 1; break;

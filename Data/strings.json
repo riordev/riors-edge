@@ -76,6 +76,8 @@
 		"settings.audio.description": "Master and effects control combat sounds. Music is not available yet.",
 		"settings.audio.test": "TEST SOUND",
 		"settings.audio.musicUnavailable": "Music is not available yet.",
-        "core.overviewHint": "SELECT A CONSTELLATION TO VIEW AND SPEND POINTS · WHEEL ZOOM · DRAG PAN · ESC BACK"
+        "core.overviewHint": "SELECT A CONSTELLATION TO VIEW AND SPEND POINTS · WHEEL ZOOM · DRAG PAN · ESC BACK",
+        "equipment.weaponBaseDamage": "BASE DAMAGE  %.1f",
+        "equipment.weaponBasePellets": "BASE DAMAGE  %.1f × %d PELLETS"
 	}
 }
