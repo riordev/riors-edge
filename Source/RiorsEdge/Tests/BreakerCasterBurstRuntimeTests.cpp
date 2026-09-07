@@ -150,7 +150,11 @@ bool FBreakerCasterBurstRuntimeTest::RunTest(const FString& Parameters)
         };
         // A declared five-presses/s input cadence, not a new ability cooldown.
         // The actual resource/cooldown gates decide how many casts are accepted.
-        for (int32 Step = 0; Step < 200; ++Step)
+        float SliceHealth = StartingHealth;
+        int32 SliceCasts = 0, SliceRounds = 0;
+        float OpeningDamage = 0;
+        int32 OpeningCasts = 0;
+        for (int32 Step = 0; Step < 1200; ++Step)
         {
             Aim();
             if (bFracture && Step % 4 == 0 && ASC->TryActivateAbility(Fracture)) ++PaidCasts;
@@ -171,6 +175,17 @@ bool FBreakerCasterBurstRuntimeTest::RunTest(const FString& Parameters)
                 bWasReloading = bReloading;
             }
             if (FirstDeath < 0 && EnemyAttributes->GetHealth() <= 0) FirstDeath = (Step + 1) * .05f;
+            if ((Step + 1) % 200 == 0)
+            {
+                const float Damage = SliceHealth - EnemyAttributes->GetHealth();
+                const int32 UsedRounds = StartingAmmo - Weapon->GetMagazineAmmo() - Weapon->GetReserveAmmo();
+                AddInfo(FString::Printf(TEXT("CASTER SUSTAIN %s seconds%d-%d damage%.3f dps%.3f casts%d rounds%d mana%.2f ammo%d dead%d"),
+                    *Label, (Step + 1) / 20 - 10, (Step + 1) / 20, Damage, Damage / 10,
+                    PaidCasts - SliceCasts, UsedRounds - SliceRounds, Mana->GetMana(),
+                    Weapon->GetMagazineAmmo() + Weapon->GetReserveAmmo(), EnemyAttributes->GetHealth() <= 0));
+                if (Step == 199) { OpeningDamage = Damage; OpeningCasts = PaidCasts; }
+                SliceHealth = EnemyAttributes->GetHealth(); SliceCasts = PaidCasts; SliceRounds = UsedRounds;
+            }
         }
         Weapon->StopFire();
         const float WindowDamage = StartingHealth - EnemyAttributes->GetHealth();
@@ -182,6 +197,7 @@ bool FBreakerCasterBurstRuntimeTest::RunTest(const FString& Parameters)
         if (bFracture)
         {
             TestTrue(*(Label + TEXT(" real resource gates permit paid casts")), PaidCasts > 0);
+            TestTrue(*(Label + TEXT(" natural Mana recovery supports casts after the opening bank")), PaidCasts > OpeningCasts);
             TestTrue(*(Label + TEXT(" paid casts create actual traveling projectiles")), ProjectileSpawns > 0);
             TestEqual(*(Label + TEXT(" spell row does not spend rifle ammo")), Rounds, 0);
         }
@@ -195,8 +211,8 @@ bool FBreakerCasterBurstRuntimeTest::RunTest(const FString& Parameters)
             TestTrue(*(Label + TEXT(" actual zone releases its leases")), CastZone->IsReleased());
             TestTrue(*(Label + TEXT(" actual zone is destroyed after its final tick")), CastZone->IsActorBeingDestroyed());
         }
-        AddInfo(FString::Printf(TEXT("CASTER BURST %s hp%.3f 10sDamage%.3f tail5s%.3f casts%d projectiles%d rounds%d reloads%d rotTicks%d mana%.2f->%.2f firstDeath%.2f; full initial bank, stationary aimed target, no sustained/parity claim"),
-            *Label, StartingHealth, WindowDamage, TailDamage, PaidCasts, ProjectileSpawns, Rounds, Reloads, RotTicks, StartingMana, EndingMana, FirstDeath));
+        AddInfo(FString::Printf(TEXT("CASTER DELIVERY %s hp%.3f opening10s%.3f total60s%.3f tail5s%.3f casts%d projectiles%d rounds%d reloads%d rotTicks%d mana%.2f->%.2f firstDeath%.2f; one initial bank/ammo supply, stationary neutral target, no build-parity claim"),
+            *Label, StartingHealth, OpeningDamage, WindowDamage, TailDamage, PaidCasts, ProjectileSpawns, Rounds, Reloads, RotTicks, StartingMana, EndingMana, FirstDeath));
         ASC->CancelAllAbilities();
         for (const auto& Held : Projectiles) if (auto* Projectile = Held.Get()) Projectile->Destroy();
         Enemy->Destroy(); Controller->UnPossess(); Controller->Destroy(); Player->Destroy();

@@ -96,10 +96,11 @@ bool FBreakerManaMeleeRuntimeTest::RunTest(const FString& Parameters)
     // only that event. The melee listener cannot pay per bullet/pellet too.
     FBreakerDamageRequest Bullet = Melee;
     Bullet.SourceTags.Reset();
-    TargetCombat->ReceiveDamage(Bullet);
+    const FBreakerDamageResult BulletResult = TargetCombat->ReceiveDamage(Bullet);
     FBreakerShotResult Shot;
     Shot.bFired = true;
     Shot.bHit = true;
+    Shot.DamageResult = BulletResult;
     Weapon->OnShot.Broadcast(Shot);
     Mana->AdvanceLoop(1);
     TestEqual(TEXT("Weapon retains one normalized shot credit"), Mana->GetMana() - Before, Mana->WeaponHitGain);

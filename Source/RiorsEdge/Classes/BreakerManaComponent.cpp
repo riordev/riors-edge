@@ -509,7 +509,11 @@ void UBreakerManaComponent::HandleShot(const FBreakerShotResult& Shot)
     if (Shot.bFired && GetOwner() && GetOwner()->HasAuthority()) SecondsSinceWeaponFire = 0.0f;
     // Landed hits only: a fired-and-missed shot banks nothing, and DoT ticks
     // never arrive here at all (they carry proc coefficient 0 by rule).
-    if (!Shot.bFired || !Shot.bHit || Shot.DamageResult.bDodged || !GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || IsInSafeZone()) return;
+    if (!Shot.bFired || !Shot.bHit || Shot.DamageResult.bDodged
+        || Shot.DamageResult.HealthDamage + Shot.DamageResult.ShieldDamage <= 0.0f
+        || !GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || IsInSafeZone()) return;
+    // bHit includes world geometry. Use the volley's actual damage, not its
+    // last HitActor: a later pellet may touch a wall after another paid damage.
     // Unmake suspends generation outright (Class-Kits §2.2).
     if (IsGenerationSuspended()) return;
 
