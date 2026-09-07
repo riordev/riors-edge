@@ -43,6 +43,21 @@ float UBreakerGameSettingsLibrary::ClampVolume(float Value)
     return FMath::Clamp(Value, 0.0f, 1.0f);
 }
 
+float UBreakerGameSettingsLibrary::ClampViewBobScale(float Value)
+{
+    return FMath::Clamp(Value, 0.0f, 1.0f);
+}
+
+float UBreakerGameSettingsLibrary::ClampScreenShakeScale(float Value)
+{
+    return FMath::Clamp(Value, 0.0f, 1.0f);
+}
+
+float UBreakerGameSettingsLibrary::ClampDamageNumberScale(float Value)
+{
+    return FMath::Clamp(Value, 0.5f, 2.0f);
+}
+
 FKey UBreakerGameSettingsLibrary::ResolveActionKey(FName Action, const TMap<FName, FKey>& Overrides, const TMap<FName, FKey>& Defaults)
 {
     if (const FKey* Override = Overrides.Find(Action))
@@ -383,6 +398,12 @@ namespace BreakerGameSettingsIni
     // above and nothing else) is never mistaken for a full settings block.
     static const TCHAR* Section = TEXT("RiorsEdge.Settings");
     static const TCHAR* ScopedSensitivityKey = TEXT("ScopedSensitivityMultiplier");
+    static const TCHAR* SprintToggleKey = TEXT("SprintToggle");
+    static const TCHAR* AimToggleKey = TEXT("AimToggle");
+    static const TCHAR* ViewBobScaleKey = TEXT("ViewBobScale");
+    static const TCHAR* ScreenShakeScaleKey = TEXT("ScreenShakeScale");
+    static const TCHAR* DamageNumberScaleKey = TEXT("DamageNumberScale");
+    static const TCHAR* LargerNameplatesKey = TEXT("LargerNameplates");
     static const TCHAR* WindowModeKey = TEXT("WindowMode");
     static const TCHAR* FrameRateCapKey = TEXT("FrameRateCapFPS");
     static const TCHAR* VSyncKey = TEXT("VSyncEnabled");
@@ -423,6 +444,30 @@ void UBreakerGameSettings::LoadOrDefaults()
     float LoadedScoped = ScopedSensitivityMultiplier;
     GConfig->GetFloat(Section, ScopedSensitivityKey, LoadedScoped, GGameUserSettingsIni);
     ScopedSensitivityMultiplier = UBreakerGameSettingsLibrary::ClampScopedSensitivityMultiplier(LoadedScoped);
+
+    bool LoadedSprintToggle = bSprintToggle;
+    GConfig->GetBool(Section, SprintToggleKey, LoadedSprintToggle, GGameUserSettingsIni);
+    bSprintToggle = LoadedSprintToggle;
+
+    bool LoadedAimToggle = bAimToggle;
+    GConfig->GetBool(Section, AimToggleKey, LoadedAimToggle, GGameUserSettingsIni);
+    bAimToggle = LoadedAimToggle;
+
+    float LoadedViewBob = ViewBobScale;
+    GConfig->GetFloat(Section, ViewBobScaleKey, LoadedViewBob, GGameUserSettingsIni);
+    ViewBobScale = UBreakerGameSettingsLibrary::ClampViewBobScale(LoadedViewBob);
+
+    float LoadedShake = ScreenShakeScale;
+    GConfig->GetFloat(Section, ScreenShakeScaleKey, LoadedShake, GGameUserSettingsIni);
+    ScreenShakeScale = UBreakerGameSettingsLibrary::ClampScreenShakeScale(LoadedShake);
+
+    float LoadedDamageNumbers = DamageNumberScale;
+    GConfig->GetFloat(Section, DamageNumberScaleKey, LoadedDamageNumbers, GGameUserSettingsIni);
+    DamageNumberScale = UBreakerGameSettingsLibrary::ClampDamageNumberScale(LoadedDamageNumbers);
+
+    bool LoadedLargerNameplates = bLargerNameplates;
+    GConfig->GetBool(Section, LargerNameplatesKey, LoadedLargerNameplates, GGameUserSettingsIni);
+    bLargerNameplates = LoadedLargerNameplates;
 
     int32 LoadedWindowMode = static_cast<int32>(WindowMode);
     GConfig->GetInt(Section, WindowModeKey, LoadedWindowMode, GGameUserSettingsIni);
@@ -476,6 +521,12 @@ void UBreakerGameSettings::Save() const
     GConfig->SetBool(LegacySection, LegacyInvertKey, bInvertVerticalLook, GGameUserSettingsIni);
 
     GConfig->SetFloat(Section, ScopedSensitivityKey, ScopedSensitivityMultiplier, GGameUserSettingsIni);
+    GConfig->SetBool(Section, SprintToggleKey, bSprintToggle, GGameUserSettingsIni);
+    GConfig->SetBool(Section, AimToggleKey, bAimToggle, GGameUserSettingsIni);
+    GConfig->SetFloat(Section, ViewBobScaleKey, ViewBobScale, GGameUserSettingsIni);
+    GConfig->SetFloat(Section, ScreenShakeScaleKey, ScreenShakeScale, GGameUserSettingsIni);
+    GConfig->SetFloat(Section, DamageNumberScaleKey, DamageNumberScale, GGameUserSettingsIni);
+    GConfig->SetBool(Section, LargerNameplatesKey, bLargerNameplates, GGameUserSettingsIni);
     GConfig->SetInt(Section, WindowModeKey, static_cast<int32>(WindowMode), GGameUserSettingsIni);
     GConfig->SetFloat(Section, FrameRateCapKey, FrameRateCapFPS, GGameUserSettingsIni);
     GConfig->SetBool(Section, VSyncKey, bVSyncEnabled, GGameUserSettingsIni);

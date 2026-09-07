@@ -8,6 +8,30 @@
 #include "Weapons/BreakerWeaponComponent.h"
 #include "BreakerSaveGame.generated.h"
 
+// THE PLAYER'S BODY (O14): both models are real and a character picks one at
+// creation. Serialized BY VALUE in the character save, so this enum is
+// APPEND-ONLY FOREVER — rename is safe; insert, reorder or reuse a value and
+// every existing character silently wears the wrong body. Human = 0, Effigy
+// = 1 are pinned by the appearance round-trip test.
+UENUM(BlueprintType)
+enum class EBreakerPlayerModel : uint8
+{
+    Human,
+    Effigy
+};
+
+// THE PLAYER'S VOICE. Same append-only rule as the model. The three-word
+// vocabulary is O2 PLACEHOLDER until a voice line exists to be heard; Mid is
+// the default because it is the one a migrated character never chose.
+// Low = 0, Mid = 1, Dry = 2, pinned by the same test.
+UENUM(BlueprintType)
+enum class EBreakerPlayerVoice : uint8
+{
+    Low,
+    Mid,
+    Dry
+};
+
 // Everything a character carries between sessions. Stable ids and rolled
 // numbers only — never pointers or calculated attribute totals.
 UCLASS()
@@ -52,6 +76,17 @@ public:
     // Additive since version 7: an unset guid is a pre-v8 file. Invalid on
     // the legacy single slot, which has no roster row.
     UPROPERTY() FGuid CharacterId;
+    // APPEARANCE (O14): the model, the voice and which of the five face
+    // tiles the character wears. Chosen once at creation; never derived.
+    // Additive since version 8: a v8 file has none of the three properties,
+    // so it deserializes to Human / Mid / tile 0, which is the body every
+    // pre-v9 character was drawn with. FaceIndex is 0..4 — five tiles, the
+    // count O2 PLACEHOLDER until the tiles are drawn; nothing here clamps
+    // it, because the creation screen is the only writer and the save
+    // records what it was handed.
+    UPROPERTY() EBreakerPlayerModel Model = EBreakerPlayerModel::Human;
+    UPROPERTY() EBreakerPlayerVoice Voice = EBreakerPlayerVoice::Mid;
+    UPROPERTY() uint8 FaceIndex = 0;
     // Version 1 shipped. Version 2 renamed the first-contract flag into the
     // Quest.FirstContract.* family and added QuestCounters. Version 3 added
     // ForgeWallet. Version 4 collapsed the wallet's three denominations into
@@ -68,8 +103,9 @@ public:
     // retroactively for abilities it already has. Version 8 added the fold
     // receipt and the character id, both additive; the Riftglass fold itself
     // is NOT a migration step, because it writes two files and a pure
-    // in-memory step cannot — see Save/BreakerRiftglassFold.h.
-    static constexpr int32 CurrentSaveVersion = 8;
+    // in-memory step cannot — see Save/BreakerRiftglassFold.h. Version 9
+    // added Model, Voice and FaceIndex, additive.
+    static constexpr int32 CurrentSaveVersion = 9;
 
     UPROPERTY() int32 SaveVersion = 1;
 

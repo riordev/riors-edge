@@ -90,7 +90,8 @@ bool UBreakerCharacterRoster::IsAcceptableCharacterName(const FString& Name, FTe
     return true;
 }
 
-FGuid UBreakerCharacterRoster::CreateCharacter(const FString& CharacterName, EBreakerClassId ClassId, FText& OutFailureReason)
+FGuid UBreakerCharacterRoster::CreateCharacter(const FString& CharacterName, EBreakerClassId ClassId, FText& OutFailureReason,
+    EBreakerPlayerModel Model, EBreakerPlayerVoice Voice, uint8 FaceIndex)
 {
     if (IsFull())
     {
@@ -140,6 +141,11 @@ FGuid UBreakerCharacterRoster::CreateCharacter(const FString& CharacterName, EBr
     // stamping it here keeps the fold from ever journaling a zero for it.
     Save->bRiftglassFoldedToAccount = true;
     Save->CharacterId = Summary.CharacterId;
+    // The body, chosen once (O14). Stamped as handed; not clamped, because
+    // the creation screen is the only writer and the save records the choice.
+    Save->Model = Model;
+    Save->Voice = Voice;
+    Save->FaceIndex = FaceIndex;
     if (!UGameplayStatics::SaveGameToSlot(Save, SlotNameForCharacter(Summary.CharacterId), 0))
     {
         OutFailureReason = LOCTEXT("SaveWriteFailed", "The character's save could not be written.");
@@ -255,6 +261,9 @@ FGuid UBreakerCharacterRoster::AdoptLegacySaveIfPresent()
     // can credit a pre-roster balance twice.
     Copy->bRiftglassFoldedToAccount = Legacy->bRiftglassFoldedToAccount;
     Copy->CharacterId = Summary.CharacterId;
+    Copy->Model = Legacy->Model;
+    Copy->Voice = Legacy->Voice;
+    Copy->FaceIndex = Legacy->FaceIndex;
     if (!UGameplayStatics::SaveGameToSlot(Copy, SlotNameForCharacter(Summary.CharacterId), 0)) return FGuid();
 
     Characters.Add(Summary);

@@ -125,4 +125,72 @@ bool FBreakerSaveWalletMigrationTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// APPEARANCE (O14): the model, voice and face tile a character picks at
+// creation ride the character save. Both the round trip through the real
+// serializer and the additive v8 -> v9 step, plus the value pins that make
+// the two enums append-only in fact and not only in a comment.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerSaveAppearanceRoundTripTest,
+    "RiorsEdge.Save.AppearanceRoundTrip",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerSaveAppearanceRoundTripTest::RunTest(const FString& Parameters)
+{
+    // The serialized values are the contract. A reorder or an insert moves
+    // these and every existing character wears the wrong body.
+    TestEqual(TEXT("Human is 0"), static_cast<int32>(EBreakerPlayerModel::Human), 0);
+    TestEqual(TEXT("Effigy is 1"), static_cast<int32>(EBreakerPlayerModel::Effigy), 1);
+    TestEqual(TEXT("Low is 0"), static_cast<int32>(EBreakerPlayerVoice::Low), 0);
+    TestEqual(TEXT("Mid is 1"), static_cast<int32>(EBreakerPlayerVoice::Mid), 1);
+    TestEqual(TEXT("Dry is 2"), static_cast<int32>(EBreakerPlayerVoice::Dry), 2);
+
+    // A fresh save wears the body every pre-v9 character was drawn with.
+    UBreakerSaveGame* Written = Cast<UBreakerSaveGame>(UGameplayStatics::CreateSaveGameObject(UBreakerSaveGame::StaticClass()));
+    if (!Written) { AddError(TEXT("Could not create a save object")); return false; }
+    TestEqual(TEXT("A default save is Human"), static_cast<int32>(Written->Model), static_cast<int32>(EBreakerPlayerModel::Human));
+    TestEqual(TEXT("A default save is Mid"), static_cast<int32>(Written->Voice), static_cast<int32>(EBreakerPlayerVoice::Mid));
+    TestEqual(TEXT("A default save wears tile 0"), static_cast<int32>(Written->FaceIndex), 0);
+
+    // The non-default choice survives the real UPROPERTY serializer, in
+    // memory so the suite never touches a player's slot.
+    Written->SaveVersion = UBreakerSaveGame::CurrentSaveVersion;
+    Written->Model = EBreakerPlayerModel::Effigy;
+    Written->Voice = EBreakerPlayerVoice::Dry;
+    Written->FaceIndex = 4;
+    TArray<uint8> Bytes;
+    TestTrue(TEXT("Save serializes"), UGameplayStatics::SaveGameToMemory(Written, Bytes));
+    UBreakerSaveGame* Read = Cast<UBreakerSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes));
+    if (!Read) { AddError(TEXT("Save did not deserialize")); return false; }
+    TestEqual(TEXT("The model survives"), static_cast<int32>(Read->Model), static_cast<int32>(EBreakerPlayerModel::Effigy));
+    TestEqual(TEXT("The voice survives"), static_cast<int32>(Read->Voice), static_cast<int32>(EBreakerPlayerVoice::Dry));
+    TestEqual(TEXT("The face tile survives"), static_cast<int32>(Read->FaceIndex), 4);
+    TestEqual(TEXT("The version survives"), Read->SaveVersion, UBreakerSaveGame::CurrentSaveVersion);
+
+    // A v8 payload — the last shape written before the three fields existed
+    // — migrates to 9 wearing Human / Mid / 0, with everything it did carry
+    // untouched.
+    UBreakerSaveGame* Old = Cast<UBreakerSaveGame>(UGameplayStatics::CreateSaveGameObject(UBreakerSaveGame::StaticClass()));
+    if (!Old) { AddError(TEXT("Could not create a save object")); return false; }
+    Old->SaveVersion = 8;
+    Old->bRiftglassFoldedToAccount = true;
+    Old->CharacterId = FGuid::NewGuid();
+    const FGuid OldId = Old->CharacterId;
+    FString Note;
+    TestTrue(TEXT("A v8 save loads"), UBreakerSaveGame::MigrateToCurrent(*Old, Note));
+    TestEqual(TEXT("It is now version 9"), Old->SaveVersion, 9);
+    TestEqual(TEXT("It arrives at the head version"), Old->SaveVersion, UBreakerSaveGame::CurrentSaveVersion);
+    TestFalse(TEXT("The migration reports itself"), Note.IsEmpty());
+    TestEqual(TEXT("A migrated v8 character is Human"), static_cast<int32>(Old->Model), static_cast<int32>(EBreakerPlayerModel::Human));
+    TestEqual(TEXT("A migrated v8 character is Mid"), static_cast<int32>(Old->Voice), static_cast<int32>(EBreakerPlayerVoice::Mid));
+    TestEqual(TEXT("A migrated v8 character wears tile 0"), static_cast<int32>(Old->FaceIndex), 0);
+    TestTrue(TEXT("The fold receipt is untouched"), Old->bRiftglassFoldedToAccount);
+    TestTrue(TEXT("The character id is untouched"), Old->CharacterId == OldId);
+
+    // Idempotent at the head: a second pass changes nothing.
+    FString SecondNote;
+    TestTrue(TEXT("A current save loads"), UBreakerSaveGame::MigrateToCurrent(*Old, SecondNote));
+    TestTrue(TEXT("A current save reports no migration"), SecondNote.IsEmpty());
+    return true;
+}
+
 #endif

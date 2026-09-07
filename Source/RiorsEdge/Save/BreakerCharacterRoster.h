@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "GameFramework/SaveGame.h"
 #include "Progression/BreakerProgressionTypes.h"
+// The appearance enums CreateCharacter stamps (EBreakerPlayerModel/Voice).
+#include "Save/BreakerSaveGame.h"
 #include "BreakerCharacterRoster.generated.h"
 
 // ---------------------------------------------------------------------------
@@ -91,8 +93,15 @@ public:
     // GUID and a reason if it cannot — full roster, blank name, or a class
     // with no implemented kit (O39: locking into a kitless class is a trap,
     // and the same rule is enforced at the progression component).
+    // Model, Voice and FaceIndex (O14) are stamped onto the new save as
+    // handed; the creation screen is the writer that offers the choice.
+    // Defaulted so a caller that predates the choice still creates the body
+    // every character had before it existed.
     UFUNCTION(BlueprintCallable, Category="Save|Roster")
-    FGuid CreateCharacter(const FString& CharacterName, EBreakerClassId ClassId, FText& OutFailureReason);
+    FGuid CreateCharacter(const FString& CharacterName, EBreakerClassId ClassId, FText& OutFailureReason,
+        EBreakerPlayerModel Model = EBreakerPlayerModel::Human,
+        EBreakerPlayerVoice Voice = EBreakerPlayerVoice::Mid,
+        uint8 FaceIndex = 0);
 
     // Deletes the character's save AND its roster row. Irreversible by design
     // — the confirm belongs in the UI, not here.

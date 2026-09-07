@@ -122,6 +122,12 @@ public:
     UFUNCTION(BlueprintPure, Category="UI") bool IsLookInverted() const { return bInvertLookY; }
     UFUNCTION(BlueprintPure, Category="UI") bool IsMenuOpen() const { return MenuWidget.IsValid(); }
     void ApplyMenuSettings(float NewSensitivity, float NewFOV, bool bNewInvertLookY);
+    // The profile's feel fields onto this pawn: scoped sensitivity, view bob,
+    // screen shake, and the sprint/aim hold-or-toggle modes. Called from the
+    // BeginPlay profile load; the settings screen calls it again when a
+    // slider moves so the change is felt without a respawn. The rules
+    // themselves are Characters/BreakerInputModeMath.h.
+    void ApplyProfileFeel(const class UBreakerGameSettings& Settings);
     void ResumeFromMenu();
     void ReturnToTitleMenu();
     void QuitFromMenu();
@@ -283,6 +289,12 @@ private:
     void TurnLegacy(float Value);
     void LookUpLegacy(float Value);
     void StartSprint();
+    void StopSprint();
+    // The one writer of the sprint state from input: both edges land here
+    // and BreakerInputMode::NextEngaged decides, under bSprintToggle.
+    void ApplySprintEdge(bool bPressed);
+    // Same shape for the sights, under bAimToggle.
+    void ApplyAimEdge(bool bPressed);
     void HandleDashInput();
     void HandleJumpInput();
     bool TryMantle();
@@ -489,6 +501,15 @@ private:
     UPROPERTY() TObjectPtr<UBreakerQuestJournal> Quests;
     float LookSensitivity = 1.0f;
     bool bInvertLookY = false;
+    // The profile's feel fields, copied by ApplyProfileFeel. Defaults match
+    // UBreakerGameSettings' own so a pawn that never loaded a profile (a
+    // capture run, a test) feels exactly as a fresh install does. All O2
+    // PLACEHOLDER, on the model.
+    float ScopedSensitivityMultiplier = 1.0f;
+    float ViewBobScale = 1.0f;
+    float ScreenShakeScale = 1.0f;
+    bool bSprintToggle = true;
+    bool bAimToggle = false;
     bool bShowingInitialMenu = false;
     TSharedPtr<SBreakerMenu> MenuWidget;
     FTimerHandle ShotCosmeticTimer;

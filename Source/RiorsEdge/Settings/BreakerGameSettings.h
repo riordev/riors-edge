@@ -84,6 +84,25 @@ public:
     UFUNCTION(BlueprintPure, Category = "Settings|Clamp")
     static float ClampVolume(float Value);
 
+    // O2 PLACEHOLDER range [0, 1]: 0 is off, 1 is the authored bob; a bob
+    // beyond authored is a feel nobody has asked for and a motion-sickness
+    // hazard the slider must not be able to reach.
+    UFUNCTION(BlueprintPure, Category = "Settings|Clamp")
+    static float ClampViewBobScale(float Value);
+
+    // O2 PLACEHOLDER range [0, 1]: 0 disables shake, 1 is the authored
+    // amplitude. The Breaker.Shake.Scale cvar (Characters/BreakerCharacter
+    // .cpp) is the DEV surface above this and reaches 4.0; the player's
+    // setting only ever attenuates.
+    UFUNCTION(BlueprintPure, Category = "Settings|Clamp")
+    static float ClampScreenShakeScale(float Value);
+
+    // O2 PLACEHOLDER range [0.5, 2.0]: half to double the authored damage
+    // number size. 0 would be an invisible number the player cannot find the
+    // slider for again.
+    UFUNCTION(BlueprintPure, Category = "Settings|Clamp")
+    static float ClampDamageNumberScale(float Value);
+
     // ---- Keybinds ----
 
     // An override wins; an action with no override falls through to its
@@ -244,6 +263,44 @@ public:
     // Characters/BreakerCharacter.h:280.
     UPROPERTY(BlueprintReadOnly, Category = "Input")
     bool bInvertVerticalLook = false;
+
+    // Sprint as a toggle (press to start, press again to stop) or a hold
+    // (engaged exactly while the key is down). The rule is
+    // BreakerInputMode::NextEngaged (Characters/BreakerInputModeMath.h).
+    // O2 PLACEHOLDER default: true is the behaviour the sprint key has
+    // always had — one press flips it.
+    UPROPERTY(BlueprintReadOnly, Category = "Input")
+    bool bSprintToggle = true;
+
+    // Aim down sights as a toggle or a hold, same rule as sprint.
+    // O2 PLACEHOLDER default: false is the behaviour the aim key has always
+    // had — held while the sights are up.
+    UPROPERTY(BlueprintReadOnly, Category = "Input")
+    bool bAimToggle = false;
+
+    // ---- Feel ----
+    // Scale on the viewmodel's walk/sprint bob (ABreakerCharacter's
+    // MotionScale). O2 PLACEHOLDER default: 1.0 is the authored bob.
+    UPROPERTY(BlueprintReadOnly, Category = "Feel")
+    float ViewBobScale = 1.0f;
+
+    // Scale on the fire/take-damage camera shake, multiplied UNDER the
+    // Breaker.Shake.Scale dev cvar. O2 PLACEHOLDER default: 1.0 is the
+    // authored amplitude.
+    UPROPERTY(BlueprintReadOnly, Category = "Feel")
+    float ScreenShakeScale = 1.0f;
+
+    // Scale on the HUD's floating damage numbers. Stored and clamped here;
+    // the HUD reads it when its rows are drawn. O2 PLACEHOLDER default.
+    UPROPERTY(BlueprintReadOnly, Category = "Feel")
+    float DamageNumberScale = 1.0f;
+
+    // Larger enemy nameplates, an accessibility switch rather than a
+    // slider: one authored step up, LargerNameplateScale, so the nameplate
+    // has exactly two sizes the design system can draw. O2 PLACEHOLDER.
+    UPROPERTY(BlueprintReadOnly, Category = "Feel")
+    bool bLargerNameplates = false;
+    static constexpr float LargerNameplateScale = 1.5f; // 07-menus
 
     // ---- Keybinds ----
     // Overrides layered over UBreakerInputConfig's (Input/BreakerInputConfig.h)

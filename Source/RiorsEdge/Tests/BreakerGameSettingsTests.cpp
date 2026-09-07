@@ -62,6 +62,18 @@ bool FBreakerGameSettingsClampTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Volume ceilings at 1"), UBreakerGameSettingsLibrary::ClampVolume(5.0f), 1.0f);
     TestEqual(TEXT("Volume mid-range passes through"), UBreakerGameSettingsLibrary::ClampVolume(0.5f), 0.5f);
 
+    // View bob and screen shake: [0, 1] — off to authored, never beyond.
+    TestEqual(TEXT("View bob floors at 0"), UBreakerGameSettingsLibrary::ClampViewBobScale(-1.0f), 0.0f);
+    TestEqual(TEXT("View bob ceilings at 1"), UBreakerGameSettingsLibrary::ClampViewBobScale(3.0f), 1.0f);
+    TestEqual(TEXT("Screen shake floors at 0"), UBreakerGameSettingsLibrary::ClampScreenShakeScale(-1.0f), 0.0f);
+    TestEqual(TEXT("Screen shake ceilings at 1"), UBreakerGameSettingsLibrary::ClampScreenShakeScale(4.0f), 1.0f);
+    TestEqual(TEXT("Screen shake mid-range passes through"), UBreakerGameSettingsLibrary::ClampScreenShakeScale(0.5f), 0.5f);
+
+    // Damage number scale: [0.5, 2.0] — never an invisible number.
+    TestEqual(TEXT("Damage numbers floor at 0.5"), UBreakerGameSettingsLibrary::ClampDamageNumberScale(0.0f), 0.5f);
+    TestEqual(TEXT("Damage numbers ceiling at 2.0"), UBreakerGameSettingsLibrary::ClampDamageNumberScale(9.0f), 2.0f);
+    TestEqual(TEXT("Damage numbers mid-range passes through"), UBreakerGameSettingsLibrary::ClampDamageNumberScale(1.0f), 1.0f);
+
     return true;
 }
 

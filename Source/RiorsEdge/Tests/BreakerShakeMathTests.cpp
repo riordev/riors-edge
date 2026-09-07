@@ -35,6 +35,17 @@ bool FBreakerShakeMathTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Yaw stays inside its ceiling"), FMath::Abs(Offset.Yaw) <= 0.4f + KINDA_SMALL_NUMBER);
         TestEqual(TEXT("Roll is never touched"), Offset.Roll, 0.0);
     }
+
+    // --- The profile's shake scale is a plain multiplier on trauma ----------
+    // ABreakerCharacter::UpdateCameraShake feeds ShakeTrauma * cvar * setting;
+    // a setting of 1.0 (the shipped default) must be byte-identical to the
+    // unscaled call, and 0 must be exactly zero offset — the setting turns
+    // shake off, it does not leave a residue.
+    const FRotator Unscaled = BreakerShake::ShakeOffset(0.6f, 2.5, 18.0f, 0.5f, 0.4f);
+    const FRotator Identity = BreakerShake::ShakeOffset(0.6f * 1.0f, 2.5, 18.0f, 0.5f, 0.4f);
+    TestEqual(TEXT("A shake scale of 1.0 is the unscaled shake"), Identity, Unscaled);
+    TestTrue(TEXT("A shake scale of 0 is exactly no shake"),
+        BreakerShake::ShakeOffset(0.6f * 0.0f, 2.5, 18.0f, 0.5f, 0.4f).IsZero());
     return true;
 }
 

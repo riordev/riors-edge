@@ -189,6 +189,11 @@ bool UBreakerSaveGame::MigrateToCurrent(UBreakerSaveGame& Save, FString& OutNote
             // The balance is deliberately LEFT IN ForgeWallet here — the
             // fold that moves it writes two files, and a pure step cannot.
             break;
+        case 8:
+            // Additive (O14): Model, Voice and FaceIndex deserialize to
+            // Human / Mid / 0 on a v8 file, and that is the body every
+            // pre-v9 character was drawn with. Nothing to transform.
+            break;
         default:
             // Unreachable while every version below CurrentSaveVersion has a
             // step. Left as a hard stop so ADDING a version without adding its

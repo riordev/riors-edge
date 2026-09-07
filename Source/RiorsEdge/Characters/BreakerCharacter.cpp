@@ -23,6 +23,7 @@
 #include "Camera/PlayerCameraManager.h"
 #include "Input/BreakerInputConfig.h"
 #include "Settings/BreakerGameSettings.h"
+#include "Characters/BreakerInputModeMath.h"
 #include "InputAction.h"
 #include "InputActionValue.h"
 #include "InputMappingContext.h"
@@ -221,8 +222,11 @@ void ABreakerCharacter::UpdateCameraShake(float DeltaSeconds)
     // the noise is zero-centred and the trauma decays to nothing, so the
     // aim ends exactly where it began (see BreakerShakeMath.h).
     ShakeTrauma = BreakerShake::DecayTrauma(ShakeTrauma, BreakerShakeDecayPerSecond, DeltaSeconds);
+    // Two scales, in layers: the Breaker.Shake.Scale cvar is the DEV surface
+    // (up to 4x, for tuning with a controller in hand); the profile's
+    // ScreenShakeScale sits under it and only ever attenuates, 0..1.
     const FRotator NewShake = BreakerShake::ShakeOffset(
-        ShakeTrauma * FMath::Clamp(BreakerShakeScale, 0.0f, 4.0f),
+        ShakeTrauma * FMath::Clamp(BreakerShakeScale, 0.0f, 4.0f) * ScreenShakeScale,
         GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0,
         BreakerShakeFrequencyHz, BreakerShakeMaxPitchDegrees, BreakerShakeMaxYawDegrees);
     if (Controller && (!NewShake.IsNearlyZero() || !LastShakeOffset.IsNearlyZero()))
@@ -418,12 +422,19 @@ void ABreakerCharacter::BeginPlay()
     // below covers mid-session rebinds from the settings screen. AddUObject
     // binds weakly, so a destroyed pawn's entry is skipped and compacted at
     // the next broadcast — no unsubscribe needed.
-    if (IsLocallyControlled() && InputConfig && InputConfig->DefaultMappingContext)
+    if (IsLocallyControlled())
     {
         UBreakerGameSettings* ProfileSettings = NewObject<UBreakerGameSettings>(GetTransientPackage());
         ProfileSettings->LoadOrDefaults();
-        ApplyKeybindOverrides(ProfileSettings->KeybindOverrides);
-        UBreakerGameSettings::OnKeybindOverridesChanged().AddUObject(this, &ThisClass::ApplyKeybindOverrides);
+        // The feel fields apply whatever input path the pawn is on: scoped
+        // sensitivity and the toggles read on the legacy bindings too, and
+        // bob and shake do not touch input at all.
+        ApplyProfileFeel(*ProfileSettings);
+        if (InputConfig && InputConfig->DefaultMappingContext)
+        {
+            ApplyKeybindOverrides(ProfileSettings->KeybindOverrides);
+            UBreakerGameSettings::OnKeybindOverridesChanged().AddUObject(this, &ThisClass::ApplyKeybindOverrides);
+        }
     }
     // THE TITLE MENU BELONGS TO SESSIONS THAT HAVE NOT ENTERED THE WORLD YET.
     // OpenLevel destroys the pawn, so BeginPlay re-runs on every map arrival —
@@ -737,6 +748,7 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
         PlayerInputComponent->BindAction(TEXT("Jump"), IE_Pressed, this, &ThisClass::HandleJumpInput);
         PlayerInputComponent->BindAction(TEXT("Jump"), IE_Released, this, &ACharacter::StopJumping);
         PlayerInputComponent->BindAction(TEXT("Sprint"), IE_Pressed, this, &ThisClass::StartSprint);
+        PlayerInputComponent->BindAction(TEXT("Sprint"), IE_Released, this, &ThisClass::StopSprint);
         PlayerInputComponent->BindAction(TEXT("Dash"), IE_Pressed, this, &ThisClass::HandleDashInput);
         PlayerInputComponent->BindAction(TEXT("Slide"), IE_Pressed, this, &ThisClass::StartSlide);
         PlayerInputComponent->BindAction(TEXT("Slide"), IE_Released, this, &ThisClass::StopSlide);
@@ -759,8 +771,19 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
         Input->BindAction(InputConfig->Jump, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
     }
     if (InputConfig->Sprint) {
+        // Both edges: hold mode needs the release, toggle mode ignores it
+        // (BreakerInputMode::NextEngaged, under the profile's bSprintToggle).
         Input->BindAction(InputConfig->Sprint, ETriggerEvent::Started, this, &ThisClass::StartSprint);
+        Input->BindAction(InputConfig->Sprint, ETriggerEvent::Completed, this, &ThisClass::StopSprint);
     }
+    // CROUCH HAS NO VERB ON THE PLAYER'S INPUT. The movement rules list it
+    // (walk, sprint, crouch, dash, slide, vault, mantle) and the settings
+    // screen's hold/toggle pair would naturally cover it, but UBreakerInputConfig
+    // carries no Crouch action and the movement component has no crouch state:
+    // the slide is the only lowered stance the player can take today. Recorded
+    // rather than bound to the slide key as a nearest fit. OWNER QUESTION
+    // (.claude/DESK.md): is crouch a verb of its own, or is the slide the
+    // crouch? A crouch toggle setting waits on the answer.
     if (InputConfig->Dash) Input->BindAction(InputConfig->Dash, ETriggerEvent::Started, this, &ThisClass::HandleDashInput);
     if (InputConfig->Slide) {
         Input->BindAction(InputConfig->Slide, ETriggerEvent::Started, this, &ThisClass::StartSlide);
@@ -854,8 +877,12 @@ void ABreakerCharacter::Move(const FInputActionValue& Value)
 void ABreakerCharacter::Look(const FInputActionValue& Value)
 {
     const FVector2D Axis = Value.Get<FVector2D>();
-    AddControllerYawInput(Axis.X * LookSensitivity);
-    AddControllerPitchInput(Axis.Y * LookSensitivity * (bInvertLookY ? 1.0f : -1.0f));
+    // The scoped multiplier bites only while the sights are up
+    // (BreakerInputMode::LookGain); hip fire is the base sensitivity alone.
+    const float Gain = BreakerInputMode::LookGain(
+        LookSensitivity, ScopedSensitivityMultiplier, Weapon && Weapon->IsAiming());
+    AddControllerYawInput(Axis.X * Gain);
+    AddControllerPitchInput(Axis.Y * Gain * (bInvertLookY ? 1.0f : -1.0f));
 }
 
 void ABreakerCharacter::MoveForwardLegacy(float Value)
@@ -872,8 +899,16 @@ void ABreakerCharacter::MoveRightLegacy(float Value)
     AddMovementInput(FRotationMatrix(Yaw).GetUnitAxis(EAxis::Y), Value);
 }
 
-void ABreakerCharacter::TurnLegacy(float Value) { AddControllerYawInput(Value * LookSensitivity); }
-void ABreakerCharacter::LookUpLegacy(float Value) { AddControllerPitchInput(Value * LookSensitivity * (bInvertLookY ? -1.0f : 1.0f)); }
+void ABreakerCharacter::TurnLegacy(float Value)
+{
+    AddControllerYawInput(Value * BreakerInputMode::LookGain(
+        LookSensitivity, ScopedSensitivityMultiplier, Weapon && Weapon->IsAiming()));
+}
+void ABreakerCharacter::LookUpLegacy(float Value)
+{
+    AddControllerPitchInput(Value * BreakerInputMode::LookGain(
+        LookSensitivity, ScopedSensitivityMultiplier, Weapon && Weapon->IsAiming()) * (bInvertLookY ? -1.0f : 1.0f));
+}
 
 float ABreakerCharacter::GetHorizontalSpeed() const
 {
@@ -897,9 +932,19 @@ bool ABreakerCharacter::IsSliding() const
     return Movement && Movement->IsSliding();
 }
 
-void ABreakerCharacter::StartSprint()
+void ABreakerCharacter::StartSprint() { ApplySprintEdge(true); }
+void ABreakerCharacter::StopSprint() { ApplySprintEdge(false); }
+
+void ABreakerCharacter::ApplySprintEdge(bool bPressed)
 {
-    if (UBreakerCharacterMovementComponent* Movement = GetBreakerMovement()) Movement->SetSprinting(!Movement->IsSprinting());
+    // Toggle (the default, the behaviour the key has always had): a press
+    // flips, a release lands here and changes nothing. Hold: the state
+    // follows the edge both ways. The rule is NextEngaged; this is the
+    // caller.
+    if (UBreakerCharacterMovementComponent* Movement = GetBreakerMovement())
+    {
+        Movement->SetSprinting(BreakerInputMode::NextEngaged(Movement->IsSprinting(), bPressed, bSprintToggle));
+    }
 }
 
 void ABreakerCharacter::HandleDashInput() { TryDash(); }
@@ -975,18 +1020,21 @@ void ABreakerCharacter::StopSlide()
 // travel load must always be releasable.
 void ABreakerCharacter::StartFire() { if (bWeaponsHolstered) return; if (Weapon) Weapon->StartFire(); OnFireInput(true); }
 void ABreakerCharacter::StopFire() { if (Weapon) Weapon->StopFire(); OnFireInput(false); }
-void ABreakerCharacter::StartAim()
-{
-    if (Weapon) Weapon->SetAiming(true);
-    UpdateViewmodelKick();
-    OnAimInput(true);
-}
+void ABreakerCharacter::StartAim() { ApplyAimEdge(true); }
+void ABreakerCharacter::StopAim() { ApplyAimEdge(false); }
 
-void ABreakerCharacter::StopAim()
+void ABreakerCharacter::ApplyAimEdge(bool bPressed)
 {
-    if (Weapon) Weapon->SetAiming(false);
+    // Hold (the default, the behaviour the key has always had): the sights
+    // are up exactly while the key is down. Toggle: a press flips, and the
+    // release is a no-op — it must not fire the aim-off cue for a state that
+    // did not change.
+    const bool bWasAiming = Weapon && Weapon->IsAiming();
+    const bool bNextAiming = BreakerInputMode::NextEngaged(bWasAiming, bPressed, bAimToggle);
+    if (bAimToggle && bNextAiming == bWasAiming) return;
+    if (Weapon) Weapon->SetAiming(bNextAiming);
     UpdateViewmodelKick();
-    OnAimInput(false);
+    OnAimInput(bNextAiming);
 }
 
 namespace
@@ -1132,6 +1180,9 @@ void ABreakerCharacter::UpdateViewmodelKick()
             const FBreakerRecoilProfile Profile = Weapon->GetRecoilProfile();
             MotionScale = FMath::Lerp(1.0f, Profile.AimViewmodelMultiplier, Weapon->GetAimAlpha());
         }
+        // The profile's view-bob slider, 0..1, over whatever ADS left. At 1.0
+        // this is the unscaled call (RiorsEdge.Weapons.ViewmodelMotion).
+        MotionScale *= ViewBobScale;
         Motion = FBreakerWeaponFeel::MotionOffsets(ViewmodelMotion,
             static_cast<float>(MotionWorld->GetTimeSeconds()), ViewmodelBobPhase, ViewmodelSpeedFraction, MotionScale,
             ViewmodelSprintFraction);
@@ -2049,6 +2100,20 @@ void ABreakerCharacter::SavePlaytestSettings() const
     GConfig->SetFloat(TEXT("RiorsEdge.Playtest"), TEXT("Sensitivity"), LookSensitivity, GGameUserSettingsIni);
     GConfig->SetBool(TEXT("RiorsEdge.Playtest"), TEXT("InvertLookY"), bInvertLookY, GGameUserSettingsIni);
     GConfig->Flush(false, GGameUserSettingsIni);
+}
+
+void ABreakerCharacter::ApplyProfileFeel(const UBreakerGameSettings& Settings)
+{
+    // Copied through the model's own clamps, so a value that reached the
+    // model unclamped (a slider's raw write) is bounded on the way onto the
+    // pawn exactly as an ini load would be. Sprint and aim mode changes take
+    // effect on the NEXT edge: a sprint already toggled on stays on until a
+    // press or, under hold, a release ends it.
+    ScopedSensitivityMultiplier = UBreakerGameSettingsLibrary::ClampScopedSensitivityMultiplier(Settings.ScopedSensitivityMultiplier);
+    ViewBobScale = UBreakerGameSettingsLibrary::ClampViewBobScale(Settings.ViewBobScale);
+    ScreenShakeScale = UBreakerGameSettingsLibrary::ClampScreenShakeScale(Settings.ScreenShakeScale);
+    bSprintToggle = Settings.bSprintToggle;
+    bAimToggle = Settings.bAimToggle;
 }
 
 void ABreakerCharacter::ApplyMenuSettings(float NewSensitivity, float NewFOV, bool bNewInvertLookY)
