@@ -11,6 +11,7 @@
 #include "Progression/BreakerWorldPoints.h"
 #include "Save/BreakerMissionContent.h"
 #include "Save/BreakerQuestContent.h"
+#include "UObject/UnrealType.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -435,6 +436,103 @@ bool FBreakerAbilitiesFreshTest::RunTest(const FString& Parameters)
             *Path));
         return false;
     }
+    return true;
+}
+
+// THE ABILITY CLASSES' NUMBERS ARE THE FILE'S, OR THIS IS RED.
+//
+// Every EditDefaultsOnly float and int32 an ability class declares below
+// UBreakerGameplayAbility is a key on its row's "numbers" object, applied
+// onto the class default object at load. The shipped configuration: one
+// key per property on every row, one hundred and eighteen keys across the
+// registry (one hundred and fifteen declarations; the Gunsmith deploy
+// base's PlacementRangeCm is carried once by each of its four subclasses),
+// and a missing key answers with the caller's default.
+//
+// The file is the compiled table today, so every authored value equals the
+// initialiser the compiler put on the class default object. That assertion
+// is deleted in the first change that tunes a number in the file alone: from
+// then on the file is the authority and the compiled value is only the
+// failed-load fallback.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerAbilitiesNumbersTest,
+    "RiorsEdge.Data.Abilities.Numbers",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerAbilitiesNumbersTest::RunTest(const FString& Parameters)
+{
+    const TArray<FString>& LoadErrors = BreakerAbilityData::GetDataErrors();
+    for (const FString& Error : LoadErrors)
+    {
+        AddError(Error);
+    }
+    if (!LoadErrors.IsEmpty())
+    {
+        return false;
+    }
+
+    const TArray<UBreakerAbilityDefinition*>& Abilities = UBreakerAbilityDefinition::GetFallbackRegistry();
+    int32 KeyCount = 0;
+    int32 RowsWithNumbers = 0;
+    for (const UBreakerAbilityDefinition* Definition : Abilities)
+    {
+        if (!Definition)
+        {
+            AddError(TEXT("A registry row is null"));
+            continue;
+        }
+        const FString Id = Definition->AbilityId.ToString();
+        const TArray<FNumericProperty*> Properties = BreakerAbilityData::NumberProperties(Definition->AbilityClass.Get());
+        TestEqual(FString::Printf(TEXT("%s carries one key per numeric property"), *Id), Definition->Numbers.Num(), Properties.Num());
+        TestEqual(FString::Printf(TEXT("%s recorded one compiled value per numeric property"), *Id), Definition->CompiledNumbers.Num(), Properties.Num());
+        KeyCount += Definition->Numbers.Num();
+        if (Properties.Num() > 0)
+        {
+            ++RowsWithNumbers;
+        }
+        for (const FNumericProperty* Property : Properties)
+        {
+            const FName Key = Property->GetFName();
+            const float* Authored = Definition->Numbers.Find(Key);
+            const float* Compiled = Definition->CompiledNumbers.Find(Key);
+            if (!Authored || !Compiled)
+            {
+                AddError(FString::Printf(TEXT("%s: %s is declared on %s but not carried"), *Id, *Key.ToString(), *Property->GetOwnerClass()->GetName()));
+                continue;
+            }
+            TestEqual(FString::Printf(TEXT("%s.%s: the file carries the compiled default"), *Id, *Key.ToString()), *Authored, *Compiled);
+            TestEqual(FString::Printf(TEXT("%s.%s: Number reads the authored value"), *Id, *Key.ToString()), Definition->Number(Key, -1.0f), *Authored);
+        }
+        TestEqual(FString::Printf(TEXT("%s: a key the file does not name answers with the default"), *Id),
+            Definition->Number(FName(TEXT("Breaker.NoSuchNumber")), 7.0f), 7.0f);
+    }
+    TestEqual(TEXT("One hundred and eighteen numbers across the registry"), KeyCount, 118);
+    TestEqual(TEXT("Twenty-eight rows carry numbers; seven classes keep theirs as constexpr or in the body"), RowsWithNumbers, 28);
+
+    // Order is the class's declaration order, super first: the Gunsmith
+    // deploy base's range precedes anything a deployable declares itself,
+    // and Cleave's first number is its range.
+    const UBreakerAbilityDefinition* Turret = UBreakerAbilityDefinition::FindFallback(FName(TEXT("Gunsmith.Turret")));
+    const UBreakerAbilityDefinition* Cleave = UBreakerAbilityDefinition::FindFallback(FName(TEXT("Caster.Cleave")));
+    if (Turret && Cleave)
+    {
+        const TArray<FNumericProperty*> TurretNumbers = BreakerAbilityData::NumberProperties(Turret->AbilityClass.Get());
+        const TArray<FNumericProperty*> CleaveNumbers = BreakerAbilityData::NumberProperties(Cleave->AbilityClass.Get());
+        TestTrue(TEXT("Turret's first number is the deploy base's placement range"),
+            TurretNumbers.Num() > 0 && TurretNumbers[0]->GetFName() == FName(TEXT("PlacementRangeCm")));
+        TestTrue(TEXT("Cleave's first number is its range"),
+            CleaveNumbers.Num() > 0 && CleaveNumbers[0]->GetFName() == FName(TEXT("RangeCm")));
+        TestEqual(TEXT("Turret's placement range is the file's"), Turret->Number(FName(TEXT("PlacementRangeCm")), 0.0f), 800.0f);
+    }
+    else
+    {
+        AddError(TEXT("Gunsmith.Turret and Caster.Cleave are registry rows"));
+    }
+    TestEqual(TEXT("A class outside the ability hierarchy carries no numbers"),
+        BreakerAbilityData::NumberProperties(UObject::StaticClass()).Num(), 0);
+    TestEqual(TEXT("A null class carries no numbers"),
+        BreakerAbilityData::NumberProperties(nullptr).Num(), 0);
+    AddInfo(FString::Printf(TEXT("Ability numbers: %d keys across %d rows"), KeyCount, RowsWithNumbers));
     return true;
 }
 

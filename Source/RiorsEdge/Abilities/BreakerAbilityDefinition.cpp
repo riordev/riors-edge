@@ -2,6 +2,7 @@
 
 #include "Abilities/BreakerAbilityData.h"
 #include "Abilities/BreakerAbilityTags.h"
+#include "Abilities/BreakerGameplayAbility.h"
 #include "Abilities/BreakerAbility_CadenceBreak.h"
 #include "Abilities/BreakerAbility_Cleave.h"
 #include "Abilities/BreakerAbility_HardStop.h"
@@ -20,6 +21,13 @@
 #include "Abilities/BreakerSupportAbilities.h"
 #include "Abilities/BreakerTankAbilities.h"
 #include "Data/BreakerDataFile.h"
+#include "UObject/UnrealType.h"
+
+float UBreakerAbilityDefinition::Number(FName Key, float Default) const
+{
+    const float* Found = Numbers.Find(Key);
+    return Found ? *Found : Default;
+}
 
 bool UBreakerAbilityDefinition::CanOccupySlot(EBreakerAbilitySlot Slot) const
 {
@@ -150,11 +158,14 @@ namespace
 // THE NUMERICS, FROM Data/abilities.json (O186).
 // ---------------------------------------------------------------------------
 // The registry below authors WHAT each ability is; the file authors HOW MUCH.
-// Rows match by id and variants by keystone tag name, and the file has to
-// describe the registry exactly — the same row count, every id known, every
-// variant row present — before a single number is applied. Anything short of
-// that leaves every row at its default-constructed numerics behind an ensure,
-// because a table that half-loaded would play as a table that loaded.
+// Rows match by id, variants by keystone tag name and numbers by property
+// name on the row's ability class, and the file has to describe the registry
+// exactly — the same row count, every id known, every variant row present,
+// every numeric property keyed and no key without a property — before a
+// single number is applied. Anything short of that leaves every row at its
+// default-constructed numerics and every ability class at its compiled
+// initialisers behind an ensure, because a table that half-loaded would play
+// as a table that loaded.
 namespace
 {
     struct FBreakerAbilityVariantData
@@ -172,6 +183,7 @@ namespace
         float ResourceCost = 0.0f;
         float CooldownSeconds = 0.0f;
         float WindowDuration = 0.0f;
+        TMap<FName, float> Numbers;
         TArray<FBreakerAbilityVariantData> Variants;
     };
 
@@ -225,6 +237,32 @@ namespace
         bool bOk = BreakerAbilityDataReadNumber(Row, TEXT("resourceCost"), Id, Out.ResourceCost, Errors);
         bOk = BreakerAbilityDataReadNumber(Row, TEXT("cooldownSeconds"), Id, Out.CooldownSeconds, Errors) && bOk;
         bOk = BreakerAbilityDataReadNumber(Row, TEXT("windowDuration"), Id, Out.WindowDuration, Errors) && bOk;
+
+        // The ability class's own numbers, keyed by property name. Required
+        // on every row, empty on a row whose class declares none, so a row
+        // that forgot the object is a broken row and not a row with no
+        // numbers. Which keys are legal is decided in the match phase,
+        // against the class.
+        const TSharedPtr<FJsonObject>* NumbersObject = nullptr;
+        if (!Row.TryGetObjectField(TEXT("numbers"), NumbersObject))
+        {
+            Errors.Add(FString::Printf(TEXT("%s: no \"numbers\" object (use {} for none)"), *Id));
+            bOk = false;
+        }
+        else
+        {
+            for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : (*NumbersObject)->Values)
+            {
+                double Value = 0.0;
+                if (!Pair.Value.IsValid() || !Pair.Value->TryGetNumber(Value))
+                {
+                    Errors.Add(FString::Printf(TEXT("%s: \"numbers\".\"%s\" is not a number"), *Id, *Pair.Key));
+                    bOk = false;
+                    continue;
+                }
+                Out.Numbers.Add(FName(*Pair.Key), static_cast<float>(Value));
+            }
+        }
 
         const TArray<TSharedPtr<FJsonValue>>* VariantValues = nullptr;
         if (!Row.TryGetArrayField(TEXT("variants"), VariantValues))
@@ -322,6 +360,32 @@ namespace
             Matched[Index] = *Found;
 
             const UBreakerAbilityDefinition& Definition = **Found;
+
+            // Numbers: every property on the class has a key and every key
+            // names a property. A class that declares a number the file
+            // does not carry would keep its compiled value while the rest of
+            // the file applied, and a key the class does not declare is a
+            // typo or a renamed member; both are the same all-or-nothing
+            // failure as a missing row.
+            const TArray<FNumericProperty*> Properties = BreakerAbilityData::NumberProperties(Definition.AbilityClass.Get());
+            const FString ClassName = Definition.AbilityClass.Get() ? Definition.AbilityClass.Get()->GetName() : FString(TEXT("no ability class"));
+            for (const FNumericProperty* Property : Properties)
+            {
+                if (!Row.Numbers.Contains(Property->GetFName()))
+                {
+                    Errors.Add(FString::Printf(TEXT("%s: \"numbers\" has no \"%s\" (%s declares it)"), *Row.Id.ToString(), *Property->GetName(), *ClassName));
+                }
+            }
+            for (const TPair<FName, float>& Number : Row.Numbers)
+            {
+                const bool bDeclared = Properties.ContainsByPredicate(
+                    [&Number](const FNumericProperty* Property) { return Property->GetFName() == Number.Key; });
+                if (!bDeclared)
+                {
+                    Errors.Add(FString::Printf(TEXT("%s: \"numbers\".\"%s\" is not a numeric property of %s"), *Row.Id.ToString(), *Number.Key.ToString(), *ClassName));
+                }
+            }
+
             if (Row.Variants.Num() != Definition.Variants.Num())
             {
                 Errors.Add(FString::Printf(TEXT("%s: %d variants for a row with %d"), *Row.Id.ToString(), Row.Variants.Num(), Definition.Variants.Num()));
@@ -357,7 +421,7 @@ namespace
         if (!Errors.IsClean())
         {
             BreakerAbilityDataErrorsStore = Errors.Messages;
-            ensureMsgf(false, TEXT("%s failed to load; every ability keeps zero cost, zero cooldown and zero window.\n%s"), *File, *Errors.Join());
+            ensureMsgf(false, TEXT("%s failed to load; every ability keeps zero cost, zero cooldown, zero window and its compiled class numbers.\n%s"), *File, *Errors.Join());
             return;
         }
 
@@ -369,6 +433,36 @@ namespace
             Definition.ResourceCost = Row.ResourceCost;
             Definition.CooldownSeconds = Row.CooldownSeconds;
             Definition.WindowDuration = Row.WindowDuration;
+
+            // The class numbers go onto the class default object, which every
+            // instance copies at grant (InstancedPerActor), so the ability
+            // body reads its own member and finds the file's value. The
+            // value the compiler put there is recorded first. Ints round from
+            // the file's float.
+            Definition.CompiledNumbers.Reset();
+            Definition.Numbers.Reset();
+            if (UObject* Defaults = Definition.AbilityClass.Get() ? Definition.AbilityClass.Get()->GetDefaultObject() : nullptr)
+            {
+                for (FNumericProperty* Property : BreakerAbilityData::NumberProperties(Definition.AbilityClass.Get()))
+                {
+                    void* Value = Property->ContainerPtrToValuePtr<void>(Defaults);
+                    const float Compiled = Property->IsFloatingPoint()
+                        ? static_cast<float>(Property->GetFloatingPointPropertyValue(Value))
+                        : static_cast<float>(Property->GetSignedIntPropertyValue(Value));
+                    const float Authored = Row.Numbers[Property->GetFName()];
+                    Definition.CompiledNumbers.Add(Property->GetFName(), Compiled);
+                    Definition.Numbers.Add(Property->GetFName(), Authored);
+                    if (Property->IsFloatingPoint())
+                    {
+                        Property->SetFloatingPointPropertyValue(Value, static_cast<double>(Authored));
+                    }
+                    else
+                    {
+                        Property->SetIntPropertyValue(Value, static_cast<int64>(FMath::RoundToInt(Authored)));
+                    }
+                }
+            }
+
             for (const FBreakerAbilityVariantData& Variant : Row.Variants)
             {
                 FBreakerAbilityVariant* Target = Definition.Variants.FindByPredicate(
@@ -385,6 +479,42 @@ namespace
 FString BreakerAbilityData::DataRelativePath()
 {
     return TEXT("Data/abilities.json");
+}
+
+TArray<FNumericProperty*> BreakerAbilityData::NumberProperties(const UClass* AbilityClass)
+{
+    TArray<FNumericProperty*> Out;
+    const UClass* Base = UBreakerGameplayAbility::StaticClass();
+    if (!AbilityClass || !AbilityClass->IsChildOf(Base) || AbilityClass == Base)
+    {
+        return Out;
+    }
+
+    // The chain from the class up to, not including, the shared base, walked
+    // super first so a base's number (the Gunsmith deploy range) precedes a
+    // subclass's own. TFieldIterator yields the current class before its
+    // super, so the chain is collected and read in reverse.
+    TArray<const UClass*> Chain;
+    for (const UClass* Class = AbilityClass; Class && Class != Base; Class = Class->GetSuperClass())
+    {
+        Chain.Insert(Class, 0);
+    }
+    for (const UClass* Class : Chain)
+    {
+        for (TFieldIterator<FProperty> It(Class, EFieldIteratorFlags::ExcludeSuper); It; ++It)
+        {
+            FProperty* Property = *It;
+            if (!Property->HasAnyPropertyFlags(CPF_Edit))
+            {
+                continue;
+            }
+            if (CastField<FFloatProperty>(Property) || CastField<FIntProperty>(Property))
+            {
+                Out.Add(CastFieldChecked<FNumericProperty>(Property));
+            }
+        }
+    }
+    return Out;
 }
 
 const TArray<FString>& BreakerAbilityData::GetDataErrors()
@@ -410,10 +540,10 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     // instrumentation before content lock.
     //
     // THE NUMBERS LIVE IN Data/abilities.json (O186): every row's cost,
-    // cooldown and window, and every variant's four numerics, are overlaid
-    // by BreakerAbilityDataApply before this table is returned. The
-    // citations beside each row say where a number comes from; the file
-    // says what it is.
+    // cooldown and window, every variant's four numerics, and every ability
+    // class's own numeric defaults are overlaid by BreakerAbilityDataApply
+    // before this table is returned. The citations beside each row say where
+    // a number comes from; the file says what it is.
     // ------------------------------------------------------------------
 
     // S1 Slipcut — §1.2 row S1: 20 Momentum, 4s cooldown, 0.4s window.

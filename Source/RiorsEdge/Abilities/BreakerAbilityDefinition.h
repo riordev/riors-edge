@@ -95,6 +95,21 @@ public:
     // Index 0 is the base row when authored. Empty on non-ultimates.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Variants") TArray<FBreakerAbilityVariant> Variants;
 
+    // The ability class's own numbers, keyed by property name: every
+    // EditDefaultsOnly float and int32 the class declares below
+    // UBreakerGameplayAbility (BreakerAbilityData::NumberProperties), as
+    // Data/abilities.json authors them and as the loader wrote them onto the
+    // class default object. Empty until the file is applied, and empty for
+    // good when the file fails to load.
+    UPROPERTY() TMap<FName, float> Numbers;
+    // What the class default object held before the file was applied: the
+    // compiled member initialisers, which are the fallback a failed load
+    // leaves in place. Recorded so a test can say whether file and code agree.
+    TMap<FName, float> CompiledNumbers;
+
+    // The authored number under Key, or Default when the file names none.
+    UFUNCTION(BlueprintPure, Category="Abilities") float Number(FName Key, float Default) const;
+
     // Spec D1 selector: at most one keystone can be held (Class-Kits §0.2), so
     // this is a lookup, not a merge. Falls back to the base row, and to a
     // default-constructed row when nothing is authored.

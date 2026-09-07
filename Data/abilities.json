@@ -5,6 +5,9 @@
 			"resourceCost": 20,
 			"cooldownSeconds": 4,
 			"windowDuration": 0.4,
+			"numbers":
+			{
+			},
 			"variants": []
 		},
 		{
@@ -12,6 +15,9 @@
 			"resourceCost": 15,
 			"cooldownSeconds": 3,
 			"windowDuration": 0.25,
+			"numbers":
+			{
+			},
 			"variants": []
 		},
 		{
@@ -19,6 +25,11 @@
 			"resourceCost": 40,
 			"cooldownSeconds": 10,
 			"windowDuration": 6,
+			"numbers":
+			{
+				"MarkMinimumRangeCm": 2500,
+				"MarkTraceDistanceCm": 12000
+			},
 			"variants": []
 		},
 		{
@@ -26,6 +37,10 @@
 			"resourceCost": 35,
 			"cooldownSeconds": 8,
 			"windowDuration": 3,
+			"numbers":
+			{
+				"FlatDamagePerStack": 4
+			},
 			"variants": []
 		},
 		{
@@ -33,6 +48,9 @@
 			"resourceCost": 30,
 			"cooldownSeconds": 6,
 			"windowDuration": 0.6,
+			"numbers":
+			{
+			},
 			"variants": []
 		},
 		{
@@ -40,6 +58,9 @@
 			"resourceCost": 25,
 			"cooldownSeconds": 6,
 			"windowDuration": 2,
+			"numbers":
+			{
+			},
 			"variants": []
 		},
 		{
@@ -47,6 +68,9 @@
 			"resourceCost": 100,
 			"cooldownSeconds": 0,
 			"windowDuration": 8,
+			"numbers":
+			{
+			},
 			"variants": [
 				{
 					"keystone": "",
@@ -83,6 +107,17 @@
 			"resourceCost": 20,
 			"cooldownSeconds": 0,
 			"windowDuration": 0.45,
+			"numbers":
+			{
+				"RangeCm": 300,
+				"ArcDegrees": 120,
+				"WeaponDamageCoefficient": 1.5,
+				"UnarmedDamage": 20,
+				"AnimationLockSeconds": 0.45,
+				"BleedDamagePerTick": 6,
+				"BleedDuration": 4,
+				"BleedTickInterval": 1
+			},
 			"variants": []
 		},
 		{
@@ -90,6 +125,14 @@
 			"resourceCost": 35,
 			"cooldownSeconds": 0,
 			"windowDuration": 0,
+			"numbers":
+			{
+				"MaximumRangeCm": 1200,
+				"StandoffCm": 200,
+				"RefundHealthFraction": 0.4,
+				"RefundMana": 15,
+				"UnrestrictedRangeCm": 100000
+			},
 			"variants": []
 		},
 		{
@@ -97,6 +140,19 @@
 			"resourceCost": 25,
 			"cooldownSeconds": 0,
 			"windowDuration": 6,
+			"numbers":
+			{
+				"RadiusCm": 400,
+				"DurationSeconds": 6,
+				"TickIntervalSeconds": 1,
+				"ZoneDamagePerTick": 0,
+				"FlatArmorReduction": 40,
+				"PoisonDamagePerTick": 5,
+				"PoisonDuration": 4,
+				"PoisonTickInterval": 1,
+				"MaximumRangeCm": 2500,
+				"HalfHeightCm": 250
+			},
 			"variants": []
 		},
 		{
@@ -104,6 +160,16 @@
 			"resourceCost": 30,
 			"cooldownSeconds": 0,
 			"windowDuration": 5,
+			"numbers":
+			{
+				"ChannelSeconds": 5,
+				"TickIntervalSeconds": 0.5,
+				"DamagePerTick": 14,
+				"LeechFraction": 0.4,
+				"BreakThresholdFraction": 0.05,
+				"MaximumRangeCm": 3000,
+				"BreakDistanceCm": 3600
+			},
 			"variants": []
 		},
 		{
@@ -111,6 +177,13 @@
 			"resourceCost": 30,
 			"cooldownSeconds": 0,
 			"windowDuration": 0,
+			"numbers":
+			{
+				"CyclePositionsPerCast": 1,
+				"ImpactDamage": 30,
+				"ProjectileSpeed": 4000,
+				"MuzzleForwardCm": 80
+			},
 			"variants": []
 		},
 		{
@@ -118,6 +191,12 @@
 			"resourceCost": 40,
 			"cooldownSeconds": 0,
 			"windowDuration": 0,
+			"numbers":
+			{
+				"DurationScalarWhenNotConsuming": 0.5,
+				"RefundManaPerStatus": 0,
+				"MaximumRangeCm": 4000
+			},
 			"variants": []
 		},
 		{
@@ -125,6 +204,9 @@
 			"resourceCost": 80,
 			"cooldownSeconds": 0,
 			"windowDuration": 6,
+			"numbers":
+			{
+			},
 			"variants": [
 				{
 					"keystone": "",
@@ -161,6 +243,11 @@
 			"resourceCost": 0,
 			"cooldownSeconds": 10,
 			"windowDuration": 0,
+			"numbers":
+			{
+				"FlatBonusDamage": 8,
+				"PierceBonus": 1
+			},
 			"variants": []
 		},
 		{
@@ -168,6 +255,14 @@
 			"resourceCost": 0,
 			"cooldownSeconds": 18,
 			"windowDuration": 10,
+			"numbers":
+			{
+				"ReservePerRound": 3,
+				"MaximumCapacityFraction": 1,
+				"OverpressureReserveGrantFraction": 0.25,
+				"OverpressurePerShotReserveFraction": 0.02,
+				"OverpressureCapacityShrinkFraction": 0.5
+			},
 			"variants": []
 		},
 		{
@@ -175,6 +270,10 @@
 			"resourceCost": 40,
 			"cooldownSeconds": 0,
 			"windowDuration": 30,
+			"numbers":
+			{
+				"PlacementRangeCm": 800
+			},
 			"variants": []
 		},
 		{
@@ -182,6 +281,10 @@
 			"resourceCost": 30,
 			"cooldownSeconds": 0,
 			"windowDuration": 45,
+			"numbers":
+			{
+				"PlacementRangeCm": 800
+			},
 			"variants": []
 		},
 		{
@@ -189,6 +292,10 @@
 			"resourceCost": 35,
 			"cooldownSeconds": 0,
 			"windowDuration": 60,
+			"numbers":
+			{
+				"PlacementRangeCm": 800
+			},
 			"variants": []
 		},
 		{
@@ -196,6 +303,10 @@
 			"resourceCost": 45,
 			"cooldownSeconds": 0,
 			"windowDuration": 20,
+			"numbers":
+			{
+				"PlacementRangeCm": 800
+			},
 			"variants": []
 		},
 		{
@@ -203,6 +314,15 @@
 			"resourceCost": 100,
 			"cooldownSeconds": 0,
 			"windowDuration": 20,
+			"numbers":
+			{
+				"RaisedDensityCap": 8,
+				"MachinistFlatDamageFraction": 0.3,
+				"MachinistReservePulseSeconds": 5,
+				"MachinistReservePulseFraction": 0.1,
+				"MachinistDetonationCoefficient": 0.6,
+				"MachinistDetonationRadiusCm": 300
+			},
 			"variants": [
 				{
 					"keystone": "",
@@ -239,6 +359,16 @@
 			"resourceCost": 25,
 			"cooldownSeconds": 6,
 			"windowDuration": 0,
+			"numbers":
+			{
+				"RangeCm": 300,
+				"ArcDegrees": 120,
+				"WeaponDamageCoefficient": 1.3,
+				"UnarmedDamage": 25,
+				"HealFraction": 0.35,
+				"OverhealShieldFraction": 1,
+				"ShieldCeilingHealthFraction": 0.25
+			},
 			"variants": []
 		},
 		{
@@ -246,6 +376,9 @@
 			"resourceCost": 40,
 			"cooldownSeconds": 12,
 			"windowDuration": 8,
+			"numbers":
+			{
+			},
 			"variants": []
 		},
 		{
@@ -253,6 +386,10 @@
 			"resourceCost": 30,
 			"cooldownSeconds": 10,
 			"windowDuration": 12,
+			"numbers":
+			{
+				"PlacementRangeCm": 250
+			},
 			"variants": []
 		},
 		{
@@ -260,6 +397,13 @@
 			"resourceCost": 35,
 			"cooldownSeconds": 12,
 			"windowDuration": 4,
+			"numbers":
+			{
+				"RadiusCm": 1000,
+				"FlatDamagePerEnemyFraction": 0.04,
+				"MaximumStacks": 6,
+				"BonusDurationSeconds": 6
+			},
 			"variants": []
 		},
 		{
@@ -267,6 +411,17 @@
 			"resourceCost": 30,
 			"cooldownSeconds": 8,
 			"windowDuration": 0,
+			"numbers":
+			{
+				"ThrowRangeCm": 700,
+				"FuseSeconds": 1.2,
+				"BlastRadiusCm": 500,
+				"WeaponDamageCoefficient": 1.5,
+				"UnarmedDamage": 40,
+				"EdgeDamageFraction": 0.35,
+				"SelfDamageFraction": 0.5,
+				"KnockbackImpulse": 1400
+			},
 			"variants": []
 		},
 		{
@@ -274,6 +429,17 @@
 			"resourceCost": 45,
 			"cooldownSeconds": 10,
 			"windowDuration": 0,
+			"numbers":
+			{
+				"BlastRadiusCm": 600,
+				"WeaponDamageCoefficient": 1.8,
+				"UnarmedDamage": 50,
+				"FullPowerFallSpeed": 1200,
+				"MinimumPowerFraction": 0.4,
+				"StaggerSeconds": 1.5,
+				"SlamDownSpeed": 2200,
+				"TerminalDescentPowerCap": 1.44
+			},
 			"variants": []
 		},
 		{
@@ -281,6 +447,15 @@
 			"resourceCost": 100,
 			"cooldownSeconds": 0,
 			"windowDuration": 10,
+			"numbers":
+			{
+				"GenerationMultiplier": 3,
+				"BaseIncomingMultiplier": 0.5,
+				"WallSoloIncomingMultiplier": 0.25,
+				"VeinHealFraction": 0.6,
+				"DetonationReleaseFraction": 0.7,
+				"DetonationRadiusCm": 800
+			},
 			"variants": [
 				{
 					"keystone": "",
@@ -317,6 +492,11 @@
 			"resourceCost": 25,
 			"cooldownSeconds": 6,
 			"windowDuration": 0,
+			"numbers":
+			{
+				"TargetRangeCm": 2000,
+				"HealFractionOfTargetMax": 0.25
+			},
 			"variants": []
 		},
 		{
@@ -324,6 +504,10 @@
 			"resourceCost": 30,
 			"cooldownSeconds": 10,
 			"windowDuration": 3,
+			"numbers":
+			{
+				"TargetRangeCm": 2000
+			},
 			"variants": []
 		},
 		{
@@ -331,6 +515,10 @@
 			"resourceCost": 30,
 			"cooldownSeconds": 8,
 			"windowDuration": 8,
+			"numbers":
+			{
+				"DetachedBatonRadiusCm": 800
+			},
 			"variants": []
 		},
 		{
@@ -338,6 +526,12 @@
 			"resourceCost": 35,
 			"cooldownSeconds": 9,
 			"windowDuration": 8,
+			"numbers":
+			{
+				"FlatDamagePerStack": 2,
+				"MaximumStacks": 5,
+				"StreakGapSeconds": 1
+			},
 			"variants": []
 		},
 		{
@@ -345,6 +539,16 @@
 			"resourceCost": 20,
 			"cooldownSeconds": 5,
 			"windowDuration": 10,
+			"numbers":
+			{
+				"TargetRangeCm": 3000,
+				"MarkedDamageMultiplier": 1.15,
+				"DeepMarkDamagePerDepth": 0.05,
+				"DeepMarkYieldPerDepth": 0.25,
+				"DeepMarkMaxDepth": 3,
+				"HuntersEconomyDuration": 4,
+				"TellOutgoingMultiplier": 0.75
+			},
 			"variants": []
 		},
 		{
@@ -352,6 +556,17 @@
 			"resourceCost": 40,
 			"cooldownSeconds": 10,
 			"windowDuration": 6,
+			"numbers":
+			{
+				"AimRangeCm": 3000,
+				"RadiusCm": 600,
+				"SlowMultiplier": 0.55,
+				"SuppressionArmorCut": 30,
+				"PressureChargePerSecond": 1,
+				"PressureChargePerSecondRank2": 2,
+				"SuppressAccuracyMultiplier": 1.75,
+				"AccuracyApplyDelaySeconds": 1
+			},
 			"variants": []
 		},
 		{
@@ -359,6 +574,14 @@
 			"resourceCost": 100,
 			"cooldownSeconds": 0,
 			"windowDuration": 12,
+			"numbers":
+			{
+				"RadiusCm": 1500,
+				"TriageHealFractionPerSecond": 0.04,
+				"DownbeatFlatDamagePerBuffedTarget": 4,
+				"BlackoutMarkedDamageMultiplier": 1.15,
+				"BlackoutSlowMultiplier": 0.55
+			},
 			"variants": [
 				{
 					"keystone": "",

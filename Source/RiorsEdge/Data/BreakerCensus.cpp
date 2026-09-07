@@ -15,6 +15,7 @@
 #include "Save/BreakerQuestContent.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
+#include "UObject/UnrealType.h"
 
 namespace
 {
@@ -379,7 +380,29 @@ namespace
     }
 
     // The base row's keystone is "", a keystone row's is the tag's full
-    // name: the spelling the registry's loader matches variants by.
+    // name: the spelling the registry's loader matches variants by. The
+    // numbers are written in the class's declaration order, super first,
+    // through the same walk the loader validates against; a TMap's own
+    // order would reshuffle the file on every export. A key the definition
+    // does not carry writes the class default object's live value, which is
+    // the compiled initialiser when nothing was applied.
+    float BreakerCensusAbilityNumber(const UBreakerAbilityDefinition& Definition, const FNumericProperty& Property)
+    {
+        if (const float* Authored = Definition.Numbers.Find(Property.GetFName()))
+        {
+            return *Authored;
+        }
+        const UObject* Defaults = Definition.AbilityClass.Get() ? Definition.AbilityClass.Get()->GetDefaultObject() : nullptr;
+        if (!Defaults)
+        {
+            return 0.0f;
+        }
+        const void* Value = Property.ContainerPtrToValuePtr<void>(Defaults);
+        return Property.IsFloatingPoint()
+            ? static_cast<float>(Property.GetFloatingPointPropertyValue(Value))
+            : static_cast<float>(Property.GetSignedIntPropertyValue(Value));
+    }
+
     void BreakerCensusAbilityRow(FBreakerCensusWriter& Writer, const UBreakerAbilityDefinition& Definition)
     {
         Writer.WriteObjectStart();
@@ -387,6 +410,13 @@ namespace
         Writer.WriteValue(TEXT("resourceCost"), Definition.ResourceCost);
         Writer.WriteValue(TEXT("cooldownSeconds"), Definition.CooldownSeconds);
         Writer.WriteValue(TEXT("windowDuration"), Definition.WindowDuration);
+        Writer.WriteObjectStart(TEXT("numbers"));
+        for (const FNumericProperty* Property : BreakerAbilityData::NumberProperties(Definition.AbilityClass.Get()))
+        {
+            const float Value = BreakerCensusAbilityNumber(Definition, *Property);
+            Writer.WriteValue(Property->GetName(), Value);
+        }
+        Writer.WriteObjectEnd();
         Writer.WriteArrayStart(TEXT("variants"));
         for (const FBreakerAbilityVariant& Variant : Definition.Variants)
         {
