@@ -156,7 +156,8 @@
 				{
 					"id": "Doctrine",
 					"kind": "Unlock",
-					"doctrinePoints": 2
+					"doctrinePoints": 2,
+					"benchmark": "Act1.Fernhall"
 				}
 			]
 		},
@@ -237,7 +238,8 @@
 				{
 					"id": "Doctrine",
 					"kind": "Unlock",
-					"doctrinePoints": 2
+					"doctrinePoints": 2,
+					"benchmark": "Act2.Breach"
 				}
 			]
 		},
@@ -299,7 +301,90 @@
 				{
 					"id": "Doctrine",
 					"kind": "Unlock",
-					"doctrinePoints": 2
+					"doctrinePoints": 2,
+					"benchmark": "Act3.Survivor"
+				}
+			]
+		},
+		{
+			"id": "Act3.Finale",
+			"act": 3,
+			"title": "",
+			"quests": [
+				"Quest.Finale"
+			],
+			"beats": [
+				{
+					"id": "Briefing",
+					"kind": "Dialogue",
+					"npc": "Researcher",
+					"node": "FinaleOffer",
+					"completesOn": "Quest.Finale.Accepted"
+				},
+				{
+					"id": "Stripped",
+					"kind": "Travel",
+					"destination": "Earth.Stripped",
+					"completesOn": "Mission.Act3.Finale.Arrived"
+				},
+				{
+					"id": "Fragment",
+					"kind": "Encounter",
+					"worldEncounter": "earth.rior_fragment",
+					"quest": "Quest.Finale",
+					"objectives": [
+						"Fragment"
+					]
+				},
+				{
+					"id": "ReconstructionReturn",
+					"kind": "Travel",
+					"destination": "Hub",
+					"completesOn": "Quest.Finale.ReturnedWithFragment"
+				},
+				{
+					"id": "Reconstruction",
+					"kind": "Dialogue",
+					"npc": "Researcher",
+					"node": "Reconstruct",
+					"completesOn": "Quest.Finale.Reconstructed"
+				},
+				{
+					"id": "Won",
+					"kind": "Travel",
+					"destination": "Earth.Won",
+					"completesOn": "Quest.Finale.ArrivedWon"
+				},
+				{
+					"id": "AlternateMeeting",
+					"kind": "Dialogue",
+					"npc": "AlternateSelf",
+					"node": "Meet",
+					"completesOn": "Quest.Finale.MetAlternate"
+				},
+				{
+					"id": "FinalReturn",
+					"kind": "Travel",
+					"destination": "Hub",
+					"completesOn": "Quest.Finale.ReturnedFromWon"
+				},
+				{
+					"id": "Device",
+					"kind": "Return",
+					"npc": "FinaleDevice",
+					"node": "Choice",
+					"completesOn": "Quest.Finale.TurnedIn"
+				},
+				{
+					"id": "Reward",
+					"kind": "Reward",
+					"quest": "Quest.Finale"
+				},
+				{
+					"id": "Doctrine",
+					"kind": "Unlock",
+					"doctrinePoints": 2,
+					"benchmark": "Act3.Finale"
 				}
 			]
 		}

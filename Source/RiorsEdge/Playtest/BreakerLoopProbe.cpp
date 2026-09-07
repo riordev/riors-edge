@@ -6,6 +6,7 @@
 #include "Combat/BreakerBossEnemy.h"
 #include "Interaction/BreakerNPC.h"
 #include "Interaction/BreakerSurvivor.h"
+#include "Interaction/BreakerFinaleActor.h"
 #include "Save/BreakerMissionContent.h"
 #include "Save/BreakerQuestJournal.h"
 #include "Game/BreakerGameInstance.h"
@@ -54,7 +55,8 @@ void UBreakerLoopProbe::Initialize(FSubsystemCollectionBase& Collection)
         return;
     }
     StartedAt = FPlatformTime::Seconds();
-    bSurvivorLoop = FParse::Param(FCommandLine::Get(), TEXT("BreakerSurvivorLoop"));
+    bFinaleLoop = FParse::Param(FCommandLine::Get(), TEXT("BreakerFinaleLoop"));
+    bSurvivorLoop = bFinaleLoop || FParse::Param(FCommandLine::Get(), TEXT("BreakerSurvivorLoop"));
     bActTwo = bSurvivorLoop || FParse::Param(FCommandLine::Get(), TEXT("BreakerActTwoLoop"));
     if (bActTwo) UE_LOG(LogTemp, Display, TEXT("[LoopProbe] Act I + II earned-path mode: no seeded flags/points; authored visible dialogue choices, accelerated real kills, real travel. Not a Slate input test."));
     UE_LOG(LogTemp, Display, TEXT("[LoopProbe] isolated saves: %s"), *FPaths::ProjectSavedDir());
@@ -126,6 +128,33 @@ bool UBreakerLoopProbe::SelectDialogueFlag(ABreakerCharacter* Player, FName Flag
                             Player->TeleportTo(Survivor->GetActorLocation() + FVector(180, 0, 0), FRotator::ZeroRotator);
                             if (!Survivor->TryBeginEscort(Player)) return false;
                         }
+                        if (Selected.Action == EBreakerDialogueAction::MeetAlternate)
+                        {
+                            Player->TeleportTo(It->GetActorLocation() + FVector(150, 0, 0), FRotator::ZeroRotator);
+                            if (!ABreakerFinaleActor::TryMeetAlternate(*It, Player)) return false;
+                            continue;
+                        }
+                        if (Selected.Action == EBreakerDialogueAction::SealRifts || Selected.Action == EBreakerDialogueAction::HoldRifts)
+                        {
+                            ABreakerFinaleActor* Device = Cast<ABreakerFinaleActor>(*It);
+                            if (!Device) return false;
+                            Player->TeleportTo(Device->GetActorLocation() + FVector(150, 0, 0), FRotator::ZeroRotator);
+                            UBreakerProgressionComponent* Progress = Player->GetProgression();
+                            if (!bFinaleLevelFixture)
+                            {
+                                if (Progress->GetProgressionState().CharacterLevel >= 50 || Device->TryChooseFinale(Player, true))
+                                    return false;
+                                // Explicit level fixture after all actual mission actions.
+                                // This tests the cap gate, not natural levelling duration.
+                                UE_LOG(LogTemp, Display, TEXT("[LoopProbe] Finale level gate refused level %d; applying explicit XP fixture to level50. No quest flags/Doctrine are seeded."), Progress->GetProgressionState().CharacterLevel);
+                                Progress->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(50, Progress->ExperienceCurve) - Progress->GetTotalExperience());
+                                if (Progress->GetProgressionState().LevelDoctrinePointsGranted != 6
+                                    || Progress->GetProgressionState().UnspentDoctrinePoints != 6) return false;
+                                bFinaleLevelFixture = true;
+                            }
+                            if (!Device->TryChooseFinale(Player, Selected.Action == EBreakerDialogueAction::SealRifts)) return false;
+                            continue;
+                        }
                         Player->AddQuestFlag(Selected.SetsQuestFlag);
                         UE_LOG(LogTemp, Display, TEXT("[LoopProbe] dialogue %s: %s -> %s"), *It->GetDisplayName().ToString(), *Selected.Text, *Selected.SetsQuestFlag.ToString());
                     }
@@ -151,23 +180,47 @@ bool UBreakerLoopProbe::TickActTwo(ABreakerCharacter* Player, ABreakerGameMode* 
     UBreakerQuestJournal* Journal = Player->GetQuestJournal();
     UBreakerGameInstance* Session = Cast<UBreakerGameInstance>(GetGameInstance());
     if (!Journal || !Session) return Finish(false, TEXT("Campaign journal/session missing"));
+    if (bFinaleLoop && FParse::Param(FCommandLine::Get(), TEXT("BreakerActTwoPhotos")))
+    {
+        const bool bStripped = UBreakerGameInstance::IsStrippedEarthMap(World);
+        const bool bWon = UBreakerGameInstance::IsWinningEarthMap(World);
+        if ((bStripped && !bStrippedPhotoTaken) || (bWon && !bWinningPhotoTaken))
+        {
+            bStrippedPhotoTaken |= bStripped; bWinningPhotoTaken |= bWon;
+            const FString Directory = FPaths::ProjectSavedDir() / TEXT("Screenshots");
+            IFileManager::Get().MakeDirectory(*Directory, true);
+            PendingPhoto = Directory / (bStripped ? TEXT("finale-stripped-earth.png") : TEXT("finale-winning-earth.png"));
+            PhotoDelay = 2;
+            return true;
+        }
+    }
     const FBreakerMissionBeat* Beat = nullptr;
     for (const FBreakerMissionDefinition& Mission : UBreakerMissionLibrary::GetMissions())
     {
         if (Mission.Act > (bSurvivorLoop ? 3 : 2)) continue;
+        if (!bFinaleLoop && Mission.MissionId == FName(TEXT("Act3.Finale"))) continue;
         Beat = UBreakerMissionLibrary::CurrentBeat(Mission, Journal->GetState());
         if (Beat) break;
     }
     if (!Beat)
     {
+        if (bFinaleLoop && FinaleReloadStage < 2)
+        {
+            const FName Destination = FinaleReloadStage++ == 0 ? ABreakerTravelPoint::FernhallDestinationId : ABreakerTravelPoint::HubDestinationId;
+            return SelectTravel(Player, Destination) ? true : Finish(false, TEXT("Finale persisted reward reload travel failed"));
+        }
         const FBreakerProgressionState& Progress = Player->GetProgression()->GetProgressionState();
+        const int32 ExpectedDoctrine = bFinaleLoop ? 8 : bSurvivorLoop ? 6 : 4;
         const bool bCorrect = UBreakerGameInstance::IsAnchorMap(World) && bSawMarshal && BreachMaximumWave == 4
             && Journal->HasFlag(TEXT("Quest.Breach.TurnedIn"))
             && (!bSurvivorLoop || Journal->HasFlag(TEXT("Quest.Survivor.TurnedIn")))
-            && UBreakerMissionLibrary::DoctrinePointEntitlement(Journal->GetState()) == (bSurvivorLoop ? 6 : 4)
-            && Progress.LevelDoctrinePointsGranted == (bSurvivorLoop ? 6 : 4)
-            && Progress.UnspentDoctrinePoints == (bSurvivorLoop ? 6 : 4);
-        return Finish(bCorrect, bSurvivorLoop
+            && (!bFinaleLoop || (bFinaleLevelFixture && Journal->HasFlag(TEXT("Quest.Finale.TurnedIn"))
+                && Journal->HasFlag(TEXT("Quest.Finale.Seal")) && !Journal->HasFlag(TEXT("Quest.Finale.Hold"))))
+            && UBreakerMissionLibrary::DoctrinePointEntitlement(Journal->GetState()) == ExpectedDoctrine
+            && Progress.LevelDoctrinePointsGranted == ExpectedDoctrine && Progress.UnspentDoctrinePoints == ExpectedDoctrine;
+        return Finish(bCorrect, bFinaleLoop
+            ? TEXT("Actual campaign mission actions and finale choice persisted through reload: eight Doctrine; explicit level50 XP fixture, not natural levelling validation")
+            : bSurvivorLoop
             ? TEXT("Earned Act I + II + Survivor: physical escort, actual extraction and Anchor return, exactly six cumulative Doctrine points")
             : TEXT("Earned Act I + II: real dialogue/deaths/travel, dedicated contact, four-wave Field Marshal and exactly four cumulative Doctrine points"));
     }
@@ -180,14 +233,41 @@ bool UBreakerLoopProbe::TickActTwo(ABreakerCharacter* Player, ABreakerGameMode* 
     if (bDialogue)
     {
         const bool bMeetSurvivor = Beat->CompletesOn == FName(TEXT("Quest.Survivor.Met"));
+        const bool bMeetAlternate = Beat->CompletesOn == FName(TEXT("Quest.Finale.MetAlternate"));
         if (bMeetSurvivor && !UBreakerGameInstance::IsErasedEarthMap(World))
             return Finish(false, TEXT("Survivor meeting is not in the erased Earth"));
-        if (!bMeetSurvivor && !UBreakerGameInstance::IsAnchorMap(World))
+        if (bMeetAlternate && !UBreakerGameInstance::IsWinningEarthMap(World))
+            return Finish(false, TEXT("Alternate meeting is not in the Winning Earth"));
+        if (!bMeetSurvivor && !bMeetAlternate && !UBreakerGameInstance::IsAnchorMap(World))
             return SelectTravel(Player, ABreakerTravelPoint::HubDestinationId) ? true : Finish(false, TEXT("Campaign cannot return to Anchor"));
         return SelectDialogueFlag(Player, Beat->CompletesOn) ? true : Finish(false, TEXT("Campaign dialogue completion flag is not reachable through visible choices"));
     }
     if (Beat->Kind == EBreakerMissionBeatKind::Travel)
         return SelectTravel(Player, Beat->Destination) ? true : Finish(false, TEXT("Campaign destination unavailable"));
+    if (Beat->WorldEncounter == FName(TEXT("earth.rior_fragment")))
+    {
+        if (!UBreakerGameInstance::IsStrippedEarthMap(World)) return Finish(false, TEXT("Fragment recovery lost Stripped Earth"));
+        for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
+        {
+            if (It->IsDeadEnemy() || !It->ActorHasTag(TEXT("Finale.FragmentGuard"))) continue;
+            FBreakerDamageRequest Hit; Hit.BaseDamage = 100000000; Hit.bCanCritical = false; Hit.bBypassShield = true; Hit.SetInstigator(Player);
+            It->FindComponentByClass<UBreakerCombatComponent>()->ReceiveDamage(Hit);
+            if (It->IsDeadEnemy()) ++KilledEnemies;
+        }
+        for (TActorIterator<ABreakerFinaleActor> It(World); It; ++It)
+        {
+            if (!It->IsFragment() || !It->AreAllPocketsCleared()) continue;
+            const bool bArrived = Player->TeleportTo(It->GetActorLocation() + FVector(150, 0, 0), FRotator::ZeroRotator);
+            const bool bRecovered = It->TryRecoverFragment(Player);
+            if (!bRecovered)
+                UE_LOG(LogTemp, Error, TEXT("[LoopProbe] Fragment refusal teleport=%d player=%s target=%s alive=%d accepted=%d arrived=%d survivor=%d candidateFlags=%d"),
+                    bArrived, *Player->GetActorLocation().ToString(), *It->GetActorLocation().ToString(), !Player->GetCombat()->IsDead(),
+                    Journal->HasFlag(TEXT("Quest.Finale.Accepted")), Journal->HasFlag(TEXT("Mission.Act3.Finale.Arrived")),
+                    Journal->HasFlag(TEXT("Quest.Survivor.TurnedIn")), UBreakerMissionLibrary::WorldEncounterCompletionFlagsFor(TEXT("earth.rior_fragment"), Journal->GetState()).Num());
+            return bRecovered ? true : Finish(false, TEXT("Physical fragment interaction refused after confirmed clear"));
+        }
+        return true;
+    }
     if (Beat->WorldEncounter == FName(TEXT("earth.survivor_extraction")))
     {
         if (!UBreakerGameInstance::IsErasedEarthMap(World)) return Finish(false, TEXT("Extraction beat lost its actual Earth"));
@@ -370,7 +450,7 @@ bool UBreakerLoopProbe::TickMarshalPhotos(float DeltaSeconds)
 
 bool UBreakerLoopProbe::TickProbe(float DeltaSeconds)
 {
-    if (FPlatformTime::Seconds() - StartedAt > (bSurvivorLoop ? 400.0 : bActTwo ? 250.0 : 150.0))
+    if (FPlatformTime::Seconds() - StartedAt > (bFinaleLoop ? 500.0 : bSurvivorLoop ? 400.0 : bActTwo ? 250.0 : 150.0))
         return Finish(false, TEXT("Travel/combat progression timed out"));
     UBreakerGameInstance* Session = Cast<UBreakerGameInstance>(GetGameInstance());
     UWorld* World = Session ? Session->GetWorld() : nullptr;

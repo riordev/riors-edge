@@ -27,8 +27,8 @@ bool FBreakerHubTravelRegistryTest::RunTest(const FString& Parameters)
     // the original claim exactly as strong and adds the new one, rather than
     // loosening a 3 into a 4 and losing what the 3 was asserting.
     //
-    // GENERAL destinations — four: the gym, the way back (the Anchor), Earth, and
-    // the Fernhall approach. The old "no third destination without checking
+    // GENERAL destinations — six: gym, Anchor, Fernhall and three earned
+    // erased Earths. The old "no third destination without checking
     // the selection UI exists" reason is discharged: SBreakerMenu's travel
     // screen is a real multi-card picker over GetAvailableDestinations.
     //
@@ -51,7 +51,7 @@ bool FBreakerHubTravelRegistryTest::RunTest(const FString& Parameters)
         if (!Destination.bEnabled) continue;
         if (Destination.bDoorOnly) ++DoorOnlyCount; else ++GeneralCount;
     }
-    TestEqual(TEXT("Exactly four general destinations: gym, Anchor, Fernhall, and earned Earth"), GeneralCount, 4);
+    TestEqual(TEXT("Exactly six general destinations: gym, Anchor, Fernhall, and three earned Earths"), GeneralCount, 6);
     TestEqual(TEXT("Exactly one door-only destination: the Local Rift"), DoorOnlyCount, 1);
 
     // A travel point never offers the place it stands in, which is what keeps

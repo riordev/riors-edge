@@ -1481,6 +1481,616 @@
 					]
 				}
 			]
+		},
+		{
+			"id": "Researcher",
+			"displayName": "THE RESEARCHER",
+			"startNodeId": "Before",
+			"nodes": [
+				{
+					"nodeId": "Before",
+					"speakerLine": "The instruments are still running. Give me a moment.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "[Leave] I'll be back.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "FinaleLead",
+					"speakerLine": "The person you brought back described a world without industry. This signal comes from one that solved the problems ours could not. There is almost nothing left of it.",
+					"requiredFlags": [
+						"Quest.Survivor.TurnedIn"
+					],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "What happened there?",
+							"nextNodeId": "FinaleOffer",
+							"setsQuestFlag": "Quest.Finale.Offered",
+							"requiredFlags": [
+								"Quest.Survivor.TurnedIn"
+							],
+							"blockedByFlags": [
+								"Quest.Finale.Accepted"
+							],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] I'll be back.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "FinaleOffer",
+					"speakerLine": "I worked with Rior on the transfer array. Those are our couplings in the survey image. Someone used them to take that Earth apart. Recover the working fragment at the extraction rig; I can reconstruct the routing from it.",
+					"requiredFlags": [
+						"Quest.Survivor.TurnedIn"
+					],
+					"blockedByFlags": [
+						"Quest.Finale.Accepted"
+					],
+					"choices": [
+						{
+							"text": "[Accept] I'll recover the fragment.",
+							"nextNodeId": "Progress",
+							"setsQuestFlag": "Quest.Finale.Accepted",
+							"requiredFlags": [
+								"Quest.Survivor.TurnedIn"
+							],
+							"blockedByFlags": [
+								"Quest.Finale.Accepted"
+							],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] I'll be back.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Progress",
+					"speakerLine": "The fragment sits inside the stripped Earth's extraction rig. Bring back the assembly, not a transcription.",
+					"requiredFlags": [
+						"Quest.Survivor.TurnedIn"
+					],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "[Leave] I'll be back.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Reconstruct",
+					"speakerLine": "These are working notes: 'Transfer demand exceeds local renewal. Receiving timelines must close their draw before the source can recover.' That correction was in the original model. I am leaving the extraction stage disconnected.",
+					"requiredFlags": [
+						"Quest.Survivor.TurnedIn",
+						"Quest.Finale.Accepted",
+						"Quest.Finale.FragmentRecovered",
+						"Quest.Finale.ReturnedWithFragment"
+					],
+					"blockedByFlags": [
+						"Quest.Finale.Reconstructed"
+					],
+					"choices": [
+						{
+							"text": "[Reconstruct] Show me the surviving route.",
+							"nextNodeId": "WonRoute",
+							"setsQuestFlag": "Quest.Finale.Reconstructed",
+							"requiredFlags": [
+								"Quest.Survivor.TurnedIn",
+								"Quest.Finale.Accepted",
+								"Quest.Finale.FragmentRecovered",
+								"Quest.Finale.ReturnedWithFragment"
+							],
+							"blockedByFlags": [
+								"Quest.Finale.Reconstructed"
+							],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] I'll be back.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "WonRoute",
+					"speakerLine": "One coordinate still resolves to an inhabited Earth. Their array stopped before ours did. Go there. See what remained.",
+					"requiredFlags": [
+						"Quest.Survivor.TurnedIn",
+						"Quest.Finale.Accepted",
+						"Quest.Finale.FragmentRecovered",
+						"Quest.Finale.ReturnedWithFragment"
+					],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "[Leave] I'll be back.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "DeviceReady",
+					"speakerLine": "The assembly is ready. The control face shows both outcomes. I will not choose for you.",
+					"requiredFlags": [
+						"Quest.Survivor.TurnedIn",
+						"Quest.Finale.Accepted",
+						"Quest.Finale.FragmentRecovered",
+						"Quest.Finale.ReturnedWithFragment",
+						"Quest.Finale.Reconstructed",
+						"Quest.Finale.ArrivedWon",
+						"Quest.Finale.MetAlternate",
+						"Quest.Finale.ReturnedFromWon"
+					],
+					"blockedByFlags": [
+						"Quest.Finale.TurnedIn"
+					],
+					"choices": [
+						{
+							"text": "[Leave] I'll be back.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "SealEpilogue",
+					"speakerLine": "The receiver is quiet. I have kept the names we brought inside.",
+					"requiredFlags": [
+						"Quest.Finale.Seal",
+						"Quest.Finale.TurnedIn"
+					],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "[Leave] I'll be back.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "HoldEpilogue",
+					"speakerLine": "There are still voices on the receiver. I am leaving the extraction stage disconnected.",
+					"requiredFlags": [
+						"Quest.Finale.Hold",
+						"Quest.Finale.TurnedIn"
+					],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "[Leave] I'll be back.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				}
+			],
+			"entries": [
+				{
+					"startNodeId": "SealEpilogue",
+					"requiredFlags": [
+						"Quest.Finale.Seal",
+						"Quest.Finale.TurnedIn"
+					],
+					"blockedByFlags": []
+				},
+				{
+					"startNodeId": "HoldEpilogue",
+					"requiredFlags": [
+						"Quest.Finale.Hold",
+						"Quest.Finale.TurnedIn"
+					],
+					"blockedByFlags": []
+				},
+				{
+					"startNodeId": "DeviceReady",
+					"requiredFlags": [
+						"Quest.Survivor.TurnedIn",
+						"Quest.Finale.Accepted",
+						"Quest.Finale.FragmentRecovered",
+						"Quest.Finale.ReturnedWithFragment",
+						"Quest.Finale.Reconstructed",
+						"Quest.Finale.ArrivedWon",
+						"Quest.Finale.MetAlternate",
+						"Quest.Finale.ReturnedFromWon"
+					],
+					"blockedByFlags": [
+						"Quest.Finale.TurnedIn"
+					]
+				},
+				{
+					"startNodeId": "WonRoute",
+					"requiredFlags": [
+						"Quest.Survivor.TurnedIn",
+						"Quest.Finale.Accepted",
+						"Quest.Finale.FragmentRecovered",
+						"Quest.Finale.ReturnedWithFragment",
+						"Quest.Finale.Reconstructed"
+					],
+					"blockedByFlags": [
+						"Quest.Finale.ReturnedFromWon"
+					]
+				},
+				{
+					"startNodeId": "Reconstruct",
+					"requiredFlags": [
+						"Quest.Survivor.TurnedIn",
+						"Quest.Finale.Accepted",
+						"Quest.Finale.FragmentRecovered",
+						"Quest.Finale.ReturnedWithFragment"
+					],
+					"blockedByFlags": [
+						"Quest.Finale.Reconstructed"
+					]
+				},
+				{
+					"startNodeId": "Progress",
+					"requiredFlags": [
+						"Quest.Survivor.TurnedIn",
+						"Quest.Finale.Accepted"
+					],
+					"blockedByFlags": [
+						"Quest.Finale.FragmentRecovered"
+					]
+				},
+				{
+					"startNodeId": "FinaleOffer",
+					"requiredFlags": [
+						"Quest.Survivor.TurnedIn",
+						"Quest.Finale.Offered"
+					],
+					"blockedByFlags": [
+						"Quest.Finale.Accepted"
+					]
+				},
+				{
+					"startNodeId": "FinaleLead",
+					"requiredFlags": [
+						"Quest.Survivor.TurnedIn"
+					],
+					"blockedByFlags": [
+						"Quest.Finale.Offered",
+						"Quest.Finale.Accepted"
+					]
+				}
+			]
+		},
+		{
+			"id": "FinaleFragment",
+			"displayName": "WORKING FRAGMENT",
+			"startNodeId": "Recover",
+			"nodes": [
+				{
+					"nodeId": "Recover",
+					"speakerLine": "A transfer assembly remains bolted to the extraction rig. Its working slate still records the draw from this Earth.",
+					"requiredFlags": [
+						"Quest.Survivor.TurnedIn",
+						"Quest.Finale.Accepted"
+					],
+					"blockedByFlags": [
+						"Quest.Finale.FragmentRecovered"
+					],
+					"choices": [
+						{
+							"text": "[Recover] Remove the working fragment.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [
+								"Quest.Survivor.TurnedIn",
+								"Quest.Finale.Accepted"
+							],
+							"blockedByFlags": [
+								"Quest.Finale.FragmentRecovered"
+							],
+							"action": "RecoverFragment"
+						},
+						{
+							"text": "[Leave] I'll be back.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Blocked",
+					"speakerLine": "Clear the nearby Vestige guards, then approach the rig to recover the fragment.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "[Close] Return to the rig.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				}
+			],
+			"entries": []
+		},
+		{
+			"id": "AlternateSelf",
+			"displayName": "A FAMILIAR FACE",
+			"startNodeId": "Meet",
+			"nodes": [
+				{
+					"nodeId": "Meet",
+					"speakerLine": "You stop at the same distance I did. We shut their array down here. The town is still ours. Come and sit a moment; you look as if you have been walking for days.",
+					"requiredFlags": [
+						"Quest.Survivor.TurnedIn",
+						"Quest.Finale.Accepted",
+						"Quest.Finale.FragmentRecovered",
+						"Quest.Finale.ReturnedWithFragment",
+						"Quest.Finale.Reconstructed",
+						"Quest.Finale.ArrivedWon"
+					],
+					"blockedByFlags": [
+						"Quest.Finale.MetAlternate"
+					],
+					"choices": [
+						{
+							"text": "[Meet] We made it here.",
+							"nextNodeId": "",
+							"setsQuestFlag": "Quest.Finale.MetAlternate",
+							"requiredFlags": [
+								"Quest.Survivor.TurnedIn",
+								"Quest.Finale.Accepted",
+								"Quest.Finale.FragmentRecovered",
+								"Quest.Finale.ReturnedWithFragment",
+								"Quest.Finale.Reconstructed",
+								"Quest.Finale.ArrivedWon"
+							],
+							"blockedByFlags": [
+								"Quest.Finale.MetAlternate"
+							],
+							"action": "MeetAlternate"
+						},
+						{
+							"text": "[Leave] I'll be back.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "After",
+					"speakerLine": "There is a spare place at the table. It will be here when you come back.",
+					"requiredFlags": [
+						"Quest.Survivor.TurnedIn",
+						"Quest.Finale.Accepted",
+						"Quest.Finale.FragmentRecovered",
+						"Quest.Finale.ReturnedWithFragment",
+						"Quest.Finale.Reconstructed",
+						"Quest.Finale.ArrivedWon",
+						"Quest.Finale.MetAlternate"
+					],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "[Leave] I'll be back.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				}
+			],
+			"entries": [
+				{
+					"startNodeId": "After",
+					"requiredFlags": [
+						"Quest.Survivor.TurnedIn",
+						"Quest.Finale.Accepted",
+						"Quest.Finale.FragmentRecovered",
+						"Quest.Finale.ReturnedWithFragment",
+						"Quest.Finale.Reconstructed",
+						"Quest.Finale.ArrivedWon",
+						"Quest.Finale.MetAlternate"
+					],
+					"blockedByFlags": []
+				}
+			]
+		},
+		{
+			"id": "FinaleDevice",
+			"displayName": "THE ASSEMBLED DEVICE",
+			"startNodeId": "Choice",
+			"nodes": [
+				{
+					"nodeId": "Choice",
+					"speakerLine": "SEAL closes every rift permanently. This timeline is safe; every timeline beyond the rifts, and every refugee not inside an Anchor, is erased as if they never existed.\n\nHOLD leaves the doors open. Those people can still be reached. The transfer method remains usable, including by those who stripped the other Earth.\n\nBoth choices lead into the same endgame. The decision is available at level 50.",
+					"requiredFlags": [
+						"Quest.Survivor.TurnedIn",
+						"Quest.Finale.Accepted",
+						"Quest.Finale.FragmentRecovered",
+						"Quest.Finale.ReturnedWithFragment",
+						"Quest.Finale.Reconstructed",
+						"Quest.Finale.ArrivedWon",
+						"Quest.Finale.MetAlternate",
+						"Quest.Finale.ReturnedFromWon"
+					],
+					"blockedByFlags": [
+						"Quest.Finale.TurnedIn"
+					],
+					"choices": [
+						{
+							"text": "[SEAL] Make this timeline safe. Erase the worlds beyond.",
+							"nextNodeId": "",
+							"setsQuestFlag": "Quest.Finale.TurnedIn",
+							"requiredFlags": [
+								"Quest.Survivor.TurnedIn",
+								"Quest.Finale.Accepted",
+								"Quest.Finale.FragmentRecovered",
+								"Quest.Finale.ReturnedWithFragment",
+								"Quest.Finale.Reconstructed",
+								"Quest.Finale.ArrivedWon",
+								"Quest.Finale.MetAlternate",
+								"Quest.Finale.ReturnedFromWon"
+							],
+							"blockedByFlags": [
+								"Quest.Finale.Seal",
+								"Quest.Finale.Hold",
+								"Quest.Finale.TurnedIn"
+							],
+							"action": "SealRifts"
+						},
+						{
+							"text": "[HOLD] Keep the refugees reachable. Leave the method intact.",
+							"nextNodeId": "",
+							"setsQuestFlag": "Quest.Finale.TurnedIn",
+							"requiredFlags": [
+								"Quest.Survivor.TurnedIn",
+								"Quest.Finale.Accepted",
+								"Quest.Finale.FragmentRecovered",
+								"Quest.Finale.ReturnedWithFragment",
+								"Quest.Finale.Reconstructed",
+								"Quest.Finale.ArrivedWon",
+								"Quest.Finale.MetAlternate",
+								"Quest.Finale.ReturnedFromWon"
+							],
+							"blockedByFlags": [
+								"Quest.Finale.Seal",
+								"Quest.Finale.Hold",
+								"Quest.Finale.TurnedIn"
+							],
+							"action": "HoldRifts"
+						},
+						{
+							"text": "[Leave] I'll be back.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "SealEpilogue",
+					"speakerLine": "SEAL selected. The receiver is silent. The names of those inside the Anchor remain.",
+					"requiredFlags": [
+						"Quest.Finale.Seal",
+						"Quest.Finale.TurnedIn"
+					],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "[Leave] I'll be back.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "HoldEpilogue",
+					"speakerLine": "HOLD selected. The receiver still carries living voices. The work of reaching them continues.",
+					"requiredFlags": [
+						"Quest.Finale.Hold",
+						"Quest.Finale.TurnedIn"
+					],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "[Leave] I'll be back.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "LevelRequired",
+					"speakerLine": "The assembled device requires level 50. Your recovered work is safe; return when you reach level 50 to choose SEAL or HOLD.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "[Close] Return at level 50.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				}
+			],
+			"entries": [
+				{
+					"startNodeId": "SealEpilogue",
+					"requiredFlags": [
+						"Quest.Finale.Seal",
+						"Quest.Finale.TurnedIn"
+					],
+					"blockedByFlags": []
+				},
+				{
+					"startNodeId": "HoldEpilogue",
+					"requiredFlags": [
+						"Quest.Finale.Hold",
+						"Quest.Finale.TurnedIn"
+					],
+					"blockedByFlags": []
+				}
+			]
 		}
 	]
 }

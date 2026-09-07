@@ -6,8 +6,8 @@
 
 // THE POINT BUDGETS ARE HELD BY THE VALIDATOR, NOT BY THE AUTHOR'S ARITHMETIC.
 //
-// Doctrine points are paid two per main-story benchmark, one benchmark per
-// act, eight in all (O111); Core world points are fifteen named sources, each
+// Doctrine points are paid two per explicit main-story benchmark across
+// three acts, eight in all (O111); Core world points are fifteen named sources, each
 // granted once, in the act that names them (O7). A mission file that pays
 // seven, or nine, or a source nobody registered, or the same source twice,
 // must refuse to load — because the alternative is a character paid the
@@ -33,15 +33,19 @@ namespace
     FString BreakerMissionTestFile(const TArray<FBreakerMissionTestRow>& Rows)
     {
         FString Out = TEXT("{ \"version\": 1, \"rifts\": [], \"missions\": [");
+        int32 ActThreeRows = 0;
         for (int32 Index = 0; Index < Rows.Num(); ++Index)
         {
             const FBreakerMissionTestRow& Row = Rows[Index];
             if (Index > 0) { Out += TEXT(","); }
-            Out += FString::Printf(TEXT("{ \"id\": \"Act%d.Test%d\", \"act\": %d, \"title\": \"\", \"quests\": [], \"beats\": ["), Row.Act, Index, Row.Act);
+            const FString Benchmark = Row.Act == 1 ? TEXT("Act1.Fernhall") : Row.Act == 2 ? TEXT("Act2.Breach")
+                : Row.Act == 3 ? (++ActThreeRows == 1 ? TEXT("Act3.Survivor") : TEXT("Act3.Finale"))
+                : FString::Printf(TEXT("Act%d.Unknown"), Row.Act);
+            Out += FString::Printf(TEXT("{ \"id\": \"%s\", \"act\": %d, \"title\": \"\", \"quests\": [], \"beats\": ["), *Benchmark, Row.Act);
             bool bFirstBeat = true;
             if (Row.DoctrinePoints > 0)
             {
-                Out += FString::Printf(TEXT("{ \"id\": \"Doctrine\", \"kind\": \"Unlock\", \"doctrinePoints\": %d }"), Row.DoctrinePoints);
+                Out += FString::Printf(TEXT("{ \"id\": \"Doctrine\", \"kind\": \"Unlock\", \"doctrinePoints\": %d, \"benchmark\": \"%s\" }"), Row.DoctrinePoints, *Benchmark);
                 bFirstBeat = false;
             }
             for (int32 Core = 0; Core < Row.CorePoints.Num(); ++Core)
@@ -98,7 +102,7 @@ bool FBreakerMissionPointBudgetsTest::RunTest(const FString& Parameters)
 
     // ---- doctrine: the whole grant across every benchmark ------------------
     TArray<FBreakerMissionTestRow> AllActs;
-    for (int32 Act = 1; Act <= Benchmarks; ++Act) { AllActs.Add({ Act, PerBenchmark, {} }); }
+    for (int32 Index = 0; Index < Benchmarks; ++Index) { AllActs.Add({ FMath::Min(Index + 1, 3), PerBenchmark, {} }); }
     TestTrue(TEXT("Every benchmark paid is the whole grant and is clean"),
         UBreakerMissionLibrary::ParseMissionsJson(BreakerMissionTestFile(AllActs), Data, Errors));
     TestEqual(TEXT("No complaints"), Errors.Num(), 0);

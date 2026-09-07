@@ -10,6 +10,8 @@
 #include "Progression/BreakerProgressionNode.h"
 #include "Progression/BreakerBuildConditions.h"
 #include "Progression/BreakerProgressionTree.h"
+#include "Save/BreakerMissionContent.h"
+#include "Save/BreakerQuestJournal.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerFallbackTreeIntegrityTest,
@@ -297,10 +299,8 @@ bool FBreakerNodePurchaseFlowTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Crit chance aggregates from the crit rims"), Progression->GetNodeStats().CriticalChanceBonus, 0.04f, 0.0001f);
     TestEqual(TEXT("Crit damage aggregates from Ledger and Tunnel Vision"), Progression->GetNodeStats().CriticalMultiplierBonus, 0.22f, 0.0001f);
 
-    // O111: THE DOCTRINE WALLET IS FILLED BY COMMITMENT, NOT BY LEVELLING.
-    // A doctrine node is unaffordable until the Forge pays the eight, and that
-    // ordering is the ruling rather than a rig detail -- so the purchase is
-    // asserted to FAIL first, then to succeed once committed.
+    // The empty Doctrine wallet cannot purchase; commitment selects the board
+    // while completed mission benchmarks supply its points.
     FText CommitFailure;
     TestFalse(TEXT("A doctrine node is unaffordable before commitment"),
         Progression->PurchaseNode(Kinetic, TEXT("Swift.Kinetic.Carry"), Failure));
@@ -309,13 +309,29 @@ bool FBreakerNodePurchaseFlowTest::RunTest(const FString& Parameters)
     // COMMITMENT PAYS NOTHING. It used to hand over the whole eight; the pool
     // is now earned at four benchmarks, so committing chooses WHERE points go
     // and the benchmarks decide WHEN they exist. This fixture reaches the
-    // points by levelling to the cap rather than by committing.
+    // level prerequisite through XP, then settles the completed mission journal.
     TestEqual(TEXT("Committing pays no points by itself"),
         Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
     // Reach the last benchmark the way the game does -- XP, not a setter.
     const FBreakerExperienceCurve BenchmarkCurve;
     Progression->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(
         UBreakerProgressionLibrary::CorePointCapLevel, BenchmarkCurve) - Progression->GetTotalExperience());
+    // Completed-campaign journal fixture, not a playthrough claim. The native
+    // finale probe earns the physical actions; this tests spending their pool.
+    TestEqual(TEXT("Level cap alone pays no Doctrine"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
+    TestEqual(TEXT("Fixture reaches actual level fifty"), Progression->GetCharacterLevel(), 50);
+    UBreakerQuestJournal* Journal = NewObject<UBreakerQuestJournal>();
+    FBreakerQuestFlagSet CompletedCampaign;
+    for (const FBreakerMissionDefinition& Mission : UBreakerMissionLibrary::GetMissions())
+        for (const FBreakerMissionBeat& Beat : Mission.Beats)
+            for (FName Flag : UBreakerMissionLibrary::BeatCompletionFlags(Beat)) CompletedCampaign.Add(Flag);
+    CompletedCampaign.Add(TEXT("Quest.Finale.Seal")); // One explicit ending in this completed-state fixture.
+    Journal->RestoreFrom(CompletedCampaign);
+    TestEqual(TEXT("Authored completed benchmarks owe exactly eight"), UBreakerMissionLibrary::DoctrinePointEntitlement(Journal->GetState()), 8);
+    Progression->SettleDoctrineEntitlement(Journal->GetState());
+    TestEqual(TEXT("Settlement records exactly eight paid"), Progression->GetProgressionState().LevelDoctrinePointsGranted, 8);
+    Progression->SettleDoctrineEntitlement(Journal->GetState());
+    TestEqual(TEXT("Replaying the same journal cannot pay sixteen"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 8);
     TestEqual(TEXT("Reaching the last benchmark pays the whole pool"),
         Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),
         UBreakerProgressionLibrary::DoctrinePointGrant);
@@ -363,7 +379,7 @@ bool FBreakerNodePurchaseFlowTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Doctrine effects are cleared"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.0f, 0.0001f);
     // AND THE FARM STAYS CLOSED, which is the half worth keeping from the old
     // rule. Re-committing pays nothing, so respec-then-recommit cannot mint: the
-    // grant is a function of level settled against a counter, not an event.
+    // grant is mission entitlement settled against a counter, not commitment.
     TestTrue(TEXT("Re-committing succeeds"),
         Progression->CommitToBranch(TEXT("Doctrine.Swift.Kinetic"), CommitFailure));
     TestEqual(TEXT("...and pays nothing, so eight never becomes sixteen"),

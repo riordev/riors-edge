@@ -29,7 +29,11 @@ enum class EBreakerDialogueAction : uint8
     // INVENTORY button opens two clicks deep.
     OpenForge,
     // Starts/restarts the physically present Survivor's escort; not a flag-only completion.
-    StartSurvivorEscort
+    StartSurvivorEscort,
+    RecoverFragment,
+    SealRifts,
+    HoldRifts,
+    MeetAlternate
 };
 
 USTRUCT(BlueprintType)

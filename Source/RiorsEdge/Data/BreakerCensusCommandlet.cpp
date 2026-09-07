@@ -38,10 +38,10 @@ DEFINE_LOG_CATEGORY_STATIC(LogBreakerCensus, Log, All);
 
 namespace
 {
-    int32 BreakerCreateRescueMap()
+    int32 BreakerCreateRescueMap(const TCHAR* MapName = TEXT("Lvl_ErasedEarth"))
     {
 #if WITH_EDITOR
-        const FString PackageName(TEXT("/Game/Breaker/Maps/Lvl_ErasedEarth"));
+        const FString PackageName = FString::Printf(TEXT("/Game/Breaker/Maps/%s"), MapName);
         const FString Filename = FPackageName::LongPackageNameToFilename(PackageName, FPackageName::GetMapPackageExtension());
         // This is a creation command, never an editor or migration for an existing map.
         if (FPackageName::DoesPackageExist(PackageName) || IFileManager::Get().FileExists(*Filename)
@@ -53,11 +53,11 @@ namespace
         UPackage* Package = CreatePackage(*PackageName);
         UWorld::InitializationValues Init;
         Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
-        UWorld* World = UWorld::CreateWorld(EWorldType::Editor, false, TEXT("Lvl_ErasedEarth"), Package,
+        UWorld* World = UWorld::CreateWorld(EWorldType::Editor, false, FName(MapName), Package,
             true, ERHIFeatureLevel::Num, &Init);
         if (!World)
         {
-            UE_LOG(LogBreakerCensus, Error, TEXT("[CreateRescueMap] World creation failed"));
+            UE_LOG(LogBreakerCensus, Error, TEXT("[CreateRescueMap] World creation failed: %s"), *PackageName);
             return 1;
         }
         ON_SCOPE_EXIT { World->DestroyWorld(false); };
@@ -70,7 +70,7 @@ namespace
         AActor* Atmosphere = World->SpawnActor<AActor>();
         if (!Settings || !Start || !Sun || !Sky || !Atmosphere)
         {
-            UE_LOG(LogBreakerCensus, Error, TEXT("[CreateRescueMap] Required map actor creation failed"));
+            UE_LOG(LogBreakerCensus, Error, TEXT("[CreateRescueMap] Required map actor creation failed: %s"), *PackageName);
             return 1;
         }
         Settings->DefaultGameMode = ABreakerGameMode::StaticClass();
@@ -91,7 +91,11 @@ namespace
         Atmosphere->SetRootComponent(Air);
         Air->RegisterComponent();
         Package->MarkPackageDirty();
-        if (!IFileManager::Get().MakeDirectory(*FPaths::GetPath(Filename), true)) return 1;
+        if (!IFileManager::Get().MakeDirectory(*FPaths::GetPath(Filename), true))
+        {
+            UE_LOG(LogBreakerCensus, Error, TEXT("[CreateRescueMap] Cannot create output directory: %s"), *Filename);
+            return 1;
+        }
         FSavePackageArgs SaveArgs;
         SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
         SaveArgs.SaveFlags = SAVE_NoError;
@@ -100,7 +104,7 @@ namespace
             UE_LOG(LogBreakerCensus, Error, TEXT("[CreateRescueMap] Save failed: %s"), *Filename);
             return 1;
         }
-        UE_LOG(LogBreakerCensus, Display, TEXT("[CreateRescueMap] Created %s; runtime rescue builder supplies terrain and encounters."), *Filename);
+        UE_LOG(LogBreakerCensus, Display, TEXT("[CreateRescueMap] Created %s; runtime campaign builder supplies terrain and encounters."), *Filename);
         return 0;
 #else
         UE_LOG(LogBreakerCensus, Error, TEXT("[CreateRescueMap] Requires an editor build."));
@@ -188,6 +192,21 @@ UBreakerCensusCommandlet::UBreakerCensusCommandlet()
 int32 UBreakerCensusCommandlet::Main(const FString& Params)
 {
     if (FParse::Param(*Params, TEXT("CreateRescueMap"))) return BreakerCreateRescueMap();
+    if (FParse::Param(*Params, TEXT("CreateFinaleMaps")))
+    {
+        int32 Failures = 0;
+        // Fixed authored destinations only; no caller-supplied package path.
+        // An existing map is refused individually, never overwritten. The
+        // other missing map can still be created after a partial prior run.
+        for (const TCHAR* MapName : { TEXT("Lvl_StrippedEarth"), TEXT("Lvl_WinningEarth") })
+        {
+            const int32 Result = BreakerCreateRescueMap(MapName);
+            UE_LOG(LogBreakerCensus, Display, TEXT("[CreateFinaleMaps] %s: %s"), MapName,
+                Result == 0 ? TEXT("CREATED") : TEXT("FAILED OR EXISTING (not overwritten)"));
+            Failures += Result != 0 ? 1 : 0;
+        }
+        return Failures == 0 ? 0 : 1;
+    }
     // Optional read-only geometry probe exits BEFORE every canonical data export.
     if (FParse::Param(*Params, TEXT("MeshAudit"))) return BreakerAuditArmMeshes();
     const TArray<UBreakerProgressionTree*>& Trees = UBreakerProgressionLibrary::GetAllFallbackTrees();

@@ -150,6 +150,8 @@ public:
     static const TCHAR* GymMapName()      { return TEXT("Lvl_Gym"); }
     static const TCHAR* FernhallMapName() { return TEXT("Lvl_Fernhall"); }
     static const TCHAR* ErasedEarthMapName() { return TEXT("Lvl_ErasedEarth"); }
+    static const TCHAR* StrippedEarthMapName() { return TEXT("Lvl_StrippedEarth"); }
+    static const TCHAR* WinningEarthMapName() { return TEXT("Lvl_WinningEarth"); }
 
     // What a map is FOR. The game mode is shared across all of them, so it
     // asks this rather than carrying a subclass per map — the alternative is
@@ -161,6 +163,8 @@ public:
     UFUNCTION(BlueprintPure, Category="Breaker|Session")
     static bool IsFernhallMap(const UObject* WorldContext);
     static bool IsErasedEarthMap(const UObject* WorldContext);
+    static bool IsStrippedEarthMap(const UObject* WorldContext);
+    static bool IsWinningEarthMap(const UObject* WorldContext);
     // Session intent alone cannot prove an arrival in a different world.
     static bool IsDestinationMap(const UObject* WorldContext, FName DestinationId);
     UFUNCTION(BlueprintPure, Category="Breaker|Session")

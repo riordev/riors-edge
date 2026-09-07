@@ -3,6 +3,10 @@
 #include "Characters/BreakerCharacter.h"
 #include "Interaction/BreakerNPC.h"
 #include "Interaction/BreakerSurvivor.h"
+#include "Interaction/BreakerFinaleActor.h"
+#include "Game/BreakerGameInstance.h"
+#include "Combat/BreakerCombatComponent.h"
+#include "Progression/BreakerProgressionComponent.h"
 #include "Save/BreakerQuestJournal.h"
 #include "InputCoreTypes.h"
 
@@ -43,6 +47,35 @@ FReply SBreakerMenu::SelectDialogueChoice(int32 ChoiceIndex)
         if (!Survivor || !Survivor->TryBeginEscort(Character.Get())) return FReply::Handled();
         Character->AddQuestFlag(Choice.SetsQuestFlag);
         Character->ResumeFromMenu();
+        return FReply::Handled();
+    }
+    if (Choice.Action == EBreakerDialogueAction::RecoverFragment
+        || Choice.Action == EBreakerDialogueAction::SealRifts || Choice.Action == EBreakerDialogueAction::HoldRifts)
+    {
+        ABreakerFinaleActor* Finale = Cast<ABreakerFinaleActor>(NPC);
+        if (!Finale) return FReply::Handled();
+        const bool bRecover = Choice.Action == EBreakerDialogueAction::RecoverFragment;
+        const bool bSeal = Choice.Action == EBreakerDialogueAction::SealRifts;
+        const bool bSucceeded = bRecover ? Finale->TryRecoverFragment(Character.Get()) : Finale->TryChooseFinale(Character.Get(), bSeal);
+        if (!bSucceeded)
+        {
+            DialogueNodeId = bRecover ? FName(TEXT("Blocked")) : FName(TEXT("LevelRequired"));
+            Rebuild(EBreakerMenuScreen::Dialogue);
+            return FReply::Handled();
+        }
+        if (bRecover) Character->ResumeFromMenu();
+        else
+        {
+            DialogueNodeId = bSeal ? FName(TEXT("SealEpilogue")) : FName(TEXT("HoldEpilogue"));
+            Rebuild(EBreakerMenuScreen::Dialogue);
+        }
+        return FReply::Handled();
+    }
+    if (Choice.Action == EBreakerDialogueAction::MeetAlternate)
+    {
+        if (!ABreakerFinaleActor::TryMeetAlternate(NPC, Character.Get())) return FReply::Handled();
+        if (Choice.NextNodeId.IsNone()) Character->ResumeFromMenu();
+        else { DialogueNodeId = Choice.NextNodeId; Rebuild(EBreakerMenuScreen::Dialogue); }
         return FReply::Handled();
     }
     Character->AddQuestFlag(Choice.SetsQuestFlag);

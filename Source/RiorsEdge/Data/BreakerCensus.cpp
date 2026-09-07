@@ -350,6 +350,7 @@ namespace
             if (Beat.DoctrinePoints > 0)
             {
                 Writer.WriteValue(TEXT("doctrinePoints"), Beat.DoctrinePoints);
+                Writer.WriteValue(TEXT("benchmark"), Beat.Benchmark.ToString());
             }
             if (!Beat.CorePoint.IsNone())
             {

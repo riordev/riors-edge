@@ -33,7 +33,18 @@
 		"Quest.Survivor.Met",
 		"Quest.Survivor.Extracted",
 		"Quest.Survivor.ReachedAnchor",
-		"Quest.Survivor.TurnedIn"
+		"Quest.Survivor.TurnedIn",
+		"Quest.Finale.Offered",
+		"Quest.Finale.Accepted",
+		"Quest.Finale.FragmentRecovered",
+		"Quest.Finale.ReturnedWithFragment",
+		"Quest.Finale.Reconstructed",
+		"Quest.Finale.ArrivedWon",
+		"Quest.Finale.MetAlternate",
+		"Quest.Finale.ReturnedFromWon",
+		"Quest.Finale.Seal",
+		"Quest.Finale.Hold",
+		"Quest.Finale.TurnedIn"
 	],
 	"quests": [
 		{
@@ -226,6 +237,54 @@
 				"itemCount": 2,
 				"minimumRarity": "Exceptional",
 				"itemLevel": 30
+			}
+		},
+		{
+			"id": "Quest.Finale",
+			"title": "WHAT REMAINS",
+			"giver": "THE RESEARCHER",
+			"offeredFlag": "Quest.Finale.Offered",
+			"acceptedFlag": "Quest.Finale.Accepted",
+			"turnedInFlag": "Quest.Finale.TurnedIn",
+			"objectives": [
+				{
+					"id": "Fragment",
+					"text": "Recover the working fragment from the stripped Earth's rig",
+					"completionFlag": "Quest.Finale.FragmentRecovered",
+					"progressCounter": "",
+					"requiredCount": 0,
+					"requiresEliteKill": false
+				},
+				{
+					"id": "Reconstruction",
+					"text": "Return the fragment to the Researcher and reconstruct its surviving route",
+					"completionFlag": "Quest.Finale.Reconstructed",
+					"progressCounter": "",
+					"requiredCount": 0,
+					"requiresEliteKill": false
+				},
+				{
+					"id": "Alternate",
+					"text": "Meet the living version of yourself in the Earth that won",
+					"completionFlag": "Quest.Finale.MetAlternate",
+					"progressCounter": "",
+					"requiredCount": 0,
+					"requiresEliteKill": false
+				},
+				{
+					"id": "Return",
+					"text": "Return to the Anchor and reach the assembled device",
+					"completionFlag": "Quest.Finale.ReturnedFromWon",
+					"progressCounter": "",
+					"requiredCount": 0,
+					"requiresEliteKill": false
+				}
+			],
+			"reward":
+			{
+				"itemCount": 2,
+				"minimumRarity": "Exceptional",
+				"itemLevel": 50
 			}
 		}
 	]

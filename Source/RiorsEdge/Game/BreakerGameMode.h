@@ -514,6 +514,16 @@ private:
     FVector SurvivorExtraction = FVector::ZeroVector;
     bool bSurvivorRosterValid = false;
     bool bAnchorSurvivorSpawned = false;
+    void BuildFinaleEarth(APawn* Player, bool bWinning);
+    void TickFinaleMission();
+    class ABreakerNPC* SpawnFinaleResident(FName RowId, const FVector& At, const FRotator& Facing);
+    TWeakObjectPtr<class ABreakerFinaleActor> FinaleFragment;
+    TArray<TWeakObjectPtr<class ABreakerEnemy>> FinaleEnemies;
+    TArray<int32> FinaleEnemyPockets;
+    TArray<bool> FinaleEnemyDeaths;
+    bool bFinaleRosterValid = false;
+    bool bResearcherSpawned = false;
+    bool bFinaleDeviceSpawned = false;
     void BindFernhallMissionJournal(APawn* Pawn);
     void RefreshFernhallMission(FName ChangedFlag = NAME_None);
     UFUNCTION() void HandleAlteredContactDeath();

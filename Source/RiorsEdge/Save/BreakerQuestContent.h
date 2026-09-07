@@ -86,6 +86,17 @@ namespace BreakerQuestFlags
     RIORSEDGE_API extern const FName SurvivorExtracted;
     RIORSEDGE_API extern const FName SurvivorReachedAnchor;
     RIORSEDGE_API extern const FName SurvivorTurnedIn;
+    RIORSEDGE_API extern const FName FinaleOffered;
+    RIORSEDGE_API extern const FName FinaleAccepted;
+    RIORSEDGE_API extern const FName FinaleFragmentRecovered;
+    RIORSEDGE_API extern const FName FinaleReturnedWithFragment;
+    RIORSEDGE_API extern const FName FinaleReconstructed;
+    RIORSEDGE_API extern const FName FinaleArrivedWon;
+    RIORSEDGE_API extern const FName FinaleMetAlternate;
+    RIORSEDGE_API extern const FName FinaleReturnedFromWon;
+    RIORSEDGE_API extern const FName FinaleSeal;
+    RIORSEDGE_API extern const FName FinaleHold;
+    RIORSEDGE_API extern const FName FinaleTurnedIn;
 }
 
 // Derived, never stored. A quest's state is a pure function of the flag set,

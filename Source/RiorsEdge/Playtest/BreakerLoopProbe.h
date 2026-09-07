@@ -30,6 +30,11 @@ private:
     double MarshalOrderSeen = 0;
     bool bActTwo = false;
     bool bSurvivorLoop = false;
+    bool bFinaleLoop = false;
+    bool bFinaleLevelFixture = false;
+    int32 FinaleReloadStage = 0;
+    bool bStrippedPhotoTaken = false;
+    bool bWinningPhotoTaken = false;
     int32 SurvivorRouteObserved = INDEX_NONE;
     bool bSawMarshal = false;
     int32 BreachMaximumWave = 0;

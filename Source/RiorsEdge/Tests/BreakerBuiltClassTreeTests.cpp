@@ -10,6 +10,8 @@
 #include "Progression/BreakerExperience.h"
 #include "Progression/BreakerProgressionNode.h"
 #include "Progression/BreakerProgressionTree.h"
+#include "Save/BreakerMissionContent.h"
+#include "Save/BreakerQuestJournal.h"
 
 // ---------------------------------------------------------------------------
 // GUNSMITH / TANK / SUPPORT BRANCH TREES — authored 2026-08-16 (owner
@@ -386,8 +388,8 @@ bool FBreakerBuiltClassTreesKeystoneBudgetTest::RunTest(const FString& Parameter
     UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>();
     TestTrue(TEXT("Choosing Gunsmith succeeds"), Progression->ChoosePermanentClassById(EBreakerClassId::Gunsmith));
 
-    // NOTHING IS GRANTED HERE. The commitment pays, which is the whole of O111's
-    // doctrine economy: a fresh Gunsmith holds no doctrine points at all.
+    // Neither class selection nor commitment pays: a fresh Gunsmith holds no
+    // Doctrine until completed mission benchmarks are settled.
     TestEqual(TEXT("A Gunsmith holds no doctrine points before committing"),
         Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
 
@@ -400,10 +402,26 @@ bool FBreakerBuiltClassTreesKeystoneBudgetTest::RunTest(const FString& Parameter
     // it stays the point now that the number comes from the game.
     TestEqual(TEXT("Committing pays no points by itself"),
         Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
-    // Reach the last benchmark the way the game does -- XP, not a setter.
+    // Level fifty is the final device prerequisite; XP alone grants no Doctrine.
     const FBreakerExperienceCurve BenchmarkCurve;
     Progression->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(
         UBreakerProgressionLibrary::CorePointCapLevel, BenchmarkCurve) - Progression->GetTotalExperience());
+    // Completed-campaign journal fixture, not a playthrough claim. The native
+    // finale probe earns the physical actions; this tests spending their pool.
+    TestEqual(TEXT("Level cap alone pays no Doctrine"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
+    TestEqual(TEXT("Fixture reaches actual level fifty"), Progression->GetCharacterLevel(), 50);
+    UBreakerQuestJournal* Journal = NewObject<UBreakerQuestJournal>();
+    FBreakerQuestFlagSet CompletedCampaign;
+    for (const FBreakerMissionDefinition& Mission : UBreakerMissionLibrary::GetMissions())
+        for (const FBreakerMissionBeat& Beat : Mission.Beats)
+            for (FName Flag : UBreakerMissionLibrary::BeatCompletionFlags(Beat)) CompletedCampaign.Add(Flag);
+    CompletedCampaign.Add(TEXT("Quest.Finale.Seal")); // One explicit ending in this completed-state fixture.
+    Journal->RestoreFrom(CompletedCampaign);
+    TestEqual(TEXT("Authored completed benchmarks owe exactly eight"), UBreakerMissionLibrary::DoctrinePointEntitlement(Journal->GetState()), 8);
+    Progression->SettleDoctrineEntitlement(Journal->GetState());
+    TestEqual(TEXT("Settlement records exactly eight paid"), Progression->GetProgressionState().LevelDoctrinePointsGranted, 8);
+    Progression->SettleDoctrineEntitlement(Journal->GetState());
+    TestEqual(TEXT("Replaying the same journal cannot pay sixteen"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 8);
     TestEqual(TEXT("Every benchmark passed pays exactly the grant"),
         Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),
         UBreakerProgressionLibrary::DoctrinePointGrant);

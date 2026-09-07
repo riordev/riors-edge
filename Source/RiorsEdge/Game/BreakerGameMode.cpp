@@ -4,6 +4,8 @@
 #include "Game/BreakerHubBuilder.h"
 #include "Game/BreakerErasedEarthBuilder.h"
 #include "Interaction/BreakerSurvivor.h"
+#include "Interaction/BreakerFinaleActor.h"
+#include "Game/BreakerFinaleEarthBuilder.h"
 #include "Game/BreakerZoneBuilder.h"
 #include "Game/BreakerGameInstance.h"
 #include "Game/BreakerDeathBudgetMath.h"
@@ -88,6 +90,7 @@ void ABreakerGameMode::Tick(float DeltaSeconds)
         BindFernhallMissionJournal(GetWorld()->GetFirstPlayerController()->GetPawn());
     ApplyAlteredContactWound();
     TickSurvivorMission();
+    TickFinaleMission();
 }
 
 void ABreakerGameMode::EndPlay(const EEndPlayReason::Type Reason)
@@ -151,6 +154,8 @@ void ABreakerGameMode::HandleHubTravelSelected(FName DestinationId, APawn* Reque
     if (!RequestingPawn) return;
     if (DestinationId == ABreakerTravelPoint::ErasedEarthDestinationId
         && !ABreakerTravelPoint::CanEnterErasedEarth(RequestingPawn)) return;
+    if ((DestinationId == ABreakerTravelPoint::StrippedEarthDestinationId || DestinationId == ABreakerTravelPoint::WinningEarthDestinationId)
+        && !ABreakerTravelPoint::CanEnterFinaleEarth(DestinationId, RequestingPawn)) return;
     // TRAVEL IS A LEVEL LOAD NOW, not a teleport. It was a teleport because
     // there was one map and both places were in it; with three maps the
     // destination does not exist until it is loaded.
@@ -187,6 +192,12 @@ void ABreakerGameMode::HandleHubTravelSelected(FName DestinationId, APawn* Reque
     if (DestinationId == ABreakerTravelPoint::ErasedEarthDestinationId)
     {
         UBreakerGameInstance::TravelTo(this, FName(UBreakerGameInstance::ErasedEarthMapName()));
+        return;
+    }
+    if (DestinationId == ABreakerTravelPoint::StrippedEarthDestinationId || DestinationId == ABreakerTravelPoint::WinningEarthDestinationId)
+    {
+        UBreakerGameInstance::TravelTo(this, FName(DestinationId == ABreakerTravelPoint::StrippedEarthDestinationId
+            ? UBreakerGameInstance::StrippedEarthMapName() : UBreakerGameInstance::WinningEarthMapName()));
         return;
     }
     // Any other id is refused rather than guessed at. The old teleport that
@@ -509,6 +520,14 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
     if (UBreakerGameInstance::IsErasedEarthMap(this))
     {
         BuildSurvivorMission(NewPlayer->GetPawn());
+        bPlaytestTargetsSpawned = true;
+        ScheduleScreenshots();
+        return;
+    }
+
+    if (UBreakerGameInstance::IsStrippedEarthMap(this) || UBreakerGameInstance::IsWinningEarthMap(this))
+    {
+        BuildFinaleEarth(NewPlayer->GetPawn(), UBreakerGameInstance::IsWinningEarthMap(this));
         bPlaytestTargetsSpawned = true;
         ScheduleScreenshots();
         return;
@@ -3541,6 +3560,140 @@ void ABreakerGameMode::HandleAlteredContactDeath()
     bAlteredContactDeathConsumed = true;
     for (FName Flag : UBreakerMissionLibrary::WorldEncounterCompletionFlagsFor(
         TEXT("fernhall.altered_contact"), Journal->GetState())) Journal->SetFlag(Flag);
+}
+
+ABreakerNPC* ABreakerGameMode::SpawnFinaleResident(FName RowId, const FVector& At, const FRotator& Facing)
+{
+    const FBreakerDialogueRow* Row = ABreakerNPC::GetDialogueData().Npcs.FindByPredicate(
+        [RowId](const FBreakerDialogueRow& Entry) { return Entry.Id == RowId; });
+    if (!Row || !GetWorld()) return nullptr;
+    const FTransform Transform(Facing, At);
+    ABreakerNPC* NPC = GetWorld()->SpawnActorDeferred<ABreakerNPC>(ABreakerNPC::StaticClass(), Transform,
+        nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
+    if (!NPC) return nullptr;
+    NPC->DisplayName = FText::FromString(Row->DisplayName);
+    NPC->StartNodeId = Row->StartNodeId; NPC->DialogueNodes = Row->Nodes; NPC->EntryOverrides = Row->Entries;
+    NPC->Tags.Add(RowId);
+    if (RowId == FName(TEXT("AlternateSelf")))
+    {
+        // The same currently equipped character mesh, presented as a living
+        // person. This actor has no combat component or enemy controller.
+        const ACharacter* Player = GetWorld()->GetFirstPlayerController()
+            ? Cast<ACharacter>(GetWorld()->GetFirstPlayerController()->GetPawn()) : nullptr;
+        if (Player && Player->GetMesh() && Player->GetMesh()->GetSkeletalMeshAsset())
+            NPC->BodyMeshAsset = FSoftObjectPath(Player->GetMesh()->GetSkeletalMeshAsset());
+        else NPC->BodyMeshAsset = FSoftObjectPath(TEXT("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple"));
+        // ApplyCharacterBody uses this mannequin family. A plain NPC cannot
+        // drive the Character-owned animation blueprint, so use its unarmed idle.
+        NPC->BodyIdleAnimation = FSoftObjectPath(TEXT("/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle.MM_Idle"));
+        NPC->BodyMeshRotation = FRotator(0, -90, 0);
+    }
+    NPC->FinishSpawning(Transform);
+    return NPC;
+}
+
+void ABreakerGameMode::BuildFinaleEarth(APawn* Player, bool bWinning)
+{
+    UWorld* World = GetWorld();
+    if (!World || !Player) return;
+    const FBreakerFinaleEarthLayout Layout = bWinning ? UBreakerFinaleEarthBuilder::BuildWon(World)
+        : UBreakerFinaleEarthBuilder::BuildStripped(World);
+    Player->TeleportTo(Layout.PlayerArrival, Layout.ArrivalFacing);
+    if (AController* Controller = Player->GetController()) Controller->SetControlRotation(Layout.ArrivalFacing);
+    if (bWinning)
+    {
+        ABreakerNPC* Alternate = SpawnFinaleResident(TEXT("AlternateSelf"), Layout.InteractionLocation, Layout.InteractionFacing);
+        if (Alternate && FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureAlternate")))
+        {
+            const FVector At = Alternate->GetActorLocation() + Alternate->GetActorForwardVector() * 450 + FVector(0, 0, 10);
+            const FRotator Facing = (Alternate->GetActorLocation() - At).Rotation();
+            Player->TeleportTo(At, Facing);
+            if (AController* Controller = Player->GetController()) Controller->SetControlRotation(Facing);
+        }
+    }
+    else
+    {
+        const FTransform Transform(Layout.InteractionFacing, Layout.InteractionLocation);
+        ABreakerFinaleActor* Fragment = World->SpawnActorDeferred<ABreakerFinaleActor>(ABreakerFinaleActor::StaticClass(),
+            Transform, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+        if (Fragment) { Fragment->ConfigureFragment(Layout.PocketCount); Fragment->FinishSpawning(Transform); }
+        FinaleFragment = Fragment;
+        bFinaleRosterValid = Fragment && Layout.PocketCount > 0 && !Layout.Enemies.IsEmpty();
+        for (const FBreakerFinaleEnemySpawn& Spawn : Layout.Enemies)
+        {
+            FActorSpawnParameters Parameters;
+            Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+            ABreakerEnemy* Enemy = World->SpawnActor<ABreakerEnemy>(Spawn.EnemyClass, Spawn.Location, FRotator::ZeroRotator, Parameters);
+            if (!Enemy) { bFinaleRosterValid = false; continue; }
+            Enemy->ConfigureWave(40); // O2 first finale recovery area.
+            UCapsuleComponent* Capsule = Enemy->FindComponentByClass<UCapsuleComponent>();
+            FCollisionQueryParams Query(SCENE_QUERY_STAT(FinaleEnemyFloor), false, Enemy);
+            FHitResult Floor;
+            if (!Capsule || !World->LineTraceSingleByObjectType(Floor, Spawn.Location + FVector(0, 0, 1000),
+                Spawn.Location - FVector(0, 0, 1000), FCollisionObjectQueryParams(ECC_WorldStatic), Query) || Floor.ImpactNormal.Z < 0.7f)
+            { Enemy->Destroy(); bFinaleRosterValid = false; continue; }
+            const FVector At = Floor.ImpactPoint + FVector(0, 0, Capsule->GetScaledCapsuleHalfHeight() + 2);
+            if (World->OverlapBlockingTestByChannel(At, FQuat::Identity, ECC_Pawn,
+                FCollisionShape::MakeCapsule(Capsule->GetScaledCapsuleRadius(), Capsule->GetScaledCapsuleHalfHeight()), Query))
+            { Enemy->Destroy(); bFinaleRosterValid = false; continue; }
+            Enemy->SetActorLocation(At); Enemy->ConfigureEncounter(At, FinaleEnemies.Num() * 1.3f);
+            Enemy->Tags.Add(TEXT("Finale.FragmentGuard"));
+            UBreakerKillTelemetryComponent::AttachTo(Enemy);
+            FinaleEnemies.Add(Enemy); FinaleEnemyPockets.Add(Spawn.PocketIndex); FinaleEnemyDeaths.Add(false);
+        }
+    }
+    for (const FVector At : {Layout.PlayerArrival + FVector(0, 450, 0), Layout.InteractionLocation + FVector(0, 500, 0)})
+    {
+        if (ABreakerTravelPoint* Gate = World->SpawnActor<ABreakerTravelPoint>(At, FRotator::ZeroRotator))
+        {
+            Gate->ExcludedDestinationId = bWinning ? ABreakerTravelPoint::WinningEarthDestinationId : ABreakerTravelPoint::StrippedEarthDestinationId;
+            Gate->OnDestinationSelected.AddUObject(this, &ABreakerGameMode::HandleHubTravelSelected);
+        }
+    }
+    UE_LOG(LogTemp, Display, TEXT("[Finale] %s built: %d finite enemies, rosterValid=%d"),
+        bWinning ? TEXT("Winning Earth") : TEXT("Stripped Earth"), FinaleEnemies.Num(), bFinaleRosterValid);
+}
+
+void ABreakerGameMode::TickFinaleMission()
+{
+    UWorld* World = GetWorld();
+    ABreakerCharacter* Player = World && World->GetFirstPlayerController()
+        ? Cast<ABreakerCharacter>(World->GetFirstPlayerController()->GetPawn()) : nullptr;
+    UBreakerQuestJournal* Journal = Player ? Player->GetQuestJournal() : nullptr;
+    if (!HasAuthority() || !Journal) return;
+    if (UBreakerGameInstance::IsAnchorMap(this))
+    {
+        if (!bResearcherSpawned && Journal->HasFlag(TEXT("Quest.Survivor.TurnedIn")))
+            bResearcherSpawned = SpawnFinaleResident(TEXT("Researcher"), HubOrigin - Frame.Right * 650
+                + Frame.Forward * 350 + FVector(0, 0, 90), (-Frame.Forward).Rotation()) != nullptr;
+        if (!bFinaleDeviceSpawned && Journal->HasFlag(TEXT("Quest.Finale.ReturnedFromWon")))
+        {
+            const FTransform Transform((-Frame.Forward).Rotation(), HubOrigin - Frame.Right * 650
+                + Frame.Forward * 700 + FVector(0, 0, 90));
+            ABreakerFinaleActor* Device = World->SpawnActorDeferred<ABreakerFinaleActor>(ABreakerFinaleActor::StaticClass(),
+                Transform, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
+            if (Device) { Device->ConfigureDevice(); Device->FinishSpawning(Transform); bFinaleDeviceSpawned = true; }
+        }
+    }
+    ABreakerFinaleActor* Fragment = FinaleFragment.Get();
+    if (!Fragment || !bFinaleRosterValid) return;
+    for (int32 Index = 0; Index < FinaleEnemies.Num(); ++Index)
+    {
+        if (FinaleEnemyDeaths[Index]) continue;
+        ABreakerEnemy* Enemy = FinaleEnemies[Index].Get();
+        const UBreakerCombatComponent* Combat = Enemy ? Enemy->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+        if (Combat && Combat->IsDead()) FinaleEnemyDeaths[Index] = true;
+        else if (!Enemy) bFinaleRosterValid = false;
+    }
+    TSet<int32> Pockets;
+    for (int32 Pocket : FinaleEnemyPockets) Pockets.Add(Pocket);
+    for (int32 Pocket : Pockets)
+    {
+        bool bCleared = bFinaleRosterValid;
+        for (int32 Index = 0; Index < FinaleEnemies.Num(); ++Index)
+            if (FinaleEnemyPockets[Index] == Pocket) bCleared &= FinaleEnemyDeaths[Index];
+        Fragment->SetPocketCleared(Pocket, bCleared);
+    }
 }
 
 void ABreakerGameMode::BuildSurvivorMission(APawn* Player)

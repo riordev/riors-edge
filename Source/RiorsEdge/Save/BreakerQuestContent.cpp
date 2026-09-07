@@ -43,6 +43,17 @@ namespace BreakerQuestFlags
     const FName SurvivorExtracted(TEXT("Quest.Survivor.Extracted"));
     const FName SurvivorReachedAnchor(TEXT("Quest.Survivor.ReachedAnchor"));
     const FName SurvivorTurnedIn(TEXT("Quest.Survivor.TurnedIn"));
+    const FName FinaleOffered(TEXT("Quest.Finale.Offered"));
+    const FName FinaleAccepted(TEXT("Quest.Finale.Accepted"));
+    const FName FinaleFragmentRecovered(TEXT("Quest.Finale.FragmentRecovered"));
+    const FName FinaleReturnedWithFragment(TEXT("Quest.Finale.ReturnedWithFragment"));
+    const FName FinaleReconstructed(TEXT("Quest.Finale.Reconstructed"));
+    const FName FinaleArrivedWon(TEXT("Quest.Finale.ArrivedWon"));
+    const FName FinaleMetAlternate(TEXT("Quest.Finale.MetAlternate"));
+    const FName FinaleReturnedFromWon(TEXT("Quest.Finale.ReturnedFromWon"));
+    const FName FinaleSeal(TEXT("Quest.Finale.Seal"));
+    const FName FinaleHold(TEXT("Quest.Finale.Hold"));
+    const FName FinaleTurnedIn(TEXT("Quest.Finale.TurnedIn"));
 }
 
 // ---------------------------------------------------------------------------

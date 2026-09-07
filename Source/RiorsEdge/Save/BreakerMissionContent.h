@@ -73,6 +73,8 @@ struct FBreakerMissionBeat
     int32 DoctrinePoints = 0;
     FName CorePoint = NAME_None;
     FName AbilityToken = NAME_None;
+    // Stable main-story benchmark identity, required only for Doctrine grants.
+    FName Benchmark = NAME_None;
 };
 
 // A rift by id, resolving to the yard's rift definition

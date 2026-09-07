@@ -17,9 +17,10 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerDestinationArrivalTest, "RiorsEdge.Miss
 bool FBreakerDestinationArrivalTest::RunTest(const FString& Parameters)
 {
     const FName Destinations[] = { ABreakerTravelPoint::HubDestinationId, ABreakerTravelPoint::GymDestinationId,
-        ABreakerTravelPoint::FernhallDestinationId, ABreakerTravelPoint::RiftDestinationId, ABreakerTravelPoint::ErasedEarthDestinationId };
+        ABreakerTravelPoint::FernhallDestinationId, ABreakerTravelPoint::RiftDestinationId, ABreakerTravelPoint::ErasedEarthDestinationId,
+        ABreakerTravelPoint::StrippedEarthDestinationId, ABreakerTravelPoint::WinningEarthDestinationId };
     const FString Maps[] = { TEXT("Lvl_Anchor"), TEXT("Lvl_Gym"), TEXT("Lvl_Fernhall"), TEXT("Lvl_FrontEnd"),
-        TEXT("Lvl_ErasedEarth"), TEXT("UEDPIE_0_Lvl_ErasedEarth") };
+        TEXT("Lvl_ErasedEarth"), TEXT("UEDPIE_0_Lvl_ErasedEarth"), TEXT("Lvl_StrippedEarth"), TEXT("Lvl_WinningEarth") };
     for (int32 MapIndex = 0; MapIndex < UE_ARRAY_COUNT(Maps); ++MapIndex)
     {
         UWorld::InitializationValues Init;
@@ -38,14 +39,17 @@ bool FBreakerDestinationArrivalTest::RunTest(const FString& Parameters)
             const bool Expected = (MapIndex == 0 && DestinationIndex == 0)
                 || (MapIndex == 1 && DestinationIndex == 1)
                 || (MapIndex == 2 && (DestinationIndex == 2 || DestinationIndex == 3))
-                || (MapIndex >= 4 && DestinationIndex == 4);
+                || ((MapIndex == 4 || MapIndex == 5) && DestinationIndex == 4)
+                || (MapIndex == 6 && DestinationIndex == 5) || (MapIndex == 7 && DestinationIndex == 6);
             TestEqual(FString::Printf(TEXT("Actual map %s verifies destination %s"), *Maps[MapIndex], *Destinations[DestinationIndex].ToString()),
                 UBreakerGameInstance::IsDestinationMap(World, Destinations[DestinationIndex]), Expected);
         }
         TestFalse(TEXT("Unknown destination never verifies"), UBreakerGameInstance::IsDestinationMap(World, TEXT("Unknown")));
         if (MapIndex >= 4)
         {
-            TestTrue(TEXT("Earth classification includes PIE prefix stripping"), UBreakerGameInstance::IsErasedEarthMap(World));
+            TestEqual(TEXT("Rescue Earth classification includes PIE prefix stripping"), UBreakerGameInstance::IsErasedEarthMap(World), MapIndex == 4 || MapIndex == 5);
+            TestEqual(TEXT("Stripped Earth is a separate world"), UBreakerGameInstance::IsStrippedEarthMap(World), MapIndex == 6);
+            TestEqual(TEXT("Winning Earth is a separate world"), UBreakerGameInstance::IsWinningEarthMap(World), MapIndex == 7);
             TestFalse(TEXT("Earth never falls into Gym content"), UBreakerGameInstance::IsGymMap(World));
         }
         if (MapIndex != 0) continue;

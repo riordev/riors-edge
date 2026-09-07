@@ -211,6 +211,7 @@ namespace
             if (Row.HasField(TEXT("doctrinePoints")))
             {
                 ++Grants;
+                bOk = BreakerMissionReadName(Row, TEXT("benchmark"), Where, Out.Benchmark, Errors) && bOk;
                 if (BreakerMissionReadInt(Row, TEXT("doctrinePoints"), Where, Out.DoctrinePoints, Errors))
                 {
                     if (Out.DoctrinePoints <= 0)
@@ -239,7 +240,12 @@ namespace
                 Errors.Add(FString::Printf(TEXT("%s: an Unlock grants exactly one of \"doctrinePoints\", \"corePoint\", \"abilityToken\" (found %d)"), *Where, Grants));
                 bOk = false;
             }
-            bOk = BreakerMissionRefuseExtraFields(Row, { TEXT("id"), TEXT("kind"), TEXT("doctrinePoints"), TEXT("corePoint"), TEXT("abilityToken") }, Where, Errors) && bOk;
+            if (Row.HasField(TEXT("benchmark")) && !Row.HasField(TEXT("doctrinePoints")))
+            {
+                Errors.Add(Where + TEXT(": benchmark belongs only to a Doctrine unlock"));
+                bOk = false;
+            }
+            bOk = BreakerMissionRefuseExtraFields(Row, { TEXT("id"), TEXT("kind"), TEXT("doctrinePoints"), TEXT("benchmark"), TEXT("corePoint"), TEXT("abilityToken") }, Where, Errors) && bOk;
             break;
         }
         }
@@ -413,14 +419,12 @@ namespace
         }
 
         // ---- missions ------------------------------------------------------
-        // Doctrine points are paid two per main-story benchmark, one benchmark
-        // per act, and the file's total is held to the whole grant. The file
-        // carries the acts that are authored, so the rule is stated per act
-        // present and the total is capped: a file with one act grants one
-        // benchmark, and the missing acts are the campaign's gap, counted by
-        // DoctrinePointGrant minus the sum, not faked by an act-one grant of
-        // eight.
-        TMap<int32, int32> DoctrineByAct;
+        // Four explicit benchmarks across three acts; chapter numbering is
+        // not a wallet identity. Existing three grants retain their identity.
+        const TMap<FName, int32> AuthoredBenchmarks = {
+            { TEXT("Act1.Fernhall"), 1 }, { TEXT("Act2.Breach"), 2 },
+            { TEXT("Act3.Survivor"), 3 }, { TEXT("Act3.Finale"), 3 } };
+        TSet<FName> GrantedBenchmarks;
         int32 DoctrineTotal = 0;
         TArray<FName> CorePointsGranted;
 
@@ -461,7 +465,8 @@ namespace
                 {
                     if (Beat.WorldEncounter.IsNone()) BreakerMissionCheckRiftId(Beat.Rift, Where, Data, Errors);
                     else if (Beat.WorldEncounter != FName(TEXT("fernhall.altered_contact"))
-                        && Beat.WorldEncounter != FName(TEXT("earth.survivor_extraction")))
+                        && Beat.WorldEncounter != FName(TEXT("earth.survivor_extraction"))
+                        && Beat.WorldEncounter != FName(TEXT("earth.rior_fragment")))
                         Errors.Add(Where + TEXT(": worldEncounter has no authored field encounter"));
                     if (const FBreakerQuestDefinition* Quest = BreakerMissionCheckQuest(Beat.Quest, Where, Mission, Registry, Errors))
                     {
@@ -537,7 +542,14 @@ namespace
                 case EBreakerMissionBeatKind::Unlock:
                     if (Beat.DoctrinePoints > 0)
                     {
-                        DoctrineByAct.FindOrAdd(Mission.Act) += Beat.DoctrinePoints;
+                        const int32* ExpectedAct = AuthoredBenchmarks.Find(Beat.Benchmark);
+                        if (!ExpectedAct || *ExpectedAct != Mission.Act || Beat.Benchmark != Mission.MissionId)
+                            Errors.Add(Where + TEXT(": unknown or misplaced Doctrine benchmark"));
+                        if (GrantedBenchmarks.Contains(Beat.Benchmark))
+                            Errors.Add(Where + TEXT(": Doctrine benchmark is granted twice"));
+                        if (Beat.DoctrinePoints != UBreakerProgressionLibrary::DoctrinePointsPerBenchmark)
+                            Errors.Add(Where + TEXT(": each benchmark pays exactly two doctrine points"));
+                        GrantedBenchmarks.Add(Beat.Benchmark);
                         DoctrineTotal += Beat.DoctrinePoints;
                     }
                     if (!Beat.CorePoint.IsNone())
@@ -566,20 +578,10 @@ namespace
         }
 
         // ---- the point budgets ---------------------------------------------
-        for (const TPair<int32, int32>& Pair : DoctrineByAct)
-        {
-            if (Pair.Value != UBreakerProgressionLibrary::DoctrinePointsPerBenchmark)
-            {
-                Errors.Add(FString::Printf(TEXT("act %d grants %d doctrine points; a benchmark pays %d"), Pair.Key, Pair.Value, UBreakerProgressionLibrary::DoctrinePointsPerBenchmark));
-            }
-        }
         for (const FBreakerMissionDefinition& Mission : Data.Missions)
         {
-            if (!DoctrineByAct.Contains(Mission.Act))
-            {
-                Errors.Add(FString::Printf(TEXT("act %d grants no doctrine points; a benchmark pays %d"), Mission.Act, UBreakerProgressionLibrary::DoctrinePointsPerBenchmark));
-                DoctrineByAct.Add(Mission.Act, 0);
-            }
+            if (!GrantedBenchmarks.Contains(Mission.MissionId))
+                Errors.Add(Mission.MissionId.ToString() + TEXT(": mission grants no doctrine points from its authored benchmark"));
         }
         if (DoctrineTotal > UBreakerProgressionLibrary::DoctrinePointGrant)
         {

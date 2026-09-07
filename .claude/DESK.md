@@ -5,11 +5,11 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
-## Cycle — Earned finale benchmark
-- [ ] Author the Researcher reconstruction, stripped Earth recovery and winning Earth alternate-self meeting as one ordered Act III mission.
-- [ ] Build distinct physical destinations and finite encounters; the living alternate self is friendly, and Rior is absent.
-- [ ] Add the Anchor device's atomic SEAL/HOLD choice at level 50, identical endgame access and the final two earned Doctrine points. Keep four unique benchmarks within three acts.
-- [ ] Verify real recovery/travel/meeting, level-49 refusal, level-50 completion, persistence and replay; inspect the actual spaces and complete review/build/census/suite.
+## Cycle — First-person arms and rifle presentation
+- [ ] Generate a real arms-only Manny duplicate through Unreal's editor mesh APIs, preserving compatible animation/skeleton/materials and excluding torso at every LOD.
+- [ ] Integrate the cropped arms with the rifle's hip/ADS/fire/reload poses and actual grip locations; retain a safe fallback if the generated asset is absent.
+- [ ] Inspect close hip/ADS/fire/reload captures, wrist/shoulder alignment and owner-only visibility; reject torso intrusion or disconnected grips.
+- [ ] Complete source/asset review, build, census and full suite before landing. Continue ability balance, missing affixes and the remaining repairs next.
 Remaining repairs include the final campaign benchmark, silent nodes/affixes, ability balance, rarity identities, arms/weapon art and audible combat polish.
 ## Playtest queue (owner, 2026-09-07)
 Continue through the entire repair list in tested batches without stopping after each commit for a playtest. After repairs, execute the content phase below (owner instruction, 2026-09-07).
@@ -22,7 +22,7 @@ Continue through the entire repair list in tested batches without stopping after
 
 ## Repair dependencies found in runtime review
 - Sequence requires three distinct applications, but Caster has only Bleed and Poison. Void is not an applied status. A third functional status or a revised node contract is required; do not fake the third tag.
-- Doctrine progression now awards 6/8 through Acts I, II and the physical Survivor rescue. The final earned benchmark needs alternate-self finale gameplay and level-50 completion. Mission validation must support the separate Act III finale and stable encounter identities; replaying Fernhall must not counterfeit later completion.
+- Doctrine progression now has all four authored benchmarks across three acts and pays 8/8 through the physical finale at level50. The real mission probe verifies actions/reloads but uses an explicit XP fixture at the final gate; normal campaign leveling pace remains unvalidated.
 - New special loot now respects its final affix budget. Existing saved items remain unchanged; a migration still needs to be designed.
 
 ## Content phase after the repair list (owner, 2026-09-07)
@@ -67,7 +67,7 @@ No playtest until the core loop has more oomph. The next blocks are the ones tha
 
 ## Later (infrastructure only when it unblocks a felt item this week)
 - Inventory equipped titles, affix names, rarity sublines and base damage fit the inspected1920x1080GEARDAMAGE capture after button padding/alignment repair. Other menus/resolutions remain in the clipping queue.
-- Two expected reds carry the campaign's absence: `KeystoneAtShippedBudget` and `NodePurchaseFlow` assert doctrine purchases at the full pool, and the shipped entitlement is two of eight until acts two, three and the finale carry their Unlock beats. Both pinned with that delete condition; never widened.
+- `KeystoneAtShippedBudget` and `NodePurchaseFlow` now pass through completed campaign journal fixtures at level50; their expected-red entries were retired after the physical mission probe reached eight and survived reload. All original numeric purchase/refund/Core assertions remain unchanged.
 - Arrival and rift-completion flags are set only when the beat is current (the kill-counter rule). If arrival should count unconditionally, drop the flag-set argument on the two seams.
 - The enemy chip re-arm inside a hold reads `GetSecondsSinceDamage() <= DeltaSeconds`; settled chips are not pruned (they hold the last fraction) and the map is bounded by live enemies in range.
 - An occluded, unfocused enemy still draws its bar; only its marks and the BOSS word yield. Say if the bar should yield too.
@@ -106,6 +106,7 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - Four Niagara systems at `/Game/Breaker/FX/NS_<Moment>` with a `Color` user parameter, or a free Fab VFX pack placed there
 
 ## Done (last three cycles; older is git)
+- **Earned finale benchmark (2026-09-07):** Researcher briefing/reconstruction, separate Stripped Earth with12finiteVestiges and physical fragment recovery, separate intact Winning Earth with friendly animated player-mesh alternate, actual Anchor return and guarded level50 SEAL/HOLD device. Four unique benchmark IDs pay2each across3acts; atomic choice publishes completion/branch before persistence and rejects repeats/opposite choice. Both endings keep identical rewards/Rift access. Fixed Unreal mesh-default collision overriding decorative NoCollision in both Earth builders. Final build/census clean; **638 tests,635pass,3known,0unexpected**. Retired two campaign purchase expected reds with original budgets preserved. Full native mission run **PASS138kills,eightDoctrine after two map reloads**, `Saved/LoopProbe/3bc0d554e0ef4f74b7ce7472f04e2906/loop.log`; explicitly refused level6 then used XPfixture50, no natural-leveling claim. Earlier photo runs correctly refused fragment recovery after the test player died during screenshot dwell; normal headless mission run passed. Stripped/Won/alternate frames inspected; all environment art remains blockout. STATE unchanged under host-Python quarantine.
 - **Earned Survivor rescue (2026-09-07):** Separate Quiet Earth map, garden/settlement/causeway/terrace blockout, physical swept escort, three finite Vestige pockets (15 enemies), visible lucidity countdown and retryable timeout/death. Ordered dialogue → actual extraction → actual Anchor arrival → rescued resident turn-in pays two Exceptional ilvl30 items and +2 Doctrine (six cumulative); dialogue cannot counterfeit extraction. Destination map verification and all-NPC quest validation corrected. Build/census clean; full suite **632 tests, 627 pass, five known failures, zero unexpected**. Fresh isolated `-Survivor -Photos` campaign **PASS,126 actual deaths,six earned Doctrine**, log `Saved/LoopProbe/92c0720783194c05b0d587a27edef5bc/loop.log`; garden/causeway frames inspected. Probe relocates only test player and accelerates damage, not Survivor movement; no combat pacing/input claim. Environment/NPC art remains visibly placeholder. STATE unchanged under host-Python quarantine.
 ### Swift traversal income and Damage Ramp — 623 / 5 / 0
 - [x] Contact now grants brief income after actual vault/mantle completion, with purchased ranks, fractional timing and the existing income/anti-farm caps. Corrected the wall ray that missed50–80cm vaults; real collision tests cover vault/mantle, obstruction, teleport, death and respec within the currently attainable four-point wallet.

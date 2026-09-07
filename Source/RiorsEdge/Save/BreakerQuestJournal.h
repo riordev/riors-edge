@@ -78,6 +78,10 @@ public:
 
     // Returns true when the flag was new. Persists on change, never otherwise.
     UFUNCTION(BlueprintCallable, Category="Quest") bool SetFlag(FName Flag);
+    // Commit a mutually exclusive story choice and its completion together.
+    // Every callback/save sees both flags; existing per-flag reward listeners
+    // still run exactly once. Refuses a conflicting or completed decision.
+    bool CommitExclusiveChoice(FName Choice, FName OtherChoice, FName CompletionFlag);
     // Raises a progress counter and, when it reaches Threshold, sets
     // CompletionFlag. One call so no caller can advance progress and forget to
     // close the objective.

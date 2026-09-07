@@ -32,8 +32,8 @@ FBreakerErasedEarthLayout UBreakerErasedEarthBuilder::Build(UWorld* World, const
 #endif
         UStaticMeshComponent* Mesh = Actor->GetStaticMeshComponent();
         Mesh->SetMobility(EComponentMobility::Movable); Mesh->SetStaticMesh(MeshAsset); Mesh->SetWorldScale3D(Size / 100.0f);
-        Mesh->SetCollisionEnabled(bCollision ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
-        Mesh->SetCollisionResponseToAllChannels(ECR_Block);
+        Mesh->SetCollisionProfileName(bCollision ? TEXT("BlockAll") : TEXT("NoCollision"));
+        Mesh->SetCanEverAffectNavigation(bCollision);
         if (Material)
         {
             UMaterialInstanceDynamic* Tint = UMaterialInstanceDynamic::Create(Material, Mesh);

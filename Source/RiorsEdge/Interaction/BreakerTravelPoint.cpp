@@ -17,6 +17,8 @@ const FName ABreakerTravelPoint::GymDestinationId(TEXT("Gym"));
 const FName ABreakerTravelPoint::HubDestinationId(TEXT("Hub"));
 const FName ABreakerTravelPoint::FernhallDestinationId(TEXT("Fernhall"));
 const FName ABreakerTravelPoint::ErasedEarthDestinationId(TEXT("Earth.Unindustrialized"));
+const FName ABreakerTravelPoint::StrippedEarthDestinationId(TEXT("Earth.Stripped"));
+const FName ABreakerTravelPoint::WinningEarthDestinationId(TEXT("Earth.Won"));
 const FName ABreakerTravelPoint::RiftDestinationId(TEXT("Rift.Local"));
 
 ABreakerTravelPoint::ABreakerTravelPoint()
@@ -113,6 +115,8 @@ TArray<FBreakerTravelDestination> ABreakerTravelPoint::GetAvailableDestinations(
         if (Destination.bEnabled && !Destination.bDoorOnly && Destination.Id != ExcludedDestinationId)
         {
             if (Destination.Id == ErasedEarthDestinationId && !CanEnterErasedEarth(Player)) continue;
+            if ((Destination.Id == StrippedEarthDestinationId || Destination.Id == WinningEarthDestinationId)
+                && !CanEnterFinaleEarth(Destination.Id, Player)) continue;
             Available.Add(Destination);
         }
     }
@@ -122,6 +126,8 @@ TArray<FBreakerTravelDestination> ABreakerTravelPoint::GetAvailableDestinations(
 bool ABreakerTravelPoint::SelectDestination(FName DestinationId, APawn* RequestingPawn)
 {
     if (DestinationId == ErasedEarthDestinationId && !CanEnterErasedEarth(RequestingPawn)) return false;
+    if ((DestinationId == StrippedEarthDestinationId || DestinationId == WinningEarthDestinationId)
+        && !CanEnterFinaleEarth(DestinationId, RequestingPawn)) return false;
     FBreakerTravelDestination Destination;
     if (!FindDestination(DestinationId, Destination) || !Destination.bEnabled)
     {
@@ -214,6 +220,16 @@ const TArray<FBreakerTravelDestination>& ABreakerTravelPoint::GetFallbackRegistr
     Earth.DisplayName = FText::FromString(TEXT("The Quiet Earth"));
     Earth.Description = TEXT("A world of stone gardens and broken paths. Find the living signal and bring its survivor home.");
     Registry.Add(Earth);
+    FBreakerTravelDestination Stripped;
+    Stripped.Id = StrippedEarthDestinationId;
+    Stripped.DisplayName = FText::FromString(TEXT("The Stripped Earth"));
+    Stripped.Description = TEXT("A solved world, taken apart. Recover the working fragment from its civic systems.");
+    Registry.Add(Stripped);
+    FBreakerTravelDestination Won;
+    Won.Id = WinningEarthDestinationId;
+    Won.DisplayName = FText::FromString(TEXT("The Winning Earth"));
+    Won.Description = TEXT("An intact world beyond Rior's reach. Follow the reconstructed signal.");
+    Registry.Add(Won);
 
     return Registry;
 }
@@ -225,6 +241,17 @@ bool ABreakerTravelPoint::CanEnterErasedEarth(const APawn* RequestingPawn)
     return Player && Player->GetCombat() && !Player->GetCombat()->IsDead() && Journal
         && Journal->HasFlag(TEXT("Quest.Breach.TurnedIn")) && Journal->HasFlag(TEXT("Quest.Survivor.Accepted"))
         && !Journal->HasFlag(TEXT("Quest.Survivor.Extracted"));
+}
+
+bool ABreakerTravelPoint::CanEnterFinaleEarth(FName DestinationId, const APawn* RequestingPawn)
+{
+    const ABreakerCharacter* Player = Cast<ABreakerCharacter>(RequestingPawn);
+    const UBreakerQuestJournal* Journal = Player ? Player->GetQuestJournal() : nullptr;
+    if (!Player || !Player->GetCombat() || Player->GetCombat()->IsDead() || !Journal
+        || !Journal->HasFlag(TEXT("Quest.Survivor.TurnedIn")) || !Journal->HasFlag(TEXT("Quest.Finale.Accepted"))) return false;
+    if (DestinationId == StrippedEarthDestinationId) return !Journal->HasFlag(TEXT("Quest.Finale.FragmentRecovered"));
+    if (DestinationId == WinningEarthDestinationId) return Journal->HasFlag(TEXT("Quest.Finale.Reconstructed"));
+    return false;
 }
 
 bool ABreakerTravelPoint::FindDestination(FName DestinationId, FBreakerTravelDestination& OutDestination)

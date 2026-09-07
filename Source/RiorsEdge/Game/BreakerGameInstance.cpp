@@ -63,9 +63,21 @@ bool UBreakerGameInstance::IsDestinationMap(const UObject* WorldContext, FName D
     if (DestinationId == ABreakerTravelPoint::HubDestinationId) return Map == AnchorMapName();
     if (DestinationId == ABreakerTravelPoint::FernhallDestinationId) return Map == FernhallMapName();
     if (DestinationId == ABreakerTravelPoint::ErasedEarthDestinationId) return Map == ErasedEarthMapName();
+    if (DestinationId == ABreakerTravelPoint::StrippedEarthDestinationId) return Map == StrippedEarthMapName();
+    if (DestinationId == ABreakerTravelPoint::WinningEarthDestinationId) return Map == WinningEarthMapName();
     if (DestinationId == ABreakerTravelPoint::GymDestinationId) return Map == GymMapName();
     if (DestinationId == ABreakerTravelPoint::RiftDestinationId) return Map == FernhallMapName();
     return false;
+}
+
+bool UBreakerGameInstance::IsStrippedEarthMap(const UObject* WorldContext)
+{
+    return BreakerCurrentMapName(WorldContext) == StrippedEarthMapName();
+}
+
+bool UBreakerGameInstance::IsWinningEarthMap(const UObject* WorldContext)
+{
+    return BreakerCurrentMapName(WorldContext) == WinningEarthMapName();
 }
 
 bool UBreakerGameInstance::IsGymMapName(const FString& Name)
@@ -78,7 +90,8 @@ bool UBreakerGameInstance::IsGymMapName(const FString& Name)
     // of the fallback is that every NEW named map must be excluded here by
     // hand, or it silently fills with targets and a boss key — which is why
     // this is a name-in, bool-out function the suite can hold.
-    return Name != FrontEndMapName() && Name != AnchorMapName() && Name != FernhallMapName() && Name != ErasedEarthMapName();
+    return Name != FrontEndMapName() && Name != AnchorMapName() && Name != FernhallMapName()
+        && Name != ErasedEarthMapName() && Name != StrippedEarthMapName() && Name != WinningEarthMapName();
 }
 
 // ---------------------------------------------------------------------------

@@ -47,6 +47,22 @@ bool UBreakerQuestJournal::SetFlag(FName Flag)
     return true;
 }
 
+bool UBreakerQuestJournal::CommitExclusiveChoice(FName Choice, FName OtherChoice, FName CompletionFlag)
+{
+    if (Choice.IsNone() || OtherChoice.IsNone() || CompletionFlag.IsNone()
+        || Choice == OtherChoice || Choice == CompletionFlag || OtherChoice == CompletionFlag
+        || State.Has(OtherChoice) || State.Has(CompletionFlag)) return false;
+    const bool bNewChoice = State.Add(Choice);
+    State.Add(CompletionFlag);
+    // Mutate the entire decision before callbacks: reward listeners may save.
+    // Completion first preserves the reward handler's established ordering:
+    // a choice observer must not persist completion before its reward runs.
+    OnFlagSet.Broadcast(CompletionFlag);
+    if (bNewChoice) OnFlagSet.Broadcast(Choice);
+    OnPersistRequested.Broadcast();
+    return true;
+}
+
 bool UBreakerQuestJournal::AddProgress(FName Counter, int32 Delta, int32 Threshold, FName CompletionFlag)
 {
     const bool bCounterMoved = State.AddToCounter(Counter, Delta);
