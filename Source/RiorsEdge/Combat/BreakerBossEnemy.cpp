@@ -116,6 +116,45 @@ void ABreakerBossEnemy::BeginPlay()
 {
     Super::BeginPlay();
 
+    if (GetClass() == ABreakerBossEnemy::StaticClass() && ShieldVisual)
+    {
+        // The old full-height slab hid the imported commander's entire body.
+        // Keep a readable frontal plate below the head and shoulder line;
+        // the existing front pool, break and windup still own its behavior.
+        ConfigureShieldPresentation(FVector(45, 0, -15), FVector(0.10f, 0.78f, 0.80f));
+        UStaticMesh* TrimMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+        UMaterialInterface* TrimBase = LoadObject<UMaterialInterface>(nullptr,
+            TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+        auto AddTrim = [&](const TCHAR* Name, FVector Position, FVector Scale, FLinearColor Color, float Roll = 0.0f)
+        {
+            UStaticMeshComponent* Trim = NewObject<UStaticMeshComponent>(this, FName(Name));
+            AddInstanceComponent(Trim);
+            Trim->SetupAttachment(ShieldVisual);
+            Trim->SetStaticMesh(TrimMesh);
+            Trim->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+            Trim->SetRelativeLocation(Position);
+            Trim->SetRelativeScale3D(Scale);
+            Trim->SetRelativeRotation(FRotator(0, 0, Roll));
+            if (TrimBase)
+            {
+                UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(TrimBase, Trim);
+                Material->SetVectorParameterValue(TEXT("Color"), Color);
+                Trim->SetMaterial(0, Material);
+            }
+            Trim->RegisterComponent();
+            Trim->SetVisibility(!IsFrontBroken());
+        };
+        const FLinearColor FrameColor(0.10f, 0.19f, 0.20f);
+        AddTrim(TEXT("MarshalPlateLeft"), FVector(55, -46, 0), FVector(0.6f, 0.08f, 1.05f), FrameColor);
+        AddTrim(TEXT("MarshalPlateRight"), FVector(55, 46, 0), FVector(0.6f, 0.08f, 1.05f), FrameColor);
+        AddTrim(TEXT("MarshalPlateTop"), FVector(55, 0, 46), FVector(0.6f, 0.85f, 0.08f), FrameColor);
+        AddTrim(TEXT("MarshalPlateBottom"), FVector(55, 0, -46), FVector(0.6f, 0.85f, 0.08f), FrameColor);
+        const FLinearColor CommandColor(0.12f, 0.70f, 0.64f);
+        AddTrim(TEXT("MarshalInsigniaLeft"), FVector(56, -9, 8), FVector(0.3f, 0.25f, 0.035f), CommandColor, 30);
+        AddTrim(TEXT("MarshalInsigniaRight"), FVector(56, 9, 8), FVector(0.3f, 0.25f, 0.035f), CommandColor, -30);
+        AddTrim(TEXT("MarshalInsigniaBar"), FVector(56, 0, -12), FVector(0.3f, 0.40f, 0.035f), CommandColor);
+    }
+
     BaseSweepCooldown = SweepCooldownSeconds;
     BaseSlamCooldown = SlamCooldownSeconds;
     BaseBossMoveSpeed = MoveSpeed;

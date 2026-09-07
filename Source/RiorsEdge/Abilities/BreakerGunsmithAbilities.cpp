@@ -535,6 +535,7 @@ float UBreakerGunsmithDeployAbility::EffectiveDeployCost(float BaseCost, EBreake
 
 float UBreakerGunsmithDeployAbility::GetResourceCost() const
 {
+    if (bCommittingPlacement) return CommittedPlacementCost;
     using namespace BreakerGunsmithAbilityLocal;
     const float BaseCost = Super::GetResourceCost();
     const ABreakerCharacter* Character = GetBreakerCharacter();
@@ -578,32 +579,82 @@ void UBreakerGunsmithDeployAbility::ActivateAbility(const FGameplayAbilitySpecHa
         return;
     }
 
-    // §2.1: destroy-oldest BEFORE the new placement, so the field is never
-    // blocked by its own furniture. The cull refunds through the one path.
-    ABreakerDeployable::EnforceDensityCapForPlacement(Character, DeployableType);
-
-    if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+    PlacementCombat = Character->FindComponentByClass<UBreakerCombatComponent>();
+    if (!PlacementCombat.IsValid() || PlacementCombat->IsDead())
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return;
     }
+    PendingPlacement = PlaceLocation; PendingYaw = ViewRotation.Yaw;
+    PlacementCombat->OnDeath.AddDynamic(this, &UBreakerGunsmithDeployAbility::CancelPendingPlacement);
+    float Delay = FMath::Max(0.0f, BaseDeployCastSeconds);
+    const UBreakerScrapComponent* Scrap = Character->FindComponentByClass<UBreakerScrapComponent>();
+    if (IsTinkererDeployable(DeployableType) && BreakerGunsmithAbilityLocal::BreakerOwnerNodeRank(Character, TEXT("Gunsmith.Tinkerer.DeadGround")) > 0)
+        Delay = Scrap && Scrap->GetScrapState() == EBreakerScrapState::Surplus ? Delay * 2.0f : 0.0f;
+    if (Delay <= 0) CompletePlacement();
+    else World->GetTimerManager().SetTimer(PlacementTimer, this, &UBreakerGunsmithDeployAbility::CompletePlacement, Delay, false);
+}
+
+void UBreakerGunsmithDeployAbility::CompletePlacement()
+{
+    if (!IsActive()) return;
+    ABreakerCharacter* Character = GetBreakerCharacter();
+    UWorld* World = Character ? Character->GetWorld() : nullptr;
+    FVector Eye = Character ? Character->GetActorLocation() : FVector::ZeroVector;
+    FRotator Rotation;
+    if (Character && Character->GetController()) Character->GetController()->GetPlayerViewPoint(Eye, Rotation);
+    if (!World || !PlacementCombat.IsValid() || PlacementCombat->IsDead()
+        || !ABreakerDeployable::ValidatePlacement(World, Character, Eye, PendingPlacement, PlacementRangeCm))
+    { CancelPendingPlacement(); return; }
 
     FActorSpawnParameters SpawnParams;
     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     SpawnParams.Owner = Character;
-    if (ABreakerDeployable* Deployable = World->SpawnActor<ABreakerDeployable>(ABreakerDeployable::StaticClass(), PlaceLocation, FRotator(0.0f, ViewRotation.Yaw, 0.0f), SpawnParams))
+    ABreakerDeployable* Deployable = World->SpawnActor<ABreakerDeployable>(ABreakerDeployable::StaticClass(), PendingPlacement, FRotator(0, PendingYaw, 0), SpawnParams);
+    if (!Deployable) { CancelPendingPlacement(); return; }
+    CommittedPlacementCost = GetResourceCost();
+    bCommittingPlacement = true;
+    const bool bPaid = CommitAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo);
+    bCommittingPlacement = false;
+    if (!bPaid)
     {
-        // The refund base is the cost ACTUALLY PAID — the live GetResourceCost,
-        // discounts included, so a Cheap Work placement cannot refund more than
-        // it cost (§1.1: refund, never profit).
-        Deployable->InitializeDeployable(DeployableType, Character, GetResourceCost());
-        // FT5: the discount is a one-placement credit; the placement spent it.
-        ABreakerDeployable::ConsumeReplacementCredit(Character, DeployableType);
-
-        BreakerGunsmithPlacementRing(World, PlaceLocation);
+        Deployable->Destroy();
+        CancelPendingPlacement();
+        return;
     }
+    // Consume only the credit actually priced into this cast. A density cull
+    // may create a new credit; it belongs to the following placement.
+    ABreakerDeployable::ConsumeReplacementCredit(Character, DeployableType);
+    ABreakerDeployable::EnforceDensityCapForPlacement(Character, DeployableType);
+    Deployable->InitializeDeployable(DeployableType, Character, CommittedPlacementCost);
+    BreakerGunsmithPlacementRing(World, PendingPlacement);
+    EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+}
 
-    EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+void UBreakerGunsmithDeployAbility::ClearPendingPlacement()
+{
+    if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(PlacementTimer);
+    if (PlacementCombat.IsValid()) PlacementCombat->OnDeath.RemoveDynamic(this, &UBreakerGunsmithDeployAbility::CancelPendingPlacement);
+    PlacementCombat.Reset();
+}
+
+void UBreakerGunsmithDeployAbility::CancelPendingPlacement()
+{
+    if (IsActive()) EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+    else ClearPendingPlacement();
+}
+
+void UBreakerGunsmithDeployAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+    const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
+{
+    ClearPendingPlacement();
+    Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+}
+
+void UBreakerGunsmithDeployAbility::OnRemoveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)
+{
+    CancelPendingPlacement();
+    Super::OnRemoveAbility(ActorInfo, Spec);
 }
 
 UBreakerAbility_Turret::UBreakerAbility_Turret()

@@ -3,6 +3,7 @@
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Abilities/BreakerGameplayAbility.h"
+#include "Abilities/BreakerGunsmithAbilities.h"
 #include "Abilities/BreakerAbilityStateComponent.h"
 #include "Abilities/BreakerAbilityTags.h"
 #include "Combat/BreakerEnemy.h"
@@ -598,6 +599,22 @@ bool UBreakerAbilityComponent::TryActivateSlot(EBreakerAbilitySlot Slot)
         }
         return false;
     }
+    FGameplayAbilitySpec* Spec = ASC->FindAbilitySpecFromHandle(Granted->Handle);
+    if (Spec && Spec->Ability && Spec->Ability->IsA<UBreakerGunsmithDeployAbility>())
+    {
+        if (GetOwner() && !GetOwner()->HasAuthority())
+        {
+            // Server-only casts have no reliable local active instance. Route
+            // both first and second press through one authoritative decision.
+            ServerActivateSlot(Slot);
+            return true;
+        }
+        if (Spec->IsActive())
+        {
+            ASC->CancelAbilityHandle(Granted->Handle);
+            return true;
+        }
+    }
     const bool bActivated = ASC->TryActivateAbility(Granted->Handle);
     if (bActivated)
     {
@@ -611,15 +628,7 @@ bool UBreakerAbilityComponent::TryActivateSlot(EBreakerAbilitySlot Slot)
 
 void UBreakerAbilityComponent::ServerActivateSlot_Implementation(EBreakerAbilitySlot Slot)
 {
-    const FBreakerGrantedAbility* Granted = GrantedBySlot.Find(Slot);
-    UAbilitySystemComponent* ASC = GetAbilitySystem();
-    if (ASC && Granted && Granted->bImplemented && Granted->Handle.IsValid())
-    {
-        if (ASC->TryActivateAbility(Granted->Handle))
-        {
-            OnAbilityActivated.Broadcast(Slot);
-        }
-    }
+    TryActivateSlot(Slot);
 }
 
 FName UBreakerAbilityComponent::GetAbilityIdForSlot(EBreakerAbilitySlot Slot) const

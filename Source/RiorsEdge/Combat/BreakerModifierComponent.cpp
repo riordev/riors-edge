@@ -167,6 +167,7 @@ void UBreakerEnemyModifierComponent::TickWard(float DeltaSeconds)
     UBreakerCombatComponent* Combat = OwnerCombat();
     ABreakerEnemy* Enemy = Cast<ABreakerEnemy>(GetOwner());
     if (!Combat || !Enemy || Combat->IsDead()) return;
+    if (Combat->IsBeneficialEffectSuppressed()) return;
     if (Combat->GetSecondsSinceDamage() < FMath::Max(0.0f, Params.WardRechargeDelaySeconds)) return;
 
     const float Full = UBreakerEnemyModifierLibrary::GetWardShieldAmount(OwnerMaxHealth(), Params);
@@ -202,7 +203,7 @@ void UBreakerEnemyModifierComponent::TickAura(float DeltaSeconds)
             // REPLACE, and every aura in the game shares this one key, so two
             // overlapping auras are one aura by construction rather than by a
             // rule somebody has to remember.
-            AllyCombat->PushIncomingDamageModifier(BreakerModifierRuntime::BreakerAuraModifierKey, Multiplier);
+            AllyCombat->PushBeneficialIncomingDamageModifier(BreakerModifierRuntime::BreakerAuraModifierKey, Multiplier);
             StillInside.Add(Ally);
         }
     }

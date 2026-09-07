@@ -132,6 +132,8 @@ public:
     // must cost nothing, so callers validate BEFORE committing any cost.
     static bool ResolvePlacement(UWorld* World, AActor* OwnerCharacter, const FVector& ViewLocation,
         const FVector& ViewDirection, float RangeCm, FVector& OutLocation);
+    static bool ValidatePlacement(UWorld* World, AActor* OwnerCharacter, const FVector& ViewLocation,
+        const FVector& Location, float RangeCm);
 
     // Live deployables owned by this character (Anchor Points excluded from the
     // Scrap density count — see the enum comment).

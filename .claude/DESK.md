@@ -5,14 +5,11 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
-## Cycle — earned Act II progression and Swift movement nodes
-- [x] Connect the authored wounded-contact investigation to a dedicated finite Fernhall enemy and real death credit.
-- [x] Open the Breach through the Quartermaster job; stage its armoured line, flanker, combined formation and actual Field Marshal.
-- [x] Award the next two doctrine points only through the completed Act II return/turn-in.
-- [x] Wire Read the Room airborne credit and Landing momentum through actual movement and purchases.
-- [x] Review, build, census, run the full suite and validate the playable flow before landing.
-Remaining repair work includes the other silent nodes, later campaign doctrine reachability, ability/weapon balance, broader clipping, arms/weapon/weakpoint art, audible combat polish and the full rarity identities.
-
+## Cycle — ability flat power and integrated Marshal weakpoint
+- [ ] Connect collected flat ability damage to the shared ability damage calculation and author one ordinary flat-power affix; verify direct damage, DoT snapshots, equip/unequip and weapon isolation without changing parity pins.
+- [ ] Make the Marshal's exposed rear apparatus the actual weakpoint, close it correctly at spawn and preserve exposure/visibility across body and revive paths; inspect real weapon traces and rendered exposure.
+- [ ] Review, build, census, run the full suite and inspect affected captures before landing.
+Remaining repairs include later campaign benchmarks, other silent nodes, ability/weapon balance, special-rarity More source budgeting, rarity identities, arms/weapon art and audible combat polish.
 ## Playtest queue (owner, 2026-09-07)
 Continue through the entire repair list in tested batches without stopping after each commit for a playtest. After repairs, execute the content phase below (owner instruction, 2026-09-07).
 - (ui, npcs, systems) Reduce menu density and clipping; repair NPC interaction flow, ability assignment and point spending; present Core as the authored tree rather than a node cloud; update the dev sandbox. Finish silent nodes and Caster progression.
@@ -108,6 +105,12 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - Four Niagara systems at `/Game/Breaker/FX/NS_<Moment>` with a `Color` user parameter, or a free Fab VFX pack placed there
 
 ## Done (last three cycles; older is git)
+### Three silent nodes and Marshal armour — 614 / 5 / 0
+- [x] Tank Overpressure persists as a real fused charge with free re-press detonation, rank-two enemy attachment, Demolition's two placements and cancellation on unequip/death.
+- [x] Gunsmith deployables have real placement timers, Dead Ground band timing, input cancellation and transactional validation that preserves existing objects on failure. Four base cast durations are editable in Data/abilities.json.
+- [x] Support Blackout Protocol dynamically suppresses healing and beneficial buffs for its marked enemies inside Suppress at Resonant; leaving, losing marks/Charge, source death and overlapping/released zones restore behavior correctly.
+- [x] Marshal shield is smaller framed armour with command markings, exposing its head/shoulders. Actual earned campaign boss frame inspected. Rear apparatus/hitbox mismatch is the next repair.
+- [x] Build and canonical census clean (135 ability numbers); all 619 tests complete: 614 passed, 5 known, 0 unexpected. Runtime fixtures corrected actual controller viewpoint, engine timer/world initialization and duplicate equipment setup without weakening assertions. Fresh earned Act I-II integration passed 111 kills and exactly 4 Doctrine points; accelerated damage, no combat-feel claim. STATE unchanged.
 ### Earned Act II progression and Swift movement — 611 / 5 / 0
 - [x] Dedicated wounded Drudge investigation, actual-death objective, Quartermaster report/orders, restored Breach entrance and four-wave Field Marshal job now earn the next two Doctrine points. Stable encounter identity and verified active-boss death prevent developer completion from awarding story progress.
 - [x] Swift Read the Room and Landing use purchased ranks and actual movement. Ground-only credit refill, continuous fall distance, teleport/traversal resets and once-per-landing gains are tested.
@@ -120,9 +123,3 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - [x] Special loot reserves signatures, special lines and paired downsides inside final count/category budgets. Ordinary rolls and existing saved items unchanged. New slot/level/seed coverage preserves all four legendary identities; Refractor card inspected with five affixes.
 - [x] Rift boss/story lookup uses stable EncounterId carried through travel/retry, never display copy. Renames, duplicate display names and missing IDs tested. Real round trip passed again:24kills,2015XP,231Riftglass retained; accelerated integration, not combat-feel validation.
 - [x] Final build and609tests complete:604passed/5existing expected/0unexpected. Strict pool-membership test fixed without widening counts; real enemy fixture registers its existing ASC attributes. STATE unchanged. Read-only MeshAudit confirms both imported mannequins mix arm/body weights in both sections; no arms replacement claimed.
-### Ability picker and five Caster nodes — 602 / 5 / 0
-- [x] One selected ability catalogue, equipped slot summaries and pinned feedback replace the repeated lists. Actual Anchor capture inspected with all six Caster choices and unlock refusal fitting. Escape dismisses equip modals; bench refusal text wraps.
-- [x] Standing Water pays one live-occupied Rot stream; Zonework reconciles extra flat strip across overlapping zones; Wellspring follows intentional self-ground placement and refreshes one following zone. Mobile rim now follows actor transform; movement/overlap verified in runtime tests, no rendered mobile-ring capture yet.
-- [x] Chain copies the newest accepted status without recursive spread/double duration scaling and excludes player teammates. Momentum Transfer uses successful Closequarter arrival and only the matching next eligible melee hit. Seven new ability numbers are editable; Chain reach remains editor-only.
-- [x] Build and all607tests complete:602passed/5existing expected/0unexpected. New fixtures respect actual prerequisites, eight doctrine points, resource costs and GAS activation. Canonical census clean; STATE unchanged under quarantine. No pins widened.
-- [x] Rifle-arm prototype photographed and reverted because its torso intruded into the camera; art item remains open.

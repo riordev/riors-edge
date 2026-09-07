@@ -161,6 +161,9 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BreachCharge", meta=(ClampMin="0", ClampMax="1")) float SelfDamageFraction = 0.5f;   // §T5 placeholder
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BreachCharge", meta=(ClampMin="0")) float KnockbackImpulse = 1400.0f;   // O2 PLACEHOLDER
 
+    virtual bool CheckCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
+    virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
+    virtual void OnRemoveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec) override;
     // D7 DEMOLITION: two charges sharing one cooldown. CheckCooldown admits one
     // extra cast while the first cooldown runs; ApplyCooldown declines to
     // restart the timer for that cast, so both charges return together when the
@@ -170,7 +173,9 @@ public:
 
 private:
     void Detonate(FVector BlastLocation);
-    FTimerHandle FuseTimer;
+    class ABreakerBreachCharge* RepressCharge() const;
+    void CancelCharges();
+    TArray<TWeakObjectPtr<class ABreakerBreachCharge>> Charges;
     // Demolition bookkeeping: true while the second charge has been spent into
     // a still-running cooldown. Mutable because CheckCooldown is const.
     mutable bool bDemolitionSecondSpent = false;

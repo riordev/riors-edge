@@ -869,12 +869,12 @@ void UBreakerAbility_Mark::ActivateAbility(const FGameplayAbilitySpecHandle Hand
     FHitResult Hit;
     FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(BreakerMarkAim), false, Character);
     AActor* Target = nullptr;
-    if (World->LineTraceSingleByChannel(Hit, ViewLocation, ViewLocation + ViewRotation.Vector() * TargetRangeCm, ECC_Pawn, QueryParams))
+    if (World->LineTraceSingleByChannel(Hit, ViewLocation, ViewLocation + ViewRotation.Vector() * TargetRangeCm, ECC_GameTraceChannel2, QueryParams))
     {
         if (Cast<ABreakerEnemy>(Hit.GetActor())) Target = Hit.GetActor();
     }
     UBreakerCombatComponent* TargetCombat = Target ? Target->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
-    if (!TargetCombat)
+    if (!TargetCombat || TargetCombat->IsDead())
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return;

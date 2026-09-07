@@ -218,6 +218,25 @@ from its peak and grants 2/3 Momentum per metre beyond six metres, capped at
 editable Momentum-component O2 defaults, tested through real movement and
 node purchases; they are not yet playtest-balanced values.
 
+## Implemented node behavior (2026-09-07)
+
+Tank Overpressure uses the existing Breach Charge input again to detonate a
+live charge without a second cost or cooldown. Rank two follows the first
+living enemy hit. The ordinary fuse remains active; Demolition permits its
+two sequential placements under one shared cooldown. Death and unequipping
+remove pending charges.
+
+Gunsmith Dead Ground now modifies a real deployment cast. Pending placements
+can be cancelled and must pass the ground/range/sight/cost checks again at
+completion. Failed payment does not evict an existing deployable; refunds use
+the exact cost paid before spending changes the Scrap band.
+
+Support Blackout Protocol prevents healing and active beneficial effects on
+the owner's marked enemy inside Suppress while that owner is Resonant. It
+reads those conditions live, including overlapping fields and release/expiry.
+The existing Warding Aura benefit and Warded shield recharge are suppressed;
+intrinsic boss mechanics and shields already granted are preserved.
+
 ## Open
 
 - Whether Momentum's generation threshold is a deliberate tension or a trap.

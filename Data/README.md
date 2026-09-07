@@ -40,3 +40,13 @@ Siphon's `DrainRankOneThreshold` / `DrainRankTwoThreshold` in `abilities.json` r
 Rot's StandingWaterRankOneManaPerSecond / StandingWaterRankTwoManaPerSecond grant 2/4 Mana per second while a living enemy occupies your Rot, sharing the conditional-income cap. More zones or enemies do not multiply this stream. ZoneworkAdditionalArmorReduction adds 20 flat armour strip against an already damaged-over-time target. WellspringSelfPlacementRadiusCm (150 cm) and WellspringMinimumGroundNormalZ (0.7) define an intentional ground cast near your feet; that zone follows you and later self-casts refresh it. These five values are O2 placeholders in abilities.json.
 
 Closequarter's MomentumTransferRankOneSeconds / MomentumTransferRankTwoSeconds give 2/3 seconds after a successful targeted arrival to land your next melee hit with that target's block and dodge bypassed. Chain's rank reach is currently an editor-only StatusComponent default (600/900 cm), not an abilities.json key. These are O2 placeholders.
+
+## Gunsmith placement timing
+
+`BaseDeployCastSeconds` in the Turret, Ammo Crate, Mine Cluster and Disruptor
+rows is the ordinary placement delay, currently 1 second (O2 placeholder).
+Purchased Dead Ground makes Mine Cluster and Disruptor instant while Dry or
+Stocked, and doubles the delay while Surplus. The band is read when casting
+starts. Pressing the same slot again cancels a pending placement. The target
+must still have valid ground, range and line of sight when the cast finishes;
+payment and cooldown start only when placement succeeds.

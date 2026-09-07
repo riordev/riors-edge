@@ -106,6 +106,7 @@ public:
     UFUNCTION(BlueprintPure, Category="Zone") int32 GetOccupantCount() const { return Occupants.Num(); }
     UFUNCTION(BlueprintPure, Category="Zone") const FBreakerZoneSpec& GetSpec() const { return Spec; }
     UFUNCTION(BlueprintPure, Category="Zone") float GetRemainingDuration() const { return RemainingDuration; }
+    bool IsReleased() const { return bReleased; }
     UFUNCTION(BlueprintPure, Category="Zone") AActor* GetZoneInstigator() const { return ZoneInstigator.Get(); }
     UFUNCTION(BlueprintPure, Category="Zone") int32 GetTicksDelivered() const { return TicksDelivered; }
 

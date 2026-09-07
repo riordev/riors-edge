@@ -153,6 +153,7 @@ protected:
     // The slab's one visibility-and-collision write, so the body rule and the
     // break rule cannot disagree about whether an invisible slab eats rounds.
     void SetSlabVisible(bool bVisible);
+    void ConfigureShieldPresentation(const FVector& Location, const FVector& Scale);
 
     // Both attacks resolve through the ordinary damage contract with this actor
     // as Instigator, so armour, shields, the passive dodge/block layer, the

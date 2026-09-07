@@ -133,6 +133,10 @@ public:
     // First consumer: Caster's Overcast penalty (Class-Kits §2.1).
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat|Incoming")
     void PushIncomingDamageModifier(FName Key, float Multiplier);
+    // Explicit external buffs, separate from boss gates and other mechanics.
+    void PushBeneficialIncomingDamageModifier(FName Key, float Multiplier);
+    void AddBeneficialSuppressionLease(class ABreakerZoneActor* Zone);
+    bool IsBeneficialEffectSuppressed() const;
 
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat|Incoming")
     void RemoveIncomingDamageModifier(FName Key);
@@ -296,6 +300,8 @@ private:
     // responsible for removing it, and a silently expiring defence is worse
     // than one that is visibly stuck.
     TMap<FName, float> IncomingDamageModifiers;
+    TSet<FName> BeneficialIncomingModifierKeys;
+    TSet<TWeakObjectPtr<class ABreakerZoneActor>> BeneficialSuppressionLeases;
     // Keyed for the same reason, and summed rather than multiplied because
     // armour reduction is authored FLAT.
     TMap<FName, float> ArmorReductions;

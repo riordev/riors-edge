@@ -1250,6 +1250,8 @@ bool ABreakerDeployable::ResolvePlacement(UWorld* World, AActor* OwnerCharacter,
 
     // §2.3: seed 8 m along the aim ray, snapping to the nearest valid floor.
     FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(BreakerDeployablePlace), false, OwnerCharacter);
+    for (const TWeakObjectPtr<ABreakerDeployable>& Entry : GetLiveDeployables())
+        if (Entry.IsValid() && Entry->GetOwningCharacter() == OwnerCharacter) QueryParams.AddIgnoredActor(Entry.Get());
     FHitResult AimHit;
     const FVector AimEnd = ViewLocation + ViewDirection.GetSafeNormal() * FMath::Max(0.0f, RangeCm);
     const FVector Anchor = World->LineTraceSingleByChannel(AimHit, ViewLocation, AimEnd, ECC_Visibility, QueryParams)
@@ -1268,7 +1270,22 @@ bool ABreakerDeployable::ResolvePlacement(UWorld* World, AActor* OwnerCharacter,
         return false;
     }
     OutLocation = FloorHit.ImpactPoint + FVector(0.0f, 0.0f, 2.0f);
-    return true;
+    return FloorHit.ImpactNormal.Z >= 0.7f && ValidatePlacement(World, OwnerCharacter, ViewLocation, OutLocation, RangeCm);
+}
+
+bool ABreakerDeployable::ValidatePlacement(UWorld* World, AActor* OwnerCharacter, const FVector& ViewLocation,
+    const FVector& Location, float RangeCm)
+{
+    if (!World || FVector::Dist2D(ViewLocation, Location) > FMath::Max(0.0f, RangeCm) + 1.0f) return false;
+    FCollisionQueryParams Query(SCENE_QUERY_STAT(BreakerDeployableRevalidate), false, OwnerCharacter);
+    // Existing owned furniture is replaced only after successful payment.
+    for (const TWeakObjectPtr<ABreakerDeployable>& Entry : GetLiveDeployables())
+        if (Entry.IsValid() && Entry->GetOwningCharacter() == OwnerCharacter) Query.AddIgnoredActor(Entry.Get());
+    FHitResult Floor;
+    if (!World->LineTraceSingleByChannel(Floor, Location + FVector(0, 0, 30), Location - FVector(0, 0, 30), ECC_Visibility, Query)
+        || Floor.ImpactNormal.Z < 0.7f || FMath::Abs(Floor.ImpactPoint.Z + 2.0f - Location.Z) > 5.0f) return false;
+    FHitResult Block;
+    return !World->LineTraceSingleByChannel(Block, ViewLocation, Location + FVector(0, 0, 20), ECC_Visibility, Query);
 }
 
 const TArray<TWeakObjectPtr<ABreakerDeployable>>& ABreakerDeployable::GetLiveDeployables()

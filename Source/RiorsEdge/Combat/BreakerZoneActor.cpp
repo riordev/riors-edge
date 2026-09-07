@@ -244,6 +244,11 @@ void ABreakerZoneActor::UpdateMembership()
 
     for (AActor* Candidate : Inside)
     {
+        // The physical zone owns this weak lease, not a shared ability
+        // instance whose current-zone pointer changes on the next cast.
+        if (Spec.ZoneTag == FGameplayTag::RequestGameplayTag(TEXT("Zone.Support.Suppress"), false))
+            if (UBreakerCombatComponent* TargetCombat = Candidate->FindComponentByClass<UBreakerCombatComponent>())
+                TargetCombat->AddBeneficialSuppressionLease(this);
         const bool bAlready = Occupants.ContainsByPredicate(
             [Candidate](const TWeakObjectPtr<AActor>& Held) { return Held.Get() == Candidate; });
         if (bAlready) { ApplyArmorStrip(Candidate); continue; }

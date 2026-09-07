@@ -1,4 +1,5 @@
 #include "Abilities/BreakerTankAbilities.h"
+#include "Abilities/BreakerBreachCharge.h"
 
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemInterface.h"
@@ -808,6 +809,13 @@ UBreakerAbility_BreachCharge::UBreakerAbility_BreachCharge()
 
 void UBreakerAbility_BreachCharge::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
+    // Re-press is the existing charge's trigger, not another paid placement.
+    if (ABreakerBreachCharge* Charge = RepressCharge())
+    {
+        Charge->DetonateNow();
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+        return;
+    }
     ABreakerCharacter* Character = GetBreakerCharacter();
     UWorld* World = Character ? Character->GetWorld() : nullptr;
     if (!World || !CommitAbility(Handle, ActorInfo, ActivationInfo))
@@ -815,52 +823,67 @@ void UBreakerAbility_BreachCharge::ActivateAbility(const FGameplayAbilitySpecHan
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return;
     }
-
     FVector ViewLocation = Character->GetActorLocation();
     FRotator ViewRotation = Character->GetControlRotation();
-    if (const AController* Controller = Character->GetController())
-    {
-        Controller->GetPlayerViewPoint(ViewLocation, ViewRotation);
-    }
-
-    // The throw resolves as an aim trace rather than a projectile actor: no
-    // grenade arc exists to reuse and inventing one is not this pass. Where
-    // the ray lands, the charge sits; 1.2s later it detonates (§T5).
+    if (const AController* Controller = Character->GetController()) Controller->GetPlayerViewPoint(ViewLocation, ViewRotation);
     FHitResult Hit;
     FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(BreakerBreachAim), false, Character);
     const FVector TraceEnd = ViewLocation + ViewRotation.Vector() * ThrowRangeCm;
-    const FVector BlastLocation = World->LineTraceSingleByChannel(Hit, ViewLocation, TraceEnd, ECC_Visibility, QueryParams)
-        ? Hit.ImpactPoint : TraceEnd;
-
-    // THE CHARGE, VISIBLE AT LAST: the census recorded it as a bare FVector
-    // in a timer. It is still no actor -- but the spot now glows OrangeDeep
-    // for exactly the fuse, a fixed world point being the one place a
-    // lifetime-length world primitive tells no lie. The player (and anyone
-    // standing on it) can read where and roughly when. O2 PLACEHOLDER.
-    if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World))
+    const bool bHit = World->LineTraceSingleByChannel(Hit, ViewLocation, TraceEnd, ECC_GameTraceChannel2, QueryParams);
+    const FVector Location = bHit ? Hit.ImpactPoint : TraceEnd;
+    AActor* StickyTarget = nullptr;
+    if (bHit && BreakerTankAbilityLocal::BreakerTankNodeRank(Character, TEXT("Tank.Demolitionist.Overpressure")) >= 2)
     {
-        BreakerFX::FEffectTiming FuseTiming;
-        FuseTiming.DurationSeconds = FMath::Max(0.05f, FuseSeconds);
-        FuseTiming.FadeInSeconds = 0.03f;
-        FuseTiming.FadeOutSeconds = 0.0f;   // it does not fade, it detonates
-        Effects->AddGlow(BlastLocation + FVector(0.0f, 0.0f, 15.0f), 20.0f, BreakerUI::OrangeDeep, 3.0f, FuseTiming);
+        ABreakerEnemy* Enemy = Cast<ABreakerEnemy>(Hit.GetActor());
+        if (Enemy && !Enemy->IsDeadEnemy()) StickyTarget = Enemy;
     }
-
-    TWeakObjectPtr<UBreakerAbility_BreachCharge> WeakThis(this);
-    World->GetTimerManager().SetTimer(FuseTimer, FTimerDelegate::CreateLambda([WeakThis, BlastLocation]()
+    ABreakerBreachCharge* Charge = World->SpawnActor<ABreakerBreachCharge>(Location, FRotator::ZeroRotator);
+    if (Charge)
     {
-        if (UBreakerAbility_BreachCharge* Ability = WeakThis.Get())
-        {
-            Ability->Detonate(BlastLocation);
-        }
-    }), FMath::Max(0.05f, FuseSeconds), false);
-    // The ability itself ends now; the fuse timer owns the detonation. The
-    // cooldown (8s) already prevents a second charge racing the first fuse.
+        Charges.RemoveAll([](const TWeakObjectPtr<ABreakerBreachCharge>& Existing) { return !Existing.IsValid(); });
+        Charges.Add(Charge);
+        Charge->OnDetonated.BindUObject(this, &ThisClass::Detonate);
+        Charge->Arm(Character, FuseSeconds, StickyTarget);
+    }
     EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 }
 
+ABreakerBreachCharge* UBreakerAbility_BreachCharge::RepressCharge() const
+{
+    ABreakerCharacter* Character = GetBreakerCharacter();
+    if (!BreakerTankAbilityLocal::BreakerTankHasNode(Character, BreakerNodeTags::Node_D_Overpressure.GetTag())
+        || !Character || !Character->GetCombat() || Character->GetCombat()->IsDead()) return nullptr;
+    for (const TWeakObjectPtr<ABreakerBreachCharge>& Charge : Charges)
+        if (Charge.IsValid() && !Charge->IsActorBeingDestroyed()) return Charge.Get();
+    return nullptr;
+}
+
+bool UBreakerAbility_BreachCharge::CheckCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags) const
+{
+    return RepressCharge() || Super::CheckCost(Handle, ActorInfo, OptionalRelevantTags);
+}
+
+void UBreakerAbility_BreachCharge::CancelCharges()
+{
+    for (const TWeakObjectPtr<ABreakerBreachCharge>& Charge : Charges)
+        if (Charge.IsValid()) Charge->Destroy();
+    Charges.Reset();
+}
+
+void UBreakerAbility_BreachCharge::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
+{
+    if (bWasCancelled) CancelCharges();
+    Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+}
+
+void UBreakerAbility_BreachCharge::OnRemoveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)
+{
+    CancelCharges();
+    Super::OnRemoveAbility(ActorInfo, Spec);
+}
 bool UBreakerAbility_BreachCharge::CheckCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, OUT FGameplayTagContainer* OptionalRelevantTags) const
 {
+    if (RepressCharge()) return true;
     if (Super::CheckCooldown(Handle, ActorInfo, OptionalRelevantTags))
     {
         // The one cooldown has expired: both charges are home again.

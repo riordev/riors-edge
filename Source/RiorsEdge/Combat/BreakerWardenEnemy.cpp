@@ -186,6 +186,14 @@ void ABreakerWardenEnemy::SetSlabVisible(bool bVisible)
     ShieldVisual->SetCollisionEnabled(bVisible ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
 }
 
+void ABreakerWardenEnemy::ConfigureShieldPresentation(const FVector& Location, const FVector& Scale)
+{
+    if (!ShieldVisual) return;
+    ShieldVisual->SetRelativeLocation(Location);
+    ShieldVisual->SetRelativeScale3D(Scale);
+    ShieldRestLocation = Location;
+}
+
 float ABreakerWardenEnemy::GetSweepDamage() const
 {
     // AttackDamage is the chassis output for this archetype at this area level

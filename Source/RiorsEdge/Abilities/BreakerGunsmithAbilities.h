@@ -172,12 +172,25 @@ public:
     // a refund credit may make a placement cheap, never paid-to-place.
     static float EffectiveDeployCost(float BaseCost, EBreakerDeployableType Type, EBreakerScrapState State, int32 CheapWorkRank, float ReplacementDiscount);
     static bool IsTinkererDeployable(EBreakerDeployableType Type);
+    virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
+    virtual void OnRemoveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec) override;
+    UFUNCTION() void CancelPendingPlacement();
 
     // §2.3: seed 8 m along the aim ray.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Deploy", meta=(ClampMin="0")) float PlacementRangeCm = 800.0f;   // §2.3 seed
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Deploy", meta=(ClampMin="0")) float BaseDeployCastSeconds = 1.0f; // O2 placeholder; Data/abilities.json
 
 protected:
     EBreakerDeployableType DeployableType = EBreakerDeployableType::Turret;
+private:
+    void CompletePlacement();
+    void ClearPendingPlacement();
+    FTimerHandle PlacementTimer;
+    FVector PendingPlacement = FVector::ZeroVector;
+    float PendingYaw = 0;
+    bool bCommittingPlacement = false;
+    float CommittedPlacementCost = 0;
+    TWeakObjectPtr<class UBreakerCombatComponent> PlacementCombat;
 };
 
 // G3 Turret (§3 G3, starter, Field Tech): 40 Scrap, autonomous emplacement,

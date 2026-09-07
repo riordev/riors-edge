@@ -2,6 +2,11 @@
 
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
+#include "Abilities/BreakerAbilityStateComponent.h"
+#include "Classes/BreakerChargeComponent.h"
+#include "Combat/BreakerZoneActor.h"
+#include "Combat/BreakerZoneMath.h"
+#include "Progression/BreakerProgressionLibrary.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Attributes/BreakerHealthBands.h"
 #include "Combat/BreakerDamageLibrary.h"
@@ -641,20 +646,60 @@ float UBreakerCombatComponent::ComposeDotSourcePower(const UBreakerAttributeSet*
 void UBreakerCombatComponent::PushIncomingDamageModifier(FName Key, float Multiplier)
 {
     if (Key.IsNone()) return;
+    BeneficialIncomingModifierKeys.Remove(Key);
     // Re-pushing the same key replaces rather than stacks, matching the
     // outgoing chain's rule.
     IncomingDamageModifiers.Add(Key, FMath::Max(0.0f, Multiplier));
 }
 
+void UBreakerCombatComponent::PushBeneficialIncomingDamageModifier(FName Key, float Multiplier)
+{
+    PushIncomingDamageModifier(Key, Multiplier);
+    if (!Key.IsNone()) BeneficialIncomingModifierKeys.Add(Key);
+}
+
+void UBreakerCombatComponent::AddBeneficialSuppressionLease(ABreakerZoneActor* Zone)
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !Zone) return;
+    for (auto It = BeneficialSuppressionLeases.CreateIterator(); It; ++It)
+        if (!It->IsValid() || It->Get()->IsActorBeingDestroyed() || It->Get()->IsReleased() || It->Get()->GetRemainingDuration() <= 0) It.RemoveCurrent();
+    BeneficialSuppressionLeases.Add(Zone);
+}
+
+bool UBreakerCombatComponent::IsBeneficialEffectSuppressed() const
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority() || IsDead() || !GetOwner()->IsA<ABreakerEnemy>()) return false;
+    for (const TWeakObjectPtr<ABreakerZoneActor>& Lease : BeneficialSuppressionLeases)
+    {
+        const ABreakerZoneActor* Zone = Lease.Get();
+        if (!Zone || Zone->IsActorBeingDestroyed() || Zone->IsReleased() || Zone->GetWorld() != GetWorld() || Zone->GetRemainingDuration() <= 0) continue;
+        const FBreakerZoneSpec& Spec = Zone->GetSpec();
+        if (Spec.ZoneTag != FGameplayTag::RequestGameplayTag(TEXT("Zone.Support.Suppress"), false)
+            || !UBreakerZoneMath::IsInsideZone(Zone->GetActorLocation(), Spec.RadiusCm, Spec.HalfHeightCm, GetOwner()->GetActorLocation())) continue;
+        const ABreakerCharacter* Source = Cast<ABreakerCharacter>(Zone->GetZoneInstigator());
+        if (!Source || Source->GetWorld() != GetWorld() || Source->IsActorBeingDestroyed()
+            || !Source->GetProgression() || !Source->GetCombat() || Source->GetCombat()->IsDead()) continue;
+        const UBreakerChargeComponent* Charge = Source->FindComponentByClass<UBreakerChargeComponent>();
+        const UBreakerAbilityStateComponent* State = Source->FindComponentByClass<UBreakerAbilityStateComponent>();
+        if (Charge && Charge->IsActiveForOwner() && Charge->GetChargeBand() == EBreakerChargeBand::Resonant
+            && Source->GetProgression()->HasNodeTag(BreakerNodeTags::Node_WA_BlackoutProtocol.GetTag())
+            && State && State->IsMarked(GetOwner())) return true;
+    }
+    return false;
+}
+
 void UBreakerCombatComponent::RemoveIncomingDamageModifier(FName Key)
 {
     IncomingDamageModifiers.Remove(Key);
+    BeneficialIncomingModifierKeys.Remove(Key);
 }
 
 float UBreakerCombatComponent::GetComposedIncomingDamageMultiplier() const
 {
     float Product = 1.0f;
-    for (const TPair<FName, float>& Entry : IncomingDamageModifiers) Product *= Entry.Value;
+    const bool bSuppressBuffs = !BeneficialIncomingModifierKeys.IsEmpty() && IsBeneficialEffectSuppressed();
+    for (const TPair<FName, float>& Entry : IncomingDamageModifiers)
+        if (!bSuppressBuffs || !BeneficialIncomingModifierKeys.Contains(Entry.Key)) Product *= Entry.Value;
     return Product;
 }
 
@@ -691,7 +736,7 @@ FBreakerHealResult UBreakerCombatComponent::ApplyHealing(const FBreakerHealReque
     if (!Attributes || !GetOwner() || !GetOwner()->HasAuthority()) return Result;
     // Healing is not revival. A heal landing on a corpse would resurrect it
     // without any of the state a real revive has to restore.
-    if (IsDead()) return Result;
+    if (IsDead() || IsBeneficialEffectSuppressed()) return Result;
 
     FBreakerVitalsState Vitals;
     Vitals.Health = Attributes->GetHealth();

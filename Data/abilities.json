@@ -285,7 +285,8 @@
 			"windowDuration": 30,
 			"numbers":
 			{
-				"PlacementRangeCm": 800
+				"PlacementRangeCm": 800,
+				"BaseDeployCastSeconds": 1
 			},
 			"variants": []
 		},
@@ -296,7 +297,8 @@
 			"windowDuration": 45,
 			"numbers":
 			{
-				"PlacementRangeCm": 800
+				"PlacementRangeCm": 800,
+				"BaseDeployCastSeconds": 1
 			},
 			"variants": []
 		},
@@ -307,7 +309,8 @@
 			"windowDuration": 60,
 			"numbers":
 			{
-				"PlacementRangeCm": 800
+				"PlacementRangeCm": 800,
+				"BaseDeployCastSeconds": 1
 			},
 			"variants": []
 		},
@@ -318,7 +321,8 @@
 			"windowDuration": 20,
 			"numbers":
 			{
-				"PlacementRangeCm": 800
+				"PlacementRangeCm": 800,
+				"BaseDeployCastSeconds": 1
 			},
 			"variants": []
 		},
