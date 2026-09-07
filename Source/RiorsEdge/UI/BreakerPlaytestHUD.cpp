@@ -35,6 +35,9 @@
 #include "Game/BreakerGameInstance.h"
 #include "Game/BreakerGameMode.h"
 #include "Game/BreakerRiftDefinition.h"
+// Every word the HUD draws for the player is a row in Data/strings.json
+// (O195); the literals left in this file are dev instruments and fixtures.
+#include "Data/BreakerStrings.h"
 // Quest line: definitions and the pure state helpers (read-only — the HUD
 // derives, never writes). The journal type itself comes through
 // BreakerQuestContent.h's own include.
@@ -344,7 +347,7 @@ void ABreakerPlaytestHUD::DrawHUD()
         // SPENT, which is exactly why it reads here and not in a wave.
         if (const UBreakerEquipmentComponent* AnchorEquipment = Character->GetEquipment())
         {
-            DrawSpecText(FString::Printf(TEXT("RIFTGLASS  %d"), AnchorEquipment->GetForgeWallet().Riftglass),
+            DrawSpecText(BreakerStrings::Format(EBreakerStringKey::HudWalletRiftglass, AnchorEquipment->GetForgeWallet().Riftglass),
                 S(BreakerUI::HudVitalsLeft), S(BreakerUI::HudVitalsTop) - S(20.0f), BreakerUI::Gold, 12.0f);
         }
         DrawQuestLine(Character);
@@ -370,9 +373,9 @@ void ABreakerPlaytestHUD::DrawHUD()
     // of them is the wording:
     //  * COLOUR. Harm is the damage accent and it read as an alarm. System
     //    bone is the player/system accent, which is what a respawn state is.
-    //  * WEIGHT. The rule half — WHERE you come back — is the quiet half, so
-    //    it drops to caption size and TextMuted. The state is the loud half
-    //    and it is still only 14px.
+    //  * WEIGHT. One line, and it is still only 14px. WHERE the player comes
+    //    back is not stated: no name for the campaign's start point has been
+    //    authored, and the state alone is the read until one is.
     //  * PLACE. Below the crosshair rather than through it. A dead player is
     //    not aiming, but the crosshair is still drawn and two things in the
     //    same 40 pixels is what made it read as competing.
@@ -380,10 +383,8 @@ void ABreakerPlaytestHUD::DrawHUD()
     // ruling; the whole beat was over-produced rather than under-produced.
     if (Character->IsAwaitingRespawn())
     {
-        DrawSpecTextCentered(TEXT("REDEPLOYING"),
+        DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudDeathRedeploying),
             Center.X, Center.Y + S(96.0f), BreakerUI::System, 14.0f);
-        DrawSpecTextCentered(TEXT("FROM THE TILESET START"),
-            Center.X, Center.Y + S(96.0f) + S(18.0f), BreakerUI::TextMuted, 10.0f);
     }
 
     TickCapturePreview(Character);
@@ -471,7 +472,7 @@ void ABreakerPlaytestHUD::DrawHUD()
     {
         // Harm is instant: full-bleed edge lines, no inset, no fade in.
         const FLinearColor DamageColor = BreakerUI::Alpha(BreakerUI::Harm, 0.85f);
-        DrawSpecTextCentered(TEXT("DAMAGE"), Center.X, Center.Y - S(80.0f), DamageColor, 16.0f);
+        DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudCalloutDamage), Center.X, Center.Y - S(80.0f), DamageColor, 16.0f);
         const float T = S(4.0f);
         DrawRect(DamageColor, 0.0f, 0.0f, Canvas->ClipX, T);
         DrawRect(DamageColor, 0.0f, Canvas->ClipY - T, Canvas->ClipX, T);
@@ -483,7 +484,7 @@ void ABreakerPlaytestHUD::DrawHUD()
     DrawNearDeathFrame(Character);
     if ((Weapon && Weapon->IsReloading()) || (IsCapturePreview() && bPreviewReload))
     {
-        DrawSpecTextCentered(TEXT("RELOADING"), Center.X, Center.Y + S(48.0f), BreakerUI::Orange, 14.0f);
+        DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudCalloutReloading), Center.X, Center.Y + S(48.0f), BreakerUI::Orange, 14.0f);
     }
 
     // The old fixed-position damage readout is gone: floating world-space
@@ -491,7 +492,7 @@ void ABreakerPlaytestHUD::DrawHUD()
     // callout survives, because it is a skill confirmation, not a value.
     if (bRecentShot && Shot && Shot->bHit && Shot->bWeakPoint)
     {
-        DrawSpecText(TEXT("WEAK POINT"), Center.X + S(24.0f), Center.Y + S(18.0f), BreakerUI::Gold, 11.0f);
+        DrawSpecText(BreakerStrings::Get(EBreakerStringKey::HudCalloutWeakPoint), Center.X + S(24.0f), Center.Y + S(18.0f), BreakerUI::Gold, 11.0f);
     }
 
     // Latch elite kills: the shot feedback window is far shorter than the
@@ -513,7 +514,7 @@ void ABreakerPlaytestHUD::DrawHUD()
     if (EliteKillAge >= 0.0 && EliteKillAge < 1.2f)
     {
         const float Fade = 1.0f - static_cast<float>(EliteKillAge) / 1.2f;
-        DrawSpecTextCentered(TEXT("ELITE DOWN"), Center.X, Center.Y - S(118.0f), BreakerUI::Gold, 20.0f, Fade);
+        DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudCalloutEliteDown), Center.X, Center.Y - S(118.0f), BreakerUI::Gold, 20.0f, Fade);
     }
 
     DrawPlaytestInstrumentation(Character, Center);
@@ -778,7 +779,7 @@ void ABreakerPlaytestHUD::DrawAbilityCluster(const ABreakerCharacter* Character)
 
     if (Abilities && Abilities->GetGrantedCount() == 0)
     {
-        DrawSpecTextCentered(TEXT("NO ABILITY KIT FOR THIS CLASS YET"),
+        DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudAbilitiesNoKit),
             S(BreakerUI::HudUltimateX + BreakerUI::HudUltimateTile * 0.5f), Bottom + S(BreakerUI::Space4),
             BreakerUI::Orange, 11.0f);
     }
@@ -1043,7 +1044,7 @@ void ABreakerPlaytestHUD::DrawZoneLine(const ABreakerCharacter* Character)
     if (LastWaveAdvanceRemaining < 0.0f && Remaining > 0.0f && GameMode && GameMode->GetCurrentWave() > 0)
     {
         EnqueueBanner(EBreakerBannerKind::WaveClear,
-            FString::Printf(TEXT("WAVE %d CLEAR"), GameMode->GetCurrentWave()), FString());
+            BreakerStrings::Format(EBreakerStringKey::HudBannerWaveClear, GameMode->GetCurrentWave()), FString());
     }
     LastWaveAdvanceRemaining = Remaining;
     const FString Countdown = BreakerHUDMath::FormatCountdown(Remaining);
@@ -1293,7 +1294,7 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
         if (Number->bKilled && Number->Overkill >= Number->Value * BreakerHUD::DamageOverkillCaptionFraction)
         {
             const float NumberHeight = MeasureSpecText(TEXT("0"), SizePixels).Y;
-            DrawOutlinedNumber(FString::Printf(TEXT("+%s OVER"), *BreakerUI::FormatDamage(Number->Overkill)),
+            DrawOutlinedNumber(BreakerStrings::Format(EBreakerStringKey::HudDamageOverkill, *BreakerUI::FormatDamage(Number->Overkill)),
                 Screen.X, NumberY + NumberHeight, BreakerUI::Harm, 13.0f, DrawAlpha);
         }
         else if (bAbsorbed)
@@ -1303,7 +1304,7 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
             // state word has to its track. Position is MEASURED off the
             // number's own glyph height, not a fixed nudge, so it holds at
             // every one of the three damage sizes and at every UI scale.
-            const FString Caption = FString::Printf(TEXT("ABSORBED -%.0f%%"), Number->MitigatedFraction * 100.0f);
+            const FString Caption = BreakerStrings::Format(EBreakerStringKey::HudDamageAbsorbed, Number->MitigatedFraction * 100.0f);
             const float NumberHeight = MeasureSpecText(TEXT("0"), SizePixels).Y;
             DrawOutlinedNumber(Caption, Screen.X, NumberY + NumberHeight,
                 BreakerUI::Orange, 13.0f, Fade);
@@ -1342,7 +1343,7 @@ void ABreakerPlaytestHUD::DrawInteractPrompt(const ABreakerCharacter* Character,
         if (bBackpackFull)
         {
             DrawSpecTextCentered(
-                FString::Printf(TEXT("BACKPACK FULL  %d/%d"), Carried, UBreakerEquipmentComponent::BackpackCapacity),
+                BreakerStrings::Format(EBreakerStringKey::HudBackpackFull, Carried, UBreakerEquipmentComponent::BackpackCapacity),
                 Center.X, Center.Y + S(90.0f), BreakerUI::Orange, 14.0f);
         }
         return;
@@ -1364,7 +1365,7 @@ void ABreakerPlaytestHUD::DrawInteractPrompt(const ABreakerCharacter* Character,
         const FVector Projected = Project(NearbyNPC->GetActorLocation() + FVector(0.0f, 0.0f, 150.0f), false);
         if (Projected.Z <= 0.0f) return;
         DrawInteractPlate(Projected.X, Projected.Y, BreakerUI::TextSecondary, 1,
-            FString::Printf(TEXT("TALK — %s"), *NearbyNPC->GetDisplayName().ToString().ToUpper()), true);
+            BreakerStrings::Format(EBreakerStringKey::HudPromptTalkNamed, *NearbyNPC->GetDisplayName().ToString().ToUpper()), true);
     }
 }
 
@@ -1455,7 +1456,7 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
         // Always drawn: muted while out of reach — a standing answer to
         // "what does this thing answer to" — and bone once F would land.
         const bool bInReach = Distance <= NPC->GetInteractionRange();
-        DrawSpecTextCentered(TEXT("F  TALK"), Projected.X, Projected.Y + S(14.0f) * NameScale,
+        DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudPromptTalk), Projected.X, Projected.Y + S(14.0f) * NameScale,
             bInReach ? BreakerUI::System : BreakerUI::TextMuted, 10.0f * NameScale);
     }
 
@@ -1511,7 +1512,7 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
         // Same always-drawn verb rule as the NPCs: muted out of reach, bone
         // once F would land.
         const bool bInReach = Distance <= TravelPoint->GetInteractionRange();
-        DrawSpecTextCentered(FString::Printf(TEXT("F  %s"), *PromptWord),
+        DrawSpecTextCentered(BreakerStrings::Format(EBreakerStringKey::HudPromptKeyed, *PromptWord),
             Projected.X, LabelY,
             bInReach ? BreakerUI::System : BreakerUI::TextMuted, 10.0f * GateScale);
     }
@@ -1636,7 +1637,7 @@ void ABreakerPlaytestHUD::HandleRiftCompleted(const FBreakerRiftDefinition& Rift
     // NO REWARD NUMBERS. LEDGER owns what was paid and binds the same seam; a
     // figure here would be a second owner of one question.
     EnqueueBanner(EBreakerBannerKind::RiftComplete,
-        Rift.AreaName.IsEmpty() ? FString(TEXT("RIFT CLEARED")) : Rift.AreaName.ToString().ToUpper(),
+        Rift.AreaName.IsEmpty() ? BreakerStrings::Get(EBreakerStringKey::HudBannerRiftCleared) : Rift.AreaName.ToString().ToUpper(),
         Rift.AreaLine.ToString());
 }
 
@@ -1688,9 +1689,9 @@ void ABreakerPlaytestHUD::DrawBanners(const FVector2D& Center)
         // The label names the event in the rail's colour; the title is the
         // thing itself; the line is what it paid or where it was. Stacked and
         // centred vertically inside the fixed plate, never sizing it.
-        const TCHAR* Label = Banner.Kind == EBreakerBannerKind::RiftComplete ? TEXT("RUN COMPLETE")
-            : Banner.Kind == EBreakerBannerKind::LevelUp ? TEXT("LEVEL UP") : nullptr;
-        const FVector2D LabelSize = Label ? MeasureSpecText(Label, BreakerHUD::BannerLabelPixels) : FVector2D::ZeroVector;
+        const FString* Label = Banner.Kind == EBreakerBannerKind::RiftComplete ? &BreakerStrings::Get(EBreakerStringKey::HudBannerRunComplete)
+            : Banner.Kind == EBreakerBannerKind::LevelUp ? &BreakerStrings::Get(EBreakerStringKey::HudBannerLevelUp) : nullptr;
+        const FVector2D LabelSize = Label ? MeasureSpecText(*Label, BreakerHUD::BannerLabelPixels) : FVector2D::ZeroVector;
         const FVector2D TitleSize = MeasureSpecText(Banner.Title, BreakerHUD::BannerTitlePixels);
         const FVector2D LineSize = Banner.Line.IsEmpty() ? FVector2D::ZeroVector
             : MeasureSpecText(Banner.Line, BreakerHUD::BannerLinePixels);
@@ -1699,7 +1700,7 @@ void ABreakerPlaytestHUD::DrawBanners(const FVector2D& Center)
         float LineY = PlateY + (PlateH - ContentH) * 0.5f;
         if (Label)
         {
-            DrawSpecTextCentered(Label, CenterX, LineY, Rail, BreakerHUD::BannerLabelPixels);
+            DrawSpecTextCentered(*Label, CenterX, LineY, Rail, BreakerHUD::BannerLabelPixels);
             LineY += LabelSize.Y + S(BreakerUI::Space4);
         }
         DrawSpecTextCentered(Banner.Title, CenterX, LineY, BreakerUI::System, BreakerHUD::BannerTitlePixels);
@@ -1726,8 +1727,8 @@ void ABreakerPlaytestHUD::HandleLevelGained(int32 NewLevel, int32 LevelsGained)
     // by one: a single kill can cross more than one level early on, and a
     // tell that says "level 2" when the player reached 4 is worse than none.
     const FString Title = LevelsGained > 1
-        ? FString::Printf(TEXT("LEVEL %d  (+%d)"), NewLevel, LevelsGained)
-        : FString::Printf(TEXT("LEVEL %d"), NewLevel);
+        ? BreakerStrings::Format(EBreakerStringKey::HudBannerLevelGained, NewLevel, LevelsGained)
+        : BreakerStrings::Format(EBreakerStringKey::HudBannerLevel, NewLevel);
     // What this level-up actually PAID, computed the same way the progression
     // component grants it (one point per level up to each currency's cap), so
     // the banner states the grant instead of leaving the player to discover
@@ -1741,13 +1742,13 @@ void ABreakerPlaytestHUD::HandleLevelGained(int32 NewLevel, int32 LevelsGained)
         FMath::Min(NewLevel, UBreakerProgressionLibrary::CorePointCapLevel)
         - FMath::Min(PrevLevel, UBreakerProgressionLibrary::CorePointCapLevel));
     FString Grant;
-    if (ClassGain > 0) Grant = FString::Printf(TEXT("+%d CLASS"), ClassGain);
+    if (ClassGain > 0) Grant = BreakerStrings::Format(EBreakerStringKey::HudBannerClassPoints, ClassGain);
     if (CoreGain > 0)
     {
         if (!Grant.IsEmpty()) Grant += TEXT("   ");
-        Grant += FString::Printf(TEXT("+%d CORE"), CoreGain);
+        Grant += BreakerStrings::Format(EBreakerStringKey::HudBannerCorePoints, CoreGain);
     }
-    if (Grant.IsEmpty()) Grant = TEXT("POINT CAP REACHED");
+    if (Grant.IsEmpty()) Grant = BreakerStrings::Get(EBreakerStringKey::HudBannerPointCapReached);
     EnqueueBanner(EBreakerBannerKind::LevelUp, Title, Grant);
 }
 
@@ -1931,7 +1932,7 @@ void ABreakerPlaytestHUD::DrawUltimateTreatment(const ABreakerCharacter* Charact
         const float PlateX = W * 0.5f - PlateW * 0.5f;
         const float PlateY = S(BreakerUI::UltimateTitleTop);
         DrawPlate(PlateX, PlateY, PlateW, PlateH, BreakerUI::Violet, EBreakerRail::Top);
-        DrawSpecTextCentered(TEXT("OVERDRIVE ACTIVE"), W * 0.5f, PlateY + S(14.0f), BreakerUI::Violet, 20.0f);
+        DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudCalloutOverdriveActive), W * 0.5f, PlateY + S(14.0f), BreakerUI::Violet, 20.0f);
     }
 }
 
@@ -1994,7 +1995,7 @@ void ABreakerPlaytestHUD::DrawMarkedTarget(const ABreakerCharacter* Character)
     DrawLine(CX, CY + Radius, CX - Radius, CY, Color, S(1.75f));
     DrawLine(CX - Radius, CY, CX, CY - Radius, Color, S(1.75f));
 
-    DrawSpecTextCentered(TEXT("MARKED"), CX, CY - Radius - S(16.0f), Color, 11.0f);
+    DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudCalloutMarked), CX, CY - Radius - S(16.0f), Color, 11.0f);
 }
 
 ABreakerTracerRenderer* ABreakerPlaytestHUD::GetTracerRenderer()
@@ -2088,6 +2089,14 @@ void ABreakerPlaytestHUD::HandlePlayerShot(const FBreakerShotResult& Shot)
             !bPelletShot && BreakerHUD::ShouldTraceRound(RoundsFired, RoundsPerTracer);
         ++RoundsFired;
 
+        // Momentum on the round (KIT-2): the same read the resource row
+        // makes, 0 for every owner without a Swift bar, so the streak is
+        // brighter exactly when the bar is up and ordinary otherwise.
+        const ABreakerCharacter* Shooter = BoundWeapon ? Cast<ABreakerCharacter>(BoundWeapon->GetOwner()) : nullptr;
+        const UBreakerMomentumComponent* Momentum = Shooter ? Shooter->GetMomentum() : nullptr;
+        const float TracerIntensityScale = BreakerHUD::TracerMomentumIntensityScale(
+            (Momentum && Momentum->IsActiveForOwner()) ? Momentum->GetMomentumFraction() : 0.0f);
+
         if (bDrawSpread)
         {
             // The whole blast in one call: the renderer draws the budgeted
@@ -2097,14 +2106,14 @@ void ABreakerPlaytestHUD::HandlePlayerShot(const FBreakerShotResult& Shot)
             // skipping two shells in three would read as the gun misfiring.
             if (ABreakerTracerRenderer* Renderer = GetTracerRenderer())
             {
-                Renderer->AddSpread(Start, Shot.Pellets);
+                Renderer->AddSpread(Start, Shot.Pellets, TracerIntensityScale);
             }
         }
         else if (bVisibleRound)
         {
             if (ABreakerTracerRenderer* Renderer = GetTracerRenderer())
             {
-                Renderer->AddTracer(Start, End);
+                Renderer->AddTracer(Start, End, TracerIntensityScale);
             }
         }
         // The flash fires on every hit whether or not the round was traced:
@@ -2493,7 +2502,7 @@ void ABreakerPlaytestHUD::TickCapturePreview(const ABreakerCharacter* Character)
     if (PreviewPhase == 1 && Now - SwapStartTime >= BreakerUI::HudWeaponSwapSeconds + 0.4f)
     {
         SwapStartTime = Now;
-        SwapName = BoundWeapon ? BoundWeapon->GetArchetypeName().ToUpper() : FString(TEXT("RIFLE"));
+        SwapName = BoundWeapon ? BoundWeapon->GetArchetypeName().ToUpper() : BreakerStrings::Get(EBreakerStringKey::HudWeaponRifle);
     }
 
     if (Now - LastPreviewSpawnTime < LongestLifetime) return;
@@ -2639,7 +2648,7 @@ void ABreakerPlaytestHUD::DrawDefenseFeedback(const FVector2D& Center)
     const float Fade = 1.0f - Age / 0.8f;
     // Dodge is a movement verb (O179); block is mitigation, which is the
     // armour/weapon family (orange).
-    DrawSpecTextCentered(bShowDodge ? TEXT("DODGED") : TEXT("BLOCKED"),
+    DrawSpecTextCentered(BreakerStrings::Get(bShowDodge ? EBreakerStringKey::HudCalloutDodged : EBreakerStringKey::HudCalloutBlocked),
         Center.X, Center.Y - S(108.0f), bShowDodge ? BreakerUI::VerbMove : BreakerUI::Orange, 20.0f, Fade);
 }
 
@@ -2790,7 +2799,7 @@ float ABreakerPlaytestHUD::DrawStatusReadout(const ABreakerCharacter* Character,
     {
         const FBreakerActiveStatus& Entry = Active[Index];
         FString ShortName = Entry.Spec.StatusTag.IsValid()
-            ? Entry.Spec.StatusTag.GetTagName().ToString() : TEXT("STATUS");
+            ? Entry.Spec.StatusTag.GetTagName().ToString() : BreakerStrings::Get(EBreakerStringKey::HudStatusUnnamed);
         int32 SeparatorIndex = INDEX_NONE;
         if (ShortName.FindLastChar(TEXT('.'), SeparatorIndex)) ShortName = ShortName.RightChop(SeparatorIndex + 1);
         const FString Text = Entry.Stacks > 1

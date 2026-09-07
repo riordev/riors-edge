@@ -1,5 +1,6 @@
 #include "UI/BreakerLoadingScreen.h"
 
+#include "Data/BreakerStrings.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "Styling/CoreStyle.h"
@@ -66,9 +67,9 @@ FBreakerDeploymentBriefing SBreakerLoadingScreen::MakeBriefing(const FBreakerRif
     Briefing.HealthMultiplier = UBreakerRiftLibrary::GetMonsterHealthMultiplier(Briefing.AreaLevel, Params);
     Briefing.DamageMultiplier = UBreakerRiftLibrary::GetMonsterDamageMultiplier(Briefing.AreaLevel, Params);
     Briefing.DeathAllowance = UBreakerRiftLibrary::GetDeathAllowanceReadout(Rift.Tier, EndgameDeathsRemaining);
-    Briefing.TierKicker = Rift.Tier == EBreakerRiftTier::Campaign
-        ? TEXT("CAMPAIGN RIFT · DEPLOYMENT")
-        : TEXT("ENDGAME RIFT · DEPLOYMENT");
+    Briefing.TierKicker = BreakerStrings::Get(Rift.Tier == EBreakerRiftTier::Campaign
+        ? EBreakerStringKey::LoadingTitleCampaign
+        : EBreakerStringKey::LoadingTitleEndgame);
     return Briefing;
 }
 
@@ -144,7 +145,7 @@ void SBreakerLoadingScreen::Construct(const FArguments& InArgs)
             SNew(SVerticalBox)
             + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right)
             [
-                BreakerMonoText(FText::FromString(TEXT("AREA LEVEL")), BreakerUI::TypeCaption,
+                BreakerMonoText(FText::FromString(BreakerStrings::Get(EBreakerStringKey::LoadingAreaLevel)), BreakerUI::TypeCaption,
                     BreakerUI::TextMuted, 0.16f)
             ]
             + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right)
@@ -156,7 +157,7 @@ void SBreakerLoadingScreen::Construct(const FArguments& InArgs)
             ]
             + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right)
             [
-                BreakerMonoText(FText::FromString(FString::Printf(TEXT("ITEM LEVEL i%d–i%d"),
+                BreakerMonoText(FText::FromString(BreakerStrings::Format(EBreakerStringKey::LoadingItemLevel,
                     Briefing.ItemLevelMin, Briefing.ItemLevelMax)), 12, BreakerUI::TextSecondary, 0.16f)
             ]
         ];
@@ -164,7 +165,7 @@ void SBreakerLoadingScreen::Construct(const FArguments& InArgs)
     // ---- The stat row ------------------------------------------------------
     // Three readouts split by 1px dividers. The third is O123's field: always
     // present, only the value moves.
-    auto MakeStat = [](const TCHAR* Caption, const FString& Value) -> TSharedRef<SWidget>
+    auto MakeStat = [](const FString& Caption, const FString& Value) -> TSharedRef<SWidget>
     {
         return SNew(SVerticalBox)
             + SVerticalBox::Slot().AutoHeight()
@@ -186,17 +187,19 @@ void SBreakerLoadingScreen::Construct(const FArguments& InArgs)
     const TSharedRef<SWidget> StatRow = SNew(SHorizontalBox)
         + SHorizontalBox::Slot().AutoWidth()
         [
-            MakeStat(TEXT("MONSTER HEALTH"), FString::Printf(TEXT("x%.2f"), Briefing.HealthMultiplier))
+            MakeStat(BreakerStrings::Get(EBreakerStringKey::LoadingStatMonsterHealth),
+                BreakerStrings::Format(EBreakerStringKey::LoadingStatMultiplier, Briefing.HealthMultiplier))
         ]
         + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space24, 0.0f)[MakeStatDivider()]
         + SHorizontalBox::Slot().AutoWidth()
         [
-            MakeStat(TEXT("MONSTER DAMAGE"), FString::Printf(TEXT("x%.2f"), Briefing.DamageMultiplier))
+            MakeStat(BreakerStrings::Get(EBreakerStringKey::LoadingStatMonsterDamage),
+                BreakerStrings::Format(EBreakerStringKey::LoadingStatMultiplier, Briefing.DamageMultiplier))
         ]
         + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space24, 0.0f)[MakeStatDivider()]
         + SHorizontalBox::Slot().AutoWidth()
         [
-            MakeStat(TEXT("DEATHS"), Briefing.DeathAllowance)
+            MakeStat(BreakerStrings::Get(EBreakerStringKey::LoadingStatDeaths), Briefing.DeathAllowance)
         ];
 
     // ---- The content block -------------------------------------------------
@@ -276,7 +279,7 @@ void SBreakerLoadingScreen::Construct(const FArguments& InArgs)
             ]
             + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(18.0f, 0.0f, 0.0f, 0.0f)
             [
-                BreakerMonoText(FText::FromString(TEXT("BREAKERS")), 11, BreakerUI::TextMuted, 0.22f)
+                BreakerMonoText(FText::FromString(BreakerStrings::Get(EBreakerStringKey::LoadingInsignia)), 11, BreakerUI::TextMuted, 0.22f)
             ]
         ]
         + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)

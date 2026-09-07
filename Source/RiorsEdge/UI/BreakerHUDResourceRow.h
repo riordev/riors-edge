@@ -5,6 +5,7 @@
 #include "Classes/BreakerGritComponent.h"
 #include "Classes/BreakerMomentumComponent.h"
 #include "Classes/BreakerScrapComponent.h"
+#include "Data/BreakerStrings.h"
 #include "UI/BreakerHUDMath.h"
 #include "UI/BreakerUIStyle.h"
 
@@ -20,7 +21,13 @@
 // branch in the resolver, never a new drawing path.
 //
 // Everything in this header is pure: no world, no components, no actors. That
-// is what makes the row testable at all, since the drawing itself is not.
+// is what makes the row testable at all, since the drawing itself is not. The
+// words come from the string table (O195), a static file read that needs no
+// world either.
+//
+// A RESTING RESOURCE HAS NO STATE WORD. Momentum at rest and Mana in credit
+// leave StateWord empty: the fill carries the read, and the word slot is for
+// the states that change what the class can do.
 // ---------------------------------------------------------------------------
 namespace BreakerHUD
 {
@@ -46,9 +53,10 @@ namespace BreakerHUD
     struct FResourceRow
     {
         // Uppercase, drawn at caption weight in the fixed left column.
-        FString Label = TEXT("RESOURCE");
+        FString Label = BreakerStrings::Get(EBreakerStringKey::HudResourceLabel);
         // The confirmation for the centre of vision, never the carrier (§2).
-        FString StateWord = TEXT("NO RESOURCE");
+        // Empty for a resource at rest.
+        FString StateWord = BreakerStrings::Get(EBreakerStringKey::HudResourceStateNone);
         // SIGNED. [0,1] is credit against the resource's maximum; [-1,0) is
         // debt against the resource's own negative floor. A resource that
         // cannot go negative never returns a negative value here.
@@ -84,25 +92,26 @@ namespace BreakerHUD
     {
         FResourceRow Row;
         Row.bActive = true;
-        Row.Label = TEXT("MOMENTUM");
+        Row.Label = BreakerStrings::Get(EBreakerStringKey::HudResourceMomentumLabel);
         // Momentum is a [0, Max] pool: it has no debt half.
         Row.Fraction = FMath::Clamp(MomentumFraction, 0.0f, 1.0f);
         switch (State)
         {
         case EBreakerMomentumState::Redline:
-            Row.StateWord = TEXT("REDLINE");
+            Row.StateWord = BreakerStrings::Get(EBreakerStringKey::HudResourceMomentumRedline);
             Row.StateColor = BreakerUI::Orange;
             Row.Track = EResourceTrack::WideBlocks;
             Row.BorderColor = BreakerUI::Orange;
             Row.BorderPixels = 2.0f;
             break;
         case EBreakerMomentumState::Running:
-            Row.StateWord = TEXT("RUNNING");
+            Row.StateWord = BreakerStrings::Get(EBreakerStringKey::HudResourceMomentumRunning);
             Row.StateColor = BreakerUI::Gold;
             Row.Track = EResourceTrack::Blocks;
             break;
         default:
-            Row.StateWord = TEXT("SETTLED");
+            // At rest: no word, the low continuous fill is the read.
+            Row.StateWord.Reset();
             Row.StateColor = BreakerUI::Cyan;
             Row.Track = EResourceTrack::Continuous;
             break;
@@ -124,7 +133,7 @@ namespace BreakerHUD
     {
         FResourceRow Row;
         Row.bActive = true;
-        Row.Label = TEXT("MANA");
+        Row.Label = BreakerStrings::Get(EBreakerStringKey::HudResourceManaLabel);
         Row.Track = EResourceTrack::Signed;
         // Caster's cells (O120: one per authored cast) are not drawn: nothing
         // on the Mana component states a cast count or a cell total, and a
@@ -135,7 +144,7 @@ namespace BreakerHUD
         if (Mana < 0.0f)
         {
             // Debt. Harm colour, and the fill runs the other way from zero.
-            Row.StateWord = TEXT("OVERCAST");
+            Row.StateWord = BreakerStrings::Get(EBreakerStringKey::HudResourceManaOvercast);
             Row.StateColor = BreakerUI::Harm;
             Row.BorderColor = BreakerUI::Harm;
             Row.BorderPixels = 2.0f;
@@ -143,7 +152,8 @@ namespace BreakerHUD
         }
         else
         {
-            Row.StateWord = TEXT("BANKED");
+            // In credit: no word, the upper half of the signed track is the read.
+            Row.StateWord.Reset();
             Row.StateColor = BreakerUI::Cyan;
             Row.Fraction = MaxMana > 0.0f ? FMath::Min(Mana / MaxMana, 1.0f) : 0.0f;
         }
@@ -159,7 +169,7 @@ namespace BreakerHUD
     {
         FResourceRow Row;
         Row.bActive = true;
-        Row.Label = TEXT("SCRAP");
+        Row.Label = BreakerStrings::Get(EBreakerStringKey::HudResourceScrapLabel);
         Row.Fraction = FMath::Clamp(ScrapFraction, 0.0f, 1.0f);
         // Scrap is working capital for weapons and deployables, so its fill
         // is the weapon verb's orange (O179).
@@ -167,19 +177,19 @@ namespace BreakerHUD
         switch (State)
         {
         case EBreakerScrapState::Surplus:
-            Row.StateWord = TEXT("SURPLUS");
+            Row.StateWord = BreakerStrings::Get(EBreakerStringKey::HudResourceScrapSurplus);
             Row.StateColor = BreakerUI::Orange;
             Row.Track = EResourceTrack::WideBlocks;
             Row.BorderColor = BreakerUI::Orange;
             Row.BorderPixels = 2.0f;
             break;
         case EBreakerScrapState::Stocked:
-            Row.StateWord = TEXT("STOCKED");
+            Row.StateWord = BreakerStrings::Get(EBreakerStringKey::HudResourceScrapStocked);
             Row.StateColor = BreakerUI::Gold;
             Row.Track = EResourceTrack::Blocks;
             break;
         default:
-            Row.StateWord = TEXT("DRY");
+            Row.StateWord = BreakerStrings::Get(EBreakerStringKey::HudResourceScrapDry);
             Row.StateColor = BreakerUI::Cyan;
             Row.Track = EResourceTrack::Continuous;
             break;
@@ -193,25 +203,25 @@ namespace BreakerHUD
     {
         FResourceRow Row;
         Row.bActive = true;
-        Row.Label = TEXT("GRIT");
+        Row.Label = BreakerStrings::Get(EBreakerStringKey::HudResourceGritLabel);
         Row.Fraction = FMath::Clamp(GritFraction, 0.0f, 1.0f);
         Row.StepMarks = BreakerHUDMath::GritStepMarks();
         switch (Band)
         {
         case EBreakerGritBand::Ironclad:
-            Row.StateWord = TEXT("IRONCLAD");
+            Row.StateWord = BreakerStrings::Get(EBreakerStringKey::HudResourceGritIronclad);
             Row.StateColor = BreakerUI::Orange;
             Row.Track = EResourceTrack::WideBlocks;
             Row.BorderColor = BreakerUI::Orange;
             Row.BorderPixels = 2.0f;
             break;
         case EBreakerGritBand::Braced:
-            Row.StateWord = TEXT("BRACED");
+            Row.StateWord = BreakerStrings::Get(EBreakerStringKey::HudResourceGritBraced);
             Row.StateColor = BreakerUI::Gold;
             Row.Track = EResourceTrack::Blocks;
             break;
         default:
-            Row.StateWord = TEXT("WINDED");
+            Row.StateWord = BreakerStrings::Get(EBreakerStringKey::HudResourceGritWinded);
             Row.StateColor = BreakerUI::Cyan;
             Row.Track = EResourceTrack::Continuous;
             break;
@@ -227,7 +237,7 @@ namespace BreakerHUD
     {
         FResourceRow Row;
         Row.bActive = true;
-        Row.Label = TEXT("CHARGE");
+        Row.Label = BreakerStrings::Get(EBreakerStringKey::HudResourceChargeLabel);
         Row.Fraction = FMath::Clamp(ChargeFraction, 0.0f, 1.0f);
         // The ally segment — the share of Charge an ally's hits paid in — is
         // not drawn: the Charge component states one pool and no per-source
@@ -235,19 +245,19 @@ namespace BreakerHUD
         switch (Band)
         {
         case EBreakerChargeBand::Resonant:
-            Row.StateWord = TEXT("RESONANT");
+            Row.StateWord = BreakerStrings::Get(EBreakerStringKey::HudResourceChargeResonant);
             Row.StateColor = BreakerUI::Orange;
             Row.Track = EResourceTrack::WideBlocks;
             Row.BorderColor = BreakerUI::Orange;
             Row.BorderPixels = 2.0f;
             break;
         case EBreakerChargeBand::Attuned:
-            Row.StateWord = TEXT("ATTUNED");
+            Row.StateWord = BreakerStrings::Get(EBreakerStringKey::HudResourceChargeAttuned);
             Row.StateColor = BreakerUI::Gold;
             Row.Track = EResourceTrack::Blocks;
             break;
         default:
-            Row.StateWord = TEXT("COLD");
+            Row.StateWord = BreakerStrings::Get(EBreakerStringKey::HudResourceChargeCold);
             Row.StateColor = BreakerUI::Cyan;
             Row.Track = EResourceTrack::Continuous;
             break;

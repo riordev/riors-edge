@@ -39,6 +39,9 @@
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerTargetDummy.h"
 #include "Components/CapsuleComponent.h"
+// Declared crossing, GLASS/DATA -> FIELD (O195): the bar's one word is a
+// string-table row, so its copy is a data edit like every other surface's.
+#include "Data/BreakerStrings.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 #include "UI/BreakerHUDMath.h"
@@ -811,7 +814,8 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         {
             if (bShowName)
             {
-                DrawSpecTextCentered(TEXT("BOSS"), Projected.X, NameY, BreakerUI::TealName, NamePixels, BarAlpha);
+                // Declared crossing, GLASS/DATA -> FIELD: the word is bar.boss in Data/strings.json.
+                DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::BarBoss), Projected.X, NameY, BreakerUI::TealName, NamePixels, BarAlpha);
             }
             if (Marks.Num() > 0)
             {

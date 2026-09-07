@@ -25,6 +25,7 @@
 #include "UI/BreakerMenu.h"
 
 #include "Characters/BreakerCharacter.h"
+#include "Data/BreakerStrings.h"
 #include "Game/BreakerGameInstance.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
@@ -412,8 +413,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildStashScreen()
     const bool bMoveLive = bAtAnchor && bSelectedInBackpack && CanMoveToStash(StashCount);
     const bool bTakeLive = bAtAnchor && bSelectedInStash && CanTakeToBackpack(Backpack.Num());
 
-    const FText MoveLabel = FText::FromString(TEXT("MOVE TO STASH"));
-    const FText TakeLabel = FText::FromString(TEXT("TAKE TO BACKPACK"));
+    const FText MoveLabel = FText::FromString(BreakerStrings::Get(EBreakerStringKey::StashMoveToStash));
+    const FText TakeLabel = FText::FromString(BreakerStrings::Get(EBreakerStringKey::StashTakeToBackpack));
 
     TSharedRef<SWidget> MoveButton = bMoveLive
         ? MakeButton(MoveLabel, FOnClicked::CreateLambda([this, bAtAnchor, StashCount]()
@@ -485,7 +486,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildStashScreen()
 
     const FVector2D Plate = BreakerStashMeasurePlate();
     return BuildZonedFrame(
-        FText::FromString(TEXT("STASH")),
+        FText::FromString(BreakerStrings::Get(EBreakerStringKey::StashTitle)),
         FText::FromString(MetaLine(StashCount, Backpack.Num())),
         Tabs, Body, Footer, Plate.X, Plate.Y, /*bFillHeight=*/true);
 }
