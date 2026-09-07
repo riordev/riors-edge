@@ -191,6 +191,7 @@ void ABreakerProjectileBase::ResolveImpact(AActor* HitActor, const FVector& Loca
     if (!ShouldDamageActor(HitActor)) return;
 
     bool bLandedHit = false;
+    bool bImpactAvoided = false;
     if (UBreakerCombatComponent* TargetCombat = HitActor->FindComponentByClass<UBreakerCombatComponent>())
     {
         FBreakerDamageRequest Applied = Damage;
@@ -209,11 +210,14 @@ void ABreakerProjectileBase::ResolveImpact(AActor* HitActor, const FVector& Loca
         if (Applied.BaseDamage > 0.0f)
         {
             const FBreakerDamageResult Result = TargetCombat->ReceiveDamage(Applied);
+            bImpactAvoided = Result.bDodged || Result.bParried;
             bLandedHit = !Result.bDodged && (Result.HealthDamage > 0.0f || Result.ShieldDamage > 0.0f);
         }
     }
 
-    if (!ImpactStatuses.IsEmpty())
+    // Carried ailments belong to this impact; a dodge/parry avoids its riders too.
+    // No damage request (status-only projectile) retains the ordinary application path.
+    if (!bImpactAvoided && !ImpactStatuses.IsEmpty())
     {
         if (UBreakerStatusComponent* Status = HitActor->FindComponentByClass<UBreakerStatusComponent>())
         {

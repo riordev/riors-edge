@@ -52,8 +52,12 @@ bool FBreakerEntropyLiveRiftRuntimeTest::RunTest(const FString& Parameters)
     }
     if (!TestTrue(TEXT("legal level-one converted rifle actually rolls"), bFound)) return false;
     for (auto& Affix : Rifle.Affixes) if (Affix.AffixId != ConversionId) Affix.Value = 0;
-    for (const bool bAbility : {false, true})
+    // Preserve both Entropy rows and include the guaranteed unmodified kit.
+    // A converted drop is attainable, but is not guaranteed before entry.
+    for (int32 Row = 0; Row < 3; ++Row)
     {
+        const bool bAbility = Row == 1;
+        const bool bStarter = Row == 2;
         UWorld::InitializationValues Init;
         Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
         UPackage* Package = CreatePackage(*FString::Printf(TEXT("/Temp/EntropyLive_%s/Lvl_Fernhall"), *FGuid::NewGuid().ToString(EGuidFormats::Digits)));
@@ -82,7 +86,7 @@ bool FBreakerEntropyLiveRiftRuntimeTest::RunTest(const FString& Parameters)
         Player->GetProgression()->BindAttributes(Player->GetAttributes());
         Player->GetEquipment()->BindAttributes(Player->GetAttributes());
         if (!Player->GetProgression()->ChoosePermanentClassById(EBreakerClassId::Caster)
-            || !Player->GetEquipment()->EquipItem(Rifle)) return false;
+            || !Player->GetEquipment()->EquipItem(bStarter ? UBreakerEquipmentComponent::MakeStarterRifle() : Rifle)) return false;
         auto* Weapon = Player->GetWeapon();
         Weapon->RegisterAllComponentTickFunctions(true); Weapon->SetComponentTickEnabled(true); Weapon->BeginPlay();
         Weapon->SyncArchetypesToEquipment(); Weapon->EquipSlot(1);
@@ -214,7 +218,7 @@ bool FBreakerEntropyLiveRiftRuntimeTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("shipped enemies actually move in the encounter"), MovedEnemies > 0);
         TestTrue(TEXT("real attacks or received damage demonstrate live enemy threat"), bAttackObserved || LostPlayerHealth > 0);
         TestTrue(TEXT("ordinary delivery reduces actual enemy health"), InitialEnemyHealth > RemainingEnemyHealth);
-        TestTrue(TEXT("Entropy delivery earns buildup or threshold activation"), MaxBuildup > 0 || bRotActivated || PeakRotNumber > 0);
+        if (!bStarter) TestTrue(TEXT("Entropy delivery earns buildup or threshold activation"), MaxBuildup > 0 || bRotActivated || PeakRotNumber > 0);
         if (bAbility)
         {
             TestTrue(TEXT("actual ability resource gates admit paid casts"), Casts > 0);
@@ -222,7 +226,7 @@ bool FBreakerEntropyLiveRiftRuntimeTest::RunTest(const FString& Parameters)
         }
         else TestTrue(TEXT("actual converted rifle consumes ammunition"), Rounds > 0);
         AddInfo(FString::Printf(TEXT("LIVE ENTROPY RIFT %s area5 ilvl1 seconds%.2f kills%d/%d damage%.2f playerHealth%.2f->%.2f incomingHealthDamage%.2f moved%d attackObserved%d mana%.2f->%.2f fracture%d rot%d rounds%d reloads%d maxBuildup%.2f rotActivated%d peakObservedRotNumber%.2f outcome%s; ordinary starting resources, normal enemy AI, no forced clear or parity claim"),
-            bAbility ? TEXT("Fracture+Rot") : TEXT("convertedRifle"), Elapsed, Killed, Enemies.Num(), InitialEnemyHealth - RemainingEnemyHealth,
+            bAbility ? TEXT("Fracture+Rot") : bStarter ? TEXT("starterRifle") : TEXT("convertedRifle"), Elapsed, Killed, Enemies.Num(), InitialEnemyHealth - RemainingEnemyHealth,
             InitialHealth, Player->GetAttributes()->GetHealth(), LostPlayerHealth, MovedEnemies, bAttackObserved,
             InitialMana, Mana->GetMana(), Casts, RotCasts, Rounds, Reloads, MaxBuildup, bRotActivated, PeakRotNumber,
             Player->GetCombat()->IsDead() ? TEXT("playerDead") : Killed == Enemies.Num() ? TEXT("firstWaveCleared") : TEXT("timeLimit")));

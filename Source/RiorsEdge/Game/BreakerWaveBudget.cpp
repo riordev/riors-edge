@@ -1,5 +1,21 @@
 #include "Game/BreakerWaveBudget.h"
 
+FBreakerWaveComposition UBreakerWaveBudgetLibrary::MakeEntryRiftOpening(const FBreakerWaveBudgetParams& Params)
+{
+    FBreakerWaveComposition Opening;
+    Opening.Wave = 1;
+    Opening.Kind = EBreakerWaveKind::Standard;
+    Opening.Budget = GetWaveBudget(1, Params);
+    // O2 content tuning: one melee pack and one readable ranged source,
+    // rather than filling the density ceiling before the first encounter.
+    Opening.Skitters = 4;
+    Opening.Lattices = 1;
+    Opening.SpentBudget = Opening.Skitters * Params.SkitterCost + Opening.Lattices * Params.LatticeCost;
+    Opening.UnspentBudget = Opening.Budget - Opening.SpentBudget;
+    Opening.bDropsLoot = Params.bRiftInstance;
+    return Opening;
+}
+
 FBreakerWaveBudgetParams UBreakerWaveBudgetLibrary::MakeRiftWaveBudget(int32 BossWave)
 {
     FBreakerWaveBudgetParams Params;

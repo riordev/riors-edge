@@ -606,11 +606,7 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
             if (RiftSession && !RiftSession->PendingRift.IsSet()
                 && FParse::Param(FCommandLine::Get(), TEXT("BreakerRiftInstance")))
             {
-                RiftSession->PendingRift.AreaName = FText::FromString(TEXT("Fernhall Substation"));
-                RiftSession->PendingRift.AreaLine = FText::FromString(
-                    TEXT("The tear under the substation, where the yard stops being quiet."));
-                RiftSession->PendingRift.AreaLevel = 5;   // O2 PLACEHOLDER, the door's own level
-                RiftSession->PendingRift.Tier = EBreakerRiftTier::Campaign;
+                RiftSession->PendingRift = UBreakerZoneBuilder::FernhallRiftFor(NAME_None);
                 UE_LOG(LogTemp, Display, TEXT("[Rift] -BreakerRiftInstance seeded a run; this is a capture, not a door."));
             }
 
@@ -3938,8 +3934,7 @@ void ABreakerGameMode::StartNextWave()
     // walker of this array.
     WaveEnemies.RemoveAll([](const TObjectPtr<ABreakerEnemy>& Enemy) { return !IsValid(Enemy) || Enemy->IsDeadEnemy(); });
 
-    const FBreakerWaveComposition Composition =
-        UBreakerWaveBudgetLibrary::SolveWave(CurrentWave, 1, WaveBudget);
+    const FBreakerWaveComposition Composition = GetWaveComposition(CurrentWave);
     const float EncounterRadius = bRiftInstance && Composition.bBoss
         ? FMath::Max(WaveSpawnPackRadiusCm, BossArenaClearanceCm) : WaveSpawnPackRadiusCm;
     const FVector Origin = PlayerPawn->GetActorLocation();
@@ -4272,6 +4267,10 @@ void ABreakerGameMode::SetEnemyDropsLoot(ABreakerEnemy* Enemy, bool bDrops) cons
 
 FBreakerWaveComposition ABreakerGameMode::GetWaveComposition(int32 WaveIndex) const
 {
+    const auto* Session = GetGameInstance<UBreakerGameInstance>();
+    if (bRiftInstance && WaveIndex == 1 && Session
+        && Session->PendingRift.EncounterId == FName(TEXT("fernhall.entry")))
+        return UBreakerWaveBudgetLibrary::MakeEntryRiftOpening(WaveBudget);
     // Solo, because solo is the primary balance target and the gym has one
     // player. Party sizes go through the same solver with a different count.
     return UBreakerWaveBudgetLibrary::SolveWave(WaveIndex, 1, WaveBudget);
