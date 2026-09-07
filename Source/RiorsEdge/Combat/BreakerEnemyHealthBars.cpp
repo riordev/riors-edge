@@ -31,6 +31,7 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Characters/BreakerCharacter.h"
+#include "Combat/BreakerBossEnemy.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerEnemyBarMath.h"
 #include "Combat/BreakerEnemyModifiers.h"
@@ -111,6 +112,9 @@ namespace
         float W = 0.0f;
         float H = 0.0f;
         float FillH = 0.0f;
+        // The rank's border in screen pixels: one for every rank but the boss,
+        // two for the boss. Scaled by ScaleUnit only, never by range.
+        float Border = 0.0f;
         float Scale = 1.0f;
     };
 
@@ -123,6 +127,7 @@ namespace
         Rect.W = Size.W * ScaleUnit;
         Rect.H = Size.H * ScaleUnit;
         Rect.FillH = Size.FillH * ScaleUnit;
+        Rect.Border = Size.Border * ScaleUnit;
         Rect.X = HeadProjected.X - Rect.W * 0.5f;
         Rect.Y = HeadProjected.Y - BreakerEnemyBarMath::PlateAboveHeadPx * Scale * ScaleUnit - Rect.H;
         return Rect;
@@ -273,7 +278,8 @@ namespace
     // and a change authored into only one of them would have been invisible
     // on the surface the owner actually plays.
     //
-    // Plate, one-pixel border, system fill at the live fraction; the chip's
+    // Plate, the rank's border (one pixel; two for the boss, so its edge reads
+    // at 640 wide), system fill at the live fraction; the chip's
     // hatch from the live fraction to the fraction the bar was showing; the
     // shield as a line along the top of the fill at its own fraction. The
     // chip and the shield are detail and the caller hides them past
@@ -288,7 +294,7 @@ namespace
         float HealthFraction, float ChipFraction, float ShieldFraction, bool bShowChipAndShield,
         float ScaleUnit, float BarAlpha)
     {
-        const float Border = BreakerEnemyBarMath::BorderPx * ScaleUnit;
+        const float Border = Bar.Border;
         HUD.DrawRect(BreakerUI::Alpha(BreakerUI::Panel10, BarAlpha), Bar.X, Bar.Y, Bar.W, Bar.H);
         const FLinearColor Edge = BreakerUI::Alpha(BreakerUI::BorderEmphasis, BarAlpha);
         HUD.DrawRect(Edge, Bar.X, Bar.Y, Bar.W, Border);
@@ -320,6 +326,32 @@ namespace
             HUD.DrawRect(BreakerUI::Alpha(BreakerUI::TextSecondary, BarAlpha), InnerX, InnerY, InnerW * Shield, LineH);
         }
     }
+
+    // Whether a modifier's rule is FIRING this frame, for the underline under
+    // its mark. Four modifiers keep a state the component exposes across
+    // frames. The other six do not, and that is recorded here rather than
+    // faked with a nearest-fit clock:
+    //  * Warded, Anchored, Fleetfoot are standing rules with no on and off —
+    //    the ward is the shield line the bar already draws; the other two are
+    //    stat rewrites applied once.
+    //  * Splitting, Cascading, Wakeful fire once, on a death or a landed hit,
+    //    with no interval a frame can observe.
+    //  * Reflective's flag is a re-entrancy guard raised and cleared inside one
+    //    reflect call, so it is never up when the HUD reads it. The case is
+    //    wired so the underline lights the moment the component keeps a
+    //    window; today it does not.
+    bool BreakerEnemyBarModifierActive(const UBreakerEnemyModifierComponent& Modifiers,
+        EBreakerEnemyModifier Modifier)
+    {
+        switch (Modifier)
+        {
+        case EBreakerEnemyModifier::Phasing:     return Modifiers.IsBlinking() || Modifiers.IsPhaseTelegraphing();
+        case EBreakerEnemyModifier::Volatile:    return Modifiers.IsFuseLit();
+        case EBreakerEnemyModifier::Reflective:  return Modifiers.IsReflecting();
+        case EBreakerEnemyModifier::WardingAura: return Modifiers.IsAuraHolding();
+        default:                                 return false;
+        }
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -343,7 +375,12 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
     const FVector ViewerLocation = Character->GetActorLocation();
     // S() is private and the geometry helpers above are free functions, so the
     // scale crosses that boundary as a value. Resolved once per frame.
-    const float ScaleUnit = S(1.0f);
+    // DECLARED CROSSING (GLASS -> FIELD): the profile's larger-nameplates
+    // switch, read off the HUD. Plates draw 1.5x; the floors in
+    // BreakerEnemyBarMath are unscaled and unchanged by the toggle. Applied
+    // once, here, so the ScaleFor sizes below inherit it without compounding.
+    float ScaleUnit = S(1.0f);
+    ScaleUnit *= NameplateScale();
     const double Now = World->GetTimeSeconds();
     const float FrameSeconds = World->GetDeltaSeconds();
 
@@ -362,10 +399,14 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
             .GetScaledAxis(EAxis::Y);
     }
 
+    // The camera's location, for the focus cone here and the line-of-sight
+    // trace in the loop. Falls back to the body when there is no camera
+    // manager, so the trace degrades to body-to-head rather than to nothing.
+    FVector CameraLocation = ViewerLocation;
     const ABreakerEnemy* FocusedEnemy = nullptr;
     if (PlayerOwner && PlayerOwner->PlayerCameraManager)
     {
-        const FVector CameraLocation = PlayerOwner->PlayerCameraManager->GetCameraLocation();
+        CameraLocation = PlayerOwner->PlayerCameraManager->GetCameraLocation();
         const FVector CameraForward = PlayerOwner->PlayerCameraManager->GetCameraRotation().Vector();
         float BestDot = BreakerEnemyBar::FocusMinimumDot;
         for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
@@ -396,7 +437,8 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
     //    when the chip has settled: a settled chip carries the fraction the
     //    bar last showed (see the chip block in the loop), and dropping it
     //    would make the next hit's origin unknowable. Bounded by the live
-    //    enemies inside DrawCm, which is the pool.
+    //    enemies inside DrawCm, which is the pool — plus the boss, whose plate
+    //    draws past DrawCm and whose chip therefore lives as long as it does.
     for (auto It = FocusBarReleaseTimes.CreateIterator(); It; ++It)
     {
         if (!It.Key().IsValid() || Now - It.Value() >= BreakerEnemyBar::FocusFadeSeconds)
@@ -407,8 +449,9 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
     for (auto It = ShownEnemyHealth.CreateIterator(); It; ++It)
     {
         const ABreakerEnemy* Keyed = It.Key().Get();
+        const bool bDrawsBeyond = Keyed && Keyed->GetMonsterRank() == EBreakerMonsterRank::Boss;
         if (!Keyed || Keyed->IsDeadEnemy()
-            || FVector::Distance(ViewerLocation, Keyed->GetActorLocation()) > BreakerEnemyBarMath::DrawCm)
+            || (!bDrawsBeyond && FVector::Distance(ViewerLocation, Keyed->GetActorLocation()) > BreakerEnemyBarMath::DrawCm))
         {
             It.RemoveCurrent();
         }
@@ -443,7 +486,42 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         }
 
         const float Distance = FVector::Distance(ViewerLocation, Enemy->GetActorLocation());
-        if (Distance > BreakerEnemyBarMath::DrawCm) continue;
+        const EBreakerMonsterRank Rank = Enemy->GetMonsterRank();
+        const bool bBossRank = Rank == EBreakerMonsterRank::Boss;
+
+        // Head and feet off the capsule root, so the plate rides a tall body
+        // and the ellipse sits on the ground whatever the chassis height is.
+        float HalfHeight = BreakerEnemyBar::FallbackHeadCm;
+        if (const UCapsuleComponent* Capsule = Cast<UCapsuleComponent>(Enemy->GetRootComponent()))
+        {
+            HalfHeight = Capsule->GetScaledCapsuleHalfHeight();
+        }
+        const FVector HeadWorld = Enemy->GetActorLocation() + FVector(0.0f, 0.0f, HalfHeight);
+        const FVector FeetWorld = Enemy->GetActorLocation() - FVector(0.0f, 0.0f, HalfHeight);
+
+        // ---- Beyond DrawCm ----------------------------------------------------
+        // The plate is gone, with the sheet's two exceptions. The champion
+        // keeps a contact dot at the head: a ChampionContactDotPx square in the
+        // system colour, unscaled, untraced (a dot behind a wall costs nothing
+        // and a trace per far champion would). The boss keeps its whole plate
+        // at the floor scale, minus the BOSS word — the bar and the phase
+        // geometry are the read from across the arena; the word is not.
+        const bool bBeyondDraw = Distance > BreakerEnemyBarMath::DrawCm;
+        if (bBeyondDraw)
+        {
+            if (Rank == EBreakerMonsterRank::ModifierBearing)
+            {
+                if (Enemy->IsDeadEnemy()) continue;
+                const FVector Head = Project(HeadWorld, false);
+                if (Head.Z > 0.0f)
+                {
+                    const float Dot = BreakerEnemyBarMath::ChampionContactDotPx * ScaleUnit;
+                    DrawRect(BreakerUI::System, Head.X - Dot * 0.5f, Head.Y - Dot * 0.5f, Dot, Dot);
+                }
+                continue;
+            }
+            if (!bBossRank) continue;
+        }
 
         const UAbilitySystemComponent* EnemyAbilitySystem = Enemy->GetAbilitySystemComponent();
         const UBreakerAttributeSet* EnemyAttributes = EnemyAbilitySystem ? EnemyAbilitySystem->GetSet<UBreakerAttributeSet>() : nullptr;
@@ -498,20 +576,27 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
             }
         }
 
-        // Head and feet off the capsule root, so the plate rides a tall body
-        // and the ellipse sits on the ground whatever the chassis height is.
-        float HalfHeight = BreakerEnemyBar::FallbackHeadCm;
-        if (const UCapsuleComponent* Capsule = Cast<UCapsuleComponent>(Enemy->GetRootComponent()))
-        {
-            HalfHeight = Capsule->GetScaledCapsuleHalfHeight();
-        }
-        const FVector HeadWorld = Enemy->GetActorLocation() + FVector(0.0f, 0.0f, HalfHeight);
-        const FVector FeetWorld = Enemy->GetActorLocation() - FVector(0.0f, 0.0f, HalfHeight);
         const FVector Projected = Project(HeadWorld, false);
         if (Projected.Z <= 0.0f) continue;
 
-        const EBreakerMonsterRank Rank = Enemy->GetMonsterRank();
-        const float Scale = BreakerEnemyBarMath::ScaleFor(Distance);
+        // ---- Line of sight ------------------------------------------------------
+        // One trace per barred enemy per frame, camera to head, against world
+        // statics only: the enemy and the player are ignored, and other bodies
+        // do not count as cover — a plate over a pack is the crowd read, not a
+        // leak. A wall between the camera and the head hides the WHOLE plate
+        // for every rank but the boss, because a bar floating over a wall is a
+        // position leak rather than a health read. The boss's bar draws
+        // through — the fight is read from anywhere in the arena — and only its
+        // marks and its name yield.
+        FCollisionQueryParams SightParams(FName(TEXT("BreakerEnemyBarSight")), false);
+        SightParams.AddIgnoredActor(Enemy);
+        SightParams.AddIgnoredActor(Character);
+        const bool bSightBlocked = World->LineTraceTestByObjectType(CameraLocation, HeadWorld,
+            FCollisionObjectQueryParams(ECC_WorldStatic), SightParams);
+        if (bSightBlocked && !bBossRank) continue;
+
+        const float Scale = bBeyondDraw ? BreakerEnemyBarMath::BeyondDrawBossScale
+                                        : BreakerEnemyBarMath::ScaleFor(Distance);
         const FBreakerEnemyBarRect Bar = BreakerEnemyBarPlace(Projected, Rank, Scale, ScaleUnit);
         const bool bShowChipAndShield = Distance < BreakerEnemyBarMath::ChipAndShieldHideCm;
 
@@ -568,7 +653,8 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         // No gold edge (O129: colour carries health, not rank), no rank glyph,
         // no rank word. Elite is the ellipse at the feet (O203); the champion
         // is a filled diamond off each end of its wider bar; trash is the bar
-        // alone; boss draws nothing new until its own pass.
+        // alone; the boss's phase geometry stands on the fill and is drawn
+        // after the body below.
         if (Rank == EBreakerMonsterRank::Elite)
         {
             const FVector Feet = Project(FeetWorld, false);
@@ -594,29 +680,46 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         // ---- The column above the bar: marks, then the name ------------------
         // No prose. A modifier is announced by SHAPE at every range, and the
         // shape is the same one at every range, so what the player learns at
-        // ten metres is what they read at fifty. The only word left is BOSS.
+        // ten metres is what they read at fifty. The only word on any plate is
+        // BOSS: no other rank has a name source — the enemy carries no display
+        // name and the sheet's NameDropCm has nothing to drop — so no other
+        // name is drawn. Recorded here, not faked with a class or family word.
+        // Beside each mark, whether its rule is firing this frame, for the
+        // underline; see BreakerEnemyBarModifierActive for which can.
         TArray<BreakerEnemyBarMath::EBreakerEnemyMark> Marks;
+        TArray<bool> MarkActive;
         if (const UBreakerEnemyModifierComponent* Modifiers = Enemy->GetModifierComponent())
         {
             for (EBreakerEnemyModifier Modifier : Modifiers->GetModifiers())
             {
                 if (Marks.Num() >= BreakerEnemyBarMath::MaximumMarks) break;
                 const BreakerEnemyBarMath::EBreakerEnemyMark Mark = BreakerEnemyBarMath::MarkFor(Modifier);
-                if (Mark != BreakerEnemyBarMath::EBreakerEnemyMark::None) Marks.Add(Mark);
+                if (Mark == BreakerEnemyBarMath::EBreakerEnemyMark::None) continue;
+                Marks.Add(Mark);
+                MarkActive.Add(BreakerEnemyBarModifierActive(*Modifiers, Modifier));
             }
         }
-        const bool bBossRank = Rank == EBreakerMonsterRank::Boss;
+
+        // The BOSS word: BossNameFor(Scale) spec pixels in the teal name token
+        // (ui.md: teal is a noun, and name text is one of its nouns), on a line
+        // the same pad taller than the glyphs as every other name line here.
+        // Suppressed beyond DrawCm, where the bar alone is the read.
+        const bool bShowName = bBossRank && !bBeyondDraw;
+        const float NamePixels = bShowName ? BreakerEnemyBarMath::BossNameFor(Scale) : 0.0f;
+        const float NameLinePad = BreakerEnemyBar::NameLinePixels - BreakerEnemyBar::NamePixels;
 
         const float Gap = BreakerEnemyBarMath::ColumnGapPx * Scale * ScaleUnit;
-        const float NameH = bBossRank ? BreakerEnemyBar::NameLinePixels * Scale * ScaleUnit : 0.0f;
+        const float NameH = bShowName ? (NamePixels + NameLinePad) * ScaleUnit : 0.0f;
         const float NameY = Bar.Y - Gap - NameH;
         const float Cell = BreakerEnemyBarMath::MarkCellPx * Scale * ScaleUnit;
         const float Pitch = Cell + BreakerEnemyBarMath::MarkGapFor(Scale) * ScaleUnit;
         const float MarksW = Marks.Num() > 0 ? Cell + Pitch * (Marks.Num() - 1) : 0.0f;
-        const float MarksY = (bBossRank ? NameY : Bar.Y) - (Marks.Num() > 0 ? Gap + Cell : 0.0f);
-        const float ColumnTop = Marks.Num() > 0 ? MarksY : (bBossRank ? NameY : Bar.Y);
+        const float MarksY = (bShowName ? NameY : Bar.Y) - (Marks.Num() > 0 ? Gap + Cell : 0.0f);
+        const float ColumnTop = Marks.Num() > 0 ? MarksY : (bShowName ? NameY : Bar.Y);
+        // The boss's pip row hangs under the bar and is part of its column.
+        const float PipRowH = bBossRank ? Gap + BreakerEnemyBarMath::BossPipSizeFor(Scale).Y * ScaleUnit : 0.0f;
         const float ColumnW = FMath::Max(Bar.W, MarksW);
-        const float ColumnH = Bar.Y + Bar.H - ColumnTop;
+        const float ColumnH = Bar.Y + Bar.H + PipRowH - ColumnTop;
 
         // Screen-space overlap suppression over the WHOLE column. Two enemies
         // standing in line with the camera project to nearly the same point,
@@ -625,9 +728,11 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         // on the body behind is worse than two bars touching. The marks and
         // the name yield, because those are what turned to mush. The focused
         // enemy is drawn regardless, because it is the one the player is
-        // deliberately asking about.
+        // deliberately asking about. This is OVERLAP, screen-space and between
+        // plates; the wall test above is line of sight and is a different
+        // flag.
         const bool bFocused = (Enemy == FocusedEnemy);
-        bool bOccluded = false;
+        bool bOverlapped = false;
         if (!bFocused)
         {
             for (const FVector4& Taken : DrawnLabelBounds)
@@ -635,12 +740,12 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
                 if (FMath::Abs(Projected.X - Taken.X) < (ColumnW + Taken.Z) * 0.5f
                     && FMath::Abs(ColumnTop - Taken.Y) < (ColumnH + Taken.W) * 0.5f)
                 {
-                    bOccluded = true;
+                    bOverlapped = true;
                     break;
                 }
             }
         }
-        if (!bOccluded)
+        if (!bOverlapped)
         {
             DrawnLabelBounds.Emplace(Projected.X, ColumnTop, ColumnW, ColumnH);
         }
@@ -648,20 +753,83 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         BreakerEnemyBarDrawBody(*this, Bar, Fraction, ChipFraction, ShieldFraction, bShowChipAndShield,
             ScaleUnit, BarAlpha);
 
-        if (!bOccluded)
+        // ---- The boss: the phase on the body (O156) ----------------------------
+        // Two gate marks standing on the fill at the boss's own health gates,
+        // read off its params so the plate and the phase machine cannot
+        // disagree; a pip under the bar per phase, lit by where the boss is.
+        // Drawn AFTER the body because the marks stand over the fill, and
+        // through both the wall test and the overlap test: they are the bar's
+        // geometry, and the bar always draws.
+        if (bBossRank)
         {
-            if (bBossRank)
+            if (const ABreakerBossEnemy* Boss = Cast<const ABreakerBossEnemy>(Enemy))
             {
-                DrawSpecTextCentered(TEXT("BOSS"), Projected.X, NameY, BreakerUI::TextSecondary,
-                    BreakerEnemyBar::NamePixels * Scale, BarAlpha);
+                using namespace BreakerEnemyBarMath;
+                const FBossMarkFractions Gates = BossMarkFractions(Boss->PhaseParams);
+                const float InnerX = Bar.X + Bar.Border;
+                const float InnerW = FMath::Max(0.0f, Bar.W - 2.0f * Bar.Border);
+                const float MarkW = BossMarkW * ScaleUnit;
+                const float MarkH = BossMarkHeightFor(Scale) * ScaleUnit;
+                const float MarkY = Bar.Y + (Bar.H - MarkH) * 0.5f;
+                const float EdgeW = BossMarkEdgePx * ScaleUnit;
+                const FLinearColor MarkEdge = BreakerUI::Alpha(BreakerUI::System, BarAlpha);
+                const FLinearColor MarkBody = BreakerUI::Alpha(BreakerUI::BgVoid, BarAlpha);
+                const float GateFractions[] = { Gates.Commitment, Gates.Suppression };
+                for (const float Gate : GateFractions)
+                {
+                    const float MarkX = InnerX + InnerW * FMath::Clamp(Gate, 0.0f, 1.0f) - MarkW * 0.5f;
+                    DrawRect(MarkBody, MarkX, MarkY, MarkW, MarkH);
+                    DrawRect(MarkEdge, MarkX, MarkY, EdgeW, MarkH);
+                    DrawRect(MarkEdge, MarkX + MarkW - EdgeW, MarkY, EdgeW, MarkH);
+                }
+
+                const int32 PipCount = BossPhaseCount();
+                const FVector2D Pip = BossPipSizeFor(Scale) * ScaleUnit;
+                const float PipGap = BossPipGapPx * ScaleUnit;
+                const float PipRowW = Pip.X * PipCount + PipGap * (PipCount - 1);
+                const float PipRowX = Projected.X - PipRowW * 0.5f;
+                const float PipRowY = Bar.Y + Bar.H + Gap;
+                for (int32 i = 0; i < PipCount; ++i)
+                {
+                    FLinearColor PipColour = BreakerUI::BorderRest;
+                    switch (PipStateFor(i, Boss->GetPhase()))
+                    {
+                    case EBreakerPipState::Done:     PipColour = BreakerUI::TextSecondary; break;
+                    case EBreakerPipState::Current:  PipColour = BreakerUI::System; break;
+                    case EBreakerPipState::Upcoming: PipColour = BreakerUI::BorderRest; break;
+                    }
+                    DrawRect(BreakerUI::Alpha(PipColour, BarAlpha), PipRowX + (Pip.X + PipGap) * i, PipRowY,
+                        Pip.X, Pip.Y);
+                }
+            }
+            // A Boss-ranked body that is not an ABreakerBossEnemy has no phase
+            // machine to read, so it gets the boss bar and no phase geometry.
+            // Recorded, not faked with a health-fraction stand-in.
+        }
+
+        if (!bOverlapped && !bSightBlocked)
+        {
+            if (bShowName)
+            {
+                DrawSpecTextCentered(TEXT("BOSS"), Projected.X, NameY, BreakerUI::TealName, NamePixels, BarAlpha);
             }
             if (Marks.Num() > 0)
             {
                 const FLinearColor MarkColour = BreakerUI::Alpha(BreakerUI::System, BarAlpha);
                 const float RowX = Projected.X - MarksW * 0.5f;
+                const float UnderlineY = MarksY + Cell + BreakerEnemyBarMath::MarkActiveUnderlineGapPx * ScaleUnit;
+                const float UnderlineH = BreakerEnemyBarMath::MarkActiveUnderlinePx * ScaleUnit;
                 for (int32 i = 0; i < Marks.Num(); ++i)
                 {
-                    BreakerEnemyBarDrawMark(*this, RowX + Pitch * i, MarksY, Cell, Marks[i], MarkColour);
+                    const float CellX = RowX + Pitch * i;
+                    BreakerEnemyBarDrawMark(*this, CellX, MarksY, Cell, Marks[i], MarkColour);
+                    // The underline: a mark whose rule is firing carries a line
+                    // under its cell, in the mark's own colour so the shape
+                    // still announces the modifier and the line only says NOW.
+                    if (MarkActive[i])
+                    {
+                        DrawRect(MarkColour, CellX, UnderlineY, Cell, UnderlineH);
+                    }
                 }
             }
         }

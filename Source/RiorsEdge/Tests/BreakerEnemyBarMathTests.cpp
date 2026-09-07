@@ -4,6 +4,7 @@
 #include "Combat/BreakerEnemyBarMath.h"
 #include "Combat/BreakerEnemyModifiers.h"
 #include "Combat/BreakerMonsterChassis.h"
+#include "Settings/BreakerGameSettings.h"
 
 // The nameplate's drawing cannot be tested — no viewport, no way to assert a
 // mark reads. Its ARITHMETIC can: every rule the nameplate sheet states is a
@@ -35,8 +36,17 @@ bool FBreakerEnemyBarMathTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Standard bar 6 tall"), StandardBarH, 6.0f);
     TestEqual(TEXT("Champion bar 160 wide"), ChampionBarW, 160.0f);
     TestEqual(TEXT("Champion bar 8 tall"), ChampionBarH, 8.0f);
+    TestEqual(TEXT("Boss bar 640 wide"), BossBarW, 640.0f);
+    TestEqual(TEXT("Boss bar 24 tall"), BossBarH, 24.0f);
     TestEqual(TEXT("Border 1"), BorderPx, 1.0f);
+    TestEqual(TEXT("Boss border 2"), BossBorderPx, 2.0f);
     TestEqual(TEXT("Plate floor 5"), MinPlateH, 5.0f);
+    TestEqual(TEXT("Boss plate floor 12"), BossMinPlateH, 12.0f);
+    TestEqual(TEXT("Champion contact dot 4"), ChampionContactDotPx, 4.0f);
+    TestEqual(TEXT("Boss beyond DrawCm draws at the floor"), BeyondDrawBossScale, FloorScale);
+    TestEqual(TEXT("Name drop 2000, unused until a name source lands"), NameDropCm, 2000.0f);
+    TestEqual(TEXT("Active underline 2"), MarkActiveUnderlinePx, 2.0f);
+    TestEqual(TEXT("Active underline 2 below the cell"), MarkActiveUnderlineGapPx, 2.0f);
     TestEqual(TEXT("Fill floor 3"), MinFillH, 3.0f);
     TestEqual(TEXT("Shield line 2"), ShieldLinePx, 2.0f);
     TestEqual(TEXT("Halo width ratio 1.6"), HaloWidthRatio, 1.6f);
@@ -56,6 +66,16 @@ bool FBreakerEnemyBarMathTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Halfway is three quarters"), ScaleFor(2350.0f), 0.75f, BreakerEnemyBarMathTolerance);
     TestEqual(TEXT("Floor at Far"), ScaleFor(3500.0f), 0.5f, BreakerEnemyBarMathTolerance);
     TestEqual(TEXT("Floor holds past Far"), ScaleFor(5000.0f), ScaleFor(3500.0f), BreakerEnemyBarMathTolerance);
+    // The profile's larger-nameplates switch is a multiplier on the range
+    // scale, applied by the nameplate TU: one authored step up, and the
+    // math's floors are not the toggle's to move.
+    TestEqual(TEXT("Larger nameplates at Near is one step up"),
+        ScaleFor(1200.0f) * UBreakerGameSettings::LargerNameplateScale, 1.5f, BreakerEnemyBarMathTolerance);
+    // BarSizeFor takes no profile: the unscaled fill at Near is the sheet's 4
+    // whatever the toggle says, and the floor beneath it is still 3.
+    TestEqual(TEXT("The unscaled fill is unchanged by the toggle"),
+        BarSizeFor(EBreakerMonsterRank::Trash, 1.0f).FillH, 4.0f, BreakerEnemyBarMathTolerance);
+    TestEqual(TEXT("Fill floor 3 stands under the toggle"), MinFillH, 3.0f);
 
     // --- Bar size by rank ---------------------------------------------------------
     {
@@ -69,20 +89,78 @@ bool FBreakerEnemyBarMathTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Elite 6 tall"), Elite.H, 6.0f, BreakerEnemyBarMathTolerance);
         TestEqual(TEXT("Champion 160 wide"), Champion.W, 160.0f, BreakerEnemyBarMathTolerance);
         TestEqual(TEXT("Champion 8 tall"), Champion.H, 8.0f, BreakerEnemyBarMathTolerance);
-        TestEqual(TEXT("Boss takes the champion's width"), Boss.W, 160.0f, BreakerEnemyBarMathTolerance);
-        TestEqual(TEXT("Boss takes the champion's height"), Boss.H, 8.0f, BreakerEnemyBarMathTolerance);
+        TestEqual(TEXT("Boss 640 wide"), Boss.W, 640.0f, BreakerEnemyBarMathTolerance);
+        TestEqual(TEXT("Boss 24 tall"), Boss.H, 24.0f, BreakerEnemyBarMathTolerance);
+        TestEqual(TEXT("Boss border 2"), Boss.Border, 2.0f, BreakerEnemyBarMathTolerance);
+        TestEqual(TEXT("Boss fill inside a 2px border"), Boss.FillH, 20.0f, BreakerEnemyBarMathTolerance);
+        TestEqual(TEXT("Trash border 1"), Trash.Border, 1.0f, BreakerEnemyBarMathTolerance);
+        TestEqual(TEXT("Elite border 1"), Elite.Border, 1.0f, BreakerEnemyBarMathTolerance);
+        TestEqual(TEXT("Champion border 1"), Champion.Border, 1.0f, BreakerEnemyBarMathTolerance);
         TestEqual(TEXT("Standard fill inside a 1px border"), Trash.FillH, 4.0f, BreakerEnemyBarMathTolerance);
         TestEqual(TEXT("Champion fill inside a 1px border"), Champion.FillH, 6.0f, BreakerEnemyBarMathTolerance);
     }
     {
         const FBarSize Trash = BarSizeFor(EBreakerMonsterRank::Trash, 0.5f);
         const FBarSize Champion = BarSizeFor(EBreakerMonsterRank::ModifierBearing, 0.5f);
+        const FBarSize Boss = BarSizeFor(EBreakerMonsterRank::Boss, 0.5f);
         TestEqual(TEXT("Trash 48 wide at the floor"), Trash.W, 48.0f, BreakerEnemyBarMathTolerance);
         TestEqual(TEXT("Trash plate floors at 5"), Trash.H, 5.0f, BreakerEnemyBarMathTolerance);
         TestEqual(TEXT("Champion 80 wide at the floor"), Champion.W, 80.0f, BreakerEnemyBarMathTolerance);
         TestEqual(TEXT("Champion plate floors at 5"), Champion.H, 5.0f, BreakerEnemyBarMathTolerance);
+        TestEqual(TEXT("Boss 320 wide at the floor"), Boss.W, 320.0f, BreakerEnemyBarMathTolerance);
+        TestEqual(TEXT("Boss 12 tall at the floor"), Boss.H, 12.0f, BreakerEnemyBarMathTolerance);
+        TestEqual(TEXT("Boss border never scales"), Boss.Border, 2.0f, BreakerEnemyBarMathTolerance);
         TestTrue(TEXT("Trash fill never under 3"), Trash.FillH >= MinFillH - BreakerEnemyBarMathTolerance);
         TestTrue(TEXT("Champion fill never under 3"), Champion.FillH >= MinFillH - BreakerEnemyBarMathTolerance);
+        TestTrue(TEXT("Boss fill never under 3"), Boss.FillH >= MinFillH - BreakerEnemyBarMathTolerance);
+    }
+
+    // --- The boss's phase geometry (O156: the phase lives on the body) ----------
+    {
+        // The gate marks are the boss's own params, default-constructed here so
+        // the shipped gates are pinned against the shipped plate.
+        const FBossMarkFractions Gates = BossMarkFractions(FBreakerBossPhaseParams{});
+        TestEqual(TEXT("Lower mark at the Commitment gate"), Gates.Commitment, 0.33f, BreakerEnemyBarMathTolerance);
+        TestEqual(TEXT("Upper mark at the Suppression gate"), Gates.Suppression, 0.66f, BreakerEnemyBarMathTolerance);
+        TestTrue(TEXT("The marks are ordered"), Gates.Commitment < Gates.Suppression);
+
+        FBreakerBossPhaseParams Retuned;
+        Retuned.CommitmentGate = 0.25f;
+        Retuned.SuppressionGate = 0.75f;
+        const FBossMarkFractions RetunedGates = BossMarkFractions(Retuned);
+        TestEqual(TEXT("The marks follow the params, not a copy"), RetunedGates.Commitment, 0.25f, BreakerEnemyBarMathTolerance);
+        TestEqual(TEXT("The marks follow the params, not a copy (upper)"), RetunedGates.Suppression, 0.75f, BreakerEnemyBarMathTolerance);
+
+        TestEqual(TEXT("Three phases, three pips"), BossPhaseCount(), 3);
+
+        // Walk every phase: pips before it are done, its own is current, the
+        // rest are upcoming.
+        for (int32 Phase = 0; Phase < BossPhaseCount(); ++Phase)
+        {
+            const EBreakerBossPhase Current = static_cast<EBreakerBossPhase>(Phase);
+            for (int32 Pip = 0; Pip < BossPhaseCount(); ++Pip)
+            {
+                const EBreakerPipState Expected = Pip < Phase ? EBreakerPipState::Done
+                    : Pip == Phase ? EBreakerPipState::Current : EBreakerPipState::Upcoming;
+                TestTrue(FString::Printf(TEXT("Pip %d in phase %d"), Pip, Phase), PipStateFor(Pip, Current) == Expected);
+            }
+        }
+        TestTrue(TEXT("Deployment: first pip current"), PipStateFor(0, EBreakerBossPhase::Deployment) == EBreakerPipState::Current);
+        TestTrue(TEXT("Suppression: first pip done"), PipStateFor(0, EBreakerBossPhase::Suppression) == EBreakerPipState::Done);
+        TestTrue(TEXT("Commitment: last pip current"), PipStateFor(2, EBreakerBossPhase::Commitment) == EBreakerPipState::Current);
+        TestTrue(TEXT("Deployment: last pip upcoming"), PipStateFor(2, EBreakerBossPhase::Deployment) == EBreakerPipState::Upcoming);
+
+        TestEqual(TEXT("Gate mark 4 wide"), BossMarkW, 4.0f);
+        TestEqual(TEXT("Gate mark 32 tall near"), BossMarkHeightFor(1.0f), 32.0f, BreakerEnemyBarMathTolerance);
+        TestEqual(TEXT("Gate mark 16 tall at the floor"), BossMarkHeightFor(0.5f), 16.0f, BreakerEnemyBarMathTolerance);
+        TestEqual(TEXT("Gate mark edge 1"), BossMarkEdgePx, 1.0f);
+        TestEqual(TEXT("Pip 24 wide near"), BossPipSizeFor(1.0f).X, 24.0, static_cast<double>(BreakerEnemyBarMathTolerance));
+        TestEqual(TEXT("Pip 6 tall near"), BossPipSizeFor(1.0f).Y, 6.0, static_cast<double>(BreakerEnemyBarMathTolerance));
+        TestEqual(TEXT("Pip 16 wide at the floor"), BossPipSizeFor(0.5f).X, 16.0, static_cast<double>(BreakerEnemyBarMathTolerance));
+        TestEqual(TEXT("Pip 4 tall at the floor"), BossPipSizeFor(0.5f).Y, 4.0, static_cast<double>(BreakerEnemyBarMathTolerance));
+        TestEqual(TEXT("BOSS 32 near"), BossNameFor(1.0f), 32.0f, BreakerEnemyBarMathTolerance);
+        TestEqual(TEXT("BOSS 20 at the floor"), BossNameFor(0.5f), 20.0f, BreakerEnemyBarMathTolerance);
+        TestEqual(TEXT("BOSS 20 at the beyond-draw scale"), BossNameFor(BeyondDrawBossScale), 20.0f, BreakerEnemyBarMathTolerance);
     }
 
     // --- The elite's ellipse and the champion's diamonds -------------------------

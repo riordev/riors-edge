@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Combat/BreakerBossPhases.h"
 #include "Combat/BreakerEnemyModifiers.h"
 #include "Combat/BreakerMonsterChassis.h"
 
@@ -39,17 +40,37 @@ namespace BreakerEnemyBarMath
         return FMath::Clamp(1.0f - (1.0f - FloorScale) * T, FloorScale, 1.0f);
     }
 
+    // --- Beyond DrawCm ------------------------------------------------------------
+    // Past DrawCm a plate is gone, with two exceptions the sheet names. The
+    // champion keeps a contact dot at the head — a square of ChampionContactDotPx,
+    // never scaled — so a champion at the far end of a field is still a
+    // champion. The boss keeps its whole plate at the floor scale, because a
+    // boss fight is read from anywhere in the arena.
+    inline constexpr float ChampionContactDotPx = 4.0f;       // 03-nameplates
+    inline constexpr float BeyondDrawBossScale = FloorScale;  // 03-nameplates
+
+    // The sheet drops a non-boss name past this range. UNUSED: no non-boss rank
+    // has a name source — the only word on a plate is BOSS, and it never drops
+    // — so nothing reads this yet. It is here so the number has one home when
+    // a name source lands, not as a rule anything follows today.
+    inline constexpr float NameDropCm = 2000.0f;              // 03-nameplates
+
     // --- The bar --------------------------------------------------------------
-    // Two widths: the standard body and the champion. Boss takes the champion's
-    // until its own pass rules otherwise. The border never scales; the plate
-    // never drops below MinPlateH so the fill inside it never drops below
-    // MinFillH — a one-pixel fill is not a health read.
+    // Three widths: the standard body, the champion, and the boss. The border
+    // never scales; the plate never drops below its floor so the fill inside
+    // it never drops below MinFillH — a one-pixel fill is not a health read.
+    // The boss carries its own border (thicker) and its own plate floor (the
+    // phase marks sit on it and need the height).
     inline constexpr float StandardBarW = 96.0f;  // 03-nameplates
     inline constexpr float StandardBarH = 6.0f;   // 03-nameplates
     inline constexpr float ChampionBarW = 160.0f; // 03-nameplates
     inline constexpr float ChampionBarH = 8.0f;   // 03-nameplates
+    inline constexpr float BossBarW = 640.0f;     // 03-nameplates
+    inline constexpr float BossBarH = 24.0f;      // 03-nameplates
     inline constexpr float BorderPx = 1.0f;       // 03-nameplates
+    inline constexpr float BossBorderPx = 2.0f;   // 03-nameplates
     inline constexpr float MinPlateH = 5.0f;      // 03-nameplates
+    inline constexpr float BossMinPlateH = 12.0f; // 03-nameplates
     inline constexpr float MinFillH = 3.0f;       // 03-nameplates
     inline constexpr float ShieldLinePx = 2.0f;   // 03-nameplates
 
@@ -59,17 +80,106 @@ namespace BreakerEnemyBarMath
         float H = 0.0f;
         // The fill's height inside the border, already floored.
         float FillH = 0.0f;
+        // The border's thickness, which never scales: 1 for every rank but the
+        // boss, 2 for the boss.
+        float Border = BorderPx;
     };
 
     inline FBarSize BarSizeFor(EBreakerMonsterRank Rank, float Scale)
     {
-        const bool bWide = Rank == EBreakerMonsterRank::ModifierBearing || Rank == EBreakerMonsterRank::Boss;
         FBarSize Size;
-        Size.W = (bWide ? ChampionBarW : StandardBarW) * Scale;
-        Size.H = FMath::Max((bWide ? ChampionBarH : StandardBarH) * Scale, MinPlateH);
-        Size.FillH = FMath::Max(Size.H - 2.0f * BorderPx, MinFillH);
+        if (Rank == EBreakerMonsterRank::Boss)
+        {
+            Size.Border = BossBorderPx;
+            Size.W = BossBarW * Scale;
+            Size.H = FMath::Max(BossBarH * Scale, BossMinPlateH);
+        }
+        else
+        {
+            const bool bWide = Rank == EBreakerMonsterRank::ModifierBearing;
+            Size.Border = BorderPx;
+            Size.W = (bWide ? ChampionBarW : StandardBarW) * Scale;
+            Size.H = FMath::Max((bWide ? ChampionBarH : StandardBarH) * Scale, MinPlateH);
+        }
+        Size.FillH = FMath::Max(Size.H - 2.0f * Size.Border, MinFillH);
         return Size;
     }
+
+    // --- The boss's phase geometry ------------------------------------------------
+    // The phase lives on the body (O156): the bar carries the two health gates
+    // as marks standing on the fill, and a row of pips under it, one per
+    // phase, so the player reads "which phase" and "how far to the next" off
+    // the same plate. The gates are read off the boss's own params, never
+    // authored a second time here.
+    struct FBossMarkFractions
+    {
+        // The fraction the boss crosses into Commitment; the lower mark.
+        float Commitment = 0.0f;
+        // The fraction the boss crosses into Suppression; the upper mark.
+        float Suppression = 0.0f;
+    };
+
+    inline FBossMarkFractions BossMarkFractions(const FBreakerBossPhaseParams& Params)
+    {
+        FBossMarkFractions Marks;
+        Marks.Commitment = Params.CommitmentGate;
+        Marks.Suppression = Params.SuppressionGate;
+        return Marks;
+    }
+
+    // Reflected off the enum rather than authored: NumEnums counts the hidden
+    // _MAX entry UHT appends, hence the minus one. EBreakerBossPhase is
+    // append-only, so a fourth phase grows this row without touching it.
+    inline int32 BossPhaseCount()
+    {
+        return StaticEnum<EBreakerBossPhase>()->NumEnums() - 1;
+    }
+
+    // Plain and unserialized: a pip's state is resolved every frame from the
+    // boss's phase, never stored.
+    enum class EBreakerPipState : uint8
+    {
+        Done,
+        Current,
+        Upcoming
+    };
+
+    inline EBreakerPipState PipStateFor(int32 Pip, EBreakerBossPhase Current)
+    {
+        const int32 Now = static_cast<int32>(Current);
+        if (Pip < Now) return EBreakerPipState::Done;
+        if (Pip == Now) return EBreakerPipState::Current;
+        return EBreakerPipState::Upcoming;
+    }
+
+    // The gate mark: a BossMarkW-wide bar standing taller than the plate. Its
+    // width never scales (it is an edge, like the border); its height shrinks
+    // with the plate.
+    inline constexpr float BossMarkW = 4.0f;        // 03-nameplates
+    inline constexpr float BossMarkH = 32.0f;       // 03-nameplates
+    inline constexpr float BossMarkEdgePx = 1.0f;   // 03-nameplates
+
+    inline float BossMarkHeightFor(float Scale) { return BossMarkH * Scale; }
+
+    // The pips: BossPipW x BossPipH near, floored at BossPipMinW x BossPipMinH
+    // so a pip at the far end of the arena is still a pip, not a hyphen.
+    inline constexpr float BossPipW = 24.0f;        // 03-nameplates
+    inline constexpr float BossPipH = 6.0f;         // 03-nameplates
+    inline constexpr float BossPipMinW = 16.0f;     // 03-nameplates
+    inline constexpr float BossPipMinH = 4.0f;      // 03-nameplates
+    inline constexpr float BossPipGapPx = 4.0f;     // O2 PLACEHOLDER — the sheet sizes the pip, not the row
+
+    inline FVector2D BossPipSizeFor(float Scale)
+    {
+        return FVector2D(FMath::Max(BossPipW * Scale, BossPipMinW), FMath::Max(BossPipH * Scale, BossPipMinH));
+    }
+
+    // The BOSS word, in the teal name token: BossNamePx near, floored at
+    // BossNameMinPx.
+    inline constexpr float BossNamePx = 32.0f;      // 03-nameplates
+    inline constexpr float BossNameMinPx = 20.0f;   // 03-nameplates
+
+    inline float BossNameFor(float Scale) { return FMath::Max(BossNamePx * Scale, BossNameMinPx); }
 
     // --- The elite's ellipse ---------------------------------------------------
     // At the feet, wider than the body by the ratio, HaloHeightPx tall at the
@@ -102,6 +212,11 @@ namespace BreakerEnemyBarMath
     inline constexpr int32 MaximumMarks = 3;         // 03-nameplates
 
     inline float MarkGapFor(float Scale) { return FMath::Max(MarkGapPx * Scale, MarkGapMinPx); }
+
+    // The active underline: a modifier whose rule is FIRING right now (a lit
+    // fuse, a blink, a held aura) carries a line under its mark. Never scales.
+    inline constexpr float MarkActiveUnderlinePx = 2.0f;     // 03-nameplates
+    inline constexpr float MarkActiveUnderlineGapPx = 2.0f;  // 03-nameplates
 
     // --- The marks ---------------------------------------------------------------
     // Plain and unserialized: a mark is a screen shape resolved every frame from
