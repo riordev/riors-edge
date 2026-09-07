@@ -203,19 +203,73 @@ namespace
         if (A.IsLegendary() || B.IsLegendary()) return A.IsLegendary() && B.IsLegendary();
         return A.Rarity == B.Rarity;
     }
+
+    // THE ONE WALK that names cap victims (O205). Every worn piece on the
+    // candidate's axis except the piece in the candidate's own slot and the
+    // piece the slot rule already ejects, weakest first: lowest item level,
+    // ties broken by wear order (slot index), which makes the order
+    // deterministic — the player is told which piece dies and that is the
+    // piece that dies. PreviewEquipAgainst takes its LimitDisplaced from
+    // element 0 and SwapCandidatesAgainst returns the whole list, so the
+    // pre-focused row and the rule's own choice cannot drift apart.
+    TArray<FBreakerItemInstance> BreakerCapVictimsOnAxis(const TArray<FBreakerItemInstance>& EquippedItems,
+        const FBreakerItemInstance& Candidate, bool bRuleDisplaces, EBreakerEquipSlot RuleDisplacedSlot)
+    {
+        TArray<FBreakerItemInstance> Victims;
+        for (const FBreakerItemInstance& Existing : EquippedItems)
+        {
+            if (!Existing.IsValid() || !SharesEquipCapAxis(Existing, Candidate)) continue;
+            if (Existing.Slot == Candidate.Slot) continue;
+            if (bRuleDisplaces && Existing.Slot == RuleDisplacedSlot) continue;
+            Victims.Add(Existing);
+        }
+        Victims.Sort([](const FBreakerItemInstance& A, const FBreakerItemInstance& B)
+        {
+            if (A.ItemLevel != B.ItemLevel) return A.ItemLevel < B.ItemLevel;
+            return static_cast<uint8>(A.Slot) < static_cast<uint8>(B.Slot);
+        });
+        return Victims;
+    }
 }
 
 bool UBreakerEquipmentComponent::EquipItem(const FBreakerItemInstance& Item)
+{
+    // The rule's own choice of victim: an invalid id means "the lowest item
+    // level", which is the piece the card's limit tell names.
+    return EquipItemDisplacing(Item, FGuid());
+}
+
+bool UBreakerEquipmentComponent::EquipItemDisplacing(const FBreakerItemInstance& Item, const FGuid& DisplaceId)
 {
     if (!Item.IsValid() || !HasAttributeAuthority()) return false;
     // Resolve the cap BEFORE anything moves, so the piece the UI named as
     // doomed is exactly the piece that leaves. The cap never refuses the
     // equip (UI-Inventory-Spec "Limit tells": disclosed, not blocked).
     const FBreakerEquipPreview Preview = PreviewEquipAgainst(Equipped, Item);
-    UnequipSlot(Item.Slot);
-    if (Preview.bExceedsRarityLimit && Preview.LimitDisplaced.IsValid())
+    bool bEjectForLimit = Preview.bExceedsRarityLimit && Preview.LimitDisplaced.IsValid();
+    EBreakerEquipSlot LimitVictimSlot = Preview.LimitDisplaced.Slot;
+    if (DisplaceId.IsValid())
     {
-        UnequipSlot(Preview.LimitDisplaced.Slot);
+        // O205: a CHOSEN victim must be one the rule offers. The one refusal
+        // in this function, and it happens before anything moves: a picker
+        // that named a piece off the list gets nothing, not a nearest fit.
+        const FBreakerItemInstance* Chosen = Equipped.FindByPredicate([&DisplaceId](const FBreakerItemInstance& Existing)
+        {
+            return Existing.ItemId == DisplaceId;
+        });
+        if (!Chosen || !IsValidSwapChoice(Item, DisplaceId))
+        {
+            UE_LOG(LogTemp, Display, TEXT("EquipItemDisplacing refused: %s is not a swap candidate for the incoming piece (O205). Nothing moved."),
+                *DisplaceId.ToString());
+            return false;
+        }
+        bEjectForLimit = true;
+        LimitVictimSlot = Chosen->Slot;
+    }
+    UnequipSlot(Item.Slot);
+    if (bEjectForLimit)
+    {
+        UnequipSlot(LimitVictimSlot);
     }
     // A legendary whose rule claims another slot ejects whatever is standing in
     // it. Cadence occupies both hands, so it and a Secondary cannot be worn
@@ -381,24 +435,37 @@ FBreakerEquipPreview UBreakerEquipmentComponent::PreviewEquipAgainst(const TArra
     if (Preview.bRuleDisplaces && SharesEquipCapAxis(Preview.RuleDisplaced, Candidate)) --Surviving;
     if (Surviving < Preview.RarityLimit) return Preview;
 
-    // Over the cap: the WEAKEST equipped piece ON THE SAME AXIS leaves.
-    // Weakest is lowest item level, ties broken by wear order (slot index),
-    // which makes the choice deterministic — the player is told which piece
-    // dies and that is the piece that dies.
+    // Over the cap: the WEAKEST equipped piece ON THE SAME AXIS leaves — the
+    // head of the same list the swap picker offers (BreakerCapVictimsOnAxis).
     Preview.bExceedsRarityLimit = true;
-    const FBreakerItemInstance* Weakest = nullptr;
-    for (const FBreakerItemInstance& Existing : EquippedItems)
-    {
-        if (!Existing.IsValid() || !SharesEquipCapAxis(Existing, Candidate)) continue;
-        if (Existing.Slot == Candidate.Slot) continue;
-        if (Preview.bRuleDisplaces && Existing.Slot == Preview.RuleDisplaced.Slot) continue;
-        const bool bBetterVictim = !Weakest
-            || Existing.ItemLevel < Weakest->ItemLevel
-            || (Existing.ItemLevel == Weakest->ItemLevel && static_cast<uint8>(Existing.Slot) < static_cast<uint8>(Weakest->Slot));
-        if (bBetterVictim) Weakest = &Existing;
-    }
-    if (Weakest) Preview.LimitDisplaced = *Weakest;
+    const TArray<FBreakerItemInstance> Victims = BreakerCapVictimsOnAxis(EquippedItems, Candidate,
+        Preview.bRuleDisplaces, Preview.RuleDisplaced.Slot);
+    if (Victims.Num() > 0) Preview.LimitDisplaced = Victims[0];
     return Preview;
+}
+
+TArray<FBreakerItemInstance> UBreakerEquipmentComponent::SwapCandidatesAgainst(const TArray<FBreakerItemInstance>& EquippedItems, const FBreakerItemInstance& Candidate)
+{
+    // The list exists only where the cap bites: PreviewEquipAgainst decides
+    // that (its own slot-swap and rule-displacement credits included), and
+    // the walk below is the one that named its LimitDisplaced.
+    const FBreakerEquipPreview Preview = PreviewEquipAgainst(EquippedItems, Candidate);
+    if (!Preview.bExceedsRarityLimit) return TArray<FBreakerItemInstance>();
+    return BreakerCapVictimsOnAxis(EquippedItems, Candidate, Preview.bRuleDisplaces, Preview.RuleDisplaced.Slot);
+}
+
+TArray<FBreakerItemInstance> UBreakerEquipmentComponent::SwapCandidates(const FBreakerItemInstance& Candidate) const
+{
+    return SwapCandidatesAgainst(Equipped, Candidate);
+}
+
+bool UBreakerEquipmentComponent::IsValidSwapChoice(const FBreakerItemInstance& Candidate, const FGuid& DisplaceId) const
+{
+    if (!DisplaceId.IsValid()) return false;
+    return SwapCandidates(Candidate).ContainsByPredicate([&DisplaceId](const FBreakerItemInstance& Row)
+    {
+        return Row.ItemId == DisplaceId;
+    });
 }
 
 TArray<FBreakerAffixComparison> UBreakerEquipmentComponent::CompareAffixes(const FBreakerItemInstance& Candidate, const FBreakerItemInstance& Reference)
@@ -514,6 +581,11 @@ void UBreakerEquipmentComponent::RestoreState(const TArray<FBreakerItemInstance>
 
 bool UBreakerEquipmentComponent::EquipFromBackpack(const FGuid& ItemId)
 {
+    return EquipFromBackpackDisplacing(ItemId, FGuid());
+}
+
+bool UBreakerEquipmentComponent::EquipFromBackpackDisplacing(const FGuid& ItemId, const FGuid& DisplaceId)
+{
     if (!HasAttributeAuthority()) return false;
     const int32 Index = Backpack.IndexOfByPredicate([&ItemId](const FBreakerItemInstance& Existing) { return Existing.ItemId == ItemId; });
     if (Index == INDEX_NONE) return false;
@@ -537,9 +609,23 @@ bool UBreakerEquipmentComponent::EquipFromBackpack(const FGuid& ItemId)
             Backpack[Index].ItemLevel, BreakerItemRequirements::RequiredLevelFor(Backpack[Index].ItemLevel), CharacterLevel);
         return false;
     }
+    // O205: a chosen victim is checked BEFORE the item leaves the backpack,
+    // so a refused choice leaves the loadout and the backpack exactly as
+    // they were — an item lifted out and then refused would be lost.
+    if (DisplaceId.IsValid() && !IsValidSwapChoice(Backpack[Index], DisplaceId))
+    {
+        UE_LOG(LogTemp, Display, TEXT("EquipFromBackpackDisplacing refused: %s is not a swap candidate (O205). The item stays in the backpack."),
+            *DisplaceId.ToString());
+        return false;
+    }
     const FBreakerItemInstance Item = Backpack[Index];
     Backpack.RemoveAt(Index);
-    return EquipItem(Item);
+    if (!EquipItemDisplacing(Item, DisplaceId))
+    {
+        Backpack.Insert(Item, Index);
+        return false;
+    }
+    return true;
 }
 
 bool UBreakerEquipmentComponent::DepositToStash(const FGuid& ItemId, bool bAtAnchor)

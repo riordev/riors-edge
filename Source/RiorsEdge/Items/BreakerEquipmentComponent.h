@@ -146,6 +146,33 @@ public:
     // displacement choice are testable with no component, actor, or world.
     static FBreakerEquipPreview PreviewEquipAgainst(const TArray<FBreakerItemInstance>& EquippedItems, const FBreakerItemInstance& Candidate);
 
+    // ---- The swap picker's list (O205) -----------------------------------
+    // At the equip limit the COMPONENT supplies the candidates and the
+    // pre-focus, and validates the choice; the picker offers and never
+    // computes the list. Every worn piece on the candidate's cap axis that
+    // the cap could take off — the piece in the candidate's own slot and the
+    // rule-displaced piece are excluded, exactly as PreviewEquipAgainst
+    // excludes them — lowest item level first, ties by wear order. Element 0
+    // IS PreviewEquipAgainst's LimitDisplaced: the preview reads its victim
+    // off the same walk, so the two cannot drift. Empty whenever the cap is
+    // not exceeded (an uncapped rarity, or a swap that frees its own place).
+    static TArray<FBreakerItemInstance> SwapCandidatesAgainst(const TArray<FBreakerItemInstance>& EquippedItems, const FBreakerItemInstance& Candidate);
+    UFUNCTION(BlueprintPure, Category="Equipment") TArray<FBreakerItemInstance> SwapCandidates(const FBreakerItemInstance& Candidate) const;
+    // True iff DisplaceId names a piece in SwapCandidates(Candidate). The
+    // one predicate EquipItemDisplacing refuses on, so the picker's list and
+    // the equip's acceptance are the same set.
+    UFUNCTION(BlueprintPure, Category="Equipment") bool IsValidSwapChoice(const FBreakerItemInstance& Candidate, const FGuid& DisplaceId) const;
+    // EquipItem with the cap's victim CHOSEN. An invalid DisplaceId (the
+    // default) takes the rule's own choice — the lowest item level — which is
+    // what EquipItem(Item) is. A valid id that is not a swap candidate is
+    // refused outright: false, and nothing moves. Distinct names rather than
+    // overloads, because UHT does not take overloaded UFUNCTIONs.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment") bool EquipItemDisplacing(const FBreakerItemInstance& Item, const FGuid& DisplaceId);
+    // EquipFromBackpack with the cap's victim chosen: the same level gate,
+    // then EquipItemDisplacing. A refused choice leaves the item in the
+    // backpack.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment") bool EquipFromBackpackDisplacing(const FGuid& ItemId, const FGuid& DisplaceId);
+
     // Per-affix comparison of Candidate against Reference. Matching is by
     // (stat target, bucket), not by affix id: two affixes that raise the same
     // stat the same way are one number to the player, and a flat +Health is
