@@ -37,6 +37,7 @@
 #include "Combat/BreakerRangedEnemy.h"
 #include "Combat/BreakerSkirmisherEnemy.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerStatusComponent.h"
 #include "Combat/BreakerEnemyBarMath.h"
 #include "Combat/BreakerEnemyModifiers.h"
 #include "Combat/BreakerModifierComponent.h"
@@ -47,6 +48,7 @@
 // string-table row, so its copy is a data edit like every other surface's.
 #include "Data/BreakerStrings.h"
 #include "EngineUtils.h"
+#include "Engine/Canvas.h"
 #include "GameFramework/PlayerController.h"
 #include "UI/BreakerHUDMath.h"
 #include "UI/BreakerUIStyle.h"
@@ -731,8 +733,22 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         const float ColumnTop = Marks.Num() > 0 ? MarksY : (bShowName ? NameY : Bar.Y);
         // The boss's pip row hangs under the bar and is part of its column.
         const float PipRowH = bBossRank ? Gap + BreakerEnemyBarMath::BossPipSizeFor(Scale).Y * ScaleUnit : 0.0f;
-        const float ColumnW = FMath::Max3(Bar.W, MarksW, bShowName ? static_cast<float>(MeasureSpecText(Name, NamePixels).X) : 0.0f);
-        const float ColumnH = Bar.Y + Bar.H + PipRowH - ColumnTop;
+        const auto* Status = Enemy->FindComponentByClass<UBreakerStatusComponent>();
+        const FBreakerActiveStatus* Rot = Status ? Status->GetActiveStatuses().FindByPredicate([](const auto& Entry)
+            { return Entry.Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot")) && Entry.RemainingDuration > 0; }) : nullptr;
+        const float Threshold = Status ? Status->GetEntropyThreshold() : 0;
+        const float Buildup = Status && Threshold > UE_SMALL_NUMBER ? FMath::Clamp(Status->GetEntropyBuildup() / Threshold, 0.0f, 1.0f) : 0;
+        const bool bShowEntropy = bShowName && !bSightBlocked && (Rot || Buildup > 0);
+        const float EntropyPixels = BreakerEnemyBar::NamePixels * Scale;
+        const FString EntropyText = Rot ? BreakerStrings::Format(EBreakerStringKey::HudRotTimer, Rot->RemainingDuration)
+            : FString::Printf(TEXT("%s %d%%"), *BreakerStrings::Get(EBreakerStringKey::HudEntropy), FMath::Clamp(FMath::RoundToInt(Buildup * 100), 1, 100));
+        const FVector2D EntropyTextSize = bShowEntropy ? MeasureSpecText(EntropyText, EntropyPixels) : FVector2D::ZeroVector;
+        const float EntropyRailH = FMath::Max(1.0f, 2.0f * Scale * ScaleUnit); // O2 presentation.
+        const float EntropyY = Bar.Y + Bar.H + PipRowH + Gap;
+        const float EntropyH = bShowEntropy ? Gap + EntropyTextSize.Y + Gap + EntropyRailH : 0;
+        const float ColumnW = FMath::Max(FMath::Max3(Bar.W, MarksW, bShowName ? static_cast<float>(MeasureSpecText(Name, NamePixels).X) : 0.0f),
+            bShowEntropy ? static_cast<float>(EntropyTextSize.X) : 0.0f);
+        const float ColumnH = Bar.Y + Bar.H + PipRowH + EntropyH - ColumnTop;
 
         // Screen-space overlap suppression over the WHOLE column. Two enemies
         // standing in line with the camera project to nearly the same point,
@@ -822,6 +838,16 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
 
         if (!bOverlapped && !bSightBlocked)
         {
+            if (bShowEntropy && Bar.X >= 0 && Bar.X + Bar.W <= Canvas->ClipX
+                && EntropyY + EntropyH <= Canvas->ClipY
+                && Projected.X - EntropyTextSize.X * .5f >= 0 && Projected.X + EntropyTextSize.X * .5f <= Canvas->ClipX)
+            {
+                DrawSpecTextCentered(EntropyText, Projected.X, EntropyY, Rot ? BreakerUI::Orange : BreakerUI::Gold, EntropyPixels, BarAlpha);
+                const float RailY = EntropyY + EntropyTextSize.Y + Gap;
+                const float Fill = Rot ? FMath::Clamp(Rot->RemainingDuration / FMath::Max(Rot->Spec.Duration, UE_SMALL_NUMBER), 0.0f, 1.0f) : Buildup;
+                DrawRect(BreakerUI::Alpha(BreakerUI::BorderRest, BarAlpha), Bar.X, RailY, Bar.W, EntropyRailH);
+                DrawRect(BreakerUI::Alpha(Rot ? BreakerUI::Orange : BreakerUI::Gold, BarAlpha), Bar.X, RailY, Bar.W * Fill, EntropyRailH);
+            }
             if (bShowName)
             {
                 DrawSpecTextCentered(Name, Projected.X, NameY,

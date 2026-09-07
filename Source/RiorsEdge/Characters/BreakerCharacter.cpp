@@ -1,6 +1,8 @@
 #include "Characters/BreakerCharacter.h"
 #include "Characters/BreakerFirstPersonArms.h"
 #include "Combat/BreakerStatusCycleComponent.h"
+#include "Combat/BreakerStatusComponent.h"
+#include "Combat/BreakerEntropyCapture.h"
 
 #include "AbilitySystemComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
@@ -114,6 +116,7 @@ ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer
     Abilities = CreateDefaultSubobject<UBreakerAbilityComponent>(TEXT("Abilities"));
     Quests = CreateDefaultSubobject<UBreakerQuestJournal>(TEXT("QuestJournal"));
     CreateDefaultSubobject<UBreakerStatusCycleComponent>(TEXT("StatusCycle"));
+    CreateDefaultSubobject<UBreakerStatusComponent>(TEXT("Status"));
 
     // --- The first-person blockout --------------------------------------
     // Composed engine primitives plus dynamic material instances, exactly the
@@ -1284,6 +1287,11 @@ namespace
 void ABreakerCharacter::StartViewmodelCaptureCycle()
 {
 #if !UE_BUILD_SHIPPING
+    if (FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureEntropy")))
+    {
+        BreakerStartEntropyCapture(this);
+        return;
+    }
     const bool bCaptureTriage = FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureTriage"));
     if (bCaptureTriage || FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureCadence")))
     {

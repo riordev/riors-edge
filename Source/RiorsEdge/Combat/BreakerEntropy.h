@@ -1,0 +1,8 @@
+#pragma once
+#include "CoreMinimal.h"
+
+namespace BreakerEntropy
+{
+    RIORSEDGE_API float VestigeMeleeFraction();
+    RIORSEDGE_API float VestigeResistancePercent();
+}

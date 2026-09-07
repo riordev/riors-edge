@@ -123,9 +123,9 @@ bool FBreakerStatusCycleTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("FindOrAdd returns the same component twice"),
         UBreakerStatusCycleComponent::FindOrAdd(Owner) == Cycle);
 
-    // Zero-setup keeps only physical statuses until element-aware cycle delivery.
+    // Zero-setup includes two physical statuses and a real Entropy impact position.
     const int32 Length = Cycle->GetCycleLength();
-    TestEqual(TEXT("The cycle ships two physical types until elemental cycle delivery exists"), Length, 2);
+    TestEqual(TEXT("The cycle ships two physical types plus Entropy"), Length, 3);
 
     // Deterministic, because the HUD previews the next position and a preview
     // that can lie is worse than no preview.

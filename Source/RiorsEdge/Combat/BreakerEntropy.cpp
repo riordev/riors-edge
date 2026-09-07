@@ -1,3 +1,4 @@
+#include "Combat/BreakerEntropy.h"
 #include "Combat/BreakerStatusComponent.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Items/BreakerEquipmentComponent.h"
@@ -8,6 +9,7 @@ namespace
     struct FBreakerEntropyTuning
     {
         float Threshold = 0, Damage = 0, Duration = 0, Tick = 0, Timeout = 0;
+        float VestigeFraction = 0, VestigeResistance = 0;
     };
     const FBreakerEntropyTuning& BreakerEntropyTuning()
     {
@@ -16,10 +18,10 @@ namespace
             FBreakerEntropyTuning Value;
             BreakerDataFile::FBreakerDataErrors Errors;
             const auto Data = BreakerDataFile::Load(TEXT("Data/elements.json"), Errors);
-            auto Read = [&](const TCHAR* Key, float& Field)
+            auto Read = [&](const TCHAR* Key, float& Field, bool bAllowZero = false)
             {
                 double Number = 0;
-                if (!Data || !Data->TryGetNumberField(Key, Number) || !FMath::IsFinite(Number) || Number <= 0)
+                if (!Data || !Data->TryGetNumberField(Key, Number) || !FMath::IsFinite(Number) || Number < 0 || (!bAllowZero && Number == 0) || !FMath::IsFinite(static_cast<float>(Number)))
                     Errors.Add(FString::Printf(TEXT("Invalid Entropy tuning: %s"), Key));
                 else Field = static_cast<float>(Number);
             };
@@ -28,6 +30,10 @@ namespace
             Read(TEXT("entropyDurationSeconds"), Value.Duration);
             Read(TEXT("entropyTickSeconds"), Value.Tick);
             Read(TEXT("entropyBuildupTimeoutSeconds"), Value.Timeout);
+            Read(TEXT("vestigeMeleeEntropyFraction"), Value.VestigeFraction, true);
+            Read(TEXT("vestigeEntropyResistancePercent"), Value.VestigeResistance, true);
+            if (Value.VestigeFraction > 1 || Value.VestigeResistance > 100)
+                Errors.Add(TEXT("Invalid Vestige elemental tuning"));
             if (Value.Threshold > 1 || Value.Damage > 1 || Value.Tick > Value.Duration)
                 Errors.Add(TEXT("Entropy fractions must be <= 1 and tick <= duration"));
             if (!ensureAlwaysMsgf(Errors.IsClean(), TEXT("%s"), *Errors.Join())) return FBreakerEntropyTuning();
@@ -36,6 +42,9 @@ namespace
         return Tuning;
     }
 }
+
+float BreakerEntropy::VestigeMeleeFraction() { return BreakerEntropyTuning().VestigeFraction; }
+float BreakerEntropy::VestigeResistancePercent() { return BreakerEntropyTuning().VestigeResistance; }
 
 float UBreakerStatusComponent::GetEntropyThreshold() const
 {

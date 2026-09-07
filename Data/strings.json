@@ -109,6 +109,9 @@
         "hud.parry.active": "GUARD",
         "hud.parry.success": "PARRIED",
         "hud.weapon.damageRamp": "DAMAGE RAMP %d / %d",
-        "cycle.void": "VOID"
+        "cycle.void": "VOID",
+        "hud.entropy": "ENTROPY",
+        "hud.rotTimer": "ROT %.1fs",
+        "cycle.entropy": "ENTROPY"
 	}
 }

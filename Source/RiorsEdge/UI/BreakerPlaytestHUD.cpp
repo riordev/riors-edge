@@ -2856,7 +2856,9 @@ float ABreakerPlaytestHUD::DrawStatusReadout(const ABreakerCharacter* Character,
     if (!Status) return 0.0f;
 
     const TArray<FBreakerActiveStatus>& Active = Status->GetActiveStatuses();
-    if (Active.Num() == 0) return 0.0f;
+    const float Threshold = Status->GetEntropyThreshold();
+    const float EntropyFraction = Threshold > UE_SMALL_NUMBER ? FMath::Clamp(Status->GetEntropyBuildup() / Threshold, 0.0f, 1.0f) : 0;
+    if (Active.Num() == 0 && EntropyFraction <= 0) return 0.0f;
 
     const float Dot = S(BreakerUI::HudV2StatusDot);
     const float Pixels = BreakerUI::HudV2StatusPixels;
@@ -2866,24 +2868,44 @@ float ABreakerPlaytestHUD::DrawStatusReadout(const ABreakerCharacter* Character,
     // Newest at the BOTTOM, so the row nearest the momentum track is the one
     // that just landed and the column above it is history.
     float RowBottom = BottomY;
+    if (EntropyFraction > 0)
+    {
+        const float RailH = S(2.0f); // O2 presentation, attached to vitals only.
+        const float RowY = RowBottom - RowH - RailH - S(3.0f);
+        const FString Text = FString::Printf(TEXT("%s %d%%"), *BreakerStrings::Get(EBreakerStringKey::HudEntropy),
+            FMath::Clamp(FMath::RoundToInt(EntropyFraction * 100), 1, 100));
+        DrawSpecText(Text, X, RowY, BreakerUI::Gold, Pixels);
+        DrawRect(BreakerUI::BorderRest, X, RowBottom - RailH, Width, RailH);
+        DrawRect(BreakerUI::Gold, X, RowBottom - RailH, Width * EntropyFraction, RailH);
+        RowBottom = RowY - RowGap;
+    }
     for (int32 Index = Active.Num() - 1; Index >= 0; --Index)
     {
         const FBreakerActiveStatus& Entry = Active[Index];
+        const bool bRot = Entry.Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"));
         FString ShortName = Entry.Spec.StatusTag.IsValid()
             ? Entry.Spec.StatusTag.GetTagName().ToString() : BreakerStrings::Get(EBreakerStringKey::HudStatusUnnamed);
         int32 SeparatorIndex = INDEX_NONE;
         if (ShortName.FindLastChar(TEXT('.'), SeparatorIndex)) ShortName = ShortName.RightChop(SeparatorIndex + 1);
-        const FString Text = Entry.Stacks > 1
+        const FString Text = bRot ? BreakerStrings::Format(EBreakerStringKey::HudRotTimer, FMath::Max(Entry.RemainingDuration, 0.0f)) : Entry.Stacks > 1
             ? FString::Printf(TEXT("%s %d  %.1f"), *ShortName.ToUpper(), Entry.Stacks,
                 FMath::Max(Entry.RemainingDuration, 0.0f))
             : FString::Printf(TEXT("%s  %.1f"), *ShortName.ToUpper(),
                 FMath::Max(Entry.RemainingDuration, 0.0f));
 
-        const float RowY = RowBottom - RowH;
-        DrawRect(BreakerUI::Harm, X, RowY + (RowH - Dot) * 0.5f, Dot, Dot);
+        const float ExtraH = bRot ? S(5.0f) : 0;
+        const float RowY = RowBottom - RowH - ExtraH;
+        const FLinearColor StatusColor = bRot ? BreakerUI::Orange : BreakerUI::Harm;
+        DrawRect(StatusColor, X, RowY + (RowH - Dot) * 0.5f, Dot, Dot);
         const FVector2D TextSize = MeasureSpecText(Text, Pixels);
         DrawSpecText(Text, X + Dot + S(BreakerUI::Space8), RowY + (RowH - TextSize.Y) * 0.5f,
-            BreakerUI::Harm, Pixels);
+            StatusColor, Pixels);
+        if (bRot)
+        {
+            const float Remaining = FMath::Clamp(Entry.RemainingDuration / FMath::Max(Entry.Spec.Duration, UE_SMALL_NUMBER), 0.0f, 1.0f);
+            DrawRect(BreakerUI::BorderRest, X, RowBottom - S(2.0f), Width, S(2.0f));
+            DrawRect(BreakerUI::Orange, X, RowBottom - S(2.0f), Width * Remaining, S(2.0f));
+        }
         RowBottom = RowY - RowGap;
     }
     return BottomY - (RowBottom + RowGap);

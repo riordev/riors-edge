@@ -73,7 +73,7 @@ bool FBreakerVoidAbilityRuntimeTest::RunTest(const FString& Parameters)
     const auto Fracture = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Fracture::StaticClass(), 1));
     UBreakerStatusCycleComponent* Cycle = UBreakerStatusCycleComponent::FindOrAdd(Caster);
     if (!TestNotNull(TEXT("actual default cycle"), Cycle)) return false;
-    TestEqual(TEXT("two physical default positions until elemental delivery is implemented"), Cycle->GetCycleLength(), 2);
+    TestEqual(TEXT("two physical positions plus earned Entropy delivery"), Cycle->GetCycleLength(), 3);
     TSet<FGameplayTag> Delivered;
     for (int32 I = 0; I < 2; ++I)
     {
@@ -93,6 +93,35 @@ bool FBreakerVoidAbilityRuntimeTest::RunTest(const FString& Parameters)
     }
     TestEqual(TEXT("both physical status types coexist"), Status->GetDistinctStatusTypeCount(), 2);
     TestFalse(TEXT("Fracture never emits retired Void"), Delivered.Contains(VoidTag));
+    const FGameplayTag RotTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"));
+    TestEqual(TEXT("third position is explicit Entropy"), Cycle->PeekNextEntry().Element, EBreakerElement::Entropy);
+    bool bFirstEntropyImpact = true;
+    for (int32 Shot = 0; Shot < 120 && !Status->HasStatus(RotTag); ++Shot)
+    {
+        // Consume real intervening physical positions as well: no cursor override.
+        const auto Entry = Cycle->PeekNextEntry();
+        TSet<ABreakerProjectileBase*> Existing;
+        for (TActorIterator<ABreakerProjectileBase> It(World); It; ++It) Existing.Add(*It);
+        Caster->GetAttributes()->ApplyClassResource(100); // Cast funding, no offensive stats.
+        if (!TestTrue(TEXT("actual follow-up Fracture cast"), ASC->TryActivateAbility(Fracture))) return false;
+        ABreakerProjectileBase* Projectile = nullptr;
+        for (TActorIterator<ABreakerProjectileBase> It(World); It; ++It)
+            if (!Existing.Contains(*It) && !It->HasImpacted()) { Projectile = *It; break; }
+        if (!TestNotNull(TEXT("follow-up projectile actually spawned"), Projectile)) return false;
+        const float BuildupBefore = Status->GetEntropyBuildup();
+        const float HealthBefore = Health->GetHealth();
+        Projectile->Impact(Target, Target->GetActorLocation());
+        if (Entry.Element == EBreakerElement::Entropy && bFirstEntropyImpact)
+        {
+            TestTrue(TEXT("Entropy position deals one actual impact"), Health->GetHealth() < HealthBefore);
+            TestTrue(TEXT("Entropy position builds through accepted hit"), Status->GetEntropyBuildup() > BuildupBefore);
+            TestFalse(TEXT("below-threshold element position cannot fabricate Rot"), Status->HasStatus(RotTag));
+            bFirstEntropyImpact = false;
+        }
+    }
+    TestFalse(TEXT("real cycle reached an Entropy position"), bFirstEntropyImpact);
+    TestTrue(TEXT("repeated real projectile impacts earn Rot threshold"), Status->HasStatus(RotTag));
+    TestEqual(TEXT("earned Rot joins the two physical statuses"), Status->GetDistinctStatusTypeCount(), 3);
     return true;
 }
 #endif

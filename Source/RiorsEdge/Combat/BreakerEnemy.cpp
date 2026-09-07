@@ -18,6 +18,7 @@
 #include "Combat/BreakerModifierComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Combat/BreakerStatusComponent.h"
+#include "Combat/BreakerEntropy.h"
 #include "Movement/BreakerCharacterMovementComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/BoxComponent.h"
@@ -534,6 +535,7 @@ void ABreakerEnemy::ApplyChassis()
         + (IsEliteOrBetter() ? FMath::Max(EliteDropItemLevelBonus, 0) : 0);
     EnemyLevel = FMath::Clamp(EnemyLevel, 1, UBreakerAffixLibrary::MaxItemLevel);
 
+    if (Status) Status->EntropyResistancePercent = Family == EBreakerEnemyFamily::Vestige ? BreakerEntropy::VestigeResistancePercent() : 0.0f;
     AttackDamage = UBreakerMonsterChassisLibrary::GetMonsterDamage(
         AreaLevel, MonsterRank, Chassis, ArchetypeDamageMultiplier);
 
@@ -1120,13 +1122,16 @@ void ABreakerEnemy::PerformAttack(APawn* TargetPawn)
     // Unkeyed the lane composes to exactly 1.0 and this IS AttackDamage.
     Damage.BaseDamage = GetEffectiveAttackDamage();
     Damage.DamageFamily = EBreakerDamageFamily::Physical;
+    if (Family == EBreakerEnemyFamily::Vestige)
+    { Damage.Element = EBreakerElement::Entropy; Damage.ElementalFraction = BreakerEntropy::VestigeMeleeFraction(); }
     Damage.bCanCritical = false;
     Damage.SetInstigator(this);
-    TargetCombat->ReceiveDamage(Damage);
+    const FBreakerDamageResult Result = TargetCombat->ReceiveDamage(Damage);
     LastAttackTime = GetWorld()->GetTimeSeconds();
     // Anchored's slow and Cascading's hazard both hang off a LANDED hit rather
     // than a swing, so a whiff costs the player nothing.
-    if (ModifierComponent) ModifierComponent->NotifyAttackLanded(TargetPawn->GetActorLocation());
+    if (ModifierComponent && !Result.bDodged && !Result.bParried && Result.HealthDamage + Result.ShieldDamage > 0)
+        ModifierComponent->NotifyAttackLanded(TargetPawn->GetActorLocation());
 }
 
 // ---------------------------------------------------------------------------

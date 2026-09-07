@@ -141,6 +141,16 @@ bool FBreakerMultispellPurchasedRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("duplicate impact does not advance twice"), Cycle->GetCursor(), AfterHit);
     TestTrue(TEXT("projectile actually damaged target"), Attributes->GetHealth() < 10000.0f);
 
+    ABreakerProjectileBase* Entropy = CastFracture(Caster, Fracture);
+    if (!TestNotNull(TEXT("real third cycle position casts Entropy"), Entropy)) return false;
+    TestEqual(TEXT("Entropy carries no unearned status payload"), Entropy->GetImpactStatuses().Num(), 0);
+    const float BeforeEntropy = Status->GetEntropyBuildup();
+    HitProjectile(Entropy, Target);
+    TestTrue(TEXT("actual Entropy impact earns buildup"), Status->GetEntropyBuildup() > BeforeEntropy);
+    const float AfterEntropy = Status->GetEntropyBuildup();
+    HitProjectile(Entropy, Target);
+    TestEqual(TEXT("duplicate impact cannot add Entropy twice"), Status->GetEntropyBuildup(), AfterEntropy);
+    TestEqual(TEXT("actual third-position hit returns to physical pair"), Cycle->GetCursor(), 0);
     if (!Buy(TEXT("Caster.Multispell.Variance")) || !Buy(TEXT("Caster.Multispell.Variance"))
         || !Buy(TEXT("Caster.Multispell.Chain"))
         || !Buy(TEXT("Caster.Multispell.Fracture"))) return false;

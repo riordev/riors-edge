@@ -19,6 +19,8 @@ struct RIORSEDGE_API FBreakerCycleEntry
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FBreakerStatusApplicationSpec Spec;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerDamageFamily DamageFamily = EBreakerDamageFamily::Physical;
+    // Element positions feed the actual impact's buildup; Spec is preview identity only.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerElement Element = EBreakerElement::None;
     // Shown on the HUD cycle readout (SI-4). O2 PLACEHOLDER text.
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FText DisplayName;
 };
@@ -26,8 +28,8 @@ struct RIORSEDGE_API FBreakerCycleEntry
 // The status cycle behind C5 Fracture (Ability-Implementation-Spec §5.5).
 //
 // "The caster's available status types" is DERIVED, not authored per ability:
-// Bleed and Poison ship now, Void ships with Siphon, Rift and Entropy arrive
-// with O5's resistance model. The cycle must therefore be a list that grows,
+// Bleed and Poison are direct physical statuses; Entropy earns Rot through buildup.
+// Future elements extend this list only when their actual delivery path exists.
 // and the order must be deterministic — the HUD previews the next position, and
 // a preview that can lie is worse than no preview.
 //

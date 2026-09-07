@@ -88,7 +88,11 @@ void UBreakerStatusCycleComponent::SeedDefaultCycle()
         Entry.DisplayName = FText::FromString(BreakerStrings::Get(Names[SeedIndex]));
         AvailableStatuses.Add(Entry);
     }
-    // O225: only the two physical statuses remain until an element-aware Fracture entry is implemented.
+    FBreakerCycleEntry Entropy;
+    Entropy.Element = EBreakerElement::Entropy;
+    Entropy.Spec.StatusTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"));
+    Entropy.DisplayName = FText::FromString(BreakerStrings::Get(EBreakerStringKey::CycleEntropy));
+    AvailableStatuses.Add(Entropy);
 }
 
 FBreakerCycleEntry UBreakerStatusCycleComponent::PeekNextEntry(int32 Lookahead) const

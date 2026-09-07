@@ -96,6 +96,16 @@ void UBreakerAbility_Fracture::ActivateAbility(const FGameplayAbilitySpecHandle 
         FBreakerCycleEntry Entry = Cycle->PeekNextEntry(bAdvanceOnHit ? Index : 0);
         if (!bAdvanceOnHit) Cycle->AdvanceCycle();
         if (!Entry.Spec.StatusTag.IsValid()) continue;
+        if (Entry.Element != EBreakerElement::None)
+        {
+            // One actual impact carries conversion, even when several cycle
+            // positions are selected. Never grant a threshold status directly.
+            Damage.Element = Entry.Element;
+            Damage.ElementalFraction = 1.0f;
+            if (Index == 0)
+                Projectile->SetOrbColor(BreakerFX::ColorForStatusTag(Entry.Spec.StatusTag, Projectile->OrbColor));
+            continue;
+        }
 
         // O35: the cycle's authored per-tick numbers are item-level-1 values;
         // the applied copy rides the weapon scalar exactly as the impact hit
