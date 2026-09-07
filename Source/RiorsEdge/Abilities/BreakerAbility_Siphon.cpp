@@ -180,6 +180,7 @@ void UBreakerAbility_Siphon::TickChannel()
     Damage.BaseDamage = DamagePerTick * AbilityDamageScalarFor(Character);
     // O5: Elemental is the pipeline family until the resistance model lands;
     // O225: Siphon retains its damage and leech, without the retired Void debuff.
+    Damage.DamageFamily = EBreakerDamageFamily::Elemental;
     Damage.SourceTags.AddTag(BreakerAbilityTags::Ability_Class_Caster_Siphon.GetTag());
     Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
     Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;

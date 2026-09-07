@@ -14,6 +14,8 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "Items/BreakerEquipmentComponent.h"
+#include "Items/BreakerLootLibrary.h"
 #include "Movement/BreakerCharacterMovementComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
 
@@ -40,6 +42,7 @@ bool FBreakerVoidAbilityRuntimeTest::RunTest(const FString& Parameters)
     Caster->GetMana()->BindAttributes(Caster->GetAttributes());
     Caster->GetBreakerMovement()->SetComponentTickEnabled(false);
     Caster->GetAttributes()->ApplyClassResource(100);
+    ASC->SetNumericAttributeBase(UBreakerAttributeSet::GetCriticalChanceAttribute(), 0.0f);
     AActor* Target = World->SpawnActor<AActor>();
     if (!TestNotNull(TEXT("real target"), Target)) return false;
     USphereComponent* Body = NewObject<USphereComponent>(Target);
@@ -68,7 +71,48 @@ bool FBreakerVoidAbilityRuntimeTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("later real Siphon tick lands damage"), Health->GetHealth() < 10000);
     TestTrue(TEXT("Siphon still heals from actual landed damage"), Caster->GetAttributes()->GetHealth() > 20);
     TestFalse(TEXT("successful Siphon no longer applies retired Void"), Status->HasStatus(VoidTag));
+    const float BaselineHealth = Health->GetHealth();
+    Advance(10);
+    const float BaselineTickDamage = BaselineHealth - Health->GetHealth();
+    if (!TestTrue(TEXT("unarmoured paid channel supplies a positive reference tick"), BaselineTickDamage > 0)) return false;
+
+    // Real ordinary gear supplies family-specific mitigation. Keep its rolled
+    // Physical DR and isolate co-affixes; no fabricated damage-family observer.
+    FBreakerItemInstance ReductionItem;
+    int32 ReductionIndex = INDEX_NONE;
+    for (int32 Seed = 1; Seed <= 4096; ++Seed)
+    {
+        ReductionItem = UBreakerLootLibrary::RollItem(TEXT("Siphon.FamilyControl"),
+            EBreakerEquipSlot::Necklace, EBreakerItemRarity::Standard, 1, Seed);
+        ReductionIndex = ReductionItem.Affixes.IndexOfByPredicate([](const auto& Row)
+        { return Row.AffixId == FName(TEXT("Core.PhysicalDR")); });
+        if (ReductionIndex != INDEX_NONE) break;
+    }
+    if (!TestTrue(TEXT("ordinary necklace rolls physical reduction"), ReductionIndex != INDEX_NONE)) return false;
+    for (auto& Row : ReductionItem.Affixes)
+        if (Row.AffixId != FName(TEXT("Core.PhysicalDR"))) Row.Value = 0;
+    auto* Equipment = NewObject<UBreakerEquipmentComponent>(Target);
+    Target->AddInstanceComponent(Equipment);
+    Equipment->RegisterComponent();
+    if (!TestTrue(TEXT("target actually equips physical reduction"), Equipment->EquipItem(ReductionItem))) return false;
+    TestTrue(TEXT("equipped physical reduction is positive"), Equipment->GetStats().PhysicalDamageReductionPercent > 0);
+    const float ArmouredHealth = Health->GetHealth();
+    const float CasterHealth = Caster->GetAttributes()->GetHealth();
+    Advance(10);
+    const float ArmouredTickDamage = ArmouredHealth - Health->GetHealth();
+    TestEqual(TEXT("actual Siphon channel remains Elemental and bypasses physical-only reduction"),
+        ArmouredTickDamage, BaselineTickDamage, 0.001f);
+    TestEqual(TEXT("family-correct channel still leeches actual damage"),
+        Caster->GetAttributes()->GetHealth() - CasterHealth,
+        UBreakerAbility_Siphon::HealForTick(ArmouredTickDamage, GetDefault<UBreakerAbility_Siphon>()->LeechFraction), 0.001f);
     ASC->CancelAbilityHandle(Siphon);
+    FBreakerDamageRequest PhysicalControl;
+    PhysicalControl.BaseDamage = BaselineTickDamage;
+    PhysicalControl.bCanCritical = false;
+    const FBreakerDamageResult PhysicalResult = Combat->ReceiveDamage(PhysicalControl);
+    TestTrue(TEXT("same target really reduces a physical control hit"),
+        PhysicalResult.HealthDamage > 0 && PhysicalResult.HealthDamage < ArmouredTickDamage);
+    Equipment->UnequipSlot(EBreakerEquipSlot::Necklace);
     Status->ConsumeAllStatuses();
     const auto Fracture = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Fracture::StaticClass(), 1));
     UBreakerStatusCycleComponent* Cycle = UBreakerStatusCycleComponent::FindOrAdd(Caster);
