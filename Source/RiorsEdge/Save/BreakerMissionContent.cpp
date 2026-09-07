@@ -387,7 +387,7 @@ namespace
         // FernhallRiftFor answers the entry yard for any name it does not
         // know, so "resolves" is: the entry yard, or a definition that
         // differs from the entry yard's.
-        const FText EntryName = UBreakerZoneBuilder::FernhallRiftFor(NAME_None).AreaName;
+        const FName EntryId = UBreakerZoneBuilder::FernhallRiftFor(NAME_None).EncounterId;
         for (int32 Index = 0; Index < Data.Rifts.Num(); ++Index)
         {
             const FBreakerMissionRift& Rift = Data.Rifts[Index];
@@ -399,7 +399,7 @@ namespace
                     break;
                 }
             }
-            if (!Rift.Yard.IsNone() && UBreakerZoneBuilder::FernhallRiftFor(Rift.Yard).AreaName.EqualTo(EntryName))
+            if (!Rift.Yard.IsNone() && UBreakerZoneBuilder::FernhallRiftFor(Rift.Yard).EncounterId == EntryId)
             {
                 Errors.Add(FString::Printf(TEXT("rifts.%s: yard \"%s\" has no rift definition"), *Rift.RiftId.ToString(), *Rift.Yard.ToString()));
             }
@@ -987,13 +987,13 @@ TArray<FName> UBreakerMissionLibrary::ArrivalFlagsFor(FName DestinationId, const
 
 FName UBreakerMissionLibrary::BossForRift(const FBreakerRiftDefinition& Rift)
 {
-    if (!Rift.IsSet()) return NAME_None;
+    if (!Rift.IsSet() || Rift.EncounterId.IsNone()) return NAME_None;
     for (const FBreakerMissionDefinition& Mission : GetMissions())
         for (const FBreakerMissionBeat& Beat : Mission.Beats)
         {
             if (Beat.Kind != EBreakerMissionBeatKind::Boss || Beat.Boss.IsNone()) continue;
             const FBreakerMissionRift* Authored = BreakerMissionFindRift(Beat.Rift);
-            if (Authored && UBreakerZoneBuilder::FernhallRiftFor(Authored->Yard).AreaName.EqualTo(Rift.AreaName))
+            if (Authored && UBreakerZoneBuilder::FernhallRiftFor(Authored->Yard).EncounterId == Rift.EncounterId)
                 return Beat.Boss;
         }
     return NAME_None;
@@ -1002,6 +1002,7 @@ FName UBreakerMissionLibrary::BossForRift(const FBreakerRiftDefinition& Rift)
 TArray<FName> UBreakerMissionLibrary::RiftCompletionFlagsFor(const FBreakerRiftDefinition& Rift, const FBreakerQuestFlagSet& Flags)
 {
     TArray<FName> Out;
+    if (!Rift.IsSet() || Rift.EncounterId.IsNone()) return Out;
     for (const FBreakerMissionDefinition& Mission : GetMissions())
     {
         // Current only, as above: clearing the substation before Deeper is
@@ -1010,7 +1011,7 @@ TArray<FName> UBreakerMissionLibrary::RiftCompletionFlagsFor(const FBreakerRiftD
         if (!Beat || Beat->Kind != EBreakerMissionBeatKind::Boss) continue;
         const FBreakerMissionRift* BeatRift = BreakerMissionFindRift(Beat->Rift);
         if (!BeatRift) continue;
-        if (UBreakerZoneBuilder::FernhallRiftFor(BeatRift->Yard).AreaName.EqualTo(Rift.AreaName))
+        if (UBreakerZoneBuilder::FernhallRiftFor(BeatRift->Yard).EncounterId == Rift.EncounterId)
         {
             Out.Add(Beat->CompletesOn);
         }

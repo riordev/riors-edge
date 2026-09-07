@@ -1974,11 +1974,12 @@ void ABreakerPlaytestHUD::DrawSkimBurst(const FVector2D& Center)
 void ABreakerPlaytestHUD::DrawMarkedTarget(const ABreakerCharacter* Character)
 {
     const UBreakerAbilityStateComponent* State = GetAbilityState(Character);
-    const AActor* Marked = State ? State->GetMarkedTarget() : nullptr;
-    if (!Marked) return;
+    if (!State) return;
+    for (const AActor* Marked : State->GetMarkedTargets())
+    {
 
     const FVector Projected = Project(Marked->GetActorLocation() + FVector(0.0f, 0.0f, BreakerHUD::MarkHeadroomCm), false);
-    if (Projected.Z <= 0.0f) return;
+    if (Projected.Z <= 0.0f) continue;
 
     // Slow pulse: enough to catch the eye in peripheral vision, not enough to
     // compete with the impact feedback at the crosshair.
@@ -1998,6 +1999,7 @@ void ABreakerPlaytestHUD::DrawMarkedTarget(const ABreakerCharacter* Character)
     DrawLine(CX - Radius, CY, CX, CY - Radius, Color, S(1.75f));
 
     DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudCalloutMarked), CX, CY - Radius - S(16.0f), Color, 11.0f);
+    }
 }
 
 ABreakerTracerRenderer* ABreakerPlaytestHUD::GetTracerRenderer()

@@ -195,9 +195,8 @@ public:
     // now. Each returns the flags to set, possibly several when more than one
     // mission is waiting on the same event, and the caller sets them.
     static TArray<FName> ArrivalFlagsFor(FName DestinationId, const FBreakerQuestFlagSet& Flags);
-    // A rift definition carries no id, only its name, so the beat's rift is
-    // matched the way the validator matches it: the yard's definition from
-    // UBreakerZoneBuilder::FernhallRiftFor, compared by AreaName.
+    // Match the authored yard's stable EncounterId. Display names are copy,
+    // and unnamed/dev definitions cannot satisfy a story encounter.
     static TArray<FName> RiftCompletionFlagsFor(const FBreakerRiftDefinition& Rift, const FBreakerQuestFlagSet& Flags);
     // Authored identity of a rift's boss, independent of whether the player
     // has reached its story beat. Re-clears fight the same boss.

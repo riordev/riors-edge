@@ -1,6 +1,7 @@
 #include "Abilities/BreakerAbilityStateComponent.h"
 
 #include "GameFramework/Actor.h"
+#include "Combat/BreakerCombatComponent.h"
 
 UBreakerAbilityStateComponent::UBreakerAbilityStateComponent()
 {
@@ -140,32 +141,73 @@ TArray<FName> UBreakerAbilityStateComponent::GetActiveWindowKeys() const
 
 void UBreakerAbilityStateComponent::SetMark(AActor* Target, float Duration)
 {
-    if (!Target || Duration <= 0.0f)
+    ClearMark();
+    AddMark(Target, Duration, 1);
+}
+
+void UBreakerAbilityStateComponent::AddMark(AActor* Target, float Duration, int32 Capacity)
+{
+    Marks.RemoveAll([this, Target](const FMarkState& Mark)
     {
-        ClearMark();
-        return;
-    }
-    MarkTarget = Target;
-    MarkEndTime = Clock + Duration;
+        const UBreakerCombatComponent* Combat = Mark.Target.IsValid() ? Mark.Target->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+        return !Mark.Target.IsValid() || Mark.EndTime <= Clock || Mark.Target.Get() == Target || (Combat && Combat->IsDead());
+    });
+    if (!Target || Duration <= 0) return;
+    const int32 Limit = FMath::Clamp(Capacity, 1, 2);
+    while (Marks.Num() >= Limit) Marks.RemoveAt(0);
+    FMarkState Mark;
+    Mark.Target = Target; Mark.EndTime = Clock + Duration;
+    Marks.Add(Mark);
+}
+
+TArray<AActor*> UBreakerAbilityStateComponent::GetMarkedTargets() const
+{
+    TArray<AActor*> Targets;
+    for (const FMarkState& Mark : Marks)
+        if (Mark.EndTime > Clock && Mark.Target.IsValid())
+        {
+            const UBreakerCombatComponent* Combat = Mark.Target->FindComponentByClass<UBreakerCombatComponent>();
+            if (!Combat || !Combat->IsDead()) Targets.Add(Mark.Target.Get());
+        }
+    return Targets;
 }
 
 AActor* UBreakerAbilityStateComponent::GetMarkedTarget() const
 {
-    // Expiry is evaluated on read, so no tick work is needed to retire a mark.
-    return MarkEndTime > Clock ? MarkTarget.Get() : nullptr;
+    const TArray<AActor*> Targets = GetMarkedTargets();
+    return Targets.IsEmpty() ? nullptr : Targets.Last();
 }
 
-float UBreakerAbilityStateComponent::GetMarkRemaining() const
+float UBreakerAbilityStateComponent::GetMarkRemainingFor(const AActor* Target) const
 {
-    return MarkTarget.IsValid() ? FMath::Max(MarkEndTime - Clock, 0.0f) : 0.0f;
+    for (const FMarkState& Mark : Marks)
+        if (Mark.Target.IsValid() && Mark.Target.Get() == Target) return FMath::Max(0.0f, Mark.EndTime - Clock);
+    return 0;
 }
 
-void UBreakerAbilityStateComponent::ClearMark()
+bool UBreakerAbilityStateComponent::IsMarked(const AActor* Target) const
 {
-    MarkTarget = nullptr;
-    MarkEndTime = -1000.0f;
+    const UBreakerCombatComponent* Combat = Target ? Target->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    return Target && (!Combat || !Combat->IsDead()) && GetMarkRemainingFor(Target) > 0;
+}
+float UBreakerAbilityStateComponent::GetMarkRemaining() const { return GetMarkRemainingFor(GetMarkedTarget()); }
+void UBreakerAbilityStateComponent::ClearMark() { Marks.Reset(); }
+
+bool UBreakerAbilityStateComponent::ConsumeMarkRefund(const AActor* Target)
+{
+    for (FMarkState& Mark : Marks)
+        if (Mark.Target.Get() == Target && Mark.EndTime > Clock && !Mark.bRefunded)
+        { Mark.bRefunded = true; return true; }
+    return false;
 }
 
+void UBreakerAbilityStateComponent::TransferMark(const AActor* From, AActor* To)
+{
+    if (!To || IsMarked(To)) return;
+    for (FMarkState& Mark : Marks)
+        if (Mark.Target.Get() == From && Mark.EndTime > Clock)
+        { Mark.Target = To; return; }
+}
 bool UBreakerAbilityStateComponent::ShouldContinueStreak(bool bSameTarget, float SecondsSinceLastHit, float GapSeconds)
 {
     return bSameTarget && SecondsSinceLastHit <= GapSeconds;

@@ -1668,8 +1668,8 @@ bool UBreakerWeaponComponent::FireOnce()
     // no remaining time reads as no mark at all. Non-const because Mark
     // Economy (§1.5 M5, below the pellet loop) may re-site the mark.
     UBreakerAbilityStateComponent* AbilityState = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerAbilityStateComponent>() : nullptr;
-    const float MarkRemainingAtPull = AbilityState ? AbilityState->GetMarkRemaining() : 0.0f;
-    const AActor* MarkedTarget = (AbilityState && MarkRemainingAtPull > 0.0f) ? AbilityState->GetMarkedTarget() : nullptr;
+    const TArray<AActor*> MarkedTargetsAtPull = AbilityState ? AbilityState->GetMarkedTargets() : TArray<AActor*>();
+    const AActor* MostRecentMarkedTarget = AbilityState ? AbilityState->GetMarkedTarget() : nullptr;
     // Progression, read once per trigger pull beside the Momentum read above
     // the spread and shared by every rule below.
     const UBreakerProgressionComponent* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
@@ -1734,7 +1734,7 @@ bool UBreakerWeaponComponent::FireOnce()
         // the channels at zero it performs exactly one trace and one damage
         // submission, the legacy path to the bit.
         PiercedThisPull += ResolvePelletImpacts(Definition, ViewLocation, Direction, Channels, ScaledBaseDamage,
-            SourceAttributes, MarkedTarget, LeadMinimumRangeCm, LevelScalar, PelletSeed, Shot, Pellet);
+            SourceAttributes, MostRecentMarkedTarget, LeadMinimumRangeCm, LevelScalar, PelletSeed, Shot, Pellet);
     }
 
     // Pierce Discipline (Class-Kits §1.5 M6, transcribed): each target pierced
@@ -1753,10 +1753,11 @@ bool UBreakerWeaponComponent::FireOnce()
     }
 
     // Ledger and Mark Economy (Class-Kits §1.5 M3 / M5, LIVE): both rules key
-    // off the mark this pull was fired against, so they resolve here, after
-    // the pellets, from the one mark reading the whole pull shares.
-    if (MarkedTarget)
+    // off the marks active at the start of this pull and resolve after its pellets.
+    for (AActor* MarkedTarget : MarkedTargetsAtPull)
     {
+        if (!IsValid(MarkedTarget)) continue;
+        const float MarkRemainingAtPull = AbilityState->GetMarkRemainingFor(MarkedTarget);
         bool bMarkHit = false;
         for (const FBreakerPelletImpact& Pellet : Shot.Pellets)
         {
@@ -1780,8 +1781,7 @@ bool UBreakerWeaponComponent::FireOnce()
         const int32 LedgerRank = GetClassNodeRank(BreakerLedgerNodeId);
         if (bMarkHit && LedgerRank > 0 && Momentum && Momentum->IsActiveForOwner())
         {
-            const bool bFreshMark = LedgerRefundedTarget.Get() != MarkedTarget
-                || MarkRemainingAtPull > LedgerRefundedMarkRemaining;
+            const bool bFreshMark = AbilityState->ConsumeMarkRefund(MarkedTarget);
             if (bFreshMark)
             {
                 const UBreakerAbilityDefinition* LeadDefinition = UBreakerAbilityDefinition::FindFallback(TEXT("Swift.Lead"));
@@ -1811,12 +1811,13 @@ bool UBreakerWeaponComponent::FireOnce()
             if (MarkedCombat && MarkedCombat->IsDead())
             {
                 TArray<const AActor*> Excluded;
-                Excluded.Add(MarkedTarget);
+                for (const AActor* OtherMark : MarkedTargetsAtPull) Excluded.Add(OtherMark);
+                for (const AActor* CurrentMark : AbilityState->GetMarkedTargets()) Excluded.AddUnique(CurrentMark);
                 if (AActor* JumpTarget = FindNearestChainTarget(MarkedTarget->GetActorLocation(),
                     FBreakerWeaponMath::MarkJumpRadiusCm(EconomyRank), Excluded))
                 {
                     // The surviving window rides along: persistence, not a re-cast.
-                    AbilityState->SetMark(JumpTarget, MarkRemainingAtPull);
+                    AbilityState->TransferMark(MarkedTarget, JumpTarget);
                 }
             }
         }
@@ -2096,6 +2097,7 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
     const AActor* MarkedTarget, float LeadMinimumRangeCm, float LevelScalar, int32 PelletSeed,
     FBreakerShotResult& Shot, FBreakerPelletImpact& Pellet)
 {
+    const UBreakerAbilityStateComponent* AbilityState = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerAbilityStateComponent>() : nullptr;
     const uint32 OwnerHash = GetTypeHash(GetOwner());
     const UBreakerProgressionComponent* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
     // Sightline (Class-Kits §1.5 M7 rule half): "its pierce also ignores
@@ -2212,7 +2214,7 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
         const bool bEarnedWeakPoint = ResolveWeakPointHit(Hit, SegmentStart, SegmentDirection);
         const bool bGrantedWeakPoint = !bEarnedWeakPoint
             && UBreakerAbility_Lead::ShouldTreatAsWeakPoint(
-                MarkedTarget != nullptr && HitActor == MarkedTarget, DistanceFromMuzzleCm, LeadMinimumRangeCm);
+                AbilityState && AbilityState->IsMarked(HitActor), DistanceFromMuzzleCm, LeadMinimumRangeCm);
         const bool bWeakPoint = bEarnedWeakPoint || bGrantedWeakPoint;
         if (bIsFirstLeg)
         {

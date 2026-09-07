@@ -75,14 +75,18 @@ public:
     UFUNCTION(BlueprintPure, Category="Abilities|State") TArray<FName> GetActiveWindowKeys() const;
 
     // Marks ---------------------------------------------------------------
-    // A single mark, held on the *caster's* state component rather than on the
-    // target, so a destroyed target simply reads back as null. This is the
-    // minimum surface the HUD needs; UBreakerMarkComponent (spec §4.6) replaces
-    // it wholesale when it lands.
+    // At most two independently timed marks, oldest cast first. The legacy
+    // setter replaces the set; the legacy getter returns the latest live mark.
     UFUNCTION(BlueprintCallable, Category="Abilities|State") void SetMark(AActor* Target, float Duration);
     UFUNCTION(BlueprintPure, Category="Abilities|State") AActor* GetMarkedTarget() const;
     UFUNCTION(BlueprintPure, Category="Abilities|State") float GetMarkRemaining() const;
     UFUNCTION(BlueprintCallable, Category="Abilities|State") void ClearMark();
+    void AddMark(AActor* Target, float Duration, int32 Capacity);
+    TArray<AActor*> GetMarkedTargets() const;
+    bool IsMarked(const AActor* Target) const;
+    float GetMarkRemainingFor(const AActor* Target) const;
+    bool ConsumeMarkRefund(const AActor* Target);
+    void TransferMark(const AActor* From, AActor* To);
 
     // Per-target hit streaks ---------------------------------------------
     // Returns the streak count after recording the hit. The streak resets to 1
@@ -125,8 +129,13 @@ private:
 
     // Shares the component's Clock, so the mark expires on exactly the same
     // schedule as the window that opened it.
-    TWeakObjectPtr<AActor> MarkTarget;
-    float MarkEndTime = -1000.0f;
+    struct FMarkState
+    {
+        TWeakObjectPtr<AActor> Target;
+        float EndTime = 0;
+        bool bRefunded = false;
+    };
+    TArray<FMarkState> Marks;
 
     TWeakObjectPtr<AActor> StreakTarget;
     int32 StreakCount = 0;

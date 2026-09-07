@@ -19,6 +19,82 @@ namespace
         if (!Item.IsWeapon()) return 1.0f;
         return UBreakerAffixLibrary::ArchetypeAffixWeightMultiplier(Item.WeaponArchetype, AffixId);
     }
+
+    // The count is the finished item, including bills. Identity occupies seats
+    // before generic variance; neither signatures nor downsides append past it.
+    bool BreakerLootAllocateSpecial(FBreakerItemInstance& Item, FRandomStream& Random, int32 Budget,
+        int32 BestTier, const FBreakerLegendaryDefinition& Legendary)
+    {
+        const auto& Generic = UBreakerAffixLibrary::GetSliceAffixPool();
+        const auto& Downsides = UBreakerAffixLibrary::GetSpecialDownsidePool();
+        const bool bAberrant = Item.Rarity == EBreakerItemRarity::Aberrant;
+        const auto& Specials = bAberrant ? UBreakerAffixLibrary::GetAberrantAffixPool() : UBreakerAffixLibrary::GetAnomalousAffixPool();
+        auto Has = [&](FName Id) { return Item.Affixes.ContainsByPredicate([Id](const FBreakerRolledAffix& A) { return A.AffixId == Id; }); };
+        auto Count = [&](EBreakerAffixCategory Category) { return UBreakerLootLibrary::CountAffixesOfCategory(Item, Category); };
+        auto Add = [&](const FBreakerAffixDefinition& Definition, int32 Tier, bool bVariance)
+        {
+            FBreakerRolledAffix Rolled;
+            Rolled.AffixId = Definition.AffixId; Rolled.Tier = Tier; Rolled.Category = Definition.Category;
+            Rolled.Value = UBreakerAffixLibrary::ValueForTier(Definition, Tier);
+            if (bVariance)
+                Rolled.Value = FMath::Lerp(Rolled.Value, UBreakerAffixLibrary::ValueForTier(Definition,
+                    FMath::Max(Tier - 1, UBreakerAffixLibrary::TopTier)), Random.FRand() * 0.5f);
+            Item.Affixes.Add(Rolled);
+        };
+        auto Draw = [&](const TArray<FBreakerAffixDefinition>& Pool, bool bSpecial, bool bFocused) -> bool
+        {
+            TArray<const FBreakerAffixDefinition*> Candidates;
+            float TotalWeight = 0;
+            for (const FBreakerAffixDefinition& Definition : Pool)
+            {
+                if (!Definition.AllowsSlot(Item.Slot) || Has(Definition.AffixId)) continue;
+                const FBreakerAffixDefinition* Bill = bSpecial && !Definition.PairedAffixId.IsNone()
+                    ? Downsides.FindByPredicate([&](const FBreakerAffixDefinition& Entry) { return Entry.AffixId == Definition.PairedAffixId; }) : nullptr;
+                if (bSpecial && !Definition.PairedAffixId.IsNone() && (!Bill || !Bill->AllowsSlot(Item.Slot) || Has(Bill->AffixId))) continue;
+                if (Item.Affixes.Num() + 1 + (Bill ? 1 : 0) > Budget) continue;
+                int32 Prefixes = Definition.Category == EBreakerAffixCategory::Prefix ? 1 : 0;
+                int32 Suffixes = 1 - Prefixes;
+                if (Bill) { if (Bill->Category == EBreakerAffixCategory::Prefix) ++Prefixes; else ++Suffixes; }
+                if (Count(EBreakerAffixCategory::Prefix) + Prefixes > 4 || Count(EBreakerAffixCategory::Suffix) + Suffixes > 4) continue;
+                Candidates.Add(&Definition);
+                TotalWeight += Definition.RollWeight * (bSpecial ? 1.0f : BreakerLootArchetypeAffixWeight(Item, Definition.AffixId));
+            }
+            if (Candidates.IsEmpty()) return false;
+            const FBreakerAffixDefinition* Chosen = Candidates.Last();
+            float Weight = Random.FRand() * TotalWeight;
+            for (const FBreakerAffixDefinition* Candidate : Candidates)
+                if ((Weight -= Candidate->RollWeight * (bSpecial ? 1.0f : BreakerLootArchetypeAffixWeight(Item, Candidate->AffixId))) < 0)
+                { Chosen = Candidate; break; }
+            const int32 Ceiling = bFocused ? FMath::Max(BestTier - 1, UBreakerAffixLibrary::TierCapForRarity(Item.Rarity)) : BestTier;
+            int32 Tier = UBreakerAffixLibrary::WorstTier;
+            for (int32 Candidate = Tier - 1; Candidate >= Ceiling; --Candidate)
+            {
+                if (Random.FRand() >= UBreakerAffixLibrary::TierUpgradeChance) break;
+                Tier = Candidate;
+            }
+            if (bFocused) Tier = FMath::Min(Tier, BestTier);
+            Add(*Chosen, Tier, true);
+            if (bSpecial && !Chosen->PairedAffixId.IsNone())
+                Add(*Downsides.FindByPredicate([&](const FBreakerAffixDefinition& Entry) { return Entry.AffixId == Chosen->PairedAffixId; }), Tier, false);
+            return true;
+        };
+        if (bAberrant && !Draw(Generic, false, true)) return false;
+        for (FName Id : Legendary.GuaranteedAffixIds)
+        {
+            // Membership, not rolled-ID resolution: FindAffix intentionally
+            // falls back into special pools and cannot validate a signature.
+            const FBreakerAffixDefinition* Definition = Generic.FindByPredicate([Id](const FBreakerAffixDefinition& Entry) { return Entry.AffixId == Id; });
+            if (!Definition || !Definition->AllowsSlot(Item.Slot) || Has(Id)
+                || Item.Affixes.Num() >= Budget || Count(Definition->Category) >= 4) return false;
+            Add(*Definition, BestTier, false);
+        }
+        const int32 SpecialCount = bAberrant ? Random.RandRange(1, 2) : 1;
+        for (int32 Index = 0; Index < SpecialCount; ++Index)
+            if (!Draw(Specials, true, false)) { if (Index == 0) return false; break; }
+        while (Item.Affixes.Num() < Budget)
+            if (!Draw(Generic, false, false)) return false;
+        return true;
+    }
 }
 
 EBreakerItemRarity UBreakerLootLibrary::RollRarity(int32 RandomSeed, float DropChanceBonusPercent)
@@ -69,7 +145,7 @@ EBreakerEquipSlot UBreakerLootLibrary::RollDropSlot(int32 RandomSeed)
 }
 
 FBreakerItemInstance UBreakerLootLibrary::RollItemInternal(FName DefinitionId, EBreakerEquipSlot Slot, EBreakerItemRarity Rarity,
-    int32 ItemLevel, int32 RandomSeed, bool bAllowLegendary)
+    int32 ItemLevel, int32 RandomSeed, bool bAllowLegendary, FName ForcedLegendaryId)
 {
     FRandomStream Random(RandomSeed);
 
@@ -122,6 +198,31 @@ FBreakerItemInstance UBreakerLootLibrary::RollItemInternal(FName DefinitionId, E
     // Rarity caps below T1 clamp the ceiling; T0/T-1 rarity ceilings do not
     // unlock tiers item level has not reached — those come from crafting.
     const int32 BestTier = FMath::Max(BestLevelTier, UBreakerAffixLibrary::TierCapForRarity(Rarity));
+
+    if (Rarity == EBreakerItemRarity::Aberrant || Rarity == EBreakerItemRarity::Anomalous)
+    {
+        const FBreakerLegendaryDefinition Legendary = UBreakerItemRuleLibrary::FindLegendary(ForcedLegendaryId);
+        if (bAllowLegendary && Rarity == EBreakerItemRarity::Anomalous)
+        {
+            const FBreakerLegendaryDefinition Candidate = UBreakerItemRuleLibrary::FindLegendaryForSlot(Slot);
+            if (Candidate.IsValid() && Random.FRand() < LegendaryChanceWithinAnomalous)
+                return RollLegendary(Candidate.LegendaryId, Item.ItemLevel, RandomSeed ^ 0x1EDA5EED);
+        }
+        if (Legendary.IsValid())
+        {
+            Item.LegendaryId = Legendary.LegendaryId;
+            Item.DefinitionId = Legendary.LegendaryId;
+            Item.Rule = Legendary.Rule;
+        }
+        else if (Rarity == EBreakerItemRarity::Anomalous)
+            Item.Rule = UBreakerItemRuleLibrary::RollRule(Random.RandRange(0, MAX_int32 - 1));
+        if (!BreakerLootAllocateSpecial(Item, Random, AffixCount, BestTier, Legendary))
+        {
+            UE_LOG(LogTemp, Error, TEXT("[Loot] No legal affix allocation for %s within %d lines"), *DefinitionId.ToString(), AffixCount);
+            return FBreakerItemInstance();
+        }
+        return Item;
+    }
 
     // ABERRANT IS FOCUSED. Rarity used to gate affix COUNT and a tier ceiling
     // and nothing else, so an Aberrant was an Exceptional with a line or two
@@ -222,137 +323,6 @@ FBreakerItemInstance UBreakerLootLibrary::RollItemInternal(FName DefinitionId, E
         else ++SuffixCount;
     }
 
-    // ANOMALOUS CARRIES A RULE. This is the whole answer to "what does rarity
-    // mean above Exceptional", and it is drawn LAST on purpose: every rarity
-    // below Anomalous consumes exactly the draws it always did, so no
-    // previously-recorded roll moves and the existing determinism tests keep
-    // meaning what they meant.
-    //
-    // A legendary is picked here rather than upstream so the slot and item
-    // level are already resolved and the ordinary Anomalous path stays the
-    // default. The three legendaries occupy three of the eight slots, so five
-    // slots always take the generic branch.
-    if (Rarity == EBreakerItemRarity::Anomalous)
-    {
-        const FBreakerLegendaryDefinition Legendary = bAllowLegendary
-            ? UBreakerItemRuleLibrary::FindLegendaryForSlot(Slot)
-            : FBreakerLegendaryDefinition();
-        if (Legendary.IsValid() && Random.FRand() < LegendaryChanceWithinAnomalous)
-        {
-            // Re-rolled from a derived seed rather than continuing this stream,
-            // so a legendary is reproducible from its own id and seed alone —
-            // which is what lets a dev grant and a drop produce the same item.
-            return RollLegendary(Legendary.LegendaryId, Item.ItemLevel, RandomSeed ^ 0x1EDA5EED);
-        }
-        Item.Rule = UBreakerItemRuleLibrary::RollRule(Random.RandRange(0, MAX_int32 - 1));
-    }
-
-    // -----------------------------------------------------------------------
-    // THE RESERVED SEAT, OCCUPIED — special affixes for the high rarities.
-    // -----------------------------------------------------------------------
-    // Aberrant draws 1-2 lines from its own pool (O11's "1-2 unique modifier
-    // affixes", verbatim); Anomalous draws exactly ONE from its stronger pool,
-    // BESIDE the rule it already rolled. Drawn LAST, from the SAME stream, for
-    // the same reason the rule draw is last: every rarity below Aberrant
-    // consumes exactly the draws it always did, and Anomalous' rule/legendary
-    // draws sit BEFORE this block, so no previously-recorded rule or legendary
-    // outcome moves either. A legendary reaches here through its own inner
-    // RollItemInternal call, so a named item carries a signature line too —
-    // the peak of the ladder is not exempt from the ladder's identity.
-    //
-    // The pools are EXCLUSIVE per rarity (Aberrant lines never on Anomalous,
-    // and vice versa): each high rarity keeps its own identity instead of the
-    // higher one being the lower one plus more. Archetype leans deliberately do
-    // not apply — a pool of six-to-eight hand-authored lines is already an
-    // identity, and bending it per gun would be a second rarity system nobody
-    // ruled on.
-    if (Rarity == EBreakerItemRarity::Aberrant || Rarity == EBreakerItemRarity::Anomalous)
-    {
-        const bool bAberrantSeat = Rarity == EBreakerItemRarity::Aberrant;
-        const TArray<FBreakerAffixDefinition>& SpecialPool = bAberrantSeat
-            ? UBreakerAffixLibrary::GetAberrantAffixPool()
-            : UBreakerAffixLibrary::GetAnomalousAffixPool();
-        const TArray<FBreakerAffixDefinition>& DownsidePool = UBreakerAffixLibrary::GetSpecialDownsidePool();
-
-        const int32 SpecialCount = bAberrantSeat ? Random.RandRange(1, 2) : 1;  // O2 PLACEHOLDER (the 1-2 is O11's own number)
-        for (int32 SpecialIndex = 0; SpecialIndex < SpecialCount; ++SpecialIndex)
-        {
-            // Candidates: slot-legal, not already rolled, and the prefix/suffix
-            // caps of four must hold for the line AND its bill together — the
-            // special seat obeys the same item shape as everything else.
-            float TotalWeight = 0.0f;
-            TArray<const FBreakerAffixDefinition*> Candidates;
-            for (const FBreakerAffixDefinition& Affix : SpecialPool)
-            {
-                if (!Affix.AllowsSlot(Slot)) continue;
-                if (Item.Affixes.ContainsByPredicate([&Affix](const FBreakerRolledAffix& Rolled) { return Rolled.AffixId == Affix.AffixId; })) continue;
-
-                int32 NeededPrefixes = Affix.Category == EBreakerAffixCategory::Prefix ? 1 : 0;
-                int32 NeededSuffixes = 1 - NeededPrefixes;
-                const FBreakerAffixDefinition* Bill = Affix.PairedAffixId.IsNone()
-                    ? nullptr
-                    : UBreakerAffixLibrary::FindAffix(DownsidePool, Affix.PairedAffixId);
-                if (Bill)
-                {
-                    if (Bill->Category == EBreakerAffixCategory::Prefix) ++NeededPrefixes; else ++NeededSuffixes;
-                }
-                if (PrefixCount + NeededPrefixes > 4) continue;
-                if (SuffixCount + NeededSuffixes > 4) continue;
-
-                Candidates.Add(&Affix);
-                TotalWeight += Affix.RollWeight;
-            }
-            if (Candidates.IsEmpty()) break;
-
-            const FBreakerAffixDefinition* Chosen = Candidates.Last();
-            float WeightRoll = Random.FRand() * TotalWeight;
-            for (const FBreakerAffixDefinition* Candidate : Candidates)
-            {
-                if ((WeightRoll -= Candidate->RollWeight) < 0.0f) { Chosen = Candidate; break; }
-            }
-
-            // Same tier walk as the ordinary loop, against the ordinary
-            // ceiling: a special line is special because of WHAT it is, and its
-            // tier still has to be earned the same way — which also keeps the
-            // Forge's Temper meaningful on it.
-            const int32 WorstTier = UBreakerAffixLibrary::WorstTier;
-            int32 Tier = WorstTier;
-            for (int32 Candidate = WorstTier - 1; Candidate >= BestTier; --Candidate)
-            {
-                if (Random.FRand() >= UBreakerAffixLibrary::TierUpgradeChance) break;
-                Tier = Candidate;
-            }
-
-            FBreakerRolledAffix Rolled;
-            Rolled.AffixId = Chosen->AffixId;
-            Rolled.Tier = Tier;
-            Rolled.Category = Chosen->Category;
-            const float TierValue = UBreakerAffixLibrary::ValueForTier(*Chosen, Tier);
-            const float NextValue = UBreakerAffixLibrary::ValueForTier(*Chosen, FMath::Max(Tier - 1, UBreakerAffixLibrary::TopTier));
-            Rolled.Value = FMath::Lerp(TierValue, NextValue, Random.FRand() * 0.5f);
-            Item.Affixes.Add(Rolled);
-            if (Chosen->Category == EBreakerAffixCategory::Prefix) ++PrefixCount; else ++SuffixCount;
-
-            // The bill rides along with NO draw of its own: it is part of the
-            // deal, not loot, and consuming stream draws for it would make the
-            // downside a source of roll variance. Constant-anchored, so
-            // ValueForTier returns the same figure at every normal tier.
-            if (!Chosen->PairedAffixId.IsNone())
-            {
-                if (const FBreakerAffixDefinition* Bill = UBreakerAffixLibrary::FindAffix(DownsidePool, Chosen->PairedAffixId))
-                {
-                    FBreakerRolledAffix BillLine;
-                    BillLine.AffixId = Bill->AffixId;
-                    BillLine.Tier = Tier;
-                    BillLine.Category = Bill->Category;
-                    BillLine.Value = UBreakerAffixLibrary::ValueForTier(*Bill, Tier);
-                    Item.Affixes.Add(BillLine);
-                    if (Bill->Category == EBreakerAffixCategory::Prefix) ++PrefixCount; else ++SuffixCount;
-                }
-            }
-        }
-    }
-
     return Item;
 }
 
@@ -361,42 +331,10 @@ FBreakerItemInstance UBreakerLootLibrary::RollLegendary(FName LegendaryId, int32
     const FBreakerLegendaryDefinition Definition = UBreakerItemRuleLibrary::FindLegendary(LegendaryId);
     if (!Definition.IsValid()) return FBreakerItemInstance();
 
-    // Built on top of an ordinary Anomalous roll rather than beside it, so a
-    // legendary is a real item: it has an item level, its affix values come off
-    // the same tier curve, and two of them differ. The signature is what is
-    // guaranteed; everything else is still loot.
-    FBreakerItemInstance Item = RollItemInternal(LegendaryId, Definition.Slot, EBreakerItemRarity::Anomalous,
-        ItemLevel, RandomSeed, /*bAllowLegendary=*/false);
-    Item.DefinitionId = LegendaryId;
-    Item.LegendaryId = LegendaryId;
-    Item.Rule = Definition.Rule;
-
-    // The signature. Any guaranteed line the ordinary roll already produced is
-    // left exactly as it rolled — overwriting it would quietly re-roll a good
-    // value down to the floor of its tier. Missing lines are added at the
-    // item's own best tier, because a legendary's IDENTITY should not depend on
-    // whether the affix draw happened to cooperate.
-    const TArray<FBreakerAffixDefinition>& Pool = UBreakerAffixLibrary::GetSliceAffixPool();
-    const int32 BestTier = FMath::Max(
-        UBreakerAffixLibrary::BestTierForItemLevel(Item.ItemLevel),
-        UBreakerAffixLibrary::TierCapForRarity(EBreakerItemRarity::Anomalous));
-    for (const FName AffixId : Definition.GuaranteedAffixIds)
-    {
-        if (Item.Affixes.ContainsByPredicate([AffixId](const FBreakerRolledAffix& Rolled) { return Rolled.AffixId == AffixId; })) continue;
-        const FBreakerAffixDefinition* Affix = UBreakerAffixLibrary::FindAffix(Pool, AffixId);
-        // A signature naming a line that is not legal on the slot is a content
-        // bug, and it is caught by RiorsEdge.Items.Legendary.Signature rather
-        // than shipping as a line that silently never appears.
-        if (!Affix || !Affix->AllowsSlot(Definition.Slot)) continue;
-
-        FBreakerRolledAffix Rolled;
-        Rolled.AffixId = AffixId;
-        Rolled.Tier = BestTier;
-        Rolled.Category = Affix->Category;
-        Rolled.Value = UBreakerAffixLibrary::ValueForTier(*Affix, BestTier);
-        Item.Affixes.Add(Rolled);
-    }
-    return Item;
+    // Signatures enter the allocation before generic variance, inside the
+    // same final budget and category caps as their special line and its bill.
+    return RollItemInternal(LegendaryId, Definition.Slot, EBreakerItemRarity::Anomalous,
+        ItemLevel, RandomSeed, false, LegendaryId);
 }
 
 int32 UBreakerLootLibrary::CountAffixesOfCategory(const FBreakerItemInstance& Item, EBreakerAffixCategory Category)

@@ -4,6 +4,8 @@
 #include "Abilities/BreakerAbilityStateComponent.h"
 #include "Abilities/BreakerAbilityTags.h"
 #include "Characters/BreakerCharacter.h"
+#include "Combat/BreakerCombatComponent.h"
+#include "Progression/BreakerProgressionComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
 #include "UI/BreakerEffectRenderer.h"
@@ -59,9 +61,10 @@ void UBreakerAbility_Lead::ActivateAbility(const FGameplayAbilitySpecHandle Hand
     FCollisionQueryParams Params(SCENE_QUERY_STAT(BreakerLeadMark), false, Character);
     const FVector TraceEnd = ViewLocation + ViewRotation.Vector() * MarkTraceDistanceCm;
     MarkedTarget = nullptr;
-    if (World->LineTraceSingleByChannel(Hit, ViewLocation, TraceEnd, ECC_Visibility, Params) && Hit.GetActor())
+    if (World->LineTraceSingleByChannel(Hit, ViewLocation, TraceEnd, ECC_GameTraceChannel2, Params) && Hit.GetActor())
     {
-        MarkedTarget = Hit.GetActor();
+        const UBreakerCombatComponent* Combat = Hit.GetActor()->FindComponentByClass<UBreakerCombatComponent>();
+        if (Combat && !Combat->IsDead()) MarkedTarget = Hit.GetActor();
     }
 
     // The window opens whether or not a target was found: the cost is already
@@ -75,7 +78,10 @@ void UBreakerAbility_Lead::ActivateAbility(const FGameplayAbilitySpecHandle Hand
         // Publish the mark alongside the window so anything outside this
         // ability instance — starting with the HUD's target diamond — can see
         // *which* actor was marked, not merely that a mark is running.
-        State->SetMark(MarkedTarget.Get(), Duration);
+        const UBreakerProgressionComponent* Progression = Character->GetProgression();
+        const int32 Capacity = Progression && Progression->GetNodeRank(TEXT("Swift.Marksman.Lead"), EBreakerPointCurrency::DoctrinePoints) > 0 ? 2 : 1;
+        if (Capacity == 1) State->SetMark(MarkedTarget.Get(), Duration);
+        else State->AddMark(MarkedTarget.Get(), Duration, Capacity);
     }
 
     // The painting, drawn once at cast: a thin gold line from the eye to

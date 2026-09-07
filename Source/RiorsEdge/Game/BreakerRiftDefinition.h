@@ -58,6 +58,10 @@ struct RIORSEDGE_API FBreakerRiftDefinition
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Rift")
     EBreakerRiftTier Tier = EBreakerRiftTier::Campaign;
 
+    // Stable gameplay identity; display copy may change without changing
+    // which encounter the journal and boss resolver recognize.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Rift") FName EncounterId = NAME_None;
+
     bool IsSet() const { return AreaLevel > 0; }
     int32 EffectiveAreaLevel() const { return UBreakerMonsterChassisLibrary::ClampAreaLevel(AreaLevel); }
 };

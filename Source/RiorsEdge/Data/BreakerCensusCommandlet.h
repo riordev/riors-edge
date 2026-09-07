@@ -7,6 +7,8 @@
 // Writes Data/progression.json from the built trees. Run it after any edit
 // to the node library and commit the file; RiorsEdge.Data.Census.Fresh is
 // red until you do. `bash Scripts/ue-census.sh` wraps the invocation.
+// -MeshAudit instead logs imported mannequin LOD0 sections/weighted bone coverage
+// and returns before any data exports. It never saves or modifies mesh assets.
 UCLASS()
 class UBreakerCensusCommandlet : public UCommandlet
 {

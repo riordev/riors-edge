@@ -11,8 +11,82 @@
 #include "Progression/BreakerProgressionTree.h"
 #include "Save/BreakerMissionContent.h"
 #include "Save/BreakerQuestContent.h"
+#include "Engine/SkeletalMesh.h"
+#include "Materials/MaterialInterface.h"
+#include "Rendering/SkeletalMeshModel.h"
+#include "Rendering/SkeletalMeshLODModel.h"
+#include "Misc/Parse.h"
+#include "AssetCompilingManager.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogBreakerCensus, Log, All);
+
+namespace
+{
+    int32 BreakerAuditArmMeshes()
+    {
+#if WITH_EDITOR
+        int32 Failures = 0;
+        for (const TCHAR* Path : { TEXT("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple"),
+            TEXT("/Game/Characters/Mannequins/Meshes/SKM_Quinn_Simple.SKM_Quinn_Simple") })
+        {
+            USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, Path);
+            if (!Mesh) { UE_LOG(LogBreakerCensus, Error, TEXT("[MeshAudit] Missing %s"), Path); ++Failures; continue; }
+            FAssetCompilingManager::Get().FinishAllCompilation();
+            const FSkeletalMeshModel* Model = Mesh->GetImportedModel();
+            if (!Model || Model->LODModels.IsEmpty())
+            { UE_LOG(LogBreakerCensus, Error, TEXT("[MeshAudit] No imported LOD0 for %s"), Path); ++Failures; continue; }
+            const FReferenceSkeleton& Skeleton = Mesh->GetRefSkeleton();
+            UE_LOG(LogBreakerCensus, Display, TEXT("[MeshAudit] %s bounds origin=%s extent=%s sections=%d"), Path,
+                *Mesh->GetBounds().Origin.ToString(), *Mesh->GetBounds().BoxExtent.ToString(), Model->LODModels[0].Sections.Num());
+            int32 ArmOnlySections = 0;
+            for (int32 SectionIndex = 0; SectionIndex < Model->LODModels[0].Sections.Num(); ++SectionIndex)
+            {
+                const FSkelMeshSection& Section = Model->LODModels[0].Sections[SectionIndex];
+                TArray<FString> BoneNames, WeightedArms, WeightedBody;
+                for (FBoneIndexType Bone : Section.BoneMap)
+                    if (Bone < Skeleton.GetNum()) BoneNames.Add(Skeleton.GetBoneName(Bone).ToString());
+                FBox Bounds(ForceInit);
+                bool bUnprovenWeights = Section.SoftVertices.IsEmpty();
+                for (const FSoftSkinVertex& Vertex : Section.SoftVertices)
+                {
+                    Bounds += FVector(Vertex.Position);
+                    bool bHasValidInfluence = false;
+                    for (int32 Influence = 0; Influence < UE_ARRAY_COUNT(Vertex.InfluenceWeights); ++Influence)
+                    {
+                        if (Vertex.InfluenceWeights[Influence] == 0) continue;
+                        if (!Section.BoneMap.IsValidIndex(Vertex.InfluenceBones[Influence])) { bUnprovenWeights = true; continue; }
+                        const int32 Bone = Section.BoneMap[Vertex.InfluenceBones[Influence]];
+                        if (Bone >= Skeleton.GetNum()) { bUnprovenWeights = true; continue; }
+                        bHasValidInfluence = true;
+                        bool bArm = false;
+                        for (int32 Ancestor = Bone; Ancestor != INDEX_NONE; Ancestor = Skeleton.GetParentIndex(Ancestor))
+                        {
+                            const FString Name = Skeleton.GetBoneName(Ancestor).ToString();
+                            if (Name.StartsWith(TEXT("clavicle_")) || Name.StartsWith(TEXT("upperarm_"))) { bArm = true; break; }
+                        }
+                        (bArm ? WeightedArms : WeightedBody).AddUnique(Skeleton.GetBoneName(Bone).ToString());
+                    }
+                    bUnprovenWeights |= !bHasValidInfluence;
+                }
+                const bool bArmOnly = !bUnprovenWeights && !WeightedArms.IsEmpty() && WeightedBody.IsEmpty();
+                ArmOnlySections += bArmOnly ? 1 : 0;
+                const FSkeletalMaterial* Material = Mesh->GetMaterials().IsValidIndex(Section.MaterialIndex) ? &Mesh->GetMaterials()[Section.MaterialIndex] : nullptr;
+                UE_LOG(LogBreakerCensus, Display, TEXT("[MeshAudit] section=%d material=%d slot=%s asset=%s triangles=%d softVertices=%d bounds=%s armOnly=%s"),
+                    SectionIndex, Section.MaterialIndex, Material ? *Material->MaterialSlotName.ToString() : TEXT("missing"),
+                    Material && Material->MaterialInterface ? *Material->MaterialInterface->GetPathName() : TEXT("none"),
+                    Section.NumTriangles, Section.SoftVertices.Num(), *Bounds.ToString(), bArmOnly ? TEXT("YES") : TEXT("NO/UNPROVEN"));
+                UE_LOG(LogBreakerCensus, Display, TEXT("[MeshAudit] boneMap=[%s] weightedArm=[%s] weightedTorsoOrOther=[%s]"),
+                    *FString::Join(BoneNames, TEXT(",")), *FString::Join(WeightedArms, TEXT(",")), *FString::Join(WeightedBody, TEXT(",")));
+            }
+            UE_LOG(LogBreakerCensus, Display, TEXT("[MeshAudit] isolatedArmSections=%d; mixed weighted sections cannot be isolated by section visibility alone. Empty soft vertices are unproven, not safe."), ArmOnlySections);
+        }
+        return Failures ? 1 : 0;
+#else
+        UE_LOG(LogBreakerCensus, Error, TEXT("[MeshAudit] Imported section audit requires an editor build."));
+        return 1;
+#endif
+    }
+}
 
 UBreakerCensusCommandlet::UBreakerCensusCommandlet()
 {
@@ -27,6 +101,8 @@ UBreakerCensusCommandlet::UBreakerCensusCommandlet()
 
 int32 UBreakerCensusCommandlet::Main(const FString& Params)
 {
+    // Optional read-only geometry probe exits BEFORE every canonical data export.
+    if (FParse::Param(*Params, TEXT("MeshAudit"))) return BreakerAuditArmMeshes();
     const TArray<UBreakerProgressionTree*>& Trees = UBreakerProgressionLibrary::GetAllFallbackTrees();
     const FString Json = BreakerCensus::Serialize(BreakerCensus::Export(Trees));
 

@@ -63,5 +63,5 @@ private:
     // legendary's ordinary affixes would re-enter the legendary branch and
     // recurse until the stack ran out.
     static FBreakerItemInstance RollItemInternal(FName DefinitionId, EBreakerEquipSlot Slot, EBreakerItemRarity Rarity,
-        int32 ItemLevel, int32 RandomSeed, bool bAllowLegendary);
+        int32 ItemLevel, int32 RandomSeed, bool bAllowLegendary, FName ForcedLegendaryId = NAME_None);
 };

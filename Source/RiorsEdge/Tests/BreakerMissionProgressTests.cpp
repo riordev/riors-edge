@@ -76,6 +76,16 @@ bool FBreakerMissionProgressTest::RunTest(const FString& Parameters)
     const FBreakerRiftDefinition Substation = UBreakerZoneBuilder::FernhallRiftFor(FName(TEXT("substation")));
     const FBreakerRiftDefinition Entry = UBreakerZoneBuilder::FernhallRiftFor(NAME_None);
     TestFalse(TEXT("The substation is not the entry yard"), Substation.AreaName.EqualTo(Entry.AreaName));
+    TestEqual(TEXT("Undercroft has stable authored identity"), Substation.EncounterId, FName(TEXT("fernhall.substation")));
+    FBreakerRiftDefinition Renamed = Substation;
+    Renamed.AreaName = FText::FromString(TEXT("A revised display title"));
+    TestEqual(TEXT("Boss lookup survives copy changes"), UBreakerMissionLibrary::BossForRift(Renamed), FName(TEXT("Holdfast")));
+    FBreakerRiftDefinition Impostor = Entry;
+    Impostor.AreaName = Substation.AreaName;
+    TestTrue(TEXT("Matching display name cannot select another encounter boss"), UBreakerMissionLibrary::BossForRift(Impostor).IsNone());
+    FBreakerRiftDefinition Unidentified = Substation;
+    Unidentified.EncounterId = NAME_None;
+    TestTrue(TEXT("Unidentified dev rifts cannot select a story boss"), UBreakerMissionLibrary::BossForRift(Unidentified).IsNone());
 
     // ---- the walk -----------------------------------------------------------
     FBreakerQuestFlagSet Flags;
@@ -126,6 +136,12 @@ bool FBreakerMissionProgressTest::RunTest(const FString& Parameters)
         // The boss seam: the substation completes the Undercroft only once
         // Deeper has been accepted, and the entry yard never does.
         const TArray<FName> Sweep = UBreakerMissionLibrary::RiftCompletionFlagsFor(Substation, Flags);
+        TestEqual(Where + TEXT(" display rename preserves completion"),
+            UBreakerMissionLibrary::RiftCompletionFlagsFor(Renamed, Flags).Num(), Sweep.Num());
+        TestEqual(Where + TEXT(" matching copy cannot counterfeit completion"),
+            UBreakerMissionLibrary::RiftCompletionFlagsFor(Impostor, Flags).Num(), 0);
+        TestEqual(Where + TEXT(" unidentified rift cannot complete a story beat"),
+            UBreakerMissionLibrary::RiftCompletionFlagsFor(Unidentified, Flags).Num(), 0);
         if (Completed == UndercroftIndex)
         {
             TestEqual(Where + TEXT(" the substation run completes the Undercroft"), Sweep.Num(), 1);

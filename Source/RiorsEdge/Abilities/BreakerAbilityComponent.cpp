@@ -3,6 +3,14 @@
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Abilities/BreakerGameplayAbility.h"
+#include "Abilities/BreakerAbilityStateComponent.h"
+#include "Abilities/BreakerAbilityTags.h"
+#include "Combat/BreakerEnemy.h"
+#include "Combat/BreakerCombatComponent.h"
+#include "Camera/PlayerCameraManager.h"
+#include "GameFramework/PlayerController.h"
+#include "EngineUtils.h"
+#include "Progression/BreakerProgressionLibrary.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Classes/BreakerChargeComponent.h"
 #include "Classes/BreakerGritComponent.h"
@@ -48,6 +56,63 @@ void UBreakerAbilityComponent::BeginPlay()
     const bool bProbeValue = FParse::Value(FCommandLine::Get(), TEXT("BreakerAbilityProbe="), ProbeClassName);
     if (bProbeFlag || bProbeValue)
     {
+        // Opt-in, save-isolated companion to the existing ability probe. Both
+        // diamonds are produced by actual purchased Lead casts on live enemies.
+        if (FParse::Param(FCommandLine::Get(), TEXT("BreakerLeadPair")))
+        {
+            TWeakObjectPtr<UBreakerAbilityComponent> WeakProbe(this);
+            FTimerHandle PairHandle;
+            GetWorld()->GetTimerManager().SetTimer(PairHandle, FTimerDelegate::CreateLambda([WeakProbe]()
+            {
+                UBreakerAbilityComponent* Probe = WeakProbe.Get();
+                APawn* Pawn = Probe ? Cast<APawn>(Probe->GetOwner()) : nullptr;
+                APlayerController* Controller = Pawn ? Cast<APlayerController>(Pawn->GetController()) : nullptr;
+                UBreakerProgressionComponent* Progression = Probe ? Probe->GetProgression() : nullptr;
+                if (!Controller || !Progression || !Pawn->HasAuthority()) return;
+                Progression->DevForceClass(EBreakerClassId::Swift);
+                Progression->GrantPlaytestPoints(8, 0);
+                const UBreakerProgressionTree* Tree = UBreakerProgressionLibrary::GetSwiftMarksmanTree();
+                for (const TCHAR* Id : { TEXT("Swift.Marksman.Steady"), TEXT("Swift.Marksman.Steady"), TEXT("Swift.Marksman.Ledger"), TEXT("Swift.Marksman.MarkEconomy"), TEXT("Swift.Marksman.Lead") })
+                {
+                    FText Reason;
+                    if (!Progression->PurchaseNode(Tree, Id, Reason))
+                    {
+                        UE_LOG(LogTemp, Error, TEXT("[BreakerLeadPair] purchase %s failed: %s"), Id, *Reason.ToString());
+                        return;
+                    }
+                }
+                Progression->DevForceEquipAbility(EBreakerAbilitySlot::ClassAbilityTwo, TEXT("Swift.Lead"));
+                Probe->RefreshGrants();
+                TArray<AActor*> Targets;
+                FVector Eye; FRotator Rotation; Controller->GetPlayerViewPoint(Eye, Rotation);
+                for (TActorIterator<ABreakerEnemy> It(Probe->GetWorld()); It; ++It)
+                {
+                    const UBreakerCombatComponent* Combat = It->FindComponentByClass<UBreakerCombatComponent>();
+                    if (!Combat || Combat->IsDead()) continue;
+                    const float Distance = FVector::Distance(Eye, It->GetActorLocation());
+                    if (Distance > 12000.0f) { UE_LOG(LogTemp, Log, TEXT("[BreakerLeadPair] %s outside range %.0fcm"), *It->GetName(), Distance); continue; }
+                    FHitResult Hit; FCollisionQueryParams Params(SCENE_QUERY_STAT(LeadPairCapture), false, Pawn);
+                    if (Probe->GetWorld()->LineTraceSingleByChannel(Hit, Eye, It->GetActorLocation(), ECC_GameTraceChannel2, Params) && Hit.GetActor() == *It) Targets.Add(*It);
+                    else UE_LOG(LogTemp, Log, TEXT("[BreakerLeadPair] %s %.0fcm blocked by %s"), *It->GetName(), Distance, *GetNameSafe(Hit.GetActor()));
+                }
+                Targets.Sort([Eye](const AActor& A, const AActor& B) { return FVector::DistSquared(Eye, A.GetActorLocation()) < FVector::DistSquared(Eye, B.GetActorLocation()); });
+                if (Targets.Num() < 2) { UE_LOG(LogTemp, Error, TEXT("[BreakerLeadPair] fewer than two visible living enemies")); return; }
+                for (int32 Index = 0; Index < 2; ++Index)
+                {
+                    Controller->SetControlRotation((Targets[Index]->GetActorLocation() - Eye).Rotation());
+                    if (Controller->PlayerCameraManager) Controller->PlayerCameraManager->UpdateCamera(0.0f);
+                    if (UBreakerMomentumComponent* Momentum = Pawn->FindComponentByClass<UBreakerMomentumComponent>()) Momentum->GrantMomentum(200);
+                    FGameplayTagContainer Cooldown; Cooldown.AddTag(BreakerAbilityTags::Cooldown_Class_Swift_Lead.GetTag());
+                    Probe->GetAbilitySystem()->RemoveActiveEffectsWithGrantedTags(Cooldown);
+                    const bool bCast = Probe->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityTwo);
+                    UE_LOG(LogTemp, Log, TEXT("[BreakerLeadPair] cast%d=%d target=%s"), Index + 1, bCast, *Targets[Index]->GetName());
+                }
+                Controller->SetControlRotation(((Targets[0]->GetActorLocation() + Targets[1]->GetActorLocation()) * 0.5f - Eye).Rotation());
+                const UBreakerAbilityStateComponent* State = Pawn->FindComponentByClass<UBreakerAbilityStateComponent>();
+                UE_LOG(LogTemp, Log, TEXT("[BreakerLeadPair] live marks=%d"), State ? State->GetMarkedTargets().Num() : 0);
+            }), 5.3f, false);
+            return;
+        }
         // =Class:AbilityId photographs an UNLOCKABLE (One-U item 16 + O181):
         // the id goes into its affinity slot through LEDGER's dev writer,
         // which bypasses the unlock and nothing else — impossible loadouts

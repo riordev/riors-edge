@@ -186,6 +186,10 @@ first sends the player to Kess is its natural site.
 
 **Rifts are named by id** in the file and resolve to the yard's rift
 definition. A mission's act must match the world-point sources it grants.
+The runtime definition carries a stable `EncounterId` through travel and
+retry. Boss lookup and story completion match that identity, never display
+text; a renamed area still works, while an unidentified dev Rift cannot
+satisfy a story beat.
 
 **How a mission plays.** The prompt sits on the NPC. The Anchor gate opens
 onto the arrival cover. The rift door admits the player; the waves carry

@@ -42,7 +42,7 @@ public:
 
     // Class-Kits §1.2 S6: 25 m.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Lead", meta=(ClampMin="0")) float MarkMinimumRangeCm = 2500.0f;
-    // O2 PLACEHOLDER: no design doc states the targeting trace length. 12 km is
+    // O2 PLACEHOLDER: no design doc states the targeting trace length. 120 m is
     // "as far as the player can see" for the gym, not a balance number.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Lead", meta=(ClampMin="0")) float MarkTraceDistanceCm = 12000.0f;
 

@@ -374,6 +374,7 @@ FBreakerRiftDefinition UBreakerZoneBuilder::FernhallRiftFor(FName Yard)
 
     if (Yard == FName(TEXT("substation")))
     {
+        Rift.EncounterId = TEXT("fernhall.substation");
         Rift.AreaName = FText::FromString(TEXT("Substation Undercroft"));
         Rift.AreaLine = FText::FromString(
             TEXT("Below the transformer yard, where the rift went looking for power."));
@@ -385,6 +386,7 @@ FBreakerRiftDefinition UBreakerZoneBuilder::FernhallRiftFor(FName Yard)
         return Rift;
     }
 
+    Rift.EncounterId = TEXT("fernhall.entry");
     Rift.AreaName = FText::FromString(TEXT("Fernhall Substation"));
     Rift.AreaLine = FText::FromString(
         TEXT("The tear under the substation, where the yard stops being quiet."));

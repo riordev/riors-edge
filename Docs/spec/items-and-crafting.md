@@ -87,6 +87,12 @@ carries the whole endgame.
 | Aberrant | 4–6 | T-1 | Focused: one affix rolls a tier better |
 | Unwritten | 5–6 | T-1 | One rolled rewrite, drawn from a pool of three |
 
+These are final affix counts on new drops, including special stat lines,
+paired downsides and guaranteed legendary signatures. Rule descriptions do
+not consume affix seats. No item may exceed four prefixes or four suffixes.
+Existing saved items keep their affixes; this correction does not delete
+previously acquired or crafted lines.
+
 Equip caps: three Aberrant, one non-legendary Unwritten, one legendary, as
 three separate axes. A legendary does not draw against the Unwritten cap.
 
@@ -191,8 +197,12 @@ as the rare tiers clustering in the same seeds.
 Rarity, then affix count from the rarity's range, then slot-legal weighted
 selection with no duplicates, then a tier per affix — item-level gated, rarity
 capped, walking up one step at a time so the top tiers stay earned — then a
-value inside the tier band. **The rewrite and the legendary draw come last**,
-after every affix, so no previously recorded roll moves when the pool grows.
+value inside the tier band. Standard through Exceptional keep their existing
+seeded selection. Aberrant and Unwritten reserve their special lines and
+paired downsides inside the drawn count before filling generic seats; named
+legendaries also reserve their guaranteed signatures. Aberrant retains one
+focused generic line. New special-rarity rolls change because their former
+append-after-filling behavior exceeded both the count and category budgets.
 
 Archetype leans are weights, never filters: a lean makes a line likelier on the
 gun it suits and never makes another impossible.

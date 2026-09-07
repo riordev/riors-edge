@@ -5,10 +5,11 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
-## Cycle — clearer ability picking and five Caster delivery/zone nodes
-- [x] Select one ability slot catalogue, pin feedback, dismiss equip modals and wrap bench refusals.
-- [x] Wire Standing Water, Zonework, Wellspring, Chain and Momentum Transfer to actual purchases and combat.
-- [ ] Arms replacement remains open: inspected Manny rifle pose intrudes into the camera; prototype reverted.
+## Cycle — two-target Lead, final special-loot budgets and stable Rift identity
+- [x] Wire purchased two-target Lead through timed state, weapon hits and both HUD marks.
+- [x] Reserve special affixes, paired bills and legendary signatures inside the final rarity budget; preserve ordinary rolls and existing saved items.
+- [x] Identify authored Rifts by stable encounter IDs rather than display copy.
+- [x] Inspected both mannequin meshes: neither has an isolated arm-only section. A dedicated/extracted arms mesh is still needed.
 Remaining repair work includes the other silent nodes, campaign doctrine reachability, ability/weapon balance, broader clipping, arms/weapon/weakpoint art, audible combat polish and the full rarity identities.
 
 ## Playtest queue (owner, 2026-09-07)
@@ -106,6 +107,12 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - Four Niagara systems at `/Game/Breaker/FX/NS_<Moment>` with a `Color` user parameter, or a free Fab VFX pack placed there
 
 ## Done (last three cycles; older is git)
+### Two-target Lead, special loot budgets and Rift identity — 604 / 5 / 0
+- [x] Purchased Lead retains two independently timed targets and renders both diamonds; weapon hits honor both, Ledger refunds once per cast, Mark Economy preserves lifetime/refund identity. Actual GAS/weapon tests plus shipped enemy geometry; live Fernhall capture shows both marks.
+- [x] Lead now targets the weapon collision channel and rejects scenery/dead combat targets. Live capture found the mismatch hidden by the old synthetic fixture. Capture probe purchases nodes and casts normally under isolated saves.
+- [x] Special loot reserves signatures, special lines and paired downsides inside final count/category budgets. Ordinary rolls and existing saved items unchanged. New slot/level/seed coverage preserves all four legendary identities; Refractor card inspected with five affixes.
+- [x] Rift boss/story lookup uses stable EncounterId carried through travel/retry, never display copy. Renames, duplicate display names and missing IDs tested. Real round trip passed again:24kills,2015XP,231Riftglass retained; accelerated integration, not combat-feel validation.
+- [x] Final build and609tests complete:604passed/5existing expected/0unexpected. Strict pool-membership test fixed without widening counts; real enemy fixture registers its existing ASC attributes. STATE unchanged. Read-only MeshAudit confirms both imported mannequins mix arm/body weights in both sections; no arms replacement claimed.
 ### Ability picker and five Caster nodes — 602 / 5 / 0
 - [x] One selected ability catalogue, equipped slot summaries and pinned feedback replace the repeated lists. Actual Anchor capture inspected with all six Caster choices and unlock refusal fitting. Escape dismisses equip modals; bench refusal text wraps.
 - [x] Standing Water pays one live-occupied Rot stream; Zonework reconciles extra flat strip across overlapping zones; Wellspring follows intentional self-ground placement and refreshes one following zone. Mobile rim now follows actor transform; movement/overlap verified in runtime tests, no rendered mobile-ring capture yet.
@@ -119,11 +126,3 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - [x] Refractor is a reachable named Unwritten necklace: each hitscan pellet's first successful crit-eligible enemy hit may fork to two visible targets for 60% normal nonweak damage, trading away hitscan critical strikes. Real roll/equip/damage/exclusion/O104 tests; no recursive forks or weapon statuses. Generic OnHit listeners still see proc-zero fork damage. Projectile weapons unchanged.
 - [x] All inventory rule cards now print their canonical perk/forfeit descriptions. Refractor card inspected with full text and affixes; no claim runtime beams photographed. Special-item damage permission reflected in intent docs; rarity migration remains open.
 - [x] Final build, canonical census and all604tests complete:599passed/5existing expected/0unexpected. Corrected isolated-world context/reflected-event fixtures and expanded exact legendary population assertions; no damage bands/pins widened. STATE unchanged under Python quarantine.
-
-
-### Caster resource nodes, sandbox and real Rift travel — 594 / 5 / 0
-- [x] Purchased Seep, FollowThrough, Attrition and Payment now pay through actual status, melee, death and detonation events. New editable resource tuning documents O2 placeholders; lethal final DoT ticks pay once. Campaign still grants only two doctrine points; deeper runtime fixtures do not claim shipped reachability.
-- [x] Cycle rank two displays the next status with owner-only replicated state and immediate purchase/respec updates. Sandbox has Character/Gear/Stats tabs, strict repeat seeds and explicit full-backpack refusal. Five UI captures inspected.
-- [x] Added reachable ability debt/ledge affixes without weapon leakage. Honest rolled ability/weapon multiplier parity remains 0.550 at level 50 and 0.365 at level 120; balance work remains open.
-- [x] Isolated real Anchor → Fernhall → authored Rift → Fernhall → Anchor probe passed: 24 kills, exact completion purse, final 2015 XP / 211 Riftglass retained. Accelerated kills validate integration, not combat feel.
-- [x] Final build and all 599 tests complete: 594 passed / 5 existing expected / 0 unexpected. Canonical C++ census and PowerShell reconciliation; STATE unchanged. No test pins widened.
