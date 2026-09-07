@@ -17,28 +17,25 @@ No playtest until the core loop has more oomph. The next blocks are the ones tha
 - (systems) "The hub is the only start" is built as twelve inner-rim entries on a virtual centre. If you meant a real centre node, that is content for a later cycle.
 - (bosses) The third boss ("mobility and sustain") has no story name and no act; the Act III climax is a meeting, not a fight. Name it and its act, or drop the third.
 - (persistence) The amended O82 spends the endgame death budget at runtime; O122 says the two rules ship together or the limit is a loading screen, and `BreakerRiftDefinition.h` states O122's side. Every rift is Campaign today, so the decrement is wired but unreachable. Which stands?
-- (enemies) The sheet's teal boss name has no string source: no strings table and no display name per family. The bar says BOSS until O195's table or a `displayName` per family lands.
+- (enemies) The sheet's teal boss name has no string source: no strings table and no display name per family. `bar.boss` is a `Data/strings.json` row; a per-family display name is still a `displayName` on the family, when ruled.
 - (movement) Crouch: the player has no crouch verb on its input; the slide is the crouch and the design's keybind sheet shows "L CTRL · HOLD CROUCH" as the slide key. A separate crouch verb, or crouch = the slide key held? Until ruled, the HOLD|TOGGLE rows cover sprint and aim only.
+- (weapons) Momentum on the gun is built as tighten-only: the cone shrinks to 0.6x at a full bar (O2 PLACEHOLDER) and tracers brighten to 1.75x; an empty bar is baseline (O92). If "follows the bar" meant something else, say what.
+- (enemies) A Volatile blast hits enemies at the player's number (O217): 9x chassis damage kills every trash body inside the inner radius. Keep one number, or rule an enemy fraction after a playtest.
+- (abilities) Class numbers ride `Data/abilities.json` and are written onto the class defaults at load; the compiled members stay as the failed-load fallback. Delete the compiled defaults later (as cycle 17 deleted the registry's costs), or keep them?
 - (fun interactions) Elements: the spec names Rift, Entropy and Void (O19) with one reaction per pair; code has only a Void damage tag and the Bleed/Poison ailments. Does Void become an applied status (the ini once said healing and armour reduction) or stay a damage tag? Do enemies deal elemental damage at all? What are the three reaction cells and the interval? Do Bleed and Poison join the matrix or stay the physical lane beside it? May Provoke become a status an enemy reads as its target (a threat primitive by another name; "no class-pair specials" is honoured)?
 
-## Cycle 12c — the death screen and the rift retry (KIT, GROUND, GLASS; one build)
-- [ ] `SpendDeath`/`CanRetryRift` pure on the rift tier; the game mode's `EndgameDeathsRemaining` from `SoloEndgameDeathBudget`; `RetryRift` = the rift entry travel through the cover, `ReturnToAnchor` = the hub travel; the death beat's Black phase opens `EBreakerMenuScreen::Death` (appended last) in its own TU on the stash pattern when in a rift instance, campaign and gym unchanged (O82); RETRY THE RIFT gold focused, RETURN TO ANCHOR panel, DEATHS REMAINING n OF m with tally cells, terminal variant RETURN alone, boss line "The encounter resets."; the input handoff at Black is the playtest risk. Pin `Game.DeathBudget`.
-
 ## Plumbing the design asks for, in the order that unblocks the most
-1. Swap picker (O205): `EquipItem(Item, DisplaceId)` and a candidate list with a pre-focus from the component (LEDGER), then the modal, pinned by `UI.EquipLimit.SwapPicker`.
-2. NPC rail colour and hold-to-leave for Kess and the Quartermaster (O209), landing in `Data/dialogue.json`.
 - Not to build without a system and a ruling: subtitles, text scale, reduce-flash, Forge Attune-to-rift, a MATERIALS tab, pad glyphs, the gamepad toggle, the class-select yard with 3D figures (waits on O14 models).
 
 ## Then, in this order, each sized when it reaches the top
 1. The reaction matrix (Rift, Entropy, Void; O19) waits on its cells being named; Provoke-as-a-status waits on the threat question. The pierce-spread rule is live in `Data/statuses.json`.
-2. Volatile enemies as player weapons; Momentum reads off the gun (KIT-2: spread and tracer brightness follow the bar).
-3. Rift interiors (GROUND-1): three to five room shapes measured against the gap rules, feeding the wave solver.
-4. Ten authored legendaries with printed forfeits (LEDGER-4, O66/O67).
-5. Anomalies as the first real endgame (GROUND-3): key → run → payout as a functional test.
-6. Two-seat listen-server smoke every cycle (O185), then Dungeons, then Raids.
+2. Rift interiors (GROUND-1): three to five room shapes measured against the gap rules, feeding the wave solver.
+3. Ten authored legendaries with printed forfeits (LEDGER-4, O66/O67).
+4. Anomalies as the first real endgame (GROUND-3): key → run → payout as a functional test.
+5. Two-seat listen-server smoke every cycle (O185), then Dungeons, then Raids.
 
 ## The voice (O195) — slots in whenever a cycle has room
-- [ ] O195 string table: every player-facing `TEXT("…")` in `UI/` and `Game/` → `Data/strings.json`; TILESET / BANKED / SETTLED never reach the screen.
+- [ ] O195 string table, the menu series: `BreakerMenu.cpp` by screen (title/pause/settings, inventory, trees, …), one build each, through `BreakerStrings::Get`; the HUD, loading, stash and bar slice is live in `Data/strings.json`. `BANKED FROM THE FIGHT · SPENT IN LUMPS` on the class cards is the first menu row to move.
 - [ ] Menu checklist: every screen photographed; hover/press states, transitions, type hierarchy, density, faded-disabled — a list the owner marks.
 - [ ] Per-archetype weapon fire: `weapon_fire_<archetype>.wav` → `weapon_fire.wav` → synth.
 
@@ -85,6 +82,14 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 
 ## Done (last three cycles; older is git)
 
+### Round four — one build, one suite, 567 / 5 / 0
+- [x] Cycle 12c, the death screen and the rift retry (O82): the budget pure in `BreakerDeathBudgetMath.h`, the counter on the game instance across a retry, `RetryRift` = the rift entry travel and `ReturnToAnchor` = the hub travel, `EBreakerMenuScreen::Death` in its own TU opened at Black in a rift instance; campaign, Anchor and gym unchanged. Enter-confirms and the boss-only reset are recorded gaps at the site; every shipped door is Campaign so the tally and terminal variants are pure-test until O122.
+- [x] Volatile as a player weapon (O217) and Momentum on the gun: the blast reaches every live pawn in range; the cone tightens and the tracer brightens with the bar, tighten-only (O92). Blast kills are not credited to the player (the dealer is the corpse) — recorded at the site.
+- [x] Ability class numbers to `Data/abilities.json` (O186): 118 keys over 28 rows, walked by reflection, written onto the class defaults at load; `Data.Abilities.Numbers` pins the file to the compiled table until the first data-only tuning. The 26 in-body literals, 12 constexprs and Resonance's detonation struct stay compiled.
+- [x] Swap picker (O205): `SwapCandidates`, `IsValidSwapChoice`, `EquipItemDisplacing` on the component; the modal in its own TU pre-focused on the lowest item level; a refused choice moves nothing. Under the cap rule every row reads TAKE OFF; the sheet's SWAP row cannot arise.
+- [x] O195 strings, first slice: `Data/strings.json` (60 rows) behind `BreakerStrings::Get` for the HUD, the resource words, loading, stash and the boss bar; SETTLED and BANKED set no state word; the TILESET line is deleted.
+- [x] NPC rail by verb (Kess orange, Quartermaster system) and F held 600 ms steps away (O209); the [Leave] rows, the slide and the hold fill are recorded, not built.
+
 ### Round three — one build, one suite, 560 / 5 / 0
 - [x] Cycle 16c, the Core wheel under O211–O213: the travel ring is gone (117 Core nodes, 171 edges, no rank without a magnitude), five sectors as data on every constellation, dark constellations sealed on the board, class gates off the Core, `RespecCore` free until level N (30, O2 PLACEHOLDER) and Riftglass after.
 - [x] Cycle 16b, the Holdfast: Act I's boss with the add-gate grammar (`AddGate` beat, gated advance, incoming multiplier while adds live), spawned by name from the mission's Boss beat and `-BreakerBossOnStart=Holdfast`; `BossBand` holds for both bosses. The third boss is found-not-built: it has no story name (Open questions).
@@ -97,9 +102,3 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 
 ### Cycle 16 — the mission seams, 544 / 5 / 0
 - [x] A mission plays end to end in code: the character sets the mission's arrival flag when it arrives at a Travel beat's destination, the game mode sets the Boss beat's flag when its rift completes, and doctrine points are paid from the journal by reached Unlock beats instead of character levels (`SettleDoctrineEntitlement`; `DoctrineBenchmarkLevels` is gone; the counter keeps its name and a paid character keeps its points). `Missions.Progress` walks act one's twenty beats. Two tests that raised a character to 50 for the full doctrine pool are expected red until the other three acts exist.
-
-### Cycles 11, 12, 15, 16 — one build, one suite, 545 / 3 / 0
-- [x] The HUD to the design system, pass 1: the olive palette with System bone split from the movement-verb cyan, three borders, the text ramp, rails 4/2, gutter 40; vitals bottom-left with the max after the value (O199) and a health chip; near-death frame and brackets; abilities bottom-centre with READY / drain / hatch; weapon bottom-right with the ammo rail and the name only on swap; a four-tick crosshair with spread and ADS collapse; hit / kill / weak-point markers; zone name and mm:ss countdown; a quest one-liner; the minimap, the screen-top encounter row, the armour meter, ability digits, resource words and the weapon name at rest deleted. Seven pure pins in `UI/BreakerHUDMath.h`.
-- [x] Nameplates, pass 1: scale 1.0 at 12 m to 0.5 at 35 m, draw to 60 m, borders never scale, per-rank widths; chip hatch and a 2 px shield line; band dividers off; the Elite ellipse at the feet, Champion diamonds off both bar ends, gold edge and labels gone; the ten modifier marks as system-colour geometry above the bar; the coloured modifier disc and light retired (O203). Death beat to the sheet: weapon lower 0.3 s, drop 60 cm, hard cut at 0.8. `Combat.EnemyBarMath`; photographed on the bar matrix.
-- [x] Menus value pass on all eight screens: the 640 plate with the pause XP plate (O210), settings row values, class cards with Swift's open slot (O176), the create rail NAME / BODY / VOICE / FACE, the Forge diamond and RIFTGLASS (O206), the dialogue speaker/role split, inventory rows and drawn compare marks and rarity tally and tier column, the trees' DOCTRINE / CORE counters, two-level zoom and the node ladder (O204). `MenuLayout.SplitSpeakerLine`; the settings walk pins every drawn row to a live field.
-- [x] Missions are data: `Data/missions.json` (act one as 20 beats over the four quests, boss unnamed) through a loader with a validator that holds each act to one benchmark and the file to the budget; export byte-identical; `Data.Missions.Fresh`, `Missions.PointBudgets`.

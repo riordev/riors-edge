@@ -1082,6 +1082,13 @@ void SBreakerMenu::ApplyScreen(EBreakerMenuScreen NewScreen)
     // A confirmation modal belongs to the screen that raised it; leaving the
     // screen answers it with "no".
     if (CurrentScreen != EBreakerMenuScreen::Inventory) DiscardModalIndex = -1;
+    // Same rule for the swap picker (O205): leaving the loadout is KEEP
+    // CURRENT.
+    if (CurrentScreen != EBreakerMenuScreen::Inventory)
+    {
+        SwapPickerItemId.Invalidate();
+        SwapPickerFocusId.Invalidate();
+    }
     // Same rule for the travel refusal line: it describes one screen's last
     // click and means nothing anywhere else.
     if (CurrentScreen != EBreakerMenuScreen::Travel) TravelStatus = FText::GetEmpty();
@@ -1130,6 +1137,7 @@ void SBreakerMenu::ApplyScreen(EBreakerMenuScreen NewScreen)
         case EBreakerMenuScreen::DevSandbox: ContentHost->SetContent(BuildDevSandboxScreen()); break;
         case EBreakerMenuScreen::CharacterSheet: ContentHost->SetContent(BuildCharacterSheetScreen()); break;
         case EBreakerMenuScreen::Stash: ContentHost->SetContent(BuildStashScreen()); break;
+        case EBreakerMenuScreen::Death: ContentHost->SetContent(BuildDeathScreen()); break;
         default: ContentHost->SetContent(BuildMainScreen()); break;
     }
 
@@ -1437,6 +1445,19 @@ FReply SBreakerMenu::OnPreviewKeyDown(const FGeometry& Geometry, const FKeyEvent
         return FReply::Handled();
     }
 
+    // The dialogue plate's hold-to-leave (O209): the press only stamps the
+    // clock; OnKeyUp measures the hold and decides. Repeats are ignored so a
+    // held key does not keep moving the stamp forward. Handled either way,
+    // so F cannot fall through to a focused choice button.
+    if (CurrentScreen == EBreakerMenuScreen::Dialogue && KeyEvent.GetKey() == EKeys::F)
+    {
+        if (!KeyEvent.IsRepeat())
+        {
+            DialogueLeavePressedAt = FPlatformTime::Seconds();
+        }
+        return FReply::Handled();
+    }
+
     // The roster legend's DEL DISCHARGE: the same arm/confirm the button
     // runs, aimed at the selected row. First press arms and states the
     // consequence; the second press is the confirm.
@@ -1473,6 +1494,26 @@ FReply SBreakerMenu::OnPreviewKeyDown(const FGeometry& Geometry, const FKeyEvent
         }
     }
     return SCompoundWidget::OnKeyDown(Geometry, KeyEvent);
+}
+
+FReply SBreakerMenu::OnKeyUp(const FGeometry& Geometry, const FKeyEvent& KeyEvent)
+{
+    // The release half of hold-to-leave. A stamp is only ever set on the
+    // dialogue plate, and it is cleared on every F release so a press that
+    // outlived its screen cannot fire later. A complete hold leaves by the
+    // same exit the [Leave] rows and Escape take: ResumeFromMenu, having
+    // done nothing.
+    if (CurrentScreen == EBreakerMenuScreen::Dialogue && KeyEvent.GetKey() == EKeys::F && DialogueLeavePressedAt > 0.0)
+    {
+        const float HeldSeconds = static_cast<float>(FPlatformTime::Seconds() - DialogueLeavePressedAt);
+        DialogueLeavePressedAt = 0.0;
+        if (BreakerMenuLayout::DialogueLeaveHoldComplete(HeldSeconds))
+        {
+            if (Character.IsValid()) Character->ResumeFromMenu();
+        }
+        return FReply::Handled();
+    }
+    return SCompoundWidget::OnKeyUp(Geometry, KeyEvent);
 }
 
 FReply SBreakerMenu::OnPreviewMouseButtonDown(const FGeometry& Geometry, const FPointerEvent& PointerEvent)
@@ -4735,7 +4776,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                 // the screen must not hold a second opinion about a rule that
                 // decides which of the player's items gets ejected.
                 MenuWrappedText(FText::FromString(FString::Printf(
-                    TEXT("ABERRANT %d · ANOMALOUS %d. EQUIPPING ANOTHER SWAPS THE LOWEST ITEM LEVEL OF THAT RARITY. THE PIECE IT EJECTS OUTLINES RED ON HOVER."),
+                    TEXT("ABERRANT %d · ANOMALOUS %d. EQUIPPING ANOTHER OPENS THE SWAP PICKER, PRE-FOCUSED ON THE LOWEST ITEM LEVEL."),
                     UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Aberrant),
                     UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Anomalous))),
                     BreakerUI::TypeCaption, SoftText,
@@ -4811,6 +4852,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                 Preview.LimitDisplaced.ItemLevel)
             : FString();
         const EBreakerEquipSlot DoomedSlot = Preview.LimitDisplaced.Slot;
+        const FGuid DoomedId = Preview.LimitDisplaced.ItemId;
 
         const FOnClicked DiscardOne = FOnClicked::CreateLambda([this, ItemId]()
         {
@@ -4860,8 +4902,20 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                             SNew(SButton)
                             .ButtonColorAndOpacity(PanelRaised)
                             .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
-                            .OnClicked(FOnClicked::CreateLambda([this, ItemId]()
+                            .OnClicked(FOnClicked::CreateLambda([this, ItemId, bLimitTell, DoomedId]()
                             {
+                                // O205: at the cap the click opens the swap
+                                // picker instead of equipping, pre-focused on
+                                // the piece the component named (the lowest
+                                // item level). The component still owns the
+                                // list and the choice; the picker offers.
+                                if (bLimitTell)
+                                {
+                                    SwapPickerItemId = ItemId;
+                                    SwapPickerFocusId = DoomedId;
+                                    Rebuild(EBreakerMenuScreen::Inventory);
+                                    return FReply::Handled();
+                                }
                                 if (Character.IsValid() && Character->GetEquipment()) Character->GetEquipment()->EquipFromBackpack(ItemId);
                                 Rebuild(EBreakerMenuScreen::Inventory);
                                 return FReply::Handled();
@@ -5229,6 +5283,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
     const int32 AberrantLimit = UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Aberrant);
     const int32 AnomalousLimit = UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Anomalous);
 
+    // The sheet makes the counter at "3 / 3" the control that opens the swap
+    // picker. It stays STATIC here: the picker needs an incoming piece, and
+    // this screen has no focused-card state to supply one — the card click is
+    // the only entry (O205). A counter that opened an empty picker would be a
+    // control that does nothing.
     auto MakeLimitChip = [](const FString& Label, int32 Count, int32 Limit, const FLinearColor& Rail, bool bFullBorder) -> TSharedRef<SWidget>
     {
         // One 44px row: the label and the count side by side at mono 16, so
@@ -5331,6 +5390,15 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         // filter, every status line. Fixed height, so the rectangle cannot
         // move. See the long note in BuildZonedFrame.
         /*bFillHeight=*/true);
+
+    // The swap picker (O205) overlays the screen exactly as the discard modal
+    // does: above every zone, behind a scrim, sticky across rebuilds.
+    if (SwapPickerItemId.IsValid())
+    {
+        return SNew(SOverlay)
+            + SOverlay::Slot()[Screen]
+            + SOverlay::Slot()[BuildSwapPickerModal()];
+    }
 
     if (DiscardModalIndex < 0) return Screen;
 
@@ -10979,7 +11047,10 @@ TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()
             [
                 MenuWrappedText(FText::FromString(Node.SpeakerLine), BreakerUI::TypeH2, SoftText, SpeakerLineWrap)
             ],
-            BreakerUI::BgBase, Sys, FMargin(BreakerUI::Space24, BreakerUI::Space24))
+            // The identity rail is the NPC's verb (O209): orange for the
+            // NPC whose choices open the Forge, system for every other.
+            // Derived from the node list, never a field on the row.
+            BreakerUI::BgBase, BreakerMenuLayout::DialogueRail(NPC->DialogueNodes), FMargin(BreakerUI::Space24, BreakerUI::Space24))
     ];
 
     // Gated entries: a choice can require a flag or be hidden by one. Iterating
@@ -11064,9 +11135,19 @@ TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()
         ];
     }
 
+    // The footer names the two inputs the plate answers to: a number picks,
+    // F held steps away (O209, 08-forge-dialogue-stash). Escape still leaves
+    // through HandleEscape and is not advertised here.
+    //
+    // The [Leave] rows remain in the list above: ValidateDialogue requires an
+    // exit on every node and the census pins each node's choice count, so
+    // removing them is a Data/dialogue.json change with its own cycle.
+    // The sheet's 120/160 ms plate slide and the hold's progress fill are not
+    // built: this widget has no Tick and ui.md forbids per-frame rebuilds, so
+    // the hold has no visible progress until release.
     Body->AddSlot().AutoHeight().Padding(0.0f, 14.0f, 0.0f, 0.0f)
     [
-        MenuText(FText::FromString(TEXT("Choices marked [Leave] end the conversation  |  ESC to walk away")), BreakerUI::TypeCaption, SoftText)
+        MenuText(FText::FromString(FString::Printf(TEXT("1 – %d CHOOSE  |  F HOLD TO STEP AWAY"), ChoiceNumber)), BreakerUI::TypeCaption, SoftText)
     ];
     return BuildFrame(FText::FromString(TEXT("CONVERSATION")), NPC->GetDisplayName(), Body, DialoguePanelWidth);
 }

@@ -553,7 +553,7 @@ bool FBreakerTealSealedClusterTest::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// MENU LAYOUT — the two text rules BreakerMenuLayout carries for the dialogue
+// MENU LAYOUT — the text rules BreakerMenuLayout carries for the dialogue
 // plate and the pause plate, exercised with no widget.
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -616,6 +616,58 @@ bool FBreakerMenuLayoutSplitSpeakerLineTest::RunTest(const FString& Parameters)
         BreakerMenuLayout::LevelCaption(7, 0.4f, 20000), FString(TEXT("LV 7    12.0k")));
     TestEqual(TEXT("The cap prints MAX"),
         BreakerMenuLayout::LevelCaption(60, 1.0f, 0), FString(TEXT("LV 60    MAX")));
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// DIALOGUE RAIL (O209) — the plate's identity rail is derived from the row's
+// verb, and the hold-to-leave threshold is the sheet's 600 ms. Both against
+// the rows Data/dialogue.json actually ships, through the loader the game
+// reads them with, so a re-authored Start node that lost its OpenForge choice
+// would turn Kess's rail system-coloured here before anyone saw the plate.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerDialogueRailTest,
+    "RiorsEdge.UI.Dialogue.Rail",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerDialogueRailTest::RunTest(const FString& Parameters)
+{
+    const FBreakerDialogueData& Data = ABreakerNPC::GetDialogueData();
+    TestTrue(TEXT("Data/dialogue.json loaded at least one NPC"), Data.Npcs.Num() > 0);
+
+    const FBreakerDialogueRow* ForgeKeeper = nullptr;
+    const FBreakerDialogueRow* Quartermaster = nullptr;
+    for (const FBreakerDialogueRow& Row : Data.Npcs)
+    {
+        if (Row.Id == FName(TEXT("ForgeKeeper"))) ForgeKeeper = &Row;
+        if (Row.Id == FName(TEXT("Quartermaster"))) Quartermaster = &Row;
+    }
+    TestNotNull(TEXT("The ForgeKeeper row is in the shipped data"), ForgeKeeper);
+    TestNotNull(TEXT("The Quartermaster row is in the shipped data"), Quartermaster);
+    if (!ForgeKeeper || !Quartermaster)
+    {
+        return false;
+    }
+
+    // Kess opens the Forge, so her rail is weapon orange; the quartermaster
+    // opens his own screen, so his is the system accent. Neither is teal — a
+    // rail is chrome, and teal is a noun.
+    const FLinearColor KessRail = BreakerMenuLayout::DialogueRail(ForgeKeeper->Nodes);
+    const FLinearColor QuartermasterRail = BreakerMenuLayout::DialogueRail(Quartermaster->Nodes);
+    TestEqual(TEXT("Kess's rail is weapon orange"), KessRail, BreakerUI::Orange);
+    TestEqual(TEXT("The quartermaster's rail is the system accent"), QuartermasterRail, BreakerUI::System);
+    TestFalse(TEXT("Kess's rail is not reserved teal"), BreakerUI::IsReservedTeal(KessRail));
+    TestFalse(TEXT("The quartermaster's rail is not reserved teal"), BreakerUI::IsReservedTeal(QuartermasterRail));
+
+    // An NPC with no door at all reads as system by default: the rail is
+    // derived, never authored.
+    TestEqual(TEXT("An empty node list is system"), BreakerMenuLayout::DialogueRail(TArray<FBreakerDialogueNode>()), BreakerUI::System);
+
+    // The hold: the sheet's 600 ms, inclusive at the threshold.
+    TestEqual(TEXT("The leave hold is 600 ms"), BreakerMenuLayout::DialogueLeaveHoldSeconds, 0.600f);
+    TestFalse(TEXT("599 ms does not step away"), BreakerMenuLayout::DialogueLeaveHoldComplete(0.599f));
+    TestTrue(TEXT("600 ms steps away"), BreakerMenuLayout::DialogueLeaveHoldComplete(0.600f));
     return true;
 }
 

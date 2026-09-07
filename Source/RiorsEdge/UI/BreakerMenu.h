@@ -13,6 +13,10 @@
 #include "Save/BreakerCharacterRoster.h"
 // Complete type: the settings model is held the same way, for the same reason.
 #include "Settings/BreakerGameSettings.h"
+// Complete type: the death screen's model is a member by value.
+#include "Game/BreakerDeathBudgetMath.h"
+// Complete type: BreakerMenuLayout::DialogueRail walks a node list's choices.
+#include "Interaction/BreakerNPC.h"
 
 class ABreakerCharacter;
 class SBorder;
@@ -90,7 +94,14 @@ enum class EBreakerMenuScreen : uint8
     // open onto a screen whose two buttons both refuse. The screen builds in
     // its own TU (UI/BreakerStashScreen.cpp). Appended last, same rule as
     // Travel.
-    Stash
+    Stash,
+    // The death screen (O82): raised by the death beat's black in a rift
+    // instance, in place of the campaign respawn. Two lines and two verbs —
+    // RETRY THE RIFT, RETURN TO ANCHOR — both of which are level travels, so
+    // the screen has no back and HandleEscape never names it. Builds in its
+    // own TU (UI/BreakerDeathScreen.cpp). Appended last, same rule as
+    // Travel.
+    Death
 };
 
 // ---------------------------------------------------------------------------
@@ -427,6 +438,38 @@ namespace BreakerMenuLayout
         OutRole = Display.Mid(At + 3).TrimStartAndEnd();
     }
 
+    // THE PLATE'S IDENTITY RAIL (O209, 08-forge-dialogue-stash). Each NPC's
+    // plate carries a 4px left rail in the colour of what the conversation
+    // opens: the forgemaster's is weapon orange because her door is the
+    // Forge, the quartermaster's is the system accent. The colour is derived
+    // from the row's own verb — a choice anywhere in the node list whose
+    // Action is OpenForge — so no data field is authored for it and a third
+    // NPC with no door reads as system by default. Colour by verb (O179),
+    // never teal: a rail is chrome describing a panel.
+    inline FLinearColor DialogueRail(const TArray<FBreakerDialogueNode>& Nodes)
+    {
+        for (const FBreakerDialogueNode& Node : Nodes)
+        {
+            for (const FBreakerDialogueChoice& Choice : Node.Choices)
+            {
+                if (Choice.Action == EBreakerDialogueAction::OpenForge)
+                {
+                    return BreakerUI::Orange;
+                }
+            }
+        }
+        return BreakerUI::System;
+    }
+
+    // "NEVER A GOODBYE LINE": F held this long steps away from the plate. A
+    // UI token, not a game rule; the widget stamps the press and measures on
+    // release, so the number lives here where it can be asserted.
+    inline constexpr float DialogueLeaveHoldSeconds = 0.600f;   // 08-forge-dialogue-stash — O2 PLACEHOLDER
+    inline bool DialogueLeaveHoldComplete(float HeldSeconds)
+    {
+        return HeldSeconds >= DialogueLeaveHoldSeconds;
+    }
+
     // THE LEVEL CAPTION, in exactly the HUD's words (UI/BreakerPlaytestHUD.cpp
     // draws the same sentence under its XP rule): the level, four spaces, and
     // either the XP still owed to the next level through FormatDamage's
@@ -470,6 +513,11 @@ public:
     // path in Characters/ needed no change. RootScreen is Pause for the same
     // reason ShowDialogue's is. Defined in UI/BreakerStashScreen.cpp.
     void ShowStash();
+    // The death screen's front door, in ShowStash's shape: the caller has
+    // opened the menu (OpenMenu(false)) under the death beat's black and
+    // hands over the model the world-free rule built
+    // (Game/BreakerDeathBudgetMath.h). Defined in UI/BreakerDeathScreen.cpp.
+    void ShowDeath(const FBreakerDeathScreenModel& Model);
     void HandleEscape();
     // Enter/Space, routed from the input component rather than from Slate
     // focus - see ABreakerCharacter::ConfirmMenuKey for why.
@@ -580,6 +628,13 @@ private:
     // label. Returns the scrim plus the plate, meant to sit in an SOverlay
     // above the whole screen.
     TSharedRef<SWidget> BuildDiscardModal(int32 ArmIndex, EBreakerItemRarity MinimumKept, int32 Count);
+    // The equip-limit swap picker (O205), on the discard modal's pattern:
+    // scrim, centred plate, rail in the rarity colour. Rows are the
+    // component's SwapCandidates for SwapPickerItemId, the focused row is
+    // SwapPickerFocusId, and confirm goes through EquipFromBackpackDisplacing.
+    // Builds in its own TU (UI/BreakerSwapPickerScreen.cpp); the numbers and
+    // strings are BreakerSwapPickerLayout.
+    TSharedRef<SWidget> BuildSwapPickerModal();
     TSharedRef<SWidget> MakeButton(const FText& Label, const FOnClicked& OnClicked, bool bPrimary = false) const;
     FReply GoBack();
 
@@ -591,6 +646,13 @@ private:
     // reaches us rather than being swallowed by the game viewport.
     virtual bool SupportsKeyboardFocus() const override { return true; }
     virtual FReply OnPreviewKeyDown(const FGeometry& Geometry, const FKeyEvent& KeyEvent) override;
+    // The dialogue plate's hold-to-leave (O209): the press is stamped in
+    // OnPreviewKeyDown, the release measures the hold here. Not preview —
+    // nothing beneath the plate wants F's release.
+    virtual FReply OnKeyUp(const FGeometry& Geometry, const FKeyEvent& KeyEvent) override;
+    // FPlatformTime::Seconds() at the F press on the dialogue plate; 0.0 when
+    // no press is pending.
+    double DialogueLeavePressedAt = 0.0;
     // Mouse capture for the rebind flow. "Rebindable to whatever" includes the
     // two keys the game is most played with — Fire is LMB and Aim is RMB — and
     // a mouse button never arrives as a key event, so a keyboard-only listener
@@ -705,6 +767,14 @@ private:
     // sticky across rebuilds: a modal that vanished when the screen refreshed
     // would be worse than no modal.
     int32 DiscardModalIndex = -1;
+    // The swap picker's state (O205). ItemId is the backpack piece whose
+    // equip hit the cap — valid means the picker is up, sticky across
+    // rebuilds like DiscardModalIndex. FocusId is the row the component
+    // pre-focused (its LimitDisplaced) until the player moves it; confirm
+    // hands exactly this id to EquipFromBackpackDisplacing. Both clear on
+    // confirm, on KEEP CURRENT and on leaving the screen.
+    FGuid SwapPickerItemId;
+    FGuid SwapPickerFocusId;
     // Result line echoed under the cleanup row after a discard.
     FText InventoryStatus;
     // Hover disclosure for the equip-limit tell. A backpack card whose equip
@@ -822,6 +892,13 @@ private:
     // rebuild — so the same selection survives its own move across the two
     // grids, and an id that left both resolves to "no selection".
     FGuid StashSelectedItemId;
+    // ---- The death screen (UI/BreakerDeathScreen.cpp) ---------------------
+    // Draws DeathModel and nothing else: every string, the tally and the
+    // terminal variant are decided by BreakerDeathBudget::Model before the
+    // screen is shown. The two verbs call the game mode's RetryRift and
+    // ReturnToAnchor, both level travels.
+    TSharedRef<SWidget> BuildDeathScreen();
+    FBreakerDeathScreenModel DeathModel;
     // Abilities tab: result line echoed under the slot that was last clicked,
     // so a refusal (e.g. a Caster's "That ability has not been unlocked.")
     // stays readable after the rebuild it triggers.
