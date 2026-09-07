@@ -244,6 +244,7 @@ void UBreakerStatusComponent::HandleAfflictedOwnerDeath()
     if (!GetOwner() || !GetOwner()->HasAuthority()) return;
     EntropyBuildup = 0;
     EntropyBuildupRemaining = 0;
+    EntropyProtectedContributions.Reset();
     TSet<AActor*> Credited;
     // Copy before refunds can notify resource listeners and change state.
     const TArray<FBreakerActiveStatus> AtDeath = ActiveStatuses;
@@ -280,6 +281,9 @@ void UBreakerStatusComponent::AdvanceStatuses(float DeltaTime)
     if (!FMath::IsFinite(DeltaTime) || DeltaTime <= 0.0f) return;
     EntropyBuildupRemaining = FMath::Max(0.0f, EntropyBuildupRemaining - DeltaTime);
     if (EntropyBuildupRemaining <= 0) EntropyBuildup = 0;
+    for (auto& Contribution : EntropyProtectedContributions)
+        Contribution.Decay = BreakerBuildup::Advance(Contribution.Decay, DeltaTime);
+    EntropyProtectedContributions.RemoveAll([](const FEntropyProtectedContribution& Contribution) { return Contribution.Decay.Amount <= 0; });
     if (StatusImmunityRemaining > 0.0f) StatusImmunityRemaining = FMath::Max(0.0f, StatusImmunityRemaining - DeltaTime);
     if (!GetOwner() || !GetOwner()->HasAuthority() || ActiveStatuses.IsEmpty()) return;
     // Lazy re-bind: BeginPlay's bind misses a combat component added after it

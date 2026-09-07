@@ -154,6 +154,18 @@ rank two lingers briefly after ordinary buff expiry or aura exit. Cancellation,
 death and losing the node remove its conversion. Projectiles keep the element
 from firing. Gear and buff conversion use the higher fraction, capped at one.
 
+Sympathetic Resonance adds flat buildup to eligible Entropy hits from an
+actively attuned buff recipient, including self. The flat amount is independent
+of damage; proc and resistance weight it once. A landed, fully mitigated hit
+can earn that flat amount, but avoidance, immunity, zero raw damage and DoT
+cannot. The bonus never enters hit damage or Rot's damage snapshot.
+Protected buildup holds for four seconds after that attacker's last protected
+hit, then fades linearly over four seconds. Other attackers cannot refresh it.
+Ordinary buildup retains its four-second clear. Both contributions count toward
+one threshold and are consumed together. Flat buildup (2) and fade seconds (4)
+are O2 tuning. Weapons and Entropy ability casts snapshot eligibility; an
+Attunement-only linger grants no new Sympathetic payload.
+
 Severance — the degradation that turns a refugee into a hostile — is Entropy
 happening slowly to a person, which is why the element set and the enemy
 families are the same idea at two scales. The elements do not need explaining

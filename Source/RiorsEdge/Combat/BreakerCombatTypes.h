@@ -118,6 +118,10 @@ struct RIORSEDGE_API FBreakerDamageRequest
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerElement Element = EBreakerElement::None;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float ElementalFraction = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bCanApplyElementBuildup = true;
+    // Paid at fire/cast time by an actually maintained Sympathetic buff.
+    // These values change buildup only, never the hit or Rot damage snapshot.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float ElementBuildupFlat = 0.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float ElementBuildupFadeSeconds = 0.0f;
 
     void SetInstigator(AActor* InInstigator) { Instigator = InInstigator; }
 };

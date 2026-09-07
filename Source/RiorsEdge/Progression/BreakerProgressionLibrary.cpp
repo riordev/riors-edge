@@ -3612,8 +3612,8 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSupportConductorTree()
     // Conductor's non-negotiable rule (§4.2): every Conductor buff applies to
     // the Support FIRST and allies second — the branch's solo guarantee.
     // Attunement converts held weapons to the available Entropy element.
-    // Sympathetic needs its independent buildup and decay primitives before
-    // it can add the next layer of elemental support.
+    // Sympathetic adds independent buildup and protects the recipient's
+    // contributions with a gradual fade while the cast is actually buffed.
 
     // --- Tier 1 (CO1-CO3) ----------------------------------------------------
     // CO1. The self-first rule expressed as duration. WAITING ON: the
@@ -3687,13 +3687,10 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSupportConductorTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_StandingOvation.GetTag());
     Tree->Nodes.Add(Node);
 
-    // CO10. BLOCKED [ELEM-BUILDUP][ELEM-MATRIX], carried verbatim: feeds the
-    // buildup track and deliberately STOPS there — no reaction trigger, so it
-    // treads on neither Multispell nor Elements' reaction lane. Attunement is
-    // the load-bearing prerequisite: buildup of an element you cannot attune
-    // to is nothing.
+    // CO10 feeds the buildup track without adding damage to the applying hit
+    // or to its Rot snapshot. A maintained buff is required; R2 tails do not pay.
     Node = MakeNode(TEXT("Support.Conductor.SympatheticResonance"), TEXT("Sympathetic Resonance"),
-        TEXT("An attuned, buffed target applies elemental buildup on hit, independent of damage dealt, and buildup your buffed allies apply decays slower. Triggers no reaction. Inert until the buildup track exists."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 4, 1, 2);
+        TEXT("While your Conductor buff is maintained, the recipient's Entropy hits add buildup independent of damage dealt. Their buildup fades gradually after its grace period. Adds no hit or Rot damage and triggers no reaction."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Support.Conductor.Attunement"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_SympatheticResonance.GetTag());
     Tree->Nodes.Add(Node);

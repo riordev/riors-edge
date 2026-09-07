@@ -1,6 +1,7 @@
 #include "Abilities/BreakerAbility_Rot.h"
 
 #include "Abilities/BreakerAbilityTags.h"
+#include "Abilities/BreakerAbilityStateComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
@@ -139,6 +140,7 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     Spec.TickDamage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
     UBreakerDamageLibrary::FillSourcePools(SourceAttributes, EBreakerDamageDelivery::Ability, Spec.TickDamage);
     Spec.TickDamage.SetInstigator(Character);
+    if (const auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>()) State->SnapshotSympatheticEntropy(Spec.TickDamage);
 
     // Rot now builds Entropy on accepted zone hits; physical Poison remains a separate status.
 

@@ -4,6 +4,7 @@
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerEntropy.h"
 #include "Progression/BreakerProgressionComponent.h"
+#include "Progression/BreakerProgressionLibrary.h"
 
 namespace
 {
@@ -129,6 +130,33 @@ void UBreakerAbilityStateComponent::RefreshAttunementWindowEnds()
         Lease.bMaintained = false;
         Lease.EndTime = FMath::Min(Lease.EndTime, Clock) + (Rank >= 2 ? BreakerEntropy::AttunementTailSeconds() : 0);
     }
+}
+
+bool UBreakerAbilityStateComponent::HasActiveSympatheticAttunement() const
+{
+    if (!BreakerAttunementAlive(GetOwner())) return false;
+    for (const auto& Lease : AttunementLeases)
+    {
+        if (!Lease.bMaintained) continue; // Attunement's R2 tail is not a maintained buff.
+        const auto* Source = Lease.Source.Get();
+        if (!Source || !BreakerAttunementAlive(Source->GetOwner()) || BreakerAttunementRank(Source->GetOwner()) <= 0) continue;
+        const auto* Progression = Source->GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+        if (!Progression || !Progression->HasNodeTag(BreakerNodeTags::Node_CO_SympatheticResonance.GetTag())) continue;
+        for (const auto& Window : OwnedWindows)
+            if (const float* End = Window.Value.Find(Lease.OwnerKey); End && *End > Clock) return true;
+    }
+    return false;
+}
+
+void UBreakerAbilityStateComponent::SnapshotSympatheticEntropy(FBreakerDamageRequest& Request) const
+{
+    Request.ElementBuildupFlat = 0;
+    Request.ElementBuildupFadeSeconds = 0;
+    if (Request.Element != EBreakerElement::Entropy || Request.bIsDamageOverTime || !Request.bCanApplyElementBuildup
+        || !FMath::IsFinite(Request.ElementalFraction) || Request.ElementalFraction <= 0 || !HasActiveSympatheticAttunement()) return;
+    // Overlapping qualifying buffs authorize one payload, never one per holder.
+    Request.ElementBuildupFlat = BreakerEntropy::SympatheticFlatBuildup();
+    Request.ElementBuildupFadeSeconds = BreakerEntropy::SympatheticFadeSeconds();
 }
 
 void UBreakerAbilityStateComponent::HandleAttunementDeath()

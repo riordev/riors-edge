@@ -3,6 +3,7 @@
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerStatusComponent.h"
+#include "Combat/BreakerEntropy.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/PawnMovementComponent.h"
@@ -27,6 +28,7 @@ void BreakerStartEntropyCapture(ABreakerCharacter* Character)
         AActor* SourceEnemy = nullptr;
         AActor* FocusEnemy = nullptr;
         const int32 FocusIndex = FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureEntropyRot")) ? 1 : 0;
+        const bool bSympathetic = FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureSympathetic"));
         for (TActorIterator<ABreakerEnemy> It(World); It && Index < 2; ++It)
         {
             ABreakerEnemy* Enemy = *It;
@@ -44,6 +46,13 @@ void BreakerStartEntropyCapture(ABreakerCharacter* Character)
             Hit.bCanCritical = false; Hit.SetInstigator(Character);
             Hit.BaseDamage = Status->GetEntropyThreshold() * (Index == 0 ? .6f : 1.01f)
                 / FMath::Max(.01f, 1 - Status->GetEntropyResistancePercent() / 100);
+            // Visual fixture for the real fading meter; purchased-node delivery
+            // is exercised separately by SympatheticRuntime.
+            if (bSympathetic && Index == 0)
+            {
+                Hit.ElementBuildupFlat = BreakerEntropy::SympatheticFlatBuildup();
+                Hit.ElementBuildupFadeSeconds = BreakerEntropy::SympatheticFadeSeconds();
+            }
             Combat->ReceiveDamage(Hit);
             UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] Entropy target=%d buildup=%.2f threshold=%.2f rot=%d"),
                 Index, Status->GetEntropyBuildup(), Status->GetEntropyThreshold(),
@@ -63,6 +72,11 @@ void BreakerStartEntropyCapture(ABreakerCharacter* Character)
             FBreakerDamageRequest Hit;
             Hit.Element = EBreakerElement::Entropy; Hit.ElementalFraction = 1;
             Hit.BaseDamage = Status->GetEntropyThreshold() * .6f;
+            if (bSympathetic)
+            {
+                Hit.ElementBuildupFlat = BreakerEntropy::SympatheticFlatBuildup();
+                Hit.ElementBuildupFadeSeconds = BreakerEntropy::SympatheticFadeSeconds();
+            }
             Hit.bCanCritical = false; Hit.SetInstigator(SourceEnemy);
             Character->GetCombat()->ReceiveDamage(Hit);
         }

@@ -6,5 +6,7 @@
   "entropyBuildupTimeoutSeconds": 4.0,
   "vestigeMeleeEntropyFraction": 0.5,
   "vestigeEntropyResistancePercent": 25.0,
-  "attunementTailSeconds": 2.0
+  "attunementTailSeconds": 2.0,
+  "sympatheticFlatBuildup": 2.0,
+  "sympatheticFadeSeconds": 4.0
 }

@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Combat/BreakerCombatTypes.h"
+#include "Combat/BreakerBuildupMath.h"
 #include "BreakerStatusComponent.generated.h"
 
 class UBreakerCombatComponent;
@@ -63,7 +64,7 @@ public:
     // credits the applier through the attacker-side hit events.
     void ApplyStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator);
     void ApplyEntropyHit(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result);
-    float GetEntropyBuildup() const { return EntropyBuildup; }
+    float GetEntropyBuildup() const;
     float GetEntropyThreshold() const;
     float GetEntropyResistancePercent() const;
     UPROPERTY(EditAnywhere, Category="Status|Entropy") float EntropyResistancePercent = 0.0f;
@@ -198,5 +199,11 @@ private:
     // not shift the seeds of everything after it.
     float EntropyBuildup = 0.0f;
     float EntropyBuildupRemaining = 0.0f;
+    struct FEntropyProtectedContribution
+    {
+        TWeakObjectPtr<AActor> Applier;
+        BreakerBuildup::FDecayState Decay;
+    };
+    TArray<FEntropyProtectedContribution> EntropyProtectedContributions;
     uint32 ApplicationsAttempted = 0;
 };

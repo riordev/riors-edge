@@ -2172,6 +2172,7 @@ FBreakerDamageResult UBreakerWeaponComponent::SubmitWeaponDamage(const UBreakerW
     {
         Damage.ElementalFraction = FMath::Max(Damage.ElementalFraction, State->GetWeaponEntropyConversionFraction());
         if (Damage.ElementalFraction > 0) Damage.Element = EBreakerElement::Entropy;
+        State->SnapshotSympatheticEntropy(Damage);
     }
     Damage.WeakPointMultiplier = Definition->WeakPointMultiplier;
     Damage.ArmorPenetration = ArmorPenetrationOverride;
@@ -2634,6 +2635,7 @@ void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Def
     {
         Damage.ElementalFraction = FMath::Max(Damage.ElementalFraction, State->GetWeaponEntropyConversionFraction());
         if (Damage.ElementalFraction > 0) Damage.Element = EBreakerElement::Entropy;
+        State->SnapshotSympatheticEntropy(Damage);
     }
     Damage.WeakPointMultiplier = 1.0f;
     Damage.ArmorPenetration = Definition->ArmorPenetration;

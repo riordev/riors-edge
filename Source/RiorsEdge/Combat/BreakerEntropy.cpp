@@ -11,6 +11,7 @@ namespace
         float Threshold = 0, Damage = 0, Duration = 0, Tick = 0, Timeout = 0;
         float VestigeFraction = 0, VestigeResistance = 0;
         float AttunementTail = 0;
+        float SympatheticFlat = 0, SympatheticFade = 0;
     };
     const FBreakerEntropyTuning& BreakerEntropyTuning()
     {
@@ -34,6 +35,8 @@ namespace
             Read(TEXT("vestigeMeleeEntropyFraction"), Value.VestigeFraction, true);
             Read(TEXT("vestigeEntropyResistancePercent"), Value.VestigeResistance, true);
             Read(TEXT("attunementTailSeconds"), Value.AttunementTail, true);
+            Read(TEXT("sympatheticFlatBuildup"), Value.SympatheticFlat, true);
+            Read(TEXT("sympatheticFadeSeconds"), Value.SympatheticFade, true);
             if (Value.VestigeFraction > 1 || Value.VestigeResistance > 100)
                 Errors.Add(TEXT("Invalid Vestige elemental tuning"));
             if (Value.Threshold > 1 || Value.Damage > 1 || Value.Tick > Value.Duration)
@@ -48,6 +51,15 @@ namespace
 float BreakerEntropy::VestigeMeleeFraction() { return BreakerEntropyTuning().VestigeFraction; }
 float BreakerEntropy::VestigeResistancePercent() { return BreakerEntropyTuning().VestigeResistance; }
 float BreakerEntropy::AttunementTailSeconds() { return BreakerEntropyTuning().AttunementTail; }
+float BreakerEntropy::SympatheticFlatBuildup() { return BreakerEntropyTuning().SympatheticFlat; }
+float BreakerEntropy::SympatheticFadeSeconds() { return BreakerEntropyTuning().SympatheticFade; }
+
+float UBreakerStatusComponent::GetEntropyBuildup() const
+{
+    float Total = EntropyBuildup;
+    for (const auto& Contribution : EntropyProtectedContributions) Total += Contribution.Decay.Amount;
+    return Total;
+}
 
 float UBreakerStatusComponent::GetEntropyThreshold() const
 {
@@ -70,23 +82,40 @@ void UBreakerStatusComponent::ApplyEntropyHit(const FBreakerDamageRequest& Reque
         || Request.Element != EBreakerElement::Entropy || !Request.bCanApplyElementBuildup
         || Request.bIsDamageOverTime || Result.bDodged || Result.bParried || IsStatusImmune()
         || !FMath::IsFinite(Result.RawDamage) || !FMath::IsFinite(Request.ProcCoefficient)
-        || !FMath::IsFinite(Request.ElementalFraction) || Result.ShieldDamage + Result.HealthDamage <= 0) return;
+        || !FMath::IsFinite(Request.ElementalFraction) || Result.RawDamage <= 0) return;
     const auto Rot = FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"));
     if (HasStatus(Rot)) return; // A live damage budget is never refreshed or multiplied.
     const auto& Tuning = BreakerEntropyTuning();
     const float Threshold = GetEntropyThreshold();
     const float Snapshot = Result.RawDamage * FMath::Clamp(Request.ElementalFraction, 0.0f, 1.0f);
-    const float Buildup = Snapshot * FMath::Clamp(Request.ProcCoefficient, 0.0f, 1.0f)
+    const float Bonus = FMath::IsFinite(Request.ElementBuildupFlat) ? FMath::Max(0.0f, Request.ElementBuildupFlat) : 0;
+    // Damage-independent means a fully mitigated landed hit still contributes
+    // the purchased flat amount. Avoidance, immunity and invalid hits do not.
+    const float Ordinary = Result.ShieldDamage + Result.HealthDamage > 0 ? Snapshot : 0;
+    if (Snapshot <= 0) return;
+    const float Buildup = (Ordinary + Bonus) * FMath::Clamp(Request.ProcCoefficient, 0.0f, 1.0f)
         * (1.0f - GetEntropyResistancePercent() / 100.0f);
     if (Threshold <= 0 || !FMath::IsFinite(Buildup) || Buildup <= 0) return;
-    EntropyBuildup += Buildup;
-    EntropyBuildupRemaining = Tuning.Timeout;
+    if (FMath::IsFinite(Request.ElementBuildupFadeSeconds) && Request.ElementBuildupFadeSeconds > 0)
+    {
+        auto* Contribution = EntropyProtectedContributions.FindByPredicate([&](const FEntropyProtectedContribution& Value) { return Value.Applier == Request.Instigator; });
+        if (!Contribution) { Contribution = &EntropyProtectedContributions.AddDefaulted_GetRef(); Contribution->Applier = Request.Instigator; }
+        Contribution->Decay.Amount += Buildup;
+        Contribution->Decay.GraceRemaining = Tuning.Timeout;
+        Contribution->Decay.FadeRemaining = Request.ElementBuildupFadeSeconds;
+    }
+    else
+    {
+        EntropyBuildup += Buildup;
+        EntropyBuildupRemaining = Tuning.Timeout;
+    }
     if (!Sink->OnDeath.IsAlreadyBound(this, &UBreakerStatusComponent::HandleAfflictedOwnerDeath))
         const_cast<UBreakerCombatComponent*>(Sink)->OnDeath.AddDynamic(this, &UBreakerStatusComponent::HandleAfflictedOwnerDeath);
-    if (EntropyBuildup < Threshold) return;
+    if (GetEntropyBuildup() < Threshold) return;
     // Commit consumption before status/resource callbacks can re-enter combat.
     EntropyBuildup = 0;
     EntropyBuildupRemaining = 0;
+    EntropyProtectedContributions.Reset();
     FBreakerStatusApplicationSpec Spec;
     Spec.StatusTag = Rot;
     Spec.Duration = Tuning.Duration;

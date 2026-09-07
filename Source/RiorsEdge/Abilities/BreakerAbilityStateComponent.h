@@ -6,6 +6,7 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerWindowEnded, FName, WindowKey);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FBreakerMaintainedRecipientsChanged);
+struct FBreakerDamageRequest;
 
 // SI-9 (Ability-Implementation-Spec §2.5). Eleven abilities and a dozen tree
 // nodes need "a named state that lasts N seconds" or "a counter per target that
@@ -67,6 +68,8 @@ public:
     void ClearMaintainedBuffRecipients(FName OwnerKey, bool bCancelAttunement = false);
     int32 GetMaintainedBuffRecipientCount() const;
     float GetWeaponEntropyConversionFraction() const;
+    bool HasActiveSympatheticAttunement() const;
+    void SnapshotSympatheticEntropy(FBreakerDamageRequest& Request) const;
     UPROPERTY() FBreakerMaintainedRecipientsChanged OnMaintainedBuffRecipientsChanged;
     // One scalar carried by the window itself, so a state that rewrites a rule
     // can also carry the rule's magnitude without a second registry. Unmake is

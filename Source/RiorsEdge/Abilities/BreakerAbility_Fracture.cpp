@@ -1,6 +1,7 @@
 #include "Abilities/BreakerAbility_Fracture.h"
 
 #include "Abilities/BreakerAbilityTags.h"
+#include "Abilities/BreakerAbilityStateComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
@@ -142,6 +143,7 @@ void UBreakerAbility_Fracture::ActivateAbility(const FGameplayAbilitySpecHandle 
         }
     }
 
+    if (const auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>()) State->SnapshotSympatheticEntropy(Damage);
     Projectile->InitializeProjectile(Damage, Direction, ProjectileSpeed);
     EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 }
