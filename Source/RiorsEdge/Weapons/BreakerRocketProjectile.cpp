@@ -65,7 +65,7 @@ ABreakerRocketProjectile::ABreakerRocketProjectile()
 
     Collision = CreateDefaultSubobject<USphereComponent>(TEXT("Collision"));
     Collision->InitSphereRadius(12.0f);
-    Collision->SetCollisionProfileName(TEXT("BlockAllDynamic"));
+    Collision->SetCollisionProfileName(TEXT("Projectile"));
     SetRootComponent(Collision);
 
     // Casing. X is forward: the projectile movement component keeps the actor

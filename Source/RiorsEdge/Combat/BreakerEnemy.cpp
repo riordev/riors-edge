@@ -283,6 +283,9 @@ ABreakerEnemy::ABreakerEnemy()
     BodyHitBox->SetRelativeLocation(FVector(0.0f, 0.0f, 4.0f));
     BodyHitBox->SetCollisionResponseToAllChannels(ECR_Ignore);
     BodyHitBox->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Block);
+    // Traveling rounds use the authored Projectile object channel. Keep the
+    // movement capsule overlapping and the weapon weak-point query separate.
+    BodyHitBox->SetCollisionResponseToChannel(ECC_GameTraceChannel1, ECR_Block);
 
     WeakPoint = CreateDefaultSubobject<USphereComponent>(TEXT("WeakPoint"));
     WeakPoint->SetupAttachment(BodyCollision);

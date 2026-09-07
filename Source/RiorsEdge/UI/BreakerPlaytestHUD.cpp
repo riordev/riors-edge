@@ -368,7 +368,7 @@ void ABreakerPlaytestHUD::DrawHUD()
     if (Character->IsAwaitingRespawn())
     {
         DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudDeathRedeploying),
-            Center.X, Center.Y + S(96.0f), BreakerUI::System, 14.0f);
+            Center.X, Center.Y + S(96.0f), BreakerUI::System, 14.0f, 1.0f, ESpecFontRole::Display);
     }
 
     TickCapturePreview(Character);
@@ -456,7 +456,7 @@ void ABreakerPlaytestHUD::DrawHUD()
     {
         // Harm is instant: full-bleed edge lines, no inset, no fade in.
         const FLinearColor DamageColor = BreakerUI::Alpha(BreakerUI::Harm, 0.85f);
-        DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudCalloutDamage), Center.X, Center.Y - S(80.0f), DamageColor, 16.0f);
+        DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudCalloutDamage), Center.X, Center.Y - S(80.0f), DamageColor, 16.0f, 1.0f, ESpecFontRole::Display);
         const float T = S(4.0f);
         DrawRect(DamageColor, 0.0f, 0.0f, Canvas->ClipX, T);
         DrawRect(DamageColor, 0.0f, Canvas->ClipY - T, Canvas->ClipX, T);
@@ -468,7 +468,7 @@ void ABreakerPlaytestHUD::DrawHUD()
     DrawNearDeathFrame(Character);
     if ((Weapon && Weapon->IsReloading()) || (IsCapturePreview() && bPreviewReload))
     {
-        DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudCalloutReloading), Center.X, Center.Y + S(48.0f), BreakerUI::Orange, 14.0f);
+        DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudCalloutReloading), Center.X, Center.Y + S(48.0f), BreakerUI::Orange, 14.0f, 1.0f, ESpecFontRole::Display);
     }
 
     // The old fixed-position damage readout is gone: floating world-space
@@ -476,7 +476,7 @@ void ABreakerPlaytestHUD::DrawHUD()
     // callout survives, because it is a skill confirmation, not a value.
     if (bRecentShot && Shot && Shot->bHit && Shot->bWeakPoint)
     {
-        DrawSpecText(BreakerStrings::Get(EBreakerStringKey::HudCalloutWeakPoint), Center.X + S(24.0f), Center.Y + S(18.0f), BreakerUI::Gold, 11.0f);
+        DrawSpecText(BreakerStrings::Get(EBreakerStringKey::HudCalloutWeakPoint), Center.X + S(24.0f), Center.Y + S(18.0f), BreakerUI::Gold, 11.0f, 1.0f, ESpecFontRole::Display);
     }
 
     // Latch elite kills: the shot feedback window is far shorter than the
@@ -498,7 +498,7 @@ void ABreakerPlaytestHUD::DrawHUD()
     if (EliteKillAge >= 0.0 && EliteKillAge < 1.2f)
     {
         const float Fade = 1.0f - static_cast<float>(EliteKillAge) / 1.2f;
-        DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudCalloutEliteDown), Center.X, Center.Y - S(118.0f), BreakerUI::Gold, 20.0f, Fade);
+        DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudCalloutEliteDown), Center.X, Center.Y - S(118.0f), BreakerUI::Gold, 20.0f, Fade, ESpecFontRole::Display);
     }
 
     DrawPlaytestInstrumentation(Character, Center);
@@ -544,13 +544,13 @@ void ABreakerPlaytestHUD::DrawPlaytestInstrumentation(const ABreakerCharacter* C
     const float LegendTop = BreakerUI::HudCountdownTop + BreakerUI::HudCountdownPixels + BreakerUI::Space16;   // O2 PLACEHOLDER
     {
         const FString KeyLegend(TEXT("F1 RESET   F2 REPORT   F3 DIAGNOSTICS   ESC MENU"));
-        const FVector2D LegendSize = MeasureSpecText(KeyLegend, 11.0f);
+        const FVector2D LegendSize = MeasureSpecText(KeyLegend, 11.0f, ESpecFontRole::Mono);
         const float LegendX = S(BreakerUI::HudSafeMargin);
         const float LegendY = S(LegendTop);
         const float LegendH = LegendSize.Y + S(BreakerUI::Space8);
         DrawPlate(LegendX, LegendY, LegendSize.X + S(BreakerUI::Space24) + S(BreakerUI::HudRailIdentity), LegendH, BreakerUI::TextMuted);
         DrawSpecText(KeyLegend, LegendX + S(BreakerUI::HudRailIdentity) + S(BreakerUI::Space8), LegendY + S(BreakerUI::Space4),
-            BreakerUI::TextSecondary, 11.0f);
+            BreakerUI::TextSecondary, 11.0f, 1.0f, ESpecFontRole::Mono);
     }
     if (Playtest && Playtest->AreDiagnosticsVisible())
     {
@@ -567,11 +567,11 @@ void ABreakerPlaytestHUD::DrawPlaytestInstrumentation(const ABreakerCharacter* C
         // beside the resource track it used to ride.
         DrawSpecText(FString::Printf(TEXT("FPS %.0f   FOV %.0f   SENS %.1f   %.0f M/S"), FPS, Character->GetCurrentFOV(),
                 Character->GetLookSensitivity(), Character->GetHorizontalSpeed() / 100.0f),
-            TextX, DiagY + S(10.0f), BreakerUI::TextSecondary, 11.0f);
+            TextX, DiagY + S(10.0f), BreakerUI::TextSecondary, 11.0f, 1.0f, ESpecFontRole::Mono);
         DrawSpecText(FString::Printf(TEXT("SHOTS %d   ACC %.1f%%   WEAK %.1f%%"), Stats.ShotsFired, Stats.Accuracy(), Stats.WeakPointRate()),
-            TextX, DiagY + S(30.0f), BreakerUI::TextSecondary, 11.0f);
+            TextX, DiagY + S(30.0f), BreakerUI::TextSecondary, 11.0f, 1.0f, ESpecFontRole::Mono);
         DrawSpecText(FString::Printf(TEXT("DMG %.0f   RELOADS %d"), Stats.DamageDealt, Stats.Reloads),
-            TextX, DiagY + S(50.0f), BreakerUI::TextSecondary, 11.0f);
+            TextX, DiagY + S(50.0f), BreakerUI::TextSecondary, 11.0f, 1.0f, ESpecFontRole::Mono);
 
         // Diagnostics world labels stay short-range and small: past 25m they
         // were pure screen noise.
@@ -583,7 +583,7 @@ void ABreakerPlaytestHUD::DrawPlaytestInstrumentation(const ABreakerCharacter* C
             if (PlayerOwner && PlayerOwner->ProjectWorldLocationToScreen(It->GetActorLocation() + FVector(0.0f, 0.0f, 130.0f), Screen))
             {
                 DrawSpecTextCentered(FString::Printf(TEXT("%s  %.0fm"), *It->GetProfileLabel(), Distance / 100.0f),
-                    Screen.X, Screen.Y, BreakerUI::TextMuted, 11.0f, 0.8f);
+                    Screen.X, Screen.Y, BreakerUI::TextMuted, 11.0f, 0.8f, ESpecFontRole::Display);
             }
         }
         // OCCLUSION-SUPPRESSED, AND IT WAS NOT. This pass drew
@@ -615,7 +615,7 @@ void ABreakerPlaytestHUD::DrawPlaytestInstrumentation(const ABreakerCharacter* C
                 It->GetActorLocation() + FVector(0.0f, 0.0f, 130.0f), Screen)) continue;
 
             const FString Label = It->GetEnemyStateLabel();
-            const FVector2D Size = MeasureSpecText(Label, 11.0f);
+            const FVector2D Size = MeasureSpecText(Label, 11.0f, ESpecFontRole::Display);
             bool bOccluded = false;
             for (const FVector4& Taken : DiagnosticLabelBounds)
             {
@@ -628,17 +628,17 @@ void ABreakerPlaytestHUD::DrawPlaytestInstrumentation(const ABreakerCharacter* C
             }
             if (bOccluded) { ++SuppressedLabels; continue; }
             DiagnosticLabelBounds.Emplace(Screen.X, Screen.Y, Size.X, Size.Y);
-            DrawSpecTextCentered(Label, Screen.X, Screen.Y, BreakerUI::Orange, 11.0f, 0.7f);
+            DrawSpecTextCentered(Label, Screen.X, Screen.Y, BreakerUI::Orange, 11.0f, 0.7f, ESpecFontRole::Display);
         }
         if (SuppressedLabels > 0)
         {
             DrawSpecTextCentered(FString::Printf(TEXT("+%d STATE LABEL(S) HIDDEN — OVERLAP"), SuppressedLabels),
-                Center.X, Center.Y + S(110.0f), BreakerUI::TextMuted, 10.0f, 0.7f);
+                Center.X, Center.Y + S(110.0f), BreakerUI::TextMuted, 10.0f, 0.7f, ESpecFontRole::Mono);
         }
     }
     if (Playtest && Playtest->GetSecondsSinceReportCopy() < 2.0f)
     {
-        DrawSpecTextCentered(TEXT("PLAYTEST REPORT COPIED"), Center.X, Center.Y + S(72.0f), BreakerUI::System, 14.0f);
+        DrawSpecTextCentered(TEXT("PLAYTEST REPORT COPIED"), Center.X, Center.Y + S(72.0f), BreakerUI::System, 14.0f, 1.0f, ESpecFontRole::Display);
     }
 }
 
@@ -671,20 +671,20 @@ void ABreakerPlaytestHUD::DrawVitals(const ABreakerCharacter* Character)
     // Both share one baseline: the max is small and sits on the value's
     // bottom edge, not its own top.
     const float ValueTop = S(BreakerUI::HudVitalsTop);
-    const FVector2D ValueSize = MeasureSpecText(Vitals.HealthText, BreakerUI::HudVitalsValuePixels);
-    const FVector2D MaxSize = MeasureSpecText(Vitals.MaxText, BreakerUI::HudVitalsMaxPixels);
+    const FVector2D ValueSize = MeasureSpecText(Vitals.HealthText, BreakerUI::HudVitalsValuePixels, ESpecFontRole::Mono);
+    const FVector2D MaxSize = MeasureSpecText(Vitals.MaxText, BreakerUI::HudVitalsMaxPixels, ESpecFontRole::Mono);
     DrawSpecText(Vitals.HealthText, Left, ValueTop,
         BreakerHUDMath::VitalsValueIsHarm(HealthFraction) ? BreakerUI::Harm : BreakerUI::System,
-        BreakerUI::HudVitalsValuePixels);
+        BreakerUI::HudVitalsValuePixels, 1.0f, ESpecFontRole::Mono);
     DrawSpecText(Vitals.MaxText, Left + ValueSize.X + S(BreakerUI::HudVitalsMaxGap),
-        ValueTop + ValueSize.Y - MaxSize.Y, BreakerUI::TextSecondary, BreakerUI::HudVitalsMaxPixels);
+        ValueTop + ValueSize.Y - MaxSize.Y, BreakerUI::TextSecondary, BreakerUI::HudVitalsMaxPixels, 1.0f, ESpecFontRole::Mono);
     // The shield number, small, at the row's right edge, only when a pool
     // exists (O199). Right-aligned so it cannot collide with a long max.
     if (Vitals.bDrawShield)
     {
-        const FVector2D ShieldSize = MeasureSpecText(Vitals.ShieldText, BreakerUI::HudVitalsMaxPixels);
+        const FVector2D ShieldSize = MeasureSpecText(Vitals.ShieldText, BreakerUI::HudVitalsMaxPixels, ESpecFontRole::Mono);
         DrawSpecTextRight(Vitals.ShieldText, Right, ValueTop + ValueSize.Y - ShieldSize.Y,
-            BreakerUI::TextSecondary, BreakerUI::HudVitalsMaxPixels);
+            BreakerUI::TextSecondary, BreakerUI::HudVitalsMaxPixels, 1.0f, ESpecFontRole::Mono);
     }
 
     // --- Shield layer -----------------------------------------------------------
@@ -783,15 +783,15 @@ void ABreakerPlaytestHUD::DrawAbilityCluster(const ABreakerCharacter* Character)
         static const TMap<FName, FKey> Defaults = UBreakerGameSettingsLibrary::FirstKeyPerAction(UBreakerGameSettingsLibrary::ProjectDefaultKeybinds());
         const FKey Key = Profile ? UBreakerGameSettingsLibrary::ResolveActionKey(TEXT("Parry"), Profile->KeybindOverrides, Defaults) : EKeys::V;
         const FString Hint = Key.GetDisplayName().ToString();
-        const float KeyFont = 11.0f * FMath::Min(1.0f, (Tile - S(4)) / FMath::Max(1.0f, MeasureSpecText(Hint, 11).X));
-        DrawSpecTextCentered(Hint, Center.X, Y - S(16), BreakerUI::TextSecondary, KeyFont);
+        const float KeyFont = 11.0f * FMath::Min(1.0f, (Tile - S(4)) / FMath::Max(1.0f, MeasureSpecText(Hint, 11, ESpecFontRole::Mono).X));
+        DrawSpecTextCentered(Hint, Center.X, Y - S(16), BreakerUI::TextSecondary, KeyFont, 1.0f, ESpecFontRole::Mono);
         if (Combat->IsParryCounterActive())
-            DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudParrySuccess), Center.X, Y - S(31), BreakerUI::TextPrimary, 10);
+            DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudParrySuccess), Center.X, Y - S(31), BreakerUI::TextPrimary, 10, 1.0f, ESpecFontRole::Display);
         const FString State = Remaining > 0 && !Combat->IsParryActive()
             ? BreakerHUDMath::AbilityCooldownText(Remaining)
             : BreakerStrings::Get(Combat->IsParryActive() ? EBreakerStringKey::HudParryActive
                 : EBreakerStringKey::HudParryLabel);
-        DrawSpecTextCentered(State, Center.X, Y + Tile - S(15), BreakerUI::TextPrimary, 10.0f);
+        DrawSpecTextCentered(State, Center.X, Y + Tile - S(15), BreakerUI::TextPrimary, 10.0f, 1.0f, ESpecFontRole::Mono);
     }
 
     const UBreakerStatusCycleComponent* Cycle = Character->FindComponentByClass<UBreakerStatusCycleComponent>();
@@ -811,13 +811,13 @@ void ABreakerPlaytestHUD::DrawAbilityCluster(const ABreakerCharacter* Character)
         const FString Label = (Cycle->CanPreviewAhead() || bCaptureAhead)
             ? BreakerStrings::Format(EBreakerStringKey::CyclePreview, *Current, *Cycle->PeekNextEntry(1).DisplayName.ToString())
             : BreakerStrings::Format(EBreakerStringKey::CycleCurrent, *Current);
-        DrawSpecTextCentered(Label, S(BreakerUI::HudUltimateX + BreakerUI::HudUltimateTile * 0.5f), Bottom - Ultimate - S(22.0f), BreakerUI::TextPrimary, 11.0f);
+        DrawSpecTextCentered(Label, S(BreakerUI::HudUltimateX + BreakerUI::HudUltimateTile * 0.5f), Bottom - Ultimate - S(22.0f), BreakerUI::TextPrimary, 11.0f, 1.0f, ESpecFontRole::Display);
     }
     if (Abilities && Abilities->GetGrantedCount() == 0)
     {
         DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudAbilitiesNoKit),
             S(BreakerUI::HudUltimateX + BreakerUI::HudUltimateTile * 0.5f), Bottom + S(BreakerUI::Space4),
-            BreakerUI::Orange, 11.0f);
+            BreakerUI::Orange, 11.0f, 1.0f, ESpecFontRole::Display);
     }
 }
 
@@ -840,14 +840,14 @@ void ABreakerPlaytestHUD::DrawWeaponReadout(const ABreakerCharacter* Character)
     const int32 Capacity = Weapon->GetEffectiveMagazineSize();
     const FString MagazineText = FString::FromInt(Magazine);
     const FString ReserveText = BreakerUI::FormatTicker(static_cast<float>(Weapon->GetReserveAmmo()));
-    const FVector2D MagazineSize = MeasureSpecText(MagazineText, BreakerUI::HudMagazinePixels);
-    const FVector2D ReserveSize = MeasureSpecText(ReserveText, BreakerUI::HudReservePixels);
+    const FVector2D MagazineSize = MeasureSpecText(MagazineText, BreakerUI::HudMagazinePixels, ESpecFontRole::Mono);
+    const FVector2D ReserveSize = MeasureSpecText(ReserveText, BreakerUI::HudReservePixels, ESpecFontRole::Mono);
     DrawSpecTextRight(MagazineText, Right, MagazineTop,
         BreakerHUDMath::MagazineIsLow(Magazine, Capacity) ? BreakerUI::Orange : BreakerUI::System,
-        BreakerUI::HudMagazinePixels);
+        BreakerUI::HudMagazinePixels, 1.0f, ESpecFontRole::Mono);
     // Reserve to the LEFT of the magazine, baseline-aligned.
     DrawSpecTextRight(ReserveText, Right - MagazineSize.X - S(BreakerUI::HudReserveGap),
-        MagazineTop + MagazineSize.Y - ReserveSize.Y, BreakerUI::TextSecondary, BreakerUI::HudReservePixels);
+        MagazineTop + MagazineSize.Y - ReserveSize.Y, BreakerUI::TextSecondary, BreakerUI::HudReservePixels, 1.0f, ESpecFontRole::Mono);
 
     // The ammo rail. At rest it is the magazine's fill in bone. During a reload
     // it is the reload's progress 0→100 left to right in weapon orange, read
@@ -878,7 +878,7 @@ void ABreakerPlaytestHUD::DrawWeaponReadout(const ABreakerCharacter* Character)
             DrawRect(Index < Stacks ? BreakerUI::Orange : BreakerUI::BorderRest,
                 RailX + Index * (CellWidth + Gap), RailY + S(12.0f), CellWidth, S(3.0f));
         DrawSpecTextRight(BreakerStrings::Format(EBreakerStringKey::HudDamageRamp, Stacks, Maximum),
-            Right, RailY + S(20.0f), BreakerUI::TextSecondary, 11.0f);
+            Right, RailY + S(20.0f), BreakerUI::TextSecondary, 11.0f, 1.0f, ESpecFontRole::Mono);
     }
 
     // The name on swap. Latched on the FALLING edge of IsSwapping, when the
@@ -894,10 +894,10 @@ void ABreakerPlaytestHUD::DrawWeaponReadout(const ABreakerCharacter* Character)
     const BreakerHUDMath::FSwapSlide Slide = BreakerHUDMath::WeaponNameSwap(static_cast<float>(Now - SwapStartTime));
     if (Slide.bVisible && !SwapName.IsEmpty())
     {
-        const FVector2D NameSize = MeasureSpecText(SwapName, BreakerUI::HudWeaponNamePixels);
+        const FVector2D NameSize = MeasureSpecText(SwapName, BreakerUI::HudWeaponNamePixels, ESpecFontRole::Display);
         DrawSpecTextRight(SwapName, Right,
             MagazineTop - NameSize.Y - S(BreakerUI::Space4) + S(Slide.OffsetPixels),
-            BreakerUI::TextPrimary, BreakerUI::HudWeaponNamePixels, Slide.Alpha);
+            BreakerUI::TextPrimary, BreakerUI::HudWeaponNamePixels, Slide.Alpha, ESpecFontRole::Display);
     }
 }
 
@@ -1054,7 +1054,7 @@ void ABreakerPlaytestHUD::DrawZoneLine(const ABreakerCharacter* Character)
     }
     if (!ZoneName.IsEmpty())
     {
-        DrawSpecText(ZoneName, S(BreakerUI::HudZoneLeft), S(BreakerUI::HudZoneTop), BreakerUI::System, BreakerUI::HudZonePixels);
+        DrawSpecText(ZoneName, S(BreakerUI::HudZoneLeft), S(BreakerUI::HudZoneTop), BreakerUI::System, BreakerUI::HudZonePixels, 1.0f, ESpecFontRole::Display);
     }
 
     const ABreakerGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<ABreakerGameMode>() : nullptr;
@@ -1101,7 +1101,7 @@ void ABreakerPlaytestHUD::DrawZoneLine(const ABreakerCharacter* Character)
     if (!Countdown.IsEmpty())
     {
         DrawSpecText(Countdown, CountdownX, S(BreakerUI::HudCountdownTop),
-            BreakerUI::TextSecondary, BreakerUI::HudCountdownPixels);
+            BreakerUI::TextSecondary, BreakerUI::HudCountdownPixels, 1.0f, ESpecFontRole::Mono);
     }
 }
 
@@ -1364,7 +1364,7 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
         // when trivial — a sliver of overkill is trivia, not a read.
         if (Number->bKilled && Number->Overkill >= Number->Value * BreakerHUD::DamageOverkillCaptionFraction)
         {
-            const float NumberHeight = MeasureSpecText(TEXT("0"), SizePixels).Y;
+            const float NumberHeight = MeasureSpecText(TEXT("0"), SizePixels, ESpecFontRole::Mono).Y;
             DrawOutlinedNumber(BreakerStrings::Format(EBreakerStringKey::HudDamageOverkill, *BreakerUI::FormatDamage(Number->Overkill)),
                 Screen.X, NumberY + NumberHeight, BreakerUI::Harm, 13.0f, DrawAlpha);
         }
@@ -1376,7 +1376,7 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
             // number's own glyph height, not a fixed nudge, so it holds at
             // every one of the three damage sizes and at every UI scale.
             const FString Caption = BreakerStrings::Format(EBreakerStringKey::HudDamageAbsorbed, Number->MitigatedFraction * 100.0f);
-            const float NumberHeight = MeasureSpecText(TEXT("0"), SizePixels).Y;
+            const float NumberHeight = MeasureSpecText(TEXT("0"), SizePixels, ESpecFontRole::Mono).Y;
             DrawOutlinedNumber(Caption, Screen.X, NumberY + NumberHeight,
                 BreakerUI::Orange, 13.0f, Fade);
         }
@@ -1415,7 +1415,7 @@ void ABreakerPlaytestHUD::DrawInteractPrompt(const ABreakerCharacter* Character,
         {
             DrawSpecTextCentered(
                 BreakerStrings::Format(EBreakerStringKey::HudBackpackFull, Carried, UBreakerEquipmentComponent::BackpackCapacity),
-                Center.X, Center.Y + S(90.0f), BreakerUI::Orange, 14.0f);
+                Center.X, Center.Y + S(90.0f), BreakerUI::Orange, 14.0f, 1.0f, ESpecFontRole::Mono);
         }
         return;
     }
@@ -1449,7 +1449,7 @@ void ABreakerPlaytestHUD::DrawInteractPlate(float CenterX, float BottomY, const 
     const FString& Name, bool bKeyTile)
 {
     if (!Canvas) return;
-    const FVector2D NameSize = MeasureSpecText(Name, BreakerHUD::InteractPlateNamePixels);
+    const FVector2D NameSize = MeasureSpecText(Name, BreakerHUD::InteractPlateNamePixels, ESpecFontRole::Display);
     const BreakerHUDMath::FInteractPlateLayout Layout = BreakerHUDMath::InteractPlateLayout(
         NameSize.X / FMath::Max(UIScale, UE_KINDA_SMALL_NUMBER), TallyCells, bKeyTile);
     const float W = S(Layout.Width);
@@ -1466,9 +1466,9 @@ void ABreakerPlaytestHUD::DrawInteractPlate(float CenterX, float BottomY, const 
         const float KeyX = X + S(Layout.KeyX);
         const float KeyY = Y + (H - KeySize) * 0.5f;
         DrawRect(BreakerUI::System, KeyX, KeyY, KeySize, KeySize);
-        const FVector2D KeyGlyph = MeasureSpecText(TEXT("F"), BreakerUI::HudAbilityKeyPixels);
+        const FVector2D KeyGlyph = MeasureSpecText(TEXT("F"), BreakerUI::HudAbilityKeyPixels, ESpecFontRole::Mono);
         DrawSpecTextCentered(TEXT("F"), KeyX + KeySize * 0.5f, KeyY + (KeySize - KeyGlyph.Y) * 0.5f,
-            BreakerUI::BgVoid, BreakerUI::HudAbilityKeyPixels);
+            BreakerUI::BgVoid, BreakerUI::HudAbilityKeyPixels, 1.0f, ESpecFontRole::Mono);
     }
 
     // The tally, in the rail's colour: the count is the second read of the
@@ -1482,7 +1482,7 @@ void ABreakerPlaytestHUD::DrawInteractPlate(float CenterX, float BottomY, const 
     }
 
     DrawSpecText(Name, X + S(Layout.NameX), Y + (H - NameSize.Y) * 0.5f, BreakerUI::TextPrimary,
-        BreakerHUD::InteractPlateNamePixels);
+        BreakerHUD::InteractPlateNamePixels, 1.0f, ESpecFontRole::Display);
 }
 
 void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Character)
@@ -1521,14 +1521,14 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
         if (Projected.Z <= 0.0f) continue;
         const float NameScale = DistanceScaleFor(Distance);
         DrawSpecTextCentered(NPC->GetDisplayName().ToString().ToUpper(),
-            Projected.X, Projected.Y, PersonWarm, 12.0f * NameScale);
+            Projected.X, Projected.Y, PersonWarm, 12.0f * NameScale, 1.0f, ESpecFontRole::Display);
         // THE VERB UNDER THE NAME (ruled: close the 30:1 gap between "I can
         // read its name at 9,000" and "I'm told what to press at 300").
         // Always drawn: muted while out of reach — a standing answer to
         // "what does this thing answer to" — and bone once F would land.
         const bool bInReach = Distance <= NPC->GetInteractionRange();
         DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudPromptTalk), Projected.X, Projected.Y + S(14.0f) * NameScale,
-            bInReach ? BreakerUI::System : BreakerUI::TextMuted, 10.0f * NameScale);
+            bInReach ? BreakerUI::System : BreakerUI::TextMuted, 10.0f * NameScale, 1.0f, ESpecFontRole::Mono);
     }
 
     for (TActorIterator<ABreakerTravelPoint> It(World); It; ++It)
@@ -1566,7 +1566,7 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
         float LabelY = Projected.Y;
         if (!NounWord.IsEmpty() && NounWord != PromptWord)
         {
-            DrawSpecTextCentered(NounWord, Projected.X, LabelY, BreakerUI::TealAnomalous, 13.0f * GateScale);
+            DrawSpecTextCentered(NounWord, Projected.X, LabelY, BreakerUI::TealAnomalous, 13.0f * GateScale, 1.0f, ESpecFontRole::Display);
             LabelY += S(15.0f) * GateScale;
         }
         // The difficulty gauge, empty on a general gate. GROUND owns the number
@@ -1585,7 +1585,7 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
         const bool bInReach = Distance <= TravelPoint->GetInteractionRange();
         DrawSpecTextCentered(BreakerStrings::Format(EBreakerStringKey::HudPromptKeyed, *PromptWord),
             Projected.X, LabelY,
-            bInReach ? BreakerUI::System : BreakerUI::TextMuted, 10.0f * GateScale);
+            bInReach ? BreakerUI::System : BreakerUI::TextMuted, 10.0f * GateScale, 1.0f, ESpecFontRole::Mono);
     }
 }
 
@@ -1762,8 +1762,8 @@ void ABreakerPlaytestHUD::DrawBanners(const FVector2D& Center)
         // centred vertically inside the fixed plate, never sizing it.
         const FString* Label = Banner.Kind == EBreakerBannerKind::RiftComplete ? &BreakerStrings::Get(EBreakerStringKey::HudBannerRunComplete)
             : Banner.Kind == EBreakerBannerKind::LevelUp ? &BreakerStrings::Get(EBreakerStringKey::HudBannerLevelUp) : nullptr;
-        const FVector2D LabelSize = Label ? MeasureSpecText(*Label, BreakerHUD::BannerLabelPixels) : FVector2D::ZeroVector;
-        const FVector2D TitleSize = MeasureSpecText(Banner.Title, BreakerHUD::BannerTitlePixels);
+        const FVector2D LabelSize = Label ? MeasureSpecText(*Label, BreakerHUD::BannerLabelPixels, ESpecFontRole::Display) : FVector2D::ZeroVector;
+        const FVector2D TitleSize = MeasureSpecText(Banner.Title, BreakerHUD::BannerTitlePixels, ESpecFontRole::Display);
         const FVector2D LineSize = Banner.Line.IsEmpty() ? FVector2D::ZeroVector
             : MeasureSpecText(Banner.Line, BreakerHUD::BannerLinePixels);
         const float ContentH = (Label ? LabelSize.Y + S(BreakerUI::Space4) : 0.0f) + TitleSize.Y
@@ -1771,10 +1771,10 @@ void ABreakerPlaytestHUD::DrawBanners(const FVector2D& Center)
         float LineY = PlateY + (PlateH - ContentH) * 0.5f;
         if (Label)
         {
-            DrawSpecTextCentered(*Label, CenterX, LineY, Rail, BreakerHUD::BannerLabelPixels);
+            DrawSpecTextCentered(*Label, CenterX, LineY, Rail, BreakerHUD::BannerLabelPixels, 1.0f, ESpecFontRole::Display);
             LineY += LabelSize.Y + S(BreakerUI::Space4);
         }
-        DrawSpecTextCentered(Banner.Title, CenterX, LineY, BreakerUI::System, BreakerHUD::BannerTitlePixels);
+        DrawSpecTextCentered(Banner.Title, CenterX, LineY, BreakerUI::System, BreakerHUD::BannerTitlePixels, 1.0f, ESpecFontRole::Display);
         if (!Banner.Line.IsEmpty())
         {
             LineY += TitleSize.Y + S(BreakerUI::Space8);
@@ -1917,8 +1917,8 @@ void ABreakerPlaytestHUD::DrawAbilityWindows(const ABreakerCharacter* Character,
         const FLinearColor Color = BreakerHUD::WindowColor(ShortKey);
 
         const float RowY = RowBottom - RowH;
-        DrawSpecText(ShortKey.ToUpper(), X, RowY, Color, 11.0f);
-        DrawSpecTextRight(FString::Printf(TEXT("%.1fs"), Remaining), X + Width, RowY, Color, 11.0f);
+        DrawSpecText(ShortKey.ToUpper(), X, RowY, Color, 11.0f, 1.0f, ESpecFontRole::Display);
+        DrawSpecTextRight(FString::Printf(TEXT("%.1fs"), Remaining), X + Width, RowY, Color, 11.0f, 1.0f, ESpecFontRole::Mono);
 
         // The bar has no authored maximum to divide by — GetWindowRemaining is
         // the only reading available — so it is drawn as a decaying 10s scale,
@@ -2003,7 +2003,7 @@ void ABreakerPlaytestHUD::DrawUltimateTreatment(const ABreakerCharacter* Charact
         const float PlateX = W * 0.5f - PlateW * 0.5f;
         const float PlateY = S(BreakerUI::UltimateTitleTop);
         DrawPlate(PlateX, PlateY, PlateW, PlateH, BreakerUI::Violet, EBreakerRail::Top);
-        DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudCalloutOverdriveActive), W * 0.5f, PlateY + S(14.0f), BreakerUI::Violet, 20.0f);
+        DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudCalloutOverdriveActive), W * 0.5f, PlateY + S(14.0f), BreakerUI::Violet, 20.0f, 1.0f, ESpecFontRole::Display);
     }
 }
 
@@ -2067,7 +2067,7 @@ void ABreakerPlaytestHUD::DrawMarkedTarget(const ABreakerCharacter* Character)
     DrawLine(CX, CY + Radius, CX - Radius, CY, Color, S(1.75f));
     DrawLine(CX - Radius, CY, CX, CY - Radius, Color, S(1.75f));
 
-    DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudCalloutMarked), CX, CY - Radius - S(16.0f), Color, 11.0f);
+    DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudCalloutMarked), CX, CY - Radius - S(16.0f), Color, 11.0f, 1.0f, ESpecFontRole::Display);
     }
 }
 
@@ -2731,7 +2731,7 @@ void ABreakerPlaytestHUD::DrawDefenseFeedback(const FVector2D& Center)
     // Dodge is a movement verb (O179); block is mitigation, which is the
     // armour/weapon family (orange).
     DrawSpecTextCentered(BreakerStrings::Get(bShowDodge ? EBreakerStringKey::HudCalloutDodged : EBreakerStringKey::HudCalloutBlocked),
-        Center.X, Center.Y - S(108.0f), bShowDodge ? BreakerUI::VerbMove : BreakerUI::Orange, 20.0f, Fade);
+        Center.X, Center.Y - S(108.0f), bShowDodge ? BreakerUI::VerbMove : BreakerUI::Orange, 20.0f, Fade, ESpecFontRole::Display);
 }
 
 // --------------------------------------------------------------------------
@@ -2874,7 +2874,7 @@ float ABreakerPlaytestHUD::DrawStatusReadout(const ABreakerCharacter* Character,
     const float Dot = S(BreakerUI::HudV2StatusDot);
     const float Pixels = BreakerUI::HudV2StatusPixels;
     const float RowGap = S(BreakerUI::HudV2StatusRowGap);
-    const float RowH = FMath::Max(Dot, MeasureSpecText(TEXT("0"), Pixels).Y);
+    const float RowH = FMath::Max(Dot, MeasureSpecText(TEXT("0"), Pixels, ESpecFontRole::Mono).Y);
 
     // Newest at the BOTTOM, so the row nearest the momentum track is the one
     // that just landed and the column above it is history.
@@ -2885,7 +2885,7 @@ float ABreakerPlaytestHUD::DrawStatusReadout(const ABreakerCharacter* Character,
         const float RowY = RowBottom - RowH - RailH - S(3.0f);
         const FString Text = FString::Printf(TEXT("%s %d%%"), *BreakerStrings::Get(EBreakerStringKey::HudEntropy),
             FMath::Clamp(FMath::RoundToInt(EntropyFraction * 100), 1, 100));
-        DrawSpecText(Text, X, RowY, BreakerUI::Gold, Pixels);
+        DrawSpecText(Text, X, RowY, BreakerUI::Gold, Pixels, 1.0f, ESpecFontRole::Mono);
         DrawRect(BreakerUI::BorderRest, X, RowBottom - RailH, Width, RailH);
         DrawRect(BreakerUI::Gold, X, RowBottom - RailH, Width * EntropyFraction, RailH);
         RowBottom = RowY - RowGap;
@@ -2908,9 +2908,9 @@ float ABreakerPlaytestHUD::DrawStatusReadout(const ABreakerCharacter* Character,
         const float RowY = RowBottom - RowH - ExtraH;
         const FLinearColor StatusColor = bRot ? BreakerUI::Orange : BreakerUI::Harm;
         DrawRect(StatusColor, X, RowY + (RowH - Dot) * 0.5f, Dot, Dot);
-        const FVector2D TextSize = MeasureSpecText(Text, Pixels);
+        const FVector2D TextSize = MeasureSpecText(Text, Pixels, ESpecFontRole::Mono);
         DrawSpecText(Text, X + Dot + S(BreakerUI::Space8), RowY + (RowH - TextSize.Y) * 0.5f,
-            StatusColor, Pixels);
+            StatusColor, Pixels, 1.0f, ESpecFontRole::Mono);
         if (bRot)
         {
             const float Remaining = FMath::Clamp(Entry.RemainingDuration / FMath::Max(Entry.Spec.Duration, UE_SMALL_NUMBER), 0.0f, 1.0f);
@@ -2977,39 +2977,44 @@ void ABreakerPlaytestHUD::DrawCrosshair(const FVector2D& Center, float GapPx, fl
 // asset — and a Runtime-cached one, because GetFontCacheType() dereferences it
 // to pick the draw path, and the offline path ignores the size in the font
 // info and goes back to magnifying a bitmap.
-const UFont* ABreakerPlaytestHUD::GetSpecFont()
+const UFont* ABreakerPlaytestHUD::GetSpecFont(ESpecFontRole FontRole)
 {
-    if (!SpecFont)
+    auto& Font = FontRole == ESpecFontRole::Display ? SpecDisplayFont : FontRole == ESpecFontRole::Mono ? SpecMonoFont : SpecFont;
+    if (!Font)
     {
-        // UMG's default face. Vector, Runtime-cached, and the same Roboto the
-        // Slate menus draw with, so the HUD and the front end agree.
-        SpecFont = LoadObject<UFont>(nullptr, TEXT("/Engine/EngineFonts/Roboto.Roboto"));
+        const TCHAR* Path = FontRole == ESpecFontRole::Display ? TEXT("/Game/Breaker/UI/Fonts/F_BreakerDisplay.F_BreakerDisplay")
+            : FontRole == ESpecFontRole::Mono ? TEXT("/Game/Breaker/UI/Fonts/F_BreakerMono.F_BreakerMono")
+            : TEXT("/Game/Breaker/UI/Fonts/F_BreakerBody.F_BreakerBody");
+        Font = LoadObject<UFont>(nullptr, Path);
+        if (!Font) Font = LoadObject<UFont>(nullptr, TEXT("/Engine/EngineFonts/Roboto.Roboto"));
     }
-    return SpecFont;
+    return Font;
 }
 
-bool ABreakerPlaytestHUD::CanDrawSpecFont()
+bool ABreakerPlaytestHUD::CanDrawSpecFont(ESpecFontRole FontRole)
 {
-    const UFont* Font = GetSpecFont();
+    const UFont* Font = GetSpecFont(FontRole);
     return Font && Font->FontCacheType == EFontCacheType::Runtime;
 }
 
-FSlateFontInfo ABreakerPlaytestHUD::MakeSpecFont(float SpecPixels)
+FSlateFontInfo ABreakerPlaytestHUD::MakeSpecFont(float SpecPixels, ESpecFontRole FontRole)
 {
-    // The type scale carries its own weight rule: display and number tokens are
-    // 600-700, body and caption are 400-500. 17px is the boundary between them,
-    // so weight follows size rather than needing a flag at every call site.
+    // Roles are explicit; a large number and a large heading use different faces.
     const int32 PixelSize = FMath::Max(FMath::RoundToInt(S(SpecPixels)), 6);
-    return FSlateFontInfo(GetSpecFont(), PixelSize, SpecPixels >= 17.0f ? TEXT("Bold") : TEXT("Regular"));
+    const UFont* Font = GetSpecFont(FontRole);
+    const FName Face = Font && Font->GetFName() == TEXT("Roboto")
+        ? FName(FontRole == ESpecFontRole::Body ? TEXT("Regular") : TEXT("Bold"))
+        : FName(FontRole == ESpecFontRole::Display ? TEXT("SemiBold") : FontRole == ESpecFontRole::Mono ? TEXT("Medium") : TEXT("Regular"));
+    return FSlateFontInfo(Font, PixelSize, Face);
 }
 
-FVector2D ABreakerPlaytestHUD::MeasureSpecText(const FString& Text, float SpecPixels)
+FVector2D ABreakerPlaytestHUD::MeasureSpecText(const FString& Text, float SpecPixels, ESpecFontRole FontRole)
 {
-    if (CanDrawSpecFont() && FSlateApplication::IsInitialized())
+    if (CanDrawSpecFont(FontRole) && FSlateApplication::IsInitialized())
     {
         if (const FSlateRenderer* Renderer = FSlateApplication::Get().GetRenderer())
         {
-            return FVector2D(Renderer->GetFontMeasureService()->Measure(Text, MakeSpecFont(SpecPixels)));
+            return FVector2D(Renderer->GetFontMeasureService()->Measure(Text, MakeSpecFont(SpecPixels, FontRole)));
         }
     }
     // Headless or pre-Slate: fall back to the legacy path so measurement never
@@ -3021,13 +3026,13 @@ FVector2D ABreakerPlaytestHUD::MeasureSpecText(const FString& Text, float SpecPi
     return FVector2D(Width, Height);
 }
 
-void ABreakerPlaytestHUD::DrawSpecText(const FString& Text, float X, float Y, const FLinearColor& Color, float SpecPixels, float TextAlpha)
+void ABreakerPlaytestHUD::DrawSpecText(const FString& Text, float X, float Y, const FLinearColor& Color, float SpecPixels, float TextAlpha, ESpecFontRole FontRole)
 {
     if (TextAlpha <= 0.0f || !Canvas) return;
     const FLinearColor Face = BreakerUI::Alpha(Color, Color.A * TextAlpha);
-    if (CanDrawSpecFont())
+    if (CanDrawSpecFont(FontRole))
     {
-        FCanvasTextItem Item(FVector2D(X, Y), FText::FromString(Text), MakeSpecFont(SpecPixels), Face);
+        FCanvasTextItem Item(FVector2D(X, Y), FText::FromString(Text), MakeSpecFont(SpecPixels, FontRole), Face);
         // No shadow and no engine outline: this system draws its own outline
         // pass where it wants one (§4), and a default drop shadow would put a
         // soft edge on a spec that says flat fills and hard edges only.
@@ -3040,7 +3045,7 @@ void ABreakerPlaytestHUD::DrawSpecText(const FString& Text, float X, float Y, co
         S(BreakerUI::CanvasTextScale(SpecPixels)), false);
 }
 
-float ABreakerPlaytestHUD::FitSpecPixels(const FString& Text, float DesiredPixels, float MaxWidth, float MinPixels)
+float ABreakerPlaytestHUD::FitSpecPixels(const FString& Text, float DesiredPixels, float MaxWidth, float MinPixels, ESpecFontRole FontRole)
 {
     if (Text.IsEmpty() || MaxWidth <= 0.0f) return DesiredPixels;
     // Down one spec pixel at a time. The type scale is small integers and the
@@ -3048,19 +3053,19 @@ float ABreakerPlaytestHUD::FitSpecPixels(const FString& Text, float DesiredPixel
     // the worst case and usually exactly one.
     for (float Pixels = DesiredPixels; Pixels > MinPixels; Pixels -= 1.0f)
     {
-        if (MeasureSpecText(Text, Pixels).X <= MaxWidth) return Pixels;
+        if (MeasureSpecText(Text, Pixels, FontRole).X <= MaxWidth) return Pixels;
     }
     return MinPixels;
 }
 
-void ABreakerPlaytestHUD::DrawSpecTextRight(const FString& Text, float RightX, float Y, const FLinearColor& Color, float SpecPixels, float TextAlpha)
+void ABreakerPlaytestHUD::DrawSpecTextRight(const FString& Text, float RightX, float Y, const FLinearColor& Color, float SpecPixels, float TextAlpha, ESpecFontRole FontRole)
 {
-    DrawSpecText(Text, RightX - MeasureSpecText(Text, SpecPixels).X, Y, Color, SpecPixels, TextAlpha);
+    DrawSpecText(Text, RightX - MeasureSpecText(Text, SpecPixels, FontRole).X, Y, Color, SpecPixels, TextAlpha, FontRole);
 }
 
-void ABreakerPlaytestHUD::DrawSpecTextCentered(const FString& Text, float CenterX, float Y, const FLinearColor& Color, float SpecPixels, float TextAlpha)
+void ABreakerPlaytestHUD::DrawSpecTextCentered(const FString& Text, float CenterX, float Y, const FLinearColor& Color, float SpecPixels, float TextAlpha, ESpecFontRole FontRole)
 {
-    DrawSpecText(Text, CenterX - MeasureSpecText(Text, SpecPixels).X * 0.5f, Y, Color, SpecPixels, TextAlpha);
+    DrawSpecText(Text, CenterX - MeasureSpecText(Text, SpecPixels, FontRole).X * 0.5f, Y, Color, SpecPixels, TextAlpha, FontRole);
 }
 
 // §4: a 2px outline in a near-black tinted toward the number's own hue, so the
@@ -3068,14 +3073,14 @@ void ABreakerPlaytestHUD::DrawSpecTextCentered(const FString& Text, float Center
 void ABreakerPlaytestHUD::DrawOutlinedNumber(const FString& Text, float CenterX, float Y, const FLinearColor& Face, float SpecPixels, float TextAlpha)
 {
     if (TextAlpha <= 0.0f) return;
-    const float X = CenterX - MeasureSpecText(Text, SpecPixels).X * 0.5f;
+    const float X = CenterX - MeasureSpecText(Text, SpecPixels, ESpecFontRole::Mono).X * 0.5f;
     const FLinearColor Outline(Face.R * 0.10f, Face.G * 0.10f, Face.B * 0.10f, 0.9f * TextAlpha);
     const float Offset = FMath::Max(S(SpecPixels * 0.05f), 1.0f);
-    DrawSpecText(Text, X - Offset, Y, Outline, SpecPixels);
-    DrawSpecText(Text, X + Offset, Y, Outline, SpecPixels);
-    DrawSpecText(Text, X, Y - Offset, Outline, SpecPixels);
-    DrawSpecText(Text, X, Y + Offset, Outline, SpecPixels);
-    DrawSpecText(Text, X, Y, Face, SpecPixels, TextAlpha);
+    DrawSpecText(Text, X - Offset, Y, Outline, SpecPixels, 1.0f, ESpecFontRole::Mono);
+    DrawSpecText(Text, X + Offset, Y, Outline, SpecPixels, 1.0f, ESpecFontRole::Mono);
+    DrawSpecText(Text, X, Y - Offset, Outline, SpecPixels, 1.0f, ESpecFontRole::Mono);
+    DrawSpecText(Text, X, Y + Offset, Outline, SpecPixels, 1.0f, ESpecFontRole::Mono);
+    DrawSpecText(Text, X, Y, Face, SpecPixels, TextAlpha, ESpecFontRole::Mono);
 }
 
 void ABreakerPlaytestHUD::DrawBorder(float X, float Y, float Width, float Height, const FLinearColor& Color, float Thickness)
@@ -3426,9 +3431,9 @@ void ABreakerPlaytestHUD::DrawAbilitySlot(const ABreakerCharacter* Character, co
     {
         const FString Countdown = BreakerHUDMath::AbilityCooldownText(Remaining);
         const float Pixels = bUltimate ? 16.0f : 14.0f; // O2 PLACEHOLDER
-        const FVector2D TextSize = MeasureSpecText(Countdown, Pixels);
+        const FVector2D TextSize = MeasureSpecText(Countdown, Pixels, ESpecFontRole::Mono);
         DrawSpecText(Countdown, X + (Size - TextSize.X) * 0.5f, Y + Size - TextSize.Y - S(3.0f),
-            BreakerUI::TextPrimary, Pixels);
+            BreakerUI::TextPrimary, Pixels, 1.0f, ESpecFontRole::Mono);
     }
 
     // Unaffordable: the struck hex, lower-centre on its own opaque chip. No
@@ -3454,5 +3459,5 @@ void ABreakerPlaytestHUD::DrawAbilitySlot(const ABreakerCharacter* Character, co
     // The key, top-right: 6/6 in on an ability tile, 8/10 on the ultimate.
     const float KeyInsetX = S(bUltimate ? BreakerUI::HudUltimateKeyInsetX : BreakerUI::HudAbilityKeyInset);
     const float KeyInsetY = S(bUltimate ? BreakerUI::HudUltimateKeyInsetY : BreakerUI::HudAbilityKeyInset);
-    DrawSpecTextRight(KeyHint, X + Size - KeyInsetX, Y + KeyInsetY, KeyColor, BreakerUI::HudAbilityKeyPixels);
+    DrawSpecTextRight(KeyHint, X + Size - KeyInsetX, Y + KeyInsetY, KeyColor, BreakerUI::HudAbilityKeyPixels, 1.0f, ESpecFontRole::Mono);
 }

@@ -14,8 +14,8 @@
 // ---------------------------------------------------------------------------
 // FIELDPLATE TYPE ROLES AND MARKS — shared by every Slate surface.
 //
-// Archivo (display), IBM Plex Sans (body), IBM Plex Mono (numbers and chrome
-// captions): the three role fonts Scripts/import_fonts.py builds from
+// Barlow Condensed (display), Source Sans 3 (body), Sometype Mono (numbers and chrome
+// captions): the three role fonts BreakerBuildRoleFonts imports from
 // Assets/fonts into /Game/Breaker/UI/Fonts, and the mark textures
 // Scripts/import_marks.py imports into /Game/Breaker/UI/Marks. This header
 // exists because the deployment briefing draws the same roles as the menu,
@@ -64,10 +64,9 @@ inline FSlateFontInfo BreakerBodyFont(int32 Size, bool bSemiBold = false)
         bSemiBold ? TEXT("Bold") : TEXT("Regular"));
 }
 
-// Mono: every number, key cap and tracked chrome caption. Tabular figures
-// come with the face; the tracking parameter is the caption's 0.16em. The
-// family carries Regular and Medium — bMedium is the emphasis weight where a
-// spec asks for mono 700, the closest the pack's own weights come.
+// Mono: every number, key cap and tracked chrome caption. Regular/Medium are
+// stable role keys for the token sheet's actual 500/700 faces respectively.
+// Tabular figures come with the face; tracking is the caption's 0.16em.
 inline FSlateFontInfo BreakerMonoFont(int32 Size, float TrackingEm = 0.0f, bool bMedium = false)
 {
     return BreakerRoleFont(TEXT("/Game/Breaker/UI/Fonts/F_BreakerMono.F_BreakerMono"),

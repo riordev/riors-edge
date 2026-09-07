@@ -9,6 +9,7 @@
 #include "Items/BreakerEquipmentComponent.h"
 #include "Items/BreakerItemRules.h"
 #include "Items/BreakerLootLibrary.h"
+#include "GameFramework/Actor.h"
 #include "Progression/BreakerBuildConditions.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
@@ -734,6 +735,64 @@ namespace BreakerPowerBandTest
         if (bCadence)
         {
             Loadout.RemoveAll([](const FBreakerItemInstance& Item) { return Item.Slot == EBreakerEquipSlot::Secondary; });
+        }
+        return Loadout;
+    }
+
+    // Separate diagnostic: score each replacement in the entire worn loadout.
+    // Same candidate stream and ranks as the original per-piece measurement;
+    // this is bounded coordinate search, not a claim of a global optimum.
+    // The pinned fixtures and their denominator remain independent of it.
+    TArray<FBreakerItemInstance> BreakerPowerBandWholeLoadout(int32 ItemLevel, bool bAbilityLane)
+    {
+        auto Loadout = BreakerPowerBandRolledBestInSlot(ItemLevel, RolledBestInSlotSeed,
+            RolledBestInSlotCandidates, bAbilityLane);
+        const auto Ranks = bAbilityLane ? AbilityOptimizedRanks() : OptimizedRanks();
+        const auto State = MeasurementState();
+        const auto Score = [&](const TArray<FBreakerItemInstance>& Items)
+        {
+            const auto Build = Compose(Items, Ranks, State);
+            return bAbilityLane ? Build.AbilityTotal : Build.Total;
+        };
+        float BestScore = Score(Loadout);
+        const EBreakerItemRarity Rarities[] = { EBreakerItemRarity::Exceptional,
+            EBreakerItemRarity::Anomalous, EBreakerItemRarity::Aberrant };
+        for (int32 Pass = 0; Pass < 3; ++Pass) // O2 PLACEHOLDER: bounded diagnostic search.
+        {
+            bool bImproved = false;
+            for (int32 SlotIndex = 0; SlotIndex < static_cast<int32>(EBreakerEquipSlot::Count); ++SlotIndex)
+                for (int32 RarityIndex = 0; RarityIndex < UE_ARRAY_COUNT(Rarities); ++RarityIndex)
+                    for (int32 Candidate = 0; Candidate < RolledBestInSlotCandidates; ++Candidate)
+                    {
+                        const auto Slot = static_cast<EBreakerEquipSlot>(SlotIndex);
+                        const uint32 Salt = HashCombine(HashCombine(static_cast<uint32>(RolledBestInSlotSeed),
+                            static_cast<uint32>(SlotIndex)), static_cast<uint32>(RarityIndex * RolledBestInSlotCandidates + Candidate));
+                        const auto Item = UBreakerLootLibrary::RollItem(TEXT("PowerBand"), Slot,
+                            Rarities[RarityIndex], ItemLevel, static_cast<int32>(Salt));
+                        auto Trial = Loadout;
+                        Trial.RemoveAll([&](const auto& Existing) { return Existing.Slot == Slot; });
+                        Trial.Add(Item);
+                        if (Item.Rule == EBreakerItemRule::Cadence)
+                            Trial.RemoveAll([](const auto& Existing) { return Existing.Slot == EBreakerEquipSlot::Secondary; });
+                        else if (Slot == EBreakerEquipSlot::Secondary && Trial.ContainsByPredicate(
+                            [](const auto& Existing) { return Existing.Rule == EBreakerItemRule::Cadence; })) continue;
+                        bool bLegal = true;
+                        for (const auto Rarity : Rarities)
+                        {
+                            const int32 Limit = UBreakerEquipmentComponent::EquipLimitForRarity(Rarity);
+                            const int32 Count = Trial.FilterByPredicate([&](const auto& Existing) { return Existing.Rarity == Rarity; }).Num();
+                            if (Limit > 0 && Count > Limit) bLegal = false;
+                        }
+                        if (!bLegal) continue;
+                        const float TrialScore = Score(Trial);
+                        if (TrialScore > BestScore + UE_SMALL_NUMBER)
+                        {
+                            BestScore = TrialScore;
+                            Loadout = MoveTemp(Trial);
+                            bImproved = true;
+                        }
+                    }
+            if (!bImproved) break;
         }
         return Loadout;
     }
@@ -1948,6 +2007,22 @@ bool FBreakerPowerBandAbilityLaneTest::RunTest(const FString& Parameters)
         AddInfo(FString::Printf(TEXT("ABILITY LANE  ROLLED decomposition: flat %.3fx x increased %.3fx x more %.3fx x crit %.3fx"),
             Ability.AbilityFlatLayer / Weapon.FlatLayer, Ability.AbilityIncreasedLayer / Weapon.IncreasedLayer,
             Ability.AbilityMoreLayer / Weapon.MoreLayer, Ability.EffectiveCrit / Weapon.EffectiveCrit));
+        const auto WholeWeapons = BreakerPowerBandWholeLoadout(ItemLevel, false);
+        const auto WholeAbilities = BreakerPowerBandWholeLoadout(ItemLevel, true);
+        for (const auto* Selected : { &WholeWeapons, &WholeAbilities })
+        {
+            auto* Owner = NewObject<AActor>(GetTransientPackage());
+            auto* Equipment = NewObject<UBreakerEquipmentComponent>(Owner);
+            for (const auto& Item : *Selected)
+                TestTrue(TEXT("whole-loadout candidate passes actual equipment rules"), Equipment->EquipItem(Item));
+            TestEqual(TEXT("whole-loadout candidate keeps every selected piece equipped"), Equipment->GetEquipped().Num(), Selected->Num());
+        }
+        const auto WholeWeapon = Compose(WholeWeapons, OptimizedRanks(), State);
+        const auto WholeAbility = Compose(WholeAbilities, AbilityOptimizedRanks(), State);
+        TestTrue(TEXT("whole-loadout weapon search cannot worsen its starting loadout"), WholeWeapon.Total >= Weapon.Total);
+        TestTrue(TEXT("whole-loadout ability search cannot worsen its starting loadout"), WholeAbility.AbilityTotal >= Ability.AbilityTotal);
+        AddInfo(FString::Printf(TEXT("ABILITY LANE  WHOLE LOADOUT (ilvl %d, same seed/pool/ranks) weapon x%.3f ability x%.3f parity %.3fx; bounded search, not pinned"),
+            ItemLevel, WholeWeapon.Total, WholeAbility.AbilityTotal, WholeAbility.AbilityTotal / WholeWeapon.Total));
     }
 
     // RESPONSE - the assertion the pools were built to make possible.

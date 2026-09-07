@@ -126,7 +126,7 @@ void ABreakerZoneActor::RefreshDuration(float NewDuration)
     if (!HasAuthority()) return;
     // Refresh, never extend: VW4's rule is that a recast resets the clock, so
     // spamming Rot cannot bank duration.
-    RemainingDuration = FMath::Max(RemainingDuration, FMath::Max(0.0f, NewDuration));
+    RemainingDuration = FMath::Max(RemainingDuration, static_cast<double>(FMath::Max(0.0f, NewDuration)));
 }
 
 void ABreakerZoneActor::SetFollowActor(AActor* Follow)
@@ -156,7 +156,7 @@ float ABreakerZoneActor::OwnedOccupiedSeconds(AActor* Owner, FGameplayTag Tag, f
         Zone->UpdateMembership();
         if (!Zone->Occupants.IsEmpty())
             Seconds = FMath::Max(Seconds, Zone->bExpiryPaused ? FMath::Max(0.0f, DeltaSeconds)
-                : FMath::Clamp(Zone->RemainingDuration, 0.0f, FMath::Max(0.0f, DeltaSeconds)));
+                : static_cast<float>(FMath::Clamp(Zone->RemainingDuration, 0.0, static_cast<double>(FMath::Max(0.0f, DeltaSeconds)))));
     }
     return Seconds;
 }
@@ -184,8 +184,8 @@ void ABreakerZoneActor::AdvanceZone(float DeltaSeconds)
 
     UpdateMembership();
 
-    const float ActiveSeconds = bExpiryPaused ? FMath::Max(0.0f, DeltaSeconds)
-        : FMath::Min(FMath::Max(0.0f, DeltaSeconds), FMath::Max(0.0f, RemainingDuration));
+    const double ActiveSeconds = bExpiryPaused ? FMath::Max(0.0f, DeltaSeconds)
+        : FMath::Min(static_cast<double>(FMath::Max(0.0f, DeltaSeconds)), FMath::Max(0.0, RemainingDuration));
     const int32 Ticks = UBreakerZoneMath::ConsumeTicks(TimeUntilNextTick, ActiveSeconds, Spec.TickInterval, MaximumTicksPerAdvance);
     for (int32 Index = 0; Index < Ticks; ++Index)
     {

@@ -149,7 +149,7 @@
 				"RadiusCm": 400,
 				"DurationSeconds": 6,
 				"TickIntervalSeconds": 0.5,
-				"ZoneDamagePerTick": 5,
+				"ZoneDamagePerTick": 10,
 				"FlatArmorReduction": 40,
 				"MaximumRangeCm": 2500,
 				"HalfHeightCm": 250,
@@ -188,7 +188,7 @@
 			"numbers":
 			{
 				"CyclePositionsPerCast": 1,
-				"ImpactDamage": 30,
+				"ImpactDamage": 300,
 				"ProjectileSpeed": 4000,
 				"MuzzleForwardCm": 80
 			},

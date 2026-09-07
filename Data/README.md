@@ -21,7 +21,9 @@ Use only the keys already present on the row. Some abilities have no `numbers` e
 
 Cleave: `RangeCm` is now 450 (4.5 metres). `ArcDegrees` controls width, `WeaponDamageCoefficient` controls the hit, and `Bleed*` values control its damage over time.
 
-Rot: `ZoneDamagePerTick` (5) and `TickIntervalSeconds` (0.5) control direct Entropy hits. Accepted hits build toward Rot; the zone no longer applies Poison. The three old Poison tuning keys are removed.
+Rot: `ZoneDamagePerTick` (10) and `TickIntervalSeconds` (0.5) control direct Entropy hits. Accepted hits build toward Rot; the zone no longer applies Poison. Its six-second lifetime delivers twelve hits. The three old Poison tuning keys are removed.
+
+Fracture: `ImpactDamage` (300) controls its projectile hit before gear-depth scaling. Its 30 Mana cost and status cycle remain separate knobs. These are O2 tuning values; a full starting Mana bank is a burst window, not sustained throughput.
 
 After an edit, check a fresh cast on the same enemy with the same gear. Change one value at a time. Invalid data is reported in the game log; fallback values should not be used to judge a tuning experiment.
 
@@ -39,11 +41,10 @@ Close doubles landed weapon-hit Mana within 600/900 cm at ranks 1/2. Debt extend
 
 Siphon's `DrainRankOneThreshold` / `DrainRankTwoThreshold` in `abilities.json` raise the incoming health-damage threshold that interrupts the channel to 10%/15% of maximum health. The unpurchased threshold stays 5%. All three are fractions (0.10 means 10%), not damage amounts.
 
-`Data/statuses.json` defines Void as a non-damaging debuff: `durationSeconds`
-is 4, `armorReductionPercent` is 20, and `healingReductionPercent` is 25
-(O2 placeholders). Siphon's successful damage ticks and Fracture's third cycle
-position apply it. Refreshing extends the effect without stacking its reductions.
-Changing `dealsPeriodicDamage` changes status behavior, so keep it false for Void.
+Legacy `Status.Void` armour and healing reductions are retired. Siphon retains
+its damage and healing; Fracture's third cycle position delivers Entropy.
+`Data/elements.json` controls Entropy buildup thresholds, resistance and the
+earned Rot damage snapshot. Void's Erased pipeline follows the Entropy pass.
 
 Sequence's `SequenceWindowSeconds`, `SequenceCooldownSeconds`,
 `SequenceRankOneMana` and `SequenceRankTwoMana` in `caster-resource.json` are

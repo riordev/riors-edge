@@ -11,6 +11,7 @@
 #include "GameFramework/Controller.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
+#include "UI/BreakerEffectMath.h"
 
 UBreakerAbility_Rot::UBreakerAbility_Rot()
 {
@@ -77,7 +78,7 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     FHitResult Hit;
     FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(BreakerRotAim), false, Character);
     const FVector TraceEnd = ViewLocation + ViewRotation.Vector() * MaximumRangeCm;
-    const bool bHit = World->LineTraceSingleByChannel(Hit, ViewLocation, TraceEnd, ECC_Visibility, QueryParams);
+    const bool bHit = World->LineTraceSingleByChannel(Hit, ViewLocation, TraceEnd, ECC_GameTraceChannel2, QueryParams);
     const bool bFollowCaster = ShouldFollowCaster(Character, bHit, Hit.ImpactPoint, Hit.ImpactNormal);
     const FVector Center = bFollowCaster ? Hit.ImpactPoint
         : AimPoint(ViewLocation, ViewRotation.Vector(), MaximumRangeCm, bHit, Hit.ImpactPoint);
@@ -114,8 +115,7 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 
     const UBreakerAttributeSet* SourceAttributes = GetBreakerAttributes();
     const UBreakerCombatComponent* OwnerCombat = Character->FindComponentByClass<UBreakerCombatComponent>();
-    // O35: one item-level reading for the whole cast — the zone's own ticks
-    // and the Poison it applies share it.
+    // O35: one item-level reading for the whole cast's Entropy hits.
     const float LevelScalar = AbilityDamageScalarFor(Character);
 
     FBreakerZoneSpec Spec;
@@ -127,9 +127,8 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     Spec.FlatArmorReduction = FlatArmorReduction;
     if (Character->GetProgression()->GetNodeRank(TEXT("Caster.VoidWhisperer.Zonework"), EBreakerPointCurrency::DoctrinePoints) > 0)
         Spec.AfflictedArmorReduction = ZoneworkAdditionalArmorReduction;
-    // Not teal (O19): saturated teal is a property of rift objects and
-    // suppression hardware, and a Void Whisperer puddle is neither. Sick green.
-    Spec.ZoneColor = FLinearColor(0.34f, 0.78f, 0.20f);
+    // The footprint shares Entropy's projectile, activation and meter palette.
+    Spec.ZoneColor = BreakerFX::ColorForStatusTag(FGameplayTag::RequestGameplayTag(TEXT("Status.Rot")), FLinearColor::White);
 
     Spec.TickDamage.BaseDamage = ZoneDamagePerTick * LevelScalar;
     Spec.TickDamage.DamageFamily = EBreakerDamageFamily::Elemental;

@@ -426,22 +426,25 @@ private:
     // Non-const because the font is loaded on first use, and guarded because
     // FCanvasTextItem draws NOTHING when its UFont is null — which is exactly
     // how a whole HUD's worth of text once disappeared.
-    const UFont* GetSpecFont();
-    bool CanDrawSpecFont();
-    FSlateFontInfo MakeSpecFont(float SpecPixels);
+    enum class ESpecFontRole : uint8 { Body, Display, Mono };
+    const UFont* GetSpecFont(ESpecFontRole FontRole);
+    bool CanDrawSpecFont(ESpecFontRole FontRole);
+    FSlateFontInfo MakeSpecFont(float SpecPixels, ESpecFontRole FontRole);
     UPROPERTY() TObjectPtr<const UFont> SpecFont;
+    UPROPERTY() TObjectPtr<const UFont> SpecDisplayFont;
+    UPROPERTY() TObjectPtr<const UFont> SpecMonoFont;
 
     // Text authored in spec pixels. Y is the top of the line, matching Canvas.
-    void DrawSpecText(const FString& Text, float X, float Y, const FLinearColor& Color, float SpecPixels, float TextAlpha = 1.0f);
-    void DrawSpecTextRight(const FString& Text, float RightX, float Y, const FLinearColor& Color, float SpecPixels, float TextAlpha = 1.0f);
-    void DrawSpecTextCentered(const FString& Text, float CenterX, float Y, const FLinearColor& Color, float SpecPixels, float TextAlpha = 1.0f);
-    FVector2D MeasureSpecText(const FString& Text, float SpecPixels);
+    void DrawSpecText(const FString& Text, float X, float Y, const FLinearColor& Color, float SpecPixels, float TextAlpha = 1.0f, ESpecFontRole FontRole = ESpecFontRole::Body);
+    void DrawSpecTextRight(const FString& Text, float RightX, float Y, const FLinearColor& Color, float SpecPixels, float TextAlpha = 1.0f, ESpecFontRole FontRole = ESpecFontRole::Body);
+    void DrawSpecTextCentered(const FString& Text, float CenterX, float Y, const FLinearColor& Color, float SpecPixels, float TextAlpha = 1.0f, ESpecFontRole FontRole = ESpecFontRole::Body);
+    FVector2D MeasureSpecText(const FString& Text, float SpecPixels, ESpecFontRole FontRole = ESpecFontRole::Body);
     // The largest size at or below DesiredPixels at which Text measures no
     // wider than MaxWidth, never below MinPixels. MaxWidth is derived from the
     // MEASUREMENT of a different string, never from this widget's own
     // arrangement, so — like every other measured fit in this codebase — it is
     // a pure function of inputs known before layout and cannot oscillate.
-    float FitSpecPixels(const FString& Text, float DesiredPixels, float MaxWidth, float MinPixels);
+    float FitSpecPixels(const FString& Text, float DesiredPixels, float MaxWidth, float MinPixels, ESpecFontRole FontRole = ESpecFontRole::Body);
 
     // Outline + weight pass for numbers that sit over the world. The outline
     // is tinted toward the number's own hue so it never reads as grey mud.

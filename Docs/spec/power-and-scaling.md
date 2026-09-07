@@ -67,6 +67,8 @@ Never two specific pools from one source — that is one bucket double-dipped.
 
 **Added Ability Power bids Flat into the ability multiplier**, dividing its
 printed percentage by 100 before Increased and More compose; Added Damage stays in the weapon lane.
+Its airborne, sliding, Redline, recent-dash and grounded variants use the same
+condition gates as weapon flat damage and never contribute to the weapon pool.
 
 **There is ONE More ceiling across damage pools.** Gear and tree sources enter
 one selection: the strongest three, each at most 1.30x, compose as an unordered

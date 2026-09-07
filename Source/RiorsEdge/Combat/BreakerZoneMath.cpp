@@ -14,6 +14,14 @@ bool UBreakerZoneMath::IsInsideZone(const FVector& ZoneCenter, float RadiusCm, f
 
 int32 UBreakerZoneMath::ConsumeTicks(float& TimeUntilNextTick, float DeltaSeconds, float TickInterval, int32 MaximumTicksPerAdvance)
 {
+    double Countdown = TimeUntilNextTick;
+    const int32 Ticks = ConsumeTicks(Countdown, static_cast<double>(DeltaSeconds), TickInterval, MaximumTicksPerAdvance);
+    TimeUntilNextTick = static_cast<float>(Countdown);
+    return Ticks;
+}
+
+int32 UBreakerZoneMath::ConsumeTicks(double& TimeUntilNextTick, double DeltaSeconds, float TickInterval, int32 MaximumTicksPerAdvance)
+{
     if (TickInterval <= 0.0f || DeltaSeconds <= 0.0f) return 0;
 
     TimeUntilNextTick -= DeltaSeconds;
@@ -34,6 +42,11 @@ float UBreakerZoneMath::RemainingAfter(float Remaining, float DeltaSeconds, bool
 {
     if (bPaused) return Remaining;
     return Remaining - FMath::Max(0.0f, DeltaSeconds);
+}
+
+double UBreakerZoneMath::RemainingAfter(double Remaining, float DeltaSeconds, bool bPaused)
+{
+    return bPaused ? Remaining : Remaining - FMath::Max(0.0f, DeltaSeconds);
 }
 
 bool UBreakerZoneMath::ShouldRefreshExisting(const FVector& ExistingCenter, const FVector& NewCenter, float RadiusCm, float RefreshFractionOfRadius)

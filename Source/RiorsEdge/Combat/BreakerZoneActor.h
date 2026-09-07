@@ -107,7 +107,7 @@ public:
 
     UFUNCTION(BlueprintPure, Category="Zone") int32 GetOccupantCount() const { return Occupants.Num(); }
     UFUNCTION(BlueprintPure, Category="Zone") const FBreakerZoneSpec& GetSpec() const { return Spec; }
-    UFUNCTION(BlueprintPure, Category="Zone") float GetRemainingDuration() const { return RemainingDuration; }
+    UFUNCTION(BlueprintPure, Category="Zone") float GetRemainingDuration() const { return static_cast<float>(RemainingDuration); }
     bool IsReleased() const { return bReleased; }
     UFUNCTION(BlueprintPure, Category="Zone") AActor* GetZoneInstigator() const { return ZoneInstigator.Get(); }
     UFUNCTION(BlueprintPure, Category="Zone") int32 GetTicksDelivered() const { return TicksDelivered; }
@@ -215,8 +215,10 @@ private:
     UPROPERTY(Transient) TArray<TObjectPtr<UStaticMeshComponent>> MobileRim;
     TWeakObjectPtr<ABreakerEffectRenderer> RimRenderer;
     TArray<int32> RimHandles;
-    float RemainingDuration = 0.0f;
-    float TimeUntilNextTick = 0.0f;
+    // Share double precision across lifetime clipping and cadence; separate
+    // float accumulators can expire a zone just before its final owed tick.
+    double RemainingDuration = 0.0;
+    double TimeUntilNextTick = 0.0;
     int32 TicksDelivered = 0;
     bool bExpiryPaused = false;
     bool bReleased = false;

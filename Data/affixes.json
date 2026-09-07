@@ -1049,6 +1049,26 @@
 			"pairedAffixId": ""
 		},
 		{
+			"id": "Ability.AirborneAddedPower",
+			"pool": "slice",
+			"displayName": "Ability Power in Air",
+			"category": "Prefix",
+			"target": "AbilityDamage",
+			"bucket": "Flat",
+			"slots": [
+				"Boots",
+				"Helmet",
+				"Necklace",
+				"Primary"
+			],
+			"valueAtT12": 1.5,
+			"valueAtT1": 16,
+			"rollWeight": 45,
+			"condition": "Airborne",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
 			"id": "Offense.AirborneAddedDamage",
 			"pool": "slice",
 			"displayName": "Added Dmg while Airborne",
@@ -1065,6 +1085,26 @@
 			"valueAtT1": 16,
 			"rollWeight": 45,
 			"condition": "Airborne",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Ability.SlidingAddedPower",
+			"pool": "slice",
+			"displayName": "Ability Power in Slide",
+			"category": "Prefix",
+			"target": "AbilityDamage",
+			"bucket": "Flat",
+			"slots": [
+				"Boots",
+				"Waist",
+				"BodyArmour",
+				"Secondary"
+			],
+			"valueAtT12": 1.5,
+			"valueAtT1": 16,
+			"rollWeight": 45,
+			"condition": "Sliding",
 			"minimumRarity": "Standard",
 			"pairedAffixId": ""
 		},
@@ -1089,6 +1129,26 @@
 			"pairedAffixId": ""
 		},
 		{
+			"id": "Ability.RedlineAddedPower",
+			"pool": "slice",
+			"displayName": "Ability Power at Redline",
+			"category": "Prefix",
+			"target": "AbilityDamage",
+			"bucket": "Flat",
+			"slots": [
+				"Necklace",
+				"BodyArmour",
+				"Helmet",
+				"Primary"
+			],
+			"valueAtT12": 1.5,
+			"valueAtT1": 16,
+			"rollWeight": 45,
+			"condition": "Redline",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
 			"id": "Offense.RedlineAddedDamage",
 			"pool": "slice",
 			"displayName": "Added Damage at Redline",
@@ -1109,6 +1169,26 @@
 			"pairedAffixId": ""
 		},
 		{
+			"id": "Ability.DashAddedPower",
+			"pool": "slice",
+			"displayName": "Ability Power after Dash",
+			"category": "Prefix",
+			"target": "AbilityDamage",
+			"bucket": "Flat",
+			"slots": [
+				"Gloves",
+				"Waist",
+				"Necklace",
+				"Secondary"
+			],
+			"valueAtT12": 1.5,
+			"valueAtT1": 16,
+			"rollWeight": 45,
+			"condition": "RecentlyDashed",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
 			"id": "Offense.DashAddedDamage",
 			"pool": "slice",
 			"displayName": "Added Damage after Dashing",
@@ -1125,6 +1205,26 @@
 			"valueAtT1": 16,
 			"rollWeight": 45,
 			"condition": "RecentlyDashed",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Ability.GroundedAddedPower",
+			"pool": "slice",
+			"displayName": "Ability Power on Ground",
+			"category": "Prefix",
+			"target": "AbilityDamage",
+			"bucket": "Flat",
+			"slots": [
+				"BodyArmour",
+				"Boots",
+				"Waist",
+				"Gloves"
+			],
+			"valueAtT12": 1.5,
+			"valueAtT1": 16,
+			"rollWeight": 45,
+			"condition": "Grounded",
 			"minimumRarity": "Standard",
 			"pairedAffixId": ""
 		},

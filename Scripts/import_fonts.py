@@ -1,4 +1,4 @@
-# Imports the Fieldplate font pack's seven faces.
+# Imports the interface font set's seven faces.
 #
 # Run headless from the repo the script sits in:
 #   UnrealEditor-Cmd.exe <project> -ExecutePythonScript="Scripts/import_fonts.py"
@@ -19,13 +19,13 @@ SRC = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), 
 DEST = "/Game/Breaker/UI/Fonts"
 
 FACES = {
-    "ArchivoSemiBold": "Archivo-SemiBold.ttf",
-    "ArchivoBold": "Archivo-Bold.ttf",
-    "PlexSansRegular": "IBMPlexSans-Regular.ttf",
-    "PlexSansMedium": "IBMPlexSans-Medium.ttf",
-    "PlexSansSemiBold": "IBMPlexSans-SemiBold.ttf",
-    "PlexMonoRegular": "IBMPlexMono-Regular.ttf",
-    "PlexMonoMedium": "IBMPlexMono-Medium.ttf",
+    "BarlowCondensedSemiBold": "BarlowCondensed-SemiBold.ttf",
+    "BarlowCondensedBold": "BarlowCondensed-Bold.ttf",
+    "SourceSans3Regular": "SourceSans3-Regular.ttf",
+    "SourceSans3Medium": "SourceSans3-Medium.ttf",
+    "SourceSans3SemiBold": "SourceSans3-SemiBold.ttf",
+    "SometypeMonoMedium": "SometypeMono-Medium.ttf",
+    "SometypeMonoBold": "SometypeMono-Bold.ttf",
 }
 
 tools = unreal.AssetToolsHelpers.get_asset_tools()

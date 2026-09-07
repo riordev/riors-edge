@@ -155,7 +155,7 @@ bool FBreakerZoneEntryAndEntropyTest::RunTest(const FString& Parameters)
     if (!TestNotNull(TEXT("Rot world"), World)) return false;
     ON_SCOPE_EXIT { World->DestroyWorld(false); };
     const UBreakerAbility_Rot* Rot = GetDefault<UBreakerAbility_Rot>();
-    TestEqual(TEXT("Rot has actual five damage Entropy hits"), Rot->ZoneDamagePerTick, 5.0f);
+    TestEqual(TEXT("Rot has actual ten damage Entropy hits"), Rot->ZoneDamagePerTick, 10.0f);
     TestEqual(TEXT("Rot hits every half second"), Rot->TickIntervalSeconds, 0.5f);
     FBreakerDamageSubject Target = BreakerMakeDamageSubject(World, FVector(100, 0, 0));
     ABreakerZoneActor* Zone = World->SpawnActor<ABreakerZoneActor>();
@@ -195,13 +195,12 @@ bool FBreakerZoneEntryAndEntropyTest::RunTest(const FString& Parameters)
     EntropySpec.TickDamage.DamageFamily = EBreakerDamageFamily::Elemental;
     EntropyZone->ConfigureZone(EntropySpec, nullptr);
     EntropyZone->AdvanceZone(.5f);
-    TestEqual(TEXT("Actual Entropy zone hit builds before threshold"), EntropyTarget.Status->GetEntropyBuildup(), 5.0f);
-    EntropyZone->AdvanceZone(.5f);
-    TestTrue(TEXT("Second actual zone hit earns Rot"), EntropyTarget.Status->HasStatus(FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"))));
+    TestEqual(TEXT("Threshold hit consumes earned buildup"), EntropyTarget.Status->GetEntropyBuildup(), 0.0f);
+    TestTrue(TEXT("Actual ten damage zone hit earns Rot on the hundred-health fixture"), EntropyTarget.Status->HasStatus(FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"))));
     TestFalse(TEXT("Entropy zone does not apply old Poison payload"), EntropyTarget.Status->HasStatus(FGameplayTag::RequestGameplayTag(TEXT("Status.Poison"))));
     const float BeforeRot = EntropyTarget.Attributes->GetHealth();
     EntropyTarget.Status->AdvanceStatuses(4);
-    TestEqual(TEXT("Earned Rot pays half of triggering five damage hit"), BeforeRot - EntropyTarget.Attributes->GetHealth(), 2.5f, .01f);
+    TestEqual(TEXT("Earned Rot pays half of triggering ten damage hit"), BeforeRot - EntropyTarget.Attributes->GetHealth(), 5.0f, .01f);
     return true;
 }
 #endif

@@ -59,10 +59,8 @@ bool FBreakerZoneCadenceTest::RunTest(const FString& Parameters)
     // on each tick loses the remainder every frame, so the same zone ticks
     // slower at 60fps than at 30fps. Sixty frames of 1/60s across a 1.0s
     // interval must deliver exactly one tick, and the leftover must carry.
-    // Frame times here are exact binary fractions (1/64, 1/128) rather than
-    // 1/60 and 1/120: this test is about the ACCUMULATOR losing time, and a
-    // decimal frame time would fail it for float summation error instead,
-    // which would be a test bug wearing the costume of the bug being hunted.
+    // Keep the binary-fraction coverage and also exercise ordinary frame
+    // intervals against the lifetime-clipped production precision below.
     float Countdown = 1.0f;
     int32 Total = 0;
     for (int32 Frame = 0; Frame < 64; ++Frame)
@@ -86,6 +84,22 @@ bool FBreakerZoneCadenceTest::RunTest(const FString& Parameters)
     }
     TestEqual(TEXT("Ten seconds is ten ticks at one frame rate"), SlowTotal, 10);
     TestEqual(TEXT("Ten seconds is ten ticks at double the frame rate"), FastTotal, 10);
+
+    for (const float FrameSeconds : { .05f, 1.0f / 30.0f, 1.0f / 60.0f, 1.0f / 144.0f })
+    {
+        double Life = 6.0, NextTick = .5;
+        int32 DeliveredAtExpiry = 0;
+        while (Life > 0.0)
+        {
+            const double Active = FMath::Min(Life, static_cast<double>(FrameSeconds));
+            DeliveredAtExpiry += UBreakerZoneMath::ConsumeTicks(NextTick, Active, .5f);
+            Life = UBreakerZoneMath::RemainingAfter(Life, FrameSeconds, false);
+        }
+        TestEqual(TEXT("decimal frame cadence includes all twelve lifetime-clipped ticks"), DeliveredAtExpiry, 12);
+    }
+    double NotYetDue = .5;
+    TestEqual(TEXT("a genuinely unfinished interval does not grant a tick"),
+        UBreakerZoneMath::ConsumeTicks(NotYetDue, .499, .5f), 0);
 
     // A long frame owes several ticks and delivers them all.
     float LongFrame = 1.0f;

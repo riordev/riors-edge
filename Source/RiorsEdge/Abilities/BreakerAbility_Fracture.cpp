@@ -54,7 +54,7 @@ void UBreakerAbility_Fracture::ActivateAbility(const FGameplayAbilitySpecHandle 
 
     FBreakerDamageRequest Damage;
     // O35: flat ability damage rides the equipped weapon's item-level scalar
-    // (exactly 1.0 at item level 1, so the authored 30 is bit-identical there).
+    // (exactly 1.0 at item level 1, preserving the authored base hit there).
     Damage.BaseDamage = ImpactDamage * AbilityDamageScalarFor(Character);
     Damage.DamageFamily = EBreakerDamageFamily::Physical;
     Damage.SourceTags.AddTag(BreakerAbilityTags::Ability_Class_Caster_Fracture.GetTag());

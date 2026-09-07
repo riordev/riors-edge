@@ -39,6 +39,7 @@ public:
     // owes 30 ticks, and delivering 30 damage events in one frame is a worse
     // outcome than dropping some. The excess is discarded, not banked.
     static int32 ConsumeTicks(float& TimeUntilNextTick, float DeltaSeconds, float TickInterval, int32 MaximumTicksPerAdvance = 8);
+    static int32 ConsumeTicks(double& TimeUntilNextTick, double DeltaSeconds, float TickInterval, int32 MaximumTicksPerAdvance = 8);
 
     // Remaining lifetime after a frame. A paused zone does not age — that is
     // the Long Dark keystone's "zones placed during the window do not expire
@@ -46,6 +47,7 @@ public:
     // as a second timer somebody has to remember to stop.
     UFUNCTION(BlueprintPure, Category="Combat|Zone")
     static float RemainingAfter(float Remaining, float DeltaSeconds, bool bPaused);
+    static double RemainingAfter(double Remaining, float DeltaSeconds, bool bPaused);
 
     // VW4's anti-stack rule, as pure geometry: a new zone should REFRESH an
     // existing one rather than spawn when they are the same kind of zone from

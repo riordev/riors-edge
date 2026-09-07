@@ -742,11 +742,11 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         const float EntropyPixels = BreakerEnemyBar::NamePixels * Scale;
         const FString EntropyText = Rot ? BreakerStrings::Format(EBreakerStringKey::HudRotTimer, Rot->RemainingDuration)
             : FString::Printf(TEXT("%s %d%%"), *BreakerStrings::Get(EBreakerStringKey::HudEntropy), FMath::Clamp(FMath::RoundToInt(Buildup * 100), 1, 100));
-        const FVector2D EntropyTextSize = bShowEntropy ? MeasureSpecText(EntropyText, EntropyPixels) : FVector2D::ZeroVector;
+        const FVector2D EntropyTextSize = bShowEntropy ? MeasureSpecText(EntropyText, EntropyPixels, ESpecFontRole::Mono) : FVector2D::ZeroVector;
         const float EntropyRailH = FMath::Max(1.0f, 2.0f * Scale * ScaleUnit); // O2 presentation.
         const float EntropyY = Bar.Y + Bar.H + PipRowH + Gap;
         const float EntropyH = bShowEntropy ? Gap + EntropyTextSize.Y + Gap + EntropyRailH : 0;
-        const float ColumnW = FMath::Max(FMath::Max3(Bar.W, MarksW, bShowName ? static_cast<float>(MeasureSpecText(Name, NamePixels).X) : 0.0f),
+        const float ColumnW = FMath::Max(FMath::Max3(Bar.W, MarksW, bShowName ? static_cast<float>(MeasureSpecText(Name, NamePixels, ESpecFontRole::Display).X) : 0.0f),
             bShowEntropy ? static_cast<float>(EntropyTextSize.X) : 0.0f);
         const float ColumnH = Bar.Y + Bar.H + PipRowH + EntropyH - ColumnTop;
 
@@ -842,7 +842,7 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
                 && EntropyY + EntropyH <= Canvas->ClipY
                 && Projected.X - EntropyTextSize.X * .5f >= 0 && Projected.X + EntropyTextSize.X * .5f <= Canvas->ClipX)
             {
-                DrawSpecTextCentered(EntropyText, Projected.X, EntropyY, Rot ? BreakerUI::Orange : BreakerUI::Gold, EntropyPixels, BarAlpha);
+                DrawSpecTextCentered(EntropyText, Projected.X, EntropyY, Rot ? BreakerUI::Orange : BreakerUI::Gold, EntropyPixels, BarAlpha, ESpecFontRole::Mono);
                 const float RailY = EntropyY + EntropyTextSize.Y + Gap;
                 const float Fill = Rot ? FMath::Clamp(Rot->RemainingDuration / FMath::Max(Rot->Spec.Duration, UE_SMALL_NUMBER), 0.0f, 1.0f) : Buildup;
                 DrawRect(BreakerUI::Alpha(BreakerUI::BorderRest, BarAlpha), Bar.X, RailY, Bar.W, EntropyRailH);
@@ -851,7 +851,7 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
             if (bShowName)
             {
                 DrawSpecTextCentered(Name, Projected.X, NameY,
-                    bBossRank ? BreakerUI::TealName : BreakerUI::TextSecondary, NamePixels, BarAlpha);
+                    bBossRank ? BreakerUI::TealName : BreakerUI::TextSecondary, NamePixels, BarAlpha, ESpecFontRole::Display);
             }
             if (Marks.Num() > 0)
             {
@@ -919,6 +919,6 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         const float NameY = Bar.Y - BreakerEnemyBarMath::ColumnGapPx * Scale * ScaleUnit
             - BreakerEnemyBar::NameLinePixels * Scale * ScaleUnit;
         DrawSpecTextCentered(Dummy->GetProfileLabel(), Projected.X, NameY,
-            BreakerUI::TextSecondary, BreakerEnemyBar::NamePixels * Scale);
+            BreakerUI::TextSecondary, BreakerEnemyBar::NamePixels * Scale, 1.0f, ESpecFontRole::Display);
     }
 }

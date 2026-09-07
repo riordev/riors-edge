@@ -28,7 +28,7 @@ ABreakerProjectileBase::ABreakerProjectileBase()
     // Deliberately generous relative to the visual: a projectile the player can
     // see must also hit roughly where it looks like it will.
     Collision->InitSphereRadius(30.0f);
-    Collision->SetCollisionProfileName(TEXT("BlockAllDynamic"));
+    Collision->SetCollisionProfileName(TEXT("Projectile"));
     SetRootComponent(Collision);
 
     Visual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Visual"));
