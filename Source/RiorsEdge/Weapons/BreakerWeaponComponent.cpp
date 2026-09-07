@@ -2602,16 +2602,17 @@ void UBreakerWeaponComponent::ApplyBleedOnHit(const UBreakerWeaponDefinition* De
 
 void UBreakerWeaponComponent::SnapshotWeaponElement(FBreakerDamageRequest& Request) const
 {
-    float GearEntropy = 0, GearVoid = 0;
+    float GearEntropy = 0, GearVoid = 0, GearRift = 0;
     if (CurrentSlot == 1)
         if (const auto* Equipment = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>() : nullptr)
         {
             GearEntropy = Equipment->GetStats().PrimaryEntropyConversionPercent / 100.0f;
             GearVoid = Equipment->GetStats().PrimaryVoidConversionPercent / 100.0f;
+            GearRift = Equipment->GetStats().PrimaryRiftConversionPercent / 100.0f;
         }
     const auto* State = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerAbilityStateComponent>() : nullptr;
     const auto Selection = BreakerElementConversion::Select(GearEntropy, GearVoid,
-        State ? State->GetWeaponEntropyConversionFraction() : 0);
+        State ? State->GetWeaponEntropyConversionFraction() : 0, GearRift);
     Request.Element = Selection.Element;
     Request.ElementalFraction = Selection.Fraction;
     if (State) State->SnapshotSympatheticEntropy(Request);

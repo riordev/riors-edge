@@ -4437,7 +4437,8 @@ namespace
             (Definition->StatTarget == EBreakerStatTarget::CriticalChance || Definition->StatTarget == EBreakerStatTarget::CriticalDamage
                 || Definition->StatTarget == EBreakerStatTarget::AddedDamage || Definition->StatTarget == EBreakerStatTarget::AbilityDamage
                 || Definition->StatTarget == EBreakerStatTarget::WeaponEntropyConversion
-                || Definition->StatTarget == EBreakerStatTarget::WeaponVoidConversion);
+                || Definition->StatTarget == EBreakerStatTarget::WeaponVoidConversion
+                || Definition->StatTarget == EBreakerStatTarget::WeaponRiftConversion);
         return FString::Printf(TEXT("+%.1f%s %s"), Affix.Value,
             bPercent || bPercentStyleFlat ? TEXT("%") : TEXT(""), *Name);
     }
@@ -8919,7 +8920,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
             || Definition->StatTarget == EBreakerStatTarget::AddedDamage
             || Definition->StatTarget == EBreakerStatTarget::AbilityDamage
             || Definition->StatTarget == EBreakerStatTarget::WeaponEntropyConversion
-            || Definition->StatTarget == EBreakerStatTarget::WeaponVoidConversion);
+            || Definition->StatTarget == EBreakerStatTarget::WeaponVoidConversion
+            || Definition->StatTarget == EBreakerStatTarget::WeaponRiftConversion);
         const FString Digits = FMath::Abs(Value) < 10.0f
             ? FString::Printf(TEXT("%.1f"), Value)
             : FString::Printf(TEXT("%.0f"), Value);

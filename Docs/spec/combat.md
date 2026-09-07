@@ -143,8 +143,8 @@ Void; the delayed burst does not repeat the channel's leech or generate buildup.
 
 Vestige attacks carry Entropy; Altered attacks carry Void. Family attack shares
 and resistance are O2 tuning. Independent modifier hazards keep their own type.
-Weapon conversion selects the larger of Void and combined gear/buff Entropy;
-ties retain Entropy. Current full Attunement therefore selects Entropy while
+Weapon conversion selects the largest share among gear Rift, gear Void and
+combined gear/buff Entropy; ties prefer Entropy, then Void. Full Attunement selects Entropy while
 active. Selection is snapshotted when firing, including projectiles in flight.
 
 Rift reaches its threshold at 10% of chassis health, then pays half the applying
@@ -294,6 +294,3 @@ or reviving does not rearm a consumed rescue; another cast supplies a new one.
 - Lag-compensation tolerance: how far back the server rewinds to validate a
   shot. Deferred rather than answered, because the current topology makes it a
   small-number-of-players problem.
-- Whether enemies deal elemental damage. If they never do, elemental
-  resistance is a stat with nothing to resist.
-- The resistance formula and its value ranges.

@@ -12,6 +12,7 @@ float UBreakerAffixLibrary::ValueForTier(const FBreakerAffixDefinition& Affix, i
     {
         return Affix.StatTarget == EBreakerStatTarget::WeaponEntropyConversion
             || Affix.StatTarget == EBreakerStatTarget::WeaponVoidConversion
+            || Affix.StatTarget == EBreakerStatTarget::WeaponRiftConversion
             ? FMath::Clamp(Value, 0.0f, 100.0f) : Value;
     };
     if (ClampedTier == 0) return BoundConversion(Affix.ValueAtT1 * TierSpikeT0Multiplier);
@@ -540,6 +541,7 @@ bool UBreakerAffixLibrary::IsOffensiveTarget(EBreakerStatTarget Target)
     case EBreakerStatTarget::WeaponPierce:
     case EBreakerStatTarget::WeaponEntropyConversion:
     case EBreakerStatTarget::WeaponVoidConversion:
+    case EBreakerStatTarget::WeaponRiftConversion:
     // O54's other two pools. Both are damage by any reading, and the breadth
     // test's per-slot "can this slot raise damage at all" question has to count
     // them or a slot carrying only ability lines would read as defensive.

@@ -997,7 +997,8 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
                 || Definition->StatTarget == EBreakerStatTarget::WeaponSustainedAccuracy
                 || Definition->StatTarget == EBreakerStatTarget::WeaponPierce
                 || Definition->StatTarget == EBreakerStatTarget::WeaponEntropyConversion
-                || Definition->StatTarget == EBreakerStatTarget::WeaponVoidConversion;
+                || Definition->StatTarget == EBreakerStatTarget::WeaponVoidConversion
+                || Definition->StatTarget == EBreakerStatTarget::WeaponRiftConversion;
             if (bPrimaryOnlyTarget && Item.Slot != EBreakerEquipSlot::Primary) continue;
             if (Definition->StatTarget == EBreakerStatTarget::WeaponSustainedAccuracy
                 && !UBreakerAffixLibrary::IsEligibleForItem(*Definition, Item, Rolled.Tier)) continue;
@@ -1176,6 +1177,7 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
     Stats.PrimaryPierceCount = FMath::Max(0, FMath::FloorToInt(FlatByTarget[static_cast<int32>(EBreakerStatTarget::WeaponPierce)]));
     Stats.PrimaryEntropyConversionPercent = FMath::Clamp(FlatByTarget[static_cast<int32>(EBreakerStatTarget::WeaponEntropyConversion)], 0.0f, 100.0f);
     Stats.PrimaryVoidConversionPercent = FMath::Clamp(FlatByTarget[static_cast<int32>(EBreakerStatTarget::WeaponVoidConversion)], 0.0f, 100.0f);
+    Stats.PrimaryRiftConversionPercent = FMath::Clamp(FlatByTarget[static_cast<int32>(EBreakerStatTarget::WeaponRiftConversion)], 0.0f, 100.0f);
     Stats.CriticalMultiplierBonus = FlatByTarget[static_cast<int32>(EBreakerStatTarget::CriticalDamage)] / 100.0f;
     Stats.SlideSpeedMultiplier = Increased(EBreakerStatTarget::SlideSpeed);
     // DEADFALL's bill. An ordinary NEGATIVE Increased percentage into the same
