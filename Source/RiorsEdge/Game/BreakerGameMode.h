@@ -285,6 +285,13 @@ public:
     // CONTROLLER's input component from HandleStartingNewPlayer instead, and a
     // console command backs it up.
     UFUNCTION(BlueprintCallable, Category="Playtest|Boss") void SpawnBossTest();
+    // The class-taking spawn the key, the switch, the command and the reset
+    // all land on. SpawnBossTest is the Marshal by default and stays void()
+    // because the F5 binding needs that signature; the switch takes
+    // -BreakerBossOnStart=<name> and the command Breaker.Boss <name>, both
+    // resolved through ABreakerBossEnemy::ClassForBossName.
+    void SpawnBossOfClass(TSubclassOf<class ABreakerBossEnemy> BossClass);
+    void SpawnBossCommand(const TArray<FString>& Args);
     UFUNCTION(BlueprintPure, Category="Playtest|Boss") bool IsBossAlive() const;
     // O82: a campaign death during a live boss encounter resets it whole.
     // O121's length dependency is recorded at the implementation.

@@ -8,6 +8,7 @@
 #include "Combat/BreakerSkirmisherEnemy.h"
 #include "Combat/BreakerRangedEnemy.h"
 #include "Combat/BreakerBossEnemy.h"
+#include "Combat/BreakerHoldfastEnemy.h"
 #include "Combat/BreakerAlteredEnemy.h"
 
 // ---------------------------------------------------------------------------
@@ -205,7 +206,8 @@ bool FBreakerRiftTerminatorMarkTest::RunTest(const FString& Parameters)
     // half that a mistake would live in.
     for (UClass* EnemyClass : { ABreakerEnemy::StaticClass(), ABreakerAlteredEnemy::StaticClass(),
         ABreakerRangedEnemy::StaticClass(), ABreakerSkirmisherEnemy::StaticClass(),
-        ABreakerWardenEnemy::StaticClass(), ABreakerBossEnemy::StaticClass() })
+        ABreakerWardenEnemy::StaticClass(), ABreakerBossEnemy::StaticClass(),
+        ABreakerHoldfastEnemy::StaticClass() })
     {
         const ABreakerEnemy* Enemy = NewObject<ABreakerEnemy>(GetTransientPackage(), EnemyClass);
         if (!Enemy)
@@ -250,7 +252,7 @@ bool FBreakerArrivalRingTest::RunTest(const FString& Parameters)
     // the fight quietly stops happening.
     for (UClass* EnemyClass : { ABreakerEnemy::StaticClass(), ABreakerAlteredEnemy::StaticClass(),
         ABreakerSkirmisherEnemy::StaticClass(), ABreakerWardenEnemy::StaticClass(),
-        ABreakerBossEnemy::StaticClass() })
+        ABreakerBossEnemy::StaticClass(), ABreakerHoldfastEnemy::StaticClass() })
     {
         const ABreakerEnemy* Enemy = NewObject<ABreakerEnemy>(GetTransientPackage(), EnemyClass);
         if (!Enemy) { AddError(FString::Printf(TEXT("%s failed to construct"), *EnemyClass->GetName())); continue; }

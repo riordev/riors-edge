@@ -101,7 +101,24 @@ struct RIORSEDGE_API FBreakerBossPhaseParams
     float CommitmentSweepCadenceScale = 0.70f;   // O2 PLACEHOLDER (-30%)
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Boss|Commitment", meta=(ClampMin="0"))
     float CommitmentSlamCooldownSeconds = 4.0f;   // O2 PLACEHOLDER (7s -> 4s)
+
+    // THE ADD GATE. While the boss has live adds and is not yet in Commitment,
+    // incoming damage is scaled by (1 - this) and the next phase gate holds:
+    // the adds are what the player has to answer, and a build that ignores
+    // them does not out-DPS the fight. Zero means no gate at all — the Field
+    // Marshal ships at zero and is byte-identical to a boss that never heard
+    // of one. O31: the reduction is never a wall (BreakerAddGateMaxReduction),
+    // so every build still lands damage through it.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Boss|AddGate", meta=(ClampMin="0", ClampMax="0.9"))
+    float AddGateDamageReduction = 0.0f;   // O2 PLACEHOLDER
 };
+
+namespace BreakerBossGate
+{
+    // The most an add gate may take. 1.0 would be immunity, which O31 forbids
+    // outright; anything above this reads as immunity in play. O2 PLACEHOLDER.
+    constexpr float BreakerAddGateMaxReduction = 0.9f;
+}
 
 // THE BOSS GRAMMAR. Five kinds of beat, and every phase of the fight is a
 // sentence in them. The grammar is DERIVED from the params and the actor's
@@ -124,7 +141,12 @@ enum class EBreakerBossBeat : uint8
     // Adds arrive, AddCount of them, Seconds after the beat before it.
     AddWave,
     // The room itself changes what it is.
-    ArenaChange
+    ArenaChange,
+    // The adds hold the boss: while any of the wave before this beat is alive,
+    // incoming damage is scaled by (1 - Reduction) and the phase gate after it
+    // does not open. Never emitted in Commitment, and never emitted at all
+    // when the params author no reduction.
+    AddGate
 };
 
 struct RIORSEDGE_API FBreakerBossBeat
@@ -137,6 +159,8 @@ struct RIORSEDGE_API FBreakerBossBeat
     float GateFraction = -1.0f;
     // AddWave only.
     int32 AddCount = 0;
+    // AddGate only: the fraction of incoming damage the live adds take off.
+    float Reduction = 0.0f;
     // Which tell, which window, which change — for a test or a log to name.
     FName Tag;
 };
@@ -172,6 +196,21 @@ public:
     // no defined length at all.
     UFUNCTION(BlueprintPure, Category="Boss|Phases")
     static EBreakerBossPhase AdvancePhase(EBreakerBossPhase Current, float HealthFraction, const FBreakerBossPhaseParams& Params);
+
+    // AdvancePhase with the add gate: while the params author a reduction and
+    // LiveAddCount is above zero, a boss outside Commitment holds its phase
+    // whatever its health says. Still monotonic — the gate only ever delays
+    // a step forward, never takes one back. With a zero reduction this IS
+    // AdvancePhase. A separate name rather than an overload because UHT does
+    // not overload a UFUNCTION; the actor calls this one and nothing else.
+    static EBreakerBossPhase AdvancePhaseGated(EBreakerBossPhase Current, float HealthFraction,
+        const FBreakerBossPhaseParams& Params, int32 LiveAddCount);
+
+    // The incoming-damage multiplier the add gate applies to the boss:
+    // (1 - Reduction) while LiveAddCount > 0 outside Commitment, else 1.0.
+    // Never zero (O31): the reduction is capped at BreakerAddGateMaxReduction.
+    UFUNCTION(BlueprintPure, Category="Boss|AddGate")
+    static float AddGateIncomingMultiplier(EBreakerBossPhase Phase, int32 LiveAddCount, const FBreakerBossPhaseParams& Params);
 
     UFUNCTION(BlueprintPure, Category="Boss|Phases")
     static EBreakerBossOrder GetOrderForPhase(EBreakerBossPhase Phase);
@@ -222,7 +261,9 @@ public:
 
     // The shipped grammar, derived. SweepTellSeconds is the Warden's draw-back:
     // it lives on the archetype, not in the params, and is passed in rather
-    // than authored a second time here.
+    // than authored a second time here. When the params author an add-gate
+    // reduction, an AddGate follows every AddWave in Deployment and
+    // Suppression; Commitment never has one, because it has no adds.
     static FBreakerBossGrammar MakeShippedGrammar(const FBreakerBossPhaseParams& Params,
         int32 AddsPerDeploy, int32 GalleryLatticeCount, float SweepTellSeconds);
 

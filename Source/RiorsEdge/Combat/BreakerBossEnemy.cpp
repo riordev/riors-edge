@@ -3,6 +3,7 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerHoldfastEnemy.h"
 #include "Combat/BreakerRangedBehavior.h"
 #include "Combat/BreakerRangedEnemy.h"
 #include "Combat/BreakerStatusComponent.h"
@@ -14,6 +15,22 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
+
+namespace BreakerBossRuntime
+{
+    // Distinctively prefixed for the unity build, the same discipline as
+    // BreakerModifierRuntime::BreakerAuraModifierKey. One key, so a re-push
+    // replaces rather than stacks and a remove takes the whole gate off.
+    static const FName BreakerBossAddGateKey(TEXT("Boss.AddGate"));
+}
+
+TSubclassOf<ABreakerBossEnemy> ABreakerBossEnemy::ClassForBossName(FName BossName)
+{
+    if (BossName.IsNone()) return nullptr;
+    if (BossName == FName(TEXT("Holdfast"))) return ABreakerHoldfastEnemy::StaticClass();
+    if (BossName == FName(TEXT("FieldMarshal"))) return ABreakerBossEnemy::StaticClass();
+    return nullptr;
+}
 
 ABreakerBossEnemy::ABreakerBossEnemy()
 {
@@ -179,6 +196,7 @@ void ABreakerBossEnemy::Tick(float DeltaSeconds)
     if (!HasAuthority() || IsDeadEnemy() || !GetWorld()) return;
 
     UpdatePhase();
+    UpdateAddGate();
     TickGalleryRespawn(DeltaSeconds);
 
     // The front-break window runs down here, not in the engaged tick, so a
@@ -211,8 +229,37 @@ void ABreakerBossEnemy::UpdatePhase()
     if (MaxHealth <= 0.0f) return;
     const float Fraction = Attributes->GetHealth() / MaxHealth;
 
-    const EBreakerBossPhase Next = UBreakerBossPhaseLibrary::AdvancePhase(Phase, Fraction, PhaseParams);
+    // The gated step: with a zero reduction (the Marshal) this is AdvancePhase
+    // exactly; with one authored, live adds hold the gate until they are dead.
+    const EBreakerBossPhase Next = UBreakerBossPhaseLibrary::AdvancePhaseGated(Phase, Fraction, PhaseParams, CountLiveAdds());
     if (Next != Phase) EnterPhase(Next);
+}
+
+int32 ABreakerBossEnemy::CountLiveAdds()
+{
+    LiveAdds.RemoveAll([](const TWeakObjectPtr<ABreakerEnemy>& Add)
+    {
+        return !Add.IsValid() || Add->IsDeadEnemy();
+    });
+    GalleryLattices.RemoveAll([](const TWeakObjectPtr<ABreakerRangedEnemy>& Lattice)
+    {
+        return !Lattice.IsValid() || Lattice->IsDeadEnemy();
+    });
+    return LiveAdds.Num() + GalleryLattices.Num();
+}
+
+void ABreakerBossEnemy::UpdateAddGate()
+{
+    if (!Combat) return;
+    const float Multiplier = UBreakerBossPhaseLibrary::AddGateIncomingMultiplier(Phase, CountLiveAdds(), PhaseParams);
+    const bool bWantGate = Multiplier < 1.0f;
+    if (bWantGate == bAddGatePushed) return;
+    // Pushed and removed on the CROSSING only, on the boss's own component, so
+    // a boss with no reduction never touches its modifier map at all and a
+    // boss with one carries exactly one keyed entry while adds stand.
+    if (bWantGate) Combat->PushIncomingDamageModifier(BreakerBossRuntime::BreakerBossAddGateKey, Multiplier);
+    else Combat->RemoveIncomingDamageModifier(BreakerBossRuntime::BreakerBossAddGateKey);
+    bAddGatePushed = bWantGate;
 }
 
 void ABreakerBossEnemy::EnterPhase(EBreakerBossPhase NewPhase)
@@ -403,10 +450,7 @@ void ABreakerBossEnemy::SpawnDeployAdds(const FVector& AlcoveWorldLocation)
     if (!GetWorld() || !HasAuthority() || !DeployAddClass) return;
     if (!UBreakerBossPhaseLibrary::ShouldSpawnAdds(Phase)) return;
 
-    LiveAdds.RemoveAll([](const TWeakObjectPtr<ABreakerEnemy>& Add)
-    {
-        return !Add.IsValid() || Add->IsDeadEnemy();
-    });
+    CountLiveAdds();
     // §5.3's density ceiling, enforced where the density is created. A boss
     // that deploys into an uncleared field turns a 12-enemy cap into 30.
     const int32 Room = FMath::Max(0, MaximumLiveAdds - LiveAdds.Num());
@@ -431,10 +475,7 @@ void ABreakerBossEnemy::SpawnDeployAdds(const FVector& AlcoveWorldLocation)
 void ABreakerBossEnemy::SpawnGalleryLattices()
 {
     if (!GetWorld() || !HasAuthority() || !GalleryLatticeClass || GalleryOffsets.IsEmpty()) return;
-    GalleryLattices.RemoveAll([](const TWeakObjectPtr<ABreakerRangedEnemy>& Lattice)
-    {
-        return !Lattice.IsValid() || Lattice->IsDeadEnemy();
-    });
+    CountLiveAdds();
 
     // §5.3's hard cap of 3 live Lattices, regardless of anything: "four
     // converging projectile sources removes all safe ground; this is the single
@@ -457,10 +498,7 @@ void ABreakerBossEnemy::SpawnGalleryLattices()
 void ABreakerBossEnemy::TickGalleryRespawn(float DeltaSeconds)
 {
     if (Phase != EBreakerBossPhase::Suppression) return;
-    GalleryLattices.RemoveAll([](const TWeakObjectPtr<ABreakerRangedEnemy>& Lattice)
-    {
-        return !Lattice.IsValid() || Lattice->IsDeadEnemy();
-    });
+    CountLiveAdds();
     const int32 Wanted = FMath::Min(FMath::Clamp(GalleryLatticeCount, 0, 3), GalleryOffsets.Num());
     if (GalleryLattices.Num() >= Wanted)
     {
@@ -512,5 +550,12 @@ void ABreakerBossEnemy::HandleDeath()
         if (ABreakerRangedEnemy* Lattice = Weak.Get()) Lattice->Destroy();
     }
     GalleryLattices.Reset();
+    // A dead boss takes no more damage, but the modifier map is state and a
+    // pooled or revived body must not wake up gated.
+    if (bAddGatePushed && Combat)
+    {
+        Combat->RemoveIncomingDamageModifier(BreakerBossRuntime::BreakerBossAddGateKey);
+        bAddGatePushed = false;
+    }
     OnBossDefeated.Broadcast();
 }

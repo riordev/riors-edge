@@ -11,7 +11,9 @@ class UPointLightComponent;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerBossPhaseChanged, EBreakerBossPhase, NewPhase);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FBreakerBossDefeated);
 
-// THE FIELD MARSHAL — the slice boss (Encounter-Design §3).
+// THE FIELD MARSHAL — the slice boss (Encounter-Design §3), and Act II's
+// (O214): no Altered commands before Act II, so Act I ends on The Holdfast
+// (Combat/BreakerHoldfastEnemy.h), which is this machine on a Vestige body.
 //
 // THE DESIGN THESIS, and the reason this class subclasses the Warden rather
 // than ABreakerEnemy: §3.1 says "the boss is not a big Warden. The boss is a
@@ -69,6 +71,13 @@ public:
     UFUNCTION(BlueprintPure, Category="Boss") bool IsGivingOrder() const { return bOrderRaiseActive; }
     UFUNCTION(BlueprintPure, Category="Boss") bool IsApparatusExposed() const;
     UFUNCTION(BlueprintPure, Category="Boss") int32 GetOrdersGiven() const { return OrdersGiven; }
+
+    // The boss vocabulary Data/missions.json's "boss" field and the gym's
+    // -BreakerBossOnStart=<name> / Breaker.Boss <name> speak: one line per
+    // shipped boss class, null for a name nothing ships. The mission loader
+    // stores the name and nothing else, so this is the one place a name
+    // becomes a body.
+    static TSubclassOf<ABreakerBossEnemy> ClassForBossName(FName BossName);
 
     UPROPERTY(BlueprintAssignable, Category="Boss") FBreakerBossPhaseChanged OnPhaseChanged;
     UPROPERTY(BlueprintAssignable, Category="Boss") FBreakerBossDefeated OnBossDefeated;
@@ -149,6 +158,15 @@ protected:
     void ResolveOrder();
     void UpdateApparatus(float Alpha);
 
+    // Prunes the dead and the destroyed out of LiveAdds and GalleryLattices
+    // and returns what is left of both. The one count the add gate reads and
+    // the one place either list is pruned.
+    int32 CountLiveAdds();
+    // Pushes or removes the boss's own keyed incoming modifier as the pure
+    // add-gate multiplier crosses 1.0. Pushes nothing, ever, at a reduction
+    // of zero.
+    void UpdateAddGate();
+
     void SpawnDeployAdds(const FVector& AlcoveWorldLocation);
     void SpawnGalleryLattices();
     void TickGalleryRespawn(float DeltaSeconds);
@@ -183,6 +201,9 @@ private:
     float FrontBreakWindowRemaining = 0.0f;
     bool bOrderRaiseActive = false;
     bool bApparatusExposed = false;
+    // Whether the Boss.AddGate modifier currently stands on this body's
+    // combat component; the push and the remove are gated on the crossing.
+    bool bAddGatePushed = false;
     int32 OrdersGiven = 0;
     int32 OrderTargetIndex = 0;
     float BaseSweepCooldown = 2.2f;

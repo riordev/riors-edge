@@ -708,23 +708,40 @@ void ABreakerGameMode::ArmDevInstruments(APlayerController* NewPlayer)
     {
         UE_LOG(LogTemp, Warning, TEXT("[BreakerGym] no controller input component; the F5 boss key is unavailable. Use Breaker.Boss."));
     }
-    // -BreakerBossOnStart spawns the Field Marshal during the gym build, so the
-    // capture harness can PHOTOGRAPH it. Without this the boss is only
-    // reachable by a key press, and a headless run cannot press a key — which
-    // would leave the one archetype most worth looking at as the one archetype
-    // nobody has looked at. Dev-only by construction: a command-line switch
+    // -BreakerBossOnStart spawns a boss during the gym build, so the capture
+    // harness can PHOTOGRAPH it. Without this the boss is only reachable by a
+    // key press, and a headless run cannot press a key — which would leave
+    // the one archetype most worth looking at as the one archetype nobody has
+    // looked at. Bare, it is the Field Marshal; =<name> picks a body through
+    // ABreakerBossEnemy::ClassForBossName (Holdfast, FieldMarshal), and an
+    // unknown name is refused loudly rather than falling back — the same rule
+    // -BreakerCrowdLoad keeps. Dev-only by construction: a command-line switch
     // cannot be reached from a shipped build.
-    if (FParse::Param(FCommandLine::Get(), TEXT("BreakerBossOnStart")))
     {
-        SpawnBossTest();
-        LogGymSummary();
+        FString BossOnStart;
+        const bool bNamed = FParse::Value(FCommandLine::Get(), TEXT("BreakerBossOnStart="), BossOnStart);
+        if (bNamed || FParse::Param(FCommandLine::Get(), TEXT("BreakerBossOnStart")))
+        {
+            const TSubclassOf<ABreakerBossEnemy> BossClass = BossOnStart.IsEmpty()
+                ? TSubclassOf<ABreakerBossEnemy>(ABreakerBossEnemy::StaticClass())
+                : ABreakerBossEnemy::ClassForBossName(FName(*BossOnStart));
+            if (BossClass)
+            {
+                SpawnBossOfClass(BossClass);
+                LogGymSummary();
+            }
+            else
+            {
+                UE_LOG(LogTemp, Error, TEXT("[BreakerGym] -BreakerBossOnStart=%s names no boss; nothing spawned. Known: Holdfast, FieldMarshal."), *BossOnStart);
+            }
+        }
     }
     if (!BossConsoleCommand)
     {
         BossConsoleCommand = IConsoleManager::Get().RegisterConsoleCommand(
             TEXT("Breaker.Boss"),
-            TEXT("Spawns THE FIELD MARSHAL at the elite arena (Encounter-Design 3)."),
-            FConsoleCommandDelegate::CreateUObject(this, &ABreakerGameMode::SpawnBossTest));
+            TEXT("Spawns a boss at the elite arena (Encounter-Design 3). Breaker.Boss [Holdfast|FieldMarshal]; bare is the Field Marshal."),
+            FConsoleCommandWithArgsDelegate::CreateUObject(this, &ABreakerGameMode::SpawnBossCommand));
     }
     // -BreakerEffectProbe: the Phase B proof. One glow, fixed spot in the
     // spawn view, fixed clock, placed during the gym build so the capture
@@ -1215,19 +1232,44 @@ void ABreakerGameMode::ResetBossEncounter()
     // comment exists because the TTK figure lives in a different file from
     // the death rule and nothing else connects them.
     if (!IsBossAlive()) return;
-    UE_LOG(LogTemp, Display, TEXT("[BreakerGym] boss encounter RESET on player death (O82): the Field Marshal respawns whole."));
+    // The SAME boss comes back: the class is read off the body before it is
+    // destroyed, so a Holdfast encounter does not reset into a Marshal.
+    const TSubclassOf<ABreakerBossEnemy> BossClass = ActiveBoss->GetClass();
+    UE_LOG(LogTemp, Display, TEXT("[BreakerGym] boss encounter RESET on player death (O82): %s respawns whole."),
+        *BossClass->GetName());
     ActiveBoss->Destroy();
     ActiveBoss = nullptr;
-    SpawnBossTest();
+    SpawnBossOfClass(BossClass);
 }
 
 void ABreakerGameMode::SpawnBossTest()
 {
+    SpawnBossOfClass(ABreakerBossEnemy::StaticClass());
+}
+
+void ABreakerGameMode::SpawnBossCommand(const TArray<FString>& Args)
+{
+    if (Args.IsEmpty())
+    {
+        SpawnBossTest();
+        return;
+    }
+    const TSubclassOf<ABreakerBossEnemy> BossClass = ABreakerBossEnemy::ClassForBossName(FName(*Args[0]));
+    if (!BossClass)
+    {
+        UE_LOG(LogTemp, Error, TEXT("[BreakerGym] Breaker.Boss %s names no boss; nothing spawned. Known: Holdfast, FieldMarshal."), *Args[0]);
+        return;
+    }
+    SpawnBossOfClass(BossClass);
+}
+
+void ABreakerGameMode::SpawnBossOfClass(TSubclassOf<ABreakerBossEnemy> BossClass)
+{
     UWorld* World = GetWorld();
-    if (!World || !bFieldFrameSet) return;
+    if (!World || !bFieldFrameSet || !BossClass) return;
     if (IsBossAlive())
     {
-        UE_LOG(LogTemp, Display, TEXT("[BreakerGym] the Field Marshal is already alive; refusing a second."));
+        UE_LOG(LogTemp, Display, TEXT("[BreakerGym] %s is already alive; refusing a second boss."), *ActiveBoss->GetClass()->GetName());
         return;
     }
 
@@ -1252,7 +1294,7 @@ void ABreakerGameMode::SpawnBossTest()
     // FRONT — which is the armoured side, and the whole fight is the decision
     // to stop being there.
     ABreakerBossEnemy* Boss = World->SpawnActor<ABreakerBossEnemy>(
-        ABreakerBossEnemy::StaticClass(), ArenaCentre, (-Frame.Forward).Rotation(), Params);
+        BossClass, ArenaCentre, (-Frame.Forward).Rotation(), Params);
     if (!Boss) return;
 
     Boss->ConfigureEncounter(ArenaCentre, 0.0f);
@@ -1265,8 +1307,8 @@ void ABreakerGameMode::SpawnBossTest()
     ActiveBoss = Boss;
 
     UE_LOG(LogTemp, Display,
-        TEXT("[BreakerGym] FIELD MARSHAL spawned at the elite arena (%.0f cm forward), area level %d, %.0f health. Walk to it."),
-        ArenaDistance, GymAreaLevel, Boss->GetMonsterMaxHealth());
+        TEXT("[BreakerGym] %s spawned at the elite arena (%.0f cm forward), area level %d, %.0f health. Walk to it."),
+        *Boss->GetClass()->GetName(), ArenaDistance, GymAreaLevel, Boss->GetMonsterMaxHealth());
 }
 
 void ABreakerGameMode::HandleBossDefeated()
@@ -3353,6 +3395,13 @@ void ABreakerGameMode::StartNextWave()
     // its own gallery Lattices, and §5.3's density ceiling is enforced at that
     // SOURCE — a wave budget spent alongside it would blow the cap from two
     // directions at once and neither would know about the other.
+    //
+    // O214 IS VIOLATED HERE and recorded rather than faked: the Act I rift
+    // ends on The Holdfast, and this spawns the Marshal in every rift. A wave
+    // knows nothing of which rift it is in, and nothing carries the mission
+    // beat's "boss" name (Data/missions.json) down to the wave — that
+    // rift-to-boss-class plumbing does not exist, and picking the Holdfast
+    // here for every rift would be the same violation the other way round.
     if (Composition.bBoss)
     {
         SpawnBossTest();

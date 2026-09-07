@@ -5,6 +5,7 @@
 #include "Combat/BreakerBossEnemy.h"
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerEnemyModifiers.h"
+#include "Combat/BreakerHoldfastEnemy.h"
 #include "Combat/BreakerMonsterChassis.h"
 #include "Game/BreakerGameMode.h"
 #include "Items/BreakerAffixLibrary.h"
@@ -34,6 +35,11 @@ namespace BreakerPromotedFindingTest
 {
     // Distinctively named for the unity build, per the twice-shipped rule about
     // anonymous-namespace collisions.
+
+    // O18's seed band for a baseline boss kill. Shared by every boss the game
+    // fields: BossBand below asserts each shipped boss class inside it.
+    constexpr float PromotedBossSecondsFloor = 20.0f;
+    constexpr float PromotedBossSecondsCeiling = 45.0f;
 
     // The weapon a baseline character actually carries, READ rather than
     // transcribed and rather than named.
@@ -70,11 +76,6 @@ namespace BreakerPromotedFindingTest
     // so a TTK figure below says what it is a target FOR — a Warden trash mob
     // at x3.2 kills in 2.9s and that is on target, not 3x adrift.
     constexpr float PromotedReferenceArchetype = 1.0f;
-
-    // O18's seed band for a baseline boss kill. The same two figures BossBand
-    // asserts at area level 50; GymEntry asserts them at the gym's own level.
-    constexpr float PromotedBossSecondsFloor = 20.0f;
-    constexpr float PromotedBossSecondsCeiling = 45.0f;
 
     float PromotedWeaponGrowth()
     {
@@ -518,49 +519,55 @@ bool FBreakerBossBandTest::RunTest(const FString& Parameters)
     using namespace BreakerPromotedFindingTest;
     const FBreakerMonsterChassisParams Params;
 
-    // O18's seed band for a baseline build.
-    constexpr float BossSecondsFloor = 20.0f;
-    constexpr float BossSecondsCeiling = 45.0f;
-
     constexpr int32 AreaLevel = 50;
-
-    // The boss the game FIELDS, not a boss-rank trash archetype. Read off the
-    // shipped actor's class default object, which is world-free.
-    const float BossArchetype = GetDefault<ABreakerBossEnemy>()->GetArchetypeHealthMultiplier();
-
-    const float Seconds = PromotedBaselineSecondsToKill(
-        AreaLevel, EBreakerMonsterRank::Boss, Params, BossArchetype);
     const float TrashSeconds = PromotedBaselineSecondsToKill(AreaLevel, EBreakerMonsterRank::Trash, Params);
-    const float RankTimesArchetype =
-        UBreakerMonsterChassisLibrary::GetRankHealthMultiplier(EBreakerMonsterRank::Boss, Params) * BossArchetype;
 
-    AddInfo(FString::Printf(TEXT("BOSS BAND  area level %d: %.1fs (O18 target %.0f-%.0fs)"),
-        AreaLevel, Seconds, BossSecondsFloor, BossSecondsCeiling));
-    AddInfo(FString::Printf(
-        TEXT("BOSS BAND  the fielded boss is rank x%.0f on archetype x%.2f = x%.2f over trash"),
-        UBreakerMonsterChassisLibrary::GetRankHealthMultiplier(EBreakerMonsterRank::Boss, Params),
-        BossArchetype, RankTimesArchetype));
-    AddInfo(FString::Printf(
-        TEXT("BOSS BAND  trash kills in %.2fs, so the derivation predicts %.2fs and measures %.2fs"),
-        TrashSeconds, TrashSeconds * RankTimesArchetype, Seconds));
+    // Every boss the game FIELDS, not a boss-rank trash archetype: the Field
+    // Marshal (Act II, O214) and The Holdfast (Act I). Each is read off its
+    // shipped class default object, which is world-free, and each must land
+    // in the band on its own — the Holdfast's add gate lengthens the fight
+    // only while adds stand, and this measures the ungated seed.
+    for (const ABreakerBossEnemy* Boss : { static_cast<const ABreakerBossEnemy*>(GetDefault<ABreakerBossEnemy>()),
+        static_cast<const ABreakerBossEnemy*>(GetDefault<ABreakerHoldfastEnemy>()) })
+    {
+        if (!TestNotNull(TEXT("The boss has a default object"), Boss)) continue;
+        const FString Name = Boss->GetClass()->GetName();
+        const float BossArchetype = Boss->GetArchetypeHealthMultiplier();
 
-    // THE DERIVATION IDENTITY, asserted rather than restated in prose. The
-    // spec's rule is that a rank multiplier IS the ratio of its TTK target to
-    // trash's. Composed with the actor's archetype it reproduces the measured
-    // kill exactly, which is what proves the rank table was never the error.
-    TestTrue(*FString::Printf(
-        TEXT("Boss TTK (%.4fs) is trash TTK (%.4fs) times rank x archetype (x%.4f)"),
-        Seconds, TrashSeconds, RankTimesArchetype),
-        FMath::IsNearlyEqual(Seconds, TrashSeconds * RankTimesArchetype, 0.01f));
+        const float Seconds = PromotedBaselineSecondsToKill(
+            AreaLevel, EBreakerMonsterRank::Boss, Params, BossArchetype);
+        const float RankTimesArchetype =
+            UBreakerMonsterChassisLibrary::GetRankHealthMultiplier(EBreakerMonsterRank::Boss, Params) * BossArchetype;
 
-    // A BASELINE build carries no multiplier band by construction — that is
-    // what makes it the baseline — so this is weapon base against boss health
-    // and nothing else. An optimized build's faster kill is correct behaviour
-    // and is the other test's subject, not a failure of this one.
-    TestTrue(*FString::Printf(TEXT("A baseline boss kill (%.1fs) is at least %.0fs"), Seconds, BossSecondsFloor),
-        Seconds >= BossSecondsFloor);
-    TestTrue(*FString::Printf(TEXT("A baseline boss kill (%.1fs) is at most %.0fs"), Seconds, BossSecondsCeiling),
-        Seconds <= BossSecondsCeiling);
+        AddInfo(FString::Printf(TEXT("BOSS BAND  %s area level %d: %.1fs (O18 target %.0f-%.0fs)"),
+            *Name, AreaLevel, Seconds, PromotedBossSecondsFloor, PromotedBossSecondsCeiling));
+        AddInfo(FString::Printf(
+            TEXT("BOSS BAND  %s is rank x%.0f on archetype x%.2f = x%.2f over trash"),
+            *Name, UBreakerMonsterChassisLibrary::GetRankHealthMultiplier(EBreakerMonsterRank::Boss, Params),
+            BossArchetype, RankTimesArchetype));
+        AddInfo(FString::Printf(
+            TEXT("BOSS BAND  trash kills in %.2fs, so the derivation predicts %.2fs and measures %.2fs"),
+            TrashSeconds, TrashSeconds * RankTimesArchetype, Seconds));
+
+        // THE DERIVATION IDENTITY, asserted rather than restated in prose. The
+        // spec's rule is that a rank multiplier IS the ratio of its TTK target
+        // to trash's. Composed with the actor's archetype it reproduces the
+        // measured kill exactly, which is what proves the rank table was never
+        // the error.
+        TestTrue(*FString::Printf(
+            TEXT("%s TTK (%.4fs) is trash TTK (%.4fs) times rank x archetype (x%.4f)"),
+            *Name, Seconds, TrashSeconds, RankTimesArchetype),
+            FMath::IsNearlyEqual(Seconds, TrashSeconds * RankTimesArchetype, 0.01f));
+
+        // A BASELINE build carries no multiplier band by construction — that
+        // is what makes it the baseline — so this is weapon base against boss
+        // health and nothing else. An optimized build's faster kill is correct
+        // behaviour and is the other test's subject, not a failure of this one.
+        TestTrue(*FString::Printf(TEXT("A baseline %s kill (%.1fs) is at least %.0fs"), *Name, Seconds, PromotedBossSecondsFloor),
+            Seconds >= PromotedBossSecondsFloor);
+        TestTrue(*FString::Printf(TEXT("A baseline %s kill (%.1fs) is at most %.0fs"), *Name, Seconds, PromotedBossSecondsCeiling),
+            Seconds <= PromotedBossSecondsCeiling);
+    }
     return true;
 }
 

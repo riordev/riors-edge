@@ -25,6 +25,29 @@ EBreakerBossPhase UBreakerBossPhaseLibrary::AdvancePhase(EBreakerBossPhase Curre
     return static_cast<uint8>(Implied) > static_cast<uint8>(Current) ? Implied : Current;
 }
 
+EBreakerBossPhase UBreakerBossPhaseLibrary::AdvancePhaseGated(EBreakerBossPhase Current, float HealthFraction,
+    const FBreakerBossPhaseParams& Params, int32 LiveAddCount)
+{
+    // The gate is held only while it can mean something: a reduction is
+    // authored, adds are alive, and there is a gate ahead. Commitment has no
+    // next gate and no adds of its own, so the count is irrelevant there.
+    const bool bHeld = Params.AddGateDamageReduction > 0.0f
+        && LiveAddCount > 0
+        && Current != EBreakerBossPhase::Commitment;
+    if (bHeld) return Current;
+    return AdvancePhase(Current, HealthFraction, Params);
+}
+
+float UBreakerBossPhaseLibrary::AddGateIncomingMultiplier(EBreakerBossPhase Phase, int32 LiveAddCount, const FBreakerBossPhaseParams& Params)
+{
+    if (Phase == EBreakerBossPhase::Commitment || LiveAddCount <= 0) return 1.0f;
+    // Clamped at the top, not just the bottom: 1.0 would make the boss immune
+    // while any add stood, and O31 has no room for an encounter a build cannot
+    // participate in. The product is therefore always above zero.
+    const float Reduction = FMath::Clamp(Params.AddGateDamageReduction, 0.0f, BreakerBossGate::BreakerAddGateMaxReduction);
+    return 1.0f - Reduction;
+}
+
 EBreakerBossOrder UBreakerBossPhaseLibrary::GetOrderForPhase(EBreakerBossPhase Phase)
 {
     switch (Phase)
@@ -151,6 +174,17 @@ FBreakerBossGrammar UBreakerBossPhaseLibrary::MakeShippedGrammar(const FBreakerB
         return Out;
     };
 
+    // The add gate, when authored: the same number the multiplier uses, so the
+    // grammar cannot claim a gate the fight does not run.
+    const float GateReduction = FMath::Clamp(Params.AddGateDamageReduction, 0.0f, BreakerBossGate::BreakerAddGateMaxReduction);
+    auto AddGate = [&Beat, GateReduction](TArray<FBreakerBossBeat>& List, const TCHAR* Tag)
+    {
+        if (GateReduction <= 0.0f) return;
+        FBreakerBossBeat Gate = Beat(EBreakerBossBeat::AddGate, 0.0f, Tag);
+        Gate.Reduction = GateReduction;
+        List.Add(Gate);
+    };
+
     FBreakerBossGrammar Grammar;
 
     // Fight-level: the sweep draw-back is the tell the player trades against
@@ -167,6 +201,7 @@ FBreakerBossGrammar UBreakerBossPhaseLibrary::MakeShippedGrammar(const FBreakerB
     Deployment.Add(Beat(EBreakerBossBeat::PunishWindow, DeployRaise, TEXT("DeployRaise")));
     Deployment.Add(Beat(EBreakerBossBeat::AddWave, FMath::Max(0.0f, Params.DeploySpawnDelaySeconds), TEXT("Deploy"),
         -1.0f, FMath::Max(0, AddsPerDeploy)));
+    AddGate(Deployment, TEXT("DeployGate"));
     Deployment.Add(Beat(EBreakerBossBeat::PhaseGate, 0.0f, TEXT("SuppressionGate"),
         NextGate(EBreakerBossPhase::Deployment, Params)));
 
@@ -176,6 +211,7 @@ FBreakerBossGrammar UBreakerBossPhaseLibrary::MakeShippedGrammar(const FBreakerB
     const float FireRaise = GetOrderRaiseSeconds(EBreakerBossPhase::Suppression, Params);
     Suppression.Add(Beat(EBreakerBossBeat::AddWave, 0.0f, TEXT("GalleryLattices"),
         -1.0f, FMath::Clamp(GalleryLatticeCount, 0, 3)));
+    AddGate(Suppression, TEXT("GalleryGate"));
     Suppression.Add(Beat(EBreakerBossBeat::Telegraph, FireRaise, TEXT("FireRaise")));
     Suppression.Add(Beat(EBreakerBossBeat::PunishWindow, FireRaise, TEXT("FireRaise")));
     Suppression.Add(Beat(EBreakerBossBeat::PhaseGate, 0.0f, TEXT("CommitmentGate"),

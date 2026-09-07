@@ -129,7 +129,7 @@
 					"id": "Undercroft",
 					"kind": "Boss",
 					"rift": "fernhall.substation",
-					"boss": "",
+					"boss": "Holdfast",
 					"completesOn": "Quest.Deeper.SweepDone"
 				},
 				{

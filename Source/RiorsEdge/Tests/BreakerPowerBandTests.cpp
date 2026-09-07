@@ -297,15 +297,17 @@ namespace BreakerPowerBandTest
 
     TArray<FBreakerNodeRank> BaselineRanks()
     {
-        // A FULL 65-POINT at-cap character, spent BADLY on purpose: entries,
-        // gateways, defence and utility, generalist travel picks (All +6),
-        // no Convergence, no More, and no conditional line it plays around.
-        // RING-LEGAL: a purchase order exists from the three entries through
-        // every node below, with every AND gate's rims owned. Bulwark and
-        // Aegis wheels complete (minus their hubs), Kinesis complete,
-        // Reservoir complete, a toe into Precision and Elements. 65 points
-        // exactly; the Swift doctrine rows are the same 8-point doctrine
-        // spend as ever.
+        // An at-cap character, spent BADLY on purpose: entries, gateways,
+        // defence and utility, no Convergence, no More, and no conditional
+        // line it plays around. WHEEL-LEGAL: every wheel is entered at its
+        // own rim 0 from the virtual hub (O211) and every AND gate's rims are
+        // owned. Bulwark and Aegis wheels complete (minus their hubs),
+        // Kinesis complete, Reservoir complete, a toe into Precision and
+        // Elements. 56 Core points of the 65 budget — the nine that bought
+        // travel beads between wheels have no bead to buy since O213, and
+        // where they go is a fixture decision the owner rules, not one this
+        // list makes for him; the Swift doctrine rows are the same 8-point
+        // doctrine spend as ever.
         return {
             // Precision, from the entry: 4
             {TEXT("Core.Precision.Sightline"), 1},
@@ -321,10 +323,6 @@ namespace BreakerPowerBandTest
             {TEXT("Core.Bulwark.Parry"), 1},
             {TEXT("Core.Bulwark.Counterweight"), 1},
             {TEXT("Core.Bulwark.Interposition"), 1},
-            // The run to Kinesis, generalist picks: 3
-            {TEXT("Core.Travel.Ring8P1All"), 1},
-            {TEXT("Core.Travel.Ring8P2All"), 1},
-            {TEXT("Core.Travel.Ring8P3All"), 1},
             // Kinesis, complete (no hub exists): 12
             {TEXT("Core.Kinesis.LightFooting"), 1},
             {TEXT("Core.Kinesis.Loft"), 1},
@@ -335,10 +333,6 @@ namespace BreakerPowerBandTest
             {TEXT("Core.Kinesis.AirJump"), 1},
             {TEXT("Core.Kinesis.Slipcut"), 1},
             {TEXT("Core.Kinesis.PhantomStep"), 1},
-            // The run to Aegis, entered from the Bulwark end: 3
-            {TEXT("Core.Travel.Ring7P1All"), 1},
-            {TEXT("Core.Travel.Ring7P2All"), 1},
-            {TEXT("Core.Travel.Ring7P3All"), 1},
             // Aegis, complete (no hub exists): 12
             {TEXT("Core.Aegis.Footing"), 1},
             {TEXT("Core.Aegis.Brace"), 1},
@@ -359,10 +353,7 @@ namespace BreakerPowerBandTest
             {TEXT("Core.Reservoir.ConvergencePoint"), 1},
             {TEXT("Core.Reservoir.Spillover"), 1},
             {TEXT("Core.Reservoir.Reserve"), 1},
-            // The run to Elements and a toe inside: 3 + 4
-            {TEXT("Core.Travel.Ring4P1All"), 1},
-            {TEXT("Core.Travel.Ring4P2All"), 1},
-            {TEXT("Core.Travel.Ring4P3All"), 1},
+            // A toe into Elements: 4
             {TEXT("Core.Elements.Conductive"), 1},
             {TEXT("Core.Elements.ChargeUp"), 1},
             {TEXT("Core.Elements.Penetrance"), 1},
@@ -398,14 +389,15 @@ namespace BreakerPowerBandTest
 
     TArray<FBreakerNodeRank> OptimizedRanks()
     {
-        // A FULL 65-POINT at-cap character, spent WELL: the airborne Swift
-        // weapon build the Velocity wheel exists for. RING-LEGAL like the
-        // baseline. Precision, Volley and Velocity complete to their hubs —
-        // three Mores, Fixate and Barrage on the weapon lane and Terminal
-        // Velocity shared while airborne, the same x1.9349 composed product
-        // the pre-atlas build held — travel taken on Weapon picks, and the
-        // spare eleven points pushed into Ruin for Execute and Siege.
-        // 65 points exactly.
+        // An at-cap character, spent WELL: the airborne Swift weapon build
+        // the Velocity wheel exists for. WHEEL-LEGAL like the baseline.
+        // Precision, Volley and Velocity complete to their hubs — three
+        // Mores, Fixate and Barrage on the weapon lane and Terminal Velocity
+        // shared while airborne, the same x1.9349 composed product the
+        // pre-atlas build held — and eight points into Ruin for Execute and
+        // Siege. 54 Core points of the 65 budget: the eleven that bought
+        // weapon travel beads have no bead to buy since O213, and where they
+        // go is the owner's fixture decision, not this list's.
         return {
             // Precision, complete: 15
             {TEXT("Core.Precision.Sightline"), 1},
@@ -418,10 +410,6 @@ namespace BreakerPowerBandTest
             {TEXT("Core.Precision.TunnelVision"), 1},
             {TEXT("Core.Precision.Deadeye"), 1},
             {TEXT("Core.Precision.Fixate"), 1},              // More x1.22, weapon lane
-            // The run to Volley, weapon picks: 3
-            {TEXT("Core.Travel.Ring0P1Weapon"), 1},
-            {TEXT("Core.Travel.Ring0P2Weapon"), 1},
-            {TEXT("Core.Travel.Ring0P3Weapon"), 1},
             // Volley, complete: 15
             {TEXT("Core.Volley.Cyclic"), 1},
             {TEXT("Core.Volley.Feed"), 1},
@@ -433,13 +421,8 @@ namespace BreakerPowerBandTest
             {TEXT("Core.Volley.LastRound"), 1},
             {TEXT("Core.Volley.Overrev"), 1},
             {TEXT("Core.Volley.Barrage"), 1},                // More x1.22, weapon lane
-            // The chord from Reservoir's entry to Velocity, weapon picks: 6
+            // Reservoir's rim 0, the toe this build keeps: 1
             {TEXT("Core.Reservoir.Draw"), 1},
-            {TEXT("Core.Travel.Chord2P1Weapon"), 1},
-            {TEXT("Core.Travel.Chord2P2Weapon"), 1},
-            {TEXT("Core.Travel.Chord2P3Weapon"), 1},
-            {TEXT("Core.Travel.Chord2P4Weapon"), 1},
-            {TEXT("Core.Travel.Chord2P5Weapon"), 1},
             // Velocity, complete: 15
             {TEXT("Core.Velocity.Freefall"), 1},             // airborne
             {TEXT("Core.Velocity.Afterburn"), 1},            // recently dashed
@@ -451,10 +434,7 @@ namespace BreakerPowerBandTest
             {TEXT("Core.Velocity.Redline"), 1},              // demoted: +14% ability at Redline, no More
             {TEXT("Core.Velocity.NoGround"), 1},             // decay valve, airborne/grounded
             {TEXT("Core.Velocity.TerminalVelocity"), 1},     // More x1.30, airborne, SHARED
-            // The run into Ruin and the finisher pair: 3 + 8
-            {TEXT("Core.Travel.Ring10P1Weapon"), 1},
-            {TEXT("Core.Travel.Ring10P2Weapon"), 1},
-            {TEXT("Core.Travel.Ring10P3Weapon"), 1},
+            // Ruin, entered at its rim 0, and the finisher pair: 8
             {TEXT("Core.Ruin.WeightofIt"), 1},
             {TEXT("Core.Ruin.Cull"), 1},
             {TEXT("Core.Ruin.Break"), 1},
@@ -479,18 +459,17 @@ namespace BreakerPowerBandTest
     // band was written about; the atlas then handed that shared spend eight
     // weapon travel picks and parity halved announced-but-unsummed.
     //
-    // A FULL 65-POINT at-cap character, spent WELL for abilities, and a
-    // STRUCTURAL MIRROR of OptimizedRanks: three wheels bought whole, the
-    // same Velocity chain for the same shared More, the same Ruin dip, and
-    // travel taken on Ability picks where the weapon build took Weapon.
-    // RING-LEGAL from the Reservoir ENTRY (Core.Reservoir.Draw is one of
-    // the atlas's three entries): Reservoir complete (12, hubless), Ring3
-    // to ARC (3), ARC complete to Overflow (15 — the ability More), Chord2
-    // to Velocity (5), Velocity complete to Terminal Velocity (15 — the
-    // shared More, airborne like the measurement state), Ring10 to Ruin
-    // (3), the weapon fixture's own Ruin dip (8 — Execute and Siege, with
-    // ShapedCharge's weapon line carried as the honest cost of the mirror),
-    // Ring4 toward Elements (3) and Rend (1). 65 exactly.
+    // An at-cap character, spent WELL for abilities, and a STRUCTURAL
+    // MIRROR of OptimizedRanks: three wheels bought whole, the same Velocity
+    // chain for the same shared More, the same Ruin dip. WHEEL-LEGAL: every
+    // wheel is entered at its own rim 0 (O211). Reservoir complete (12,
+    // hubless), ARC complete to Overflow (15 — the ability More), Velocity
+    // complete to Terminal Velocity (15 — the shared More, airborne like the
+    // measurement state), the weapon fixture's own Ruin dip (8 — Execute and
+    // Siege, with ShapedCharge's weapon line carried as the honest cost of
+    // the mirror) and Rend (1). 51 Core points of the 65 budget: the
+    // fourteen that bought ability travel beads have no bead to buy since
+    // O213, and where they go is the owner's fixture decision.
     TArray<FBreakerNodeRank> AbilityOptimizedRanks()
     {
         return {
@@ -504,10 +483,6 @@ namespace BreakerPowerBandTest
             {TEXT("Core.Reservoir.ConvergencePoint"), 1},
             {TEXT("Core.Reservoir.Spillover"), 1},
             {TEXT("Core.Reservoir.Reserve"), 1},
-            // The run to ARC, ability picks: 3
-            {TEXT("Core.Travel.Ring3P1Ability"), 1},
-            {TEXT("Core.Travel.Ring3P2Ability"), 1},
-            {TEXT("Core.Travel.Ring3P3Ability"), 1},
             // ARC, complete: 15
             {TEXT("Core.Arc.Channel"), 1},
             {TEXT("Core.Arc.Widen"), 1},
@@ -519,12 +494,6 @@ namespace BreakerPowerBandTest
             {TEXT("Core.Arc.Reach"), 1},
             {TEXT("Core.Arc.Widening"), 1},
             {TEXT("Core.Arc.Overflow"), 1},               // More x1.28, ability lane
-            // The chord from Reservoir's entry to Velocity, ability picks: 5
-            {TEXT("Core.Travel.Chord2P1Ability"), 1},
-            {TEXT("Core.Travel.Chord2P2Ability"), 1},
-            {TEXT("Core.Travel.Chord2P3Ability"), 1},
-            {TEXT("Core.Travel.Chord2P4Ability"), 1},
-            {TEXT("Core.Travel.Chord2P5Ability"), 1},
             // Velocity, complete — the same chain the weapon build buys, for
             // the same shared airborne More: 15
             {TEXT("Core.Velocity.Freefall"), 1},
@@ -537,20 +506,14 @@ namespace BreakerPowerBandTest
             {TEXT("Core.Velocity.Redline"), 1},
             {TEXT("Core.Velocity.NoGround"), 1},
             {TEXT("Core.Velocity.TerminalVelocity"), 1},  // More x1.30, airborne, SHARED
-            // The run into Ruin and the same finisher pair: 3 + 8
-            {TEXT("Core.Travel.Ring10P1Ability"), 1},
-            {TEXT("Core.Travel.Ring10P2Ability"), 1},
-            {TEXT("Core.Travel.Ring10P3Ability"), 1},
+            // Ruin, entered at its rim 0, and the same finisher pair: 8
             {TEXT("Core.Ruin.WeightofIt"), 1},
             {TEXT("Core.Ruin.Cull"), 1},
             {TEXT("Core.Ruin.Break"), 1},
             {TEXT("Core.Ruin.ShapedCharge"), 1},
             {TEXT("Core.Ruin.Execute"), 1},
             {TEXT("Core.Ruin.Siege"), 1},                 // TargetElite rider
-            // The spare four: Ring4 ability picks and Rend. 3 + 1
-            {TEXT("Core.Travel.Ring4P1Ability"), 1},
-            {TEXT("Core.Travel.Ring4P2Ability"), 1},
-            {TEXT("Core.Travel.Ring4P3Ability"), 1},
+            // And Rend: 1
             {TEXT("Core.Ruin.Rend"), 1},
             // The doctrine layer, IDENTICAL to the weapon fixture's on
             // purpose: the comparison isolates the Core spend, and doctrine
@@ -569,14 +532,14 @@ namespace BreakerPowerBandTest
     // measures beside the pinned pair, because the seat's question is whether
     // the mirrored fixture's crit 0.863 is a spend choice (buying crit costs
     // increased/More elsewhere) or slack (it moves and nothing falls). A
-    // legal 65-point ability build entered at PRECISION instead of Reservoir:
+    // legal ability build built around PRECISION instead of Reservoir:
     // Precision to its inners for the crit flats (12, no Fixate — a weapon
-    // More buys this lane nothing), east along the ring through Volley and
-    // Vector (their rim0s bought to cross, 2), ARC complete (15), Ring3 to
-    // the Reservoir entry (3), Chord2 to Velocity complete for the shared
-    // More (5 + 15), and the spare into Ring4 and Ring10 ability picks (4).
-    // What it gives up against AbilityOptimizedRanks: the whole Reservoir
-    // wheel and the Ruin dip.
+    // More buys this lane nothing), the Volley and Vector rim 0s it kept
+    // when they were a toll (2), ARC complete (15), the Reservoir rim 0 (1)
+    // and Velocity complete for the shared More (15). 45 Core points of the
+    // 65 budget: the twenty-one that bought ability travel beads have no
+    // bead to buy since O213. What it gives up against AbilityOptimizedRanks: the
+    // whole Reservoir wheel and the Ruin dip.
     TArray<FBreakerNodeRank> AbilityCritVariantRanks()
     {
         return {
@@ -590,19 +553,9 @@ namespace BreakerPowerBandTest
             {TEXT("Core.Precision.CalledShot"), 1},
             {TEXT("Core.Precision.TunnelVision"), 1},
             {TEXT("Core.Precision.Deadeye"), 1},
-            // East along the ring: Ring0, cross Volley, Ring1, cross Vector,
-            // Ring2 into ARC. Ability picks; the two rim0s are the toll. 3+1+3+1+3
-            {TEXT("Core.Travel.Ring0P1Ability"), 1},
-            {TEXT("Core.Travel.Ring0P2Ability"), 1},
-            {TEXT("Core.Travel.Ring0P3Ability"), 1},
+            // The Volley and Vector rim 0s: 2
             {TEXT("Core.Volley.Cyclic"), 1},
-            {TEXT("Core.Travel.Ring1P1Ability"), 1},
-            {TEXT("Core.Travel.Ring1P2Ability"), 1},
-            {TEXT("Core.Travel.Ring1P3Ability"), 1},
             {TEXT("Core.Vector.Split"), 1},
-            {TEXT("Core.Travel.Ring2P1Ability"), 1},
-            {TEXT("Core.Travel.Ring2P2Ability"), 1},
-            {TEXT("Core.Travel.Ring2P3Ability"), 1},
             // ARC, complete: 15
             {TEXT("Core.Arc.Channel"), 1},
             {TEXT("Core.Arc.Widen"), 1},
@@ -614,17 +567,8 @@ namespace BreakerPowerBandTest
             {TEXT("Core.Arc.Reach"), 1},
             {TEXT("Core.Arc.Widening"), 1},
             {TEXT("Core.Arc.Overflow"), 1},
-            // Ring3 to the Reservoir entry, ability picks: 3 + the entry: 1
-            {TEXT("Core.Travel.Ring3P1Ability"), 1},
-            {TEXT("Core.Travel.Ring3P2Ability"), 1},
-            {TEXT("Core.Travel.Ring3P3Ability"), 1},
+            // The Reservoir rim 0: 1
             {TEXT("Core.Reservoir.Draw"), 1},
-            // Chord2 to Velocity, ability picks: 5
-            {TEXT("Core.Travel.Chord2P1Ability"), 1},
-            {TEXT("Core.Travel.Chord2P2Ability"), 1},
-            {TEXT("Core.Travel.Chord2P3Ability"), 1},
-            {TEXT("Core.Travel.Chord2P4Ability"), 1},
-            {TEXT("Core.Travel.Chord2P5Ability"), 1},
             // Velocity, complete, for the shared More: 15
             {TEXT("Core.Velocity.Freefall"), 1},
             {TEXT("Core.Velocity.Afterburn"), 1},
@@ -636,11 +580,6 @@ namespace BreakerPowerBandTest
             {TEXT("Core.Velocity.Redline"), 1},
             {TEXT("Core.Velocity.NoGround"), 1},
             {TEXT("Core.Velocity.TerminalVelocity"), 1},
-            // The spare four: Ring4 ability picks and one step of Ring10. 3+1
-            {TEXT("Core.Travel.Ring4P1Ability"), 1},
-            {TEXT("Core.Travel.Ring4P2Ability"), 1},
-            {TEXT("Core.Travel.Ring4P3Ability"), 1},
-            {TEXT("Core.Travel.Ring10P1Ability"), 1},
             // The doctrine layer, identical to both fixtures on purpose.
             {TEXT("Swift.Marksman.LongLens"), 2},
             {TEXT("Swift.Marksman.Deadeye"), 2},

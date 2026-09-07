@@ -5,6 +5,7 @@
 #include "Combat/BreakerBossEnemy.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerCombatTypes.h"
+#include "Combat/BreakerHoldfastEnemy.h"
 #include "Combat/BreakerMonsterChassis.h"
 #include "Combat/BreakerShieldMath.h"
 #include "Combat/BreakerWardenEnemy.h"
@@ -95,10 +96,15 @@ bool FBreakerWardenFrontBreaksTest::RunTest(const FString& Parameters)
     // ---- Shipped configuration, off the class default objects ----------
     const ABreakerWardenEnemy* Warden = GetDefault<ABreakerWardenEnemy>();
     const ABreakerBossEnemy* Boss = GetDefault<ABreakerBossEnemy>();
+    const ABreakerHoldfastEnemy* Holdfast = GetDefault<ABreakerHoldfastEnemy>();
     if (!TestNotNull(TEXT("The Warden has a default object"), Warden)) return false;
     if (!TestNotNull(TEXT("The boss has a default object"), Boss)) return false;
+    if (!TestNotNull(TEXT("The Holdfast has a default object"), Holdfast)) return false;
     TestEqual(TEXT("The Warden's front is 15% of its max health"), Warden->FrontShieldFractionOfMaxHealth, 0.15f, 0.0001f);
     TestEqual(TEXT("The boss inherits the same fraction"), Boss->FrontShieldFractionOfMaxHealth, 0.15f, 0.0001f);
+    // O198's "the boss's shield follows the same rule" binds Act I's boss too:
+    // a Vestige mass wears the front the Warden taught, unchanged.
+    TestEqual(TEXT("The Holdfast inherits the same fraction"), Holdfast->FrontShieldFractionOfMaxHealth, 0.15f, 0.0001f);
     // The facing geometry is untouched by the rule change: the arc that
     // decides "rear" is the one the armour step always used.
     TestEqual(TEXT("The rear arc cosine is unchanged"), GetDefault<UBreakerCombatComponent>()->RearArcCosine, 0.15f, 0.0001f);
@@ -110,6 +116,9 @@ bool FBreakerWardenFrontBreaksTest::RunTest(const FString& Parameters)
     const float BossHealth = UBreakerMonsterChassisLibrary::GetMonsterHealth(
         1, EBreakerMonsterRank::Boss, Chassis, Boss->GetArchetypeHealthMultiplier());
     TestEqual(TEXT("An area-level-1 boss has 5,775 health (220 x 75 x 0.35)"), BossHealth, 5775.0f, 0.01f);
+    const float HoldfastHealth = UBreakerMonsterChassisLibrary::GetMonsterHealth(
+        1, EBreakerMonsterRank::Boss, Chassis, Holdfast->GetArchetypeHealthMultiplier());
+    TestEqual(TEXT("An area-level-1 Holdfast has 5,775 health (220 x 75 x 0.35)"), HoldfastHealth, 5775.0f, 0.01f);
 
     const UBreakerWeaponDefinition* Rifle = BreakerWardenFrontBaselineWeapon();
     if (!TestNotNull(TEXT("The baseline slot resolves to a weapon definition"), Rifle)) return false;
@@ -128,6 +137,12 @@ bool FBreakerWardenFrontBreaksTest::RunTest(const FString& Parameters)
         BossPool, BossRounds, (BossRounds - 1) * SecondsPerRound));
     TestEqual(TEXT("The level-1 rifle breaks a Warden's front in five rounds"), WardenRounds, 5);
     TestEqual(TEXT("The level-1 rifle breaks the boss's front in thirty-seven rounds"), BossRounds, 37);
+    const float HoldfastPool = BreakerShield::FrontPool(HoldfastHealth, Holdfast->FrontShieldFractionOfMaxHealth);
+    const int32 HoldfastRounds = BreakerShield::RoundsToBreak(HoldfastPool, Rifle->Damage);
+    AddInfo(FString::Printf(TEXT("FRONT  Holdfast AL1 pool %.2f: %d rounds, %.2fs after the first"),
+        HoldfastPool, HoldfastRounds, (HoldfastRounds - 1) * SecondsPerRound));
+    TestEqual(TEXT("The Holdfast's level-1 pool is 866.25"), HoldfastPool, 866.25f, 0.01f);
+    TestEqual(TEXT("The level-1 rifle breaks the Holdfast's front in thirty-seven rounds"), HoldfastRounds, 37);
 
     // O18: the boss's front is 15% of a baseline boss kill, so it must break
     // inside 15% of the 20-45s band — [3, 6.75] s — at the on-level area the
@@ -146,6 +161,16 @@ bool FBreakerWardenFrontBreaksTest::RunTest(const FString& Parameters)
         AddInfo(FString::Printf(TEXT("FRONT  boss AL%d front breaks in %.2fs (O18 x 0.15: 3.00-6.75s)"), AreaLevel, FrontSeconds));
         TestTrue(*FString::Printf(TEXT("The boss's front (%.2fs) breaks no sooner than 3s"), FrontSeconds), FrontSeconds >= 3.0f);
         TestTrue(*FString::Printf(TEXT("The boss's front (%.2fs) breaks no later than 6.75s"), FrontSeconds), FrontSeconds <= 6.75f);
+
+        // The Holdfast's twin. Its add gate scales what reaches the body, not
+        // the front pool, so the front's own arithmetic is the ungated one.
+        const float OnLevelHoldfastHealth = UBreakerMonsterChassisLibrary::GetMonsterHealth(
+            AreaLevel, EBreakerMonsterRank::Boss, Chassis, Holdfast->GetArchetypeHealthMultiplier());
+        const float HoldfastFrontSeconds = BreakerShield::FrontPool(OnLevelHoldfastHealth, Holdfast->FrontShieldFractionOfMaxHealth)
+            / FMath::Max(DamagePerSecond, UE_SMALL_NUMBER);
+        AddInfo(FString::Printf(TEXT("FRONT  Holdfast AL%d front breaks in %.2fs (O18 x 0.15: 3.00-6.75s)"), AreaLevel, HoldfastFrontSeconds));
+        TestTrue(*FString::Printf(TEXT("The Holdfast's front (%.2fs) breaks no sooner than 3s"), HoldfastFrontSeconds), HoldfastFrontSeconds >= 3.0f);
+        TestTrue(*FString::Printf(TEXT("The Holdfast's front (%.2fs) breaks no later than 6.75s"), HoldfastFrontSeconds), HoldfastFrontSeconds <= 6.75f);
     }
 
     // ---- Wiring, on the world-free ReceiveDamage harness ---------------

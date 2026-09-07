@@ -3,10 +3,14 @@
 #include "Misc/AutomationTest.h"
 #include "Combat/BreakerBossEnemy.h"
 #include "Combat/BreakerBossPhases.h"
+#include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerCoverBehavior.h"
 #include "Combat/BreakerDamageLibrary.h"
+#include "Combat/BreakerEnemyModifiers.h"
+#include "Combat/BreakerHoldfastEnemy.h"
 #include "Combat/BreakerSkirmisherEnemy.h"
 #include "Combat/BreakerWardenEnemy.h"
+#include "Save/BreakerMissionContent.h"
 
 // The boss's phase machine, the facing-armour geometry and the cover chooser
 // are all pure, and all three are the kind of thing that breaks silently in a
@@ -286,6 +290,18 @@ bool FBreakerBossGrammarTest::RunTest(const FString& Parameters)
         }
     }
 
+    // The Marshal authors no add gate, so its grammar has none anywhere: the
+    // gate is the Holdfast's beat and the Marshal is byte-identical to a boss
+    // that never heard of one.
+    TestEqual(TEXT("The Marshal ships without an add gate"), Boss->PhaseParams.AddGateDamageReduction, 0.0f);
+    for (const TArray<FBreakerBossBeat>& List : Grammar.PerPhase)
+    {
+        for (const FBreakerBossBeat& B : List)
+        {
+            TestTrue(TEXT("The Marshal's grammar has no AddGate"), B.Beat != EBreakerBossBeat::AddGate);
+        }
+    }
+
     // The window rule the actor reads.
     TestFalse(TEXT("No order, no break window: closed"),
         EBoss::IsPunishWindowOpen(EBreakerBossPhase::Deployment, false, 0.0f));
@@ -310,6 +326,264 @@ bool FBreakerBossGrammarTest::RunTest(const FString& Parameters)
     Remaining = 0.5f;
     TestTrue(TEXT("A hitch closes it once"), EBoss::AdvanceBreakWindow(Remaining, 60.0f));
     TestEqual(TEXT("A hitch leaves it at zero, not below"), Remaining, 0.0f);
+    return true;
+}
+
+// THE HOLDFAST'S GRAMMAR (O214). The Marshal's checks against the Holdfast's
+// default object, then the one beat it adds: an AddGate after every AddWave
+// in the two commanding phases, none in Commitment, and the pure rule the
+// actor reads for it.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerHoldfastGrammarTest,
+    "RiorsEdge.Combat.Boss.Holdfast.Grammar",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerHoldfastGrammarTest::RunTest(const FString& Parameters)
+{
+    const ABreakerHoldfastEnemy* Holdfast = GetDefault<ABreakerHoldfastEnemy>();
+    if (!TestNotNull(TEXT("The Holdfast has a default object"), Holdfast)) return false;
+    // The Holdfast's OWN params, not a default block: the reduction lives on
+    // the class and the grammar has to be derived from what it ships.
+    const FBreakerBossPhaseParams& Params = Holdfast->PhaseParams;
+    const FBreakerBossGrammar Grammar = EBoss::MakeShippedGrammar(
+        Params, Holdfast->AddsPerDeploy, Holdfast->GalleryLatticeCount, Holdfast->SweepWindupSeconds);
+
+    // ---- The Marshal's checks, on this body ------------------------------
+    auto CheckTelegraphed = [this](const TArray<FBreakerBossBeat>& List, const TCHAR* Name)
+    {
+        bool bSeenTelegraph = false;
+        for (const FBreakerBossBeat& B : List)
+        {
+            if (B.Beat == EBreakerBossBeat::Telegraph) bSeenTelegraph = true;
+            if (B.Beat == EBreakerBossBeat::PunishWindow && B.Seconds >= 0.0f)
+            {
+                TestTrue(FString::Printf(TEXT("%s: a timed punish window is preceded by a telegraph (%s)"),
+                    Name, *B.Tag.ToString()), bSeenTelegraph);
+            }
+        }
+    };
+    CheckTelegraphed(Grammar.FightLevel, TEXT("Fight-level"));
+    CheckTelegraphed(Grammar.ForPhase(EBreakerBossPhase::Deployment), TEXT("Deployment"));
+    CheckTelegraphed(Grammar.ForPhase(EBreakerBossPhase::Suppression), TEXT("Suppression"));
+    CheckTelegraphed(Grammar.ForPhase(EBreakerBossPhase::Commitment), TEXT("Commitment"));
+
+    const FBreakerBossBeat* First = EBoss::FirstPunishWindow(Grammar);
+    if (!TestNotNull(TEXT("The grammar has a punish window"), First)) return false;
+    TestEqual(TEXT("The first punish window is the front break (O198)"), First->Tag, FName(TEXT("FrontBreak")));
+    TestEqual(TEXT("The front-break window is the authored length"), First->Seconds, Params.FrontBreakPunishSeconds, 0.0001f);
+    TestTrue(TEXT("The front-break window is open for a real duration"), Params.FrontBreakPunishSeconds > 0.0f);
+
+    const float Gate1 = EBoss::NextGate(EBreakerBossPhase::Deployment, Params);
+    const float Gate2 = EBoss::NextGate(EBreakerBossPhase::Suppression, Params);
+    TestTrue(TEXT("Deployment's gate is below full health"), Gate1 < 1.0f && Gate1 > 0.0f);
+    TestTrue(TEXT("Gates are strictly descending"), Gate2 < Gate1 && Gate2 > 0.0f);
+    TestTrue(TEXT("Commitment has no next gate"), EBoss::NextGate(EBreakerBossPhase::Commitment, Params) < 0.0f);
+    const TArray<FBreakerBossBeat>& Suppression = Grammar.ForPhase(EBreakerBossPhase::Suppression);
+    TestTrue(TEXT("Suppression ends on the gate that is Commitment's tell"),
+        Suppression.Num() > 0 && Suppression.Last().Beat == EBreakerBossBeat::PhaseGate
+        && FMath::IsNearlyEqual(Suppression.Last().GateFraction, Gate2, 0.0001f));
+    const TArray<FBreakerBossBeat>& Commitment = Grammar.ForPhase(EBreakerBossPhase::Commitment);
+    TestTrue(TEXT("Commitment's window is permanent"),
+        Commitment.Num() > 0 && Commitment[0].Beat == EBreakerBossBeat::PunishWindow && Commitment[0].Seconds < 0.0f);
+    bool bArenaChange = false;
+    for (const FBreakerBossBeat& B : Commitment)
+    {
+        TestTrue(TEXT("No add wave after Commitment's entry"), B.Beat != EBreakerBossBeat::AddWave);
+        if (B.Beat == EBreakerBossBeat::ArenaChange) bArenaChange = true;
+    }
+    TestTrue(TEXT("Commitment changes the arena"), bArenaChange);
+    for (const FBreakerBossBeat& B : Grammar.ForPhase(EBreakerBossPhase::Deployment))
+    {
+        if (B.Beat == EBreakerBossBeat::AddWave)
+        {
+            TestTrue(TEXT("A deploy wave fits under the live-add ceiling"), B.AddCount <= Holdfast->MaximumLiveAdds);
+            TestTrue(TEXT("Adds arrive after the raise, not with it"), B.Seconds > 0.0f);
+        }
+    }
+
+    // ---- The beat it adds -------------------------------------------------
+    TestTrue(TEXT("The Holdfast authors an add gate"), Params.AddGateDamageReduction > 0.0f);
+    TestTrue(TEXT("...that is not a wall (O31)"), Params.AddGateDamageReduction < 1.0f);
+    // Authors nothing: it is the Warding Aura's reduction until felt apart.
+    TestEqual(TEXT("The gate is the aura's reduction, not a new number"),
+        Params.AddGateDamageReduction, FBreakerEnemyModifierParams().AuraDamageReduction, 0.0001f);
+
+    // An AddGate follows EVERY AddWave in the commanding phases: the wave is
+    // what the gate is made of, so a wave without a gate after it would be
+    // adds that do not hold, and a gate without a wave before it would hold
+    // on nothing.
+    for (const EBreakerBossPhase Commanding : { EBreakerBossPhase::Deployment, EBreakerBossPhase::Suppression })
+    {
+        const TArray<FBreakerBossBeat>& List = Grammar.ForPhase(Commanding);
+        const FString Name = EBoss::GetPhaseName(Commanding);
+        int32 Waves = 0;
+        int32 Gates = 0;
+        for (int32 Index = 0; Index < List.Num(); ++Index)
+        {
+            if (List[Index].Beat == EBreakerBossBeat::AddWave)
+            {
+                ++Waves;
+                TestTrue(*FString::Printf(TEXT("%s: an AddGate follows the %s wave"), *Name, *List[Index].Tag.ToString()),
+                    List.IsValidIndex(Index + 1) && List[Index + 1].Beat == EBreakerBossBeat::AddGate);
+            }
+            if (List[Index].Beat == EBreakerBossBeat::AddGate)
+            {
+                ++Gates;
+                TestTrue(*FString::Printf(TEXT("%s: the gate follows a wave"), *Name),
+                    Index > 0 && List[Index - 1].Beat == EBreakerBossBeat::AddWave);
+                TestEqual(*FString::Printf(TEXT("%s: the gate carries the shipped reduction"), *Name),
+                    List[Index].Reduction, Params.AddGateDamageReduction, 0.0001f);
+            }
+        }
+        TestTrue(*FString::Printf(TEXT("%s has at least one wave"), *Name), Waves >= 1);
+        TestEqual(*FString::Printf(TEXT("%s has one gate per wave"), *Name), Gates, Waves);
+    }
+    for (const FBreakerBossBeat& B : Commitment)
+    {
+        TestTrue(TEXT("Commitment has no AddGate"), B.Beat != EBreakerBossBeat::AddGate);
+    }
+    for (const FBreakerBossBeat& B : Grammar.FightLevel)
+    {
+        TestTrue(TEXT("The gate is a phase beat, not a fight-level one"), B.Beat != EBreakerBossBeat::AddGate);
+    }
+
+    // The gated step. Live adds hold the phase; none, and it passes; and it
+    // is monotonic under the same heal/shield/rebuild story the Marshal's is.
+    TestTrue(TEXT("Below the gate with a live add, Deployment holds"),
+        EBoss::AdvancePhaseGated(EBreakerBossPhase::Deployment, 0.5f, Params, 1) == EBreakerBossPhase::Deployment);
+    TestTrue(TEXT("Below the gate with no adds, Deployment passes"),
+        EBoss::AdvancePhaseGated(EBreakerBossPhase::Deployment, 0.5f, Params, 0) == EBreakerBossPhase::Suppression);
+    TestTrue(TEXT("Suppression holds on a live Lattice"),
+        EBoss::AdvancePhaseGated(EBreakerBossPhase::Suppression, 0.1f, Params, 1) == EBreakerBossPhase::Suppression);
+    TestTrue(TEXT("Suppression passes with the galleries dead"),
+        EBoss::AdvancePhaseGated(EBreakerBossPhase::Suppression, 0.1f, Params, 0) == EBreakerBossPhase::Commitment);
+    TestTrue(TEXT("A burst through both gates with no adds lands in Commitment"),
+        EBoss::AdvancePhaseGated(EBreakerBossPhase::Deployment, 0.05f, Params, 0) == EBreakerBossPhase::Commitment);
+    TestTrue(TEXT("A healed Suppression boss does not return to Deployment, adds or not"),
+        EBoss::AdvancePhaseGated(EBreakerBossPhase::Suppression, 1.0f, Params, 0) == EBreakerBossPhase::Suppression
+        && EBoss::AdvancePhaseGated(EBreakerBossPhase::Suppression, 1.0f, Params, 3) == EBreakerBossPhase::Suppression);
+    TestTrue(TEXT("Commitment stays Commitment whatever is alive"),
+        EBoss::AdvancePhaseGated(EBreakerBossPhase::Commitment, 0.9f, Params, 5) == EBreakerBossPhase::Commitment);
+    TestTrue(TEXT("A negative count is no adds"),
+        EBoss::AdvancePhaseGated(EBreakerBossPhase::Deployment, 0.5f, Params, -1) == EBreakerBossPhase::Suppression);
+    // The Marshal's zero reduction is the ungated step exactly, adds or not.
+    const FBreakerBossPhaseParams Ungated;
+    TestTrue(TEXT("At zero reduction the gate never holds"),
+        EBoss::AdvancePhaseGated(EBreakerBossPhase::Deployment, 0.5f, Ungated, 8) == EBoss::AdvancePhase(EBreakerBossPhase::Deployment, 0.5f, Ungated));
+
+    // The multiplier the actor pushes.
+    TestEqual(TEXT("No adds: no reduction"), EBoss::AddGateIncomingMultiplier(EBreakerBossPhase::Deployment, 0, Params), 1.0f);
+    TestEqual(TEXT("Commitment: no reduction with adds alive"), EBoss::AddGateIncomingMultiplier(EBreakerBossPhase::Commitment, 4, Params), 1.0f);
+    TestEqual(TEXT("Deployment with adds: 1 - Reduction"),
+        EBoss::AddGateIncomingMultiplier(EBreakerBossPhase::Deployment, 1, Params), 1.0f - Params.AddGateDamageReduction, 0.0001f);
+    TestEqual(TEXT("Suppression with a Lattice: 1 - Reduction"),
+        EBoss::AddGateIncomingMultiplier(EBreakerBossPhase::Suppression, 2, Params), 1.0f - Params.AddGateDamageReduction, 0.0001f);
+    TestEqual(TEXT("The Marshal's zero reduction multiplies by one"),
+        EBoss::AddGateIncomingMultiplier(EBreakerBossPhase::Deployment, 8, Ungated), 1.0f);
+    // Never zero, whatever is authored: O31.
+    FBreakerBossPhaseParams Wall;
+    Wall.AddGateDamageReduction = 1.0f;
+    TestTrue(TEXT("A reduction of one is still not immunity"),
+        EBoss::AddGateIncomingMultiplier(EBreakerBossPhase::Deployment, 1, Wall) > 0.0f);
+    return true;
+}
+
+// O31 ON THE BOSSES: no encounter may have a build that cannot participate.
+// Every shipped boss class, the same assertions: a window to punish, a front
+// that breaks, a DoT cap that is a cap and not a ban, a gate that is not a
+// wall, a modifier map that starts clean, and a live-add ceiling a deploy
+// fits under. Then the shipped identity of each.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerBossEveryBuildParticipatesTest,
+    "RiorsEdge.Combat.Boss.EveryBuildParticipates",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerBossEveryBuildParticipatesTest::RunTest(const FString& Parameters)
+{
+    for (const ABreakerBossEnemy* Boss : { static_cast<const ABreakerBossEnemy*>(GetDefault<ABreakerBossEnemy>()),
+        static_cast<const ABreakerBossEnemy*>(GetDefault<ABreakerHoldfastEnemy>()) })
+    {
+        if (!TestNotNull(TEXT("The boss has a default object"), Boss)) continue;
+        const FString Name = Boss->GetClass()->GetName();
+        const FBreakerBossPhaseParams& Params = Boss->PhaseParams;
+        const FBreakerBossGrammar Grammar = EBoss::MakeShippedGrammar(
+            Params, Boss->AddsPerDeploy, Boss->GalleryLatticeCount, Boss->SweepWindupSeconds);
+
+        // A window exists and the last one never closes: a burst build and a
+        // sustained build both get their turn at the weak point.
+        TestNotNull(*FString::Printf(TEXT("%s: the grammar has a punish window"), *Name), EBoss::FirstPunishWindow(Grammar));
+        const TArray<FBreakerBossBeat>& Commitment = Grammar.ForPhase(EBreakerBossPhase::Commitment);
+        TestTrue(*FString::Printf(TEXT("%s: Commitment's window is permanent"), *Name),
+            Commitment.Num() > 0 && Commitment[0].Beat == EBreakerBossBeat::PunishWindow && Commitment[0].Seconds < 0.0f);
+
+        // The front is a pool, not a wall (O198): a real fraction, under one.
+        TestTrue(*FString::Printf(TEXT("%s: the front is a fraction of max health"), *Name),
+            Boss->FrontShieldFractionOfMaxHealth > 0.0f && Boss->FrontShieldFractionOfMaxHealth < 1.0f);
+        // DoT builds participate: a cap of at least one stack.
+        TestTrue(*FString::Printf(TEXT("%s: DoTs stack at least once"), *Name), Boss->BossDamageOverTimeStackCap >= 1);
+        // The add gate is never immunity, for any count of adds.
+        TestTrue(*FString::Printf(TEXT("%s: the add gate is below one"), *Name), Params.AddGateDamageReduction < 1.0f);
+        for (const int32 Count : { 0, 1, 2, 8, 100 })
+        {
+            for (const EBreakerBossPhase Phase : { EBreakerBossPhase::Deployment, EBreakerBossPhase::Suppression, EBreakerBossPhase::Commitment })
+            {
+                TestTrue(*FString::Printf(TEXT("%s: the gate multiplier is above zero at %d adds"), *Name, Count),
+                    EBoss::AddGateIncomingMultiplier(Phase, Count, Params) > 0.0f);
+            }
+        }
+        // The body starts ungated: a fresh component composes to exactly one,
+        // so the only way a gate stands is a push the actor made on a crossing.
+        const UBreakerCombatComponent* Fresh = NewObject<UBreakerCombatComponent>();
+        TestEqual(*FString::Printf(TEXT("%s: a fresh combat component composes incoming to one"), *Name),
+            Fresh->GetComposedIncomingDamageMultiplier(), 1.0f);
+        // §5.3's ceiling, and a deploy fits under it.
+        TestTrue(*FString::Printf(TEXT("%s: there is a live-add ceiling"), *Name), Boss->MaximumLiveAdds > 0);
+        TestTrue(*FString::Printf(TEXT("%s: a deploy fits under it"), *Name), Boss->AddsPerDeploy <= Boss->MaximumLiveAdds);
+    }
+
+    // ---- Shipped identity -------------------------------------------------
+    const ABreakerBossEnemy* Marshal = GetDefault<ABreakerBossEnemy>();
+    const ABreakerHoldfastEnemy* Holdfast = GetDefault<ABreakerHoldfastEnemy>();
+    if (!TestNotNull(TEXT("The Marshal has a default object"), Marshal)) return false;
+    if (!TestNotNull(TEXT("The Holdfast has a default object"), Holdfast)) return false;
+    TestEqual(TEXT("The Marshal has no add gate"), Marshal->PhaseParams.AddGateDamageReduction, 0.0f);
+
+    // O214: a Vestige mass, no stage, boss rank, not a sponge, no respawn, no
+    // detonation, and not wearing the Altered heavy's body.
+    TestTrue(TEXT("The Holdfast is a Vestige"), Holdfast->GetFamily() == EBreakerEnemyFamily::Vestige);
+    TestTrue(TEXT("...with no severance stage"), Holdfast->GetSeveranceStage() == EBreakerSeveranceStage::NotApplicable);
+    TestTrue(TEXT("...at boss rank"), Holdfast->GetMonsterRank() == EBreakerMonsterRank::Boss);
+    TestTrue(TEXT("...and not a sponge"), Holdfast->GetArchetypeHealthMultiplier() < 1.0f);
+    TestFalse(TEXT("...and does not respawn"), Holdfast->DoesRespawn());
+    TestFalse(TEXT("...and does not chain-detonate"), Holdfast->DoesExplodeOnDeath());
+    TestFalse(TEXT("...and does not wear George"), Holdfast->BodyMeshAsset.ToString().Contains(TEXT("George")));
+    TestTrue(TEXT("...and has a body slot filled (O190)"), Holdfast->BodyMeshAsset.IsValid());
+
+    // The mission file names it, and the name resolves to this class without
+    // the loader knowing what a class is.
+    TestTrue(TEXT("\"Holdfast\" resolves to the Holdfast"),
+        ABreakerBossEnemy::ClassForBossName(FName(TEXT("Holdfast"))) == ABreakerHoldfastEnemy::StaticClass());
+    TestTrue(TEXT("\"FieldMarshal\" resolves to the Marshal"),
+        ABreakerBossEnemy::ClassForBossName(FName(TEXT("FieldMarshal"))) == ABreakerBossEnemy::StaticClass());
+    TestTrue(TEXT("An unknown name resolves to nothing"), !ABreakerBossEnemy::ClassForBossName(FName(TEXT("Nobody"))));
+    TestTrue(TEXT("No name resolves to nothing"), !ABreakerBossEnemy::ClassForBossName(NAME_None));
+    int32 BossBeats = 0;
+    for (const FBreakerMissionDefinition& Mission : UBreakerMissionLibrary::GetMissions())
+    {
+        for (const FBreakerMissionBeat& Beat : Mission.Beats)
+        {
+            if (Beat.Kind != EBreakerMissionBeatKind::Boss) continue;
+            ++BossBeats;
+            TestTrue(*FString::Printf(TEXT("%s's Boss beat names a body that exists"), *Mission.MissionId.ToString()),
+                ABreakerBossEnemy::ClassForBossName(Beat.Boss) != nullptr);
+            if (Mission.Act == 1)
+            {
+                TestTrue(TEXT("Act I ends on The Holdfast (O214)"),
+                    ABreakerBossEnemy::ClassForBossName(Beat.Boss) == ABreakerHoldfastEnemy::StaticClass());
+            }
+        }
+    }
+    TestTrue(TEXT("There is a Boss beat to name"), BossBeats >= 1);
     return true;
 }
 
