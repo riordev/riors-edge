@@ -640,6 +640,7 @@ protected:
     UFUNCTION() void OnRep_Swapping();
 
 private:
+    void SnapshotWeaponElement(FBreakerDamageRequest& Request) const;
     int32 GetMagazineCapacityForSlot(int32 Slot, const UBreakerWeaponDefinition* Definition) const;
     bool bSynchronizingMagazineCapacity = false;
     bool bAmmunitionInitialized = false;

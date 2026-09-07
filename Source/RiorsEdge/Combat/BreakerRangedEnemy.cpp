@@ -312,6 +312,7 @@ void ABreakerRangedEnemy::FireVolley(const AActor* Target)
         // IS the chassis AttackDamage exactly.
         Shot.BaseDamage = GetEffectiveAttackDamage();
         Shot.DamageFamily = EBreakerDamageFamily::Physical;
+        ApplyAuthoredAttackElement(Shot);
         // Enemies do not crit; crit is the player's multiplier
         // (Encounter-Design §0).
         Shot.bCanCritical = false;
@@ -354,8 +355,8 @@ bool ABreakerRangedEnemy::HasLineOfSightFrom(const FVector& From, const AActor* 
     FHitResult Blocked;
     // World statics only: the level's cover, ruins and pillars break the shot;
     // other enemies never do.
-    return !World->LineTraceSingleByChannel(Blocked, From,
-        Target->GetActorLocation(), ECC_WorldStatic, Params);
+    return !World->LineTraceSingleByObjectType(Blocked, From,
+        Target->GetActorLocation(), FCollisionObjectQueryParams(ECC_WorldStatic), Params);
 }
 
 bool ABreakerRangedEnemy::ChooseCoverGoal(const AActor* Player, FVector& OutGoal) const

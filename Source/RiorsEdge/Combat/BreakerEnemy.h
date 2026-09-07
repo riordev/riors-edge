@@ -373,6 +373,8 @@ protected:
     // Ammo economy: kills return reserve ammo to the killer (O2 placeholder).
     void GrantAmmo();
     void RespawnEnemy();
+    // Family owns authored attacks; modifier payloads retain their own definitions.
+    void ApplyAuthoredAttackElement(FBreakerDamageRequest& Request) const;
     virtual void PerformAttack(APawn* TargetPawn);
     // Shows/hides the whole humanoid assembly across death and respawn.
     // Virtual so archetypes with extra presentation (a charging emitter) can

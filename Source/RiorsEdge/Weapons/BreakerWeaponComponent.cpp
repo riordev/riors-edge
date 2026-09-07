@@ -11,6 +11,7 @@
 #include "Classes/BreakerMomentumComponent.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerDamageLibrary.h"
+#include "Combat/BreakerElementConversionMath.h"
 #include "Combat/BreakerStatusComponent.h"
 #include "Combat/BreakerStatusRuleMath.h"
 #include "Combat/BreakerStatusRules.h"
@@ -2162,18 +2163,7 @@ FBreakerDamageResult UBreakerWeaponComponent::SubmitWeaponDamage(const UBreakerW
         : FBreakerWeaponMath::DamageMultiplierAtDistance(Definition, DistanceFromMuzzle / GetEffectiveRangeMultiplier());
     Damage.BaseDamage = BaseDamage * FalloffMultiplier;
     Damage.DamageFamily = EBreakerDamageFamily::Physical;
-    if (CurrentSlot == 1)
-        if (const auto* Equipment = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>() : nullptr)
-        {
-            Damage.ElementalFraction = Equipment->GetStats().PrimaryEntropyConversionPercent / 100.0f;
-            if (Damage.ElementalFraction > 0) Damage.Element = EBreakerElement::Entropy;
-        }
-    if (const auto* State = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerAbilityStateComponent>() : nullptr)
-    {
-        Damage.ElementalFraction = FMath::Max(Damage.ElementalFraction, State->GetWeaponEntropyConversionFraction());
-        if (Damage.ElementalFraction > 0) Damage.Element = EBreakerElement::Entropy;
-        State->SnapshotSympatheticEntropy(Damage);
-    }
+    SnapshotWeaponElement(Damage);
     Damage.WeakPointMultiplier = Definition->WeakPointMultiplier;
     Damage.ArmorPenetration = ArmorPenetrationOverride;
     Damage.bWeakPointHit = bWeakPoint;
@@ -2610,6 +2600,23 @@ void UBreakerWeaponComponent::ApplyBleedOnHit(const UBreakerWeaponDefinition* De
     Status->ApplyStatus(Spec, EBreakerDamageFamily::Physical, GetOwner());
 }
 
+void UBreakerWeaponComponent::SnapshotWeaponElement(FBreakerDamageRequest& Request) const
+{
+    float GearEntropy = 0, GearVoid = 0;
+    if (CurrentSlot == 1)
+        if (const auto* Equipment = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>() : nullptr)
+        {
+            GearEntropy = Equipment->GetStats().PrimaryEntropyConversionPercent / 100.0f;
+            GearVoid = Equipment->GetStats().PrimaryVoidConversionPercent / 100.0f;
+        }
+    const auto* State = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerAbilityStateComponent>() : nullptr;
+    const auto Selection = BreakerElementConversion::Select(GearEntropy, GearVoid,
+        State ? State->GetWeaponEntropyConversionFraction() : 0);
+    Request.Element = Selection.Element;
+    Request.ElementalFraction = Selection.Fraction;
+    if (State) State->SnapshotSympatheticEntropy(Request);
+}
+
 void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed, float ShotAimAlpha, uint32 RampToken)
 {
     const FVector Direction = FBreakerWeaponMath::ApplyConeSpread(ViewRotation.Vector(), Spread, ++ShotSequence);
@@ -2624,19 +2631,8 @@ void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Def
     // base damage number and scales with item level identically.
     Damage.BaseDamage = FMath::Max(0.0f, Definition->Damage) * GetItemLevelDamageScalar();
     Damage.DamageFamily = EBreakerDamageFamily::Physical;
-    if (CurrentSlot == 1)
-        if (const auto* Equipment = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>() : nullptr)
-        {
-            // Carried in the complete fire-time request, independent of later swaps.
-            Damage.ElementalFraction = Equipment->GetStats().PrimaryEntropyConversionPercent / 100.0f;
-            if (Damage.ElementalFraction > 0) Damage.Element = EBreakerElement::Entropy;
-        }
-    if (const auto* State = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerAbilityStateComponent>() : nullptr)
-    {
-        Damage.ElementalFraction = FMath::Max(Damage.ElementalFraction, State->GetWeaponEntropyConversionFraction());
-        if (Damage.ElementalFraction > 0) Damage.Element = EBreakerElement::Entropy;
-        State->SnapshotSympatheticEntropy(Damage);
-    }
+    // The complete request retains this selection through travel and swaps.
+    SnapshotWeaponElement(Damage);
     Damage.WeakPointMultiplier = 1.0f;
     Damage.ArmorPenetration = Definition->ArmorPenetration;
     Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;

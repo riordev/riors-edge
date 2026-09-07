@@ -141,6 +141,12 @@ after four seconds. Erased pays half the triggering share after two seconds.
 These values are O2 tuning in elements.json. Siphon's live channel hits apply
 Void; the delayed burst does not repeat the channel's leech or generate buildup.
 
+Vestige attacks carry Entropy; Altered attacks carry Void. Family attack shares
+and resistance are O2 tuning. Independent modifier hazards keep their own type.
+Weapon conversion selects the larger of Void and combined gear/buff Entropy;
+ties retain Entropy. Current full Attunement therefore selects Entropy while
+active. Selection is snapshotted when firing, including projectiles in flight.
+
 Each ordered pair consumes the first status: Rift on Rot produces Collapse,
 Void on Rot produces Wither, and Rift on Erased produces Tear. Reactions spend
 only damage already earned by the consumed status; damage already paid cannot

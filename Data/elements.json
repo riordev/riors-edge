@@ -12,5 +12,7 @@
   "voidThresholdHealthFraction": 0.1,
   "voidDamageFraction": 0.5,
   "voidDelaySeconds": 2.0,
-  "voidBuildupTimeoutSeconds": 4.0
+  "voidBuildupTimeoutSeconds": 4.0,
+  "alteredAttackVoidFraction": 0.5,
+  "alteredVoidResistancePercent": 25.0
 }

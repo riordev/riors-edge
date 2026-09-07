@@ -19,6 +19,7 @@
 #include "Progression/BreakerProgressionComponent.h"
 #include "Combat/BreakerStatusComponent.h"
 #include "Combat/BreakerEntropy.h"
+#include "Combat/BreakerVoid.h"
 #include "Movement/BreakerCharacterMovementComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/BoxComponent.h"
@@ -538,7 +539,11 @@ void ABreakerEnemy::ApplyChassis()
         + (IsEliteOrBetter() ? FMath::Max(EliteDropItemLevelBonus, 0) : 0);
     EnemyLevel = FMath::Clamp(EnemyLevel, 1, UBreakerAffixLibrary::MaxItemLevel);
 
-    if (Status) Status->EntropyResistancePercent = Family == EBreakerEnemyFamily::Vestige ? BreakerEntropy::VestigeResistancePercent() : 0.0f;
+    if (Status)
+    {
+        Status->EntropyResistancePercent = Family == EBreakerEnemyFamily::Vestige ? BreakerEntropy::VestigeResistancePercent() : 0.0f;
+        Status->VoidResistancePercent = Family == EBreakerEnemyFamily::Altered ? BreakerVoid::AlteredResistancePercent() : 0.0f;
+    }
     AttackDamage = UBreakerMonsterChassisLibrary::GetMonsterDamage(
         AreaLevel, MonsterRank, Chassis, ArchetypeDamageMultiplier);
 
@@ -1115,6 +1120,14 @@ void ABreakerEnemy::InterruptCombatAction()
     StateLabel = TEXT("STAGGERED");
 }
 
+void ABreakerEnemy::ApplyAuthoredAttackElement(FBreakerDamageRequest& Request) const
+{
+    // O2 family association and shares: Altered erase, Vestiges decay.
+    Request.Element = Family == EBreakerEnemyFamily::Altered ? EBreakerElement::Void : EBreakerElement::Entropy;
+    Request.ElementalFraction = Family == EBreakerEnemyFamily::Altered
+        ? BreakerVoid::AlteredAttackFraction() : BreakerEntropy::VestigeMeleeFraction();
+}
+
 void ABreakerEnemy::PerformAttack(APawn* TargetPawn)
 {
     if (!TargetPawn || !GetWorld() || GetWorld()->GetTimeSeconds() - LastAttackTime < AttackCooldown) return;
@@ -1134,8 +1147,7 @@ void ABreakerEnemy::PerformAttack(APawn* TargetPawn)
     // Unkeyed the lane composes to exactly 1.0 and this IS AttackDamage.
     Damage.BaseDamage = GetEffectiveAttackDamage();
     Damage.DamageFamily = EBreakerDamageFamily::Physical;
-    if (Family == EBreakerEnemyFamily::Vestige)
-    { Damage.Element = EBreakerElement::Entropy; Damage.ElementalFraction = BreakerEntropy::VestigeMeleeFraction(); }
+    ApplyAuthoredAttackElement(Damage);
     Damage.bCanCritical = false;
     Damage.SourceLocation = StrikeOrigin;
     Damage.bHasSourceLocation = true;

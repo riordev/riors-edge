@@ -10,7 +10,7 @@ namespace
 {
     struct FBreakerVoidTuning
     {
-        float Threshold = 0, Damage = 0, Delay = 0, Timeout = 0;
+        float Threshold = 0, Damage = 0, Delay = 0, Timeout = 0, AlteredFraction = 0, AlteredResistance = 0;
     };
 
     const FBreakerVoidTuning& BreakerVoidTuning()
@@ -20,11 +20,11 @@ namespace
             FBreakerVoidTuning Value;
             BreakerDataFile::FBreakerDataErrors Errors;
             const auto Data = BreakerDataFile::Load(TEXT("Data/elements.json"), Errors);
-            auto Read = [&](const TCHAR* Key, float& Field, double Maximum)
+            auto Read = [&](const TCHAR* Key, float& Field, double Maximum, bool bAllowZero = false)
             {
                 double Number = 0;
                 if (!Data || !Data->TryGetNumberField(Key, Number) || !FMath::IsFinite(Number)
-                    || Number <= 0 || Number > Maximum || !FMath::IsFinite(static_cast<float>(Number)))
+                    || (bAllowZero ? Number < 0 : Number <= 0) || Number > Maximum || !FMath::IsFinite(static_cast<float>(Number)))
                     Errors.Add(FString::Printf(TEXT("Invalid Void tuning: %s"), Key));
                 else Field = static_cast<float>(Number);
             };
@@ -32,6 +32,8 @@ namespace
             Read(TEXT("voidDamageFraction"), Value.Damage, 1);
             Read(TEXT("voidDelaySeconds"), Value.Delay, 3600);
             Read(TEXT("voidBuildupTimeoutSeconds"), Value.Timeout, 3600);
+            Read(TEXT("alteredAttackVoidFraction"), Value.AlteredFraction, 1, true);
+            Read(TEXT("alteredVoidResistancePercent"), Value.AlteredResistance, 100, true);
             if (!ensureAlwaysMsgf(Errors.IsClean(), TEXT("%s"), *Errors.Join())) return FBreakerVoidTuning();
             return Value;
         }();
@@ -39,6 +41,8 @@ namespace
     }
 }
 
+float BreakerVoid::AlteredAttackFraction() { return BreakerVoidTuning().AlteredFraction; }
+float BreakerVoid::AlteredResistancePercent() { return BreakerVoidTuning().AlteredResistance; }
 float BreakerVoid::ThresholdHealthFraction() { return BreakerVoidTuning().Threshold; }
 float BreakerVoid::DamageFraction() { return BreakerVoidTuning().Damage; }
 float BreakerVoid::DelaySeconds() { return BreakerVoidTuning().Delay; }

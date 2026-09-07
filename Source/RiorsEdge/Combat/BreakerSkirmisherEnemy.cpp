@@ -145,7 +145,7 @@ bool ABreakerSkirmisherEnemy::IsBlockedFrom(const FVector& ThreatLocation, const
     FHitResult Hit;
     // WorldStatic only: another enemy standing in the way is not cover, and
     // treating it as cover would make a pack shuffle behind each other.
-    return GetWorld()->LineTraceSingleByChannel(Hit, From, To, ECC_WorldStatic, Query);
+    return GetWorld()->LineTraceSingleByObjectType(Hit, From, To, FCollisionObjectQueryParams(ECC_WorldStatic), Query);
 }
 
 bool ABreakerSkirmisherEnemy::FindCoverPoint(const FVector& ThreatLocation, FVector& OutPoint)
@@ -372,12 +372,9 @@ void ABreakerSkirmisherEnemy::FireRound(const AActor* Target)
         FMath::Max(0.0f, SpreadDegrees), GetComposedAimErrorMultiplier(), AimErrorUnitDegrees);
     const FVector Direction = FMath::VRandCone(Base, FMath::DegreesToRadians(EffectiveSpread));
 
-    FActorSpawnParameters SpawnParams;
-    SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-    SpawnParams.Owner = this;
-    SpawnParams.Instigator = this;
-    ABreakerEnemyProjectile* Round = World->SpawnActor<ABreakerEnemyProjectile>(
-        ProjectileClass, Muzzle, Direction.Rotation(), SpawnParams);
+    const FTransform SpawnTransform(Direction.Rotation(), Muzzle);
+    ABreakerEnemyProjectile* Round = World->SpawnActorDeferred<ABreakerEnemyProjectile>(
+        ProjectileClass, SpawnTransform, this, this, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
     if (!Round) return;
 
     // Smaller and paler than the Lattice orb, so the player can tell which
@@ -395,10 +392,12 @@ void ABreakerSkirmisherEnemy::FireRound(const AActor* Target)
     // are bit-identical.
     Shot.BaseDamage = GetEffectiveAttackDamage() * FMath::Max(0.0f, DamagePerRoundFraction);
     Shot.DamageFamily = EBreakerDamageFamily::Physical;
+    ApplyAuthoredAttackElement(Shot);
     // Enemies do not crit; crit is the player's multiplier (§0).
     Shot.bCanCritical = false;
     Shot.SetInstigator(this);
     Round->InitializeProjectile(Shot, Direction, ProjectileSpeed);
+    Round->FinishSpawning(SpawnTransform);
 }
 
 void ABreakerSkirmisherEnemy::UpdateMuzzle(float Alpha)

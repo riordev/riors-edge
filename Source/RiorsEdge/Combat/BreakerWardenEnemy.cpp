@@ -355,6 +355,7 @@ void ABreakerWardenEnemy::ResolveSweep(AActor* Target)
     FBreakerDamageRequest Damage;
     Damage.BaseDamage = GetSweepDamage();
     Damage.DamageFamily = EBreakerDamageFamily::Physical;
+    ApplyAuthoredAttackElement(Damage);
     Damage.bCanCritical = false;
     Damage.SourceLocation = GetActorLocation();
     Damage.bHasSourceLocation = true;
@@ -389,6 +390,7 @@ void ABreakerWardenEnemy::ResolveSlam()
         FBreakerDamageRequest Damage;
         Damage.BaseDamage = GetSlamDamage();
         Damage.DamageFamily = EBreakerDamageFamily::Physical;
+        ApplyAuthoredAttackElement(Damage);
         Damage.bCanCritical = false;
         Damage.SourceLocation = Center;
         Damage.bHasSourceLocation = true;
@@ -420,6 +422,7 @@ void ABreakerWardenEnemy::ResolveSlam()
     Spec.ZoneColor = SlamRingColor;
     Spec.TickDamage.BaseDamage = GetSlamDamage() * FMath::Max(0.0f, SlamHazardTickFractionOfSlam);
     Spec.TickDamage.DamageFamily = EBreakerDamageFamily::Physical;
+    ApplyAuthoredAttackElement(Spec.TickDamage);
     Spec.TickDamage.bCanCritical = false;
 
     if (ABreakerZoneActor* Zone = GetWorld()->SpawnActor<ABreakerZoneActor>(
