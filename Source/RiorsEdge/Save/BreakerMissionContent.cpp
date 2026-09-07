@@ -771,6 +771,62 @@ namespace
         return UBreakerMissionLibrary::GetRifts().FindByPredicate(
             [RiftId](const FBreakerMissionRift& Candidate) { return Candidate.RiftId == RiftId; });
     }
+
+    // The quest a flag belongs to, by the field the beat kind completes on.
+    // The registry holds every flag unique across its rows, so "the quest
+    // whose AcceptedFlag is this" is one row or none.
+    const FBreakerQuestDefinition* BreakerMissionQuestByAccepted(FName Flag)
+    {
+        return UBreakerQuestLibrary::GetFallbackQuests().FindByPredicate(
+            [Flag](const FBreakerQuestDefinition& Candidate) { return Candidate.AcceptedFlag == Flag; });
+    }
+
+    const FBreakerQuestDefinition* BreakerMissionQuestByTurnedIn(FName Flag)
+    {
+        return UBreakerQuestLibrary::GetFallbackQuests().FindByPredicate(
+            [Flag](const FBreakerQuestDefinition& Candidate) { return Candidate.TurnedInFlag == Flag; });
+    }
+
+    // The objective a Boss beat completes on, across the registry: the same
+    // match BreakerMissionBossCloses makes per quest, here over every row
+    // because a beat alone does not name its mission.
+    const FBreakerQuestObjective* BreakerMissionObjectiveByCompletion(FName Flag)
+    {
+        for (const FBreakerQuestDefinition& Quest : UBreakerQuestLibrary::GetFallbackQuests())
+        {
+            const FBreakerQuestObjective* Objective = Quest.Objectives.FindByPredicate(
+                [Flag](const FBreakerQuestObjective& Candidate) { return Candidate.CompletionFlag == Flag; });
+            if (Objective) return Objective;
+        }
+        return nullptr;
+    }
+
+    // An objective's line: its text, and its counter over its count when it
+    // is counted. The counter is the one NotifyEnemyKilled raises
+    // (Objective.ProgressCounter), clamped so a save that overshot reads as
+    // done, not as more than done.
+    FString BreakerMissionObjectiveLine(const FBreakerQuestObjective& Objective, const FBreakerQuestFlagSet& Flags)
+    {
+        FString Line = Objective.Text.ToUpper();
+        if (Objective.RequiredCount > 0)
+        {
+            const int32 Count = FMath::Clamp(Flags.GetCounter(Objective.ProgressCounter), 0, Objective.RequiredCount);
+            Line += FString::Printf(TEXT("  %d/%d"), Count, Objective.RequiredCount);
+        }
+        return Line;
+    }
+
+    // The gap branch for a Dialogue or Return whose flag is no quest's: the
+    // NPC's name, unverbed. No shipped beat reaches it -- every act-one
+    // Dialogue accepts a quest and every Return turns one in -- and the
+    // tracker asks a line to name the story, so a beat that names none is
+    // left to say who, and nothing more, until the owner writes what.
+    FString BreakerMissionNpcName(FName Npc)
+    {
+        const FBreakerDialogueRow* Row = ABreakerNPC::GetDialogueData().Npcs.FindByPredicate(
+            [Npc](const FBreakerDialogueRow& Candidate) { return Candidate.Id == Npc; });
+        return Row ? Row->DisplayName.ToUpper() : FString();
+    }
 }
 
 TArray<FName> UBreakerMissionLibrary::BeatCompletionFlags(const FBreakerMissionBeat& Beat)
@@ -826,6 +882,72 @@ const FBreakerMissionBeat* UBreakerMissionLibrary::CurrentBeat(const FBreakerMis
 {
     const int32 Completed = BeatsCompleted(Mission, Flags);
     return Mission.Beats.IsValidIndex(Completed) ? &Mission.Beats[Completed] : nullptr;
+}
+
+FString UBreakerMissionLibrary::TrackerLine(const FBreakerMissionBeat& Beat, const FBreakerQuestFlagSet& Flags)
+{
+    switch (Beat.Kind)
+    {
+    case EBreakerMissionBeatKind::Dialogue:
+        if (const FBreakerQuestDefinition* Quest = BreakerMissionQuestByAccepted(Beat.CompletesOn))
+        {
+            return FString::Printf(SpeakToVerb, *Quest->Giver.ToUpper());
+        }
+        return BreakerMissionNpcName(Beat.Npc);
+
+    case EBreakerMissionBeatKind::Return:
+        if (const FBreakerQuestDefinition* Quest = BreakerMissionQuestByTurnedIn(Beat.CompletesOn))
+        {
+            return FString::Printf(ReturnToVerb, *Quest->Giver.ToUpper());
+        }
+        return BreakerMissionNpcName(Beat.Npc);
+
+    case EBreakerMissionBeatKind::Encounter:
+        if (const FBreakerQuestDefinition* Quest = BreakerMissionFindQuest(Beat.Quest))
+        {
+            for (const FName& ObjectiveId : Beat.Objectives)
+            {
+                const FBreakerQuestObjective* Objective = Quest->Objectives.FindByPredicate(
+                    [ObjectiveId](const FBreakerQuestObjective& Candidate) { return Candidate.ObjectiveId == ObjectiveId; });
+                if (!Objective || Flags.Has(Objective->CompletionFlag)) continue;
+                return BreakerMissionObjectiveLine(*Objective, Flags);
+            }
+        }
+        // Every named objective held: the beat is complete and never current,
+        // so nothing is asked.
+        return FString();
+
+    case EBreakerMissionBeatKind::Boss:
+    {
+        if (const FBreakerQuestObjective* Objective = BreakerMissionObjectiveByCompletion(Beat.CompletesOn))
+        {
+            return BreakerMissionObjectiveLine(*Objective, Flags);
+        }
+        // A Boss whose flag is no objective's names where, not what: the
+        // beat has no boss name yet (the loader's warning) and no line of
+        // its own, so the rift's area is the truthful ask.
+        const FBreakerMissionRift* Rift = BreakerMissionFindRift(Beat.Rift);
+        return Rift ? UBreakerZoneBuilder::FernhallRiftFor(Rift->Yard).AreaName.ToString().ToUpper() : FString();
+    }
+
+    case EBreakerMissionBeatKind::Travel:
+    {
+        FBreakerTravelDestination Destination;
+        if (ABreakerTravelPoint::FindDestination(Beat.Destination, Destination))
+        {
+            return Destination.DisplayName.ToString().ToUpper();
+        }
+        // The loader refuses a destination outside the registry, so this is
+        // reachable only through a beat built by hand.
+        return FString();
+    }
+
+    case EBreakerMissionBeatKind::Reward:
+    case EBreakerMissionBeatKind::Unlock:
+        // Paid, not asked: the corner is empty by rule.
+        return FString();
+    }
+    return FString();
 }
 
 int32 UBreakerMissionLibrary::DoctrinePointEntitlement(const FBreakerQuestFlagSet& Flags)

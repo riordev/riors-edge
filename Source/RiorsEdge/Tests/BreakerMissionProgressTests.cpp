@@ -5,6 +5,7 @@
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "Save/BreakerMissionContent.h"
+#include "Save/BreakerQuestContent.h"
 #include "Save/BreakerQuestJournal.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -199,6 +200,203 @@ bool FBreakerMissionProgressTest::RunTest(const FString& Parameters)
         Paid->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), UBreakerProgressionLibrary::DoctrinePointGrant);
     TestEqual(TEXT("...and its counter"),
         Paid->GetProgressionState().LevelDoctrinePointsGranted, UBreakerProgressionLibrary::DoctrinePointGrant);
+    return true;
+}
+
+// THE TRACKER LINE, WALKED ON THE SHIPPED FILE (O195, O186).
+//
+// Every string the corner can draw is built here from the rows the line is
+// derived from -- the quest's giver, the objective's text and count, the
+// destination's name -- never from a literal, so the assertion is that the
+// line has one home and the HUD's corner reads it. The walk sets each beat's
+// flags in order as the Progress walk does and asks the line of the current
+// beat at every step.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerMissionTrackerLineTest,
+    "RiorsEdge.Missions.TrackerLine",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+namespace
+{
+    const FBreakerQuestDefinition* BreakerMissionTrackerQuestWhere(TFunctionRef<bool(const FBreakerQuestDefinition&)> Match)
+    {
+        return UBreakerQuestLibrary::GetFallbackQuests().FindByPredicate(Match);
+    }
+
+    const FBreakerQuestObjective* BreakerMissionTrackerObjective(const FBreakerQuestDefinition& Quest, FName ObjectiveId)
+    {
+        return Quest.Objectives.FindByPredicate([ObjectiveId](const FBreakerQuestObjective& Candidate) { return Candidate.ObjectiveId == ObjectiveId; });
+    }
+
+    // The expected objective line, from the rows: text, and "  n/N" when
+    // counted. The same shape the tracker prints, restated here so a drift
+    // in either the format or the clamp shows as a mismatch.
+    FString BreakerMissionTrackerObjectiveLine(const FBreakerQuestObjective& Objective, int32 Count)
+    {
+        FString Line = Objective.Text.ToUpper();
+        if (Objective.RequiredCount > 0)
+        {
+            Line += FString::Printf(TEXT("  %d/%d"), FMath::Clamp(Count, 0, Objective.RequiredCount), Objective.RequiredCount);
+        }
+        return Line;
+    }
+}
+
+bool FBreakerMissionTrackerLineTest::RunTest(const FString& Parameters)
+{
+    const FBreakerMissionDefinition* Found = UBreakerMissionLibrary::GetMissions().FindByPredicate(
+        [](const FBreakerMissionDefinition& Candidate) { return Candidate.MissionId == FName(TEXT("Act1.Fernhall")); });
+    if (!TestNotNull(TEXT("Act1.Fernhall is in the shipped file"), Found)) return false;
+    const FBreakerMissionDefinition& Mission = *Found;
+    TestEqual(TEXT("Act one is twenty beats"), Mission.Beats.Num(), 20);
+
+    const int32 SpillIndex = BreakerMissionProgressIndexOf(Mission, TEXT("Spill"));
+    const int32 UndercroftIndex = BreakerMissionProgressIndexOf(Mission, TEXT("Undercroft"));
+    TestTrue(TEXT("Spill and the Undercroft are in the file"), SpillIndex != INDEX_NONE && UndercroftIndex != INDEX_NONE);
+
+    FBreakerQuestFlagSet Flags;
+    for (int32 Index = 0; Index < Mission.Beats.Num(); ++Index)
+    {
+        const FBreakerMissionBeat& Beat = Mission.Beats[Index];
+        const FString Where = FString::Printf(TEXT("[%d %s %s]"), Index, BreakerMissionProgressKindName(Beat.Kind), *Beat.BeatId.ToString());
+
+        // The beat under test is the current one whenever it has flags of
+        // its own to set; a Reward or Unlock closed with the beat before it
+        // and is asked directly, since the corner it would draw is the same.
+        const FBreakerMissionBeat* Current = UBreakerMissionLibrary::CurrentBeat(Mission, Flags);
+        const bool bExpectEmpty = Beat.Kind == EBreakerMissionBeatKind::Reward || Beat.Kind == EBreakerMissionBeatKind::Unlock;
+        if (!bExpectEmpty && TestNotNull(Where + TEXT(" is current"), Current))
+        {
+            TestEqual(Where + TEXT(" current beat id"), Current->BeatId, Beat.BeatId);
+        }
+
+        const FString Line = UBreakerMissionLibrary::TrackerLine(Beat, Flags);
+        TestEqual(Where + TEXT(" the line is empty iff the beat pays rather than asks"), Line.IsEmpty(), bExpectEmpty);
+
+        switch (Beat.Kind)
+        {
+        case EBreakerMissionBeatKind::Dialogue:
+        {
+            const FBreakerQuestDefinition* Quest = BreakerMissionTrackerQuestWhere(
+                [&Beat](const FBreakerQuestDefinition& Candidate) { return Candidate.AcceptedFlag == Beat.CompletesOn; });
+            if (TestNotNull(Where + TEXT(" accepts a quest by flag (the unverbed branch is never taken)"), Quest))
+            {
+                TestEqual(Where + TEXT(" speaks to the giver"), Line,
+                    FString::Printf(UBreakerMissionLibrary::SpeakToVerb, *Quest->Giver.ToUpper()));
+            }
+            break;
+        }
+
+        case EBreakerMissionBeatKind::Return:
+        {
+            const FBreakerQuestDefinition* Quest = BreakerMissionTrackerQuestWhere(
+                [&Beat](const FBreakerQuestDefinition& Candidate) { return Candidate.TurnedInFlag == Beat.CompletesOn; });
+            if (TestNotNull(Where + TEXT(" turns in a quest by flag (the unverbed branch is never taken)"), Quest))
+            {
+                TestEqual(Where + TEXT(" returns to the giver"), Line,
+                    FString::Printf(UBreakerMissionLibrary::ReturnToVerb, *Quest->Giver.ToUpper()));
+            }
+            break;
+        }
+
+        case EBreakerMissionBeatKind::Travel:
+        {
+            FBreakerTravelDestination Destination;
+            if (TestTrue(Where + TEXT(" the destination resolves"), ABreakerTravelPoint::FindDestination(Beat.Destination, Destination)))
+            {
+                TestEqual(Where + TEXT(" names the destination"), Line, Destination.DisplayName.ToString().ToUpper());
+            }
+            break;
+        }
+
+        case EBreakerMissionBeatKind::Encounter:
+        {
+            const FBreakerQuestDefinition* Quest = BreakerMissionTrackerQuestWhere(
+                [&Beat](const FBreakerQuestDefinition& Candidate) { return Candidate.QuestId == Beat.Quest; });
+            if (!TestNotNull(Where + TEXT(" the quest resolves"), Quest)) break;
+            if (!TestTrue(Where + TEXT(" counts at least one objective"), Beat.Objectives.Num() > 0)) break;
+            const FBreakerQuestObjective* First = BreakerMissionTrackerObjective(*Quest, Beat.Objectives[0]);
+            if (!TestNotNull(Where + TEXT(" the first objective resolves"), First)) break;
+
+            TestEqual(Where + TEXT(" the first objective, uncounted"), Line, BreakerMissionTrackerObjectiveLine(*First, 0));
+
+            // The counter as NotifyEnemyKilled raises it, one short of done.
+            if (First->RequiredCount > 1)
+            {
+                FBreakerQuestFlagSet Nearly = Flags;
+                Nearly.RaiseCounter(First->ProgressCounter, First->RequiredCount - 1);
+                TestEqual(Where + TEXT(" the counter reads one short"),
+                    UBreakerMissionLibrary::TrackerLine(Beat, Nearly), BreakerMissionTrackerObjectiveLine(*First, First->RequiredCount - 1));
+            }
+
+            // The first objective done: the line moves to the second.
+            if (Beat.Objectives.Num() > 1)
+            {
+                const FBreakerQuestObjective* Second = BreakerMissionTrackerObjective(*Quest, Beat.Objectives[1]);
+                if (TestNotNull(Where + TEXT(" the second objective resolves"), Second))
+                {
+                    FBreakerQuestFlagSet FirstDone = Flags;
+                    FirstDone.Add(First->CompletionFlag);
+                    TestEqual(Where + TEXT(" the line moves to the second objective"),
+                        UBreakerMissionLibrary::TrackerLine(Beat, FirstDone), BreakerMissionTrackerObjectiveLine(*Second, 0));
+                }
+            }
+            break;
+        }
+
+        case EBreakerMissionBeatKind::Boss:
+        {
+            const FBreakerQuestObjective* Closes = nullptr;
+            for (const FName& QuestId : Mission.Quests)
+            {
+                const FBreakerQuestDefinition* Quest = BreakerMissionTrackerQuestWhere(
+                    [QuestId](const FBreakerQuestDefinition& Candidate) { return Candidate.QuestId == QuestId; });
+                if (!Quest) continue;
+                Closes = Quest->Objectives.FindByPredicate(
+                    [&Beat](const FBreakerQuestObjective& Candidate) { return Candidate.CompletionFlag == Beat.CompletesOn; });
+                if (Closes) break;
+            }
+            if (TestNotNull(Where + TEXT(" closes one of the mission's objectives"), Closes))
+            {
+                TestEqual(Where + TEXT(" the sweep, uncounted"), Line, BreakerMissionTrackerObjectiveLine(*Closes, 0));
+            }
+            const FBreakerMissionRift* Rift = UBreakerMissionLibrary::GetRifts().FindByPredicate(
+                [&Beat](const FBreakerMissionRift& Candidate) { return Candidate.RiftId == Beat.Rift; });
+            TestNotNull(Where + TEXT(" the rift resolves"), Rift);
+            break;
+        }
+
+        case EBreakerMissionBeatKind::Reward:
+        case EBreakerMissionBeatKind::Unlock:
+            break;
+        }
+
+        for (const FName& Flag : UBreakerMissionLibrary::BeatCompletionFlags(Beat)) Flags.Add(Flag);
+    }
+    TestNull(TEXT("Every beat is complete"), UBreakerMissionLibrary::CurrentBeat(Mission, Flags));
+
+    // ---- the shipped configuration ----------------------------------------
+    // Spill counts Thin then Elite, so the move to a second objective is
+    // exercised on the shipped file; the Undercroft closes Deeper's sweep,
+    // a counted objective of five.
+    if (SpillIndex != INDEX_NONE)
+    {
+        TestEqual(TEXT("Spill counts two objectives"), Mission.Beats[SpillIndex].Objectives.Num(), 2);
+    }
+    if (UndercroftIndex != INDEX_NONE)
+    {
+        const FBreakerMissionBeat& Undercroft = Mission.Beats[UndercroftIndex];
+        const FBreakerQuestDefinition* Deeper = BreakerMissionTrackerQuestWhere(
+            [](const FBreakerQuestDefinition& Candidate) { return Candidate.QuestId == FName(TEXT("Quest.Deeper")); });
+        const FBreakerQuestObjective* Sweep = Deeper ? Deeper->Objectives.FindByPredicate(
+            [&Undercroft](const FBreakerQuestObjective& Candidate) { return Candidate.CompletionFlag == Undercroft.CompletesOn; }) : nullptr;
+        if (TestNotNull(TEXT("The Undercroft closes Deeper's sweep"), Sweep))
+        {
+            TestEqual(TEXT("The sweep counts five"), Sweep->RequiredCount, 5);
+            TestEqual(TEXT("The sweep line on a fresh set"), UBreakerMissionLibrary::TrackerLine(Undercroft, FBreakerQuestFlagSet()),
+                BreakerMissionTrackerObjectiveLine(*Sweep, 0));
+        }
+    }
     return true;
 }
 

@@ -161,6 +161,27 @@ public:
     // The first beat not yet complete, or null once the mission is done.
     static const FBreakerMissionBeat* CurrentBeat(const FBreakerMissionDefinition& Mission, const FBreakerQuestFlagSet& Flags);
 
+    // THE TRACKER LINE: the one string the HUD's quest corner draws for a
+    // beat, built from the rows and nothing else (O195: one home per string).
+    // The two verbs are the tracker's own words and live here so the HUD
+    // reads them rather than owning a copy. TCHAR arrays, not pointers,
+    // because FString::Printf holds its format to an array type.
+    //   Dialogue  -> SpeakToVerb over the giver of the quest whose
+    //                AcceptedFlag the beat completes on.
+    //   Return    -> ReturnToVerb over the giver of the quest whose
+    //                TurnedInFlag the beat completes on.
+    //   Encounter -> the first of the beat's objectives (beat order) the flag
+    //                set does not hold: its text, with "  n/N" when counted.
+    //   Boss      -> the objective whose CompletionFlag the beat completes on,
+    //                the same way; else the rift's area name.
+    //   Travel    -> the destination's display name.
+    //   Reward, Unlock -> empty: nothing is asked of the player.
+    // Every name is upper-cased here, once. A Dialogue or Return matching no
+    // quest by flag answers the dialogue row's display name with no verb.
+    static constexpr TCHAR SpeakToVerb[] = TEXT("SPEAK TO THE %s");
+    static constexpr TCHAR ReturnToVerb[] = TEXT("RETURN TO THE %s");
+    static FString TrackerLine(const FBreakerMissionBeat& Beat, const FBreakerQuestFlagSet& Flags);
+
     // O43: doctrine points are granted by mission beats, not by level. The
     // sum of doctrinePoints over every reached Unlock beat across every
     // mission; the component settles it against LevelDoctrinePointsGranted.
