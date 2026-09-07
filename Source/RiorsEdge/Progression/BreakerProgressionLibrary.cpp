@@ -3530,9 +3530,8 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSupportMedicTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MD_SecondOpinion.GetTag());
     Tree->Nodes.Add(Node);
 
-    // MD6. The Medic/Warden bridge — solo it fires when you heal yourself
-    // with a mark live. WAITING ON: the marked-target Charge source reading
-    // heal events.
+    // MD6. Actual restored health pays the marked source at proc weight;
+    // rank two refreshes both the mark's payload clock and its display.
     Node = MakeNode(TEXT("Support.Medic.Attending"), TEXT("Attending"),
         TEXT("Healing while your mark is live also pays the marked-target source at the damage rate (R2: and refreshes the mark)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Support.Medic.FieldDressing"));
@@ -3591,11 +3590,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSupportMedicTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MD_NoTriage.GetTag());
     Tree->Nodes.Add(Node);
 
-    // MD12 TRIAGE — keystone, tier-3/cost-3 compression. Its 1.20x WEAPON
-    // More for 4s after any heal is NOT OWED (O95): no RecentlyHealed condition
-    // exists (the Recently* family has no healed entry and is not yet
-    // evaluable besides) and WeaponDamage has no composed More lane.
-    // Conduit's Triage row resolves off the tag below.
+    // MD12. Conduit's healing field owns one lethal rescue per target/cast.
     Node = MakeNode(TEXT("Support.Medic.Triage"), TEXT("Triage"),
         TEXT("Branch keystone. Rewrites Conduit: a continuous healing field with one lethal-hit save per target, and no free casts."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Support.Medic.SteadyHands"));

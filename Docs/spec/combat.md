@@ -126,17 +126,19 @@ does. Each owns a verb no other element has.
 | **Entropy** | Accelerate decay |
 | **Void** | Erase |
 
-`Status.Void` erases part of the target's armour and incoming healing for a
-timed window. It deals no periodic damage and produces no damage-tick events.
-Its percentage reductions follow existing flat armour strips and healing
-modifiers; repeated applications refresh one effect. Immunity, avoidance,
-cleanse, consumption and expiry use the ordinary status lifecycle. Siphon's
-successful hits and Fracture's Bleed → Poison → Void cycle apply it.
+Each element builds toward a chassis-scaled threshold: Rift applies Unstable,
+Entropy applies Rot, and Void applies Erased. Status damage snapshots from the
+applying hit. Bleed and Poison remain physical. Resistance reduces elemental
+buildup rate, never damage; conversion affixes give weapons an elemental path.
+Enemy families author the element of their attacks. Void does not reduce armour
+or incoming healing.
 
-Three elements give exactly three pairs, which is small enough to memorise and
-large enough to be a rotation — that is why the count is three rather than
-four. Each pair has one reaction. **One reaction per target per interval**, and
-**a reaction may never itself apply a status**, or the matrix recurses.
+Each ordered pair consumes the first status: Rift on Rot produces Collapse,
+Void on Rot produces Wither, and Rift on Erased produces Tear. Reactions spend
+only damage already earned by the consumed status; damage already paid cannot
+be paid again. Reactions cannot trigger other reactions or apply statuses.
+There is no triple reaction. Build Entropy end to end, then Void, then Rift,
+then reactions.
 
 Severance — the degradation that turns a refugee into a hostile — is Entropy
 happening slowly to a person, which is why the element set and the enemy
@@ -229,6 +231,11 @@ absorbed by shields before health. Kinetic Recovery cancels this landing
 damage after an owned Breach launch within three seconds and grants 1.5
 seconds of stagger immunity. Foreign launches, teleports, traversal and death
 invalidate the launch; a later class or node change cannot retain protection.
+
+Triage protects each recipient from one lethal hit per cast while the living
+caster is within the field radius. It preserves shield expenditure and leaves
+at most one health (O2), without reporting a kill or overkill. Leaving, returning
+or reviving does not rearm a consumed rescue; another cast supplies a new one.
 
 ## Open questions
 

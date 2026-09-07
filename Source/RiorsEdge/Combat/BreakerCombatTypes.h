@@ -207,6 +207,7 @@ struct RIORSEDGE_API FBreakerHealRequest
     // Weak for the same reason the damage request's Instigator is: a heal over
     // time outliving its healer must never keep the healer alive.
     UPROPERTY(BlueprintReadWrite) TWeakObjectPtr<AActor> Healer = nullptr;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float ProcCoefficient = 1.0f;
 
     void SetHealer(AActor* InHealer) { Healer = InHealer; }
 };
@@ -255,6 +256,7 @@ struct RIORSEDGE_API FBreakerHealContext
     UPROPERTY(BlueprintReadOnly) TObjectPtr<AActor> Target = nullptr;
     UPROPERTY(BlueprintReadOnly) FBreakerHealResult Result;
     UPROPERTY(BlueprintReadOnly) FGameplayTag SourceTag;
+    UPROPERTY(BlueprintReadOnly) float ProcCoefficient = 1.0f;
 };
 
 // Attacker-side view of one resolved damage instance (SI-8). Broadcast on the

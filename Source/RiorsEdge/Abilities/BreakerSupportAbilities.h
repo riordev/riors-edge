@@ -220,6 +220,7 @@ public:
     // WA11 HUNTER'S ECONOMY: Mark costs nothing (duration halved in the cpp).
     virtual float GetResourceCost() const override;
 
+    void RefreshDuration(float MinimumRemainingSeconds);
     static FName IncomingModifierKey();
     // WA6 Tell's softening key, on the ENEMY's keyed outgoing-damage seam.
     static FName TellModifierKey();
@@ -335,8 +336,7 @@ public:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Conduit", meta=(ClampMin="0")) float RadiusCm = 1500.0f;   // §3.1: 15 m
     // Triage (§3.1): a continuous healing field — every valid target (solo:
-    // self) healed each second. THE LETHAL-HIT SAVE IS RECORDED ABSENT: no
-    // lethal-prevention hook exists on the damage pipeline.
+    // self) healed each second, with one lethal save per target per cast.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Conduit", meta=(ClampMin="0", ClampMax="1")) float TriageHealFractionPerSecond = 0.04f;   // O2 PLACEHOLDER
     // Downbeat (§3.1): flat weapon damage for every buffed target (solo: one).
     // FLAT is load-bearing — flat-sum stage, cannot double-dip with gear.
@@ -351,10 +351,17 @@ private:
     UFUNCTION() void RefreshDownbeat();
     UFUNCTION() void HandleConduitDeath();
     void HandleTriagePulse();
+    void RefreshTriageRecipients();
     void CloseConduit();
 
     FTimerHandle WindowTimer;
     FTimerHandle TriageTimer;
+    FTimerHandle TriageRecipientsTimer;
+    UPROPERTY() TObjectPtr<ABreakerZoneActor> TriageBoundary = nullptr;
+    FName TriageOwnerKey;
+    uint32 TriageCastSerial = 0;
+    double TriageEndTime = 0;
+    TSet<TWeakObjectPtr<ABreakerCharacter>> TriageRecipients;
     FTimerHandle DownbeatTimer;
     FName DownbeatOwnerKey;
     TWeakObjectPtr<UBreakerCombatComponent> BoundCombat;

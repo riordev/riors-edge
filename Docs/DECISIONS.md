@@ -400,3 +400,12 @@ Numbers are permanent and never reused.
 **O216** — Act I's givers are the Quartermaster and Kess; Command enters the story when it has a dialogue row (O209).
 
 **O217** — A Volatile blast reaches every live pawn in range, enemies included, at the one monster-scaled number; enemy projectiles and zones stay enemy-safe. Volatile is the only enemy fire that hurts enemies.
+**O221** — A rewrite on an Aberrant or Unwritten item may author a More; gear and tree Mores share the three slots under the one ceiling. Ordinary affixes never do.
+
+**O222** — The elements are verbs: Rift displaces (Unstable), Entropy decays (Rot), Void erases (Erased). Each is a buildup status whose threshold scales with the chassis and whose damage snapshots from the applying hit. Bleed and Poison stay physical.
+
+**O223** — One reaction per pair, fired by consuming the first status: Rift on Rot is Collapse, Void on Rot is Wither, Rift on Erased is Tear. A reaction spends only the damage already earned; no triple, no chain.
+
+**O224** — Enemies deal elements by family. Resistance reduces buildup rate, never damage. Conversion affixes carry weapon builds into an element.
+
+**O225** — Elements are built one at a time, each end to end before the next: Entropy, Void, Rift, then reactions. Status.Void's armour and healing reduction is retired.

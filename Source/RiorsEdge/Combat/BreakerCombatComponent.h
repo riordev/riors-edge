@@ -130,6 +130,11 @@ public:
     // submissions alike), 1.0 when no attribute set is bound.
     UFUNCTION(BlueprintPure, Category="Combat|Outgoing") float GetAttributeSideMoreProduct() const;
 
+    // One rescue per source cast. Refreshing membership never rearms a spent
+    // rescue, including after leaving the field or reviving during that cast.
+    void GrantLethalSave(FName Key, AActor* Source, float Duration, float RadiusCm);
+    void RemoveLethalSave(FName Key);
+
     // Snapshot-time source power for a DoT APPLICATION — the WHOLE tick
     // multiplier since A4 (owner ruling 2026-08-16): Increased Damage and
     // Increased DoT fold into ONE additive bucket (1 + IncDamage + IncDoT),
@@ -332,6 +337,15 @@ private:
 
     UPROPERTY() TArray<FBreakerOutgoingModifier> OutgoingModifiers;
     TMap<FName, float> WeaponFlatDamage;
+    struct FLethalSaveLease
+    {
+        TWeakObjectPtr<AActor> Source;
+        double ExpiryTime = 0;
+        float RadiusCm = 0;
+        bool bConsumed = false;
+    };
+    TMap<FName, FLethalSaveLease> LethalSaveLeases;
+    bool ConsumeLethalSave();
     // Keyed so a pusher removes exactly its own entry. No expiry: an incoming
     // modifier reflects a state (Overcast, a defensive window) whose owner is
     // responsible for removing it, and a silently expiring defence is worse

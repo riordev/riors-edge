@@ -400,6 +400,15 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
             bFrontBrokeThisHit = true;
         }
     }
+    if (Result.bKilled && Defense.Health > 0.0f && ConsumeLethalSave())
+    {
+        // O2 PLACEHOLDER: survive at one health without healing a sub-one
+        // target. Consume before vitals/death callbacks can re-enter damage.
+        Result.RemainingHealth = FMath::Min(Defense.Health, 1.0f);
+        Result.HealthDamage = FMath::Max(0.0f, Defense.Health - Result.RemainingHealth);
+        Result.OverkillDamage = 0.0f;
+        Result.bKilled = false;
+    }
     // Same null-safe route the healing path uses: identical to the generated
     // setters when there is an ability system, and writable (rather than an
     // ensure) when there is not, which is what lets automation exercise a
@@ -921,6 +930,7 @@ FBreakerHealResult UBreakerCombatComponent::ApplyHealing(const FBreakerHealReque
             Context.Target = GetOwner();
             Context.Result = Result;
             Context.SourceTag = Request.SourceTag;
+            Context.ProcCoefficient = FMath::IsFinite(Request.ProcCoefficient) ? FMath::Clamp(Request.ProcCoefficient, 0.0f, 1.0f) : 0.0f;
             HealerCombat->OnHealingDealt.Broadcast(Context);
         }
     }
@@ -934,6 +944,53 @@ FBreakerHealResult UBreakerCombatComponent::ApplyHealingAmount(float Amount, AAc
     Request.SourceTag = SourceTag;
     Request.SetHealer(Healer);
     return ApplyHealing(Request);
+}
+
+void UBreakerCombatComponent::GrantLethalSave(FName Key, AActor* Source, float Duration, float RadiusCm)
+{
+    AActor* Target = GetOwner();
+    if (Key.IsNone() || !IsValid(Target) || !Target->HasAuthority() || !IsValid(Source)
+        || Source->GetWorld() != GetWorld() || !Source->HasAuthority() || !GetWorld()
+        || !FMath::IsFinite(Duration) || Duration <= 0 || !FMath::IsFinite(RadiusCm) || RadiusCm <= 0) return;
+    const auto* SourceCombat = Source->FindComponentByClass<UBreakerCombatComponent>();
+    if (!SourceCombat || SourceCombat->IsDead() || Source->IsActorBeingDestroyed()) return;
+    auto& Lease = LethalSaveLeases.FindOrAdd(Key);
+    // A key identifies one cast, never a reusable slot. The source cannot be
+    // replaced under that key; another cast must mint another key.
+    if (Lease.Source.IsValid() && Lease.Source.Get() != Source) return;
+    Lease.Source = Source;
+    Lease.ExpiryTime = GetWorld()->GetTimeSeconds() + Duration;
+    Lease.RadiusCm = RadiusCm;
+}
+
+void UBreakerCombatComponent::RemoveLethalSave(FName Key)
+{
+    LethalSaveLeases.Remove(Key);
+}
+
+bool UBreakerCombatComponent::ConsumeLethalSave()
+{
+    AActor* Target = GetOwner();
+    if (!Target || !Target->HasAuthority() || !GetWorld() || IsDead() || IsBeneficialEffectSuppressed()) return false;
+    const double Now = GetWorld()->GetTimeSeconds();
+    FName Selected = NAME_None;
+    double Earliest = TNumericLimits<double>::Max();
+    for (auto It = LethalSaveLeases.CreateIterator(); It; ++It)
+    {
+        auto& Lease = It.Value();
+        AActor* Source = Lease.Source.Get();
+        if (!IsValid(Source) || Source->IsActorBeingDestroyed() || Lease.ExpiryTime <= Now)
+        { It.RemoveCurrent(); continue; }
+        const auto* SourceCombat = Source->FindComponentByClass<UBreakerCombatComponent>();
+        if (Lease.bConsumed || Source->GetWorld() != GetWorld() || !Source->HasAuthority()
+            || !SourceCombat || SourceCombat->IsDead()
+            || FVector::DistSquared(Target->GetActorLocation(), Source->GetActorLocation()) > FMath::Square(Lease.RadiusCm)) continue;
+        if (Lease.ExpiryTime < Earliest || (Lease.ExpiryTime == Earliest && It.Key().LexicalLess(Selected)))
+        { Earliest = Lease.ExpiryTime; Selected = It.Key(); }
+    }
+    if (Selected.IsNone()) return false;
+    LethalSaveLeases.FindChecked(Selected).bConsumed = true;
+    return true;
 }
 
 void UBreakerCombatComponent::PushWeaponFlatDamage(FName Key, float FlatBonus)

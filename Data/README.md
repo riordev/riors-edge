@@ -74,6 +74,15 @@ Metronome's `RecipientRadiusCm` selects recipients at cast, currently 500 cm
 holder's independent weapon ramp. Conduit's `DownbeatFlatDamagePerBuffedTarget`
 uses the live unique count of your Cadence and Metronome recipients.
 
+## Support Triage and Attending
+
+Triage uses Conduit's existing `RadiusCm` (1500) and
+`TriageHealFractionPerSecond` (0.04). The boundary follows the caster; nearby
+living players receive healing and one lethal-hit rescue per cast. Rescue
+leaves at most 1 health (O2 C++ default), and cannot be reset by leaving or
+reviving. Attending credits actual restored health at the heal's proc weight;
+rank two also refreshes the real Mark effect, preserving any longer remainder.
+
 ## Support Mark
 
 Mark's `PaintedAllyYieldMultiplier` is 0.5 (O2), paid only at Painted rank two.

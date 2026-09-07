@@ -31,6 +31,8 @@
 #include "InputMappingContext.h"
 #include "Movement/BreakerCharacterMovementComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
+#include "Progression/BreakerProgressionLibrary.h"
+#include "Progression/BreakerProgressionTree.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Misc/CommandLine.h"
@@ -1282,15 +1284,37 @@ namespace
 void ABreakerCharacter::StartViewmodelCaptureCycle()
 {
 #if !UE_BUILD_SHIPPING
-    if (FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureCadence")))
+    const bool bCaptureTriage = FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureTriage"));
+    if (bCaptureTriage || FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureCadence")))
     {
         // Isolated visual fixture: real class, ability payment and cast. This
         // grants capture resources, so it is not progression or balance proof.
         GetWorldTimerManager().SetTimer(ViewmodelFireTimer,
-            FTimerDelegate::CreateWeakLambda(this, [this]()
+            FTimerDelegate::CreateWeakLambda(this, [this, bCaptureTriage]()
         {
             if (!Progression || !Abilities || !Charge) return;
             Progression->DevForceClass(EBreakerClassId::Support);
+            if (bCaptureTriage)
+            {
+                // Eight is the complete authored campaign budget. This fresh
+                // capture fixture verifies appearance, not campaign earning.
+                Progression->GrantPlaytestPoints(8, 0);
+                const auto* Tree = UBreakerProgressionLibrary::GetSupportMedicTree();
+                FText Reason;
+                for (const TCHAR* Node : { TEXT("Support.Medic.FieldDressing"), TEXT("Support.Medic.FieldDressing"),
+                    TEXT("Support.Medic.SteadyHands"), TEXT("Support.Medic.SteadyHands"),
+                    TEXT("Support.Medic.CleanHands"), TEXT("Support.Medic.CleanHands") })
+                    if (!Progression->PurchaseNode(Tree, Node, Reason)) return;
+                if (!Progression->CommitToBranch(Tree->TreeId, Reason)
+                    || !Progression->PurchaseNode(Tree, TEXT("Support.Medic.Triage"), Reason)) return;
+                Progression->DevForceEquipAbility(EBreakerAbilitySlot::Ultimate, TEXT("Support.Conduit"));
+                Abilities->RefreshGrants();
+                Charge->GrantCharge(100.0f);
+                Attributes->ApplyHealth(Attributes->GetMaxHealth() * .5f);
+                if (Controller) Controller->SetControlRotation(FRotator(-25.0f, GetActorRotation().Yaw, 0));
+                UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] Triage actual cast=%d"), Abilities->TryActivateSlot(EBreakerAbilitySlot::Ultimate));
+                return;
+            }
             Progression->DevForceEquipAbility(EBreakerAbilitySlot::ClassAbilityOne, TEXT("Support.Cadence"));
             Abilities->RefreshGrants();
             Charge->GrantCharge(100.0f);
@@ -1921,18 +1945,17 @@ void ABreakerCharacter::HandleClassResourceHealingDealt(const FBreakerHealContex
         }
     }
     const bool bSelfTargeted = Heal.Target == this;
-    // RECORDED GAP: heal contexts carry no proc coefficient (no heal-over-time
-    // source exists to need one); 1.0 until one does.
+    // Timed allied heals carry the same proc weight as the original request.
     if (Heal.Result.HealthHealed > 0.0f || Heal.Result.Overheal > 0.0f)
     {
-        Charge->NotifyHealingDone(Heal.Result.HealthHealed, Heal.Result.Overheal, TargetMaxHealth, bSelfTargeted, 1.0f);
+        Charge->NotifyHealingDone(Heal.Result.HealthHealed, Heal.Result.Overheal, TargetMaxHealth, bSelfTargeted, Heal.ProcCoefficient);
     }
     // The shield-side twin: shield actually granted (the overheal-to-shield
     // routing) credits through the shielding source; over-cap shield was
     // already trimmed by the healing resolve and so never reaches the rule.
     if (Heal.Result.ShieldGranted > 0.0f)
     {
-        Charge->NotifyShieldingDone(Heal.Result.ShieldGranted, 0.0f, TargetMaxHealth, bSelfTargeted);
+        Charge->NotifyShieldingDone(Heal.Result.ShieldGranted * Heal.ProcCoefficient, 0.0f, TargetMaxHealth, bSelfTargeted);
     }
 }
 

@@ -5,13 +5,15 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
-## Cycle — Medic Triage and Attending
-- [ ] Give Conduit Triage a real nearby-player healing field and one lethal-hit save per target per cast with owned expiry and cleanup.
-- [ ] Pay Attending from actual healing, including timed heals, and extend the actual Mark effect alongside its display.
-- [ ] Prove lethal/overlap/exit/death/refusal cases and actual heal/mark expiry, review, build, census and suite.
-Remaining repairs include Support element nodes, ability balance, rarity identities, other weapon poses and audible combat polish.
+## Cycle — Entropy end to end (O221–O225)
+- [ ] Add explicit element identity, accepted-hit buildup and chassis-scaled thresholds; Entropy applies Rot with damage snapshotted from the applying hit.
+- [ ] Route an actual weapon conversion affix and Caster Rot through the same damage/buildup path. Resistance changes buildup only; Bleed and Poison remain physical.
+- [ ] Retire legacy Status.Void armour/healing reduction and update Siphon, Fracture and Sequence dependencies without inert stand-ins. This runtime retirement and the new elements are not implemented yet.
+- [ ] Prove conversion, resisted buildup, threshold activation, snapshot ticks, expiry, death and refused hits; capture feedback and validate a real Rift run.
+- [ ] Build Void, then Rift, then the three consuming reactions only after Entropy is complete.
+O221–O225 are recorded in DECISIONS and combat intent. Element magnitudes remain O2 tuning; the existing legacy elemental-resistance damage reduction must be removed from the new element path.
 ## Playtest queue (owner, 2026-09-07)
-Continue through the entire repair list in tested batches without stopping after each commit for a playtest. After repairs, execute the content phase below (owner instruction, 2026-09-07).
+The owner is back: make reasonable progress, then stop and report for a playtest. Continue the remaining repair list and subsequent content phase in bounded batches.
 - (ui, npcs, systems) Reduce menu density and clipping; repair NPC interaction flow, ability assignment and point spending; present Core as the authored tree rather than a node cloud; update the dev sandbox. Finish silent nodes and Caster progression.
 - (maps, story, endgame loop) Finish Fernhall → Rift → reward → return, expand Fernhall into meaningful combat areas, make Anchor a hub, and author one memorable mission. Validate the complete Rift loop before expanding multiplayer/MMO scope.
 - (abilities, build diversity) Improve ability builds versus weapons; investigate intermittent Rot damage, ticks and numbers and Caster Cleave range. Provide an easy ability/ultimate/base-stat tuning surface.
@@ -47,13 +49,13 @@ No playtest until the core loop has more oomph. The next blocks are the ones tha
 - (weapons) Momentum on the gun is built as tighten-only: the cone shrinks to 0.6x at a full bar (O2 PLACEHOLDER) and tracers brighten to 1.75x; an empty bar is baseline (O92). If "follows the bar" meant something else, say what.
 - (enemies) A Volatile blast hits enemies at the player's number (O217): 9x chassis damage kills every trash body inside the inner radius. Keep one number, or rule an enemy fraction after a playtest.
 - (abilities) Class numbers ride `Data/abilities.json` and are written onto the class defaults at load; the compiled members stay as the failed-load fallback. Delete the compiled defaults later (as cycle 17 deleted the registry's costs), or keep them?
-- (fun interactions) Elements: the spec names Rift, Entropy and Void (O19) with one reaction per pair; code has only a Void damage tag and the Bleed/Poison ailments. Does Void become an applied status (the ini once said healing and armour reduction) or stay a damage tag? Do enemies deal elemental damage at all? What are the three reaction cells and the interval? Do Bleed and Poison join the matrix or stay the physical lane beside it? May Provoke become a status an enemy reads as its target (a threat primitive by another name; "no class-pair specials" is honoured)?
+- (fun interactions) Provoke-as-a-status still needs a threat ruling; elemental semantics are defined by O222–O225.
 
 ## Plumbing the design asks for, in the order that unblocks the most
 - Not to build without a system and a ruling: subtitles, text scale, reduce-flash, Forge Attune-to-rift, a MATERIALS tab, pad glyphs, the gamepad toggle, the class-select yard with 3D figures (waits on O14 models).
 
 ## Then, in this order, each sized when it reaches the top
-1. The reaction matrix (Rift, Entropy, Void; O19) waits on its cells being named; Provoke-as-a-status waits on the threat question. The pierce-spread rule is live in `Data/statuses.json`.
+1. Implement Entropy, Void, Rift, then Collapse/Wither/Tear under O222–O225. Provoke-as-a-status waits on the threat question.
 2. Rift interiors (GROUND-1): three to five room shapes measured against the gap rules, feeding the wave solver.
 3. Ten authored legendaries with printed forfeits (LEDGER-4, O66/O67).
 4. Anomalies as the first real endgame (GROUND-3): key → run → payout as a functional test.
@@ -105,6 +107,7 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - Four Niagara systems at `/Game/Breaker/FX/NS_<Moment>` with a `Color` user parameter, or a free Fab VFX pack placed there
 
 ## Done (last three cycles; older is git)
+- **Medic Triage and Attending:** Conduit Triage heals nearby living players and grants one lethal save per target per cast; exit/re-entry and death/revive cannot reset a spent save. Source death, cancellation and expiry remove owned leases. Attending pays actual restored health with proc weighting and renews the actual Mark timer. Build/census clean; 657 tests, 654 passed, three known failures, zero unexpected. Native Rift loop passes with 24 kills, 2015 XP and 230 Riftglass retained through return. Triage capture inspected: visible placeholder boundary, not finished effects. Test fixture budget priming and authored Mark multiplier corrected without relaxing assertions. O221–O225 recorded; Entropy and legacy Void runtime retirement remain unbuilt. STATE unchanged under host-Python quarantine.
 - **Support Painted and Mark:** Real target damage events route caster shots, purchased ability/tick sources and rank-two allied damage at half yield with proc weighting. Blood Debt requires an owner shot and cannot recursively pay Charge. Same-target marks retain the strongest vulnerability/Tell effect through one owner's cancellation, retarget and death. Handoff reads actual lethal remaining time and skips marked enemies on any target death; Ledger refunds remain owner-kill only. Canceled/dead source marks clear HUD state. Registry143numbers; build/census clean; **656tests,653passed,3known,0unexpected**. Actual controller/local-player camera fixture and purchased Medic cache repaired without weakening assertions; Blackout fixture recasts after revival. Native Rift PASS24kills,2015XP,200Glass. STATE unchanged under host-Python quarantine.
 
 - **Support Metronome and Conduit:** Cast-time500cm living-player snapshot, independent proc-weighted weapon ramps, purchased Tempo ally behavior and Counterpoint damage sources. Owned cleanup and Rehearsal preserve live reapplication while refusing canceled caches; receiving buffs grants no upkeep. Conduit counts actual unique living holders and updates its weapon flat immediately on membership changes; bonus doubling composes correctly. Raw weapon flat excludes abilities, melee and DoT requests. One new editable radius key brings numeric registry to142. Build/census clean; **655 tests,652passed,3known,0unexpected**. New runtime test retains timing/value assertions after fixing an observed Conduit timer-order lag. Native Rift PASS24kills,2015XP,186Glass. Triage/Painted/Attending and element nodes remain unfinished. STATE unchanged under host-Python quarantine.

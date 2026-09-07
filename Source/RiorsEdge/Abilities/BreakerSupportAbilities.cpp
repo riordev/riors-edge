@@ -105,6 +105,7 @@ namespace BreakerSupportAbilityLocal
         if (Charge) Charge->BeginSupportHealScope();
         FBreakerHealRequest Heal;
         Heal.Amount = Amount;
+        Heal.ProcCoefficient = ProcCoefficient;
         Heal.bOverhealToShield = bOverhealToShield;
         Heal.SetHealer(Healer);
         Result = TargetCombat->ApplyHealing(Heal);
@@ -119,6 +120,7 @@ namespace BreakerSupportAbilityLocal
             if (Unrouted > 0.0f)
             {
                 FBreakerHealRequest Convert;
+                Convert.ProcCoefficient = ProcCoefficient;
                 Convert.Amount = Unrouted * 0.5f;   // O2 PLACEHOLDER ("a fraction of its value")
                 Convert.bOverhealToShield = true;
                 Convert.SetHealer(Healer);
@@ -129,8 +131,7 @@ namespace BreakerSupportAbilityLocal
 
         // Self-heals credit here, explicitly, at the true proc coefficient.
         // Ally heals credit through the character's OnHealingDealt wiring
-        // (recorded gap there: ally credits run at 1.0 until heal contexts
-        // carry a coefficient). The overheal pays NOTHING; the shield it
+        // with the same carried proc coefficient. Overheal pays nothing; the shield it
         // became pays as shield — MD9's exact sentence.
         if (Charge && bSelf)
         {
@@ -141,8 +142,25 @@ namespace BreakerSupportAbilityLocal
             const float ShieldPaid = Result.ShieldGranted + OverflowShield;
             if (ShieldPaid > 0.0f)
             {
-                Charge->NotifyShieldingDone(ShieldPaid, 0.0f, TargetMax, true);
+                Charge->NotifyShieldingDone(ShieldPaid * (FMath::IsFinite(ProcCoefficient) ? FMath::Clamp(ProcCoefficient, 0.0f, 1.0f) : 0.0f), 0.0f, TargetMax, true);
             }
+        }
+        // Attending pays actual restored health at the real heal proc weight.
+        // Every healing verb shares this seam, including deferred HoT pulses.
+        if (Charge && Healer && !Healer->GetCombat()->IsDead() && Result.HealthHealed > 0
+            && FMath::IsFinite(ProcCoefficient) && ProcCoefficient > 0)
+        {
+            const auto* Progression = Healer->FindComponentByClass<UBreakerProgressionComponent>();
+            const int32 Rank = Progression ? Progression->GetNodeRank(TEXT("Support.Medic.Attending"), EBreakerPointCurrency::DoctrinePoints) : 0;
+            if (auto* State = Healer->FindComponentByClass<UBreakerAbilityStateComponent>())
+                if (AActor* Marked = State->GetMarkedTarget(); Rank > 0 && Marked)
+                {
+                    Charge->NotifyMarkedTargetDamage(Result.HealthHealed * FMath::Clamp(ProcCoefficient, 0.0f, 1.0f), BreakerSupportTargetMaxHealth(Marked));
+                    if (Rank >= 2)
+                        if (auto* ASC = Healer->GetAbilitySystemComponent())
+                            for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+                                if (auto* Mark = Cast<UBreakerAbility_Mark>(Spec.GetPrimaryInstance())) Mark->RefreshDuration(10.0f);
+                }
         }
         return Result;
     }
@@ -353,27 +371,6 @@ void UBreakerAbility_Patch::ActivateAbility(const FGameplayAbilitySpecHandle Han
         else
         {
             BreakerSupportHealAndCredit(Character, Target, Amount, 1.0f, bOverflow);
-        }
-
-        // MD6 ATTENDING: healing while your mark is live also pays the
-        // marked-target source at the damage rate (R2: and refreshes the mark).
-        const int32 AttendingRank = SupportNodeRank(Character, TEXT("Support.Medic.Attending"));
-        if (AttendingRank > 0)
-        {
-            if (UBreakerAbilityStateComponent* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>())
-            {
-                if (AActor* Marked = State->GetMarkedTarget())
-                {
-                    if (UBreakerChargeComponent* Charge = Character->FindComponentByClass<UBreakerChargeComponent>())
-                    {
-                        Charge->NotifyMarkedTargetDamage(Amount, BreakerSupportTargetMaxHealth(Marked));
-                    }
-                    if (AttendingRank >= 2)
-                    {
-                        State->SetMark(Marked, FMath::Max(State->GetMarkRemaining(), 10.0f));   // refresh, never shorten
-                    }
-                }
-            }
         }
 
         // THE HEAL, VISIBLE: a gold pulse and a short rising stroke at the
@@ -1206,6 +1203,21 @@ void UBreakerAbility_Mark::ReconcileTarget(AActor* Target)
         else Enemy->PopOutgoingDamageMultiplier(TellModifierKey());
     }
 }
+void UBreakerAbility_Mark::RefreshDuration(float MinimumRemainingSeconds)
+{
+    if (!bMarkActive || !GetWorld() || !FMath::IsFinite(MinimumRemainingSeconds)) return;
+    ABreakerCharacter* Character = GetBreakerCharacter();
+    AActor* Target = MarkedTarget.Get();
+    if (!Character || Character->GetCombat()->IsDead() || !Target) return;
+    auto* TargetCombat = Target->FindComponentByClass<UBreakerCombatComponent>();
+    auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>();
+    if (!TargetCombat || TargetCombat->IsDead() || !State) return;
+    const float Remaining = FMath::Max(State->GetMarkRemainingFor(Target), MinimumRemainingSeconds);
+    if (Remaining <= 0) return;
+    ActiveMarkDuration = FMath::Max(ActiveMarkDuration, Remaining);
+    State->SetMark(Target, Remaining);
+    GetWorld()->GetTimerManager().SetTimer(MarkTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { CloseMark(); }), Remaining, false);
+}
 void UBreakerAbility_Mark::CloseMark()
 {
     if (CurrentActorInfo)
@@ -1500,10 +1512,19 @@ void UBreakerAbility_Conduit::ActivateAbility(const FGameplayAbilitySpecHandle H
 
     if (bTriage)
     {
-        // §3.1 TRIAGE: a continuous healing field, every valid target — solo,
-        // the set is the Support, unconditionally. The one-lethal-hit-save per
-        // target is RECORDED ABSENT (no lethal-prevention hook exists).
-        World->GetTimerManager().SetTimer(TriageTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { HandleTriagePulse(); }), 1.0f, /*bLoop=*/true);
+        TriageOwnerKey = FName(*FString::Printf(TEXT("Conduit.Triage.%u.%u"), GetUniqueID(), ++TriageCastSerial));
+        TriageEndTime = World->GetTimeSeconds() + Duration;
+        FBreakerZoneSpec Visual;
+        Visual.RadiusCm = RadiusCm; Visual.Duration = Duration;
+        Visual.bMobileFootprint = true; Visual.bShowFilledFootprint = false; Visual.ZoneColor = BreakerUI::Gold;
+        FActorSpawnParameters Spawn; Spawn.Owner = Character;
+        Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+        const FVector Feet = Character->GetActorLocation() - FVector(0, 0, Character->GetSimpleCollisionHalfHeight());
+        TriageBoundary = World->SpawnActor<ABreakerZoneActor>(ABreakerZoneActor::StaticClass(), Feet, FRotator::ZeroRotator, Spawn);
+        if (TriageBoundary) { TriageBoundary->ConfigureZone(Visual, Character); TriageBoundary->SetFollowActor(Character); }
+        RefreshTriageRecipients();
+        World->GetTimerManager().SetTimer(TriageRecipientsTimer, this, &ThisClass::RefreshTriageRecipients, .05f, true);
+        World->GetTimerManager().SetTimer(TriageTimer, this, &ThisClass::HandleTriagePulse, 1.0f, true);
     }
     else if (bDownbeat)
     {
@@ -1556,18 +1577,43 @@ void UBreakerAbility_Conduit::RefreshDownbeat()
 }
 
 void UBreakerAbility_Conduit::HandleConduitDeath() { CloseConduit(); }
-void UBreakerAbility_Conduit::HandleTriagePulse()
+void UBreakerAbility_Conduit::RefreshTriageRecipients()
 {
+    if (!bConduitActive) return;
     ABreakerCharacter* Character = GetBreakerCharacter();
-    if (!Character) return;
-    // Through the one heal-and-credit seam: generation deliberately CONTINUES
-    // under CONDUIT (§3.1), and Overflow's conversion applies if owned.
-    const float MaxHealth = BreakerSupportAbilityLocal::BreakerSupportTargetMaxHealth(Character);
-    const bool bOverflow = SupportHasNode(Character, BreakerNodeTags::Node_MD_Overflow.GetTag());
-    BreakerSupportAbilityLocal::BreakerSupportHealAndCredit(Character, Character,
-        MaxHealth * TriageHealFractionPerSecond, 1.0f, bOverflow);
+    if (!Character || Character->GetCombat()->IsDead()) { CloseConduit(); return; }
+    UWorld* World = Character->GetWorld();
+    const float Remaining = static_cast<float>(TriageEndTime - World->GetTimeSeconds());
+    if (Remaining <= 0) return;
+    for (TActorIterator<ABreakerCharacter> It(World); It; ++It)
+    {
+        ABreakerCharacter* Recipient = *It;
+        if (Recipient->IsActorBeingDestroyed() || Recipient->GetCombat()->IsDead()) continue;
+        // Register outside the field too; the damage seam checks the current
+        // distance, so entering between maintenance ticks is still protected.
+        Recipient->GetCombat()->GrantLethalSave(TriageOwnerKey, Character, Remaining, RadiusCm);
+        TriageRecipients.Add(Recipient);
+    }
 }
 
+void UBreakerAbility_Conduit::HandleTriagePulse()
+{
+    RefreshTriageRecipients();
+    if (!bConduitActive) return;
+    ABreakerCharacter* Character = GetBreakerCharacter();
+    if (!Character || !GetWorld() || GetWorld()->GetTimeSeconds() >= TriageEndTime) return;
+    const bool bOverflow = SupportHasNode(Character, BreakerNodeTags::Node_MD_Overflow.GetTag());
+    const auto Snapshot = TriageRecipients.Array();
+    for (const auto& Weak : Snapshot)
+    {
+        if (!bConduitActive || Character->IsActorBeingDestroyed() || Character->GetCombat()->IsDead()) break;
+        if (ABreakerCharacter* Recipient = Weak.Get())
+            if (!Recipient->IsActorBeingDestroyed() && !Recipient->GetCombat()->IsDead()
+                && FVector::DistSquared(Character->GetActorLocation(), Recipient->GetActorLocation()) <= FMath::Square(RadiusCm))
+                BreakerSupportAbilityLocal::BreakerSupportHealAndCredit(Character, Recipient,
+                    BreakerSupportAbilityLocal::BreakerSupportTargetMaxHealth(Recipient) * TriageHealFractionPerSecond, 1.0f, bOverflow);
+    }
+}
 void UBreakerAbility_Conduit::HandleBlackoutHit(const FBreakerHitContext& Hit)
 {
     if (!bConduitActive || !Hit.Target || !BlackoutTargets.Contains(Hit.Target)) return;
@@ -1594,6 +1640,10 @@ void UBreakerAbility_Conduit::EndAbility(const FGameplayAbilitySpecHandle Handle
     if (bConduitActive)
     {
         bConduitActive = false;
+        for (const auto& Weak : TriageRecipients) if (auto* Recipient = Weak.Get()) Recipient->GetCombat()->RemoveLethalSave(TriageOwnerKey);
+        TriageRecipients.Reset();
+        if (IsValid(TriageBoundary)) TriageBoundary->Destroy();
+        TriageBoundary = nullptr;
         ABreakerCharacter* Character = GetBreakerCharacter();
         if (Character)
         {
@@ -1632,6 +1682,7 @@ void UBreakerAbility_Conduit::EndAbility(const FGameplayAbilitySpecHandle Handle
         {
             World->GetTimerManager().ClearTimer(WindowTimer);
             World->GetTimerManager().ClearTimer(TriageTimer);
+            World->GetTimerManager().ClearTimer(TriageRecipientsTimer);
             World->GetTimerManager().ClearTimer(DownbeatTimer);
         }
     }
