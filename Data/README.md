@@ -2,6 +2,8 @@
 
 Edit `Data/abilities.json` in a text editor. Find an ability by its `id`, such as `Caster.Cleave` or `Caster.Rot`. Save valid JSON, then fully close and relaunch the game/editor: this file is loaded once per process. Numeric edits require no C++ rebuild. Keep every existing ID and key; do not add comments or trailing commas to JSON.
 
+Gear's `Ability.AddedPower` row in `Data/affixes.json` controls Added Ability Power. Its initial 1–11 tier anchors are O2 placeholder tuning. This percentage increases the ability lane's base multiplier before Increased bonuses; it does not change weapon damage. Ability-delivered damage-over-time snapshots that multiplier when applied.
+
 Each row exposes `resourceCost`, `cooldownSeconds`, and `windowDuration`. Its `numbers` object contains that ability's supported base values. Ultimate rows and their `variants` are in the same file; keep keystone IDs intact.
 
 | Value | Meaning |

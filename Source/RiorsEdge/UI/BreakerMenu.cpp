@@ -1085,6 +1085,27 @@ void SBreakerMenu::ShowScreenForCapture(EBreakerMenuScreen Screen)
                 }
             }
         }
+        else if (Board == TEXT("ABILITYPOWER"))
+        {
+            Screen = EBreakerMenuScreen::Inventory;
+            BackpackFilter = BreakerInventoryLayout::EBackpackFilter::Trinkets;
+            if (Character.IsValid() && Character->GetEquipment())
+            {
+                // Photograph a legitimately rolled row, never fabricate an
+                // affix or alter balance-test seeds to obtain the subject.
+                bool bFound = false;
+                for (int32 Seed = 0; Seed < 4096 && !bFound; ++Seed)
+                {
+                    const FBreakerItemInstance Rolled = UBreakerLootLibrary::RollItem(
+                        TEXT("CaptureAbilityPower"), EBreakerEquipSlot::Necklace,
+                        EBreakerItemRarity::Exceptional, 40, Seed);
+                    bFound = Rolled.Affixes.ContainsByPredicate([](const FBreakerRolledAffix& Affix)
+                        { return Affix.AffixId == FName(TEXT("Ability.AddedPower")); });
+                    if (bFound) Character->GetEquipment()->AddToBackpack(Rolled);
+                }
+                if (!bFound) UE_LOG(LogTemp, Error, TEXT("Ability power capture could not roll its subject"));
+            }
+        }
         else if (Board == TEXT("UNWRITTEN"))
         {
             Screen = EBreakerMenuScreen::Inventory;
@@ -4363,10 +4384,11 @@ namespace
         const FBreakerAffixDefinition* Definition = UBreakerAffixLibrary::FindAffix(Pool, Affix.AffixId);
         const FString Name = Definition ? Definition->DisplayName.ToString() : Affix.AffixId.ToString();
         const bool bPercent = Definition && Definition->StatBucket != EBreakerStatBucket::Flat;
-        // Critical Chance and Critical Damage roll as flat numbers but are
-        // printed as percentages, because that is what they mean.
+        // Flat damage power and critical stats are percentage points even
+        // though they enter their attribute before Increased composition.
         const bool bPercentStyleFlat = Definition &&
-            (Definition->StatTarget == EBreakerStatTarget::CriticalChance || Definition->StatTarget == EBreakerStatTarget::CriticalDamage);
+            (Definition->StatTarget == EBreakerStatTarget::CriticalChance || Definition->StatTarget == EBreakerStatTarget::CriticalDamage
+                || Definition->StatTarget == EBreakerStatTarget::AddedDamage || Definition->StatTarget == EBreakerStatTarget::AbilityDamage);
         return FString::Printf(TEXT("+%.1f%s %s"), Affix.Value,
             bPercent || bPercentStyleFlat ? TEXT("%") : TEXT(""), *Name);
     }
@@ -9306,7 +9328,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
     {
         const bool bPercent = Definition && (Definition->StatBucket != EBreakerStatBucket::Flat
             || Definition->StatTarget == EBreakerStatTarget::CriticalChance
-            || Definition->StatTarget == EBreakerStatTarget::CriticalDamage);
+            || Definition->StatTarget == EBreakerStatTarget::CriticalDamage
+            || Definition->StatTarget == EBreakerStatTarget::AddedDamage
+            || Definition->StatTarget == EBreakerStatTarget::AbilityDamage);
         const FString Digits = FMath::Abs(Value) < 10.0f
             ? FString::Printf(TEXT("%.1f"), Value)
             : FString::Printf(TEXT("%.0f"), Value);

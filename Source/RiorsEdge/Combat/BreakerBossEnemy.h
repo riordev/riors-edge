@@ -65,6 +65,7 @@ class RIORSEDGE_API ABreakerBossEnemy : public ABreakerWardenEnemy
 
 public:
     ABreakerBossEnemy();
+    virtual void ApplyBodyMesh() override;
 
     UFUNCTION(BlueprintPure, Category="Boss") EBreakerBossPhase GetPhase() const { return Phase; }
     UFUNCTION(BlueprintPure, Category="Boss") EBreakerBossOrder GetActiveOrder() const { return ActiveOrder; }
@@ -179,6 +180,13 @@ protected:
     // The rear weak point: open during orders in phases 1-2, for the front-break
     // window wherever it lands, and permanently in phase 3.
     void SetApparatusExposed(bool bExposed);
+    void RefreshApparatusWeakPoint();
+    void BuildMarshalApparatusDetails();
+    UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> ApparatusMastOuter;
+    UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> ApparatusMastInner;
+    UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> ApparatusSupportVisuals;
+    bool bApparatusBodyVisible = true;
+    float ApparatusPoseAlpha = 0.0f;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UStaticMeshComponent> ApparatusVisual;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UPointLightComponent> ApparatusLight;

@@ -24,6 +24,8 @@
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
 #include "UnrealClient.h"
+#include "Camera/CameraActor.h"
+#include "Components/CapsuleComponent.h"
 
 bool UBreakerLoopProbe::ShouldCreateSubsystem(UObject* Outer) const
 {
@@ -61,6 +63,7 @@ void UBreakerLoopProbe::Initialize(FSubsystemCollectionBase& Collection)
 void UBreakerLoopProbe::Deinitialize()
 {
     FTSTicker::GetCoreTicker().RemoveTicker(Ticker);
+    FTSTicker::GetCoreTicker().RemoveTicker(MarshalPhotoTicker);
     Super::Deinitialize();
 }
 
@@ -129,6 +132,7 @@ bool UBreakerLoopProbe::SelectDialogueFlag(ABreakerCharacter* Player, FName Flag
 
 bool UBreakerLoopProbe::TickActTwo(ABreakerCharacter* Player, ABreakerGameMode* Mode)
 {
+    if (MarshalPhotoStage > 0 && MarshalPhotoStage < 4) return true;
     if (PhotoDelay > 0)
     {
         if (--PhotoDelay == 1) FScreenshotRequest::RequestScreenshot(PendingPhoto, true, false);
@@ -211,6 +215,16 @@ bool UBreakerLoopProbe::TickActTwo(ABreakerCharacter* Player, ABreakerGameMode* 
             IFileManager::Get().MakeDirectory(*Directory, true);
             PendingPhoto = Directory / (bContact ? TEXT("acttwo-contact.png") : TEXT("acttwo-marshal.png"));
             PhotoDelay = 2;
+            if (bMarshal)
+            {
+                PhotoMarshal = Cast<ABreakerBossEnemy>(Enemy);
+                MarshalCamera = World->SpawnActor<ACameraActor>();
+                MarshalPhotoStage = 1;
+                MarshalPhotoStarted = FPlatformTime::Seconds();
+                MarshalPhotoTicker = FTSTicker::GetCoreTicker().AddTicker(
+                    FTickerDelegate::CreateUObject(this, &UBreakerLoopProbe::TickMarshalPhotos), 0.05f);
+                PhotoDelay = 0;
+            }
             return true;
         }
         if (Session->PendingRift.EncounterId == FName(TEXT("breach.marshalling"))
@@ -223,6 +237,80 @@ bool UBreakerLoopProbe::TickActTwo(ABreakerCharacter* Player, ABreakerGameMode* 
     // objectives. Travel back out and in; never manufacture elite kills.
     if (Living.IsEmpty() && !Mode->IsRiftInstance() && Beat->WorldEncounter.IsNone())
         return SelectTravel(Player, ABreakerTravelPoint::HubDestinationId) ? true : Finish(false, TEXT("Finite encounter revisit unavailable"));
+    return true;
+}
+
+bool UBreakerLoopProbe::TickMarshalPhotos(float DeltaSeconds)
+{
+    ABreakerBossEnemy* Boss = PhotoMarshal.Get();
+    ACameraActor* Camera = MarshalCamera.Get();
+    APlayerController* Controller = Boss && Boss->GetWorld() ? Boss->GetWorld()->GetFirstPlayerController() : nullptr;
+    if (!Boss || !Camera || !Controller || Boss->IsDeadEnemy())
+        return Finish(false, TEXT("Marshal exposure photograph lost its live actor/camera"));
+    ABreakerCharacter* Player = Cast<ABreakerCharacter>(Controller->GetPawn());
+    if (!Player || Player->GetCombat()->IsDead())
+        return Finish(false, TEXT("Marshal photograph player died before exposure"));
+    // This is a camera inspection, not a stationary damage sponge. Keep the
+    // real player in detection range but outside melee while the order clock
+    // runs; do not change health, boss cadence or exposure rules.
+    if (FVector::DistSquared2D(Player->GetActorLocation(), Boss->GetActorLocation()) < FMath::Square(1800.0f))
+    {
+        FVector Away = (Player->GetActorLocation() - Boss->GetActorLocation()).GetSafeNormal2D();
+        if (Away.IsNearlyZero()) Away = Boss->GetActorForwardVector();
+        bool bRetreated = false;
+        const ABreakerGameMode* Mode = Boss->GetWorld()->GetAuthGameMode<ABreakerGameMode>();
+        for (const FVector Direction : { Away, -Away, Away.RotateAngleAxis(90, FVector::UpVector), Away.RotateAngleAxis(-90, FVector::UpVector) })
+        {
+            FVector Retreat = Boss->GetActorLocation() + Direction * 2500.0f;
+            if (Mode && Mode->IsInSafeZone(Retreat)) continue;
+            FHitResult Floor;
+            FCollisionQueryParams GroundQuery(SCENE_QUERY_STAT(MarshalPhotoRetreat), false);
+            GroundQuery.AddIgnoredActor(Player); GroundQuery.AddIgnoredActor(Boss);
+            if (!Boss->GetWorld()->LineTraceSingleByChannel(Floor, Retreat + FVector(0, 0, 500),
+                Retreat - FVector(0, 0, 1000), ECC_Visibility, GroundQuery) || Floor.ImpactNormal.Z < 0.6) continue;
+            Retreat = Floor.ImpactPoint + FVector(0, 0, Player->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() + 2);
+            if (Player->TeleportTo(Retreat, (-Direction).Rotation())) { bRetreated = true; break; }
+        }
+        if (!bRetreated)
+            return Finish(false, TEXT("Marshal photo retreat has no safe standing location"));
+    }
+    const double Now = FPlatformTime::Seconds();
+    // Allow the authored full cadence plus raise; the first Deployment order
+    // itself takes twenty seconds, so a twenty-second timeout cannot see it.
+    const float PhotoTimeout = Boss->PhaseParams.DeployIntervalSeconds + Boss->PhaseParams.DeployRaiseSeconds + 5.0f;
+    if (Now - MarshalPhotoStarted > PhotoTimeout)
+        return Finish(false, TEXT("Marshal did not present a natural order window for photograph"));
+    const FVector Target = Boss->GetActorLocation() + FVector(0, 0, 60);
+    const bool bRear = MarshalPhotoStage == 1;
+    const FVector At = Target + Boss->GetActorForwardVector() * (bRear ? -550.0f : 650.0f) + FVector(0, 0, 65);
+    Camera->SetActorLocation(At);
+    Camera->SetActorRotation((Target - At).Rotation());
+    Controller->SetViewTarget(Camera);
+    const FString Directory = FPaths::ProjectSavedDir() / TEXT("Screenshots");
+    if (MarshalPhotoStage == 1 && Now - MarshalPhotoStarted > 0.25 && !Boss->IsApparatusExposed())
+    {
+        FScreenshotRequest::RequestScreenshot(Directory / TEXT("acttwo-marshal-rear.png"), true, false);
+        MarshalPhotoStage = 2;
+    }
+    else if (MarshalPhotoStage == 2)
+    {
+        if (!Boss->IsGivingOrder()) MarshalOrderSeen = 0;
+        else if (MarshalOrderSeen == 0) MarshalOrderSeen = Now;
+        else if (Now - MarshalOrderSeen > 0.75f * UBreakerBossPhaseLibrary::GetOrderRaiseSeconds(Boss->GetPhase(), Boss->PhaseParams)
+            && Boss->IsApparatusExposed())
+        {
+            FScreenshotRequest::RequestScreenshot(Directory / TEXT("acttwo-marshal.png"), true, false);
+            MarshalPhotoStage = 3;
+            MarshalOrderSeen = Now;
+        }
+    }
+    else if (MarshalPhotoStage == 3 && Now - MarshalOrderSeen > 0.25)
+    {
+        Controller->SetViewTarget(Controller->GetPawn());
+        Camera->Destroy();
+        MarshalPhotoStage = 4;
+        return false;
+    }
     return true;
 }
 

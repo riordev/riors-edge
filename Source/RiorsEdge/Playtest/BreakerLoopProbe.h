@@ -21,6 +21,13 @@ private:
     bool SelectTravel(class ABreakerCharacter* Player, FName Destination);
     bool TickActTwo(class ABreakerCharacter* Player, class ABreakerGameMode* Mode);
     bool SelectDialogueFlag(class ABreakerCharacter* Player, FName Flag);
+    bool TickMarshalPhotos(float DeltaSeconds);
+    FTSTicker::FDelegateHandle MarshalPhotoTicker;
+    TWeakObjectPtr<class ABreakerBossEnemy> PhotoMarshal;
+    TWeakObjectPtr<class ACameraActor> MarshalCamera;
+    int32 MarshalPhotoStage = 0;
+    double MarshalPhotoStarted = 0;
+    double MarshalOrderSeen = 0;
     bool bActTwo = false;
     bool bSawMarshal = false;
     int32 BreachMaximumWave = 0;

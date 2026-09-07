@@ -5,11 +5,12 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
-## Cycle — ability flat power and integrated Marshal weakpoint
-- [ ] Connect collected flat ability damage to the shared ability damage calculation and author one ordinary flat-power affix; verify direct damage, DoT snapshots, equip/unequip and weapon isolation without changing parity pins.
-- [ ] Make the Marshal's exposed rear apparatus the actual weakpoint, close it correctly at spawn and preserve exposure/visibility across body and revive paths; inspect real weapon traces and rendered exposure.
+## Cycle — Core parry, special damage scaling and compact gear
+- [ ] Make Parry a real rebindable defensive action; wire Read's window and Counterweight's success-only bonus with runtime coverage.
+- [ ] Select gear/tree damage More sources jointly inside the existing three-source ceiling; permit one authored Aberrant ability payoff with its paired downside, keeping ordinary gear restrictions and parity pins intact.
+- [ ] Remove the inventory's empty full-body placeholder and give equipment, stats and backpack cards usable space; inspect the actual layout.
 - [ ] Review, build, census, run the full suite and inspect affected captures before landing.
-Remaining repairs include later campaign benchmarks, other silent nodes, ability/weapon balance, special-rarity More source budgeting, rarity identities, arms/weapon art and audible combat polish.
+Remaining repairs include later campaign benchmarks, other silent nodes, ability/weapon balance, rarity identities, arms/weapon art and audible combat polish.
 ## Playtest queue (owner, 2026-09-07)
 Continue through the entire repair list in tested batches without stopping after each commit for a playtest. After repairs, execute the content phase below (owner instruction, 2026-09-07).
 - (ui, npcs, systems) Reduce menu density and clipping; repair NPC interaction flow, ability assignment and point spending; present Core as the authored tree rather than a node cloud; update the dev sandbox. Finish silent nodes and Caster progression.
@@ -105,6 +106,11 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - Four Niagara systems at `/Game/Breaker/FX/NS_<Moment>` with a `Color` user parameter, or a free Fab VFX pack placed there
 
 ## Done (last three cycles; older is git)
+### Ability flat power and integrated Marshal module — 616 / 5 / 0
+- [x] Added Ability Power rolls on ordinary gear and feeds the ability multiplier's Flat bucket; direct damage, captured DoT, weapon isolation and equip/unequip are tested. Item and Forge values print percentage units.
+- [x] Marshal's visible command module receives weakpoint hits; inherited head orb stays disabled across body/revive/visibility paths. Exposure is applied at spawn, follows real Orders/front-break windows and lights at rest. Compact ribbed module and telescoping mast replace the disconnected slab; Holdfast presentation remains separate.
+- [x] Build/census clean (59 ordinary affixes); 621 tests complete: 616 passed, 5 known, 0 unexpected. Fixed historical parity stays 0.542; unchanged rolled search measures 0.569 cap and 0.732 endgame. The larger ability balance deficit remains open; no pins or search fixtures changed.
+- [x] Actual ordinary item card and rear-closed/front-raised Marshal frames inspected. Fresh earned Act I-II loop passed 111 kills and 4 Doctrine. Photo probe waits the authored full order cadence and repositions its live player outside melee on real floor; no damage-feel claim. STATE unchanged.
 ### Three silent nodes and Marshal armour — 614 / 5 / 0
 - [x] Tank Overpressure persists as a real fused charge with free re-press detonation, rank-two enemy attachment, Demolition's two placements and cancellation on unequip/death.
 - [x] Gunsmith deployables have real placement timers, Dead Ground band timing, input cancellation and transactional validation that preserves existing objects on failure. Four base cast durations are editable in Data/abilities.json.
@@ -116,10 +122,3 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - [x] Swift Read the Room and Landing use purchased ranks and actual movement. Ground-only credit refill, continuous fall distance, teleport/traversal resets and once-per-landing gains are tested.
 - [x] Fixed two real integration failures: offer-node gates hid their own dialogue choices, and silently restored journals did not refresh the physical entrance. Added visible-choice and same-journal save-restore regressions.
 - [x] Final build/census and616tests:611passed/5known/0unexpected. Fresh isolated fully earned Act I-II run passed111kills, actual travel/contact/Marshal/return and exactly4Doctrine points. Damage accelerated; no combat-feel or Slate-input claim. Contact and Marshal frames inspected; Marshal solid shield panel remains visual repair. STATE unchanged.
-
-### Two-target Lead, special loot budgets and Rift identity — 604 / 5 / 0
-- [x] Purchased Lead retains two independently timed targets and renders both diamonds; weapon hits honor both, Ledger refunds once per cast, Mark Economy preserves lifetime/refund identity. Actual GAS/weapon tests plus shipped enemy geometry; live Fernhall capture shows both marks.
-- [x] Lead now targets the weapon collision channel and rejects scenery/dead combat targets. Live capture found the mismatch hidden by the old synthetic fixture. Capture probe purchases nodes and casts normally under isolated saves.
-- [x] Special loot reserves signatures, special lines and paired downsides inside final count/category budgets. Ordinary rolls and existing saved items unchanged. New slot/level/seed coverage preserves all four legendary identities; Refractor card inspected with five affixes.
-- [x] Rift boss/story lookup uses stable EncounterId carried through travel/retry, never display copy. Renames, duplicate display names and missing IDs tested. Real round trip passed again:24kills,2015XP,231Riftglass retained; accelerated integration, not combat-feel validation.
-- [x] Final build and609tests complete:604passed/5existing expected/0unexpected. Strict pool-membership test fixed without widening counts; real enemy fixture registers its existing ASC attributes. STATE unchanged. Read-only MeshAudit confirms both imported mannequins mix arm/body weights in both sections; no arms replacement claimed.

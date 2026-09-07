@@ -174,6 +174,8 @@ void ABreakerBossEnemy::BeginPlay()
         }
     }
 
+    if (GetClass() == ABreakerBossEnemy::StaticClass()) BuildMarshalApparatusDetails();
+
     // §3.2's DoT stack cap. The status component already owns stacking, so this
     // is one number rather than a boss-specific status path.
     if (Status) Status->MaximumStacksPerStatus = FMath::Max(1, BossDamageOverTimeStackCap);
@@ -208,27 +210,114 @@ void ABreakerBossEnemy::OnFrontBroken()
     SetApparatusExposed(true);
 }
 
+void ABreakerBossEnemy::BuildMarshalApparatusDetails()
+{
+    if (!ApparatusVisual || !ApparatusSupportVisuals.IsEmpty()) return;
+    // O2 ART PLACEHOLDERS: a compact ribbed command module on two visibly
+    // telescoping rails. The module remains the only weapon-query surface.
+    ApparatusVisual->SetRelativeScale3D(FVector(0.16f, 0.32f, 0.42f));
+    UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+    UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+    auto Part = [&](const FString& Name, USceneComponent* Parent, FVector Location, FVector Scale, FLinearColor Color)
+    {
+        UStaticMeshComponent* Mesh = NewObject<UStaticMeshComponent>(this, FName(*Name));
+        AddInstanceComponent(Mesh);
+        Mesh->SetupAttachment(Parent);
+        Mesh->SetStaticMesh(Cube);
+        Mesh->SetRelativeLocation(Location);
+        Mesh->SetRelativeScale3D(Scale);
+        Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        if (Base)
+        {
+            UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(Base, Mesh);
+            Material->SetVectorParameterValue(TEXT("Color"), Color);
+            Mesh->SetMaterial(0, Material);
+        }
+        Mesh->RegisterComponent();
+        return Mesh;
+    };
+    const FLinearColor Steel(0.075f, 0.095f, 0.10f);
+    const FLinearColor Edge(0.30f, 0.34f, 0.33f);
+    const FLinearColor Copper(0.48f, 0.24f, 0.08f);
+    for (int32 Face : { -1, 1 })
+    {
+        const FString Prefix = FString::Printf(TEXT("MarshalModule%d"), Face);
+        for (int32 Side : { -1, 1 })
+        {
+            Part(Prefix + FString::Printf(TEXT("Rail%d"), Side), ApparatusVisual,
+                FVector(Face * 52.0f, Side * 45.0f, 0), FVector(0.08f, 0.10f, 1.0f), Steel);
+            Part(Prefix + FString::Printf(TEXT("Cap%d"), Side), ApparatusVisual,
+                FVector(Face * 52.0f, 0, Side * 45.0f), FVector(0.08f, 0.80f, 0.10f), Edge);
+        }
+        for (int32 Rib = 0; Rib < 5; ++Rib)
+            Part(Prefix + FString::Printf(TEXT("CoolingRib%d"), Rib), ApparatusVisual,
+                FVector(Face * 52.0f, 0, -28.0f + Rib * 14.0f), FVector(0.06f, 0.72f, 0.045f), Steel);
+        Part(Prefix + TEXT("CoilSpine"), ApparatusVisual,
+            FVector(Face * 54.0f, 0, 0), FVector(0.06f, 0.08f, 0.72f), Copper);
+    }
+    ApparatusSupportVisuals.Add(Part(TEXT("MarshalMastMount"), BodyCollision,
+        ApparatusRestLocation + FVector(0, 0, -25), FVector(0.20f, 0.36f, 0.10f), Steel));
+    for (int32 Side : { -1, 1 })
+    {
+        UStaticMeshComponent* Outer = Part(FString::Printf(TEXT("MarshalMastOuter%d"), Side), BodyCollision,
+            ApparatusRestLocation, FVector(0.065f, 0.065f, 0.10f), Steel);
+        UStaticMeshComponent* Inner = Part(FString::Printf(TEXT("MarshalMastInner%d"), Side), BodyCollision,
+            ApparatusRestLocation, FVector(0.038f, 0.038f, 0.10f), Edge);
+        ApparatusMastOuter.Add(Outer);
+        ApparatusMastInner.Add(Inner);
+        ApparatusSupportVisuals.Add(Outer);
+        ApparatusSupportVisuals.Add(Inner);
+    }
+    UpdateApparatus(ApparatusPoseAlpha);
+}
+void ABreakerBossEnemy::ApplyBodyMesh()
+{
+    Super::ApplyBodyMesh();
+    // Body fitting attaches the generic weak point to Head. The Marshal's
+    // target is its command hardware, including after a mesh reapply/revive.
+    RefreshApparatusWeakPoint();
+}
+
+void ABreakerBossEnemy::RefreshApparatusWeakPoint()
+{
+    if (GetClass() != ABreakerBossEnemy::StaticClass()) return;
+    if (WeakPoint) WeakPoint->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    if (WeakPointVisual) WeakPointVisual->SetVisibility(false, true);
+    if (ApparatusVisual)
+    {
+        ApparatusVisual->ComponentTags.AddUnique(TEXT("WeakPoint"));
+        ApparatusVisual->SetCollisionResponseToAllChannels(ECR_Ignore);
+        ApparatusVisual->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Block);
+        ApparatusVisual->SetCollisionEnabled(bApparatusExposed && bApparatusBodyVisible
+            ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
+    }
+}
+
 void ABreakerBossEnemy::SetApparatusExposed(bool bExposed)
 {
-    if (bApparatusExposed == bExposed) return;
+    // Presentation writes are intentionally idempotent: the initial false
+    // state must close inherited collision, and body restoration may reset it.
     bApparatusExposed = bExposed;
-    // Literally untargetable when closed rather than a damage filter: a weak
-    // point the player can hit but that scores nothing teaches them the weak
-    // point does not work.
-    if (WeakPoint) WeakPoint->SetCollisionEnabled(bExposed
+    if (ApparatusMaterial) UpdateApparatus(ApparatusPoseAlpha);
+    if (GetClass() == ABreakerBossEnemy::StaticClass())
+    {
+        RefreshApparatusWeakPoint();
+        return;
+    }
+    if (WeakPoint) WeakPoint->SetCollisionEnabled(bExposed && bApparatusBodyVisible
         ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
-    if (WeakPointVisual) WeakPointVisual->SetVisibility(bExposed, true);
+    if (WeakPointVisual) WeakPointVisual->SetVisibility(bExposed && bApparatusBodyVisible, true);
 }
 
 void ABreakerBossEnemy::SetBodyVisible(bool bVisible)
 {
+    bApparatusBodyVisible = bVisible;
     Super::SetBodyVisible(bVisible);
     if (ApparatusVisual) ApparatusVisual->SetVisibility(bVisible, true);
-    // The weak point follows the apparatus rule, not the body rule: showing it
-    // on a respawn would open a window §3.2 says is closed.
-    if (WeakPointVisual) WeakPointVisual->SetVisibility(bVisible && bApparatusExposed, true);
+    for (UStaticMeshComponent* Support : ApparatusSupportVisuals)
+        if (Support) Support->SetVisibility(bVisible, true);
+    SetApparatusExposed(bApparatusExposed);
 }
-
 void ABreakerBossEnemy::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
@@ -462,6 +551,11 @@ void ABreakerBossEnemy::ResolveOrder()
 
 void ABreakerBossEnemy::UpdateApparatus(float Alpha)
 {
+    ApparatusPoseAlpha = Alpha;
+    // The resting front-break window is exposed too: the actual hardware
+    // must advertise it even when no Orders raise is moving the apparatus.
+    const float GlowAlpha = GetClass() == ABreakerBossEnemy::StaticClass() && bApparatusExposed
+        ? FMath::Max(Alpha, 0.65f) : Alpha; // O2 PLACEHOLDER: resting exposure glow floor.
     if (ApparatusVisual)
     {
         // It LIFTS. That is what makes a rear weak point hittable from the
@@ -469,10 +563,24 @@ void ABreakerBossEnemy::UpdateApparatus(float Alpha)
         // the player reads which order from where it points, not from the pose.
         ApparatusVisual->SetRelativeLocation(ApparatusRestLocation + FVector(0.0f, 0.0f, ApparatusRaiseCm * Alpha));
     }
+    // Two overlapping stages connect the backpack mount to the moving module;
+    // they retract rather than leaving a detached rectangle above the head.
+    const float Extension = FMath::Max(0.0f, ApparatusRaiseCm * Alpha);
+    const float OuterLength = 10.0f + Extension * 0.55f;
+    const float InnerLength = 10.0f + Extension * 0.55f;
+    for (int32 Index = 0; Index < ApparatusMastOuter.Num(); ++Index)
+    {
+        const float Side = Index == 0 ? -1.0f : 1.0f;
+        const FVector Start = ApparatusRestLocation + FVector(0, Side * 10.0f, -25.0f);
+        ApparatusMastOuter[Index]->SetRelativeLocation(Start + FVector(0, 0, OuterLength * 0.5f));
+        ApparatusMastOuter[Index]->SetRelativeScale3D(FVector(0.065f, 0.065f, OuterLength / 100.0f));
+        ApparatusMastInner[Index]->SetRelativeLocation(Start + FVector(0, 0, Extension + 5.0f - InnerLength * 0.5f));
+        ApparatusMastInner[Index]->SetRelativeScale3D(FVector(0.038f, 0.038f, InnerLength / 100.0f));
+    }
     const FLinearColor Hot = ActiveOrder == EBreakerBossOrder::Fire ? ApparatusFireColor : ApparatusDeployColor;
     if (ApparatusMaterial)
     {
-        ApparatusMaterial->SetVectorParameterValue(TEXT("Color"), FMath::Lerp(ApparatusIdleColor, Hot, Alpha));
+        ApparatusMaterial->SetVectorParameterValue(TEXT("Color"), FMath::Lerp(ApparatusIdleColor, Hot, GlowAlpha));
     }
     if (ApparatusLight)
     {
@@ -480,7 +588,7 @@ void ABreakerBossEnemy::UpdateApparatus(float Alpha)
         // Squared, so the last third of the raise is where it really lights —
         // the same curve the Lattice telegraph uses, so the two tells feel like
         // one vocabulary.
-        ApparatusLight->SetIntensity(ApparatusLightIntensity * Alpha * Alpha);
+        ApparatusLight->SetIntensity(ApparatusLightIntensity * GlowAlpha * GlowAlpha);
     }
 }
 
@@ -579,6 +687,7 @@ void ABreakerBossEnemy::CommandGalleryVolley()
 
 void ABreakerBossEnemy::HandleDeath()
 {
+    SetApparatusExposed(false);
     Super::HandleDeath();
     // The gallery Lattices are its guns and they die with it. §3.4's phase 3
     // says "anything alive stays alive" about the ADDS, which are Skitters the

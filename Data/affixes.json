@@ -355,6 +355,28 @@
 			"pairedAffixId": ""
 		},
 		{
+			"id": "Ability.AddedPower",
+			"pool": "slice",
+			"displayName": "Added Ability Power",
+			"category": "Prefix",
+			"target": "AbilityDamage",
+			"bucket": "Flat",
+			"slots": [
+				"Helmet",
+				"Gloves",
+				"Waist",
+				"Necklace",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 1,
+			"valueAtT1": 11,
+			"rollWeight": 70,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
 			"id": "Offense.AddedDamage",
 			"pool": "slice",
 			"displayName": "Added Damage",

@@ -65,6 +65,9 @@ rule pre-answers every future case and there are no exceptions to argue about.
 **A source authors at most one specific pool, plus optionally the shared one.**
 Never two specific pools from one source — that is one bucket double-dipped.
 
+**Added Ability Power bids Flat into the ability multiplier**, dividing its
+printed percentage by 100 before Increased and More compose; Added Damage stays in the weapon lane.
+
 **There is ONE More ceiling and it spans all three pools.** A build holds at
 most three More multipliers, each at most 1.30x, composing as an unordered
 product to 1.30^3. The ceiling is derived from those two numbers rather than
@@ -293,8 +296,5 @@ does not own:
 ## Open
 
 - The conditional-line payout ratio is unauthored and waits on measurement.
-- Whether the ability pool gets a flat line. Added Damage bids Flat into the
-  weapon lane alone, so an ability build's flat layer is structurally 1.000 —
-  the half of the parity deficit that degrades fastest with gear depth.
 - The tier-bonus curve past its ordinary cap — how many endgame tiers reach
   item level 120 — is unauthored.

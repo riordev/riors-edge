@@ -1239,6 +1239,11 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         // increased line are two different decisions instead of one.
         OutContribution->AddFlat(EBreakerAggregatedAttribute::DamageMultiplier,
             FlatByTarget[static_cast<int32>(EBreakerStatTarget::AddedDamage)] / 100.0f);
+        // Ability Added Power is the independent counterpart to Added Damage:
+        // flat power folds before this lane's Increased pool. O2 magnitudes
+        // live in affixes.json; weapon hits never read this contribution.
+        OutContribution->AddFlat(EBreakerAggregatedAttribute::AbilityDamageMultiplier,
+            FlatByTarget[static_cast<int32>(EBreakerStatTarget::AbilityDamage)] / 100.0f);
 
         // Flat armour, joining the fold for the first time. Its consumer is
         // UBreakerCombatComponent::GetEffectiveArmor(), which is the same route

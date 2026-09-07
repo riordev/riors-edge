@@ -456,7 +456,7 @@ public:
     // OVERLAY at BreakerBodyPaint::ResolveOverlayStrength, livery intact
     // underneath — the paint port that closed the mech-cast ruling's
     // recorded cost.
-    UFUNCTION(BlueprintCallable, Category="Enemy") void ApplyBodyMesh();
+    UFUNCTION(BlueprintCallable, Category="Enemy") virtual void ApplyBodyMesh();
     // Dev photography only (Breaker.BodyPaint): holds a paint state still for
     // the capture cadence, through the same public setters a fight drives.
     void DevDriveBodyPaintProbe(const FString& Mode);
