@@ -70,6 +70,13 @@ void UBreakerCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType
     }
 }
 
+void UBreakerCombatComponent::ArmMeleeDefenseSuppression(AActor* Attacker, float DurationSeconds)
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !Attacker || !GetWorld() || IsDead()
+        || !FMath::IsFinite(DurationSeconds) || DurationSeconds <= 0) return;
+    MeleeDefenseSuppressionExpiry.Add(Attacker, GetWorld()->GetTimeSeconds() + DurationSeconds);
+}
+
 FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamageRequest& Request)
 {
     FBreakerDamageResult Result;
@@ -196,6 +203,18 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
         {
             Defense.BlockChance = 1.0f;
         }
+    }
+
+    const double SuppressionNow = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    for (auto It = MeleeDefenseSuppressionExpiry.CreateIterator(); It; ++It)
+        if (!It.Key().IsValid() || It.Value() <= SuppressionNow) It.RemoveCurrent();
+    const FGameplayTag MeleeTag = FGameplayTag::RequestGameplayTag(TEXT("Damage.Melee"), false);
+    if (!Request.bIsDamageOverTime && Request.ProcCoefficient > 0 && Request.BaseDamage > 0
+        && Request.SourceTags.HasTagExact(MeleeTag)
+        && MeleeDefenseSuppressionExpiry.Remove(Request.Instigator) > 0)
+    {
+        Defense.DodgeChance = 0;
+        Defense.BlockChance = 0;
     }
 
     // Stage 6 (H3): target-conditional riders resolve HERE, the one site that

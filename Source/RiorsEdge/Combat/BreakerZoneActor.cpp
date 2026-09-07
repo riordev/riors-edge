@@ -4,6 +4,7 @@
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerStatusComponent.h"
 #include "Combat/BreakerZoneMath.h"
+#include "Classes/BreakerManaComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/OverlapResult.h"
@@ -70,7 +71,7 @@ void ABreakerZoneActor::BeginPlay()
     if (HasAuthority())
     {
         BreakerZoneActorLocal::BreakerLiveZones.RemoveAll([](const TWeakObjectPtr<ABreakerZoneActor>& Zone) { return !Zone.IsValid(); });
-        BreakerZoneActorLocal::BreakerLiveZones.Add(this);
+        BreakerZoneActorLocal::BreakerLiveZones.AddUnique(this);
     }
     RefreshPresentation();
 }
@@ -97,6 +98,11 @@ void ABreakerZoneActor::ConfigureZone(const FBreakerZoneSpec& InSpec, AActor* In
     if (!HasAuthority()) return;
     Spec = InSpec;
     ZoneInstigator = InInstigator;
+    BreakerZoneActorLocal::BreakerLiveZones.AddUnique(this);
+    // Income samples the current membership/lifetime before zones age this frame.
+    if (InInstigator)
+        if (UBreakerManaComponent* Mana = InInstigator->FindComponentByClass<UBreakerManaComponent>())
+            AddTickPrerequisiteComponent(Mana);
     RemainingDuration = FMath::Max(0.0f, Spec.Duration);
     // First tick lands one interval in, not immediately: a zone that damages on
     // the frame it is placed makes its cadence unreadable and gives a free tick
@@ -127,6 +133,32 @@ void ABreakerZoneActor::SetFollowActor(AActor* Follow)
 {
     if (!HasAuthority()) return;
     FollowActor = Follow;
+    FollowOffset = Follow ? GetActorLocation() - Follow->GetActorLocation() : FVector::ZeroVector;
+    Spec.bMobileFootprint = Follow != nullptr;
+    if (ABreakerEffectRenderer* Renderer = RimRenderer.Get())
+        for (int32 Handle : RimHandles) Renderer->EndEffect(Handle, 0.0f);
+    RimHandles.Reset();
+    RefreshPresentation();
+    ForceNetUpdate();
+}
+
+float ABreakerZoneActor::OwnedOccupiedSeconds(AActor* Owner, FGameplayTag Tag, float DeltaSeconds)
+{
+    float Seconds = 0.0f;
+    if (!Owner || !Owner->HasAuthority()) return Seconds;
+    const TArray<TWeakObjectPtr<ABreakerZoneActor>> Snapshot = BreakerZoneActorLocal::BreakerLiveZones;
+    for (const TWeakObjectPtr<ABreakerZoneActor>& Held : Snapshot)
+    {
+        ABreakerZoneActor* Zone = Held.Get();
+        if (!Zone || Zone->bReleased || Zone->GetWorld() != Owner->GetWorld()
+            || Zone->ZoneInstigator != Owner || Zone->Spec.ZoneTag != Tag) continue;
+        if (AActor* Follow = Zone->FollowActor.Get()) Zone->SetActorLocation(Follow->GetActorLocation() + Zone->FollowOffset);
+        Zone->UpdateMembership();
+        if (!Zone->Occupants.IsEmpty())
+            Seconds = FMath::Max(Seconds, Zone->bExpiryPaused ? FMath::Max(0.0f, DeltaSeconds)
+                : FMath::Clamp(Zone->RemainingDuration, 0.0f, FMath::Max(0.0f, DeltaSeconds)));
+    }
+    return Seconds;
 }
 
 void ABreakerZoneActor::SetExpiryPaused(bool bPaused)
@@ -147,7 +179,7 @@ void ABreakerZoneActor::AdvanceZone(float DeltaSeconds)
 
     if (AActor* Follow = FollowActor.Get())
     {
-        SetActorLocation(Follow->GetActorLocation());
+        SetActorLocation(Follow->GetActorLocation() + FollowOffset);
     }
 
     UpdateMembership();
@@ -214,7 +246,7 @@ void ABreakerZoneActor::UpdateMembership()
     {
         const bool bAlready = Occupants.ContainsByPredicate(
             [Candidate](const TWeakObjectPtr<AActor>& Held) { return Held.Get() == Candidate; });
-        if (bAlready) continue;
+        if (bAlready) { ApplyArmorStrip(Candidate); continue; }
         Occupants.Add(Candidate);
         ApplyArmorStrip(Candidate);
         if (Spec.bApplyStatusOnEntry && (RemainingDuration > 0.0f || bExpiryPaused)) ApplyStatusToOccupant(Candidate);
@@ -225,7 +257,8 @@ void ABreakerZoneActor::UpdateMembership()
 bool ABreakerZoneActor::ShouldAffectActor(AActor* Candidate) const
 {
     if (!Candidate || Candidate == ZoneInstigator.Get()) return false;
-    if (!Candidate->FindComponentByClass<UBreakerCombatComponent>()) return false;
+    const UBreakerCombatComponent* Combat = Candidate->FindComponentByClass<UBreakerCombatComponent>();
+    if (!Combat || Combat->IsDead()) return false;
     // Same friendly-fire rule ABreakerEnemyProjectile already uses: a zone cast
     // by an enemy never touches another enemy. Enemy friendly fire is not a
     // system this project has ruled on, and a pack melting itself in its own
@@ -298,24 +331,40 @@ FName ABreakerZoneActor::ArmorKey() const
 
 void ABreakerZoneActor::ApplyArmorStrip(AActor* Occupant) const
 {
-    if (Spec.FlatArmorReduction <= 0.0f || !Occupant) return;
-    if (UBreakerCombatComponent* Combat = Occupant->FindComponentByClass<UBreakerCombatComponent>())
-    {
-        Combat->PushArmorReduction(ArmorKey(), Spec.FlatArmorReduction);
-    }
+    ReconcileArmorStrip(Occupant, true);
 }
 
 void ABreakerZoneActor::ReleaseArmorStrip(AActor* Occupant) const
 {
-    if (Spec.FlatArmorReduction <= 0.0f || !Occupant) return;
-    // Do not release while the occupant is still standing in ANOTHER zone of
-    // the same tag. Popping here and letting the other zone re-push on its next
-    // tick would flicker the strip off for up to a full tick interval.
-    if (AnyOtherZoneContains(Occupant)) return;
-    if (UBreakerCombatComponent* Combat = Occupant->FindComponentByClass<UBreakerCombatComponent>())
+    ReconcileArmorStrip(Occupant, false);
+}
+
+float ABreakerZoneActor::ArmorStripFor(AActor* Occupant) const
+{
+    float Amount = FMath::Max(0.0f, Spec.FlatArmorReduction);
+    if (const UBreakerStatusComponent* Status = Occupant ? Occupant->FindComponentByClass<UBreakerStatusComponent>() : nullptr)
+        for (const FBreakerActiveStatus& Active : Status->GetActiveStatuses())
+            if (Active.RemainingDuration > 0.0f && Active.Spec.BaseDamagePerTick > 0.0f)
+            { Amount += FMath::Max(0.0f, Spec.AfflictedArmorReduction); break; }
+    return Amount;
+}
+
+void ABreakerZoneActor::ReconcileArmorStrip(AActor* Occupant, bool bIncludeThis) const
+{
+    UBreakerCombatComponent* Combat = Occupant ? Occupant->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    if (!Combat) return;
+    float Strongest = bIncludeThis && !bReleased && !Combat->IsDead() ? ArmorStripFor(Occupant) : 0.0f;
+    for (const TWeakObjectPtr<ABreakerZoneActor>& Held : BreakerZoneActorLocal::BreakerLiveZones)
     {
-        Combat->PopArmorReduction(ArmorKey());
+        const ABreakerZoneActor* Other = Held.Get();
+        if (!Other || Other == this || Other->bReleased || Other->GetWorld() != GetWorld()
+            || Other->Spec.ZoneTag != Spec.ZoneTag || (!Other->bExpiryPaused && Other->RemainingDuration <= 0.0f)
+            || !Other->ShouldAffectActor(Occupant)) continue;
+        if (UBreakerZoneMath::IsInsideZone(Other->GetActorLocation(), Other->Spec.RadiusCm, Other->Spec.HalfHeightCm, Occupant->GetActorLocation()))
+            Strongest = FMath::Max(Strongest, Other->ArmorStripFor(Occupant));
     }
+    if (Strongest > 0.0f) Combat->PushArmorReduction(ArmorKey(), Strongest);
+    else Combat->PopArmorReduction(ArmorKey());
 }
 
 bool ABreakerZoneActor::AnyOtherZoneContains(AActor* Actor) const
@@ -377,20 +426,20 @@ void ABreakerZoneActor::OnRep_Spec()
 
 void ABreakerZoneActor::SubmitRimEffect()
 {
-    if (bRimSubmitted || Spec.Duration <= 0.0f) return;
+    if (bRimSubmitted || Spec.Duration <= 0.0f || Spec.bMobileFootprint) return;
     ABreakerEffectRenderer* Renderer = ABreakerEffectRenderer::FindOrSpawn(GetWorld());
     if (!Renderer) return;
     bRimSubmitted = true;
+    RimRenderer = Renderer;
 
     // The clip is the zone's whole life with the final second as the visible
     // expiry — the rim dims to nothing exactly as the volume stops biting.
-    // THE CLIP IS FIXED AT SUBMISSION, which leaves three recorded gaps, all
+    // THE STATIC CLIP IS FIXED AT SUBMISSION, which leaves two recorded gaps,
     // of them lifetime mutations this placeholder does not track:
     // RefreshDuration (a VW4 recast resets the clock; the old rim still dies
-    // on the old clock), SetExpiryPaused (Long Dark freezes the zone but not
-    // the rim), and SetFollowActor (VW8 rides an actor; the rim stays where
-    // it was drawn). All three want per-slot handles on the renderer — the
-    // seam BreakerEffectRenderer.h already names for Siphon's channel break.
+    // on the old clock), and SetExpiryPaused (Long Dark freezes the zone but
+    // not the rim). Mobile zones instead use attached geometry and cancel
+    // this clip, so Wellspring follows and expires with its gameplay volume.
     // An EARLY Destroy has the mirror gap: the rim finishes its clip alone.
     BreakerFX::FEffectTiming Timing;
     Timing.DurationSeconds = Spec.Duration;
@@ -406,12 +455,18 @@ void ABreakerZoneActor::SubmitRimEffect()
     {
         FVector A, B;
         BreakerFX::RingStroke(Center, Spec.RadiusCm, Index, BreakerFX::GroundRingStrokes, A, B);
-        Renderer->AddStroke(A, B, RimThicknessCm, Spec.ZoneColor, RimIntensity, Timing);
+        RimHandles.Add(Renderer->AddStroke(A, B, RimThicknessCm, Spec.ZoneColor, RimIntensity, Timing));
     }
 }
 
 void ABreakerZoneActor::RefreshPresentation()
 {
+    if (Spec.bMobileFootprint && !RimHandles.IsEmpty())
+    {
+        if (ABreakerEffectRenderer* Renderer = RimRenderer.Get())
+            for (int32 Handle : RimHandles) Renderer->EndEffect(Handle, 0.0f);
+        RimHandles.Reset();
+    }
     if (Footprint)
     {
         // BasicShapes/Cylinder is 100 cm across and 100 cm tall, so a unit of
@@ -426,6 +481,28 @@ void ABreakerZoneActor::RefreshPresentation()
                 Footprint->SetMaterial(0, Dynamic);
             }
         }
+    }
+    // Mobile rings belong to the zone transform/lifetime, not a fixed pooled
+    // world-space clip. Replicated Spec builds the same footprint on clients.
+    if (Spec.bMobileFootprint && MobileRim.IsEmpty())
+        if (UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")))
+            for (int32 Index = 0; Index < BreakerFX::GroundRingStrokes; ++Index)
+            {
+                UStaticMeshComponent* Stroke = NewObject<UStaticMeshComponent>(this);
+                AddInstanceComponent(Stroke); Stroke->SetupAttachment(Root);
+                Stroke->SetStaticMesh(Mesh); Stroke->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+                Stroke->SetCastShadow(false); Stroke->RegisterComponent(); MobileRim.Add(Stroke);
+            }
+    for (int32 Index = 0; Index < MobileRim.Num(); ++Index)
+    {
+        UStaticMeshComponent* Stroke = MobileRim[Index];
+        Stroke->SetVisibility(Spec.bMobileFootprint);
+        FVector A, B;
+        BreakerFX::RingStroke(FVector(0, 0, 6), Spec.RadiusCm, Index, BreakerFX::GroundRingStrokes, A, B);
+        Stroke->SetRelativeLocation((A + B) * 0.5f);
+        Stroke->SetRelativeRotation((B - A).Rotation());
+        Stroke->SetRelativeScale3D(FVector(FVector::Distance(A, B) / 100.0f, 0.07f, 0.07f)); // O2 PLACEHOLDER, existing rim7cm.
+        if (Footprint) Stroke->SetMaterial(0, Footprint->GetMaterial(0));
     }
     if (Glow)
     {

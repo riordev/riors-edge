@@ -507,7 +507,7 @@ bool FBreakerAbilitiesNumbersTest::RunTest(const FString& Parameters)
         TestEqual(FString::Printf(TEXT("%s: a key the file does not name answers with the default"), *Id),
             Definition->Number(FName(TEXT("Breaker.NoSuchNumber")), 7.0f), 7.0f);
     }
-    TestEqual(TEXT("One hundred and twenty-four numbers across the registry"), KeyCount, 124);
+    TestEqual(TEXT("One hundred and thirty-one numbers across the registry"), KeyCount, 131);
     TestEqual(TEXT("Twenty-eight rows carry numbers; seven classes keep theirs as constexpr or in the body"), RowsWithNumbers, 28);
 
     // Order is the class's declaration order, super first: the Gunsmith
@@ -520,6 +520,21 @@ bool FBreakerAbilitiesNumbersTest::RunTest(const FString& Parameters)
     {
         TestEqual(TEXT("Drain rank-one threshold is authored"), Siphon->Number(TEXT("DrainRankOneThreshold"), -1), 0.10f);
         TestEqual(TEXT("Drain rank-two threshold is authored"), Siphon->Number(TEXT("DrainRankTwoThreshold"), -1), 0.15f);
+    }
+    const UBreakerAbilityDefinition* Rot = UBreakerAbilityDefinition::FindFallback(FName(TEXT("Caster.Rot")));
+    if (TestNotNull(TEXT("Rot node tuning row is reachable"), Rot))
+    {
+        TestEqual(TEXT("Standing Water first rank is authored"), Rot->Number(TEXT("StandingWaterRankOneManaPerSecond"), -1), 2.0f);
+        TestEqual(TEXT("Standing Water second rank is authored"), Rot->Number(TEXT("StandingWaterRankTwoManaPerSecond"), -1), 4.0f);
+        TestEqual(TEXT("Zonework flat strip is authored"), Rot->Number(TEXT("ZoneworkAdditionalArmorReduction"), -1), 20.0f);
+        TestEqual(TEXT("Wellspring self-placement reach is authored"), Rot->Number(TEXT("WellspringSelfPlacementRadiusCm"), -1), 150.0f);
+        TestEqual(TEXT("Wellspring ground normal is authored"), Rot->Number(TEXT("WellspringMinimumGroundNormalZ"), -1), 0.7f);
+    }
+    const UBreakerAbilityDefinition* Closequarter = UBreakerAbilityDefinition::FindFallback(FName(TEXT("Caster.Closequarter")));
+    if (TestNotNull(TEXT("Closequarter node tuning row is reachable"), Closequarter))
+    {
+        TestEqual(TEXT("Momentum Transfer first rank is authored"), Closequarter->Number(TEXT("MomentumTransferRankOneSeconds"), -1), 2.0f);
+        TestEqual(TEXT("Momentum Transfer second rank is authored"), Closequarter->Number(TEXT("MomentumTransferRankTwoSeconds"), -1), 3.0f);
     }
     const UBreakerAbilityDefinition* Resonance = UBreakerAbilityDefinition::FindFallback(FName(TEXT("Caster.Resonance")));
     if (TestNotNull(TEXT("Resonance resource tuning row is reachable"), Resonance))

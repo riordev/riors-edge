@@ -88,6 +88,9 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Closequarter", meta=(ClampMin="0")) float StandoffCm = 200.0f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Closequarter", meta=(ClampMin="0", ClampMax="1")) float RefundHealthFraction = 0.4f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Closequarter", meta=(ClampMin="0")) float RefundMana = 15.0f;
+    // O2 PLACEHOLDER: time to spend Momentum Transfer after actual arrival.
+    UPROPERTY(EditDefaultsOnly, Category="Closequarter") float MomentumTransferRankOneSeconds = 2.0f;
+    UPROPERTY(EditDefaultsOnly, Category="Closequarter") float MomentumTransferRankTwoSeconds = 3.0f;
 
     // Edgework's "no range limit within line of sight". 1 km stands in for
     // unlimited: far past any playable sightline, so it reads as no limit at

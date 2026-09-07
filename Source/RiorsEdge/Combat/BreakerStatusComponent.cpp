@@ -4,8 +4,11 @@
 #include "Combat/BreakerDamageLibrary.h"
 #include "Combat/BreakerZoneMath.h"
 #include "Classes/BreakerManaComponent.h"
+#include "Characters/BreakerCharacter.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
+#include "Engine/World.h"
+#include "UObject/UObjectIterator.h"
 
 UBreakerStatusComponent::UBreakerStatusComponent()
 {
@@ -42,6 +45,14 @@ float UBreakerStatusComponent::GetEffectiveAilmentAvoidanceChance() const
 
 void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator)
 {
+    ApplyStatusInternal(Spec, DamageFamily, Instigator, false);
+}
+
+void UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicationSpec& InputSpec, EBreakerDamageFamily DamageFamily, AActor* Instigator, bool bDurationAlreadyScaled)
+{
+    // Caller may have passed an entry in a live status array; callbacks can
+    // consume or reallocate it. Accepted application owns its payload.
+    const FBreakerStatusApplicationSpec Spec = InputSpec;
     if (!GetOwner() || !GetOwner()->HasAuthority() || !Spec.StatusTag.IsValid()
         || !FMath::IsFinite(Spec.Duration) || !FMath::IsFinite(Spec.TickInterval)
         || !FMath::IsFinite(Spec.ProcCoefficient) || Spec.Duration <= 0.0f || Spec.TickInterval <= 0.0f) return;
@@ -59,7 +70,7 @@ void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& S
     // progression component (every enemy) scales by exactly 1. At a composed
     // 0 the application does not exist, mirroring the Duration guard above.
     float DurationScale = 1.0f;
-    if (Instigator)
+    if (Instigator && !bDurationAlreadyScaled)
     {
         if (const UBreakerProgressionComponent* InstigatorProgression = Instigator->FindComponentByClass<UBreakerProgressionComponent>())
         {
@@ -129,6 +140,7 @@ void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& S
             }
             const FBreakerActiveStatus Applied = Active;
             if (SourceMana) SourceMana->NotifyStatusApplication(Spec, true);
+            SpreadNewestStatus(Spec, DamageFamily, Instigator, ScaledDuration);
             OnStatusApplied.Broadcast(Applied);
             return;
         }
@@ -153,7 +165,46 @@ void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& S
     }
     ActiveStatuses.Add(Status);
     if (SourceMana) SourceMana->NotifyStatusApplication(Spec, false);
+    SpreadNewestStatus(Spec, DamageFamily, Instigator, ScaledDuration);
     OnStatusApplied.Broadcast(Status);
+}
+
+void UBreakerStatusComponent::SpreadNewestStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator, float ScaledDuration)
+{
+    if (!Instigator || Spec.ProcCoefficient <= 0 || GetDistinctStatusTypeCount() < 2 || !GetWorld()) return;
+    const UBreakerCombatComponent* SourceCombat = Instigator->FindComponentByClass<UBreakerCombatComponent>();
+    const UBreakerCombatComponent* OwnerCombat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>();
+    if ((SourceCombat && SourceCombat->IsDead()) || (OwnerCombat && OwnerCombat->IsDead())) return;
+    const UBreakerProgressionComponent* Progression = Instigator->FindComponentByClass<UBreakerProgressionComponent>();
+    const int32 Rank = Progression ? Progression->GetNodeRank(TEXT("Caster.Multispell.Chain"), EBreakerPointCurrency::DoctrinePoints) : 0;
+    if (Rank <= 0) return;
+    const float Radius = Rank >= 2 ? ChainRankTwoRangeCm : ChainRankOneRangeCm;
+    UBreakerStatusComponent* Nearest = nullptr;
+    double NearestSquared = FMath::Square(static_cast<double>(FMath::Max(0.0f, Radius)));
+    const FVector Origin = GetOwner()->GetActorLocation();
+    FCollisionQueryParams Params(SCENE_QUERY_STAT(BreakerStatusChain), true, GetOwner());
+    Params.AddIgnoredActor(Instigator);
+    for (TObjectIterator<UBreakerStatusComponent> It; It; ++It)
+    {
+        UBreakerStatusComponent* Candidate = *It;
+        AActor* Actor = Candidate->GetOwner();
+        if (!Actor || Actor == GetOwner() || Actor == Instigator || Actor->GetWorld() != GetWorld()
+            || Actor->IsA<ABreakerCharacter>()) continue;
+        const UBreakerCombatComponent* CandidateCombat = Actor->FindComponentByClass<UBreakerCombatComponent>();
+        if (!CandidateCombat || CandidateCombat->IsDead()) continue;
+        const double Distance = FVector::DistSquared(Origin, Actor->GetActorLocation());
+        if (Distance > NearestSquared) continue;
+        FHitResult Hit;
+        if (GetWorld()->LineTraceSingleByChannel(Hit, Origin, Actor->GetActorLocation(), ECC_GameTraceChannel2, Params)
+            && Hit.GetActor() != Actor) continue;
+        Nearest = Candidate;
+        NearestSquared = Distance;
+    }
+    if (!Nearest) return;
+    FBreakerStatusApplicationSpec Copy = Spec;
+    Copy.Duration = ScaledDuration;
+    Copy.ProcCoefficient = 0;
+    Nearest->ApplyStatusInternal(Copy, DamageFamily, Instigator, true);
 }
 
 void UBreakerStatusComponent::HandleAfflictedOwnerDeath()

@@ -5,10 +5,10 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
-## Cycle — held input, six Caster nodes and a distinct Unwritten
-- [ ] Release held combat inputs on menu/death, wire death confirmation keys and correct dialogue wrapping.
-- [ ] Wire Close, Debt, Bloodprice, Patience, Drain and Variance to purchased ranks and editable tuning.
-- [ ] Author a reachable named Unwritten that trades single-target critical damage for visible crowd forks.
+## Cycle — clearer ability picking and five Caster delivery/zone nodes
+- [x] Select one ability slot catalogue, pin feedback, dismiss equip modals and wrap bench refusals.
+- [x] Wire Standing Water, Zonework, Wellspring, Chain and Momentum Transfer to actual purchases and combat.
+- [ ] Arms replacement remains open: inspected Manny rifle pose intrudes into the camera; prototype reverted.
 Remaining repair work includes the other silent nodes, campaign doctrine reachability, ability/weapon balance, broader clipping, arms/weapon/weakpoint art, audible combat polish and the full rarity identities.
 
 ## Playtest queue (owner, 2026-09-07)
@@ -23,7 +23,7 @@ Continue through the entire repair list in tested batches without stopping after
 ## Repair dependencies found in runtime review
 - Sequence requires three distinct applications, but Caster has only Bleed and Poison. Void is not an applied status. A third functional status or a revised node contract is required; do not fake the third tag.
 - Doctrine progression awards only 2/8. Remaining earned benchmarks need the authored Breach/Field Marshal, Survivor/Erased Earth, and alternate-self finale gameplay. Mission validation must support the separate Act III finale and stable encounter identities before extending content; replaying Fernhall must not counterfeit later completion.
-- Ability assignment repeats the catalogue three times and jumps to the top after a click, while feedback sits below every list. Next UI slice selects one slot and pins wrapped feedback; also close equip modals on Escape and wrap NPC bench refusals.
+- Special loot currently exceeds its final affix budget because special lines, paired bills and legendary signatures append after generic filling. Reserve these before filling; preserve existing saved items until migration is explicitly designed.
 
 ## Content phase after the repair list (owner, 2026-09-07)
 - [ ] Author more distinct Fernhall spaces and improve layout/content density.
@@ -106,6 +106,12 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - Four Niagara systems at `/Game/Breaker/FX/NS_<Moment>` with a `Color` user parameter, or a free Fab VFX pack placed there
 
 ## Done (last three cycles; older is git)
+### Ability picker and five Caster nodes — 602 / 5 / 0
+- [x] One selected ability catalogue, equipped slot summaries and pinned feedback replace the repeated lists. Actual Anchor capture inspected with all six Caster choices and unlock refusal fitting. Escape dismisses equip modals; bench refusal text wraps.
+- [x] Standing Water pays one live-occupied Rot stream; Zonework reconciles extra flat strip across overlapping zones; Wellspring follows intentional self-ground placement and refreshes one following zone. Mobile rim now follows actor transform; movement/overlap verified in runtime tests, no rendered mobile-ring capture yet.
+- [x] Chain copies the newest accepted status without recursive spread/double duration scaling and excludes player teammates. Momentum Transfer uses successful Closequarter arrival and only the matching next eligible melee hit. Seven new ability numbers are editable; Chain reach remains editor-only.
+- [x] Build and all607tests complete:602passed/5existing expected/0unexpected. New fixtures respect actual prerequisites, eight doctrine points, resource costs and GAS activation. Canonical census clean; STATE unchanged under quarantine. No pins widened.
+- [x] Rifle-arm prototype photographed and reverted because its torso intruded into the camera; art item remains open.
 
 ### Held input, six Caster nodes and Refractor — 599 / 5 / 0
 - [x] Menus/death clear fire, aim, sprint and slide intent. Death confirmation uses Slate, preserves focused Return/navigation and prevents duplicate travel. Wider death buttons and wrapped NPC speaker text inspected in actual Anchor captures.
@@ -121,12 +127,3 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - [x] Added reachable ability debt/ledge affixes without weapon leakage. Honest rolled ability/weapon multiplier parity remains 0.550 at level 50 and 0.365 at level 120; balance work remains open.
 - [x] Isolated real Anchor → Fernhall → authored Rift → Fernhall → Anchor probe passed: 24 kills, exact completion purse, final 2015 XP / 211 Riftglass retained. Accelerated kills validate integration, not combat feel.
 - [x] Final build and all 599 tests complete: 594 passed / 5 existing expected / 0 unexpected. Canonical C++ census and PowerShell reconciliation; STATE unchanged. No test pins widened.
-
-
-### Fernhall combat pockets, enemy names and DoT scaling — 588 / 5 / 0
-- [x] Ordinary Fernhall now spawns 11 finite enemies across three supported combat pockets, including an elite, Lattice, Warden and Skirmisher. Existing kill quests and XP receive real combat credit; repeated startup does not duplicate spawns. Rift wave behavior remains separate.
-- [x] Flat damage now multiplies the combined delivery/DoT Increased bucket. Tests cover both delivery lanes, frozen snapshots, removal and uncaptured baseline fallback without changing the More ceiling.
-- [x] Seven authored enemy-type names use the strings table and existing range/focus/occlusion rules. Ground-level Fernhall capture inspected with SKITTER above its health bar. Capture-only tour targeting and velocity reset added; static capture does not validate full traversal.
-- [x] Final build and all 593 tests complete: 588 passed / 5 existing expected / 0 unexpected. Runtime fixture checks supported spawn capsules, finite roster, separation, actual kills and quest progress. PowerShell reconciliation under Python quarantine; STATE unchanged. Full cross-map loading remains outstanding.
-
-

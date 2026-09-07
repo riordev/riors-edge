@@ -8,6 +8,8 @@
 #include "Combat/BreakerZoneActor.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "Progression/BreakerProgressionComponent.h"
 
 UBreakerAbility_Rot::UBreakerAbility_Rot()
 {
@@ -44,6 +46,16 @@ float UBreakerAbility_Rot::ComputeEffectiveDurationSeconds(const AActor* OwnerAc
     return FMath::Max(0.0f, DurationSeconds) * FMath::Max(0.0f, AbilityDurationMultiplierFor(OwnerActor));
 }
 
+bool UBreakerAbility_Rot::ShouldFollowCaster(const AActor* OwnerActor, bool bGroundHit, const FVector& HitPoint, const FVector& HitNormal) const
+{
+    const ACharacter* Character = Cast<ACharacter>(OwnerActor);
+    const UBreakerProgressionComponent* Progression = OwnerActor ? OwnerActor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    return Character && Character->GetCharacterMovement()->IsMovingOnGround() && Progression
+        && Progression->GetNodeRank(TEXT("Caster.VoidWhisperer.Wellspring"), EBreakerPointCurrency::DoctrinePoints) > 0
+        && bGroundHit && HitNormal.Z >= WellspringMinimumGroundNormalZ
+        && FVector::Dist2D(OwnerActor->GetActorLocation(), HitPoint) <= WellspringSelfPlacementRadiusCm;
+}
+
 void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
     ABreakerCharacter* Character = GetBreakerCharacter();
@@ -65,7 +77,9 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(BreakerRotAim), false, Character);
     const FVector TraceEnd = ViewLocation + ViewRotation.Vector() * MaximumRangeCm;
     const bool bHit = World->LineTraceSingleByChannel(Hit, ViewLocation, TraceEnd, ECC_Visibility, QueryParams);
-    const FVector Center = AimPoint(ViewLocation, ViewRotation.Vector(), MaximumRangeCm, bHit, Hit.ImpactPoint);
+    const bool bFollowCaster = ShouldFollowCaster(Character, bHit, Hit.ImpactPoint, Hit.ImpactNormal);
+    const FVector Center = bFollowCaster ? Hit.ImpactPoint
+        : AimPoint(ViewLocation, ViewRotation.Vector(), MaximumRangeCm, bHit, Hit.ImpactPoint);
 
     const FGameplayTag ZoneTag = BreakerAbilityTags::Zone_Caster_Rot.GetTag();
 
@@ -73,6 +87,17 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     // search, the spawned volume and the refresh all share one reading.
     const float EffectiveRadiusCm = ComputeEffectiveRadiusCm(Character);
     const float EffectiveDuration = ComputeEffectiveDurationSeconds(Character);
+    if (bFollowCaster)
+        for (const TWeakObjectPtr<ABreakerZoneActor>& Held : ABreakerZoneActor::GetLiveZones())
+            if (ABreakerZoneActor* Existing = Held.Get())
+                if (Existing->GetWorld() == World && Existing->GetZoneInstigator() == Character
+                    && Existing->GetSpec().ZoneTag == ZoneTag && Existing->GetFollowActor() == Character
+                    && Existing->GetRemainingDuration() > 0.0f)
+                {
+                    Existing->RefreshDuration(EffectiveDuration);
+                    EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+                    return;
+                }
 
     // VW4's anti-stack rule lives at the SPAWNER, once, exactly as the spec
     // requires — never per ability. A recast on top of a live Rot refreshes it;
@@ -81,6 +106,7 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     if (ABreakerZoneActor* Existing = ABreakerZoneActor::FindRefreshableZone(World, ZoneTag, Character, Center, EffectiveRadiusCm, 0.5f))
     {
         Existing->RefreshDuration(EffectiveDuration);
+        if (bFollowCaster) Existing->SetFollowActor(Character);
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
         return;
     }
@@ -98,6 +124,8 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     Spec.Duration = EffectiveDuration;
     Spec.TickInterval = TickIntervalSeconds;
     Spec.FlatArmorReduction = FlatArmorReduction;
+    if (Character->GetProgression()->GetNodeRank(TEXT("Caster.VoidWhisperer.Zonework"), EBreakerPointCurrency::DoctrinePoints) > 0)
+        Spec.AfflictedArmorReduction = ZoneworkAdditionalArmorReduction;
     // Not teal (O19): saturated teal is a property of rift objects and
     // suppression hardware, and a Void Whisperer puddle is neither. Sick green.
     Spec.ZoneColor = FLinearColor(0.34f, 0.78f, 0.20f);
@@ -140,6 +168,7 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     if (ABreakerZoneActor* Zone = World->SpawnActor<ABreakerZoneActor>(ABreakerZoneActor::StaticClass(), Center, FRotator::ZeroRotator, SpawnParams))
     {
         Zone->ConfigureZone(Spec, Character);
+        if (bFollowCaster) Zone->SetFollowActor(Character);
     }
 
     EndAbility(Handle, ActorInfo, ActivationInfo, true, false);

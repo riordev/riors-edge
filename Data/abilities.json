@@ -133,6 +133,8 @@
 				"StandoffCm": 200,
 				"RefundHealthFraction": 0.4,
 				"RefundMana": 15,
+				"MomentumTransferRankOneSeconds": 2,
+				"MomentumTransferRankTwoSeconds": 3,
 				"UnrestrictedRangeCm": 100000
 			},
 			"variants": []
@@ -153,7 +155,12 @@
 				"PoisonDuration": 4,
 				"PoisonTickInterval": 0.5,
 				"MaximumRangeCm": 2500,
-				"HalfHeightCm": 250
+				"HalfHeightCm": 250,
+				"StandingWaterRankOneManaPerSecond": 2,
+				"StandingWaterRankTwoManaPerSecond": 4,
+				"ZoneworkAdditionalArmorReduction": 20,
+				"WellspringSelfPlacementRadiusCm": 150,
+				"WellspringMinimumGroundNormalZ": 0.7
 			},
 			"variants": []
 		},

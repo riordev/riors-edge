@@ -902,6 +902,7 @@ private:
     // so a refusal (e.g. a Caster's "That ability has not been unlocked.")
     // stays readable after the rebuild it triggers.
     FText AbilityStatus;
+    EBreakerAbilitySlot AbilityPickerSlot = EBreakerAbilitySlot::ClassAbilityOne;
     TWeakObjectPtr<class ABreakerNPC> DialogueNPC;
     FName DialogueNodeId = NAME_None;
     // Travel screen state. Weak for the same reason DialogueNPC is: the actor

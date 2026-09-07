@@ -211,6 +211,14 @@ void UBreakerAbility_Closequarter::ActivateAbility(const FGameplayAbilitySpecHan
         Movement->Velocity = FVector::ZeroVector;
     }
     BreakerClosequarterBlinkCosmetics(World, Departure, Character->GetActorLocation());
+    const UBreakerProgressionComponent* TransferProgression = Character->GetProgression();
+    const int32 TransferRank = TransferProgression ? TransferProgression->GetNodeRank(TEXT("Caster.Spellblade.MomentumTransfer"), EBreakerPointCurrency::DoctrinePoints) : 0;
+    if (TransferRank > 0 && !Character->GetActorLocation().Equals(Departure, 1.0f)
+        && Character->GetActorLocation().Equals(Destination, 5.0f))
+    {
+        if (UBreakerCombatComponent* TargetCombat = Target->FindComponentByClass<UBreakerCombatComponent>())
+            TargetCombat->ArmMeleeDefenseSuppression(Character, TransferRank >= 2 ? MomentumTransferRankTwoSeconds : MomentumTransferRankOneSeconds);
+    }
 
     float HealthFraction = 1.0f;
     if (const IAbilitySystemInterface* TargetAbilities = Cast<IAbilitySystemInterface>(Target))

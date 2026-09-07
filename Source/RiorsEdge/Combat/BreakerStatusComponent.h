@@ -48,6 +48,9 @@ class RIORSEDGE_API UBreakerStatusComponent : public UActorComponent
     GENERATED_BODY()
 
 public:
+    // O2 PLACEHOLDER: Chain's rank buys reach, never extra generations.
+    UPROPERTY(EditDefaultsOnly, Category="Status|Chain") float ChainRankOneRangeCm = 600.0f;
+    UPROPERTY(EditDefaultsOnly, Category="Status|Chain") float ChainRankTwoRangeCm = 900.0f;
     UBreakerStatusComponent();
     virtual void BeginPlay() override;
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
@@ -163,6 +166,8 @@ public:
     UPROPERTY(BlueprintAssignable, Category="Combat|Status") FBreakerStatusEvent OnStatusAvoided;
 
 private:
+    void ApplyStatusInternal(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator, bool bDurationAlreadyScaled);
+    void SpreadNewestStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator, float ScaledDuration);
     UFUNCTION() void HandleAfflictedOwnerDeath();
     // An expiry tick remains an active damaging status during its callbacks,
     // even though its remaining time was advanced before damage dispatch.

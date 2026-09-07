@@ -38,6 +38,8 @@ class RIORSEDGE_API UBreakerCombatComponent : public UActorComponent
     GENERATED_BODY()
 
 public:
+    // Momentum Transfer: only this attacker's next eligible melee spends the window.
+    void ArmMeleeDefenseSuppression(AActor* Attacker, float DurationSeconds);
     UBreakerCombatComponent();
     virtual void BeginPlay() override;
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
@@ -268,6 +270,7 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Defense", meta=(ClampMin="0")) float DodgeResourceRefund = 5.0f;   // O2 PLACEHOLDER
 
 private:
+    TMap<TWeakObjectPtr<AActor>, double> MeleeDefenseSuppressionExpiry;
     void PruneExpiredOutgoingModifiers();
     // STAGE 6 (Hook-And-Condition-Vocabulary §3.2-§3.3): target-conditional
     // damage, resolved on the TARGET side because ReceiveDamage is the one

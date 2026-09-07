@@ -8,6 +8,7 @@
 class UBreakerCombatComponent;
 class UPointLightComponent;
 class UStaticMeshComponent;
+class ABreakerEffectRenderer;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerZoneOccupancy, AActor*, Occupant);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FBreakerZoneExpired);
@@ -58,10 +59,13 @@ struct RIORSEDGE_API FBreakerZoneSpec
     // PushArmorReduction). Flat, never percentage — Class-Kits VW7 says this
     // is what protects the boss armour cap.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) float FlatArmorReduction = 0.0f;
+    // Optional additional FLAT strip, evaluated against current damaging statuses.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) float AfflictedArmorReduction = 0.0f;
 
     // Presentation only. O2 PLACEHOLDER, and deliberately not teal: saturated
     // teal is reserved for rift objects and suppression hardware (O19).
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FLinearColor ZoneColor = FLinearColor(0.35f, 0.85f, 0.25f);
+    UPROPERTY() bool bMobileFootprint = false;
 };
 
 // A persistent damage/effect volume: the shared primitive behind C3 Rot,
@@ -112,6 +116,8 @@ public:
     // VW8 Wellspring: the zone rides an actor instead of the ground.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Zone")
     void SetFollowActor(AActor* Follow);
+    AActor* GetFollowActor() const { return FollowActor.Get(); }
+    static float OwnedOccupiedSeconds(AActor* Owner, FGameplayTag Tag, float DeltaSeconds);
 
     // Long Dark (VW12): zones placed inside the window stop ageing until it
     // closes. Membership and damage continue — only the lifetime is frozen.
@@ -189,6 +195,8 @@ private:
     void UpdateMembership();
     void ApplyArmorStrip(AActor* Occupant) const;
     void ReleaseArmorStrip(AActor* Occupant) const;
+    float ArmorStripFor(AActor* Occupant) const;
+    void ReconcileArmorStrip(AActor* Occupant, bool bIncludeThis) const;
     // The keyed name used for the armour strip. Keyed by ZONE TAG only, never
     // by instance, so two overlapping Rots share one entry and cannot
     // double-strip (spec §5.3 task 6).
@@ -200,6 +208,10 @@ private:
     TArray<TWeakObjectPtr<AActor>> Occupants;
     TWeakObjectPtr<AActor> ZoneInstigator;
     TWeakObjectPtr<AActor> FollowActor;
+    FVector FollowOffset = FVector::ZeroVector;
+    UPROPERTY(Transient) TArray<TObjectPtr<UStaticMeshComponent>> MobileRim;
+    TWeakObjectPtr<ABreakerEffectRenderer> RimRenderer;
+    TArray<int32> RimHandles;
     float RemainingDuration = 0.0f;
     float TimeUntilNextTick = 0.0f;
     int32 TicksDelivered = 0;

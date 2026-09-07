@@ -6,6 +6,8 @@
 #include "Abilities/BreakerAbilityTags.h"
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Abilities/BreakerAbility_Cleave.h"
+#include "Abilities/BreakerAbility_Rot.h"
+#include "Combat/BreakerZoneActor.h"
 #include "Data/BreakerDataFile.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Game/BreakerGameMode.h"
@@ -551,6 +553,17 @@ void UBreakerManaComponent::AdvanceLoop(float DeltaTime)
         return;
     }
 
+    // Standing Water is one owner income stream, independent of bodies or
+    // overlapping puddles. It shares the same budget as other accelerators.
+    const UBreakerCombatComponent* OwnerCombat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>();
+    const int32 StandingRank = Progression ? Progression->GetNodeRank(TEXT("Caster.VoidWhisperer.StandingWater"), EBreakerPointCurrency::DoctrinePoints) : 0;
+    if (StandingRank > 0 && OwnerCombat && !OwnerCombat->IsDead())
+    {
+        UBreakerAbilityDefinition::FindFallback(TEXT("Caster.Rot"));
+        const UBreakerAbility_Rot* Rot = GetDefault<UBreakerAbility_Rot>();
+        const float Rate = StandingRank >= 2 ? Rot->StandingWaterRankTwoManaPerSecond : Rot->StandingWaterRankOneManaPerSecond;
+        GrantMana(Rate * ABreakerZoneActor::OwnedOccupiedSeconds(GetOwner(), BreakerAbilityTags::Zone_Caster_Rot.GetTag(), DeltaTime), false);
+    }
     // Conditional income on top: accelerators, metered against the budget.
     if (PendingGrants > 0.0f)
     {

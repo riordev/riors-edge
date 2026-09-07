@@ -917,6 +917,15 @@ void SBreakerMenu::ShowTravel(ABreakerTravelPoint* InTravelPoint)
 
 void SBreakerMenu::HandleEscape()
 {
+    if (CurrentScreen == EBreakerMenuScreen::Inventory && (SwapPickerItemId.IsValid() || DiscardModalIndex >= 0))
+    {
+        SwapPickerItemId.Invalidate();
+        SwapPickerFocusId.Invalidate();
+        DiscardModalIndex = -1;
+        PendingCleanupArm = -1;
+        Rebuild(EBreakerMenuScreen::Inventory);
+        return;
+    }
     // A listening keybind row eats Escape before the screen does. Escape
     // reaches this widget by TWO independent routes — Slate preview
     // (OnPreviewKeyDown) and the player-input BindKey that has always driven
@@ -1036,7 +1045,7 @@ void SBreakerMenu::ShowScreenForCapture(EBreakerMenuScreen Screen)
         // The front door's second state: the reveal listens for a real key,
         // which a capture run cannot press.
         else if (Board == TEXT("REVEALED")) { bTitleRevealed = true; }
-        else if (Board == TEXT("ABILITYSWAP"))
+        else if (Board == TEXT("ABILITYSWAP") || Board == TEXT("ABILITYSECOND"))
         {
             Screen = EBreakerMenuScreen::Abilities;
             // Capture the two shipped Caster starters without buying unlocks.
@@ -1048,6 +1057,17 @@ void SBreakerMenu::ShowScreenForCapture(EBreakerMenuScreen Screen)
                 Character->GetProgression()->EquipAbility(EBreakerAbilitySlot::ClassAbilityTwo, TEXT("Caster.Rot"), Failure);
                 Character->GetProgression()->EquipAbility(EBreakerAbilitySlot::Ultimate, TEXT("Caster.Unmake"), Failure);
                 if (Character->GetAbilities()) Character->GetAbilities()->RefreshGrants();
+                if (Board == TEXT("ABILITYSECOND") && Character->GetAbilities())
+                {
+                    AbilityPickerSlot = EBreakerAbilitySlot::ClassAbilityTwo;
+                    // The real selector supplies a refusal; no unlocks or points.
+                    for (const FName Id : Character->GetAbilities()->GetSelectableAbilityIds(AbilityPickerSlot))
+                        if (Character->GetAbilities()->PreviewSelection(AbilityPickerSlot, Id) != EBreakerAbilitySelectionResult::Allowed)
+                        {
+                            Character->GetAbilities()->TryEquipAbility(AbilityPickerSlot, Id, AbilityStatus);
+                            break;
+                        }
+                }
             }
         }
         else if (Board == TEXT("GEARDAMAGE"))
@@ -10104,10 +10124,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
     // The status line, reserved.
     Bench->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space12, 0.0f, 0.0f)
     [
-        SNew(SBox).HeightOverride(20.0f)
-        [
-            BreakerMonoText(ForgeStatus, BreakerUI::TypeCaption, Amber, 0.16f)
-        ]
+        MenuWrappedText(ForgeStatus, BreakerUI::TypeCaption, Amber, FMath::Max(160.0f, MeasureWideScreen().PanelWidth - 456.0f))
     ];
 
     // The bench footer: COST on the left, the verb's gold (or harm) action on
@@ -10516,10 +10533,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildQuartermasterScreen()
     // own words.
     Bench->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space12, 0.0f, 0.0f)
     [
-        SNew(SBox).HeightOverride(20.0f)
-        [
-            BreakerMonoText(QuartermasterStatus, BreakerUI::TypeCaption, Amber, 0.16f)
-        ]
+        MenuWrappedText(QuartermasterStatus, BreakerUI::TypeCaption, Amber, FMath::Max(160.0f, MeasureWideScreen().PanelWidth - 456.0f))
     ];
 
     const TSharedRef<SWidget> BenchFooter = SNew(SHorizontalBox)
@@ -10626,6 +10640,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildAbilitiesScreen()
     ];
 
     TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
+    TSharedRef<SHorizontalBox> Selectors = SNew(SHorizontalBox);
 
     if (!Abilities || PermanentClass == EBreakerClassId::None)
     {
@@ -10646,9 +10661,25 @@ TSharedRef<SWidget> SBreakerMenu::BuildAbilitiesScreen()
             { EBreakerAbilitySlot::Ultimate,        TEXT("ULTIMATE") },
         };
 
+        for (const FSlotEntry& Entry : SlotEntries)
+        {
+            const EBreakerAbilitySlot Slot = Entry.Slot;
+            const UBreakerAbilityDefinition* Active = Abilities->GetDefinitionForSlot(Slot);
+            Selectors->AddSlot().FillWidth(1.0f).Padding(0, 0, BreakerUI::Space8, BreakerUI::Space12)
+            [BorderWrap(SNew(SButton)
+                .ButtonColorAndOpacity(AbilityPickerSlot == Slot ? PanelHover : PanelRaised)
+                .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space12))
+                .OnClicked(FOnClicked::CreateLambda([this, Slot]() { AbilityPickerSlot = Slot; Rebuild(EBreakerMenuScreen::Abilities); return FReply::Handled(); }))
+                [SNew(SVerticalBox)
+                    + SVerticalBox::Slot().AutoHeight()[MenuWrappedText(FText::FromString(Entry.Label), BreakerUI::TypeCaption, Muted, Metrics.PanelWidth / 3 - 2 * BreakerUI::Space24, true)]
+                    + SVerticalBox::Slot().AutoHeight().Padding(0, BreakerUI::Space4, 0, 0)
+                    [MenuWrappedText(Active ? Active->DisplayName : FText::FromString(TEXT("NONE")), BreakerUI::TypeBody, Primary, Metrics.PanelWidth / 3 - 2 * BreakerUI::Space24, true)]],
+                AbilityPickerSlot == Slot ? Cyan : BorderRest, AbilityPickerSlot == Slot ? BreakerUI::BorderSelected : BreakerUI::BorderThin)];
+        }
         for (const FSlotEntry& SlotEntry : SlotEntries)
         {
             const EBreakerAbilitySlot Slot = SlotEntry.Slot;
+            if (Slot != AbilityPickerSlot) continue;
             // GetEquippedAbilityId is the PLAYER'S raw pick (what the picker
             // must mark as selected); GetAbilityIdForSlot is what actually
             // resolves once fallback is applied (what the HUD activates). The
@@ -10748,12 +10779,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildAbilitiesScreen()
                             ]
                             + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
                             [
-                                MenuText(Definition ? Definition->Description : FText::GetEmpty(), BreakerUI::TypeCaption, Muted)
+                                MenuWrappedText(Definition ? Definition->Description : FText::GetEmpty(), BreakerUI::TypeCaption, Muted, Metrics.PanelWidth - 4 * BreakerUI::Space16 - 2 * BreakerUI::BorderSelected)
                             ]
                             + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
                             [
                                 bPreviewBlocked
-                                    ? StaticCastSharedRef<SWidget>(MenuText(UBreakerAbilityComponent::DescribeSelectionResult(Preview), BreakerUI::TypeCaption, Harm, true))
+                                    ? StaticCastSharedRef<SWidget>(MenuWrappedText(UBreakerAbilityComponent::DescribeSelectionResult(Preview), BreakerUI::TypeCaption, Harm, Metrics.PanelWidth - 4 * BreakerUI::Space16 - 2 * BreakerUI::BorderSelected, true))
                                     : SNullWidget::NullWidget
                             ]
                         ],
@@ -10768,10 +10799,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildAbilitiesScreen()
             ];
         }
 
-        if (!AbilityStatus.IsEmpty())
-        {
-            Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)[MenuText(AbilityStatus, BreakerUI::TypeCaption, Amber, true)];
-        }
+
     }
 
     const FString MetaLine = FString::Printf(TEXT("BREAKER · %s · TWO CLASS ABILITIES + ONE ULTIMATE"), *ClassDisplayName(PermanentClass));
@@ -10780,8 +10808,10 @@ TSharedRef<SWidget> SBreakerMenu::BuildAbilitiesScreen()
         FText::FromString(TEXT("ABILITIES")),
         FText::FromString(MetaLine),
         HeaderRight,
-        SNew(SScrollBox) + SScrollBox::Slot()[Body],
-        SNullWidget::NullWidget,
+        SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight()[Selectors]
+            + SVerticalBox::Slot().FillHeight(1.0f)[SNew(SScrollBox) + SScrollBox::Slot()[Body]],
+        SNew(SBox).Padding(BreakerUI::Space24, BreakerUI::Space12)[MenuWrappedText(AbilityStatus, BreakerUI::TypeCaption, Amber, Metrics.PanelWidth - 2 * BreakerUI::Space24, true)],
         Metrics.PanelWidth,
         Metrics.PanelHeight,
         // Fixed height — see the shrink-wrap note in BuildZonedFrame.

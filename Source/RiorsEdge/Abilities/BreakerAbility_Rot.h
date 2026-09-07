@@ -43,6 +43,7 @@ public:
     float ComputeEffectiveRadiusCm(const AActor* OwnerActor) const;
     UFUNCTION(BlueprintPure, Category="Rot")
     float ComputeEffectiveDurationSeconds(const AActor* OwnerActor) const;
+    bool ShouldFollowCaster(const AActor* OwnerActor, bool bGroundHit, const FVector& HitPoint, const FVector& HitNormal) const;
 
     // Class-Kits §2.2 C3: 4 m radius, 6 s.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float RadiusCm = 400.0f;
@@ -67,4 +68,10 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float MaximumRangeCm = 2500.0f;
     // Vertical reach of the volume; see FBreakerZoneSpec::HalfHeightCm.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float HalfHeightCm = 250.0f;
+    // O2 PLACEHOLDER: conditional income shares the Caster generation cap.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot|Nodes", meta=(ClampMin="0")) float StandingWaterRankOneManaPerSecond = 2.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot|Nodes", meta=(ClampMin="0")) float StandingWaterRankTwoManaPerSecond = 4.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot|Nodes", meta=(ClampMin="0")) float ZoneworkAdditionalArmorReduction = 20.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot|Nodes", meta=(ClampMin="0")) float WellspringSelfPlacementRadiusCm = 150.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot|Nodes", meta=(ClampMin="0", ClampMax="1")) float WellspringMinimumGroundNormalZ = 0.7f;
 };
