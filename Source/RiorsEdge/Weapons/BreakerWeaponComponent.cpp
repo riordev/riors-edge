@@ -646,7 +646,35 @@ void UBreakerWeaponComponent::GetLifetimeReplicatedProps(TArray<FLifetimePropert
     DOREPLIFETIME(UBreakerWeaponComponent, bSwapping);
     DOREPLIFETIME(UBreakerWeaponComponent, SlotOneArchetype);
     DOREPLIFETIME(UBreakerWeaponComponent, SlotTwoArchetype);
+    DOREPLIFETIME_CONDITION(UBreakerWeaponComponent, ReloadSpeedMultiplier, COND_OwnerOnly);
+    DOREPLIFETIME_CONDITION(UBreakerWeaponComponent, SwapSpeedMultiplier, COND_OwnerOnly);
     DOREPLIFETIME_CONDITION(UBreakerWeaponComponent, DamageRampStacks, COND_OwnerOnly);
+}
+
+void UBreakerWeaponComponent::PushTempoBonus(FName Key, float ReloadMultiplier, float SwapMultiplier)
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority() || Key.IsNone()
+        || !FMath::IsFinite(ReloadMultiplier) || !FMath::IsFinite(SwapMultiplier)
+        || ReloadMultiplier <= 0.0f || SwapMultiplier <= 0.0f) return;
+    TempoBonuses.Add(Key, FVector2D(FMath::Max(1.0f, ReloadMultiplier), FMath::Max(1.0f, SwapMultiplier)));
+    RecalculateTempoBonuses();
+}
+
+void UBreakerWeaponComponent::PopTempoBonus(FName Key)
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+    if (TempoBonuses.Remove(Key) > 0) RecalculateTempoBonuses();
+}
+
+void UBreakerWeaponComponent::RecalculateTempoBonuses()
+{
+    ReloadSpeedMultiplier = 1.0f;
+    SwapSpeedMultiplier = 1.0f;
+    for (const auto& Entry : TempoBonuses)
+    {
+        ReloadSpeedMultiplier = FMath::Max(ReloadSpeedMultiplier, static_cast<float>(Entry.Value.X));
+        SwapSpeedMultiplier = FMath::Max(SwapSpeedMultiplier, static_cast<float>(Entry.Value.Y));
+    }
 }
 
 float UBreakerWeaponComponent::GetDamageRampPerStack() const
@@ -1274,11 +1302,9 @@ void UBreakerWeaponComponent::EquipSlot(int32 SlotNumber)
     OnReloadChanged.Broadcast(false);
     OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
 
-    // Swap tempo: the incoming weapon is unusable for its SwapInDuration.
-    // Swap speed affixes will scale this window; on-swap-in damage windows
-    // read GetSecondsSinceSwapIn once it closes.
+    // Snapshot tempo at entry; later aura changes affect the next swap.
     const UBreakerWeaponDefinition* Incoming = ResolveDefinition();
-    const float SwapDuration = Incoming ? Incoming->SwapInDuration : 0.5f;
+    const float SwapDuration = (Incoming ? Incoming->SwapInDuration : 0.5f) / GetSwapSpeedMultiplier();
     bSwapping = true;
     OnSwapChanged.Broadcast(true, CurrentSlot);
     if (SwapDuration > 0.0f && GetWorld())
@@ -1560,8 +1586,14 @@ void UBreakerWeaponComponent::StartReload()
         }
     }
     bReloading = true;
+    const float ReloadDuration = Definition->ReloadDuration / GetReloadSpeedMultiplier();
+    if (ReloadDuration <= 0.0f)
+    {
+        FinishReload();
+        return;
+    }
+    GetWorld()->GetTimerManager().SetTimer(ReloadTimer, this, &ThisClass::FinishReload, ReloadDuration, false);
     OnReloadChanged.Broadcast(true);
-    GetWorld()->GetTimerManager().SetTimer(ReloadTimer, this, &ThisClass::FinishReload, Definition->ReloadDuration, false);
 }
 
 void UBreakerWeaponComponent::CompleteReloadImmediately()

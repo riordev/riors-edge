@@ -20,6 +20,8 @@
 #include "TimerManager.h"
 #include "UI/BreakerEffectRenderer.h"
 #include "UI/BreakerUIStyle.h"
+#include "Weapons/BreakerWeaponComponent.h"
+#include "Movement/BreakerCharacterMovementComponent.h"
 
 namespace BreakerSupportAbilityLocal
 {
@@ -241,8 +243,7 @@ void UBreakerSupportAbility::RefreshBuffUptime(ABreakerCharacter* Character)
     const UBreakerAbilityStateComponent* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>();
     if (!Charge || !State) return;
     // A BOOL by construction: two live buffs pay exactly what one pays.
-    const bool bAnyBuff = State->IsWindowActive(UBreakerAbility_Cadence::WindowKey())
-        || State->IsWindowActive(UBreakerAbility_Metronome::WindowKey());
+    const bool bAnyBuff = State->IsWindowActive(UBreakerAbility_Metronome::WindowKey());
     Charge->SetAnyBuffActive(bAnyBuff);
 }
 
@@ -531,160 +532,194 @@ FName UBreakerAbility_Cadence::WindowKey() { return TEXT("Window.Support.Cadence
 
 void UBreakerAbility_Cadence::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
-    const UBreakerAbilityDefinition* Definition = GetAbilityDefinition();
     ABreakerCharacter* Character = GetBreakerCharacter();
     UWorld* World = Character ? Character->GetWorld() : nullptr;
-    if (!World || !CommitAbility(Handle, ActorInfo, ActivationInfo))
+    if (!World || Character->GetCombat()->IsDead() || !CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return;
     }
-
-    UBreakerChargeComponent* Charge = Character->FindComponentByClass<UBreakerChargeComponent>();
-
-    // CO4 REHEARSAL: re-applying a live Conductor buff refunds part of its
-    // cost (R2: a larger refund). The refresh itself is the retrigger path.
-    const int32 RehearsalRank = SupportNodeRank(Character, TEXT("Support.Conductor.Rehearsal"));
-    if (RehearsalRank > 0 && bReappliedWhileLive && Charge)
-    {
-        Charge->GrantCharge(GetResourceCost() * (RehearsalRank >= 2 ? 0.5f : 0.25f));   // O2 PLACEHOLDER
-    }
+    const int32 Rehearsal = SupportNodeRank(Character, TEXT("Support.Conductor.Rehearsal"));
+    if (Rehearsal > 0 && bReappliedWhileLive)
+        if (auto* Charge = Character->FindComponentByClass<UBreakerChargeComponent>())
+            Charge->GrantCharge(GetResourceCost() * (Rehearsal >= 2 ? .5f : .25f));
     bReappliedWhileLive = false;
-
-    // CO1 DOWNBEAT DISCIPLINE: your own copy outlasts the handed-out copies —
-    // solo, the only copy IS yours, so the node reads as +2s (R2: +4s).
+    const UBreakerAbilityDefinition* Definition = GetAbilityDefinition();
     float Duration = Definition ? Definition->WindowDuration : 8.0f;
-    const int32 DisciplineRank = SupportNodeRank(Character, TEXT("Support.Conductor.DownbeatDiscipline"));
-    if (DisciplineRank > 0) Duration += DisciplineRank >= 2 ? 4.0f : 2.0f;   // O2 PLACEHOLDER
-    // CO9 STANDING OVATION: at Resonant the buff lands extended. The
-    // cannot-be-stripped half is structurally true already — no enemy strips
-    // buffs — and stands recorded as such.
-    if (SupportHasNode(Character, BreakerNodeTags::Node_CO_StandingOvation.GetTag())
-        && Charge && Charge->GetChargeBand() == EBreakerChargeBand::Resonant)
-    {
-        Duration *= 1.5f;   // O2 PLACEHOLDER ("extended")
-    }
-
-    // CO11 DETACHED BATON: planted as a much larger STATIONARY zone which no
-    // longer applies to you first — your own copy runs only while you stand
-    // inside it. A party trade, declined solo, exactly as authored.
-    if (SupportHasNode(Character, BreakerNodeTags::Node_CO_DetachedBaton.GetTag()))
-    {
-        FBreakerZoneSpec Spec;
-        Spec.ZoneTag = FGameplayTag::RequestGameplayTag(TEXT("Zone.Support.Cadence"), false);
-        Spec.RadiusCm = DetachedBatonRadiusCm;
-        Spec.Duration = Duration;
-        Spec.TickInterval = 1.0f;
-        Spec.ZoneColor = FLinearColor(0.85f, 0.75f, 0.3f);   // brass; teal reserved (O19)
-        FActorSpawnParameters SpawnParams;
-        SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-        SpawnParams.Owner = Character;
-        BatonZone = World->SpawnActor<ABreakerZoneActor>(ABreakerZoneActor::StaticClass(), Character->GetActorLocation(), FRotator::ZeroRotator, SpawnParams);
-        if (BatonZone)
-        {
-            BatonZone->ConfigureZone(Spec, Character);
-            BatonZone->OnOccupantEntered.AddDynamic(this, &UBreakerAbility_Cadence::HandleBatonOccupantEntered);
-            BatonZone->OnOccupantExited.AddDynamic(this, &UBreakerAbility_Cadence::HandleBatonOccupantExited);
-            BatonZone->OnZoneExpired.AddDynamic(this, &UBreakerAbility_Cadence::HandleBatonZoneExpired);
-        }
-        // No self-first window here; entering the zone opens it.
-    }
-    else if (UBreakerAbilityStateComponent* State = UBreakerAbilityStateComponent::FindOrAdd(Character))
-    {
-        State->StartWindow(WindowKey(), Duration);
-    }
-    // Being a BUFF, it drives the count-independent uptime source (§U3) —
-    // that, plus the HUD window, is the whole shipped payload; the tempo half
-    // is the header's recorded gap.
-    RefreshBuffUptime(Character);
+    const int32 Discipline = SupportNodeRank(Character, TEXT("Support.Conductor.DownbeatDiscipline"));
+    SelfTailSeconds = Discipline > 0 ? (Discipline >= 2 ? 4.0f : 2.0f) : 0;
+    auto* Charge = Character->FindComponentByClass<UBreakerChargeComponent>();
+    if (SupportHasNode(Character, BreakerNodeTags::Node_CO_StandingOvation.GetTag()) && Charge
+        && Charge->GetChargeBand() == EBreakerChargeBand::Resonant)
+    { Duration *= 1.5f; SelfTailSeconds *= 1.5f; }
+    bDetached = SupportHasNode(Character, BreakerNodeTags::Node_CO_DetachedBaton.GetTag());
+    bConducting = SupportHasNode(Character, BreakerNodeTags::Node_CO_Conducting.GetTag());
+    const int32 Section = SupportNodeRank(Character, TEXT("Support.Conductor.Section"));
+    bSection = Section > 0;
+    ActiveAuraRadius = bDetached ? DetachedBatonRadiusCm : AuraRadiusCm;
+    ActiveAuraRadius += Section >= 2 ? SectionRankTwoRadiusBonusCm : Section == 1 ? SectionRankOneRadiusBonusCm : 0;
+    AuraEndTime = World->GetTimeSeconds() + Duration;
+    LastAuraUpdateTime = World->GetTimeSeconds();
+    TempoOwnerKey = FName(*FString::Printf(TEXT("Cadence.%u"), GetUniqueID()));
+    FBreakerZoneSpec Spec;
+    Spec.ZoneTag = FGameplayTag::RequestGameplayTag(TEXT("Zone.Support.Cadence"), false);
+    Spec.RadiusCm = ActiveAuraRadius;
+    Spec.Duration = Duration;
+    Spec.bMobileFootprint = !bDetached;
+    Spec.bShowFilledFootprint = false;
+    Spec.ZoneColor = BreakerUI::Orange;
+    FActorSpawnParameters Spawn;
+    Spawn.Owner = Character; Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    const FVector Feet = Character->GetActorLocation() - FVector(0, 0, Character->GetSimpleCollisionHalfHeight());
+    BatonZone = World->SpawnActor<ABreakerZoneActor>(ABreakerZoneActor::StaticClass(), Feet, FRotator::ZeroRotator, Spawn);
+    if (!BatonZone) { EndAbility(Handle, ActorInfo, ActivationInfo, true, true); return; }
+    BatonZone->ConfigureZone(Spec, Character);
+    if (!bDetached && bSection) BatonZone->SetFollowActor(Character);
     bCadenceActive = true;
-    BreakerSupportAbilityLocal::BreakerSupportCastFlash(Character, BreakerUI::Cyan, 45.0f);
+    Character->GetCombat()->OnDeath.AddUniqueDynamic(this, &ThisClass::HandleCadenceDeath);
+    RefreshAura();
+    World->GetTimerManager().SetTimer(WindowTimer, this, &ThisClass::RefreshAura, .05f, true);
+    if (bConducting) World->GetTimerManager().SetTimer(ConductingTimer, this, &ThisClass::ShaveTick, 1.0f, true);
+    BreakerSupportAbilityLocal::BreakerSupportCastFlash(Character, BreakerUI::Orange, 45.0f);
+}
 
-    // CO7 CONDUCTING: Cadence also speeds ability cooldown recovery for the
-    // buffed — solo, you. A once-a-second shave through the Charge component's
-    // GAS path while the buff runs. The detach-tail clause is vacuous while
-    // the aura follows its caster and stands recorded.
-    if (SupportHasNode(Character, BreakerNodeTags::Node_CO_Conducting.GetTag()))
+void UBreakerAbility_Cadence::RemoveRecipient(ABreakerCharacter* Recipient)
+{
+    if (!Recipient) return;
+    Recipients.Remove(Recipient);
+    InsideRecipients.Remove(Recipient);
+    if (auto* Weapon = Recipient->GetWeapon()) Weapon->PopTempoBonus(TempoOwnerKey);
+    if (Recipient != GetBreakerCharacter()) Recipient->GetCombat()->OnDeath.RemoveDynamic(this, &ThisClass::HandleCadenceDeath);
+    if (auto* State = Recipient->FindComponentByClass<UBreakerAbilityStateComponent>())
     {
-        World->GetTimerManager().SetTimer(ConductingTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { ShaveTick(); }), 1.0f, /*bLoop=*/true);
+        State->OnWindowEnded.RemoveDynamic(this, &ThisClass::HandleCadenceWindowEnded);
+        State->CloseOwnedWindow(WindowKey(), TempoOwnerKey);
     }
+    RefreshBuffUptime(Recipient);
+}
 
-    World->GetTimerManager().SetTimer(WindowTimer, FTimerDelegate::CreateWeakLambda(this, [this]()
+void UBreakerAbility_Cadence::HandleCadenceWindowEnded(FName Key)
+{
+    if (Key == WindowKey()) RefreshAura();
+}
+
+void UBreakerAbility_Cadence::HandleCadenceDeath() { RefreshAura(); }
+
+void UBreakerAbility_Cadence::RefreshAura()
+{
+    if (!bCadenceActive || bRefreshingAura) return;
+    TGuardValue<bool> Guard(bRefreshingAura, true);
+    ABreakerCharacter* Character = GetBreakerCharacter();
+    UWorld* World = Character ? Character->GetWorld() : nullptr;
+    if (!World || Character->IsActorBeingDestroyed() || Character->GetCombat()->IsDead())
+    { EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true); return; }
+    const float AuraRemaining = FMath::Max(0.0, AuraEndTime - World->GetTimeSeconds());
+    const float Elapsed = FMath::Max(0.0, World->GetTimeSeconds() - LastAuraUpdateTime);
+    LastAuraUpdateTime = World->GetTimeSeconds();
+    TSet<TWeakObjectPtr<ABreakerCharacter>> Inside;
+    if (AuraRemaining > 0 && IsValid(BatonZone) && !BatonZone->IsActorBeingDestroyed())
     {
-        if (CurrentActorInfo) EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
-    }), Duration, false);
+        // Query living cooperative player characters directly: the generic zone
+        // overlap excludes its caster and includes enemies, neither is a buff rule.
+        const FVector Desired = Character->GetActorLocation() - FVector(0, 0, Character->GetSimpleCollisionHalfHeight());
+        if (!bDetached)
+            BatonZone->SetActorLocation(bSection ? Desired : FMath::VInterpConstantTo(BatonZone->GetActorLocation(), Desired, Elapsed, Character->GetBreakerMovement()->GetWalkSpeedCap()));
+        const FVector Center = BatonZone->GetActorLocation();
+        for (TActorIterator<ABreakerCharacter> It(World); It; ++It)
+        {
+            ABreakerCharacter* Recipient = *It;
+            if (Recipient->IsActorBeingDestroyed() || Recipient->GetCombat()->IsDead()) continue;
+            const FVector Delta = Recipient->GetActorLocation() - Center;
+            if ((bDetached || Recipient != Character)
+                && (Delta.SizeSquared2D() > FMath::Square(ActiveAuraRadius) || FMath::Abs(Delta.Z) > 250.0f)) continue;
+            Inside.Add(Recipient);
+            auto* State = UBreakerAbilityStateComponent::FindOrAdd(Recipient);
+            if (!Recipients.Contains(Recipient))
+            {
+                Recipients.Add(Recipient);
+                State->StartOwnedWindow(WindowKey(), TempoOwnerKey, AuraRemaining + (Recipient == Character ? SelfTailSeconds : 0));
+                State->OnWindowEnded.AddUniqueDynamic(this, &ThisClass::HandleCadenceWindowEnded);
+                Recipient->GetCombat()->OnDeath.AddUniqueDynamic(this, &ThisClass::HandleCadenceDeath);
+            }
+            else if (!InsideRecipients.Contains(Recipient))
+                State->StartOwnedWindow(WindowKey(), TempoOwnerKey, FMath::Max(State->GetOwnedWindowRemaining(WindowKey(), TempoOwnerKey), AuraRemaining + (Recipient == Character ? SelfTailSeconds : 0)));
+        }
+    }
+    const auto Previous = Recipients.Array();
+    for (const auto& Held : Previous)
+    {
+        ABreakerCharacter* Recipient = Held.Get();
+        if (!Recipient) { Recipients.Remove(Held); InsideRecipients.Remove(Held); continue; }
+        auto* State = Recipient->FindComponentByClass<UBreakerAbilityStateComponent>();
+        if (Recipient->IsActorBeingDestroyed() || Recipient->GetCombat()->IsDead() || !State)
+        { RemoveRecipient(Recipient); continue; }
+        if (AuraRemaining > 0 && !Inside.Contains(Recipient))
+        {
+            if (Recipient == Character && bConducting && InsideRecipients.Contains(Recipient))
+            {
+                const float Extension = FMath::Max(0.0f, State->GetOwnedWindowRemaining(WindowKey(), TempoOwnerKey) - AuraRemaining - SelfTailSeconds);
+                State->StartOwnedWindow(WindowKey(), TempoOwnerKey, ConductingTailSeconds + SelfTailSeconds + Extension);
+            }
+            else if (Recipient != Character || !bConducting) { RemoveRecipient(Recipient); continue; }
+        }
+        if (State->GetOwnedWindowRemaining(WindowKey(), TempoOwnerKey) <= 0)
+        { RemoveRecipient(Recipient); continue; }
+        const auto* SourceState = Character->FindComponentByClass<UBreakerAbilityStateComponent>();
+        const bool bDownbeat = SupportHasNode(Character, FGameplayTag::RequestGameplayTag(TEXT("Keystone.Support.Downbeat"), false))
+            && SourceState && SourceState->IsWindowActive(ConduitWindowKey());
+        const float BonusScale = bDownbeat ? 2.0f : 1.0f;
+        Recipient->GetWeapon()->PushTempoBonus(TempoOwnerKey,
+            1.0f + FMath::Max(0.0f, ReloadTempoMultiplier - 1.0f) * BonusScale,
+            1.0f + FMath::Max(0.0f, SwapTempoMultiplier - 1.0f) * BonusScale);
+        RefreshBuffUptime(Recipient);
+    }
+    InsideRecipients = MoveTemp(Inside);
+    if (auto* Charge = Character->FindComponentByClass<UBreakerChargeComponent>())
+        Charge->SetMaintainedBuffActive(TempoOwnerKey, !Recipients.IsEmpty());
+    // Owned window expiry is the payload clock too: Continuance extensions
+    // remain real after the footprint ends, rather than extending only the HUD.
+    if (AuraRemaining <= 0 && Recipients.IsEmpty())
+        EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UBreakerAbility_Cadence::ShaveTick()
 {
-    ABreakerCharacter* Character = GetBreakerCharacter();
-    UBreakerChargeComponent* Charge = Character ? Character->FindComponentByClass<UBreakerChargeComponent>() : nullptr;
-    // The buffed set is "whoever the buff is on" — solo, you, and only while
-    // the window is actually open (the Detached Baton zone can close it).
-    const UBreakerAbilityStateComponent* State = Character ? Character->FindComponentByClass<UBreakerAbilityStateComponent>() : nullptr;
-    if (Charge && State && State->IsWindowActive(WindowKey()))
-    {
-        Charge->ShaveAllAbilityCooldowns(0.25f);   // O2 PLACEHOLDER
-    }
+    RefreshAura();
+    if (!bCadenceActive) return;
+    for (const auto& Held : Recipients)
+        if (ABreakerCharacter* Recipient = Held.Get())
+            if (auto* Charge = Recipient->FindComponentByClass<UBreakerChargeComponent>()) Charge->ShaveAllAbilityCooldowns(.25f);
 }
 
-void UBreakerAbility_Cadence::HandleBatonOccupantEntered(AActor* Occupant)
-{
-    ABreakerCharacter* Character = GetBreakerCharacter();
-    if (!Character || Occupant != Character || !BatonZone) return;
-    if (UBreakerAbilityStateComponent* State = UBreakerAbilityStateComponent::FindOrAdd(Character))
-    {
-        State->StartWindow(WindowKey(), BatonZone->GetRemainingDuration());
-    }
-    RefreshBuffUptime(Character);
-}
-
-void UBreakerAbility_Cadence::HandleBatonOccupantExited(AActor* Occupant)
-{
-    ABreakerCharacter* Character = GetBreakerCharacter();
-    if (!Character || Occupant != Character) return;
-    if (UBreakerAbilityStateComponent* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>())
-    {
-        State->CloseWindow(WindowKey());
-    }
-    RefreshBuffUptime(Character);
-}
-
-void UBreakerAbility_Cadence::HandleBatonZoneExpired()
-{
-    BatonZone = nullptr;
-}
+// Kept as native delegate seams for existing authored actors; membership is
+// evaluated by the same live-player query for normal and detached auras.
+void UBreakerAbility_Cadence::HandleBatonOccupantEntered(AActor*) { RefreshAura(); }
+void UBreakerAbility_Cadence::HandleBatonOccupantExited(AActor*) { RefreshAura(); }
+void UBreakerAbility_Cadence::HandleBatonZoneExpired() { BatonZone = nullptr; }
 
 void UBreakerAbility_Cadence::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
     if (bCadenceActive)
     {
         bCadenceActive = false;
-        if (ABreakerCharacter* Character = GetBreakerCharacter())
+        bReappliedWhileLive = false;
+        if (auto* Character = GetBreakerCharacter())
         {
-            if (UBreakerAbilityStateComponent* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>())
-            {
-                // CO4's re-application detection: a teardown that finds real
-                // time still on the window is a refresh, not an expiry.
-                bReappliedWhileLive = State->GetWindowRemaining(WindowKey()) > 0.1f;
-                State->CloseWindow(WindowKey());
-            }
-            RefreshBuffUptime(Character);
+            if (auto* Charge = Character->FindComponentByClass<UBreakerChargeComponent>()) Charge->SetMaintainedBuffActive(TempoOwnerKey, false);
+            Character->GetCombat()->OnDeath.RemoveDynamic(this, &ThisClass::HandleCadenceDeath);
+            if (auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>())
+                bReappliedWhileLive = State->GetOwnedWindowRemaining(WindowKey(), TempoOwnerKey) > .1f;
         }
-        if (BatonZone)
-        {
-            BatonZone->Destroy();
-            BatonZone = nullptr;
-        }
+        const auto Previous = Recipients.Array();
+        for (const auto& Held : Previous) if (auto* Recipient = Held.Get()) RemoveRecipient(Recipient);
+        Recipients.Reset(); InsideRecipients.Reset();
+        if (IsValid(BatonZone)) BatonZone->Destroy();
+        BatonZone = nullptr;
         if (UWorld* World = GetWorld())
-        {
-            World->GetTimerManager().ClearTimer(WindowTimer);
-            World->GetTimerManager().ClearTimer(ConductingTimer);
-        }
+        { World->GetTimerManager().ClearTimer(WindowTimer); World->GetTimerManager().ClearTimer(ConductingTimer); }
     }
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
-
 // ---------------------------------------------------------------------------
 // U4 — METRONOME
 // ---------------------------------------------------------------------------
@@ -1423,9 +1458,8 @@ void UBreakerAbility_Conduit::ActivateAbility(const FGameplayAbilitySpecHandle H
     }
     else if (bDownbeat)
     {
-        // §3.1 DOWNBEAT: free casts stay, cadence effects double (the cadence
-        // payload is the recorded Cadence gap, so the doubling has nothing to
-        // double yet), and every buffed target adds FLAT weapon damage — solo,
+        // §3.1 DOWNBEAT: free casts stay; live Cadence doubles tempo bonuses
+        // while this window is active. Every buffed target adds FLAT damage — solo,
         // one buffed target: the Support.
         if (UBreakerCombatComponent* Combat = Character->FindComponentByClass<UBreakerCombatComponent>())
         {

@@ -3633,8 +3633,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSupportConductorTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_DownbeatDiscipline.GetTag());
     Tree->Nodes.Add(Node);
 
-    // CO2. A handling rewrite; no magnitude on any affix-owned stat. WAITING
-    // ON: UBreakerAbility_Cadence's aura radius and follow behaviour.
+    // CO2. Cadence enlarges its actual footprint and follows at sprint speed.
     Node = MakeNode(TEXT("Support.Conductor.Section"), TEXT("Section"),
         TEXT("Cadence's aura reaches further and keeps pace at sprint speed (R2: further again)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 2, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_Section.GetTag());
@@ -3677,9 +3676,8 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSupportConductorTree()
     Tree->Nodes.Add(Node);
 
     // --- Tier 3 (CO7-CO8) ----------------------------------------------------
-    // CO7. "Grants U3 Cadence" is not authored (block comment above); the
-    // cooldown-recovery aura and the detach-tail are the node. WAITING ON:
-    // UBreakerAbility_Cadence's aura effect list.
+    // CO7. Cadence shortens each actual recipient's cooldowns and retains a
+    // brief caster-owned effect after leaving a detached footprint.
     Node = MakeNode(TEXT("Support.Conductor.Conducting"), TEXT("Conducting"),
         TEXT("Cadence also speeds ability cooldown recovery for the buffed, and clings to you briefly if its aura ever leaves you."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 3, 1, 2);
     AddPrerequisite(Node, TEXT("Support.Conductor.Rehearsal"));
@@ -3716,8 +3714,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSupportConductorTree()
 
     // CO11. The ONE node in the branch that suspends the self-first rule, and
     // the treatment flags it exactly so: a deliberate party-play trade the
-    // solo player declines, optional, with nothing depending on it. WAITING
-    // ON: UBreakerAbility_Cadence's placement mode.
+    // solo player declines, optional, with nothing depending on it.
     Node = MakeNode(TEXT("Support.Conductor.DetachedBaton"), TEXT("Detached Baton"),
         TEXT("Cadence may be planted as a much larger stationary zone — which no longer applies to you first. A party trade, declined solo."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Support.Conductor.Conducting"));

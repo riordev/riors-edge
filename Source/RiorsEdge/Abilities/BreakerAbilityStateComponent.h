@@ -57,6 +57,9 @@ public:
     // Starting a window that is already open replaces its remaining time
     // rather than stacking: a re-cast refreshes, it does not accumulate.
     UFUNCTION(BlueprintCallable, Category="Abilities|State") void StartWindow(FName Key, float Duration);
+    void StartOwnedWindow(FName Key, FName OwnerKey, float Duration);
+    void CloseOwnedWindow(FName Key, FName OwnerKey);
+    float GetOwnedWindowRemaining(FName Key, FName OwnerKey) const;
     // One scalar carried by the window itself, so a state that rewrites a rule
     // can also carry the rule's magnitude without a second registry. Unmake is
     // the first user: it opens a window whose payload is the cost scalar every
@@ -126,6 +129,7 @@ private:
         float Payload = 0.0f;
     };
     TMap<FName, FWindowState> Windows;
+    TMap<FName, TMap<FName, float>> OwnedWindows;
 
     // Shares the component's Clock, so the mark expires on exactly the same
     // schedule as the window that opened it.

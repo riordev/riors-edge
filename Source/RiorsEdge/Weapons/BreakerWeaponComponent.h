@@ -252,6 +252,12 @@ public:
     // through ServerStartReload before the timer is set, so a client has the
     // state and not the clock. The HUD draws the full bar for -1.
     UFUNCTION(BlueprintPure, Category="Weapon") float GetReloadFraction() const;
+    // Independent sources refresh their own entry. The strongest bonus on each
+    // axis wins; changing a buff never restarts a reload or swap already begun.
+    void PushTempoBonus(FName Key, float ReloadMultiplier, float SwapMultiplier);
+    void PopTempoBonus(FName Key);
+    UFUNCTION(BlueprintPure, Category="Weapon") float GetReloadSpeedMultiplier() const { return ReloadSpeedMultiplier; }
+    UFUNCTION(BlueprintPure, Category="Weapon") float GetSwapSpeedMultiplier() const { return SwapSpeedMultiplier; }
     // Authority trigger state, including automatic fire waiting through a reload.
     bool IsTriggerHeld() const { return bTriggerHeld; }
     UFUNCTION(BlueprintPure, Category="Weapon") bool IsAiming() const { return bAiming; }
@@ -637,6 +643,10 @@ private:
     int32 GetMagazineCapacityForSlot(int32 Slot, const UBreakerWeaponDefinition* Definition) const;
     bool bSynchronizingMagazineCapacity = false;
     bool bAmmunitionInitialized = false;
+    TMap<FName, FVector2D> TempoBonuses;
+    void RecalculateTempoBonuses();
+    UPROPERTY(Replicated) float ReloadSpeedMultiplier = 1.0f;
+    UPROPERTY(Replicated) float SwapSpeedMultiplier = 1.0f;
     float GetEffectiveBloomDegrees() const;
     // The weak-point instrument's ledger (see the public block's comment).
     // Plain map, no UPROPERTY: keys are FNames and values are POD counters,

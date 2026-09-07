@@ -107,13 +107,8 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Purge", meta=(ClampMin="0")) float TargetRangeCm = 2000.0f;   // O2 PLACEHOLDER (mirrors Patch)
 };
 
-// U3 Cadence (§3 U3, Conductor): an 8s aura improving reload and swap tempo
-// for everyone inside, starting with the Support. WHAT SHIPS: the buff WINDOW
-// itself — it follows the Support, drives the count-independent uptime source,
-// and reads on the HUD. WHAT IS RECORDED ABSENT: the tempo payload. No
-// reload-speed or swap-speed multiplier exists anywhere on the weapon
-// component, and this pass's weapon territory is the magazine hooks only. The
-// buff is real and its payload is a named hole, not a fake.
+// U3 Cadence: living cooperative players receive keyed reload/swap tempo.
+// Each caster owns its window; normal aura follows, Detached Baton stays put.
 UCLASS()
 class RIORSEDGE_API UBreakerAbility_Cadence : public UBreakerSupportAbility
 {
@@ -130,12 +125,32 @@ public:
     UFUNCTION() void HandleBatonOccupantExited(AActor* Occupant);
     UFUNCTION() void HandleBatonZoneExpired();
 
-    // CO11 DETACHED BATON's stationary zone radius. O2 PLACEHOLDER ("much
-    // larger" than the followed aura, which has no radius of its own yet).
+    // O2 presentation and tempo tuning, exported to abilities.json.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cadence", meta=(ClampMin="0")) float DetachedBatonRadiusCm = 800.0f;
+    UPROPERTY(EditDefaultsOnly, Category="Cadence") float AuraRadiusCm = 500.0f;
+    UPROPERTY(EditDefaultsOnly, Category="Cadence") float SectionRankOneRadiusBonusCm = 200.0f;
+    UPROPERTY(EditDefaultsOnly, Category="Cadence") float SectionRankTwoRadiusBonusCm = 400.0f;
+    UPROPERTY(EditDefaultsOnly, Category="Cadence") float ReloadTempoMultiplier = 1.25f;
+    UPROPERTY(EditDefaultsOnly, Category="Cadence") float SwapTempoMultiplier = 1.25f;
+    UPROPERTY(EditDefaultsOnly, Category="Cadence") float ConductingTailSeconds = 2.0f;
 
 private:
     void ShaveTick();
+    void RefreshAura();
+    void RemoveRecipient(ABreakerCharacter* Recipient);
+    UFUNCTION() void HandleCadenceWindowEnded(FName Key);
+    UFUNCTION() void HandleCadenceDeath();
+    FName TempoOwnerKey;
+    TSet<TWeakObjectPtr<ABreakerCharacter>> Recipients;
+    TSet<TWeakObjectPtr<ABreakerCharacter>> InsideRecipients;
+    double AuraEndTime = 0;
+    float ActiveAuraRadius = 500;
+    float SelfTailSeconds = 0;
+    bool bDetached = false;
+    bool bSection = false;
+    double LastAuraUpdateTime = 0;
+    bool bConducting = false;
+    bool bRefreshingAura = false;
 
     FTimerHandle WindowTimer;
     FTimerHandle ConductingTimer;

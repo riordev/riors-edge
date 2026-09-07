@@ -57,6 +57,16 @@ Rot's StandingWaterRankOneManaPerSecond / StandingWaterRankTwoManaPerSecond gran
 
 Closequarter's MomentumTransferRankOneSeconds / MomentumTransferRankTwoSeconds give 2/3 seconds after a successful targeted arrival to land your next melee hit with that target's block and dodge bypassed. Chain's rank reach is currently an editor-only StatusComponent default (600/900 cm), not an abilities.json key. These are O2 placeholders.
 
+## Support Cadence
+
+Cadence's `AuraRadiusCm` is 500. Section adds 200/400 cm at ranks 1/2;
+`DetachedBatonRadiusCm` is 800 before that addition. `ReloadTempoMultiplier`
+and `SwapTempoMultiplier` are 1.25, making each action take its authored
+duration divided by 1.25. These bonuses do not multiply across Supports.
+Downbeat's active Conduit doubles the bonus above 1, producing 1.5 at these
+defaults. `ConductingTailSeconds` is 2. All are O2 placeholder values in
+`abilities.json`, loaded once per process.
+
 ## Gunsmith placement timing
 
 `BaseDeployCastSeconds` in the Turret, Ammo Crate, Mine Cluster and Disruptor

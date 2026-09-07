@@ -474,6 +474,7 @@ void ABreakerZoneActor::RefreshPresentation()
     }
     if (Footprint)
     {
+        Footprint->SetVisibility(Spec.bShowFilledFootprint);
         // BasicShapes/Cylinder is 100 cm across and 100 cm tall, so a unit of
         // scale is a metre. Deliberately flat: this stands in for a decal.
         const float Diameter = FMath::Max(Spec.RadiusCm, 1.0f) * 2.0f / 100.0f;

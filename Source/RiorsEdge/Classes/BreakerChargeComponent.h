@@ -112,6 +112,9 @@ public:
     // closes "stack five buffs on yourself for 5x" and "party of five for 5x" in
     // one rule. The symmetry is the point.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Charge|Buffs") void SetAnyBuffActive(bool bActive);
+    // Upkeep belongs to the caster maintaining recipients, not to recipients
+    // of somebody else's buff. Multiple casts still produce one income stream.
+    void SetMaintainedBuffActive(FName SourceKey, bool bActive);
     UFUNCTION(BlueprintPure, Category="Charge|Buffs") bool HasAnyBuffActive() const { return bAnyBuffActive; }
 
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Charge|Combat") void SetInCombat(bool bNowInCombat);
@@ -251,6 +254,7 @@ private:
 
     bool bIsSupport = false;
     bool bAnyBuffActive = false;
+    TSet<FName> MaintainedBuffSources;
     bool bInCombat = false;
     EBreakerChargeBand CachedBand = EBreakerChargeBand::Cold;
     float PendingGrants = 0.0f;

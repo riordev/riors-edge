@@ -534,7 +534,13 @@
 			"windowDuration": 8,
 			"numbers":
 			{
-				"DetachedBatonRadiusCm": 800
+				"DetachedBatonRadiusCm": 800,
+				"AuraRadiusCm": 500,
+				"SectionRankOneRadiusBonusCm": 200,
+				"SectionRankTwoRadiusBonusCm": 400,
+				"ReloadTempoMultiplier": 1.25,
+				"SwapTempoMultiplier": 1.25,
+				"ConductingTailSeconds": 2
 			},
 			"variants": []
 		},

@@ -219,6 +219,7 @@ Every lane permitted to touch outgoing player damage.
 | Sustained accuracy | Primary Increased divisor on accumulated bloom only; base spread, movement and recoil unchanged |
 | Gear pierce | Primary hitscan count, exact tier steps; additional impacts use existing penetration falloff and total travel budget |
 | Fire rate | Named, watched, uncapped |
+| Reload and swap tempo | Strongest active source on each axis; divide authored duration by speed, snapshot when the action starts, conserve ammunition |
 | Target-conditional riders | The same additive bucket, never a multiplier |
 | DoT | The same additive bucket as direct damage |
 
@@ -249,26 +250,18 @@ retunes the whole game. No rested experience, no death penalty, party-neutral,
 and an account-wide flat catch-up for alts — the one sanctioned exception to the
 additive bucket, and there is not a second.
 
-Points: one Core Point per level to 50 plus fifteen from world content — the
-only per-level point — and a doctrine's eight, paid whole at commitment.
+Points: one Core Point per level to 50 plus fifteen from world content.
+Eight Doctrine points come from four authored campaign benchmarks.
 
 **There is no experience at cap.** A currency drops instead — a conversion
 would be a post-cap progression track wearing a currency's clothes.
 
 ## Boundaries
 
-This spec owns the curves, the composition law, the pools and the bands. It
-does not own:
-
-- the order damage resolves in, armour composition, or the proc-coefficient
-  law — **combat**;
-- the affix roster, the rarity ladder, drop rates or crafting — **items and
-  crafting**;
-- which stat targets and conditions exist, and what a node may author —
-  **progression and trees**;
-- resource loops, ability costs and cooldowns — **classes and abilities**;
-- rank composition within an encounter, and modifier selection — **content and
-  modes**.
+This spec owns curves, composition, pools and bands. Damage resolution belongs
+to **combat**; loot and treatment to **items and crafting**; node vocabulary
+to **progression and trees**; resource loops to **classes and abilities**;
+encounter ranks and modifiers to **content and modes**.
 
 ## Asserted invariants
 

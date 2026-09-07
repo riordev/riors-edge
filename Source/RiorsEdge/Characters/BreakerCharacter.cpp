@@ -1281,6 +1281,28 @@ namespace
 
 void ABreakerCharacter::StartViewmodelCaptureCycle()
 {
+#if !UE_BUILD_SHIPPING
+    if (FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureCadence")))
+    {
+        // Isolated visual fixture: real class, ability payment and cast. This
+        // grants capture resources, so it is not progression or balance proof.
+        GetWorldTimerManager().SetTimer(ViewmodelFireTimer,
+            FTimerDelegate::CreateWeakLambda(this, [this]()
+        {
+            if (!Progression || !Abilities || !Charge) return;
+            Progression->DevForceClass(EBreakerClassId::Support);
+            Progression->DevForceEquipAbility(EBreakerAbilitySlot::ClassAbilityOne, TEXT("Support.Cadence"));
+            Abilities->RefreshGrants();
+            Charge->GrantCharge(100.0f);
+            if (Controller) Controller->SetControlRotation(FRotator(-35.0f, GetActorRotation().Yaw, 0.0f));
+            const bool bCast = Abilities->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityOne);
+            UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] Cadence actual cast=%d reload=%.2f swap=%.2f"),
+                bCast, Weapon ? Weapon->GetReloadSpeedMultiplier() : 1.0f,
+                Weapon ? Weapon->GetSwapSpeedMultiplier() : 1.0f);
+        }), 1.0f, false);
+        return;
+    }
+#endif
     FString RiflePose;
     if (FParse::Value(FCommandLine::Get(), TEXT("BreakerCaptureRifle="), RiflePose) && Weapon)
     {

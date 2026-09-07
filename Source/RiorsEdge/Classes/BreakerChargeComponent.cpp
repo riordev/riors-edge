@@ -393,12 +393,21 @@ void UBreakerChargeComponent::NotifyAssist()
 
 void UBreakerChargeComponent::SetAnyBuffActive(bool bActive)
 {
+    SetMaintainedBuffActive(TEXT("Support.LegacySelfBuffs"), bActive);
+}
+
+void UBreakerChargeComponent::SetMaintainedBuffActive(FName SourceKey, bool bActive)
+{
+    if (SourceKey.IsNone()) return;
+    if (bActive) MaintainedBuffSources.Add(SourceKey);
+    else MaintainedBuffSources.Remove(SourceKey);
+    const bool bMaintaining = !MaintainedBuffSources.IsEmpty();
     // CO3 Sustain's edge: the grace clock starts when the LAST buff expires.
-    if (bAnyBuffActive && !bActive)
+    if (bAnyBuffActive && !bMaintaining)
     {
         SecondsSinceBuffExpire = 0.0f;
     }
-    bAnyBuffActive = bActive;
+    bAnyBuffActive = bMaintaining;
 }
 
 void UBreakerChargeComponent::HandleOwnerHealed(const FBreakerHealResult& Result)

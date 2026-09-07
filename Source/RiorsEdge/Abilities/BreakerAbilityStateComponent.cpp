@@ -32,7 +32,7 @@ void UBreakerAbilityStateComponent::TickComponent(float DeltaTime, ELevelTick Ti
 void UBreakerAbilityStateComponent::AdvanceTime(float DeltaSeconds)
 {
     Clock += FMath::Max(DeltaSeconds, 0.0f);
-    if (Windows.Num() == 0)
+    if (Windows.Num() == 0 && OwnedWindows.Num() == 0)
     {
         return;
     }
@@ -52,15 +52,42 @@ void UBreakerAbilityStateComponent::AdvanceTime(float DeltaSeconds)
     {
         Windows.Remove(Key);
     }
+    for (auto Group = OwnedWindows.CreateIterator(); Group; ++Group)
+    {
+        for (auto Owner = Group.Value().CreateIterator(); Owner; ++Owner)
+            if (Owner.Value() <= Clock) Owner.RemoveCurrent();
+        if (Group.Value().IsEmpty()) { Expired.AddUnique(Group.Key()); Group.RemoveCurrent(); }
+    }
     for (const FName Key : Expired)
     {
-        OnWindowEnded.Broadcast(Key);
+        if (!IsWindowActive(Key)) OnWindowEnded.Broadcast(Key);
     }
 }
 
 void UBreakerAbilityStateComponent::StartWindow(FName Key, float Duration)
 {
     StartWindowWithPayload(Key, Duration, 0.0f);
+}
+
+void UBreakerAbilityStateComponent::StartOwnedWindow(FName Key, FName OwnerKey, float Duration)
+{
+    if (!Key.IsNone() && !OwnerKey.IsNone() && FMath::IsFinite(Duration) && Duration > 0)
+        OwnedWindows.FindOrAdd(Key).Add(OwnerKey, Clock + Duration);
+}
+
+float UBreakerAbilityStateComponent::GetOwnedWindowRemaining(FName Key, FName OwnerKey) const
+{
+    const auto* Group = OwnedWindows.Find(Key);
+    const float* End = Group ? Group->Find(OwnerKey) : nullptr;
+    return End ? FMath::Max(0.0f, *End - Clock) : 0.0f;
+}
+
+void UBreakerAbilityStateComponent::CloseOwnedWindow(FName Key, FName OwnerKey)
+{
+    auto* Group = OwnedWindows.Find(Key);
+    if (!Group || Group->Remove(OwnerKey) == 0) return;
+    if (Group->IsEmpty()) OwnedWindows.Remove(Key);
+    if (!IsWindowActive(Key)) OnWindowEnded.Broadcast(Key);
 }
 
 void UBreakerAbilityStateComponent::StartWindowWithPayload(FName Key, float Duration, float Payload)
@@ -87,11 +114,15 @@ void UBreakerAbilityStateComponent::ExtendWindow(FName Key, float ExtraSeconds)
     {
         State->EndTime += FMath::Max(ExtraSeconds, 0.0f);
     }
+    if (auto* Group = OwnedWindows.Find(Key))
+        for (auto& Owner : *Group) if (Owner.Value > Clock) Owner.Value += FMath::Max(0.0f, ExtraSeconds);
 }
 
 void UBreakerAbilityStateComponent::CloseWindow(FName Key)
 {
-    if (Windows.Remove(Key) > 0)
+    const bool bRemoved = Windows.Remove(Key) > 0;
+    const bool bOwnedRemoved = OwnedWindows.Remove(Key) > 0;
+    if (bRemoved || bOwnedRemoved)
     {
         OnWindowEnded.Broadcast(Key);
     }
@@ -99,27 +130,21 @@ void UBreakerAbilityStateComponent::CloseWindow(FName Key)
 
 bool UBreakerAbilityStateComponent::IsWindowActive(FName Key) const
 {
-    const FWindowState* State = Windows.Find(Key);
-    return State && State->EndTime > Clock;
+    return GetWindowRemaining(Key) > 0;
 }
 
 float UBreakerAbilityStateComponent::GetWindowRemaining(FName Key) const
 {
     const FWindowState* State = Windows.Find(Key);
-    return State ? FMath::Max(State->EndTime - Clock, 0.0f) : 0.0f;
+    float Remaining = State ? FMath::Max(State->EndTime - Clock, 0.0f) : 0.0f;
+    if (const auto* Group = OwnedWindows.Find(Key))
+        for (const auto& Owner : *Group) Remaining = FMath::Max(Remaining, Owner.Value - Clock);
+    return Remaining;
 }
 
 int32 UBreakerAbilityStateComponent::GetActiveWindowCount() const
 {
-    int32 Count = 0;
-    for (const TPair<FName, FWindowState>& Pair : Windows)
-    {
-        if (Pair.Value.EndTime > Clock)
-        {
-            ++Count;
-        }
-    }
-    return Count;
+    return GetActiveWindowKeys().Num();
 }
 
 TArray<FName> UBreakerAbilityStateComponent::GetActiveWindowKeys() const
@@ -134,6 +159,8 @@ TArray<FName> UBreakerAbilityStateComponent::GetActiveWindowKeys() const
         }
     }
     // Stable order: the HUD stacks these vertically, and a TMap's iteration
+    for (const auto& Group : OwnedWindows)
+        if (IsWindowActive(Group.Key)) Keys.AddUnique(Group.Key);
     // order would make the rows swap places between frames.
     Keys.Sort([](const FName& A, const FName& B) { return A.LexicalLess(B); });
     return Keys;

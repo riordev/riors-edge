@@ -242,6 +242,25 @@ reads those conditions live, including overlapping fields and release/expiry.
 The existing Warding Aura benefit and Warded shield recharge are suppressed;
 intrinsic boss mechanics and shields already granted are preserved.
 
+## Support tempo
+
+Cadence grants reload and swap tempo to living players within its footprint.
+The ordinary footprint follows at walking speed; Section enlarges it and
+keeps it with the caster at sprint speed. The caster receives the ordinary
+buff continuously. Detached Baton stays where cast and requires the caster
+to enter its footprint like any other recipient.
+
+Each cast owns its recipient effects. Leaving removes that cast's effect;
+another Support's active cast remains. Downbeat Discipline extends the
+caster's copy, and Conducting supplies a brief self tail after leaving a
+detached footprint. Conducting shortens the actual recipients' cooldowns.
+Buff-upkeep Charge belongs to the caster maintaining at least one recipient,
+including self, and never scales with the number of recipients or casts.
+
+Tempo uses the strongest active reload and swap bonuses separately. Reloads
+and swaps capture their duration when they begin; aura changes affect the
+next action. Reloading transfers ammunition without creating rounds.
+
 ## Open
 
 - Whether Momentum's generation threshold is a deliberate tension or a trap.

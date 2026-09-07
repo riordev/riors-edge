@@ -66,6 +66,8 @@ struct RIORSEDGE_API FBreakerZoneSpec
     // teal is reserved for rift objects and suppression hardware (O19).
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FLinearColor ZoneColor = FLinearColor(0.35f, 0.85f, 0.25f);
     UPROPERTY() bool bMobileFootprint = false;
+    // Friendly auras can show their boundary without covering the ground.
+    UPROPERTY() bool bShowFilledFootprint = true;
 };
 
 // A persistent damage/effect volume: the shared primitive behind C3 Rot,
