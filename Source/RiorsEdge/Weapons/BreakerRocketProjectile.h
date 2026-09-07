@@ -25,7 +25,8 @@ class RIORSEDGE_API ABreakerRocketProjectile : public AActor
 public:
     ABreakerRocketProjectile();
 
-    void InitializeRocket(const FBreakerDamageRequest& InDamage, float Speed, float InExplosionRadius);
+    // Optional weapon range limits straight flight; other callers keep MaximumLifetime.
+    void InitializeRocket(const FBreakerDamageRequest& InDamage, float Speed, float InExplosionRadius, float MaximumTravelCm = 0.0f);
     void InitializeDamageRamp(UBreakerWeaponComponent* Weapon, uint32 Token);
     // Real authoritative impact seam; duplicate impacts are latched.
     void Explode(const FVector& Location);
@@ -97,5 +98,6 @@ protected:
 private:
     FBreakerDamageRequest Damage;
     float ExplosionRadius = 350.0f;
+    float RangeLifetime = 0.0f;
     bool bExploded = false;
 };

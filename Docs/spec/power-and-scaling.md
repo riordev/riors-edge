@@ -214,6 +214,8 @@ Every lane permitted to touch outgoing player damage.
 | Weak point | Site multiplier, skill-gated, [1.0, 2.0], outside the More budget |
 | Weak point, gate removed | A build multiplier. Inside the accounting the skill gate stood in for, and crit does not also multiply on that hit |
 | Distance falloff | Per-pellet geometry, not a stat-layer multiplier |
+| Effective range | Primary Increased percentages add; scale falloff distances and maximum travel together, never close-range damage |
+| Magazine capacity | Primary Increased percentages add; round base capacity down before temporary round deltas, conserve ammunition |
 | Fire rate | Named, watched, uncapped |
 | Target-conditional riders | The same additive bucket, never a multiplier |
 | DoT | The same additive bucket as direct damage |

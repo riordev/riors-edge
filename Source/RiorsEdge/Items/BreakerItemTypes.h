@@ -190,6 +190,9 @@ enum class EBreakerStatTarget : uint8
     SharedDamage,
     // Primary-only Increased weapon damage per earned consecutive-hit stack.
     WeaponDamageRamp,
+    // Append-only Primary weapon utility targets; no Secondary spillover.
+    WeaponMagazineCapacity,
+    WeaponEffectiveRange,
     Count UMETA(Hidden)
 };
 
@@ -515,6 +518,8 @@ struct RIORSEDGE_API FBreakerEquipmentStats
     // through the DamageMultiplier attribute's Flat lane, never from here.
     UPROPERTY(BlueprintReadOnly) float AddedDamagePercent = 0.0f;
     UPROPERTY(BlueprintReadOnly) float DamageRampPerStack = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float PrimaryMagazineCapacityMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float PrimaryEffectiveRangeMultiplier = 1.0f;
     // DISPLAY ONLY. Increased damage from conditional lines that are live RIGHT
     // NOW, in whole percent. Zero on a rig with no movement component, which is
     // why the aggregation tests still read clean numbers.

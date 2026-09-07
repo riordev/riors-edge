@@ -991,7 +991,10 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         {
             const FBreakerAffixDefinition* Definition = UBreakerAffixLibrary::FindAffix(Pool, Rolled.AffixId);
             if (!Definition) continue;
-            if (Definition->StatTarget == EBreakerStatTarget::WeaponDamageRamp && Item.Slot != EBreakerEquipSlot::Primary) continue;
+            const bool bPrimaryOnlyTarget = Definition->StatTarget == EBreakerStatTarget::WeaponDamageRamp
+                || Definition->StatTarget == EBreakerStatTarget::WeaponMagazineCapacity
+                || Definition->StatTarget == EBreakerStatTarget::WeaponEffectiveRange;
+            if (bPrimaryOnlyTarget && Item.Slot != EBreakerEquipSlot::Primary) continue;
 
             float Value = Rolled.Value;
             if (TierUplift > 0)
@@ -1156,6 +1159,8 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         0.0f, FBreakerEquipmentStats::ElementalResistanceCapPercent);
     Stats.CriticalChanceBonus = FlatByTarget[static_cast<int32>(EBreakerStatTarget::CriticalChance)] / 100.0f;
     Stats.DamageRampPerStack = FMath::Max(0.0f, IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::WeaponDamageRamp)]);
+    Stats.PrimaryMagazineCapacityMultiplier = Increased(EBreakerStatTarget::WeaponMagazineCapacity);
+    Stats.PrimaryEffectiveRangeMultiplier = Increased(EBreakerStatTarget::WeaponEffectiveRange);
     Stats.CriticalMultiplierBonus = FlatByTarget[static_cast<int32>(EBreakerStatTarget::CriticalDamage)] / 100.0f;
     Stats.SlideSpeedMultiplier = Increased(EBreakerStatTarget::SlideSpeed);
     // DEADFALL's bill. An ordinary NEGATIVE Increased percentage into the same
@@ -1321,6 +1326,13 @@ void UBreakerEquipmentComponent::RecalculateStats()
         CachedContribution.AddIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier, CachedStats.DamageRampPerStack * Stacks);
     }
     ApplyStatsToAttributes();
+    if (HasAttributeAuthority())
+    {
+        if (UBreakerWeaponComponent* Weapon = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerWeaponComponent>() : nullptr)
+        {
+            Weapon->SynchronizeMagazineCapacity();
+        }
+    }
 }
 
 void UBreakerEquipmentComponent::RefreshDamageRampContribution()

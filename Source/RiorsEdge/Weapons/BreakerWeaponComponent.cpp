@@ -1196,12 +1196,14 @@ void UBreakerWeaponComponent::EquipArchetype(EBreakerWeaponArchetype NewArchetyp
     const UBreakerWeaponDefinition* Definition = ResolveDefinition();
     MagazineAmmo = Definition ? Definition->MagazineSize : 0;
     ReserveAmmo = Definition ? Definition->StartingReserveAmmo : 0;
+    bAmmunitionInitialized = true;
     OnReloadChanged.Broadcast(false);
     OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
 }
 
 void UBreakerWeaponComponent::InitializeSlotAmmunition()
 {
+    bAmmunitionInitialized = true;
     if (SlotOneMagazineAmmo < 0)
     {
         const UBreakerWeaponDefinition* SlotOne = GetPrototypeDefinition(SlotOneArchetype);
@@ -1245,10 +1247,13 @@ void UBreakerWeaponComponent::EquipSlot(int32 SlotNumber)
     InitializeSlotAmmunition();
     StoreActiveSlotAmmunition();
     CurrentSlot = SlotNumber;
-    ResetDamageRamp();
     CurrentArchetype = CurrentSlot == 1 ? SlotOneArchetype : SlotTwoArchetype;
     MagazineAmmo = CurrentSlot == 1 ? SlotOneMagazineAmmo : SlotTwoMagazineAmmo;
     ReserveAmmo = CurrentSlot == 1 ? SlotOneReserveAmmo : SlotTwoReserveAmmo;
+    // Resetting ramp recalculates equipment. Publish the complete incoming
+    // ammo/archetype state before that callback may reconcile its capacity.
+    ResetDamageRamp();
+    SynchronizeMagazineCapacity();
     bReloading = false;
     // The incoming weapon starts its pattern from zero; any kick still in the
     // air keeps settling, because the aim it moved is still the player's aim.
@@ -1349,7 +1354,6 @@ void UBreakerWeaponComponent::SetSlotArchetype(int32 SlotNumber, EBreakerWeaponA
     }
     if (CurrentSlot == SlotNumber)
     {
-        ResetDamageRamp();
         StopFire();
         if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(ReloadTimer);
         bReloading = false;
@@ -1360,6 +1364,8 @@ void UBreakerWeaponComponent::SetSlotArchetype(int32 SlotNumber, EBreakerWeaponA
         bMagazineDumpBroadcastThisCycle = false;
         MagazineAmmo = Definition->MagazineSize;
         ReserveAmmo = Definition->StartingReserveAmmo;
+        bAmmunitionInitialized = true;
+        ResetDamageRamp();
         OnReloadChanged.Broadcast(false);
         OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
     }
@@ -1793,7 +1799,7 @@ bool UBreakerWeaponComponent::FireOnce()
             ? FBreakerWeaponMath::SecondaryShotSeed(GetTypeHash(GetOwner()), ShotSequence, BreakerMultishotSalt, PelletIndex - BasePelletCount)
             : ++ShotSequence;
         const FVector Direction = FBreakerWeaponMath::ApplyConeSpread(ViewRotation.Vector(), Spread, PelletSeed);
-        const FVector PelletEnd = ViewLocation + Direction * Definition->MaximumRange;
+        const FVector PelletEnd = ViewLocation + Direction * GetEffectiveMaximumRange();
         if (PelletIndex == 0) Shot.TraceEnd = PelletEnd;
 
         // Added BEFORE the resolution so that every code path below — miss,
@@ -2099,7 +2105,7 @@ FBreakerDamageResult UBreakerWeaponComponent::SubmitWeaponDamage(const UBreakerW
     // to 1.0 — every other term here is untouched.
     const float FalloffMultiplier = IsRangeTreatmentOverridden()
         ? 1.0f
-        : FBreakerWeaponMath::DamageMultiplierAtDistance(Definition, DistanceFromMuzzle);
+        : FBreakerWeaponMath::DamageMultiplierAtDistance(Definition, DistanceFromMuzzle / GetEffectiveRangeMultiplier());
     Damage.BaseDamage = BaseDamage * FalloffMultiplier;
     Damage.DamageFamily = EBreakerDamageFamily::Physical;
     Damage.WeakPointMultiplier = Definition->WeakPointMultiplier;
@@ -2211,9 +2217,10 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
     // the ricochet law is its own line and no status spreads through it.
     bool bRicochetLeg = false;
 
-    while (TravelledCm < Definition->MaximumRange - 1.0f)
+    const float MaximumRange = GetEffectiveMaximumRange();
+    while (TravelledCm < MaximumRange - 1.0f)
     {
-        const float RemainingRange = Definition->MaximumRange - TravelledCm;
+        const float RemainingRange = MaximumRange - TravelledCm;
         const FVector SegmentEnd = SegmentStart + SegmentDirection * RemainingRange;
         const bool bIsFirstLeg = EnemiesStruck == 0 && TravelledCm == 0.0f;
 
@@ -2578,7 +2585,7 @@ void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Def
     const FVector SpawnLocation = ViewLocation + Direction * 80.0f;
     if (ABreakerRocketProjectile* Rocket = GetWorld()->SpawnActor<ABreakerRocketProjectile>(ABreakerRocketProjectile::StaticClass(), SpawnLocation, Direction.Rotation(), Params))
     {
-        Rocket->InitializeRocket(Damage, Definition->ProjectileSpeed, Definition->ExplosionRadius);
+        Rocket->InitializeRocket(Damage, Definition->ProjectileSpeed, Definition->ExplosionRadius, GetEffectiveMaximumRange());
         Rocket->InitializeDamageRamp(this, RampToken);
     }
     else ResolveDamageRampShot(RampToken, false);
@@ -2646,6 +2653,7 @@ int32 UBreakerWeaponComponent::PushMagazineCapacityOverride(FName Key, int32 Del
         // pockets, magazine -> reserve, 1:1 — they are real rounds, not a
         // conversion, so no ratio applies and the pop owes nothing back.
         FMagazineCapacityOverrideEntry Entry;
+        Entry.Slot = CurrentSlot;
         Entry.DeltaRounds = FBreakerWeaponMath::ClampMagazineCapacityDelta(GetEffectiveMagazineSize(), DeltaRounds);
         if (Entry.DeltaRounds >= 0) return 0;
         MagazineCapacityOverrides.Add(Key, Entry);
@@ -2660,6 +2668,7 @@ int32 UBreakerWeaponComponent::PushMagazineCapacityOverride(FName Key, int32 Del
     }
 
     FMagazineCapacityOverrideEntry Entry;
+    Entry.Slot = CurrentSlot;
     Entry.ReservePerRound = FMath::Max(0, ReservePerRound);
     if (Entry.ReservePerRound > 0)
     {
@@ -2669,13 +2678,15 @@ int32 UBreakerWeaponComponent::PushMagazineCapacityOverride(FName Key, int32 Del
         if (Entry.DeltaRounds <= 0) return 0;
         ReserveAmmo -= Entry.DeltaRounds * Entry.ReservePerRound;
         MagazineAmmo += Entry.DeltaRounds;
-        OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
     }
     else
     {
         Entry.DeltaRounds = DeltaRounds;
     }
     MagazineCapacityOverrides.Add(Key, Entry);
+    // Ammo listeners may recalculate equipment and reconcile capacity.
+    // Publish the capacity before exposing the converted rounds to them.
+    if (Entry.ReservePerRound > 0) OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
     return Entry.DeltaRounds;
 }
 
@@ -2685,31 +2696,83 @@ void UBreakerWeaponComponent::PopMagazineCapacityOverride(FName Key)
     if (!Entry) return;
     const FMagazineCapacityOverrideEntry Removed = *Entry;
     MagazineCapacityOverrides.Remove(Key);
+    if (bAmmunitionInitialized) StoreActiveSlotAmmunition();
+    int32& SettledMagazine = Removed.Slot == CurrentSlot ? MagazineAmmo
+        : Removed.Slot == 1 ? SlotOneMagazineAmmo : SlotTwoMagazineAmmo;
+    int32& SettledReserve = Removed.Slot == CurrentSlot ? ReserveAmmo
+        : Removed.Slot == 1 ? SlotOneReserveAmmo : SlotTwoReserveAmmo;
+    const UBreakerWeaponDefinition* SettledDefinition = Removed.Slot == CurrentSlot ? ResolveDefinition()
+        : GetPrototypeDefinition(Removed.Slot == 1 ? SlotOneArchetype : SlotTwoArchetype);
 
     if (Removed.ReservePerRound > 0)
     {
         // Settle the unspent remainder back (G2): whatever converted rounds
         // are still sitting above the restored capacity return to reserve at
         // the ratio they were bought at. Fired rounds refund nothing.
-        const int32 Unspent = FMath::Clamp(MagazineAmmo - GetEffectiveMagazineSize(), 0, Removed.DeltaRounds);
+        const int32 Unspent = FMath::Clamp(SettledMagazine - GetMagazineCapacityForSlot(Removed.Slot, SettledDefinition), 0, Removed.DeltaRounds);
         if (Unspent > 0)
         {
-            MagazineAmmo -= Unspent;
-            ReserveAmmo += Unspent * Removed.ReservePerRound;
-            OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
+            SettledMagazine -= Unspent;
+            SettledReserve += Unspent * Removed.ReservePerRound;
+            if (Removed.Slot == CurrentSlot) OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
         }
     }
+    // Unpaid capacity still contains ordinary ammunition; return any excess
+    // after paid conversion rounds have settled at their own purchase ratio.
+    SynchronizeMagazineCapacity();
 }
 
 int32 UBreakerWeaponComponent::GetEffectiveMagazineSize() const
 {
-    const UBreakerWeaponDefinition* Definition = ResolveDefinition();
-    int32 Size = Definition ? Definition->MagazineSize : 0;
+    return GetMagazineCapacityForSlot(CurrentSlot, ResolveDefinition());
+}
+
+int32 UBreakerWeaponComponent::GetMagazineCapacityForSlot(int32 Slot, const UBreakerWeaponDefinition* Definition) const
+{
+    const UBreakerEquipmentComponent* Equipment = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>() : nullptr;
+    const float Multiplier = Slot == 1 && Equipment ? Equipment->GetStats().PrimaryMagazineCapacityMultiplier : 1.0f;
+    // Whole rounds round down; temporary Loaded rounds are added afterwards.
+    int32 Size = Definition ? FMath::FloorToInt(Definition->MagazineSize * Multiplier) : 0;
     for (const TPair<FName, FMagazineCapacityOverrideEntry>& Override : MagazineCapacityOverrides)
     {
-        Size += Override.Value.DeltaRounds;
+        if (Override.Value.Slot == Slot) Size += Override.Value.DeltaRounds;
     }
     return FMath::Max(1, Size);
+}
+
+void UBreakerWeaponComponent::SynchronizeMagazineCapacity()
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !bAmmunitionInitialized || bSynchronizingMagazineCapacity) return;
+    TGuardValue<bool> Guard(bSynchronizingMagazineCapacity, true);
+    const int32 PreviousMagazine = MagazineAmmo;
+    const int32 PreviousReserve = ReserveAmmo;
+    auto ClampMagazine = [](int32& Magazine, int32& Reserve, int32 Capacity)
+    {
+        if (Magazine < 0) return; // Uninitialized slots still receive only their normal starting ammunition.
+        const int32 Displaced = FMath::Max(0, Magazine - Capacity);
+        Magazine -= Displaced;
+        Reserve += Displaced;
+    };
+    ClampMagazine(MagazineAmmo, ReserveAmmo, GetEffectiveMagazineSize());
+    StoreActiveSlotAmmunition();
+    if (CurrentSlot != 1)
+        ClampMagazine(SlotOneMagazineAmmo, SlotOneReserveAmmo, GetMagazineCapacityForSlot(1, GetPrototypeDefinition(SlotOneArchetype)));
+    if (CurrentSlot != 2)
+        ClampMagazine(SlotTwoMagazineAmmo, SlotTwoReserveAmmo, GetMagazineCapacityForSlot(2, GetPrototypeDefinition(SlotTwoArchetype)));
+    if (PreviousMagazine != MagazineAmmo || PreviousReserve != ReserveAmmo)
+        OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
+}
+
+float UBreakerWeaponComponent::GetEffectiveRangeMultiplier() const
+{
+    const UBreakerEquipmentComponent* Equipment = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>() : nullptr;
+    return CurrentSlot == 1 && Equipment ? FMath::Max(1.0f, Equipment->GetStats().PrimaryEffectiveRangeMultiplier) : 1.0f;
+}
+
+float UBreakerWeaponComponent::GetEffectiveMaximumRange() const
+{
+    const UBreakerWeaponDefinition* Definition = ResolveDefinition();
+    return Definition ? Definition->MaximumRange * GetEffectiveRangeMultiplier() : 0.0f;
 }
 
 FVector UBreakerWeaponComponent::GetVisualMuzzleLocation() const

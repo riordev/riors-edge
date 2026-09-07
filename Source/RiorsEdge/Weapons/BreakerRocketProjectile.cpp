@@ -126,13 +126,20 @@ void ABreakerRocketProjectile::Tick(float DeltaSeconds)
     BreakerUI::SetGlowColor(ExhaustMaterial, BreakerUI::Orange, ExhaustIntensity * Flicker);
 }
 
-void ABreakerRocketProjectile::InitializeRocket(const FBreakerDamageRequest& InDamage, float Speed, float InExplosionRadius)
+void ABreakerRocketProjectile::InitializeRocket(const FBreakerDamageRequest& InDamage, float Speed, float InExplosionRadius, float MaximumTravelCm)
 {
     Damage = InDamage;
     ExplosionRadius = InExplosionRadius;
     Movement->InitialSpeed = Speed;
     Movement->MaxSpeed = Speed;
     Movement->Velocity = GetActorForwardVector() * Speed;
+    RangeLifetime = 0.0f;
+    if (FMath::IsFinite(MaximumTravelCm) && MaximumTravelCm > 0.0f && FMath::IsFinite(Speed) && Speed > 0.0f)
+    {
+        const float FlightSeconds = MaximumTravelCm / Speed;
+        if (FMath::IsFinite(FlightSeconds) && FlightSeconds > 0.0f) RangeLifetime = FlightSeconds;
+    }
+    if (HasActorBegunPlay()) SetLifeSpan(RangeLifetime > 0.0f ? RangeLifetime : MaximumLifetime);
 }
 
 void ABreakerRocketProjectile::InitializeDamageRamp(UBreakerWeaponComponent* Weapon, uint32 Token)
@@ -161,7 +168,7 @@ void ABreakerRocketProjectile::BeginPlay()
 
     if (GetInstigator()) Collision->IgnoreActorWhenMoving(GetInstigator(), true);
     Collision->OnComponentHit.AddDynamic(this, &ThisClass::HandleImpact);
-    SetLifeSpan(MaximumLifetime);
+    SetLifeSpan(RangeLifetime > 0.0f ? RangeLifetime : MaximumLifetime);
 }
 
 void ABreakerRocketProjectile::HandleImpact(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComponent, FVector NormalImpulse, const FHitResult& Hit)

@@ -593,10 +593,13 @@ public:
     // rounds you FIRED; the unspent conversion settles back).
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Weapon|Magazine")
     void PopMagazineCapacityOverride(FName Key);
-    // The active definition's MagazineSize plus every live override delta,
-    // floored at 1.
+    // Primary gear scales the base magazine (whole rounds rounded down), then
+    // every live override delta is added; the final capacity is at least one.
     UFUNCTION(BlueprintPure, Category="Weapon|Magazine")
     int32 GetEffectiveMagazineSize() const;
+    void SynchronizeMagazineCapacity();
+    float GetEffectiveRangeMultiplier() const;
+    float GetEffectiveMaximumRange() const;
 
     // ---- Gunsmith / Tank weapon-half node rules (2026-08-16) --------------
     // The weapon-side consumers of the Armory/Bastion tags the tree already
@@ -629,6 +632,9 @@ protected:
     UFUNCTION() void OnRep_Swapping();
 
 private:
+    int32 GetMagazineCapacityForSlot(int32 Slot, const UBreakerWeaponDefinition* Definition) const;
+    bool bSynchronizingMagazineCapacity = false;
+    bool bAmmunitionInitialized = false;
     // The weak-point instrument's ledger (see the public block's comment).
     // Plain map, no UPROPERTY: keys are FNames and values are POD counters,
     // nothing here for GC to see or a save to inherit.
@@ -699,6 +705,8 @@ private:
     // ability window owns its pop, exactly like the incoming-modifier chain.
     struct FMagazineCapacityOverrideEntry
     {
+        // Capacity and converted ammunition belong to the gun that paid.
+        int32 Slot = 1;
         // Capacity delta this entry contributes (== the rounds drawn, for a
         // conversion push).
         int32 DeltaRounds = 0;

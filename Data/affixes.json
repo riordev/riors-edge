@@ -1,6 +1,40 @@
 {
 	"affixes": [
 		{
+			"id": "Weapon.MagazineCapacity",
+			"pool": "slice",
+			"displayName": "Magazine Capacity",
+			"category": "Prefix",
+			"target": "WeaponMagazineCapacity",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Primary"
+			],
+			"valueAtT12": 8,
+			"valueAtT1": 35,
+			"rollWeight": 70,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Weapon.EffectiveRange",
+			"pool": "slice",
+			"displayName": "Effective Range",
+			"category": "Prefix",
+			"target": "WeaponEffectiveRange",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Primary"
+			],
+			"valueAtT12": 5,
+			"valueAtT1": 22,
+			"rollWeight": 70,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
 			"id": "Weapon.DamageRamp",
 			"pool": "slice",
 			"displayName": "Damage Ramp per Stack",

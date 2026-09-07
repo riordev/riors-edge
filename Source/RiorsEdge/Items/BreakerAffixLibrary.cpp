@@ -508,6 +508,8 @@ bool UBreakerAffixLibrary::IsOffensiveTarget(EBreakerStatTarget Target)
     {
     case EBreakerStatTarget::WeaponDamage:
     case EBreakerStatTarget::WeaponDamageRamp:
+    case EBreakerStatTarget::WeaponMagazineCapacity:
+    case EBreakerStatTarget::WeaponEffectiveRange:
     // O54's other two pools. Both are damage by any reading, and the breadth
     // test's per-slot "can this slot raise damage at all" question has to count
     // them or a slot carrying only ability lines would read as defensive.

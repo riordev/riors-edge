@@ -68,6 +68,15 @@ movement state a decision rather than a strictly better version of the line.
 **A stat stays out of the pool until something can consume it.** A line that
 cannot pay is dead content wearing a number, and the pool must lie to nobody.
 
+Primary weapons can roll magazine capacity and effective range prefixes.
+Their T12/T1 anchors are 8%/35% and 5%/22% respectively (O2 PLACEHOLDER);
+both follow the shared tier curve. Capacity scales the base magazine before
+temporary Loaded rounds, rounds down to whole rounds and draws added rounds
+from reserve through reload. Removing capacity returns excess rounds to that
+weapon's reserve. Range extends falloff thresholds and maximum hitscan travel;
+rockets receive the same maximum travel through their straight-flight lifetime.
+Neither line affects the Secondary.
+
 **The stash is account-wide and transfer is Anchor-gated.** Characters are
 builds, gear is an account asset, and a run cannot mutate account state.
 
