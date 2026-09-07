@@ -60,6 +60,16 @@
 		"loading.insignia": "BREAKERS",
 		"stash.moveToStash": "MOVE TO STASH",
 		"stash.takeToBackpack": "TAKE TO BACKPACK",
-		"stash.title": "STASH"
+		"stash.title": "STASH",
+		"equipment.authority": "Equipment changes are unavailable on this connection.",
+		"equipment.missingItem": "That item is no longer in your backpack.",
+		"equipment.missingLevel": "Your character level is unavailable. Equipment was not changed.",
+		"equipment.requiredLevel": "Requires level %d. You are level %d.",
+		"equipment.invalidSwap": "That swap choice is no longer available. Equipment was not changed.",
+		"equipment.failed": "That item could not be equipped. It remains in your backpack.",
+		"equipment.unavailable": "Equipment is unavailable.",
+		"equipment.equipped": "Equipped.",
+		"equipment.requirementCard": "REQUIRES LEVEL %d / YOU ARE %d",
+		"equipment.missingLevelCard": "CHARACTER LEVEL UNAVAILABLE"
 	}
 }

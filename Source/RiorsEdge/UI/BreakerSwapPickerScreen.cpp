@@ -1,4 +1,5 @@
 // THE EQUIP-LIMIT SWAP PICKER — SBreakerMenu::BuildSwapPickerModal, in its
+#include "Data/BreakerStrings.h"
 // own translation unit (ui.md: BreakerMenu.cpp is over 11,000 lines; a new
 // screen goes in its own TU).
 //
@@ -321,9 +322,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildSwapPickerModal()
             // cannot equip past the cap. Snaps on frame one (the sheet's
             // 100 ms leave is recorded in the layout header, not faked).
             SwapPickerFocusId = RowId;
+            InventoryStatus = FText::FromString(BreakerStrings::Get(EBreakerStringKey::EquipmentUnavailable));
             if (UBreakerEquipmentComponent* Live = Character.IsValid() ? Character->GetEquipment() : nullptr)
             {
-                Live->EquipFromBackpackDisplacing(SwapPickerItemId, SwapPickerFocusId);
+                FText FailureReason;
+                const bool bEquipped = Live->TryEquipFromBackpack(SwapPickerItemId, SwapPickerFocusId, FailureReason);
+                InventoryStatus = bEquipped ? FText::FromString(BreakerStrings::Get(EBreakerStringKey::EquipmentEquipped)) : FailureReason;
             }
             SwapPickerItemId.Invalidate();
             SwapPickerFocusId.Invalidate();

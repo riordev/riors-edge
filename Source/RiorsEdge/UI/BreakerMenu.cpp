@@ -1,4 +1,5 @@
 #include "UI/BreakerMenu.h"
+#include "Data/BreakerStrings.h"
 
 #include "Save/BreakerCharacterRoster.h"
 #include "Characters/BreakerCharacter.h"
@@ -11,6 +12,7 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Items/BreakerEquipmentComponent.h"
+#include "Items/BreakerItemRequirements.h"
 #include "Items/BreakerForgeLibrary.h"
 // The legendary registry: the only items in the game that carry a display
 // name, which is what a card's line one wants.
@@ -996,6 +998,20 @@ void SBreakerMenu::ShowScreenForCapture(EBreakerMenuScreen Screen)
         // The front door's second state: the reveal listens for a real key,
         // which a capture run cannot press.
         else if (Board == TEXT("REVEALED")) { bTitleRevealed = true; }
+        else if (Board == TEXT("EQUIPREQUIREMENT"))
+        {
+            // Seeded capture fixture for the reported level-11 item refusal.
+            // The real equip entry produces the status; capture grants no levels.
+            Screen = EBreakerMenuScreen::Inventory;
+            if (Character.IsValid() && Character->GetEquipment())
+            {
+                const FBreakerItemInstance Rolled = UBreakerLootLibrary::RollItem(
+                    TEXT("CaptureRequirement"), EBreakerEquipSlot::BodyArmour,
+                    EBreakerItemRarity::Exceptional, 11, /*RandomSeed=*/1887);
+                Character->GetEquipment()->AddToBackpack(Rolled);
+                Character->GetEquipment()->TryEquipFromBackpack(Rolled.ItemId, FGuid(), InventoryStatus);
+            }
+        }
         else if (Board == TEXT("FORGEBENCH"))
         {
             // Fabricates a bench subject the way -BreakerCaptureHUD fabricates
@@ -4834,16 +4850,25 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         // is being spent "the footer reads LIMIT FULL 3/3 beside the name of
         // the piece the swap ejects". The action is never blocked — it is
         // disclosed.
-        const bool bLimitTell = BreakerInventoryLayout::ShouldShowLimitTell(Preview);
+        const UBreakerProgressionComponent* ItemProgression = Character.IsValid() ? Character->GetProgression() : nullptr;
+        const int32 PlayerLevel = ItemProgression ? ItemProgression->GetProgressionState().CharacterLevel : 0;
+        const bool bLevelBlocked = !ItemProgression || !BreakerItemRequirements::CanEquipAtLevel(Item.ItemLevel, PlayerLevel);
+        const bool bLimitTell = !bLevelBlocked && BreakerInventoryLayout::ShouldShowLimitTell(Preview);
         FString FooterLead = BreakerInventoryLayout::MakeFooterLead(Preview);
         if (!bLimitTell && Preview.bSlotOccupied)
         {
             FooterLead += FString::Printf(TEXT(" %s i%d"),
                 *ItemDisplayName(Preview.SlotDisplaced), Preview.SlotDisplaced.ItemLevel);
         }
+        if (bLevelBlocked)
+        {
+            FooterLead = ItemProgression
+                ? BreakerStrings::Format(EBreakerStringKey::EquipmentRequirementCard, BreakerItemRequirements::RequiredLevelFor(Item.ItemLevel), PlayerLevel)
+                : BreakerStrings::Get(EBreakerStringKey::EquipmentMissingLevelCard);
+        }
         // Harm for a cap being spent, gold for "this costs you something",
         // cyan for a free action.
-        const FLinearColor FooterLeadColor = bLimitTell ? Harm : (Preview.bSlotOccupied ? Amber : Cyan);
+        const FLinearColor FooterLeadColor = (bLevelBlocked || bLimitTell) ? Harm : (Preview.bSlotOccupied ? Amber : Cyan);
         // The right half names the ejected piece. Gold, because the eject is
         // the cost, and the cap itself is what the harm-red half states.
         const FString FooterTrail = bLimitTell
@@ -4916,7 +4941,13 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                                     Rebuild(EBreakerMenuScreen::Inventory);
                                     return FReply::Handled();
                                 }
-                                if (Character.IsValid() && Character->GetEquipment()) Character->GetEquipment()->EquipFromBackpack(ItemId);
+                                InventoryStatus = FText::FromString(BreakerStrings::Get(EBreakerStringKey::EquipmentUnavailable));
+                                if (Character.IsValid() && Character->GetEquipment())
+                                {
+                                    FText FailureReason;
+                                    const bool bEquipped = Character->GetEquipment()->TryEquipFromBackpack(ItemId, FGuid(), FailureReason);
+                                    InventoryStatus = bEquipped ? FText::FromString(BreakerStrings::Get(EBreakerStringKey::EquipmentEquipped)) : FailureReason;
+                                }
                                 Rebuild(EBreakerMenuScreen::Inventory);
                                 return FReply::Handled();
                             }))
@@ -5229,7 +5260,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
     {
         BackpackColumn->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
         [
-            MenuText(InventoryStatus, BreakerUI::TypeCaption, Amber, true)
+            MenuWrappedText(InventoryStatus, BreakerUI::TypeCaption, Amber, BackpackGridWidth, true)
         ];
     }
     // The empty backpack is the one place the screen teaches the world: the

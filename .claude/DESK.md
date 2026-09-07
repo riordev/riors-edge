@@ -5,6 +5,14 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
+## Playtest queue (owner, 2026-09-07)
+- (ui, npcs, systems) Reduce menu density and clipping; repair NPC interaction flow, ability assignment and point spending; present Core as the authored tree rather than a node cloud; update the dev sandbox. Finish silent nodes and Caster progression.
+- (maps, story, endgame loop) Finish Fernhall → Rift → reward → return, expand Fernhall into meaningful combat areas, make Anchor a hub, and author one memorable mission. Validate the complete Rift loop before expanding multiplayer/MMO scope.
+- (abilities, build diversity) Improve ability builds versus weapons; investigate intermittent Rot damage, ticks and numbers and Caster Cleave range. Provide an easy ability/ultimate/base-stat tuning surface.
+- (movement, weapons) Reduce sprint bob/sway; disallow sprinting while shooting; remove dash except innate Swift; give scoped/unscoped fire a tradeoff. Add base health regeneration after four seconds out of combat (owner suggests 1–2; magnitude to tune).
+- (loot & economy) Fix gear behavior and show base weapon damage. Evaluate Standard 3–4, Uncommon 4–5, Exceptional 4–6 affixes with existing tier caps. Aberrants should have quirky unique rules; Unwrittens should have strong build-defining exotic perks; the no-More restriction does not apply to these two categories. A well-rolled and treated Exceptional should outperform them on some axes.
+- (visuals, sound, enemies) Improve arms and weapon models, integrate weakpoints, add subtle enemy names, and make one weapon/ability/enemy/boss visually polished. Add audible combat feedback. Replace colored ability borders with placeholder icons, radial cooldown recovery and numeric timers; hide irrelevant Riftglass. Smooth the death screen and mouse handoff.
+
 ## Direction (owner, 2026-09-06)
 Push hard on today's build; the owner is out and reads the report. Cycles run in parallel on disjoint files, one build, one suite, one commit per cycle. The affix system is updated as Cycle 13 lands. A story-mission schema is drafted now so the campaign can be fleshed out. The owner's frame to check every system against: characters pick a doctrine (sub-class) a couple of levels in and unlock doctrine points through the main story quest; a Core tree every class shares scales on its own; the doctrine tree is class-specific. A current inventory of abilities, ultimates, doctrines, affixes and their scaling is owed, with each marked live, stub or unreachable.
 
@@ -40,6 +48,7 @@ No playtest until the core loop has more oomph. The next blocks are the ones tha
 - [ ] Per-archetype weapon fire: `weapon_fire_<archetype>.wav` → `weapon_fire.wav` → synth.
 
 ## Later (infrastructure only when it unblocks a felt item this week)
+- Inventory captures still show item-title truncation and the item-level label under the discard button; the new equipment requirement footer and refusal line fit. Fix the card header with the menu clipping pass.
 - Two expected reds carry the campaign's absence: `KeystoneAtShippedBudget` and `NodePurchaseFlow` assert doctrine purchases at the full pool, and the shipped entitlement is two of eight until acts two, three and the finale carry their Unlock beats. Both pinned with that delete condition; never widened.
 - Arrival and rift-completion flags are set only when the beat is current (the kill-counter rule). If arrival should count unconditionally, drop the flag-set argument on the two seams.
 - The enemy chip re-arm inside a hold reads `GetSecondsSinceDamage() <= DeltaSeconds`; settled chips are not pruned (they hold the last fraction) and the map is bounded by live enemies in range.
@@ -82,6 +91,11 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 
 ## Done (last three cycles; older is git)
 
+### Equipment feedback and return to gameplay — 567 / 5 / 0
+- [x] Equipment requirements appear before a cap swap; inventory and swap confirmation report the component's actual refusal. `Items.Requirements.GateAtEntry` verifies level refusal, unchanged inventory, legal equipment, invalid swaps and stale items with owned progression components. Ten strings are table-backed.
+- [x] Menu resume retains the launch policy that delivers the first capture click to gameplay. Death/NPC mouse handoff still needs hands-on play; this is not a claim that every focus problem is fixed.
+- [x] `-BreakerCaptureMenu=INVENTORY -BreakerCaptureBoard=EQUIPREQUIREMENT` shows a seeded level-11 item and the real refusal at level 1; both 1920×1080 frames read. The empty default inventory required an added fixture and a second successful build/suite. All 572 declarations started and completed, reconciled through the machine-approved PowerShell port; Python remains quarantined, so generated STATE is unchanged.
+
 ### Round four — one build, one suite, 567 / 5 / 0
 - [x] Cycle 12c, the death screen and the rift retry (O82): the budget pure in `BreakerDeathBudgetMath.h`, the counter on the game instance across a retry, `RetryRift` = the rift entry travel and `ReturnToAnchor` = the hub travel, `EBreakerMenuScreen::Death` in its own TU opened at Black in a rift instance; campaign, Anchor and gym unchanged. Enter-confirms and the boss-only reset are recorded gaps at the site; every shipped door is Campaign so the tally and terminal variants are pure-test until O122.
 - [x] Volatile as a player weapon (O217) and Momentum on the gun: the blast reaches every live pawn in range; the cone tightens and the tracer brightens with the bar, tighten-only (O92). Blast kills are not credited to the player (the dealer is the corpse) — recorded at the site.
@@ -99,6 +113,3 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - [x] Cycle 16d, the tracker line reads the current beat: SPEAK TO, the destination, the objective counter, RETURN TO.
 - [x] Cycle 12b, nameplates pass 2: the boss bar 640×24 with phase marks and pips, the occlusion trace, the beyond-60 m rules, the active-modifier underline; banners on a priority queue to the sheet's three regions. The name string source stays open (O195).
 - [x] Cycle 11b, HUD pass 2: the interact plate, the reload fraction on the ammo rail, verb-coloured ability rails, wave cells with the encounter total, the four resource treatments, menu chrome to bone, kit tiles fit, the XP rail off the combat HUD (O210), the ACCESSIBILITY pane with six rows.
-
-### Cycle 16 — the mission seams, 544 / 5 / 0
-- [x] A mission plays end to end in code: the character sets the mission's arrival flag when it arrives at a Travel beat's destination, the game mode sets the Boss beat's flag when its rift completes, and doctrine points are paid from the journal by reached Unlock beats instead of character levels (`SettleDoctrineEntitlement`; `DoctrineBenchmarkLevels` is gone; the counter keeps its name and a paid character keeps its points). `Missions.Progress` walks act one's twenty beats. Two tests that raised a character to 50 for the full doctrine pool are expected red until the other three acts exist.

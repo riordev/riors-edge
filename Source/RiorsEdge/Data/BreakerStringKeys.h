@@ -81,7 +81,17 @@
     BREAKER_STRING(LoadingInsignia,              "loading.insignia",                "") \
     BREAKER_STRING(StashMoveToStash,             "stash.moveToStash",               "") \
     BREAKER_STRING(StashTakeToBackpack,          "stash.takeToBackpack",            "") \
-    BREAKER_STRING(StashTitle,                   "stash.title",                     "")
+    BREAKER_STRING(StashTitle,                   "stash.title",                     "") \
+    BREAKER_STRING(EquipmentAuthority, "equipment.authority", "") \
+    BREAKER_STRING(EquipmentMissingItem, "equipment.missingItem", "") \
+    BREAKER_STRING(EquipmentMissingLevel, "equipment.missingLevel", "") \
+    BREAKER_STRING(EquipmentRequiredLevel, "equipment.requiredLevel", "%d%d") \
+    BREAKER_STRING(EquipmentInvalidSwap, "equipment.invalidSwap", "") \
+    BREAKER_STRING(EquipmentFailed, "equipment.failed", "") \
+    BREAKER_STRING(EquipmentUnavailable, "equipment.unavailable", "") \
+    BREAKER_STRING(EquipmentEquipped, "equipment.equipped", "") \
+    BREAKER_STRING(EquipmentRequirementCard, "equipment.requirementCard", "%d%d") \
+    BREAKER_STRING(EquipmentMissingLevelCard, "equipment.missingLevelCard", "")
 
 // The enumerator is an index into the loaded table and nothing else: it is
 // never serialized, so the list may be reordered freely. The key string is

@@ -1,4 +1,5 @@
 #include "Items/BreakerEquipmentComponent.h"
+#include "Data/BreakerStrings.h"
 
 #include "Items/BreakerItemRequirements.h"
 #include "Save/BreakerAccountSave.h"
@@ -586,9 +587,24 @@ bool UBreakerEquipmentComponent::EquipFromBackpack(const FGuid& ItemId)
 
 bool UBreakerEquipmentComponent::EquipFromBackpackDisplacing(const FGuid& ItemId, const FGuid& DisplaceId)
 {
-    if (!HasAttributeAuthority()) return false;
+    FText FailureReason;
+    return TryEquipFromBackpack(ItemId, DisplaceId, FailureReason);
+}
+
+bool UBreakerEquipmentComponent::TryEquipFromBackpack(const FGuid& ItemId, const FGuid& DisplaceId, FText& OutFailureReason)
+{
+    OutFailureReason = FText::GetEmpty();
+    if (!HasAttributeAuthority())
+    {
+        OutFailureReason = FText::FromString(BreakerStrings::Get(EBreakerStringKey::EquipmentAuthority));
+        return false;
+    }
     const int32 Index = Backpack.IndexOfByPredicate([&ItemId](const FBreakerItemInstance& Existing) { return Existing.ItemId == ItemId; });
-    if (Index == INDEX_NONE) return false;
+    if (Index == INDEX_NONE)
+    {
+        OutFailureReason = FText::FromString(BreakerStrings::Get(EBreakerStringKey::EquipmentMissingItem));
+        return false;
+    }
     // The One-AA gate, at the player-facing entry and NOT inside EquipItem
     // (the mechanism stays ungated for the systems and rigs that compose
     // loadouts directly). A character the component cannot find a level for
@@ -599,12 +615,15 @@ bool UBreakerEquipmentComponent::EquipFromBackpackDisplacing(const FGuid& ItemId
         ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
     if (!Progression)
     {
+        OutFailureReason = FText::FromString(BreakerStrings::Get(EBreakerStringKey::EquipmentMissingLevel));
         UE_LOG(LogTemp, Warning, TEXT("EquipFromBackpack refused: no progression component to read a character level from (the gate refuses rather than passes on missing data)."));
         return false;
     }
     const int32 CharacterLevel = Progression->GetProgressionState().CharacterLevel;
     if (!BreakerItemRequirements::CanEquipAtLevel(Backpack[Index].ItemLevel, CharacterLevel))
     {
+        OutFailureReason = FText::FromString(BreakerStrings::Format(EBreakerStringKey::EquipmentRequiredLevel,
+            BreakerItemRequirements::RequiredLevelFor(Backpack[Index].ItemLevel), CharacterLevel));
         UE_LOG(LogTemp, Display, TEXT("EquipFromBackpack refused: item level %d requires character level %d, character is %d (One-AA)."),
             Backpack[Index].ItemLevel, BreakerItemRequirements::RequiredLevelFor(Backpack[Index].ItemLevel), CharacterLevel);
         return false;
@@ -614,6 +633,7 @@ bool UBreakerEquipmentComponent::EquipFromBackpackDisplacing(const FGuid& ItemId
     // they were — an item lifted out and then refused would be lost.
     if (DisplaceId.IsValid() && !IsValidSwapChoice(Backpack[Index], DisplaceId))
     {
+        OutFailureReason = FText::FromString(BreakerStrings::Get(EBreakerStringKey::EquipmentInvalidSwap));
         UE_LOG(LogTemp, Display, TEXT("EquipFromBackpackDisplacing refused: %s is not a swap candidate (O205). The item stays in the backpack."),
             *DisplaceId.ToString());
         return false;
@@ -623,6 +643,7 @@ bool UBreakerEquipmentComponent::EquipFromBackpackDisplacing(const FGuid& ItemId
     if (!EquipItemDisplacing(Item, DisplaceId))
     {
         Backpack.Insert(Item, Index);
+        OutFailureReason = FText::FromString(BreakerStrings::Get(EBreakerStringKey::EquipmentFailed));
         return false;
     }
     return true;

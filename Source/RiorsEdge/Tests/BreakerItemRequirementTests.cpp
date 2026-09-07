@@ -61,6 +61,8 @@ bool FBreakerEquipGateAtEntryTest::RunTest(const FString& Parameters)
     AActor* Owner = NewObject<AActor>();
     UBreakerEquipmentComponent* Equipment = NewObject<UBreakerEquipmentComponent>(Owner);
     UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>(Owner);
+    Owner->AddInstanceComponent(Equipment);
+    Owner->AddInstanceComponent(Progression);
     TestTrue(TEXT("Swift locks"), Progression->ChoosePermanentClassById(EBreakerClassId::Swift));
 
     FBreakerItemInstance Item;
@@ -72,7 +74,27 @@ bool FBreakerEquipGateAtEntryTest::RunTest(const FString& Parameters)
     // The player-facing path refuses an under-levelled character and the
     // item stays in the backpack — a refusal that eats the item would be the
     // spend-refusal bug wearing armour.
-    TestFalse(TEXT("the entry point refuses below the required level"), Equipment->EquipFromBackpack(Item.ItemId));
+    FText FailureReason;
+    TestFalse(TEXT("the entry point refuses below the required level"), Equipment->TryEquipFromBackpack(Item.ItemId, FGuid(), FailureReason));
+    TestEqual(TEXT("the refusal explains the level gate"), FailureReason.ToString(), FString(TEXT("Requires level 30. You are level 1.")));
+    TestEqual(TEXT("refusal does not equip anything"), Equipment->GetEquipped().Num(), 0);
+    if (!TestEqual(TEXT("refusal preserves backpack count"), Equipment->GetBackpack().Num(), 1)) return false;
+    TestEqual(TEXT("refusal preserves the same backpack item"), Equipment->GetBackpack()[0].ItemId, Item.ItemId);
+
+    FBreakerItemInstance LegalItem = Item;
+    LegalItem.ItemId = FGuid::NewGuid();
+    LegalItem.ItemLevel = Progression->GetProgressionState().CharacterLevel;
+    Equipment->AddToBackpack(LegalItem);
+    const FGuid InvalidSwapId = FGuid::NewGuid();
+    TestFalse(TEXT("invalid swap refuses before moving items"), Equipment->TryEquipFromBackpack(LegalItem.ItemId, InvalidSwapId, FailureReason));
+    TestEqual(TEXT("invalid swap explains refusal"), FailureReason.ToString(), FString(TEXT("That swap choice is no longer available. Equipment was not changed.")));
+    TestEqual(TEXT("invalid swap preserves backpack"), Equipment->GetBackpack().Num(), 2);
+    TestEqual(TEXT("invalid swap preserves equipment"), Equipment->GetEquipped().Num(), 0);
+    TestTrue(TEXT("a shipped-level item equips through the player entry"), Equipment->TryEquipFromBackpack(LegalItem.ItemId, FGuid(), FailureReason));
+    TestTrue(TEXT("success clears the old refusal"), FailureReason.IsEmpty());
+    FBreakerItemInstance Worn;
+    TestTrue(TEXT("legal item reaches its equipment slot"), Equipment->GetEquippedItem(LegalItem.Slot, Worn));
+    TestEqual(TEXT("the selected item is equipped"), Worn.ItemId, LegalItem.ItemId);
     TestEqual(TEXT("the refused item stays in the backpack"), Equipment->GetBackpack().Num(), 1);
 
     // The MECHANISM stays ungated: the same item equips directly, which is
@@ -87,7 +109,10 @@ bool FBreakerEquipGateAtEntryTest::RunTest(const FString& Parameters)
     BareItem.Slot = EBreakerEquipSlot::Boots;
     BareItem.ItemLevel = 1;
     BareEquipment->AddToBackpack(BareItem);
-    TestFalse(TEXT("no readable level refuses rather than passes"), BareEquipment->EquipFromBackpack(BareItem.ItemId));
+    TestFalse(TEXT("no readable level refuses rather than passes"), BareEquipment->TryEquipFromBackpack(BareItem.ItemId, FGuid(), FailureReason));
+    TestEqual(TEXT("missing progression has a distinct explanation"), FailureReason.ToString(), FString(TEXT("Your character level is unavailable. Equipment was not changed.")));
+    TestFalse(TEXT("a stale item refuses"), Equipment->TryEquipFromBackpack(FGuid::NewGuid(), FGuid(), FailureReason));
+    TestEqual(TEXT("a stale item has an explanation"), FailureReason.ToString(), FString(TEXT("That item is no longer in your backpack.")));
     return true;
 }
 

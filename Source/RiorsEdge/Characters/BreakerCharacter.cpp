@@ -2332,7 +2332,11 @@ void ABreakerCharacter::ResumeFromMenu()
     PC->bShowMouseCursor = false;
     PC->bEnableClickEvents = false;
     PC->bEnableMouseOverEvents = false;
-    PC->SetInputMode(FInputModeGameOnly());
+    // Match the launch capture policy: the first click after a menu must
+    // reach gameplay instead of being swallowed just to recapture the mouse.
+    FInputModeGameOnly InputMode;
+    InputMode.SetConsumeCaptureMouseDown(false);
+    PC->SetInputMode(InputMode);
 }
 
 void ABreakerCharacter::ReturnToTitleMenu()

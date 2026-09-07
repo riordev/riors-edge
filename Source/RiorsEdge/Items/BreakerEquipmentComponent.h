@@ -172,6 +172,8 @@ public:
     // then EquipItemDisplacing. A refused choice leaves the item in the
     // backpack.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment") bool EquipFromBackpackDisplacing(const FGuid& ItemId, const FGuid& DisplaceId);
+    // Player-facing result, shared by the card and explicit swap confirmation.
+    bool TryEquipFromBackpack(const FGuid& ItemId, const FGuid& DisplaceId, FText& OutFailureReason);
 
     // Per-affix comparison of Candidate against Reference. Matching is by
     // (stat target, bucket), not by affix id: two affixes that raise the same
