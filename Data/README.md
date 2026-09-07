@@ -21,7 +21,7 @@ Use only the keys already present on the row. Some abilities have no `numbers` e
 
 Cleave: `RangeCm` is now 450 (4.5 metres). `ArcDegrees` controls width, `WeaponDamageCoefficient` controls the hit, and `Bleed*` values control its damage over time.
 
-Rot: `ZoneDamagePerTick` is direct zone damage; `PoisonDamagePerTick` is the applied poison's damage per tick. `TickIntervalSeconds` controls zone damage/status-application ticks, while `PoisonTickInterval` controls poison damage. These are separate clocks. Rot now applies poison on entry and deals 2.5 base damage every 0.5 seconds per stack (5 per second). Its zone reapplies once per second; ordinary status stacking and refresh rules still apply. Halving a tick interval requires halving per-tick damage to preserve base DPS. Earlier application, stack ramps, and proc effects can still change total combat output.
+Rot: `ZoneDamagePerTick` (5) and `TickIntervalSeconds` (0.5) control direct Entropy hits. Accepted hits build toward Rot; the zone no longer applies Poison. The three old Poison tuning keys are removed.
 
 After an edit, check a fresh cast on the same enemy with the same gear. Change one value at a time. Invalid data is reported in the game log; fallback values should not be used to judge a tuning experiment.
 
@@ -135,3 +135,8 @@ not the old eight-tier draft's values. Ten stacks is the maximum. Each damaging
 shot earns one stack for later shots; purchased Redline Trigger earns two at
 Redline. A miss, swap, removal or death clears the streak. Projectile weapons
 earn stacks on impact, and pellets or multiple blast victims count once.
+
+### Entropy tuning
+`elements.json` controls the first elemental status. All five numbers are O2 placeholders: threshold is 10% of target maximum health; buildup is the raw Entropy share times proc eligibility and one minus resistance. Four seconds without a qualifying hit clears incomplete buildup. At threshold, Rot snapshots half the triggering raw Entropy share over four seconds, ticking every 0.5 seconds. Active Rot cannot stack, refresh or be directly applied by carried payloads. Its ticks cannot build another Rot. Armour and shared incoming modifiers affect its ticks once; resistance never reduces damage.
+
+`Weapon.EntropyConversion` in `affixes.json` is an ordinary Primary prefix. It converts 20–60% across the ordinary tier ladder, capped at 100% including special tiers. Only the remaining physical share receives physical gear reduction. Hitscan and projectiles snapshot conversion when fired. Legacy `Status.Void` armour/healing reduction is removed; Siphon retains its channel damage and healing, and Fracture currently cycles Bleed/Poison pending element-aware delivery.

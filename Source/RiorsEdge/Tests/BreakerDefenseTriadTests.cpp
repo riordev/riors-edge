@@ -230,9 +230,7 @@ bool FBreakerTriadAggregationTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Baseline and gear compose into the effective chance"),
         Status->GetEffectiveAilmentAvoidanceChance(), 0.3f, 0.001f);
 
-    // The Elemental read site consumes the resistance: an Elemental hit is
-    // reduced by the gear percentage, and a TrueDamage hit answers to
-    // neither leg.
+    // O224: elemental resistance slows buildup and never reduces damage.
     AActor* Defender = NewObject<AActor>();
     UBreakerCombatComponent* Combat = NewObject<UBreakerCombatComponent>(Defender);
     UBreakerEquipmentComponent* DefenderGear = NewObject<UBreakerEquipmentComponent>(Defender);
@@ -241,11 +239,14 @@ bool FBreakerTriadAggregationTest::RunTest(const FString& Parameters)
     DefenderGear->EquipItem(BreakerTriadMakeItem(EBreakerEquipSlot::BodyArmour, {{TEXT("Core.ElementalResist"), 18.0f}}));
 
     FBreakerDamageRequest Elemental;
-    Elemental.BaseDamage = 100.0f;
+    auto* EntropyStatus = NewObject<UBreakerStatusComponent>(Defender);
+    Elemental.BaseDamage = 10.0f;
+    Elemental.Element = EBreakerElement::Entropy; Elemental.ElementalFraction = 1;
     Elemental.DamageFamily = EBreakerDamageFamily::Elemental;
     Elemental.bCanCritical = false;
     const FBreakerDamageResult ElementalResult = Combat->ReceiveDamage(Elemental);
-    TestEqual(TEXT("Elemental resistance reduces an Elemental hit"), ElementalResult.MitigatedDamage, 82.0f, 0.001f);
+    TestEqual(TEXT("Elemental resistance leaves immediate damage unchanged"), ElementalResult.MitigatedDamage, 10.0f, 0.001f);
+    TestEqual(TEXT("Actual equipped resistance reduces buildup by eighteen percent"), EntropyStatus->GetEntropyBuildup(), 8.2f, 0.001f);
 
     FBreakerDamageRequest True;
     True.BaseDamage = 100.0f;

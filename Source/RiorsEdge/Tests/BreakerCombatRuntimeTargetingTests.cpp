@@ -146,29 +146,30 @@ bool FBreakerZoneLifetimeAndBoundsTest::RunTest(const FString& Parameters)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerRotEntryPoisonTest,
-    "RiorsEdge.Abilities.RotEntryPoison", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerZoneEntryAndEntropyTest,
+    "RiorsEdge.Abilities.ZoneEntryAndEntropy", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-bool FBreakerRotEntryPoisonTest::RunTest(const FString& Parameters)
+bool FBreakerZoneEntryAndEntropyTest::RunTest(const FString& Parameters)
 {
     UWorld* World = BreakerTargetingWorld();
     if (!TestNotNull(TEXT("Rot world"), World)) return false;
     ON_SCOPE_EXIT { World->DestroyWorld(false); };
     const UBreakerAbility_Rot* Rot = GetDefault<UBreakerAbility_Rot>();
-    TestEqual(TEXT("Poison retains five base damage per second per stack"), Rot->PoisonDamagePerTick / Rot->PoisonTickInterval, 5.0f);
-    TestEqual(TEXT("Poison now ticks every half second"), Rot->PoisonTickInterval, 0.5f);
+    TestEqual(TEXT("Rot has actual five damage Entropy hits"), Rot->ZoneDamagePerTick, 5.0f);
+    TestEqual(TEXT("Rot hits every half second"), Rot->TickIntervalSeconds, 0.5f);
     FBreakerDamageSubject Target = BreakerMakeDamageSubject(World, FVector(100, 0, 0));
     ABreakerZoneActor* Zone = World->SpawnActor<ABreakerZoneActor>();
     FBreakerZoneSpec Spec;
     TestFalse(TEXT("Other zones retain delayed application unless opted in"), Spec.bApplyStatusOnEntry);
+    // Generic physical poison entry behavior remains independent of the Rot ability.
     Spec.bAppliesStatus = true;
     Spec.bApplyStatusOnEntry = true;
     Spec.Duration = Rot->DurationSeconds;
     Spec.TickInterval = Rot->TickIntervalSeconds;
     Spec.StatusSpec.StatusTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Poison"));
-    Spec.StatusSpec.BaseDamagePerTick = Rot->PoisonDamagePerTick;
-    Spec.StatusSpec.Duration = Rot->PoisonDuration;
-    Spec.StatusSpec.TickInterval = Rot->PoisonTickInterval;
+    Spec.StatusSpec.BaseDamagePerTick = 2.5f;
+    Spec.StatusSpec.Duration = 4.0f;
+    Spec.StatusSpec.TickInterval = 0.5f;
     Zone->ConfigureZone(Spec, nullptr);
     if (!TestTrue(TEXT("Placement immediately applies poison to an occupant"), Target.Status->HasStatus(Spec.StatusSpec.StatusTag))) return false;
     TestEqual(TEXT("Application does not deal an instant extra hit"), Target.Attributes->GetHealth(), 100.0f);
@@ -184,6 +185,23 @@ bool FBreakerRotEntryPoisonTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Leaving releases zone occupancy"), Zone->GetOccupantCount(), 0);
     Target.Status->AdvanceStatuses(0.5f);
     TestTrue(TEXT("Brief contact leaves the ordinary poison tail"), Target.Attributes->GetHealth() < AfterFirstTick);
+    FBreakerDamageSubject EntropyTarget = BreakerMakeDamageSubject(World, FVector(100, 0, 0));
+    ABreakerZoneActor* EntropyZone = World->SpawnActor<ABreakerZoneActor>();
+    FBreakerZoneSpec EntropySpec;
+    EntropySpec.Duration = Rot->DurationSeconds; EntropySpec.TickInterval = Rot->TickIntervalSeconds;
+    EntropySpec.TickDamage.BaseDamage = Rot->ZoneDamagePerTick;
+    EntropySpec.TickDamage.bCanCritical = false;
+    EntropySpec.TickDamage.Element = EBreakerElement::Entropy; EntropySpec.TickDamage.ElementalFraction = 1;
+    EntropySpec.TickDamage.DamageFamily = EBreakerDamageFamily::Elemental;
+    EntropyZone->ConfigureZone(EntropySpec, nullptr);
+    EntropyZone->AdvanceZone(.5f);
+    TestEqual(TEXT("Actual Entropy zone hit builds before threshold"), EntropyTarget.Status->GetEntropyBuildup(), 5.0f);
+    EntropyZone->AdvanceZone(.5f);
+    TestTrue(TEXT("Second actual zone hit earns Rot"), EntropyTarget.Status->HasStatus(FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"))));
+    TestFalse(TEXT("Entropy zone does not apply old Poison payload"), EntropyTarget.Status->HasStatus(FGameplayTag::RequestGameplayTag(TEXT("Status.Poison"))));
+    const float BeforeRot = EntropyTarget.Attributes->GetHealth();
+    EntropyTarget.Status->AdvanceStatuses(4);
+    TestEqual(TEXT("Earned Rot pays half of triggering five damage hit"), BeforeRot - EntropyTarget.Attributes->GetHealth(), 2.5f, .01f);
     return true;
 }
 #endif

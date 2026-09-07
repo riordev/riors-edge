@@ -67,22 +67,8 @@ enum class EBreakerStatTarget : uint8
     MoveSpeed,
     DropChance,
     PhysicalDamageReduction,
-    // AUTHORED, CONSUMED, NOT YET DROPPABLE (owner ruling 2026-08-16, the
-    // defense triad). This target now HAS an aggregated field
-    // (FBreakerEquipmentStats::ElementalResistancePercent) and a live consumer
-    // (UBreakerCombatComponent::ReceiveDamage folds it into the incoming
-    // multiplier for EBreakerDamageFamily::Elemental, the exact mirror of the
-    // PhysicalDamageReduction read site) — so a line that rolls it genuinely
-    // reduces Elemental damage. What does not exist yet is any enemy that
-    // DEALS Elemental damage: every enemy damage site in Combat/ authors
-    // Physical or TrueDamage, and the per-element model (Rift/Entropy/Void)
-    // is post-slice per O5/O38. The affix definition therefore stays OUT of
-    // the droppable pools (UBreakerAffixLibrary::GetElementalResistanceAffix
-    // holds it, resolvable but never rolled) so no player spends a suffix on
-    // a stat the slice cannot test them with — the "lies to nobody" rule,
-    // one step up: the LINE is honest, so the POOL has to be. The day
-    // elemental incoming lands, pool entry is one row in
-    // Data/affixes.json.
+    // Serialized legacy target name is retained. Elemental resistance now
+    // reduces buildup rather than direct hit damage (owner Entropy ruling).
     ElementalDamageReduction,
     CriticalChance,
     CriticalDamage,
@@ -195,6 +181,7 @@ enum class EBreakerStatTarget : uint8
     WeaponEffectiveRange,
     WeaponSustainedAccuracy,
     WeaponPierce,
+    WeaponEntropyConversion,
     Count UMETA(Hidden)
 };
 
@@ -524,6 +511,7 @@ struct RIORSEDGE_API FBreakerEquipmentStats
     UPROPERTY(BlueprintReadOnly) float PrimaryEffectiveRangeMultiplier = 1.0f;
     UPROPERTY(BlueprintReadOnly) float PrimarySustainedAccuracyMultiplier = 1.0f;
     UPROPERTY(BlueprintReadOnly) int32 PrimaryPierceCount = 0;
+    UPROPERTY(BlueprintReadOnly) float PrimaryEntropyConversionPercent = 0.0f;
     // DISPLAY ONLY. Increased damage from conditional lines that are live RIGHT
     // NOW, in whole percent. Zero on a rig with no movement component, which is
     // why the aggregation tests still read clean numbers.

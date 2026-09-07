@@ -72,7 +72,17 @@ bool FBreakerSequenceRuntimeTest::RunTest(const FString& Parameters)
     };
     auto Apply = [&](UBreakerStatusComponent* Status, int32 Type, float Proc = 1.0f)
     {
-        FBreakerStatusApplicationSpec Spec = Type == 2 ? BreakerStatusRules::MakeVoidSpec() : FBreakerStatusApplicationSpec();
+        if (Type == 2)
+        {
+            FBreakerDamageRequest Hit;
+            Hit.BaseDamage = Status->GetEntropyThreshold() / (Proc > 0.0f ? Proc : 1.0f);
+            Hit.Element = EBreakerElement::Entropy; Hit.ElementalFraction = 1.0f;
+            Hit.Delivery = EBreakerDamageDelivery::Ability; Hit.ProcCoefficient = Proc;
+            Hit.bCanCritical = false; Hit.SetInstigator(Player);
+            Status->GetOwner()->FindComponentByClass<UBreakerCombatComponent>()->ReceiveDamage(Hit);
+            return;
+        }
+        FBreakerStatusApplicationSpec Spec;
         if (Type != 2)
         {
             Spec.StatusTag = FGameplayTag::RequestGameplayTag(Type == 0 ? TEXT("Status.Bleed") : TEXT("Status.Poison"));
@@ -119,10 +129,12 @@ bool FBreakerSequenceRuntimeTest::RunTest(const FString& Parameters)
     SettleOrdinaryIncome();
     TestEqual(TEXT("second target ordinary applications retain their own metered income"), Mana->GetMana(), 32.0f);
     Advance(202);
+    First->AdvanceStatuses(4.0f); // Real Rot expires before another threshold application.
+    SettleOrdinaryIncome(); // Drain real tick income before measuring the new rotation.
     Player->GetAttributes()->ApplyClassResource(0);
     Triple(First);
     SettleOrdinaryIncome();
-    TestEqual(TEXT("accepted refresh rotation pays again after real per-target cooldown"), Mana->GetMana(), 10.0f);
+    TestEqual(TEXT("physical refresh plus newly earned Rot pays after cooldown"), Mana->GetMana(), 12.0f);
     if (!Buy(TEXT("Caster.Multispell.Sequence"))) return false;
     ResetIncome();
     UBreakerStatusComponent* RankTwo = Target();
@@ -148,7 +160,7 @@ bool FBreakerSequenceRuntimeTest::RunTest(const FString& Parameters)
     if (!TestNotNull(TEXT("secondary effect target"), Echo)) return false;
     Triple(Echo, 0);
     SettleOrdinaryIncome();
-    TestEqual(TEXT("accepted proc-zero statuses cannot grant ordinary or Sequence income"), Mana->GetMana(), 0.0f);
+    TestEqual(TEXT("proc-zero applications cannot earn Rot or grant Sequence income"), Mana->GetMana(), 0.0f);
     ResetIncome();
     UBreakerStatusComponent* ReducedProc = Target();
     if (!TestNotNull(TEXT("partial-proc rotation target"), ReducedProc)) return false;

@@ -140,6 +140,14 @@ be paid again. Reactions cannot trigger other reactions or apply statuses.
 There is no triple reaction. Build Entropy end to end, then Void, then Rift,
 then reactions.
 
+Entropy buildup uses the applying hit's pre-mitigation elemental damage share,
+weighted by proc coefficient and buildup resistance. The threshold is 10% of
+maximum chassis health; incomplete buildup clears after four seconds without
+a qualifying hit. Rot spends half the triggering share across eight half-second
+ticks. These magnitudes are O2 tuning in elements.json. The snapshot includes
+source scaling and critical damage once; ticks apply target mitigation once.
+An active Rot cannot stack or refresh, and its ticks generate no buildup.
+
 Severance — the degradation that turns a refugee into a hostile — is Entropy
 happening slowly to a person, which is why the element set and the enemy
 families are the same idea at two scales. The elements do not need explaining

@@ -88,11 +88,7 @@ void UBreakerStatusCycleComponent::SeedDefaultCycle()
         Entry.DisplayName = FText::FromString(BreakerStrings::Get(Names[SeedIndex]));
         AvailableStatuses.Add(Entry);
     }
-    FBreakerCycleEntry Void;
-    Void.Spec = BreakerStatusRules::MakeVoidSpec();
-    Void.DamageFamily = EBreakerDamageFamily::Elemental;
-    Void.DisplayName = FText::FromString(BreakerStrings::Get(EBreakerStringKey::CycleVoid));
-    if (Void.Spec.StatusTag.IsValid()) AvailableStatuses.Add(Void);
+    // O225: only the two physical statuses remain until an element-aware Fracture entry is implemented.
 }
 
 FBreakerCycleEntry UBreakerStatusCycleComponent::PeekNextEntry(int32 Lookahead) const

@@ -131,35 +131,16 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     Spec.ZoneColor = FLinearColor(0.34f, 0.78f, 0.20f);
 
     Spec.TickDamage.BaseDamage = ZoneDamagePerTick * LevelScalar;
-    Spec.TickDamage.DamageFamily = EBreakerDamageFamily::Physical;
+    Spec.TickDamage.DamageFamily = EBreakerDamageFamily::Elemental;
+    Spec.TickDamage.Element = EBreakerElement::Entropy;
+    Spec.TickDamage.ElementalFraction = 1.0f;
     Spec.TickDamage.SourceTags.AddTag(BreakerAbilityTags::Ability_Class_Caster_Rot.GetTag());
     Spec.TickDamage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
     Spec.TickDamage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
     UBreakerDamageLibrary::FillSourcePools(SourceAttributes, EBreakerDamageDelivery::Ability, Spec.TickDamage);
     Spec.TickDamage.SetInstigator(Character);
 
-    // Poison is the payload Class-Kits names. It is a snapshotting DoT like
-    // every other, so it captures the caster's offensive stats HERE, at
-    // application, and one critical roll decides every tick of an application —
-    // the locked DoT ruling, not a per-zone choice. The snapshot includes the
-    // outgoing chain's budgeted window product (DoT snapshot completeness):
-    // Poison from a Rot cast inside a damage window keeps that strength for
-    // its whole life, and a window opened later changes nothing.
-    Spec.bAppliesStatus = true;
-    Spec.bApplyStatusOnEntry = true;
-    Spec.StatusFamily = EBreakerDamageFamily::Physical;
-    Spec.StatusSpec.StatusTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Poison"), false);
-    // O35: the authored per-tick number is the item-level-1 value.
-    Spec.StatusSpec.BaseDamagePerTick = PoisonDamagePerTick * LevelScalar;
-    Spec.StatusSpec.Duration = PoisonDuration;
-    Spec.StatusSpec.TickInterval = PoisonTickInterval;
-    Spec.StatusSpec.Snapshot.SourcePower = UBreakerCombatComponent::ComposeDotSourcePower(SourceAttributes, OwnerCombat,
-        EBreakerDamageDelivery::Ability);
-    Spec.StatusSpec.Snapshot.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
-    Spec.StatusSpec.Snapshot.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
-    Spec.StatusSpec.Snapshot.DamageOverTimeMultiplier = SourceAttributes ? SourceAttributes->GetDamageOverTimeMultiplier() : 1.0f;
-    FRandomStream Stream(static_cast<int32>(HashCombine(GetTypeHash(Character), static_cast<uint32>(World->GetTimeSeconds() * 1000.0))));
-    Spec.StatusSpec.Snapshot.bRolledCritical = Stream.FRand() < Spec.StatusSpec.Snapshot.CriticalChance;
+    // Rot now builds Entropy on accepted zone hits; physical Poison remains a separate status.
 
     FActorSpawnParameters SpawnParams;
     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;

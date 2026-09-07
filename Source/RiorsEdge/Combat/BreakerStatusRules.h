@@ -26,7 +26,6 @@ struct RIORSEDGE_API FBreakerStatusRule
 
 namespace BreakerStatusRules
 {
-    RIORSEDGE_API FBreakerStatusApplicationSpec MakeVoidSpec();
     RIORSEDGE_API FString DataRelativePath();
 
     // Every row, in file order. Empty when the file failed to load.

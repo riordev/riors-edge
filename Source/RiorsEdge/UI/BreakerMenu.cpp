@@ -4432,7 +4432,8 @@ namespace
         // though they enter their attribute before Increased composition.
         const bool bPercentStyleFlat = Definition &&
             (Definition->StatTarget == EBreakerStatTarget::CriticalChance || Definition->StatTarget == EBreakerStatTarget::CriticalDamage
-                || Definition->StatTarget == EBreakerStatTarget::AddedDamage || Definition->StatTarget == EBreakerStatTarget::AbilityDamage);
+                || Definition->StatTarget == EBreakerStatTarget::AddedDamage || Definition->StatTarget == EBreakerStatTarget::AbilityDamage
+                || Definition->StatTarget == EBreakerStatTarget::WeaponEntropyConversion);
         return FString::Printf(TEXT("+%.1f%s %s"), Affix.Value,
             bPercent || bPercentStyleFlat ? TEXT("%") : TEXT(""), *Name);
     }
@@ -9281,7 +9282,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
             || Definition->StatTarget == EBreakerStatTarget::CriticalChance
             || Definition->StatTarget == EBreakerStatTarget::CriticalDamage
             || Definition->StatTarget == EBreakerStatTarget::AddedDamage
-            || Definition->StatTarget == EBreakerStatTarget::AbilityDamage);
+            || Definition->StatTarget == EBreakerStatTarget::AbilityDamage
+            || Definition->StatTarget == EBreakerStatTarget::WeaponEntropyConversion);
         const FString Digits = FMath::Abs(Value) < 10.0f
             ? FString::Printf(TEXT("%.1f"), Value)
             : FString::Printf(TEXT("%.0f"), Value);

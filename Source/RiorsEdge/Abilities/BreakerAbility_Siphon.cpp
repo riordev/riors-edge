@@ -173,10 +173,7 @@ void UBreakerAbility_Siphon::TickChannel()
     // repeated LIVE hit — the same reason it carries no bIsDamageOverTime.
     Damage.BaseDamage = DamagePerTick * AbilityDamageScalarFor(Character);
     // O5: Elemental is the pipeline family until the resistance model lands;
-    // Void rides on the type tag, so Siphon gains resistance interaction later
-    // with no rewrite.
-    Damage.DamageFamily = EBreakerDamageFamily::Elemental;
-    Damage.DamageTypeTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Void"), false);
+    // O225: Siphon retains its damage and leech, without the retired Void debuff.
     Damage.SourceTags.AddTag(BreakerAbilityTags::Ability_Class_Caster_Siphon.GetTag());
     Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
     Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
@@ -195,19 +192,6 @@ void UBreakerAbility_Siphon::TickChannel()
     if (CasterCombat) CasterCombat->ApplyOutgoingModifiers(Damage);
 
     const FBreakerDamageResult Result = TargetCombat->ReceiveDamage(Damage);
-    if (!Result.bDodged && Result.HealthDamage + Result.ShieldDamage > 0.0f
-        && IsValid(Target) && !Target->IsActorBeingDestroyed() && !TargetCombat->IsDead())
-    {
-        if (UBreakerStatusComponent* Status = Target->FindComponentByClass<UBreakerStatusComponent>())
-        {
-            FBreakerStatusApplicationSpec Void = BreakerStatusRules::MakeVoidSpec();
-            Void.ProcCoefficient = Damage.ProcCoefficient;
-            Void.Snapshot.SourceTags = Damage.SourceTags;
-            Void.Snapshot.SourcePower = UBreakerCombatComponent::ComposeDotSourcePower(SourceAttributes, CasterCombat, EBreakerDamageDelivery::Ability);
-            Status->ApplyStatus(Void, EBreakerDamageFamily::Elemental, Character);
-        }
-    }
-
     // Heal on DAMAGE LANDED, not on damage requested: a dodged, blocked or
     // shield-absorbed tick must not pay the caster full value. This is the
     // whole reason the heal is a portion of the RESULT.

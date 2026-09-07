@@ -145,17 +145,6 @@ FString BreakerStatusRules::DataRelativePath()
     return TEXT("Data/statuses.json");
 }
 
-FBreakerStatusApplicationSpec BreakerStatusRules::MakeVoidSpec()
-{
-    FBreakerStatusApplicationSpec Spec;
-    const FGameplayTag Tag = FGameplayTag::RequestGameplayTag(TEXT("Status.Void"), false);
-    const FBreakerStatusRule* Rule = FindRule(Tag);
-    if (!Rule || !Rule->IsNonDamagingDebuff()) return Spec;
-    Spec.StatusTag = Tag; Spec.Duration = Rule->DurationSeconds;
-    Spec.TickInterval = 1.0f; Spec.BaseDamagePerTick = 0.0f; Spec.InitialStacks = 1;
-    return Spec;
-}
-
 const TArray<FBreakerStatusRule>& BreakerStatusRules::GetRules()
 {
     return BreakerStatusRuleLoaded().Rules;

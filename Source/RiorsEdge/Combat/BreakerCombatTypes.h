@@ -6,6 +6,9 @@
 #include "BreakerCombatTypes.generated.h"
 
 UENUM(BlueprintType)
+enum class EBreakerElement : uint8 { None, Entropy };
+
+UENUM(BlueprintType)
 enum class EBreakerDamageFamily : uint8
 {
     Physical,
@@ -111,6 +114,10 @@ struct RIORSEDGE_API FBreakerDamageRequest
     UPROPERTY(BlueprintReadWrite) TWeakObjectPtr<AActor> Instigator = nullptr;
     // Environmental falls cannot be dodged/blocked; all existing hits opt in.
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bCanBeAvoided = true;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerElement Element = EBreakerElement::None;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float ElementalFraction = 0.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bCanApplyElementBuildup = true;
 
     void SetInstigator(AActor* InInstigator) { Instigator = InInstigator; }
 };
@@ -276,6 +283,7 @@ struct RIORSEDGE_API FBreakerHitContext
     UPROPERTY(BlueprintReadOnly) float ProcCoefficient = 1.0f;
     UPROPERTY(BlueprintReadOnly) bool bWeakPoint = false;
     UPROPERTY(BlueprintReadOnly) EBreakerDamageFamily DamageFamily = EBreakerDamageFamily::Physical;
+    UPROPERTY(BlueprintReadOnly) EBreakerElement Element = EBreakerElement::None;
     UPROPERTY(BlueprintReadOnly) FVector WorldLocation = FVector::ZeroVector;
     // Carried from the request so presentation can put weapon hits on the
     // round's ARRIVAL clock (the HUD's ruling) while ability hits confirm

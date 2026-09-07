@@ -62,6 +62,11 @@ public:
     // Instigator is remembered weakly so every tick this application produces
     // credits the applier through the attacker-side hit events.
     void ApplyStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator);
+    void ApplyEntropyHit(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result);
+    float GetEntropyBuildup() const { return EntropyBuildup; }
+    float GetEntropyThreshold() const;
+    float GetEntropyResistancePercent() const;
+    UPROPERTY(EditAnywhere, Category="Status|Entropy") float EntropyResistancePercent = 0.0f;
     float GetArmorMultiplier() const;
     float GetHealingReceivedMultiplier() const;
 
@@ -191,5 +196,7 @@ private:
     // all sharing one verdict. Counted per application ATTEMPT (valid specs
     // only), whether or not it lands, so equipping avoidance mid-fight does
     // not shift the seeds of everything after it.
+    float EntropyBuildup = 0.0f;
+    float EntropyBuildupRemaining = 0.0f;
     uint32 ApplicationsAttempted = 0;
 };

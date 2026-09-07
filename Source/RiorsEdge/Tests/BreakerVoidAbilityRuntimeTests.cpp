@@ -63,25 +63,22 @@ bool FBreakerVoidAbilityRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("dodged channel tick deals no damage"), Health->GetHealth(), 10000.0f);
     TestFalse(TEXT("dodged channel tick cannot apply Void"), Status->HasStatus(VoidTag));
     Combat->DodgeChance = 0;
+    Caster->GetAttributes()->ApplyHealth(20);
     Advance(12);
     TestTrue(TEXT("later real Siphon tick lands damage"), Health->GetHealth() < 10000);
-    TestTrue(TEXT("successful Siphon tick applies real Void"), Status->HasStatus(VoidTag));
+    TestTrue(TEXT("Siphon still heals from actual landed damage"), Caster->GetAttributes()->GetHealth() > 20);
+    TestFalse(TEXT("successful Siphon no longer applies retired Void"), Status->HasStatus(VoidTag));
     ASC->CancelAbilityHandle(Siphon);
     Status->ConsumeAllStatuses();
     const auto Fracture = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Fracture::StaticClass(), 1));
     UBreakerStatusCycleComponent* Cycle = UBreakerStatusCycleComponent::FindOrAdd(Caster);
     if (!TestNotNull(TEXT("actual default cycle"), Cycle)) return false;
-    TestEqual(TEXT("three distinct default positions"), Cycle->GetCycleLength(), 3);
+    TestEqual(TEXT("two physical default positions until elemental delivery is implemented"), Cycle->GetCycleLength(), 2);
     TSet<FGameplayTag> Delivered;
-    for (int32 I = 0; I < 3; ++I)
+    for (int32 I = 0; I < 2; ++I)
     {
         const auto Entry = Cycle->PeekNextEntry();
         TestFalse(TEXT("each default position is distinct"), Delivered.Contains(Entry.Spec.StatusTag));
-        if (Entry.Spec.StatusTag == VoidTag)
-        {
-            TestEqual(TEXT("Void carries no synthetic DoT"), Entry.Spec.BaseDamagePerTick, 0.0f);
-            TestEqual(TEXT("Void HUD label is authored"), Entry.DisplayName.ToString(), FString(TEXT("VOID")));
-        }
         TSet<ABreakerProjectileBase*> Existing;
         for (TActorIterator<ABreakerProjectileBase> It(World); It; ++It) Existing.Add(*It);
         Caster->GetAttributes()->ApplyClassResource(100);
@@ -94,8 +91,8 @@ bool FBreakerVoidAbilityRuntimeTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Fracture applies the consumed actual status"), Status->HasStatus(Entry.Spec.StatusTag));
         Delivered.Add(Entry.Spec.StatusTag);
     }
-    TestEqual(TEXT("all three real status types coexist"), Status->GetDistinctStatusTypeCount(), 3);
-    TestTrue(TEXT("Siphon and Fracture share Void identity"), Delivered.Contains(VoidTag));
+    TestEqual(TEXT("both physical status types coexist"), Status->GetDistinctStatusTypeCount(), 2);
+    TestFalse(TEXT("Fracture never emits retired Void"), Delivered.Contains(VoidTag));
     return true;
 }
 #endif

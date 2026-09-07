@@ -93,9 +93,9 @@ bool FBreakerAbilityScalingAnchorTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Fracture's impact damage is unmoved at the anchor"),
         GetDefault<UBreakerAbility_Fracture>()->ImpactDamage * Anchor,
         GetDefault<UBreakerAbility_Fracture>()->ImpactDamage);
-    TestEqual(TEXT("Rot's poison tick is unmoved at the anchor"),
-        GetDefault<UBreakerAbility_Rot>()->PoisonDamagePerTick * Anchor,
-        GetDefault<UBreakerAbility_Rot>()->PoisonDamagePerTick);
+    TestEqual(TEXT("Rot's Entropy hit is unmoved at the anchor"),
+        GetDefault<UBreakerAbility_Rot>()->ZoneDamagePerTick * Anchor,
+        GetDefault<UBreakerAbility_Rot>()->ZoneDamagePerTick);
     TestEqual(TEXT("Siphon's tick is unmoved at the anchor"),
         GetDefault<UBreakerAbility_Siphon>()->DamagePerTick * Anchor,
         GetDefault<UBreakerAbility_Siphon>()->DamagePerTick);

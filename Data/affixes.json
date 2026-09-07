@@ -35,6 +35,23 @@
 			"pairedAffixId": ""
 		},
 		{
+			"id": "Weapon.EntropyConversion",
+			"pool": "slice",
+			"displayName": "Entropy Conversion",
+			"category": "Prefix",
+			"target": "WeaponEntropyConversion",
+			"bucket": "Flat",
+			"slots": [
+				"Primary"
+			],
+			"valueAtT12": 20,
+			"valueAtT1": 60,
+			"rollWeight": 70,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
 			"id": "Weapon.MagazineCapacity",
 			"pool": "slice",
 			"displayName": "Magazine Capacity",

@@ -726,7 +726,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Rot->AbilityId = TEXT("Caster.Rot");
     Rot->ClassId = EBreakerClassId::Caster;
     Rot->DisplayName = FText::FromString(TEXT("Rot"));
-    Rot->Description = FText::FromString(TEXT("A 4 m zone that poisons and strips armour from everything standing in it."));
+    Rot->Description = FText::FromString(TEXT("A 4 m zone that deals Entropy damage, builds Rot and strips armour."));
     Rot->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
     Rot->Verb = EBreakerAbilityVerb::Weapon;
     Rot->AbilityTag = BreakerAbilityTags::Ability_Class_Caster_Rot;

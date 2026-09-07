@@ -9,7 +9,7 @@ class UBreakerAttributeSet;
 
 // C3 Rot (Class-Kits §2.2, Ability-Implementation-Spec §5.3): 25 Mana, no
 // cooldown. "4 m radius zone at the aim point, 6s duration. Enemies inside take
-// Poison and have their Armour reduced by a flat 40. Zones are the Void
+// Entropy damage and have their Armour reduced by a flat 40. Zones are the Void
 // Whisperer's whole grammar."
 //
 // The ability is deliberately thin: everything durable about it lives in
@@ -50,20 +50,12 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float DurationSeconds = 6.0f;
     // O2 PLACEHOLDER: the doc gives radius and duration and nothing else. The
     // cadence is a shape, not balance.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0.05")) float TickIntervalSeconds = 1.0f;
-    // O2 PLACEHOLDER: Rot's own per-tick damage. Class-Kits describes Rot as a
-    // Poison-and-armour zone rather than a damage zone, so this defaults to
-    // zero and the damage arrives through the Poison it applies. Raise it in
-    // the editor to make the puddle bite directly.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float ZoneDamagePerTick = 0.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0.05")) float TickIntervalSeconds = 0.5f;
+    // O2 PLACEHOLDER: direct Entropy hits build the earned Rot status.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float ZoneDamagePerTick = 5.0f;
     // Class-Kits §2.2 C3: a FLAT 40. Flat and never percentage is the ruling —
     // it is what protects the boss armour cap (Master 7.10.5).
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float FlatArmorReduction = 40.0f;
-    // O2 PLACEHOLDER: the Poison payload. No doc supplies these. Per-tick
-    // damage is the item-level-1 number and rides the weapon scalar (O35).
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float PoisonDamagePerTick = 2.5f;   // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float PoisonDuration = 4.0f;   // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0.05")) float PoisonTickInterval = 0.5f;
     // How far out the puddle can be placed. O2 PLACEHOLDER.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float MaximumRangeCm = 2500.0f;
     // Vertical reach of the volume; see FBreakerZoneSpec::HalfHeightCm.

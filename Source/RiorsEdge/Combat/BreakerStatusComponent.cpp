@@ -46,6 +46,8 @@ float UBreakerStatusComponent::GetEffectiveAilmentAvoidanceChance() const
 
 void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator)
 {
+    // Entropy is earned through accepted-hit buildup, never a carried status payload.
+    if (Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"))) return;
     ApplyStatusInternal(Spec, DamageFamily, Instigator, false);
 }
 
@@ -78,6 +80,8 @@ void UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicatio
     // Caller may have passed an entry in a live status array; callbacks can
     // consume or reallocate it. Accepted application owns its payload.
     FBreakerStatusApplicationSpec Spec = InputSpec;
+    if (Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Void"), false)) return;
+    if (Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot")) && HasStatus(Spec.StatusTag)) return;
     const FBreakerStatusRule* Rule = BreakerStatusRules::FindRule(Spec.StatusTag);
     const bool bEffectOnly = Rule && Rule->IsNonDamagingDebuff();
     if (bEffectOnly) { Spec.BaseDamagePerTick = 0; Spec.InitialStacks = 1; }
@@ -238,6 +242,8 @@ void UBreakerStatusComponent::SpreadNewestStatus(const FBreakerStatusApplication
 void UBreakerStatusComponent::HandleAfflictedOwnerDeath()
 {
     if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+    EntropyBuildup = 0;
+    EntropyBuildupRemaining = 0;
     TSet<AActor*> Credited;
     // Copy before refunds can notify resource listeners and change state.
     const TArray<FBreakerActiveStatus> AtDeath = ActiveStatuses;
@@ -250,6 +256,8 @@ void UBreakerStatusComponent::HandleAfflictedOwnerDeath()
         Credited.Add(Applier);
         if (UBreakerManaComponent* Mana = Applier->FindComponentByClass<UBreakerManaComponent>()) Mana->NotifyAfflictedVictimDeath();
     }
+    bool bConsumedRot = false;
+    ConsumeStatus(FGameplayTag::RequestGameplayTag(TEXT("Status.Rot")), bConsumedRot);
     for (const FBreakerActiveStatus& Status : AtDeath)
         if (const auto* Rule = BreakerStatusRules::FindRule(Status.Spec.StatusTag))
             if (!Rule->bDealsPeriodicDamage)
@@ -269,7 +277,9 @@ void UBreakerStatusComponent::AdvanceStatuses(float DeltaTime)
 {
     // The immunity clock runs whether or not any status is live — it is a
     // window on the OWNER, not on the list.
-    if (DeltaTime <= 0.0f) return;
+    if (!FMath::IsFinite(DeltaTime) || DeltaTime <= 0.0f) return;
+    EntropyBuildupRemaining = FMath::Max(0.0f, EntropyBuildupRemaining - DeltaTime);
+    if (EntropyBuildupRemaining <= 0) EntropyBuildup = 0;
     if (StatusImmunityRemaining > 0.0f) StatusImmunityRemaining = FMath::Max(0.0f, StatusImmunityRemaining - DeltaTime);
     if (!GetOwner() || !GetOwner()->HasAuthority() || ActiveStatuses.IsEmpty()) return;
     // Lazy re-bind: BeginPlay's bind misses a combat component added after it
@@ -310,6 +320,11 @@ void UBreakerStatusComponent::AdvanceStatuses(float DeltaTime)
             TickSpec.InitialStacks = Status.Stacks;
             FBreakerDamageRequest Tick = UBreakerDamageLibrary::MakeSnapshotDotTick(TickSpec, Status.DamageFamily, Status.TicksDelivered, Status.Instigator.Get(),
                 Status.SourceLocationSnapshot, Status.bHasSourceLocationSnapshot);
+            if (Tag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot")))
+            {
+                Tick.Element = EBreakerElement::Entropy; Tick.ElementalFraction = 1.0f;
+                Tick.bCanApplyElementBuildup = false;
+            }
             Tick.bBypassShield = Status.DamageFamily == EBreakerDamageFamily::Physical;
             TGuardValue<FGameplayTag> DeliveringTick(DeliveringTickTag, Tag);
             Combat->ReceiveDamage(Tick);

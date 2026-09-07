@@ -8,8 +8,9 @@ float UBreakerAffixLibrary::ValueForTier(const FBreakerAffixDefinition& Affix, i
 {
     if (Affix.StatTarget == EBreakerStatTarget::WeaponPierce) return Tier < TopTier || Tier > 4 ? 0.0f : Tier == TopTier ? 2.0f : 1.0f;
     const int32 ClampedTier = FMath::Clamp(Tier, TopTier, WorstTier);
-    if (ClampedTier == 0) return Affix.ValueAtT1 * TierSpikeT0Multiplier;
-    if (ClampedTier == TopTier) return Affix.ValueAtT1 * TierSpikeTopMultiplier;
+    const auto BoundConversion = [&](float Value) { return Affix.StatTarget == EBreakerStatTarget::WeaponEntropyConversion ? FMath::Clamp(Value, 0.0f, 100.0f) : Value; };
+    if (ClampedTier == 0) return BoundConversion(Affix.ValueAtT1 * TierSpikeT0Multiplier);
+    if (ClampedTier == TopTier) return BoundConversion(Affix.ValueAtT1 * TierSpikeTopMultiplier);
 
     // Position along the ladder: 0 at the worst tier, 1 at the best normal one.
     const float Span = static_cast<float>(WorstTier - BestNormalTier);
@@ -25,9 +26,9 @@ float UBreakerAffixLibrary::ValueForTier(const FBreakerAffixDefinition& Affix, i
     // that does is not a silent zero.
     if (Affix.ValueAtT12 <= UE_KINDA_SMALL_NUMBER || Affix.ValueAtT1 <= Affix.ValueAtT12)
     {
-        return FMath::Lerp(Affix.ValueAtT12, Affix.ValueAtT1, Shaped);
+        return BoundConversion(FMath::Lerp(Affix.ValueAtT12, Affix.ValueAtT1, Shaped));
     }
-    return Affix.ValueAtT12 * FMath::Pow(Affix.ValueAtT1 / Affix.ValueAtT12, Shaped);
+    return BoundConversion(Affix.ValueAtT12 * FMath::Pow(Affix.ValueAtT1 / Affix.ValueAtT12, Shaped));
 }
 
 int32 UBreakerAffixLibrary::WorstEligibleTier(const FBreakerAffixDefinition& Affix)
@@ -532,6 +533,7 @@ bool UBreakerAffixLibrary::IsOffensiveTarget(EBreakerStatTarget Target)
     case EBreakerStatTarget::WeaponEffectiveRange:
     case EBreakerStatTarget::WeaponSustainedAccuracy:
     case EBreakerStatTarget::WeaponPierce:
+    case EBreakerStatTarget::WeaponEntropyConversion:
     // O54's other two pools. Both are damage by any reading, and the breadth
     // test's per-slot "can this slot raise damage at all" question has to count
     // them or a slot carrying only ability lines would read as defensive.

@@ -69,6 +69,7 @@ public:
     // its attributes through a live actor in a live world cannot be tested at
     // all, and the vitals paths are exactly the ones that must be.
     void BindAttributes(UBreakerAttributeSet* InAttributes);
+    float GetMaxHealth() const;
 
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat") FBreakerDamageResult ReceiveDamage(const FBreakerDamageRequest& Request);
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat") bool SpendClassResource(float Cost);

@@ -995,7 +995,8 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
                 || Definition->StatTarget == EBreakerStatTarget::WeaponMagazineCapacity
                 || Definition->StatTarget == EBreakerStatTarget::WeaponEffectiveRange
                 || Definition->StatTarget == EBreakerStatTarget::WeaponSustainedAccuracy
-                || Definition->StatTarget == EBreakerStatTarget::WeaponPierce;
+                || Definition->StatTarget == EBreakerStatTarget::WeaponPierce
+                || Definition->StatTarget == EBreakerStatTarget::WeaponEntropyConversion;
             if (bPrimaryOnlyTarget && Item.Slot != EBreakerEquipSlot::Primary) continue;
             if (Definition->StatTarget == EBreakerStatTarget::WeaponSustainedAccuracy
                 && !UBreakerAffixLibrary::IsEligibleForItem(*Definition, Item, Rolled.Tier)) continue;
@@ -1155,7 +1156,7 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
     // The other two legs of the defense triad, capped at their own named
     // ceilings the same way. Both are read from GetStats() at exactly one
     // consumer each (the status component's application roll; the combat
-    // component's Elemental-family branch) rather than submitted as
+    // component's elemental buildup resistance) rather than submitted as
     // attributes — the Physical DR pattern, kept deliberately, so the caps
     // here are the only clamp anyone has to audit. Clamped at zero from
     // below too: no authored downside exists for either yet, but a negative
@@ -1172,6 +1173,7 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
     Stats.PrimaryEffectiveRangeMultiplier = Increased(EBreakerStatTarget::WeaponEffectiveRange);
     Stats.PrimarySustainedAccuracyMultiplier = Increased(EBreakerStatTarget::WeaponSustainedAccuracy);
     Stats.PrimaryPierceCount = FMath::Max(0, FMath::FloorToInt(FlatByTarget[static_cast<int32>(EBreakerStatTarget::WeaponPierce)]));
+    Stats.PrimaryEntropyConversionPercent = FMath::Clamp(FlatByTarget[static_cast<int32>(EBreakerStatTarget::WeaponEntropyConversion)], 0.0f, 100.0f);
     Stats.CriticalMultiplierBonus = FlatByTarget[static_cast<int32>(EBreakerStatTarget::CriticalDamage)] / 100.0f;
     Stats.SlideSpeedMultiplier = Increased(EBreakerStatTarget::SlideSpeed);
     // DEADFALL's bill. An ordinary NEGATIVE Increased percentage into the same

@@ -147,9 +147,20 @@ bool FBreakerRotNodesRuntimeTest::RunTest(const FString& Parameters)
     if (!TestNotNull(TEXT("purchased cast zone"), Mobile)) return false;
     TestEqual(TEXT("Wellspring follows actual caster"), Mobile->GetFollowActor(), static_cast<AActor*>(Player));
     TestEqual(TEXT("Zonework authored flat bonus reaches real zone"), Mobile->GetSpec().AfflictedArmorReduction, 20.0f);
-    Mobile->AdvanceZone(0);
+    // Earn the prerequisite through the actual elemental hit seam. Rot no
+    // longer gives a free Poison status merely for entering its volume.
+    auto* EnemyStatus = Enemy->FindComponentByClass<UBreakerStatusComponent>();
     UBreakerCombatComponent* EnemyCombat = Enemy->FindComponentByClass<UBreakerCombatComponent>();
-    TestEqual(TEXT("already poisoned target receives extra flat armour strip"), EnemyCombat->GetComposedArmorReduction(), 60.0f);
+    Mobile->AdvanceZone(0); // Refresh following-zone membership before reading its base strip.
+    TestEqual(TEXT("unafflicted target receives only base strip"), EnemyCombat->GetComposedArmorReduction(), 40.0f);
+    FBreakerDamageRequest EntropyHit;
+    EntropyHit.BaseDamage = EnemyStatus->GetEntropyThreshold();
+    EntropyHit.Element = EBreakerElement::Entropy; EntropyHit.ElementalFraction = 1;
+    EntropyHit.bCanCritical = false; EntropyHit.SetInstigator(Player);
+    EnemyCombat->ReceiveDamage(EntropyHit);
+    TestTrue(TEXT("real accepted hit earns prerequisite Rot"), EnemyStatus->HasStatus(FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"))));
+    Mobile->AdvanceZone(0);
+    TestEqual(TEXT("target with earned Rot receives extra flat armour strip"), EnemyCombat->GetComposedArmorReduction(), 60.0f);
     Plain.Duration = 10;
     ABreakerZoneActor* Weak = Zone(Plain);
     TestEqual(TEXT("weak overlapping zone cannot overwrite stronger strip"), EnemyCombat->GetComposedArmorReduction(), 60.0f);

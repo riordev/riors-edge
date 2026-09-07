@@ -26,8 +26,8 @@ bool FBreakerStatusRulesShippedTest::RunTest(const FString& Parameters)
         return false;
     }
 
-    // Production applications include Siphon's and Fracture's real Void debuff.
-    const TCHAR* const AppliedTags[] = { TEXT("Status.Bleed"), TEXT("Status.Poison"), TEXT("Status.Void") };
+    // Physical status applications remain; obsolete Void is rejected.
+    const TCHAR* const AppliedTags[] = { TEXT("Status.Bleed"), TEXT("Status.Poison") };
     for (const TCHAR* Name : AppliedTags)
     {
         const FGameplayTag Tag = FGameplayTag::RequestGameplayTag(Name, false);
@@ -54,7 +54,7 @@ bool FBreakerStatusRulesShippedTest::RunTest(const FString& Parameters)
     TestNull(TEXT("A damage tag has no status row"),
         BreakerStatusRules::FindRule(FGameplayTag::RequestGameplayTag(TEXT("Damage.Melee"), false)));
     const FBreakerStatusRule* Void = BreakerStatusRules::FindRule(FGameplayTag::RequestGameplayTag(TEXT("Status.Void")));
-    TestTrue(TEXT("Void is an effect-only status that does not spread on pierce"), Void && !Void->bDealsPeriodicDamage && !Void->bSpreadsOnPierce);
+    TestNull(TEXT("Retired Void has no rule or hidden defense effect"), Void);
     return true;
 }
 

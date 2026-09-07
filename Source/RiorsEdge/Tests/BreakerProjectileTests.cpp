@@ -123,9 +123,9 @@ bool FBreakerStatusCycleTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("FindOrAdd returns the same component twice"),
         UBreakerStatusCycleComponent::FindOrAdd(Owner) == Cycle);
 
-    // Zero-setup: Cleave, Rot and Siphon provide three actual status types.
+    // Zero-setup keeps only physical statuses until element-aware cycle delivery.
     const int32 Length = Cycle->GetCycleLength();
-    TestEqual(TEXT("The cycle ships all three authored status types"), Length, 3);
+    TestEqual(TEXT("The cycle ships two physical types until elemental cycle delivery exists"), Length, 2);
 
     // Deterministic, because the HUD previews the next position and a preview
     // that can lie is worse than no preview.
@@ -141,22 +141,22 @@ bool FBreakerStatusCycleTest::RunTest(const FString& Parameters)
     for (int32 Index = 0; Index < Length; ++Index) Cycle->AdvanceCycle();
     TestTrue(TEXT("The cycle wraps back around"), Cycle->PeekNext(0) == Second);
 
-    // Remove the now-shipped Void entry to exercise genuine growth again.
-    Cycle->RemoveStatusType(FGameplayTag::RequestGameplayTag(TEXT("Status.Void"), false));
+    // Remove Poison to exercise genuine growth again.
+    Cycle->RemoveStatusType(FGameplayTag::RequestGameplayTag(TEXT("Status.Poison"), false));
     const int32 BeforeGrowth = Cycle->GetCycleLength();
-    FBreakerCycleEntry Void;
-    Void.Spec.StatusTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Void"), false);
-    Void.Spec.Duration = 4.0f;
-    Void.Spec.TickInterval = 1.0f;
-    Void.DamageFamily = EBreakerDamageFamily::Elemental;
-    Cycle->AddStatusType(Void);
+    FBreakerCycleEntry Poison;
+    Poison.Spec.StatusTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Poison"), false);
+    Poison.Spec.Duration = 4.0f;
+    Poison.Spec.TickInterval = 1.0f;
+    Poison.DamageFamily = EBreakerDamageFamily::Physical;
+    Cycle->AddStatusType(Poison);
     const int32 Grown = Cycle->GetCycleLength();
-    Cycle->AddStatusType(Void);
+    Cycle->AddStatusType(Poison);
     TestEqual(TEXT("Adding the same status twice does not lengthen the cycle"), Cycle->GetCycleLength(), Grown);
     TestEqual(TEXT("Adding a new status lengthens it once"), Grown, BeforeGrowth + 1);
 
     // Removal keeps the cursor legal; a cursor past the end reads out of bounds.
-    Cycle->RemoveStatusType(Void.Spec.StatusTag);
+    Cycle->RemoveStatusType(Poison.Spec.StatusTag);
     TestEqual(TEXT("Removal shortens the cycle"), Cycle->GetCycleLength(), BeforeGrowth);
     TestTrue(TEXT("The cursor is still inside the cycle"), Cycle->GetCursor() < Cycle->GetCycleLength());
 
