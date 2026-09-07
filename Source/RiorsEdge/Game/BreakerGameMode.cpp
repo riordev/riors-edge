@@ -3,6 +3,7 @@
 #include "Game/BreakerHubBuilder.h"
 #include "Game/BreakerZoneBuilder.h"
 #include "Game/BreakerGameInstance.h"
+#include "Game/BreakerDeathBudgetMath.h"
 #include "Game/BreakerWorldBasics.h"
 #include "GameFramework/PlayerStart.h"
 #include "Interaction/BreakerTravelPoint.h"
@@ -152,6 +153,8 @@ void ABreakerGameMode::HandleHubTravelSelected(FName DestinationId, APawn* Reque
         // level instead of its own. Walking out of a place is not entering it
         // again.
         Session->PendingRift = FBreakerRiftDefinition();
+        // The counter goes with the rift it counted for (O82).
+        Session->EndgameDeathsRemaining = UBreakerRiftLibrary::SoloEndgameDeathBudget;
     }
     if (DestinationId == ABreakerTravelPoint::HubDestinationId)
     {
@@ -271,6 +274,10 @@ void ABreakerGameMode::HandleRiftEntryRequested(const FBreakerRiftDefinition& Ri
     // its area level from EffectiveAreaLevel(). None of that changes here.
     Session->PendingRift = Rift;
     Session->PendingDestinationId = ABreakerTravelPoint::RiftDestinationId;
+    // THE BUDGET IS SEEDED AT THE DOOR (O82): a fresh entry is a fresh
+    // allowance. RetryRift does not pass through here, which is what makes
+    // the counter survive a retry.
+    Session->EndgameDeathsRemaining = UBreakerRiftLibrary::SoloEndgameDeathBudget;
 
     // THE INTERIOR IS THE YARD'S OWN GEOMETRY (Part One-Q, ruled). This is the
     // line the placeholder comment said would move, and it moved: the gym was
@@ -283,6 +290,50 @@ void ABreakerGameMode::HandleRiftEntryRequested(const FBreakerRiftDefinition& Ri
     // system spawns around the PLAYER rather than at an authored arena, so it
     // has no dependency on gym geometry at all.
     UBreakerGameInstance::TravelTo(this, FName(UBreakerGameInstance::FernhallMapName()));
+}
+
+int32 ABreakerGameMode::SpendDeath()
+{
+    UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>();
+    if (!Session) return UBreakerRiftLibrary::SoloEndgameDeathBudget;
+    // THE RULE IS WORLD-FREE AND THIS IS THE THIN CALLER: the tier is the
+    // rift's, the boss is this world's, the counter is the session's.
+    const EBreakerRiftTier Tier = Session->PendingRift.Tier;
+    const int32 Before = Session->EndgameDeathsRemaining;
+    Session->EndgameDeathsRemaining = BreakerDeathBudget::SpendDeath(Tier, Before, IsBossAlive());
+    UE_LOG(LogTemp, Display, TEXT("[Rift] death %s: %d -> %d of %d (%s%s)"),
+        BreakerDeathBudget::IsBudgeted(Tier) ? TEXT("spent") : TEXT("free"),
+        Before, Session->EndgameDeathsRemaining, UBreakerRiftLibrary::SoloEndgameDeathBudget,
+        Tier == EBreakerRiftTier::Campaign ? TEXT("campaign") : TEXT("endgame"),
+        IsBossAlive() ? TEXT(", boss alive") : TEXT(""));
+    return Session->EndgameDeathsRemaining;
+}
+
+void ABreakerGameMode::RetryRift(APawn* RequestingPawn)
+{
+    if (!RequestingPawn) return;
+    UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>();
+    if (!Session) return;
+    // HandleRiftEntryRequested minus the seed. PendingRift is not touched:
+    // the retry is the same rift at the same tier, and the counter it
+    // carries is the point. The refusal is the door's: a retry with no rift
+    // set is a death somewhere that is not an instance, and this must not
+    // travel on it.
+    if (!Session->PendingRift.IsSet())
+    {
+        UE_LOG(LogTemp, Error, TEXT("[Rift] retry requested with no rift set. Refusing travel."));
+        return;
+    }
+    Session->PendingDestinationId = ABreakerTravelPoint::RiftDestinationId;
+    UE_LOG(LogTemp, Display, TEXT("[Rift] retry: %s (area level %d, %d of %d deaths remain)"),
+        *Session->PendingRift.AreaName.ToString(), Session->PendingRift.EffectiveAreaLevel(),
+        Session->EndgameDeathsRemaining, UBreakerRiftLibrary::SoloEndgameDeathBudget);
+    UBreakerGameInstance::TravelTo(this, FName(UBreakerGameInstance::FernhallMapName()));
+}
+
+void ABreakerGameMode::ReturnToAnchor(APawn* RequestingPawn)
+{
+    HandleHubTravelSelected(ABreakerTravelPoint::HubDestinationId, RequestingPawn);
 }
 
 AActor* ABreakerGameMode::ChoosePlayerStart_Implementation(AController* Player)

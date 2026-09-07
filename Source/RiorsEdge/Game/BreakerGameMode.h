@@ -515,6 +515,23 @@ public:
     // Where a session starts. PLAY puts the chosen character here, and the
     // hub's travel point is what reaches the gym from it.
     UFUNCTION(BlueprintCallable, Category="Breaker|Hub") void TeleportPawnToHub(APawn* Pawn);
+
+    // --- The death screen's three calls (O82) ------------------------------
+    // This world is a rift instance: a death here raises the death screen
+    // instead of the campaign respawn. The yard, the Anchor and the gym are
+    // not, so their death path is untouched.
+    bool IsRiftInstance() const { return bRiftInstance; }
+    // One death, spent against the session's counter through the world-free
+    // rule (Game/BreakerDeathBudgetMath.h): the tier off PendingRift, the
+    // boss off this world. Returns the counter after the spend.
+    int32 SpendDeath();
+    // RETRY THE RIFT: the same travel the rift door makes, with PendingRift
+    // left exactly as it is — same rift, same tier, same counter — so the
+    // new instance builds to the run that was lost.
+    void RetryRift(APawn* RequestingPawn);
+    // RETURN TO ANCHOR: the hub travel, which clears PendingRift and the
+    // counter with it.
+    void ReturnToAnchor(APawn* RequestingPawn);
     // Every piece of hard cover the level built, read-only: an archetype
     // choosing a firing flank asks this rather than tracing the whole field.
     const FBreakerCoverRegistry& GetCoverRegistry() const { return CoverRegistry; }

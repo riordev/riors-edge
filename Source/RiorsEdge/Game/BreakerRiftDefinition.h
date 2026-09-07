@@ -24,10 +24,10 @@
 // ---------------------------------------------------------------------------
 // Which death rule a rift runs under (O82, amended). Campaign: unlimited
 // respawn from the tileset start, boss deaths reset the encounter. Endgame:
-// the death budget — two for a solo character — PARKED behind O122's other
-// half: no decrement may be wired until endgame rifts are consumable,
-// because a limit on a free instance kicks the player out of a door they
-// immediately walk back through.
+// the death budget — two for a solo character — spent by the game mode at
+// the death beat's Black and kept on the game instance across a retry
+// (BreakerDeathBudgetMath.h). No shipped door is Endgame until O122's
+// consumable entry, so the budget is pure-test only today.
 UENUM(BlueprintType)
 enum class EBreakerRiftTier : uint8
 {
@@ -112,10 +112,9 @@ public:
             / FMath::Max(UBreakerMonsterChassisLibrary::GetChassisDamage(1, Params), KINDA_SMALL_NUMBER);
     }
 
-    // O82: what an endgame instance grants a solo character. The party
-    // scaling and the decrement are both parked behind O122's consumable
-    // entry; this constant exists so the readout below and the future
-    // budget spend read one number.
+    // O82: what an endgame instance grants a solo character. The readout
+    // below, the game instance's counter and the death budget spend read
+    // this one number. Party scaling waits on O122's consumable entry.
     static constexpr int32 SoloEndgameDeathBudget = 2;
 
     // CAN THIS RUN BE COMPLETED? The whole rule, world-free, so the latch is

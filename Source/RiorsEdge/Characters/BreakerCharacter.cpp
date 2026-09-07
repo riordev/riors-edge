@@ -48,6 +48,7 @@
 #include "Save/BreakerRiftglassFold.h"
 #include "Characters/BreakerShakeMath.h"
 #include "Game/BreakerGameInstance.h"
+#include "Game/BreakerDeathBudgetMath.h"
 #include "Save/BreakerQuestJournal.h"
 #include "Save/BreakerQuestContent.h"
 #include "Save/BreakerMissionContent.h"
@@ -1564,8 +1565,9 @@ void ABreakerCharacter::HandlePlayerDeath()
     // every target in the field and wiped the session telemetry on the way:
     // a dev tool wearing a death's clothes. A campaign death now costs a
     // beat and the walk back, and the world stays exactly as you left it.
-    // The endgame death budget is a different mode entirely and is parked
-    // behind O122's consumable-entry half — nothing here spends anything.
+    // Nothing here spends anything: in a rift instance the beat's first
+    // black frame (UpdateDeathBeat) drops the respawn timer, spends the
+    // death through the game mode and raises the death screen instead.
     // Solo-only by design: the party layer does not exist, and a revive is
     // additive later without changing any of this.
     if (bRespawnPending) return;
@@ -1639,6 +1641,50 @@ void ABreakerCharacter::UpdateDeathBeat(float DeltaSeconds)
     DeathBeatElapsed += DeltaSeconds;
     const FBreakerDeathBeatSample Beat = BreakerDeathBeat::Sample(DeathBeat, DeathBeatElapsed);
     const bool bDone = Beat.Phase == EBreakerDeathBeatPhase::Done;
+
+    // THE DEATH SCREEN, ON THE FIRST BLACK FRAME OF A RIFT INSTANCE (O82).
+    // The campaign yard, the Anchor and the gym are not rift instances and
+    // keep the respawn below untouched. In an instance the respawn timer is
+    // dropped, the death is spent against the session's counter, and the
+    // menu opens under the black with the two verbs — both level travels.
+    // The menu's pause stops this tick, so the fade stays at full black
+    // behind the screen. Not ResumeFromMenu on either verb: it would unpause
+    // a dead pawn.
+    if (Beat.Phase == EBreakerDeathBeatPhase::Black && !MenuWidget.IsValid()
+        && GetWorldTimerManager().IsTimerActive(RespawnTimer))
+    {
+        ABreakerGameMode* GameMode = GetWorld() ? Cast<ABreakerGameMode>(GetWorld()->GetAuthGameMode()) : nullptr;
+        if (GameMode && GameMode->IsRiftInstance())
+        {
+            // The menu first, the spend only if it opened: a run with no game
+            // viewport (the suite, a headless capture) cannot raise the
+            // screen, and there the campaign respawn below stands rather
+            // than a death being spent on a screen nobody can answer.
+            OpenMenu(false);
+            if (MenuWidget.IsValid())
+            {
+                GetWorldTimerManager().ClearTimer(RespawnTimer);
+                // The boss is read BEFORE the spend, so the model states the
+                // same encounter the spend was judged against.
+                const bool bBossAlive = GameMode->IsBossAlive();
+                const int32 Remaining = GameMode->SpendDeath();
+                const UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>();
+                FBreakerDeathScreenSite Site;
+                if (Session) Site.AreaName = Session->PendingRift.AreaName.ToString();
+                Site.Wave = GameMode->GetCurrentWave();
+                Site.WaveTotal = GameMode->WaveBudget.BossWaveInterval;
+                // No run clock exists on the game mode or here, so the
+                // sheet's "3 m 12 s in" piece is omitted rather than faked.
+                MenuWidget->ShowDeath(BreakerDeathBudget::Model(
+                    Session ? Session->PendingRift.Tier : EBreakerRiftTier::Campaign,
+                    Remaining, UBreakerRiftLibrary::SoloEndgameDeathBudget, bBossAlive, Site));
+                // RETRY from a boss death rebuilds the instance from its
+                // first wave, which is more than the encounter reset O82
+                // names for a campaign boss death. Recorded here; the
+                // in-place respawn is not offered on the screen.
+            }
+        }
+    }
 
     // The drop is a relative offset under the rest location; the tilt rides
     // the control rotation as a net-zero delta, the shake's technique, because
@@ -2244,6 +2290,28 @@ void ABreakerCharacter::OpenMenuScreenForCapture(const FString& ScreenName)
     // The stash, guarded for the same reason: its only in-game door is the
     // stash point in the Anchor, and a capture switch is a second door.
     else if (Wanted == TEXT("STASH")) Screen = EBreakerMenuScreen::Stash;
+    // The death screen, guarded for the same reason: its only door is dying
+    // in a rift instance. The model is built from the live session so the
+    // frame photographs the variant this world would raise; a capture run
+    // with no rift set photographs the campaign frame.
+    else if (Wanted == TEXT("DEATH"))
+    {
+        Screen = EBreakerMenuScreen::Death;
+        const UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>();
+        const ABreakerGameMode* GameMode = GetWorld() ? Cast<ABreakerGameMode>(GetWorld()->GetAuthGameMode()) : nullptr;
+        FBreakerDeathScreenSite Site;
+        if (Session) Site.AreaName = Session->PendingRift.AreaName.ToString();
+        if (GameMode)
+        {
+            Site.Wave = GameMode->GetCurrentWave();
+            Site.WaveTotal = GameMode->WaveBudget.BossWaveInterval;
+        }
+        MenuWidget->ShowDeath(BreakerDeathBudget::Model(
+            Session ? Session->PendingRift.Tier : EBreakerRiftTier::Campaign,
+            Session ? Session->EndgameDeathsRemaining : UBreakerRiftLibrary::SoloEndgameDeathBudget,
+            UBreakerRiftLibrary::SoloEndgameDeathBudget,
+            GameMode && GameMode->IsBossAlive(), Site));
+    }
 #endif
 
     MenuWidget->ShowScreenForCapture(Screen);

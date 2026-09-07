@@ -51,6 +51,16 @@ public:
     // every legacy path on the game mode's GymAreaLevel dev fallback.
     UPROPERTY(BlueprintReadWrite, Category="Breaker|Session") FBreakerRiftDefinition PendingRift;
 
+    // THE DEATH BUDGET'S COUNTER (O82). Here and not on the game mode because
+    // RETRY THE RIFT is a level travel that constructs a new game mode, and a
+    // budget that reset on every retry would be no budget. Seeded to the solo
+    // allowance at the rift door, spent by ABreakerGameMode::SpendDeath, reset
+    // beside PendingRift by an ordinary travel. Read by nothing in a campaign
+    // rift: the tier decides whether it means anything
+    // (Game/BreakerDeathBudgetMath.h).
+    UPROPERTY(BlueprintReadWrite, Category="Breaker|Session")
+    int32 EndgameDeathsRemaining = UBreakerRiftLibrary::SoloEndgameDeathBudget;
+
     // THE DEPLOYMENT BEAT (route ruled by the owner; O120 and O123 govern the
     // pane). Not a loading screen — a loading screen hides a wait, and these
     // maps load in fractions of a second; this is a BRIEFING that names where
