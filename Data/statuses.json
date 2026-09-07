@@ -1,6 +1,14 @@
 {
 	"statuses": [
 		{
+			"tag": "Status.Void",
+			"dealsPeriodicDamage": false,
+			"spreadsOnPierce": false,
+			"durationSeconds": 4,
+			"armorReductionPercent": 20,
+			"healingReductionPercent": 25
+		},
+		{
 			"tag": "Status.Bleed",
 			"spreadsOnPierce": false
 		},

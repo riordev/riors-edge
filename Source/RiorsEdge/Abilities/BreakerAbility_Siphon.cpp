@@ -6,6 +6,8 @@
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerDamageLibrary.h"
+#include "Combat/BreakerStatusComponent.h"
+#include "Combat/BreakerStatusRules.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
 #include "Progression/BreakerProgressionComponent.h"
@@ -193,6 +195,18 @@ void UBreakerAbility_Siphon::TickChannel()
     if (CasterCombat) CasterCombat->ApplyOutgoingModifiers(Damage);
 
     const FBreakerDamageResult Result = TargetCombat->ReceiveDamage(Damage);
+    if (!Result.bDodged && Result.HealthDamage + Result.ShieldDamage > 0.0f
+        && IsValid(Target) && !Target->IsActorBeingDestroyed() && !TargetCombat->IsDead())
+    {
+        if (UBreakerStatusComponent* Status = Target->FindComponentByClass<UBreakerStatusComponent>())
+        {
+            FBreakerStatusApplicationSpec Void = BreakerStatusRules::MakeVoidSpec();
+            Void.ProcCoefficient = Damage.ProcCoefficient;
+            Void.Snapshot.SourceTags = Damage.SourceTags;
+            Void.Snapshot.SourcePower = UBreakerCombatComponent::ComposeDotSourcePower(SourceAttributes, CasterCombat, EBreakerDamageDelivery::Ability);
+            Status->ApplyStatus(Void, EBreakerDamageFamily::Elemental, Character);
+        }
+    }
 
     // Heal on DAMAGE LANDED, not on damage requested: a dodged, blocked or
     // shield-absorbed tick must not pay the caster full value. This is the

@@ -108,6 +108,7 @@
         "hud.parry.label": "PARRY",
         "hud.parry.active": "GUARD",
         "hud.parry.success": "PARRIED",
-        "hud.weapon.damageRamp": "DAMAGE RAMP %d / %d"
+        "hud.weapon.damageRamp": "DAMAGE RAMP %d / %d",
+        "cycle.void": "VOID"
 	}
 }

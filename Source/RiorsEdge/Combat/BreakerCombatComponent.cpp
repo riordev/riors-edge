@@ -6,6 +6,7 @@
 #include "Classes/BreakerChargeComponent.h"
 #include "Combat/BreakerZoneActor.h"
 #include "Combat/BreakerZoneMath.h"
+#include "Combat/BreakerStatusComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Attributes/BreakerHealthBands.h"
@@ -824,7 +825,8 @@ float UBreakerCombatComponent::GetComposedArmorReduction() const
 float UBreakerCombatComponent::GetEffectiveArmor() const
 {
     const float Base = Attributes ? Attributes->GetArmor() : 0.0f;
-    return FMath::Max(0.0f, Base - GetComposedArmorReduction());
+    const UBreakerStatusComponent* Status = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerStatusComponent>() : nullptr;
+    return FMath::Max(0.0f, Base - GetComposedArmorReduction()) * (Status ? Status->GetArmorMultiplier() : 1.0f);
 }
 
 FBreakerHealResult UBreakerCombatComponent::ApplyHealing(const FBreakerHealRequest& Request)
@@ -841,7 +843,10 @@ FBreakerHealResult UBreakerCombatComponent::ApplyHealing(const FBreakerHealReque
     Vitals.Shield = Attributes->GetShield();
     Vitals.MaxShield = Attributes->GetMaxShield();
 
-    Result = UBreakerDamageLibrary::ResolveHealing(Request, Vitals);
+    FBreakerHealRequest Effective = Request;
+    if (const UBreakerStatusComponent* Status = GetOwner()->FindComponentByClass<UBreakerStatusComponent>())
+        Effective.HealingMultiplier *= Status->GetHealingReceivedMultiplier();
+    Result = UBreakerDamageLibrary::ResolveHealing(Effective, Vitals);
     if (Result.RequestedAmount <= 0.0f) return Result;
 
     // Null-safe writes: the generated setters ensure() without an owning

@@ -4,6 +4,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Data/BreakerStrings.h"
+#include "Combat/BreakerStatusRules.h"
 
 UBreakerStatusCycleComponent::UBreakerStatusCycleComponent()
 {
@@ -70,8 +71,7 @@ void UBreakerStatusCycleComponent::SeedDefaultCycle()
     if ((GetOwner() && !GetOwner()->HasAuthority()) || bSeeded || !AvailableStatuses.IsEmpty()) return;
     bSeeded = true;
 
-    // Bleed and Poison are what a Caster can actually apply today: Cleave
-    // applies Bleed, Rot applies Poison. Void joins when Siphon is in the kit.
+    // Cleave, Rot and Siphon provide the three real status families.
     // Every magnitude below is O2 PLACEHOLDER.
     const TCHAR* SeedTags[] = { TEXT("Status.Bleed"), TEXT("Status.Poison") };
     const EBreakerStringKey Names[] = { EBreakerStringKey::CycleBleed, EBreakerStringKey::CyclePoison };
@@ -88,6 +88,11 @@ void UBreakerStatusCycleComponent::SeedDefaultCycle()
         Entry.DisplayName = FText::FromString(BreakerStrings::Get(Names[SeedIndex]));
         AvailableStatuses.Add(Entry);
     }
+    FBreakerCycleEntry Void;
+    Void.Spec = BreakerStatusRules::MakeVoidSpec();
+    Void.DamageFamily = EBreakerDamageFamily::Elemental;
+    Void.DisplayName = FText::FromString(BreakerStrings::Get(EBreakerStringKey::CycleVoid));
+    if (Void.Spec.StatusTag.IsValid()) AvailableStatuses.Add(Void);
 }
 
 FBreakerCycleEntry UBreakerStatusCycleComponent::PeekNextEntry(int32 Lookahead) const

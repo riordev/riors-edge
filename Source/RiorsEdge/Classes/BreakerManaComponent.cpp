@@ -10,6 +10,7 @@
 #include "Combat/BreakerZoneActor.h"
 #include "Data/BreakerDataFile.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerStatusRules.h"
 #include "Game/BreakerGameMode.h"
 #include "GameFramework/Actor.h"
 #include "Progression/BreakerProgressionComponent.h"
@@ -42,7 +43,11 @@ bool UBreakerManaComponent::ParseResourceTuning(const FJsonObject& Object, FBrea
         { TEXT("PatienceRankOneDelay"), &Candidate.PatienceRankOneDelay, 0 },
         { TEXT("PatienceRankTwoDelay"), &Candidate.PatienceRankTwoDelay, 0 },
         { TEXT("VarianceRankOneMultiplier"), &Candidate.VarianceRankOneMultiplier, 1 },
-        { TEXT("VarianceRankTwoMultiplier"), &Candidate.VarianceRankTwoMultiplier, 1 }
+        { TEXT("VarianceRankTwoMultiplier"), &Candidate.VarianceRankTwoMultiplier, 1 },
+        { TEXT("SequenceWindowSeconds"), &Candidate.SequenceWindowSeconds, UE_KINDA_SMALL_NUMBER },
+        { TEXT("SequenceCooldownSeconds"), &Candidate.SequenceCooldownSeconds, UE_KINDA_SMALL_NUMBER },
+        { TEXT("SequenceRankOneMana"), &Candidate.SequenceRankOneMana, 0 },
+        { TEXT("SequenceRankTwoMana"), &Candidate.SequenceRankTwoMana, 0 }
     };
     if (Object.Values.Num() != UE_ARRAY_COUNT(Fields)) { Error = TEXT("Caster resource fields do not match the supported schema."); return false; }
     for (const FField& Field : Fields)
@@ -89,7 +94,7 @@ void UBreakerManaComponent::BeginPlay()
         if (UBreakerProgressionComponent* Progression = Owner->FindComponentByClass<UBreakerProgressionComponent>())
         {
             CachedProgression = Progression;
-            Progression->OnProgressionChanged.AddDynamic(this, &UBreakerManaComponent::HandleProgressionChanged);
+            Progression->OnProgressionChanged.AddUniqueDynamic(this, &UBreakerManaComponent::HandleProgressionChanged);
         }
     }
     BindOwnerEvents();
@@ -105,13 +110,18 @@ void UBreakerManaComponent::BindAttributes(UBreakerAttributeSet* InAttributes)
     // A component wired up outside a world never gets a BeginPlay, so this is
     // where it picks up the shot and reset hooks. Idempotent.
     BindOwnerEvents();
-    RefreshClassOwnership();
+    HandleProgressionChanged();
 }
 
 void UBreakerManaComponent::BindOwnerEvents()
 {
     AActor* Owner = GetOwner();
     if (!Owner) return;
+    if (UBreakerProgressionComponent* Progression = Owner->FindComponentByClass<UBreakerProgressionComponent>())
+    {
+        CachedProgression = Progression;
+        Progression->OnProgressionChanged.AddUniqueDynamic(this, &UBreakerManaComponent::HandleProgressionChanged);
+    }
 
     // Weapon hits ACCELERATE recovery (owner ruling 2026-08-14); passive
     // regeneration is the primary path and needs no hook. Melee/kill events
@@ -185,10 +195,15 @@ bool UBreakerManaComponent::CanSpendFrom(float Mana, float Cost, float Floor)
 void UBreakerManaComponent::HandleProgressionChanged()
 {
     RefreshClassOwnership();
+    const UBreakerProgressionComponent* Progression = CachedProgression.Get();
+    const int32 Rank = bIsCaster && Progression ? Progression->GetNodeRank(TEXT("Caster.Multispell.Sequence"), EBreakerPointCurrency::DoctrinePoints) : 0;
+    if (Rank != ObservedSequenceRank) ClearSequenceApplications();
+    ObservedSequenceRank = Rank;
 }
 
 void UBreakerManaComponent::HandleVitalsRestored()
 {
+    SequenceTargets.Reset();
     FillToMaximum();
 }
 
@@ -202,7 +217,7 @@ void UBreakerManaComponent::RefreshClassOwnership()
     ObservedClass = Progression ? Progression->GetProgressionState().PermanentClass : EBreakerClassId::None;
     const bool bWasCaster = bIsCaster;
     bIsCaster = ObservedClass == EBreakerClassId::Caster;
-    if (!bIsCaster) PendingGrants = 0.0f;
+    if (!bIsCaster) { PendingGrants = 0.0f; ClearSequenceApplications(); }
     // Order matters: close the floor first (which lifts a stranded negative
     // bank back to zero), then re-evaluate Overcast, so the incoming-damage
     // penalty can never outlive the class that justified it.
@@ -364,6 +379,7 @@ void UBreakerManaComponent::PushGenerationSuspension(FName Key)
 {
     if (Key.IsNone()) return;
     GenerationSuspensions.Add(Key);
+    ClearSequenceApplications();
     // Queued credits are dropped, not banked: a bar that leaps the instant the
     // window closes would read as the suspension never having happened.
     PendingGrants = 0.0f;
@@ -403,12 +419,14 @@ void UBreakerManaComponent::HandleMeleeHit(const FBreakerHitContext& Hit)
     if (Hit.ProcCoefficient > 0) GrantMana((bContactCharge ? WeakPointGain : WeaponHitGain) * FMath::Clamp(Hit.ProcCoefficient, 0.0f, 1.0f), false);
 }
 
-void UBreakerManaComponent::NotifyStatusApplication(const FBreakerStatusApplicationSpec& Spec, bool bAlreadyPresent)
+void UBreakerManaComponent::NotifyStatusApplication(const FBreakerStatusApplicationSpec& Spec, bool bAlreadyPresent, AActor* Target)
 {
-    if (!GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || IsInSafeZone() || Spec.ProcCoefficient <= 0) return;
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || IsInSafeZone()
+        || IsGenerationSuspended() || !FMath::IsFinite(Spec.ProcCoefficient) || Spec.ProcCoefficient <= 0) return;
     const UBreakerCombatComponent* Combat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>();
-    if (Combat && Combat->IsDead()) return;
+    if (Combat && Combat->IsDead()) { ClearSequenceApplications(); return; }
     const UBreakerProgressionComponent* Progression = CachedProgression.Get();
+    RecordSequenceApplication(Spec, Target);
     const bool bFollowThrough = Progression && Progression->HasNodeTag(BreakerNodeTags::Node_SB_FollowThrough.GetTag());
     const bool bCleaveBleed = Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Bleed"))
         && Spec.Snapshot.SourceTags.HasTagExact(BreakerAbilityTags::Ability_Class_Caster_Cleave.GetTag());
@@ -419,6 +437,45 @@ void UBreakerManaComponent::NotifyStatusApplication(const FBreakerStatusApplicat
     const int32 VarianceRank = !bAlreadyPresent && Progression ? Progression->GetNodeRank(TEXT("Caster.Multispell.Variance"), EBreakerPointCurrency::DoctrinePoints) : 0;
     Multiplier += VarianceRank >= 2 ? Tuning.VarianceRankTwoMultiplier - 1.0f : VarianceRank == 1 ? Tuning.VarianceRankOneMultiplier - 1.0f : 0.0f;
     GrantMana(Tuning.StatusApplicationMana * Multiplier * FMath::Clamp(Spec.ProcCoefficient, 0.0f, 1.0f), false);
+}
+
+void UBreakerManaComponent::ClearSequenceApplications()
+{
+    // Preserve per-target cooldowns through respec/suspension. Otherwise
+    // changing a build could repeatedly cash the same target's payout.
+    for (auto& Pair : SequenceTargets) Pair.Value.Applications.Reset();
+}
+
+void UBreakerManaComponent::RecordSequenceApplication(const FBreakerStatusApplicationSpec& Spec, AActor* Target)
+{
+    if (!Target || Target->IsActorBeingDestroyed() || Target == GetOwner() || !GetWorld() || !BreakerStatusRules::FindRule(Spec.StatusTag)) return;
+    const UBreakerProgressionComponent* Progression = CachedProgression.Get();
+    const int32 Rank = Progression ? Progression->GetNodeRank(TEXT("Caster.Multispell.Sequence"), EBreakerPointCurrency::DoctrinePoints) : 0;
+    if (Rank <= 0) { ClearSequenceApplications(); return; }
+    const UBreakerCombatComponent* TargetCombat = Target->FindComponentByClass<UBreakerCombatComponent>();
+    if (!TargetCombat || TargetCombat->IsDead()) return;
+    const FBreakerCasterResourceTuning& Tuning = GetResourceTuning();
+    const double Now = GetWorld()->GetTimeSeconds();
+    for (auto It = SequenceTargets.CreateIterator(); It; ++It)
+    {
+        AActor* Tracked = It.Key().Get();
+        const UBreakerCombatComponent* TrackedCombat = Tracked ? Tracked->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+        if (!TrackedCombat || Tracked->IsActorBeingDestroyed() || TrackedCombat->IsDead()) { It.RemoveCurrent(); continue; }
+        for (auto Entry = It.Value().Applications.CreateIterator(); Entry; ++Entry)
+            if (Now - Entry.Value().Time > Tuning.SequenceWindowSeconds) Entry.RemoveCurrent();
+        if (It.Value().Applications.IsEmpty() && Now >= It.Value().NextAllowedTime) It.RemoveCurrent();
+    }
+    FSequenceTarget& State = SequenceTargets.FindOrAdd(Target);
+    if (Now < State.NextAllowedTime) return;
+    State.Applications.Add(Spec.StatusTag, FSequenceApplication{Now, FMath::Clamp(Spec.ProcCoefficient, 0.0f, 1.0f)});
+    if (State.Applications.Num() < 3) return;
+    float Proc = 1.0f;
+    for (const auto& Pair : State.Applications) Proc = FMath::Min(Proc, Pair.Value.ProcCoefficient);
+    State.Applications.Reset();
+    State.NextAllowedTime = Now + Tuning.SequenceCooldownSeconds;
+    // Authored lump sum has its own per-target cooldown; the ordinary hit
+    // income meter must not discard it. Suspension and bank limits still apply.
+    GrantMana((Rank >= 2 ? Tuning.SequenceRankTwoMana : Tuning.SequenceRankOneMana) * Proc, true);
 }
 
 void UBreakerManaComponent::NotifyAfflictedVictimDeath()
@@ -512,6 +569,7 @@ void UBreakerManaComponent::AdvanceLoop(float DeltaTime)
     if (!IsActiveForOwner())
     {
         PendingGrants = 0.0f;
+        ClearSequenceApplications();
         return;
     }
 
@@ -522,6 +580,7 @@ void UBreakerManaComponent::AdvanceLoop(float DeltaTime)
     if (IsGenerationSuspended())
     {
         PendingGrants = 0.0f;
+        ClearSequenceApplications();
         RefreshOvercastState();
         return;
     }
@@ -549,6 +608,7 @@ void UBreakerManaComponent::AdvanceLoop(float DeltaTime)
     if (IsInSafeZone())
     {
         PendingGrants = 0.0f;
+        ClearSequenceApplications();
         RefreshOvercastState();
         return;
     }

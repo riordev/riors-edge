@@ -1,6 +1,7 @@
 #include "Progression/BreakerProgressionLibrary.h"
 
 #include "Abilities/BreakerAbilityTags.h"
+#include "Classes/BreakerManaComponent.h"
 #include "Data/BreakerDataFile.h"
 #include "Progression/BreakerClassDefinition.h"
 #include "Progression/BreakerProgressionNode.h"
@@ -2585,9 +2586,13 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
     // The three-status lump sum — the explicit reward for rotating all three
     // rather than mastering one. Once per target on a cooldown because the
     // uncapped version is a Mana engine, not a rotation.
-    // WAITING ON: a per-target status-application window recorder.
+    const FBreakerCasterResourceTuning& SequenceTuning = UBreakerManaComponent::GetResourceTuning();
+    const FString SequenceDescription = FString::Printf(
+        TEXT("Apply three distinct status types to one target within %.0fs to gain %.0f/%.0f Mana at ranks 1/2. Each target can pay once every %.0fs. Secondary applications scale the payout."),
+        SequenceTuning.SequenceWindowSeconds, SequenceTuning.SequenceRankOneMana,
+        SequenceTuning.SequenceRankTwoMana, SequenceTuning.SequenceCooldownSeconds);
     Node = MakeNode(TEXT("Caster.Multispell.Sequence"), TEXT("Sequence"),
-        TEXT("Applying three distinct status types to one target within a short window generates a Mana lump sum, once per target on a cooldown."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 2, 2, 1);
+        *SequenceDescription, EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Caster.Multispell.Reservoir"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Sequence.GetTag());
     Tree->Nodes.Add(Node);

@@ -27,6 +27,10 @@ struct FBreakerCasterResourceTuning
     float PatienceRankTwoDelay = 2.0f; // O2 PLACEHOLDER
     float VarianceRankOneMultiplier = 2.0f; // O2 PLACEHOLDER
     float VarianceRankTwoMultiplier = 3.0f; // O2 PLACEHOLDER
+    float SequenceWindowSeconds = 6.0f; // O2 PLACEHOLDER
+    float SequenceCooldownSeconds = 10.0f; // O2 PLACEHOLDER
+    float SequenceRankOneMana = 10.0f; // O2 PLACEHOLDER
+    float SequenceRankTwoMana = 15.0f; // O2 PLACEHOLDER
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerOvercastChanged, bool, bOvercast);
@@ -75,7 +79,7 @@ class RIORSEDGE_API UBreakerManaComponent : public UActorComponent
 public:
     static const FBreakerCasterResourceTuning& GetResourceTuning();
     static bool ParseResourceTuning(const FJsonObject& Object, FBreakerCasterResourceTuning& Out, FString& Error);
-    void NotifyStatusApplication(const FBreakerStatusApplicationSpec& Spec, bool bAlreadyPresent);
+    void NotifyStatusApplication(const FBreakerStatusApplicationSpec& Spec, bool bAlreadyPresent, AActor* Target = nullptr);
     void NotifyAfflictedVictimDeath();
     UBreakerManaComponent();
     virtual void BeginPlay() override;
@@ -255,6 +259,20 @@ private:
     EBreakerClassId ObservedClass = EBreakerClassId::None;
     float PendingGrants = 0.0f;
     TSet<FName> GenerationSuspensions;
+    struct FSequenceApplication
+    {
+        double Time = 0;
+        float ProcCoefficient = 1;
+    };
+    struct FSequenceTarget
+    {
+        TMap<FGameplayTag, FSequenceApplication> Applications;
+        double NextAllowedTime = 0;
+    };
+    TMap<TWeakObjectPtr<AActor>, FSequenceTarget> SequenceTargets;
+    int32 ObservedSequenceRank = 0;
+    void RecordSequenceApplication(const FBreakerStatusApplicationSpec& Spec, AActor* Target);
+    void ClearSequenceApplications();
 
 public:
     // The key this component uses on UBreakerCombatComponent's incoming-damage

@@ -62,6 +62,8 @@ public:
     // Instigator is remembered weakly so every tick this application produces
     // credits the applier through the attacker-side hit events.
     void ApplyStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator);
+    float GetArmorMultiplier() const;
+    float GetHealingReceivedMultiplier() const;
 
     UFUNCTION(BlueprintPure, Category="Combat|Status") const TArray<FBreakerActiveStatus>& GetActiveStatuses() const { return ActiveStatuses; }
     UFUNCTION(BlueprintPure, Category="Combat|Status") bool HasStatus(FGameplayTag StatusTag) const;

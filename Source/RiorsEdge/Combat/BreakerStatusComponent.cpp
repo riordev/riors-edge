@@ -3,6 +3,7 @@
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerDamageLibrary.h"
 #include "Combat/BreakerZoneMath.h"
+#include "Combat/BreakerStatusRules.h"
 #include "Classes/BreakerManaComponent.h"
 #include "Characters/BreakerCharacter.h"
 #include "Items/BreakerEquipmentComponent.h"
@@ -48,11 +49,38 @@ void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& S
     ApplyStatusInternal(Spec, DamageFamily, Instigator, false);
 }
 
+float UBreakerStatusComponent::GetArmorMultiplier() const
+{
+    const UBreakerCombatComponent* OwnerCombat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    if (!OwnerCombat || OwnerCombat->IsDead()) return 1.0f;
+    float Reduction = 0;
+    for (const auto& Active : ActiveStatuses)
+        if (Active.RemainingDuration > 0)
+            if (const auto* Rule = BreakerStatusRules::FindRule(Active.Spec.StatusTag))
+                Reduction = FMath::Max(Reduction, Rule->ArmorReductionPercent);
+    return 1.0f - Reduction / 100.0f;
+}
+
+float UBreakerStatusComponent::GetHealingReceivedMultiplier() const
+{
+    const UBreakerCombatComponent* OwnerCombat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    if (!OwnerCombat || OwnerCombat->IsDead()) return 1.0f;
+    float Reduction = 0;
+    for (const auto& Active : ActiveStatuses)
+        if (Active.RemainingDuration > 0)
+            if (const auto* Rule = BreakerStatusRules::FindRule(Active.Spec.StatusTag))
+                Reduction = FMath::Max(Reduction, Rule->HealingReductionPercent);
+    return 1.0f - Reduction / 100.0f;
+}
+
 void UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicationSpec& InputSpec, EBreakerDamageFamily DamageFamily, AActor* Instigator, bool bDurationAlreadyScaled)
 {
     // Caller may have passed an entry in a live status array; callbacks can
     // consume or reallocate it. Accepted application owns its payload.
-    const FBreakerStatusApplicationSpec Spec = InputSpec;
+    FBreakerStatusApplicationSpec Spec = InputSpec;
+    const FBreakerStatusRule* Rule = BreakerStatusRules::FindRule(Spec.StatusTag);
+    const bool bEffectOnly = Rule && Rule->IsNonDamagingDebuff();
+    if (bEffectOnly) { Spec.BaseDamagePerTick = 0; Spec.InitialStacks = 1; }
     if (!GetOwner() || !GetOwner()->HasAuthority() || !Spec.StatusTag.IsValid()
         || !FMath::IsFinite(Spec.Duration) || !FMath::IsFinite(Spec.TickInterval)
         || !FMath::IsFinite(Spec.ProcCoefficient) || Spec.Duration <= 0.0f || Spec.TickInterval <= 0.0f) return;
@@ -78,7 +106,7 @@ void UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicatio
         }
     }
     const float ScaledDuration = Spec.Duration * DurationScale;
-    if (ScaledDuration <= 0.0f) return;
+    if (!FMath::IsFinite(ScaledDuration) || ScaledDuration <= 0.0f) return;
 
     // --- Ailment avoidance: one roll per application, at the door ---------
     // BEFORE the immunity check by ruling: avoidance is the ORDINARY defence
@@ -126,7 +154,7 @@ void UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicatio
     {
         if (Active.Spec.StatusTag == Spec.StatusTag)
         {
-            Active.Stacks = FMath::Min(Active.Stacks + FMath::Max(1, Spec.InitialStacks), GetEffectiveStackCap());
+            Active.Stacks = bEffectOnly ? 1 : FMath::Min(Active.Stacks + FMath::Max(1, Spec.InitialStacks), GetEffectiveStackCap());
             Active.RemainingDuration = FMath::Max(Active.RemainingDuration, ScaledDuration);
             // Refresh credit to whoever most recently reapplied it — and the
             // facing snapshot with it, because credit and angle belong to the
@@ -139,7 +167,7 @@ void UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicatio
                 Active.ResourceProcCoefficient = Spec.ProcCoefficient;
             }
             const FBreakerActiveStatus Applied = Active;
-            if (SourceMana) SourceMana->NotifyStatusApplication(Spec, true);
+            if (SourceMana) SourceMana->NotifyStatusApplication(Spec, true, GetOwner());
             SpreadNewestStatus(Spec, DamageFamily, Instigator, ScaledDuration);
             OnStatusApplied.Broadcast(Applied);
             return;
@@ -164,7 +192,7 @@ void UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicatio
         Status.bHasSourceLocationSnapshot = true;
     }
     ActiveStatuses.Add(Status);
-    if (SourceMana) SourceMana->NotifyStatusApplication(Spec, false);
+    if (SourceMana) SourceMana->NotifyStatusApplication(Spec, false, GetOwner());
     SpreadNewestStatus(Spec, DamageFamily, Instigator, ScaledDuration);
     OnStatusApplied.Broadcast(Status);
 }
@@ -222,6 +250,13 @@ void UBreakerStatusComponent::HandleAfflictedOwnerDeath()
         Credited.Add(Applier);
         if (UBreakerManaComponent* Mana = Applier->FindComponentByClass<UBreakerManaComponent>()) Mana->NotifyAfflictedVictimDeath();
     }
+    for (const FBreakerActiveStatus& Status : AtDeath)
+        if (const auto* Rule = BreakerStatusRules::FindRule(Status.Spec.StatusTag))
+            if (!Rule->bDealsPeriodicDamage)
+            {
+                bool bFound = false;
+                ConsumeStatus(Status.Spec.StatusTag, bFound);
+            }
 }
 
 void UBreakerStatusComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -258,7 +293,9 @@ void UBreakerStatusComponent::AdvanceStatuses(float DeltaTime)
         Initial.RemainingDuration -= ActiveSeconds;
         // Status damage is owed for its whole remaining lifetime; do not discard
         // overdue damage under the zone presentation's burst guard.
-        const int32 Ticks = UBreakerZoneMath::ConsumeTicks(Initial.TimeUntilNextTick, ActiveSeconds, Initial.Spec.TickInterval, MAX_int32);
+        const FBreakerStatusRule* Rule = BreakerStatusRules::FindRule(Initial.Spec.StatusTag);
+        const int32 Ticks = Rule && !Rule->bDealsPeriodicDamage ? 0
+            : UBreakerZoneMath::ConsumeTicks(Initial.TimeUntilNextTick, ActiveSeconds, Initial.Spec.TickInterval, MAX_int32);
         int32 ExpectedDelivered = Initial.TicksDelivered;
         for (int32 TickIndex = 0; TickIndex < Ticks; ++TickIndex)
         {

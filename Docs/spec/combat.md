@@ -126,6 +126,13 @@ does. Each owns a verb no other element has.
 | **Entropy** | Accelerate decay |
 | **Void** | Erase |
 
+`Status.Void` erases part of the target's armour and incoming healing for a
+timed window. It deals no periodic damage and produces no damage-tick events.
+Its percentage reductions follow existing flat armour strips and healing
+modifiers; repeated applications refresh one effect. Immunity, avoidance,
+cleanse, consumption and expiry use the ordinary status lifecycle. Siphon's
+successful hits and Fracture's Bleed → Poison → Void cycle apply it.
+
 Three elements give exactly three pairs, which is small enough to memorise and
 large enough to be a rotation — that is why the count is three rather than
 four. Each pair has one reaction. **One reaction per target per interval**, and

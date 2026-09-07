@@ -123,9 +123,9 @@ bool FBreakerStatusCycleTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("FindOrAdd returns the same component twice"),
         UBreakerStatusCycleComponent::FindOrAdd(Owner) == Cycle);
 
-    // Zero-setup: Bleed and Poison are what a Caster can apply today.
+    // Zero-setup: Cleave, Rot and Siphon provide three actual status types.
     const int32 Length = Cycle->GetCycleLength();
-    TestTrue(TEXT("The cycle ships seeded"), Length >= 2);
+    TestEqual(TEXT("The cycle ships all three authored status types"), Length, 3);
 
     // Deterministic, because the HUD previews the next position and a preview
     // that can lie is worse than no preview.
@@ -141,8 +141,9 @@ bool FBreakerStatusCycleTest::RunTest(const FString& Parameters)
     for (int32 Index = 0; Index < Length; ++Index) Cycle->AdvanceCycle();
     TestTrue(TEXT("The cycle wraps back around"), Cycle->PeekNext(0) == Second);
 
-    // Growth is idempotent by tag: Siphon granting Void twice must not make
-    // Void come round twice as often.
+    // Remove the now-shipped Void entry to exercise genuine growth again.
+    Cycle->RemoveStatusType(FGameplayTag::RequestGameplayTag(TEXT("Status.Void"), false));
+    const int32 BeforeGrowth = Cycle->GetCycleLength();
     FBreakerCycleEntry Void;
     Void.Spec.StatusTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Void"), false);
     Void.Spec.Duration = 4.0f;
@@ -152,11 +153,11 @@ bool FBreakerStatusCycleTest::RunTest(const FString& Parameters)
     const int32 Grown = Cycle->GetCycleLength();
     Cycle->AddStatusType(Void);
     TestEqual(TEXT("Adding the same status twice does not lengthen the cycle"), Cycle->GetCycleLength(), Grown);
-    TestEqual(TEXT("Adding a new status lengthens it once"), Grown, Length + 1);
+    TestEqual(TEXT("Adding a new status lengthens it once"), Grown, BeforeGrowth + 1);
 
     // Removal keeps the cursor legal; a cursor past the end reads out of bounds.
     Cycle->RemoveStatusType(Void.Spec.StatusTag);
-    TestEqual(TEXT("Removal shortens the cycle"), Cycle->GetCycleLength(), Length);
+    TestEqual(TEXT("Removal shortens the cycle"), Cycle->GetCycleLength(), BeforeGrowth);
     TestTrue(TEXT("The cursor is still inside the cycle"), Cycle->GetCursor() < Cycle->GetCycleLength());
 
     // Fracture refuses to fire on an empty cycle rather than spending 30 Mana

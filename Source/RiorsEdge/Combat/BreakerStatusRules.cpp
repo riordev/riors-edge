@@ -45,6 +45,23 @@ namespace
             Errors.Add(FString::Printf(TEXT("%s: \"spreadsOnPierce\" is missing or not a boolean"), *TagName));
             bOk = false;
         }
+        auto ReadTuning = [&](const TCHAR* Key, float& OutValue, double Maximum)
+        {
+            if (!Row.HasField(Key)) return;
+            double Value = 0;
+            if (!Row.TryGetNumberField(Key, Value) || !FMath::IsFinite(Value) || Value < 0 || Value > Maximum)
+            {
+                Errors.Add(FString::Printf(TEXT("%s: invalid %s"), *TagName, Key)); bOk = false;
+            }
+            else OutValue = static_cast<float>(Value);
+        };
+        if (Row.HasField(TEXT("dealsPeriodicDamage")) && !Row.TryGetBoolField(TEXT("dealsPeriodicDamage"), Out.bDealsPeriodicDamage))
+        { Errors.Add(FString::Printf(TEXT("%s: dealsPeriodicDamage must be boolean"), *TagName)); bOk = false; }
+        ReadTuning(TEXT("durationSeconds"), Out.DurationSeconds, 3600);
+        ReadTuning(TEXT("armorReductionPercent"), Out.ArmorReductionPercent, 100);
+        ReadTuning(TEXT("healingReductionPercent"), Out.HealingReductionPercent, 100);
+        if (Out.IsNonDamagingDebuff() && Out.DurationSeconds <= 0)
+        { Errors.Add(FString::Printf(TEXT("%s: timed debuff requires positive durationSeconds"), *TagName)); bOk = false; }
         return bOk;
     }
 
@@ -126,6 +143,17 @@ namespace
 FString BreakerStatusRules::DataRelativePath()
 {
     return TEXT("Data/statuses.json");
+}
+
+FBreakerStatusApplicationSpec BreakerStatusRules::MakeVoidSpec()
+{
+    FBreakerStatusApplicationSpec Spec;
+    const FGameplayTag Tag = FGameplayTag::RequestGameplayTag(TEXT("Status.Void"), false);
+    const FBreakerStatusRule* Rule = FindRule(Tag);
+    if (!Rule || !Rule->IsNonDamagingDebuff()) return Spec;
+    Spec.StatusTag = Tag; Spec.Duration = Rule->DurationSeconds;
+    Spec.TickInterval = 1.0f; Spec.BaseDamagePerTick = 0.0f; Spec.InitialStacks = 1;
+    return Spec;
 }
 
 const TArray<FBreakerStatusRule>& BreakerStatusRules::GetRules()

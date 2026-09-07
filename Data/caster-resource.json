@@ -13,5 +13,9 @@
     "PatienceRankOneDelay": 4,
     "PatienceRankTwoDelay": 2,
     "VarianceRankOneMultiplier": 2,
-    "VarianceRankTwoMultiplier": 3
+    "VarianceRankTwoMultiplier": 3,
+    "SequenceWindowSeconds": 6,
+    "SequenceCooldownSeconds": 10,
+    "SequenceRankOneMana": 10,
+    "SequenceRankTwoMana": 15
 }

@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
+#include "Progression/BreakerProgressionTypes.h"
 
 // The status vocabulary as DATA (O186): which statuses behave how when a
 // combat verb other than "apply" meets them. The first rule is spread on
@@ -16,10 +17,16 @@ struct RIORSEDGE_API FBreakerStatusRule
 {
     FGameplayTag Tag;
     bool bSpreadsOnPierce = false;
+    bool bDealsPeriodicDamage = true;
+    float DurationSeconds = 0.0f;
+    float ArmorReductionPercent = 0.0f;
+    float HealingReductionPercent = 0.0f;
+    bool IsNonDamagingDebuff() const { return !bDealsPeriodicDamage; }
 };
 
 namespace BreakerStatusRules
 {
+    RIORSEDGE_API FBreakerStatusApplicationSpec MakeVoidSpec();
     RIORSEDGE_API FString DataRelativePath();
 
     // Every row, in file order. Empty when the file failed to load.

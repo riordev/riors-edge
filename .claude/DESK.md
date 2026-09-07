@@ -5,11 +5,11 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
-## Cycle — Caster Void status and Sequence
-- [ ] Give the existing Status.Void identity a timed armour/healing reduction consumer, without manufacturing zero-damage DoT ticks.
-- [ ] Apply real Void through Siphon and the Fracture status cycle, making three distinct statuses reachable.
-- [ ] Wire purchased Sequence to three accepted distinct types on the same target within a time window, with per-target cooldown and resource/authority safeguards.
-- [ ] Author accessible tuning and status wording, verify actual applications, defenses, healing, consumption, expiry and Mana payout; review, build, census and full suite.
+## Cycle — Support Cadence and Section
+- [ ] Give Cadence real reload/swap tempo consumers on affected weapons.
+- [ ] Apply a moving aura to living player allies and self, with Section radius and follow behavior; keep Detached Baton stationary.
+- [ ] Remove each recipient's keyed effects on exit/expiry/death, preserve overlapping casts, and make Conducting affect actual recipients.
+- [ ] Verify real casts, two-player aura entry/exit, reload/swap timing and cleanup; review, build, census and full suite.
 Remaining repairs include Support aura/element nodes, Tank recovery, ability balance, rarity identities, other weapon poses and audible combat polish. Rifle imported materials, fixed magazine/stock reload gesture and the native additive fire layer remain art/animation work; remote clients still lack a reload clock.
 ## Playtest queue (owner, 2026-09-07)
 Continue through the entire repair list in tested batches without stopping after each commit for a playtest. After repairs, execute the content phase below (owner instruction, 2026-09-07).
@@ -21,7 +21,7 @@ Continue through the entire repair list in tested batches without stopping after
 - (visuals, sound, enemies) Improve arms and weapon models, integrate weakpoints, add subtle enemy names, and make one weapon/ability/enemy/boss visually polished. Add audible combat feedback. Replace colored ability borders with placeholder icons, radial cooldown recovery and numeric timers; hide irrelevant Riftglass. Smooth the death screen and mouse handoff.
 
 ## Repair dependencies found in runtime review
-- Sequence requires three distinct applications, but Caster has only Bleed and Poison. Void is not an applied status. A third functional status or a revised node contract is required; do not fake the third tag.
+- Support's Attunement/Sympathetic require distinct element conversion/buildup consumers. Tank Kinetic Recovery requires actual fall-damage and stagger recipients; neither can be completed by a timestamp-only patch.
 - Doctrine progression now has all four authored benchmarks across three acts and pays 8/8 through the physical finale at level50. The real mission probe verifies actions/reloads but uses an explicit XP fixture at the final gate; normal campaign leveling pace remains unvalidated.
 - New special loot now respects its final affix budget. Existing saved items remain unchanged; a migration still needs to be designed.
 
@@ -106,6 +106,7 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - Four Niagara systems at `/Game/Breaker/FX/NS_<Moment>` with a `Color` user parameter, or a free Fab VFX pack placed there
 
 ## Done (last three cycles; older is git)
+- **Caster Void and Sequence:** Void is a timed, non-damaging armour/healing debuff with normal avoidance/immunity, refresh, Chain, consumption and expiry. Real Siphon hits and Fracture's third cycle position apply it. Purchased Sequence rewards three distinct applications on one target, with per-target cooldown, weakest-proc scaling and suspension/death/respec guards; unrelated progression updates preserve a rotation. Status/resource tuning and node numbers are readable data. Build/census clean; **649 tests, 646 passed, 3 known failures, 0 unexpected**. Real status, ability/projectile and Sequence tests pass; native Rift loop passes 24 kills, 2015 XP and 202 Riftglass retained. STATE unchanged under host-Python quarantine.
 - **Primary accuracy, Pierce and traversal:** Sustained accuracy reduces accumulated bloom in actual shots and HUD prediction. Pierce uses whole tier steps across drops, Prolific, Temper, Reforge and Attune, excludes rockets and respects total penetration travel. Existing wall-ride item IDs now pay after real completed vault/mantle. Forge uses exact roll bands and wraps long names. Build/census clean (64 ordinary affixes); **646 tests, 643 passed, 3 known failures, 0 unexpected**. Corrected an exhausted endgame test target without changing damage assertions. Forge capture inspected after repairing the observed clipped label; STATE unchanged under host-Python quarantine.
 - **Primary magazine and range:** Two ordinary Primary prefixes use the shared tier ladder and real capacity/falloff/travel consumers. Expanded magazines reload from reserve; shrink and inactive-slot changes conserve rounds. Temporary capacity stays with its origin gun, including paid-round refunds after swapping. Fixed equipment callback ordering during swaps and paid conversion. Build/census clean (62 ordinary affixes); **643 tests, 640 passed, 3 known failures, 0 unexpected**. Actual equipped-item/reload/range/rocket tests pass. Native Rift loop passes with 24 kills, 2015 XP and 201 Riftglass retained through return travel. STATE unchanged under host-Python quarantine.
 - **First-person rifle and cropped arms (2026-09-07):** Unreal-generated Manny arms preserve both chains, skeleton/materials and one LOD; generation/fresh-process audit passes with34,926 triangles and18,882 render vertices. Removed seven disconnected source vertices without relaxing the weight filter. Gun_Rifle replaces AR_1 with measured forward axis, fitted grips, corrected hip/ADS framing, actual reload-clock sampling/cancellation and owner-only rendering. Shot motion uses the recoil spring; additive fire clip, other archetypes, fixed magazine and imported materials remain unfinished art/animation. Tracers/VFX follow the presented muzzle using a measured datum validated against geometry, with no packaged CPU vertex reads. Build/census clean; **640 tests,637pass,3known,0unexpected**. Native Rift loop **PASS24kills,2015XP,211Glass** with actual travel/reward persistence. Hip/ADS/fire/reload frames inspected; final ADS recaptured alone after three parallel render runs exceeded shared VRAM. STATE unchanged under host-Python quarantine.

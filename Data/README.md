@@ -39,6 +39,20 @@ Close doubles landed weapon-hit Mana within 600/900 cm at ranks 1/2. Debt extend
 
 Siphon's `DrainRankOneThreshold` / `DrainRankTwoThreshold` in `abilities.json` raise the incoming health-damage threshold that interrupts the channel to 10%/15% of maximum health. The unpurchased threshold stays 5%. All three are fractions (0.10 means 10%), not damage amounts.
 
+`Data/statuses.json` defines Void as a non-damaging debuff: `durationSeconds`
+is 4, `armorReductionPercent` is 20, and `healingReductionPercent` is 25
+(O2 placeholders). Siphon's successful damage ticks and Fracture's third cycle
+position apply it. Refreshing extends the effect without stacking its reductions.
+Changing `dealsPeriodicDamage` changes status behavior, so keep it false for Void.
+
+Sequence's `SequenceWindowSeconds`, `SequenceCooldownSeconds`,
+`SequenceRankOneMana` and `SequenceRankTwoMana` in `caster-resource.json` are
+6, 10, 10 and 15 (O2 placeholders). Three different accepted applications to
+the same living target pay the lump sum immediately. This node uses its
+per-target cooldown instead of the ordinary 6 Mana/second income meter;
+suspension, resource capacity and Overcast rules still apply. The weakest
+application's proc coefficient scales the payout; zero-proc echoes never count.
+
 Rot's StandingWaterRankOneManaPerSecond / StandingWaterRankTwoManaPerSecond grant 2/4 Mana per second while a living enemy occupies your Rot, sharing the conditional-income cap. More zones or enemies do not multiply this stream. ZoneworkAdditionalArmorReduction adds 20 flat armour strip against an already damaged-over-time target. WellspringSelfPlacementRadiusCm (150 cm) and WellspringMinimumGroundNormalZ (0.7) define an intentional ground cast near your feet; that zone follows you and later self-casts refresh it. These five values are O2 placeholders in abilities.json.
 
 Closequarter's MomentumTransferRankOneSeconds / MomentumTransferRankTwoSeconds give 2/3 seconds after a successful targeted arrival to land your next melee hit with that target's block and dodge bypassed. Chain's rank reach is currently an editor-only StatusComponent default (600/900 cm), not an abilities.json key. These are O2 placeholders.
