@@ -5,12 +5,18 @@
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerEnemy.h"
+#include "Combat/BreakerRangedEnemy.h"
+#include "Combat/BreakerSkirmisherEnemy.h"
+#include "Combat/BreakerWardenEnemy.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/Engine.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Game/BreakerGameInstance.h"
 #include "Game/BreakerGameMode.h"
+#include "Game/BreakerZoneBuilder.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/WorldSettings.h"
 #include "Items/BreakerEquipmentComponent.h"
@@ -80,6 +86,9 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
         PocketCenters.Init(FVector::ZeroVector, 3);
         int32 PocketCounts[] = { 0, 0, 0 };
         int32 Elites = 0;
+        int32 SubstationMelee = 0, SubstationWardens = 0, SubstationSkirmishers = 0, EntryLattices = 0;
+        ABreakerEnemy* SubstationSkirmisher = nullptr;
+        ABreakerEnemy* SubstationWarden = nullptr;
         for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
         {
             ABreakerEnemy* Enemy = *It;
@@ -93,6 +102,13 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
             if (!TestTrue(TEXT("Every body belongs to an authored outdoor pocket"), Pocket != INDEX_NONE)) return false;
             PocketCenters[Pocket] += Enemy->GetActorLocation();
             ++PocketCounts[Pocket];
+            if (Pocket == 1 && Enemy->IsA<ABreakerRangedEnemy>()) ++EntryLattices;
+            if (Pocket == 2)
+            {
+                if (Enemy->GetClass() == ABreakerEnemy::StaticClass()) ++SubstationMelee;
+                if (Enemy->IsA<ABreakerWardenEnemy>()) { ++SubstationWardens; SubstationWarden = Enemy; }
+                if (Enemy->IsA<ABreakerSkirmisherEnemy>()) { ++SubstationSkirmishers; SubstationSkirmisher = Enemy; }
+            }
             const UCapsuleComponent* Capsule = Enemy->FindComponentByClass<UCapsuleComponent>();
             if (!TestNotNull(TEXT("Enemy capsule"), Capsule)) return false;
             FCollisionQueryParams Query(SCENE_QUERY_STAT(FernhallOutdoorTest), false, Enemy);
@@ -110,7 +126,7 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
         }
         if (!TestEqual(TEXT("Eleven existing enemies populate each fresh visit"), Enemies.Num(), 11)) return false;
         TestEqual(TEXT("Roster retains one elite for the initial contract"), Elites, 1);
-        const int32 ExpectedCounts[] = { 4, 5, 2 };
+        const int32 ExpectedCounts[] = { 4, 3, 4 };
         for (int32 Index = 0; Index < 3; ++Index)
         {
             if (!TestEqual(TEXT("Distinct pocket roster"), PocketCounts[Index], ExpectedCounts[Index])) return false;
@@ -118,6 +134,39 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
         }
         TestTrue(TEXT("Entry fights occupy separate combat spaces"), FVector::Dist2D(PocketCenters[0], PocketCenters[1]) > 2500);
         TestTrue(TEXT("Substation encounter occupies its own yard"), FVector::Dist2D(PocketCenters[1], PocketCenters[2]) > 4000);
+        TestEqual(TEXT("Entry retains its ranged pressure"), EntryLattices, 1);
+        TestEqual(TEXT("Substation gains two melee flankers"), SubstationMelee, 2);
+        TestEqual(TEXT("Substation has one Warden anchor"), SubstationWardens, 1);
+        TestEqual(TEXT("Substation has one cover Skirmisher"), SubstationSkirmishers, 1);
+        if (!SubstationSkirmisher || !SubstationWarden) return false;
+        TArray<FBreakerZonePiece> Pieces;
+        FBreakerZoneMarkers Markers;
+        if (!UBreakerZoneBuilder::CollectZonePieces(UBreakerZoneBuilder::FernhallMeshFolder(), Pieces)
+            || !UBreakerZoneBuilder::ExtractMarkers(Pieces, Markers)) return false;
+        FVector2D Approach, Forward2D;
+        if (!UBreakerZoneBuilder::YardFrame(Markers, TEXT("substation"), Approach, Forward2D)) return false;
+        const FVector Forward(Forward2D.X, Forward2D.Y, 0);
+        const FVector Right = FVector::CrossProduct(FVector::UpVector, Forward);
+        const FVector Threat(Approach.X, Approach.Y, SubstationSkirmisher->GetActorLocation().Z + 80.0f);
+        FHitResult CoverHit;
+        FCollisionQueryParams CoverQuery(SCENE_QUERY_STAT(FernhallFormationCover), false, SubstationSkirmisher);
+        const bool bBlocked = World->LineTraceSingleByObjectType(CoverHit, Threat,
+            SubstationSkirmisher->GetActorLocation() + FVector(0, 0, 60), FCollisionObjectQueryParams(ECC_WorldStatic), CoverQuery);
+        TestTrue(TEXT("Real full-height cover hides the Skirmisher from approach at eye height"), bBlocked);
+        const auto* CoverMesh = Cast<UStaticMeshComponent>(CoverHit.GetComponent());
+        TestTrue(TEXT("Sightline blocker is an authored full-height piece"), CoverMesh && CoverMesh->GetStaticMesh()
+            && CoverMesh->GetStaticMesh()->GetName().StartsWith(TEXT("blk_full_")));
+        int32 LeftFlank = 0, RightFlank = 0;
+        for (ABreakerEnemy* Enemy : Enemies)
+            if (Enemy->Tags.Contains(FName(TEXT("Fernhall.Outdoor.2"))) && Enemy->GetClass() == ABreakerEnemy::StaticClass())
+            {
+                const FVector Offset = Enemy->GetActorLocation() - SubstationWarden->GetActorLocation();
+                LeftFlank += FVector::DotProduct(Offset, Right) < -400.0f ? 1 : 0;
+                RightFlank += FVector::DotProduct(Offset, Right) > 400.0f ? 1 : 0;
+                TestTrue(TEXT("Melee flankers pressure ahead of the Warden"), FVector::DotProduct(Offset, Forward) < 0);
+            }
+        TestEqual(TEXT("One melee on each Warden flank"), LeftFlank, 1);
+        TestEqual(TEXT("Opposite melee flank is occupied"), RightFlank, 1);
         const int32 XpBefore = Player->GetProgression()->GetProgressionState().TotalExperience;
         for (ABreakerEnemy* Enemy : Enemies)
         {

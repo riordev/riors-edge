@@ -25,6 +25,8 @@
 #include "Items/BreakerLootLibrary.h"
 #include "Movement/BreakerCharacterMovementComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
+#include "Progression/BreakerProgressionLibrary.h"
+#include "Save/BreakerMissionContent.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "UObject/StrongObjectPtr.h"
 
@@ -43,11 +45,12 @@ bool FBreakerCasterBurstRuntimeTest::RunTest(const FString& Parameters)
     ON_SCOPE_EXIT { World->DestroyWorld(false); GEngine->DestroyWorldContext(World); GFrameCounter = InitialFrame; };
     int32 Scenario = 0;
     for (const int32 Depth : {1, 50})
-    for (int32 Mode = 0; Mode < 4; ++Mode)
+    for (int32 Mode = 0; Mode < 6; ++Mode)
     {
-        const bool bFracture = (Mode % 2) == 1;
-        const bool bRot = Mode >= 2;
-        const FString Label = FString::Printf(TEXT("ilvl%d area%d %s%s"), Depth, Depth, bFracture ? TEXT("Fracture") : TEXT("Rifle"), bRot ? TEXT("+Rot") : TEXT(""));
+        const bool bPatience = Mode >= 4;
+        const bool bFracture = (Mode % 2) == 1 || bPatience;
+        const bool bRot = Mode == 2 || Mode == 3 || Mode == 5;
+        const FString Label = FString::Printf(TEXT("ilvl%d area%d %s%s%s"), Depth, Depth, bFracture ? TEXT("Fracture") : TEXT("Rifle"), bRot ? TEXT("+Rot") : TEXT(""), bPatience ? TEXT("+Patience2") : TEXT(""));
         const FVector Origin(Scenario++ * 10000.0f, 0, 100);
         FActorSpawnParameters Spawn;
         Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -64,6 +67,22 @@ bool FBreakerCasterBurstRuntimeTest::RunTest(const FString& Parameters)
         Player->GetCombat()->BindAttributes(Player->GetAttributes());
         Player->GetProgression()->BindAttributes(Player->GetAttributes());
         if (!TestTrue(*(Label + TEXT(" chooses Caster without extra points")), Player->GetProgression()->ChoosePermanentClassById(EBreakerClassId::Caster))) return false;
+        if (bPatience)
+        {
+            // Explicit first-benchmark entitlement fixture, not a campaign-playthrough claim.
+            // Settle shipped completion flags, then buy through the actual node gates.
+            FBreakerQuestFlagSet Flags;
+            const auto& Missions = UBreakerMissionLibrary::GetMissions();
+            if (Missions.IsEmpty()) return false;
+            for (const auto& Beat : Missions[0].Beats)
+                for (FName Flag : UBreakerMissionLibrary::BeatCompletionFlags(Beat)) Flags.Add(Flag);
+            Player->GetProgression()->SettleDoctrineEntitlement(Flags);
+            TestEqual(TEXT("first benchmark supplies exactly two Doctrine points"), Player->GetProgression()->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 2);
+            FText Reason;
+            for (int32 Rank = 0; Rank < 2; ++Rank)
+                if (!TestTrue(TEXT("purchases authored Patience rank through normal gates"), Player->GetProgression()->PurchaseNode(
+                    UBreakerProgressionLibrary::GetCasterVoidWhispererTree(), TEXT("Caster.VoidWhisperer.Patience"), Reason))) return false;
+        }
         FBreakerItemInstance Rifle;
         for (int32 Seed = 1; Seed <= 4096; ++Seed)
         {

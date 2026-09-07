@@ -1619,9 +1619,12 @@ void ABreakerGameMode::BuildZoneCaptureTour(const FBreakerZoneMarkers& Markers)
 
     if (FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureEnemyNames")))
     {
+        int32 CapturePocket = 0;
+        FParse::Value(FCommandLine::Get(), TEXT("BreakerCapturePocket="), CapturePocket);
+        const FName PocketTag(*FString::Printf(TEXT("Fernhall.Outdoor.%d"), FMath::Clamp(CapturePocket, 0, 2)));
         for (TActorIterator<ABreakerEnemy> It(GetWorld()); It; ++It)
         {
-            if (!It->Tags.Contains(FName(TEXT("Fernhall.Outdoor.0")))) continue;
+            if (!It->Tags.Contains(PocketTag)) continue;
             const FVector Eye = It->GetActorLocation() - Fwd * 1500.0f + FVector(0, 0, 100);
             Vantages.Reset();
             Vantages.Add({ Eye, (It->GetActorLocation() - Eye).Rotation() });
@@ -3812,6 +3815,8 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
         2, 1, UBreakerWaveBudgetLibrary::MakeRiftWaveBudget(3));
     const FName Yards[] = { NAME_None, NAME_None, FName(TEXT("substation")) };
     const float Fractions[] = { 0.25f, 0.70f, 0.50f }; // O2 placeholder placement within validated bands.
+    TArray<FBreakerZonePiece> YardPieces;
+    UBreakerZoneBuilder::CollectZonePieces(UBreakerZoneBuilder::FernhallMeshFolder(), YardPieces);
     int32 Spawned = 0;
     for (int32 Pocket = 0; Pocket < 3; ++Pocket)
     {
@@ -3833,8 +3838,37 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
             const int32 Index = Placement++;
             // Compact formations stay in the authored clear corridor. Offsets
             // separate capsules while leaving the shoulder cover usable.
-            const FVector Desired = Center + Forward * ((Index / 3) * 300.0f - 150.0f)
+            FVector Desired = Center + Forward * ((Index / 3) * 300.0f - 150.0f)
                 + Right * ((Index % 3 - 1) * 300.0f);
+            if (Pocket == 2)
+            {
+                // Warden holds the approach; two melee bodies pressure its
+                // flanks while the Skirmisher uses an authored line break.
+                Desired = Center - Forward * 200.0f;
+                if (Class == ABreakerEnemy::StaticClass())
+                    Desired += Right * (Index == 1 ? -550.0f : 550.0f) - Forward * 250.0f;
+                if (Class == ABreakerSkirmisherEnemy::StaticClass())
+                {
+                    const FBreakerZonePiece* Cover = nullptr;
+                    double BestDistance = TNumericLimits<double>::Max();
+                    for (const FBreakerZonePiece& Piece : YardPieces)
+                    {
+                        if (!Piece.Name.StartsWith(TEXT("blk_full_"))
+                            || UBreakerZoneBuilder::YardForPoint(Markers, Piece.Origin) != Yards[Pocket]) continue;
+                        const double Distance = FVector::DistSquared2D(Piece.Origin, Center);
+                        if (Distance < BestDistance) { Cover = &Piece; BestDistance = Distance; }
+                    }
+                    if (!Cover)
+                    {
+                        UE_LOG(LogTemp, Error, TEXT("[Fernhall] Substation Skirmisher requires authored full-height cover."));
+                        return;
+                    }
+                    // Imported bounds are baked world placement. Clear the
+                    // complete footprint, instead of assuming gym block size.
+                    const float Depth = FMath::Abs(Forward.X) * Cover->Extent.X + FMath::Abs(Forward.Y) * Cover->Extent.Y;
+                    Desired = Cover->Origin + Forward * (Depth + 180.0f);
+                }
+            }
             FHitResult Floor;
             FCollisionQueryParams Query(SCENE_QUERY_STAT(FernhallOutdoorFloor), false);
             if (!World->LineTraceSingleByObjectType(Floor, Desired + FVector(0, 0, 3000), Desired - FVector(0, 0, 3000),
@@ -3872,13 +3906,14 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
             for (int32 Index = 0; Index < FirstMelee; ++Index) Spawn(ABreakerEnemy::StaticClass(), false);
         if (Pocket == 1)
         {
-            for (int32 Index = FirstMelee; Index < Roster.Skitters; ++Index)
+            for (int32 Index = FirstMelee; Index < Roster.Skitters - 2; ++Index)
                 Spawn(ABreakerEnemy::StaticClass(), Index - FirstMelee < Roster.Elites);
             for (int32 Index = 0; Index < Roster.Lattices; ++Index) Spawn(ABreakerRangedEnemy::StaticClass(), false);
         }
         if (Pocket == 2)
         {
             for (int32 Index = 0; Index < Roster.Wardens; ++Index) Spawn(ABreakerWardenEnemy::StaticClass(), false);
+            for (int32 Index = 0; Index < 2; ++Index) Spawn(ABreakerEnemy::StaticClass(), false);
             for (int32 Index = 0; Index < Roster.Skirmishers; ++Index) Spawn(ABreakerSkirmisherEnemy::StaticClass(), false);
         }
     }
