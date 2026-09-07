@@ -94,6 +94,11 @@ elemental buildup entries. Echoes have zero proc and cannot echo again. The
 ultimate includes targets spawned during its window; closing that window,
 death or loss of Cascade cancels queued echoes.
 
+Long Dark pauses the lifetime of owned zones placed during its Unmake window.
+Damage and membership continue. That window ending, owner death or loss of
+the keystone releases the pause; later ultimates cannot rearm an old zone.
+Refreshing a zone placed before the window does not acquire this pause.
+
 ### The five loops
 
 | Class | Resource | Shape | Spends on |

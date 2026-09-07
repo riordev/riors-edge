@@ -2503,7 +2503,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterVoidWhispererTree(
     // doctrine authors no multiplier, so the argument goes with the number.
     // What that leaves behind is recorded at the lane it leaves behind.
     Node = MakeNode(TEXT("Caster.VoidWhisperer.LongDark"), TEXT("Long Dark"),
-        TEXT("Branch keystone. Rewrites Unmake: duration extends to 12s at 50% cost instead of free, and zones placed during it do not expire. Everything you leave on the ground lasts longer."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+        TEXT("Branch keystone. Rewrites Unmake: duration extends to 12s at 50% cost instead of free, and zones placed during it stop aging until that Unmake ends. Their damage continues."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Attrition"));
     // THE MORE IS GONE (O95), and it was the largest of the four at x1.30 as
     // well as the only one that never went through AddDamageMore -- it targeted

@@ -7,11 +7,12 @@ Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
 ## Cycle — Progression and combat (step 3)
 - [x] Repair Cascade silent echoes and cancel queued echoes when its originating ultimate ends; include targets spawned during the window.
-- [ ] Implement Long Dark's promised zone-expiry pause during its originating Unmake window.
+- [x] Implement Long Dark's zone-expiry pause during its originating Unmake window; actual purchased/paid casts retain damage and membership and release on expiry, cancel, death and respec without later rearming.
 - [ ] Finish explicit Caster elemental cycle delivery without duplicating a hit or bypassing proc safeguards; resolve Resonance delivery.
 - [ ] Audit remaining live silent nodes and validate reachable purchased behavior.
 - [ ] Finish ability-versus-weapon balance with sustained actual delivery; retain existing parity findings until their conditions are resolved.
-- [ ] Validate remaining Cleave, scoped/unscoped and combat feedback issues.
+- [x] Repair Cleave wall-only occlusion and reject Bleed on avoided/lethal hits; actual paid casts cover aligned enemies, wall, dodge, purchased parry and lethal melee income.
+- [ ] Repair hitscan Bleed and pierce status payloads on avoided hits; validate scoped/unscoped and remaining combat feedback.
 
 ## Completed element implementation (steps 1–2, O221–O225)
 - [x] Add explicit element identity, accepted-hit buildup and chassis-scaled thresholds; Entropy applies Rot with damage snapshotted from the applying hit.

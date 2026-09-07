@@ -220,10 +220,12 @@ void UBreakerAbility_Cleave::ActivateAbility(const FGameplayAbilitySpecHandle Ha
         {
             OwnerCombat->ApplyOutgoingModifiers(Damage);
         }
-        TargetCombat->ReceiveDamage(Damage);
+        const FBreakerDamageResult Result = TargetCombat->ReceiveDamage(Damage);
 
         // Class-Kits §2.2 C1: Bleed at a 100% base chance — no roll at all.
-        ApplyCleaveBleed(Target, SourceAttributes, OwnerCombat, LevelScalar, TargetIndex);
+        if (!Result.bDodged && !Result.bParried && !Result.bKilled && !TargetCombat->IsDead()
+            && Result.HealthDamage + Result.ShieldDamage > 0.0f)
+            ApplyCleaveBleed(Target, SourceAttributes, OwnerCombat, LevelScalar, TargetIndex);
         ++TargetIndex;
     }
 

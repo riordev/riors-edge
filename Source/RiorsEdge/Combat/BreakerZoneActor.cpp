@@ -1,4 +1,10 @@
 #include "Combat/BreakerZoneActor.h"
+#include "AbilitySystemComponent.h"
+#include "Abilities/BreakerAbilityStateComponent.h"
+#include "Abilities/BreakerAbilityTags.h"
+#include "Abilities/BreakerCasterAbility.h"
+#include "Characters/BreakerCharacter.h"
+#include "Progression/BreakerProgressionComponent.h"
 
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerEnemy.h"
@@ -78,6 +84,7 @@ void ABreakerZoneActor::BeginPlay()
 
 void ABreakerZoneActor::EndPlay(const EEndPlayReason::Type Reason)
 {
+    ReleaseLongDarkPause();
     // Unconditional teardown, including a level transition and a destroyed
     // caster. A zone that ends without releasing its armour strip leaves the
     // target permanently softened, and that bug is invisible until someone
@@ -98,6 +105,8 @@ void ABreakerZoneActor::ConfigureZone(const FBreakerZoneSpec& InSpec, AActor* In
     if (!HasAuthority()) return;
     Spec = InSpec;
     ZoneInstigator = InInstigator;
+    AcquireLongDarkPause();
+    LastAdvanceWorldTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0;
     BreakerZoneActorLocal::BreakerLiveZones.AddUnique(this);
     // Income samples the current membership/lifetime before zones age this frame.
     if (InInstigator)
@@ -155,7 +164,7 @@ float ABreakerZoneActor::OwnedOccupiedSeconds(AActor* Owner, FGameplayTag Tag, f
         if (AActor* Follow = Zone->FollowActor.Get()) Zone->SetActorLocation(Follow->GetActorLocation() + Zone->FollowOffset);
         Zone->UpdateMembership();
         if (!Zone->Occupants.IsEmpty())
-            Seconds = FMath::Max(Seconds, Zone->bExpiryPaused ? FMath::Max(0.0f, DeltaSeconds)
+            Seconds = FMath::Max(Seconds, Zone->IsExpiryPaused() ? FMath::Max(0.0f, DeltaSeconds)
                 : static_cast<float>(FMath::Clamp(Zone->RemainingDuration, 0.0, static_cast<double>(FMath::Max(0.0f, DeltaSeconds)))));
     }
     return Seconds;
@@ -167,6 +176,79 @@ void ABreakerZoneActor::SetExpiryPaused(bool bPaused)
     bExpiryPaused = bPaused;
 }
 
+bool ABreakerZoneActor::HasLongDarkPause() const
+{
+    const auto* Character = Cast<ABreakerCharacter>(LongDarkOwner.Get());
+    if (!IsValid(Character) || Character->IsActorBeingDestroyed() || !GetWorld()
+        || GetWorld()->GetTimeSeconds() >= LongDarkDeadline) return false;
+    if (!Character->GetProgression()
+        || Character->GetProgression()->GetProgressionState().PermanentClass != EBreakerClassId::Caster) return false;
+    const auto* Combat = Character->GetCombat();
+    const auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>();
+    const auto* ASC = Character->GetAbilitySystemComponent();
+    return Combat && !Combat->IsDead() && State && State->IsWindowActive(UBreakerCasterAbility::UnmakeWindowKey())
+        && ASC && ASC->HasMatchingGameplayTag(BreakerAbilityTags::Keystone_Caster_LongDark.GetTag());
+}
+
+bool ABreakerZoneActor::IsExpiryPaused() const { return bExpiryPaused || HasLongDarkPause(); }
+
+void ABreakerZoneActor::AcquireLongDarkPause()
+{
+    ReleaseLongDarkPause();
+    LongDarkStartedAt = LongDarkStoppedAt = -1;
+    auto* Character = Cast<ABreakerCharacter>(ZoneInstigator.Get());
+    if (!Character || !GetWorld() || !Character->GetProgression()
+        || Character->GetProgression()->GetProgressionState().PermanentClass != EBreakerClassId::Caster) return;
+    auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>();
+    auto* ASC = Character->GetAbilitySystemComponent();
+    auto* Combat = Character->GetCombat();
+    if (!State || !ASC || !Combat || Combat->IsDead()
+        || !ASC->HasMatchingGameplayTag(BreakerAbilityTags::Keystone_Caster_LongDark.GetTag())) return;
+    const float Remaining = State->GetWindowRemaining(UBreakerCasterAbility::UnmakeWindowKey());
+    if (!FMath::IsFinite(Remaining) || Remaining <= 0) return;
+    LongDarkOwner = Character;
+    LongDarkDeadline = GetWorld()->GetTimeSeconds() + Remaining;
+    LongDarkStartedAt = GetWorld()->GetTimeSeconds();
+    LongDarkStoppedAt = LongDarkDeadline;
+    State->OnWindowEnded.AddUniqueDynamic(this, &ThisClass::HandleLongDarkWindowEnded);
+    Combat->OnDeath.AddUniqueDynamic(this, &ThisClass::HandleLongDarkOwnerDeath);
+    Character->OnDestroyed.AddUniqueDynamic(this, &ThisClass::HandleLongDarkOwnerDestroyed);
+    LongDarkTagHandle = ASC->RegisterGameplayTagEvent(BreakerAbilityTags::Keystone_Caster_LongDark.GetTag(),
+        EGameplayTagEventType::NewOrRemoved).AddUObject(this, &ThisClass::HandleLongDarkTagChanged);
+}
+
+void ABreakerZoneActor::ReleaseLongDarkPause()
+{
+    auto* Character = Cast<ABreakerCharacter>(LongDarkOwner.Get());
+    if (LongDarkDeadline > 0 && GetWorld())
+        LongDarkStoppedAt = FMath::Min(LongDarkDeadline, static_cast<double>(GetWorld()->GetTimeSeconds()));
+    LongDarkOwner.Reset();
+    LongDarkDeadline = 0;
+    if (Character)
+    {
+        if (auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>())
+            State->OnWindowEnded.RemoveDynamic(this, &ThisClass::HandleLongDarkWindowEnded);
+        if (auto* Combat = Character->GetCombat())
+            Combat->OnDeath.RemoveDynamic(this, &ThisClass::HandleLongDarkOwnerDeath);
+        Character->OnDestroyed.RemoveDynamic(this, &ThisClass::HandleLongDarkOwnerDestroyed);
+        if (auto* ASC = Character->GetAbilitySystemComponent(); ASC && LongDarkTagHandle.IsValid())
+            ASC->RegisterGameplayTagEvent(BreakerAbilityTags::Keystone_Caster_LongDark.GetTag(),
+                EGameplayTagEventType::NewOrRemoved).Remove(LongDarkTagHandle);
+    }
+    LongDarkTagHandle.Reset();
+}
+
+void ABreakerZoneActor::HandleLongDarkWindowEnded(FName Key)
+{
+    if (Key == UBreakerCasterAbility::UnmakeWindowKey()) ReleaseLongDarkPause();
+}
+void ABreakerZoneActor::HandleLongDarkOwnerDeath() { ReleaseLongDarkPause(); }
+void ABreakerZoneActor::HandleLongDarkOwnerDestroyed(AActor* Actor) { ReleaseLongDarkPause(); }
+void ABreakerZoneActor::HandleLongDarkTagChanged(FGameplayTag Tag, int32 Count)
+{
+    if (Count <= 0) ReleaseLongDarkPause();
+}
+
 void ABreakerZoneActor::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
@@ -176,6 +258,7 @@ void ABreakerZoneActor::Tick(float DeltaSeconds)
 void ABreakerZoneActor::AdvanceZone(float DeltaSeconds)
 {
     if (!HasAuthority() || bReleased) return;
+    if (LongDarkOwner.IsValid() && !HasLongDarkPause()) ReleaseLongDarkPause();
 
     if (AActor* Follow = FollowActor.Get())
     {
@@ -184,16 +267,27 @@ void ABreakerZoneActor::AdvanceZone(float DeltaSeconds)
 
     UpdateMembership();
 
-    const double ActiveSeconds = bExpiryPaused ? FMath::Max(0.0f, DeltaSeconds)
-        : FMath::Min(static_cast<double>(FMath::Max(0.0f, DeltaSeconds)), FMath::Max(0.0, RemainingDuration));
+    const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : LastAdvanceWorldTime;
+    const double Elapsed = FMath::Max(0.0f, DeltaSeconds);
+    double PausedSeconds = IsExpiryPaused() ? Elapsed : 0;
+    if (!bExpiryPaused && Now > LastAdvanceWorldTime && LongDarkStartedAt >= 0)
+    {
+        // Only the part of a hitch after the original lease closes ages the
+        // zone. Its damage and membership cadence continue during the pause.
+        PausedSeconds = FMath::Clamp(FMath::Min(Now, LongDarkStoppedAt)
+            - FMath::Max(Now - Elapsed, LongDarkStartedAt), 0.0, Elapsed);
+    }
+    LastAdvanceWorldTime = Now;
+    const double AgingSeconds = Elapsed - PausedSeconds;
+    const double ActiveSeconds = FMath::Min(Elapsed, FMath::Max(0.0, RemainingDuration) + PausedSeconds);
     const int32 Ticks = UBreakerZoneMath::ConsumeTicks(TimeUntilNextTick, ActiveSeconds, Spec.TickInterval, MaximumTicksPerAdvance);
     for (int32 Index = 0; Index < Ticks; ++Index)
     {
         DeliverTick();
     }
 
-    RemainingDuration = UBreakerZoneMath::RemainingAfter(RemainingDuration, DeltaSeconds, bExpiryPaused);
-    if (RemainingDuration <= 0.0f && !bExpiryPaused)
+    RemainingDuration -= AgingSeconds;
+    if (RemainingDuration <= 0.0f && !IsExpiryPaused())
     {
         ReleaseAllOccupants();
         OnZoneExpired.Broadcast();
@@ -254,7 +348,7 @@ void ABreakerZoneActor::UpdateMembership()
         if (bAlready) { ApplyArmorStrip(Candidate); continue; }
         Occupants.Add(Candidate);
         ApplyArmorStrip(Candidate);
-        if (Spec.bApplyStatusOnEntry && (RemainingDuration > 0.0f || bExpiryPaused)) ApplyStatusToOccupant(Candidate);
+        if (Spec.bApplyStatusOnEntry && (RemainingDuration > 0.0f || IsExpiryPaused())) ApplyStatusToOccupant(Candidate);
         OnOccupantEntered.Broadcast(Candidate);
     }
 }
@@ -364,7 +458,7 @@ void ABreakerZoneActor::ReconcileArmorStrip(AActor* Occupant, bool bIncludeThis)
     {
         const ABreakerZoneActor* Other = Held.Get();
         if (!Other || Other == this || Other->bReleased || Other->GetWorld() != GetWorld()
-            || Other->Spec.ZoneTag != Spec.ZoneTag || (!Other->bExpiryPaused && Other->RemainingDuration <= 0.0f)
+            || Other->Spec.ZoneTag != Spec.ZoneTag || (!Other->IsExpiryPaused() && Other->RemainingDuration <= 0.0f)
             || !Other->ShouldAffectActor(Occupant)) continue;
         if (UBreakerZoneMath::IsInsideZone(Other->GetActorLocation(), Other->Spec.RadiusCm, Other->Spec.HalfHeightCm, Occupant->GetActorLocation()))
             Strongest = FMath::Max(Strongest, Other->ArmorStripFor(Occupant));

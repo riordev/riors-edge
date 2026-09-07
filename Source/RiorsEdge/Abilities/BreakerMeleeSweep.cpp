@@ -100,7 +100,8 @@ TArray<AActor*> UBreakerMeleeSweep::SweepTargets(const UWorld* World, AActor* In
         FHitResult Occlusion;
         FCollisionQueryParams OcclusionParams = QueryParams;
         OcclusionParams.AddIgnoredActor(Candidate);
-        if (World->LineTraceSingleByChannel(Occlusion, Params.Origin, Candidate->GetActorLocation(), ECC_WorldStatic, OcclusionParams))
+        if (World->LineTraceSingleByObjectType(Occlusion, Params.Origin, Candidate->GetActorLocation(),
+            FCollisionObjectQueryParams(ECC_WorldStatic), OcclusionParams))
         {
             continue;
         }

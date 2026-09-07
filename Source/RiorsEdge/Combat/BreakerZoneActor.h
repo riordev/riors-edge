@@ -126,7 +126,7 @@ public:
     // closes. Membership and damage continue — only the lifetime is frozen.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Zone")
     void SetExpiryPaused(bool bPaused);
-    UFUNCTION(BlueprintPure, Category="Zone") bool IsExpiryPaused() const { return bExpiryPaused; }
+    UFUNCTION(BlueprintPure, Category="Zone") bool IsExpiryPaused() const;
 
     // Drives membership, cadence and expiry. Called from Tick, and directly by
     // tests so the entire zone is exercisable without a running world — the
@@ -221,6 +221,19 @@ private:
     double TimeUntilNextTick = 0.0;
     int32 TicksDelivered = 0;
     bool bExpiryPaused = false;
+    void AcquireLongDarkPause();
+    void ReleaseLongDarkPause();
+    bool HasLongDarkPause() const;
+    UFUNCTION() void HandleLongDarkWindowEnded(FName Key);
+    UFUNCTION() void HandleLongDarkOwnerDeath();
+    UFUNCTION() void HandleLongDarkOwnerDestroyed(AActor* Actor);
+    void HandleLongDarkTagChanged(FGameplayTag Tag, int32 Count);
+    TWeakObjectPtr<AActor> LongDarkOwner;
+    double LongDarkDeadline = 0;
+    double LongDarkStartedAt = -1;
+    double LongDarkStoppedAt = -1;
+    double LastAdvanceWorldTime = 0;
+    FDelegateHandle LongDarkTagHandle;
     bool bReleased = false;
     // The rim is claimed from a shared pool on fixed clips, so it must be
     // submitted exactly once per zone life: ConfigureZone and OnRep_Spec can
