@@ -838,7 +838,13 @@ float UBreakerWeaponComponent::GetNextShotSpreadDegrees() const
     // The tree's WeaponSpread lane, divisor convention, applied to the same
     // composed cone the fire path divides so the crosshair cannot lie.
     const FBreakerNodeStats* NodeStats = GetOwnerNodeStats();
-    return NodeStats ? Composed / NodeStats->WeaponSpreadReduction : Composed;
+    const float TreeSpread = NodeStats ? Composed / NodeStats->WeaponSpreadReduction : Composed;
+    // Momentum on the gun (KIT-2): the Swift bar tightens the predicted cone
+    // by the same multiplier the fire path applies, read from the same
+    // component, so the crosshair and the round agree about the bar.
+    const UBreakerMomentumComponent* Momentum = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerMomentumComponent>() : nullptr;
+    return TreeSpread * FBreakerWeaponMath::MomentumSpreadMultiplier(
+        Momentum ? Momentum->GetMomentumFraction() : 0.0f, Momentum && Momentum->IsActiveForOwner());
 }
 
 FVector UBreakerWeaponComponent::GetViewmodelLocationOffset() const
@@ -1587,8 +1593,17 @@ bool UBreakerWeaponComponent::FireOnce()
     // divides GetNextShotSpreadDegrees' predicted one — one convention, both
     // sites, or the HUD and the round disagree about the purchase.
     const FBreakerNodeStats* SpreadNodeStats = GetOwnerNodeStats();
+    // Momentum, read once per trigger pull and shared by every rule below
+    // (the spread multiplier here, Called Shot's gate, Pierce Discipline's
+    // grant, Ledger's refund, Mark Economy's jump).
+    UBreakerMomentumComponent* Momentum = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerMomentumComponent>() : nullptr;
+    // Momentum on the gun (KIT-2): the Swift bar tightens the fired cone by
+    // the same multiplier GetNextShotSpreadDegrees applies to the predicted
+    // one — both sites or the crosshair lies about the bar.
     const float Spread = FBreakerWeaponFeel::EffectiveSpreadDegrees(AimedProfile, BaseSpread, BloomDegrees, BurstShotIndex, MovementSpread)
-        / (SpreadNodeStats ? SpreadNodeStats->WeaponSpreadReduction : 1.0f);
+        / (SpreadNodeStats ? SpreadNodeStats->WeaponSpreadReduction : 1.0f)
+        * FBreakerWeaponMath::MomentumSpreadMultiplier(
+            Momentum ? Momentum->GetMomentumFraction() : 0.0f, Momentum && Momentum->IsActiveForOwner());
 
     // Recoil state for this shot, resolved before the pellets so the cosmetic
     // event can carry it to every machine and they all kick identically.
@@ -1620,10 +1635,8 @@ bool UBreakerWeaponComponent::FireOnce()
     UBreakerAbilityStateComponent* AbilityState = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerAbilityStateComponent>() : nullptr;
     const float MarkRemainingAtPull = AbilityState ? AbilityState->GetMarkRemaining() : 0.0f;
     const AActor* MarkedTarget = (AbilityState && MarkRemainingAtPull > 0.0f) ? AbilityState->GetMarkedTarget() : nullptr;
-    // Momentum and progression, read once per trigger pull and shared by every
-    // rule below (Called Shot's gate, Pierce Discipline's grant, Ledger's
-    // refund, Mark Economy's jump).
-    UBreakerMomentumComponent* Momentum = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerMomentumComponent>() : nullptr;
+    // Progression, read once per trigger pull beside the Momentum read above
+    // the spread and shared by every rule below.
     const UBreakerProgressionComponent* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
     const bool bRedline = Momentum && Momentum->IsActiveForOwner() && Momentum->GetMomentumState() == EBreakerMomentumState::Redline;
     // Called Shot (Class-Kits §1.5 M11, LIVE): at Redline, Lead's range gate

@@ -427,16 +427,31 @@ void UBreakerEnemyModifierComponent::DetonateVolatile()
     if (Full <= 0.0f) return;
     const float OuterSq = FMath::Square(FMath::Max(Params.VolatileInnerRadiusCm, Params.VolatileOuterRadiusCm));
 
-    // Hits PAWNS with a combat component and skips enemies, which is the same
-    // rule the enemy death chain and the enemy projectile already use: enemy
-    // friendly fire is not a system this project has ruled on, and a Volatile
-    // that wipes its own pack would make the modifier a gift.
+    // A Volatile blast reaches every LIVE pawn with a combat component inside
+    // the outer radius, enemies included: a Volatile is a weapon the player
+    // aims by choosing where it dies. Same Full * Falloff, same radii, same
+    // instigator for every target; no separate enemy number. A dead body is
+    // skipped the way the on-death chain skips one, so a pack that is
+    // already down does not soak up a blast meant for the pack behind it.
+    //
+    // A default Volatile (VolatileDamageAsAttackMultiple 9.0 x chassis
+    // BaseDamage 51.1) exceeds trash BaseHealth 220, so the blast kills every
+    // trash body inside the inner radius outright. A separate enemy fraction
+    // is authoring and waits on a playtest.
+    //
+    // BEHAVIOURAL GAP, RECORDED, NOT FAKED. The dealer is the corpse: the
+    // request's instigator is the detonating enemy, so an enemy killed by the
+    // blast broadcasts OnKillDealt on the corpse's combat component, and the
+    // Feed / Scrap / deployable kill hooks that credit the player's kills do
+    // not credit a blast kill. The enemy killed records no killer.
     for (TActorIterator<APawn> It(GetWorld()); It; ++It)
     {
         APawn* Candidate = *It;
-        if (!Candidate || Candidate == GetOwner() || Candidate->IsA<ABreakerEnemy>()) continue;
+        if (!Candidate) continue;
+        const ABreakerEnemy* CandidateEnemy = Cast<ABreakerEnemy>(Candidate);
         const float DistanceSq = FVector::DistSquared(Candidate->GetActorLocation(), Center);
-        if (DistanceSq > OuterSq) continue;
+        if (!UBreakerEnemyModifierLibrary::VolatileDetonationReaches(
+                Candidate == GetOwner(), CandidateEnemy && CandidateEnemy->IsDeadEnemy(), DistanceSq, OuterSq)) continue;
         UBreakerCombatComponent* Combat = Candidate->FindComponentByClass<UBreakerCombatComponent>();
         if (!Combat) continue;
 

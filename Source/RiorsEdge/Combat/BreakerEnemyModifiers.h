@@ -411,6 +411,14 @@ public:
     UFUNCTION(BlueprintPure, Category="Enemy|Modifiers")
     static float GetVolatileFalloff(float DistanceCm, const FBreakerEnemyModifierParams& Params);
 
+    // Who a Volatile blast reaches: every LIVE pawn inside the outer radius
+    // that is not the detonating body itself, enemies included. A dead body
+    // is skipped the way the on-death chain skips one, and the corpse never
+    // hits itself. Pure, so the target rule is testable with no world; the
+    // amount each target takes is GetVolatileDetonationDamage * GetVolatileFalloff.
+    UFUNCTION(BlueprintPure, Category="Enemy|Modifiers")
+    static bool VolatileDetonationReaches(bool bIsSelf, bool bIsDead, float DistanceSq, float OuterSq);
+
     UFUNCTION(BlueprintPure, Category="Enemy|Modifiers")
     static float GetReflectDamage(float IncomingDamage, float MonsterMaxHealth, const FBreakerEnemyModifierParams& Params);
 

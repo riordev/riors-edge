@@ -208,6 +208,18 @@ namespace BreakerHUD
         return FMath::Max(BaseThicknessCm, WorldHeight * FMath::Max(MinScreenFraction, 0.0f));
     }
 
+    // --- Momentum on the round (KIT-2) ---------------------------------------
+    // The Swift bar brightens the streak: 1.0 at an empty bar (and for every
+    // owner with no bar, who passes 0) up to TracerMomentumFullIntensity at a
+    // full one. Brightness only — the colour stays the weapon orange, because
+    // colour is the verb and the verb is still "gun" (O179).
+    inline constexpr float TracerMomentumFullIntensity = 1.75f;   // O2 PLACEHOLDER
+
+    inline float TracerMomentumIntensityScale(float Fraction)
+    {
+        return FMath::Lerp(1.0f, TracerMomentumFullIntensity, FMath::Clamp(Fraction, 0.0f, 1.0f));
+    }
+
     // --- Tracer cadence -----------------------------------------------------
     // Real belts carry one tracer every few rounds. Drawing a streak for every
     // single round is most of why held automatic fire read as a laser show:

@@ -785,6 +785,20 @@ bool FBreakerTracerFlightTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Beyond the floor, world thickness scales with distance"),
         FMath::IsNearlyEqual(FarerThickness / FarThickness, 2.0f, 0.01f));
 
+    // --- Momentum on the round (KIT-2) --------------------------------------
+    // Brightness follows the Swift bar: an empty bar (and every owner with no
+    // bar, who passes 0) is the authored intensity, a full bar is the
+    // authored full-bar scale, and half a bar sits strictly between. Colour
+    // is not a parameter here at all, which is the O179 guarantee.
+    TestEqual(TEXT("An empty bar leaves the round at its authored brightness"),
+        BreakerHUD::TracerMomentumIntensityScale(0.0f), 1.0f);
+    TestEqual(TEXT("A full bar is the full-bar scale"),
+        BreakerHUD::TracerMomentumIntensityScale(1.0f), BreakerHUD::TracerMomentumFullIntensity);
+    const float HalfBar = BreakerHUD::TracerMomentumIntensityScale(0.5f);
+    TestTrue(TEXT("Half a bar is brighter than none"), HalfBar > 1.0f);
+    TestTrue(TEXT("Half a bar is dimmer than a full one"), HalfBar < BreakerHUD::TracerMomentumFullIntensity);
+    TestTrue(TEXT("A full bar brightens rather than dims"), BreakerHUD::TracerMomentumFullIntensity > 1.0f);
+
     // --- Cadence ------------------------------------------------------------
     // EVERY ROUND LEAVES A STREAK, at every fire rate. The cadence used to thin
     // fast weapons to one round in three so that held automatic fire did not

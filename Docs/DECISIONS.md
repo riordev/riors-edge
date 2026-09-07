@@ -397,4 +397,6 @@ Numbers are permanent and never reused.
 
 **O215** — Doctrine commitment is sited at the first Kess turn-in and never gated on it: the Forge accepts a commitment at any point after the class lock (O86).
 
-**O216** — Act I's givers are the Quartermaster and Kess; Command enters the story when it has a dialogue row (O209)..
+**O216** — Act I's givers are the Quartermaster and Kess; Command enters the story when it has a dialogue row (O209).
+
+**O217** — A Volatile blast reaches every live pawn in range, enemies included, at the one monster-scaled number; enemy projectiles and zones stay enemy-safe. Volatile is the only enemy fire that hurts enemies.

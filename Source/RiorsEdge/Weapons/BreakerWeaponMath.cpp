@@ -100,6 +100,19 @@ float FBreakerWeaponMath::SteadyMovementSpreadDegrees(float MovementSpreadDegree
     return MovementSpreadDegrees * (1.0f - FMath::Clamp(AimAlpha, 0.0f, 1.0f));
 }
 
+float FBreakerWeaponMath::MomentumSpreadMultiplier(float MomentumFraction, bool bActive)
+{
+    if (!bActive) return 1.0f;
+    // Linear from the baseline at an empty bar to the floor at a full one.
+    // The clamp keeps a bar that reports past full from tightening past the
+    // floor and a bar that reports negative from widening past baseline; the
+    // two ends return their constants exactly rather than through the lerp.
+    const float Fraction = FMath::Clamp(MomentumFraction, 0.0f, 1.0f);
+    if (Fraction <= 0.0f) return 1.0f;
+    if (Fraction >= 1.0f) return MomentumSpreadFloor;
+    return FMath::Lerp(1.0f, MomentumSpreadFloor, Fraction);
+}
+
 float FBreakerWeaponMath::LeadRangeGateCm(float BaseGateCm, bool bCalledShotOwned, bool bRedline)
 {
     // Class-Kits §1.5 M11 / node text: 25 m -> 10 m. The 10 m is transcribed;

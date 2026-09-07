@@ -104,7 +104,10 @@ public:
     // One round leaving the barrel. Start is the VISUAL muzzle, End is the
     // impact (or the end of the trace when it hit nothing). The shot itself
     // already resolved; this is a replay.
-    void AddTracer(const FVector& Start, const FVector& End);
+    // IntensityScale multiplies the authored head and trail brightness for
+    // this round only: the Momentum read lives with the HUD that fires it
+    // (BreakerHUD::TracerMomentumIntensityScale); 1.0 is an ordinary round.
+    void AddTracer(const FVector& Start, const FVector& End, float IntensityScale = 1.0f);
 
     // A whole spread from one trigger pull, streaks and impact flashes
     // together. Pellets are the shot contract's per-pellet record, in fire
@@ -114,7 +117,7 @@ public:
     // Budgeted: see the pool-sharing note above. Returns how many streaks were
     // actually drawn, which is what the automation suite asserts against the
     // pool size.
-    int32 AddSpread(const FVector& Start, TArrayView<const FBreakerPelletImpact> Pellets);
+    int32 AddSpread(const FVector& Start, TArrayView<const FBreakerPelletImpact> Pellets, float IntensityScale = 1.0f);
 
     // One SECONDARY leg of a shot: a pierce continuation, a chain arc or a
     // ricochet bounce (FBreakerShotResult::SecondaryImpacts). Drawn in its own
@@ -199,6 +202,10 @@ private:
         // of a spread. Held per slot rather than read at draw time because the
         // slot outlives the call that filled it.
         float ThicknessScale = 1.0f;
+        // Multiplies the authored head and trail intensity for this round.
+        // 1.0 for an ordinary round; above it when the Swift bar was up at
+        // the trigger pull. Per slot for the same reason as the thickness.
+        float IntensityScale = 1.0f;
         // Primary rounds are the weapon orange; secondary legs carry the
         // player-system cyan so pierce/chain/ricochet read as manipulation
         // rather than as more bullets. Held per slot, same reason as above.
@@ -259,7 +266,8 @@ private:
     // per-slot state can never disagree. DelaySeconds > 0 schedules the streak
     // to begin in the future (secondary legs).
     void ClaimTracerSlot(const FVector& Start, const FVector& End, float ThicknessScale,
-        const FLinearColor& HeadColor, const FLinearColor& TrailColor, float DelaySeconds = 0.0f);
+        const FLinearColor& HeadColor, const FLinearColor& TrailColor, float DelaySeconds = 0.0f,
+        float IntensityScale = 1.0f);
 };
 
 constexpr int32 ABreakerTracerRenderer::GetSparkSlots() { return SparkSlots; }

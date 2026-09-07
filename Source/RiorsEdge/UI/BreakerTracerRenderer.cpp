@@ -169,7 +169,7 @@ void ABreakerTracerRenderer::BeginPlay()
 }
 
 void ABreakerTracerRenderer::ClaimTracerSlot(const FVector& Start, const FVector& End, float ThicknessScale,
-    const FLinearColor& HeadColor, const FLinearColor& TrailColor, float DelaySeconds)
+    const FLinearColor& HeadColor, const FLinearColor& TrailColor, float DelaySeconds, float IntensityScale)
 {
     // Round-robin. Overwriting the oldest slot is the right failure: when
     // twelve rounds really are in the air the one that disappears is the one
@@ -180,14 +180,15 @@ void ABreakerTracerRenderer::ClaimTracerSlot(const FVector& Start, const FVector
     Slot.StartTime = (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0) + FMath::Max(DelaySeconds, 0.0f);
     Slot.bActive = true;
     Slot.ThicknessScale = ThicknessScale;
+    Slot.IntensityScale = FMath::Max(IntensityScale, 0.0f);
     Slot.HeadColor = HeadColor;
     Slot.TrailColor = TrailColor;
     NextTracerSlot = (NextTracerSlot + 1) % TracerSlots;
 }
 
-void ABreakerTracerRenderer::AddTracer(const FVector& Start, const FVector& End)
+void ABreakerTracerRenderer::AddTracer(const FVector& Start, const FVector& End, float IntensityScale)
 {
-    ClaimTracerSlot(Start, End, 1.0f, BreakerUI::Orange, BreakerUI::OrangeDeep);
+    ClaimTracerSlot(Start, End, 1.0f, BreakerUI::Orange, BreakerUI::OrangeDeep, 0.0f, IntensityScale);
 }
 
 void ABreakerTracerRenderer::AddSecondaryLeg(const FVector& Start, const FVector& End, bool bHit, float DelaySeconds)
@@ -208,7 +209,7 @@ void ABreakerTracerRenderer::AddSecondaryLeg(const FVector& Start, const FVector
     }
 }
 
-int32 ABreakerTracerRenderer::AddSpread(const FVector& Start, TArrayView<const FBreakerPelletImpact> Pellets)
+int32 ABreakerTracerRenderer::AddSpread(const FVector& Start, TArrayView<const FBreakerPelletImpact> Pellets, float IntensityScale)
 {
     const int32 PelletCount = Pellets.Num();
     if (PelletCount <= 0) return 0;
@@ -222,7 +223,7 @@ int32 ABreakerTracerRenderer::AddSpread(const FVector& Start, TArrayView<const F
     {
         const int32 PelletIndex = BreakerHUD::SpreadStreakPellet(StreakIndex, StreakCount, PelletCount);
         ClaimTracerSlot(Start, Pellets[PelletIndex].End, SpreadThicknessScale,
-            BreakerUI::Orange, BreakerUI::OrangeDeep);
+            BreakerUI::Orange, BreakerUI::OrangeDeep, 0.0f, IntensityScale);
     }
 
     // --- Flashes: every landed pellet, up to the spark budget ---------------
@@ -380,13 +381,13 @@ void ABreakerTracerRenderer::Tick(float DeltaSeconds)
 
         PlaceSegment(Head, HeadMaterials.IsValidIndex(Index) ? HeadMaterials[Index].Get() : nullptr,
             Sample.HeadStart, Sample.Head, Thickness,
-            Slot.HeadColor, Look.HeadIntensity * Fade);
+            Slot.HeadColor, Look.HeadIntensity * Slot.IntensityScale * Fade);
 
         if (BreakerHUD::TracerHasTrail(Sample))
         {
             PlaceSegment(Trail, TrailMaterials.IsValidIndex(Index) ? TrailMaterials[Index].Get() : nullptr,
                 Sample.Tail, Sample.HeadStart, Thickness * Look.TrailThicknessScale,
-                Slot.TrailColor, Look.TrailIntensity * Fade);
+                Slot.TrailColor, Look.TrailIntensity * Slot.IntensityScale * Fade);
         }
         else
         {

@@ -127,6 +127,16 @@ public:
     static float SteadyMovementSpreadDegrees(float MovementSpreadDegrees, float AimAlpha, int32 SteadyRank, bool bAirborne);
 
     /**
+     * Momentum on the gun (Class-Kits §1.3, KIT-2): the Swift bar tightens
+     * the composed cone. 1.0 with the bar inactive (every non-Swift owner is
+     * bit-identical) and 1.0 at an empty bar, linear down to
+     * MomentumSpreadFloor at a full bar. Tighten-only: an empty bar is the
+     * baseline the weapon already has, never a penalty (O92).
+     */
+    static constexpr float MomentumSpreadFloor = 0.6f;   // O2 PLACEHOLDER
+    static float MomentumSpreadMultiplier(float MomentumFraction, bool bActive);
+
+    /**
      * Called Shot (Class-Kits §1.5 M11, the node text's own numbers): "At
      * Redline, Lead's range gate drops from 25 m to 10 m." Both clauses are
      * required — the node owned AND the bar at Redline — otherwise the

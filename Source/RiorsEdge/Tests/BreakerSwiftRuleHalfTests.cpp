@@ -102,6 +102,27 @@ bool FBreakerMarksmanRuleHalvesTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("R1 airborne keeps the penalty"), FBreakerWeaponMath::SteadyMovementSpreadDegrees(2.0f, 1.0f, 1, true), 2.0f);
     TestEqual(TEXT("R2 airborne loses it"), FBreakerWeaponMath::SteadyMovementSpreadDegrees(2.0f, 1.0f, 2, true), 0.0f);
 
+    // Momentum on the gun (KIT-2). An inactive bar is baseline at every
+    // fill, an empty active bar is baseline, and a full active bar is the
+    // floor: tighten-only, never a penalty (O92).
+    TestEqual(TEXT("an empty active bar is baseline"), FBreakerWeaponMath::MomentumSpreadMultiplier(0.0f, true), 1.0f);
+    for (const float Fraction : { 0.0f, 0.5f, 1.0f })
+    {
+        TestEqual(FString::Printf(TEXT("an inactive bar at %.1f is baseline"), Fraction),
+            FBreakerWeaponMath::MomentumSpreadMultiplier(Fraction, false), 1.0f);
+    }
+    TestEqual(TEXT("a full active bar is the floor"),
+        FBreakerWeaponMath::MomentumSpreadMultiplier(1.0f, true), FBreakerWeaponMath::MomentumSpreadFloor);
+    float PreviousMultiplier = 1.0f;
+    for (int32 Step = 0; Step <= 10; ++Step)
+    {
+        const float Multiplier = FBreakerWeaponMath::MomentumSpreadMultiplier(static_cast<float>(Step) / 10.0f, true);
+        TestTrue(FString::Printf(TEXT("the bar only tightens, step %d"), Step), Multiplier <= PreviousMultiplier + KINDA_SMALL_NUMBER);
+        TestTrue(FString::Printf(TEXT("never below the floor, step %d"), Step), Multiplier >= FBreakerWeaponMath::MomentumSpreadFloor - KINDA_SMALL_NUMBER);
+        TestTrue(FString::Printf(TEXT("never a penalty, step %d"), Step), Multiplier <= 1.0f + KINDA_SMALL_NUMBER);
+        PreviousMultiplier = Multiplier;
+    }
+
     // Called Shot (§1.5 M11): 25 m -> 10 m needs BOTH the node and Redline.
     TestEqual(TEXT("no node, no rewrite"), FBreakerWeaponMath::LeadRangeGateCm(2500.0f, false, true), 2500.0f);
     TestEqual(TEXT("node without Redline keeps Lead's gate"), FBreakerWeaponMath::LeadRangeGateCm(2500.0f, true, false), 2500.0f);

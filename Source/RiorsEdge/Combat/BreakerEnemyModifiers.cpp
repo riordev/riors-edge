@@ -420,6 +420,12 @@ float UBreakerEnemyModifierLibrary::GetVolatileFalloff(float DistanceCm, const F
     return 1.0f - (DistanceCm - Inner) / (Outer - Inner);
 }
 
+bool UBreakerEnemyModifierLibrary::VolatileDetonationReaches(bool bIsSelf, bool bIsDead, float DistanceSq, float OuterSq)
+{
+    if (bIsSelf || bIsDead) return false;
+    return DistanceSq <= OuterSq;
+}
+
 float UBreakerEnemyModifierLibrary::GetReflectDamage(float IncomingDamage, float MonsterMaxHealth, const FBreakerEnemyModifierParams& Params)
 {
     const float Raw = FMath::Max(0.0f, IncomingDamage) * FMath::Clamp(Params.ReflectFraction, 0.0f, 1.0f);

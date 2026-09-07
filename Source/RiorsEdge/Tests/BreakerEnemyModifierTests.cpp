@@ -319,6 +319,27 @@ bool FBreakerModifierCannotReadPlayerTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("A monster that deals no damage detonates for nothing"),
         EMods::GetVolatileDetonationDamage(0.0f, Params), 0.0f);
 
+    // (1b) Who the blast reaches: every live pawn in range, enemies included,
+    // never the corpse itself, never a body that is already down, and nothing
+    // past the outer radius.
+    const float OuterSq = FMath::Square(Params.VolatileOuterRadiusCm);
+    TestFalse(TEXT("A Volatile never hits itself"),
+        EMods::VolatileDetonationReaches(true, false, 0.0f, OuterSq));
+    TestTrue(TEXT("A live enemy inside the radius is reached"),
+        EMods::VolatileDetonationReaches(false, false, OuterSq * 0.25f, OuterSq));
+    TestFalse(TEXT("A dead body inside the radius is skipped"),
+        EMods::VolatileDetonationReaches(false, true, OuterSq * 0.25f, OuterSq));
+    TestFalse(TEXT("A live pawn beyond the outer radius is not reached"),
+        EMods::VolatileDetonationReaches(false, false, OuterSq * 1.5f, OuterSq));
+
+    // Shipped configuration: a default Volatile on a default chassis deals
+    // more than a default trash body has, so the blast kills every trash body
+    // inside the inner radius. Whether that is the wanted enemy fraction is a
+    // playtest question; this pins what ships today.
+    const FBreakerMonsterChassisParams Chassis;
+    TestTrue(TEXT("A default Volatile kills a default trash body outright"),
+        EMods::GetVolatileDetonationDamage(Chassis.BaseDamage, Params) > Chassis.BaseHealth);
+
     // (2) Reflective. §1.2 caps it at "6% of PLAYER max health"; it is capped
     // against the MONSTER's max health instead. The cap is the load-bearing
     // part: uncapped, it is a tax on high-DPS builds for existing.
