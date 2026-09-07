@@ -74,6 +74,12 @@ Metronome's `RecipientRadiusCm` selects recipients at cast, currently 500 cm
 holder's independent weapon ramp. Conduit's `DownbeatFlatDamagePerBuffedTarget`
 uses the live unique count of your Cadence and Metronome recipients.
 
+## Support Mark
+
+Mark's `PaintedAllyYieldMultiplier` is 0.5 (O2), paid only at Painted rank two.
+Own and allied marked damage also use their actual proc coefficient; zero
+proc and unsuccessful hits generate no Charge. This does not grant kill credit.
+
 ## Tank landing and stagger
 
 Ground Zero resolves its hit when the plunge physically lands. Its damage

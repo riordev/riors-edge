@@ -242,7 +242,7 @@ reads those conditions live, including overlapping fields and release/expiry.
 The existing Warding Aura benefit and Warded shield recharge are suppressed;
 intrinsic boss mechanics and shields already granted are preserved.
 
-## Support tempo
+## Support buffs and marks
 
 Cadence grants reload and swap tempo to living players within its footprint.
 The ordinary footprint follows at walking speed; Section enlarges it and
@@ -275,6 +275,13 @@ including distinct maintaining sources. They exclude ability, melee and DoT
 requests, even when those requests use the weapon damage pool. Conduit's
 Downbeat counts unique living recipients of the caster's active Conductor
 buffs, and doubles Cadence's tempo bonus and Metronome's flat bonus while live.
+
+Mark generates Charge from the caster's successful weapon shots. Painted adds
+own ability and DoT damage at rank one, then allied player damage at half yield
+at rank two (O2). Actual proc coefficient scales all yields; zero proc pays
+nothing. Blood Debt cashes out only on the caster's weapon hit. Overlapping
+Marks use the strongest vulnerability and Tell reduction without multiplying
+identical effects; ending one cast preserves the others.
 
 ## Open
 

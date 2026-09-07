@@ -5,11 +5,11 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
-## Cycle — Support Painted and Mark routing
-- [ ] Route real marked-target damage by source, purchased Painted rank and proc weight, including rank-two allies.
-- [ ] Restrict Blood Debt settlement to real weapon hits and prevent recursive Charge credit.
-- [ ] Preserve mark transfer/kill cleanup and prove actual casts, rank purchases, allied hits and cancellation; build, census and suite.
-Remaining repairs include Triage/Attending, Support element nodes, ability balance, rarity identities, other weapon poses and audible combat polish.
+## Cycle — Medic Triage and Attending
+- [ ] Give Conduit Triage a real nearby-player healing field and one lethal-hit save per target per cast with owned expiry and cleanup.
+- [ ] Pay Attending from actual healing, including timed heals, and extend the actual Mark effect alongside its display.
+- [ ] Prove lethal/overlap/exit/death/refusal cases and actual heal/mark expiry, review, build, census and suite.
+Remaining repairs include Support element nodes, ability balance, rarity identities, other weapon poses and audible combat polish.
 ## Playtest queue (owner, 2026-09-07)
 Continue through the entire repair list in tested batches without stopping after each commit for a playtest. After repairs, execute the content phase below (owner instruction, 2026-09-07).
 - (ui, npcs, systems) Reduce menu density and clipping; repair NPC interaction flow, ability assignment and point spending; present Core as the authored tree rather than a node cloud; update the dev sandbox. Finish silent nodes and Caster progression.
@@ -105,6 +105,8 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - Four Niagara systems at `/Game/Breaker/FX/NS_<Moment>` with a `Color` user parameter, or a free Fab VFX pack placed there
 
 ## Done (last three cycles; older is git)
+- **Support Painted and Mark:** Real target damage events route caster shots, purchased ability/tick sources and rank-two allied damage at half yield with proc weighting. Blood Debt requires an owner shot and cannot recursively pay Charge. Same-target marks retain the strongest vulnerability/Tell effect through one owner's cancellation, retarget and death. Handoff reads actual lethal remaining time and skips marked enemies on any target death; Ledger refunds remain owner-kill only. Canceled/dead source marks clear HUD state. Registry143numbers; build/census clean; **656tests,653passed,3known,0unexpected**. Actual controller/local-player camera fixture and purchased Medic cache repaired without weakening assertions; Blackout fixture recasts after revival. Native Rift PASS24kills,2015XP,200Glass. STATE unchanged under host-Python quarantine.
+
 - **Support Metronome and Conduit:** Cast-time500cm living-player snapshot, independent proc-weighted weapon ramps, purchased Tempo ally behavior and Counterpoint damage sources. Owned cleanup and Rehearsal preserve live reapplication while refusing canceled caches; receiving buffs grants no upkeep. Conduit counts actual unique living holders and updates its weapon flat immediately on membership changes; bonus doubling composes correctly. Raw weapon flat excludes abilities, melee and DoT requests. One new editable radius key brings numeric registry to142. Build/census clean; **655 tests,652passed,3known,0unexpected**. New runtime test retains timing/value assertions after fixing an observed Conduit timer-order lag. Native Rift PASS24kills,2015XP,186Glass. Triage/Painted/Attending and element nodes remain unfinished. STATE unchanged under host-Python quarantine.
 
 - **Tank landing and stagger:** Binary timed interruption with resistance and immunity cancels actual enemy windups and interruptible player channels. Ground Zero waits for physical landing and scales from measured fall distance with the purchased Terminal Descent cap. Ordinary falls damage shields/health; owned Breach landings within three seconds preserve takeoff self-damage while granting Kinetic fall protection and 1.5-second stagger immunity. Foreign launches, teleport, death and respec refuse stale protection. Build/census clean; **654 tests, 651 passed, 3 known failures, 0 unexpected**. Physical fall fixtures use real rolled shield gear and retain original resource/damage assertions. Native Rift loop PASS:24kills,2015XP,217Glass. Warden slam delivery inspected, not separately exercised by automation. STATE unchanged under host-Python quarantine.

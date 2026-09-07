@@ -237,9 +237,12 @@ public:
     // you softer — a keyed multiplier on the enemy's outgoing-damage seam.
     // Below 1 by definition, above 0 by law: softer, never disarmed.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="0.05", ClampMax="1")) float TellOutgoingMultiplier = 0.75f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="0", ClampMax="1")) float PaintedAllyYieldMultiplier = 0.5f; // O2 PLACEHOLDER
 
 private:
     UFUNCTION() void HandleHitDealt(const FBreakerHitContext& Hit);
+    UFUNCTION() void HandleMarkOwnerDeath();
+    static void ReconcileTarget(AActor* Target);
     void CloseMark();
     void PointMarkAt(AActor* NewTarget, float Duration);
 

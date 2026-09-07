@@ -1020,34 +1020,13 @@ void UBreakerAbility_Mark::ActivateAbility(const FGameplayAbilitySpecHandle Hand
             Effects->AddGlow(Hit.ImpactPoint, 28.0f, BreakerUI::Gold, 3.2f, PaintTiming);
         }
     }
-    // "Takes more damage from ALL SOURCES including allies" is structural: the
-    // keyed incoming modifier sits on the TARGET, so every damage request from
-    // anyone passes through it (§U5). Deep Mark rides the same key.
-    TargetCombat->PushIncomingDamageModifier(IncomingModifierKey(), MarkedDamageMultiplier + DeepMarkDamagePerDepth * MarkDepth);
-
-    // WA6 TELL, the softening half: while the mark lives the marked enemy hits
-    // you softer — a keyed push on the ENEMY's outgoing-damage seam, popped
-    // wherever the incoming key pops so the two halves cannot drift. Solo the
-    // Support is the only target an enemy has, so mark-lifetime scope IS
-    // "while it attacks you" (R2's allies clause waits on a party existing).
-    // The telegraph half of the node text is carried by the enemies' universal
-    // wind-up tells; a mark-scoped EXTRA telegraph read remains recorded
-    // absent — there is no HUD surface for it yet.
-    if (SupportHasNode(Character, BreakerNodeTags::Node_WA_Tell.GetTag()))
-    {
-        if (ABreakerEnemy* MarkedEnemy = Cast<ABreakerEnemy>(Target))
-        {
-            MarkedEnemy->PushOutgoingDamageMultiplier(TellModifierKey(), TellOutgoingMultiplier);
-        }
-    }
-
+    // Incoming vulnerability and Tell reconcile across living cast owners.
     MarkedTarget = Target;
-    if (UBreakerCombatComponent* OwnCombat = Character->FindComponentByClass<UBreakerCombatComponent>())
-    {
-        BoundCombat = OwnCombat;
-        OwnCombat->OnHitDealt.AddDynamic(this, &UBreakerAbility_Mark::HandleHitDealt);
-    }
+    BoundCombat = TargetCombat;
+    TargetCombat->OnDamageTaken.AddUniqueDynamic(this, &ThisClass::HandleHitDealt);
     bMarkActive = true;
+    Character->GetCombat()->OnDeath.AddUniqueDynamic(this, &ThisClass::HandleMarkOwnerDeath);
+    ReconcileTarget(Target);
     World->GetTimerManager().SetTimer(MarkTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { CloseMark(); }), Duration, false);
 }
 
@@ -1058,36 +1037,27 @@ void UBreakerAbility_Mark::PointMarkAt(AActor* NewTarget, float Duration)
     ABreakerCharacter* Character = GetBreakerCharacter();
     UWorld* World = Character ? Character->GetWorld() : nullptr;
     if (!Character || !World || !NewTarget) return;
-    if (AActor* Old = MarkedTarget.Get())
+    AActor* PreviousTarget = MarkedTarget.Get();
+    if (AActor* Old = PreviousTarget)
     {
         if (UBreakerCombatComponent* OldCombat = Old->FindComponentByClass<UBreakerCombatComponent>())
         {
-            OldCombat->RemoveIncomingDamageModifier(IncomingModifierKey());
-        }
-        // WA6: the softening travels with the paint (pop of an unpushed key is
-        // a no-op for a build without the node).
-        if (ABreakerEnemy* OldEnemy = Cast<ABreakerEnemy>(Old))
-        {
-            OldEnemy->PopOutgoingDamageMultiplier(TellModifierKey());
+            OldCombat->OnDamageTaken.RemoveDynamic(this, &ThisClass::HandleHitDealt);
         }
     }
     MarkDepth = 0;   // a jumped mark lands shallow
     if (UBreakerCombatComponent* NewCombat = NewTarget->FindComponentByClass<UBreakerCombatComponent>())
     {
-        NewCombat->PushIncomingDamageModifier(IncomingModifierKey(), MarkedDamageMultiplier);
-    }
-    if (SupportHasNode(Character, BreakerNodeTags::Node_WA_Tell.GetTag()))
-    {
-        if (ABreakerEnemy* NewEnemy = Cast<ABreakerEnemy>(NewTarget))
-        {
-            NewEnemy->PushOutgoingDamageMultiplier(TellModifierKey(), TellOutgoingMultiplier);
-        }
+        BoundCombat = NewCombat;
+        NewCombat->OnDamageTaken.AddUniqueDynamic(this, &ThisClass::HandleHitDealt);
     }
     if (UBreakerAbilityStateComponent* State = UBreakerAbilityStateComponent::FindOrAdd(Character))
     {
         State->SetMark(NewTarget, Duration);
     }
     MarkedTarget = NewTarget;
+    ReconcileTarget(PreviousTarget);
+    ReconcileTarget(NewTarget);
     World->GetTimerManager().SetTimer(MarkTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { CloseMark(); }), Duration, false);
 }
 
@@ -1096,28 +1066,32 @@ void UBreakerAbility_Mark::HandleHitDealt(const FBreakerHitContext& Hit)
     if (!bMarkActive || Hit.Target != MarkedTarget.Get() || !Hit.Target) return;
     ABreakerCharacter* Character = GetBreakerCharacter();
     if (!Character) return;
-    // WA1 PAINTED: marked-target Charge pays on ability and DoT damage, not
-    // weapon hits alone. WITHOUT the node, DoT ticks pay nothing (§1.1 authors
-    // the weapon-hit source; ticks riding it for free was over-generous).
-    // RECORDED LIMIT: weapon-vs-ability is indistinguishable on the context,
-    // so that finer cut waits on a context tag; the DoT half is the honest cut
-    // available today. R2's allied-damage clause waits on a party existing.
-    const bool bPainted = SupportHasNode(Character, BreakerNodeTags::Node_WA_Painted.GetTag());
-    if (Hit.bFromDoT && !bPainted) return;
-    // §1.1: damage YOU deal to your mark generates, at +1 per 2% of the
-    // TARGET'S maximum health — a boss pays the same total for the same
-    // fraction, so the bar is bounded and predictable. WA8 deepens the yield.
+    if (Character->GetCombat()->IsDead() || Character->IsActorBeingDestroyed()) return;
+    ABreakerCharacter* Dealer = Cast<ABreakerCharacter>(Hit.Instigator);
+    const bool bOwner = Dealer == Character;
+    const bool bLivingPlayer = Dealer && !Dealer->IsActorBeingDestroyed() && Dealer->GetCombat() && !Dealer->GetCombat()->IsDead();
+    const bool bWeaponShot = Hit.Delivery == EBreakerDamageDelivery::Weapon && !Hit.bFromDoT
+        && !Hit.SourceTags.HasTag(FGameplayTag::RequestGameplayTag(TEXT("Ability"), false))
+        && !Hit.SourceTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Damage.Melee"), false));
+    const float ActualDamage = Hit.Result.HealthDamage + Hit.Result.ShieldDamage;
+    const bool bPayingHit = bLivingPlayer && !Hit.Result.bDodged && FMath::IsFinite(ActualDamage) && ActualDamage > 0
+        && FMath::IsFinite(Hit.ProcCoefficient) && Hit.ProcCoefficient > 0;
+    const int32 PaintedRank = SupportNodeRank(Character, TEXT("Support.Warden.Painted"));
     if (UBreakerChargeComponent* Charge = Character->FindComponentByClass<UBreakerChargeComponent>())
     {
-        const float YieldScale = 1.0f + DeepMarkYieldPerDepth * MarkDepth;
-        Charge->NotifyMarkedTargetDamage((Hit.Result.HealthDamage + Hit.Result.ShieldDamage) * YieldScale,
-            BreakerSupportAbilityLocal::BreakerSupportTargetMaxHealth(Hit.Target));
-
+        if (bPayingHit && (bOwner ? (bWeaponShot || PaintedRank >= 1) : PaintedRank >= 2))
+        {
+            const float YieldScale = (1.0f + DeepMarkYieldPerDepth * MarkDepth)
+                * FMath::Clamp(Hit.ProcCoefficient, 0.0f, 1.0f)
+                * (bOwner ? 1.0f : FMath::Clamp(PaintedAllyYieldMultiplier, 0.0f, 1.0f));
+            Charge->NotifyMarkedTargetDamage(ActualDamage * YieldScale,
+                BreakerSupportAbilityLocal::BreakerSupportTargetMaxHealth(Hit.Target));
+        }
         // MD10 BLOOD DEBT: the next weapon hit on a marked target spends the
         // banked pool as flat damage — a one-shot settlement request, flat
         // bucket, no crit, proc 0, so it can neither double-dip nor seed.
         const float Debt = Charge->GetBloodDebtPool();
-        if (Debt > 0.0f && !Hit.bFromDoT && !Hit.Result.bKilled)
+        if (Debt > 0.0f && bOwner && bWeaponShot && bPayingHit && !Hit.Result.bKilled)
         {
             if (UBreakerCombatComponent* TargetCombat = Hit.Target->FindComponentByClass<UBreakerCombatComponent>())
             {
@@ -1146,9 +1120,9 @@ void UBreakerAbility_Mark::HandleHitDealt(const FBreakerHitContext& Hit)
     if (Hit.Result.bKilled)
     {
         const UBreakerAbilityStateComponent* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>();
-        const float Remaining = State ? State->GetMarkRemaining() : 0.0f;
+        const float Remaining = State ? State->GetMarkRemainingFor(Hit.Target) : 0.0f;
         const float UnspentFraction = ActiveMarkDuration > 0.0f ? FMath::Clamp(Remaining / ActiveMarkDuration, 0.0f, 1.0f) : 0.0f;
-        if (UnspentFraction > 0.0f && SupportHasNode(Character, BreakerNodeTags::Node_WA_ExecutionersLedger.GetTag()))
+        if (bOwner && UnspentFraction > 0.0f && SupportHasNode(Character, BreakerNodeTags::Node_WA_ExecutionersLedger.GetTag()))
         {
             if (UBreakerChargeComponent* Charge = Character->FindComponentByClass<UBreakerChargeComponent>())
             {
@@ -1173,6 +1147,10 @@ void UBreakerAbility_Mark::HandleHitDealt(const FBreakerHitContext& Hit)
                 {
                     ABreakerEnemy* Candidate = *It;
                     if (!Candidate || Candidate == Hit.Target) continue;
+                    bool bMarked = false;
+                    for (TActorIterator<ABreakerCharacter> Player(World); Player; ++Player)
+                        if (const auto* PlayerState = Player->FindComponentByClass<UBreakerAbilityStateComponent>()) bMarked |= PlayerState->IsMarked(Candidate);
+                    if (bMarked) continue;
                     const UBreakerCombatComponent* CandidateCombat = Candidate->FindComponentByClass<UBreakerCombatComponent>();
                     if (!CandidateCombat || CandidateCombat->IsDead()) continue;
                     const float DistSq = FVector::DistSquared(Hit.Target->GetActorLocation(), Candidate->GetActorLocation());
@@ -1191,6 +1169,43 @@ void UBreakerAbility_Mark::HandleHitDealt(const FBreakerHitContext& Hit)
     }
 }
 
+void UBreakerAbility_Mark::HandleMarkOwnerDeath() { CloseMark(); }
+
+void UBreakerAbility_Mark::ReconcileTarget(AActor* Target)
+{
+    if (!Target || !Target->GetWorld()) return;
+    bool bAny = false;
+    bool bTell = false;
+    float Strongest = 1.0f;
+    float Softest = 1.0f;
+    // Same named mark does not multiply with itself. Live source instances
+    // retain ownership while the shared target payload uses the strongest.
+    for (TActorIterator<ABreakerCharacter> Player(Target->GetWorld()); Player; ++Player)
+    {
+        if (Player->IsActorBeingDestroyed() || Player->GetCombat()->IsDead()) continue;
+        auto* ASC = Player->GetAbilitySystemComponent();
+        if (!ASC) continue;
+        for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+        {
+            const auto* Mark = Cast<UBreakerAbility_Mark>(Spec.GetPrimaryInstance());
+            if (!Mark || !Mark->bMarkActive || Mark->MarkedTarget.Get() != Target) continue;
+            bAny = true;
+            Strongest = FMath::Max(Strongest, Mark->MarkedDamageMultiplier + Mark->DeepMarkDamagePerDepth * Mark->MarkDepth);
+            if (SupportHasNode(*Player, BreakerNodeTags::Node_WA_Tell.GetTag()))
+            { bTell = true; Softest = FMath::Min(Softest, Mark->TellOutgoingMultiplier); }
+        }
+    }
+    if (auto* Combat = Target->FindComponentByClass<UBreakerCombatComponent>())
+    {
+        if (bAny) Combat->PushIncomingDamageModifier(IncomingModifierKey(), Strongest);
+        else Combat->RemoveIncomingDamageModifier(IncomingModifierKey());
+    }
+    if (auto* Enemy = Cast<ABreakerEnemy>(Target))
+    {
+        if (bTell) Enemy->PushOutgoingDamageMultiplier(TellModifierKey(), Softest);
+        else Enemy->PopOutgoingDamageMultiplier(TellModifierKey());
+    }
+}
 void UBreakerAbility_Mark::CloseMark()
 {
     if (CurrentActorInfo)
@@ -1204,24 +1219,18 @@ void UBreakerAbility_Mark::EndAbility(const FGameplayAbilitySpecHandle Handle, c
     if (bMarkActive)
     {
         bMarkActive = false;
-        if (AActor* Target = MarkedTarget.Get())
+        if (auto* Character = GetBreakerCharacter())
         {
-            if (UBreakerCombatComponent* TargetCombat = Target->FindComponentByClass<UBreakerCombatComponent>())
-            {
-                TargetCombat->RemoveIncomingDamageModifier(IncomingModifierKey());
-            }
-            // WA6: the softening dies with the mark, unconditionally — a pop
-            // of a never-pushed key is a no-op, and gating it on the node tag
-            // would leak the softening across a respec.
-            if (ABreakerEnemy* MarkedEnemy = Cast<ABreakerEnemy>(Target))
-            {
-                MarkedEnemy->PopOutgoingDamageMultiplier(TellModifierKey());
-            }
+            Character->GetCombat()->OnDeath.RemoveDynamic(this, &ThisClass::HandleMarkOwnerDeath);
+            if (bWasCancelled || Character->GetCombat()->IsDead())
+                if (auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>())
+                    if (State->GetMarkRemainingFor(MarkedTarget.Get()) > 0.0f) State->ClearMark();
         }
+        ReconcileTarget(MarkedTarget.Get());
         MarkedTarget.Reset();
         if (UBreakerCombatComponent* Combat = BoundCombat.Get())
         {
-            Combat->OnHitDealt.RemoveDynamic(this, &UBreakerAbility_Mark::HandleHitDealt);
+            Combat->OnDamageTaken.RemoveDynamic(this, &UBreakerAbility_Mark::HandleHitDealt);
         }
         BoundCombat.Reset();
         if (UWorld* World = GetWorld())

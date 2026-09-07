@@ -2,6 +2,7 @@
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerSupportAbilities.h"
+#include "Abilities/BreakerAbilityDefinition.h"
 #include "Abilities/BreakerAbilityStateComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
@@ -132,6 +133,16 @@ bool FBreakerBlackoutProtocolRuntimeTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("source actually died"), Player->GetCombat()->IsDead())) return false;
     TestFalse(TEXT("dead caster cannot retain suppression"), Combat->IsBeneficialEffectSuppressed());
     Player->GetCombat()->RestoreVitals(); SetCharge(100);
+    TestFalse(TEXT("death clears the former mark"), State->IsMarked(Target));
+    // Restore the required mark through an actual cast before testing the
+    // surviving zone leases; revival does not restore a dead caster's mark.
+    FGameplayTagContainer MarkCooldown;
+    MarkCooldown.AddTag(GetDefault<UBreakerAbility_Mark>()->GetAbilityDefinition()->CooldownTag);
+    ASC->RemoveActiveEffectsWithGrantedTags(MarkCooldown);
+    Controller->GetPlayerViewPoint(Eye, View);
+    Controller->SetControlRotation((Target->GetActorLocation() - Eye).Rotation());
+    if (!TestTrue(TEXT("revived caster marks again"), ASC->TryActivateAbility(Mark))) return false;
+    SetCharge(100);
     const FVector Inside = Target->GetActorLocation(); Target->SetActorLocation(Inside + FVector(0, 0, 1000));
     TestFalse(TEXT("vertical exit releases before next membership tick"), Combat->IsBeneficialEffectSuppressed());
     Target->SetActorLocation(Inside);

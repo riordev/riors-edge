@@ -3748,9 +3748,8 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSupportWardenTree()
     // points the solo player here first.
 
     // --- Tier 1 (WA1-WA3) ----------------------------------------------------
-    // WA1. R2's ally clause adds nothing solo and therefore cannot become a
-    // solo dependency — the treatment's own guard. WAITING ON:
-    // UBreakerChargeComponent's marked-target source reading damage kinds.
+    // WA1. Own weapon hits generate by default; purchased ranks admit own
+    // abilities/ticks, then allied damage at a reduced proc-weighted rate.
     UBreakerProgressionNode* Node = MakeNode(TEXT("Support.Warden.Painted"), TEXT("Painted"),
         TEXT("Marked-target Charge pays on your ability and DoT damage, not weapon hits alone (R2: allied damage too, at a reduced rate)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 2, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_WA_Painted.GetTag());

@@ -571,7 +571,8 @@
 				"DeepMarkYieldPerDepth": 0.25,
 				"DeepMarkMaxDepth": 3,
 				"HuntersEconomyDuration": 4,
-				"TellOutgoingMultiplier": 0.75
+				"TellOutgoingMultiplier": 0.75,
+				"PaintedAllyYieldMultiplier": 0.5
 			},
 			"variants": []
 		},
