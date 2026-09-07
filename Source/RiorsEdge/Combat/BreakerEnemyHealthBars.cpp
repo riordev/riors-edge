@@ -746,9 +746,19 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         const float EntropyRailH = FMath::Max(1.0f, 2.0f * Scale * ScaleUnit); // O2 presentation.
         const float EntropyY = Bar.Y + Bar.H + PipRowH + Gap;
         const float EntropyH = bShowEntropy ? Gap + EntropyTextSize.Y + Gap + EntropyRailH : 0;
+        const FBreakerActiveStatus* Erased = Status ? Status->GetActiveStatuses().FindByPredicate([](const auto& Entry)
+            { return Entry.Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Erased")) && Entry.RemainingDuration > 0; }) : nullptr;
+        const float VoidThreshold = Status ? Status->GetVoidThreshold() : 0;
+        const float VoidBuildup = Status && VoidThreshold > UE_SMALL_NUMBER ? FMath::Clamp(Status->GetVoidBuildup() / VoidThreshold, 0.0f, 1.0f) : 0;
+        const bool bShowVoid = bShowName && !bSightBlocked && (Erased || VoidBuildup > 0);
+        const FString VoidText = Erased ? BreakerStrings::Format(EBreakerStringKey::HudErasedTimer, Erased->RemainingDuration)
+            : FString::Printf(TEXT("%s %d%%"), *BreakerStrings::Get(EBreakerStringKey::HudVoid), FMath::Clamp(FMath::RoundToInt(VoidBuildup * 100), 1, 100));
+        const FVector2D VoidTextSize = bShowVoid ? MeasureSpecText(VoidText, EntropyPixels, ESpecFontRole::Mono) : FVector2D::ZeroVector;
+        const float VoidY = EntropyY + EntropyH;
+        const float VoidH = bShowVoid ? Gap + VoidTextSize.Y + Gap + EntropyRailH : 0;
         const float ColumnW = FMath::Max(FMath::Max3(Bar.W, MarksW, bShowName ? static_cast<float>(MeasureSpecText(Name, NamePixels, ESpecFontRole::Display).X) : 0.0f),
-            bShowEntropy ? static_cast<float>(EntropyTextSize.X) : 0.0f);
-        const float ColumnH = Bar.Y + Bar.H + PipRowH + EntropyH - ColumnTop;
+            FMath::Max(bShowEntropy ? static_cast<float>(EntropyTextSize.X) : 0.0f, static_cast<float>(VoidTextSize.X)));
+        const float ColumnH = Bar.Y + Bar.H + PipRowH + EntropyH + VoidH - ColumnTop;
 
         // Screen-space overlap suppression over the WHOLE column. Two enemies
         // standing in line with the camera project to nearly the same point,
@@ -847,6 +857,16 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
                 const float Fill = Rot ? FMath::Clamp(Rot->RemainingDuration / FMath::Max(Rot->Spec.Duration, UE_SMALL_NUMBER), 0.0f, 1.0f) : Buildup;
                 DrawRect(BreakerUI::Alpha(BreakerUI::BorderRest, BarAlpha), Bar.X, RailY, Bar.W, EntropyRailH);
                 DrawRect(BreakerUI::Alpha(Rot ? BreakerUI::Orange : BreakerUI::Gold, BarAlpha), Bar.X, RailY, Bar.W * Fill, EntropyRailH);
+            }
+            if (bShowVoid && Bar.X >= 0 && Bar.X + Bar.W <= Canvas->ClipX
+                && VoidY + VoidH <= Canvas->ClipY
+                && Projected.X - VoidTextSize.X * .5f >= 0 && Projected.X + VoidTextSize.X * .5f <= Canvas->ClipX)
+            {
+                DrawSpecTextCentered(VoidText, Projected.X, VoidY, BreakerUI::Violet, EntropyPixels, BarAlpha, ESpecFontRole::Mono);
+                const float RailY = VoidY + VoidTextSize.Y + Gap;
+                const float Fill = Erased ? FMath::Clamp(Erased->RemainingDuration / FMath::Max(Erased->Spec.Duration, UE_SMALL_NUMBER), 0.0f, 1.0f) : VoidBuildup;
+                DrawRect(BreakerUI::Alpha(BreakerUI::BorderRest, BarAlpha), Bar.X, RailY, Bar.W, EntropyRailH);
+                DrawRect(BreakerUI::Alpha(BreakerUI::Violet, BarAlpha), Bar.X, RailY, Bar.W * Fill, EntropyRailH);
             }
             if (bShowName)
             {

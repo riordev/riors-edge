@@ -134,7 +134,10 @@
     BREAKER_STRING(HudEntropy, "hud.entropy", "") \
     BREAKER_STRING(HudRotTimer, "hud.rotTimer", "%.1f") \
     BREAKER_STRING(CycleEntropy, "cycle.entropy", "") \
-    BREAKER_STRING(HudRotDamage, "hud.damage.rot", "%s")
+    BREAKER_STRING(HudRotDamage, "hud.damage.rot", "%s") \
+    BREAKER_STRING(HudVoid, "hud.void", "") \
+    BREAKER_STRING(HudErasedTimer, "hud.erasedTimer", "%.1f") \
+    BREAKER_STRING(HudErasedDamage, "hud.damage.erased", "%s")
 
 // The enumerator is an index into the loaded table and nothing else: it is
 // never serialized, so the list may be reordered freely. The key string is

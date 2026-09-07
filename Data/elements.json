@@ -8,5 +8,9 @@
   "vestigeEntropyResistancePercent": 25.0,
   "attunementTailSeconds": 2.0,
   "sympatheticFlatBuildup": 2.0,
-  "sympatheticFadeSeconds": 4.0
+  "sympatheticFadeSeconds": 4.0,
+  "voidThresholdHealthFraction": 0.1,
+  "voidDamageFraction": 0.5,
+  "voidDelaySeconds": 2.0,
+  "voidBuildupTimeoutSeconds": 4.0
 }

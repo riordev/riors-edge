@@ -112,6 +112,7 @@ public:
     void PlayAbilityCast(FName AbilityId);
     // Earned Rot activation for the local applier or recipient, never per tick.
     bool PlayEntropyActivation();
+    bool PlayVoidCue(bool bBurst);
     int32 GetEntropyCueCount() const { return EntropyCueCount; }
 
 protected:
@@ -129,6 +130,12 @@ private:
     UPROPERTY() TObjectPtr<UAudioComponent> AbilityVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> PlayerDeathVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> EntropyVoice;
+    UPROPERTY() TObjectPtr<UAudioComponent> VoidMarkVoice;
+    UPROPERTY() TObjectPtr<UAudioComponent> VoidBurstVoice;
+    UPROPERTY() TObjectPtr<USoundWaveProcedural> VoidMarkWave;
+    UPROPERTY() TObjectPtr<USoundWaveProcedural> VoidBurstWave;
+    TArray<int16> VoidMarkPcm, VoidBurstPcm;
+    double LastVoidMarkTime = -1000, LastVoidBurstTime = -1000;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> FireWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> HitWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> KillWave;

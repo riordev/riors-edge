@@ -177,6 +177,19 @@ namespace BreakerSound
         const float Grit = NoiseAt(static_cast<uint32>(Index) ^ 0xE170u);
         return .42f * (.6f * FMath::Sin(Phase) + .4f * Grit) * Envelope(T, EntropyActivationDurationSeconds, 9.0f); // O2 PLACEHOLDER
     }
+    // O2: a restrained rising mark, followed later by a short low erasure snap.
+    inline float VoidActivationSample(int32 Index)
+    {
+        const float T = static_cast<float>(Index) / SampleRate;
+        return .3f * FMath::Sin(2 * PI * (210 * T + 700 * T * T)) * Envelope(T, .24f, 8);
+    }
+    inline float VoidBurstSample(int32 Index)
+    {
+        const float T = static_cast<float>(Index) / SampleRate;
+        return .4f * (.7f * FMath::Sin(2 * PI * 90 * T) + .3f * NoiseAt(Index ^ 0xE2A5u)) * Envelope(T, .18f, 14);
+    }
+    inline void RenderVoidActivation(TArray<int16>& Out) { RenderPcm16(Out, .24f, &VoidActivationSample); }
+    inline void RenderVoidBurst(TArray<int16>& Out) { RenderPcm16(Out, .18f, &VoidBurstSample); }
     inline void RenderEntropyActivation(TArray<int16>& Out) { RenderPcm16(Out, EntropyActivationDurationSeconds, &EntropyActivationSample); }
     inline void RenderHitConfirm(TArray<int16>& Out) { RenderPcm16(Out, HitDurationSeconds, &HitConfirmSample); }
     inline void RenderKill(TArray<int16>& Out)       { RenderPcm16(Out, KillDurationSeconds, &KillSample); }

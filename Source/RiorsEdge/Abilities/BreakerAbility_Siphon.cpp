@@ -181,6 +181,9 @@ void UBreakerAbility_Siphon::TickChannel()
     // O5: Elemental is the pipeline family until the resistance model lands;
     // O225: Siphon retains its damage and leech, without the retired Void debuff.
     Damage.DamageFamily = EBreakerDamageFamily::Elemental;
+    // O2 association: Siphon's live channel supplies Void buildup through real hits.
+    Damage.Element = EBreakerElement::Void;
+    Damage.ElementalFraction = 1.0f;
     Damage.SourceTags.AddTag(BreakerAbilityTags::Ability_Class_Caster_Siphon.GetTag());
     Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
     Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;

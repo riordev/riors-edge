@@ -27,6 +27,7 @@ void BreakerStartEntropyCapture(ABreakerCharacter* Character)
         int32 Index = 0;
         AActor* SourceEnemy = nullptr;
         AActor* FocusEnemy = nullptr;
+        const bool bVoid = FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureVoid"));
         const bool bFeedback = FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureEntropyFeedback"));
         const int32 FocusIndex = bFeedback || FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureEntropyRot")) ? 1 : 0;
         const bool bSympathetic = FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureSympathetic"));
@@ -55,6 +56,14 @@ void BreakerStartEntropyCapture(ABreakerCharacter* Character)
                 Hit.ElementBuildupFadeSeconds = BreakerEntropy::SympatheticFadeSeconds();
             }
             Combat->ReceiveDamage(Hit);
+            if (bVoid)
+            {
+                FBreakerDamageRequest VoidHit = Hit;
+                VoidHit.Element = EBreakerElement::Void;
+                VoidHit.BaseDamage = Status->GetVoidThreshold() * (Index == 0 ? .6f : 1.01f)
+                    / FMath::Max(.01f, 1 - Status->GetVoidResistancePercent() / 100);
+                Combat->ReceiveDamage(VoidHit);
+            }
             if (bFeedback && Index == 1)
             {
                 FBreakerStatusApplicationSpec Bleed;
@@ -88,7 +97,13 @@ void BreakerStartEntropyCapture(ABreakerCharacter* Character)
             }
             Hit.bCanCritical = false; Hit.SetInstigator(SourceEnemy);
             Character->GetCombat()->ReceiveDamage(Hit);
+            if (bVoid)
+            {
+                Hit.Element = EBreakerElement::Void;
+                Hit.BaseDamage = Status->GetVoidThreshold() * .6f;
+                Character->GetCombat()->ReceiveDamage(Hit);
+            }
         }
-    }), 1.0f, false);
+    }), FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureVoid")) ? 5.5f : 1.0f, false);
 #endif
 }

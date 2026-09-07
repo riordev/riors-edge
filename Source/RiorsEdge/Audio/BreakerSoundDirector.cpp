@@ -38,6 +38,8 @@ ABreakerSoundDirector::ABreakerSoundDirector()
     AbilityVoice = MakeVoice(TEXT("AbilityVoice"));
     PlayerDeathVoice = MakeVoice(TEXT("PlayerDeathVoice"));
     EntropyVoice = MakeVoice(TEXT("EntropyVoice"));
+    VoidMarkVoice = MakeVoice(TEXT("VoidMarkVoice"));
+    VoidBurstVoice = MakeVoice(TEXT("VoidBurstVoice"));
 }
 
 USoundWaveProcedural* ABreakerSoundDirector::MakeWave(int32 SampleRate)
@@ -115,13 +117,17 @@ void ABreakerSoundDirector::BeginPlay()
     PlayerDeathVoice->SetSound(PlayerDeathWave);
     EntropyWave = MakeWave(EntropyRate);
     EntropyVoice->SetSound(EntropyWave);
+    VoidMarkWave = MakeWave(LoadOrSynth(TEXT("void_activate.wav"), &BreakerSound::RenderVoidActivation, VoidMarkPcm));
+    VoidBurstWave = MakeWave(LoadOrSynth(TEXT("void_burst.wav"), &BreakerSound::RenderVoidBurst, VoidBurstPcm));
+    VoidMarkVoice->SetSound(VoidMarkWave);
+    VoidBurstVoice->SetSound(VoidBurstWave);
 }
 
 void ABreakerSoundDirector::ApplyVolumeSettings(float Master, float Effects)
 {
     const float Gain = BreakerSound::EffectsGain(Master, Effects);
     for (UAudioComponent* Voice : { FireVoice.Get(), HitVoice.Get(), KillVoice.Get(),
-        TakeHitVoice.Get(), AbilityVoice.Get(), PlayerDeathVoice.Get(), EntropyVoice.Get() })
+        TakeHitVoice.Get(), AbilityVoice.Get(), PlayerDeathVoice.Get(), EntropyVoice.Get(), VoidMarkVoice.Get(), VoidBurstVoice.Get() })
     {
         if (Voice) Voice->SetVolumeMultiplier(Gain);
     }
@@ -154,6 +160,19 @@ bool ABreakerSoundDirector::PlayEntropyActivation()
     LastEntropyCueTime = Now;
     ++EntropyCueCount;
     Trigger(EntropyVoice, EntropyWave, EntropyPcm);
+    return true;
+}
+
+bool ABreakerSoundDirector::PlayVoidCue(bool bBurst)
+{
+    auto* Wave = bBurst ? VoidBurstWave.Get() : VoidMarkWave.Get();
+    const auto& Pcm = bBurst ? VoidBurstPcm : VoidMarkPcm;
+    if (!GetWorld() || !Wave || Pcm.IsEmpty()) return false;
+    double& Last = bBurst ? LastVoidBurstTime : LastVoidMarkTime;
+    const double Now = GetWorld()->GetTimeSeconds();
+    if (Now - Last < .15) return false; // O2 crowd throttle, independent mark and payout cues.
+    Last = Now;
+    Trigger(bBurst ? VoidBurstVoice.Get() : VoidMarkVoice.Get(), Wave, Pcm);
     return true;
 }
 

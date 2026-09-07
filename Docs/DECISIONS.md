@@ -402,7 +402,7 @@ Numbers are permanent and never reused.
 **O217** — A Volatile blast reaches every live pawn in range, enemies included, at the one monster-scaled number; enemy projectiles and zones stay enemy-safe. Volatile is the only enemy fire that hurts enemies.
 **O221** — A rewrite on an Aberrant or Unwritten item may author a More; gear and tree Mores share the three slots under the one ceiling. Ordinary affixes never do.
 
-**O222** — The elements are verbs: Rift displaces (Unstable), Entropy decays (Rot), Void erases (Erased). Each is a buildup status whose threshold scales with the chassis and whose damage snapshots from the applying hit. Bleed and Poison stay physical.
+**O222** — The elements are verbs: Rift displaces (Unstable), Entropy decays (Rot), Void erases (Erased). Each is a buildup status whose threshold scales with the chassis and whose damage snapshots from the applying hit. Bleed and Poison stay physical. Erased pays its snapshotted damage as one delayed burst; an active mark cannot stack or refresh, and consumption cancels its unpaid burst.
 
 **O223** — One reaction per pair, fired by consuming the first status: Rift on Rot is Collapse, Void on Rot is Wither, Rift on Erased is Tear. A reaction spends only the damage already earned; no triple, no chain.
 

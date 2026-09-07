@@ -298,7 +298,7 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
         if (const UBreakerEquipmentComponent* Equipment = GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>())
         {
             ReductionPercent += Request.DamageFamily == EBreakerDamageFamily::Physical
-                ? Equipment->GetStats().PhysicalDamageReductionPercent * (Request.Element == EBreakerElement::Entropy && FMath::IsFinite(Request.ElementalFraction) ? 1.0f - FMath::Clamp(Request.ElementalFraction, 0.0f, 1.0f) : 1.0f)
+                ? Equipment->GetStats().PhysicalDamageReductionPercent * (Request.Element != EBreakerElement::None && FMath::IsFinite(Request.ElementalFraction) ? 1.0f - FMath::Clamp(Request.ElementalFraction, 0.0f, 1.0f) : 1.0f)
                 : 0.0f;
         }
         // The tree's lane joins gear's family bucket here — points summed,
@@ -394,7 +394,10 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     Attributes->ApplyShield(Result.RemainingShield);
     Attributes->ApplyHealth(Result.RemainingHealth);
     if (UBreakerStatusComponent* Status = GetOwner()->FindComponentByClass<UBreakerStatusComponent>())
+    {
         Status->ApplyEntropyHit(ResolvedRequest, Result);
+        Status->ApplyVoidHit(ResolvedRequest, Result);
+    }
     if (bFrontBrokeThisHit) OnFrontShieldBroken.Broadcast();
     // TargetBandBroken's write: did THIS hit move the health-band index?
     // Defense.Health is the pre-damage read from the top of this function, so

@@ -1237,6 +1237,8 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
 
     TArray<FVector2D> Placed;
     Placed.Reserve(Visible.Num());
+    TArray<FBox2D> PlacedLabels;
+    PlacedLabels.Reserve(Visible.Num());
     const float ClusterRadius = S(BreakerHUD::DamageClusterRadius);
 
     for (const FBreakerHUDDamageNumber* Number : Visible)
@@ -1251,7 +1253,7 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
             if (FVector2D::Distance(Other, Screen) <= ClusterRadius) ++Neighbours;
         }
         if (Neighbours >= BreakerHUD::DamageClusterMax) continue;
-        Placed.Add(Screen);
+
 
         const float Age = static_cast<float>(Now - Number->Time);
 
@@ -1309,12 +1311,6 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
         // The profile's slider, last, over the whole hierarchy: it scales the
         // read, never the ranking between kinds.
         if (Profile) SizePixels *= Profile->DamageNumberScale;
-        // Stack offset scales with the number's OWN size, so a 52px crit and a
-        // 26px body hit in the same cluster separate by proportionate amounts
-        // instead of both by a flat 8px. Taken before the pop, or a number
-        // would jump sideways in the stack as it settled.
-        const float StackOffset = S(SizePixels * BreakerHUD::DamageClusterOffsetRatio);
-
         // ABSORBED. The Warden's whole mechanic is that its FRONT is the wrong
         // place to shoot, and until now the only report of that was the health
         // bar not moving — which reads as a broken game, not as a wrong angle.
@@ -1349,12 +1345,49 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
         // full weight of the trigger pull.
         const float DrawAlpha = Number->bSecondary ? Fade * 0.8f : Fade;
 
-        const float NumberY = Screen.Y - Rise - Neighbours * StackOffset;
+        float NumberY = Screen.Y - Rise;
         const bool bRotTick = Number->bFromDoT && Number->Element == EBreakerElement::Entropy
             && Number->DamageTypeTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"));
-        const FString DamageText = bRotTick
+        const bool bErasedBurst = Number->Element == EBreakerElement::Void
+            && Number->DamageTypeTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Erased"));
+        const FString DamageText = bErasedBurst
+            ? BreakerStrings::Format(EBreakerStringKey::HudErasedDamage, *BreakerUI::FormatDamage(Number->Value)) : bRotTick
             ? BreakerStrings::Format(EBreakerStringKey::HudRotDamage, *BreakerUI::FormatDamage(Number->Value))
             : BreakerUI::FormatDamage(Number->Value);
+        // Compare the final animated glyph bounds, not the world anchor or an
+        // average offset. Different rises and pop scales can otherwise place
+        // ROT and ERASED on the same line even inside the old cluster budget.
+        const FVector2D MainSize = MeasureSpecText(DamageText, SizePixels, ESpecFontRole::Mono);
+        FString CaptionText;
+        if (Number->bKilled && Number->Overkill >= Number->Value * BreakerHUD::DamageOverkillCaptionFraction)
+            CaptionText = BreakerStrings::Format(EBreakerStringKey::HudDamageOverkill, *BreakerUI::FormatDamage(Number->Overkill));
+        else if (bAbsorbed)
+            CaptionText = BreakerStrings::Format(EBreakerStringKey::HudDamageAbsorbed, Number->MitigatedFraction * 100.0f);
+        const FVector2D CaptionSize = CaptionText.IsEmpty() ? FVector2D::ZeroVector
+            : MeasureSpecText(CaptionText, 13.0f, ESpecFontRole::Mono);
+        const float Outline = FMath::Max(S(FMath::Max(SizePixels, 13.0f) * .05f), 1.0f);
+        const float HalfWidth = FMath::Max(MainSize.X, CaptionSize.X) * .5f + Outline;
+        const float LabelHeight = MainSize.Y + CaptionSize.Y + 2 * Outline;
+        const float LabelGap = S(3.0f); // O2 presentation spacing between actual glyph boxes.
+        FBox2D Label(FVector2D(Screen.X - HalfWidth, NumberY - Outline),
+            FVector2D(Screen.X + HalfWidth, NumberY - Outline + LabelHeight));
+        for (int32 Pass = 0; Pass <= PlacedLabels.Num(); ++Pass)
+        {
+            bool bMoved = false;
+            for (const FBox2D& Other : PlacedLabels)
+                if (Label.Intersect(Other))
+                {
+                    const float Shift = Label.Max.Y - Other.Min.Y + LabelGap;
+                    Label.Min.Y -= Shift;
+                    Label.Max.Y -= Shift;
+                    NumberY -= Shift;
+                    bMoved = true;
+                }
+            if (!bMoved) break;
+        }
+        if (Label.Min.X < 0 || Label.Max.X > Canvas->ClipX || Label.Min.Y < 0 || Label.Max.Y > Canvas->ClipY) continue;
+        Placed.Add(Screen);
+        PlacedLabels.Add(Label);
         DrawOutlinedNumber(DamageText,
             Screen.X, NumberY, Face, SizePixels, DrawAlpha);
 
@@ -1364,7 +1397,7 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
         // when trivial — a sliver of overkill is trivia, not a read.
         if (Number->bKilled && Number->Overkill >= Number->Value * BreakerHUD::DamageOverkillCaptionFraction)
         {
-            const float NumberHeight = MeasureSpecText(TEXT("0"), SizePixels, ESpecFontRole::Mono).Y;
+            const float NumberHeight = MainSize.Y;
             DrawOutlinedNumber(BreakerStrings::Format(EBreakerStringKey::HudDamageOverkill, *BreakerUI::FormatDamage(Number->Overkill)),
                 Screen.X, NumberY + NumberHeight, BreakerUI::Harm, 13.0f, DrawAlpha);
         }
@@ -1376,7 +1409,7 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
             // number's own glyph height, not a fixed nudge, so it holds at
             // every one of the three damage sizes and at every UI scale.
             const FString Caption = BreakerStrings::Format(EBreakerStringKey::HudDamageAbsorbed, Number->MitigatedFraction * 100.0f);
-            const float NumberHeight = MeasureSpecText(TEXT("0"), SizePixels, ESpecFontRole::Mono).Y;
+            const float NumberHeight = MainSize.Y;
             DrawOutlinedNumber(Caption, Screen.X, NumberY + NumberHeight,
                 BreakerUI::Orange, 13.0f, Fade);
         }
@@ -2869,7 +2902,9 @@ float ABreakerPlaytestHUD::DrawStatusReadout(const ABreakerCharacter* Character,
     const TArray<FBreakerActiveStatus>& Active = Status->GetActiveStatuses();
     const float Threshold = Status->GetEntropyThreshold();
     const float EntropyFraction = Threshold > UE_SMALL_NUMBER ? FMath::Clamp(Status->GetEntropyBuildup() / Threshold, 0.0f, 1.0f) : 0;
-    if (Active.Num() == 0 && EntropyFraction <= 0) return 0.0f;
+    const float VoidThreshold = Status->GetVoidThreshold();
+    const float VoidFraction = VoidThreshold > UE_SMALL_NUMBER ? FMath::Clamp(Status->GetVoidBuildup() / VoidThreshold, 0.0f, 1.0f) : 0;
+    if (Active.Num() == 0 && EntropyFraction <= 0 && VoidFraction <= 0) return 0.0f;
 
     const float Dot = S(BreakerUI::HudV2StatusDot);
     const float Pixels = BreakerUI::HudV2StatusPixels;
@@ -2890,32 +2925,44 @@ float ABreakerPlaytestHUD::DrawStatusReadout(const ABreakerCharacter* Character,
         DrawRect(BreakerUI::Gold, X, RowBottom - RailH, Width * EntropyFraction, RailH);
         RowBottom = RowY - RowGap;
     }
+    if (VoidFraction > 0)
+    {
+        const float RailH = S(2.0f); // O2 presentation, independent of concurrent Entropy.
+        const float RowY = RowBottom - RowH - RailH - S(3.0f);
+        const FString Text = FString::Printf(TEXT("%s %d%%"), *BreakerStrings::Get(EBreakerStringKey::HudVoid),
+            FMath::Clamp(FMath::RoundToInt(VoidFraction * 100), 1, 100));
+        DrawSpecText(Text, X, RowY, BreakerUI::Violet, Pixels, 1.0f, ESpecFontRole::Mono);
+        DrawRect(BreakerUI::BorderRest, X, RowBottom - RailH, Width, RailH);
+        DrawRect(BreakerUI::Violet, X, RowBottom - RailH, Width * VoidFraction, RailH);
+        RowBottom = RowY - RowGap;
+    }
     for (int32 Index = Active.Num() - 1; Index >= 0; --Index)
     {
         const FBreakerActiveStatus& Entry = Active[Index];
         const bool bRot = Entry.Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"));
+        const bool bErased = Entry.Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Erased"));
         FString ShortName = Entry.Spec.StatusTag.IsValid()
             ? Entry.Spec.StatusTag.GetTagName().ToString() : BreakerStrings::Get(EBreakerStringKey::HudStatusUnnamed);
         int32 SeparatorIndex = INDEX_NONE;
         if (ShortName.FindLastChar(TEXT('.'), SeparatorIndex)) ShortName = ShortName.RightChop(SeparatorIndex + 1);
-        const FString Text = bRot ? BreakerStrings::Format(EBreakerStringKey::HudRotTimer, FMath::Max(Entry.RemainingDuration, 0.0f)) : Entry.Stacks > 1
+        const FString Text = bErased ? BreakerStrings::Format(EBreakerStringKey::HudErasedTimer, FMath::Max(Entry.RemainingDuration, 0.0f)) : bRot ? BreakerStrings::Format(EBreakerStringKey::HudRotTimer, FMath::Max(Entry.RemainingDuration, 0.0f)) : Entry.Stacks > 1
             ? FString::Printf(TEXT("%s %d  %.1f"), *ShortName.ToUpper(), Entry.Stacks,
                 FMath::Max(Entry.RemainingDuration, 0.0f))
             : FString::Printf(TEXT("%s  %.1f"), *ShortName.ToUpper(),
                 FMath::Max(Entry.RemainingDuration, 0.0f));
 
-        const float ExtraH = bRot ? S(5.0f) : 0;
+        const float ExtraH = (bRot || bErased) ? S(5.0f) : 0;
         const float RowY = RowBottom - RowH - ExtraH;
-        const FLinearColor StatusColor = bRot ? BreakerUI::Orange : BreakerUI::Harm;
+        const FLinearColor StatusColor = bErased ? BreakerUI::Violet : bRot ? BreakerUI::Orange : BreakerUI::Harm;
         DrawRect(StatusColor, X, RowY + (RowH - Dot) * 0.5f, Dot, Dot);
         const FVector2D TextSize = MeasureSpecText(Text, Pixels, ESpecFontRole::Mono);
         DrawSpecText(Text, X + Dot + S(BreakerUI::Space8), RowY + (RowH - TextSize.Y) * 0.5f,
             StatusColor, Pixels, 1.0f, ESpecFontRole::Mono);
-        if (bRot)
+        if (bRot || bErased)
         {
             const float Remaining = FMath::Clamp(Entry.RemainingDuration / FMath::Max(Entry.Spec.Duration, UE_SMALL_NUMBER), 0.0f, 1.0f);
             DrawRect(BreakerUI::BorderRest, X, RowBottom - S(2.0f), Width, S(2.0f));
-            DrawRect(BreakerUI::Orange, X, RowBottom - S(2.0f), Width * Remaining, S(2.0f));
+            DrawRect(StatusColor, X, RowBottom - S(2.0f), Width * Remaining, S(2.0f));
         }
         RowBottom = RowY - RowGap;
     }

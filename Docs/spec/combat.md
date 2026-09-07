@@ -131,7 +131,15 @@ Entropy applies Rot, and Void applies Erased. Status damage snapshots from the
 applying hit. Bleed and Poison remain physical. Resistance reduces elemental
 buildup rate, never damage; conversion affixes give weapons an elemental path.
 Enemy families author the element of their attacks. Void does not reduce armour
-or incoming healing.
+or incoming healing. Erased is a brief mark that pays its snapshotted damage
+as one delayed burst. An active mark cannot stack or refresh; consumption
+removes its unpaid burst, so Tear cannot pay damage twice.
+
+Void buildup uses the accepted hit's raw elemental share, proc coefficient and
+resistance. Its threshold is 10% of chassis health; incomplete buildup expires
+after four seconds. Erased pays half the triggering share after two seconds.
+These values are O2 tuning in elements.json. Siphon's live channel hits apply
+Void; the delayed burst does not repeat the channel's leech or generate buildup.
 
 Each ordered pair consumes the first status: Rift on Rot produces Collapse,
 Void on Rot produces Wither, and Rift on Erased produces Tear. Reactions spend

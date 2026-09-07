@@ -57,6 +57,10 @@ namespace
         };
         if (Row.HasField(TEXT("dealsPeriodicDamage")) && !Row.TryGetBoolField(TEXT("dealsPeriodicDamage"), Out.bDealsPeriodicDamage))
         { Errors.Add(FString::Printf(TEXT("%s: dealsPeriodicDamage must be boolean"), *TagName)); bOk = false; }
+        if (Row.HasField(TEXT("dealsDamageOnExpiry")) && !Row.TryGetBoolField(TEXT("dealsDamageOnExpiry"), Out.bDealsDamageOnExpiry))
+        { Errors.Add(FString::Printf(TEXT("%s: dealsDamageOnExpiry must be boolean"), *TagName)); bOk = false; }
+        if (Out.bDealsPeriodicDamage && Out.bDealsDamageOnExpiry)
+        { Errors.Add(FString::Printf(TEXT("%s: periodic and expiry damage are mutually exclusive"), *TagName)); bOk = false; }
         ReadTuning(TEXT("durationSeconds"), Out.DurationSeconds, 3600);
         ReadTuning(TEXT("armorReductionPercent"), Out.ArmorReductionPercent, 100);
         ReadTuning(TEXT("healingReductionPercent"), Out.HealingReductionPercent, 100);

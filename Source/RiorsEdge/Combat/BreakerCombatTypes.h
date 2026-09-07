@@ -6,7 +6,7 @@
 #include "BreakerCombatTypes.generated.h"
 
 UENUM(BlueprintType)
-enum class EBreakerElement : uint8 { None, Entropy };
+enum class EBreakerElement : uint8 { None, Entropy, Void };
 
 UENUM(BlueprintType)
 enum class EBreakerDamageFamily : uint8

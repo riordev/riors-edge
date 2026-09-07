@@ -113,6 +113,9 @@
         "hud.entropy": "ENTROPY",
         "hud.rotTimer": "ROT %.1fs",
         "cycle.entropy": "ENTROPY",
-        "hud.damage.rot": "ROT %s"
+        "hud.damage.rot": "ROT %s",
+        "hud.void": "VOID",
+        "hud.erasedTimer": "ERASED %.1fs",
+        "hud.damage.erased": "ERASED %s"
 	}
 }

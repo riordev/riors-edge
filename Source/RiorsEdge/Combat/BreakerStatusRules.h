@@ -18,10 +18,11 @@ struct RIORSEDGE_API FBreakerStatusRule
     FGameplayTag Tag;
     bool bSpreadsOnPierce = false;
     bool bDealsPeriodicDamage = true;
+    bool bDealsDamageOnExpiry = false;
     float DurationSeconds = 0.0f;
     float ArmorReductionPercent = 0.0f;
     float HealingReductionPercent = 0.0f;
-    bool IsNonDamagingDebuff() const { return !bDealsPeriodicDamage; }
+    bool IsNonDamagingDebuff() const { return !bDealsPeriodicDamage && !bDealsDamageOnExpiry; }
 };
 
 namespace BreakerStatusRules

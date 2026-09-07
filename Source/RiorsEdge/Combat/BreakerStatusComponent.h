@@ -19,6 +19,10 @@ struct RIORSEDGE_API FBreakerActiveStatus
     UPROPERTY(BlueprintReadOnly) float RemainingDuration = 0.0f;
     UPROPERTY(BlueprintReadOnly) float TimeUntilNextTick = 0.0f;
     UPROPERTY(BlueprintReadOnly) int32 TicksDelivered = 0;
+    // Erased owns one finite snapshot. Consumption transfers this unpaid
+    // amount; payout claims it before any damage callback can re-enter.
+    UPROPERTY(BlueprintReadOnly) float UnpaidDamageBudget = 0.0f;
+    uint64 ApplicationSerial = 0;
     // Who applied this status. Weak: a DoT outliving its applier keeps
     // ticking, it just stops crediting anyone.
     UPROPERTY(BlueprintReadOnly) TWeakObjectPtr<AActor> Instigator = nullptr;
@@ -68,6 +72,11 @@ public:
     float GetEntropyThreshold() const;
     float GetEntropyResistancePercent() const;
     UPROPERTY(EditAnywhere, Category="Status|Entropy") float EntropyResistancePercent = 0.0f;
+    void ApplyVoidHit(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result);
+    float GetVoidBuildup() const;
+    float GetVoidThreshold() const;
+    float GetVoidResistancePercent() const;
+    UPROPERTY(EditAnywhere, Category="Status|Void") float VoidResistancePercent = 0.0f;
     float GetArmorMultiplier() const;
     float GetHealingReceivedMultiplier() const;
 
@@ -174,7 +183,10 @@ public:
     UPROPERTY(BlueprintAssignable, Category="Combat|Status") FBreakerStatusEvent OnStatusAvoided;
 
 private:
-    void ApplyStatusInternal(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator, bool bDurationAlreadyScaled);
+    void ApplyStatusInternal(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator, bool bDurationAlreadyScaled, float UnpaidDamageBudget = 0.0f);
+    void AdvanceVoidBuildup(float DeltaSeconds);
+    void ResetVoidBuildup();
+    void DeliverVoidBurst(uint64 ApplicationSerial);
     void SpreadNewestStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator, float ScaledDuration);
     UFUNCTION() void HandleAfflictedOwnerDeath();
     // An expiry tick remains an active damaging status during its callbacks,
@@ -205,5 +217,9 @@ private:
         BreakerBuildup::FDecayState Decay;
     };
     TArray<FEntropyProtectedContribution> EntropyProtectedContributions;
+    float VoidBuildup = 0.0f;
+    float VoidBuildupRemaining = 0.0f;
+    TArray<FEntropyProtectedContribution> VoidProtectedContributions;
+    uint64 NextApplicationSerial = 1;
     uint32 ApplicationsAttempted = 0;
 };

@@ -349,7 +349,8 @@ float ABreakerZoneActor::ArmorStripFor(AActor* Occupant) const
     float Amount = FMath::Max(0.0f, Spec.FlatArmorReduction);
     if (const UBreakerStatusComponent* Status = Occupant ? Occupant->FindComponentByClass<UBreakerStatusComponent>() : nullptr)
         for (const FBreakerActiveStatus& Active : Status->GetActiveStatuses())
-            if (Active.RemainingDuration > 0.0f && Active.Spec.BaseDamagePerTick > 0.0f)
+            if (Active.RemainingDuration > 0.0f
+                && (Active.Spec.BaseDamagePerTick > 0.0f || Active.UnpaidDamageBudget > 0.0f))
             { Amount += FMath::Max(0.0f, Spec.AfflictedArmorReduction); break; }
     return Amount;
 }

@@ -44,6 +44,7 @@ bool FBreakerCasterBurstRuntimeTest::RunTest(const FString& Parameters)
     const uint64 InitialFrame = GFrameCounter;
     ON_SCOPE_EXIT { World->DestroyWorld(false); GEngine->DestroyWorldContext(World); GFrameCounter = InitialFrame; };
     int32 Scenario = 0;
+    TMap<FIntPoint, int32> BaselineSustainedCasts;
     for (const int32 Depth : {1, 50})
     for (int32 Mode = 0; Mode < 6; ++Mode)
     {
@@ -173,6 +174,8 @@ bool FBreakerCasterBurstRuntimeTest::RunTest(const FString& Parameters)
         int32 SliceCasts = 0, SliceRounds = 0;
         float OpeningDamage = 0;
         int32 OpeningCasts = 0;
+        int32 FinalSliceCasts = 0;
+        float FinalSliceDamage = 0;
         for (int32 Step = 0; Step < 1200; ++Step)
         {
             Aim();
@@ -203,6 +206,7 @@ bool FBreakerCasterBurstRuntimeTest::RunTest(const FString& Parameters)
                     PaidCasts - SliceCasts, UsedRounds - SliceRounds, Mana->GetMana(),
                     Weapon->GetMagazineAmmo() + Weapon->GetReserveAmmo(), EnemyAttributes->GetHealth() <= 0));
                 if (Step == 199) { OpeningDamage = Damage; OpeningCasts = PaidCasts; }
+                if (Step == 1199) { FinalSliceDamage = Damage; FinalSliceCasts = PaidCasts - SliceCasts; }
                 SliceHealth = EnemyAttributes->GetHealth(); SliceCasts = PaidCasts; SliceRounds = UsedRounds;
             }
         }
@@ -217,6 +221,22 @@ bool FBreakerCasterBurstRuntimeTest::RunTest(const FString& Parameters)
         {
             TestTrue(*(Label + TEXT(" real resource gates permit paid casts")), PaidCasts > 0);
             TestTrue(*(Label + TEXT(" natural Mana recovery supports casts after the opening bank")), PaidCasts > OpeningCasts);
+            TestTrue(*(Label + TEXT(" normal Mana recovery still pays casts during seconds 50-60")), FinalSliceCasts > 0);
+            TestTrue(*(Label + TEXT(" late paid delivery still reduces actual target health during seconds 50-60")), FinalSliceDamage > 0);
+            TestTrue(*(Label + TEXT(" shipped target survives the measurement so sustain is not limited by target death")), FirstDeath < 0);
+            const FIntPoint SustainKey(Depth, bRot ? 1 : 0);
+            const int32 SustainedCasts = PaidCasts - OpeningCasts;
+            if (!bPatience) BaselineSustainedCasts.Add(SustainKey, SustainedCasts);
+            else
+            {
+                // Identical level/gear/input and optional opening Rot. The
+                // existing fixture buys only Patience with two earned Doctrine;
+                // compare resource-paid casts after the initial bank, not DPS
+                // parity, a damage multiplier, or a claimed human clear time.
+                const int32* Baseline = BaselineSustainedCasts.Find(SustainKey);
+                if (TestNotNull(*(Label + TEXT(" has its matching unpurchased sustain control")), Baseline))
+                    TestTrue(*(Label + TEXT(" purchased Patience pays more actual casts during seconds 10-60")), SustainedCasts > *Baseline);
+            }
             TestTrue(*(Label + TEXT(" paid casts create actual traveling projectiles")), ProjectileSpawns > 0);
             TestEqual(*(Label + TEXT(" spell row does not spend rifle ammo")), Rounds, 0);
         }
