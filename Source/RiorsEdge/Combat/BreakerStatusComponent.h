@@ -84,6 +84,9 @@ public:
     float GetRiftThreshold() const;
     float GetRiftResistancePercent() const;
     UPROPERTY(EditAnywhere, Category="Status|Rift") float RiftResistancePercent = 0.0f;
+    uint64 PrepareElementReaction(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result);
+    void FlushElementReaction(uint64 Token);
+    bool IsElementTransactionActive() const { return PendingReactionToken != 0; }
     float GetArmorMultiplier() const;
     float GetHealingReceivedMultiplier() const;
 
@@ -196,11 +199,13 @@ private:
     void DeliverVoidBurst(uint64 ApplicationSerial);
     void AdvanceRiftBuildup(float DeltaSeconds);
     void ResetRiftBuildup();
+    void AdvanceRotStatus(uint64 ApplicationSerial, float DeltaSeconds);
     void SpreadNewestStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator, float ScaledDuration);
     UFUNCTION() void HandleAfflictedOwnerDeath();
     // An expiry tick remains an active damaging status during its callbacks,
     // even though its remaining time was advanced before damage dispatch.
     FGameplayTag DeliveringTickTag;
+    bool bAdvancingStatuses = false;
     UPROPERTY() TArray<FBreakerActiveStatus> ActiveStatuses;
     UPROPERTY() TObjectPtr<UBreakerCombatComponent> Combat;
     // Additive against MaximumStacksPerStatus. Separate from the authored cap
@@ -233,5 +238,10 @@ private:
     float RiftBuildupRemaining = 0.0f;
     TArray<FEntropyProtectedContribution> RiftProtectedContributions;
     uint64 NextApplicationSerial = 1;
+    uint64 NextReactionToken = 1;
+    uint64 PendingReactionToken = 0;
+    bool bFlushingReaction = false;
+    FGameplayTag PendingReactionTag;
+    FBreakerActiveStatus PendingReactionStatus;
     uint32 ApplicationsAttempted = 0;
 };

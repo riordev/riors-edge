@@ -194,6 +194,26 @@ namespace BreakerSound
         return .35f * (.7f * FMath::Sin(2 * PI * (760 * T - 900 * T * T))
             + .3f * NoiseAt(Index ^ 0x21F7u)) * Envelope(T, .22f, 12); // O2 displacement snap.
     }
+    // O2 reaction signatures: low collapse, rough wither, high tearing snap.
+    inline float ReactionCollapseSample(int32 Index)
+    {
+        const float T = static_cast<float>(Index) / SampleRate;
+        return .4f * FMath::Sin(2 * PI * (170 * T - 150 * T * T)) * Envelope(T, .28f, 12);
+    }
+    inline float ReactionWitherSample(int32 Index)
+    {
+        const float T = static_cast<float>(Index) / SampleRate;
+        return .3f * NoiseAt(Index ^ 0x7174u) * Envelope(T, .3f, 10);
+    }
+    inline float ReactionTearSample(int32 Index)
+    {
+        const float T = static_cast<float>(Index) / SampleRate;
+        return .35f * (.7f * FMath::Sin(2 * PI * (900 * T - 1300 * T * T))
+            + .3f * NoiseAt(Index ^ 0x7EA2u)) * Envelope(T, .2f, 14);
+    }
+    inline void RenderReactionCollapse(TArray<int16>& Out) { RenderPcm16(Out, .28f, &ReactionCollapseSample); }
+    inline void RenderReactionWither(TArray<int16>& Out) { RenderPcm16(Out, .3f, &ReactionWitherSample); }
+    inline void RenderReactionTear(TArray<int16>& Out) { RenderPcm16(Out, .2f, &ReactionTearSample); }
     inline void RenderRiftActivation(TArray<int16>& Out) { RenderPcm16(Out, .22f, &RiftActivationSample); }
     inline void RenderVoidActivation(TArray<int16>& Out) { RenderPcm16(Out, .24f, &VoidActivationSample); }
     inline void RenderVoidBurst(TArray<int16>& Out) { RenderPcm16(Out, .18f, &VoidBurstSample); }

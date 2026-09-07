@@ -40,6 +40,7 @@ ABreakerSoundDirector::ABreakerSoundDirector()
     EntropyVoice = MakeVoice(TEXT("EntropyVoice"));
     VoidMarkVoice = MakeVoice(TEXT("VoidMarkVoice"));
     RiftVoice = MakeVoice(TEXT("RiftVoice"));
+    ReactionVoice = MakeVoice(TEXT("ReactionVoice"));
     VoidBurstVoice = MakeVoice(TEXT("VoidBurstVoice"));
 }
 
@@ -123,6 +124,9 @@ void ABreakerSoundDirector::BeginPlay()
     VoidMarkVoice->SetSound(VoidMarkWave);
     RiftWave = MakeWave(LoadOrSynth(TEXT("rift_activate.wav"), &BreakerSound::RenderRiftActivation, RiftPcm));
     RiftVoice->SetSound(RiftWave);
+    CollapseWave = MakeWave(LoadOrSynth(TEXT("reaction_collapse.wav"), &BreakerSound::RenderReactionCollapse, CollapsePcm));
+    WitherWave = MakeWave(LoadOrSynth(TEXT("reaction_wither.wav"), &BreakerSound::RenderReactionWither, WitherPcm));
+    TearWave = MakeWave(LoadOrSynth(TEXT("reaction_tear.wav"), &BreakerSound::RenderReactionTear, TearPcm));
     VoidBurstVoice->SetSound(VoidBurstWave);
 }
 
@@ -130,7 +134,7 @@ void ABreakerSoundDirector::ApplyVolumeSettings(float Master, float Effects)
 {
     const float Gain = BreakerSound::EffectsGain(Master, Effects);
     for (UAudioComponent* Voice : { FireVoice.Get(), HitVoice.Get(), KillVoice.Get(),
-        TakeHitVoice.Get(), AbilityVoice.Get(), PlayerDeathVoice.Get(), EntropyVoice.Get(), VoidMarkVoice.Get(), VoidBurstVoice.Get(), RiftVoice.Get() })
+        TakeHitVoice.Get(), AbilityVoice.Get(), PlayerDeathVoice.Get(), EntropyVoice.Get(), VoidMarkVoice.Get(), VoidBurstVoice.Get(), RiftVoice.Get(), ReactionVoice.Get() })
     {
         if (Voice) Voice->SetVolumeMultiplier(Gain);
     }
@@ -163,6 +167,23 @@ bool ABreakerSoundDirector::PlayEntropyActivation()
     LastEntropyCueTime = Now;
     ++EntropyCueCount;
     Trigger(EntropyVoice, EntropyWave, EntropyPcm);
+    return true;
+}
+
+bool ABreakerSoundDirector::PlayReaction(FGameplayTag ReactionTag)
+{
+    USoundWaveProcedural* Wave = nullptr;
+    const TArray<int16>* Pcm = nullptr;
+    if (ReactionTag == FGameplayTag::RequestGameplayTag(TEXT("Reaction.Collapse"))) { Wave = CollapseWave; Pcm = &CollapsePcm; }
+    else if (ReactionTag == FGameplayTag::RequestGameplayTag(TEXT("Reaction.Wither"))) { Wave = WitherWave; Pcm = &WitherPcm; }
+    else if (ReactionTag == FGameplayTag::RequestGameplayTag(TEXT("Reaction.Tear"))) { Wave = TearWave; Pcm = &TearPcm; }
+    if (!GetWorld() || !ReactionVoice || !Wave || !Pcm || Pcm->IsEmpty()) return false;
+    const double Now = GetWorld()->GetTimeSeconds();
+    if (Now - LastReactionCueTime < .15) return false; // O2 shared crowd throttle.
+    LastReactionCueTime = Now;
+    ReactionVoice->Stop();
+    ReactionVoice->SetSound(Wave);
+    Trigger(ReactionVoice, Wave, *Pcm);
     return true;
 }
 

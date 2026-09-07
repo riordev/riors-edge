@@ -90,7 +90,7 @@ void UBreakerStatusComponent::ApplyVoidHit(const FBreakerDamageRequest& Request,
 {
     const auto* Sink = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
     const auto Erased = FGameplayTag::RequestGameplayTag(TEXT("Status.Erased"));
-    if (!GetOwner() || !GetOwner()->HasAuthority() || !Sink || Sink->IsDead() || Result.bKilled
+    if (IsElementTransactionActive() || !GetOwner() || !GetOwner()->HasAuthority() || !Sink || Sink->IsDead() || Result.bKilled
         || Request.Element != EBreakerElement::Void || !Request.bCanApplyElementBuildup
         || Request.bIsDamageOverTime || Result.bDodged || Result.bParried || IsStatusImmune()
         || HasStatus(Erased) || DeliveringTickTag == Erased

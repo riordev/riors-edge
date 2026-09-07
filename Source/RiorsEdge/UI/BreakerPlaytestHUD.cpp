@@ -1353,7 +1353,13 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
             && Number->DamageTypeTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Erased"));
         const bool bUnstableBurst = Number->Element == EBreakerElement::Rift
             && Number->DamageTypeTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Unstable"));
-        const FString DamageText = bUnstableBurst
+        const bool bCollapse = Number->DamageTypeTag == FGameplayTag::RequestGameplayTag(TEXT("Reaction.Collapse"));
+        const bool bWither = Number->DamageTypeTag == FGameplayTag::RequestGameplayTag(TEXT("Reaction.Wither"));
+        const bool bTear = Number->DamageTypeTag == FGameplayTag::RequestGameplayTag(TEXT("Reaction.Tear"));
+        const FString DamageText = bCollapse
+            ? BreakerStrings::Format(EBreakerStringKey::HudCollapseDamage, *BreakerUI::FormatDamage(Number->Value)) : bWither
+            ? BreakerStrings::Format(EBreakerStringKey::HudWitherDamage, *BreakerUI::FormatDamage(Number->Value)) : bTear
+            ? BreakerStrings::Format(EBreakerStringKey::HudTearDamage, *BreakerUI::FormatDamage(Number->Value)) : bUnstableBurst
             ? BreakerStrings::Format(EBreakerStringKey::HudUnstableDamage, *BreakerUI::FormatDamage(Number->Value)) : bErasedBurst
             ? BreakerStrings::Format(EBreakerStringKey::HudErasedDamage, *BreakerUI::FormatDamage(Number->Value)) : bRotTick
             ? BreakerStrings::Format(EBreakerStringKey::HudRotDamage, *BreakerUI::FormatDamage(Number->Value))

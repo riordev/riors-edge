@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "GameplayTagContainer.h"
 #include "Weapons/BreakerWeaponArchetype.h"
 #include "BreakerSoundDirector.generated.h"
 
@@ -114,6 +115,7 @@ public:
     bool PlayEntropyActivation();
     bool PlayVoidCue(bool bBurst);
     bool PlayRiftActivation();
+    bool PlayReaction(FGameplayTag ReactionTag);
     int32 GetEntropyCueCount() const { return EntropyCueCount; }
 
 protected:
@@ -133,6 +135,12 @@ private:
     UPROPERTY() TObjectPtr<UAudioComponent> EntropyVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> VoidMarkVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> RiftVoice;
+    UPROPERTY() TObjectPtr<UAudioComponent> ReactionVoice;
+    UPROPERTY() TObjectPtr<USoundWaveProcedural> CollapseWave;
+    UPROPERTY() TObjectPtr<USoundWaveProcedural> WitherWave;
+    UPROPERTY() TObjectPtr<USoundWaveProcedural> TearWave;
+    TArray<int16> CollapsePcm, WitherPcm, TearPcm;
+    double LastReactionCueTime = -1000;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> RiftWave;
     TArray<int16> RiftPcm;
     double LastRiftCueTime = -1000;

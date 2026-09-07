@@ -395,11 +395,16 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     Attributes->ApplyHealth(Result.RemainingHealth);
     UBreakerStatusComponent* ElementStatus = GetOwner()->FindComponentByClass<UBreakerStatusComponent>();
     uint64 PendingRiftActivation = 0;
+    uint64 PendingReaction = 0;
     if (UBreakerStatusComponent* Status = ElementStatus)
     {
-        Status->ApplyEntropyHit(ResolvedRequest, Result);
-        Status->ApplyVoidHit(ResolvedRequest, Result);
-        PendingRiftActivation = Status->ApplyRiftHit(ResolvedRequest, Result);
+        PendingReaction = Status->PrepareElementReaction(ResolvedRequest, Result);
+        if (PendingReaction == 0)
+        {
+            Status->ApplyEntropyHit(ResolvedRequest, Result);
+            Status->ApplyVoidHit(ResolvedRequest, Result);
+            PendingRiftActivation = Status->ApplyRiftHit(ResolvedRequest, Result);
+        }
     }
     if (bFrontBrokeThisHit) OnFrontShieldBroken.Broadcast();
     // TargetBandBroken's write: did THIS hit move the health-band index?
@@ -443,6 +448,8 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     // lethal activation cannot be followed by stale outer-hit band/death state.
     if (PendingRiftActivation != 0 && IsValid(ElementStatus))
         ElementStatus->FlushRiftActivation(PendingRiftActivation);
+    if (PendingReaction != 0 && IsValid(ElementStatus))
+        ElementStatus->FlushElementReaction(PendingReaction);
     return Result;
 }
 

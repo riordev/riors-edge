@@ -78,7 +78,7 @@ float UBreakerStatusComponent::GetEntropyResistancePercent() const
 void UBreakerStatusComponent::ApplyEntropyHit(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result)
 {
     const auto* Sink = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
-    if (!GetOwner() || !GetOwner()->HasAuthority() || !Sink || Sink->IsDead() || Result.bKilled
+    if (IsElementTransactionActive() || !GetOwner() || !GetOwner()->HasAuthority() || !Sink || Sink->IsDead() || Result.bKilled
         || Request.Element != EBreakerElement::Entropy || !Request.bCanApplyElementBuildup
         || Request.bIsDamageOverTime || Result.bDodged || Result.bParried || IsStatusImmune()
         || !FMath::IsFinite(Result.RawDamage) || !FMath::IsFinite(Request.ProcCoefficient)
@@ -126,5 +126,5 @@ void UBreakerStatusComponent::ApplyEntropyHit(const FBreakerDamageRequest& Reque
     Spec.Snapshot.CriticalChance = 0;
     Spec.Snapshot.bRolledCritical = false;
     Spec.Snapshot.SourceTags = Request.SourceTags;
-    ApplyStatusInternal(Spec, EBreakerDamageFamily::Elemental, Request.Instigator.Get(), true);
+    ApplyStatusInternal(Spec, EBreakerDamageFamily::Elemental, Request.Instigator.Get(), true, Snapshot * Tuning.Damage);
 }

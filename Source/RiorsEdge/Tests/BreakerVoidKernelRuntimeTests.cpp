@@ -163,7 +163,7 @@ bool FBreakerVoidKernelRuntimeTest::RunTest(const FString& Parameters)
     FBreakerDamageRequest Entropy;
     Entropy.BaseDamage = 100; Entropy.Element = EBreakerElement::Entropy;
     Entropy.ElementalFraction = 1; Entropy.bCanCritical = false; Entropy.SetInstigator(Source);
-    Combat->ReceiveDamage(Entropy); Hit(100);
+    Hit(100); Combat->ReceiveDamage(Entropy);
     TestTrue(TEXT("Rot and Erased can coexist without premature reaction"), Status->HasStatus(Rot) && Status->HasStatus(Erased));
     Status->ConsumeAllStatuses();
     // Deterministic real avoidance applications: capped ordinary avoidance,

@@ -5,7 +5,14 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
-## Cycle — Entropy end to end (O221–O225)
+## Cycle — Progression and combat (step 3)
+- [ ] Repair Cascade silent echoes and cancel queued echoes when its originating ultimate ends; include targets spawned during the window.
+- [ ] Finish explicit Caster elemental cycle delivery without duplicating a hit or bypassing proc safeguards; resolve Resonance delivery.
+- [ ] Audit remaining live silent nodes and validate reachable purchased behavior.
+- [ ] Finish ability-versus-weapon balance with sustained actual delivery; retain existing parity findings until their conditions are resolved.
+- [ ] Validate remaining Cleave, scoped/unscoped and combat feedback issues.
+
+## Completed element implementation (steps 1–2, O221–O225)
 - [x] Add explicit element identity, accepted-hit buildup and chassis-scaled thresholds; Entropy applies Rot with damage snapshotted from the applying hit.
 - [x] Route an actual weapon conversion affix and Caster Rot through the same damage/buildup path. Resistance changes buildup only; Bleed and Poison remain physical.
 - [x] Retire legacy Status.Void armour/healing reduction. Siphon keeps damage/healing and Sequence earns its third status through actual Entropy.
@@ -20,8 +27,8 @@ Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 - [x] Finish Void implementation: delayed Erased, paid Siphon, ordinary weapon conversion and family attack delivery validated. Altered applies Void; Vestige authored attacks consistently apply Entropy. Human balance acceptance remains separate.
 - [x] Build Rift kernel and Breach delivery: accepted-hit Unstable pays once and sweeps actual enemy/player capsules against walls and ledges; status, damage and audio feedback are wired.
 - [x] Finish Rift weapon conversion through actual rolled/equipped Primary hitscan and rocket fire-time snapshots.
-- [ ] Implement Collapse, Wither and Tear, consuming only the first status's unpaid damage.
-O221–O225 are recorded in DECISIONS and combat intent. Element magnitudes remain O2 tuning in Data/elements.json. Entropy is not end-to-end complete until the remaining family, presentation and encounter work above is done.
+- [x] Implement Collapse, Wither and Tear, consuming only the first status's unpaid damage; accepted-hit, callback, hitch, shortened-duration and cancellation tests pass.
+O221–O225 are recorded in DECISIONS and combat intent. Element magnitudes remain O2 tuning in Data/elements.json. Element implementation is validated; human balance and audible-mix acceptance remain part of the eventual playtest.
 ## Current owner direction
 Finish steps 1-6 before the owner playtests: Entropy, remaining elements/reactions, progression/combat, loot, interface, then Fernhall/Rift content. Erased's delayed burst is approved. Automated checks and inspected captures validate implementation; human balance acceptance remains separate.
 
@@ -122,6 +129,7 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - Four Niagara systems at `/Game/Breaker/FX/NS_<Moment>` with a `Color` user parameter, or a free Fab VFX pack placed there
 
 ## Done (last three cycles; older is git)
+- Reactions: Collapse/Wither/Tear spend one consumed unpaid budget; original-applier credit, proc0, no new buildup or chains. Rot ticks claim payment before callbacks; shortening cancels future budget permanently. Build/suite688started/685passed/3known/0unexpected. Inspected all7frames across three reaction types at1080p/720p: labels separate from each other; original hit still overlaps enemy nameplate, retained for step5. Overlapping activation effects and audible mix need later polish/playtest.
 - Rift conversion: ordinary Primary prefix, real rifle threshold activation and marker suppression, wrong-slot isolation and launched rocket snapshot after gear replacement. Build/suite687started/684passed/3known/0unexpected. Entropy/Void/Rift each have real ability and weapon delivery; reactions remain unbuilt. Existing enemy families cover Entropy/Void; no new Rift family authored.
 - Rift kernel/Breach: full suite686started/683passed/3known/0unexpected; actual paid Breach, callback cancellation/order, lethal single payout, native floor-backed activation and capsule wall/ledge tests pass. Opened both1080p and720p frames: UNSTABLE timer/damage and player RIFT60% meter readable; transient enemy-plate overlap remains step5. Screenshots do not validate movement feel or audible mix. Rift weapon conversion and reactions remain next.
 - **Void weapons and family attacks:** Ordinary Primary conversion rolls route hitscan/rockets through one explicit strongest-share selection; actual ammunition earns Erased and world ticks pay once, rockets retain launch identity after gear swaps. Altered attacks carry Void and Vestige attacks Entropy across authored melee/projectile/Warden paths; modifier hazards remain separate. Skirmisher rounds now configure before BeginPlay. Runtime review exposed player capsules being counted as cover: Lattice/Skirmisher now query actual WorldStatic objects, with open/wall regressions. Build passed;683declared/started,680passed,3known,0unexpected via quarantine auditor. No new art-quality claim; projectile geometry checked through actual begun components. STATE unchanged.

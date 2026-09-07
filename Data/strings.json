@@ -119,6 +119,9 @@
         "hud.damage.erased": "ERASED %s",
         "hud.rift": "RIFT",
         "hud.unstableTimer": "UNSTABLE %.1fs",
-        "hud.damage.unstable": "UNSTABLE %s"
+        "hud.damage.unstable": "UNSTABLE %s",
+        "hud.damage.collapse": "COLLAPSE %s",
+        "hud.damage.wither": "WITHER %s",
+        "hud.damage.tear": "TEAR %s"
 	}
 }

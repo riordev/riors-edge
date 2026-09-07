@@ -27,10 +27,13 @@ void BreakerStartEntropyCapture(ABreakerCharacter* Character)
         int32 Index = 0;
         AActor* SourceEnemy = nullptr;
         AActor* FocusEnemy = nullptr;
+        FString Reaction;
+        FParse::Value(FCommandLine::Get(), TEXT("BreakerCaptureReaction="), Reaction);
+        const bool bReaction = !Reaction.IsEmpty();
         const bool bRift = FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureRift"));
         const bool bVoid = FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureVoid"));
         const bool bFeedback = FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureEntropyFeedback"));
-        const int32 FocusIndex = bFeedback || FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureEntropyRot")) ? 1 : 0;
+        const int32 FocusIndex = bReaction || bFeedback || FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureEntropyRot")) ? 1 : 0;
         const bool bSympathetic = FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureSympathetic"));
         for (TActorIterator<ABreakerEnemy> It(World); It && Index < 2; ++It)
         {
@@ -62,13 +65,33 @@ void BreakerStartEntropyCapture(ABreakerCharacter* Character)
                 Hit.BaseDamage = Status->GetRiftThreshold() * (Index == 0 ? .6f : 1.01f)
                     / FMath::Max(.01f, 1 - Status->GetRiftResistancePercent() / 100);
             }
+            if (bReaction && Index == 1)
+            {
+                Hit.Element = Reaction == TEXT("Tear") ? EBreakerElement::Void : EBreakerElement::Entropy;
+                const float Threshold = Reaction == TEXT("Tear") ? Status->GetVoidThreshold() : Status->GetEntropyThreshold();
+                const float Resistance = Reaction == TEXT("Tear") ? Status->GetVoidResistancePercent() : Status->GetEntropyResistancePercent();
+                Hit.BaseDamage = Threshold * 1.01f / FMath::Max(.01f, 1 - Resistance / 100);
+            }
+            if (bVoid)
+            {
+                Hit.Element = EBreakerElement::Void;
+                Hit.BaseDamage = Status->GetVoidThreshold() * (Index == 0 ? .6f : 1.01f)
+                    / FMath::Max(.01f, 1 - Status->GetVoidResistancePercent() / 100);
+            }
             Combat->ReceiveDamage(Hit);
+            if (bReaction && Index == 1)
+            {
+                FBreakerDamageRequest Trigger = Hit;
+                Trigger.Element = Reaction == TEXT("Wither") ? EBreakerElement::Void : EBreakerElement::Rift;
+                Trigger.BaseDamage = 1; // Capture fixture: expose only the consumed earned budget.
+                Combat->ReceiveDamage(Trigger);
+            }
             if (bVoid)
             {
                 FBreakerDamageRequest VoidHit = Hit;
-                VoidHit.Element = EBreakerElement::Void;
-                VoidHit.BaseDamage = Status->GetVoidThreshold() * (Index == 0 ? .6f : 1.01f)
-                    / FMath::Max(.01f, 1 - Status->GetVoidResistancePercent() / 100);
+                VoidHit.Element = EBreakerElement::Entropy;
+                VoidHit.BaseDamage = Status->GetEntropyThreshold() * (Index == 0 ? .6f : 1.01f)
+                    / FMath::Max(.01f, 1 - Status->GetEntropyResistancePercent() / 100);
                 Combat->ReceiveDamage(VoidHit);
             }
             if (bFeedback && Index == 1)
@@ -79,9 +102,9 @@ void BreakerStartEntropyCapture(ABreakerCharacter* Character)
                 Bleed.ProcCoefficient = 0; // Visual fixture: distinguish simultaneous physical and Rot ticks.
                 Status->ApplyStatus(Bleed, EBreakerDamageFamily::Physical, Character);
             }
-            UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] Entropy target=%d buildup=%.2f threshold=%.2f rot=%d"),
-                Index, Status->GetEntropyBuildup(), Status->GetEntropyThreshold(),
-                Status->HasStatus(FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"))));
+            UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] Elements target=%d entropy=%.2f void=%.2f rift=%.2f statuses=%d reaction=%s"),
+                Index, Status->GetEntropyBuildup(), Status->GetVoidBuildup(), Status->GetRiftBuildup(),
+                Status->GetActiveStatuses().Num(), *Reaction);
             SourceEnemy = Enemy;
             if (Index == FocusIndex) FocusEnemy = Enemy;
             ++Index;
@@ -112,6 +135,6 @@ void BreakerStartEntropyCapture(ABreakerCharacter* Character)
                 Character->GetCombat()->ReceiveDamage(Hit);
             }
         }
-    }), FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureRift")) ? 5.8f : FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureVoid")) ? 5.5f : 1.0f, false);
+    }), (FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureRift")) || FCString::Strstr(FCommandLine::Get(), TEXT("BreakerCaptureReaction="))) ? 5.8f : FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureVoid")) ? 5.5f : 1.0f, false);
 #endif
 }

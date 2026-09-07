@@ -11,6 +11,7 @@
 #include "Engine/World.h"
 #include "UI/BreakerEntropyFeedback.h"
 #include "UI/BreakerVoidFeedback.h"
+#include "Combat/BreakerElementReactions.h"
 #include "UObject/UObjectIterator.h"
 
 UBreakerStatusComponent::UBreakerStatusComponent()
@@ -87,6 +88,8 @@ uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicat
     if (Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Void"), false)) return 0;
     const bool bErased = Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Erased"));
     const bool bUnstable = Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Unstable"));
+    const bool bRot = Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"));
+    if (IsElementTransactionActive() && (bErased || bUnstable || bRot)) return 0;
     // Only the accepted-hit kernel supplies a deferred budget. Chain, carried
     // payloads and refreshes cannot mint another copy of already-earned damage.
     if ((bErased || bUnstable) && (!FMath::IsFinite(UnpaidDamageBudget) || UnpaidDamageBudget <= 0
@@ -121,6 +124,17 @@ uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicat
     }
     const float ScaledDuration = Spec.Duration * DurationScale;
     if (!FMath::IsFinite(ScaledDuration) || ScaledDuration <= 0.0f) return 0;
+    if (bRot)
+    {
+        // The accepted-hit kernel supplies the finite original budget. The
+        // existing Chain copy path retains its authored snapshot/tick count,
+        // but future duration changes cannot create more damage for either.
+        if (UnpaidDamageBudget <= 0)
+            UnpaidDamageBudget = Spec.BaseDamagePerTick * FMath::Max(1, Spec.InitialStacks)
+                * FMath::FloorToFloat(ScaledDuration / Spec.TickInterval);
+        if (!FMath::IsFinite(UnpaidDamageBudget) || UnpaidDamageBudget <= 0
+            || !FMath::IsFinite(Spec.BaseDamagePerTick) || Spec.BaseDamagePerTick <= 0) return 0;
+    }
 
     // --- Ailment avoidance: one roll per application, at the door ---------
     // BEFORE the immunity check by ruling: avoidance is the ORDINARY defence
@@ -190,7 +204,7 @@ uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicat
 
     FBreakerActiveStatus Status;
     Status.Spec = Spec;
-    Status.UnpaidDamageBudget = (bErased || bUnstable) ? UnpaidDamageBudget : 0.0f;
+    Status.UnpaidDamageBudget = (bErased || bUnstable || bRot) ? UnpaidDamageBudget : 0.0f;
     Status.ApplicationSerial = NextApplicationSerial++;
     Status.DamageFamily = DamageFamily;
     Status.Stacks = FMath::Clamp(Spec.InitialStacks, 1, GetEffectiveStackCap());
@@ -265,6 +279,9 @@ void UBreakerStatusComponent::SpreadNewestStatus(const FBreakerStatusApplication
 void UBreakerStatusComponent::HandleAfflictedOwnerDeath()
 {
     if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+    // Keep the transaction guard until its owning outer hit flushes, even
+    // if another callback revives this actor before that flush.
+    PendingReactionStatus.UnpaidDamageBudget = 0;
     EntropyBuildup = 0;
     EntropyBuildupRemaining = 0;
     EntropyProtectedContributions.Reset();
@@ -309,7 +326,8 @@ void UBreakerStatusComponent::AdvanceStatuses(float DeltaTime)
 {
     // The immunity clock runs whether or not any status is live — it is a
     // window on the OWNER, not on the list.
-    if (!FMath::IsFinite(DeltaTime) || DeltaTime <= 0.0f) return;
+    if (bAdvancingStatuses || !FMath::IsFinite(DeltaTime) || DeltaTime <= 0.0f) return;
+    TGuardValue<bool> AdvancingStatuses(bAdvancingStatuses, true);
     EntropyBuildupRemaining = FMath::Max(0.0f, EntropyBuildupRemaining - DeltaTime);
     if (EntropyBuildupRemaining <= 0) EntropyBuildup = 0;
     for (auto& Contribution : EntropyProtectedContributions)
@@ -325,23 +343,28 @@ void UBreakerStatusComponent::AdvanceStatuses(float DeltaTime)
     if (!Combat) Combat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>();
     if (!Combat) return;
 
-    TArray<FGameplayTag> AdvancingTags;
-    for (const FBreakerActiveStatus& Status : ActiveStatuses) AdvancingTags.Add(Status.Spec.StatusTag);
-    for (const FGameplayTag Tag : AdvancingTags)
+    TArray<uint64> AdvancingSerials;
+    for (const FBreakerActiveStatus& Status : ActiveStatuses) AdvancingSerials.Add(Status.ApplicationSerial);
+    for (const uint64 ApplicationSerial : AdvancingSerials)
     {
-        // A damage callback may advance the component recursively. The
-        // currently dispatched application has already claimed its payment.
-        if (Tag == DeliveringTickTag) continue;
-        auto FindActive = [this, Tag]()
+        auto FindActive = [this, ApplicationSerial]()
         {
-            return ActiveStatuses.IndexOfByPredicate([Tag](const FBreakerActiveStatus& Entry) { return Entry.Spec.StatusTag == Tag; });
+            return ActiveStatuses.IndexOfByPredicate([ApplicationSerial](const FBreakerActiveStatus& Entry) { return Entry.ApplicationSerial == ApplicationSerial; });
         };
         int32 Index = FindActive();
         if (Index == INDEX_NONE) continue;
         FBreakerActiveStatus& Initial = ActiveStatuses[Index];
+        const FGameplayTag Tag = Initial.Spec.StatusTag;
+        // A damage callback may advance the component recursively. The
+        // currently dispatched application has already claimed its payment.
+        if (Tag == DeliveringTickTag) continue;
+        if (Tag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot")))
+        {
+            AdvanceRotStatus(ApplicationSerial, DeltaTime);
+            continue;
+        }
         const float ActiveSeconds = FMath::Min(DeltaTime, FMath::Max(0.0f, Initial.RemainingDuration));
         Initial.RemainingDuration -= ActiveSeconds;
-        const uint64 ApplicationSerial = Initial.ApplicationSerial;
         // Status damage is owed for its whole remaining lifetime; do not discard
         // overdue damage under the zone presentation's burst guard.
         const FBreakerStatusRule* Rule = BreakerStatusRules::FindRule(Initial.Spec.StatusTag);
@@ -366,11 +389,6 @@ void UBreakerStatusComponent::AdvanceStatuses(float DeltaTime)
             TickSpec.InitialStacks = Status.Stacks;
             FBreakerDamageRequest Tick = UBreakerDamageLibrary::MakeSnapshotDotTick(TickSpec, Status.DamageFamily, Status.TicksDelivered, Status.Instigator.Get(),
                 Status.SourceLocationSnapshot, Status.bHasSourceLocationSnapshot);
-            if (Tag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot")))
-            {
-                Tick.Element = EBreakerElement::Entropy; Tick.ElementalFraction = 1.0f;
-                Tick.bCanApplyElementBuildup = false;
-            }
             Tick.bBypassShield = Status.DamageFamily == EBreakerDamageFamily::Physical;
             TGuardValue<FGameplayTag> DeliveringTick(DeliveringTickTag, Tag);
             Combat->ReceiveDamage(Tick);
@@ -420,6 +438,10 @@ TArray<FBreakerActiveStatus> UBreakerStatusComponent::ConsumeAllStatuses()
     // Move first, broadcast second. A listener that reapplies a status (Cascade
     // does exactly that) must land in an EMPTY list, not into the array being
     // iterated — otherwise the reapplication is consumed by its own detonation.
+    const auto Rot = FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"));
+    for (FBreakerActiveStatus& Status : ActiveStatuses)
+        if (Status.Spec.StatusTag == Rot)
+            Status.UnpaidDamageBudget = BreakerElementReactions::RemainingRotBudget(Status);
     Consumed = MoveTemp(ActiveStatuses);
     ActiveStatuses.Reset();
     for (const FBreakerActiveStatus& Status : Consumed) OnStatusConsumed.Broadcast(Status);
@@ -435,6 +457,8 @@ FBreakerActiveStatus UBreakerStatusComponent::ConsumeStatus(FGameplayTag StatusT
     for (int32 Index = 0; Index < ActiveStatuses.Num(); ++Index)
     {
         if (ActiveStatuses[Index].Spec.StatusTag != StatusTag) continue;
+        if (StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot")))
+            ActiveStatuses[Index].UnpaidDamageBudget = BreakerElementReactions::RemainingRotBudget(ActiveStatuses[Index]);
         Consumed = ActiveStatuses[Index];
         ActiveStatuses.RemoveAt(Index);
         bOutFound = true;
@@ -450,11 +474,18 @@ FBreakerActiveStatus UBreakerStatusComponent::ConsumeStatus(FGameplayTag StatusT
 
 void UBreakerStatusComponent::ScaleRemainingDurations(float Scalar)
 {
-    if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !FMath::IsFinite(Scalar)) return;
     const float Clamped = FMath::Max(0.0f, Scalar);
-    for (int32 Index = ActiveStatuses.Num() - 1; Index >= 0; --Index)
+    TArray<uint64> Serials;
+    for (const FBreakerActiveStatus& Status : ActiveStatuses) Serials.Add(Status.ApplicationSerial);
+    for (uint64 Serial : Serials)
     {
+        const int32 Index = ActiveStatuses.IndexOfByPredicate([Serial](const FBreakerActiveStatus& Status)
+        { return Status.ApplicationSerial == Serial; });
+        if (Index == INDEX_NONE) continue;
         ActiveStatuses[Index].RemainingDuration *= Clamped;
+        if (ActiveStatuses[Index].Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot")))
+            ActiveStatuses[Index].UnpaidDamageBudget = BreakerElementReactions::RemainingRotBudget(ActiveStatuses[Index]);
         // A scalar of zero means gone, and gone is gone by exactly one route:
         // it broadcasts as a consumption, because a caller that shortened a
         // duration to nothing did consume it.

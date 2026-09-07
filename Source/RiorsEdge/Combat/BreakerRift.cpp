@@ -89,7 +89,7 @@ uint64 UBreakerStatusComponent::ApplyRiftHit(const FBreakerDamageRequest& Reques
 {
     const auto* Sink = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
     const auto Unstable = FGameplayTag::RequestGameplayTag(TEXT("Status.Unstable"));
-    if (!GetOwner() || !GetOwner()->HasAuthority() || !Sink || Sink->IsDead() || Result.bKilled
+    if (IsElementTransactionActive() || !GetOwner() || !GetOwner()->HasAuthority() || !Sink || Sink->IsDead() || Result.bKilled
         || Request.Element != EBreakerElement::Rift || !Request.bCanApplyElementBuildup
         || Request.bIsDamageOverTime || Result.bDodged || Result.bParried || IsStatusImmune()
         || HasStatus(Unstable) || DeliveringTickTag == Unstable

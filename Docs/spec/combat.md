@@ -114,11 +114,8 @@ shooter with server-round-trip aiming is not a shippable feel regardless of
 topology.
 
 ## The model
-
 ### The three elements
-
-A rift is a hole in time, so the elements are the three things a hole in time
-does. Each owns a verb no other element has.
+Each element owns a distinct verb.
 
 | Element | Verb |
 |---|---|
@@ -158,8 +155,13 @@ Each ordered pair consumes the first status: Rift on Rot produces Collapse,
 Void on Rot produces Wither, and Rift on Erased produces Tear. Reactions spend
 only damage already earned by the consumed status; damage already paid cannot
 be paid again. Reactions cannot trigger other reactions or apply statuses.
-There is no triple reaction. Build Entropy end to end, then Void, then Rift,
-then reactions.
+An accepted elemental hit with positive landed damage and proc consumes one
+matching status instead of building its own element. Immunity refuses it;
+Rift prioritizes Rot when both statuses exist. Payment follows the triggering
+hit callbacks, credits the original applier and has no proc or new critical.
+Rot consumption spends only unpaid ticks; shortening its lifetime cuts that
+budget. Reentrant callbacks cannot produce another elemental application.
+These ordering choices are O2. There is no triple reaction or reaction chain.
 
 Entropy buildup uses the applying hit's pre-mitigation elemental damage share,
 weighted by proc coefficient and buildup resistance. The threshold is 10% of
@@ -262,7 +264,7 @@ element model. It does not own:
 | Melee coefficients read the full weapon base | `Combat.AbilityScaling.MeleeSwingsTheFullBlast` |
 | Healing refuses a dead actor and reports overheal at full value | `Combat.Healing.ThroughContract` |
 | Every damage submission passes through the outgoing-modifier chain | `Combat.Ceiling.AbilitySubmissionConformance` |
-| A reaction applies no status, and no target takes two inside one interval | `Combat.Elements.ReactionMatrix` |
+| Reactions consume one earned budget and cannot chain | `Combat.Elements.ReactionMatrix` |
 
 ## Stagger and landing
 
