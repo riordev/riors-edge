@@ -3935,10 +3935,53 @@ void ABreakerGameMode::StartNextWave()
     WaveEnemies.RemoveAll([](const TObjectPtr<ABreakerEnemy>& Enemy) { return !IsValid(Enemy) || Enemy->IsDeadEnemy(); });
 
     const FBreakerWaveComposition Composition = GetWaveComposition(CurrentWave);
-    const float EncounterRadius = bRiftInstance && Composition.bBoss
-        ? FMath::Max(WaveSpawnPackRadiusCm, BossArenaClearanceCm) : WaveSpawnPackRadiusCm;
     const FVector Origin = PlayerPawn->GetActorLocation();
     const FVector Forward = PlayerPawn->GetActorForwardVector().GetSafeNormal2D();
+    // Reserve the actual fixed formation in field coordinates, including its
+    // capsules. The former 900cm margin omitted even the melee pack's extent.
+    float EncounterRadius = WaveSpawnPackRadiusCm;
+    TArray<FVector> MeleeOffsets, LatticeOffsets, WardenOffsets;
+    auto ReserveOffset = [&](const FVector& Offset, float BodyRadius)
+    {
+        const FVector AxisF = bFieldFrameSet ? Frame.Forward : FVector::ForwardVector;
+        const FVector AxisR = bFieldFrameSet ? Frame.Right : FVector::RightVector;
+        EncounterRadius = FMath::Max(EncounterRadius, BodyRadius + FMath::Max(
+            FMath::Abs(static_cast<float>(FVector::DotProduct(Offset, AxisF))),
+            FMath::Abs(static_cast<float>(FVector::DotProduct(Offset, AxisR)))));
+    };
+    const float MeleeRadius = bSpawnDrudges
+        ? FMath::Max(GetDefault<ABreakerEnemy>()->GetBodyCapsuleRadius(), GetDefault<ABreakerAlteredEnemy>()->GetBodyCapsuleRadius())
+        : GetDefault<ABreakerEnemy>()->GetBodyCapsuleRadius();
+    for (int32 Index = 0; Index < Composition.Skitters; ++Index)
+    {
+        const float Angle = 360.0f * (Index / 4) / FMath::Max(1, (Composition.Skitters + 3) / 4);
+        MeleeOffsets.Add(FVector::ForwardVector.RotateAngleAxis(Angle, FVector::UpVector) * (CombatPocketRadius * .55f)
+            + FVector::ForwardVector.RotateAngleAxis(Index * 90.0f, FVector::UpVector) * 160.0f);
+        // Elite modifiers restore the authored Elite rank; ordinary carriers
+        // may promote to ModifierBearing. Reserve that possible final size.
+        const EBreakerMonsterRank SpawnRank = Index < Composition.Elites
+            ? EBreakerMonsterRank::Elite
+            : (bGrantModifiers && Index < Composition.Elites + Composition.ModifierCarriers
+                ? EBreakerMonsterRank::ModifierBearing : EBreakerMonsterRank::Trash);
+        ReserveOffset(MeleeOffsets.Last(), MeleeRadius
+            * UBreakerMonsterChassisLibrary::GetRankScaleMultiplier(SpawnRank));
+    }
+    for (int32 Index = 0; Index < Composition.Lattices; ++Index)
+    {
+        LatticeOffsets.Add(FVector::ForwardVector.RotateAngleAxis(360.0f * Index / FMath::Max(1, Composition.Lattices) + 45.0f,
+            FVector::UpVector) * CombatPocketRadius);
+        ReserveOffset(LatticeOffsets.Last(), GetDefault<ABreakerRangedEnemy>()->GetBodyCapsuleRadius());
+    }
+    for (int32 Index = 0; Index < Composition.Wardens; ++Index)
+    {
+        WardenOffsets.Add(-Forward * (CombatPocketRadius * .6f)
+            + FVector::ForwardVector.RotateAngleAxis(Index * 90.0f, FVector::UpVector) * 300.0f);
+        ReserveOffset(WardenOffsets.Last(), GetDefault<ABreakerWardenEnemy>()->GetBodyCapsuleRadius());
+    }
+    // Skirmishers select cover anchors separately; do not move them blindly
+    // away from cover to make a fixed-ring containment claim.
+    if (bRiftInstance && Composition.bBoss)
+        EncounterRadius = FMath::Max(EncounterRadius, BossArenaClearanceCm);
     // Wave mode deliberately spawns around the PLAYER rather than at the
     // authored arena: the instrument has to work wherever a playtest happens
     // to be standing. THAT IS CORRECT FOR AN INSTRUMENT IN AN OPEN FIELD AND
@@ -4097,12 +4140,7 @@ void ABreakerGameMode::StartNextWave()
 
     for (int32 Index = 0; Index < Composition.Skitters; ++Index)
     {
-        const int32 Pack = Index / 4;
-        const float PackAngle = 360.0f * Pack / FMath::Max(1, (Composition.Skitters + 3) / 4);
-        // Packs sit on the pocket rim rather than at a flat 1100 cm, so the
-        // ring the player circles is the same radius everywhere in the field.
-        const FVector PackCenter = ArenaCenter + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(PackAngle, FVector::UpVector) * (CombatPocketRadius * 0.55f);
-        const FVector SpawnLocation = PackCenter + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(Index * 90.0f, FVector::UpVector) * 160.0f;
+        const FVector SpawnLocation = ArenaCenter + MeleeOffsets[Index];
         if (WaveDrudges > 0 && Index >= FirstDrudgeIndex)
         {
             if (ABreakerAlteredEnemy* Drudge = SpawnDrudge(SpawnLocation, Index * 1.3f, AreaLevel))
@@ -4145,9 +4183,7 @@ void ABreakerGameMode::StartNextWave()
     // push the player ACROSS the ranged fire lanes instead of away from them.
     for (int32 Index = 0; Index < Composition.Lattices; ++Index)
     {
-        const float Angle = 360.0f * Index / FMath::Max(1, Composition.Lattices) + 45.0f;
-        const FVector SpawnLocation = ArenaCenter
-            + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(Angle, FVector::UpVector) * CombatPocketRadius;
+        const FVector SpawnLocation = ArenaCenter + LatticeOffsets[Index];
         ABreakerEnemy* Ranged = AcquirePooledEnemy(ABreakerRangedEnemy::StaticClass(), SpawnLocation);
         if (!Ranged) continue;
         Ranged->ConfigureEncounter(SpawnLocation, Index * 0.9f);
@@ -4182,8 +4218,7 @@ void ABreakerGameMode::StartNextWave()
     // player never has to solve.
     for (int32 Index = 0; Index < Composition.Wardens; ++Index)
     {
-        const FVector SpawnLocation = ArenaCenter - Forward * (CombatPocketRadius * 0.6f)
-            + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(Index * 90.0f, FVector::UpVector) * 300.0f;
+        const FVector SpawnLocation = ArenaCenter + WardenOffsets[Index];
         ABreakerEnemy* Warden = AcquirePooledEnemy(ABreakerWardenEnemy::StaticClass(), SpawnLocation);
         if (!Warden) continue;
         Warden->ConfigureEncounter(SpawnLocation, 1.7f + Index);

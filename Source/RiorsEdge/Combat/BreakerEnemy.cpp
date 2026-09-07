@@ -1118,6 +1118,15 @@ void ABreakerEnemy::InterruptCombatAction()
 void ABreakerEnemy::PerformAttack(APawn* TargetPawn)
 {
     if (!TargetPawn || !GetWorld() || GetWorld()->GetTimeSeconds() - LastAttackTime < AttackCooldown) return;
+    // The AI's broad-phase distance is planar. A real strike must also reach
+    // the target vertically and cannot cross intervening blocking geometry.
+    const FVector StrikeOrigin = GetActorLocation();
+    const FVector StrikeTarget = TargetPawn->GetActorLocation();
+    if (FVector::DistSquared(StrikeOrigin, StrikeTarget) > FMath::Square(AttackRange)) return;
+    FCollisionQueryParams StrikeQuery(SCENE_QUERY_STAT(BreakerEnemyMeleeObstruction), false, this);
+    StrikeQuery.AddIgnoredActor(TargetPawn);
+    FHitResult Obstruction;
+    if (GetWorld()->LineTraceSingleByChannel(Obstruction, StrikeOrigin, StrikeTarget, ECC_GameTraceChannel2, StrikeQuery)) return;
     UBreakerCombatComponent* TargetCombat = TargetPawn->FindComponentByClass<UBreakerCombatComponent>();
     if (!TargetCombat) return;
     FBreakerDamageRequest Damage;
@@ -1128,6 +1137,8 @@ void ABreakerEnemy::PerformAttack(APawn* TargetPawn)
     if (Family == EBreakerEnemyFamily::Vestige)
     { Damage.Element = EBreakerElement::Entropy; Damage.ElementalFraction = BreakerEntropy::VestigeMeleeFraction(); }
     Damage.bCanCritical = false;
+    Damage.SourceLocation = StrikeOrigin;
+    Damage.bHasSourceLocation = true;
     Damage.SetInstigator(this);
     const FBreakerDamageResult Result = TargetCombat->ReceiveDamage(Damage);
     LastAttackTime = GetWorld()->GetTimeSeconds();
