@@ -106,9 +106,12 @@ bool FBreakerSpecialAffixPoolContentTest::RunTest(const FString& Parameters)
             static_cast<int32>(Affix.MinimumRarity), static_cast<int32>(ExpectedRarity));
         TestTrue(*(Context + TEXT(" rolls on at least one slot")), Affix.AllowedSlots.Num() > 0);
         TestFalse(*(Context + TEXT(" has a display name")), Affix.DisplayName.IsEmpty());
-        // The locked aggregation law: gear never authors a More, and a special
-        // is not an exemption.
-        TestTrue(*(Context + TEXT(" does not author a More")), Affix.StatBucket != EBreakerStatBucket::MorePercent);
+        // Special-rarity damage Mores are explicitly permitted; ordinary and
+        // downside pools remain excluded, and non-damage More is not authored.
+        if (Affix.StatBucket == EBreakerStatBucket::MorePercent)
+            TestTrue(*(Context + TEXT(" special More has a supported damage lane")),
+                Affix.StatTarget == EBreakerStatTarget::WeaponDamage || Affix.StatTarget == EBreakerStatTarget::AbilityDamage
+                || Affix.StatTarget == EBreakerStatTarget::SharedDamage || Affix.StatTarget == EBreakerStatTarget::DamageOverTime);
         // Its condition must be answerable TODAY, or the line can never pay —
         // the exact bug class this project keeps finding.
         TestTrue(*(Context + TEXT("'s condition is self-evaluable")),
@@ -331,9 +334,12 @@ bool FBreakerSpecialAffixRarityGatingTest::RunTest(const FString& Parameters)
             TestNotNull(TEXT("A rolled bill has a carrier in the pool"), Carrier);
             if (Carrier)
             {
-                const FName CarrierId = Carrier->AffixId;
                 TestTrue(TEXT("The bill's carrier is on the same item"),
-                    Item.Affixes.ContainsByPredicate([CarrierId](const FBreakerRolledAffix& R) { return R.AffixId == CarrierId; }));
+                    AberrantPool.ContainsByPredicate([&Item, BillId](const FBreakerAffixDefinition& Definition)
+                    {
+                        return Definition.PairedAffixId == BillId && Item.Affixes.ContainsByPredicate(
+                            [&Definition](const FBreakerRolledAffix& R) { return R.AffixId == Definition.AffixId; });
+                    }));
             }
         }
     }

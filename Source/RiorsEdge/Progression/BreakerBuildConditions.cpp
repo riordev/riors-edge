@@ -111,6 +111,7 @@ const TCHAR* FBreakerBuildConditionState::DescribeCondition(EBreakerBuildConditi
     case EBreakerBuildCondition::TargetAtCloseRange:    return TEXT("TargetAtCloseRange");
     case EBreakerBuildCondition::TargetBandBroken:      return TEXT("TargetBandBroken");
     case EBreakerBuildCondition::RecentlyLedgeTraversed: return TEXT("RecentlyLedgeTraversed");
+    case EBreakerBuildCondition::ParryCounter: return TEXT("ParryCounter");
     // No default. A new enum entry must fail to compile here rather than fall
     // through to a placeholder — "STAT" in UI/BreakerMenu.cpp's two label
     // switches is exactly that mistake, and it is why every damage node on the
@@ -221,6 +222,8 @@ FBreakerBuildConditionState FBreakerBuildConditionState::EvaluateForActor(const 
 {
     FBreakerBuildConditionState State;
     if (!Actor) return State;
+    if (const UBreakerCombatComponent* Combat = Actor->FindComponentByClass<UBreakerCombatComponent>())
+        State.Set(EBreakerBuildCondition::ParryCounter, Combat->IsParryCounterActive());
 
     if (const UBreakerCharacterMovementComponent* Movement = Actor->FindComponentByClass<UBreakerCharacterMovementComponent>())
     {

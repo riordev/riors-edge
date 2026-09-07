@@ -15,6 +15,7 @@
 #include "Characters/BreakerCharacter.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/GameStateBase.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Net/UnrealNetwork.h"
@@ -28,6 +29,12 @@ UBreakerCombatComponent::UBreakerCombatComponent()
 void UBreakerCombatComponent::BeginPlay()
 {
     Super::BeginPlay();
+    if (GetOwner() && GetOwner()->HasAuthority())
+    {
+        if (UBreakerProgressionComponent* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>())
+            Progression->OnProgressionChanged.AddUniqueDynamic(this, &ThisClass::RefreshParryPermission);
+        RefreshParryPermission();
+    }
     if (const IAbilitySystemInterface* AbilityOwner = Cast<IAbilitySystemInterface>(GetOwner()))
     {
         if (UAbilitySystemComponent* ASC = AbilityOwner->GetAbilitySystemComponent())
@@ -42,9 +49,79 @@ void UBreakerCombatComponent::BindAttributes(UBreakerAttributeSet* InAttributes)
     Attributes = InAttributes;
 }
 
+void UBreakerCombatComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME_CONDITION(UBreakerCombatComponent, bParryOwned, COND_OwnerOnly);
+    DOREPLIFETIME_CONDITION(UBreakerCombatComponent, ParryWindowEnd, COND_OwnerOnly);
+    DOREPLIFETIME_CONDITION(UBreakerCombatComponent, ParryCooldownEnd, COND_OwnerOnly);
+    DOREPLIFETIME_CONDITION(UBreakerCombatComponent, ParryCounterEnd, COND_OwnerOnly);
+}
+
+float UBreakerCombatComponent::ParryClock() const
+{
+    if (!GetWorld()) return 0.0f;
+    const AGameStateBase* GameState = GetWorld()->GetGameState();
+    return GameState ? GameState->GetServerWorldTimeSeconds() : GetWorld()->GetTimeSeconds();
+}
+
+bool UBreakerCombatComponent::HasParryPermission() const
+{
+    if (!GetOwner()) return false;
+    if (!GetOwner()->HasAuthority()) return bParryOwned;
+    const UBreakerProgressionComponent* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+    return Progression && Progression->HasNodeTag(BreakerNodeTags::Verb_Parry.GetTag());
+}
+
+bool UBreakerCombatComponent::IsParryAvailable() const
+{
+    return HasParryPermission() && !IsDead() && GetParryCooldownRemaining() <= 0.0f;
+}
+bool UBreakerCombatComponent::IsParryActive() const
+{
+    return HasParryPermission() && !IsDead() && ParryWindowEnd > ParryClock();
+}
+bool UBreakerCombatComponent::IsParryCounterActive() const
+{
+    return HasParryPermission() && !IsDead() && ParryCounterEnd > ParryClock();
+}
+float UBreakerCombatComponent::GetParryCooldownRemaining() const
+{
+    return HasParryPermission() && !IsDead() ? FMath::Max(0.0f, ParryCooldownEnd - ParryClock()) : 0.0f;
+}
+float UBreakerCombatComponent::GetParryWindowRemaining() const
+{
+    return IsParryActive() ? FMath::Max(0.0f, ParryWindowEnd - ParryClock()) : 0.0f;
+}
+void UBreakerCombatComponent::ClearParryWindows()
+{
+    const bool bHadCounter = ParryCounterEnd >= 0.0f;
+    ParryWindowEnd = ParryCooldownEnd = ParryCounterEnd = -1.0f;
+    if (bHadCounter && GetOwner())
+        if (UBreakerProgressionComponent* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>())
+            Progression->RefreshBuildConditions();
+}
+void UBreakerCombatComponent::RefreshParryPermission()
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+    bParryOwned = HasParryPermission();
+    if (!bParryOwned || IsDead()) ClearParryWindows();
+}
+bool UBreakerCombatComponent::TryParry()
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !GetWorld() || !Attributes || !IsParryAvailable()) return false;
+    RefreshParryPermission();
+    const UBreakerProgressionComponent* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+    const float Bonus = Progression->HasNodeTag(BreakerNodeTags::Node_Read.GetTag()) ? ReadParryBonusSeconds : 0.0f;
+    ParryWindowEnd = ParryClock() + FMath::Max(0.0f, ParryWindowSeconds + Bonus);
+    ParryCooldownEnd = ParryClock() + FMath::Max(0.0f, ParryCooldownSeconds);
+    return true;
+}
+
 void UBreakerCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+    if (GetOwner() && GetOwner()->HasAuthority()) RefreshParryPermission();
 
     // THE PLAYER-SIDE SHIELD RECHARGE — the missing source for a pool the
     // damage library has spent correctly since it shipped. Pure step in
@@ -86,6 +163,25 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
 {
     FBreakerDamageResult Result;
     if (!Attributes || !GetOwner() || !GetOwner()->HasAuthority() || IsDead()) return Result;
+    const FVector TowardSource = (Request.SourceLocation - GetOwner()->GetActorLocation()).GetSafeNormal2D();
+    if (IsParryActive() && Request.BaseDamage > 0.0f && !Request.bIsDamageOverTime
+        && Request.Instigator.Get() != GetOwner()
+        && Request.bHasSourceLocation && !TowardSource.IsNearlyZero()
+        && FVector::DotProduct(GetOwner()->GetActorForwardVector().GetSafeNormal2D(), TowardSource) >= 0.0f)
+    {
+        ParryWindowEnd = -1.0f;
+        ParryCounterEnd = ParryClock() + FMath::Max(0.0f, ParryCounterSeconds);
+        // Incoming pressure still counts as combat for recovery; recording
+        // the clock does not broadcast damage, block or dodge procs.
+        LastDamageTime = GetWorld()->GetTimeSeconds();
+        Result.bParried = true;
+        Result.RemainingHealth = Attributes->GetHealth();
+        Result.RemainingShield = Attributes->GetShield();
+        if (UBreakerProgressionComponent* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>())
+            Progression->RefreshBuildConditions();
+        // No hit/dodge/block broadcasts: a negated strike pays no such procs.
+        return Result;
+    }
 
     FBreakerDefenseState Defense;
     Defense.Health = Attributes->GetHealth();
@@ -290,6 +386,7 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     if (Result.bKilled && !bDeathBroadcast)
     {
         bDeathBroadcast = true;
+        ClearParryWindows();
         OnDeath.Broadcast();
     }
     DispatchHitDealt(Request, Result);

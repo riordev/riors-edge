@@ -112,7 +112,10 @@ bool FBreakerItemRuleNoMoreTest::RunTest(const FString& Parameters)
     // stack on top of the tree's three. Item-Foundation recorded this hole in
     // so many words; this is the assertion that it is closed.
     FBreakerAttributeContribution TreeOffer;
-    TreeOffer.ComposeMore(EBreakerAggregatedAttribute::DamageMultiplier, 1.94f);   // three tree keystones
+    // Three actual sources, retaining the original 1.94 product fixture.
+    TreeOffer.ComposeMore(EBreakerAggregatedAttribute::DamageMultiplier, 1.25f);
+    TreeOffer.ComposeMore(EBreakerAggregatedAttribute::DamageMultiplier, 1.25f);
+    TreeOffer.ComposeMore(EBreakerAggregatedAttribute::DamageMultiplier, 1.2416f);
     FBreakerAttributeContribution ItemOffer;
     ItemOffer.ComposeMore(EBreakerAggregatedAttribute::DamageMultiplier, 1.30f);   // a hypothetical fourth
 

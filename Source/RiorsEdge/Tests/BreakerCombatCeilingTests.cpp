@@ -518,16 +518,18 @@ bool FBreakerCeilingDotAdditiveBucketTest::RunTest(const FString& Parameters)
     }
 
     // ---- One O34 ceiling across Damage Mores + DoT More -------------------
-    AddExpectedError(TEXT("exceeds the"), EAutomationExpectedErrorFlags::Contains, 0);
     {
         UBreakerAttributeSet* Attributes = CeilingTestMakeAttributes();
         FBreakerAttributeContribution Offer = CeilingTestTreeMores(3);
         Offer.ComposeMore(EBreakerAggregatedAttribute::DamageOverTimeMultiplier, FBreakerAttributeAggregator::SingleMoreCeiling);
         Attributes->ApplyAttributeContribution(EBreakerAttributeContributor::Progression, Offer);
 
-        // Three Damage Mores already sit AT the ceiling; a DoT More on top of
-        // that raw offer buys the tick nothing more — the fold clamps the
-        // combined More side at the single budget.
+        // Selection rejects the fourth tied source before hit-time composition,
+        // so no over-ceiling warning should be necessary to enforce the budget.
+        TestEqual(TEXT("The fourth tied DoT source spends no additional slot"),
+            Attributes->GetAttributeAggregator().GetSelectedDamageMoreSourceCount(), 3);
+        TestEqual(TEXT("The displaced DoT source contributes no multiplier"),
+            Attributes->GetAttributeAggregator().ComposedMoreProduct(EBreakerAggregatedAttribute::DamageOverTimeMultiplier), 1.0f);
         TestEqual(TEXT("The tick's total More side clamps at the one O34 ceiling"),
             UBreakerCombatComponent::ComposeDotSourcePower(Attributes, nullptr, EBreakerDamageDelivery::Weapon),
             FBreakerAttributeAggregator::ComposedMoreCeiling(), 0.001f);

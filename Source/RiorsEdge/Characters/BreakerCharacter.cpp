@@ -760,6 +760,7 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
         PlayerInputComponent->BindAction(TEXT("Aim"), IE_Pressed, this, &ThisClass::StartAim);
         PlayerInputComponent->BindAction(TEXT("Aim"), IE_Released, this, &ThisClass::StopAim);
         PlayerInputComponent->BindAction(TEXT("Reload"), IE_Pressed, this, &ThisClass::HandleReloadInput);
+        PlayerInputComponent->BindAction(TEXT("Parry"), IE_Pressed, this, &ThisClass::HandleParryInput);
         PlayerInputComponent->BindAction(TEXT("PlaytestReset"), IE_Pressed, this, &ThisClass::ResetPlaytest);
         PlayerInputComponent->BindAction(TEXT("PlaytestReport"), IE_Pressed, this, &ThisClass::CopyPlaytestReport);
         PlayerInputComponent->BindAction(TEXT("PlaytestDiagnostics"), IE_Pressed, this, &ThisClass::TogglePlaytestDiagnostics);
@@ -801,6 +802,7 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
         Input->BindAction(InputConfig->Aim, ETriggerEvent::Completed, this, &ThisClass::StopAim);
     }
     if (InputConfig->Reload) Input->BindAction(InputConfig->Reload, ETriggerEvent::Started, this, &ThisClass::HandleReloadInput);
+    if (InputConfig->Parry) Input->BindAction(InputConfig->Parry, ETriggerEvent::Started, this, &ThisClass::HandleParryInput);
     if (InputConfig->PlaytestReset) Input->BindAction(InputConfig->PlaytestReset, ETriggerEvent::Started, this, &ThisClass::ResetPlaytest);
     if (InputConfig->PlaytestReport) Input->BindAction(InputConfig->PlaytestReport, ETriggerEvent::Started, this, &ThisClass::CopyPlaytestReport);
     if (InputConfig->PlaytestDiagnostics) Input->BindAction(InputConfig->PlaytestDiagnostics, ETriggerEvent::Started, this, &ThisClass::TogglePlaytestDiagnostics);
@@ -855,6 +857,17 @@ void ABreakerCharacter::ActivateAbilityOne()
 {
     if (bWeaponsHolstered) return;   // holstered in the Anchor, same as fire
     if (Abilities) Abilities->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityOne);
+}
+
+void ABreakerCharacter::HandleParryInput()
+{
+    if (bWeaponsHolstered || !Combat || Combat->IsDead()) return;
+    if (HasAuthority()) Combat->TryParry();
+    else ServerParry();
+}
+void ABreakerCharacter::ServerParry_Implementation()
+{
+    if (!bWeaponsHolstered && Combat && !Combat->IsDead()) Combat->TryParry();
 }
 
 void ABreakerCharacter::ActivateAbilityTwo()

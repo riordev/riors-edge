@@ -942,6 +942,7 @@ bool UBreakerEquipmentComponent::GetEquippedItem(EBreakerEquipSlot Slot, FBreake
 FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<FBreakerItemInstance>& Items, FBreakerAttributeContribution* OutContribution,
     const FBreakerBuildConditionState& Conditions)
 {
+    if (OutContribution) OutContribution->Reset();
     const TArray<FBreakerAffixDefinition>& Pool = UBreakerAffixLibrary::GetSliceAffixPool();
 
     // RULES FIRST. Every rewrite below changes how the affixes are READ, so the
@@ -1010,32 +1011,50 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
 
             if (Definition->IsConditional())
             {
-                PotentialConditionalPercent += Value;
+                if (Definition->StatBucket == EBreakerStatBucket::IncreasedPercent) PotentialConditionalPercent += Value;
                 // A conditional line whose condition is false contributes
                 // NOTHING — not a reduced amount, not a separate multiplier.
                 // That is what keeps the locked one-bucket rule intact while
                 // the bucket's contents change with the movement state.
                 if (!BreakerConditionSatisfied(Definition->Condition)) continue;
-                ActiveConditionalPercent += Value;
+                if (Definition->StatBucket == EBreakerStatBucket::IncreasedPercent) ActiveConditionalPercent += Value;
             }
             const int32 Target = static_cast<int32>(Definition->StatTarget);
             if (Definition->StatBucket == EBreakerStatBucket::Flat) FlatByTarget[Target] += Value;
             else if (Definition->StatBucket == EBreakerStatBucket::IncreasedPercent) IncreasedByTarget[Target] += Value;
+            else if (Definition->StatBucket == EBreakerStatBucket::MorePercent)
+            {
+                // Definitions must belong to the exact authored special pool;
+                // copying a special ID onto ordinary gear never grants its More.
+                const auto Exact = [Definition](const FBreakerAffixDefinition& Row) { return Row.AffixId == Definition->AffixId; };
+                const bool bPermitted = Item.Rarity >= Definition->MinimumRarity && Item.Rarity >= EBreakerItemRarity::Aberrant
+                    && ((Definition->MinimumRarity == EBreakerItemRarity::Aberrant && UBreakerAffixLibrary::GetAberrantAffixPool().ContainsByPredicate(Exact))
+                        || (Definition->MinimumRarity == EBreakerItemRarity::Anomalous && UBreakerAffixLibrary::GetAnomalousAffixPool().ContainsByPredicate(Exact)));
+                EBreakerDamageMoreLane Lane = EBreakerDamageMoreLane::Weapon;
+                bool bDamageLane = true;
+                switch (Definition->StatTarget)
+                {
+                case EBreakerStatTarget::WeaponDamage: break;
+                case EBreakerStatTarget::AbilityDamage: Lane = EBreakerDamageMoreLane::Ability; break;
+                case EBreakerStatTarget::SharedDamage: Lane = EBreakerDamageMoreLane::Shared; break;
+                case EBreakerStatTarget::DamageOverTime: Lane = EBreakerDamageMoreLane::Dot; break;
+                default: bDamageLane = false; break;
+                }
+                if (bPermitted && bDamageLane && OutContribution)
+                {
+                    const FName Key(*FString::Printf(TEXT("%02d.%s"), static_cast<int32>(Item.Slot), *Definition->AffixId.ToString()));
+                    OutContribution->AddDamageMoreSource(Key, Lane, 1.0f + FMath::Max(0.0f, Value) / 100.0f);
+                }
+            }
             else
             {
-                // Audit item 2, the Items-side twin of the Progression fix:
-                // gear must never author EBreakerStatBucket::MorePercent (More
-                // multipliers are reserved for trees/Anomalous rewrites, and
-                // RiorsEdge.Items.Affixes.Breadth pins that no pool entry does)
-                // — but before this, a definition that DID would silently drop
-                // here with no signal, same as the Progression aggregator did.
-                // Loud once per offending affix id rather than silent forever.
+                // Unknown bucket values remain loud instead of disappearing.
                 static TSet<FName> WarnedOnceAffixIds;
                 if (!WarnedOnceAffixIds.Contains(Definition->AffixId))
                 {
                     WarnedOnceAffixIds.Add(Definition->AffixId);
                     UE_LOG(LogTemp, Warning,
-                        TEXT("[BreakerEquipment] affix '%s' is authored with StatBucket MorePercent, which gear never composes — this effect is silently dropped."),
+                        TEXT("[BreakerEquipment] affix '%s' has an unsupported stat bucket; effect omitted."),
                         *Definition->AffixId.ToString());
                 }
             }
@@ -1187,7 +1206,6 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         // they can join the tree's percentages in ONE additive bucket per stat.
         // Gear authors no More multipliers — those are reserved for trees and
         // Anomalous items (O3).
-        OutContribution->Reset();
         // Base health rides the same lane as the Health affix: one flat
         // bucket, folded with the tree's, so a Life piece and a Health line
         // compose instead of stacking through different doors.

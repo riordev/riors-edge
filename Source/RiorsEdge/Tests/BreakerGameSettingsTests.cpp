@@ -327,6 +327,7 @@ bool FBreakerKeybindRuntimeContextTest::RunTest(const FString& Parameters)
     Config->DefaultMappingContext = Authored;
     Config->Jump = JumpAction;
     Config->Fire = FireAction;
+    Config->Parry = nullptr; // This fixture deliberately models only its two authored actions.
 
     // No overrides: nullptr, meaning "register the authored asset itself" —
     // no clone exists to drift from the asset, and RESET ALL lands here.

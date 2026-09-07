@@ -306,6 +306,8 @@ private:
     void StartAim();
     void StopAim();
     void HandleReloadInput();
+    void HandleParryInput();
+    UFUNCTION(Server, Reliable) void ServerParry();
     void EquipPrimaryWeapon();
     void EquipSecondaryWeapon();
     void ApplyWeaponPresentation();

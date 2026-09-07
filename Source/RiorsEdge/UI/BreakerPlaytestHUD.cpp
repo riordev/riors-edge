@@ -760,6 +760,39 @@ void ABreakerPlaytestHUD::DrawAbilityCluster(const ABreakerCharacter* Character)
     DrawAbilitySlot(Character, Abilities, EBreakerAbilitySlot::ClassAbilityTwo, TEXT("T"),
         S(BreakerUI::HudAbilityTwoX), Bottom - Tile, Tile, S(BreakerUI::HudAbilityMark), RailFor(EBreakerAbilitySlot::ClassAbilityTwo));
 
+    const UBreakerCombatComponent* Combat = Character->GetCombat();
+    const bool bParryPreview = IsCapturePreview() && FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureParry"));
+    if (Combat && !Combat->IsDead() && (bParryPreview || Combat->IsParryUnlocked()))
+    {
+        const float X = S(BreakerUI::HudAbilityOneX - 80.0f);
+        const float Y = Bottom - Tile;
+        const FVector2D Center(X + Tile * 0.5f, Y + Tile * 0.42f);
+        const float Remaining = Combat->GetParryCooldownRemaining();
+        const float Recovery = BreakerHUDMath::AbilityRecoveryFraction(Remaining, Combat->ParryCooldownSeconds);
+        DrawRect(BreakerUI::BgBase, X, Y, Tile, Tile);
+        DrawBorder(X, Y, Tile, Tile, BreakerUI::BorderRest, S(BreakerUI::BorderThin));
+        DrawAbilityRecoveryDisc(Center, Tile * 0.30f, 1, BreakerUI::Panel20);
+        DrawAbilityRecoveryDisc(Center, Tile * 0.30f, Recovery,
+            BreakerUI::Alpha(BreakerUI::System, Combat->IsParryActive() ? 0.9f : 0.5f));
+        // Shield outline: distinct from the three ability placeholders.
+        const FVector2D Points[] = { {-12,-12}, {12,-12}, {10,5}, {0,14}, {-10,5}, {-12,-12} };
+        for (int32 I = 1; I < UE_ARRAY_COUNT(Points); ++I)
+            DrawLine(Center.X + S(Points[I-1].X), Center.Y + S(Points[I-1].Y),
+                Center.X + S(Points[I].X), Center.Y + S(Points[I].Y), BreakerUI::TextPrimary, S(1.5f));
+        static const TMap<FName, FKey> Defaults = UBreakerGameSettingsLibrary::FirstKeyPerAction(UBreakerGameSettingsLibrary::ProjectDefaultKeybinds());
+        const FKey Key = Profile ? UBreakerGameSettingsLibrary::ResolveActionKey(TEXT("Parry"), Profile->KeybindOverrides, Defaults) : EKeys::V;
+        const FString Hint = Key.GetDisplayName().ToString();
+        const float KeyFont = 11.0f * FMath::Min(1.0f, (Tile - S(4)) / FMath::Max(1.0f, MeasureSpecText(Hint, 11).X));
+        DrawSpecTextCentered(Hint, Center.X, Y - S(16), BreakerUI::TextSecondary, KeyFont);
+        if (Combat->IsParryCounterActive())
+            DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudParrySuccess), Center.X, Y - S(31), BreakerUI::TextPrimary, 10);
+        const FString State = Remaining > 0 && !Combat->IsParryActive()
+            ? BreakerHUDMath::AbilityCooldownText(Remaining)
+            : BreakerStrings::Get(Combat->IsParryActive() ? EBreakerStringKey::HudParryActive
+                : EBreakerStringKey::HudParryLabel);
+        DrawSpecTextCentered(State, Center.X, Y + Tile - S(15), BreakerUI::TextPrimary, 10.0f);
+    }
+
     const UBreakerStatusCycleComponent* Cycle = Character->FindComponentByClass<UBreakerStatusCycleComponent>();
     bool bFracture = false;
     if (Abilities)

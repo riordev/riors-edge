@@ -5,11 +5,10 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
-## Cycle — Core parry, special damage scaling and compact gear
-- [ ] Make Parry a real rebindable defensive action; wire Read's window and Counterweight's success-only bonus with runtime coverage.
-- [ ] Select gear/tree damage More sources jointly inside the existing three-source ceiling; permit one authored Aberrant ability payoff with its paired downside, keeping ordinary gear restrictions and parity pins intact.
-- [ ] Remove the inventory's empty full-body placeholder and give equipment, stats and backpack cards usable space; inspect the actual layout.
-- [ ] Review, build, census, run the full suite and inspect affected captures before landing.
+## Cycle — Swift traversal income and real Damage Ramp
+- [ ] Replace Contact's retired wall-ride dependency with a brief purchased post-vault/mantle income grace, using real completed traversal and anti-farm limits.
+- [ ] Implement the authored Primary Damage Ramp affix with actual consecutive-hit stacks, weapon/DoT consumers and projectile ownership; make purchased Redline Trigger double accrual at Redline.
+- [ ] Review, build, census and run the full suite before landing; retain separate evidence for currently earned four-point progression and the later eight-point keystone path.
 Remaining repairs include later campaign benchmarks, other silent nodes, ability/weapon balance, rarity identities, arms/weapon art and audible combat polish.
 ## Playtest queue (owner, 2026-09-07)
 Continue through the entire repair list in tested batches without stopping after each commit for a playtest. After repairs, execute the content phase below (owner instruction, 2026-09-07).
@@ -106,6 +105,11 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - Four Niagara systems at `/Game/Breaker/FX/NS_<Moment>` with a `Color` user parameter, or a free Fab VFX pack placed there
 
 ## Done (last three cycles; older is git)
+### Parry, special damage sources and compact inventory — 621 / 5 / 0
+- [x] Purchased Parry is a rebindable V action with a frontal one-hit window, Read extension, successful Counterweight bonus, owner replication and combat recovery timing. Real purchase/input/runtime tests cover exclusions, cooldown, respec and death; ready HUD preview inspected.
+- [x] Gear/tree damage More sources share strongest-three selection across weapon, ability, shared and DoT lanes. Reserve Surge rolls an ability payoff while resource-low with the actual paired weapon downside; live equip/direct/DoT/removal and counterfeit rejection are covered.
+- [x] Empty inventory preview removed; equipment, totals and three readable backpack cards use the space. Wide-screen sizing converts physical pixels through Unreal's actual UI scale;1920 and1280 frames inspected, footer wrapping repaired.
+- [x] Build/census clean;626 tests complete:621 passed,5 known,0 unexpected. Integration caught and fixed erased source records and missing DoT selection; obsolete warning fixture now asserts source rejection with the original numerical ceiling. Historical parity0.542 unchanged; rolled cap0.608/endgame0.738 remain below goal. STATE unchanged.
 ### Ability flat power and integrated Marshal module — 616 / 5 / 0
 - [x] Added Ability Power rolls on ordinary gear and feeds the ability multiplier's Flat bucket; direct damage, captured DoT, weapon isolation and equip/unequip are tested. Item and Forge values print percentage units.
 - [x] Marshal's visible command module receives weakpoint hits; inherited head orb stays disabled across body/revive/visibility paths. Exposure is applied at spawn, follows real Orders/front-break windows and lights at rest. Compact ribbed module and telescoping mast replace the disconnected slab; Holdfast presentation remains separate.
@@ -117,8 +121,3 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - [x] Support Blackout Protocol dynamically suppresses healing and beneficial buffs for its marked enemies inside Suppress at Resonant; leaving, losing marks/Charge, source death and overlapping/released zones restore behavior correctly.
 - [x] Marshal shield is smaller framed armour with command markings, exposing its head/shoulders. Actual earned campaign boss frame inspected. Rear apparatus/hitbox mismatch is the next repair.
 - [x] Build and canonical census clean (135 ability numbers); all 619 tests complete: 614 passed, 5 known, 0 unexpected. Runtime fixtures corrected actual controller viewpoint, engine timer/world initialization and duplicate equipment setup without weakening assertions. Fresh earned Act I-II integration passed 111 kills and exactly 4 Doctrine points; accelerated damage, no combat-feel claim. STATE unchanged.
-### Earned Act II progression and Swift movement — 611 / 5 / 0
-- [x] Dedicated wounded Drudge investigation, actual-death objective, Quartermaster report/orders, restored Breach entrance and four-wave Field Marshal job now earn the next two Doctrine points. Stable encounter identity and verified active-boss death prevent developer completion from awarding story progress.
-- [x] Swift Read the Room and Landing use purchased ranks and actual movement. Ground-only credit refill, continuous fall distance, teleport/traversal resets and once-per-landing gains are tested.
-- [x] Fixed two real integration failures: offer-node gates hid their own dialogue choices, and silently restored journals did not refresh the physical entrance. Added visible-choice and same-journal save-restore regressions.
-- [x] Final build/census and616tests:611passed/5known/0unexpected. Fresh isolated fully earned Act I-II run passed111kills, actual travel/contact/Marshal/return and exactly4Doctrine points. Damage accelerated; no combat-feel or Slate-input claim. Contact and Marshal frames inspected; Marshal solid shield panel remains visual repair. STATE unchanged.

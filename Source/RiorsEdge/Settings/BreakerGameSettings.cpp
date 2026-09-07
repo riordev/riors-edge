@@ -121,7 +121,7 @@ const TArray<FName>& UBreakerGameSettingsLibrary::BindableActionNames()
     // the same grouping the asset's Category tags already declare.
     static const TArray<FName> Names = {
         TEXT("Move"), TEXT("Look"), TEXT("Jump"), TEXT("Sprint"), TEXT("Dash"), TEXT("Slide"),
-        TEXT("Fire"), TEXT("Aim"), TEXT("Reload"), TEXT("Interact"),
+        TEXT("Fire"), TEXT("Aim"), TEXT("Reload"), TEXT("Parry"), TEXT("Interact"),
         TEXT("AbilityOne"), TEXT("AbilityTwo"), TEXT("Ultimate"),
         TEXT("FOVUp"), TEXT("FOVDown"), TEXT("SensitivityUp"), TEXT("SensitivityDown"),
         TEXT("PlaytestReset"), TEXT("PlaytestReport"), TEXT("PlaytestDiagnostics")
@@ -144,6 +144,7 @@ FText UBreakerGameSettingsLibrary::DescribeAction(FName Action)
         { TEXT("Fire"),                TEXT("FIRE") },
         { TEXT("Aim"),                 TEXT("AIM") },
         { TEXT("Reload"),              TEXT("RELOAD") },
+        { TEXT("Parry"),               TEXT("PARRY") },
         { TEXT("Interact"),            TEXT("INTERACT") },
         { TEXT("AbilityOne"),          TEXT("ABILITY 1") },
         { TEXT("AbilityTwo"),          TEXT("ABILITY 2") },
@@ -238,6 +239,7 @@ void UBreakerGameSettingsLibrary::ListConfigActions(const UBreakerInputConfig* C
     Add(TEXT("Fire"), Config->Fire);
     Add(TEXT("Aim"), Config->Aim);
     Add(TEXT("Reload"), Config->Reload);
+    Add(TEXT("Parry"), Config->Parry);
     // The contextual verb the interact prompt names. Added the day the config
     // gained the field: this list also feeds BuildRuntimeMappingContext, so
     // an action missing here is not merely rowless — its rebinds silently
@@ -277,6 +279,7 @@ TMap<FName, TArray<FKey>> UBreakerGameSettingsLibrary::ProjectDefaultKeybinds()
 
     TMap<FName, TArray<FKey>> KeysByAction;
     ResolveDefaultKeysByAction(ActionsByName, Config->DefaultMappingContext->GetMappings(), KeysByAction);
+    if (Config->Parry && !KeysByAction.Contains(TEXT("Parry"))) KeysByAction.Add(TEXT("Parry"), { EKeys::V });
     return KeysByAction;
 }
 
@@ -334,18 +337,20 @@ TArray<FEnhancedActionKeyMapping> UBreakerGameSettingsLibrary::BuildOverriddenMa
 UInputMappingContext* UBreakerGameSettingsLibrary::BuildRuntimeMappingContext(
     const UBreakerInputConfig* Config, const TMap<FName, FKey>& Overrides, UObject* Outer)
 {
-    // Nothing to override means "use the default asset itself" — signalled as
-    // nullptr so the caller registers the authored context and no clone
-    // exists to drift from it.
-    if (!Config || !Config->DefaultMappingContext || Overrides.Num() == 0)
+    // Old shipped assets need the code-supplied Parry mapping even without
+    // overrides. Fully authored contexts can still use the asset unchanged.
+    if (!Config || !Config->DefaultMappingContext)
     {
         return nullptr;
     }
 
     TArray<TPair<FName, const UInputAction*>> ActionsByName;
     ListConfigActions(Config, ActionsByName);
-    const TArray<FEnhancedActionKeyMapping> Rewritten =
-        BuildOverriddenMappings(ActionsByName, Config->DefaultMappingContext->GetMappings(), Overrides);
+    TArray<FEnhancedActionKeyMapping> Defaults = Config->DefaultMappingContext->GetMappings();
+    const bool bNeedsParry = Config->Parry && !Defaults.ContainsByPredicate([Config](const FEnhancedActionKeyMapping& Row) { return Row.Action == Config->Parry; });
+    if (bNeedsParry) Defaults.Add(FEnhancedActionKeyMapping(Config->Parry, EKeys::V));
+    if (Overrides.IsEmpty() && !bNeedsParry) return nullptr;
+    const TArray<FEnhancedActionKeyMapping> Rewritten = BuildOverriddenMappings(ActionsByName, Defaults, Overrides);
 
     UInputMappingContext* Context = NewObject<UInputMappingContext>(
         Outer ? Outer : GetTransientPackage(), NAME_None, RF_Transient);

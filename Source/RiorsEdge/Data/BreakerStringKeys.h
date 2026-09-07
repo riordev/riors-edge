@@ -125,7 +125,10 @@
     BREAKER_STRING(CyclePoison, "cycle.poison", "") \
     BREAKER_STRING(CycleCurrent, "cycle.current", "%s") \
     BREAKER_STRING(CyclePreview, "cycle.preview", "%s%s") \
-    BREAKER_STRING(SandboxRarityGates, "sandbox.rarityGates", "")
+    BREAKER_STRING(SandboxRarityGates, "sandbox.rarityGates", "") \
+    BREAKER_STRING(HudParryLabel, "hud.parry.label", "") \
+    BREAKER_STRING(HudParryActive, "hud.parry.active", "") \
+    BREAKER_STRING(HudParrySuccess, "hud.parry.success", "")
 
 // The enumerator is an index into the loaded table and nothing else: it is
 // never serialized, so the list may be reordered freely. The key string is

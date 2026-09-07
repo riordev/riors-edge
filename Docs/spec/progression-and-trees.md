@@ -25,14 +25,13 @@ promise the game does not keep.
   percentages. They make existing actions better, cheaper, faster or longer;
   they do not introduce actions.
 
-**Item rules are a fourth layer that also rewrites rules**, and the boundary is
-the constraint rather than the kind of effect: an item rule may never author a
-More, and a tree rewrite is a build committed to where an item rewrite is a
-build found.
+**Item rules are a fourth layer that also rewrites rules.** Special-rarity
+damage perks share the same More budget as trees. A tree rewrite is a build
+committed to; an item rewrite is a build found.
 
-**Parry is the only tree-granted verb.** Walk, sprint, two jumps, crouch, dash,
-slide, vault, mantle, passive block and passive dodge are all base kit
-from level one. Trees improve movement verbs; gear never grants one.
+**Parry is the only tree-granted verb.** Walk, sprint, two jumps, slide, vault,
+mantle, passive block and passive dodge are base kit. Dash is innate to Swift.
+Trees improve movement verbs; gear never grants one.
 
 **A node that reads as a flat percentage is doing the affix layer's job.**
 With almost no verbs left to grant, a node is a conditional quality change, a
@@ -63,7 +62,7 @@ the Core side it is arithmetic on the pool: a third keystone costs more than the
 pool holds. On the doctrine side it is the shape of the wallet — eight points,
 four picks of two, and the keystone is one of them.
 
-**More multipliers are Core's alone: one per constellation, on its Convergence
+**Tree More multipliers belong to Core: one per constellation, on its Convergence
 or Keystone only.** Composed cap of three across the build. Two Core Mores plus
 one item-layer slot is the intended composition. A doctrine authors none — its
 keystone earns its place by rewriting the ultimate, not by multiplying a number,

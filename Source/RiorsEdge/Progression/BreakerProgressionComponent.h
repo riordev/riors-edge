@@ -69,6 +69,7 @@ class RIORSEDGE_API UBreakerProgressionComponent : public UActorComponent
     GENERATED_BODY()
 
 public:
+    void RefreshBuildConditions();
     UBreakerProgressionComponent();
     virtual void BeginPlay() override;
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
@@ -402,7 +403,6 @@ private:
     // Conditional node effects are live state, so the offer they belong to has
     // to be rebuilt on a transition. Called from the tick; only recalculates
     // when the active set actually moved.
-    void RefreshBuildConditions();
     // The refund body both respecs share: clears the currency's ranks and
     // refunds the running total into its wallet. Nothing else — each caller
     // re-seeds, recalculates and broadcasts once, after its own clears (the

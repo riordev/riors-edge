@@ -430,21 +430,20 @@ bool FBreakerPointSpendDamageBaselineTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("A second damage rim purchases"), Progression->PurchaseNode(Core, TEXT("Core.Bulwark.HeldGround"), Failure));
     TestTrue(TEXT("The 2-point inner purchases"), Progression->PurchaseNode(Core, TEXT("Core.Bulwark.Counterweight"), Failure));
     TestEqual(TEXT("Committed points count by cost"), Progression->GetSpentPoints(), 6.0f, 0.0001f);
-    // 6 points x 0.25% baseline + the node lines (3 + 2 + 2 + 16), all one
-    // bucket. The nodes out-earn the accumulation by an order of magnitude;
-    // before the O27 cut they were equal, which is the imbalance it names.
-    TestEqual(TEXT("Baseline and node damage share one additive bucket"), Attributes->GetDamageMultiplier(), 1.245f, 0.0001f);
+    // 6 points x 0.25% baseline + the live node lines (3 + 2 + 2).
+    // Counterweight's 16% requires a successful Parry; this fixture has none.
+    TestEqual(TEXT("Baseline and live node damage share one additive bucket"), Attributes->GetDamageMultiplier(), 1.085f, 0.0001f);
 
     // Turning the baseline off must leave exactly the node content behind, so
     // the owner can retune or disable it without touching content.
     const FBreakerProgressionState Allocated = Progression->GetProgressionState();
     Progression->IncreasedDamagePerSpentPoint = 0.0f;
     Progression->LoadProgressionState(Allocated);
-    TestEqual(TEXT("A zeroed baseline leaves only node damage"), Attributes->GetDamageMultiplier(), 1.23f, 0.0001f);
+    TestEqual(TEXT("A zeroed baseline leaves only live node damage"), Attributes->GetDamageMultiplier(), 1.07f, 0.0001f);
 
     Progression->IncreasedDamagePerSpentPoint = 2.5f;
     Progression->LoadProgressionState(Allocated);
-    TestEqual(TEXT("The baseline retunes without a content change"), Attributes->GetDamageMultiplier(), 1.38f, 0.0001f);
+    TestEqual(TEXT("The baseline retunes without a content change"), Attributes->GetDamageMultiplier(), 1.22f, 0.0001f);
     return true;
 }
 

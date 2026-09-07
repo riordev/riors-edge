@@ -1175,6 +1175,7 @@ bool UBreakerProgressionComponent::IsAbilityUnlocked(FName AbilityId) const
 FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<const UBreakerProgressionNode*>& Nodes, const TArray<FBreakerNodeRank>& Ranks,
     FBreakerAttributeContribution* OutContribution, const FBreakerBuildConditionState& Conditions)
 {
+    if (OutContribution) OutContribution->Reset();
     constexpr int32 TargetCount = static_cast<int32>(EBreakerNodeStatTarget::Count);
     float FlatByTarget[TargetCount] = {};
     float IncreasedByTarget[TargetCount] = {};
@@ -1197,7 +1198,7 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     // purchase. O74 is what keeps this honest: the lanes share ONE budget of
     // three, so a shared source spends one slot and not two, and adding a lane
     // never adds headroom.
-    enum class EBreakerMoreLane : uint8 { Weapon, Ability, Shared, Dot };
+    using EBreakerMoreLane = EBreakerDamageMoreLane;
     struct FBreakerMoreSource { float Multiplier = 1.0f; EBreakerMoreLane Lane = EBreakerMoreLane::Weapon; };
     TArray<FBreakerMoreSource> MoreSources;
     float ActiveConditionalPercent = 0.0f;
@@ -1295,6 +1296,13 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
                 default: break;
                 }
                 MoreSources.Add({ 1.0f + FMath::Max(0.0f, Effect.ValuePerRank) / 100.0f, Lane });
+                if (OutContribution)
+                {
+                    const int32 EffectIndex = static_cast<int32>(&Effect - Node->Effects.GetData());
+                    const FName SourceKey(*FString::Printf(TEXT("%s.%d"), *Node->NodeId.ToString(), EffectIndex));
+                    OutContribution->AddDamageMoreSource(SourceKey, static_cast<EBreakerDamageMoreLane>(Lane),
+                        1.0f + FMath::Max(0.0f, Effect.ValuePerRank) / 100.0f);
+                }
             }
             else
             {
@@ -1319,9 +1327,9 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     // O3's hard cap of three, and Damage-Pipeline §4's per-multiplier ceiling of
     // 1.30x. The strongest three win — across BOTH lanes, one budget (A4/O34) —
     // so a fourth purchase is dead weight the player can be told about rather
-    // than a quiet nerf to the other three. The source count reports every held
-    // source, DoT Mores included: the skill screen's "N / 3 MORE" is the whole
-    // budget, not the direct-hit lane alone.
+    // than a quiet nerf to the other three. These statistics describe tree
+    // sources only; the attribute aggregator exposes the joint gear/tree count
+    // and performs the actual live selection, including DoT sources.
     Stats.DamageMoreSourceCount = MoreSources.Num();
     // THE SORT IS BY RAW MAGNITUDE, NOT BY CONTRIBUTION. A Shared source
     // multiplies both delivery lanes from its one slot while a Weapon-only
@@ -1331,7 +1339,7 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     // orderings agree; the first time a doctrine or an Anomalous item authors
     // a lane-specific More alongside Shared ones, this line is where the
     // selection stops meaning "most valuable three" and a decision is due.
-    MoreSources.Sort([](const FBreakerMoreSource& A, const FBreakerMoreSource& B) { return A.Multiplier > B.Multiplier; });
+    MoreSources.StableSort([](const FBreakerMoreSource& A, const FBreakerMoreSource& B) { return A.Multiplier > B.Multiplier; });
     // O54/O74: four lanes out of ONE selection. A shared source is one slot of
     // the three and multiplies both delivery lanes; it is not two purchases and
     // it does not widen the budget. Splitting the budget per lane here would be
@@ -1447,7 +1455,6 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
         // product is the exception and always was — it is a different bucket,
         // composed multiplicatively through ComposeMore under the O3 cap
         // enforced above.
-        OutContribution->Reset();
         OutContribution->AddFlat(EBreakerAggregatedAttribute::MaxHealth, Stats.BonusHealth);
         OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalChance, Stats.CriticalChanceBonus);
         OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalMultiplier, Stats.CriticalMultiplierBonus);
@@ -1503,37 +1510,9 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
         // only shape two layers can share one bucket in.
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DashCooldownReduction, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::DashCooldown)]);
         OutContribution->AddFlat(EBreakerAggregatedAttribute::Armor, FlatByTarget[static_cast<int32>(EBreakerNodeStatTarget::Armor)]);
-        // The two delivery lanes' More products, already selected out of the one
-        // budget above. A shared More has been multiplied into both, which is
-        // why there is no third ComposeSharedMoreDamage call here — the
-        // duplication happened at selection, once, where the budget is spent.
-        if (!FMath::IsNearlyEqual(WeaponMoreProduct, 1.0f))
-        {
-            OutContribution->ComposeMore(EBreakerAggregatedAttribute::DamageMultiplier, WeaponMoreProduct);
-        }
-        if (!FMath::IsNearlyEqual(AbilityMoreProduct, 1.0f))
-        {
-            OutContribution->ComposeMore(EBreakerAggregatedAttribute::AbilityDamageMultiplier, AbilityMoreProduct);
-        }
-        // A4 (owner ruling 2026-08-16): the DoT More lane rides the
-        // DamageOverTimeMultiplier attribute's More product — selected and
-        // per-source-clamped above WITH the Damage Mores, one shared budget.
-        // ComposeDotSourcePower divides it back out of the composed attribute
-        // to keep the Increased half additive, then multiplies it into the
-        // tick's More side under the one O34 ceiling. Direct hits never see it.
-        //
-        // NOTHING IN THE PROGRESSION CONTENT AUTHORS THIS LANE. It was built
-        // for Caster.VoidWhisperer.LongDark, which was its only author, and
-        // O95 took that node's multiplier away — so this branch is currently
-        // unreachable from the tree. It is not dead: the mechanism is exercised
-        // by RiorsEdge.Combat.Ceiling.DotAdditiveBucket and stays available to
-        // an Anomalous rewrite, which is the layer O3 still permits a More on.
-        // But a lane waiting for an author is not a lane in service, and this
-        // is the one place a reader can learn that without a grep.
-        if (!FMath::IsNearlyEqual(DotMoreProduct, 1.0f))
-        {
-            OutContribution->ComposeMore(EBreakerAggregatedAttribute::DamageOverTimeMultiplier, DotMoreProduct);
-        }
+        // Individual damage More effects were submitted at collection time.
+        // The aggregator selects jointly with equipment; local products above
+        // remain progression-only display statistics.
     }
     return Stats;
 }

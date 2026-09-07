@@ -38,10 +38,9 @@
 // Classes/, Weapons/, Attributes/ and Combat/ — it never edits them; every read
 // in the .cpp is an existing public accessor.
 //
-// The composition rule is unchanged and still LOCKED: a conditional line is an
-// ordinary Increased percentage that joins the ONE additive bucket for its stat
-// while it is active and is absent while it is not. Nothing here is a second
-// multiplier. Widening the set of predicates does not widen the aggregation law.
+// Conditions gate the authored bucket: Increased joins its additive pool;
+// an allowed tree or special-gear More competes in the shared damage-source
+// selection. Inactive lines contribute neither value nor a source slot.
 //
 // APPEND ONLY. This enum is serialized BY VALUE into Data Assets, into affix
 // table rows (Items/BreakerAffixLibrary.cpp) and into node effects. Inserting or
@@ -221,6 +220,8 @@ enum class EBreakerBuildCondition : uint8
     // mantle-only window waits until a node actually wants the distinction,
     // and KIT splits the recorder then rather than a duration being sniffed.
     RecentlyLedgeTraversed,
+    // A live window opened only by a successful Core Parry.
+    ParryCounter,
 
     Count UMETA(Hidden)
 };

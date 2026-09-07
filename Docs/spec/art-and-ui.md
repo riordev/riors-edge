@@ -73,12 +73,14 @@ inventory management.
 **No item score, anywhere, ever.** A single number telling the player which
 item is better deletes the decision the whole endgame is made of.
 
-**The Core tree and the doctrine board are tabs, never a merged view.** The
-reason is no longer two budgets — there is one pool of sixty-five and the
-boards spend it together — it is that they are two different reading models:
-the Core tree is tier bands where a node's row is its rank, and the board is an
-adjacency lattice where size is the type. Merged, the player has to hold both
-grammars at once on one surface.
+**The Core tree and the doctrine board are separate tabs and budgets.** Core
+shows connected branches from its inner entries; doctrine shows class paths.
+Each board makes its prerequisites, purchased ranks and available points clear.
+
+**Inventory gives its width to usable gear.** Equipped slots stay in a left
+column; backpack cards and compact totals occupy the remaining width. No empty
+character-preview placeholder reserves space. Cards wrap affixes and choose a
+readable column count; cleanup controls stay beside the backpack.
 
 **Tooltip order is signatures, then prefixes, then suffixes, never
 interleaved**, with tier badges in a fixed column so the eye can scan one axis.
@@ -268,8 +270,6 @@ five it is the only instrument there is.
   budget. Telegraph tuning cannot be validated without it.
 - The specific shade of the rift-element damage cyan, and the two remaining
   element colours.
-- Whether the inventory grid gets the frame width its three-across layout
-  needs, which changes the frame policy for every other full-screen tab.
 - Whether the nameplate policy becomes a per-mode asset before the densest
   mode exists, or after it breaks.
 - How much bespoke geometry elite modifiers need. The tells were specified

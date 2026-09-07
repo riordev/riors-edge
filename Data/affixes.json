@@ -1222,6 +1222,28 @@
 			"pairedAffixId": ""
 		},
 		{
+			"id": "Aberrant.ReserveSurge",
+			"pool": "aberrant",
+			"displayName": "Reserve Surge",
+			"category": "Prefix",
+			"target": "AbilityDamage",
+			"bucket": "MorePercent",
+			"slots": [
+				"Helmet",
+				"Gloves",
+				"Waist",
+				"Necklace",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 3,
+			"valueAtT1": 8,
+			"rollWeight": 100,
+			"condition": "ResourceLow",
+			"minimumRarity": "Aberrant",
+			"pairedAffixId": "Downside.Riftburn"
+		},
+		{
 			"id": "Aberrant.Riftburn",
 			"pool": "aberrant",
 			"displayName": "Riftburn",

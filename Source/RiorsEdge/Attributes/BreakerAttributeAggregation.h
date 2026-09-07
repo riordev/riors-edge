@@ -148,6 +148,14 @@ enum class EBreakerAttributeContributor : uint8
     Count
 };
 
+enum class EBreakerDamageMoreLane : uint8 { Weapon, Ability, Shared, Dot };
+struct FBreakerDamageMoreSource
+{
+    FName Key;
+    float Multiplier = 1.0f;
+    EBreakerDamageMoreLane Lane = EBreakerDamageMoreLane::Weapon;
+};
+
 // One layer's complete, re-derivable offer. A contributor rebuilds this from
 // scratch whenever anything it owns changes; it never mutates an attribute.
 struct RIORSEDGE_API FBreakerAttributeContribution
@@ -175,14 +183,15 @@ struct RIORSEDGE_API FBreakerAttributeContribution
     // moment they each write their own pair, one of them gains a lane the
     // other has not.
     void AddSharedIncreasedDamage(float Percent);
-    // The same duplication for the More side: a shared More multiplies both
-    // lanes from ONE selected source. The source count it spends against the
-    // O3 budget of three is decided upstream, by whoever selects; this only
-    // delivers the product it was given to both lanes.
+    // Each damage call contributes one source; Shared spends one slot for both lanes.
     void ComposeSharedMoreDamage(float Multiplier);
     // Composes into this contributor's More product. Reserved for tree
     // keystones and Anomalous rule rewrites (O3 caps the composed budget).
     void ComposeMore(EBreakerAggregatedAttribute Attribute, float Multiplier);
+    void AddDamageMoreSource(FName Key, EBreakerDamageMoreLane Lane, float Multiplier);
+    const TArray<FBreakerDamageMoreSource>& GetDamageMoreSources() const { return DamageMoreSources; }
+    static TArray<FBreakerDamageMoreSource> SelectDamageMoreSources(const TArray<FBreakerDamageMoreSource>& Sources);
+    static float DamageMoreProduct(const TArray<FBreakerDamageMoreSource>& Selected, EBreakerAggregatedAttribute Attribute);
 
     float GetFlat(EBreakerAggregatedAttribute Attribute) const;
     float GetIncreasedPercent(EBreakerAggregatedAttribute Attribute) const;
@@ -195,6 +204,7 @@ private:
     float Flat[AttributeCount];
     float IncreasedPercent[AttributeCount];
     float MoreMultiplier[AttributeCount];
+    TArray<FBreakerDamageMoreSource> DamageMoreSources;
 };
 
 // Owns the true base values and folds every contribution over them. Held by
@@ -238,19 +248,11 @@ struct RIORSEDGE_API FBreakerAttributeAggregator
     float ComposedIncreasedPercent(EBreakerAggregatedAttribute Attribute) const;
 
     // ---- The O3 More ceiling, enforced GLOBALLY --------------------------
-    // Docs/Item-Foundation.md recorded this as an open hole in so many words:
-    // "The O3 More cap is enforced per LAYER, not globally. Three tree Mores is
-    // the whole budget today because nothing else authors one. When Anomalous
-    // items gain Mores, the clamp has to move to a single shared pass over the
-    // composed contribution or a build can hold three tree Mores plus an
-    // item's."
-    //
-    // This is that shared pass. UBreakerProgressionComponent still picks its
-    // own strongest three and clamps each at 1.30x — that selection needs to
-    // know about individual SOURCES and only that layer has them — but the
-    // product every layer's selection composes to is clamped here, once, over
-    // the whole build. A contributor cannot buy its way past O3 by arriving
-    // second.
+    // All live gear/tree damage effects enter one strongest-three selection.
+    // Source records retain delivery identity until that joint selection; a
+    // shared effect consumes one slot and contributes to both delivery lanes.
+    // Equal magnitudes preserve tree order, then canonical gear slot/affix order.
+    // Temporary windows retain their existing remaining-product-headroom rule.
     //
     // O34: THIS IS THE ONE MORE CEILING. 1.30^3 == 2.197, reached from the two
     // numbers that define it rather than restated as a constant that can drift.
@@ -273,6 +275,9 @@ struct RIORSEDGE_API FBreakerAttributeAggregator
     // live contributions on every call, so it is correct for equipment and
     // progression submissions alike with nothing to cache or invalidate.
     float ComposedMoreProduct(EBreakerAggregatedAttribute Attribute) const;
+    int32 GetDamageMoreSourceCount() const;
+    int32 GetSelectedDamageMoreSourceCount() const;
+    TArray<FBreakerDamageMoreSource> GetSelectedDamageMoreSources() const;
     // True when Attribute is under the O3 budget. Named so the rule is
     // greppable rather than living inside an `if` in Compose.
     static bool IsMoreCappedAttribute(EBreakerAggregatedAttribute Attribute)
@@ -285,7 +290,8 @@ struct RIORSEDGE_API FBreakerAttributeAggregator
         // here is not adding headroom; a build holding three Mores has three
         // however they are distributed.
         return Attribute == EBreakerAggregatedAttribute::DamageMultiplier
-            || Attribute == EBreakerAggregatedAttribute::AbilityDamageMultiplier;
+            || Attribute == EBreakerAggregatedAttribute::AbilityDamageMultiplier
+            || Attribute == EBreakerAggregatedAttribute::DamageOverTimeMultiplier;
     }
 
 private:

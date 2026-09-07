@@ -115,17 +115,28 @@ enum class EBreakerMenuScreen : uint8
 // UBreakerEquipmentComponent's answers, arriving as FBreakerEquipPreview. This
 // namespace only chooses a width, a glyph and a sentence.
 // ---------------------------------------------------------------------------
+namespace BreakerWideScreenLayout
+{
+    // Viewport dimensions are physical pixels; SBox dimensions are game-layer
+    // Slate units. SGameLayerManager applies GameUIScale once when painting.
+    inline FVector2D SolvePanelSize(FVector2D PhysicalViewport, float GameUIScale)
+    {
+        const float Scale = FMath::IsFinite(GameUIScale) && GameUIScale > 0.0f ? GameUIScale : 1.0f;
+        const FVector2D LogicalViewport = PhysicalViewport / Scale;
+        return FVector2D(
+            FMath::Clamp(static_cast<float>(LogicalViewport.X) - 2.0f * BreakerUI::Space40, 720.0f, 1760.0f),
+            FMath::Clamp(static_cast<float>(LogicalViewport.Y) - 2.0f * BreakerUI::Space40, 420.0f, 1000.0f));
+    }
+}
+
 namespace BreakerInventoryLayout
 {
     // The reference's ZONES section, authored at 1920x1080.
     inline constexpr float SpecPanelWidth = 1920.0f;
     inline constexpr float HeaderHeight = 88.0f;
-    inline constexpr float SpecCharacterColumn = 560.0f;
+
     inline constexpr float SpecEquipmentColumn = 400.0f;
-    inline constexpr float SpecBackpackColumn = 960.0f;
-    // The render slot's authored box. Height is a MINIMUM here: the column
-    // stretches with the plate, and the doll is centred in whatever it gets.
-    inline constexpr float RenderSlotHeight = 660.0f;
+    inline constexpr float SpecBackpackColumn = SpecPanelWidth - SpecEquipmentColumn;
     inline constexpr float FilterBarHeight = 64.0f;
     // "a 3-across card grid at 16px gaps". THREE IS THE TARGET, NOT THE RULE.
     //
@@ -144,8 +155,8 @@ namespace BreakerInventoryLayout
     // Floors. Below these the copy stops fitting rather than merely looking
     // tight, and the backpack is the last zone that should give ground because
     // it is where the cards are.
-    inline constexpr float MinBackpackColumn = 640.0f;
-    inline constexpr float MinCharacterColumn = 320.0f;
+    inline constexpr float MinBackpackColumn = 320.0f;
+
     inline constexpr float MinEquipmentColumn = 280.0f;
     // One equipment row: a 44px icon square (the system's minimum hit target)
     // plus its two stacked text lines and 10px of interior padding.
@@ -153,38 +164,25 @@ namespace BreakerInventoryLayout
 
     struct FColumns
     {
-        float Character = SpecCharacterColumn;
         float Equipment = SpecEquipmentColumn;
         float Backpack = SpecBackpackColumn;
     };
 
-    // Spec widths at the authored panel; scaled down TOGETHER once the panel
-    // cannot hold them plus a usable backpack, each floored independently.
+    // Two useful zones: equipment stays visible while the backpack gets the
+    // remaining width. Whole pixels avoid fractional clipping at card edges.
     inline FColumns SolveColumns(float PanelWidth, float Gutters)
     {
+        const float Room = FMath::Max(0.0f, PanelWidth - Gutters);
         FColumns Columns;
-        const float FixedRoom = PanelWidth - Gutters - MinBackpackColumn;
-        const float SpecFixed = SpecCharacterColumn + SpecEquipmentColumn;
-        if (FixedRoom < SpecFixed)
-        {
-            // FLOORED to whole pixels, and that is not cosmetic. Scaling both
-            // columns by a ratio makes their sum land a fraction of a pixel
-            // ABOVE the room they were given (560+400 at 760/960 sums to
-            // 760.00001), so the backpack came out at 639.99999 against its own
-            // 640 floor — a real test failure from a rounding error rather than
-            // from a layout mistake. Rounding each column down guarantees the
-            // sum never exceeds FixedRoom, so the floor below is exact.
-            // Whole-pixel column widths are also what Slate wants: a fractional
-            // width is where measure-versus-rasterise disagreements start, and
-            // this file has six reports of clipped text.
-            const float Scale = FMath::Max(0.55f, FixedRoom / SpecFixed);
-            Columns.Character = FMath::Max(MinCharacterColumn, FMath::FloorToFloat(SpecCharacterColumn * Scale));
-            Columns.Equipment = FMath::Max(MinEquipmentColumn, FMath::FloorToFloat(SpecEquipmentColumn * Scale));
-        }
-        Columns.Backpack = FMath::Max(320.0f, PanelWidth - Columns.Character - Columns.Equipment - Gutters);
+        Columns.Equipment = FMath::Min(Room, FMath::Clamp(FMath::FloorToFloat(Room * 0.28f), MinEquipmentColumn, SpecEquipmentColumn));
+        Columns.Backpack = Room - Columns.Equipment;
         return Columns;
     }
 
+    inline int32 SolveTotalColumns(float InnerWidth)
+    {
+        return FMath::Clamp(FMath::FloorToInt((InnerWidth + 24.0f) / (260.0f + 24.0f)), 1, 3);
+    }
     // ---- THE READABILITY BUDGET -------------------------------------------
     // Every number below exists so a card can print its affix lines. They are
     // written as a BUDGET rather than as a card width, because that is the
@@ -266,6 +264,11 @@ namespace BreakerInventoryLayout
     // the 1px ring on both sides, and 16px of interior pad on both sides.
     inline constexpr float CardChrome =
         BreakerUI::RailThickness + 2.0f * BreakerUI::BorderThin + 2.0f * BreakerUI::Space16;
+    inline float EquipmentFooterTextWidth(float EquipmentColumnWidth)
+    {
+        // The outer equipment SBox has padding in addition to the plate.
+        return FMath::Max(120.0f, EquipmentColumnWidth - 2.0f * BreakerUI::Space16 - CardChrome);
+    }
     // THE RULE THIS SCREEN IS NOW HELD TO: a card is only worth drawing at a
     // width where the longest stat name fits on one line beside its delta.
     inline constexpr float MinAffixColumnWidth = LongestAffixNameChars * CaptionAdvance;

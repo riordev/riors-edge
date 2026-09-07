@@ -236,7 +236,8 @@
 		"TargetElite",
 		"TargetAtCloseRange",
 		"TargetBandBroken",
-		"RecentlyLedgeTraversed"
+		"RecentlyLedgeTraversed",
+		"ParryCounter"
 	],
 	"trees": [
 		{
@@ -1842,7 +1843,7 @@
 							"target": "WeaponDamage",
 							"bucket": "IncreasedPercent",
 							"valuePerRank": 16,
-							"condition": "Always",
+							"condition": "ParryCounter",
 							"alsoRequires": []
 						}
 					],

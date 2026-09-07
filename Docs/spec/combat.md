@@ -58,6 +58,13 @@ may be authored. A dodge is full evasion and returns immediately, raising
 nothing that keys off being hit — anything watching for a hit correctly sees
 nothing. **Parry is the only defensive input**, on its own short cooldown.
 
+Purchased Parry defaults to V and can be rebound. Its O2 timing is a 0.25-second
+window on a 2-second cooldown; Read adds 0.10 seconds. The first positive direct
+hit from the forward hemisphere is negated. Rear hits, damage over time,
+self-damage and hits without a source position do not consume the window.
+A parry grants no hit, block or dodge procs. Counterweight's existing 16%
+Increased weapon damage applies only for 2 seconds after a successful parry.
+
 **Crit and weak point are the two site multipliers.** Crit is build-gated,
 weak point is skill-gated and archetype-bounded, and nothing else multiplies at
 the hit site.

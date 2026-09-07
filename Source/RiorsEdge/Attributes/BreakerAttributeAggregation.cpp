@@ -17,6 +17,7 @@ namespace
 
 void FBreakerAttributeContribution::Reset()
 {
+    DamageMoreSources.Reset();
     for (int32 Index = 0; Index < AttributeCount; ++Index)
     {
         Flat[Index] = 0.0f;
@@ -45,14 +46,55 @@ void FBreakerAttributeContribution::AddSharedIncreasedDamage(float Percent)
 
 void FBreakerAttributeContribution::ComposeSharedMoreDamage(float Multiplier)
 {
-    ComposeMore(EBreakerAggregatedAttribute::DamageMultiplier, Multiplier);
-    ComposeMore(EBreakerAggregatedAttribute::AbilityDamageMultiplier, Multiplier);
+    AddDamageMoreSource(FName(*FString::Printf(TEXT("Anonymous.%d"), DamageMoreSources.Num())), EBreakerDamageMoreLane::Shared, Multiplier);
 }
 
 void FBreakerAttributeContribution::ComposeMore(EBreakerAggregatedAttribute Attribute, float Multiplier)
 {
+    if (FBreakerAttributeAggregator::IsMoreCappedAttribute(Attribute))
+    {
+        const EBreakerDamageMoreLane Lane = Attribute == EBreakerAggregatedAttribute::DamageMultiplier ? EBreakerDamageMoreLane::Weapon
+            : Attribute == EBreakerAggregatedAttribute::AbilityDamageMultiplier ? EBreakerDamageMoreLane::Ability : EBreakerDamageMoreLane::Dot;
+        AddDamageMoreSource(FName(*FString::Printf(TEXT("Anonymous.%d"), DamageMoreSources.Num())), Lane, Multiplier);
+        return;
+    }
     const int32 Index = AttributeIndex(Attribute);
     if (Index != INDEX_NONE) MoreMultiplier[Index] *= Multiplier;
+}
+
+void FBreakerAttributeContribution::AddDamageMoreSource(FName Key, EBreakerDamageMoreLane Lane, float Multiplier)
+{
+    if (Key.IsNone()) return;
+    if (!FMath::IsFinite(Multiplier) || Multiplier <= 1.0f)
+    {
+        DamageMoreSources.RemoveAll([Key](const FBreakerDamageMoreSource& Source) { return Source.Key == Key; });
+        return;
+    }
+    for (FBreakerDamageMoreSource& Existing : DamageMoreSources)
+        if (Existing.Key == Key) { Existing.Multiplier = Multiplier; Existing.Lane = Lane; return; }
+    DamageMoreSources.Add({ Key, Multiplier, Lane });
+}
+
+TArray<FBreakerDamageMoreSource> FBreakerAttributeContribution::SelectDamageMoreSources(const TArray<FBreakerDamageMoreSource>& Sources)
+{
+    TArray<FBreakerDamageMoreSource> Selected = Sources;
+    // Stable raw-magnitude ordering retains authored tree traversal ties.
+    Selected.StableSort([](const FBreakerDamageMoreSource& A, const FBreakerDamageMoreSource& B) { return A.Multiplier > B.Multiplier; });
+    if (Selected.Num() > FBreakerAttributeAggregator::MaxComposedMoreSources) Selected.SetNum(FBreakerAttributeAggregator::MaxComposedMoreSources);
+    return Selected;
+}
+
+float FBreakerAttributeContribution::DamageMoreProduct(const TArray<FBreakerDamageMoreSource>& Selected, EBreakerAggregatedAttribute Attribute)
+{
+    float Product = 1.0f;
+    for (const FBreakerDamageMoreSource& Source : Selected)
+    {
+        const bool bApplies = (Attribute == EBreakerAggregatedAttribute::DamageMultiplier && (Source.Lane == EBreakerDamageMoreLane::Weapon || Source.Lane == EBreakerDamageMoreLane::Shared))
+            || (Attribute == EBreakerAggregatedAttribute::AbilityDamageMultiplier && (Source.Lane == EBreakerDamageMoreLane::Ability || Source.Lane == EBreakerDamageMoreLane::Shared))
+            || (Attribute == EBreakerAggregatedAttribute::DamageOverTimeMultiplier && Source.Lane == EBreakerDamageMoreLane::Dot);
+        if (bApplies) Product *= FMath::Min(Source.Multiplier, FBreakerAttributeAggregator::SingleMoreCeiling);
+    }
+    return Product;
 }
 
 float FBreakerAttributeContribution::GetFlat(EBreakerAggregatedAttribute Attribute) const
@@ -69,12 +111,14 @@ float FBreakerAttributeContribution::GetIncreasedPercent(EBreakerAggregatedAttri
 
 float FBreakerAttributeContribution::GetMore(EBreakerAggregatedAttribute Attribute) const
 {
+    if (FBreakerAttributeAggregator::IsMoreCappedAttribute(Attribute)) return DamageMoreProduct(SelectDamageMoreSources(DamageMoreSources), Attribute);
     const int32 Index = AttributeIndex(Attribute);
     return Index != INDEX_NONE ? MoreMultiplier[Index] : 1.0f;
 }
 
 bool FBreakerAttributeContribution::IsIdentity() const
 {
+    if (!DamageMoreSources.IsEmpty()) return false;
     for (int32 Index = 0; Index < AttributeCount; ++Index)
     {
         if (Flat[Index] != 0.0f || IncreasedPercent[Index] != 0.0f || MoreMultiplier[Index] != 1.0f) return false;
@@ -167,6 +211,7 @@ float FBreakerAttributeAggregator::ComposedIncreasedPercent(EBreakerAggregatedAt
 
 float FBreakerAttributeAggregator::ComposedMoreProduct(EBreakerAggregatedAttribute Attribute) const
 {
+    if (IsMoreCappedAttribute(Attribute)) return FBreakerAttributeContribution::DamageMoreProduct(GetSelectedDamageMoreSources(), Attribute);
     const int32 Index = AttributeIndex(Attribute);
     if (Index == INDEX_NONE) return 1.0f;
 
@@ -176,15 +221,30 @@ float FBreakerAttributeAggregator::ComposedMoreProduct(EBreakerAggregatedAttribu
         More *= Contributions[Contributor].GetMore(Attribute);
     }
 
-    // O3's hard cap, applied ACROSS contributors rather than inside each of
-    // them. Without this an Anomalous item's More would ride on top of the
-    // three the tree already selected, which is the exact hole Item-Foundation
-    // recorded when node Mores landed.
-    if (IsMoreCappedAttribute(Attribute))
-    {
-        More = FMath::Min(More, ComposedMoreCeiling());
-    }
     return More;
+}
+
+int32 FBreakerAttributeAggregator::GetDamageMoreSourceCount() const
+{
+    int32 Count = 0;
+    for (const FBreakerAttributeContribution& Contribution : Contributions) Count += Contribution.GetDamageMoreSources().Num();
+    return Count;
+}
+
+int32 FBreakerAttributeAggregator::GetSelectedDamageMoreSourceCount() const
+{
+    return FMath::Min(GetDamageMoreSourceCount(), MaxComposedMoreSources);
+}
+
+TArray<FBreakerDamageMoreSource> FBreakerAttributeAggregator::GetSelectedDamageMoreSources() const
+{
+    // Progression wins equal ties in its existing authored order. Equipment
+    // order is canonical slot/affix key, independent of equip arrival order.
+    TArray<FBreakerDamageMoreSource> Sources = GetContribution(EBreakerAttributeContributor::Progression).GetDamageMoreSources();
+    TArray<FBreakerDamageMoreSource> Gear = GetContribution(EBreakerAttributeContributor::Equipment).GetDamageMoreSources();
+    Gear.Sort([](const FBreakerDamageMoreSource& A, const FBreakerDamageMoreSource& B) { return A.Key.LexicalLess(B.Key); });
+    Sources.Append(Gear);
+    return FBreakerAttributeContribution::SelectDamageMoreSources(Sources);
 }
 
 float FBreakerAttributeAggregator::ComposedMoreCeiling()

@@ -249,8 +249,7 @@ namespace BreakerPowerBandTest
             + ProgressionOffer.GetFlat(EBreakerAggregatedAttribute::DamageMultiplier);
         Build.IncreasedLayer = 1.0f + (EquipmentOffer.GetIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier)
             + ProgressionOffer.GetIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier)) / 100.0f;
-        Build.MoreLayer = EquipmentOffer.GetMore(EBreakerAggregatedAttribute::DamageMultiplier)
-            * ProgressionOffer.GetMore(EBreakerAggregatedAttribute::DamageMultiplier);
+        Build.MoreLayer = Aggregator.ComposedMoreProduct(EBreakerAggregatedAttribute::DamageMultiplier);
 
         Build.ComposedDamageMultiplier = Aggregator.Compose(EBreakerAggregatedAttribute::DamageMultiplier);
         // PreAttributeChange's clamps, applied here because the aggregator is
@@ -262,8 +261,7 @@ namespace BreakerPowerBandTest
 
         Build.AbilityIncreasedLayer = 1.0f + (EquipmentOffer.GetIncreasedPercent(EBreakerAggregatedAttribute::AbilityDamageMultiplier)
             + ProgressionOffer.GetIncreasedPercent(EBreakerAggregatedAttribute::AbilityDamageMultiplier)) / 100.0f;
-        Build.AbilityMoreLayer = EquipmentOffer.GetMore(EBreakerAggregatedAttribute::AbilityDamageMultiplier)
-            * ProgressionOffer.GetMore(EBreakerAggregatedAttribute::AbilityDamageMultiplier);
+        Build.AbilityMoreLayer = Aggregator.ComposedMoreProduct(EBreakerAggregatedAttribute::AbilityDamageMultiplier);
         Build.AbilityFlatLayer = 1.0f
             + EquipmentOffer.GetFlat(EBreakerAggregatedAttribute::AbilityDamageMultiplier)
             + ProgressionOffer.GetFlat(EBreakerAggregatedAttribute::AbilityDamageMultiplier);

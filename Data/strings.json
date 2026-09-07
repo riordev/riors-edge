@@ -104,6 +104,9 @@
         "sandbox.fresh": "FRESH ROLL",
         "sandbox.repeat": "REPEAT SEED",
         "sandbox.wallet": "LEVEL %d · %d XP · %d DOCTRINE / %d CORE UNSPENT",
-        "equipment.rarityChoices": "FIVE RARITIES · FIND YOUR BUILD"
+        "equipment.rarityChoices": "FIVE RARITIES · FIND YOUR BUILD",
+        "hud.parry.label": "PARRY",
+        "hud.parry.active": "GUARD",
+        "hud.parry.success": "PARRIED"
 	}
 }

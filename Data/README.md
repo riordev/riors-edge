@@ -52,3 +52,12 @@ Stocked, and doubles the delay while Surplus. The band is read when casting
 starts. Pressing the same slot again cancels a pending placement. The target
 must still have valid ground, range and line of sight when the cast finishes;
 payment and cooldown start only when placement succeeds.
+
+## Special gear damage
+
+`Aberrant.ReserveSurge` in `affixes.json` grants ability More damage while your
+class resource is low. Its tier anchors run from 3% at T12 to 8% at T1 (O2
+placeholders). It consumes the shared strongest-three gear/tree damage-source
+budget and carries `Downside.Riftburn`, reducing Increased weapon damage.
+The paired bill is 12% at ordinary tiers; existing tier extrapolation also
+scales that downside at T0 and T-1. Ordinary affixes cannot grant damage More.

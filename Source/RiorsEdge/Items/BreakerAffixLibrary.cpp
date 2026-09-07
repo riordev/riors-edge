@@ -234,7 +234,12 @@ namespace
         }
         if (Affix.StatBucket == EBreakerStatBucket::MorePercent)
         {
-            Errors.Add(FString::Printf(TEXT("%s: affixes author no More multipliers (O3)"), *Id));
+            const bool bSpecialPool = (Pool == BreakerAffixPoolAberrant && Affix.MinimumRarity == EBreakerItemRarity::Aberrant)
+                || (Pool == BreakerAffixPoolAnomalous && Affix.MinimumRarity == EBreakerItemRarity::Anomalous);
+            const bool bDamageLane = Affix.StatTarget == EBreakerStatTarget::WeaponDamage || Affix.StatTarget == EBreakerStatTarget::AbilityDamage
+                || Affix.StatTarget == EBreakerStatTarget::SharedDamage || Affix.StatTarget == EBreakerStatTarget::DamageOverTime;
+            if (!bSpecialPool || !bDamageLane || Affix.ValueAtT12 <= 0 || Affix.ValueAtT1 <= 0)
+                Errors.Add(FString::Printf(TEXT("%s: More requires a matching special pool/rarity and positive damage-lane values"), *Id));
         }
         if (bDownside)
         {

@@ -924,7 +924,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     Tree->Nodes.Add(SetStance);
 
     UBreakerProgressionNode* Read = MakeNode(TEXT("Core.Bulwark.Read"), TEXT("Read"),
-        TEXT("Your shots hit a little harder. The tag still widens Parry's window the day Parry ships."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Bulwark"));
+        TEXT("Your shots hit a little harder. Parry's timing window is wider."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Bulwark"));
     AddEffect(Read, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
     Read->GrantedTags.AddTag(BreakerNodeTags::Node_Read.GetTag());
     Tree->Nodes.Add(Read);
@@ -950,25 +950,20 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     Tree->Nodes.Add(BulLoud);
 
     UBreakerProgressionNode* Parry = MakeNode(TEXT("Core.Bulwark.Parry"), TEXT("Parry"),
-        TEXT("VERB GRANT. Parry becomes available on its own short cooldown."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Bulwark"));
+        TEXT("Grants Parry on its own short cooldown. Time it to negate one frontal hit; damage over time and self-damage cannot be parried."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Bulwark"));
     AddPrerequisite(Parry, TEXT("Core.Bulwark.SetStance"));
     AddPrerequisite(Parry, TEXT("Core.Bulwark.Read"));
-    // PHANTOM GRANT still fixed (audit item 3): no Parry ability exists in
-    // the registry, so no id is granted here. O1 and O25 still name Parry the
-    // one tree-granted verb; the grant returns the day the ability ships.
-    // Verb_Parry stays — its consumer is a future Combat/ parry check.
+    // O1/O25's standalone defensive input is consumed by Combat::TryParry;
+    // it does not occupy one of the class ability slots.
     Parry->GrantedTags.AddTag(BreakerNodeTags::Verb_Parry.GetTag());
     Tree->Nodes.Add(Parry);
 
-    // The spec's "+16% inside a counter window" has no condition to say it —
-    // counter windows do not exist while Parry is unshipped — so the line is
-    // unconditional at a value sized for that, the gate recorded as waiting
-    // on Parry's counter window.
+    // The same authored Increased bid now requires a successful parry.
     UBreakerProgressionNode* BulCounterweight = MakeNode(TEXT("Core.Bulwark.Counterweight"), TEXT("Counterweight"),
-        TEXT("Your shots hit considerably harder. Its window — inside a parried counter — is waiting on Parry itself."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Bulwark"));
+        TEXT("Your shots hit considerably harder during the counter window after a successful parry."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Bulwark"));
     AddPrerequisite(BulCounterweight, TEXT("Core.Bulwark.Weight"));
     AddPrerequisite(BulCounterweight, TEXT("Core.Bulwark.HeldGround"));
-    AddEffect(BulCounterweight, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::IncreasedPercent, 16.0f); // O2 PLACEHOLDER
+    AddEffect(BulCounterweight, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::IncreasedPercent, 16.0f, EBreakerBuildCondition::ParryCounter); // O2 PLACEHOLDER
     Tree->Nodes.Add(BulCounterweight);
 
     // Rule rewrite with its consumer LIVE in the same commit: after a

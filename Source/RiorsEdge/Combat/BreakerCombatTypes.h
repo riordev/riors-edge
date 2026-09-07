@@ -152,6 +152,7 @@ struct RIORSEDGE_API FBreakerDamageResult
     UPROPERTY(BlueprintReadOnly) float RemainingHealth = 0.0f;
     UPROPERTY(BlueprintReadOnly) bool bCritical = false;
     UPROPERTY(BlueprintReadOnly) bool bDodged = false;
+    UPROPERTY(BlueprintReadOnly) bool bParried = false;
     UPROPERTY(BlueprintReadOnly) bool bBlocked = false;
     UPROPERTY(BlueprintReadOnly) bool bWeakPoint = false;
     UPROPERTY(BlueprintReadOnly) bool bShieldBroken = false;

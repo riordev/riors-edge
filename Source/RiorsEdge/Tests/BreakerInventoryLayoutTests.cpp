@@ -14,7 +14,7 @@
 // Everything in it that can be WRONG rather than merely ugly is arithmetic or a
 // mapping, and both live in BreakerInventoryLayout so they can be asserted with
 // no widget, no world and no Slate application:
-//   - the zone arithmetic (560 + 400 + 960 against the panel),
+//   - the two-zone arithmetic against the measured panel,
 //   - the affix delta's glyph and magnitude,
 //   - the WEAR ORDER the equipment column walks,
 //   - when a card discloses an equip-limit ejection and what it says,
@@ -69,6 +69,25 @@ namespace
 // ---------------------------------------------------------------------------
 // ZONES
 // ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerWideScreenDpiTest, "RiorsEdge.UI.InventoryLayout.ViewportDpi",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FBreakerWideScreenDpiTest::RunTest(const FString& Parameters)
+{
+    const FVector2D Reference = BreakerWideScreenLayout::SolvePanelSize(FVector2D(1920, 1080), 1.0f);
+    TestTrue(TEXT("1920 authored panel stays unchanged"), Reference.Equals(FVector2D(1760, 1000), 0.01));
+    const float SmallScale = 2.0f / 3.0f;
+    const FVector2D Small = BreakerWideScreenLayout::SolvePanelSize(FVector2D(1280, 720), SmallScale);
+    TestTrue(TEXT("720p at engine DPI preserves logical layout instead of double shrinking"), Small.Equals(Reference, 0.01));
+    TestEqual(TEXT("720p rendered panel uses available width"), Small.X * SmallScale, 1173.333333, 0.01);
+    TestEqual(TEXT("720p rendered panel uses available height"), Small.Y * SmallScale, 666.666667, 0.01);
+    const FVector2D UnscaledSmall = BreakerWideScreenLayout::SolvePanelSize(FVector2D(1280, 720), 1.0f);
+    TestTrue(TEXT("A different actual UI scale reflows rather than assuming 1080p"), UnscaledSmall.Equals(FVector2D(1200, 640), 0.01));
+    for (const float Width : { 280.0f, 320.0f, 400.0f })
+        TestEqual(TEXT("Footer wrap fits outer padding and plate chrome"),
+            BreakerInventoryLayout::EquipmentFooterTextWidth(Width) + 2.0f * BreakerUI::Space16 + BreakerInventoryLayout::CardChrome, Width, 0.01f);
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerInventoryLayoutColumnsTest,
     "RiorsEdge.UI.InventoryLayout.Columns",
@@ -78,45 +97,25 @@ bool FBreakerInventoryLayoutColumnsTest::RunTest(const FString& Parameters)
 {
     using namespace BreakerInventoryLayout;
 
-    // The authored panel, tiled exactly: 560 + 400 + 960 = 1920. This is the
-    // whole reason the zones are separated by 1px dividers rather than by 24px
-    // gutters — a gutter would make the reference's arithmetic false.
+    // Only equipment and backpack divide the usable interior; no hidden
+    // preview reservation remains at any supported viewport size.
+    for (const float PanelWidth : { 1920.0f, 1760.0f, 1600.0f, 1440.0f, 1120.0f, 900.0f, 720.0f })
     {
-        const FColumns Columns = SolveColumns(SpecPanelWidth, 0.0f);
-        TestEqual(TEXT("character column at spec width"), Columns.Character, SpecCharacterColumn);
-        TestEqual(TEXT("equipment column at spec width"), Columns.Equipment, SpecEquipmentColumn);
-        TestEqual(TEXT("backpack column at spec width"), Columns.Backpack, SpecBackpackColumn);
+        const float Gutter = 1.0f;
+        const FColumns Columns = SolveColumns(PanelWidth, Gutter);
+        TestEqual(FString::Printf(TEXT("two zones tile %.0f"), PanelWidth),
+            Columns.Equipment + Columns.Backpack + Gutter, PanelWidth, 0.01f);
+        TestTrue(TEXT("equipment remains readable"), Columns.Equipment >= MinEquipmentColumn);
+        TestTrue(TEXT("equipment does not consume extra backpack room"), Columns.Equipment <= SpecEquipmentColumn);
+        TestTrue(TEXT("backpack preserves readable card space"), Columns.Backpack >= MinBackpackColumn);
+        const float InnerTotals = Columns.Backpack - 64.0f;
+        const int32 Count = SolveTotalColumns(InnerTotals);
+        TestTrue(TEXT("totals use one to three cells"), Count >= 1 && Count <= 3);
+        TestTrue(TEXT("total label/value cell remains readable"),
+            (InnerTotals - 24.0f * (Count - 1)) / Count >= 260.0f);
     }
-
-    // The zones tile whatever they are given: nothing is lost or double-counted
-    // between them at any width above the floors.
-    for (const float PanelWidth : { 1920.0f, 1760.0f, 1600.0f, 1440.0f })
-    {
-        const float Gutters = 2.0f;
-        const FColumns Columns = SolveColumns(PanelWidth, Gutters);
-        TestEqual(FString::Printf(TEXT("zones tile the panel at %.0f"), PanelWidth),
-            Columns.Character + Columns.Equipment + Columns.Backpack + Gutters, PanelWidth, 0.01f);
-    }
-
-    // The two fixed columns give ground BEFORE the backpack does — the backpack
-    // is where the cards are, so it is the last zone that should be squeezed.
-    {
-        const FColumns Wide = SolveColumns(1920.0f, 0.0f);
-        const FColumns Narrow = SolveColumns(1400.0f, 0.0f);
-        TestTrue(TEXT("character column gives ground on a narrow panel"), Narrow.Character < Wide.Character);
-        TestTrue(TEXT("equipment column gives ground on a narrow panel"), Narrow.Equipment < Wide.Equipment);
-        TestTrue(TEXT("backpack keeps its floor on a narrow panel"), Narrow.Backpack >= MinBackpackColumn);
-    }
-
-    // The floors hold even when the panel is absurd. A column below these stops
-    // being able to print its own copy, which is worse than a clipped screen.
-    {
-        const FColumns Tiny = SolveColumns(720.0f, 0.0f);
-        TestTrue(TEXT("character floor"), Tiny.Character >= MinCharacterColumn);
-        TestTrue(TEXT("equipment floor"), Tiny.Equipment >= MinEquipmentColumn);
-        TestTrue(TEXT("backpack never collapses"), Tiny.Backpack >= 320.0f);
-    }
-
+    TestTrue(TEXT("narrow equipment gives space to cards"), SolveColumns(1120, 1).Equipment < SolveColumns(1920, 1).Equipment);
+    TestEqual(TEXT("wide layout supports three totals columns"), SolveTotalColumns(SolveColumns(1920, 1).Backpack - 64), 3);
     return true;
 }
 

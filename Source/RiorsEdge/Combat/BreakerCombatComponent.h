@@ -41,6 +41,19 @@ public:
     // Momentum Transfer: only this attacker's next eligible melee spends the window.
     void ArmMeleeDefenseSuppression(AActor* Attacker, float DurationSeconds);
     UBreakerCombatComponent();
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    // O2 tuning: a single timed defensive input, granted by the Core tree.
+    bool TryParry();
+    bool IsParryUnlocked() const { return HasParryPermission(); }
+    bool IsParryAvailable() const;
+    bool IsParryActive() const;
+    bool IsParryCounterActive() const;
+    float GetParryCooldownRemaining() const;
+    float GetParryWindowRemaining() const;
+    UPROPERTY(EditDefaultsOnly, Category="Combat|Parry") float ParryWindowSeconds = 0.25f;
+    UPROPERTY(EditDefaultsOnly, Category="Combat|Parry") float ParryCooldownSeconds = 2.0f;
+    UPROPERTY(EditDefaultsOnly, Category="Combat|Parry") float ReadParryBonusSeconds = 0.10f;
+    UPROPERTY(EditDefaultsOnly, Category="Combat|Parry") float ParryCounterSeconds = 2.0f;
     virtual void BeginPlay() override;
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
@@ -274,6 +287,14 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Defense", meta=(ClampMin="0")) float DodgeResourceRefund = 5.0f;   // O2 PLACEHOLDER
 
 private:
+    bool HasParryPermission() const;
+    float ParryClock() const;
+    void ClearParryWindows();
+    UFUNCTION() void RefreshParryPermission();
+    UPROPERTY(Replicated) bool bParryOwned = false;
+    UPROPERTY(Replicated) float ParryWindowEnd = -1.0f;
+    UPROPERTY(Replicated) float ParryCooldownEnd = -1.0f;
+    UPROPERTY(Replicated) float ParryCounterEnd = -1.0f;
     TMap<TWeakObjectPtr<AActor>, double> MeleeDefenseSuppressionExpiry;
     void PruneExpiredOutgoingModifiers();
     // STAGE 6 (Hook-And-Condition-Vocabulary §3.2-§3.3): target-conditional

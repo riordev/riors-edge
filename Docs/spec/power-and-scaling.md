@@ -68,13 +68,13 @@ Never two specific pools from one source — that is one bucket double-dipped.
 **Added Ability Power bids Flat into the ability multiplier**, dividing its
 printed percentage by 100 before Increased and More compose; Added Damage stays in the weapon lane.
 
-**There is ONE More ceiling and it spans all three pools.** A build holds at
-most three More multipliers, each at most 1.30x, composing as an unordered
-product to 1.30^3. The ceiling is derived from those two numbers rather than
-restated as a third constant that can drift, and it is clamped globally across
-every contributor so a layer arriving second cannot buy past it. An ability-lane
-More counts inside the same budget as a weapon-lane one; a per-lane ceiling
-would be the second budget the single ceiling exists to delete.
+**There is ONE More ceiling across damage pools.** Gear and tree sources enter
+one selection: the strongest three, each at most 1.30x, compose as an unordered
+product bounded by 1.30^3. Weapon, ability, shared and damage-over-time sources
+spend this same budget. A shared source spends one slot. Individual authored
+sources retain their identity across contributors; ties resolve consistently.
+The ceiling derives from the source count and per-source limit rather than a
+separate constant. Non-damage statistics do not spend damage source slots.
 
 **Temporary ability windows ARE Mores** and compete for the same headroom. On a
 build already holding three, a window buys little. That competition is the
@@ -278,7 +278,7 @@ does not own:
 | The at-cap band lands in 8–10x | `Progression.PowerBand.AtCap` |
 | The endgame band lands in 12–20x | `Progression.PowerBand.Endgame` |
 | Rewrite impact stays under its per-band ceiling | `Progression.RuleBandImpact.Step` |
-| The composed More product never exceeds the ceiling, from any combination of layers | `Items.Rules.NeverAuthorsAMore` |
+| Gear and tree sources share three slots and the composed More ceiling | `Attributes.JointMoreSelection`, `Items.ReserveSurgeRuntime` |
 | An ability-lane More counts inside the same ceiling as a weapon-lane one | `Progression.PowerBand.AbilityLaneMore` |
 | A hit whose weak-point gate was removed does not also take crit | `Combat.Ceiling.GateRemoval` |
 | Every damage submission passes through the outgoing-modifier chain | `Combat.Ceiling.AbilitySubmissionConformance` |
