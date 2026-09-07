@@ -1,4 +1,5 @@
 #include "Combat/BreakerProjectileBase.h"
+#include "Combat/BreakerStatusCycleComponent.h"
 
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerStatusComponent.h"
@@ -161,10 +162,17 @@ void ABreakerProjectileBase::HandleImpact(UPrimitiveComponent* HitComponent, AAc
     Impact(OtherActor, Hit.ImpactPoint.IsNearlyZero() ? GetActorLocation() : FVector(Hit.ImpactPoint));
 }
 
+void ABreakerProjectileBase::SetCycleAdvanceOnHit(UBreakerStatusCycleComponent* Cycle, int32 Positions)
+{
+    if (!HasAuthority()) return;
+    ImpactCycle = Cycle;
+    CyclePositionsOnHit = FMath::Max(0, Positions);
+}
+
 void ABreakerProjectileBase::Impact(AActor* HitActor, const FVector& Location)
 {
     // One latch, in one place, so no override can resolve an impact twice.
-    if (bImpacted) return;
+    if (!HasAuthority() || bImpacted) return;
     bImpacted = true;
 
     ResolveImpact(HitActor, Location);
@@ -182,6 +190,7 @@ void ABreakerProjectileBase::ResolveImpact(AActor* HitActor, const FVector& Loca
 {
     if (!ShouldDamageActor(HitActor)) return;
 
+    bool bLandedHit = false;
     if (UBreakerCombatComponent* TargetCombat = HitActor->FindComponentByClass<UBreakerCombatComponent>())
     {
         FBreakerDamageRequest Applied = Damage;
@@ -197,7 +206,11 @@ void ABreakerProjectileBase::ResolveImpact(AActor* HitActor, const FVector& Loca
         // still credits its shooter — kill credit, Mana generation and every
         // on-hit affix hang off this.
         if (!Applied.Instigator.IsValid()) Applied.SetInstigator(GetInstigator());
-        if (Applied.BaseDamage > 0.0f) TargetCombat->ReceiveDamage(Applied);
+        if (Applied.BaseDamage > 0.0f)
+        {
+            const FBreakerDamageResult Result = TargetCombat->ReceiveDamage(Applied);
+            bLandedHit = !Result.bDodged && (Result.HealthDamage > 0.0f || Result.ShieldDamage > 0.0f);
+        }
     }
 
     if (!ImpactStatuses.IsEmpty())
@@ -212,6 +225,13 @@ void ABreakerProjectileBase::ResolveImpact(AActor* HitActor, const FVector& Loca
             {
                 Status->ApplyStatus(Carried.Spec, Carried.DamageFamily, Applier);
             }
+        }
+    }
+    if (bLandedHit)
+    {
+        if (UBreakerStatusCycleComponent* Cycle = ImpactCycle.Get())
+        {
+            for (int32 Index = 0; Index < CyclePositionsOnHit; ++Index) Cycle->AdvanceCycle();
         }
     }
 }

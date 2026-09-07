@@ -265,6 +265,9 @@ struct RIORSEDGE_API FBreakerHitContext
     UPROPERTY(BlueprintReadOnly) TObjectPtr<AActor> Target = nullptr;
     UPROPERTY(BlueprintReadOnly) FBreakerDamageResult Result;
     UPROPERTY(BlueprintReadOnly) bool bFromDoT = false;
+    // Delivery alone cannot distinguish a Cleave swing from a bullet: both
+    // draw the weapon pool. Preserve the authored source identity for hooks.
+    UPROPERTY(BlueprintReadOnly) FGameplayTagContainer SourceTags;
     UPROPERTY(BlueprintReadOnly) bool bWeakPoint = false;
     UPROPERTY(BlueprintReadOnly) EBreakerDamageFamily DamageFamily = EBreakerDamageFamily::Physical;
     UPROPERTY(BlueprintReadOnly) FVector WorldLocation = FVector::ZeroVector;

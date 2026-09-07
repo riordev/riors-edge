@@ -4652,6 +4652,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                 SNew(SButton)
                 .ButtonColorAndOpacity(PanelRaised)
                 .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
+                .NormalPaddingOverride(FMargin(0.0f)).PressedPaddingOverride(FMargin(0.0f))
+                .HAlign(HAlign_Fill)
                 .OnClicked(FOnClicked::CreateLambda([this, Slot]()
                 {
                     if (Character.IsValid() && Character->GetEquipment()) Character->GetEquipment()->UnequipSlot(Slot);
@@ -5017,6 +5019,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                             SNew(SButton)
                             .ButtonColorAndOpacity(PanelRaised)
                             .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
+                            .NormalPaddingOverride(FMargin(0.0f)).PressedPaddingOverride(FMargin(0.0f))
+                            .HAlign(HAlign_Fill)
                             .OnClicked(FOnClicked::CreateLambda([this, ItemId, bLimitTell, DoomedId]()
                             {
                                 // O205: at the cap the click opens the swap
@@ -5349,7 +5353,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         ]
         + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)
         [
-            MenuText(FText::FromString(TEXT("FIVE RARITIES, WORST TO BEST")), BreakerUI::TypeH2, Primary, true)
+            MenuText(FText::FromString(BreakerStrings::Get(EBreakerStringKey::GearRarityChoices)), BreakerUI::TypeH2, Primary, true)
         ]
         + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
         [

@@ -9,6 +9,8 @@
 #include "Combat/BreakerStatusCycleComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
+#include "Progression/BreakerProgressionComponent.h"
+#include "Progression/BreakerProgressionLibrary.h"
 #include "UI/BreakerEffectMath.h"
 
 UBreakerAbility_Fracture::UBreakerAbility_Fracture()
@@ -82,16 +84,17 @@ void UBreakerAbility_Fracture::ActivateAbility(const FGameplayAbilitySpecHandle 
         return;
     }
 
-    // Advance the cycle NOW, at cast, and load the drawn positions onto the
-    // projectile. MS2 R1 moves this to on-hit; that is a data flag on the cycle
-    // component (SetAdvanceOnHit) rather than a second code path here, and it
-    // is deliberately not wired yet — the projectile would have to call back
-    // into the cycle on impact, which is a hook the node can add when it lands.
-    const int32 Positions = FMath::Clamp(CyclePositionsPerCast, 1, FMath::Max(1, Cycle->GetCycleLength()));
+    const UBreakerProgressionComponent* Progression = Character->GetProgression();
+    const bool bAdvanceOnHit = Cycle->GetAdvanceOnHit()
+        || (Progression && Progression->HasNodeTag(BreakerNodeTags::Node_MS_Cycle.GetTag()));
+    const bool bDoublePosition = Progression && Progression->HasNodeTag(BreakerNodeTags::Node_MS_Fracture.GetTag());
+    const int32 Positions = FMath::Clamp(bDoublePosition ? FMath::Max(2, CyclePositionsPerCast) : CyclePositionsPerCast,
+        1, FMath::Max(1, Cycle->GetCycleLength()));
+    if (bAdvanceOnHit) Projectile->SetCycleAdvanceOnHit(Cycle, Positions);
     for (int32 Index = 0; Index < Positions; ++Index)
     {
-        FBreakerCycleEntry Entry = Cycle->PeekNextEntry(0);
-        Cycle->AdvanceCycle();
+        FBreakerCycleEntry Entry = Cycle->PeekNextEntry(bAdvanceOnHit ? Index : 0);
+        if (!bAdvanceOnHit) Cycle->AdvanceCycle();
         if (!Entry.Spec.StatusTag.IsValid()) continue;
 
         // O35: the cycle's authored per-tick numbers are item-level-1 values;

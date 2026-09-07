@@ -9,6 +9,8 @@
 #include "Combat/BreakerStatusComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
+#include "Progression/BreakerProgressionComponent.h"
+#include "Progression/BreakerProgressionLibrary.h"
 #include "UI/BreakerEffectRenderer.h"
 #include "UI/BreakerUIStyle.h"
 
@@ -68,7 +70,9 @@ void UBreakerAbility_Resonance::ActivateAbility(const FGameplayAbilitySpecHandle
     // BEFORE the damage matters: the burst can kill, and a death that fires
     // while the status list is still populated would let a listener detonate a
     // corpse's statuses a second time.
-    if (bConsumeStatuses)
+    const UBreakerProgressionComponent* Progression = Character->GetProgression();
+    const bool bPreserveStatuses = Progression && Progression->HasNodeTag(BreakerNodeTags::Node_MS_Resonance.GetTag());
+    if (bConsumeStatuses && !bPreserveStatuses)
     {
         Status->ConsumeAllStatuses();
     }

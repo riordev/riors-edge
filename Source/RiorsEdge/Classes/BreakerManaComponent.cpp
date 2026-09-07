@@ -3,10 +3,12 @@
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
+#include "Abilities/BreakerAbilityTags.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Game/BreakerGameMode.h"
 #include "GameFramework/Actor.h"
 #include "Progression/BreakerProgressionComponent.h"
+#include "Progression/BreakerProgressionLibrary.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Weapons/BreakerWeaponDefinition.h"
 
@@ -71,6 +73,8 @@ void UBreakerManaComponent::BindOwnerEvents()
     // that spawn already gave them once.
     if (UBreakerCombatComponent* Combat = Owner->FindComponentByClass<UBreakerCombatComponent>())
     {
+        if (!Combat->OnHitDealt.IsAlreadyBound(this, &UBreakerManaComponent::HandleMeleeHit))
+            Combat->OnHitDealt.AddDynamic(this, &UBreakerManaComponent::HandleMeleeHit);
         if (!Combat->OnVitalsRestored.IsAlreadyBound(this, &UBreakerManaComponent::HandleVitalsRestored))
         {
             Combat->OnVitalsRestored.AddDynamic(this, &UBreakerManaComponent::HandleVitalsRestored);
@@ -303,6 +307,20 @@ void UBreakerManaComponent::PushGenerationSuspension(FName Key)
 void UBreakerManaComponent::PopGenerationSuspension(FName Key)
 {
     GenerationSuspensions.Remove(Key);
+}
+
+void UBreakerManaComponent::HandleMeleeHit(const FBreakerHitContext& Hit)
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || IsInSafeZone()) return;
+    if (Hit.Instigator != GetOwner() || Hit.bFromDoT || Hit.Result.bDodged
+        || Hit.Result.HealthDamage + Hit.Result.ShieldDamage <= 0.0f
+        || !Hit.SourceTags.HasTagExact(BreakerAbilityTags::Damage_Melee.GetTag())) return;
+    const UBreakerProgressionComponent* Progression = CachedProgression.Get();
+    const bool bContactCharge = Progression && Progression->HasNodeTag(BreakerNodeTags::Node_SB_ContactCharge.GetTag());
+    // SB1 replaces the baseline hit gain with the existing weak-point rate.
+    // Ordinary weapon hits stay on OnShot's normalized volley path, so this
+    // listener never multiplies their income by pellet count.
+    GrantMana(bContactCharge ? WeakPointGain : WeaponHitGain, false);
 }
 
 void UBreakerManaComponent::HandleShot(const FBreakerShotResult& Shot)

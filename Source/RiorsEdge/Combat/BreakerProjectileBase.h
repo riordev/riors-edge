@@ -9,6 +9,7 @@ class UPointLightComponent;
 class UProjectileMovementComponent;
 class USphereComponent;
 class UStaticMeshComponent;
+class UBreakerStatusCycleComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FBreakerProjectileImpact, AActor*, HitActor, const FVector&, Location);
 
@@ -65,6 +66,12 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Projectile")
     void SetImpactStatuses(const TArray<FBreakerCarriedStatus>& InStatuses);
     UFUNCTION(BlueprintPure, Category="Projectile") const TArray<FBreakerCarriedStatus>& GetImpactStatuses() const { return ImpactStatuses; }
+    // Fracture's on-hit cycle rewrite is server gameplay, independent of the
+    // cosmetic impact multicast and of the already-ended casting ability.
+    void SetCycleAdvanceOnHit(UBreakerStatusCycleComponent* Cycle, int32 Positions);
+    // Authority impact entry, shared by collision and explicit projectile
+    // resolution. Damage/status callbacks and destruction occur at most once.
+    void Impact(AActor* HitActor, const FVector& Location);
 
     UFUNCTION(BlueprintPure, Category="Projectile") const FBreakerDamageRequest& GetProjectileDamage() const { return Damage; }
     UFUNCTION(BlueprintPure, Category="Projectile") bool HasImpacted() const { return bImpacted; }
@@ -117,10 +124,6 @@ protected:
     UFUNCTION() void HandleImpact(UPrimitiveComponent* HitComponent, AActor* OtherActor,
         UPrimitiveComponent* OtherComponent, FVector NormalImpulse, const FHitResult& Hit);
 
-    // Server-side. Runs once — the bImpacted latch is in Impact(), not here, so
-    // an override cannot accidentally re-enter.
-    void Impact(AActor* HitActor, const FVector& Location);
-
     // What actually happens at the impact point. The default is single-target
     // damage plus the carried status; the rocket's splash would be an override.
     virtual void ResolveImpact(AActor* HitActor, const FVector& Location);
@@ -146,5 +149,7 @@ protected:
 
     FBreakerDamageRequest Damage;
     TArray<FBreakerCarriedStatus> ImpactStatuses;
+    TWeakObjectPtr<UBreakerStatusCycleComponent> ImpactCycle;
+    int32 CyclePositionsOnHit = 0;
     bool bImpacted = false;
 };

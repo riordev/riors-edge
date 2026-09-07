@@ -394,6 +394,7 @@ void UBreakerCombatComponent::DispatchHitDealt(const FBreakerDamageRequest& Requ
     Context.Target = GetOwner();
     Context.Result = Result;
     Context.bFromDoT = Request.bIsDamageOverTime;
+    Context.SourceTags = Request.SourceTags;
     Context.bWeakPoint = Result.bWeakPoint;
     Context.DamageFamily = Request.DamageFamily;
     Context.Delivery = Request.Delivery;

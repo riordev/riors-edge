@@ -183,6 +183,7 @@ public:
 
 private:
     UFUNCTION() void HandleShot(const FBreakerShotResult& Shot);
+    UFUNCTION() void HandleMeleeHit(const FBreakerHitContext& Hit);
     UFUNCTION() void HandleVitalsRestored();
     // Binds the owner's shot and vitals-restore events. Called from BeginPlay
     // and from BindAttributes, because a component wired up outside a world

@@ -78,6 +78,7 @@
 		"settings.audio.musicUnavailable": "Music is not available yet.",
         "core.overviewHint": "SELECT A CONSTELLATION TO VIEW AND SPEND POINTS · WHEEL ZOOM · DRAG PAN · ESC BACK",
         "equipment.weaponBaseDamage": "BASE DAMAGE  %.1f",
-        "equipment.weaponBasePellets": "BASE DAMAGE  %.1f × %d PELLETS"
+        "equipment.weaponBasePellets": "BASE DAMAGE  %.1f × %d PELLETS",
+        "equipment.rarityChoices": "FIVE RARITIES · FIND YOUR BUILD"
 	}
 }

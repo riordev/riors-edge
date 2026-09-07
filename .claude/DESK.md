@@ -5,10 +5,9 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
-## Cycle — make purchased Multispell rewrites work
-- [ ] Cycle advances on a successful hit; misses preserve its position.
-- [ ] Fracture carries two distinct cycle positions when purchased.
-- [ ] Resonance retains statuses at half duration when its rewrite is purchased.
+## Cycle — populate Fernhall and fix DoT affix scaling
+- [ ] Populate three ordinary Fernhall combat pockets using existing finite enemy roster, supported spawn positions and existing quest/XP credit; preserve Rift behavior.
+- [ ] Fold flat damage before the shared Increased Damage/DoT bucket, preserving delivery selection, snapshots and the existing More ceiling.
 
 ## Playtest queue (owner, 2026-09-07)
 Continue through this queue in tested batches without stopping after each commit for a playtest (owner instruction, 2026-09-07).
@@ -54,7 +53,7 @@ No playtest until the core loop has more oomph. The next blocks are the ones tha
 - [ ] Per-archetype weapon fire: `weapon_fire_<archetype>.wav` → `weapon_fire.wav` → synth.
 
 ## Later (infrastructure only when it unblocks a felt item this week)
-- Equipped titles and base damage now fit. Backpack affix names and rarity/slot sublines still clip in GEARDAMAGE capture; reconcile actual button interior with wrap widths. Empty-backpack copy still calls rarities worst-to-best, contrary to desired build tradeoffs.
+- Inventory equipped titles, affix names, rarity sublines and base damage fit the inspected1920x1080GEARDAMAGE capture after button padding/alignment repair. Other menus/resolutions remain in the clipping queue.
 - Two expected reds carry the campaign's absence: `KeystoneAtShippedBudget` and `NodePurchaseFlow` assert doctrine purchases at the full pool, and the shipped entitlement is two of eight until acts two, three and the finale carry their Unlock beats. Both pinned with that delete condition; never widened.
 - Arrival and rift-completion flags are set only when the beat is current (the kill-counter rule). If arrival should count unconditionally, drop the flag-set argument on the two seams.
 - The enemy chip re-arm inside a hold reads `GetSecondsSinceDamage() <= DeltaSeconds`; settled chips are not pruned (they hold the last fraction) and the map is bounded by live enemies in range.
@@ -97,6 +96,13 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 
 ## Done (last three cycles; older is git)
 
+### Purchased Caster rewrites and inventory text — 587 / 5 / 0
+- [x] Purchased Multispell Cycle advances on landed damage instead of cast; Fracture carries two distinct cycle positions; Resonance leaves statuses at half duration with unchanged burst damage. Runtime realGAS casts/purchases and programmatic authority impacts tested; collision flight is not simulated. Cycle rank2 preview remains unimplemented.
+- [x] Successful Caster melee grants existing1.5Mana hit rate; ContactCharge replaces with existing4weak-point rate through6/s cap. Actual damage/node purchase tests cover cap/remainder, dodge, DoT, zero, suspension, kill/corpse, nonCaster and no weapon double credit. Other status/kill refunds still lack shipped numeric amounts.
+- [x] Inventory buttons remove default padding and fill their measured content width. Final GEARDAMAGE capture shows full affix names, rarity/slot text and damage values. Empty rarity copy now describes build choice rather than worst-to-best.
+- [x] Final build and all592tests complete:587passed/5existing expected/0unexpected. Fixed fixture lifecycle/old-projectile selection before accepting suite. PowerShell audit under Python quarantine; STATE unchanged, no widened pins.
+
+
 ### Ordinary gear depth and weapon base damage — 585 / 5 / 0
 - [x] New Standard rolls3–4, Uncommon4–5, Exceptional4–6 affixes; tiercaps4/2/-1 unchanged. 4608seeded rolls cover all8slots, three rarities, level bands, distinct/allowed affixes and category caps. Existing saved items are not rerolled.
 - [x] Weapon cards show shared runtime base damage and pellet count; candidates use their own archetype/ilvl. Preview/equip equivalence tested across8archetypes and3levels, custom held overrides, invalid inputs and no state mutation.
@@ -111,8 +117,3 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - [x] Final build and all588tests complete:583passed/5existing expected/0unexpected. Fixture map-package and multicast observation order errors corrected; production payout verified. PowerShell reconciliation under Python quarantine; STATE unchanged, no pins widened.
 
 
-### Connected Core, cooldown icons, Rot feedback and inventory headers — 581 / 5 / 0
-- [x] Core overview draws all117nodes171edges12entries in5sectors; focused constellations retain actual purchase handlers and clear paths. Opaque board, fitted overview, readable labels, accurate focused purchase count and unclipped Back. Graph geometry and hit targets tested; CORE/COREPRECISION captures inspected.
-- [x] Neutral ability tiles use glyph icons, clockwise radial recovery and numeric cooldown; plain DoT numbers brighter at20px. Forced half-cooldown capture inspected; existing preview banners are fixture content, not a completed gameplay run.
-- [x] Rot applies poison on entry and ticks2.5damage/.5s per stack, preserving5baseDPS while advancing initial feedback/stack ramp. Runtime entry/noinstantdamage/exit-tail test passes. Inventory separates level/discard row from full-width title; equipment refusal capture inspected.
-- [x] Final build clean; all586tests completed:581passed/5existing expected/0unexpected. PowerShell reconciliation under Python quarantine; STATE unchanged. Static captures do not establish hands-on feel or multiplayer correctness.
