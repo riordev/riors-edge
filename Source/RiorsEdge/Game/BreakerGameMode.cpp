@@ -3403,25 +3403,65 @@ ABreakerSkirmisherEnemy* ABreakerGameMode::SpawnSkirmisherNearCover(const FVecto
     // real — so ducking behind chest-high cover leaves it visible and it is a
     // plain shooter again. Chest-high is the fallback rather than the answer,
     // and the log below says which one it got.
-    FVector Anchor = Around;
-    FBreakerCoverAnchor Chosen;
-    bool bHasCover = CoverRegistry.FindNearestOfClass(Around, CoverPitchMax, EBreakerCoverClass::FullHeight, Chosen);
-    if (!bHasCover) bHasCover = CoverRegistry.FindNearest(Around, CoverPitchMax, Chosen);
-    if (bHasCover) Anchor = Chosen.Location;
-    FVector SpawnLocation = Anchor;
-    if (bHasCover)
+    const auto* Defaults = GetDefault<ABreakerSkirmisherEnemy>();
+    const auto* Capsule = Defaults->FindComponentByClass<UCapsuleComponent>();
+    if (!Capsule) return nullptr;
+    const float Radius = Capsule->GetScaledCapsuleRadius();
+    const float HalfHeight = Capsule->GetScaledCapsuleHalfHeight();
+    auto ResolveSafePoint = [&](const FVector& Desired, FVector& Out)
     {
-        const FVector AwayFromThreat = (Anchor - ThreatLocation).GetSafeNormal2D();
-        // 260 cm: clear of the cover block's own footprint (the pocket blocks
-        // are up to 260 cm on their long axis) and well inside the 1400 cm
-        // search radius, so every candidate ring it generates still contains
-        // this piece.
-        SpawnLocation = Anchor + AwayFromThreat * 260.0f;
+        if (bFieldFrameSet)
+        {
+            const FBreakerCoverFieldParams Field = bActiveFieldParamsSet ? ActiveFieldParams : MakeCoverFieldParams();
+            const FVector Offset = Desired - Frame.Ground;
+            const float F = FVector::DotProduct(Offset, Frame.Forward);
+            const float R = FVector::DotProduct(Offset, Frame.Right);
+            if (F - Radius < Field.BandNearCm || F + Radius > Field.BandFarCm
+                || FMath::Abs(R) + Radius > Field.BandHalfWidthCm) return false;
+        }
+        FCollisionQueryParams Query(SCENE_QUERY_STAT(SkirmisherSpawnFloor), false);
+        FHitResult Floor;
+        if (!World->LineTraceSingleByObjectType(Floor, Desired + FVector(0, 0, 3000),
+            Desired - FVector(0, 0, 3000), FCollisionObjectQueryParams(ECC_WorldStatic), Query)
+            || Floor.ImpactNormal.Z < .7f) return false;
+        const FVector At = Floor.ImpactPoint + FVector(0, 0, HalfHeight + 2);
+        if (World->OverlapBlockingTestByChannel(At, FQuat::Identity, ECC_Pawn,
+            FCollisionShape::MakeCapsule(Radius, HalfHeight), Query)) return false;
+        Out = At;
+        return true;
+    };
+    TArray<FBreakerCoverAnchor> Candidates;
+    for (const FBreakerCoverAnchor& Candidate : CoverRegistry.Anchors)
+        if (FVector::DistSquared2D(Candidate.Location, Around) <= FMath::Square(CoverPitchMax))
+            Candidates.Add(Candidate);
+    Candidates.StableSort([&](const FBreakerCoverAnchor& A, const FBreakerCoverAnchor& B)
+    {
+        const bool FullA = A.Class == EBreakerCoverClass::FullHeight;
+        const bool FullB = B.Class == EBreakerCoverClass::FullHeight;
+        if (FullA != FullB) return FullA;
+        return FVector::DistSquared2D(A.Location, Around) < FVector::DistSquared2D(B.Location, Around);
+    });
+    FBreakerCoverAnchor Chosen;
+    FVector SpawnLocation;
+    bool bHasCover = false;
+    for (const FBreakerCoverAnchor& Candidate : Candidates)
+    {
+        // Preserve the existing rear-side placement; choose another actual
+        // anchor when this one has no safe space, never clamp through its wall.
+        const FVector Behind = Candidate.Location + (Candidate.Location - ThreatLocation).GetSafeNormal2D() * 260.0f;
+        if (!ResolveSafePoint(Behind, SpawnLocation)) continue;
+        Chosen = Candidate;
+        bHasCover = true;
+        break;
     }
-    SpawnLocation.Z = Frame.Ground.Z + 120.0f;
+    if (!bHasCover && !ResolveSafePoint(Around, SpawnLocation))
+    {
+        UE_LOG(LogTemp, Error, TEXT("[BreakerWave] Skirmisher has no safe cover or fallback placement at %s."), *Around.ToString());
+        return nullptr;
+    }
 
     FActorSpawnParameters Params;
-    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::DontSpawnIfColliding;
     ABreakerSkirmisherEnemy* Skirmisher = World->SpawnActor<ABreakerSkirmisherEnemy>(
         ABreakerSkirmisherEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, Params);
     if (!Skirmisher) return nullptr;

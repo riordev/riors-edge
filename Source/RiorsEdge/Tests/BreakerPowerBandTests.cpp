@@ -1885,29 +1885,17 @@ bool FBreakerPowerBandAbilityLaneTest::RunTest(const FString& Parameters)
     AddInfo(FString::Printf(TEXT("ABILITY LANE  ability build, ability lane (ilvl %d, T%d) flat x%.3f | increased x%.3f | more x%.3f => x%.2f"),
         AtCapItemLevel, Tier, AbilityBuild.AbilityFlatLayer, AbilityBuild.AbilityIncreasedLayer, AbilityBuild.AbilityMoreLayer, AbilityBuild.AbilityTotal));
 
-    // PARITY AT THE CAP, against O99's ruled band. EXPECTED RED: the figure is
-    // 0.647x and the band is 0.85-1.15x, and that gap is a work item with a
-    // number on it rather than an open question in a document.
+    // Fixed-build damage-multiplier parity against O99's ruled band. This
+    // compares the selected gear/Core contributions and expected crit only.
+    // It does not model an ability's base damage, cast cadence, Mana/Overcast,
+    // zone retention, or a weapon's ammunition and reload cycle, so it is not
+    // a Fracture/Rot DPS measurement.
     //
-    // THE GAP IS AFFIX BREADTH, AND THE DIAGNOSIS IS IN THE LAYERS ABOVE.
-    // The two builds hold an identical More product and identical crit lines,
-    // so both cancel exactly and parity is the flat ratio times the increased
-    // ratio. BOTH are short, and they are two different pieces of work:
-    //
-    //   increased 3.35 against 4.49 — the ability pool is one seeded line per
-    //     slot at placeholder values, where the weapon pool is that line plus
-    //     added damage, fire rate, five conditional lines and the projectile
-    //     family. This half closes by authoring ability affix breadth.
-    //
-    //   flat 1.000 against 1.154 — the ability lane has NO FLAT LINE AT ALL.
-    //     Added Damage bids Flat into the weapon lane only, and O54 names three
-    //     INCREASED pools and says nothing about the flat half. This is an
-    //     unanswered design question rather than unauthored content, and it is
-    //     recorded as one.
-    //
-    // Neither half closes by touching the composition, and a future reader who
-    // "fixes" this by folding the weapon pool back into ability hits has
-    // deleted the partition rather than closed the gap.
+    // The fixed loadouts retain their original selections. Ordinary ability
+    // flat and conditional affixes now exist; the separate rolled and whole-
+    // loadout diagnostics below measure that wider pool without replacing
+    // this fixture's inputs or denominator. Actual delivery is measured by
+    // the Caster burst/sustain and live encounter fixtures.
     const float Parity = AbilityBuild.AbilityTotal / WeaponBuild.Total;
     AddInfo(FString::Printf(TEXT("ABILITY LANE  PARITY (cap) %.3fx against O99's %.2f-%.2fx"),
         Parity, AbilityParityBandMinimum, AbilityParityBandMaximum));
