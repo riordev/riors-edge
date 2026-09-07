@@ -17,6 +17,8 @@
 #include "Abilities/BreakerMeleeSweep.h"
 #include "Classes/BreakerManaComponent.h"
 #include "GameFramework/Actor.h"
+#include "UI/BreakerHUDMath.h"
+#include "UI/BreakerUIStyle.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerAbilityRegistryTest,
@@ -955,6 +957,65 @@ bool FBreakerAbilitySelectionTest::RunTest(const FString& Parameters)
     {
         TestFalse(TEXT("The ultimate has no cooldown either"), Definition->HasCooldown());
     }
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// The verb table (O179): every fallback row says its verb, each class's
+// ultimate carries the class's identity verb, and the rail colours by verb
+// and by nothing else.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerAbilityVerbTableTest,
+    "RiorsEdge.Abilities.VerbTable",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerAbilityVerbTableTest::RunTest(const FString& Parameters)
+{
+    const TArray<UBreakerAbilityDefinition*>& Registry = UBreakerAbilityDefinition::GetFallbackRegistry();
+    TestTrue(TEXT("The fallback registry is populated"), Registry.Num() > 0);
+    for (const UBreakerAbilityDefinition* Definition : Registry)
+    {
+        if (!Definition) continue;
+        TestTrue(*FString::Printf(TEXT("%s says its verb"), *Definition->AbilityId.ToString()),
+            Definition->Verb != EBreakerAbilityVerb::None);
+    }
+
+    // Each ultimate's verb is the class's identity verb.
+    struct FIdentity { const TCHAR* UltimateId; EBreakerAbilityVerb Verb; };
+    const FIdentity Identities[] = {
+        { TEXT("Swift.Overdrive"),        EBreakerAbilityVerb::Movement },
+        { TEXT("Caster.Unmake"),          EBreakerAbilityVerb::Weapon },
+        { TEXT("Gunsmith.FieldAssembly"), EBreakerAbilityVerb::Weapon },
+        { TEXT("Tank.Hold"),              EBreakerAbilityVerb::Taunt },
+        { TEXT("Support.Conduit"),        EBreakerAbilityVerb::Reward },
+    };
+    for (const FIdentity& Identity : Identities)
+    {
+        const UBreakerAbilityDefinition* Ultimate = UBreakerAbilityDefinition::FindFallback(Identity.UltimateId);
+        if (!TestNotNull(*FString::Printf(TEXT("%s is registered"), Identity.UltimateId), Ultimate)) continue;
+        TestTrue(*FString::Printf(TEXT("%s is an ultimate"), Identity.UltimateId), Ultimate->IsUltimate());
+        TestTrue(*FString::Printf(TEXT("%s carries its class's identity verb"), Identity.UltimateId),
+            Ultimate->Verb == Identity.Verb);
+    }
+
+    // The rail: one hue per verb, violet for the ultimate slot whatever the verb.
+    using namespace BreakerHUDMath;
+    constexpr float Tolerance = 0.001f;
+    TestTrue(TEXT("Movement rails cyan"), AbilityRailColor(EBreakerAbilityVerb::Movement, false).Equals(BreakerUI::VerbMove, Tolerance));
+    TestTrue(TEXT("Weapon rails orange"), AbilityRailColor(EBreakerAbilityVerb::Weapon, false).Equals(BreakerUI::Orange, Tolerance));
+    TestTrue(TEXT("Reward rails gold"), AbilityRailColor(EBreakerAbilityVerb::Reward, false).Equals(BreakerUI::Gold, Tolerance));
+    TestTrue(TEXT("Taunt rails harm"), AbilityRailColor(EBreakerAbilityVerb::Taunt, false).Equals(BreakerUI::Harm, Tolerance));
+    TestTrue(TEXT("The ultimate rails violet"), AbilityRailColor(EBreakerAbilityVerb::Movement, true).Equals(BreakerUI::Violet, Tolerance));
+    TestTrue(TEXT("The ultimate rails violet whatever its verb"), AbilityRailColor(EBreakerAbilityVerb::Taunt, true).Equals(BreakerUI::Violet, Tolerance));
+    TestFalse(TEXT("No verb is not a guess at one"), AbilityRailColor(EBreakerAbilityVerb::None, false).Equals(BreakerUI::VerbMove, Tolerance));
+
+    // Append-only: None is first and the four verbs hold their serialized values.
+    TestEqual(TEXT("None is 0"), static_cast<uint8>(EBreakerAbilityVerb::None), static_cast<uint8>(0));
+    TestEqual(TEXT("Movement is 1"), static_cast<uint8>(EBreakerAbilityVerb::Movement), static_cast<uint8>(1));
+    TestEqual(TEXT("Weapon is 2"), static_cast<uint8>(EBreakerAbilityVerb::Weapon), static_cast<uint8>(2));
+    TestEqual(TEXT("Reward is 3"), static_cast<uint8>(EBreakerAbilityVerb::Reward), static_cast<uint8>(3));
+    TestEqual(TEXT("Taunt is 4"), static_cast<uint8>(EBreakerAbilityVerb::Taunt), static_cast<uint8>(4));
     return true;
 }
 

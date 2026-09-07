@@ -1,5 +1,6 @@
 #include "Abilities/BreakerAbilityDefinition.h"
 
+#include "Abilities/BreakerAbilityData.h"
 #include "Abilities/BreakerAbilityTags.h"
 #include "Abilities/BreakerAbility_CadenceBreak.h"
 #include "Abilities/BreakerAbility_Cleave.h"
@@ -18,6 +19,7 @@
 #include "Abilities/BreakerGunsmithAbilities.h"
 #include "Abilities/BreakerSupportAbilities.h"
 #include "Abilities/BreakerTankAbilities.h"
+#include "Data/BreakerDataFile.h"
 
 bool UBreakerAbilityDefinition::CanOccupySlot(EBreakerAbilitySlot Slot) const
 {
@@ -144,6 +146,253 @@ namespace
     UE_DEFINE_GAMEPLAY_TAG_STATIC(Keystone_Support_Blackout, "Keystone.Support.Blackout");
 }
 
+// ---------------------------------------------------------------------------
+// THE NUMERICS, FROM Data/abilities.json (O186).
+// ---------------------------------------------------------------------------
+// The registry below authors WHAT each ability is; the file authors HOW MUCH.
+// Rows match by id and variants by keystone tag name, and the file has to
+// describe the registry exactly — the same row count, every id known, every
+// variant row present — before a single number is applied. Anything short of
+// that leaves every row at its default-constructed numerics behind an ensure,
+// because a table that half-loaded would play as a table that loaded.
+namespace
+{
+    struct FBreakerAbilityVariantData
+    {
+        FString Keystone;
+        float WindowDuration = 0.0f;
+        float SpeedMultiplier = 1.0f;
+        float HitTimeoutSeconds = 0.0f;
+        float AbilityCostMultiplier = 1.0f;
+    };
+
+    struct FBreakerAbilityRowData
+    {
+        FName Id = NAME_None;
+        float ResourceCost = 0.0f;
+        float CooldownSeconds = 0.0f;
+        float WindowDuration = 0.0f;
+        TArray<FBreakerAbilityVariantData> Variants;
+    };
+
+    TArray<FString> BreakerAbilityDataErrorsStore;
+
+    // A number that is present, numeric and not below zero: every field on
+    // these rows is a cost, a duration or a multiplier, and none has a
+    // meaning below zero (the definition header clamps them the same way).
+    bool BreakerAbilityDataReadNumber(const FJsonObject& Row, const TCHAR* Field, const FString& Context, float& Out, BreakerDataFile::FBreakerDataErrors& Errors)
+    {
+        double Value = 0.0;
+        if (!Row.TryGetNumberField(Field, Value))
+        {
+            Errors.Add(FString::Printf(TEXT("%s: \"%s\" is missing or not a number"), *Context, Field));
+            return false;
+        }
+        if (Value < 0.0)
+        {
+            Errors.Add(FString::Printf(TEXT("%s: \"%s\" is negative (%g)"), *Context, Field, Value));
+            return false;
+        }
+        Out = static_cast<float>(Value);
+        return true;
+    }
+
+    bool BreakerAbilityDataReadVariant(const FJsonObject& Row, const FString& Context, FBreakerAbilityVariantData& Out, BreakerDataFile::FBreakerDataErrors& Errors)
+    {
+        if (!Row.TryGetStringField(TEXT("keystone"), Out.Keystone))
+        {
+            Errors.Add(FString::Printf(TEXT("%s: a variant has no \"keystone\" (use \"\" for the base row)"), *Context));
+            return false;
+        }
+        const FString VariantContext = FString::Printf(TEXT("%s variant \"%s\""), *Context, *Out.Keystone);
+        bool bOk = BreakerAbilityDataReadNumber(Row, TEXT("windowDuration"), VariantContext, Out.WindowDuration, Errors);
+        bOk = BreakerAbilityDataReadNumber(Row, TEXT("speedMultiplier"), VariantContext, Out.SpeedMultiplier, Errors) && bOk;
+        bOk = BreakerAbilityDataReadNumber(Row, TEXT("hitTimeoutSeconds"), VariantContext, Out.HitTimeoutSeconds, Errors) && bOk;
+        bOk = BreakerAbilityDataReadNumber(Row, TEXT("abilityCostMultiplier"), VariantContext, Out.AbilityCostMultiplier, Errors) && bOk;
+        return bOk;
+    }
+
+    bool BreakerAbilityDataReadRow(const FJsonObject& Row, FBreakerAbilityRowData& Out, BreakerDataFile::FBreakerDataErrors& Errors)
+    {
+        FString Id;
+        if (!Row.TryGetStringField(TEXT("id"), Id) || Id.IsEmpty())
+        {
+            Errors.Add(TEXT("a row has no \"id\""));
+            return false;
+        }
+        Out.Id = FName(*Id);
+
+        bool bOk = BreakerAbilityDataReadNumber(Row, TEXT("resourceCost"), Id, Out.ResourceCost, Errors);
+        bOk = BreakerAbilityDataReadNumber(Row, TEXT("cooldownSeconds"), Id, Out.CooldownSeconds, Errors) && bOk;
+        bOk = BreakerAbilityDataReadNumber(Row, TEXT("windowDuration"), Id, Out.WindowDuration, Errors) && bOk;
+
+        const TArray<TSharedPtr<FJsonValue>>* VariantValues = nullptr;
+        if (!Row.TryGetArrayField(TEXT("variants"), VariantValues))
+        {
+            Errors.Add(FString::Printf(TEXT("%s: no \"variants\" array (use [] for none)"), *Id));
+            return false;
+        }
+        for (const TSharedPtr<FJsonValue>& Value : *VariantValues)
+        {
+            const TSharedPtr<FJsonObject>* VariantObject = nullptr;
+            if (!Value.IsValid() || !Value->TryGetObject(VariantObject))
+            {
+                Errors.Add(FString::Printf(TEXT("%s: a \"variants\" entry is not an object"), *Id));
+                bOk = false;
+                continue;
+            }
+            FBreakerAbilityVariantData Variant;
+            bOk = BreakerAbilityDataReadVariant(**VariantObject, Id, Variant, Errors) && bOk;
+            Out.Variants.Add(Variant);
+        }
+        return bOk;
+    }
+
+    // The base row's keystone is the empty string; a keystone row's is the
+    // tag's full name. That is the spelling the census writes back.
+    FString BreakerAbilityDataKeystoneName(const FBreakerAbilityVariant& Variant)
+    {
+        return Variant.KeystoneTag.IsValid() ? Variant.KeystoneTag.GetTagName().ToString() : FString();
+    }
+
+    // Reads the file against the built registry and, only if every check
+    // passes, writes the numbers onto the rows. Runs once, from
+    // GetFallbackRegistry, before the registry is first handed out.
+    void BreakerAbilityDataApply(TArray<UBreakerAbilityDefinition*>& Registry)
+    {
+        BreakerDataFile::FBreakerDataErrors Errors;
+        const FString File = BreakerAbilityData::DataRelativePath();
+
+        // ---- parse ---------------------------------------------------------
+        TArray<FBreakerAbilityRowData> Rows;
+        const TSharedPtr<FJsonObject> Root = BreakerDataFile::Load(File, Errors);
+        if (Root.IsValid())
+        {
+            const TArray<TSharedPtr<FJsonValue>>* RowValues = nullptr;
+            if (!Root->TryGetArrayField(TEXT("abilities"), RowValues))
+            {
+                Errors.Add(FString::Printf(TEXT("%s: no \"abilities\" array"), *File));
+            }
+            else
+            {
+                for (const TSharedPtr<FJsonValue>& Value : *RowValues)
+                {
+                    const TSharedPtr<FJsonObject>* RowObject = nullptr;
+                    if (!Value.IsValid() || !Value->TryGetObject(RowObject))
+                    {
+                        Errors.Add(FString::Printf(TEXT("%s: an \"abilities\" entry is not an object"), *File));
+                        continue;
+                    }
+                    FBreakerAbilityRowData Row;
+                    if (BreakerAbilityDataReadRow(**RowObject, Row, Errors))
+                    {
+                        Rows.Add(Row);
+                    }
+                }
+            }
+        }
+
+        // ---- match ---------------------------------------------------------
+        // Every file row names a registry row, no registry row is named
+        // twice, and every registry row is named. The count check is stated
+        // separately so a file one row short says so in one line.
+        if (Root.IsValid() && Rows.Num() != Registry.Num())
+        {
+            Errors.Add(FString::Printf(TEXT("%s: %d rows for a registry of %d"), *File, Rows.Num(), Registry.Num()));
+        }
+        TArray<UBreakerAbilityDefinition*> Matched;
+        Matched.SetNum(Rows.Num());
+        TSet<FName> Claimed;
+        for (int32 Index = 0; Index < Rows.Num(); ++Index)
+        {
+            const FBreakerAbilityRowData& Row = Rows[Index];
+            UBreakerAbilityDefinition* const* Found = Registry.FindByPredicate(
+                [&Row](const UBreakerAbilityDefinition* Definition) { return Definition && Definition->AbilityId == Row.Id; });
+            if (!Found)
+            {
+                Errors.Add(FString::Printf(TEXT("%s: \"%s\" is not a registered ability"), *File, *Row.Id.ToString()));
+                continue;
+            }
+            if (Claimed.Contains(Row.Id))
+            {
+                Errors.Add(FString::Printf(TEXT("%s: \"%s\" appears twice"), *File, *Row.Id.ToString()));
+                continue;
+            }
+            Claimed.Add(Row.Id);
+            Matched[Index] = *Found;
+
+            const UBreakerAbilityDefinition& Definition = **Found;
+            if (Row.Variants.Num() != Definition.Variants.Num())
+            {
+                Errors.Add(FString::Printf(TEXT("%s: %d variants for a row with %d"), *Row.Id.ToString(), Row.Variants.Num(), Definition.Variants.Num()));
+                continue;
+            }
+            TSet<FString> ClaimedKeystones;
+            for (const FBreakerAbilityVariantData& Variant : Row.Variants)
+            {
+                const bool bKnown = Definition.Variants.ContainsByPredicate(
+                    [&Variant](const FBreakerAbilityVariant& Candidate) { return BreakerAbilityDataKeystoneName(Candidate) == Variant.Keystone; });
+                if (!bKnown)
+                {
+                    Errors.Add(FString::Printf(TEXT("%s: no variant with keystone \"%s\""), *Row.Id.ToString(), *Variant.Keystone));
+                }
+                else if (ClaimedKeystones.Contains(Variant.Keystone))
+                {
+                    Errors.Add(FString::Printf(TEXT("%s: keystone \"%s\" appears twice"), *Row.Id.ToString(), *Variant.Keystone));
+                }
+                ClaimedKeystones.Add(Variant.Keystone);
+            }
+        }
+        if (Root.IsValid())
+        {
+            for (const UBreakerAbilityDefinition* Definition : Registry)
+            {
+                if (Definition && !Claimed.Contains(Definition->AbilityId))
+                {
+                    Errors.Add(FString::Printf(TEXT("%s: no row for \"%s\""), *File, *Definition->AbilityId.ToString()));
+                }
+            }
+        }
+
+        if (!Errors.IsClean())
+        {
+            BreakerAbilityDataErrorsStore = Errors.Messages;
+            ensureMsgf(false, TEXT("%s failed to load; every ability keeps zero cost, zero cooldown and zero window.\n%s"), *File, *Errors.Join());
+            return;
+        }
+
+        // ---- apply ---------------------------------------------------------
+        for (int32 Index = 0; Index < Rows.Num(); ++Index)
+        {
+            const FBreakerAbilityRowData& Row = Rows[Index];
+            UBreakerAbilityDefinition& Definition = *Matched[Index];
+            Definition.ResourceCost = Row.ResourceCost;
+            Definition.CooldownSeconds = Row.CooldownSeconds;
+            Definition.WindowDuration = Row.WindowDuration;
+            for (const FBreakerAbilityVariantData& Variant : Row.Variants)
+            {
+                FBreakerAbilityVariant* Target = Definition.Variants.FindByPredicate(
+                    [&Variant](const FBreakerAbilityVariant& Candidate) { return BreakerAbilityDataKeystoneName(Candidate) == Variant.Keystone; });
+                Target->WindowDuration = Variant.WindowDuration;
+                Target->SpeedMultiplier = Variant.SpeedMultiplier;
+                Target->HitTimeoutSeconds = Variant.HitTimeoutSeconds;
+                Target->AbilityCostMultiplier = Variant.AbilityCostMultiplier;
+            }
+        }
+    }
+}
+
+FString BreakerAbilityData::DataRelativePath()
+{
+    return TEXT("Data/abilities.json");
+}
+
+const TArray<FString>& BreakerAbilityData::GetDataErrors()
+{
+    UBreakerAbilityDefinition::GetFallbackRegistry();
+    return BreakerAbilityDataErrorsStore;
+}
+
 const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallbackRegistry()
 {
     static TArray<UBreakerAbilityDefinition*> Registry;
@@ -159,6 +408,12 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     // is the provenance); nothing here is invented balance. Anything NOT
     // quoted is marked O2 PLACEHOLDER and must be replaced from wave-mode
     // instrumentation before content lock.
+    //
+    // THE NUMBERS LIVE IN Data/abilities.json (O186): every row's cost,
+    // cooldown and window, and every variant's four numerics, are overlaid
+    // by BreakerAbilityDataApply before this table is returned. The
+    // citations beside each row say where a number comes from; the file
+    // says what it is.
     // ------------------------------------------------------------------
 
     // S1 Slipcut — §1.2 row S1: 20 Momentum, 4s cooldown, 0.4s window.
@@ -170,12 +425,10 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Slipcut->DisplayName = FText::FromString(TEXT("Slipcut"));
     Slipcut->Description = FText::FromString(TEXT("A breath in which the trigger runs twice as fast. Ends early on reload; rewards a held magazine."));
     Slipcut->SlotAffinity = EBreakerAbilitySlot::ClassAbilityOne;
+    Slipcut->Verb = EBreakerAbilityVerb::Weapon;
     Slipcut->AbilityTag = BreakerAbilityTags::Ability_Class_Swift_Slipcut;
     Slipcut->CooldownTag = BreakerAbilityTags::Cooldown_Class_Swift_Slipcut;
     Slipcut->AbilityClass = UBreakerAbility_Slipcut::StaticClass();
-    Slipcut->ResourceCost = 20.0f;
-    Slipcut->CooldownSeconds = 4.0f;
-    Slipcut->WindowDuration = 0.4f; // §1.2 S1: "0.4s window".
     Registry.Add(Slipcut);
 
     // S3 Skim — Class-Kits §1.2 row S3: 15 Momentum, 3s cooldown.
@@ -185,18 +438,17 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Skim->DisplayName = FText::FromString(TEXT("Skim"));
     Skim->Description = FText::FromString(TEXT("Directional impulse that redirects existing horizontal speed."));
     Skim->SlotAffinity = EBreakerAbilitySlot::ClassAbilityOne;
+    Skim->Verb = EBreakerAbilityVerb::Movement;
     Skim->AbilityTag = BreakerAbilityTags::Ability_Class_Swift_Skim;
     Skim->CooldownTag = BreakerAbilityTags::Cooldown_Class_Swift_Skim;
     Skim->AbilityClass = UBreakerAbility_Skim::StaticClass();
-    Skim->ResourceCost = 15.0f;
-    Skim->CooldownSeconds = 3.0f;
     // O2 PLACEHOLDER: the redirect/boost window length is not specified by any
     // design doc. Structure is complete; the number is a guess and must be
     // replaced (Ability-Implementation-Spec §11 GAP list).
-    Skim->WindowDuration = 0.25f;
     Registry.Add(Skim);
 
-    // S6 Lead — Class-Kits §1.2 row S6: 40 Momentum, 10s cooldown.
+    // S6 Lead — Class-Kits §1.2 row S6: 40 Momentum, 10s cooldown, the mark
+    // lasts 6s.
     // The task brief called this ability "Lash"; Class-Kits has no such ability
     // and S6 Lead is the Swift Marksman ability at that slot, so Lead is used.
     UBreakerAbilityDefinition* Lead = MakeFallback(TEXT("FallbackAbility_Swift_Lead"));
@@ -205,12 +457,10 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Lead->DisplayName = FText::FromString(TEXT("Lead"));
     Lead->Description = FText::FromString(TEXT("Marks a target; long-range hits on the mark count as weak points."));
     Lead->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Lead->Verb = EBreakerAbilityVerb::Reward;
     Lead->AbilityTag = BreakerAbilityTags::Ability_Class_Swift_Lead;
     Lead->CooldownTag = BreakerAbilityTags::Cooldown_Class_Swift_Lead;
     Lead->AbilityClass = UBreakerAbility_Lead::StaticClass();
-    Lead->ResourceCost = 40.0f;
-    Lead->CooldownSeconds = 10.0f;
-    Lead->WindowDuration = 6.0f; // Class-Kits §1.2 row S6: mark lasts 6s.
     Registry.Add(Lead);
 
     // S2 Cadence Break — Class-Kits §1.2 row S2: 35 Momentum, 8s cooldown,
@@ -224,15 +474,14 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     CadenceBreak->DisplayName = FText::FromString(TEXT("Cadence Break"));
     CadenceBreak->Description = FText::FromString(TEXT("Completes the reload and opens a state where consecutive hits on one target stack flat damage."));
     CadenceBreak->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    CadenceBreak->Verb = EBreakerAbilityVerb::Weapon;
     CadenceBreak->AbilityTag = BreakerAbilityTags::Ability_Class_Swift_CadenceBreak;
     CadenceBreak->CooldownTag = BreakerAbilityTags::Cooldown_Class_Swift_CadenceBreak;
     CadenceBreak->AbilityClass = UBreakerAbility_CadenceBreak::StaticClass();
-    CadenceBreak->ResourceCost = 35.0f;
-    CadenceBreak->CooldownSeconds = 8.0f;
-    CadenceBreak->WindowDuration = 3.0f; // Class-Kits §1.2 row S2: "a 3s state".
     Registry.Add(CadenceBreak);
 
-    // S4 Hard Stop — §1.2 row S4: 30 Momentum, 6s cooldown, 0.6s window.
+    // S4 Hard Stop — §1.2 row S4: 30 Momentum, 6s cooldown, 0.6s window
+    // ("0.6s of Damage Reduction ... treatment").
     // Its own row at last (O177): until this pass the verb rode Skim as a
     // pitch-gated modal branch behind the K7 node, at Skim's price.
     UBreakerAbilityDefinition* HardStop = MakeFallback(TEXT("FallbackAbility_Swift_HardStop"));
@@ -241,12 +490,10 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     HardStop->DisplayName = FText::FromString(TEXT("Hard Stop"));
     HardStop->Description = FText::FromString(TEXT("Cancels all velocity instantly and guards the landing for a moment. Spending Momentum to stop is the point."));
     HardStop->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    HardStop->Verb = EBreakerAbilityVerb::Movement;
     HardStop->AbilityTag = BreakerAbilityTags::Ability_Class_Swift_HardStop;
     HardStop->CooldownTag = BreakerAbilityTags::Cooldown_Class_Swift_HardStop;
     HardStop->AbilityClass = UBreakerAbility_HardStop::StaticClass();
-    HardStop->ResourceCost = 30.0f;
-    HardStop->CooldownSeconds = 6.0f;
-    HardStop->WindowDuration = 0.6f; // §1.2 S4: "0.6s of Damage Reduction ... treatment".
     Registry.Add(HardStop);
 
     // S5 Sightline — §1.2 row S5: 25 Momentum, 6s cooldown, 2s window.
@@ -258,12 +505,10 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Sightline->DisplayName = FText::FromString(TEXT("Sightline"));
     Sightline->Description = FText::FromString(TEXT("The next shot pierces every target on its line. Two seconds to take it."));
     Sightline->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Sightline->Verb = EBreakerAbilityVerb::Weapon;
     Sightline->AbilityTag = BreakerAbilityTags::Ability_Class_Swift_Sightline;
     Sightline->CooldownTag = BreakerAbilityTags::Cooldown_Class_Swift_Sightline;
     Sightline->AbilityClass = UBreakerAbility_Sightline::StaticClass();
-    Sightline->ResourceCost = 25.0f;
-    Sightline->CooldownSeconds = 6.0f;
-    Sightline->WindowDuration = 2.0f; // §1.2 S5: "fired within 2s".
     Registry.Add(Sightline);
 
     // Overdrive — Class-Kits §1.2 ultimate: 100 Momentum (full bar), no
@@ -274,51 +519,40 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Overdrive->DisplayName = FText::FromString(TEXT("Overdrive"));
     Overdrive->Description = FText::FromString(TEXT("Momentum stops decaying and generation doubles for the duration."));
     Overdrive->SlotAffinity = EBreakerAbilitySlot::Ultimate;
+    Overdrive->Verb = EBreakerAbilityVerb::Movement;
     Overdrive->AbilityTag = BreakerAbilityTags::Ability_Class_Swift_Overdrive;
     // Deliberately no cooldown tag: cost-gated, and the HUD must be able to
     // tell "no cooldown" from "cooldown of zero" (spec D3).
     Overdrive->AbilityClass = UBreakerAbility_Overdrive::StaticClass();
-    Overdrive->ResourceCost = 100.0f;
-    Overdrive->CooldownSeconds = 0.0f;
-    Overdrive->WindowDuration = 8.0f;
 
     // Keystone variant rows (spec D1). Index 0 is the base row. Class-Kits
     // specifies the *behavior* of each rewrite but no numbers for the
-    // parametric part, so every SpeedMultiplier below and the Bloodrhythm
-    // timeout's companion values are O2 PLACEHOLDER — structure is the
-    // deliverable, not balance. Durations are quoted (8s base, 1.5s
+    // parametric part, so every SpeedMultiplier in the file and the
+    // Bloodrhythm timeout's companion values are O2 PLACEHOLDER — structure
+    // is the deliverable, not balance. Durations are quoted (8s base, 1.5s
     // Bloodrhythm hit timeout).
     {
         FBreakerAbilityVariant BaseRow;
         BaseRow.VariantName = FText::FromString(TEXT("Overdrive"));
-        BaseRow.WindowDuration = 8.0f;
-        BaseRow.SpeedMultiplier = 1.10f; // O2 PLACEHOLDER
         Overdrive->Variants.Add(BaseRow);
 
+        // Class-Kits F12: the ultimate ends if the player goes 1.5s without a hit.
         FBreakerAbilityVariant Bloodrhythm;
         Bloodrhythm.KeystoneTag = BreakerAbilityTags::Keystone_Swift_Bloodrhythm;
         Bloodrhythm.VariantName = FText::FromString(TEXT("Overdrive — Bloodrhythm"));
-        Bloodrhythm.WindowDuration = 8.0f;
-        Bloodrhythm.SpeedMultiplier = 1.10f; // O2 PLACEHOLDER
-        // Class-Kits F12: the ultimate ends if the player goes 1.5s without a hit.
-        Bloodrhythm.HitTimeoutSeconds = 1.5f;
         Overdrive->Variants.Add(Bloodrhythm);
 
+        // Availability rewrite, not a speed rewrite (Class-Kits K12 quotes
+        // Master 5.4 explicitly), so the multiplier stays at 1.0.
         FBreakerAbilityVariant TerminalVelocity;
         TerminalVelocity.KeystoneTag = BreakerAbilityTags::Keystone_Swift_TerminalVelocity;
         TerminalVelocity.VariantName = FText::FromString(TEXT("Overdrive — Terminal Velocity"));
-        TerminalVelocity.WindowDuration = 8.0f;
-        // Availability rewrite, not a speed rewrite (Class-Kits K12 quotes
-        // Master 5.4 explicitly), so the multiplier stays at 1.0.
-        TerminalVelocity.SpeedMultiplier = 1.0f;
         Overdrive->Variants.Add(TerminalVelocity);
 
+        // The stationary Swift ultimate: no movement contribution at all.
         FBreakerAbilityVariant StandingWave;
         StandingWave.KeystoneTag = BreakerAbilityTags::Keystone_Swift_StandingWave;
         StandingWave.VariantName = FText::FromString(TEXT("Overdrive — Standing Wave"));
-        StandingWave.WindowDuration = 8.0f;
-        // The stationary Swift ultimate: no movement contribution at all.
-        StandingWave.SpeedMultiplier = 1.0f;
         Overdrive->Variants.Add(StandingWave);
     }
     Registry.Add(Overdrive);
@@ -326,8 +560,9 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     // ------------------------------------------------------------------
     // Caster. Costs quoted from Class-Kits §2.2. NO COOLDOWNS ANYWHERE in
     // this class: Mana *is* the cooldown (Class-Kits §2.1), so no entry below
-    // authors CooldownSeconds or a CooldownTag, and the HUD can therefore tell
-    // "cost-gated" from "cooldown of zero" (spec D3).
+    // authors a CooldownTag, every Caster cooldownSeconds in the file is 0
+    // (RiorsEdge.Data.Abilities.Fresh pins it), and the HUD can therefore
+    // tell "cost-gated" from "cooldown of zero" (spec D3).
     // ------------------------------------------------------------------
 
     // C1 Cleave — Class-Kits §2.2 row C1: 20 Mana, no cooldown.
@@ -337,13 +572,11 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Cleave->DisplayName = FText::FromString(TEXT("Cleave"));
     Cleave->Description = FText::FromString(TEXT("Short forward melee arc that always applies Bleed."));
     Cleave->SlotAffinity = EBreakerAbilitySlot::ClassAbilityOne;
+    Cleave->Verb = EBreakerAbilityVerb::Weapon;
     Cleave->AbilityTag = BreakerAbilityTags::Ability_Class_Caster_Cleave;
     Cleave->AbilityClass = UBreakerAbility_Cleave::StaticClass();
-    Cleave->ResourceCost = 20.0f;
-    Cleave->CooldownSeconds = 0.0f;
-    // O2 PLACEHOLDER: the animation lock is named by Class-Kits (Edgework
-    // removes it) but never timed. Mirrors the ability's own default.
-    Cleave->WindowDuration = 0.45f;
+    // O2 PLACEHOLDER: the window is the animation lock, named by Class-Kits
+    // (Edgework removes it) but never timed. Mirrors the ability's own default.
     Registry.Add(Cleave);
 
     // C2 Closequarter — Class-Kits §2.2 row C2: 35 Mana, no cooldown.
@@ -353,10 +586,9 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Closequarter->DisplayName = FText::FromString(TEXT("Closequarter"));
     Closequarter->Description = FText::FromString(TEXT("Blink to the target under the crosshair, arriving just short of it."));
     Closequarter->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Closequarter->Verb = EBreakerAbilityVerb::Movement;
     Closequarter->AbilityTag = BreakerAbilityTags::Ability_Class_Caster_Closequarter;
     Closequarter->AbilityClass = UBreakerAbility_Closequarter::StaticClass();
-    Closequarter->ResourceCost = 35.0f;
-    Closequarter->CooldownSeconds = 0.0f;
     Registry.Add(Closequarter);
 
     // C3 Rot — Class-Kits §2.2 row C3: 25 Mana, no cooldown, 4 m / 6 s.
@@ -366,11 +598,10 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Rot->DisplayName = FText::FromString(TEXT("Rot"));
     Rot->Description = FText::FromString(TEXT("A 4 m zone that poisons and strips armour from everything standing in it."));
     Rot->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Rot->Verb = EBreakerAbilityVerb::Weapon;
     Rot->AbilityTag = BreakerAbilityTags::Ability_Class_Caster_Rot;
     Rot->AbilityClass = UBreakerAbility_Rot::StaticClass();
-    Rot->ResourceCost = 25.0f;
-    Rot->CooldownSeconds = 0.0f;
-    Rot->WindowDuration = 6.0f; // the puddle's lifetime, for the HUD
+    // The window is the puddle's lifetime, for the HUD.
     Registry.Add(Rot);
 
     // C4 Siphon — Class-Kits §2.2 row C4: 30 Mana, no cooldown, 5 s channel.
@@ -380,11 +611,9 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Siphon->DisplayName = FText::FromString(TEXT("Siphon"));
     Siphon->Description = FText::FromString(TEXT("Channel on one target: Void damage over time that heals you for a portion."));
     Siphon->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Siphon->Verb = EBreakerAbilityVerb::Reward;
     Siphon->AbilityTag = BreakerAbilityTags::Ability_Class_Caster_Siphon;
     Siphon->AbilityClass = UBreakerAbility_Siphon::StaticClass();
-    Siphon->ResourceCost = 30.0f;
-    Siphon->CooldownSeconds = 0.0f;
-    Siphon->WindowDuration = 5.0f;
     Registry.Add(Siphon);
 
     // C5 Fracture — Class-Kits §2.2 row C5: 30 Mana, no cooldown.
@@ -394,10 +623,9 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Fracture->DisplayName = FText::FromString(TEXT("Fracture"));
     Fracture->Description = FText::FromString(TEXT("Projectile applying the next status in your cycle."));
     Fracture->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Fracture->Verb = EBreakerAbilityVerb::Weapon;
     Fracture->AbilityTag = BreakerAbilityTags::Ability_Class_Caster_Fracture;
     Fracture->AbilityClass = UBreakerAbility_Fracture::StaticClass();
-    Fracture->ResourceCost = 30.0f;
-    Fracture->CooldownSeconds = 0.0f;
     Registry.Add(Fracture);
 
     // C6 Resonance — Class-Kits §2.2 row C6: 40 Mana, no cooldown.
@@ -407,10 +635,9 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Resonance->DisplayName = FText::FromString(TEXT("Resonance"));
     Resonance->Description = FText::FromString(TEXT("Detonates every status on the target, consuming them."));
     Resonance->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Resonance->Verb = EBreakerAbilityVerb::Weapon;
     Resonance->AbilityTag = BreakerAbilityTags::Ability_Class_Caster_Resonance;
     Resonance->AbilityClass = UBreakerAbility_Resonance::StaticClass();
-    Resonance->ResourceCost = 40.0f;
-    Resonance->CooldownSeconds = 0.0f;
     Registry.Add(Resonance);
 
     // UNMAKE — Class-Kits §2.2 ultimate: 80 Mana, no cooldown, 6s base window.
@@ -420,43 +647,33 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Unmake->DisplayName = FText::FromString(TEXT("Unmake"));
     Unmake->Description = FText::FromString(TEXT("Caster abilities cost nothing and Mana generation stops."));
     Unmake->SlotAffinity = EBreakerAbilitySlot::Ultimate;
+    Unmake->Verb = EBreakerAbilityVerb::Weapon;
     Unmake->AbilityTag = BreakerAbilityTags::Ability_Class_Caster_Unmake;
     Unmake->AbilityClass = UBreakerAbility_Unmake::StaticClass();
-    Unmake->ResourceCost = 80.0f;
-    Unmake->CooldownSeconds = 0.0f;
-    Unmake->WindowDuration = 6.0f;
 
-    // Keystone variant rows (spec D1). Every duration and cost scalar below is
-    // quoted from Class-Kits §2.2 — 6s/0% base, 12s/50% for Long Dark. Edgework
-    // and Cascade change behavior, not parameters, so their rows carry the base
-    // numbers and exist so the selector resolves them rather than silently
-    // falling through to base.
+    // Keystone variant rows (spec D1). Every duration and cost scalar in the
+    // file is quoted from Class-Kits §2.2 — 6s/0% base, 12s/50% for Long
+    // Dark. Edgework and Cascade change behavior, not parameters, so their
+    // rows carry the base numbers and exist so the selector resolves them
+    // rather than silently falling through to base.
     {
         FBreakerAbilityVariant BaseRow;
         BaseRow.VariantName = FText::FromString(TEXT("Unmake"));
-        BaseRow.WindowDuration = 6.0f;
-        BaseRow.AbilityCostMultiplier = 0.0f;
         Unmake->Variants.Add(BaseRow);
 
         FBreakerAbilityVariant Edgework;
         Edgework.KeystoneTag = BreakerAbilityTags::Keystone_Caster_Edgework;
         Edgework.VariantName = FText::FromString(TEXT("Unmake - Edgework"));
-        Edgework.WindowDuration = 6.0f;
-        Edgework.AbilityCostMultiplier = 0.0f;
         Unmake->Variants.Add(Edgework);
 
         FBreakerAbilityVariant LongDark;
         LongDark.KeystoneTag = BreakerAbilityTags::Keystone_Caster_LongDark;
         LongDark.VariantName = FText::FromString(TEXT("Unmake - Long Dark"));
-        LongDark.WindowDuration = 12.0f;
-        LongDark.AbilityCostMultiplier = 0.5f;
         Unmake->Variants.Add(LongDark);
 
         FBreakerAbilityVariant Cascade;
         Cascade.KeystoneTag = BreakerAbilityTags::Keystone_Caster_Cascade;
         Cascade.VariantName = FText::FromString(TEXT("Unmake - Cascade"));
-        Cascade.WindowDuration = 6.0f;
-        Cascade.AbilityCostMultiplier = 0.0f;
         Unmake->Variants.Add(Cascade);
     }
     Registry.Add(Unmake);
@@ -503,16 +720,15 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     SidearmRig->DisplayName = FText::FromString(TEXT("Sidearm Rig"));
     SidearmRig->Description = FText::FromString(TEXT("The next magazine deals bonus flat damage and pierces one more target."));
     SidearmRig->SlotAffinity = EBreakerAbilitySlot::ClassAbilityOne;
+    SidearmRig->Verb = EBreakerAbilityVerb::Weapon;
     SidearmRig->AbilityTag = Ability_Class_Gunsmith_SidearmRig;
     SidearmRig->CooldownTag = Cooldown_Class_Gunsmith_SidearmRig;
     SidearmRig->AbilityClass = UBreakerAbility_SidearmRig::StaticClass();
-    SidearmRig->ResourceCost = 0.0f;
-    SidearmRig->CooldownSeconds = 10.0f;
-    // WindowDuration stays 0 DELIBERATELY. Sidearm Rig's window is counted in
-    // SHOTS, not seconds — it ends when the magazine empties or on reload,
-    // whichever comes first — and that is what makes it a magazine-economy
-    // ability rather than a burst window. Authoring a seconds value here would
-    // be inventing a second, contradictory expiry.
+    // windowDuration is 0 in the file DELIBERATELY. Sidearm Rig's window is
+    // counted in SHOTS, not seconds — it ends when the magazine empties or on
+    // reload, whichever comes first — and that is what makes it a
+    // magazine-economy ability rather than a burst window. Authoring a
+    // seconds value would be inventing a second, contradictory expiry.
     Registry.Add(SidearmRig);
 
     // G2 Overhaul — §3 row G2: no cost, 18s cooldown, 10s window.
@@ -522,26 +738,23 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Overhaul->DisplayName = FText::FromString(TEXT("Overhaul"));
     Overhaul->Description = FText::FromString(TEXT("Converts reserve ammunition into magazine capacity, and settles the unspent remainder back."));
     Overhaul->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Overhaul->Verb = EBreakerAbilityVerb::Weapon;
     Overhaul->AbilityTag = Ability_Class_Gunsmith_Overhaul;
     Overhaul->CooldownTag = Cooldown_Class_Gunsmith_Overhaul;
     Overhaul->AbilityClass = UBreakerAbility_Overhaul::StaticClass();
-    Overhaul->ResourceCost = 0.0f;
-    Overhaul->CooldownSeconds = 18.0f;
-    Overhaul->WindowDuration = 10.0f;
     Registry.Add(Overhaul);
 
-    // G3 Turret — §3 row G3: 40 Scrap, no cooldown. STARTER (Field Tech).
+    // G3 Turret — §3 row G3: 40 Scrap, no cooldown, 30s emplacement lifetime
+    // (the window, for the HUD). STARTER (Field Tech).
     UBreakerAbilityDefinition* Turret = MakeFallback(TEXT("FallbackAbility_Gunsmith_Turret"));
     Turret->AbilityId = TEXT("Gunsmith.Turret");
     Turret->ClassId = EBreakerClassId::Gunsmith;
     Turret->DisplayName = FText::FromString(TEXT("Turret"));
     Turret->Description = FText::FromString(TEXT("An emplacement that fires on the nearest target it can see. Consistent, never optimal."));
     Turret->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Turret->Verb = EBreakerAbilityVerb::Weapon;
     Turret->AbilityTag = Ability_Class_Gunsmith_Turret;
     Turret->AbilityClass = UBreakerAbility_Turret::StaticClass();
-    Turret->ResourceCost = 40.0f;
-    Turret->CooldownSeconds = 0.0f;
-    Turret->WindowDuration = 30.0f;   // the emplacement's lifetime, for the HUD
     Registry.Add(Turret);
 
     // G4 Ammo Crate — §3 row G4: 30 Scrap, no cooldown.
@@ -551,11 +764,9 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     AmmoCrate->DisplayName = FText::FromString(TEXT("Ammo Crate"));
     AmmoCrate->Description = FText::FromString(TEXT("A crate of reserve ammunition. You are a valid interactor with your own, at full value."));
     AmmoCrate->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    AmmoCrate->Verb = EBreakerAbilityVerb::Weapon;
     AmmoCrate->AbilityTag = Ability_Class_Gunsmith_AmmoCrate;
     AmmoCrate->AbilityClass = UBreakerAbility_AmmoCrate::StaticClass();
-    AmmoCrate->ResourceCost = 30.0f;
-    AmmoCrate->CooldownSeconds = 0.0f;
-    AmmoCrate->WindowDuration = 45.0f;
     Registry.Add(AmmoCrate);
 
     // G5 Mine Cluster — §3 row G5: 35 Scrap, no cooldown.
@@ -565,11 +776,9 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     MineCluster->DisplayName = FText::FromString(TEXT("Mine Cluster"));
     MineCluster->Description = FText::FromString(TEXT("Three proximity charges that arm on a delay. The cluster is one placement, not three."));
     MineCluster->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    MineCluster->Verb = EBreakerAbilityVerb::Weapon;
     MineCluster->AbilityTag = Ability_Class_Gunsmith_MineCluster;
     MineCluster->AbilityClass = UBreakerAbility_MineCluster::StaticClass();
-    MineCluster->ResourceCost = 35.0f;
-    MineCluster->CooldownSeconds = 0.0f;
-    MineCluster->WindowDuration = 60.0f;
     Registry.Add(MineCluster);
 
     // G6 Disruptor — §3 row G6: 45 Scrap, no cooldown, 20s lifetime.
@@ -579,11 +788,9 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Disruptor->DisplayName = FText::FromString(TEXT("Disruptor"));
     Disruptor->Description = FText::FromString(TEXT("A field that slows enemies inside it and strips a flat amount of their armour."));
     Disruptor->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Disruptor->Verb = EBreakerAbilityVerb::Weapon;
     Disruptor->AbilityTag = Ability_Class_Gunsmith_Disruptor;
     Disruptor->AbilityClass = UBreakerAbility_Disruptor::StaticClass();
-    Disruptor->ResourceCost = 45.0f;
-    Disruptor->CooldownSeconds = 0.0f;
-    Disruptor->WindowDuration = 20.0f;
     Registry.Add(Disruptor);
 
     // FIELD ASSEMBLY — §3 ultimate: 100 Scrap (full bar), no cooldown, 20s.
@@ -593,13 +800,11 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     FieldAssembly->DisplayName = FText::FromString(TEXT("Field Assembly"));
     FieldAssembly->Description = FText::FromString(TEXT("Deploys every unlocked deployable type at once and raises the density cap for the window."));
     FieldAssembly->SlotAffinity = EBreakerAbilitySlot::Ultimate;
+    FieldAssembly->Verb = EBreakerAbilityVerb::Weapon;
     FieldAssembly->AbilityTag = Ability_Class_Gunsmith_FieldAssembly;
     FieldAssembly->AbilityClass = UBreakerAbility_FieldAssembly::StaticClass();
-    FieldAssembly->ResourceCost = 100.0f;
-    FieldAssembly->CooldownSeconds = 0.0f;
-    FieldAssembly->WindowDuration = 20.0f;
     {
-        // NOTE ON AbilityCostMultiplier ACROSS ALL FOUR ROWS: it stays 1.0.
+        // NOTE ON abilityCostMultiplier ACROSS ALL FOUR ROWS: it stays 1.0.
         // The field states what the window does to the price of the owner's
         // OTHER abilities, which is Unmake's mechanic. Field Assembly does not
         // discount casts — it performs one free mass placement at activation
@@ -609,7 +814,6 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
         // to 0 would silently make every subsequent Gunsmith cast free.
         FBreakerAbilityVariant BaseRow;
         BaseRow.VariantName = FText::FromString(TEXT("Field Assembly"));
-        BaseRow.WindowDuration = 20.0f;
         FieldAssembly->Variants.Add(BaseRow);
 
         // Machinist — the solo / no-deployable ultimate: places nothing and
@@ -621,7 +825,6 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
         FBreakerAbilityVariant Machinist;
         Machinist.KeystoneTag = Keystone_Gunsmith_Machinist;
         Machinist.VariantName = FText::FromString(TEXT("Field Assembly - Machinist"));
-        Machinist.WindowDuration = 20.0f;
         FieldAssembly->Variants.Add(Machinist);
 
         // Foundry — deployables placed during the window never expire (their
@@ -631,7 +834,6 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
         FBreakerAbilityVariant Foundry;
         Foundry.KeystoneTag = Keystone_Gunsmith_Foundry;
         Foundry.VariantName = FText::FromString(TEXT("Field Assembly - Foundry"));
-        Foundry.WindowDuration = 20.0f;
         FieldAssembly->Variants.Add(Foundry);
 
         // Minefield — placements are invisible and excluded from enemy
@@ -639,7 +841,6 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
         FBreakerAbilityVariant Minefield;
         Minefield.KeystoneTag = Keystone_Gunsmith_Minefield;
         Minefield.VariantName = FText::FromString(TEXT("Field Assembly - Minefield"));
-        Minefield.WindowDuration = 20.0f;
         FieldAssembly->Variants.Add(Minefield);
     }
     Registry.Add(FieldAssembly);
@@ -660,11 +861,10 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Rend->DisplayName = FText::FromString(TEXT("Rend"));
     Rend->Description = FText::FromString(TEXT("Melee sweep that heals for a portion of the damage dealt; overheal becomes shield."));
     Rend->SlotAffinity = EBreakerAbilitySlot::ClassAbilityOne;
+    Rend->Verb = EBreakerAbilityVerb::Weapon;
     Rend->AbilityTag = Ability_Class_Tank_Rend;
     Rend->CooldownTag = Cooldown_Class_Tank_Rend;
     Rend->AbilityClass = UBreakerAbility_Rend::StaticClass();
-    Rend->ResourceCost = 25.0f;
-    Rend->CooldownSeconds = 6.0f;
     Registry.Add(Rend);
 
     // T2 Bloodline — §2 row T2: 40 Grit, 12s, 8s window.
@@ -674,12 +874,10 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Bloodline->DisplayName = FText::FromString(TEXT("Bloodline"));
     Bloodline->Description = FText::FromString(TEXT("Doubles your Life on Hit and extends it to damage-over-time ticks. Multiplies what you have; grants nothing if you have none."));
     Bloodline->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Bloodline->Verb = EBreakerAbilityVerb::Reward;
     Bloodline->AbilityTag = Ability_Class_Tank_Bloodline;
     Bloodline->CooldownTag = Cooldown_Class_Tank_Bloodline;
     Bloodline->AbilityClass = UBreakerAbility_Bloodline::StaticClass();
-    Bloodline->ResourceCost = 40.0f;
-    Bloodline->CooldownSeconds = 12.0f;
-    Bloodline->WindowDuration = 8.0f;
     Registry.Add(Bloodline);
 
     // T3 Anchor Point — §2 row T3: 30 Grit, 10s, 12s lifetime. STARTER (Bastion).
@@ -689,12 +887,10 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     AnchorPoint->DisplayName = FText::FromString(TEXT("Anchor Point"));
     AnchorPoint->Description = FText::FromString(TEXT("A frontal cover panel with its own health. Blocks enemy fire; you and allies shoot through it from behind."));
     AnchorPoint->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    AnchorPoint->Verb = EBreakerAbilityVerb::Weapon;
     AnchorPoint->AbilityTag = Ability_Class_Tank_AnchorPoint;
     AnchorPoint->CooldownTag = Cooldown_Class_Tank_AnchorPoint;
     AnchorPoint->AbilityClass = UBreakerAbility_AnchorPoint::StaticClass();
-    AnchorPoint->ResourceCost = 30.0f;
-    AnchorPoint->CooldownSeconds = 10.0f;
-    AnchorPoint->WindowDuration = 12.0f;
     Registry.Add(AnchorPoint);
 
     // T4 Provoke — §2 row T4: 35 Grit, 12s, 4s forced-target window.
@@ -704,12 +900,10 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Provoke->DisplayName = FText::FromString(TEXT("Provoke"));
     Provoke->Description = FText::FromString(TEXT("Forces nearby enemies to target you, and each one provoked adds flat damage to your next seconds."));
     Provoke->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Provoke->Verb = EBreakerAbilityVerb::Taunt;
     Provoke->AbilityTag = Ability_Class_Tank_Provoke;
     Provoke->CooldownTag = Cooldown_Class_Tank_Provoke;
     Provoke->AbilityClass = UBreakerAbility_Provoke::StaticClass();
-    Provoke->ResourceCost = 35.0f;
-    Provoke->CooldownSeconds = 12.0f;
-    Provoke->WindowDuration = 4.0f;
     Registry.Add(Provoke);
 
     // T5 Breach Charge — §2 row T5: 30 Grit, 8s.
@@ -719,11 +913,10 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     BreachCharge->DisplayName = FText::FromString(TEXT("Breach Charge"));
     BreachCharge->Description = FText::FromString(TEXT("Thrown explosive with a short fuse. Full control of the self-knockback; the self-damage is reduced and never zero."));
     BreachCharge->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    BreachCharge->Verb = EBreakerAbilityVerb::Weapon;
     BreachCharge->AbilityTag = Ability_Class_Tank_BreachCharge;
     BreachCharge->CooldownTag = Cooldown_Class_Tank_BreachCharge;
     BreachCharge->AbilityClass = UBreakerAbility_BreachCharge::StaticClass();
-    BreachCharge->ResourceCost = 30.0f;
-    BreachCharge->CooldownSeconds = 8.0f;
     Registry.Add(BreachCharge);
 
     // T6 Ground Zero — §2 row T6: 45 Grit, 10s.
@@ -733,11 +926,10 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     GroundZero->DisplayName = FText::FromString(TEXT("Ground Zero"));
     GroundZero->Description = FText::FromString(TEXT("Airborne slam that staggers, scaling with how far you fell. A normal jump is enough."));
     GroundZero->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    GroundZero->Verb = EBreakerAbilityVerb::Weapon;   // O179 by effect; O2
     GroundZero->AbilityTag = Ability_Class_Tank_GroundZero;
     GroundZero->CooldownTag = Cooldown_Class_Tank_GroundZero;
     GroundZero->AbilityClass = UBreakerAbility_GroundZero::StaticClass();
-    GroundZero->ResourceCost = 45.0f;
-    GroundZero->CooldownSeconds = 10.0f;
     Registry.Add(GroundZero);
 
     // HOLD — §2.1 ultimate: 100 Grit (full bar), no cooldown, 10s base window.
@@ -747,11 +939,9 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Hold->DisplayName = FText::FromString(TEXT("Hold"));
     Hold->Description = FText::FromString(TEXT("Caps the damage any single hit can do to you, and triples Grit generation for the duration."));
     Hold->SlotAffinity = EBreakerAbilitySlot::Ultimate;
+    Hold->Verb = EBreakerAbilityVerb::Taunt;   // O179 by effect; O2
     Hold->AbilityTag = Ability_Class_Tank_Hold;
     Hold->AbilityClass = UBreakerAbility_Hold::StaticClass();
-    Hold->ResourceCost = 100.0f;
-    Hold->CooldownSeconds = 0.0f;
-    Hold->WindowDuration = 10.0f;
     {
         // A PER-HIT CAP IS NOT DAMAGE REDUCTION, and the struct has no field for
         // one. That is the right outcome rather than a gap to paper over: the
@@ -762,7 +952,6 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
         // hook that does not exist yet.
         FBreakerAbilityVariant BaseRow;
         BaseRow.VariantName = FText::FromString(TEXT("Hold"));
-        BaseRow.WindowDuration = 10.0f;
         Hold->Variants.Add(BaseRow);
 
         // Vein — the cap is REMOVED and incoming damage instead converts to
@@ -772,7 +961,6 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
         FBreakerAbilityVariant Vein;
         Vein.KeystoneTag = Keystone_Tank_Vein;
         Vein.VariantName = FText::FromString(TEXT("Hold - Vein"));
-        Vein.WindowDuration = 10.0f;
         Hold->Variants.Add(Vein);
 
         // Wall — the cap extends to nearby allies, and SOLO it is twice as
@@ -782,7 +970,6 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
         FBreakerAbilityVariant Wall;
         Wall.KeystoneTag = Keystone_Tank_Wall;
         Wall.VariantName = FText::FromString(TEXT("Hold - Wall"));
-        Wall.WindowDuration = 10.0f;
         Hold->Variants.Add(Wall);
 
         // Detonation — ends early on command, releasing the absorbed damage as
@@ -793,7 +980,6 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
         FBreakerAbilityVariant Detonation;
         Detonation.KeystoneTag = Keystone_Tank_Detonation;
         Detonation.VariantName = FText::FromString(TEXT("Hold - Detonation"));
-        Detonation.WindowDuration = 10.0f;
         Hold->Variants.Add(Detonation);
     }
     Registry.Add(Hold);
@@ -814,26 +1000,24 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Patch->DisplayName = FText::FromString(TEXT("Patch"));
     Patch->Description = FText::FromString(TEXT("Heals the ally under your crosshair, or yourself with no target. The self-cast is worth exactly the same."));
     Patch->SlotAffinity = EBreakerAbilitySlot::ClassAbilityOne;
+    Patch->Verb = EBreakerAbilityVerb::Reward;
     Patch->AbilityTag = Ability_Class_Support_Patch;
     Patch->CooldownTag = Cooldown_Class_Support_Patch;
     Patch->AbilityClass = UBreakerAbility_Patch::StaticClass();
-    Patch->ResourceCost = 25.0f;
-    Patch->CooldownSeconds = 6.0f;
     Registry.Add(Patch);
 
-    // U2 Purge — §3 row U2: 30 Charge, 10s, 3s status immunity.
+    // U2 Purge — §3 row U2: 30 Charge, 10s, 3s status immunity (the window,
+    // which is the whole value).
     UBreakerAbilityDefinition* Purge = MakeFallback(TEXT("FallbackAbility_Support_Purge"));
     Purge->AbilityId = TEXT("Support.Purge");
     Purge->ClassId = EBreakerClassId::Support;
     Purge->DisplayName = FText::FromString(TEXT("Purge"));
     Purge->Description = FText::FromString(TEXT("Strips every status from the target and makes them immune to more for a moment. Self-castable."));
     Purge->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Purge->Verb = EBreakerAbilityVerb::Movement;   // O179: cleansing rides the movement verb
     Purge->AbilityTag = Ability_Class_Support_Purge;
     Purge->CooldownTag = Cooldown_Class_Support_Purge;
     Purge->AbilityClass = UBreakerAbility_Purge::StaticClass();
-    Purge->ResourceCost = 30.0f;
-    Purge->CooldownSeconds = 10.0f;
-    Purge->WindowDuration = 3.0f;   // the immunity window, which is the whole value
     Registry.Add(Purge);
 
     // U3 Cadence — §3 row U3: 30 Charge, 8s, 8s aura.
@@ -843,12 +1027,10 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Cadence->DisplayName = FText::FromString(TEXT("Cadence"));
     Cadence->Description = FText::FromString(TEXT("An aura that follows you, improving reload and swap tempo for everyone inside it — starting with you."));
     Cadence->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Cadence->Verb = EBreakerAbilityVerb::Weapon;   // O179 by effect; O2
     Cadence->AbilityTag = Ability_Class_Support_Cadence;
     Cadence->CooldownTag = Cooldown_Class_Support_Cadence;
     Cadence->AbilityClass = UBreakerAbility_Cadence::StaticClass();
-    Cadence->ResourceCost = 30.0f;
-    Cadence->CooldownSeconds = 8.0f;
-    Cadence->WindowDuration = 8.0f;
     Registry.Add(Cadence);
 
     // U4 Metronome — §3 row U4: 35 Charge, 9s, 8s state.
@@ -858,12 +1040,10 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Metronome->DisplayName = FText::FromString(TEXT("Metronome"));
     Metronome->Description = FText::FromString(TEXT("Consecutive hits by anyone you have buffed build a cadence ramp. Each holder builds their own."));
     Metronome->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Metronome->Verb = EBreakerAbilityVerb::Weapon;   // O179 by effect; O2
     Metronome->AbilityTag = Ability_Class_Support_Metronome;
     Metronome->CooldownTag = Cooldown_Class_Support_Metronome;
     Metronome->AbilityClass = UBreakerAbility_Metronome::StaticClass();
-    Metronome->ResourceCost = 35.0f;
-    Metronome->CooldownSeconds = 9.0f;
-    Metronome->WindowDuration = 8.0f;
     Registry.Add(Metronome);
 
     // U5 Mark — §3 row U5: 20 Charge, 5s, 10s mark. STARTER (Warden).
@@ -873,12 +1053,10 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Mark->DisplayName = FText::FromString(TEXT("Mark"));
     Mark->Description = FText::FromString(TEXT("Paints a target: it takes more damage from everyone, and the damage you do to it pays you Charge."));
     Mark->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Mark->Verb = EBreakerAbilityVerb::Reward;
     Mark->AbilityTag = Ability_Class_Support_Mark;
     Mark->CooldownTag = Cooldown_Class_Support_Mark;
     Mark->AbilityClass = UBreakerAbility_Mark::StaticClass();
-    Mark->ResourceCost = 20.0f;
-    Mark->CooldownSeconds = 5.0f;
-    Mark->WindowDuration = 10.0f;
     Registry.Add(Mark);
 
     // U6 Suppress — §3 row U6: 40 Charge, 10s, 6s zone.
@@ -888,12 +1066,10 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Suppress->DisplayName = FText::FromString(TEXT("Suppress"));
     Suppress->Description = FText::FromString(TEXT("A zone that slows enemies and spoils their aim. It deals no damage at all."));
     Suppress->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Suppress->Verb = EBreakerAbilityVerb::Weapon;   // O179 by effect; O2
     Suppress->AbilityTag = Ability_Class_Support_Suppress;
     Suppress->CooldownTag = Cooldown_Class_Support_Suppress;
     Suppress->AbilityClass = UBreakerAbility_Suppress::StaticClass();
-    Suppress->ResourceCost = 40.0f;
-    Suppress->CooldownSeconds = 10.0f;
-    Suppress->WindowDuration = 6.0f;
     Registry.Add(Suppress);
 
     // CONDUIT — §3.1 ultimate: 100 Charge (full bar), no cooldown, 12s base.
@@ -903,11 +1079,9 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Conduit->DisplayName = FText::FromString(TEXT("Conduit"));
     Conduit->Description = FText::FromString(TEXT("For the duration your abilities cost nothing and reach every valid target near you — always including yourself."));
     Conduit->SlotAffinity = EBreakerAbilitySlot::Ultimate;
+    Conduit->Verb = EBreakerAbilityVerb::Reward;
     Conduit->AbilityTag = Ability_Class_Support_Conduit;
     Conduit->AbilityClass = UBreakerAbility_Conduit::StaticClass();
-    Conduit->ResourceCost = 100.0f;
-    Conduit->CooldownSeconds = 0.0f;
-    Conduit->WindowDuration = 12.0f;
     {
         // THE ONE ULTIMATE OF THE THREE WHOSE KEYSTONES DIFFER PARAMETRICALLY,
         // and the difference is real rather than cosmetic: two of the three
@@ -922,8 +1096,6 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
         // bounded by those cooldowns, cannot fully refund it.
         FBreakerAbilityVariant BaseRow;
         BaseRow.VariantName = FText::FromString(TEXT("Conduit"));
-        BaseRow.WindowDuration = 12.0f;
-        BaseRow.AbilityCostMultiplier = 0.0f;
         Conduit->Variants.Add(BaseRow);
 
         // Triage — becomes a continuous healing field with one lethal-hit save
@@ -933,8 +1105,6 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
         FBreakerAbilityVariant Triage;
         Triage.KeystoneTag = Keystone_Support_Triage;
         Triage.VariantName = FText::FromString(TEXT("Conduit - Triage"));
-        Triage.WindowDuration = 12.0f;
-        Triage.AbilityCostMultiplier = 1.0f;
         Conduit->Variants.Add(Triage);
 
         // Downbeat — keeps the free casts and doubles the cadence effects,
@@ -944,8 +1114,6 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
         FBreakerAbilityVariant Downbeat;
         Downbeat.KeystoneTag = Keystone_Support_Downbeat;
         Downbeat.VariantName = FText::FromString(TEXT("Conduit - Downbeat"));
-        Downbeat.WindowDuration = 12.0f;
-        Downbeat.AbilityCostMultiplier = 0.0f;
         Conduit->Variants.Add(Downbeat);
 
         // Blackout — marks and suppresses every enemy in radius INSTEAD of
@@ -955,12 +1123,13 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
         FBreakerAbilityVariant Blackout;
         Blackout.KeystoneTag = Keystone_Support_Blackout;
         Blackout.VariantName = FText::FromString(TEXT("Conduit - Blackout"));
-        Blackout.WindowDuration = 12.0f;
-        Blackout.AbilityCostMultiplier = 1.0f;
         Conduit->Variants.Add(Blackout);
     }
     Registry.Add(Conduit);
 
+    // The numbers, last, once every row and variant the file has to name
+    // exists. Nothing above this line authors a cost, a cooldown or a window.
+    BreakerAbilityDataApply(Registry);
     return Registry;
 }
 

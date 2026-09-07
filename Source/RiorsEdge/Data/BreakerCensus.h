@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Dom/JsonObject.h"
 
+class UBreakerAbilityDefinition;
 class UBreakerProgressionTree;
 struct FBreakerAffixLibraryData;
 struct FBreakerDialogueData;
@@ -77,4 +78,14 @@ namespace BreakerCensus
     // written empty. NAME_None prints as "". Same printer, same line-ending
     // rule as ExportQuests.
     RIORSEDGE_API FString ExportMissions(const TArray<FBreakerMissionRift>& Rifts, const TArray<FBreakerMissionDefinition>& Missions);
+
+    // Data/abilities.json, the path the ability registry loads its numerics from.
+    RIORSEDGE_API FString AbilitiesRelativePath();
+
+    // The ability numerics as their data file: one row per registry entry in
+    // registry order, its cost, cooldown and window, then "variants" in
+    // authoring order with the keystone tag's name ("" for the base row) and
+    // the four variant numerics. Non-ultimates write an empty "variants".
+    // Same printer, same line-ending rule as ExportAffixes.
+    RIORSEDGE_API FString ExportAbilities(const TArray<UBreakerAbilityDefinition*>& Definitions);
 }

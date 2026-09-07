@@ -1,6 +1,8 @@
 #include "Misc/AutomationTest.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "Abilities/BreakerAbilityData.h"
+#include "Abilities/BreakerAbilityDefinition.h"
 #include "Data/BreakerCensus.h"
 #include "Interaction/BreakerNPC.h"
 #include "Items/BreakerAffixLibrary.h"
@@ -323,8 +325,8 @@ bool FBreakerMissionsFreshTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Two Core points"), CorePoints.Num(), 2);
     TestTrue(TEXT("FirstForge is a known source"), CorePoints.Contains(FName(TEXT("FirstForge"))) && UBreakerWorldPointLibrary::IsKnownSource(FName(TEXT("FirstForge"))));
     TestTrue(TEXT("ActOneBoss is a known source"), CorePoints.Contains(FName(TEXT("ActOneBoss"))) && UBreakerWorldPointLibrary::IsKnownSource(FName(TEXT("ActOneBoss"))));
-    TestEqual(TEXT("The Field Marshal is the one unnamed boss"), UnnamedBosses, 1);
-    TestEqual(TEXT("The loader counts it as a warning"), UBreakerMissionLibrary::GetDataWarnings().Num(), 1);
+    TestEqual(TEXT("Every Boss beat names its boss (O214: the Holdfast on the Undercroft)"), UnnamedBosses, 0);
+    TestEqual(TEXT("The loader has no unnamed-boss warning left"), UBreakerMissionLibrary::GetDataWarnings().Num(), 0);
     AddInfo(FString::Printf(TEXT("Missions: %d missions, %d beats, %d rifts; %d of %d doctrine points granted, %d of %d Core points; %d warnings"),
         Missions.Num(), ActOne.Beats.Num(), Rifts.Num(),
         DoctrineSum, UBreakerProgressionLibrary::DoctrinePointGrant,
@@ -347,6 +349,89 @@ bool FBreakerMissionsFreshTest::RunTest(const FString& Parameters)
         AddError(FString::Printf(
             TEXT("%s is not in canonical form against what the library loaded. ")
             TEXT("Run `bash Scripts/ue-census.sh` and commit Data/missions.json in the same change."),
+            *Path));
+        return false;
+    }
+    return true;
+}
+
+// THE COMMITTED ABILITY FILE IS THE LOADED REGISTRY, OR THIS IS RED.
+//
+// Data/abilities.json is what the fallback registry overlays its numerics
+// from. Same pin as the other data files, plus the shipped configuration:
+// the thirty-five rows, five ultimates each carrying a base row and three
+// keystones, and no Caster cooldown anywhere (Mana is the cooldown,
+// Class-Kits §2.1). The literal value pins live in BreakerAbilityTests and
+// BreakerUnbuiltClassTests; this test proves the file is the table those
+// read.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerAbilitiesFreshTest,
+    "RiorsEdge.Data.Abilities.Fresh",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerAbilitiesFreshTest::RunTest(const FString& Parameters)
+{
+    const TArray<FString>& LoadErrors = BreakerAbilityData::GetDataErrors();
+    for (const FString& Error : LoadErrors)
+    {
+        AddError(Error);
+    }
+    if (!LoadErrors.IsEmpty())
+    {
+        return false;
+    }
+
+    const TArray<UBreakerAbilityDefinition*>& Abilities = UBreakerAbilityDefinition::GetFallbackRegistry();
+    TestEqual(TEXT("Thirty-five rows, seven per class"), Abilities.Num(), 35);
+
+    int32 UltimateCount = 0;
+    int32 VariantCount = 0;
+    int32 CasterCooldowns = 0;
+    for (const UBreakerAbilityDefinition* Definition : Abilities)
+    {
+        if (!Definition)
+        {
+            AddError(TEXT("A registry row is null"));
+            continue;
+        }
+        if (Definition->IsUltimate())
+        {
+            ++UltimateCount;
+            TestEqual(FString::Printf(TEXT("%s carries a base row and three keystones"), *Definition->AbilityId.ToString()),
+                Definition->Variants.Num(), 4);
+        }
+        else
+        {
+            TestEqual(FString::Printf(TEXT("%s carries no variants"), *Definition->AbilityId.ToString()),
+                Definition->Variants.Num(), 0);
+        }
+        VariantCount += Definition->Variants.Num();
+        if (Definition->ClassId == EBreakerClassId::Caster && Definition->CooldownSeconds != 0.0f)
+        {
+            ++CasterCooldowns;
+        }
+    }
+    TestEqual(TEXT("Five ultimates"), UltimateCount, 5);
+    TestEqual(TEXT("Twenty variant rows"), VariantCount, 20);
+    TestEqual(TEXT("No Caster row has a cooldown: Mana is the cooldown"), CasterCooldowns, 0);
+    AddInfo(FString::Printf(TEXT("Ability registry: %d abilities, %d ultimates, %d variants"), Abilities.Num(), UltimateCount, VariantCount));
+
+    const FString Fresh = BreakerCensus::ExportAbilities(Abilities);
+
+    const FString Path = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / BreakerCensus::AbilitiesRelativePath());
+    FString Committed;
+    if (!FFileHelper::LoadFileToString(Committed, *Path))
+    {
+        AddError(FString::Printf(TEXT("%s is missing. Run `bash Scripts/ue-census.sh` and commit the file."), *Path));
+        return false;
+    }
+    Committed.ReplaceInline(TEXT("\r\n"), TEXT("\n"));
+
+    if (Committed != Fresh)
+    {
+        AddError(FString::Printf(
+            TEXT("%s is not in canonical form against what the registry loaded. ")
+            TEXT("Run `bash Scripts/ue-census.sh` and commit Data/abilities.json in the same change."),
             *Path));
         return false;
     }

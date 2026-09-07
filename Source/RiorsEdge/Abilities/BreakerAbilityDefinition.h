@@ -9,6 +9,21 @@
 
 class UGameplayAbility;
 
+// The VERB an ability's rail carries (O179: colour by verb — cyan movement
+// and cleansing, orange weapon / explosion / deployable, gold heal / leech /
+// weak-point, harm-red taunt; violet is the ultimate slot's and is not a verb
+// here). Serialized by value on a data asset, so APPEND-ONLY: None stays
+// first, nothing is inserted, reordered or reused.
+UENUM(BlueprintType)
+enum class EBreakerAbilityVerb : uint8
+{
+    None,
+    Movement,
+    Weapon,
+    Reward,
+    Taunt
+};
+
 // One keystone variant row (Ability-Implementation-Spec D1). A branch keystone
 // grants a passive GE carrying KeystoneTag; the ultimate resolves the matching
 // row at activation. The row holds only the *parametric* deltas — the
@@ -58,6 +73,9 @@ public:
     // Which loadout slot this ability is designed for. Ultimates may only be
     // equipped in the Ultimate slot; class abilities may sit in either of the two.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Identity") EBreakerAbilitySlot SlotAffinity = EBreakerAbilitySlot::ClassAbilityOne;
+    // Which verb the HUD's rail colours this ability by (O179). None is a
+    // definition that has not said, and the rail draws it as no verb.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Identity") EBreakerAbilityVerb Verb = EBreakerAbilityVerb::None;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Identity") FGameplayTag AbilityTag;
     // Cooldown tracking tag, granted by the cooldown GameplayEffect. Empty when
     // the ability is purely cost-gated (Class-Kits §0.3: "Mana *is* the cooldown").

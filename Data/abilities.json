@@ -1,0 +1,394 @@
+{
+	"abilities": [
+		{
+			"id": "Swift.Slipcut",
+			"resourceCost": 20,
+			"cooldownSeconds": 4,
+			"windowDuration": 0.4,
+			"variants": []
+		},
+		{
+			"id": "Swift.Skim",
+			"resourceCost": 15,
+			"cooldownSeconds": 3,
+			"windowDuration": 0.25,
+			"variants": []
+		},
+		{
+			"id": "Swift.Lead",
+			"resourceCost": 40,
+			"cooldownSeconds": 10,
+			"windowDuration": 6,
+			"variants": []
+		},
+		{
+			"id": "Swift.CadenceBreak",
+			"resourceCost": 35,
+			"cooldownSeconds": 8,
+			"windowDuration": 3,
+			"variants": []
+		},
+		{
+			"id": "Swift.HardStop",
+			"resourceCost": 30,
+			"cooldownSeconds": 6,
+			"windowDuration": 0.6,
+			"variants": []
+		},
+		{
+			"id": "Swift.Sightline",
+			"resourceCost": 25,
+			"cooldownSeconds": 6,
+			"windowDuration": 2,
+			"variants": []
+		},
+		{
+			"id": "Swift.Overdrive",
+			"resourceCost": 100,
+			"cooldownSeconds": 0,
+			"windowDuration": 8,
+			"variants": [
+				{
+					"keystone": "",
+					"windowDuration": 8,
+					"speedMultiplier": 1.1,
+					"hitTimeoutSeconds": 0,
+					"abilityCostMultiplier": 1
+				},
+				{
+					"keystone": "Keystone.Swift.Bloodrhythm",
+					"windowDuration": 8,
+					"speedMultiplier": 1.1,
+					"hitTimeoutSeconds": 1.5,
+					"abilityCostMultiplier": 1
+				},
+				{
+					"keystone": "Keystone.Swift.TerminalVelocity",
+					"windowDuration": 8,
+					"speedMultiplier": 1,
+					"hitTimeoutSeconds": 0,
+					"abilityCostMultiplier": 1
+				},
+				{
+					"keystone": "Keystone.Swift.StandingWave",
+					"windowDuration": 8,
+					"speedMultiplier": 1,
+					"hitTimeoutSeconds": 0,
+					"abilityCostMultiplier": 1
+				}
+			]
+		},
+		{
+			"id": "Caster.Cleave",
+			"resourceCost": 20,
+			"cooldownSeconds": 0,
+			"windowDuration": 0.45,
+			"variants": []
+		},
+		{
+			"id": "Caster.Closequarter",
+			"resourceCost": 35,
+			"cooldownSeconds": 0,
+			"windowDuration": 0,
+			"variants": []
+		},
+		{
+			"id": "Caster.Rot",
+			"resourceCost": 25,
+			"cooldownSeconds": 0,
+			"windowDuration": 6,
+			"variants": []
+		},
+		{
+			"id": "Caster.Siphon",
+			"resourceCost": 30,
+			"cooldownSeconds": 0,
+			"windowDuration": 5,
+			"variants": []
+		},
+		{
+			"id": "Caster.Fracture",
+			"resourceCost": 30,
+			"cooldownSeconds": 0,
+			"windowDuration": 0,
+			"variants": []
+		},
+		{
+			"id": "Caster.Resonance",
+			"resourceCost": 40,
+			"cooldownSeconds": 0,
+			"windowDuration": 0,
+			"variants": []
+		},
+		{
+			"id": "Caster.Unmake",
+			"resourceCost": 80,
+			"cooldownSeconds": 0,
+			"windowDuration": 6,
+			"variants": [
+				{
+					"keystone": "",
+					"windowDuration": 6,
+					"speedMultiplier": 1,
+					"hitTimeoutSeconds": 0,
+					"abilityCostMultiplier": 0
+				},
+				{
+					"keystone": "Keystone.Caster.Edgework",
+					"windowDuration": 6,
+					"speedMultiplier": 1,
+					"hitTimeoutSeconds": 0,
+					"abilityCostMultiplier": 0
+				},
+				{
+					"keystone": "Keystone.Caster.LongDark",
+					"windowDuration": 12,
+					"speedMultiplier": 1,
+					"hitTimeoutSeconds": 0,
+					"abilityCostMultiplier": 0.5
+				},
+				{
+					"keystone": "Keystone.Caster.Cascade",
+					"windowDuration": 6,
+					"speedMultiplier": 1,
+					"hitTimeoutSeconds": 0,
+					"abilityCostMultiplier": 0
+				}
+			]
+		},
+		{
+			"id": "Gunsmith.SidearmRig",
+			"resourceCost": 0,
+			"cooldownSeconds": 10,
+			"windowDuration": 0,
+			"variants": []
+		},
+		{
+			"id": "Gunsmith.Overhaul",
+			"resourceCost": 0,
+			"cooldownSeconds": 18,
+			"windowDuration": 10,
+			"variants": []
+		},
+		{
+			"id": "Gunsmith.Turret",
+			"resourceCost": 40,
+			"cooldownSeconds": 0,
+			"windowDuration": 30,
+			"variants": []
+		},
+		{
+			"id": "Gunsmith.AmmoCrate",
+			"resourceCost": 30,
+			"cooldownSeconds": 0,
+			"windowDuration": 45,
+			"variants": []
+		},
+		{
+			"id": "Gunsmith.MineCluster",
+			"resourceCost": 35,
+			"cooldownSeconds": 0,
+			"windowDuration": 60,
+			"variants": []
+		},
+		{
+			"id": "Gunsmith.Disruptor",
+			"resourceCost": 45,
+			"cooldownSeconds": 0,
+			"windowDuration": 20,
+			"variants": []
+		},
+		{
+			"id": "Gunsmith.FieldAssembly",
+			"resourceCost": 100,
+			"cooldownSeconds": 0,
+			"windowDuration": 20,
+			"variants": [
+				{
+					"keystone": "",
+					"windowDuration": 20,
+					"speedMultiplier": 1,
+					"hitTimeoutSeconds": 0,
+					"abilityCostMultiplier": 1
+				},
+				{
+					"keystone": "Keystone.Gunsmith.Machinist",
+					"windowDuration": 20,
+					"speedMultiplier": 1,
+					"hitTimeoutSeconds": 0,
+					"abilityCostMultiplier": 1
+				},
+				{
+					"keystone": "Keystone.Gunsmith.Foundry",
+					"windowDuration": 20,
+					"speedMultiplier": 1,
+					"hitTimeoutSeconds": 0,
+					"abilityCostMultiplier": 1
+				},
+				{
+					"keystone": "Keystone.Gunsmith.Minefield",
+					"windowDuration": 20,
+					"speedMultiplier": 1,
+					"hitTimeoutSeconds": 0,
+					"abilityCostMultiplier": 1
+				}
+			]
+		},
+		{
+			"id": "Tank.Rend",
+			"resourceCost": 25,
+			"cooldownSeconds": 6,
+			"windowDuration": 0,
+			"variants": []
+		},
+		{
+			"id": "Tank.Bloodline",
+			"resourceCost": 40,
+			"cooldownSeconds": 12,
+			"windowDuration": 8,
+			"variants": []
+		},
+		{
+			"id": "Tank.AnchorPoint",
+			"resourceCost": 30,
+			"cooldownSeconds": 10,
+			"windowDuration": 12,
+			"variants": []
+		},
+		{
+			"id": "Tank.Provoke",
+			"resourceCost": 35,
+			"cooldownSeconds": 12,
+			"windowDuration": 4,
+			"variants": []
+		},
+		{
+			"id": "Tank.BreachCharge",
+			"resourceCost": 30,
+			"cooldownSeconds": 8,
+			"windowDuration": 0,
+			"variants": []
+		},
+		{
+			"id": "Tank.GroundZero",
+			"resourceCost": 45,
+			"cooldownSeconds": 10,
+			"windowDuration": 0,
+			"variants": []
+		},
+		{
+			"id": "Tank.Hold",
+			"resourceCost": 100,
+			"cooldownSeconds": 0,
+			"windowDuration": 10,
+			"variants": [
+				{
+					"keystone": "",
+					"windowDuration": 10,
+					"speedMultiplier": 1,
+					"hitTimeoutSeconds": 0,
+					"abilityCostMultiplier": 1
+				},
+				{
+					"keystone": "Keystone.Tank.Vein",
+					"windowDuration": 10,
+					"speedMultiplier": 1,
+					"hitTimeoutSeconds": 0,
+					"abilityCostMultiplier": 1
+				},
+				{
+					"keystone": "Keystone.Tank.Wall",
+					"windowDuration": 10,
+					"speedMultiplier": 1,
+					"hitTimeoutSeconds": 0,
+					"abilityCostMultiplier": 1
+				},
+				{
+					"keystone": "Keystone.Tank.Detonation",
+					"windowDuration": 10,
+					"speedMultiplier": 1,
+					"hitTimeoutSeconds": 0,
+					"abilityCostMultiplier": 1
+				}
+			]
+		},
+		{
+			"id": "Support.Patch",
+			"resourceCost": 25,
+			"cooldownSeconds": 6,
+			"windowDuration": 0,
+			"variants": []
+		},
+		{
+			"id": "Support.Purge",
+			"resourceCost": 30,
+			"cooldownSeconds": 10,
+			"windowDuration": 3,
+			"variants": []
+		},
+		{
+			"id": "Support.Cadence",
+			"resourceCost": 30,
+			"cooldownSeconds": 8,
+			"windowDuration": 8,
+			"variants": []
+		},
+		{
+			"id": "Support.Metronome",
+			"resourceCost": 35,
+			"cooldownSeconds": 9,
+			"windowDuration": 8,
+			"variants": []
+		},
+		{
+			"id": "Support.Mark",
+			"resourceCost": 20,
+			"cooldownSeconds": 5,
+			"windowDuration": 10,
+			"variants": []
+		},
+		{
+			"id": "Support.Suppress",
+			"resourceCost": 40,
+			"cooldownSeconds": 10,
+			"windowDuration": 6,
+			"variants": []
+		},
+		{
+			"id": "Support.Conduit",
+			"resourceCost": 100,
+			"cooldownSeconds": 0,
+			"windowDuration": 12,
+			"variants": [
+				{
+					"keystone": "",
+					"windowDuration": 12,
+					"speedMultiplier": 1,
+					"hitTimeoutSeconds": 0,
+					"abilityCostMultiplier": 0
+				},
+				{
+					"keystone": "Keystone.Support.Triage",
+					"windowDuration": 12,
+					"speedMultiplier": 1,
+					"hitTimeoutSeconds": 0,
+					"abilityCostMultiplier": 1
+				},
+				{
+					"keystone": "Keystone.Support.Downbeat",
+					"windowDuration": 12,
+					"speedMultiplier": 1,
+					"hitTimeoutSeconds": 0,
+					"abilityCostMultiplier": 0
+				},
+				{
+					"keystone": "Keystone.Support.Blackout",
+					"windowDuration": 12,
+					"speedMultiplier": 1,
+					"hitTimeoutSeconds": 0,
+					"abilityCostMultiplier": 1
+				}
+			]
+		}
+	]
+}

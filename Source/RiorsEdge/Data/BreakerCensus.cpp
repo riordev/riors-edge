@@ -1,9 +1,12 @@
 #include "Data/BreakerCensus.h"
 
+#include "Abilities/BreakerAbilityData.h"
+#include "Abilities/BreakerAbilityDefinition.h"
 #include "Dom/JsonValue.h"
 #include "Interaction/BreakerNPC.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Policies/PrettyJsonPrintPolicy.h"
+#include "Progression/BreakerCoreWheelMath.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "Progression/BreakerProgressionNode.h"
 #include "Progression/BreakerProgressionTree.h"
@@ -146,6 +149,23 @@ TSharedRef<FJsonObject> BreakerCensus::Export(const TArray<UBreakerProgressionTr
             Nodes.Add(MakeShared<FJsonValueObject>(BreakerCensusNode(*Node)));
         }
         T->SetArrayField(TEXT("nodes"), Nodes);
+        // O212: the tree's constellations and the sector each is a wedge of,
+        // in authoring order, read from the node table rather than listed.
+        // Doctrine trees carry no constellation and export an empty array; a
+        // constellation the sector map does not know exports "None", which
+        // the wheel test refuses rather than the census inventing a sector.
+        TArray<FName> SeenConstellations;
+        TArray<TSharedPtr<FJsonValue>> Constellations;
+        for (const UBreakerProgressionNode* Node : Tree->Nodes)
+        {
+            if (!Node || Node->Constellation.IsNone() || SeenConstellations.Contains(Node->Constellation)) { continue; }
+            SeenConstellations.Add(Node->Constellation);
+            TSharedRef<FJsonObject> C = MakeShared<FJsonObject>();
+            C->SetStringField(TEXT("name"), Node->Constellation.ToString());
+            C->SetStringField(TEXT("sector"), BreakerCoreSectorOf(Node->Constellation).ToString());
+            Constellations.Add(MakeShared<FJsonValueObject>(C));
+        }
+        T->SetArrayField(TEXT("constellations"), Constellations);
         TreeValues.Add(MakeShared<FJsonValueObject>(T));
     }
     Census->SetArrayField(TEXT("trees"), TreeValues);
@@ -357,6 +377,30 @@ namespace
         Writer.WriteArrayEnd();
         Writer.WriteObjectEnd();
     }
+
+    // The base row's keystone is "", a keystone row's is the tag's full
+    // name: the spelling the registry's loader matches variants by.
+    void BreakerCensusAbilityRow(FBreakerCensusWriter& Writer, const UBreakerAbilityDefinition& Definition)
+    {
+        Writer.WriteObjectStart();
+        Writer.WriteValue(TEXT("id"), Definition.AbilityId.ToString());
+        Writer.WriteValue(TEXT("resourceCost"), Definition.ResourceCost);
+        Writer.WriteValue(TEXT("cooldownSeconds"), Definition.CooldownSeconds);
+        Writer.WriteValue(TEXT("windowDuration"), Definition.WindowDuration);
+        Writer.WriteArrayStart(TEXT("variants"));
+        for (const FBreakerAbilityVariant& Variant : Definition.Variants)
+        {
+            Writer.WriteObjectStart();
+            Writer.WriteValue(TEXT("keystone"), Variant.KeystoneTag.IsValid() ? Variant.KeystoneTag.GetTagName().ToString() : FString());
+            Writer.WriteValue(TEXT("windowDuration"), Variant.WindowDuration);
+            Writer.WriteValue(TEXT("speedMultiplier"), Variant.SpeedMultiplier);
+            Writer.WriteValue(TEXT("hitTimeoutSeconds"), Variant.HitTimeoutSeconds);
+            Writer.WriteValue(TEXT("abilityCostMultiplier"), Variant.AbilityCostMultiplier);
+            Writer.WriteObjectEnd();
+        }
+        Writer.WriteArrayEnd();
+        Writer.WriteObjectEnd();
+    }
 }
 
 FString BreakerCensus::Serialize(const TSharedRef<FJsonObject>& Census)
@@ -485,6 +529,30 @@ FString BreakerCensus::ExportMissions(const TArray<FBreakerMissionRift>& Rifts, 
     for (const FBreakerMissionDefinition& Mission : Missions)
     {
         BreakerCensusMissionRow(*Writer, Mission);
+    }
+    Writer->WriteArrayEnd();
+    Writer->WriteObjectEnd();
+    Writer->Close();
+    BreakerCensusFinish(Out);
+    return Out;
+}
+
+FString BreakerCensus::AbilitiesRelativePath()
+{
+    return BreakerAbilityData::DataRelativePath();
+}
+
+FString BreakerCensus::ExportAbilities(const TArray<UBreakerAbilityDefinition*>& Definitions)
+{
+    FString Out;
+    TSharedRef<FBreakerCensusWriter> Writer = TJsonWriterFactory<TCHAR, TPrettyJsonPrintPolicy<TCHAR>>::Create(&Out);
+
+    Writer->WriteObjectStart();
+    Writer->WriteArrayStart(TEXT("abilities"));
+    for (const UBreakerAbilityDefinition* Definition : Definitions)
+    {
+        if (!Definition) { continue; }
+        BreakerCensusAbilityRow(*Writer, *Definition);
     }
     Writer->WriteArrayEnd();
     Writer->WriteObjectEnd();

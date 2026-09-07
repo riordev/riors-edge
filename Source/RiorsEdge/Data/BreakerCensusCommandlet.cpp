@@ -1,5 +1,7 @@
 #include "Data/BreakerCensusCommandlet.h"
 
+#include "Abilities/BreakerAbilityData.h"
+#include "Abilities/BreakerAbilityDefinition.h"
 #include "Data/BreakerCensus.h"
 #include "Interaction/BreakerNPC.h"
 #include "Items/BreakerAffixLibrary.h"
@@ -157,5 +159,37 @@ int32 UBreakerCensusCommandlet::Main(const FString& Params)
     for (const FBreakerMissionDefinition& Mission : Missions) { BeatCount += Mission.Beats.Num(); }
     UE_LOG(LogBreakerCensus, Display, TEXT("wrote %s: %d missions, %d beats, %d rifts"),
         *MissionPath, Missions.Num(), BeatCount, Rifts.Num());
+
+    // The ability numerics. A dirty load leaves every row at zero cost, zero
+    // cooldown and zero window, and writing those back would erase the
+    // table — so, as with the others, a dirty load refuses to write.
+    const TArray<FString>& AbilityErrors = BreakerAbilityData::GetDataErrors();
+    if (!AbilityErrors.IsEmpty())
+    {
+        for (const FString& Error : AbilityErrors)
+        {
+            UE_LOG(LogBreakerCensus, Error, TEXT("%s"), *Error);
+        }
+        UE_LOG(LogBreakerCensus, Error, TEXT("%s did not load clean; not rewriting it"), *BreakerCensus::AbilitiesRelativePath());
+        return 1;
+    }
+    const TArray<UBreakerAbilityDefinition*>& Abilities = UBreakerAbilityDefinition::GetFallbackRegistry();
+    const FString AbilityJson = BreakerCensus::ExportAbilities(Abilities);
+    const FString AbilityPath = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / BreakerCensus::AbilitiesRelativePath());
+    if (!FFileHelper::SaveStringToFile(AbilityJson, *AbilityPath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
+    {
+        UE_LOG(LogBreakerCensus, Error, TEXT("could not write %s"), *AbilityPath);
+        return 1;
+    }
+    int32 UltimateCount = 0;
+    int32 VariantCount = 0;
+    for (const UBreakerAbilityDefinition* Definition : Abilities)
+    {
+        if (!Definition) { continue; }
+        if (Definition->IsUltimate()) { ++UltimateCount; }
+        VariantCount += Definition->Variants.Num();
+    }
+    UE_LOG(LogBreakerCensus, Display, TEXT("wrote %s: %d abilities, %d ultimates, %d variants"),
+        *AbilityPath, Abilities.Num(), UltimateCount, VariantCount);
     return 0;
 }
