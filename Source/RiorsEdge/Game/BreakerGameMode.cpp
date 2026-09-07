@@ -1,4 +1,5 @@
 #include "Game/BreakerGameMode.h"
+#include "GameFramework/PawnMovementComponent.h"
 
 #include "Game/BreakerHubBuilder.h"
 #include "Game/BreakerZoneBuilder.h"
@@ -25,6 +26,7 @@
 #include "Playtest/BreakerKillTelemetryComponent.h"
 #include "Playtest/BreakerPlaytestComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -613,7 +615,11 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
                 Door->OnRiftEntryRequested.AddUObject(this, &ABreakerGameMode::HandleRiftEntryRequested);
             }
         }
-        if (bRiftInstance)
+        if (!bRiftInstance)
+        {
+            SpawnFernhallEncounters(Markers);
+        }
+        else
         {
             // THE RUN STARTS ITSELF, AND THEN CARRIES ITSELF. A rift the
             // player has to press a key to populate is a test bench, and the
@@ -1541,6 +1547,18 @@ void ABreakerGameMode::BuildZoneCaptureTour(const FBreakerZoneMarkers& Markers)
     // 2. Behind the player start, down the entry lane: the arrival composition.
     Vantages.Add({ A - Fwd * 1800.0f + FVector(0.0f, 0.0f, 1400.0f), FRotator(-9.0f, Yaw, 0.0f) });
 
+    if (FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureEnemyNames")))
+    {
+        for (TActorIterator<ABreakerEnemy> It(GetWorld()); It; ++It)
+        {
+            if (!It->Tags.Contains(FName(TEXT("Fernhall.Outdoor.0")))) continue;
+            const FVector Eye = It->GetActorLocation() - Fwd * 1500.0f + FVector(0, 0, 100);
+            Vantages.Reset();
+            Vantages.Add({ Eye, (It->GetActorLocation() - Eye).Rotation() });
+            break;
+        }
+    }
+
     // 3. The entry yard's rift door, from the ground a player approaches it on.
     Vantages.Add({ B - Fwd * 2200.0f + FVector(0.0f, 0.0f, 200.0f), FRotator(-2.0f, Yaw, 0.0f) });
 
@@ -1683,7 +1701,9 @@ void ABreakerGameMode::CaptureScreenshot()
         {
             if (APlayerController* PC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr)
             {
-                const int32 VantageIndex = (ScreenshotIndex - 1) % TourCameras.Num();
+                int32 StartVantage = 0;
+                FParse::Value(FCommandLine::Get(), TEXT("BreakerCaptureTourStart="), StartVantage);
+                const int32 VantageIndex = (FMath::Max(0, StartVantage) + ScreenshotIndex - 1) % TourCameras.Num();
                 AActor* Vantage = TourCameras[VantageIndex];
 
                 // THE TOUR MOVES THE PAWN, NOT A FREE CAMERA (ruled). It used
@@ -1704,6 +1724,7 @@ void ABreakerGameMode::CaptureScreenshot()
                 if (APawn* Pawn = PC->GetPawn())
                 {
                     Pawn->TeleportTo(Vantage->GetActorLocation(), Vantage->GetActorRotation());
+                    if (UPawnMovementComponent* Movement = Pawn->GetMovementComponent()) Movement->StopMovementImmediately();
                     PC->SetControlRotation(Vantage->GetActorRotation());
                     PC->SetViewTarget(Pawn);
                 }
@@ -3360,6 +3381,90 @@ ABreakerSkirmisherEnemy* ABreakerGameMode::SpawnSkirmisherNearCover(const FVecto
 }
 
 
+void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Markers)
+{
+    UWorld* World = GetWorld();
+    if (!World || bRiftInstance) return;
+    // Reuse the shipped pre-boss roster, divided across ground rather than
+    // arriving as a wave: eight melee (one elite), a Lattice, a Skirmisher,
+    // and a Warden. Existing detection/leash behavior starts each encounter;
+    // the visible patrols exist before the player rounds the corner.
+    const FBreakerWaveComposition Roster = UBreakerWaveBudgetLibrary::SolveWave(
+        2, 1, UBreakerWaveBudgetLibrary::MakeRiftWaveBudget(3));
+    const FName Yards[] = { NAME_None, NAME_None, FName(TEXT("substation")) };
+    const float Fractions[] = { 0.25f, 0.70f, 0.50f }; // O2 placeholder placement within validated bands.
+    int32 Spawned = 0;
+    for (int32 Pocket = 0; Pocket < 3; ++Pocket)
+    {
+        FVector2D Origin2D, Forward2D;
+        if (!UBreakerZoneBuilder::YardFrame(Markers, Yards[Pocket], Origin2D, Forward2D))
+        {
+            UE_LOG(LogTemp, Error, TEXT("[Fernhall] outdoor pocket %d has no yard frame."), Pocket);
+            continue;
+        }
+        const FVector Forward(Forward2D.X, Forward2D.Y, 0);
+        const FVector Right = FVector::CrossProduct(FVector::UpVector, Forward);
+        const FBreakerCoverFieldParams Field = UBreakerZoneBuilder::FernhallFieldParams(Yards[Pocket]);
+        const FVector Center = FVector(Origin2D.X, Origin2D.Y, 0)
+            + Forward * FMath::Lerp(Field.BandNearCm, Field.BandFarCm, Fractions[Pocket]);
+        const int32 AreaLevel = UBreakerZoneBuilder::FernhallRiftFor(Yards[Pocket]).EffectiveAreaLevel();
+        int32 Placement = 0;
+        auto Spawn = [&](TSubclassOf<ABreakerEnemy> Class, bool bElite)
+        {
+            const int32 Index = Placement++;
+            // Compact formations stay in the authored clear corridor. Offsets
+            // separate capsules while leaving the shoulder cover usable.
+            const FVector Desired = Center + Forward * ((Index / 3) * 300.0f - 150.0f)
+                + Right * ((Index % 3 - 1) * 300.0f);
+            FHitResult Floor;
+            FCollisionQueryParams Query(SCENE_QUERY_STAT(FernhallOutdoorFloor), false);
+            if (!World->LineTraceSingleByObjectType(Floor, Desired + FVector(0, 0, 3000), Desired - FVector(0, 0, 3000),
+                FCollisionObjectQueryParams(ECC_WorldStatic), Query) || Floor.ImpactNormal.Z < 0.7f)
+            {
+                UE_LOG(LogTemp, Error, TEXT("[Fernhall] outdoor pocket %d has no walkable floor at %s."), Pocket, *Desired.ToString());
+                return;
+            }
+            FActorSpawnParameters Parameters;
+            Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+            ABreakerEnemy* Enemy = World->SpawnActor<ABreakerEnemy>(Class,
+                Floor.ImpactPoint + FVector(0, 0, 200), (-Forward).Rotation(), Parameters);
+            if (!Enemy) return;
+            Enemy->ConfigureWave(AreaLevel); // Finite life; does not enroll in the wave controller.
+            if (bElite) Enemy->ConfigureElite();
+            UCapsuleComponent* Body = Enemy->FindComponentByClass<UCapsuleComponent>();
+            if (!Body) { Enemy->Destroy(); return; }
+            const FVector At = Floor.ImpactPoint + FVector(0, 0, Body->GetScaledCapsuleHalfHeight() + 2.0f);
+            Query.AddIgnoredActor(Enemy);
+            if (World->OverlapBlockingTestByChannel(At, FQuat::Identity, ECC_Pawn,
+                FCollisionShape::MakeCapsule(Body->GetScaledCapsuleRadius(), Body->GetScaledCapsuleHalfHeight()), Query))
+            {
+                UE_LOG(LogTemp, Error, TEXT("[Fernhall] outdoor pocket %d capsule obstructed at %s."), Pocket, *At.ToString());
+                Enemy->Destroy();
+                return;
+            }
+            Enemy->SetActorLocation(At);
+            Enemy->ConfigureEncounter(At, Index * 1.3f);
+            Enemy->Tags.Add(FName(*FString::Printf(TEXT("Fernhall.Outdoor.%d"), Pocket)));
+            UBreakerKillTelemetryComponent::AttachTo(Enemy);
+            ++Spawned;
+        };
+        const int32 FirstMelee = Roster.Skitters / 2;
+        if (Pocket == 0)
+            for (int32 Index = 0; Index < FirstMelee; ++Index) Spawn(ABreakerEnemy::StaticClass(), false);
+        if (Pocket == 1)
+        {
+            for (int32 Index = FirstMelee; Index < Roster.Skitters; ++Index)
+                Spawn(ABreakerEnemy::StaticClass(), Index - FirstMelee < Roster.Elites);
+            for (int32 Index = 0; Index < Roster.Lattices; ++Index) Spawn(ABreakerRangedEnemy::StaticClass(), false);
+        }
+        if (Pocket == 2)
+        {
+            for (int32 Index = 0; Index < Roster.Wardens; ++Index) Spawn(ABreakerWardenEnemy::StaticClass(), false);
+            for (int32 Index = 0; Index < Roster.Skirmishers; ++Index) Spawn(ABreakerSkirmisherEnemy::StaticClass(), false);
+        }
+    }
+    UE_LOG(LogTemp, Display, TEXT("[Fernhall] %d finite outdoor enemies placed across three pockets; no wave controller."), Spawned);
+}
 void ABreakerGameMode::StartNextWave()
 {
     if (!GetWorld() || bRiftRunCompleted || IsWaveActive()) return;

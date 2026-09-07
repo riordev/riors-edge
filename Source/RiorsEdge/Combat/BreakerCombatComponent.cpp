@@ -555,9 +555,8 @@ float UBreakerCombatComponent::ComposeDotSourcePower(const UBreakerAttributeSet*
     // Increased bucket. Increased Damage and Increased DoT no longer multiply
     // for ticks — a build holding +50% Damage and +40% DoT ticks at
     // (1 + 0.50 + 0.40), never 1.50 x 1.40. The two lanes' Increased sums are
-    // recovered by dividing each composed attribute by its own post-clamp More
-    // product (the aggregator's fold is (1 + Inc) x prod(More), so the division
-    // is exact), folded into one bucket, and the More side — Damage Mores, the
+    // read directly from the aggregator, folded under the delivery lane's flat
+    // factor into one bucket, and the More side — Damage Mores, the
     // DoT More lane VW12/Long Dark authors, and the outgoing window chain —
     // multiplies back on top under the ONE O34 ceiling.
     //
@@ -571,6 +570,7 @@ float UBreakerCombatComponent::ComposeDotSourcePower(const UBreakerAttributeSet*
     // build — which is why the delivery is a parameter every caller states
     // rather than a default this function guesses.
     float IncreasedBucket = 1.0f;   // 1 + sum(Increased Damage) + sum(Increased DoT)
+    float FlatFactor = 1.0f;
     float AttributeMoreProduct = 1.0f;
     if (SourceAttributes)
     {
@@ -581,9 +581,25 @@ float UBreakerCombatComponent::ComposeDotSourcePower(const UBreakerAttributeSet*
             : EBreakerAggregatedAttribute::DamageMultiplier;
         const float DamageMore = FMath::Max(Aggregator.ComposedMoreProduct(Lane), UE_SMALL_NUMBER);
         const float DotMore = FMath::Max(Aggregator.ComposedMoreProduct(EBreakerAggregatedAttribute::DamageOverTimeMultiplier), UE_SMALL_NUMBER);
-        const float DamageIncreased = (bAbility ? SourceAttributes->GetAbilityDamageMultiplier() : SourceAttributes->GetDamageMultiplier()) / DamageMore;
-        const float DotIncreased = SourceAttributes->GetDamageOverTimeMultiplier() / DotMore;
-        IncreasedBucket = DamageIncreased + (DotIncreased - 1.0f);
+        // Dividing the composed damage value by More still leaves its flat
+        // factor inside it. Adding DoT Increased there would leave that part
+        // unpaid by flat damage. Use the same explicit layers as hit riders.
+        if (Aggregator.HasCapturedBases())
+        {
+            FlatFactor = FMath::Max(0.0f, Aggregator.ComposedFlatFactor(Lane));
+            IncreasedBucket = FMath::Max(0.0f, 1.0f + (Aggregator.ComposedIncreasedPercent(Lane)
+                + Aggregator.ComposedIncreasedPercent(EBreakerAggregatedAttribute::DamageOverTimeMultiplier)) / 100.0f);
+        }
+        else
+        {
+            // Before the first contribution, attribute fields are initialized
+            // but aggregator bases are not captured. Preserve that original
+            // field-based path; no flat contribution exists to split yet.
+            const float DamageIncreased = (bAbility ? SourceAttributes->GetAbilityDamageMultiplier()
+                : SourceAttributes->GetDamageMultiplier()) / DamageMore;
+            const float DotIncreased = SourceAttributes->GetDamageOverTimeMultiplier() / DotMore;
+            IncreasedBucket = FMath::Max(0.0f, DamageIncreased + DotIncreased - 1.0f);
+        }
         AttributeMoreProduct = DamageMore * DotMore;
     }
     const float WindowProduct = OwnerCombat ? OwnerCombat->GetComposedMoreMultiplier() : 1.0f;
@@ -599,7 +615,7 @@ float UBreakerCombatComponent::ComposeDotSourcePower(const UBreakerAttributeSet*
             RawMore, AttributeMoreProduct, WindowProduct, Ceiling);
     }
     const float TotalMore = FMath::Min(RawMore, Ceiling);
-    return IncreasedBucket * TotalMore;
+    return FlatFactor * IncreasedBucket * TotalMore;
 }
 
 void UBreakerCombatComponent::PushIncomingDamageModifier(FName Key, float Multiplier)

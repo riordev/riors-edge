@@ -100,7 +100,14 @@
     BREAKER_STRING(CoreOverviewHint, "core.overviewHint", "") \
     BREAKER_STRING(WeaponBaseDamage, "equipment.weaponBaseDamage", "%.1f") \
     BREAKER_STRING(WeaponBasePellets, "equipment.weaponBasePellets", "%.1f%d") \
-    BREAKER_STRING(GearRarityChoices, "equipment.rarityChoices", "")
+    BREAKER_STRING(GearRarityChoices, "equipment.rarityChoices", "") \
+    BREAKER_STRING(EnemySkitter, "enemy.skitter", "") \
+    BREAKER_STRING(EnemyDrudge, "enemy.drudge", "") \
+    BREAKER_STRING(EnemyLattice, "enemy.lattice", "") \
+    BREAKER_STRING(EnemySkirmisher, "enemy.skirmisher", "") \
+    BREAKER_STRING(EnemyWarden, "enemy.warden", "") \
+    BREAKER_STRING(EnemyFieldMarshal, "enemy.fieldMarshal", "") \
+    BREAKER_STRING(EnemyHoldfast, "enemy.holdfast", "")
 
 // The enumerator is an index into the loaded table and nothing else: it is
 // never serialized, so the list may be reordered freely. The key string is

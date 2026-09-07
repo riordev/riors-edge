@@ -14,6 +14,7 @@
 #include "BreakerGameMode.generated.h"
 
 class ABreakerEffectRenderer;
+struct FBreakerZoneMarkers;
 
 UCLASS(Blueprintable)
 class RIORSEDGE_API ABreakerGameMode : public AGameModeBase
@@ -502,6 +503,7 @@ public:
     };
 
 private:
+    void SpawnFernhallEncounters(const FBreakerZoneMarkers& Markers);
     FFieldFrame Frame;
     bool bFieldFrameSet = false;
     void BuildFieldFrame(const APawn* Pawn);

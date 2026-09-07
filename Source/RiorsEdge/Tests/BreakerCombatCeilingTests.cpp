@@ -444,6 +444,13 @@ bool FBreakerCeilingDotAdditiveBucketTest::RunTest(const FString& Parameters)
 {
     using namespace BreakerCombatCeilingTest;
 
+    UBreakerAttributeSet* Fresh = CeilingTestMakeAttributes();
+    TestFalse(TEXT("Fresh attribute bases have not been captured"), Fresh->HasCapturedAttributeBases());
+    for (const EBreakerDamageDelivery Delivery : { EBreakerDamageDelivery::Weapon, EBreakerDamageDelivery::Ability })
+        TestEqual(TEXT("An untouched attribute set retains baseline DoT power"),
+            UBreakerCombatComponent::ComposeDotSourcePower(Fresh, nullptr, Delivery), 1.0f, 0.0001f);
+    TestFalse(TEXT("Previewing fresh DoT does not mutate base capture"), Fresh->HasCapturedAttributeBases());
+
     // ---- The bucket rule itself ------------------------------------------
     {
         UBreakerAttributeSet* Attributes = CeilingTestMakeAttributes();
@@ -456,6 +463,42 @@ bool FBreakerCeilingDotAdditiveBucketTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("The DoT attribute reads its own lane alone"), Attributes->GetDamageOverTimeMultiplier(), 1.4f, 0.0001f);
         TestEqual(TEXT("A4: the two Increased lanes fold ADDITIVELY for ticks (1 + 0.5 + 0.4)"),
             UBreakerCombatComponent::ComposeDotSourcePower(Attributes, nullptr, EBreakerDamageDelivery::Weapon), 1.9f, 0.0001f);
+    }
+
+    // Flat damage applies to the whole additive bucket for either delivery.
+    // A large offer to the other lane must never leak into this snapshot.
+    for (const EBreakerDamageDelivery Delivery : { EBreakerDamageDelivery::Weapon, EBreakerDamageDelivery::Ability })
+    {
+        UBreakerAttributeSet* Attributes = CeilingTestMakeAttributes();
+        const bool bAbility = Delivery == EBreakerDamageDelivery::Ability;
+        const EBreakerAggregatedAttribute Lane = bAbility ? EBreakerAggregatedAttribute::AbilityDamageMultiplier
+            : EBreakerAggregatedAttribute::DamageMultiplier;
+        const EBreakerAggregatedAttribute OtherLane = bAbility ? EBreakerAggregatedAttribute::DamageMultiplier
+            : EBreakerAggregatedAttribute::AbilityDamageMultiplier;
+        FBreakerAttributeContribution Offer;
+        Offer.AddFlat(Lane, 1.0f);
+        Offer.AddIncreasedPercent(Lane, 50.0f);
+        Offer.AddIncreasedPercent(EBreakerAggregatedAttribute::DamageOverTimeMultiplier, 40.0f);
+        Offer.AddFlat(OtherLane, 9.0f);
+        Offer.AddIncreasedPercent(OtherLane, 900.0f);
+        Attributes->ApplyAttributeContribution(EBreakerAttributeContributor::Equipment, Offer);
+        const float Power = UBreakerCombatComponent::ComposeDotSourcePower(Attributes, nullptr, Delivery);
+        TestEqual(TEXT("Selected lane flat multiplies the complete additive DoT bucket, without the other lane"),
+            Power, 2.0f * (1.0f + 0.5f + 0.4f), 0.0001f);
+
+        FBreakerStatusApplicationSpec Status;
+        Status.BaseDamagePerTick = 10.0f;
+        Status.Snapshot.SourcePower = Power;
+        Attributes->ApplyAttributeContribution(EBreakerAttributeContributor::Equipment, FBreakerAttributeContribution());
+        TestEqual(TEXT("Removing gear changes future applications"),
+            UBreakerCombatComponent::ComposeDotSourcePower(Attributes, nullptr, Delivery), 1.0f, 0.0001f);
+        const FBreakerDamageRequest Tick = UBreakerDamageLibrary::MakeSnapshotDotTick(Status,
+            EBreakerDamageFamily::Physical, 1, nullptr, FVector::ZeroVector, false);
+        TestEqual(TEXT("Existing application retains the complete flat-scaled snapshot"), Tick.SourceDamageMultiplier, 3.8f, 0.0001f);
+        FBreakerDefenseState Defense;
+        Defense.Health = 1000.0f;
+        TestEqual(TEXT("A snapshotted ten-damage tick still delivers thirty-eight raw damage after gear removal"),
+            UBreakerDamageLibrary::ResolveDamage(Tick, Defense).RawDamage, 38.0f, 0.001f);
     }
 
     // ---- The DoT More lane composes on top, still under the one budget ----

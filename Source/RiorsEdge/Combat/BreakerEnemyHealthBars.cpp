@@ -32,6 +32,10 @@
 #include "Camera/PlayerCameraManager.h"
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerBossEnemy.h"
+#include "Combat/BreakerAlteredEnemy.h"
+#include "Combat/BreakerHoldfastEnemy.h"
+#include "Combat/BreakerRangedEnemy.h"
+#include "Combat/BreakerSkirmisherEnemy.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerEnemyBarMath.h"
 #include "Combat/BreakerEnemyModifiers.h"
@@ -53,6 +57,17 @@
 // project has shipped that collision twice under other names.
 namespace BreakerEnemyBar
 {
+    // Existing roster identities, ordered before their parent chassis.
+    static EBreakerStringKey BreakerEnemyNameKey(const ABreakerEnemy& Enemy)
+    {
+        if (Enemy.IsA<ABreakerHoldfastEnemy>()) return EBreakerStringKey::EnemyHoldfast;
+        if (Enemy.IsA<ABreakerBossEnemy>()) return EBreakerStringKey::EnemyFieldMarshal;
+        if (Enemy.IsA<ABreakerWardenEnemy>()) return EBreakerStringKey::EnemyWarden;
+        if (Enemy.IsA<ABreakerSkirmisherEnemy>()) return EBreakerStringKey::EnemySkirmisher;
+        if (Enemy.IsA<ABreakerRangedEnemy>()) return EBreakerStringKey::EnemyLattice;
+        if (Enemy.IsA<ABreakerAlteredEnemy>()) return EBreakerStringKey::EnemyDrudge;
+        return EBreakerStringKey::EnemySkitter;
+    }
     // Aim cone for "the enemy I am asking about". Presentation, not balance:
     // it decides which enemy gets a bar, never anything about damage or aim.
     // Roughly matches the loot focus cone so the two agree about what the
@@ -681,12 +696,7 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         }
 
         // ---- The column above the bar: marks, then the name ------------------
-        // No prose. A modifier is announced by SHAPE at every range, and the
-        // shape is the same one at every range, so what the player learns at
-        // ten metres is what they read at fifty. The only word on any plate is
-        // BOSS: no other rank has a name source — the enemy carries no display
-        // name and the sheet's NameDropCm has nothing to drop — so no other
-        // name is drawn. Recorded here, not faked with a class or family word.
+        // Modifiers remain shapes; the caption identifies the existing roster.
         // Beside each mark, whether its rule is firing this frame, for the
         // underline; see BreakerEnemyBarModifierActive for which can.
         TArray<BreakerEnemyBarMath::EBreakerEnemyMark> Marks;
@@ -703,12 +713,12 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
             }
         }
 
-        // The BOSS word: BossNameFor(Scale) spec pixels in the teal name token
-        // (ui.md: teal is a noun, and name text is one of its nouns), on a line
-        // the same pad taller than the glyphs as every other name line here.
-        // Suppressed beyond DrawCm, where the bar alone is the read.
-        const bool bShowName = bBossRank && !bBeyondDraw;
-        const float NamePixels = bShowName ? BreakerEnemyBarMath::BossNameFor(Scale) : 0.0f;
+        // Ordinary captions drop at the authored name distance. Boss identity
+        // occupies the existing boss line, so there is no competing BOSS label.
+        const bool bShowName = !bBeyondDraw && (bBossRank || Distance <= BreakerEnemyBarMath::NameDropCm);
+        const FString Name = bShowName ? BreakerStrings::Get(BreakerEnemyBar::BreakerEnemyNameKey(*Enemy)) : FString();
+        const float NamePixels = bShowName ? (bBossRank ? BreakerEnemyBarMath::BossNameFor(Scale)
+            : BreakerEnemyBar::NamePixels * Scale) : 0.0f;
         const float NameLinePad = BreakerEnemyBar::NameLinePixels - BreakerEnemyBar::NamePixels;
 
         const float Gap = BreakerEnemyBarMath::ColumnGapPx * Scale * ScaleUnit;
@@ -721,7 +731,7 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         const float ColumnTop = Marks.Num() > 0 ? MarksY : (bShowName ? NameY : Bar.Y);
         // The boss's pip row hangs under the bar and is part of its column.
         const float PipRowH = bBossRank ? Gap + BreakerEnemyBarMath::BossPipSizeFor(Scale).Y * ScaleUnit : 0.0f;
-        const float ColumnW = FMath::Max(Bar.W, MarksW);
+        const float ColumnW = FMath::Max3(Bar.W, MarksW, bShowName ? static_cast<float>(MeasureSpecText(Name, NamePixels).X) : 0.0f);
         const float ColumnH = Bar.Y + Bar.H + PipRowH - ColumnTop;
 
         // Screen-space overlap suppression over the WHOLE column. Two enemies
@@ -814,8 +824,8 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         {
             if (bShowName)
             {
-                // Declared crossing, GLASS/DATA -> FIELD: the word is bar.boss in Data/strings.json.
-                DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::BarBoss), Projected.X, NameY, BreakerUI::TealName, NamePixels, BarAlpha);
+                DrawSpecTextCentered(Name, Projected.X, NameY,
+                    bBossRank ? BreakerUI::TealName : BreakerUI::TextSecondary, NamePixels, BarAlpha);
             }
             if (Marks.Num() > 0)
             {

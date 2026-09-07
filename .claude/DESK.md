@@ -5,9 +5,10 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
-## Cycle — populate Fernhall and fix DoT affix scaling
-- [ ] Populate three ordinary Fernhall combat pockets using existing finite enemy roster, supported spawn positions and existing quest/XP credit; preserve Rift behavior.
-- [ ] Fold flat damage before the shared Increased Damage/DoT bucket, preserving delivery selection, snapshots and the existing More ceiling.
+## Cycle — remaining Caster progression and ability balance
+- [ ] Finish remaining silent Caster nodes and expose any missing tuning values in data.
+- [ ] Validate ability damage and resource sustain against weapon builds.
+- [ ] Continue menu simplification and complete map-travel validation.
 
 ## Playtest queue (owner, 2026-09-07)
 Continue through this queue in tested batches without stopping after each commit for a playtest (owner instruction, 2026-09-07).
@@ -30,7 +31,6 @@ No playtest until the core loop has more oomph. The next blocks are the ones tha
 - (systems) "The hub is the only start" is built as twelve inner-rim entries on a virtual centre. If you meant a real centre node, that is content for a later cycle.
 - (bosses) The third boss ("mobility and sustain") has no story name and no act; the Act III climax is a meeting, not a fight. Name it and its act, or drop the third.
 - (persistence) The amended O82 spends the endgame death budget at runtime; O122 says the two rules ship together or the limit is a loading screen, and `BreakerRiftDefinition.h` states O122's side. Every rift is Campaign today, so the decrement is wired but unreachable. Which stands?
-- (enemies) The sheet's teal boss name has no string source: no strings table and no display name per family. `bar.boss` is a `Data/strings.json` row; a per-family display name is still a `displayName` on the family, when ruled.
 - (movement) Crouch: the player has no crouch verb on its input; the slide is the crouch and the design's keybind sheet shows "L CTRL · HOLD CROUCH" as the slide key. A separate crouch verb, or crouch = the slide key held? Until ruled, the HOLD|TOGGLE rows cover sprint and aim only.
 - (weapons) Momentum on the gun is built as tighten-only: the cone shrinks to 0.6x at a full bar (O2 PLACEHOLDER) and tracers brighten to 1.75x; an empty bar is baseline (O92). If "follows the bar" meant something else, say what.
 - (enemies) A Volatile blast hits enemies at the player's number (O217): 9x chassis damage kills every trash body inside the inner radius. Keep one number, or rule an enemy fraction after a playtest.
@@ -73,7 +73,6 @@ No playtest until the core loop has more oomph. The next blocks are the ones tha
 - `player_death.wav` is not in the shipped-samples list until a sample is authored; the synth is the floor.
 - The content spec's rule "The campaign is post-slice" now sits beside a Story missions section in present tense. Keep the rule or delete it.
 - `Offense.WallRideDamage` is a dead row (its condition is never true); delete it when the leans are next touched.
-- The DoT twin of the flat fold: `ComposeDotSourcePower` (`BreakerCombatComponent.cpp` ~:513-518) recovers the Increased bucket from the composed value, so Increased-DoT is not multiplied by the flat. Same fix as the hit path, own item.
 - After the Boots-only MoveSpeed row: the Gloves `Core.MoveSpeed` roll in `Items.Equipment.AttributeContribution` (~BreakerItemTests.cpp:425) grants a slot a line it cannot roll; move it to Boots in the next build. The Sidearm lean on `Core.MoveSpeed` in `affixes.json` is inert (leans apply on weapon slots); delete the row when the leans are next touched.
 - The death beat's black is a camera fade and its teleport lands at the end of black; `HoldBlack`/`ReleaseBlack` on the game instance are the seam to move the teleport to the start of black and reveal through the arrival gate. Felt only if the respawn frame reads cold.
 - The boot's first front-end frame is still uncovered; only travels get the cover.
@@ -85,7 +84,6 @@ No playtest until the core loop has more oomph. The next blocks are the ones tha
 - NAV-2 cover on the nav · DATA-2 affixes to data · FIELD-3 boss grammar · GROUND-4 functional tests · GLASS-3 the 11K-line split · NAV cover/squad · Anomalies
 - `SlideEntrySpeed = 550` is still absolute (0.92 of the 595 walk; was reachable in the top 45 cm/s of a walk only) — a fraction of `WalkSpeed` like the Momentum gates.
 - `BreakerGameMode.h` field grammar comments derive `DashRefreshDistance 4400` and `OneJumpGap 700` from a 1100 sprint; the sprint is 990.
-- A sprint-only bob frequency needs a `SprintStrideLengthCm` and a lerp; `StrideLengthCm 360` is shared with the walk.
 
 ## Filing notes
 Every note the owner writes carries one of these tags so the queue reads by category: AI (behaviour, not roster) · bosses · animation · VFX/hit feedback · networking/party/social · loot & economy · encounter/level tooling · content authoring pipeline · onboarding/first hour · endgame loop · performance budget · telemetry · accessibility/input · persistence · systems · core gameplay · weapons · abilities · classes · maps · enemies · story · build diversity · fun interactions · visuals · sound · movement · ui · npcs.
@@ -95,6 +93,13 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - Four Niagara systems at `/Game/Breaker/FX/NS_<Moment>` with a `Color` user parameter, or a free Fab VFX pack placed there
 
 ## Done (last three cycles; older is git)
+
+### Fernhall combat pockets, enemy names and DoT scaling — 588 / 5 / 0
+- [x] Ordinary Fernhall now spawns 11 finite enemies across three supported combat pockets, including an elite, Lattice, Warden and Skirmisher. Existing kill quests and XP receive real combat credit; repeated startup does not duplicate spawns. Rift wave behavior remains separate.
+- [x] Flat damage now multiplies the combined delivery/DoT Increased bucket. Tests cover both delivery lanes, frozen snapshots, removal and uncaptured baseline fallback without changing the More ceiling.
+- [x] Seven authored enemy-type names use the strings table and existing range/focus/occlusion rules. Ground-level Fernhall capture inspected with SKITTER above its health bar. Capture-only tour targeting and velocity reset added; static capture does not validate full traversal.
+- [x] Final build and all 593 tests complete: 588 passed / 5 existing expected / 0 unexpected. Runtime fixture checks supported spawn capsules, finite roster, separation, actual kills and quest progress. PowerShell reconciliation under Python quarantine; STATE unchanged. Full cross-map loading remains outstanding.
+
 
 ### Purchased Caster rewrites and inventory text — 587 / 5 / 0
 - [x] Purchased Multispell Cycle advances on landed damage instead of cast; Fracture carries two distinct cycle positions; Resonance leaves statuses at half duration with unchanged burst damage. Runtime realGAS casts/purchases and programmatic authority impacts tested; collision flight is not simulated. Cycle rank2 preview remains unimplemented.
@@ -108,12 +113,5 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - [x] Weapon cards show shared runtime base damage and pellet count; candidates use their own archetype/ilvl. Preview/equip equivalence tested across8archetypes and3levels, custom held overrides, invalid inputs and no state mutation.
 - [x] Equipped titles use full remaining width and grow vertically. Equipped ISSUE RIFLE24.0 and backpack Rifle56.8/Shotgun23.7x8 captures inspected. Some existing affix/rarity sublines still clip; queue remains open, no claim all inventory text fixed.
 - [x] Final build clean; all590tests complete585passed/5existing expected/0unexpected. String validation passed. PowerShell reconciliation under Python quarantine; STATE unchanged.
-
-
-### Reachable Rift ending and usable Anchor stations — 583 / 5 / 0
-- [x] Authored rift bosses spawn on supported Fernhall ground instead of the remote gym arena; Undercroft selects Holdfast. Reset retains boss identity/location, wave tracking and terminator binding; completion prevents manual wave restart.
-- [x] Rift exits offer Fernhall and Anchor; existing return handler clears pending instance state. Runtime fixture builds Fernhall, clears actual waves, resets and kills actual boss, verifies exact 399 XP/80 Riftglass first-clear purse and duplicate refusal. Cross-map loading is not simulated.
-- [x] Grounded vendors face clear approaches under distinct forge/supply stations. Actual capsule/approach and rotated-layout tests pass; Anchor capture inspected. This remains blockout art.
-- [x] Final build and all588tests complete:583passed/5existing expected/0unexpected. Fixture map-package and multicast observation order errors corrected; production payout verified. PowerShell reconciliation under Python quarantine; STATE unchanged, no pins widened.
 
 
