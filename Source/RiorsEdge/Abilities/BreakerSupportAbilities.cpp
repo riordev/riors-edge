@@ -708,7 +708,7 @@ void UBreakerAbility_Cadence::EndAbility(const FGameplayAbilitySpecHandle Handle
             if (auto* Charge = Character->FindComponentByClass<UBreakerChargeComponent>()) Charge->SetMaintainedBuffActive(TempoOwnerKey, false);
             Character->GetCombat()->OnDeath.RemoveDynamic(this, &ThisClass::HandleCadenceDeath);
             if (auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>())
-                { bReappliedWhileLive = !bWasCancelled && State->GetOwnedWindowRemaining(WindowKey(), TempoOwnerKey) > .1f; State->ClearMaintainedBuffRecipients(TempoOwnerKey); }
+                { bReappliedWhileLive = !bWasCancelled && State->GetOwnedWindowRemaining(WindowKey(), TempoOwnerKey) > .1f; State->ClearMaintainedBuffRecipients(TempoOwnerKey, bWasCancelled || Character->GetCombat()->IsDead()); }
         }
         const auto Previous = Recipients.Array();
         for (const auto& Held : Previous) if (auto* Recipient = Held.Get()) RemoveRecipient(Recipient);
@@ -887,7 +887,7 @@ void UBreakerAbility_Metronome::EndAbility(const FGameplayAbilitySpecHandle Hand
         Holders.Reset();
         if (Character)
         {
-            if (auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>()) State->ClearMaintainedBuffRecipients(RampOwnerKey);
+            if (auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>()) State->ClearMaintainedBuffRecipients(RampOwnerKey, bWasCancelled || Character->GetCombat()->IsDead());
             if (auto* Charge = Character->FindComponentByClass<UBreakerChargeComponent>()) Charge->SetMaintainedBuffActive(RampOwnerKey, false);
         }
         if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(WindowTimer);

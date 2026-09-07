@@ -148,6 +148,12 @@ ticks. These magnitudes are O2 tuning in elements.json. The snapshot includes
 source scaling and critical damage once; ticks apply target mitigation once.
 An active Rot cannot stack or refresh, and its ticks generate no buildup.
 
+Conductor Attunement converts buff recipients' weapons to Entropy without
+adding hit damage. Cadence and Metronome own independent recipient copies;
+rank two lingers briefly after ordinary buff expiry or aura exit. Cancellation,
+death and losing the node remove its conversion. Projectiles keep the element
+from firing. Gear and buff conversion use the higher fraction, capped at one.
+
 Severance — the degradation that turns a refugee into a hostile — is Entropy
 happening slowly to a person, which is why the element set and the enemy
 families are the same idea at two scales. The elements do not need explaining

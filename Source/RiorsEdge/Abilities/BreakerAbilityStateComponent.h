@@ -64,8 +64,9 @@ public:
 
     // Caster-owned membership; multiple maintained buffs count a living holder once.
     void SetMaintainedBuffRecipients(FName OwnerKey, const TArray<AActor*>& Recipients);
-    void ClearMaintainedBuffRecipients(FName OwnerKey);
+    void ClearMaintainedBuffRecipients(FName OwnerKey, bool bCancelAttunement = false);
     int32 GetMaintainedBuffRecipientCount() const;
+    float GetWeaponEntropyConversionFraction() const;
     UPROPERTY() FBreakerMaintainedRecipientsChanged OnMaintainedBuffRecipientsChanged;
     // One scalar carried by the window itself, so a state that rewrites a rule
     // can also carry the rule's magnitude without a second registry. Unmake is
@@ -138,6 +139,19 @@ private:
     TMap<FName, FWindowState> Windows;
     TMap<FName, TMap<FName, float>> OwnedWindows;
     TMap<FName, TArray<TWeakObjectPtr<AActor>>> MaintainedBuffRecipients;
+    struct FAttunementLease
+    {
+        TWeakObjectPtr<UBreakerAbilityStateComponent> Source;
+        FName OwnerKey;
+        float EndTime = 0;
+        bool bMaintained = false;
+    };
+    TArray<FAttunementLease> AttunementLeases;
+    TMap<FName, TArray<TWeakObjectPtr<UBreakerAbilityStateComponent>>> AttunementRecipients;
+    void UpdateAttunementRecipients(FName OwnerKey, const TArray<TWeakObjectPtr<AActor>>& Recipients, bool bCancel);
+    void RefreshAttunementWindowEnds();
+    UFUNCTION() void HandleAttunementDeath();
+    UFUNCTION() void HandleAttunementProgressionChanged();
 
     // Shares the component's Clock, so the mark expires on exactly the same
     // schedule as the window that opened it.

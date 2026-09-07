@@ -2168,6 +2168,11 @@ FBreakerDamageResult UBreakerWeaponComponent::SubmitWeaponDamage(const UBreakerW
             Damage.ElementalFraction = Equipment->GetStats().PrimaryEntropyConversionPercent / 100.0f;
             if (Damage.ElementalFraction > 0) Damage.Element = EBreakerElement::Entropy;
         }
+    if (const auto* State = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerAbilityStateComponent>() : nullptr)
+    {
+        Damage.ElementalFraction = FMath::Max(Damage.ElementalFraction, State->GetWeaponEntropyConversionFraction());
+        if (Damage.ElementalFraction > 0) Damage.Element = EBreakerElement::Entropy;
+    }
     Damage.WeakPointMultiplier = Definition->WeakPointMultiplier;
     Damage.ArmorPenetration = ArmorPenetrationOverride;
     Damage.bWeakPointHit = bWeakPoint;
@@ -2625,6 +2630,11 @@ void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Def
             Damage.ElementalFraction = Equipment->GetStats().PrimaryEntropyConversionPercent / 100.0f;
             if (Damage.ElementalFraction > 0) Damage.Element = EBreakerElement::Entropy;
         }
+    if (const auto* State = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerAbilityStateComponent>() : nullptr)
+    {
+        Damage.ElementalFraction = FMath::Max(Damage.ElementalFraction, State->GetWeaponEntropyConversionFraction());
+        if (Damage.ElementalFraction > 0) Damage.Element = EBreakerElement::Entropy;
+    }
     Damage.WeakPointMultiplier = 1.0f;
     Damage.ArmorPenetration = Definition->ArmorPenetration;
     Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;

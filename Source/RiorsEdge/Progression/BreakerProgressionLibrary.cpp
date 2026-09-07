@@ -3611,13 +3611,9 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSupportConductorTree()
 
     // Conductor's non-negotiable rule (§4.2): every Conductor buff applies to
     // the Support FIRST and allies second — the branch's solo guarantee.
-    // CO6 and CO10 are the treatment's [ELEM-*]-tagged nodes: authored here
-    // exactly as the treatment instructs ("authored on paper but not as a
-    // Data Asset until its dependency tag clears"), as tags whose consumers
-    // are the missing elemental resistance/buildup systems themselves. No
-    // untagged node depends on either, so the branch ships cadence-only and
-    // gains its elemental layer without a rewrite — the Void Whisperer /
-    // Multispell posture.
+    // Attunement converts held weapons to the available Entropy element.
+    // Sympathetic needs its independent buildup and decay primitives before
+    // it can add the next layer of elemental support.
 
     // --- Tier 1 (CO1-CO3) ----------------------------------------------------
     // CO1. The self-first rule expressed as duration. WAITING ON: the
@@ -3657,13 +3653,10 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSupportConductorTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_Tempo.GetTag());
     Tree->Nodes.Add(Node);
 
-    // CO6. BLOCKED [ELEM-RES][ELEM-PIPE], carried verbatim: a type conversion
-    // is meaningless until resistances exist and the resistance step sits in
-    // the damage order (O5). Attunement converts the damage TYPE; it adds no
-    // damage and no multiplier. Authored, not built — the tag waits on the
-    // element pipeline itself.
+    // CO6 converts weapon type without adding damage. Entropy is the first
+    // available element; Void and Rift choices follow their complete pipelines.
     Node = MakeNode(TEXT("Support.Conductor.Attunement"), TEXT("Attunement"),
-        TEXT("Conductor buffs attune the target's weapon damage to Rift, Entropy, or Void, chosen at cast (R2: it lingers after the buff). Inert until the element pipeline exists."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 2, 2, 1);
+        TEXT("Your Conductor buffs convert the recipient's weapon damage to Entropy, the currently available element. Adds no damage. R2: conversion lingers briefly after the buff ends."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Support.Conductor.Section"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_Attunement.GetTag());
     Tree->Nodes.Add(Node);

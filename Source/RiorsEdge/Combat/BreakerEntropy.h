@@ -5,4 +5,5 @@ namespace BreakerEntropy
 {
     RIORSEDGE_API float VestigeMeleeFraction();
     RIORSEDGE_API float VestigeResistancePercent();
+    RIORSEDGE_API float AttunementTailSeconds();
 }

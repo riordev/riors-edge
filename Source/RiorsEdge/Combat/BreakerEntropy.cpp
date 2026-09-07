@@ -10,6 +10,7 @@ namespace
     {
         float Threshold = 0, Damage = 0, Duration = 0, Tick = 0, Timeout = 0;
         float VestigeFraction = 0, VestigeResistance = 0;
+        float AttunementTail = 0;
     };
     const FBreakerEntropyTuning& BreakerEntropyTuning()
     {
@@ -32,6 +33,7 @@ namespace
             Read(TEXT("entropyBuildupTimeoutSeconds"), Value.Timeout);
             Read(TEXT("vestigeMeleeEntropyFraction"), Value.VestigeFraction, true);
             Read(TEXT("vestigeEntropyResistancePercent"), Value.VestigeResistance, true);
+            Read(TEXT("attunementTailSeconds"), Value.AttunementTail, true);
             if (Value.VestigeFraction > 1 || Value.VestigeResistance > 100)
                 Errors.Add(TEXT("Invalid Vestige elemental tuning"));
             if (Value.Threshold > 1 || Value.Damage > 1 || Value.Tick > Value.Duration)
@@ -45,6 +47,7 @@ namespace
 
 float BreakerEntropy::VestigeMeleeFraction() { return BreakerEntropyTuning().VestigeFraction; }
 float BreakerEntropy::VestigeResistancePercent() { return BreakerEntropyTuning().VestigeResistance; }
+float BreakerEntropy::AttunementTailSeconds() { return BreakerEntropyTuning().AttunementTail; }
 
 float UBreakerStatusComponent::GetEntropyThreshold() const
 {

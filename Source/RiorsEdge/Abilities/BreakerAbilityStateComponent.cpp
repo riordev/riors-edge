@@ -2,6 +2,23 @@
 
 #include "GameFramework/Actor.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerEntropy.h"
+#include "Progression/BreakerProgressionComponent.h"
+
+namespace
+{
+    bool BreakerAttunementAlive(const AActor* Actor)
+    {
+        const auto* Combat = IsValid(Actor) && !Actor->IsActorBeingDestroyed() ? Actor->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+        return Combat && !Combat->IsDead();
+    }
+    int32 BreakerAttunementRank(const AActor* Actor)
+    {
+        const auto* Progression = IsValid(Actor) ? Actor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+        return Progression && Progression->GetProgressionState().PermanentClass == EBreakerClassId::Support
+            ? Progression->GetNodeRank(TEXT("Support.Conductor.Attunement"), EBreakerPointCurrency::DoctrinePoints) : 0;
+    }
+}
 
 UBreakerAbilityStateComponent::UBreakerAbilityStateComponent()
 {
@@ -16,14 +33,123 @@ void UBreakerAbilityStateComponent::SetMaintainedBuffRecipients(FName OwnerKey, 
     Held.Reset();
     for (AActor* Recipient : Recipients)
         if (IsValid(Recipient)) Held.AddUnique(Recipient);
+    UpdateAttunementRecipients(OwnerKey, Held, false);
     const bool bChanged = Previous != Held;
     if (Held.IsEmpty()) MaintainedBuffRecipients.Remove(OwnerKey);
     if (bChanged) OnMaintainedBuffRecipientsChanged.Broadcast();
 }
 
-void UBreakerAbilityStateComponent::ClearMaintainedBuffRecipients(FName OwnerKey)
+void UBreakerAbilityStateComponent::ClearMaintainedBuffRecipients(FName OwnerKey, bool bCancelAttunement)
 {
+    UpdateAttunementRecipients(OwnerKey, {}, bCancelAttunement);
     if (MaintainedBuffRecipients.Remove(OwnerKey) > 0) OnMaintainedBuffRecipientsChanged.Broadcast();
+}
+
+void UBreakerAbilityStateComponent::UpdateAttunementRecipients(FName OwnerKey, const TArray<TWeakObjectPtr<AActor>>& Recipients, bool bCancel)
+{
+    const int32 Rank = BreakerAttunementRank(GetOwner());
+    const bool bSourceAlive = BreakerAttunementAlive(GetOwner());
+    auto& Tracked = AttunementRecipients.FindOrAdd(OwnerKey);
+    if (Rank > 0 && bSourceAlive && !bCancel)
+    {
+        GetOwner()->FindComponentByClass<UBreakerCombatComponent>()->OnDeath.AddUniqueDynamic(this, &ThisClass::HandleAttunementDeath);
+        GetOwner()->FindComponentByClass<UBreakerProgressionComponent>()->OnProgressionChanged.AddUniqueDynamic(this, &ThisClass::HandleAttunementProgressionChanged);
+        for (const auto& Weak : Recipients)
+            if (AActor* Actor = Weak.Get(); BreakerAttunementAlive(Actor))
+            {
+                auto* Target = FindOrAdd(Actor);
+                float LiveEnd = Target->Clock;
+                for (const auto& Window : Target->OwnedWindows)
+                    if (const float* End = Window.Value.Find(OwnerKey)) LiveEnd = FMath::Max(LiveEnd, *End);
+                if (LiveEnd <= Target->Clock) continue;
+                Actor->FindComponentByClass<UBreakerCombatComponent>()->OnDeath.AddUniqueDynamic(Target, &ThisClass::HandleAttunementDeath);
+                Tracked.AddUnique(Target);
+                auto* Lease = Target->AttunementLeases.FindByPredicate([&](const FAttunementLease& Value) { return Value.Source == this && Value.OwnerKey == OwnerKey; });
+                if (!Lease) { Lease = &Target->AttunementLeases.AddDefaulted_GetRef(); Lease->Source = this; Lease->OwnerKey = OwnerKey; }
+                Lease->bMaintained = true;
+                Lease->EndTime = LiveEnd;
+            }
+    }
+    for (const auto& Weak : Tracked)
+        if (auto* Target = Weak.Get())
+        {
+            for (auto& Lease : Target->AttunementLeases)
+                if (Lease.Source == this && Lease.OwnerKey == OwnerKey && Lease.bMaintained && !Recipients.Contains(Target->GetOwner()))
+                {
+                    Lease.bMaintained = false;
+                    Lease.EndTime = FMath::Min(Lease.EndTime, Target->Clock) + (Rank >= 2 ? BreakerEntropy::AttunementTailSeconds() : 0); // O2 PLACEHOLDER, data-authored tail.
+                }
+            Target->AttunementLeases.RemoveAll([&](const FAttunementLease& Lease)
+            {
+                return Lease.Source == this && Lease.OwnerKey == OwnerKey
+                    && (bCancel || !bSourceAlive || Rank == 0 || !BreakerAttunementAlive(Target->GetOwner())
+                        || (!Lease.bMaintained && (Rank < 2 || Lease.EndTime <= Target->Clock)));
+            });
+        }
+    Tracked.RemoveAll([&](const TWeakObjectPtr<UBreakerAbilityStateComponent>& Weak)
+    {
+        const auto* Target = Weak.Get();
+        return !Target || !Target->AttunementLeases.ContainsByPredicate([&](const FAttunementLease& Lease) { return Lease.Source == this && Lease.OwnerKey == OwnerKey; });
+    });
+    if (Tracked.IsEmpty()) AttunementRecipients.Remove(OwnerKey);
+}
+
+float UBreakerAbilityStateComponent::GetWeaponEntropyConversionFraction() const
+{
+    if (!BreakerAttunementAlive(GetOwner())) return 0;
+    for (const auto& Lease : AttunementLeases)
+        if (const auto* Source = Lease.Source.Get(); Source && BreakerAttunementAlive(Source->GetOwner()))
+        {
+            const int32 Rank = BreakerAttunementRank(Source->GetOwner());
+            // Read the owned payload's expiry at fire time too: a shot between
+            // expiry and the aura's next membership refresh cannot extend R1.
+            float End = Lease.EndTime;
+            if (Lease.bMaintained)
+            {
+                for (const auto& Window : OwnedWindows)
+                    if (const float* CurrentEnd = Window.Value.Find(Lease.OwnerKey)) End = *CurrentEnd;
+                if (Rank >= 2) End += BreakerEntropy::AttunementTailSeconds();
+            }
+            if (Rank > 0 && (Lease.bMaintained || Rank >= 2) && End > Clock) return 1.0f;
+        }
+    return 0;
+}
+
+void UBreakerAbilityStateComponent::RefreshAttunementWindowEnds()
+{
+    for (auto& Lease : AttunementLeases)
+    {
+        if (!Lease.bMaintained) continue;
+        float LiveEnd = 0;
+        for (const auto& Window : OwnedWindows)
+            if (const float* End = Window.Value.Find(Lease.OwnerKey)) LiveEnd = FMath::Max(LiveEnd, *End);
+        if (LiveEnd > Clock) { Lease.EndTime = LiveEnd; continue; }
+        const auto* Source = Lease.Source.Get();
+        const int32 Rank = Source ? BreakerAttunementRank(Source->GetOwner()) : 0;
+        Lease.bMaintained = false;
+        Lease.EndTime = FMath::Min(Lease.EndTime, Clock) + (Rank >= 2 ? BreakerEntropy::AttunementTailSeconds() : 0);
+    }
+}
+
+void UBreakerAbilityStateComponent::HandleAttunementDeath()
+{
+    AttunementLeases.Reset();
+    TArray<FName> Keys;
+    AttunementRecipients.GetKeys(Keys);
+    for (FName Key : Keys) UpdateAttunementRecipients(Key, {}, true);
+}
+
+void UBreakerAbilityStateComponent::HandleAttunementProgressionChanged()
+{
+    const int32 Rank = BreakerAttunementRank(GetOwner());
+    if (Rank >= 2) return;
+    TArray<FName> Keys;
+    AttunementRecipients.GetKeys(Keys);
+    for (FName Key : Keys)
+    {
+        const auto* Held = MaintainedBuffRecipients.Find(Key);
+        UpdateAttunementRecipients(Key, Held ? *Held : TArray<TWeakObjectPtr<AActor>>(), Rank == 0);
+    }
 }
 
 int32 UBreakerAbilityStateComponent::GetMaintainedBuffRecipientCount() const
@@ -64,6 +190,12 @@ void UBreakerAbilityStateComponent::TickComponent(float DeltaTime, ELevelTick Ti
 void UBreakerAbilityStateComponent::AdvanceTime(float DeltaSeconds)
 {
     Clock += FMath::Max(DeltaSeconds, 0.0f);
+    AttunementLeases.RemoveAll([&](const FAttunementLease& Lease)
+    {
+        const auto* Source = Lease.Source.Get();
+        return !Source || !BreakerAttunementAlive(Source->GetOwner()) || !BreakerAttunementAlive(GetOwner())
+            || BreakerAttunementRank(Source->GetOwner()) == 0 || (!Lease.bMaintained && Lease.EndTime <= Clock);
+    });
     if (Windows.Num() == 0 && OwnedWindows.Num() == 0)
     {
         return;
@@ -90,6 +222,7 @@ void UBreakerAbilityStateComponent::AdvanceTime(float DeltaSeconds)
             if (Owner.Value() <= Clock) Owner.RemoveCurrent();
         if (Group.Value().IsEmpty()) { Expired.AddUnique(Group.Key()); Group.RemoveCurrent(); }
     }
+    RefreshAttunementWindowEnds();
     for (const FName Key : Expired)
     {
         if (!IsWindowActive(Key)) OnWindowEnded.Broadcast(Key);
@@ -105,6 +238,7 @@ void UBreakerAbilityStateComponent::StartOwnedWindow(FName Key, FName OwnerKey, 
 {
     if (!Key.IsNone() && !OwnerKey.IsNone() && FMath::IsFinite(Duration) && Duration > 0)
         OwnedWindows.FindOrAdd(Key).Add(OwnerKey, Clock + Duration);
+    RefreshAttunementWindowEnds();
 }
 
 float UBreakerAbilityStateComponent::GetOwnedWindowRemaining(FName Key, FName OwnerKey) const
@@ -119,6 +253,7 @@ void UBreakerAbilityStateComponent::CloseOwnedWindow(FName Key, FName OwnerKey)
     auto* Group = OwnedWindows.Find(Key);
     if (!Group || Group->Remove(OwnerKey) == 0) return;
     if (Group->IsEmpty()) OwnedWindows.Remove(Key);
+    RefreshAttunementWindowEnds();
     if (!IsWindowActive(Key)) OnWindowEnded.Broadcast(Key);
 }
 
@@ -148,12 +283,14 @@ void UBreakerAbilityStateComponent::ExtendWindow(FName Key, float ExtraSeconds)
     }
     if (auto* Group = OwnedWindows.Find(Key))
         for (auto& Owner : *Group) if (Owner.Value > Clock) Owner.Value += FMath::Max(0.0f, ExtraSeconds);
+    RefreshAttunementWindowEnds();
 }
 
 void UBreakerAbilityStateComponent::CloseWindow(FName Key)
 {
     const bool bRemoved = Windows.Remove(Key) > 0;
     const bool bOwnedRemoved = OwnedWindows.Remove(Key) > 0;
+    RefreshAttunementWindowEnds();
     if (bRemoved || bOwnedRemoved)
     {
         OnWindowEnded.Broadcast(Key);
