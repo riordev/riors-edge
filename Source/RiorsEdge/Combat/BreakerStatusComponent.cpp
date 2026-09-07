@@ -50,7 +50,8 @@ void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& S
 {
     // Entropy is earned through accepted-hit buildup, never a carried status payload.
     if (Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"))
-        || Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Erased"))) return;
+        || Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Erased"))
+        || Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Unstable"))) return;
     ApplyStatusInternal(Spec, DamageFamily, Instigator, false);
 }
 
@@ -78,26 +79,27 @@ float UBreakerStatusComponent::GetHealingReceivedMultiplier() const
     return 1.0f - Reduction / 100.0f;
 }
 
-void UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicationSpec& InputSpec, EBreakerDamageFamily DamageFamily, AActor* Instigator, bool bDurationAlreadyScaled, float UnpaidDamageBudget)
+uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicationSpec& InputSpec, EBreakerDamageFamily DamageFamily, AActor* Instigator, bool bDurationAlreadyScaled, float UnpaidDamageBudget, const FVector* SourceLocationOverride)
 {
     // Caller may have passed an entry in a live status array; callbacks can
     // consume or reallocate it. Accepted application owns its payload.
     FBreakerStatusApplicationSpec Spec = InputSpec;
-    if (Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Void"), false)) return;
+    if (Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Void"), false)) return 0;
     const bool bErased = Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Erased"));
+    const bool bUnstable = Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Unstable"));
     // Only the accepted-hit kernel supplies a deferred budget. Chain, carried
     // payloads and refreshes cannot mint another copy of already-earned damage.
-    if (bErased && (!FMath::IsFinite(UnpaidDamageBudget) || UnpaidDamageBudget <= 0
-        || HasStatus(Spec.StatusTag) || DeliveringTickTag == Spec.StatusTag)) return;
-    if (Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot")) && HasStatus(Spec.StatusTag)) return;
+    if ((bErased || bUnstable) && (!FMath::IsFinite(UnpaidDamageBudget) || UnpaidDamageBudget <= 0
+        || HasStatus(Spec.StatusTag) || DeliveringTickTag == Spec.StatusTag)) return 0;
+    if (Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot")) && HasStatus(Spec.StatusTag)) return 0;
     const FBreakerStatusRule* Rule = BreakerStatusRules::FindRule(Spec.StatusTag);
     const bool bEffectOnly = Rule && Rule->IsNonDamagingDebuff();
     if (bEffectOnly) { Spec.BaseDamagePerTick = 0; Spec.InitialStacks = 1; }
     if (!GetOwner() || !GetOwner()->HasAuthority() || !Spec.StatusTag.IsValid()
         || !FMath::IsFinite(Spec.Duration) || !FMath::IsFinite(Spec.TickInterval)
-        || !FMath::IsFinite(Spec.ProcCoefficient) || Spec.Duration <= 0.0f || Spec.TickInterval <= 0.0f) return;
+        || !FMath::IsFinite(Spec.ProcCoefficient) || Spec.Duration <= 0.0f || Spec.TickInterval <= 0.0f) return 0;
     const UBreakerCombatComponent* TargetCombat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>();
-    if (TargetCombat && TargetCombat->IsDead()) return;
+    if (TargetCombat && TargetCombat->IsDead()) return 0;
 
     // --- StatusDuration, the APPLIER's lane, folded at the door -----------
     // This is the one funnel every application path passes through — weapon
@@ -118,7 +120,7 @@ void UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicatio
         }
     }
     const float ScaledDuration = Spec.Duration * DurationScale;
-    if (!FMath::IsFinite(ScaledDuration) || ScaledDuration <= 0.0f) return;
+    if (!FMath::IsFinite(ScaledDuration) || ScaledDuration <= 0.0f) return 0;
 
     // --- Ailment avoidance: one roll per application, at the door ---------
     // BEFORE the immunity check by ruling: avoidance is the ORDINARY defence
@@ -149,13 +151,13 @@ void UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicatio
             Avoided.DamageFamily = DamageFamily;
             Avoided.Instigator = Instigator;
             OnStatusAvoided.Broadcast(Avoided);
-            return;
+            return 0;
         }
     }
 
     // The immunity window refuses NEW applications outright — refreshes and
     // stack adds included, because a refresh IS an application.
-    if (IsStatusImmune()) return;
+    if (IsStatusImmune()) return 0;
 
     if (UBreakerCombatComponent* OwnerCombat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>())
         if (!OwnerCombat->OnDeath.IsAlreadyBound(this, &UBreakerStatusComponent::HandleAfflictedOwnerDeath))
@@ -182,13 +184,13 @@ void UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicatio
             if (SourceMana) SourceMana->NotifyStatusApplication(Spec, true, GetOwner());
             SpreadNewestStatus(Spec, DamageFamily, Instigator, ScaledDuration);
             OnStatusApplied.Broadcast(Applied);
-            return;
+            return Applied.ApplicationSerial;
         }
     }
 
     FBreakerActiveStatus Status;
     Status.Spec = Spec;
-    Status.UnpaidDamageBudget = bErased ? UnpaidDamageBudget : 0.0f;
+    Status.UnpaidDamageBudget = (bErased || bUnstable) ? UnpaidDamageBudget : 0.0f;
     Status.ApplicationSerial = NextApplicationSerial++;
     Status.DamageFamily = DamageFamily;
     Status.Stacks = FMath::Clamp(Spec.InitialStacks, 1, GetEffectiveStackCap());
@@ -200,7 +202,12 @@ void UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicatio
     // not per tick: the DoT contract snapshots at application, and a tick that
     // re-read the applier's live position would let a shooter flank AFTER the
     // wound to retroactively strip armour off every remaining tick.
-    if (Instigator)
+    if (SourceLocationOverride && !SourceLocationOverride->ContainsNaN())
+    {
+        Status.SourceLocationSnapshot = *SourceLocationOverride;
+        Status.bHasSourceLocationSnapshot = true;
+    }
+    else if (Instigator)
     {
         Status.SourceLocationSnapshot = Instigator->GetActorLocation();
         Status.bHasSourceLocationSnapshot = true;
@@ -212,11 +219,13 @@ void UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicatio
     if (SourceMana) SourceMana->NotifyStatusApplication(Spec, false, GetOwner());
     SpreadNewestStatus(Spec, DamageFamily, Instigator, ScaledDuration);
     OnStatusApplied.Broadcast(Status);
+    return Status.ApplicationSerial;
 }
 
 void UBreakerStatusComponent::SpreadNewestStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator, float ScaledDuration)
 {
-    if (Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Erased"))) return;
+    if (Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Erased"))
+        || Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Unstable"))) return;
     if (!Instigator || Spec.ProcCoefficient <= 0 || GetDistinctStatusTypeCount() < 2 || !GetWorld()) return;
     const UBreakerCombatComponent* SourceCombat = Instigator->FindComponentByClass<UBreakerCombatComponent>();
     const UBreakerCombatComponent* OwnerCombat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>();
@@ -260,6 +269,7 @@ void UBreakerStatusComponent::HandleAfflictedOwnerDeath()
     EntropyBuildupRemaining = 0;
     EntropyProtectedContributions.Reset();
     ResetVoidBuildup();
+    ResetRiftBuildup();
     TSet<AActor*> Credited;
     // Copy before refunds can notify resource listeners and change state.
     const TArray<FBreakerActiveStatus> AtDeath = ActiveStatuses;
@@ -278,6 +288,8 @@ void UBreakerStatusComponent::HandleAfflictedOwnerDeath()
     ConsumeStatus(FGameplayTag::RequestGameplayTag(TEXT("Status.Rot")), bConsumedRot);
     bool bConsumedErased = false;
     ConsumeStatus(FGameplayTag::RequestGameplayTag(TEXT("Status.Erased")), bConsumedErased);
+    bool bConsumedUnstable = false;
+    ConsumeStatus(FGameplayTag::RequestGameplayTag(TEXT("Status.Unstable")), bConsumedUnstable);
     for (const FBreakerActiveStatus& Status : AtDeath)
         if (const auto* Rule = BreakerStatusRules::FindRule(Status.Spec.StatusTag))
             if (!Rule->bDealsPeriodicDamage)
@@ -304,6 +316,7 @@ void UBreakerStatusComponent::AdvanceStatuses(float DeltaTime)
         Contribution.Decay = BreakerBuildup::Advance(Contribution.Decay, DeltaTime);
     EntropyProtectedContributions.RemoveAll([](const FEntropyProtectedContribution& Contribution) { return Contribution.Decay.Amount <= 0; });
     AdvanceVoidBuildup(DeltaTime);
+    AdvanceRiftBuildup(DeltaTime);
     if (StatusImmunityRemaining > 0.0f) StatusImmunityRemaining = FMath::Max(0.0f, StatusImmunityRemaining - DeltaTime);
     if (!GetOwner() || !GetOwner()->HasAuthority() || ActiveStatuses.IsEmpty()) return;
     // Lazy re-bind: BeginPlay's bind misses a combat component added after it

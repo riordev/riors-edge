@@ -147,6 +147,13 @@ Weapon conversion selects the larger of Void and combined gear/buff Entropy;
 ties retain Entropy. Current full Attunement therefore selects Entropy while
 active. Selection is snapshotted when firing, including projectiles in flight.
 
+Rift reaches its threshold at 10% of chassis health, then pays half the applying
+share and attempts one horizontal displacement away from its source. The
+200cm sweep requires wall clearance and supporting floor. Stagger immunity
+refuses movement, not the earned damage. A one-second Unstable mark prevents
+refresh or repeated shoves; partial buildup expires after four seconds. These
+are O2 values in elements.json. Breach Charge applies Rift to enemies.
+
 Each ordered pair consumes the first status: Rift on Rot produces Collapse,
 Void on Rot produces Wither, and Rift on Erased produces Tear. Reactions spend
 only damage already earned by the consumed status; damage already paid cannot

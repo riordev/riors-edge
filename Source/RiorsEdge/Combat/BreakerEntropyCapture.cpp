@@ -27,6 +27,7 @@ void BreakerStartEntropyCapture(ABreakerCharacter* Character)
         int32 Index = 0;
         AActor* SourceEnemy = nullptr;
         AActor* FocusEnemy = nullptr;
+        const bool bRift = FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureRift"));
         const bool bVoid = FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureVoid"));
         const bool bFeedback = FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureEntropyFeedback"));
         const int32 FocusIndex = bFeedback || FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureEntropyRot")) ? 1 : 0;
@@ -54,6 +55,12 @@ void BreakerStartEntropyCapture(ABreakerCharacter* Character)
             {
                 Hit.ElementBuildupFlat = BreakerEntropy::SympatheticFlatBuildup();
                 Hit.ElementBuildupFadeSeconds = BreakerEntropy::SympatheticFadeSeconds();
+            }
+            if (bRift)
+            {
+                Hit.Element = EBreakerElement::Rift;
+                Hit.BaseDamage = Status->GetRiftThreshold() * (Index == 0 ? .6f : 1.01f)
+                    / FMath::Max(.01f, 1 - Status->GetRiftResistancePercent() / 100);
             }
             Combat->ReceiveDamage(Hit);
             if (bVoid)
@@ -96,6 +103,7 @@ void BreakerStartEntropyCapture(ABreakerCharacter* Character)
                 Hit.ElementBuildupFadeSeconds = BreakerEntropy::SympatheticFadeSeconds();
             }
             Hit.bCanCritical = false; Hit.SetInstigator(SourceEnemy);
+            if (bRift) { Hit.Element = EBreakerElement::Rift; Hit.BaseDamage = Status->GetRiftThreshold() * .6f; }
             Character->GetCombat()->ReceiveDamage(Hit);
             if (bVoid)
             {
@@ -104,6 +112,6 @@ void BreakerStartEntropyCapture(ABreakerCharacter* Character)
                 Character->GetCombat()->ReceiveDamage(Hit);
             }
         }
-    }), FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureVoid")) ? 5.5f : 1.0f, false);
+    }), FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureRift")) ? 5.8f : FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureVoid")) ? 5.5f : 1.0f, false);
 #endif
 }

@@ -116,6 +116,9 @@
         "hud.damage.rot": "ROT %s",
         "hud.void": "VOID",
         "hud.erasedTimer": "ERASED %.1fs",
-        "hud.damage.erased": "ERASED %s"
+        "hud.damage.erased": "ERASED %s",
+        "hud.rift": "RIFT",
+        "hud.unstableTimer": "UNSTABLE %.1fs",
+        "hud.damage.unstable": "UNSTABLE %s"
 	}
 }

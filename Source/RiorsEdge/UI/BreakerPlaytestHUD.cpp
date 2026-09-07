@@ -19,6 +19,7 @@
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "UI/BreakerUIStyle.h"
+#include "UI/BreakerRiftFeedback.h"
 #include "UI/BreakerTracerMath.h"
 #include "UI/BreakerTracerRenderer.h"
 #include "UI/BreakerEffectRenderer.h"
@@ -1350,7 +1351,10 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
             && Number->DamageTypeTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"));
         const bool bErasedBurst = Number->Element == EBreakerElement::Void
             && Number->DamageTypeTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Erased"));
-        const FString DamageText = bErasedBurst
+        const bool bUnstableBurst = Number->Element == EBreakerElement::Rift
+            && Number->DamageTypeTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Unstable"));
+        const FString DamageText = bUnstableBurst
+            ? BreakerStrings::Format(EBreakerStringKey::HudUnstableDamage, *BreakerUI::FormatDamage(Number->Value)) : bErasedBurst
             ? BreakerStrings::Format(EBreakerStringKey::HudErasedDamage, *BreakerUI::FormatDamage(Number->Value)) : bRotTick
             ? BreakerStrings::Format(EBreakerStringKey::HudRotDamage, *BreakerUI::FormatDamage(Number->Value))
             : BreakerUI::FormatDamage(Number->Value);
@@ -2904,7 +2908,9 @@ float ABreakerPlaytestHUD::DrawStatusReadout(const ABreakerCharacter* Character,
     const float EntropyFraction = Threshold > UE_SMALL_NUMBER ? FMath::Clamp(Status->GetEntropyBuildup() / Threshold, 0.0f, 1.0f) : 0;
     const float VoidThreshold = Status->GetVoidThreshold();
     const float VoidFraction = VoidThreshold > UE_SMALL_NUMBER ? FMath::Clamp(Status->GetVoidBuildup() / VoidThreshold, 0.0f, 1.0f) : 0;
-    if (Active.Num() == 0 && EntropyFraction <= 0 && VoidFraction <= 0) return 0.0f;
+    const float RiftThreshold = Status->GetRiftThreshold();
+    const float RiftFraction = RiftThreshold > UE_SMALL_NUMBER ? FMath::Clamp(Status->GetRiftBuildup() / RiftThreshold, 0.0f, 1.0f) : 0;
+    if (Active.Num() == 0 && EntropyFraction <= 0 && VoidFraction <= 0 && RiftFraction <= 0) return 0.0f;
 
     const float Dot = S(BreakerUI::HudV2StatusDot);
     const float Pixels = BreakerUI::HudV2StatusPixels;
@@ -2936,29 +2942,41 @@ float ABreakerPlaytestHUD::DrawStatusReadout(const ABreakerCharacter* Character,
         DrawRect(BreakerUI::Violet, X, RowBottom - RailH, Width * VoidFraction, RailH);
         RowBottom = RowY - RowGap;
     }
+    if (RiftFraction > 0)
+    {
+        const float RailH = S(2.0f); // O2 presentation, independent of concurrent Entropy.
+        const float RowY = RowBottom - RowH - RailH - S(3.0f);
+        const FString Text = FString::Printf(TEXT("%s %d%%"), *BreakerStrings::Get(EBreakerStringKey::HudRift),
+            FMath::Clamp(FMath::RoundToInt(RiftFraction * 100), 1, 100));
+        DrawSpecText(Text, X, RowY, BreakerRiftFeedback::Color, Pixels, 1.0f, ESpecFontRole::Mono);
+        DrawRect(BreakerUI::BorderRest, X, RowBottom - RailH, Width, RailH);
+        DrawRect(BreakerRiftFeedback::Color, X, RowBottom - RailH, Width * RiftFraction, RailH);
+        RowBottom = RowY - RowGap;
+    }
     for (int32 Index = Active.Num() - 1; Index >= 0; --Index)
     {
         const FBreakerActiveStatus& Entry = Active[Index];
         const bool bRot = Entry.Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"));
+        const bool bUnstable = Entry.Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Unstable"));
         const bool bErased = Entry.Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Erased"));
         FString ShortName = Entry.Spec.StatusTag.IsValid()
             ? Entry.Spec.StatusTag.GetTagName().ToString() : BreakerStrings::Get(EBreakerStringKey::HudStatusUnnamed);
         int32 SeparatorIndex = INDEX_NONE;
         if (ShortName.FindLastChar(TEXT('.'), SeparatorIndex)) ShortName = ShortName.RightChop(SeparatorIndex + 1);
-        const FString Text = bErased ? BreakerStrings::Format(EBreakerStringKey::HudErasedTimer, FMath::Max(Entry.RemainingDuration, 0.0f)) : bRot ? BreakerStrings::Format(EBreakerStringKey::HudRotTimer, FMath::Max(Entry.RemainingDuration, 0.0f)) : Entry.Stacks > 1
+        const FString Text = bUnstable ? BreakerStrings::Format(EBreakerStringKey::HudUnstableTimer, FMath::Max(Entry.RemainingDuration, 0.0f)) : bErased ? BreakerStrings::Format(EBreakerStringKey::HudErasedTimer, FMath::Max(Entry.RemainingDuration, 0.0f)) : bRot ? BreakerStrings::Format(EBreakerStringKey::HudRotTimer, FMath::Max(Entry.RemainingDuration, 0.0f)) : Entry.Stacks > 1
             ? FString::Printf(TEXT("%s %d  %.1f"), *ShortName.ToUpper(), Entry.Stacks,
                 FMath::Max(Entry.RemainingDuration, 0.0f))
             : FString::Printf(TEXT("%s  %.1f"), *ShortName.ToUpper(),
                 FMath::Max(Entry.RemainingDuration, 0.0f));
 
-        const float ExtraH = (bRot || bErased) ? S(5.0f) : 0;
+        const float ExtraH = (bRot || bErased || bUnstable) ? S(5.0f) : 0;
         const float RowY = RowBottom - RowH - ExtraH;
-        const FLinearColor StatusColor = bErased ? BreakerUI::Violet : bRot ? BreakerUI::Orange : BreakerUI::Harm;
+        const FLinearColor StatusColor = bUnstable ? BreakerRiftFeedback::Color : bErased ? BreakerUI::Violet : bRot ? BreakerUI::Orange : BreakerUI::Harm;
         DrawRect(StatusColor, X, RowY + (RowH - Dot) * 0.5f, Dot, Dot);
         const FVector2D TextSize = MeasureSpecText(Text, Pixels, ESpecFontRole::Mono);
         DrawSpecText(Text, X + Dot + S(BreakerUI::Space8), RowY + (RowH - TextSize.Y) * 0.5f,
             StatusColor, Pixels, 1.0f, ESpecFontRole::Mono);
-        if (bRot || bErased)
+        if (bRot || bErased || bUnstable)
         {
             const float Remaining = FMath::Clamp(Entry.RemainingDuration / FMath::Max(Entry.Spec.Duration, UE_SMALL_NUMBER), 0.0f, 1.0f);
             DrawRect(BreakerUI::BorderRest, X, RowBottom - S(2.0f), Width, S(2.0f));

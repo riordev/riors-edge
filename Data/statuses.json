@@ -1,6 +1,7 @@
 {
 	"statuses": [
         { "tag": "Status.Rot", "spreadsOnPierce": false },
+        { "tag": "Status.Unstable", "spreadsOnPierce": false, "dealsPeriodicDamage": false, "dealsDamageOnApplication": true },
         { "tag": "Status.Erased", "spreadsOnPierce": false, "dealsPeriodicDamage": false, "dealsDamageOnExpiry": true },
 		{
 			"tag": "Status.Bleed",

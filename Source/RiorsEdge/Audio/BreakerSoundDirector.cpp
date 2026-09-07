@@ -39,6 +39,7 @@ ABreakerSoundDirector::ABreakerSoundDirector()
     PlayerDeathVoice = MakeVoice(TEXT("PlayerDeathVoice"));
     EntropyVoice = MakeVoice(TEXT("EntropyVoice"));
     VoidMarkVoice = MakeVoice(TEXT("VoidMarkVoice"));
+    RiftVoice = MakeVoice(TEXT("RiftVoice"));
     VoidBurstVoice = MakeVoice(TEXT("VoidBurstVoice"));
 }
 
@@ -120,6 +121,8 @@ void ABreakerSoundDirector::BeginPlay()
     VoidMarkWave = MakeWave(LoadOrSynth(TEXT("void_activate.wav"), &BreakerSound::RenderVoidActivation, VoidMarkPcm));
     VoidBurstWave = MakeWave(LoadOrSynth(TEXT("void_burst.wav"), &BreakerSound::RenderVoidBurst, VoidBurstPcm));
     VoidMarkVoice->SetSound(VoidMarkWave);
+    RiftWave = MakeWave(LoadOrSynth(TEXT("rift_activate.wav"), &BreakerSound::RenderRiftActivation, RiftPcm));
+    RiftVoice->SetSound(RiftWave);
     VoidBurstVoice->SetSound(VoidBurstWave);
 }
 
@@ -127,7 +130,7 @@ void ABreakerSoundDirector::ApplyVolumeSettings(float Master, float Effects)
 {
     const float Gain = BreakerSound::EffectsGain(Master, Effects);
     for (UAudioComponent* Voice : { FireVoice.Get(), HitVoice.Get(), KillVoice.Get(),
-        TakeHitVoice.Get(), AbilityVoice.Get(), PlayerDeathVoice.Get(), EntropyVoice.Get(), VoidMarkVoice.Get(), VoidBurstVoice.Get() })
+        TakeHitVoice.Get(), AbilityVoice.Get(), PlayerDeathVoice.Get(), EntropyVoice.Get(), VoidMarkVoice.Get(), VoidBurstVoice.Get(), RiftVoice.Get() })
     {
         if (Voice) Voice->SetVolumeMultiplier(Gain);
     }
@@ -160,6 +163,16 @@ bool ABreakerSoundDirector::PlayEntropyActivation()
     LastEntropyCueTime = Now;
     ++EntropyCueCount;
     Trigger(EntropyVoice, EntropyWave, EntropyPcm);
+    return true;
+}
+
+bool ABreakerSoundDirector::PlayRiftActivation()
+{
+    if (!GetWorld() || !RiftWave || RiftPcm.IsEmpty()) return false;
+    const double Now = GetWorld()->GetTimeSeconds();
+    if (Now - LastRiftCueTime < .15) return false; // O2 crowd throttle.
+    LastRiftCueTime = Now;
+    Trigger(RiftVoice, RiftWave, RiftPcm);
     return true;
 }
 

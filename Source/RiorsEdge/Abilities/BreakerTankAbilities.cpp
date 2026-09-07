@@ -96,6 +96,7 @@ namespace BreakerTankAbilityLocal
     // struct existed.
     struct FBreakerTankBlastMods
     {
+        bool bRiftDelivery = false; // O2: Breach enemy-facing blast only.
         // D1 Shaped Charge: full damage over this inner fraction of the radius.
         float PlateauFraction = 0.0f;
         // D4 Fragmentation: killed enemies echo for this fraction of their own
@@ -184,6 +185,8 @@ namespace BreakerTankAbilityLocal
                 if (Stacks > 0) Damage.BaseDamage += Mods.ChainFlatPerStack * Stacks;
             }
             Damage.DamageFamily = EBreakerDamageFamily::Physical;
+            if (Mods.bRiftDelivery)
+            { Damage.Element = EBreakerElement::Rift; Damage.ElementalFraction = 1.0f; }
             Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
             Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
             UBreakerDamageLibrary::FillSourcePools(SourceAttributes, EBreakerDamageDelivery::Ability, Damage);
@@ -927,6 +930,7 @@ void UBreakerAbility_BreachCharge::Detonate(FVector BlastLocation)
     const float EnemyRadius = BlastRadiusCm * (bBlastRadius ? 1.5f : 1.0f);   // node text
 
     FBreakerTankBlastMods Mods;
+    Mods.bRiftDelivery = true;
     const int32 ShapedRank = BreakerTankNodeRank(Character, TEXT("Tank.Demolitionist.ShapedCharge"));
     if (ShapedRank > 0) Mods.PlateauFraction = ShapedRank >= 2 ? 0.6f : 0.4f;   // D1
     const int32 FragRank = BreakerTankNodeRank(Character, TEXT("Tank.Demolitionist.Fragmentation"));

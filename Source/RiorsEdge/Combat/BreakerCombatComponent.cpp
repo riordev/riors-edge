@@ -393,10 +393,13 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     // whole damage submission instead of only the pure resolver.
     Attributes->ApplyShield(Result.RemainingShield);
     Attributes->ApplyHealth(Result.RemainingHealth);
-    if (UBreakerStatusComponent* Status = GetOwner()->FindComponentByClass<UBreakerStatusComponent>())
+    UBreakerStatusComponent* ElementStatus = GetOwner()->FindComponentByClass<UBreakerStatusComponent>();
+    uint64 PendingRiftActivation = 0;
+    if (UBreakerStatusComponent* Status = ElementStatus)
     {
         Status->ApplyEntropyHit(ResolvedRequest, Result);
         Status->ApplyVoidHit(ResolvedRequest, Result);
+        PendingRiftActivation = Status->ApplyRiftHit(ResolvedRequest, Result);
     }
     if (bFrontBrokeThisHit) OnFrontShieldBroken.Broadcast();
     // TargetBandBroken's write: did THIS hit move the health-band index?
@@ -436,6 +439,10 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
         OnDeath.Broadcast();
     }
     DispatchHitDealt(Request, Result);
+    // Rift is a separate earned hit. Finish this hit's events first so a
+    // lethal activation cannot be followed by stale outer-hit band/death state.
+    if (PendingRiftActivation != 0 && IsValid(ElementStatus))
+        ElementStatus->FlushRiftActivation(PendingRiftActivation);
     return Result;
 }
 

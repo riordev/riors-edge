@@ -19,7 +19,7 @@ struct RIORSEDGE_API FBreakerActiveStatus
     UPROPERTY(BlueprintReadOnly) float RemainingDuration = 0.0f;
     UPROPERTY(BlueprintReadOnly) float TimeUntilNextTick = 0.0f;
     UPROPERTY(BlueprintReadOnly) int32 TicksDelivered = 0;
-    // Erased owns one finite snapshot. Consumption transfers this unpaid
+    // An elemental status owns one finite snapshot. Consumption transfers this unpaid
     // amount; payout claims it before any damage callback can re-enter.
     UPROPERTY(BlueprintReadOnly) float UnpaidDamageBudget = 0.0f;
     uint64 ApplicationSerial = 0;
@@ -77,6 +77,13 @@ public:
     float GetVoidThreshold() const;
     float GetVoidResistancePercent() const;
     UPROPERTY(EditAnywhere, Category="Status|Void") float VoidResistancePercent = 0.0f;
+    // Commit at accepted hit; pay only after that hit's ordinary callbacks.
+    uint64 ApplyRiftHit(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result);
+    void FlushRiftActivation(uint64 ApplicationSerial);
+    float GetRiftBuildup() const;
+    float GetRiftThreshold() const;
+    float GetRiftResistancePercent() const;
+    UPROPERTY(EditAnywhere, Category="Status|Rift") float RiftResistancePercent = 0.0f;
     float GetArmorMultiplier() const;
     float GetHealingReceivedMultiplier() const;
 
@@ -183,10 +190,12 @@ public:
     UPROPERTY(BlueprintAssignable, Category="Combat|Status") FBreakerStatusEvent OnStatusAvoided;
 
 private:
-    void ApplyStatusInternal(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator, bool bDurationAlreadyScaled, float UnpaidDamageBudget = 0.0f);
+    uint64 ApplyStatusInternal(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator, bool bDurationAlreadyScaled, float UnpaidDamageBudget = 0.0f, const FVector* SourceLocationOverride = nullptr);
     void AdvanceVoidBuildup(float DeltaSeconds);
     void ResetVoidBuildup();
     void DeliverVoidBurst(uint64 ApplicationSerial);
+    void AdvanceRiftBuildup(float DeltaSeconds);
+    void ResetRiftBuildup();
     void SpreadNewestStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator, float ScaledDuration);
     UFUNCTION() void HandleAfflictedOwnerDeath();
     // An expiry tick remains an active damaging status during its callbacks,
@@ -220,6 +229,9 @@ private:
     float VoidBuildup = 0.0f;
     float VoidBuildupRemaining = 0.0f;
     TArray<FEntropyProtectedContribution> VoidProtectedContributions;
+    float RiftBuildup = 0.0f;
+    float RiftBuildupRemaining = 0.0f;
+    TArray<FEntropyProtectedContribution> RiftProtectedContributions;
     uint64 NextApplicationSerial = 1;
     uint32 ApplicationsAttempted = 0;
 };

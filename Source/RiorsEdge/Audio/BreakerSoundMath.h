@@ -188,6 +188,13 @@ namespace BreakerSound
         const float T = static_cast<float>(Index) / SampleRate;
         return .4f * (.7f * FMath::Sin(2 * PI * 90 * T) + .3f * NoiseAt(Index ^ 0xE2A5u)) * Envelope(T, .18f, 14);
     }
+    inline float RiftActivationSample(int32 Index)
+    {
+        const float T = static_cast<float>(Index) / SampleRate;
+        return .35f * (.7f * FMath::Sin(2 * PI * (760 * T - 900 * T * T))
+            + .3f * NoiseAt(Index ^ 0x21F7u)) * Envelope(T, .22f, 12); // O2 displacement snap.
+    }
+    inline void RenderRiftActivation(TArray<int16>& Out) { RenderPcm16(Out, .22f, &RiftActivationSample); }
     inline void RenderVoidActivation(TArray<int16>& Out) { RenderPcm16(Out, .24f, &VoidActivationSample); }
     inline void RenderVoidBurst(TArray<int16>& Out) { RenderPcm16(Out, .18f, &VoidBurstSample); }
     inline void RenderEntropyActivation(TArray<int16>& Out) { RenderPcm16(Out, EntropyActivationDurationSeconds, &EntropyActivationSample); }

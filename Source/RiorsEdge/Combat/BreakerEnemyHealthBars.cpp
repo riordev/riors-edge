@@ -52,6 +52,7 @@
 #include "GameFramework/PlayerController.h"
 #include "UI/BreakerHUDMath.h"
 #include "UI/BreakerUIStyle.h"
+#include "UI/BreakerRiftFeedback.h"
 
 // Named for this pass, not BreakerHUD: unity builds merge translation units,
 // and a second `namespace BreakerHUD` carrying its own constants under the old
@@ -756,9 +757,19 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         const FVector2D VoidTextSize = bShowVoid ? MeasureSpecText(VoidText, EntropyPixels, ESpecFontRole::Mono) : FVector2D::ZeroVector;
         const float VoidY = EntropyY + EntropyH;
         const float VoidH = bShowVoid ? Gap + VoidTextSize.Y + Gap + EntropyRailH : 0;
+        const FBreakerActiveStatus* Unstable = Status ? Status->GetActiveStatuses().FindByPredicate([](const auto& Entry)
+            { return Entry.Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Unstable")) && Entry.RemainingDuration > 0; }) : nullptr;
+        const float RiftThreshold = Status ? Status->GetRiftThreshold() : 0;
+        const float RiftBuildup = Status && RiftThreshold > UE_SMALL_NUMBER ? FMath::Clamp(Status->GetRiftBuildup() / RiftThreshold, 0.0f, 1.0f) : 0;
+        const bool bShowRift = bShowName && !bSightBlocked && (Unstable || RiftBuildup > 0);
+        const FString RiftText = Unstable ? BreakerStrings::Format(EBreakerStringKey::HudUnstableTimer, Unstable->RemainingDuration)
+            : FString::Printf(TEXT("%s %d%%"), *BreakerStrings::Get(EBreakerStringKey::HudRift), FMath::Clamp(FMath::RoundToInt(RiftBuildup * 100), 1, 100));
+        const FVector2D RiftTextSize = bShowRift ? MeasureSpecText(RiftText, EntropyPixels, ESpecFontRole::Mono) : FVector2D::ZeroVector;
+        const float RiftY = VoidY + VoidH;
+        const float RiftH = bShowRift ? Gap + RiftTextSize.Y + Gap + EntropyRailH : 0;
         const float ColumnW = FMath::Max(FMath::Max3(Bar.W, MarksW, bShowName ? static_cast<float>(MeasureSpecText(Name, NamePixels, ESpecFontRole::Display).X) : 0.0f),
-            FMath::Max(bShowEntropy ? static_cast<float>(EntropyTextSize.X) : 0.0f, static_cast<float>(VoidTextSize.X)));
-        const float ColumnH = Bar.Y + Bar.H + PipRowH + EntropyH + VoidH - ColumnTop;
+            FMath::Max(bShowEntropy ? static_cast<float>(EntropyTextSize.X) : 0.0f, FMath::Max(static_cast<float>(VoidTextSize.X), static_cast<float>(RiftTextSize.X))));
+        const float ColumnH = Bar.Y + Bar.H + PipRowH + EntropyH + VoidH + RiftH - ColumnTop;
 
         // Screen-space overlap suppression over the WHOLE column. Two enemies
         // standing in line with the camera project to nearly the same point,
@@ -867,6 +878,16 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
                 const float Fill = Erased ? FMath::Clamp(Erased->RemainingDuration / FMath::Max(Erased->Spec.Duration, UE_SMALL_NUMBER), 0.0f, 1.0f) : VoidBuildup;
                 DrawRect(BreakerUI::Alpha(BreakerUI::BorderRest, BarAlpha), Bar.X, RailY, Bar.W, EntropyRailH);
                 DrawRect(BreakerUI::Alpha(BreakerUI::Violet, BarAlpha), Bar.X, RailY, Bar.W * Fill, EntropyRailH);
+            }
+            if (bShowRift && Bar.X >= 0 && Bar.X + Bar.W <= Canvas->ClipX
+                && RiftY + RiftH <= Canvas->ClipY
+                && Projected.X - RiftTextSize.X * .5f >= 0 && Projected.X + RiftTextSize.X * .5f <= Canvas->ClipX)
+            {
+                DrawSpecTextCentered(RiftText, Projected.X, RiftY, BreakerRiftFeedback::Color, EntropyPixels, BarAlpha, ESpecFontRole::Mono);
+                const float RailY = RiftY + RiftTextSize.Y + Gap;
+                const float Fill = Unstable ? FMath::Clamp(Unstable->RemainingDuration / FMath::Max(Unstable->Spec.Duration, UE_SMALL_NUMBER), 0.0f, 1.0f) : RiftBuildup;
+                DrawRect(BreakerUI::Alpha(BreakerUI::BorderRest, BarAlpha), Bar.X, RailY, Bar.W, EntropyRailH);
+                DrawRect(BreakerUI::Alpha(BreakerRiftFeedback::Color, BarAlpha), Bar.X, RailY, Bar.W * Fill, EntropyRailH);
             }
             if (bShowName)
             {

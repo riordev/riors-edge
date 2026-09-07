@@ -113,6 +113,7 @@ public:
     // Earned Rot activation for the local applier or recipient, never per tick.
     bool PlayEntropyActivation();
     bool PlayVoidCue(bool bBurst);
+    bool PlayRiftActivation();
     int32 GetEntropyCueCount() const { return EntropyCueCount; }
 
 protected:
@@ -131,6 +132,10 @@ private:
     UPROPERTY() TObjectPtr<UAudioComponent> PlayerDeathVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> EntropyVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> VoidMarkVoice;
+    UPROPERTY() TObjectPtr<UAudioComponent> RiftVoice;
+    UPROPERTY() TObjectPtr<USoundWaveProcedural> RiftWave;
+    TArray<int16> RiftPcm;
+    double LastRiftCueTime = -1000;
     UPROPERTY() TObjectPtr<UAudioComponent> VoidBurstVoice;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> VoidMarkWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> VoidBurstWave;
