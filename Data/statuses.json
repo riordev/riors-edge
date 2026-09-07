@@ -1,0 +1,13 @@
+{
+	"statuses": [
+		{
+			"tag": "Status.Bleed",
+			"spreadsOnPierce": false
+		},
+		{
+			"tag": "Status.Poison",
+			"spreadsOnPierce": true
+		}
+	],
+	"pierceSpreadPayloadFraction": 0.5
+}

@@ -11,6 +11,8 @@
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerDamageLibrary.h"
 #include "Combat/BreakerStatusComponent.h"
+#include "Combat/BreakerStatusRuleMath.h"
+#include "Combat/BreakerStatusRules.h"
 #include "Components/PrimitiveComponent.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Progression/BreakerBuildConditions.h"
@@ -1456,6 +1458,17 @@ void UBreakerWeaponComponent::CompleteReloadImmediately()
     FinishReload();
 }
 
+float UBreakerWeaponComponent::GetReloadFraction() const
+{
+    if (!bReloading || !GetWorld()) return -1.0f;
+    const FTimerManager& Timers = GetWorld()->GetTimerManager();
+    // A client sees bReloading replicate and never sets the timer (StartReload
+    // hands off to ServerStartReload above the SetTimer), so the timer's
+    // absence is the honest "no clock" answer rather than a zero.
+    if (!Timers.TimerExists(ReloadTimer)) return -1.0f;
+    return FBreakerWeaponMath::ReloadFraction(Timers.GetTimerElapsed(ReloadTimer), Timers.GetTimerRate(ReloadTimer));
+}
+
 void UBreakerWeaponComponent::SetAimingInternal(bool bNewAiming)
 {
     // Only a fresh press restarts the ramp; re-asserting an aim already held
@@ -2052,6 +2065,13 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
     int32 SecondarySeedIndex = 0;
     FVector LastEnemyImpact = FVector::ZeroVector;
     float LastEnemyDistanceCm = 0.0f;
+    // Spread on pierce (KIT-3): the FIRST body's spreading statuses, copied
+    // once, ride every later pierce leg. Filled after that body's own bleed
+    // has landed so a status the shot itself just applied can spread too.
+    TArray<FBreakerStatusApplicationSpec> PierceSpreadSpecs;
+    // A leg that reached its target off a wall is a ricochet, not a pierce;
+    // the ricochet law is its own line and no status spreads through it.
+    bool bRicochetLeg = false;
 
     while (TravelledCm < Definition->MaximumRange - 1.0f)
     {
@@ -2107,6 +2127,7 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
                 if (AActor* Sought = FindNearestChainTarget(Hit.ImpactPoint, SeekRadiusCm, StruckActors))
                 {
                     --RicochetsRemaining;
+                    bRicochetLeg = true;
                     CurrentMultiplier *= FMath::Clamp(RicochetDamageMultiplier, 0.0f, 1.0f);
                     TravelledCm += Hit.Distance;
                     SegmentStart = Hit.ImpactPoint;
@@ -2171,6 +2192,49 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
         // exactly the material the pre-channel code used, so an unchannelled
         // build's bleed rolls do not move either.
         ApplyBleedOnHit(Definition, HitActor, SourceAttributes, LevelScalar, EnemiesStruck == 0 ? PelletSeed : DamageSeed);
+
+        // SPREAD ON PIERCE (KIT-3; O186; combat.md's proc coefficient law).
+        // Declared crossing Weapons -> Combat: the weapon reads the target's
+        // status list and applies through the same ApplyStatus door its own
+        // bleed uses; Combat/BreakerStatusRules owns which tags spread.
+        // The first body is the one source: its spreading statuses are
+        // collected ONCE, here, after its own bleed landed, so the copies
+        // carry what that body had at the moment the shot went through it.
+        // Only originals spread (IsPierceSpreadSource): a copy already on
+        // the first body from an earlier shot is depth 2 and stops there.
+        // Sightline needs nothing of its own — it pushes pierce 64 onto the
+        // channel stack and this leg loop is the one it already composes
+        // through.
+        // RECORDED GAP: the copy's Duration is the source's remaining budget,
+        // and ApplyStatus then scales Duration by the applier's StatusDuration
+        // lane at the door, so a build with that lane pays it twice on a
+        // spread copy. The door is Combat's; the fold-in belongs there.
+        if (EnemiesStruck == 0)
+        {
+            if (const UBreakerStatusComponent* FirstBodyStatus = HitActor->FindComponentByClass<UBreakerStatusComponent>())
+            {
+                const float PayloadFraction = BreakerStatusRules::PierceSpreadPayloadFraction();
+                for (const FBreakerActiveStatus& Active : FirstBodyStatus->GetActiveStatuses())
+                {
+                    const FBreakerStatusRule* Rule = BreakerStatusRules::FindRule(Active.Spec.StatusTag);
+                    if (!Rule || !Rule->bSpreadsOnPierce || !FBreakerStatusRuleMath::IsPierceSpreadSource(Active)) continue;
+                    PierceSpreadSpecs.Add(FBreakerStatusRuleMath::MakePierceSpreadSpec(Active, PayloadFraction));
+                }
+            }
+        }
+        else if (!bRicochetLeg && !PierceSpreadSpecs.IsEmpty())
+        {
+            if (UBreakerStatusComponent* PiercedStatus = HitActor->FindComponentByClass<UBreakerStatusComponent>())
+            {
+                for (const FBreakerStatusApplicationSpec& Spread : PierceSpreadSpecs)
+                {
+                    // Physical, like every DoT this component applies; a
+                    // copy of a Poison is still a Poison.
+                    PiercedStatus->ApplyStatus(Spread, EBreakerDamageFamily::Physical, GetOwner());
+                }
+            }
+        }
+        bRicochetLeg = false;
 
         StruckActors.Add(HitActor);
         ++EnemiesStruck;

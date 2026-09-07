@@ -1564,6 +1564,14 @@ bool FBreakerViewmodelMotionTest::RunTest(const FString& Parameters)
     const FBreakerViewmodelMotionOffset Quiet = FBreakerWeaponFeel::MotionOffsets(Params, 1.7f, 2.0f, 1.0f, 0.0f);
     TestTrue(TEXT("Zero motion scale silences the whole channel"),
         Quiet.LateralCm == 0.0f && Quiet.VerticalCm == 0.0f && Quiet.PitchDegrees == 0.0f && Quiet.RollDegrees == 0.0f);
+    // The profile's view-bob slider multiplies MotionScale on the character
+    // (MotionScale *= ViewBobScale); at its shipped 1.0 the call is the
+    // unscaled call exactly, so the default changes nothing the owner felt.
+    const FBreakerViewmodelMotionOffset Unscaled = FBreakerWeaponFeel::MotionOffsets(Params, 1.7f, 2.0f, 1.0f, 1.0f);
+    const FBreakerViewmodelMotionOffset BobIdentity = FBreakerWeaponFeel::MotionOffsets(Params, 1.7f, 2.0f, 1.0f, 1.0f * 1.0f);
+    TestTrue(TEXT("A view-bob scale of 1.0 is the unscaled motion"),
+        BobIdentity.LateralCm == Unscaled.LateralCm && BobIdentity.VerticalCm == Unscaled.VerticalCm
+        && BobIdentity.PitchDegrees == Unscaled.PitchDegrees && BobIdentity.RollDegrees == Unscaled.RollDegrees);
 
     // The full-speed stride stays inside the authored envelope, and the
     // footfall pushes the gun DOWN - a bob that lifts reads as floating.
@@ -1729,6 +1737,45 @@ bool FBreakerShakeRecoilCoexistenceTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("A decayed shake has returned every borrowed degree of pitch"), NetPitch, 0.0f, 0.001f);
     TestEqual(TEXT("A decayed shake has returned every borrowed degree of yaw"), NetYaw, 0.0f, 0.001f);
     TestEqual(TEXT("Trauma actually reached zero"), Trauma, 0.0f, 0.0001f);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// The reload fraction the HUD's ammo rail draws: the timer's own elapsed over
+// its own rate, clamped. Walked over a stepped clock so the bar can only ever
+// fill, and pinned at both ends and at the no-duration guard.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerWeaponReloadFractionTest,
+    "RiorsEdge.Weapons.ReloadFraction",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerWeaponReloadFractionTest::RunTest(const FString& Parameters)
+{
+    constexpr float Duration = 1.8f;   // the definition's default ReloadDuration
+    TestEqual(TEXT("At the start the bar is empty"), FBreakerWeaponMath::ReloadFraction(0.0f, Duration), 0.0f);
+    TestEqual(TEXT("At the duration the bar is full"), FBreakerWeaponMath::ReloadFraction(Duration, Duration), 1.0f);
+    TestEqual(TEXT("Past the duration it stays full"), FBreakerWeaponMath::ReloadFraction(Duration * 2.0f, Duration), 1.0f);
+    TestEqual(TEXT("Halfway is half"), FBreakerWeaponMath::ReloadFraction(Duration * 0.5f, Duration), 0.5f, 0.0001f);
+    TestEqual(TEXT("Before the start clamps to empty"), FBreakerWeaponMath::ReloadFraction(-0.2f, Duration), 0.0f);
+
+    // Non-decreasing over a stepped clock, at a frame's cadence.
+    float Previous = -1.0f;
+    for (float Elapsed = 0.0f; Elapsed <= Duration + 0.1f; Elapsed += 1.0f / 60.0f)
+    {
+        const float Fraction = FBreakerWeaponMath::ReloadFraction(Elapsed, Duration);
+        TestTrue(*FString::Printf(TEXT("The bar never runs backwards at %.3f s"), Elapsed), Fraction >= Previous);
+        TestTrue(*FString::Printf(TEXT("The bar stays inside 0..1 at %.3f s"), Elapsed), Fraction >= 0.0f && Fraction <= 1.0f);
+        Previous = Fraction;
+    }
+
+    TestEqual(TEXT("No duration has no progress"), FBreakerWeaponMath::ReloadFraction(0.5f, 0.0f), 0.0f);
+    TestEqual(TEXT("A negative duration has no progress"), FBreakerWeaponMath::ReloadFraction(0.5f, -1.0f), 0.0f);
+
+    // The component's contract with the HUD: no reload running is -1, not 0,
+    // so the rail can tell "not reloading" from "just started".
+    UBreakerWeaponComponent* Weapon = NewObject<UBreakerWeaponComponent>();
+    TestEqual(TEXT("A weapon not reloading answers -1"), Weapon->GetReloadFraction(), -1.0f);
     return true;
 }
 

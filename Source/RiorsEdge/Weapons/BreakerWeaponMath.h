@@ -226,4 +226,13 @@ public:
      * the same draw on the server.
      */
     static int32 SecondaryShotSeed(uint32 OwnerHash, int32 ShotSequence, uint32 Salt, int32 Index);
+
+    /**
+     * How far through a reload the weapon is, 0..1, for the HUD's ammo rail.
+     * Elapsed and Duration are the reload timer's OWN elapsed and rate, so an
+     * affix or a Cadence aura that moved the duration moves this with it and
+     * nothing re-derives the number from the definition's base. A duration
+     * of zero or less has no progress to state and reads 0.
+     */
+    static float ReloadFraction(float Elapsed, float Duration);
 };

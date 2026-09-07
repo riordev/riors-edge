@@ -235,6 +235,12 @@ public:
     UFUNCTION(BlueprintCallable, Category="Weapon") void SetSlotArchetype(int32 SlotNumber, EBreakerWeaponArchetype NewArchetype);
     UFUNCTION(BlueprintPure, Category="Weapon") EBreakerWeaponArchetype GetSlotArchetype(int32 SlotNumber) const { return SlotNumber == 1 ? SlotOneArchetype : SlotTwoArchetype; }
     UFUNCTION(BlueprintPure, Category="Weapon") bool IsReloading() const { return bReloading; }
+    // Progress through the running reload, 0..1, read off the reload timer's
+    // own elapsed time and rate. -1 when no reload is running, and -1 on a
+    // non-authority client: bReloading replicates but StartReload returns
+    // through ServerStartReload before the timer is set, so a client has the
+    // state and not the clock. The HUD draws the full bar for -1.
+    UFUNCTION(BlueprintPure, Category="Weapon") float GetReloadFraction() const;
     UFUNCTION(BlueprintPure, Category="Weapon") bool IsAiming() const { return bAiming; }
     UFUNCTION(BlueprintPure, Category="Weapon") int32 GetMagazineAmmo() const { return MagazineAmmo; }
     UFUNCTION(BlueprintPure, Category="Weapon") int32 GetReserveAmmo() const { return ReserveAmmo; }

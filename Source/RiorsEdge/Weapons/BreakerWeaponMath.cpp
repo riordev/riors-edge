@@ -172,3 +172,9 @@ int32 FBreakerWeaponMath::SecondaryShotSeed(uint32 OwnerHash, int32 ShotSequence
     // sibling.
     return static_cast<int32>(HashCombine(HashCombine(OwnerHash, static_cast<uint32>(ShotSequence)), Salt + static_cast<uint32>(Index)));
 }
+
+float FBreakerWeaponMath::ReloadFraction(float Elapsed, float Duration)
+{
+    if (Duration <= 0.0f) return 0.0f;
+    return FMath::Clamp(Elapsed / Duration, 0.0f, 1.0f);
+}

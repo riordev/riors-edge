@@ -105,9 +105,18 @@ public:
     UFUNCTION(BlueprintCallable, Category="Enemy|Modifiers")
     void ReleaseExternalEffects();
 
-    // --- Phasing state a HUD or the owner can read ------------------------
+    // --- Live state a HUD or the owner can read -----------------------------
+    // The nameplate underlines a mark while its rule is firing. Four modifiers
+    // keep a state a frame can observe; these read it and nothing else.
     UFUNCTION(BlueprintPure, Category="Enemy|Modifiers") bool IsBlinking() const { return BlinkRemaining > 0.0f; }
     UFUNCTION(BlueprintPure, Category="Enemy|Modifiers") bool IsPhaseTelegraphing() const { return bPhaseTelegraphing; }
+    // Same sign as TickFuse: the fuse is -1 when unlit and counts down from
+    // FuseTotal while lit.
+    UFUNCTION(BlueprintPure, Category="Enemy|Modifiers") bool IsFuseLit() const { return FuseRemaining > 0.0f; }
+    // Up only inside one reflect call — bReflecting is the re-entrancy guard,
+    // not a window — so a reader outside that call sees false.
+    UFUNCTION(BlueprintPure, Category="Enemy|Modifiers") bool IsReflecting() const { return bReflecting; }
+    UFUNCTION(BlueprintPure, Category="Enemy|Modifiers") bool IsAuraHolding() const { return AuraTargets.Num() > 0; }
 
     // Every tunable, in one authored block. O2 PLACEHOLDER throughout.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Modifiers") FBreakerEnemyModifierParams Params;
