@@ -1913,13 +1913,10 @@ void ABreakerCharacter::HandleClassResourceDamageTaken(const FBreakerHitContext&
     // self-damage rate under its own sub-cap, so rocket-jumping cannot become
     // the cheapest Grit engine (§1.3 rule 3).
     //
-    // RECORDED GAP: the context carries no proc coefficient, so a DoT tick on
-    // the Tank pays at 1.0 rather than at its coefficient. No enemy applies a
-    // DoT to the player today, which is why this is a recorded gap and not a
-    // live exploit; the day one does, the coefficient must travel with the
-    // context.
+    // Actual hit provenance scales generation, including elemental ticks and
+    // proc-zero reaction payments; damage magnitude alone never grants Grit.
     Grit->NotifyDamageTaken(Hit.Result.HealthDamage, Hit.Result.ShieldDamage,
-        /*bSelfInflicted=*/Hit.Instigator == this, /*ProcCoefficient=*/1.0f);
+        /*bSelfInflicted=*/Hit.Instigator == this, /*ProcCoefficient=*/Hit.ProcCoefficient);
     // The passive block layer: an RNG proc, never an input (O1). The roll
     // already happened inside the damage resolve; this only reports it.
     if (Hit.Result.bBlocked)

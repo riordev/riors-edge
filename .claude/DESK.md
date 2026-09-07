@@ -6,7 +6,8 @@ pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
 ## Cycle — Progression and combat (step 3)
-- [ ] Repair Cascade silent echoes and cancel queued echoes when its originating ultimate ends; include targets spawned during the window.
+- [x] Repair Cascade silent echoes and cancel queued echoes when its originating ultimate ends; include targets spawned during the window.
+- [ ] Implement Long Dark's promised zone-expiry pause during its originating Unmake window.
 - [ ] Finish explicit Caster elemental cycle delivery without duplicating a hit or bypassing proc safeguards; resolve Resonance delivery.
 - [ ] Audit remaining live silent nodes and validate reachable purchased behavior.
 - [ ] Finish ability-versus-weapon balance with sustained actual delivery; retain existing parity findings until their conditions are resolved.
@@ -42,8 +43,8 @@ The owner will playtest after the remaining Entropy pass is finished. Continue i
 - (visuals, sound, enemies) Improve arms and weapon models, integrate weakpoints, add subtle enemy names, and make one weapon/ability/enemy/boss visually polished. Add audible combat feedback. Replace colored ability borders with placeholder icons, radial cooldown recovery and numeric timers; hide irrelevant Riftglass. Smooth the death screen and mouse handoff.
 
 ## Repair dependencies found in runtime review
-- Step3: Resonance still labels its independent detonation with retired Status.Void while Element is None; define its actual elemental delivery alongside Caster cycle/echo repairs. Tank incoming resource callback hardcodes proc1 despite enemy elemental ticks; carry real proc context before claiming parity.
-- Step3: two-position Fracture currently overwrites adjacent element selections; Cascade copies periodic specs and has no earned elemental echo. Finish explicit split-budget delivery without duplicating direct damage or bypassing zero-proc safeguards before adding elemental cycle positions.
+- Step3: Resonance still labels its independent detonation with retired Status.Void while Element is None; define its actual elemental delivery alongside Caster cycle/echo repairs. Tank incoming resource now uses the actual hit proc coefficient, including proc-zero reactions.
+- Step3: two-position Fracture currently overwrites adjacent element selections; Cascade draws the next physical status and skips elemental buildup entries. Finish explicit split-budget delivery without duplicating direct damage or bypassing zero-proc safeguards before adding elemental cycle positions.
 - Support Attunement and Sympathetic deliver Entropy through actual maintained buffs; Void/Rift choices wait for their element pipelines. Tank Kinetic Recovery consumes actual owned blast landings and protects against real fall harm and stagger.
 - Doctrine progression now has all four authored benchmarks across three acts and pays 8/8 through the physical finale at level50. The real mission probe verifies actions/reloads but uses an explicit XP fixture at the final gate; normal campaign leveling pace remains unvalidated.
 - New special loot now respects its final affix budget. Existing saved items remain unchanged; a migration still needs to be designed.
@@ -129,6 +130,7 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - Four Niagara systems at `/Game/Breaker/FX/NS_<Moment>` with a `Color` user parameter, or a free Fab VFX pack placed there
 
 ## Done (last three cycles; older is git)
+- Cascade/Grit: actual eight-point purchased Cascade and paid Fracture/Unmake prove physical echo across elemental cycle positions, late-spawn targets, proc0/no Chain, and cancel/death/respec before queued delivery. Tank damage callback now honors real proc0/.25/1 with proportional generation. Build/suite690started/687passed/3known/0unexpected. Fixture restores campaign entitlement and uses explicit projectile Impact; does not claim campaign traversal or natural flight. Long Dark zone pause remains next.
 - Reactions: Collapse/Wither/Tear spend one consumed unpaid budget; original-applier credit, proc0, no new buildup or chains. Rot ticks claim payment before callbacks; shortening cancels future budget permanently. Build/suite688started/685passed/3known/0unexpected. Inspected all7frames across three reaction types at1080p/720p: labels separate from each other; original hit still overlaps enemy nameplate, retained for step5. Overlapping activation effects and audible mix need later polish/playtest.
 - Rift conversion: ordinary Primary prefix, real rifle threshold activation and marker suppression, wrong-slot isolation and launched rocket snapshot after gear replacement. Build/suite687started/684passed/3known/0unexpected. Entropy/Void/Rift each have real ability and weapon delivery; reactions remain unbuilt. Existing enemy families cover Entropy/Void; no new Rift family authored.
 - Rift kernel/Breach: full suite686started/683passed/3known/0unexpected; actual paid Breach, callback cancellation/order, lethal single payout, native floor-backed activation and capsule wall/ledge tests pass. Opened both1080p and720p frames: UNSTABLE timer/damage and player RIFT60% meter readable; transient enemy-plate overlap remains step5. Screenshots do not validate movement feel or audible mix. Rift weapon conversion and reactions remain next.

@@ -2632,7 +2632,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
     // one additive bucket while it holds. Same trigger, same magnitude
     // number, honest bucket. Caster's third More SLOT stays unspent.
     Node = MakeNode(TEXT("Caster.Multispell.Cascade"), TEXT("Cascade"),
-        TEXT("Branch keystone. Rewrites Unmake: every status application during it also applies the next cycle status at proc coefficient 0. Damage is Increased by 25% against targets carrying 3 or more distinct status types."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+        TEXT("Branch keystone. Rewrites Unmake: your status applications during it echo the next physical status in Fracture's cycle. Echoes cannot trigger further echoes. Damage is Increased by 25% against targets carrying 3 or more distinct status types."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Caster.Multispell.Sequence"));
     AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 25.0f, EBreakerBuildCondition::TargetMultiStatus); // O2 PLACEHOLDER — owner ruling 2026-08-16: MS12's 1.25x More re-authored as a target-rider Increased line
     Node->bCornerstone = true;

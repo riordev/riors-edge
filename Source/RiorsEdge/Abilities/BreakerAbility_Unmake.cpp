@@ -24,8 +24,26 @@ namespace
     constexpr uint32 BreakerUnmakeCascadeSalt = 0xCA5CADEu;
 }
 
+bool UBreakerCascadeEchoListener::IsEchoActive() const
+{
+    const auto* Character = Caster.Get();
+    const auto* Actor = Target.Get();
+    if (!bActive || !IsValid(Character) || !IsValid(Actor)
+        || Character->IsActorBeingDestroyed() || Actor->IsActorBeingDestroyed()) return false;
+    const auto* SourceCombat = Character->FindComponentByClass<UBreakerCombatComponent>();
+    const auto* TargetCombat = Actor->FindComponentByClass<UBreakerCombatComponent>();
+    if (!SourceCombat || SourceCombat->IsDead() || !TargetCombat || TargetCombat->IsDead()) return false;
+    const auto* ASC = Character->GetAbilitySystemComponent();
+    const auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>();
+    return ASC && ASC->HasMatchingGameplayTag(BreakerAbilityTags::Keystone_Caster_Cascade.GetTag())
+        && State && State->IsWindowActive(UBreakerCasterAbility::UnmakeWindowKey());
+}
+
+void UBreakerCascadeEchoListener::HandleTargetDeath() { ++Generation; }
+
 void UBreakerCascadeEchoListener::HandleStatusApplied(const FBreakerActiveStatus& Status)
 {
+    if (!IsEchoActive()) return;
     ABreakerCharacter* CasterCharacter = Caster.Get();
     AActor* TargetActor = Target.Get();
     UWorld* World = TargetActor ? TargetActor->GetWorld() : nullptr;
@@ -58,12 +76,23 @@ void UBreakerCascadeEchoListener::HandleStatusApplied(const FBreakerActiveStatus
     {
         return;
     }
-    const FBreakerCycleEntry Entry = Cycle->PeekNextEntry(0);
-    Cycle->AdvanceCycle();
-    if (!Entry.Spec.StatusTag.IsValid())
+    // O222 elemental entries are buildup verbs, not proc-zero carried statuses.
+    // Draw across them without fabricating an earned Rot/Erased/Unstable mark.
+    FBreakerCycleEntry Entry;
+    bool bFoundPhysical = false;
+    const int32 Length = Cycle->GetCycleLength();
+    for (int32 Index = 0; Index < Length; ++Index)
     {
-        return;
+        Entry = Cycle->PeekNextEntry(0);
+        Cycle->AdvanceCycle();
+        if (Entry.Element == EBreakerElement::None && Entry.DamageFamily == EBreakerDamageFamily::Physical
+            && Entry.Spec.StatusTag.IsValid())
+        {
+            bFoundPhysical = true;
+            break;
+        }
     }
+    if (!bFoundPhysical || !IsEchoActive()) return;
 
     FBreakerStatusApplicationSpec Echo = UBreakerAbility_Unmake::MakeCascadeEchoSpec(
         Entry.Spec, UBreakerGameplayAbility::AbilityDamageScalarFor(CasterCharacter));
@@ -88,15 +117,17 @@ void UBreakerCascadeEchoListener::HandleStatusApplied(const FBreakerActiveStatus
     // one line prevents. One frame of latency is imperceptible; the snapshot
     // above already fixed the numbers at the moment that counts.
     const EBreakerDamageFamily Family = Entry.DamageFamily;
-    TWeakObjectPtr<AActor> WeakTarget = TargetActor;
-    TWeakObjectPtr<ABreakerCharacter> WeakCaster = CasterCharacter;
-    World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateLambda([WeakTarget, WeakCaster, Echo, Family]()
+    const TWeakObjectPtr<UBreakerCascadeEchoListener> WeakListener(this);
+    const uint64 QueuedGeneration = Generation;
+    World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateLambda([WeakListener, QueuedGeneration, Echo, Family]()
     {
-        if (AActor* EchoTarget = WeakTarget.Get())
+        const auto* Listener = WeakListener.Get();
+        if (!Listener || Listener->Generation != QueuedGeneration || !Listener->IsEchoActive()) return;
+        if (AActor* EchoTarget = Listener->Target.Get())
         {
             if (UBreakerStatusComponent* TargetStatus = EchoTarget->FindComponentByClass<UBreakerStatusComponent>())
             {
-                TargetStatus->ApplyStatus(Echo, Family, WeakCaster.Get());
+                TargetStatus->ApplyStatus(Echo, Family, Listener->Caster.Get());
             }
         }
     }));
@@ -153,11 +184,20 @@ FBreakerStatusApplicationSpec UBreakerAbility_Unmake::MakeCascadeEchoSpec(FBreak
 
 void UBreakerAbility_Unmake::BeginCascadeListening(UWorld* World, ABreakerCharacter* Character)
 {
+    EndCascadeListening();
+    CascadeWorld = World;
+    CascadeCaster = Character;
+    if (!World || !Character) return;
+    CascadeSpawnHandle = World->AddOnActorSpawnedHandler(FOnActorSpawned::FDelegate::CreateUObject(this, &ThisClass::BindCascadeActor));
+    if (auto* Combat = Character->GetCombat())
+        Combat->OnDeath.AddUniqueDynamic(this, &ThisClass::HandleCascadeOwnerDeath);
+    if (auto* ASC = Character->GetAbilitySystemComponent())
+        CascadeKeystoneHandle = ASC->RegisterGameplayTagEvent(BreakerAbilityTags::Keystone_Caster_Cascade.GetTag(),
+            EGameplayTagEventType::NewOrRemoved).AddUObject(this, &ThisClass::HandleCascadeKeystoneChanged);
     // Bind an ear to every status-bearing actor in this world. The status
     // layer's application event carries no target pointer, so each binding is
     // a small listener object that remembers whose event it is hearing.
-    // KNOWN LIMIT (header note): actors spawned after this scan echo nothing
-    // until the next Unmake.
+    // Native spawned actors are added by the scoped world delegate above.
     for (TObjectIterator<UBreakerStatusComponent> It; It; ++It)
     {
         UBreakerStatusComponent* Component = *It;
@@ -165,18 +205,7 @@ void UBreakerAbility_Unmake::BeginCascadeListening(UWorld* World, ABreakerCharac
         {
             continue;
         }
-        // Never the caster's own component: the only statuses that land there
-        // are enemy applications, which fail the instigator gate anyway, and a
-        // self-echo would hand the Caster their own DoT.
-        if (Component->GetOwner() == Character)
-        {
-            continue;
-        }
-        UBreakerCascadeEchoListener* Listener = NewObject<UBreakerCascadeEchoListener>(this);
-        Listener->Target = Component->GetOwner();
-        Listener->Caster = Character;
-        Component->OnStatusApplied.AddDynamic(Listener, &UBreakerCascadeEchoListener::HandleStatusApplied);
-        CascadeListeners.Add(Listener);
+        BindCascadeActor(Component->GetOwner());
     }
 
     // THE CHAIN, IN FIRE ORDER: one leg per armed listener, walking caster to
@@ -208,8 +237,50 @@ void UBreakerAbility_Unmake::BeginCascadeListening(UWorld* World, ABreakerCharac
     }
 }
 
+void UBreakerAbility_Unmake::BindCascadeActor(AActor* Actor)
+{
+    auto* Character = CascadeCaster.Get();
+    if (!IsValid(Actor) || Actor->IsActorBeingDestroyed() || !Character || Actor == Character
+        || !CascadeWorld.IsValid() || Actor->GetWorld() != CascadeWorld.Get()) return;
+    auto* Component = Actor->FindComponentByClass<UBreakerStatusComponent>();
+    if (!Component || CascadeListeners.ContainsByPredicate([Actor](const auto& Listener)
+        { return Listener && Listener->Target.Get() == Actor; })) return;
+    auto* Listener = NewObject<UBreakerCascadeEchoListener>(this);
+    Listener->Target = Actor;
+    Listener->Caster = Character;
+    Component->OnStatusApplied.AddDynamic(Listener, &UBreakerCascadeEchoListener::HandleStatusApplied);
+    if (auto* Combat = Actor->FindComponentByClass<UBreakerCombatComponent>())
+        Combat->OnDeath.AddDynamic(Listener, &UBreakerCascadeEchoListener::HandleTargetDeath);
+    CascadeListeners.Add(Listener);
+}
+
+void UBreakerAbility_Unmake::HandleCascadeOwnerDeath() { EndCascadeListening(); }
+
+void UBreakerAbility_Unmake::HandleCascadeKeystoneChanged(FGameplayTag Tag, int32 Count)
+{
+    if (Count <= 0) EndCascadeListening();
+}
+
 void UBreakerAbility_Unmake::EndCascadeListening()
 {
+    // Invalidate before removing any delegate: already queued next-tick work
+    // belongs to these listeners, never to a later cast of the same ultimate.
+    for (UBreakerCascadeEchoListener* Listener : CascadeListeners)
+        if (Listener) { Listener->bActive = false; ++Listener->Generation; }
+    if (auto* World = CascadeWorld.Get(); World && CascadeSpawnHandle.IsValid())
+        World->RemoveOnActorSpawnedHandler(CascadeSpawnHandle);
+    CascadeSpawnHandle.Reset();
+    if (auto* Character = CascadeCaster.Get())
+    {
+        if (auto* Combat = Character->GetCombat())
+            Combat->OnDeath.RemoveDynamic(this, &ThisClass::HandleCascadeOwnerDeath);
+        if (auto* ASC = Character->GetAbilitySystemComponent(); ASC && CascadeKeystoneHandle.IsValid())
+            ASC->RegisterGameplayTagEvent(BreakerAbilityTags::Keystone_Caster_Cascade.GetTag(),
+                EGameplayTagEventType::NewOrRemoved).Remove(CascadeKeystoneHandle);
+    }
+    CascadeKeystoneHandle.Reset();
+    CascadeWorld.Reset();
+    CascadeCaster.Reset();
     for (UBreakerCascadeEchoListener* Listener : CascadeListeners)
     {
         if (!Listener)
@@ -218,6 +289,8 @@ void UBreakerAbility_Unmake::EndCascadeListening()
         }
         if (const AActor* TargetActor = Listener->Target.Get())
         {
+            if (auto* Combat = TargetActor->FindComponentByClass<UBreakerCombatComponent>())
+                Combat->OnDeath.RemoveDynamic(Listener, &UBreakerCascadeEchoListener::HandleTargetDeath);
             if (UBreakerStatusComponent* Component = TargetActor->FindComponentByClass<UBreakerStatusComponent>())
             {
                 Component->OnStatusApplied.RemoveDynamic(Listener, &UBreakerCascadeEchoListener::HandleStatusApplied);

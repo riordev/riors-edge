@@ -20,8 +20,12 @@ class RIORSEDGE_API UBreakerCascadeEchoListener : public UObject
 public:
     UPROPERTY() TWeakObjectPtr<AActor> Target;
     UPROPERTY() TWeakObjectPtr<ABreakerCharacter> Caster;
+    bool bActive = true;
+    uint64 Generation = 1;
+    bool IsEchoActive() const;
 
     UFUNCTION() void HandleStatusApplied(const FBreakerActiveStatus& Status);
+    UFUNCTION() void HandleTargetDeath();
 };
 
 // UNMAKE — the Caster ultimate (Class-Kits §2.2, Ability-Implementation-Spec
@@ -38,14 +42,13 @@ public:
 //   Long Dark — 12s duration, abilities cost 50% instead of 0%. Fully
 //               parametric: both numbers are variant-row fields, no branch.
 //   Cascade   — every status application by this Caster during the window
-//               also applies the next status in Fracture's cycle to the same
+//               also applies the next physical status in Fracture's cycle to the same
 //               target, at proc coefficient 0. BUILT below: the window binds a
 //               listener to every status-bearing actor's application event and
 //               echoes through the caster's own status cycle. Proc coefficient
 //               0 on the echo is the load-bearing termination (Master 7.10.1):
 //               the listener ignores applications carrying 0, so an echo can
-//               never echo. KNOWN LIMIT: actors spawned after the window opens
-//               are not bound and do not echo until the next Unmake.
+//               never echo. A scoped spawn delegate also binds new actors.
 UCLASS()
 class RIORSEDGE_API UBreakerAbility_Unmake : public UBreakerCasterAbility
 {
@@ -91,8 +94,15 @@ public:
 private:
     void BeginCascadeListening(UWorld* World, ABreakerCharacter* Character);
     void EndCascadeListening();
+    void BindCascadeActor(AActor* Actor);
+    void HandleCascadeKeystoneChanged(FGameplayTag Tag, int32 Count);
+    UFUNCTION() void HandleCascadeOwnerDeath();
 
     UPROPERTY() TArray<TObjectPtr<UBreakerCascadeEchoListener>> CascadeListeners;
+    TWeakObjectPtr<UWorld> CascadeWorld;
+    TWeakObjectPtr<ABreakerCharacter> CascadeCaster;
+    FDelegateHandle CascadeSpawnHandle;
+    FDelegateHandle CascadeKeystoneHandle;
 
     FTimerHandle WindowTimer;
 };

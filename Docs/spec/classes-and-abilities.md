@@ -89,6 +89,11 @@ it does not restate it.
 
 ## The model
 
+Cascade echoes the next physical status in Fracture's shared cycle, skipping
+elemental buildup entries. Echoes have zero proc and cannot echo again. The
+ultimate includes targets spawned during its window; closing that window,
+death or loss of Cascade cancels queued echoes.
+
 ### The five loops
 
 | Class | Resource | Shape | Spends on |
