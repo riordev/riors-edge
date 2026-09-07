@@ -193,6 +193,8 @@ enum class EBreakerStatTarget : uint8
     // Append-only Primary weapon utility targets; no Secondary spillover.
     WeaponMagazineCapacity,
     WeaponEffectiveRange,
+    WeaponSustainedAccuracy,
+    WeaponPierce,
     Count UMETA(Hidden)
 };
 
@@ -520,6 +522,8 @@ struct RIORSEDGE_API FBreakerEquipmentStats
     UPROPERTY(BlueprintReadOnly) float DamageRampPerStack = 0.0f;
     UPROPERTY(BlueprintReadOnly) float PrimaryMagazineCapacityMultiplier = 1.0f;
     UPROPERTY(BlueprintReadOnly) float PrimaryEffectiveRangeMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float PrimarySustainedAccuracyMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) int32 PrimaryPierceCount = 0;
     // DISPLAY ONLY. Increased damage from conditional lines that are live RIGHT
     // NOW, in whole percent. Zero on a rig with no movement component, which is
     // why the aggregation tests still read clean numbers.

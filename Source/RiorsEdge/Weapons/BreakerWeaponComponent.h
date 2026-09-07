@@ -172,6 +172,8 @@ struct RIORSEDGE_API FBreakerShotResult
     // (fully sighted). Carried with the cosmetic event so every machine
     // reproduces the same partial-ADS kick.
     UPROPERTY(BlueprintReadOnly) float AimAlpha = 0.0f;
+    // The actual cone used by this pull, before random pellet directions.
+    UPROPERTY(BlueprintReadOnly) float SpreadDegrees = 0.0f;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerShotEvent, const FBreakerShotResult&, Shot);
@@ -635,6 +637,7 @@ private:
     int32 GetMagazineCapacityForSlot(int32 Slot, const UBreakerWeaponDefinition* Definition) const;
     bool bSynchronizingMagazineCapacity = false;
     bool bAmmunitionInitialized = false;
+    float GetEffectiveBloomDegrees() const;
     // The weak-point instrument's ledger (see the public block's comment).
     // Plain map, no UPROPERTY: keys are FNames and values are POD counters,
     // nothing here for GC to see or a save to inherit.

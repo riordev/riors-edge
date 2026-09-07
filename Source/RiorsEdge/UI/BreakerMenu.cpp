@@ -1147,6 +1147,30 @@ void SBreakerMenu::ShowScreenForCapture(EBreakerMenuScreen Screen)
                 Character->GetEquipment()->TryEquipFromBackpack(Rolled.ItemId, FGuid(), InventoryStatus);
             }
         }
+        else if (Board == TEXT("FORGEPIERCE"))
+        {
+            Screen = EBreakerMenuScreen::Forge;
+            if (Character.IsValid() && Character->GetEquipment())
+            {
+                bool bFound = false;
+                for (int32 Seed = 1; Seed <= 4096 && !bFound; ++Seed)
+                {
+                    const FBreakerItemInstance Rolled = UBreakerLootLibrary::RollItem(
+                        TEXT("CapturePierceBench"), EBreakerEquipSlot::Primary,
+                        EBreakerItemRarity::Exceptional, 120, Seed);
+                    const int32 Index = Rolled.Affixes.IndexOfByPredicate([](const FBreakerRolledAffix& Affix)
+                        { return Affix.AffixId == FName(TEXT("Weapon.Pierce")); });
+                    if (Index != INDEX_NONE)
+                    {
+                        bFound = Character->GetEquipment()->AddToBackpack(Rolled);
+                        ForgeSelectedItemId = Rolled.ItemId;
+                        ForgeSelectedAffix = Index;
+                        ForgeVerb = 1; // Photograph the exact, non-fractional Reforge band.
+                    }
+                }
+                if (!bFound) UE_LOG(LogTemp, Error, TEXT("Pierce Forge capture could not roll its subject"));
+            }
+        }
         else if (Board == TEXT("FORGEBENCH"))
         {
             // Fabricates a bench subject the way -BreakerCaptureHUD fabricates
@@ -9272,10 +9296,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
     // rolls tempering too, and ours does not. The bench tells the truth.
     auto BandTop = [](const FBreakerAffixDefinition& Definition, int32 Tier) -> float
     {
-        const float TierValue = UBreakerAffixLibrary::ValueForTier(Definition, Tier);
-        const float NextValue = UBreakerAffixLibrary::ValueForTier(Definition,
-            FMath::Max(Tier - 1, UBreakerAffixLibrary::TopTier));
-        return FMath::Lerp(TierValue, NextValue, 0.5f);
+        return UBreakerAffixLibrary::RollValueForTier(Definition, Tier, 1.0f);
     };
 
     // ---- The verb strip ----------------------------------------------------
@@ -9556,7 +9577,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
             float SpanMin = 0.0f, SpanMax = 1.0f, Current = 0.5f, NextPoint = 0.5f, BandLow = 0.5f, BandHigh = 0.5f;
             if (Definition)
             {
-                SpanMin = UBreakerAffixLibrary::ValueForTier(*Definition, UBreakerAffixLibrary::WorstTier);
+                SpanMin = UBreakerAffixLibrary::ValueForTier(*Definition, UBreakerAffixLibrary::WorstEligibleTier(*Definition));
                 SpanMax = BandTop(*Definition, Ceiling);
                 Current = Affix.Value;
                 NextPoint = UBreakerAffixLibrary::ValueForTier(*Definition,
@@ -9636,6 +9657,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
                 ]
             ];
 
+            const TSharedRef<STextBlock> AffixNameText = MenuText(FText::FromString(Name), BreakerUI::TypeBody,
+                bAtCeiling && bTemperView ? Disabled : Primary, true);
+            AffixNameText->SetWrapTextAt(210.0f);
             const TSharedRef<SWidget> RowContent = SNew(SHorizontalBox)
                 + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
                 [
@@ -9644,8 +9668,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
                         SNew(SVerticalBox)
                         + SVerticalBox::Slot().AutoHeight()
                         [
-                            MenuText(FText::FromString(Name), BreakerUI::TypeBody,
-                                bAtCeiling && bTemperView ? Disabled : Primary, true)
+                            AffixNameText
                         ]
                         + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
                         [

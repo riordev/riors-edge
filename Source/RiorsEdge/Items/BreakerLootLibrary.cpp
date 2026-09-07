@@ -37,8 +37,7 @@ namespace
             Rolled.AffixId = Definition.AffixId; Rolled.Tier = Tier; Rolled.Category = Definition.Category;
             Rolled.Value = UBreakerAffixLibrary::ValueForTier(Definition, Tier);
             if (bVariance)
-                Rolled.Value = FMath::Lerp(Rolled.Value, UBreakerAffixLibrary::ValueForTier(Definition,
-                    FMath::Max(Tier - 1, UBreakerAffixLibrary::TopTier)), Random.FRand() * 0.5f);
+                Rolled.Value = UBreakerAffixLibrary::RollValueForTier(Definition, Tier, Random.FRand());
             Item.Affixes.Add(Rolled);
         };
         auto Draw = [&](const TArray<FBreakerAffixDefinition>& Pool, bool bSpecial, bool bFocused) -> bool
@@ -47,7 +46,8 @@ namespace
             float TotalWeight = 0;
             for (const FBreakerAffixDefinition& Definition : Pool)
             {
-                if (!Definition.AllowsSlot(Item.Slot) || Has(Definition.AffixId)) continue;
+                const int32 CandidateCeiling = bFocused ? FMath::Max(BestTier - 1, UBreakerAffixLibrary::TierCapForRarity(Item.Rarity)) : BestTier;
+                if (!UBreakerAffixLibrary::IsEligibleForItem(Definition, Item, CandidateCeiling) || Has(Definition.AffixId)) continue;
                 const FBreakerAffixDefinition* Bill = bSpecial && !Definition.PairedAffixId.IsNone()
                     ? Downsides.FindByPredicate([&](const FBreakerAffixDefinition& Entry) { return Entry.AffixId == Definition.PairedAffixId; }) : nullptr;
                 if (bSpecial && !Definition.PairedAffixId.IsNone() && (!Bill || !Bill->AllowsSlot(Item.Slot) || Has(Bill->AffixId))) continue;
@@ -66,7 +66,7 @@ namespace
                 if ((Weight -= Candidate->RollWeight * (bSpecial ? 1.0f : BreakerLootArchetypeAffixWeight(Item, Candidate->AffixId))) < 0)
                 { Chosen = Candidate; break; }
             const int32 Ceiling = bFocused ? FMath::Max(BestTier - 1, UBreakerAffixLibrary::TierCapForRarity(Item.Rarity)) : BestTier;
-            int32 Tier = UBreakerAffixLibrary::WorstTier;
+            int32 Tier = UBreakerAffixLibrary::WorstEligibleTier(*Chosen);
             for (int32 Candidate = Tier - 1; Candidate >= Ceiling; --Candidate)
             {
                 if (Random.FRand() >= UBreakerAffixLibrary::TierUpgradeChance) break;
@@ -84,7 +84,7 @@ namespace
             // Membership, not rolled-ID resolution: FindAffix intentionally
             // falls back into special pools and cannot validate a signature.
             const FBreakerAffixDefinition* Definition = Generic.FindByPredicate([Id](const FBreakerAffixDefinition& Entry) { return Entry.AffixId == Id; });
-            if (!Definition || !Definition->AllowsSlot(Item.Slot) || Has(Id)
+            if (!Definition || !UBreakerAffixLibrary::IsEligibleForItem(*Definition, Item, BestTier) || Has(Id)
                 || Item.Affixes.Num() >= Budget || Count(Definition->Category) >= 4) return false;
             Add(*Definition, BestTier, false);
         }
@@ -248,7 +248,9 @@ FBreakerItemInstance UBreakerLootLibrary::RollItemInternal(FName DefinitionId, E
         TArray<const FBreakerAffixDefinition*> Candidates;
         for (const FBreakerAffixDefinition& Affix : Pool)
         {
-            if (!Affix.AllowsSlot(Slot)) continue;
+            const int32 CandidateCeiling = (bFocused && Index == 0)
+                ? FMath::Max(BestTier - 1, UBreakerAffixLibrary::TierCapForRarity(Rarity)) : BestTier;
+            if (!UBreakerAffixLibrary::IsEligibleForItem(Affix, Item, CandidateCeiling)) continue;
             if (Item.Affixes.ContainsByPredicate([&Affix](const FBreakerRolledAffix& Rolled) { return Rolled.AffixId == Affix.AffixId; })) continue;
             if (Affix.Category == EBreakerAffixCategory::Prefix && PrefixCount >= 4) continue;
             if (Affix.Category == EBreakerAffixCategory::Suffix && SuffixCount >= 4) continue;
@@ -294,7 +296,7 @@ FBreakerItemInstance UBreakerLootLibrary::RollItemInternal(FName DefinitionId, E
         // point of a back-loaded value curve -- the low tiers are cheap
         // because they are worth little, and the top is expensive because it
         // is worth a lot.
-        const int32 WorstTier = UBreakerAffixLibrary::WorstTier;
+        const int32 WorstTier = UBreakerAffixLibrary::WorstEligibleTier(*Chosen);
         int32 Tier = WorstTier;
         for (int32 Candidate = WorstTier - 1; Candidate >= SlotBestTier; --Candidate)
         {
@@ -314,9 +316,7 @@ FBreakerItemInstance UBreakerLootLibrary::RollItemInternal(FName DefinitionId, E
         Rolled.Category = Chosen->Category;
         // Step 5: value within the tier band — between this tier's value and
         // partway toward the next tier up.
-        const float TierValue = UBreakerAffixLibrary::ValueForTier(*Chosen, Tier);
-        const float NextValue = UBreakerAffixLibrary::ValueForTier(*Chosen, FMath::Max(Tier - 1, UBreakerAffixLibrary::TopTier));
-        Rolled.Value = FMath::Lerp(TierValue, NextValue, Random.FRand() * 0.5f);
+        Rolled.Value = UBreakerAffixLibrary::RollValueForTier(*Chosen, Tier, Random.FRand());
         Item.Affixes.Add(Rolled);
 
         if (Chosen->Category == EBreakerAffixCategory::Prefix) ++PrefixCount;

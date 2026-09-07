@@ -1,6 +1,40 @@
 {
 	"affixes": [
 		{
+			"id": "Weapon.SustainedAccuracy",
+			"pool": "slice",
+			"displayName": "Sustained Accuracy",
+			"category": "Prefix",
+			"target": "WeaponSustainedAccuracy",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Primary"
+			],
+			"valueAtT12": 4,
+			"valueAtT1": 18,
+			"rollWeight": 70,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Weapon.Pierce",
+			"pool": "slice",
+			"displayName": "Pierce",
+			"category": "Prefix",
+			"target": "WeaponPierce",
+			"bucket": "Flat",
+			"slots": [
+				"Primary"
+			],
+			"valueAtT12": 1,
+			"valueAtT1": 1,
+			"rollWeight": 40,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
 			"id": "Weapon.MagazineCapacity",
 			"pool": "slice",
 			"displayName": "Magazine Capacity",
@@ -510,7 +544,7 @@
 		{
 			"id": "Offense.WallRideDamage",
 			"pool": "slice",
-			"displayName": "Damage while Wall Riding",
+			"displayName": "Damage after Traversal",
 			"category": "Prefix",
 			"target": "WallRideDamage",
 			"bucket": "IncreasedPercent",
@@ -523,7 +557,7 @@
 			"valueAtT12": 6,
 			"valueAtT1": 57,
 			"rollWeight": 40,
-			"condition": "WallRiding",
+			"condition": "RecentlyLedgeTraversed",
 			"minimumRarity": "Standard",
 			"pairedAffixId": ""
 		},

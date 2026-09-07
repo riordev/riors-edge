@@ -6,6 +6,7 @@
 
 float UBreakerAffixLibrary::ValueForTier(const FBreakerAffixDefinition& Affix, int32 Tier)
 {
+    if (Affix.StatTarget == EBreakerStatTarget::WeaponPierce) return Tier < TopTier || Tier > 4 ? 0.0f : Tier == TopTier ? 2.0f : 1.0f;
     const int32 ClampedTier = FMath::Clamp(Tier, TopTier, WorstTier);
     if (ClampedTier == 0) return Affix.ValueAtT1 * TierSpikeT0Multiplier;
     if (ClampedTier == TopTier) return Affix.ValueAtT1 * TierSpikeTopMultiplier;
@@ -27,6 +28,25 @@ float UBreakerAffixLibrary::ValueForTier(const FBreakerAffixDefinition& Affix, i
         return FMath::Lerp(Affix.ValueAtT12, Affix.ValueAtT1, Shaped);
     }
     return Affix.ValueAtT12 * FMath::Pow(Affix.ValueAtT1 / Affix.ValueAtT12, Shaped);
+}
+
+int32 UBreakerAffixLibrary::WorstEligibleTier(const FBreakerAffixDefinition& Affix)
+{
+    return Affix.StatTarget == EBreakerStatTarget::WeaponPierce ? 4 : WorstTier;
+}
+
+bool UBreakerAffixLibrary::IsEligibleForItem(const FBreakerAffixDefinition& Affix, const FBreakerItemInstance& Item, int32 BestAvailableTier)
+{
+    if (!Affix.AllowsSlot(Item.Slot)) return false;
+    return Affix.StatTarget != EBreakerStatTarget::WeaponPierce || (Item.Slot == EBreakerEquipSlot::Primary
+        && Item.WeaponArchetype != EBreakerWeaponArchetype::Rocket && BestAvailableTier >= TopTier && BestAvailableTier <= 4);
+}
+
+float UBreakerAffixLibrary::RollValueForTier(const FBreakerAffixDefinition& Affix, int32 Tier, float UnitRoll)
+{
+    const float Value = ValueForTier(Affix, Tier);
+    if (Affix.StatTarget == EBreakerStatTarget::WeaponPierce) return Value;
+    return FMath::Lerp(Value, ValueForTier(Affix, FMath::Max(Tier - 1, TopTier)), UnitRoll * 0.5f);
 }
 
 int32 UBreakerAffixLibrary::BestTierForItemLevel(int32 ItemLevel)
@@ -510,6 +530,8 @@ bool UBreakerAffixLibrary::IsOffensiveTarget(EBreakerStatTarget Target)
     case EBreakerStatTarget::WeaponDamageRamp:
     case EBreakerStatTarget::WeaponMagazineCapacity:
     case EBreakerStatTarget::WeaponEffectiveRange:
+    case EBreakerStatTarget::WeaponSustainedAccuracy:
+    case EBreakerStatTarget::WeaponPierce:
     // O54's other two pools. Both are damage by any reading, and the breadth
     // test's per-slot "can this slot raise damage at all" question has to count
     // them or a slot carrying only ability lines would read as defensive.

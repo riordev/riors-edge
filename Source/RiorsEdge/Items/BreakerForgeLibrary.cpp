@@ -213,6 +213,7 @@ EBreakerForgeResult UBreakerForgeLibrary::Temper(FBreakerItemInstance& Item, int
 
     const FBreakerAffixDefinition* Definition = UBreakerAffixLibrary::FindAffix(UBreakerAffixLibrary::GetSliceAffixPool(), Rolled.AffixId);
     if (!Definition) return EBreakerForgeResult::InvalidAffix;
+    if (!UBreakerAffixLibrary::IsEligibleForItem(*Definition, Item, Rolled.Tier)) return EBreakerForgeResult::InvalidAffix;
 
     const FBreakerForgeCost Cost = BreakerForgeTemperCostForTargetTier(TargetTier, Item.ItemLevel);
     if (!Wallet.Spend(Cost)) return EBreakerForgeResult::Unaffordable;
@@ -231,6 +232,11 @@ EBreakerForgeResult UBreakerForgeLibrary::Reforge(FBreakerItemInstance& Item, FB
 {
     if (!bIsAtForge) return EBreakerForgeResult::NotAtForge;
     if (!Item.IsValid() || Item.Affixes.IsEmpty()) return EBreakerForgeResult::InvalidItem;
+    for (const FBreakerRolledAffix& Existing : Item.Affixes)
+    {
+        const auto* Definition = UBreakerAffixLibrary::FindAffix(UBreakerAffixLibrary::GetSliceAffixPool(), Existing.AffixId);
+        if (Definition && !UBreakerAffixLibrary::IsEligibleForItem(*Definition, Item, Existing.Tier)) return EBreakerForgeResult::InvalidAffix;
+    }
     if (!Wallet.Spend(ReforgeCost(Item))) return EBreakerForgeResult::Unaffordable;
 
     const TArray<FBreakerAffixDefinition>& Pool = UBreakerAffixLibrary::GetSliceAffixPool();
@@ -242,9 +248,7 @@ EBreakerForgeResult UBreakerForgeLibrary::Reforge(FBreakerItemInstance& Item, FB
         // The same in-band lerp the drop pipeline's step 5 uses, so a reforged
         // value and a dropped value are drawn from the identical distribution
         // and neither is secretly better.
-        const float TierValue = UBreakerAffixLibrary::ValueForTier(*Definition, Rolled.Tier);
-        const float NextValue = UBreakerAffixLibrary::ValueForTier(*Definition, FMath::Max(Rolled.Tier - 1, -1));
-        Rolled.Value = FMath::Lerp(TierValue, NextValue, Random.FRand() * 0.5f);
+        Rolled.Value = UBreakerAffixLibrary::RollValueForTier(*Definition, Rolled.Tier, Random.FRand());
     }
     return EBreakerForgeResult::Success;
 }
@@ -310,7 +314,7 @@ EBreakerForgeResult UBreakerForgeLibrary::Attune(FBreakerItemInstance& Item, FBr
         TArray<const FBreakerAffixDefinition*> Candidates;
         for (const FBreakerAffixDefinition& Affix : Pool)
         {
-            if (!Affix.AllowsSlot(Item.Slot)) continue;
+            if (!UBreakerAffixLibrary::IsEligibleForItem(Affix, Item, Existing.Tier)) continue;
             if (Rerolled.ContainsByPredicate([&Affix](const FBreakerRolledAffix& Taken) { return Taken.AffixId == Affix.AffixId; })) continue;
             if (Affix.Category == EBreakerAffixCategory::Prefix && PrefixCount >= 4) continue;
             if (Affix.Category == EBreakerAffixCategory::Suffix && SuffixCount >= 4) continue;
@@ -336,9 +340,7 @@ EBreakerForgeResult UBreakerForgeLibrary::Attune(FBreakerItemInstance& Item, FBr
         Replacement.AffixId = Chosen->AffixId;
         Replacement.Tier = Existing.Tier;
         Replacement.Category = Chosen->Category;
-        const float TierValue = UBreakerAffixLibrary::ValueForTier(*Chosen, Replacement.Tier);
-        const float NextValue = UBreakerAffixLibrary::ValueForTier(*Chosen, FMath::Max(Replacement.Tier - 1, -1));
-        Replacement.Value = FMath::Lerp(TierValue, NextValue, Random.FRand() * 0.5f);
+        Replacement.Value = UBreakerAffixLibrary::RollValueForTier(*Chosen, Replacement.Tier, Random.FRand());
         Rerolled.Add(Replacement);
         if (Chosen->Category == EBreakerAffixCategory::Prefix) ++PrefixCount; else ++SuffixCount;
     }

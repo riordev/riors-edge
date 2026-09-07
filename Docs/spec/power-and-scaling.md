@@ -216,6 +216,8 @@ Every lane permitted to touch outgoing player damage.
 | Distance falloff | Per-pellet geometry, not a stat-layer multiplier |
 | Effective range | Primary Increased percentages add; scale falloff distances and maximum travel together, never close-range damage |
 | Magazine capacity | Primary Increased percentages add; round base capacity down before temporary round deltas, conserve ammunition |
+| Sustained accuracy | Primary Increased divisor on accumulated bloom only; base spread, movement and recoil unchanged |
+| Gear pierce | Primary hitscan count, exact tier steps; additional impacts use existing penetration falloff and total travel budget |
 | Fire rate | Named, watched, uncapped |
 | Target-conditional riders | The same additive bucket, never a multiplier |
 | DoT | The same additive bucket as direct damage |

@@ -918,6 +918,15 @@ float UBreakerWeaponComponent::GetMovementSpreadDegrees() const
     return FBreakerWeaponMath::SteadyMovementSpreadDegrees(Movement, Alpha, GetClassNodeRank(BreakerSteadyNodeId), IsOwnerAirborne());
 }
 
+float UBreakerWeaponComponent::GetEffectiveBloomDegrees() const
+{
+    const UBreakerEquipmentComponent* Equipment = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>() : nullptr;
+    const float Divisor = CurrentSlot == 1 && Equipment ? Equipment->GetStats().PrimarySustainedAccuracyMultiplier : 1.0f;
+    // Sustained accuracy buys control of accumulated bloom, not first-shot,
+    // movement, recoil or recovery changes. O2 PLACEHOLDER divisor convention.
+    return BloomDegrees / FMath::Max(1.0f, Divisor);
+}
+
 float UBreakerWeaponComponent::GetNextShotSpreadDegrees() const
 {
     const UBreakerWeaponDefinition* Definition = ResolveDefinition();
@@ -929,7 +938,7 @@ float UBreakerWeaponComponent::GetNextShotSpreadDegrees() const
     // GetMovementSpreadDegrees, not the raw feel-layer read: Steady's rule
     // (§1.5 M2) must shape the predicted cone exactly as it shapes the shot.
     const float Movement = GetMovementSpreadDegrees();
-    const float Composed = FBreakerWeaponFeel::EffectiveSpreadDegrees(Profile, BaseSpread, BloomDegrees, BurstShotIndex, Movement);
+    const float Composed = FBreakerWeaponFeel::EffectiveSpreadDegrees(Profile, BaseSpread, GetEffectiveBloomDegrees(), BurstShotIndex, Movement);
     // The tree's WeaponSpread lane, divisor convention, applied to the same
     // composed cone the fire path divides so the crosshair cannot lie.
     const FBreakerNodeStats* NodeStats = GetOwnerNodeStats();
@@ -1714,7 +1723,7 @@ bool UBreakerWeaponComponent::FireOnce()
     // Momentum on the gun (KIT-2): the Swift bar tightens the fired cone by
     // the same multiplier GetNextShotSpreadDegrees applies to the predicted
     // one — both sites or the crosshair lies about the bar.
-    const float Spread = FBreakerWeaponFeel::EffectiveSpreadDegrees(AimedProfile, BaseSpread, BloomDegrees, BurstShotIndex, MovementSpread)
+    const float Spread = FBreakerWeaponFeel::EffectiveSpreadDegrees(AimedProfile, BaseSpread, GetEffectiveBloomDegrees(), BurstShotIndex, MovementSpread)
         / (SpreadNodeStats ? SpreadNodeStats->WeaponSpreadReduction : 1.0f)
         * FBreakerWeaponMath::MomentumSpreadMultiplier(
             Momentum ? Momentum->GetMomentumFraction() : 0.0f, Momentum && Momentum->IsActiveForOwner());
@@ -1737,6 +1746,7 @@ bool UBreakerWeaponComponent::FireOnce()
     FBreakerShotResult Shot;
     Shot.bFired = true;
     Shot.BurstShotIndex = FiredBurstIndex;
+    Shot.SpreadDegrees = Spread;
     Shot.RecoilSeed = RecoilSeed;
     Shot.bAimedShot = bAiming;
     Shot.AimAlpha = ShotAimAlpha;
@@ -1947,6 +1957,12 @@ FBreakerShotChannels UBreakerWeaponComponent::GetShotChannels() const
     FBreakerShotChannels Channels;
     const AActor* Owner = GetOwner();
     if (!Owner) return Channels;
+    const UBreakerWeaponDefinition* Definition = ResolveDefinition();
+    if (CurrentSlot == 1 && Definition && !Definition->bProjectile)
+    {
+        if (const UBreakerEquipmentComponent* Equipment = Owner->FindComponentByClass<UBreakerEquipmentComponent>())
+            Channels.PierceCount += FMath::Max(0, Equipment->GetStats().PrimaryPierceCount);
+    }
 
     // 1. The tree's Flat lanes. Read live, like GetFireRateMultiplier: a
     // respec mid-fight changes the next shot, not the next equip. Pierce,
@@ -2593,6 +2609,7 @@ void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Def
     FBreakerShotResult Shot;
     Shot.bFired = true;
     Shot.BurstShotIndex = BurstIndex;
+    Shot.SpreadDegrees = Spread;
     Shot.RecoilSeed = RecoilSeed;
     Shot.bAimedShot = bAiming;
     Shot.AimAlpha = ShotAimAlpha;

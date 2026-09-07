@@ -135,6 +135,9 @@ public:
      */
     UFUNCTION(BlueprintPure, Category="Items|Affixes")
     static float ValueForTier(const FBreakerAffixDefinition& Affix, int32 Tier);
+    static int32 WorstEligibleTier(const FBreakerAffixDefinition& Affix);
+    static bool IsEligibleForItem(const FBreakerAffixDefinition& Affix, const FBreakerItemInstance& Item, int32 BestAvailableTier);
+    static float RollValueForTier(const FBreakerAffixDefinition& Affix, int32 Tier, float UnitRoll);
 
     // The shape of the back-load. 1.0 would be plain geometric (equal relative
     // steps); above 1.0 the relative steps grow toward the top.

@@ -993,11 +993,20 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
             if (!Definition) continue;
             const bool bPrimaryOnlyTarget = Definition->StatTarget == EBreakerStatTarget::WeaponDamageRamp
                 || Definition->StatTarget == EBreakerStatTarget::WeaponMagazineCapacity
-                || Definition->StatTarget == EBreakerStatTarget::WeaponEffectiveRange;
+                || Definition->StatTarget == EBreakerStatTarget::WeaponEffectiveRange
+                || Definition->StatTarget == EBreakerStatTarget::WeaponSustainedAccuracy
+                || Definition->StatTarget == EBreakerStatTarget::WeaponPierce;
             if (bPrimaryOnlyTarget && Item.Slot != EBreakerEquipSlot::Primary) continue;
+            if (Definition->StatTarget == EBreakerStatTarget::WeaponSustainedAccuracy
+                && !UBreakerAffixLibrary::IsEligibleForItem(*Definition, Item, Rolled.Tier)) continue;
 
             float Value = Rolled.Value;
-            if (TierUplift > 0)
+            if (Definition->StatTarget == EBreakerStatTarget::WeaponPierce)
+            {
+                if (!UBreakerAffixLibrary::IsEligibleForItem(*Definition, Item, Rolled.Tier)) continue;
+                Value = UBreakerAffixLibrary::ValueForTier(*Definition, FMath::Max(Rolled.Tier - TierUplift, UBreakerAffixLibrary::TopTier));
+            }
+            else if (TierUplift > 0)
             {
                 // Scaled by the RATIO between the two tiers rather than
                 // re-derived at the better tier, so a lucky in-band roll is
@@ -1161,6 +1170,8 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
     Stats.DamageRampPerStack = FMath::Max(0.0f, IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::WeaponDamageRamp)]);
     Stats.PrimaryMagazineCapacityMultiplier = Increased(EBreakerStatTarget::WeaponMagazineCapacity);
     Stats.PrimaryEffectiveRangeMultiplier = Increased(EBreakerStatTarget::WeaponEffectiveRange);
+    Stats.PrimarySustainedAccuracyMultiplier = Increased(EBreakerStatTarget::WeaponSustainedAccuracy);
+    Stats.PrimaryPierceCount = FMath::Max(0, FMath::FloorToInt(FlatByTarget[static_cast<int32>(EBreakerStatTarget::WeaponPierce)]));
     Stats.CriticalMultiplierBonus = FlatByTarget[static_cast<int32>(EBreakerStatTarget::CriticalDamage)] / 100.0f;
     Stats.SlideSpeedMultiplier = Increased(EBreakerStatTarget::SlideSpeed);
     // DEADFALL's bill. An ordinary NEGATIVE Increased percentage into the same

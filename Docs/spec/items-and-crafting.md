@@ -77,6 +77,19 @@ weapon's reserve. Range extends falloff thresholds and maximum hitscan travel;
 rockets receive the same maximum travel through their straight-flight lifetime.
 Neither line affects the Secondary.
 
+Sustained Fire Accuracy divides accumulated bloom by one plus its Increased
+percentage; its T12/T1 anchors are 4%/18% (O2 PLACEHOLDER). Base spread,
+movement penalties, recoil and bloom recovery keep their authored behavior.
+Pierce is a discrete Primary hitscan prefix: +1 at T4 through T0, +2 at T-1.
+It cannot roll below T4 or on rockets, and neither rolling nor reforging
+interpolates fractional pierces. Prolific reads the exact value at the improved
+tier. Tempering advances tiers normally. The Forge displays this exact range.
+
+Damage after Traversal uses the existing `Offense.WallRideDamage` item identity
+and values. It pays Increased weapon damage for three seconds after a completed
+vault or mantle. Interrupted traversal cannot activate it; existing saved
+items resolve the updated condition without a value rewrite.
+
 **The stash is account-wide and transfer is Anchor-gated.** Characters are
 builds, gear is an account asset, and a run cannot mutate account state.
 
