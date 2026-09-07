@@ -4729,7 +4729,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                     [
                         SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))
                     ],
-                    Accent)
+                    Accent, BreakerUI::BorderSelected)
             ];
 
         // Vacant slots retain the plate, icon well and centered slot name.
@@ -4764,7 +4764,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                         EBreakerItemRarity::Standard, /*bHasItem=*/false)
                 ];
             EquipSlotOutlines.Add(Slot, EmptyOutline);
-            return SNew(SBox).HeightOverride(BreakerInventoryLayout::EquipRowHeight + 2.0f * BreakerUI::BorderSelected)[EmptyOutline];
+            return SNew(SBox).MinDesiredHeight(BreakerInventoryLayout::EquipRowHeight + 2.0f * BreakerUI::BorderSelected)[EmptyOutline];
         }
 
         // The doomed-piece outline. It sits OUTSIDE the card's own ring so the
