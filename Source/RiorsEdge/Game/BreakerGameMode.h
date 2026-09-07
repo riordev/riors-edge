@@ -290,7 +290,8 @@ public:
     // because the F5 binding needs that signature; the switch takes
     // -BreakerBossOnStart=<name> and the command Breaker.Boss <name>, both
     // resolved through ABreakerBossEnemy::ClassForBossName.
-    void SpawnBossOfClass(TSubclassOf<class ABreakerBossEnemy> BossClass);
+    void SpawnBossOfClass(TSubclassOf<class ABreakerBossEnemy> BossClass,
+        TOptional<FVector> EncounterCenter = TOptional<FVector>());
     void SpawnBossCommand(const TArray<FString>& Args);
     UFUNCTION(BlueprintPure, Category="Playtest|Boss") bool IsBossAlive() const;
     // O82: a campaign death during a live boss encounter resets it whole.

@@ -5,6 +5,10 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
+## Cycle — richer ordinary gear and readable weapon damage
+- [ ] Increase Standard to 3–4, Uncommon to 4–5 and Exceptional to 4–6 affixes, preserving tier caps and slot/category rules.
+- [ ] Show candidate weapon base damage from runtime weapon definitions and fix equipped title clipping.
+
 ## Playtest queue (owner, 2026-09-07)
 Continue through this queue in tested batches without stopping after each commit for a playtest (owner instruction, 2026-09-07).
 - (ui, npcs, systems) Reduce menu density and clipping; repair NPC interaction flow, ability assignment and point spending; present Core as the authored tree rather than a node cloud; update the dev sandbox. Finish silent nodes and Caster progression.
@@ -49,7 +53,7 @@ No playtest until the core loop has more oomph. The next blocks are the ones tha
 - [ ] Per-archetype weapon fire: `weapon_fire_<archetype>.wav` → `weapon_fire.wav` → synth.
 
 ## Later (infrastructure only when it unblocks a felt item this week)
-- Inventory captures still show item-title truncation and the item-level label under the discard button; the new equipment requirement footer and refusal line fit. Fix the card header with the menu clipping pass.
+- Inventory card headers now separate titles, item level and discard. Equipped slot titles can still truncate; fix with the weapon base-damage readout.
 - Two expected reds carry the campaign's absence: `KeystoneAtShippedBudget` and `NodePurchaseFlow` assert doctrine purchases at the full pool, and the shipped entitlement is two of eight until acts two, three and the finale carry their Unlock beats. Both pinned with that delete condition; never widened.
 - Arrival and rift-completion flags are set only when the beat is current (the kill-counter rule). If arrival should count unconditionally, drop the flag-set argument on the two seams.
 - The enemy chip re-arm inside a hold reads `GetSecondsSinceDamage() <= DeltaSeconds`; settled chips are not pruned (they hold the last fraction) and the map is bounded by live enemies in range.
@@ -92,6 +96,13 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 
 ## Done (last three cycles; older is git)
 
+### Reachable Rift ending and usable Anchor stations — 583 / 5 / 0
+- [x] Authored rift bosses spawn on supported Fernhall ground instead of the remote gym arena; Undercroft selects Holdfast. Reset retains boss identity/location, wave tracking and terminator binding; completion prevents manual wave restart.
+- [x] Rift exits offer Fernhall and Anchor; existing return handler clears pending instance state. Runtime fixture builds Fernhall, clears actual waves, resets and kills actual boss, verifies exact 399 XP/80 Riftglass first-clear purse and duplicate refusal. Cross-map loading is not simulated.
+- [x] Grounded vendors face clear approaches under distinct forge/supply stations. Actual capsule/approach and rotated-layout tests pass; Anchor capture inspected. This remains blockout art.
+- [x] Final build and all588tests complete:583passed/5existing expected/0unexpected. Fixture map-package and multicast observation order errors corrected; production payout verified. PowerShell reconciliation under Python quarantine; STATE unchanged, no pins widened.
+
+
 ### Connected Core, cooldown icons, Rot feedback and inventory headers — 581 / 5 / 0
 - [x] Core overview draws all117nodes171edges12entries in5sectors; focused constellations retain actual purchase handlers and clear paths. Opaque board, fitted overview, readable labels, accurate focused purchase count and unclipped Back. Graph geometry and hit targets tested; CORE/COREPRECISION captures inspected.
 - [x] Neutral ability tiles use glyph icons, clockwise radial recovery and numeric cooldown; plain DoT numbers brighter at20px. Forced half-cooldown capture inspected; existing preview banners are fixture content, not a completed gameplay run.
@@ -103,9 +114,3 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - [x] Master × effects reaches all six combat voices; live sliders and test cue wired, music labeled unavailable. Anchor permanent Riftglass removed. Anchor and audio-settings 1920×1080 captures inspected; no claim of verified speaker output, motion feel or multiplayer play.
 - [x] Data/README.md documents editable ability/ultimate numerics and restart workflow. Numeric test now verifies actual runtime defaults against JSON, allowing data-only tuning; compiled values remain failed-load fallback.
 - [x] Build clean; all 583 declarations completed, 578 passed / five pre-existing expected reds / zero unexpected. Intermediate fixture registration/player-state and stale expectation failures corrected before final run. PowerShell reconciliation used under Python quarantine; generated STATE unchanged. No pins widened.
-### Loadout choices, dialogue keys and sprint/fire exclusion — 571 / 5 / 0
-- [x] Core markers use the component's real adjacency/class gate. Full refusals wrap; small node labels stay short. This does not replace the constellation-card layout with the requested tree.
-- [x] Abilities can exchange compatible occupied slots or move into empty ones. Contextual grant resolution keeps a cleared starter slot from duplicating the ability moved elsewhere; tests cover fresh Caster swaps and fresh Swift moves, raw state and resolved grants.
-- [x] Dialogue top-row/numpad choices share the mouse dispatcher and ignore key repeats. Vendor Escape returns to dialogue rather than the pause menu.
-- [x] New fire cancels sprint; new sprint cancels held fire, with a CanFire guard. Sprint travels with saved moves; correction replay preserves current intent without replaying weapon RPCs. Component tests cover both input orders and saved flags; real multiplayer corrections and dialogue key input still need hands-on validation.
-- [x] Build and suite pass, 576 declarations accounted for through the local PowerShell audit. A test-prefix collision was detected and corrected before accepting the full run. Python status generation remains unavailable under the machine rule; STATE is unchanged. One helper Python editing invocation violated that rule and was disclosed; subsequent work used PowerShell/apply_patch.

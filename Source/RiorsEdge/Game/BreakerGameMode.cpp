@@ -575,7 +575,8 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
                 ABreakerTravelPoint::StaticClass(),
                 FTransform(YardForward.Rotation(), GateAt)))
             {
-                Gate->ExcludedDestinationId = ABreakerTravelPoint::FernhallDestinationId;
+                Gate->ExcludedDestinationId = bRiftInstance
+                    ? ABreakerTravelPoint::RiftDestinationId : ABreakerTravelPoint::FernhallDestinationId;
                 Gate->OnDestinationSelected.AddUObject(this, &ABreakerGameMode::HandleHubTravelSelected);
             }
 
@@ -1286,11 +1287,19 @@ void ABreakerGameMode::ResetBossEncounter()
     // The SAME boss comes back: the class is read off the body before it is
     // destroyed, so a Holdfast encounter does not reset into a Marshal.
     const TSubclassOf<ABreakerBossEnemy> BossClass = ActiveBoss->GetClass();
+    const FVector PreviousCenter = ActiveBoss->GetActorLocation();
     UE_LOG(LogTemp, Display, TEXT("[BreakerGym] boss encounter RESET on player death (O82): %s respawns whole."),
         *BossClass->GetName());
     ActiveBoss->Destroy();
     ActiveBoss = nullptr;
-    SpawnBossOfClass(BossClass);
+    SpawnBossOfClass(BossClass, bRiftInstance ? TOptional<FVector>(PreviousCenter) : TOptional<FVector>());
+    if (bRiftInstance && IsValid(ActiveBoss))
+    {
+        WaveEnemies.RemoveAll([](const TObjectPtr<ABreakerEnemy>& Enemy) { return !IsValid(Enemy) || Enemy->IsDeadEnemy(); });
+        ActiveBoss->ConfigureWave(GymAreaLevel);
+        WaveEnemies.Add(ActiveBoss);
+        MarkRiftTerminator(ActiveBoss);
+    }
 }
 
 void ABreakerGameMode::SpawnBossTest()
@@ -1314,7 +1323,7 @@ void ABreakerGameMode::SpawnBossCommand(const TArray<FString>& Args)
     SpawnBossOfClass(BossClass);
 }
 
-void ABreakerGameMode::SpawnBossOfClass(TSubclassOf<ABreakerBossEnemy> BossClass)
+void ABreakerGameMode::SpawnBossOfClass(TSubclassOf<ABreakerBossEnemy> BossClass, TOptional<FVector> EncounterCenter)
 {
     UWorld* World = GetWorld();
     if (!World || !bFieldFrameSet || !BossClass) return;
@@ -1331,7 +1340,21 @@ void ABreakerGameMode::SpawnBossOfClass(TSubclassOf<ABreakerBossEnemy> BossClass
     // derivations — but only just: the boss's gallery offsets are ±1900 and the
     // pocket's broken wall arc sits at 1800-2200 cm from centre, so a gallery
     // can land inside a ruin segment. Checked and reported rather than assumed.
-    const FVector ArenaCentre = Frame.At(ArenaDistance, 0.0f, 140.0f);
+    FVector ArenaCentre = EncounterCenter.IsSet() ? EncounterCenter.GetValue() : Frame.At(ArenaDistance, 0.0f, 140.0f);
+    if (EncounterCenter.IsSet())
+    {
+        FHitResult Floor;
+        const FVector TraceTop = ArenaCentre + FVector(0, 0, 1000);
+        const FVector TraceBottom = ArenaCentre - FVector(0, 0, 2000);
+        FCollisionQueryParams Query(SCENE_QUERY_STAT(RiftBossPlacement), false);
+        if (!World->LineTraceSingleByObjectType(Floor, TraceTop, TraceBottom,
+            FCollisionObjectQueryParams(ECC_WorldStatic), Query))
+        {
+            UE_LOG(LogTemp, Error, TEXT("[Rift] boss spawn refused: no floor at %s."), *ArenaCentre.ToString());
+            return;
+        }
+        ArenaCentre.Z = Floor.ImpactPoint.Z + 140.0f;
+    }
     if (CombatPocketRadius < BossArenaClearanceCm)
     {
         UE_LOG(LogTemp, Warning,
@@ -1348,7 +1371,7 @@ void ABreakerGameMode::SpawnBossOfClass(TSubclassOf<ABreakerBossEnemy> BossClass
         BossClass, ArenaCentre, (-Frame.Forward).Rotation(), Params);
     if (!Boss) return;
 
-    Boss->ConfigureEncounter(ArenaCentre, 0.0f);
+    Boss->ConfigureEncounter(Boss->GetActorLocation(), 0.0f);
     Boss->SetAreaLevel(GymAreaLevel);
     // Rank Boss is authored in the class and must NOT be overwritten here;
     // SetAreaLevel rebuilds the chassis against whatever rank the archetype
@@ -1358,8 +1381,9 @@ void ABreakerGameMode::SpawnBossOfClass(TSubclassOf<ABreakerBossEnemy> BossClass
     ActiveBoss = Boss;
 
     UE_LOG(LogTemp, Display,
-        TEXT("[BreakerGym] %s spawned at the elite arena (%.0f cm forward), area level %d, %.0f health. Walk to it."),
-        *Boss->GetClass()->GetName(), ArenaDistance, GymAreaLevel, Boss->GetMonsterMaxHealth());
+        TEXT("[BreakerBoss] %s spawned at %s (%s), area level %d, %.0f health."),
+        *Boss->GetClass()->GetName(), *Boss->GetActorLocation().ToString(),
+        EncounterCenter.IsSet() ? TEXT("rift field") : TEXT("gym arena"), GymAreaLevel, Boss->GetMonsterMaxHealth());
 }
 
 void ABreakerGameMode::HandleBossDefeated()
@@ -3338,7 +3362,7 @@ ABreakerSkirmisherEnemy* ABreakerGameMode::SpawnSkirmisherNearCover(const FVecto
 
 void ABreakerGameMode::StartNextWave()
 {
-    if (!GetWorld() || IsWaveActive()) return;
+    if (!GetWorld() || bRiftRunCompleted || IsWaveActive()) return;
     APawn* PlayerPawn = GetWorld()->GetFirstPlayerController() ? GetWorld()->GetFirstPlayerController()->GetPawn() : nullptr;
     if (!PlayerPawn) return;
 
@@ -3355,6 +3379,10 @@ void ABreakerGameMode::StartNextWave()
     // walker of this array.
     WaveEnemies.RemoveAll([](const TObjectPtr<ABreakerEnemy>& Enemy) { return !IsValid(Enemy) || Enemy->IsDeadEnemy(); });
 
+    const FBreakerWaveComposition Composition =
+        UBreakerWaveBudgetLibrary::SolveWave(CurrentWave, 1, WaveBudget);
+    const float EncounterRadius = bRiftInstance && Composition.bBoss
+        ? FMath::Max(WaveSpawnPackRadiusCm, BossArenaClearanceCm) : WaveSpawnPackRadiusCm;
     const FVector Origin = PlayerPawn->GetActorLocation();
     const FVector Forward = PlayerPawn->GetActorForwardVector().GetSafeNormal2D();
     // Wave mode deliberately spawns around the PLAYER rather than at the
@@ -3405,7 +3433,7 @@ void ABreakerGameMode::StartNextWave()
         float Afforded = 0.0f;
         const bool bFits = UBreakerCoverLayoutLibrary::SolveContainedSpawnCentre(
             FieldParams, PlayerF, PlayerR, FacingF, FacingR,
-            WaveSpawnBandMinCm, SpawnDistance, WaveSpawnPackRadiusCm,
+            WaveSpawnBandMinCm, SpawnDistance, EncounterRadius,
             CentreF, CentreR, Afforded);
         ArenaCenter = Frame.At(CentreF, CentreR, 0.0f);
         if (!bFits)
@@ -3428,8 +3456,7 @@ void ABreakerGameMode::StartNextWave()
     // UBreakerWaveBudgetLibrary is §4.2's arithmetic as pure world-free maths,
     // so what a wave IS can be asserted by automation, and all this function
     // does is place the answer in the world.
-    const FBreakerWaveComposition Composition =
-        UBreakerWaveBudgetLibrary::SolveWave(CurrentWave, 1, WaveBudget);
+
     FString IllegalReason;
     if (!UBreakerWaveBudgetLibrary::IsCompositionLegal(Composition, 1, WaveBudget, IllegalReason))
     {
@@ -3447,15 +3474,23 @@ void ABreakerGameMode::StartNextWave()
     // SOURCE — a wave budget spent alongside it would blow the cap from two
     // directions at once and neither would know about the other.
     //
-    // O214 IS VIOLATED HERE and recorded rather than faked: the Act I rift
-    // ends on The Holdfast, and this spawns the Marshal in every rift. A wave
-    // knows nothing of which rift it is in, and nothing carries the mission
-    // beat's "boss" name (Data/missions.json) down to the wave — that
-    // rift-to-boss-class plumbing does not exist, and picking the Holdfast
-    // here for every rift would be the same violation the other way round.
+    // Rift identity comes from the same authored mission content that names
+    // its completion beat. The gym retains its explicitly authored Marshal.
     if (Composition.bBoss)
     {
-        SpawnBossTest();
+        const UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>();
+        const FName BossName = bRiftInstance && Session
+            ? UBreakerMissionLibrary::BossForRift(Session->PendingRift) : NAME_None;
+        const TSubclassOf<ABreakerBossEnemy> BossClass = BossName.IsNone()
+            ? TSubclassOf<ABreakerBossEnemy>(ABreakerBossEnemy::StaticClass())
+            : ABreakerBossEnemy::ClassForBossName(BossName);
+        if (!BossClass)
+        {
+            UE_LOG(LogTemp, Error, TEXT("[Rift] authored boss '%s' has no runtime class."), *BossName.ToString());
+            return;
+        }
+        SpawnBossOfClass(BossClass, bRiftInstance
+            ? TOptional<FVector>(ArenaCenter + FVector(0, 0, 140)) : TOptional<FVector>());
         if (IsValid(ActiveBoss))
         {
             ActiveBoss->ConfigureWave(AreaLevel);

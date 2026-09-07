@@ -985,6 +985,20 @@ TArray<FName> UBreakerMissionLibrary::ArrivalFlagsFor(FName DestinationId, const
     return Out;
 }
 
+FName UBreakerMissionLibrary::BossForRift(const FBreakerRiftDefinition& Rift)
+{
+    if (!Rift.IsSet()) return NAME_None;
+    for (const FBreakerMissionDefinition& Mission : GetMissions())
+        for (const FBreakerMissionBeat& Beat : Mission.Beats)
+        {
+            if (Beat.Kind != EBreakerMissionBeatKind::Boss || Beat.Boss.IsNone()) continue;
+            const FBreakerMissionRift* Authored = BreakerMissionFindRift(Beat.Rift);
+            if (Authored && UBreakerZoneBuilder::FernhallRiftFor(Authored->Yard).AreaName.EqualTo(Rift.AreaName))
+                return Beat.Boss;
+        }
+    return NAME_None;
+}
+
 TArray<FName> UBreakerMissionLibrary::RiftCompletionFlagsFor(const FBreakerRiftDefinition& Rift, const FBreakerQuestFlagSet& Flags)
 {
     TArray<FName> Out;

@@ -138,6 +138,7 @@ namespace BreakerHubLayout
     constexpr int32 BoundaryPillarCount = 16;
     constexpr float VendorForward = 1800.0f;
     constexpr float VendorLateral = 900.0f;
+    constexpr float VendorApproachOffset = 350.0f;
     constexpr float TravelPointForward = -1800.0f;
 }
 
@@ -210,6 +211,38 @@ void UBreakerHubBuilder::BuildVendors(UWorld* World, const FBreakerHubFrame& Fra
 {
     using namespace BreakerHubLayout;
 
+    const FRotator StationYaw = Frame.Forward.Rotation();
+    // Open fronts face arrival. Posts frame the stalls without occupying the
+    // approach to either NPC; the rear walls and roofs give each shop a room.
+    for (const float Side : { -VendorLateral, VendorLateral })
+    {
+        const bool bForge = Side < 0.0f;
+        HubSpawnShape(World, HubShapeCube, Frame.At(VendorForward - 100.0f, Side, 350.0f),
+            FVector(10.0f, 9.0f, 0.30f), StationYaw,
+            bForge ? HubPaletteRust : HubPaletteOffWhite, true, TEXT("Runtime_HubStallRoof"));
+        HubSpawnShape(World, HubShapeCube, Frame.At(VendorForward + 390.0f, Side, 160.0f),
+            FVector(0.24f, 9.0f, 3.2f), StationYaw, HubPaletteConcrete, true, TEXT("Runtime_HubStallBack"));
+        for (const float PostSide : { -410.0f, 410.0f })
+        {
+            HubSpawnShape(World, HubShapeCube, Frame.At(VendorForward - 550.0f, Side + PostSide, 170.0f),
+                FVector(0.30f, 0.30f, 3.4f), StationYaw, HubPaletteStone, true, TEXT("Runtime_HubStallPost"));
+        }
+        HubSpawnShape(World, HubShapeCube, Frame.At(VendorForward - 555.0f, Side, 315.0f),
+            FVector(0.26f, 8.5f, 0.30f), StationYaw, HubPaletteAmber, false, TEXT("Runtime_HubStallFascia"));
+    }
+    // The forge chimney and stocked rear shelves distinguish the two shops
+    // without adding new NPCs or interaction targets.
+    HubSpawnShape(World, HubShapeCube, Frame.At(VendorForward + 220.0f, -VendorLateral - 230.0f, 260.0f),
+        FVector(1.0f, 1.0f, 5.2f), StationYaw, HubPaletteStone, true, TEXT("Runtime_HubForgeChimney"));
+    for (const float ShelfHeight : { 60.0f, 150.0f, 240.0f })
+    {
+        HubSpawnShape(World, HubShapeCube, Frame.At(VendorForward + 300.0f, VendorLateral, ShelfHeight),
+            FVector(1.2f, 6.0f, 0.16f), StationYaw, HubPaletteRust, true, TEXT("Runtime_HubSupplyShelf"));
+        for (const float CrateSide : { -170.0f, 150.0f })
+            HubSpawnShape(World, HubShapeCube, Frame.At(VendorForward + 300.0f, VendorLateral + CrateSide, ShelfHeight + 30.0f),
+                FVector(0.55f, 0.85f, 0.45f), StationYaw, HubPaletteAmber, true, TEXT("Runtime_HubStoredSupplies"));
+    }
+
     // Kess and the Quartermaster move here to live permanently, per the
     // brief: "The gym already spawns placeholder Kess (Forge Keeper) and a
     // Quartermaster — the hub is where they belong permanently." Spawned via
@@ -217,11 +250,12 @@ void UBreakerHubBuilder::BuildVendors(UWorld* World, const FBreakerHubFrame& Fra
     // SpawnQuartermaster, unmodified) so their dialogue, flags and vendor
     // hooks carry over with no new code.
     if (AStaticMeshActor* Forge = HubSpawnShape(World, HubShapeCube, Frame.At(VendorForward, -VendorLateral, 110.0f),
-        FVector(1.6f, 1.6f, 2.2f), FRotator::ZeroRotator, HubPaletteRust, true, TEXT("Runtime_HubForge")))
+        FVector(1.6f, 1.6f, 2.2f), StationYaw, HubPaletteRust, true, TEXT("Runtime_HubForge")))
     {
         HubAttachPropLight(Forge, FVector(0, 0, 40.0f), FLinearColor(1.0f, 0.62f, 0.26f), 900.0f, 700.0f);
     }
-    ABreakerNPC::SpawnForgeKeeper(World, Frame.At(VendorForward - 80.0f, -VendorLateral, 100.0f), (-Frame.Right).Rotation());
+    // NPC spawners add their capsule half-height; these positions are feet.
+    ABreakerNPC::SpawnForgeKeeper(World, Frame.At(VendorForward - VendorApproachOffset, -VendorLateral), (-Frame.Forward).Rotation());
 
     // Quartermaster's stall doubles as the supply prop and, through her
     // EXISTING unmodified dialogue (BreakerNPC::MakeQuartermasterDialogue,
@@ -235,13 +269,13 @@ void UBreakerHubBuilder::BuildVendors(UWorld* World, const FBreakerHubFrame& Fra
     // no new dialogue, no parallel quest mechanism was added; the vendor was
     // simply given a permanent home.
     HubSpawnShape(World, HubShapeCube, Frame.At(VendorForward, VendorLateral, 60.0f),
-        FVector(2.4f, 1.2f, 1.2f), FRotator::ZeroRotator, HubPaletteOffWhite, true, TEXT("Runtime_HubVendorStall"));
-    if (AStaticMeshActor* Crate = HubSpawnShape(World, HubShapeCube, Frame.At(VendorForward - 200.0f, VendorLateral, 55.0f),
-        FVector(1.1f, 1.1f, 1.1f), FRotator(0.0f, 12.0f, 0.0f), HubPaletteAmber, true, TEXT("Runtime_HubSupplyCrate")))
+        FVector(2.4f, 1.2f, 1.2f), StationYaw, HubPaletteOffWhite, true, TEXT("Runtime_HubVendorStall"));
+    if (AStaticMeshActor* Crate = HubSpawnShape(World, HubShapeCube, Frame.At(VendorForward + 150.0f, VendorLateral + 230.0f, 55.0f),
+        FVector(1.1f, 1.1f, 1.1f), StationYaw, HubPaletteAmber, true, TEXT("Runtime_HubSupplyCrate")))
     {
         HubAttachPropLight(Crate, FVector(0, 0, 90.0f), FLinearColor(1.0f, 0.68f, 0.28f), 700.0f, 600.0f);
     }
-    ABreakerNPC::SpawnQuartermaster(World, Frame.At(VendorForward - 80.0f, VendorLateral, 100.0f), Frame.Right.Rotation());
+    ABreakerNPC::SpawnQuartermaster(World, Frame.At(VendorForward - VendorApproachOffset, VendorLateral), (-Frame.Forward).Rotation());
 
     // THE STASH POINT, on the arrival side of the vendor crossbar: the
     // player walks up the spine from the gate, and the stash stands on it

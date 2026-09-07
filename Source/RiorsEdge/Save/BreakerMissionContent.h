@@ -199,4 +199,7 @@ public:
     // matched the way the validator matches it: the yard's definition from
     // UBreakerZoneBuilder::FernhallRiftFor, compared by AreaName.
     static TArray<FName> RiftCompletionFlagsFor(const FBreakerRiftDefinition& Rift, const FBreakerQuestFlagSet& Flags);
+    // Authored identity of a rift's boss, independent of whether the player
+    // has reached its story beat. Re-clears fight the same boss.
+    static FName BossForRift(const FBreakerRiftDefinition& Rift);
 };
