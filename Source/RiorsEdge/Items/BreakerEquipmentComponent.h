@@ -99,6 +99,8 @@ public:
     // player path. A veteran who owns anything at all is never touched.
     void EnsureStarterKit();
     UFUNCTION(BlueprintPure, Category="Equipment") const FBreakerEquipmentStats& GetStats() const { return CachedStats; }
+    // Refreshes the existing Increased contribution after an authoritative shot resolves.
+    void RefreshDamageRampContribution();
 
     // ---- Disclosure queries -----------------------------------------------
     // These answer "what happens if I equip this" BEFORE the click, so the

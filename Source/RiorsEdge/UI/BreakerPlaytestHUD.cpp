@@ -866,6 +866,20 @@ void ABreakerPlaytestHUD::DrawWeaponReadout(const ABreakerCharacter* Character)
     DrawTrack(RailX, RailY, RailW, RailH, RailFraction,
         bReloading ? BreakerUI::Orange : BreakerUI::System, BreakerUI::BorderRest);
 
+    const bool bRampPreview = IsCapturePreview() && FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureDamageRamp"));
+    if (Weapon->IsDamageRampEquipped() || bRampPreview)
+    {
+        const int32 Maximum = Weapon->GetDamageRampMaxStacks();
+        const int32 Stacks = bRampPreview ? FMath::Min(7, Maximum) : Weapon->GetDamageRampStacks();
+        const float Gap = S(3.0f);
+        const float CellWidth = (RailW - Gap * (Maximum - 1)) / FMath::Max(1, Maximum);
+        for (int32 Index = 0; Index < Maximum; ++Index)
+            DrawRect(Index < Stacks ? BreakerUI::Orange : BreakerUI::BorderRest,
+                RailX + Index * (CellWidth + Gap), RailY + S(12.0f), CellWidth, S(3.0f));
+        DrawSpecTextRight(BreakerStrings::Format(EBreakerStringKey::HudDamageRamp, Stacks, Maximum),
+            Right, RailY + S(20.0f), BreakerUI::TextSecondary, 11.0f);
+    }
+
     // The name on swap. Latched on the FALLING edge of IsSwapping, when the
     // new weapon is in the hand and its name is the right one; the preview
     // re-arms SwapStartTime on its own cadence.

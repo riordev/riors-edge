@@ -203,6 +203,8 @@ public:
     // absent plumbing.
     UFUNCTION(BlueprintPure, Category="Movement") double GetLastLedgeTraversalTime() const { return LastLedgeTraversalEndTime; }
     void NotifyLedgeTraversalCompleted();
+    uint32 GetTraversalInvalidationSerial() const { return TraversalInvalidationSerial; }
+    bool IsLastTraversalCompletionCurrent() const { return LastCompletionInvalidationSerial == TraversalInvalidationSerial; }
 
     // Pure rules, exposed for world-free tests (the house pattern).
     // A mantleable wall is near-vertical; a standable top is near-flat.
@@ -621,6 +623,9 @@ private:
     // Sentinel matches LastDashTime's: "never" is far in the past, so recency
     // reads need no separate has-ever flag.
     double LastLedgeTraversalEndTime = -1000.0;
+    uint32 TraversalInvalidationSerial = 0;
+    uint32 LastCompletionInvalidationSerial = 0;
+    void InvalidateTraversalContinuity();
     // The grounded cap as GetMaxSpeed computes it, factored so the bleed and
     // the cap read one expression and cannot drift.
     float GetGroundedSpeedCap() const;

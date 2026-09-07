@@ -5,11 +5,12 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
-## Cycle — Swift traversal income and real Damage Ramp
-- [ ] Replace Contact's retired wall-ride dependency with a brief purchased post-vault/mantle income grace, using real completed traversal and anti-farm limits.
-- [ ] Implement the authored Primary Damage Ramp affix with actual consecutive-hit stacks, weapon/DoT consumers and projectile ownership; make purchased Redline Trigger double accrual at Redline.
-- [ ] Review, build, census and run the full suite before landing; retain separate evidence for currently earned four-point progression and the later eight-point keystone path.
-Remaining repairs include later campaign benchmarks, other silent nodes, ability/weapon balance, rarity identities, arms/weapon art and audible combat polish.
+## Cycle — Earned Survivor rescue
+- [ ] Author the Act III Survivor quest, dialogue and ordered extraction/Anchor return benchmark, paying two more Doctrine points only for actual rescue.
+- [ ] Build a distinct preindustrial erased-Earth space with a physical Survivor escort, three finite Vestige encounter pockets and retryable failure; no boss replay or generic kill-counter completion.
+- [ ] Wire stable destination/map access, verified extraction and actual Anchor arrival, persistence and replay protection; extend the real campaign loop to six earned Doctrine.
+- [ ] Review, build, census, full suite and inspect the actual rescue space/escort before landing.
+Remaining repairs include the final campaign benchmark, silent nodes/affixes, ability balance, rarity identities, arms/weapon art and audible combat polish.
 ## Playtest queue (owner, 2026-09-07)
 Continue through the entire repair list in tested batches without stopping after each commit for a playtest. After repairs, execute the content phase below (owner instruction, 2026-09-07).
 - (ui, npcs, systems) Reduce menu density and clipping; repair NPC interaction flow, ability assignment and point spending; present Core as the authored tree rather than a node cloud; update the dev sandbox. Finish silent nodes and Caster progression.
@@ -105,6 +106,11 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - Four Niagara systems at `/Game/Breaker/FX/NS_<Moment>` with a `Color` user parameter, or a free Fab VFX pack placed there
 
 ## Done (last three cycles; older is git)
+### Swift traversal income and Damage Ramp — 623 / 5 / 0
+- [x] Contact now grants brief income after actual vault/mantle completion, with purchased ranks, fractional timing and the existing income/anti-farm caps. Corrected the wall ray that missed50–80cm vaults; real collision tests cover vault/mantle, obstruction, teleport, death and respec within the currently attainable four-point wallet.
+- [x] Ordinary Primary Damage Ramp rolls a per-stack Increased weapon bonus with ten-stack cap, once-per-shot hitscan/shotgun accrual and actual rocket impact ordering. Purchased Redline Trigger doubles accrual at Redline. Miss/swap/removal/death and stale projectile tokens reset safely; weapon DoT snapshots share the additive contribution.
+- [x] Visible ten-cell stack HUD and per-stack card wording; HUD preview inspected. Later Redline purchase test explicitly uses full authored eight-point wiring fixture, not current campaign reachability.
+- [x] Build/census clean (60 ordinary affixes);628 tests complete:623 passed,5 known,0 unexpected. Teleport fixture corrected to land on ground so ordinary airborne income cannot masquerade as Contact; original cancellation assertion preserved. Fresh real default loop passed24kills,2015XP,208Riftglass with reward persistence. STATE unchanged.
 ### Parry, special damage sources and compact inventory — 621 / 5 / 0
 - [x] Purchased Parry is a rebindable V action with a frontal one-hit window, Read extension, successful Counterweight bonus, owner replication and combat recovery timing. Real purchase/input/runtime tests cover exclusions, cooldown, respec and death; ready HUD preview inspected.
 - [x] Gear/tree damage More sources share strongest-three selection across weapon, ability, shared and DoT lanes. Reserve Surge rolls an ability payoff while resource-low with the actual paired weapon downside; live equip/direct/DoT/removal and counterfeit rejection are covered.
@@ -115,9 +121,3 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - [x] Marshal's visible command module receives weakpoint hits; inherited head orb stays disabled across body/revive/visibility paths. Exposure is applied at spawn, follows real Orders/front-break windows and lights at rest. Compact ribbed module and telescoping mast replace the disconnected slab; Holdfast presentation remains separate.
 - [x] Build/census clean (59 ordinary affixes); 621 tests complete: 616 passed, 5 known, 0 unexpected. Fixed historical parity stays 0.542; unchanged rolled search measures 0.569 cap and 0.732 endgame. The larger ability balance deficit remains open; no pins or search fixtures changed.
 - [x] Actual ordinary item card and rear-closed/front-raised Marshal frames inspected. Fresh earned Act I-II loop passed 111 kills and 4 Doctrine. Photo probe waits the authored full order cadence and repositions its live player outside melee on real floor; no damage-feel claim. STATE unchanged.
-### Three silent nodes and Marshal armour — 614 / 5 / 0
-- [x] Tank Overpressure persists as a real fused charge with free re-press detonation, rank-two enemy attachment, Demolition's two placements and cancellation on unequip/death.
-- [x] Gunsmith deployables have real placement timers, Dead Ground band timing, input cancellation and transactional validation that preserves existing objects on failure. Four base cast durations are editable in Data/abilities.json.
-- [x] Support Blackout Protocol dynamically suppresses healing and beneficial buffs for its marked enemies inside Suppress at Resonant; leaving, losing marks/Charge, source death and overlapping/released zones restore behavior correctly.
-- [x] Marshal shield is smaller framed armour with command markings, exposing its head/shoulders. Actual earned campaign boss frame inspected. Rear apparatus/hitbox mismatch is the next repair.
-- [x] Build and canonical census clean (135 ability numbers); all 619 tests complete: 614 passed, 5 known, 0 unexpected. Runtime fixtures corrected actual controller viewpoint, engine timer/world initialization and duplicate equipment setup without weakening assertions. Fresh earned Act I-II integration passed 111 kills and exactly 4 Doctrine points; accelerated damage, no combat-feel claim. STATE unchanged.

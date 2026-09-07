@@ -107,6 +107,7 @@
         "equipment.rarityChoices": "FIVE RARITIES · FIND YOUR BUILD",
         "hud.parry.label": "PARRY",
         "hud.parry.active": "GUARD",
-        "hud.parry.success": "PARRIED"
+        "hud.parry.success": "PARRIED",
+        "hud.weapon.damageRamp": "DAMAGE RAMP %d / %d"
 	}
 }

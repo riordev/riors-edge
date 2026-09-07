@@ -1,4 +1,5 @@
 #include "Weapons/BreakerRocketProjectile.h"
+#include "Weapons/BreakerWeaponComponent.h"
 
 #include "Combat/BreakerCombatComponent.h"
 #include "Components/PointLightComponent.h"
@@ -134,6 +135,20 @@ void ABreakerRocketProjectile::InitializeRocket(const FBreakerDamageRequest& InD
     Movement->Velocity = GetActorForwardVector() * Speed;
 }
 
+void ABreakerRocketProjectile::InitializeDamageRamp(UBreakerWeaponComponent* Weapon, uint32 Token)
+{
+    RampWeapon = Weapon;
+    RampToken = Token;
+}
+
+void ABreakerRocketProjectile::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    if (HasAuthority() && RampToken != 0)
+        if (UBreakerWeaponComponent* Weapon = RampWeapon.Get()) Weapon->ResolveDamageRampShot(RampToken, false);
+    RampToken = 0;
+    Super::EndPlay(EndPlayReason);
+}
+
 void ABreakerRocketProjectile::BeginPlay()
 {
     Super::BeginPlay();
@@ -156,8 +171,9 @@ void ABreakerRocketProjectile::HandleImpact(UPrimitiveComponent* HitComponent, A
 
 void ABreakerRocketProjectile::Explode(const FVector& Location)
 {
-    if (bExploded) return;
+    if (!HasAuthority() || bExploded) return;
     bExploded = true;
+    bool bDealtDamage = false;
 
     TArray<AActor*> Candidates;
     UGameplayStatics::GetAllActorsOfClass(this, AActor::StaticClass(), Candidates);
@@ -182,8 +198,12 @@ void ABreakerRocketProjectile::Explode(const FVector& Location)
         // The firing request normally already carries the shooter; fall back to
         // the spawn instigator so a rocket fired without one still credits.
         if (!AreaDamage.Instigator.IsValid()) AreaDamage.SetInstigator(GetInstigator());
-        Combat->ReceiveDamage(AreaDamage);
+        const FBreakerDamageResult Result = Combat->ReceiveDamage(AreaDamage);
+        bDealtDamage |= !Result.bDodged && Result.HealthDamage + Result.ShieldDamage > 0.0f;
     }
+
+    if (UBreakerWeaponComponent* Weapon = RampWeapon.Get()) Weapon->ResolveDamageRampShot(RampToken, bDealtDamage);
+    RampToken = 0;
 
     MulticastExplosionCosmetics(Location, ExplosionRadius);
     // The rocket is its own explosion: it stops, goes inert, blooms to the

@@ -1565,10 +1565,9 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
     // Makes SHORT walls worth riding. Without a grace period after contact is
     // lost, a two-metre wall pays nothing and the branch quietly demands
     // architecture the field does not always have.
-    // WAITING ON: the wall-ride generation path holding credit open past
-    // contact loss.
+    // O144 retired wall-ride. Contact now rewards the replacement verbs.
     Node = MakeNode(TEXT("Swift.Kinetic.Contact"), TEXT("Contact"),
-        TEXT("Wall ride Momentum generation continues briefly after losing contact."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 2, 1);
+        TEXT("After completing a vault or mantle, gain 8 Momentum per second for 0.35/0.70 seconds at ranks 1/2. Shares the movement income cap and traversal interval."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 2, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Contact.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -2184,9 +2183,8 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftFrenzyTree()
     // compliant precisely because it adds no percentage. It is therefore
     // un-authorable as an effect twice over: there is no stat target for a
     // ramp's accrual rate, and inventing an Increased Damage line in its place
-    // would be the affix duplication that same section forbids. The Redline
-    // condition IS expressible; there is simply nothing legal to attach it to.
-    // WAITING ON: the Damage Ramp affix reading this tag when it accrues.
+    // would be the affix duplication that same section forbids. The weapon's
+    // Damage Ramp consumer doubles accrual once per successful shot at Redline.
     Node = MakeNode(TEXT("Swift.Frenzy.RedlineTrigger"), TEXT("Redline Trigger"),
         TEXT("At Redline your weapon is treated as a cadence tier faster for Damage Ramp, so its stacks build twice as quickly."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Swift.Frenzy.Overrev"));

@@ -48,8 +48,8 @@ enum class EBreakerAffixCategory : uint8
 
 // How a rolled value combines during stat aggregation. Flat values sum first,
 // then all Increased percentages sum into a single additive bucket applied
-// once. More multipliers are reserved for tree/Anomalous rule rewrites and
-// multiply individually; affixes must not use them.
+// once. Damage More sources are restricted to trees and validated special-rarity
+// affixes, selected jointly under the shared three-source budget.
 UENUM(BlueprintType)
 enum class EBreakerStatBucket : uint8
 {
@@ -188,6 +188,8 @@ enum class EBreakerStatTarget : uint8
     // at the same tier, which is what stops it being strictly better than the
     // narrow lines it can substitute for.
     SharedDamage,
+    // Primary-only Increased weapon damage per earned consecutive-hit stack.
+    WeaponDamageRamp,
     Count UMETA(Hidden)
 };
 
@@ -512,6 +514,7 @@ struct RIORSEDGE_API FBreakerEquipmentStats
     // Added Damage, in percentage points of base weapon damage; combat reads it
     // through the DamageMultiplier attribute's Flat lane, never from here.
     UPROPERTY(BlueprintReadOnly) float AddedDamagePercent = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float DamageRampPerStack = 0.0f;
     // DISPLAY ONLY. Increased damage from conditional lines that are live RIGHT
     // NOW, in whole percent. Zero on a rig with no movement component, which is
     // why the aggregation tests still read clean numbers.

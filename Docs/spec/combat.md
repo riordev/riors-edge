@@ -146,6 +146,13 @@ Distance falloff is per-pellet geometry evaluated at the pellet, not a
 stat-layer multiplier. Weak point multipliers are per archetype and bounded.
 Fire rate is a named, watched, uncapped lane.
 
+**Damage Ramp is a Primary prefix with at most ten consecutive-hit stacks.**
+A damaging shot adds one stack for subsequent shots; pellets and splash victims
+do not each add a stack. Purchased Redline Trigger adds two while at Redline.
+Its per-stack percentage joins Increased weapon damage, including weapon DoT
+snapshots. A miss, weapon swap, removal or death clears the streak. Projectiles
+advance or break the streak in impact order; an old weapon's late impact cannot rebuild it.
+
 **Melee coefficients read the full weapon base, never a per-pellet share.**
 Reading the pellet makes the shotgun the worst melee stat stick in the game and
 the sniper the best, which inverts what every player expects from both.

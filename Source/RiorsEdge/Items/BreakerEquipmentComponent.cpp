@@ -13,6 +13,7 @@
 #include "Items/BreakerItemBaseStats.h"
 #include "Items/BreakerLootLibrary.h"
 #include "Net/UnrealNetwork.h"
+#include "Weapons/BreakerWeaponComponent.h"
 
 UBreakerEquipmentComponent::UBreakerEquipmentComponent()
 {
@@ -990,6 +991,7 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         {
             const FBreakerAffixDefinition* Definition = UBreakerAffixLibrary::FindAffix(Pool, Rolled.AffixId);
             if (!Definition) continue;
+            if (Definition->StatTarget == EBreakerStatTarget::WeaponDamageRamp && Item.Slot != EBreakerEquipSlot::Primary) continue;
 
             float Value = Rolled.Value;
             if (TierUplift > 0)
@@ -1153,6 +1155,7 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::ElementalDamageReduction)],
         0.0f, FBreakerEquipmentStats::ElementalResistanceCapPercent);
     Stats.CriticalChanceBonus = FlatByTarget[static_cast<int32>(EBreakerStatTarget::CriticalChance)] / 100.0f;
+    Stats.DamageRampPerStack = FMath::Max(0.0f, IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::WeaponDamageRamp)]);
     Stats.CriticalMultiplierBonus = FlatByTarget[static_cast<int32>(EBreakerStatTarget::CriticalDamage)] / 100.0f;
     Stats.SlideSpeedMultiplier = Increased(EBreakerStatTarget::SlideSpeed);
     // DEADFALL's bill. An ordinary NEGATIVE Increased percentage into the same
@@ -1312,7 +1315,17 @@ void UBreakerEquipmentComponent::RefreshBuildConditions()
 void UBreakerEquipmentComponent::RecalculateStats()
 {
     CachedStats = AggregateStats(Equipped, &CachedContribution, ActiveConditions);
+    if (UBreakerWeaponComponent* Weapon = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerWeaponComponent>() : nullptr)
+    {
+        const int32 Stacks = Weapon->SynchronizeDamageRampEquipment();
+        CachedContribution.AddIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier, CachedStats.DamageRampPerStack * Stacks);
+    }
     ApplyStatsToAttributes();
+}
+
+void UBreakerEquipmentComponent::RefreshDamageRampContribution()
+{
+    if (HasAttributeAuthority()) RecalculateStats();
 }
 
 void UBreakerEquipmentComponent::ApplyStatsToAttributes()

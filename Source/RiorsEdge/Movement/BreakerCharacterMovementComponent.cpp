@@ -1,5 +1,6 @@
 #include "Movement/BreakerCharacterMovementComponent.h"
 #include "Classes/BreakerMomentumComponent.h"
+#include "Combat/BreakerCombatComponent.h"
 
 #include "Attributes/BreakerAttributeSet.h"
 #include "Items/BreakerEquipmentComponent.h"
@@ -720,6 +721,7 @@ void UBreakerCharacterMovementComponent::OnMovementModeChanged(EMovementMode Pre
 void UBreakerCharacterMovementComponent::OnTeleported()
 {
     Super::OnTeleported();
+    InvalidateTraversalContinuity();
     // Only distance travelled AFTER the teleport can earn a landing credit.
     bTrackingResourceFall = IsFalling() && UpdatedComponent != nullptr;
     if (bTrackingResourceFall)
@@ -1147,6 +1149,15 @@ void UBreakerCharacterMovementComponent::ApplyAirSteering(float DeltaTime)
 void UBreakerCharacterMovementComponent::NotifyLedgeTraversalCompleted()
 {
     LastLedgeTraversalEndTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    LastCompletionInvalidationSerial = TraversalInvalidationSerial;
+}
+
+void UBreakerCharacterMovementComponent::InvalidateTraversalContinuity()
+{
+    ++TraversalInvalidationSerial;
+    bWantsLedgeTraversal = false;
+    bHasPendingTraversal = false;
+    if (IsTraversingLedge()) FinishLedgeTraversal(false);
 }
 
 // ---- The traversal's own movement mode (the custom prediction pass) -------
@@ -1291,6 +1302,9 @@ void UBreakerCharacterMovementComponent::BeginLedgeTraversal(const FBreakerLedge
 
 void UBreakerCharacterMovementComponent::FinishLedgeTraversal(bool bCompleted)
 {
+    const UBreakerCombatComponent* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    if (Combat && Combat->IsDead()) bCompleted = false;
+    if (!bCompleted) ++TraversalInvalidationSerial;
     const EBreakerLedgeVerb CompletedVerb = TraversalVerb;
     TraversalVerb = EBreakerLedgeVerb::None;
     SetMovementMode(MOVE_Falling);
@@ -1497,7 +1511,9 @@ bool UBreakerCharacterMovementComponent::ResolveLedgeTraversal(FBreakerLedgeTrav
     FCollisionQueryParams Params(SCENE_QUERY_STAT(BreakerLedgeTraversal), false, Owner);
 
     FHitResult WallHit;
-    const FVector WallTraceStart = ActorLocation + Up * 15.0f;
+    // A chest-height ray passed above every 50-80cm vault. Start within the
+    // lowest authored band; the downward probe still enforces the actual top.
+    const FVector WallTraceStart = FeetLocation + Up * (LedgeMinimumHeightCm - LedgeBandEpsilonCm);
     if (!World->LineTraceSingleByChannel(WallHit, WallTraceStart, WallTraceStart + Forward * MantleReachCm, ECC_Visibility, Params)
         || !IsMantleableWallNormal(WallHit.ImpactNormal.Z))
     {

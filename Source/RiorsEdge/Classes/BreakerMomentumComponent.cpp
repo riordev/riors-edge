@@ -46,6 +46,7 @@ void UBreakerMomentumComponent::BeginPlay()
         if (UBreakerCombatComponent* Combat = Owner->FindComponentByClass<UBreakerCombatComponent>())
         {
             Combat->OnDamageReceived.AddDynamic(this, &UBreakerMomentumComponent::HandleDamageReceived);
+            Combat->OnDeath.AddDynamic(this, &UBreakerMomentumComponent::ClearTraversalIncome);
             // Feed (Class-Kits §1.3 F6) rides the attacker-side kill event.
             Combat->OnKillDealt.AddDynamic(this, &UBreakerMomentumComponent::HandleKillDealt);
         }
@@ -242,7 +243,26 @@ void UBreakerMomentumComponent::HandleProgressionChanged()
     }
     const UBreakerProgressionComponent* Progression = CachedProgression.Get();
     bIsSwift = Progression && Progression->GetProgressionState().PermanentClass == EBreakerClassId::Swift;
-    if (!bIsSwift) PendingGrants = 0.0f;
+    const int32 NewContactRank = bIsSwift ? GetFrenzyNodeRank(TEXT("Swift.Kinetic.Contact")) : 0;
+    if (NewContactRank <= 0 || CachedContactRank <= 0)
+    {
+        ContactWindowStart = ContactWindowEnd = ContactCreditedThrough = -1000.0;
+        if (const UBreakerCharacterMovementComponent* Movement = GetBreakerMovement())
+            ContactEligibleAfterTraversal = Movement->GetLastLedgeTraversalTime();
+    }
+    CachedContactRank = NewContactRank;
+    if (!bIsSwift) { PendingGrants = 0.0f; ClearTraversalIncome(); }
+}
+
+void UBreakerMomentumComponent::ClearTraversalIncome()
+{
+    ContactWindowStart = ContactWindowEnd = ContactCreditedThrough = -1000.0;
+    if (const UBreakerCharacterMovementComponent* Movement = GetBreakerMovement())
+    {
+        LastObservedTraversalTime = Movement->GetLastLedgeTraversalTime();
+        ContactEligibleAfterTraversal = LastObservedTraversalTime;
+        ObservedTraversalInvalidation = Movement->GetTraversalInvalidationSerial();
+    }
 }
 
 bool UBreakerMomentumComponent::IsActiveForOwner() const
@@ -568,9 +588,11 @@ void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
     // One deterministic spend observation per tick, so Feed's "cost most
     // recently paid" is current even on frames where this loop writes nothing.
     ObserveExternalSpend();
-    if (!IsActiveForOwner())
+    const UBreakerCombatComponent* Combat = Owner->FindComponentByClass<UBreakerCombatComponent>();
+    if (!IsActiveForOwner() || (Combat && Combat->IsDead()))
     {
         PendingGrants = 0.0f;
+        ClearTraversalIncome();
         bHasLastLocation = false;
         // A non-Swift owner holds no shield entry: tear down anything a class
         // swap left behind (bGrounded=false composes to "remove").
@@ -580,6 +602,18 @@ void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
 
     const UBreakerCharacterMovementComponent* Movement = GetBreakerMovement();
     if (!Movement) return;
+    if (ObservedTraversalInvalidation != Movement->GetTraversalInvalidationSerial())
+    {
+        ContactWindowStart = ContactWindowEnd = ContactCreditedThrough = -1000.0;
+        ObservedTraversalInvalidation = Movement->GetTraversalInvalidationSerial();
+        // A new, valid completion AFTER a teleport may occur before this
+        // component's next tick. Discard only the old/discontinuous source.
+        if (!Movement->IsLastTraversalCompletionCurrent())
+        {
+            LastObservedTraversalTime = Movement->GetLastLedgeTraversalTime();
+            ContactEligibleAfterTraversal = LastObservedTraversalTime;
+        }
+    }
 
     const FVector Location = Owner->GetActorLocation();
     const float DisplacementRate = bHasLastLocation ? FVector::Dist2D(Location, LastLocation) / DeltaTime : 0.0f;
@@ -633,12 +667,19 @@ void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
         {
             LastTraversalGrantTime = Now;
             PendingGrants += LedgeTraversalGrant;
+            if (CachedContactRank > 0 && LastTraversalTime > ContactEligibleAfterTraversal)
+            {
+                ContactWindowStart = ContactCreditedThrough = LastTraversalTime;
+                ContactWindowEnd = LastTraversalTime + FMath::Max(0.0f,
+                    CachedContactRank >= 2 ? ContactRankTwoSeconds : ContactRankOneSeconds);
+            }
         }
     }
 
     if (IsInSafeZone())
     {
         PendingGrants = 0.0f;
+        ClearTraversalIncome();
         RefreshState();
         return;
     }
@@ -650,6 +691,13 @@ void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
     }
     if (bAirborne && CreditedAirborneSeconds > 0.0f) Rate += AirborneRate * CreditedAirborneSeconds / DeltaTime;
     if (bSliding && Speed >= ThresholdSpeed) Rate += SlideRate;
+    // Contact is additive under the SAME generation budget. Intersect the
+    // completion window with this frame; hitches cannot extend its lifetime.
+    const double ContactStart = FMath::Max(ContactWindowStart, FMath::Max(Now - DeltaTime, ContactCreditedThrough));
+    const double ContactEnd = FMath::Min(Now, ContactWindowEnd);
+    const float ContactSeconds = static_cast<float>(FMath::Max(0.0, ContactEnd - ContactStart));
+    ContactCreditedThrough = FMath::Max(ContactCreditedThrough, Now);
+    Rate += AirborneRate * ContactSeconds / DeltaTime;
 
     // An active loop override (Overdrive) multiplies both the generated rate
     // and the per-second cap, so doubling generation is not silently eaten by

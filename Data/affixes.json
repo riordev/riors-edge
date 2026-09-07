@@ -1,6 +1,23 @@
 {
 	"affixes": [
 		{
+			"id": "Weapon.DamageRamp",
+			"pool": "slice",
+			"displayName": "Damage Ramp per Stack",
+			"category": "Prefix",
+			"target": "WeaponDamageRamp",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Primary"
+			],
+			"valueAtT12": 0.5,
+			"valueAtT1": 2,
+			"rollWeight": 70,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
 			"id": "Core.Health",
 			"pool": "slice",
 			"displayName": "Health",

@@ -61,3 +61,13 @@ placeholders). It consumes the shared strongest-three gear/tree damage-source
 budget and carries `Downside.Riftburn`, reducing Increased weapon damage.
 The paired bill is 12% at ordinary tiers; existing tier extrapolation also
 scales that downside at T0 and T-1. Ordinary affixes cannot grant damage More.
+
+## Damage Ramp
+
+`Weapon.DamageRamp` in `affixes.json` is a Primary prefix. Its per-stack
+Increased weapon damage anchors are 0.5% at T12 and 2% at T1 (O2 placeholders).
+The current tier extrapolation produces 4.4% at T0 and 7.2% at T-1; these are
+not the old eight-tier draft's values. Ten stacks is the maximum. Each damaging
+shot earns one stack for later shots; purchased Redline Trigger earns two at
+Redline. A miss, swap, removal or death clears the streak. Projectile weapons
+earn stacks on impact, and pellets or multiple blast victims count once.

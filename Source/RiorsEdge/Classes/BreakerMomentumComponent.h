@@ -70,6 +70,9 @@ public:
     // O2 PLACEHOLDER: authored node windows and one-landing conversion caps.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float ReadTheRoomRankOneSeconds = 4.5f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float ReadTheRoomRankTwoSeconds = 6.0f;
+    // O2: Contact replaces the retired wall-ride node with completed traversal income.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float ContactRankOneSeconds = 0.35f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float ContactRankTwoSeconds = 0.70f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float LandingMinimumDistanceCm = 600.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float LandingRankOnePerMeter = 2.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float LandingRankTwoPerMeter = 3.0f;
@@ -263,6 +266,7 @@ public:
 
 private:
     UFUNCTION() void HandleDamageReceived(const FBreakerDamageResult& Result);
+    UFUNCTION() void ClearTraversalIncome();
 
     UBreakerCharacterMovementComponent* GetBreakerMovement() const;
     bool IsInSafeZone() const;
@@ -318,6 +322,12 @@ private:
     // was actually paid (the anti-farm interval reads this one).
     double LastObservedTraversalTime = -1000.0;
     double LastTraversalGrantTime = -1000.0;
+    int32 CachedContactRank = 0;
+    uint32 ObservedTraversalInvalidation = 0;
+    double ContactEligibleAfterTraversal = -1000.0;
+    double ContactWindowStart = -1000.0;
+    double ContactWindowEnd = -1000.0;
+    double ContactCreditedThrough = -1000.0;
 
     // ---- Frenzy rule-half state (Class-Kits §1.3) -------------------------
     // Rhythm's consecutive-hit counter (F4). Hitscan only: a rocket's shot

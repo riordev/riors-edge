@@ -645,6 +645,73 @@ void UBreakerWeaponComponent::GetLifetimeReplicatedProps(TArray<FLifetimePropert
     DOREPLIFETIME(UBreakerWeaponComponent, bSwapping);
     DOREPLIFETIME(UBreakerWeaponComponent, SlotOneArchetype);
     DOREPLIFETIME(UBreakerWeaponComponent, SlotTwoArchetype);
+    DOREPLIFETIME_CONDITION(UBreakerWeaponComponent, DamageRampStacks, COND_OwnerOnly);
+}
+
+float UBreakerWeaponComponent::GetDamageRampPerStack() const
+{
+    const UBreakerEquipmentComponent* Equipment = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>() : nullptr;
+    return CurrentSlot == 1 && Equipment ? Equipment->GetStats().DamageRampPerStack : 0.0f;
+}
+
+int32 UBreakerWeaponComponent::SynchronizeDamageRampEquipment()
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority()) return DamageRampStacks;
+    UBreakerEquipmentComponent* Equipment = GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>();
+    UBreakerCombatComponent* Combat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>();
+    FBreakerItemInstance Primary;
+    const bool bEligible = CurrentSlot == 1 && Equipment && Equipment->GetEquippedItem(EBreakerEquipSlot::Primary, Primary)
+        && Primary.IsValid() && Equipment->GetStats().DamageRampPerStack > 0 && Combat && !Combat->IsDead();
+    const FGuid CurrentItem = bEligible ? Primary.ItemId : FGuid();
+    if (CurrentItem != DamageRampItemId || !bEligible)
+    {
+        DamageRampStacks = 0;
+        PendingDamageRampShots.Reset();
+        DamageRampItemId = CurrentItem;
+    }
+    return DamageRampStacks;
+}
+
+void UBreakerWeaponComponent::ResetDamageRamp()
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+    DamageRampStacks = 0;
+    PendingDamageRampShots.Reset();
+    if (UBreakerEquipmentComponent* Equipment = GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>()) Equipment->RefreshDamageRampContribution();
+}
+
+void UBreakerWeaponComponent::HandleDamageRampDeath() { ResetDamageRamp(); }
+
+uint32 UBreakerWeaponComponent::BeginDamageRampShot()
+{
+    SynchronizeDamageRampEquipment();
+    if (DamageRampItemId.IsValid())
+    {
+        UBreakerCombatComponent* Combat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>();
+        Combat->OnDeath.AddUniqueDynamic(this, &ThisClass::HandleDamageRampDeath);
+        do { ++NextDamageRampToken; } while (NextDamageRampToken == 0 || PendingDamageRampShots.Contains(NextDamageRampToken));
+        PendingDamageRampShots.Add(NextDamageRampToken);
+        return NextDamageRampToken;
+    }
+    return 0;
+}
+
+void UBreakerWeaponComponent::ResolveDamageRampShot(uint32 Token, bool bDealtDamage)
+{
+    // Concurrent rockets advance/reset in actual impact order, not launch order.
+    // An equipment/death reset removes tokens, preventing old-weapon callbacks.
+    if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+    SynchronizeDamageRampEquipment();
+    if (Token == 0 || PendingDamageRampShots.Remove(Token) == 0) return;
+    if (!bDealtDamage) DamageRampStacks = 0;
+    else
+    {
+        const UBreakerMomentumComponent* Momentum = GetOwner()->FindComponentByClass<UBreakerMomentumComponent>();
+        const bool bDouble = Momentum && Momentum->IsActiveForOwner() && Momentum->GetMomentumState() == EBreakerMomentumState::Redline
+            && GetClassNodeRank(TEXT("Swift.Frenzy.RedlineTrigger")) > 0;
+        DamageRampStacks = FMath::Min(GetDamageRampMaxStacks(), DamageRampStacks + (bDouble ? 2 : 1));
+    }
+    if (UBreakerEquipmentComponent* Equipment = GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>()) Equipment->RefreshDamageRampContribution();
 }
 
 const UBreakerWeaponDefinition* UBreakerWeaponComponent::ResolveDefinition() const
@@ -1113,6 +1180,7 @@ void UBreakerWeaponComponent::TickRecoil(float DeltaSeconds)
 void UBreakerWeaponComponent::EquipArchetype(EBreakerWeaponArchetype NewArchetype)
 {
     if (CurrentArchetype == NewArchetype) return;
+    ResetDamageRamp();
     StopFire();
     if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(ReloadTimer);
     CurrentArchetype = NewArchetype;
@@ -1176,6 +1244,7 @@ void UBreakerWeaponComponent::EquipSlot(int32 SlotNumber)
     InitializeSlotAmmunition();
     StoreActiveSlotAmmunition();
     CurrentSlot = SlotNumber;
+    ResetDamageRamp();
     CurrentArchetype = CurrentSlot == 1 ? SlotOneArchetype : SlotTwoArchetype;
     MagazineAmmo = CurrentSlot == 1 ? SlotOneMagazineAmmo : SlotTwoMagazineAmmo;
     ReserveAmmo = CurrentSlot == 1 ? SlotOneReserveAmmo : SlotTwoReserveAmmo;
@@ -1279,6 +1348,7 @@ void UBreakerWeaponComponent::SetSlotArchetype(int32 SlotNumber, EBreakerWeaponA
     }
     if (CurrentSlot == SlotNumber)
     {
+        ResetDamageRamp();
         StopFire();
         if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(ReloadTimer);
         bReloading = false;
@@ -1560,6 +1630,8 @@ bool UBreakerWeaponComponent::FireOnce()
     if (!CanFire()) return false;
     const UBreakerWeaponDefinition* Definition = ResolveDefinition();
     if (!Definition) return false;
+    // Existing stacks apply to the entire shot; its result can only help later shots.
+    const uint32 RampToken = BeginDamageRampShot();
 
     const FBreakerRecoilProfile RecoilProfile = ResolveRecoilProfile();
     // A burst is a run of shots with no meaningful gap. Let the trigger rest
@@ -1650,7 +1722,7 @@ bool UBreakerWeaponComponent::FireOnce()
 
     if (Definition->bProjectile)
     {
-        FireProjectile(Definition, ViewLocation, ViewRotation, Spread, FiredBurstIndex, RecoilSeed, ShotAimAlpha);
+        FireProjectile(Definition, ViewLocation, ViewRotation, Spread, FiredBurstIndex, RecoilSeed, ShotAimAlpha, RampToken);
         if (MagazineAmmo <= 0 && ReserveAmmo > 0) StartReload();
         return true;
     }
@@ -1822,6 +1894,7 @@ bool UBreakerWeaponComponent::FireOnce()
             }
         }
     }
+    ResolveDamageRampShot(RampToken, Shot.DamageResult.HealthDamage + Shot.DamageResult.ShieldDamage > 0.0f);
     MulticastShotCosmetics(Shot);
 
     if (MagazineAmmo <= 0 && ReserveAmmo > 0) StartReload();
@@ -2463,7 +2536,7 @@ void UBreakerWeaponComponent::ApplyBleedOnHit(const UBreakerWeaponDefinition* De
     Status->ApplyStatus(Spec, EBreakerDamageFamily::Physical, GetOwner());
 }
 
-void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed, float ShotAimAlpha)
+void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed, float ShotAimAlpha, uint32 RampToken)
 {
     const FVector Direction = FBreakerWeaponMath::ApplyConeSpread(ViewRotation.Vector(), Spread, ++ShotSequence);
 
@@ -2505,7 +2578,9 @@ void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Def
     if (ABreakerRocketProjectile* Rocket = GetWorld()->SpawnActor<ABreakerRocketProjectile>(ABreakerRocketProjectile::StaticClass(), SpawnLocation, Direction.Rotation(), Params))
     {
         Rocket->InitializeRocket(Damage, Definition->ProjectileSpeed, Definition->ExplosionRadius);
+        Rocket->InitializeDamageRamp(this, RampToken);
     }
+    else ResolveDamageRampShot(RampToken, false);
 
     FBreakerShotResult Shot;
     Shot.bFired = true;

@@ -9,6 +9,7 @@ class UPointLightComponent;
 class UProjectileMovementComponent;
 class USphereComponent;
 class UStaticMeshComponent;
+class UBreakerWeaponComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FBreakerRocketExploded, const FVector&, Location, float, Radius);
 
@@ -25,6 +26,10 @@ public:
     ABreakerRocketProjectile();
 
     void InitializeRocket(const FBreakerDamageRequest& InDamage, float Speed, float InExplosionRadius);
+    void InitializeDamageRamp(UBreakerWeaponComponent* Weapon, uint32 Token);
+    // Real authoritative impact seam; duplicate impacts are latched.
+    void Explode(const FVector& Location);
+    bool HasExploded() const { return bExploded; }
 
     UPROPERTY(BlueprintAssignable, Category="Rocket") FBreakerRocketExploded OnExploded;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Rocket", meta=(ClampMin="0", ClampMax="1")) float EdgeDamageFraction = 0.35f;
@@ -66,9 +71,11 @@ public:
 
 protected:
     virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void Tick(float DeltaSeconds) override;
     UFUNCTION() void HandleImpact(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComponent, FVector NormalImpulse, const FHitResult& Hit);
-    void Explode(const FVector& Location);
+    TWeakObjectPtr<UBreakerWeaponComponent> RampWeapon;
+    uint32 RampToken = 0;
     UFUNCTION(NetMulticast, Unreliable) void MulticastExplosionCosmetics(const FVector& Location, float Radius);
     // Runs on every machine: swaps the rocket's body for a short detonation
     // flash in place. Called from the multicast, so a client sees it even

@@ -218,6 +218,11 @@ from its peak and grants 2/3 Momentum per metre beyond six metres, capped at
 editable Momentum-component O2 defaults, tested through real movement and
 node purchases; they are not yet playtest-balanced values.
 
+Contact replaces its retired wall-ride behavior (O144): after a completed vault
+or mantle, ranks 1/2 add the existing 8 Momentum/s movement rate for 0.35/0.70s
+(O2). This source shares the 25/s income cap and the traversal's one-second
+anti-farm gate; aborted traversal, teleport, death and class changes cancel it.
+
 ## Implemented node behavior (2026-09-07)
 
 Tank Overpressure uses the existing Breach Charge input again to detonate a

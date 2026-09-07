@@ -276,6 +276,13 @@ public:
     UFUNCTION(BlueprintPure, Category="Weapon|Debug") const FBreakerShotResult& GetLastShot() const { return LastShot; }
     UFUNCTION(BlueprintPure, Category="Weapon|Debug") float GetSecondsSinceLastShot() const;
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Weapon|Playtest") void ResetAmmunition();
+    int32 GetDamageRampStacks() const { return DamageRampStacks; }
+    static int32 GetDamageRampMaxStacks() { return 10; }
+    float GetDamageRampPerStack() const;
+    bool IsDamageRampEquipped() const { return GetDamageRampPerStack() > 0.0f; }
+    int32 SynchronizeDamageRampEquipment();
+    // A pending rocket reports its real damage once; invalidated old tokens are ignored.
+    void ResolveDamageRampShot(uint32 Token, bool bDealtDamage);
     // Ammo economy (O2 placeholder): grants Fraction of each slot's
     // StartingReserveAmmo into that slot's reserve, capped at 2x starting
     // reserve so drops top a player up without making reserve meaningless.
@@ -826,6 +833,13 @@ private:
     // Returns whether a round actually left the weapon, which the burst chain
     // needs so a shot refused by the reload/swap/cadence gates does not count
     // against the burst.
+    UPROPERTY(Replicated) int32 DamageRampStacks = 0;
+    FGuid DamageRampItemId;
+    uint32 NextDamageRampToken = 0;
+    TSet<uint32> PendingDamageRampShots;
+    uint32 BeginDamageRampShot();
+    void ResetDamageRamp();
+    UFUNCTION() void HandleDamageRampDeath();
     bool FireOnce();
     // Timer entry point: UE timers need a void() signature.
     void FireOnceTimer();
@@ -836,7 +850,7 @@ private:
     // cadence cannot drift by a callback's worth per shot.
     void AdvanceBurstFire();
     void ScheduleBurstFire(float DelaySeconds);
-    void FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed, float ShotAimAlpha);
+    void FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed, float ShotAimAlpha, uint32 RampToken);
     // LevelScalar is resolved once per trigger pull and passed down, so every
     // pellet and the bleed it may apply share one item-level reading.
     // SeedBasis is the hit's own draw seed (the base pellet's ShotSequence
