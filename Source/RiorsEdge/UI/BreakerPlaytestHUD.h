@@ -48,6 +48,8 @@ struct FBreakerHUDDamageNumber
     TWeakObjectPtr<AActor> Target;
     // A DoT tick reads differently from a strike and must not merge into one.
     bool bFromDoT = false;
+    EBreakerElement Element = EBreakerElement::None;
+    FGameplayTag DamageTypeTag;
     // A killing blow is the heaviest read on the screen and holds longer; the
     // overkill share is carried separately so it can be printed as its own
     // distinct mark rather than silently inflating the number.
@@ -94,6 +96,7 @@ public:
     // profile's larger-nameplates switch as a multiplier: one authored step
     // up (UBreakerGameSettings::LargerNameplateScale) or 1.
     float NameplateScale() const;
+    const TArray<FBreakerHUDDamageNumber>& GetDamageNumbers() const { return DamageNumbers; }
 
 private:
     // The player's profile, loaded once here and re-read on the pause menu's

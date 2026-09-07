@@ -563,6 +563,7 @@ void UBreakerCombatComponent::DispatchHitDealt(const FBreakerDamageRequest& Requ
     Context.bWeakPoint = Result.bWeakPoint;
     Context.DamageFamily = Request.DamageFamily;
     Context.Element = Request.Element;
+    Context.DamageTypeTag = Request.DamageTypeTag;
     Context.Delivery = Request.Delivery;
     // The IMPACT point when the request carries one (weapons trace real hits,
     // projectiles resolve at a real location), so the HUD's floating number

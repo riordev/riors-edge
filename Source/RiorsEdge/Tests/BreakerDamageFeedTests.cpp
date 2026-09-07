@@ -142,6 +142,19 @@ bool FBreakerDamageAggregationTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("A number whose target has gone absorbs nothing"),
         BreakerDamageFeed::ShouldMerge(BreakerDamageFeedKey(nullptr), 100.0,
             BreakerDamageFeedKey(nullptr), 100.0));
+    auto RotTick = BreakerDamageFeedKey(A, true);
+    RotTick.Element = EBreakerElement::Entropy;
+    RotTick.DamageTypeTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"));
+    auto BleedTick = BreakerDamageFeedKey(A, true);
+    BleedTick.DamageTypeTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Bleed"));
+    TestFalse(TEXT("Rot never hides inside the same target's physical DoT number"),
+        BreakerDamageFeed::ShouldMerge(RotTick, 100.0, BleedTick, 100.0));
+    TestTrue(TEXT("Successive Rot ticks retain the longer DoT merge window"),
+        BreakerDamageFeed::ShouldMerge(RotTick, 100.0, RotTick, 100.5));
+    auto OtherEntropyTick = RotTick;
+    OtherEntropyTick.DamageTypeTag = BleedTick.DamageTypeTag;
+    TestFalse(TEXT("Element alone cannot counterfeit the status provenance"),
+        BreakerDamageFeed::ShouldMerge(RotTick, 100.0, OtherEntropyTick, 100.0));
     return true;
 }
 

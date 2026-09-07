@@ -37,6 +37,7 @@ ABreakerSoundDirector::ABreakerSoundDirector()
     TakeHitVoice = MakeVoice(TEXT("TakeHitVoice"));
     AbilityVoice = MakeVoice(TEXT("AbilityVoice"));
     PlayerDeathVoice = MakeVoice(TEXT("PlayerDeathVoice"));
+    EntropyVoice = MakeVoice(TEXT("EntropyVoice"));
 }
 
 USoundWaveProcedural* ABreakerSoundDirector::MakeWave(int32 SampleRate)
@@ -98,6 +99,7 @@ void ABreakerSoundDirector::BeginPlay()
     const int32 AbilityRate = LoadOrSynth(TEXT("ability_cast.wav"), &BreakerSound::RenderAbilityCast, AbilityDefaultPcm);
     // The sixth verb (O193): one low cue at the death beat's cut to black.
     const int32 PlayerDeathRate = LoadOrSynth(TEXT("player_death.wav"), &BreakerSound::RenderPlayerDeath, PlayerDeathPcm);
+    const int32 EntropyRate = LoadOrSynth(TEXT("entropy_activate.wav"), &BreakerSound::RenderEntropyActivation, EntropyPcm);
 
     FireWave = MakeWave(FireRate);
     HitWave = MakeWave(HitRate);
@@ -111,13 +113,15 @@ void ABreakerSoundDirector::BeginPlay()
     AbilityVoice->SetSound(AbilityDefaultWave);
     PlayerDeathWave = MakeWave(PlayerDeathRate);
     PlayerDeathVoice->SetSound(PlayerDeathWave);
+    EntropyWave = MakeWave(EntropyRate);
+    EntropyVoice->SetSound(EntropyWave);
 }
 
 void ABreakerSoundDirector::ApplyVolumeSettings(float Master, float Effects)
 {
     const float Gain = BreakerSound::EffectsGain(Master, Effects);
     for (UAudioComponent* Voice : { FireVoice.Get(), HitVoice.Get(), KillVoice.Get(),
-        TakeHitVoice.Get(), AbilityVoice.Get(), PlayerDeathVoice.Get() })
+        TakeHitVoice.Get(), AbilityVoice.Get(), PlayerDeathVoice.Get(), EntropyVoice.Get() })
     {
         if (Voice) Voice->SetVolumeMultiplier(Gain);
     }
@@ -140,6 +144,17 @@ void ABreakerSoundDirector::PlaySettingsTest(UWorld* World)
         if (Director) Director->SetLifeSpan(2.0f); // O2 PLACEHOLDER: preview cleanup after its short cue.
     }
     if (Director) Director->PlayHitConfirm();
+}
+
+bool ABreakerSoundDirector::PlayEntropyActivation()
+{
+    if (!GetWorld() || !EntropyWave || EntropyPcm.IsEmpty()) return false;
+    const double Now = GetWorld()->GetTimeSeconds();
+    if (Now - LastEntropyCueTime < BreakerSound::EntropyActivationMinGapSeconds) return false;
+    LastEntropyCueTime = Now;
+    ++EntropyCueCount;
+    Trigger(EntropyVoice, EntropyWave, EntropyPcm);
+    return true;
 }
 
 void ABreakerSoundDirector::Trigger(UAudioComponent* Voice, USoundWaveProcedural* Wave, const TArray<int16>& Pcm)

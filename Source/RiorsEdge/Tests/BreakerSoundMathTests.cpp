@@ -36,10 +36,10 @@ bool FBreakerSoundSynthShapeTest::RunTest(const FString& Parameters)
         {TEXT("TakeHit"), BreakerSound::TakeHitDurationSeconds, &BreakerSound::RenderTakeHit},
         {TEXT("AbilityCast"), BreakerSound::AbilityCastDurationSeconds, &BreakerSound::RenderAbilityCast},
         {TEXT("PlayerDeath"), BreakerSound::PlayerDeathDurationSeconds, &BreakerSound::RenderPlayerDeath},
+        {TEXT("EntropyActivation"), BreakerSound::EntropyActivationDurationSeconds, &BreakerSound::RenderEntropyActivation},
     };
-    // Six verbs: the roster grows by a ruling adding one (O193 added the
-    // player's death), and a renderer that misses this table is unproven.
-    TestEqual(TEXT("six verbs are rendered"), static_cast<int32>(UE_ARRAY_COUNT(Cases)), 6);
+    // Every shipped fallback renderer participates in the waveform checks.
+    TestEqual(TEXT("seven cues are rendered"), static_cast<int32>(UE_ARRAY_COUNT(Cases)), 7);
 
     for (const FCase& Case : Cases)
     {

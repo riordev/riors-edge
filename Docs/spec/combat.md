@@ -147,6 +147,11 @@ a qualifying hit. Rot spends half the triggering share across eight half-second
 ticks. These magnitudes are O2 tuning in elements.json. The snapshot includes
 source scaling and critical damage once; ticks apply target mitigation once.
 An active Rot cannot stack or refresh, and its ticks generate no buildup.
+Rot damage numbers retain their status identity and show a subdued ROT label;
+physical damage-over-time numbers cannot merge into them. A new Rot produces
+short orange decay strokes and one local activation sound, never a tick sound.
+The sound resolves Content/Breaker/Audio/entropy_activate.wav before its synth
+fallback, shares the Effects volume and limits crowd cues to one per 0.15s.
 
 Conductor Attunement converts buff recipients' weapons to Entropy without
 adding hit damage. Cadence and Metronome own independent recipient copies;

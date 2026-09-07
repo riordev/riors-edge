@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
+#include "UI/BreakerUIStyle.h"
 
 // ---------------------------------------------------------------------------
 // PUBLISHED PATH — owner GLASS, consumers KIT (Abilities/), FIELD (Combat/) — NOT GROUND.
@@ -140,6 +141,7 @@ namespace BreakerFX
         static const FGameplayTag PoisonTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Poison"), false);
         if (StatusTag.IsValid() && StatusTag == BleedTag) return FLinearColor(1.0f, 0.25f, 0.25f);
         if (StatusTag.IsValid() && StatusTag == PoisonTag) return FLinearColor(0.35f, 0.85f, 0.25f);
+        if (StatusTag.IsValid() && StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"), false)) return BreakerUI::Orange;
         return Fallback;
     }
 

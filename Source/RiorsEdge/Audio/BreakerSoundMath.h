@@ -38,6 +38,8 @@ namespace BreakerSound
     // because it lands at the instant the screen goes black and the black
     // itself is the weight; the ring-out is the sine's slow decay, not length.
     constexpr float PlayerDeathDurationSeconds = 0.4f; // O2 PLACEHOLDER
+    constexpr float EntropyActivationDurationSeconds = 0.32f; // O2 PLACEHOLDER
+    constexpr float EntropyActivationMinGapSeconds = 0.15f; // O2 PLACEHOLDER: one crowd cue, not a chorus.
 
     inline int32 SampleCount(float DurationSeconds)
     {
@@ -167,6 +169,15 @@ namespace BreakerSound
     }
 
     inline void RenderWeaponFire(TArray<int16>& Out) { RenderPcm16(Out, FireDurationSeconds, &WeaponFireSample); }
+    // A brief dry crack followed by a falling, rough tail: the start of decay.
+    inline float EntropyActivationSample(int32 Index)
+    {
+        const float T = static_cast<float>(Index) / SampleRate;
+        const float Phase = 2 * PI * (440.0f * T - 500.0f * T * T); // O2 PLACEHOLDER
+        const float Grit = NoiseAt(static_cast<uint32>(Index) ^ 0xE170u);
+        return .42f * (.6f * FMath::Sin(Phase) + .4f * Grit) * Envelope(T, EntropyActivationDurationSeconds, 9.0f); // O2 PLACEHOLDER
+    }
+    inline void RenderEntropyActivation(TArray<int16>& Out) { RenderPcm16(Out, EntropyActivationDurationSeconds, &EntropyActivationSample); }
     inline void RenderHitConfirm(TArray<int16>& Out) { RenderPcm16(Out, HitDurationSeconds, &HitConfirmSample); }
     inline void RenderKill(TArray<int16>& Out)       { RenderPcm16(Out, KillDurationSeconds, &KillSample); }
     inline void RenderTakeHit(TArray<int16>& Out)    { RenderPcm16(Out, TakeHitDurationSeconds, &TakeHitSample); }

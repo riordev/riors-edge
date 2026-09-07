@@ -1350,7 +1350,12 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
         const float DrawAlpha = Number->bSecondary ? Fade * 0.8f : Fade;
 
         const float NumberY = Screen.Y - Rise - Neighbours * StackOffset;
-        DrawOutlinedNumber(BreakerUI::FormatDamage(Number->Value),
+        const bool bRotTick = Number->bFromDoT && Number->Element == EBreakerElement::Entropy
+            && Number->DamageTypeTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"));
+        const FString DamageText = bRotTick
+            ? BreakerStrings::Format(EBreakerStringKey::HudRotDamage, *BreakerUI::FormatDamage(Number->Value))
+            : BreakerUI::FormatDamage(Number->Value);
+        DrawOutlinedNumber(DamageText,
             Screen.X, NumberY, Face, SizePixels, DrawAlpha);
 
         // The overkill share of a killing blow, stated as its own mark in the
@@ -2410,6 +2415,8 @@ void ABreakerPlaytestHUD::HandlePlayerHitDealt(const FBreakerHitContext& Hit)
     IncomingKey.bCritical = Hit.Result.bCritical;
     IncomingKey.bWeakPoint = bWeak;
     IncomingKey.bFromDoT = Hit.bFromDoT;
+    IncomingKey.Element = Hit.Element;
+    IncomingKey.DamageTypeTag = Hit.DamageTypeTag;
 
     for (FBreakerHUDDamageNumber& Existing : DamageNumbers)
     {
@@ -2418,6 +2425,8 @@ void ABreakerPlaytestHUD::HandlePlayerHitDealt(const FBreakerHitContext& Hit)
         ExistingKey.bCritical = Existing.bCritical;
         ExistingKey.bWeakPoint = Existing.bWeakPoint;
         ExistingKey.bFromDoT = Existing.bFromDoT;
+        ExistingKey.Element = Existing.Element;
+        ExistingKey.DamageTypeTag = Existing.DamageTypeTag;
         // Merge windows are measured at ARRIVAL: two pellets of one shot share
         // an arrival and merge exactly as they did when both were born at the
         // trigger.
@@ -2454,6 +2463,8 @@ void ABreakerPlaytestHUD::HandlePlayerHitDealt(const FBreakerHitContext& Hit)
     Number.bCritical = Hit.Result.bCritical;
     Number.bWeakPoint = bWeak;
     Number.bFromDoT = Hit.bFromDoT;
+    Number.Element = Hit.Element;
+    Number.DamageTypeTag = Hit.DamageTypeTag;
     Number.MitigatedFraction = Mitigated;
     // BORN AT ARRIVAL: the draw skips negative ages, so the number appears
     // the frame the round lands, beside the spark it belongs to.

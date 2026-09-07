@@ -9,13 +9,12 @@ class UAudioComponent;
 class USoundWaveProcedural;
 
 // ---------------------------------------------------------------------------
-// The game's combat sounds, and deliberately only six of them.
+// The game's event-driven combat sounds.
 //
-// SIX VERBS (ruled): weapon fire, hit confirm, kill, taking a hit — which
+// Weapon fire, hit confirm, kill, taking a hit — which
 // matters more than the other three — the ability cast (ORDERS ruling 2) and,
-// since O193, the player's own death. There is still no generic
-// PlaySound(AnyWave) surface: the roster grows by a ruling adding a verb,
-// never by a caller passing a wave.
+// since O193, the player's own death. Earned Rot has a separate activation
+// cue, never a per-tick cue. There is no generic PlaySound(AnyWave) surface.
 //
 // THE FIFTH VERB TAKES AN ABILITY ID, and that is the whole of the override
 // mechanism. The owner will author per-ability sounds "eventually", so the cue
@@ -37,7 +36,7 @@ class USoundWaveProcedural;
 // the audio path end to end — is done; it remains as the floor.
 //
 // The rest is unchanged from the first pass: pooled persistent voices
-// (retrigger cuts, the four voices overlap each other), client-side
+// (retrigger cuts, separate voices overlap each other), client-side
 // cosmetic actor spawned lazily by the HUD, replicates nothing, never
 // ticks.
 // ---------------------------------------------------------------------------
@@ -111,6 +110,9 @@ public:
     // default. Resolved on first use per id and cached, so the miss costs one
     // failed file open per ability per session rather than one per cast.
     void PlayAbilityCast(FName AbilityId);
+    // Earned Rot activation for the local applier or recipient, never per tick.
+    bool PlayEntropyActivation();
+    int32 GetEntropyCueCount() const { return EntropyCueCount; }
 
 protected:
     virtual void BeginPlay() override;
@@ -126,12 +128,14 @@ private:
     // the other four verbs cut themselves.
     UPROPERTY() TObjectPtr<UAudioComponent> AbilityVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> PlayerDeathVoice;
+    UPROPERTY() TObjectPtr<UAudioComponent> EntropyVoice;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> FireWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> HitWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> KillWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> TakeHitWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> AbilityDefaultWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> PlayerDeathWave;
+    UPROPERTY() TObjectPtr<USoundWaveProcedural> EntropyWave;
     // Per-ability overrides, resolved lazily. A key present with a NULL value
     // means "probed, no override authored" — the sentinel is what stops a
     // missing file being re-opened on every cast.
@@ -148,6 +152,9 @@ private:
     TArray<int16> TakeHitPcm;
     TArray<int16> AbilityDefaultPcm;
     TArray<int16> PlayerDeathPcm;
+    TArray<int16> EntropyPcm;
+    double LastEntropyCueTime = -1000;
+    int32 EntropyCueCount = 0;
     TMap<FName, TArray<int16>> AbilityPcm;
     TMap<EBreakerWeaponArchetype, TArray<int16>> ArchetypeFirePcm;
 

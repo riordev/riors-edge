@@ -112,6 +112,7 @@
         "cycle.void": "VOID",
         "hud.entropy": "ENTROPY",
         "hud.rotTimer": "ROT %.1fs",
-        "cycle.entropy": "ENTROPY"
+        "cycle.entropy": "ENTROPY",
+        "hud.damage.rot": "ROT %s"
 	}
 }

@@ -27,7 +27,7 @@ bool FBreakerAudioVolumeRoutingTest::RunTest(const FString& Parameters)
     if (!TestNotNull(TEXT("Sound director"), Director)) return false;
     TArray<UAudioComponent*> Voices;
     Director->GetComponents(Voices);
-    if (!TestEqual(TEXT("All six player cues have voices"), Voices.Num(), 6)) return false;
+    if (!TestEqual(TEXT("All seven player cues have voices"), Voices.Num(), 7)) return false;
     UBreakerGameSettings* Settings = NewObject<UBreakerGameSettings>();
     Settings->MasterVolume = 0.5f;
     Settings->EffectsVolume = 0.4f;

@@ -27,7 +27,8 @@ void BreakerStartEntropyCapture(ABreakerCharacter* Character)
         int32 Index = 0;
         AActor* SourceEnemy = nullptr;
         AActor* FocusEnemy = nullptr;
-        const int32 FocusIndex = FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureEntropyRot")) ? 1 : 0;
+        const bool bFeedback = FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureEntropyFeedback"));
+        const int32 FocusIndex = bFeedback || FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureEntropyRot")) ? 1 : 0;
         const bool bSympathetic = FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureSympathetic"));
         for (TActorIterator<ABreakerEnemy> It(World); It && Index < 2; ++It)
         {
@@ -54,6 +55,14 @@ void BreakerStartEntropyCapture(ABreakerCharacter* Character)
                 Hit.ElementBuildupFadeSeconds = BreakerEntropy::SympatheticFadeSeconds();
             }
             Combat->ReceiveDamage(Hit);
+            if (bFeedback && Index == 1)
+            {
+                FBreakerStatusApplicationSpec Bleed;
+                Bleed.StatusTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Bleed"));
+                Bleed.Duration = 4; Bleed.TickInterval = .5f; Bleed.BaseDamagePerTick = 1;
+                Bleed.ProcCoefficient = 0; // Visual fixture: distinguish simultaneous physical and Rot ticks.
+                Status->ApplyStatus(Bleed, EBreakerDamageFamily::Physical, Character);
+            }
             UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] Entropy target=%d buildup=%.2f threshold=%.2f rot=%d"),
                 Index, Status->GetEntropyBuildup(), Status->GetEntropyThreshold(),
                 Status->HasStatus(FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"))));

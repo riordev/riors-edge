@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Combat/BreakerCombatTypes.h"
 
 // ---------------------------------------------------------------------------
 // THE DAMAGE-NUMBER FEED — the rules, with no HUD under them
@@ -71,6 +72,8 @@ namespace BreakerDamageFeed
         bool bCritical = false;
         bool bWeakPoint = false;
         bool bFromDoT = false;
+        EBreakerElement Element = EBreakerElement::None;
+        FGameplayTag DamageTypeTag;
     };
 
     inline bool ShouldMerge(const FMergeKey& Existing, double ExistingBirth,
@@ -81,6 +84,8 @@ namespace BreakerDamageFeed
         if (Existing.bCritical != Incoming.bCritical) return false;
         if (Existing.bWeakPoint != Incoming.bWeakPoint) return false;
         if (Existing.bFromDoT != Incoming.bFromDoT) return false;
+        if (Existing.Element != Incoming.Element) return false;
+        if (Existing.DamageTypeTag != Incoming.DamageTypeTag) return false;
         return (Now - ExistingBirth) <= MergeWindowFor(Incoming.bFromDoT);
     }
 

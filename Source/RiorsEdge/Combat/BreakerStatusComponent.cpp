@@ -9,6 +9,7 @@
 #include "Items/BreakerEquipmentComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Engine/World.h"
+#include "UI/BreakerEntropyFeedback.h"
 #include "UObject/UObjectIterator.h"
 
 UBreakerStatusComponent::UBreakerStatusComponent()
@@ -196,6 +197,8 @@ void UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicatio
         Status.bHasSourceLocationSnapshot = true;
     }
     ActiveStatuses.Add(Status);
+    if (Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot")))
+        BreakerEntropyFeedback::PlayActivation(GetOwner(), Instigator);
     if (SourceMana) SourceMana->NotifyStatusApplication(Spec, false, GetOwner());
     SpreadNewestStatus(Spec, DamageFamily, Instigator, ScaledDuration);
     OnStatusApplied.Broadcast(Status);
