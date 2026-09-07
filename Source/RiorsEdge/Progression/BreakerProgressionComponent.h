@@ -95,6 +95,7 @@ public:
     // this per node to decide enabled/disabled state and its tooltip reason.
     UFUNCTION(BlueprintCallable, Category="Progression") bool CanPurchaseNode(const UBreakerProgressionTree* Tree, FName NodeId, FText& OutFailureReason) const;
     UFUNCTION(BlueprintCallable, Category="Progression") bool EquipAbility(EBreakerAbilitySlot Slot, FName AbilityId, FText& OutFailureReason);
+    bool CanEquipAbility(EBreakerAbilitySlot Slot, FName AbilityId, FText& OutFailureReason) const;
     // The Forge's respec: Doctrine, gated on standing at one (O213: Doctrine
     // respec stays the Forge's). Called with CorePoints it routes to
     // RespecCore below and ignores bIsAtForge — the Core's price is a level

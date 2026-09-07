@@ -106,6 +106,7 @@ public:
     // Pure rule, exposed for tests: resolve a loadout id for a slot, falling
     // back to the class default when the loadout has nothing equipped.
     static UBreakerAbilityDefinition* ResolveDefinition(EBreakerClassId ClassId, EBreakerAbilitySlot Slot, FName EquippedId);
+    static UBreakerAbilityDefinition* ResolveLoadoutDefinition(EBreakerClassId ClassId, EBreakerAbilitySlot Slot, const FBreakerAbilityLoadout& Loadout);
 
     // --- Ability selection (the player's two abilities + one ultimate) -----
     //

@@ -575,6 +575,8 @@ private:
     void EnsureRosterLoaded();
     TSharedRef<SWidget> BuildSkillTreesScreen();
     TSharedRef<SWidget> BuildDialogueScreen();
+    FReply SelectDialogueChoice(int32 ChoiceIndex);
+    FReply HandleDialogueChoiceKey(const FKeyEvent& KeyEvent);
     // The Anchor's navigation screen: one card per available destination.
     TSharedRef<SWidget> BuildTravelScreen();
     // The breakpoint sandbox (see the enum note on DevSandbox). Reached from

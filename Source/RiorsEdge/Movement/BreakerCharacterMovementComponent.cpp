@@ -664,7 +664,19 @@ float UBreakerCharacterMovementComponent::GetSpeedMultiplier() const
 
 void UBreakerCharacterMovementComponent::SetSprinting(bool bEnabled)
 {
+    const bool bEnteringSprint = bEnabled && !bWantsToSprint;
     bWantsToSprint = bEnabled;
+    // Entering sprint ends automatic/burst fire; leaving sprint does not resume it.
+    // Replaying historical movement must not send a new weapon RPC that
+    // cancels a trigger press made after that saved move.
+    const bool bReplayingMove = CharacterOwner && CharacterOwner->bClientUpdating;
+    if (bEnteringSprint && !bReplayingMove && GetOwner())
+    {
+        if (UBreakerWeaponComponent* Weapon = GetOwner()->FindComponentByClass<UBreakerWeaponComponent>())
+        {
+            Weapon->StopFire();
+        }
+    }
 }
 
 void UBreakerCharacterMovementComponent::SetSlideRequested(bool bEnabled)
@@ -1287,18 +1299,30 @@ FNetworkPredictionData_Client* UBreakerCharacterMovementComponent::GetPrediction
     return ClientPredictionData;
 }
 
+bool UBreakerCharacterMovementComponent::ClientUpdatePositionAfterServerUpdate()
+{
+    // The engine restores its live input flags after historical move replay;
+    // custom sprint intent needs the same treatment. Do not replay weapon RPCs.
+    const bool bLiveSprintIntent = bWantsToSprint;
+    const bool bUpdated = Super::ClientUpdatePositionAfterServerUpdate();
+    bWantsToSprint = bLiveSprintIntent;
+    return bUpdated;
+}
+
 void UBreakerCharacterMovementComponent::UpdateFromCompressedFlags(uint8 Flags)
 {
     Super::UpdateFromCompressedFlags(Flags);
     // Server and replay only — the autonomous client consumed its own copy
     // directly, and this path is what makes the two consume the SAME move.
     bWantsLedgeTraversal = (Flags & FSavedMove_Character::FLAG_Custom_0) != 0;
+    SetSprinting((Flags & FSavedMove_Character::FLAG_Custom_1) != 0);
 }
 
 void FBreakerSavedMove_Character::Clear()
 {
     Super::Clear();
     bSavedWantsLedgeTraversal = false;
+    bSavedWantsToSprint = false;
     SavedTraversalStart = FVector::ZeroVector;
     SavedTraversalTarget = FVector::ZeroVector;
     SavedTraversalExitVelocity = FVector::ZeroVector;
@@ -1314,6 +1338,7 @@ uint8 FBreakerSavedMove_Character::GetCompressedFlags() const
     {
         Flags |= FLAG_Custom_0;
     }
+    if (bSavedWantsToSprint) Flags |= FLAG_Custom_1;
     return Flags;
 }
 
@@ -1323,7 +1348,8 @@ bool FBreakerSavedMove_Character::CanCombineWith(const FSavedMovePtr& NewMove, A
     // A one-shot request must reach the server as its own move, and a move
     // that starts mid-glide carries traversal state a combined move would
     // silently drop.
-    if (bSavedWantsLedgeTraversal != Other->bSavedWantsLedgeTraversal)
+    if (bSavedWantsLedgeTraversal != Other->bSavedWantsLedgeTraversal
+        || bSavedWantsToSprint != Other->bSavedWantsToSprint)
     {
         return false;
     }
@@ -1340,6 +1366,7 @@ void FBreakerSavedMove_Character::SetMoveFor(ACharacter* C, float InDeltaTime, F
     if (const UBreakerCharacterMovementComponent* Movement = C ? Cast<UBreakerCharacterMovementComponent>(C->GetCharacterMovement()) : nullptr)
     {
         bSavedWantsLedgeTraversal = Movement->bWantsLedgeTraversal;
+        bSavedWantsToSprint = Movement->bWantsToSprint;
         SavedTraversalStart = Movement->TraversalStart;
         SavedTraversalTarget = Movement->TraversalTarget;
         SavedTraversalExitVelocity = Movement->TraversalExitVelocity;
@@ -1354,6 +1381,8 @@ void FBreakerSavedMove_Character::PrepMoveFor(ACharacter* C)
     Super::PrepMoveFor(C);
     if (UBreakerCharacterMovementComponent* Movement = C ? Cast<UBreakerCharacterMovementComponent>(C->GetCharacterMovement()) : nullptr)
     {
+        // Restore historical movement without replaying weapon input/RPCs.
+        Movement->bWantsToSprint = bSavedWantsToSprint;
         Movement->TraversalStart = SavedTraversalStart;
         Movement->TraversalTarget = SavedTraversalTarget;
         Movement->TraversalExitVelocity = SavedTraversalExitVelocity;

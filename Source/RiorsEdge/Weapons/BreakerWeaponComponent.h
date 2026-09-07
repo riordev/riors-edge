@@ -241,6 +241,8 @@ public:
     // through ServerStartReload before the timer is set, so a client has the
     // state and not the clock. The HUD draws the full bar for -1.
     UFUNCTION(BlueprintPure, Category="Weapon") float GetReloadFraction() const;
+    // Authority trigger state, including automatic fire waiting through a reload.
+    bool IsTriggerHeld() const { return bTriggerHeld; }
     UFUNCTION(BlueprintPure, Category="Weapon") bool IsAiming() const { return bAiming; }
     UFUNCTION(BlueprintPure, Category="Weapon") int32 GetMagazineAmmo() const { return MagazineAmmo; }
     UFUNCTION(BlueprintPure, Category="Weapon") int32 GetReserveAmmo() const { return ReserveAmmo; }

@@ -358,6 +358,12 @@ EBreakerAbilitySelectionResult UBreakerAbilityComponent::PreviewSelection(EBreak
     const FBreakerProgressionState& State = Progression->GetProgressionState();
     const EBreakerAbilitySelectionResult Registry = ValidateSelection(State.PermanentClass, Slot, AbilityId,
         State.AbilityLoadout.ClassAbilityOne, State.AbilityLoadout.ClassAbilityTwo, State.AbilityLoadout.Ultimate);
+    if (Registry == EBreakerAbilitySelectionResult::AlreadyEquipped)
+    {
+        FText SwapFailure;
+        return Progression->CanEquipAbility(Slot, AbilityId, SwapFailure)
+            ? EBreakerAbilitySelectionResult::Allowed : Registry;
+    }
     if (Registry != EBreakerAbilitySelectionResult::Allowed) return Registry;
     // The registry rules pass; the last question is whether this character has
     // bought it. ASKED, NOT RESTATED — progression owns the unlock rule and
@@ -420,6 +426,27 @@ bool UBreakerAbilityComponent::TryEquipAbility(EBreakerAbilitySlot Slot, FName A
     return true;
 }
 
+UBreakerAbilityDefinition* UBreakerAbilityComponent::ResolveLoadoutDefinition(EBreakerClassId ClassId, EBreakerAbilitySlot Slot, const FBreakerAbilityLoadout& Loadout)
+{
+    const EBreakerAbilitySlot Slots[] = { EBreakerAbilitySlot::ClassAbilityOne, EBreakerAbilitySlot::ClassAbilityTwo, EBreakerAbilitySlot::Ultimate };
+    const FName Ids[] = { Loadout.ClassAbilityOne, Loadout.ClassAbilityTwo, Loadout.Ultimate };
+    for (int32 Index = 0; Index < UE_ARRAY_COUNT(Slots); ++Index)
+    {
+        if (Slots[Index] != Slot) continue;
+        UBreakerAbilityDefinition* Definition = ResolveDefinition(ClassId, Slot, Ids[Index]);
+        if (Definition && Definition->AbilityId != Ids[Index])
+        {
+            // A default must not duplicate an ability explicitly moved elsewhere.
+            for (int32 Other = 0; Other < UE_ARRAY_COUNT(Slots); ++Other)
+            {
+                if (Other != Index && Ids[Other] == Definition->AbilityId) return nullptr;
+            }
+        }
+        return Definition;
+    }
+    return nullptr;
+}
+
 void UBreakerAbilityComponent::RefreshGrants()
 {
     AActor* Owner = GetOwner();
@@ -442,16 +469,10 @@ void UBreakerAbilityComponent::RefreshGrants()
         EBreakerAbilitySlot::ClassAbilityTwo,
         EBreakerAbilitySlot::Ultimate
     };
-    const FName EquippedIds[] = {
-        State.AbilityLoadout.ClassAbilityOne,
-        State.AbilityLoadout.ClassAbilityTwo,
-        State.AbilityLoadout.Ultimate
-    };
-
     for (int32 Index = 0; Index < UE_ARRAY_COUNT(Slots); ++Index)
     {
         const EBreakerAbilitySlot Slot = Slots[Index];
-        UBreakerAbilityDefinition* Definition = ResolveDefinition(ClassId, Slot, EquippedIds[Index]);
+        UBreakerAbilityDefinition* Definition = ResolveLoadoutDefinition(ClassId, Slot, State.AbilityLoadout);
         const FName DesiredId = Definition ? Definition->AbilityId : NAME_None;
 
         FBreakerGrantedAbility* Existing = GrantedBySlot.Find(Slot);

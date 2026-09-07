@@ -70,6 +70,8 @@
 		"equipment.unavailable": "Equipment is unavailable.",
 		"equipment.equipped": "Equipped.",
 		"equipment.requirementCard": "REQUIRES LEVEL %d / YOU ARE %d",
-		"equipment.missingLevelCard": "CHARACTER LEVEL UNAVAILABLE"
+		"equipment.missingLevelCard": "CHARACTER LEVEL UNAVAILABLE",
+		"abilities.swap": "SWAP SLOTS",
+		"abilities.move": "MOVE TO THIS SLOT"
 	}
 }

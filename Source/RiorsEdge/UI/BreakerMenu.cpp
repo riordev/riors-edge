@@ -875,6 +875,7 @@ void SBreakerMenu::ShowCharacterSheet()
 void SBreakerMenu::ShowDialogue(ABreakerNPC* NPC)
 {
     DialogueNPC = NPC;
+    DialogueLeavePressedAt = 0.0;
     // Per-NPC entry state: which node an NPC opens on depends on what the
     // player has done. This used to be an unconditional GetStartNodeId(), so
     // every NPC greeted the player identically forever.
@@ -933,6 +934,15 @@ void SBreakerMenu::HandleEscape()
     if (CurrentScreen == EBreakerMenuScreen::Dialogue || CurrentScreen == EBreakerMenuScreen::Travel || CurrentScreen == EBreakerMenuScreen::Stash)
     {
         if (Character.IsValid()) Character->ResumeFromMenu();
+        return;
+    }
+    // Vendor Escape follows the same route as its Back button.
+    if ((CurrentScreen == EBreakerMenuScreen::Forge || CurrentScreen == EBreakerMenuScreen::Quartermaster)
+        && DialogueNPC.IsValid())
+    {
+        bForgeSalvageArm = false;
+        ForgeRespecArm = INDEX_NONE;
+        Rebuild(EBreakerMenuScreen::Dialogue);
         return;
     }
     // CharacterCreate backs out to CharacterSelect rather than to the root:
@@ -998,6 +1008,20 @@ void SBreakerMenu::ShowScreenForCapture(EBreakerMenuScreen Screen)
         // The front door's second state: the reveal listens for a real key,
         // which a capture run cannot press.
         else if (Board == TEXT("REVEALED")) { bTitleRevealed = true; }
+        else if (Board == TEXT("ABILITYSWAP"))
+        {
+            Screen = EBreakerMenuScreen::Abilities;
+            // Capture the two shipped Caster starters without buying unlocks.
+            if (Character.IsValid() && Character->GetProgression())
+            {
+                Character->GetProgression()->DevForceClass(EBreakerClassId::Caster);
+                FText Failure;
+                Character->GetProgression()->EquipAbility(EBreakerAbilitySlot::ClassAbilityOne, TEXT("Caster.Cleave"), Failure);
+                Character->GetProgression()->EquipAbility(EBreakerAbilitySlot::ClassAbilityTwo, TEXT("Caster.Rot"), Failure);
+                Character->GetProgression()->EquipAbility(EBreakerAbilitySlot::Ultimate, TEXT("Caster.Unmake"), Failure);
+                if (Character->GetAbilities()) Character->GetAbilities()->RefreshGrants();
+            }
+        }
         else if (Board == TEXT("EQUIPREQUIREMENT"))
         {
             // Seeded capture fixture for the reported level-11 item refusal.
@@ -1461,6 +1485,9 @@ FReply SBreakerMenu::OnPreviewKeyDown(const FGeometry& Geometry, const FKeyEvent
         return FReply::Handled();
     }
 
+    const FReply DialogueReply = HandleDialogueChoiceKey(KeyEvent);
+    if (DialogueReply.IsEventHandled()) return DialogueReply;
+
     // The dialogue plate's hold-to-leave (O209): the press only stamps the
     // clock; OnKeyUp measures the hold and decides. Repeats are ignored so a
     // held key does not keep moving the stamp forward. Handled either way,
@@ -1509,7 +1536,7 @@ FReply SBreakerMenu::OnPreviewKeyDown(const FGeometry& Geometry, const FKeyEvent
             return FReply::Handled();
         }
     }
-    return SCompoundWidget::OnKeyDown(Geometry, KeyEvent);
+    return SCompoundWidget::OnPreviewKeyDown(Geometry, KeyEvent);
 }
 
 FReply SBreakerMenu::OnKeyUp(const FGeometry& Geometry, const FKeyEvent& KeyEvent)
@@ -7247,6 +7274,11 @@ namespace
                 FString::Printf(TEXT("NEEDS %d %s POINTS"), Node->CostPerRank, *CurrencyLabel(Node->Currency)),
                 FString::Printf(TEXT("NEED %d PT"), Node->CostPerRank));
         }
+        FText AuthoritativeReason;
+        if (!Progression->CanPurchaseNode(Tree, Node->NodeId, AuthoritativeReason))
+        {
+            return Fail(AuthoritativeReason.ToString(), TEXT("LOCKED"));
+        }
         return true;
     }
 
@@ -7714,8 +7746,10 @@ namespace
         {
             Column->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
             [
-                MenuText(FText::FromString(View.ActionLine), BreakerUI::TypeCaption,
-                    View.bMaxed ? BreakerUI::System : (View.bPurchasable ? BreakerUI::Gold : BreakerUI::Harm), true)
+                MenuWrappedText(FText::FromString(View.ActionLine), BreakerUI::TypeCaption,
+                    View.bMaxed ? BreakerUI::System : (View.bPurchasable ? BreakerUI::Gold : BreakerUI::Harm),
+                    MeasureWideScreen().RailWidth - 2.0f * BreakerUI::Space16
+                        - BreakerUI::RailThickness - 2.0f * BreakerUI::BorderThin, true)
             ];
         }
         return MakePlate(Column, BreakerUI::Panel10, Rail, FMargin(BreakerUI::Space16, BreakerUI::Space16));
@@ -8585,11 +8619,13 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
 
                 const int32 Rank = ProgressionGetNodeRank(Progression, Node->NodeId, Node->Currency);
                 FString LockReason;
-                bool bPurchasable = SkillNodeIsPurchasable(Progression, CoreTree, Node, TreeSpent, LockReason);
+                FString ShortReason;
+                bool bPurchasable = SkillNodeIsPurchasable(Progression, CoreTree, Node, TreeSpent, LockReason, &ShortReason);
                 if (bExpandedSealed && bPurchasable)
                 {
                     bPurchasable = false;
                     LockReason = TEXT("SEALED");
+                    ShortReason = LockReason;
                 }
                 const bool bOwned = Rank > 0;
                 const bool bMaxed = Rank >= Node->MaxRank;
@@ -8610,7 +8646,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 const FString StateText = bMaxed
                     ? FString(TEXT("MAXED"))
                     : (bPurchasable ? FString::Printf(TEXT("%d PT -> RANK %d"), Node->CostPerRank, Rank + 1)
-                                    : (bOwned ? RankLabel(Rank, Node->MaxRank) : LockReason));
+                                    : (bOwned ? RankLabel(Rank, Node->MaxRank) : ShortReason));
 
                 TSharedRef<SVerticalBox> Text = SNew(SVerticalBox);
                 Text->AddSlot().AutoHeight()
@@ -9305,7 +9341,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
     {
         Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
         [
-            MenuText(SkillTreeStatus, BreakerUI::TypeCaption, Cyan, true)
+            MenuWrappedText(SkillTreeStatus, BreakerUI::TypeCaption, Cyan, Metrics.PanelWidth, true)
         ];
     }
     // Board column: the branch selector sits above the board, outside its
@@ -10925,17 +10961,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildAbilitiesScreen()
             {
                 const UBreakerAbilityDefinition* Definition = UBreakerAbilityDefinition::FindFallback(AbilityId);
                 const bool bIsEquippedChoice = EquippedChoiceId == AbilityId;
-                // Cheap, definite blockers only (already sitting in the other
-                // slot, wrong class/slot, unknown id). What this CANNOT see is
-                // UBreakerProgressionComponent::IsAbilityUnlocked, which only
-                // runs inside TryEquipAbility — so a Caster pick previews as
-                // fine here and the true "not unlocked" reason only appears
-                // after the click. That is the API's own documented seam
-                // (Abilities/BreakerAbilityComponent.h), not a bug in this
-                // screen: "verify with Swift, and show refusal reasons
-                // honestly for Caster."
+                // The preview reads the same unlock and slot-swap gates as the writer.
                 const EBreakerAbilitySelectionResult Preview = Abilities->PreviewSelection(Slot, AbilityId);
                 const bool bPreviewBlocked = !bIsEquippedChoice && Preview != EBreakerAbilitySelectionResult::Allowed;
+                const bool bSwapChoice = !bIsEquippedChoice && Preview == EBreakerAbilitySelectionResult::Allowed
+                    && Progression->GetProgressionState().AbilityLoadout.Contains(AbilityId);
                 const bool bImplemented = Definition && Definition->IsImplemented();
                 const FName CapturedId = AbilityId;
 
@@ -10975,7 +11005,10 @@ TSharedRef<SWidget> SBreakerMenu::BuildAbilitiesScreen()
                                 [
                                     bIsEquippedChoice
                                         ? StaticCastSharedRef<SWidget>(MenuText(FText::FromString(TEXT("EQUIPPED")), BreakerUI::TypeCaption, Cyan, true))
-                                        : SNullWidget::NullWidget
+                                        : (bSwapChoice
+                                            ? StaticCastSharedRef<SWidget>(MenuText(FText::FromString(BreakerStrings::Get(EquippedChoiceId.IsNone()
+                                                ? EBreakerStringKey::AbilitiesMove : EBreakerStringKey::AbilitiesSwap)), BreakerUI::TypeCaption, Cyan, true))
+                                            : SNullWidget::NullWidget)
                                 ]
                                 + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
                                 [
@@ -11095,9 +11128,6 @@ TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()
     for (const FBreakerDialogueChoice& Choice : VisibleChoices)
     {
         ++ChoiceNumber;
-        const FName NextNodeId = Choice.NextNodeId;
-        const FName QuestFlag = Choice.SetsQuestFlag;
-        const EBreakerDialogueAction Action = Choice.Action;
         Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
         [
             SNew(SBox).MinDesiredHeight(56.0f)   // O2 PLACEHOLDER
@@ -11108,40 +11138,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()
             .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
             .HAlign(HAlign_Fill)
             .VAlign(VAlign_Center)
-            .OnClicked(FOnClicked::CreateLambda([this, NextNodeId, QuestFlag, Action]()
+            .OnClicked(FOnClicked::CreateLambda([this, ChoiceIndex = ChoiceNumber - 1]()
             {
-                if (Character.IsValid())
-                {
-                    Character->AddQuestFlag(QuestFlag);
-                    // The action runs after the flag and BEFORE the end-of-
-                    // conversation exit, so a choice can both close the
-                    // dialogue and open a screen. This is the quartermaster's
-                    // only door (O100).
-                    if (Action == EBreakerDialogueAction::OpenQuartermaster)
-                    {
-                        QuartermasterStatus = FText::GetEmpty();
-                        Rebuild(EBreakerMenuScreen::Quartermaster);
-                        return FReply::Handled();
-                    }
-                    if (Action == EBreakerDialogueAction::OpenForge)
-                    {
-                        // Reached through Kess, so the player IS at the Forge.
-                        // This is what makes bIsAtForge a real answer rather
-                        // than a hardcoded true.
-                        bAtForge = true;
-                        ForgeStatus = FText::GetEmpty();
-                        Rebuild(EBreakerMenuScreen::Forge);
-                        return FReply::Handled();
-                    }
-                    if (NextNodeId == NAME_None)
-                    {
-                        Character->ResumeFromMenu();
-                        return FReply::Handled();
-                    }
-                }
-                DialogueNodeId = NextNodeId;
-                Rebuild(EBreakerMenuScreen::Dialogue);
-                return FReply::Handled();
+                return SelectDialogueChoice(ChoiceIndex);
             }))
             [
                 // The number in its own 32px mono column, the words beside

@@ -15,6 +15,7 @@
 #include "Combat/BreakerStatusRules.h"
 #include "Components/PrimitiveComponent.h"
 #include "Items/BreakerEquipmentComponent.h"
+#include "Movement/BreakerCharacterMovementComponent.h"
 #include "Progression/BreakerBuildConditions.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "GameFramework/Controller.h"
@@ -1325,6 +1326,11 @@ FString UBreakerWeaponComponent::GetArchetypeName() const
 void UBreakerWeaponComponent::StartFire()
 {
     if (!GetOwner()) return;
+    // A new trigger press wins over sprint on both the predicting client and authority.
+    if (UBreakerCharacterMovementComponent* Movement = GetOwner()->FindComponentByClass<UBreakerCharacterMovementComponent>())
+    {
+        Movement->SetSprinting(false);
+    }
     if (!GetOwner()->HasAuthority())
     {
         ServerStartFire();
@@ -1337,7 +1343,7 @@ void UBreakerWeaponComponent::StartFire()
     const bool bFired = FireOnce();
     if (bFired && bBurstWeapon) ++RoundsInFireBurst;
 
-    if (!Definition || !Definition->bAutomatic) return;
+    if (!Definition || !Definition->bAutomatic || !GetWorld()) return;
     if (bBurstWeapon)
     {
         // A one-shot chain, because the interval alternates. Non-burst weapons
@@ -1515,6 +1521,9 @@ void UBreakerWeaponComponent::ServerSetAiming_Implementation(bool bNewAiming) { 
 
 bool UBreakerWeaponComponent::CanFire() const
 {
+    const UBreakerCharacterMovementComponent* Movement = GetOwner()
+        ? GetOwner()->FindComponentByClass<UBreakerCharacterMovementComponent>() : nullptr;
+    if (Movement && Movement->IsSprinting()) return false;
     const UBreakerWeaponDefinition* Definition = ResolveDefinition();
     if (!Definition || bReloading || bSwapping || MagazineAmmo <= 0 || !GetWorld()) return false;
     return GetWorld()->GetTimeSeconds() - LastShotTime + UE_KINDA_SMALL_NUMBER >= FBreakerWeaponMath::FireInterval(GetEffectiveRoundsPerMinute(Definition));

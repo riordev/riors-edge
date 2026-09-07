@@ -2,6 +2,8 @@
 
 #include "Misc/AutomationTest.h"
 #include "Abilities/BreakerAbilityDefinition.h"
+#include "Abilities/BreakerAbilityComponent.h"
+#include "GameFramework/Actor.h"
 #include "Data/BreakerDataFile.h"
 #include "Progression/BreakerClassDefinition.h"
 #include "Progression/BreakerExperience.h"
@@ -583,4 +585,67 @@ bool FBreakerSaveMigrationV4ToV5Test::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerStarterAbilitySwapTest,
+    "RiorsEdge.Abilities.StarterSlotSwap", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerStarterAbilitySwapTest::RunTest(const FString& Parameters)
+{
+    AActor* Owner = NewObject<AActor>();
+    UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>(Owner);
+    UBreakerAbilityComponent* Abilities = NewObject<UBreakerAbilityComponent>(Owner);
+    Owner->AddInstanceComponent(Progression);
+    Owner->AddInstanceComponent(Abilities);
+    if (!TestTrue(TEXT("fresh Caster chosen"), Progression->ChoosePermanentClassById(EBreakerClassId::Caster))) return false;
+    const FBreakerAbilityLoadout Original = Progression->GetProgressionState().AbilityLoadout;
+    TestEqual(TEXT("starter one"), Original.ClassAbilityOne, FName(TEXT("Caster.Cleave")));
+    TestEqual(TEXT("starter two"), Original.ClassAbilityTwo, FName(TEXT("Caster.Rot")));
+    TestEqual(TEXT("starter swap preview allows"), Abilities->PreviewSelection(EBreakerAbilitySlot::ClassAbilityOne, Original.ClassAbilityTwo), EBreakerAbilitySelectionResult::Allowed);
+    FText Failure;
+    TestTrue(TEXT("starter swap succeeds"), Abilities->TryEquipAbility(EBreakerAbilitySlot::ClassAbilityOne, Original.ClassAbilityTwo, Failure));
+    TestEqual(TEXT("one becomes Rot"), Progression->GetProgressionState().AbilityLoadout.ClassAbilityOne, Original.ClassAbilityTwo);
+    TestEqual(TEXT("two becomes Cleave"), Progression->GetProgressionState().AbilityLoadout.ClassAbilityTwo, Original.ClassAbilityOne);
+    TestTrue(TEXT("same-slot reselection succeeds"), Abilities->TryEquipAbility(EBreakerAbilitySlot::ClassAbilityOne, Original.ClassAbilityTwo, Failure));
+    TestFalse(TEXT("ultimate cannot swap into class slot"), Abilities->TryEquipAbility(EBreakerAbilitySlot::ClassAbilityOne, Original.Ultimate, Failure));
+    TestFalse(TEXT("locked ability remains locked"), Abilities->TryEquipAbility(EBreakerAbilitySlot::ClassAbilityOne, TEXT("Caster.Siphon"), Failure));
+    TestEqual(TEXT("refusals leave one unchanged"), Progression->GetProgressionState().AbilityLoadout.ClassAbilityOne, Original.ClassAbilityTwo);
+    TestEqual(TEXT("refusals leave two unchanged"), Progression->GetProgressionState().AbilityLoadout.ClassAbilityTwo, Original.ClassAbilityOne);
+    TestEqual(TEXT("refusals leave ultimate unchanged"), Progression->GetProgressionState().AbilityLoadout.Ultimate, Original.Ultimate);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerStarterAbilityMoveTest,
+    "RiorsEdge.Abilities.StarterSlotMove", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FBreakerStarterAbilityMoveTest::RunTest(const FString& Parameters)
+{
+    AActor* Owner = NewObject<AActor>();
+    auto* Progression = NewObject<UBreakerProgressionComponent>(Owner);
+    auto* Abilities = NewObject<UBreakerAbilityComponent>(Owner);
+    Owner->AddInstanceComponent(Progression);
+    Owner->AddInstanceComponent(Abilities);
+    if (!TestTrue(TEXT("fresh Swift chosen"), Progression->ChoosePermanentClassById(EBreakerClassId::Swift))) return false;
+    const FBreakerAbilityLoadout Original = Progression->GetProgressionState().AbilityLoadout;
+    TestEqual(TEXT("Swift starts with Skim"), Original.ClassAbilityOne, FName(TEXT("Swift.Skim")));
+    TestTrue(TEXT("second slot starts empty"), Original.ClassAbilityTwo.IsNone());
+    TestEqual(TEXT("move preview allows"), Abilities->PreviewSelection(EBreakerAbilitySlot::ClassAbilityTwo, Original.ClassAbilityOne), EBreakerAbilitySelectionResult::Allowed);
+    FText Failure;
+    TestTrue(TEXT("Skim moves to second"), Abilities->TryEquipAbility(EBreakerAbilitySlot::ClassAbilityTwo, Original.ClassAbilityOne, Failure));
+    TestTrue(TEXT("source clears"), Progression->GetProgressionState().AbilityLoadout.ClassAbilityOne.IsNone());
+    const FBreakerAbilityLoadout Moved = Progression->GetProgressionState().AbilityLoadout;
+    TestNull(TEXT("runtime source does not refill Skim"), UBreakerAbilityComponent::ResolveLoadoutDefinition(EBreakerClassId::Swift, EBreakerAbilitySlot::ClassAbilityOne, Moved));
+    const UBreakerAbilityDefinition* ResolvedMoved = UBreakerAbilityComponent::ResolveLoadoutDefinition(EBreakerClassId::Swift, EBreakerAbilitySlot::ClassAbilityTwo, Moved);
+    if (!TestNotNull(TEXT("runtime destination resolves"), ResolvedMoved)) return false;
+    TestEqual(TEXT("runtime destination is Skim"), ResolvedMoved->AbilityId, Original.ClassAbilityOne);
+    TestEqual(TEXT("second holds Skim"), Progression->GetProgressionState().AbilityLoadout.ClassAbilityTwo, Original.ClassAbilityOne);
+    TestTrue(TEXT("Skim remains unlocked"), Progression->IsAbilityUnlocked(Original.ClassAbilityOne));
+    TestTrue(TEXT("Skim moves back"), Abilities->TryEquipAbility(EBreakerAbilitySlot::ClassAbilityOne, Original.ClassAbilityOne, Failure));
+    TestEqual(TEXT("first restored"), Progression->GetProgressionState().AbilityLoadout.ClassAbilityOne, Original.ClassAbilityOne);
+    TestTrue(TEXT("second clears"), Progression->GetProgressionState().AbilityLoadout.ClassAbilityTwo.IsNone());
+    const FBreakerAbilityLoadout Restored = Progression->GetProgressionState().AbilityLoadout;
+    const UBreakerAbilityDefinition* ResolvedBack = UBreakerAbilityComponent::ResolveLoadoutDefinition(EBreakerClassId::Swift, EBreakerAbilitySlot::ClassAbilityOne, Restored);
+    if (!TestNotNull(TEXT("runtime original slot resolves"), ResolvedBack)) return false;
+    TestEqual(TEXT("runtime original slot is Skim"), ResolvedBack->AbilityId, Original.ClassAbilityOne);
+    TestNull(TEXT("runtime second stays empty"), UBreakerAbilityComponent::ResolveLoadoutDefinition(EBreakerClassId::Swift, EBreakerAbilitySlot::ClassAbilityTwo, Restored));
+    TestEqual(TEXT("ultimate unchanged"), Progression->GetProgressionState().AbilityLoadout.Ultimate, Original.Ultimate);
+    return true;
+}
 #endif

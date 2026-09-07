@@ -75,6 +75,7 @@ public:
     virtual void UpdateCharacterStateBeforeMovement(float DeltaSeconds) override;
     virtual FNetworkPredictionData_Client* GetPredictionData_Client() const override;
     virtual void UpdateFromCompressedFlags(uint8 Flags) override;
+    virtual bool ClientUpdatePositionAfterServerUpdate() override;
 
     UFUNCTION(BlueprintCallable, Category="Movement") void SetSprinting(bool bEnabled);
     UFUNCTION(BlueprintCallable, Category="Movement") void SetSlideRequested(bool bEnabled);
@@ -662,6 +663,7 @@ public:
     using Super = FSavedMove_Character;
 
     uint8 bSavedWantsLedgeTraversal : 1;
+    uint8 bSavedWantsToSprint : 1;
     FVector SavedTraversalStart = FVector::ZeroVector;
     FVector SavedTraversalTarget = FVector::ZeroVector;
     FVector SavedTraversalExitVelocity = FVector::ZeroVector;
@@ -669,7 +671,7 @@ public:
     float SavedTraversalDuration = 0.2f;
     EBreakerLedgeVerb SavedTraversalVerb = EBreakerLedgeVerb::None;
 
-    FBreakerSavedMove_Character() : bSavedWantsLedgeTraversal(false) {}
+    FBreakerSavedMove_Character() : bSavedWantsLedgeTraversal(false), bSavedWantsToSprint(false) {}
     virtual void Clear() override;
     virtual uint8 GetCompressedFlags() const override;
     virtual bool CanCombineWith(const FSavedMovePtr& NewMove, ACharacter* InCharacter, float MaxDelta) const override;

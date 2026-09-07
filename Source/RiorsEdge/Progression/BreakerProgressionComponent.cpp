@@ -359,7 +359,7 @@ bool UBreakerProgressionComponent::CanPurchaseNode(const UBreakerProgressionTree
         }
         if (!bConnected)
         {
-            OutFailureReason = LOCTEXT("RingUnreached", "Reach this node through the ring first: no connected node is owned.");
+            OutFailureReason = LOCTEXT("RingUnreached", "Connect this node to an owned node first.");
             return false;
         }
     }
@@ -447,32 +447,53 @@ void UBreakerProgressionComponent::DevForceEquipAbility(EBreakerAbilitySlot Slot
     OnProgressionChanged.Broadcast();
 }
 
-bool UBreakerProgressionComponent::EquipAbility(EBreakerAbilitySlot Slot, FName AbilityId, FText& OutFailureReason)
+bool UBreakerProgressionComponent::CanEquipAbility(EBreakerAbilitySlot Slot, FName AbilityId, FText& OutFailureReason) const
 {
-    if (AbilityId.IsNone() || !IsAbilityUnlocked(AbilityId))
+    const UBreakerAbilityDefinition* Incoming = UBreakerAbilityDefinition::FindFallback(AbilityId);
+    if (!Incoming || Incoming->ClassId != State.PermanentClass || !Incoming->CanOccupySlot(Slot) || !IsAbilityUnlocked(AbilityId))
     {
-        OutFailureReason = LOCTEXT("AbilityLocked", "That ability has not been unlocked.");
+        OutFailureReason = LOCTEXT("AbilityIncompatible", "That ability is locked or cannot use this slot.");
         return false;
     }
-    if (State.AbilityLoadout.Contains(AbilityId))
+    const FBreakerAbilityLoadout& Loadout = State.AbilityLoadout;
+    const EBreakerAbilitySlot Slots[] = { EBreakerAbilitySlot::ClassAbilityOne, EBreakerAbilitySlot::ClassAbilityTwo, EBreakerAbilitySlot::Ultimate };
+    const FName Ids[] = { Loadout.ClassAbilityOne, Loadout.ClassAbilityTwo, Loadout.Ultimate };
+    int32 Target = INDEX_NONE;
+    for (int32 Index = 0; Index < 3; ++Index) if (Slots[Index] == Slot) Target = Index;
+    if (Target == INDEX_NONE) return false;
+    for (int32 Index = 0; Index < 3; ++Index)
     {
-        OutFailureReason = LOCTEXT("AbilityDuplicate", "That ability is already equipped.");
-        return false;
-    }
-
-    if (Slot == EBreakerAbilitySlot::Ultimate)
-    {
-        if (!ClassDefinition || AbilityId != ClassDefinition->BaseUltimateId)
+        if (Index == Target || Ids[Index] != AbilityId) continue;
+        // Moving into an empty slot leaves the source empty; nothing is displaced.
+        if (Ids[Target].IsNone()) continue;
+        const UBreakerAbilityDefinition* Displaced = UBreakerAbilityDefinition::FindFallback(Ids[Target]);
+        if (!Displaced || Displaced->ClassId != State.PermanentClass || !Displaced->CanOccupySlot(Slots[Index]) || !IsAbilityUnlocked(Ids[Target]))
         {
-            OutFailureReason = LOCTEXT("NotUltimate", "Only an unlocked class ultimate can use the ultimate slot.");
+            OutFailureReason = LOCTEXT("AbilitySwapIncompatible", "The current ability cannot move into the other slot.");
             return false;
         }
-        State.AbilityLoadout.Ultimate = AbilityId;
     }
-    else if (Slot == EBreakerAbilitySlot::ClassAbilityOne) State.AbilityLoadout.ClassAbilityOne = AbilityId;
-    else State.AbilityLoadout.ClassAbilityTwo = AbilityId;
-
     OutFailureReason = FText::GetEmpty();
+    return true;
+}
+
+bool UBreakerProgressionComponent::EquipAbility(EBreakerAbilitySlot Slot, FName AbilityId, FText& OutFailureReason)
+{
+    if (!CanEquipAbility(Slot, AbilityId, OutFailureReason)) return false;
+    FBreakerAbilityLoadout& Loadout = State.AbilityLoadout;
+    FName* Target = Slot == EBreakerAbilitySlot::Ultimate ? &Loadout.Ultimate
+        : (Slot == EBreakerAbilitySlot::ClassAbilityOne ? &Loadout.ClassAbilityOne : &Loadout.ClassAbilityTwo);
+    if (*Target == AbilityId) return true;
+    FName* Occupants[] = { &Loadout.ClassAbilityOne, &Loadout.ClassAbilityTwo, &Loadout.Ultimate };
+    for (FName* Occupant : Occupants)
+    {
+        if (Occupant != Target && *Occupant == AbilityId)
+        {
+            *Occupant = *Target;
+            break;
+        }
+    }
+    *Target = AbilityId;
     OnProgressionChanged.Broadcast();
     return true;
 }
