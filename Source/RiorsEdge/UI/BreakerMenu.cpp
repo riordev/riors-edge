@@ -1,6 +1,7 @@
 #include "UI/BreakerMenu.h"
 #include "UI/BreakerCoreBoardLayout.h"
 #include "UI/BreakerSandboxModel.h"
+#include "EngineUtils.h"
 #include "Audio/BreakerSoundDirector.h"
 #include "Data/BreakerStrings.h"
 
@@ -984,6 +985,21 @@ void SBreakerMenu::ShowScreenForCapture(EBreakerMenuScreen Screen)
     {
         Board = Board.ToUpper();
         if (Board == TEXT("CORE")) { SkillBoardTab = 1; }
+        else if (Board == TEXT("DIALOGUE") && Character.IsValid())
+        {
+            // Photograph the longest real authored speaker line. No journal
+            // flags are changed; this only selects the dialogue capture view.
+            int32 Longest = -1;
+            for (TActorIterator<ABreakerNPC> It(Character->GetWorld()); It; ++It)
+                for (const FBreakerDialogueNode& Node : It->DialogueNodes)
+                    if (Node.SpeakerLine.Len() > Longest)
+                    {
+                        Longest = Node.SpeakerLine.Len();
+                        DialogueNPC = *It;
+                        DialogueNodeId = Node.NodeId;
+                        Screen = EBreakerMenuScreen::Dialogue;
+                    }
+        }
         else if (Board == TEXT("COREPRECISION")) { SkillBoardTab = 1; SkillExpandedConstellation = TEXT("Precision"); }
         else if (Board == TEXT("COMPARE")) { SkillBoardTab = 0; SkillBranchIndex = -1; }
         else if (Board.StartsWith(TEXT("BRANCH"))) { SkillBoardTab = 0; SkillBranchIndex = FCString::Atoi(*Board.RightChop(6)); }
@@ -1048,6 +1064,13 @@ void SBreakerMenu::ShowScreenForCapture(EBreakerMenuScreen Screen)
                     Character->GetEquipment()->AddToBackpack(Rolled);
                 }
             }
+        }
+        else if (Board == TEXT("UNWRITTEN"))
+        {
+            Screen = EBreakerMenuScreen::Inventory;
+            BackpackFilter = BreakerInventoryLayout::EBackpackFilter::Trinkets;
+            if (Character.IsValid() && Character->GetEquipment())
+                Character->GetEquipment()->AddToBackpack(UBreakerLootLibrary::RollLegendary(TEXT("Legendary.Refractor"), 40, 1887));
         }
         else if (Board == TEXT("EQUIPREQUIREMENT"))
         {
@@ -1228,6 +1251,10 @@ void SBreakerMenu::ApplyScreen(EBreakerMenuScreen NewScreen)
     // nothing has painted yet.
     const float LayoutScale = GetTickSpaceGeometry().Scale > 0.0f ? GetTickSpaceGeometry().Scale : 1.0f;
     ContentHost->SlatePrepass(LayoutScale);
+    // Replacing a focused child invalidates its focus path. Death must accept
+    // confirmation without pawn input; dialogue must accept numbered choices.
+    if (CurrentScreen == EBreakerMenuScreen::Death || CurrentScreen == EBreakerMenuScreen::Dialogue)
+        FSlateApplication::Get().SetKeyboardFocus(SharedThis(this), EFocusCause::SetDirectly);
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildFrame(const FText& Title, const FText& Subtitle, const TSharedRef<SWidget>& Body, float PanelWidth) const
@@ -1478,6 +1505,7 @@ void SBreakerMenu::HandleConfirmKey()
 
 FReply SBreakerMenu::OnPreviewKeyDown(const FGeometry& Geometry, const FKeyEvent& KeyEvent)
 {
+    if (CurrentScreen == EBreakerMenuScreen::Death) return HandleDeathConfirmKey(KeyEvent);
     // ---- Rebind capture, first, and only while a row is listening ---------
     // Preview is what makes this work at all: the player reached this state by
     // CLICKING a row, so Slate's focus path runs through this widget, and a
@@ -4353,11 +4381,25 @@ namespace
     // same order as Item.Affixes — this function decides nothing about better
     // or worse, it only picks a glyph and a colour. Pass an empty array for a
     // card with nothing to compare against (an equipped piece).
+    TSharedRef<SWidget> BreakerItemRuleLines(const FBreakerItemInstance& Item, float ContentWidth)
+    {
+        if (!Item.HasRule()) return SNullWidget::NullWidget;
+        const FBreakerItemRuleDefinition Rule = UBreakerItemRuleLibrary::FindRule(Item.Rule);
+        return SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight()
+            [MenuWrappedText(Rule.DisplayName, BreakerUI::TypeCaption, RarityColor(Item.Rarity), ContentWidth, true)]
+            + SVerticalBox::Slot().AutoHeight().Padding(0, BreakerUI::Space4, 0, 0)
+            [MenuWrappedText(Rule.Description, BreakerUI::TypeCaption, SoftText, ContentWidth)];
+    }
+
     TSharedRef<SWidget> MakeAffixLines(const FBreakerItemInstance& Item, const TArray<FBreakerAffixComparison>& Deltas,
         float CardWidth)
     {
         const float NameWrap = BreakerInventoryLayout::AffixNameWrapWidth(CardWidth) - BreakerMenuAffixTierColumn;
         TSharedRef<SVerticalBox> Lines = SNew(SVerticalBox);
+        if (Item.HasRule())
+            Lines->AddSlot().AutoHeight().Padding(0, 0, 0, BreakerUI::Space8)
+            [BreakerItemRuleLines(Item, BreakerInventoryLayout::CardContentWidth(CardWidth))];
         for (int32 Index = 0; Index < Item.Affixes.Num(); ++Index)
         {
             // THE MARK IS GEOMETRY in the 14px box: an up-chevron in the
@@ -4703,6 +4745,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                             MakeWeaponBaseDamageLine(Item, Character.IsValid() ? Character->GetWeapon() : nullptr,
                                 FMath::Max(80.0f, EquipmentColumnWidth - BreakerUI::MinHitTarget
                                     - BreakerInventoryLayout::CardChrome - BreakerUI::Space16))
+                        ]
+                        + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+                        [
+                            BreakerItemRuleLines(Item, FMath::Max(80.0f, EquipmentColumnWidth - BreakerUI::MinHitTarget
+                                - BreakerInventoryLayout::CardChrome - BreakerUI::Space16))
                         ]
                     ]
 
@@ -10758,8 +10805,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()
     // the frame's 24px pad each side and the plate's 5px of rail and ring,
     // never an allotted size.
     constexpr float DialoguePanelWidth = 800.0f;   // O2 PLACEHOLDER
-    const float SpeakerLineWrap = DialoguePanelWidth - 2.0f * BreakerUI::Space24
+    const float ChoiceLineWrap = DialoguePanelWidth - 2.0f * BreakerUI::Space24
         - (BreakerUI::RailThickness + 2.0f * BreakerUI::BorderThin);
+    const float SpeakerLineWrap = ChoiceLineWrap - 2.0f * BreakerUI::Space24;
     FString Speaker;
     FString Role;
     BreakerMenuLayout::SplitSpeakerLine(NPC->GetDisplayName().ToString(), Speaker, Role);
@@ -10832,7 +10880,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()
                 + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
                 [
                     MenuWrappedText(FText::FromString(Choice.Text), BreakerUI::TypeBody, SoftText,
-                        SpeakerLineWrap - 32.0f - 2.0f * BreakerUI::Space16, true)
+                        ChoiceLineWrap - 32.0f - 2.0f * BreakerUI::Space16, true)
                 ]
             ],
             BorderEmphasis)

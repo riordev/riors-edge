@@ -130,6 +130,8 @@ public:
     // themselves are Characters/BreakerInputModeMath.h.
     void ApplyProfileFeel(const class UBreakerGameSettings& Settings);
     void ResumeFromMenu();
+    // Shared by menu entry and death before either can swallow key releases.
+    void ClearHeldGameplayInput();
     void ReturnToTitleMenu();
     void QuitFromMenu();
     UFUNCTION(BlueprintCallable, Category="Movement") bool TryDash();

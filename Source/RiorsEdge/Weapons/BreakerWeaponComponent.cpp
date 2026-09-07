@@ -15,6 +15,7 @@
 #include "Combat/BreakerStatusRules.h"
 #include "Components/PrimitiveComponent.h"
 #include "Items/BreakerEquipmentComponent.h"
+#include "Items/BreakerItemRules.h"
 #include "Movement/BreakerCharacterMovementComponent.h"
 #include "Progression/BreakerBuildConditions.h"
 #include "Progression/BreakerProgressionComponent.h"
@@ -43,6 +44,7 @@ namespace
     constexpr uint32 BreakerMultishotSalt = 0x3B0057A0u;
     constexpr uint32 BreakerPierceSalt = 0x91E4CE00u;
     constexpr uint32 BreakerChainSalt = 0xC4A15000u;
+    constexpr uint32 BreakerForkSalt = 0xF04C2000u;
     constexpr uint32 BreakerRicochetSalt = 0x51C0C4E7u;
 
     // Marksman node ids and tags this fire path consumes, spelled once. These
@@ -2013,7 +2015,7 @@ AActor* UBreakerWeaponComponent::FindNearestChainTarget(const FVector& Origin, f
 FBreakerDamageResult UBreakerWeaponComponent::SubmitWeaponDamage(const UBreakerWeaponDefinition* Definition, UBreakerCombatComponent* TargetCombat,
     const UBreakerAttributeSet* SourceAttributes, float BaseDamage, float DistanceFromMuzzle, bool bWeakPoint,
     float ArmorPenetrationOverride, const FVector& ImpactPoint, int32 DamageSeed,
-    bool bWeakPointIsGranted)
+    bool bWeakPointIsGranted, bool bForkHit)
 {
     FBreakerDamageRequest Damage;
     // The multiplicand: archetype base carried up the item-level curve, then
@@ -2050,6 +2052,16 @@ FBreakerDamageResult UBreakerWeaponComponent::SubmitWeaponDamage(const UBreakerW
         Damage.CriticalChance = 1.0f;
     }
     Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
+    const UBreakerEquipmentComponent* Equipment = GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>();
+    if (!Definition->bProjectile && Equipment && UBreakerItemRuleLibrary::ResolveRules(Equipment->GetEquipped()).bHitscanCriticalForks)
+    {
+        Damage.bCanCritical = false;
+    }
+    if (bForkHit)
+    {
+        Damage.bCanCritical = false;
+        Damage.ProcCoefficient = 0.0f;
+    }
     // ONE number, and ONE place that derives it. Gear's Weapon Damage affix,
     // every node that raises damage and the shared pool are already summed into
     // the weapon lane's single additive Increased bucket; multiplying gear in
@@ -2111,6 +2123,10 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
     int32 SecondarySeedIndex = 0;
     FVector LastEnemyImpact = FVector::ZeroVector;
     float LastEnemyDistanceCm = 0.0f;
+    FVector ForkOrigin = FVector::ZeroVector;
+    float ForkDistanceCm = 0.0f;
+    float ForkBaseDamage = 0.0f;
+    bool bForkPending = false;
     // Spread on pierce (KIT-3): the FIRST body's spreading statuses, copied
     // once, ride every later pierce leg. Filled after that body's own bleed
     // has landed so a status the shot itself just applied can spread too.
@@ -2221,9 +2237,29 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
             ? static_cast<int32>(HashCombine(OwnerHash, static_cast<uint32>(PelletSeed)))
             : FBreakerWeaponMath::SecondaryShotSeed(OwnerHash, PelletSeed, BreakerPierceSalt, SecondarySeedIndex++);
         const float ArmorPenetration = (EnemiesStruck > 0 && bSightline) ? 1.0f : Definition->ArmorPenetration;
+        if (EnemiesStruck == 0 && !Definition->bProjectile)
+        {
+            const UBreakerEquipmentComponent* Equipment = GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>();
+            if (Equipment && UBreakerItemRuleLibrary::ResolveRules(Equipment->GetEquipped()).bHitscanCriticalForks)
+            {
+                float Chance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
+                if (bFiringFinalMagazineRound && OwnerHasNodeTag(BreakerCoreLastRoundTag())) Chance = 1.0f;
+                bForkPending = UBreakerDamageLibrary::CanCriticalOnWeakPoint(
+                    bWeakPoint && !bGrantedWeakPoint, bGrantedWeakPoint, OwnerHasNodeTag(BreakerCoreDeadeyeTag()))
+                    && UBreakerItemRuleLibrary::RollCriticalFork(Chance,
+                    FBreakerWeaponMath::SecondaryShotSeed(OwnerHash, PelletSeed, BreakerForkSalt, 0));
+                ForkOrigin = Hit.ImpactPoint;
+                ForkDistanceCm = DistanceFromMuzzleCm;
+                ForkBaseDamage = ScaledBaseDamage * CurrentMultiplier * UBreakerItemRuleLibrary::ForkDamageFraction;
+            }
+        }
         const FBreakerDamageResult HitDamage = SubmitWeaponDamage(Definition, TargetCombat, SourceAttributes,
             ScaledBaseDamage * CurrentMultiplier, DistanceFromMuzzleCm, bWeakPoint, ArmorPenetration, Hit.ImpactPoint, DamageSeed,
             bGrantedWeakPoint);
+        if (EnemiesStruck == 0 && (HitDamage.bDodged || HitDamage.HealthDamage + HitDamage.ShieldDamage <= 0.0f))
+        {
+            bForkPending = false;
+        }
         Shot.DamageResult.RawDamage += HitDamage.RawDamage;
         Shot.DamageResult.MitigatedDamage += HitDamage.MitigatedDamage;
         Shot.DamageResult.ShieldDamage += HitDamage.ShieldDamage;
@@ -2341,6 +2377,33 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
         }
     }
 
+    // Forks share one origin, never arc from one secondary victim to another.
+    // Defer until ordinary channels finish so no previously struck body pays twice.
+    if (bForkPending)
+    {
+        for (int32 Fork = 0; Fork < UBreakerItemRuleLibrary::ForkTargetCount; ++Fork)
+        {
+            AActor* Target = FindNearestChainTarget(ForkOrigin, UBreakerItemRuleLibrary::ForkRadiusCm, StruckActors);
+            if (!Target) break;
+            UBreakerCombatComponent* Combat = Target->FindComponentByClass<UBreakerCombatComponent>();
+            if (!Combat) break;
+            FBreakerSecondaryImpact& Leg = Shot.SecondaryImpacts.AddDefaulted_GetRef();
+            Leg.Start = ForkOrigin;
+            Leg.End = Target->GetActorLocation();
+            Leg.bHit = true;
+            Leg.HitActor = Target;
+            const FBreakerDamageResult Result = SubmitWeaponDamage(Definition, Combat, SourceAttributes,
+                ForkBaseDamage, ForkDistanceCm, false, Definition->ArmorPenetration, Leg.End,
+                FBreakerWeaponMath::SecondaryShotSeed(OwnerHash, PelletSeed, BreakerForkSalt, Fork + 1), false, true);
+            Shot.DamageResult.RawDamage += Result.RawDamage;
+            Shot.DamageResult.MitigatedDamage += Result.MitigatedDamage;
+            Shot.DamageResult.ShieldDamage += Result.ShieldDamage;
+            Shot.DamageResult.HealthDamage += Result.HealthDamage;
+            Shot.DamageResult.bShieldBroken |= Result.bShieldBroken;
+            Shot.DamageResult.bKilled |= Result.bKilled;
+            StruckActors.Add(Target);
+        }
+    }
     return FMath::Max(0, EnemiesStruck - 1);
 }
 

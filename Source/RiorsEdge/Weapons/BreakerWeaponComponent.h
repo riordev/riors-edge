@@ -781,7 +781,7 @@ private:
         // takes the weak-point multiplier instead of crit, not as well as it.
         // Defaulted false so the legs that cannot carry a mark -- chain arcs --
         // keep their existing behaviour without restating it.
-        bool bWeakPointIsGranted = false);
+        bool bWeakPointIsGranted = false, bool bForkHit = false);
 
     // ---- Marksman / Frenzy rule-half state (Class-Kits §1.3 / §1.5) --------
     // Server-side timestamps of recent trigger pulls, pruned to Loaded's 2s

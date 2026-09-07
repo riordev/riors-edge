@@ -49,9 +49,11 @@ legendaries. Do not conflate a tier of the ladder with an identity.
 earns a rewrite when it is rolled one. Deriving it from rarity would hand one
 to every existing item in every save and every test fixture.
 
-**No item rule may author a More.** The budget is three, the trees already
-offer more options than that, so a fourth from an item is either dead weight or
-a quiet nerf to the three the player chose. Mores stay a tree instrument.
+**Ordinary affixes use flat and Increased buckets. Aberrant and Unwritten
+rewrites may grant damage, including More multipliers, when the perk warrants
+it.** Their strength must create a build choice with a clear tradeoff. An
+Exceptional can win through unrestricted, well-treated stats or superior
+single-target output. Damage perks use the shared combat pipeline.
 
 **Affix breadth is an invariant, not an aspiration.** Every slot can raise
 weapon damage; every slot can raise ability damage; every slot carries a
@@ -83,14 +85,25 @@ carries the whole endgame.
 | Uncommon | 4–5 | T2 | — |
 | Exceptional | 4–6 | T-1 | — |
 | Aberrant | 4–6 | T-1 | Focused: one affix rolls a tier better |
-| Unwritten | 5–6 | T-1 | One rolled rewrite, drawn from a pool of four |
+| Unwritten | 5–6 | T-1 | One rolled rewrite, drawn from a pool of three |
 
 Equip caps: three Aberrant, one non-legendary Unwritten, one legendary, as
 three separate axes. A legendary does not draw against the Unwritten cap.
 
+### Refractor
+
+Refractor is a named Unwritten necklace. Hitscan hits give up critical strikes;
+critical chance instead forks each pellet's first enemy hit, when it deals
+damage and is normally crit-eligible, to up to two other
+visible enemies within eight metres, dealing 60% normal damage without
+weak-point bonuses to each through
+the ordinary weapon pipeline. Forks do not fork again or apply weapon statuses.
+Projectile weapons retain their normal behavior. A critical-focused Exceptional
+keeps its single-target advantage; Refractor rewards grouped targets.
+
 ### The ladder as intended
 
-The four rollable rewrites are all invisible. Every one changes what the
+The three rollable rewrites are all invisible. Every one changes what the
 aggregation obeys; none changes what the player does or what the screen shows.
 They are not weak, they are **misfiled** — minor-rewrite content sitting in the
 top slot, which is why the top rarity reads as a rare with a bonus.
@@ -102,7 +115,7 @@ of two flavours:
   not consume a rewrite slot.
 - **Modified** — one minor rewrite, no raised ceiling. The exploration pick.
 
-The four existing rewrites migrate down into Aberrant's minor pool. They are
+The three existing rewrites migrate down into Aberrant's minor pool. They are
 the right size for something worn three of.
 
 **The fifth tier becomes the singular tier.** One equipped, and it carries
@@ -128,7 +141,7 @@ items.
 |---|---|---|
 | **Delivery** | How the damage arrives | Projectile split; area centred on the caster |
 | **Economy** | What pays for what | A sealed ultimate buying a third ability slot; a resource inversion |
-| **Rule** | What a mechanic obeys | The four existing rewrites' category |
+| **Rule** | What a mechanic obeys | The three existing rewrites' category |
 
 Weight the pool toward delivery and economy. **A major rewrite must be
 observable: if a player cannot tell it is equipped without opening the
@@ -242,7 +255,7 @@ This spec owns the item, the ladder, the roll, and the Forge. It does not own:
 
 | Invariant | Test |
 |---|---|
-| No item rule authors a More, on any aggregated attribute, including delivery and economy rewrites | `Items.Rules.NeverAuthorsAMore` |
+| Existing non-damage rewrites preserve their authored buckets; ordinary affixes author no More | `Items.Rules.NeverAuthorsAMore` |
 | Every slot can raise weapon damage and ability damage, and every slot has a conditional line | `Items.Affixes.Breadth` |
 | Trash cannot roll a gated rarity, exhaustively across the item-level range | `Items.Drops.TrashCannotRollAberrant` |
 | A seed reproduces the drop decision, the rarity and the item; the chance step does not bias the rarity step | `Items.Drops.Determinism` |

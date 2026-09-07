@@ -7,6 +7,7 @@ bool FBreakerItemRuleSet::IsIdentity() const
     return !bAllConditionsSatisfied
         && !bAirborneAlsoGroundTraversal
         && !bRegenGatedOnTraversal
+        && !bHitscanCriticalForks
         && FMath::IsNearlyEqual(PhysicalDamageReductionCap, FBreakerEquipmentStats::DefaultPhysicalDamageReductionCap)
         && FireRateToIncreasedDamage == 0.0f
         && AirControlPercentDelta == 0.0f;
@@ -66,6 +67,9 @@ namespace
             LOCTEXT("Rule_Overrun", "OVERRUN"),
             LOCTEXT("Rule_Overrun_Desc", "Triple Resource Regeneration while airborne, sliding or wall riding. None otherwise."),
             false));
+        Table.Add(BreakerMakeRuleDefinition(EBreakerItemRule::Refractor,
+            LOCTEXT("Rule_Refractor", "REFRACTOR"),
+            LOCTEXT("Rule_Refractor_Desc", "Hitscan hits cannot critically strike. Each pellet's first hit instead rolls critical chance to fork to two other enemies within 8 m for 60% normal hit damage each, without weak-point bonuses. Forks cannot fork again or apply weapon statuses. Projectile weapons are unchanged."), false));
         return Table;
     }
 
@@ -146,6 +150,14 @@ namespace
         Overrun.Rule = EBreakerItemRule::Overrun;
         Overrun.GuaranteedAffixIds = {TEXT("Core.ResourceRegen"), TEXT("Core.MaxResource"), TEXT("Offense.SlidingDamage")};
         Table.Add(Overrun);
+
+        FBreakerLegendaryDefinition Refractor;
+        Refractor.LegendaryId = TEXT("Legendary.Refractor");
+        Refractor.DisplayName = LOCTEXT("Legendary_Refractor", "REFRACTOR");
+        Refractor.Slot = EBreakerEquipSlot::Necklace;
+        Refractor.Rule = EBreakerItemRule::Refractor;
+        Refractor.GuaranteedAffixIds = {TEXT("Crit.Chance"), TEXT("Offense.WeaponDamage"), TEXT("Offense.SharedDamage")};
+        Table.Add(Refractor);
 
         return Table;
     }
@@ -229,6 +241,9 @@ FBreakerItemRuleSet UBreakerItemRuleLibrary::ResolveRules(const TArray<FBreakerI
     {
         switch (Item.Rule)
         {
+        case EBreakerItemRule::Refractor:
+            Set.bHitscanCriticalForks = true;
+            break;
         case EBreakerItemRule::Unbound:
             Set.bAllConditionsSatisfied = true;
             break;
@@ -279,3 +294,9 @@ int32 UBreakerItemRuleLibrary::TierUpliftForItem(const FBreakerItemInstance& Ite
 }
 
 #undef LOCTEXT_NAMESPACE
+
+bool UBreakerItemRuleLibrary::RollCriticalFork(float CriticalChance, int32 Seed)
+{
+    FRandomStream Random(Seed);
+    return Random.FRand() < FMath::Clamp(CriticalChance, 0.0f, 1.0f);
+}

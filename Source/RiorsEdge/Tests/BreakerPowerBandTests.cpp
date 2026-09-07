@@ -1635,9 +1635,9 @@ bool FBreakerRuleBandImpactMajorTest::RunTest(const FString& Parameters)
             ++MajorCount;
         }
     }
-    // Three legendaries, two fixtures. A fourth legendary joins the loop by
+    // Four legendaries, two fixtures. Each authored legendary joins the loop by
     // existing; a shrink here means a definition vanished from the table.
-    TestEqual(TEXT("the major population is every non-rollable rule, both bands"), MajorCount, 6);
+    TestEqual(TEXT("the major population is every non-rollable rule, both bands"), MajorCount, 8);
     return true;
 }
 

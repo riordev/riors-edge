@@ -252,6 +252,8 @@ enum class EBreakerItemRule : uint8
     // OVERRUN (waist). Resource Regeneration is tripled while airborne,
     // sliding or wall riding, and zero while it is not. Bends the REGEN rule.
     Overrun,
+    // Named hitscan fork rewrite; append-only serialized identity.
+    Refractor,
 
     Count UMETA(Hidden)
 };

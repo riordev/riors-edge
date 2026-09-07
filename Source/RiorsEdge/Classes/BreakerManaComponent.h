@@ -17,6 +17,16 @@ struct FBreakerCasterResourceTuning
     float SeepRankTwoMultiplier = 2.0f; // O2 PLACEHOLDER
     float AttritionRankOneRefund = 4.0f; // O2 PLACEHOLDER
     float AttritionRankTwoRefund = 8.0f; // O2 PLACEHOLDER
+    float CloseRankOneRangeCm = 600.0f; // O2 PLACEHOLDER
+    float CloseRankTwoRangeCm = 900.0f; // O2 PLACEHOLDER
+    float DebtRankOneExtension = 10.0f; // O2 PLACEHOLDER
+    float DebtRankTwoExtension = 20.0f; // O2 PLACEHOLDER
+    float BloodpriceRankOneFraction = 0.1f; // O2 PLACEHOLDER
+    float BloodpriceRankTwoFraction = 0.2f; // O2 PLACEHOLDER
+    float PatienceRankOneDelay = 4.0f; // O2 PLACEHOLDER
+    float PatienceRankTwoDelay = 2.0f; // O2 PLACEHOLDER
+    float VarianceRankOneMultiplier = 2.0f; // O2 PLACEHOLDER
+    float VarianceRankTwoMultiplier = 3.0f; // O2 PLACEHOLDER
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerOvercastChanged, bool, bOvercast);
@@ -96,7 +106,7 @@ public:
     // component only publishes it.
     UFUNCTION(BlueprintPure, Category="Mana") float GetOvercastIncomingDamageTaken() const;
     // Deepest the bank may be driven; negative. Spellblade SB4 lowers it.
-    UFUNCTION(BlueprintPure, Category="Mana") float GetOvercastFloor() const { return FMath::Min(0.0f, OvercastFloor); }
+    UFUNCTION(BlueprintPure, Category="Mana") float GetOvercastFloor() const;
     // Deepens (or restores) the floor at runtime — SB4 and MS10 (spec §5,
     // Class-Kits §2.1). Re-publishes the attribute immediately, so a node that
     // shallows the floor cannot leave the bank below it.
@@ -196,6 +206,7 @@ public:
     UFUNCTION() void HandleProgressionChanged();
 
 private:
+    float SecondsSinceWeaponFire = 1000000.0f;
     UFUNCTION() void HandleCasterKill(const FBreakerHitContext& Hit);
     UFUNCTION() void HandleShot(const FBreakerShotResult& Shot);
     UFUNCTION() void HandleMeleeHit(const FBreakerHitContext& Hit);

@@ -30,9 +30,19 @@ bool UBreakerManaComponent::ParseResourceTuning(const FJsonObject& Object, FBrea
         { TEXT("SeepRankOneMultiplier"), &Candidate.SeepRankOneMultiplier, 1 },
         { TEXT("SeepRankTwoMultiplier"), &Candidate.SeepRankTwoMultiplier, 1 },
         { TEXT("AttritionRankOneRefund"), &Candidate.AttritionRankOneRefund, 0 },
-        { TEXT("AttritionRankTwoRefund"), &Candidate.AttritionRankTwoRefund, 0 }
+        { TEXT("AttritionRankTwoRefund"), &Candidate.AttritionRankTwoRefund, 0 },
+        { TEXT("CloseRankOneRangeCm"), &Candidate.CloseRankOneRangeCm, 0 },
+        { TEXT("CloseRankTwoRangeCm"), &Candidate.CloseRankTwoRangeCm, 0 },
+        { TEXT("DebtRankOneExtension"), &Candidate.DebtRankOneExtension, 0 },
+        { TEXT("DebtRankTwoExtension"), &Candidate.DebtRankTwoExtension, 0 },
+        { TEXT("BloodpriceRankOneFraction"), &Candidate.BloodpriceRankOneFraction, 0 },
+        { TEXT("BloodpriceRankTwoFraction"), &Candidate.BloodpriceRankTwoFraction, 0 },
+        { TEXT("PatienceRankOneDelay"), &Candidate.PatienceRankOneDelay, 0 },
+        { TEXT("PatienceRankTwoDelay"), &Candidate.PatienceRankTwoDelay, 0 },
+        { TEXT("VarianceRankOneMultiplier"), &Candidate.VarianceRankOneMultiplier, 1 },
+        { TEXT("VarianceRankTwoMultiplier"), &Candidate.VarianceRankTwoMultiplier, 1 }
     };
-    if (Object.Values.Num() != UE_ARRAY_COUNT(Fields)) { Error = TEXT("Expected exactly five Caster resource fields."); return false; }
+    if (Object.Values.Num() != UE_ARRAY_COUNT(Fields)) { Error = TEXT("Caster resource fields do not match the supported schema."); return false; }
     for (const FField& Field : Fields)
     {
         double Value = 0;
@@ -40,6 +50,8 @@ bool UBreakerManaComponent::ParseResourceTuning(const FJsonObject& Object, FBrea
         { Error = FString::Printf(TEXT("Invalid Caster resource field %s."), Field.Name); return false; }
         *Field.Value = static_cast<float>(Value);
     }
+    if (Candidate.BloodpriceRankOneFraction > 1 || Candidate.BloodpriceRankTwoFraction > 1)
+    { Error = TEXT("Bloodprice fractions must be between zero and one."); return false; }
     Out = Candidate;
     Error.Reset();
     return true;
@@ -220,6 +232,14 @@ void UBreakerManaComponent::SetOvercastFloor(float Floor)
     RefreshOvercastState();
 }
 
+float UBreakerManaComponent::GetOvercastFloor() const
+{
+    const UBreakerProgressionComponent* Progression = CachedProgression.Get();
+    const int32 Rank = IsActiveForOwner() && Progression ? Progression->GetNodeRank(TEXT("Caster.Spellblade.Debt"), EBreakerPointCurrency::DoctrinePoints) : 0;
+    const FBreakerCasterResourceTuning& Tuning = GetResourceTuning();
+    return FMath::Min(0.0f, OvercastFloor) - (Rank >= 2 ? Tuning.DebtRankTwoExtension : Rank == 1 ? Tuning.DebtRankOneExtension : 0.0f);
+}
+
 void UBreakerManaComponent::SyncClassResourceFloor()
 {
     // Server authority only: the floor is a replicated attribute, so a client
@@ -363,7 +383,22 @@ void UBreakerManaComponent::HandleMeleeHit(const FBreakerHitContext& Hit)
     // SB1 replaces the baseline hit gain with the existing weak-point rate.
     // Ordinary weapon hits stay on OnShot's normalized volley path, so this
     // listener never multiplies their income by pellet count.
-    GrantMana(bContactCharge ? WeakPointGain : WeaponHitGain, false);
+    const int32 BloodRank = Progression ? Progression->GetNodeRank(TEXT("Caster.Spellblade.Bloodprice"), EBreakerPointCurrency::DoctrinePoints) : 0;
+    if (BloodRank > 0 && GetMana() < 0 && Hit.ProcCoefficient > 0)
+    {
+        if (UBreakerCombatComponent* Combat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>(); Combat && !Combat->IsDead())
+        {
+            const FBreakerCasterResourceTuning& Tuning = GetResourceTuning();
+            FBreakerHealRequest Heal;
+            Heal.Amount = (Hit.Result.HealthDamage + Hit.Result.ShieldDamage)
+                * (BloodRank >= 2 ? Tuning.BloodpriceRankTwoFraction : Tuning.BloodpriceRankOneFraction)
+                * FMath::Clamp(Hit.ProcCoefficient, 0.0f, 1.0f);
+            Heal.SourceTag = BreakerAbilityTags::Damage_Melee.GetTag();
+            Heal.SetHealer(GetOwner());
+            Combat->ApplyHealing(Heal);
+        }
+    }
+    if (Hit.ProcCoefficient > 0) GrantMana((bContactCharge ? WeakPointGain : WeaponHitGain) * FMath::Clamp(Hit.ProcCoefficient, 0.0f, 1.0f), false);
 }
 
 void UBreakerManaComponent::NotifyStatusApplication(const FBreakerStatusApplicationSpec& Spec, bool bAlreadyPresent)
@@ -378,7 +413,9 @@ void UBreakerManaComponent::NotifyStatusApplication(const FBreakerStatusApplicat
     if (bAlreadyPresent && !(bFollowThrough && bCleaveBleed)) return;
     const FBreakerCasterResourceTuning& Tuning = GetResourceTuning();
     const int32 Rank = Progression ? Progression->GetNodeRank(TEXT("Caster.VoidWhisperer.Seep"), EBreakerPointCurrency::DoctrinePoints) : 0;
-    const float Multiplier = Rank >= 2 ? Tuning.SeepRankTwoMultiplier : Rank == 1 ? Tuning.SeepRankOneMultiplier : 1.0f;
+    float Multiplier = Rank >= 2 ? Tuning.SeepRankTwoMultiplier : Rank == 1 ? Tuning.SeepRankOneMultiplier : 1.0f;
+    const int32 VarianceRank = !bAlreadyPresent && Progression ? Progression->GetNodeRank(TEXT("Caster.Multispell.Variance"), EBreakerPointCurrency::DoctrinePoints) : 0;
+    Multiplier += VarianceRank >= 2 ? Tuning.VarianceRankTwoMultiplier - 1.0f : VarianceRank == 1 ? Tuning.VarianceRankOneMultiplier - 1.0f : 0.0f;
     GrantMana(Tuning.StatusApplicationMana * Multiplier * FMath::Clamp(Spec.ProcCoefficient, 0.0f, 1.0f), false);
 }
 
@@ -410,9 +447,10 @@ void UBreakerManaComponent::HandleCasterKill(const FBreakerHitContext& Hit)
 
 void UBreakerManaComponent::HandleShot(const FBreakerShotResult& Shot)
 {
+    if (Shot.bFired && GetOwner() && GetOwner()->HasAuthority()) SecondsSinceWeaponFire = 0.0f;
     // Landed hits only: a fired-and-missed shot banks nothing, and DoT ticks
     // never arrive here at all (they carry proc coefficient 0 by rule).
-    if (!Shot.bFired || !Shot.bHit || !GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || IsInSafeZone()) return;
+    if (!Shot.bFired || !Shot.bHit || Shot.DamageResult.bDodged || !GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || IsInSafeZone()) return;
     // Unmake suspends generation outright (Class-Kits §2.2).
     if (IsGenerationSuspended()) return;
 
@@ -430,7 +468,17 @@ void UBreakerManaComponent::HandleShot(const FBreakerShotResult& Shot)
     // anti-Multishot clause wants. AWAITING WEAPONS: when the attacker-side
     // per-hit event (Ability-Implementation-Spec SI-8) lands, pass the real
     // landed count here and partial volleys will pay 1/n per pellet.
-    PendingGrants += HitGeneration(Shot.bWeakPoint, PelletsPerShot, PelletsPerShot, WeaponHitGain, WeakPointGain, 1.0f);
+    float Gain = HitGeneration(Shot.bWeakPoint, PelletsPerShot, PelletsPerShot, WeaponHitGain, WeakPointGain, 1.0f);
+    const UBreakerProgressionComponent* Progression = CachedProgression.Get();
+    const int32 CloseRank = Progression ? Progression->GetNodeRank(TEXT("Caster.Spellblade.Close"), EBreakerPointCurrency::DoctrinePoints) : 0;
+    if (CloseRank > 0 && Shot.HitActor && Shot.HitActor->FindComponentByClass<UBreakerCombatComponent>()
+        && !Shot.DamageResult.bDodged && Shot.DamageResult.HealthDamage + Shot.DamageResult.ShieldDamage > 0)
+    {
+        const FBreakerCasterResourceTuning& Tuning = GetResourceTuning();
+        const float Range = CloseRank >= 2 ? Tuning.CloseRankTwoRangeCm : Tuning.CloseRankOneRangeCm;
+        if (FVector::Dist(Shot.TraceStart, Shot.ImpactPoint) <= Range) Gain *= 2.0f;
+    }
+    PendingGrants += Gain;
 }
 
 void UBreakerManaComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -455,6 +503,9 @@ void UBreakerManaComponent::AdvanceLoop(float DeltaTime)
     const UBreakerProgressionComponent* Progression = CachedProgression.Get();
     const EBreakerClassId LiveClass = Progression ? Progression->GetProgressionState().PermanentClass : EBreakerClassId::None;
     if (LiveClass != ObservedClass) RefreshClassOwnership();
+    SyncClassResourceFloor();
+    const float PreviousFireAge = SecondsSinceWeaponFire;
+    SecondsSinceWeaponFire = FMath::Min(SecondsSinceWeaponFire + DeltaTime, 1000000.0f);
 
     if (!IsActiveForOwner())
     {
@@ -486,7 +537,11 @@ void UBreakerManaComponent::AdvanceLoop(float DeltaTime)
     // exactly what the doubling is for.
     if (PassiveRegenPerSecond > 0.0f)
     {
-        ApplyManaDelta(PassiveRegenPerSecond * DeltaTime * GenerationMultiplierForMana(GetMana(), OvercastGenerationMultiplier));
+        const int32 Rank = Progression ? Progression->GetNodeRank(TEXT("Caster.VoidWhisperer.Patience"), EBreakerPointCurrency::DoctrinePoints) : 0;
+        const FBreakerCasterResourceTuning& Tuning = GetResourceTuning();
+        const float Delay = Rank >= 2 ? Tuning.PatienceRankTwoDelay : Tuning.PatienceRankOneDelay;
+        const float BonusSeconds = Rank > 0 ? FMath::Clamp(DeltaTime - FMath::Max(0.0f, Delay - PreviousFireAge), 0.0f, DeltaTime) : 0.0f;
+        ApplyManaDelta(PassiveRegenPerSecond * (DeltaTime + BonusSeconds) * GenerationMultiplierForMana(GetMana(), OvercastGenerationMultiplier));
     }
 
     if (IsInSafeZone())

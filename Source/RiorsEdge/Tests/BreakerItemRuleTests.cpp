@@ -344,9 +344,9 @@ bool FBreakerItemRarityMeaningTest::RunTest(const FString& Parameters)
             TestFalse(TEXT("Only Anomalous carries a rule"), Item.HasRule());
         }
 
-        // The necklace has no legendary, so this exercises the generic branch.
+        // Gloves have no legendary, so this exercises the generic branch.
         const FBreakerItemInstance Anomalous = UBreakerLootLibrary::RollItem(TEXT("RarityTest"),
-            EBreakerEquipSlot::Necklace, EBreakerItemRarity::Anomalous, 50, Seed);
+            EBreakerEquipSlot::Gloves, EBreakerItemRarity::Anomalous, 50, Seed);
         ++AnomalousTotal;
         if (Anomalous.HasRule()) { ++AnomalousWithRule; Seen.Add(Anomalous.Rule); }
         // O196: the enum value with no definition never reaches a drop.
@@ -406,7 +406,11 @@ bool FBreakerLegendarySignatureTest::RunTest(const FString& Parameters)
     const TArray<FBreakerAffixDefinition>& Pool = UBreakerAffixLibrary::GetSliceAffixPool();
     const TArray<FBreakerLegendaryDefinition>& Legendaries = UBreakerItemRuleLibrary::GetLegendaries();
 
-    TestEqual(TEXT("Vertical-Slice.md scopes three build-defining legendaries"), Legendaries.Num(), 3);
+    TestEqual(TEXT("Three original legendaries plus the authored Refractor exotic"), Legendaries.Num(), 4);
+    TestTrue(TEXT("Deadfall remains authored"), UBreakerItemRuleLibrary::FindLegendary(TEXT("Legendary.Deadfall")).Rule == EBreakerItemRule::Deadfall);
+    TestTrue(TEXT("Cadence remains authored"), UBreakerItemRuleLibrary::FindLegendary(TEXT("Legendary.Cadence")).Rule == EBreakerItemRule::Cadence);
+    TestTrue(TEXT("Overrun remains authored"), UBreakerItemRuleLibrary::FindLegendary(TEXT("Legendary.Overrun")).Rule == EBreakerItemRule::Overrun);
+    TestTrue(TEXT("Refractor is the fourth authored identity"), UBreakerItemRuleLibrary::FindLegendary(TEXT("Legendary.Refractor")).Rule == EBreakerItemRule::Refractor);
 
     TSet<EBreakerEquipSlot> Slots;
     for (const FBreakerLegendaryDefinition& Definition : Legendaries)

@@ -25,10 +25,14 @@ After an edit, check a fresh cast on the same enemy with the same gear. Change o
 
 ## Caster resource nodes
 
-`Data/caster-resource.json` holds shared status income. All five values are **O2 PLACEHOLDER tuning**, loaded once per process with compiled defaults if validation fails. `StatusApplicationMana` is 2 for a new status type on a target. Seep's rank multipliers are 1.5 and 2. These grants scale by the application's proc coefficient (0–1) and share the existing 6 Mana/second conditional-income cap. Reapplying an existing type pays nothing unless Follow Through applies to that Cleave Bleed.
+`Data/caster-resource.json` holds Caster resource-node tuning. All values are **O2 PLACEHOLDER tuning**, loaded once per process with compiled defaults if validation fails. `StatusApplicationMana` is 2 for a new status type on a target. Seep's rank multipliers are 1.5 and 2. These grants scale by the application's proc coefficient (0–1) and share the existing 6 Mana/second conditional-income cap. Reapplying an existing type pays nothing unless Follow Through applies to that Cleave Bleed.
 
 Attrition refunds 4/8 Mana at ranks 1/2 when a victim dies carrying your damaging status, regardless of who lands the killing blow. Multiple statuses on that victim pay once per caster. Expired statuses and zero-proc applications do not pay.
 
 In `abilities.json`, Cleave's `FollowThroughRankOneKillRefund` / `FollowThroughRankTwoKillRefund` are 3/6 Mana for a direct Cleave kill. Resonance's `PaymentRankOneManaPerStatus` / `PaymentRankTwoManaPerStatus` are 2/4 per distinct detonated status, up to six; its base refund remains zero. These four values are also **O2 PLACEHOLDER tuning**. Payment still pays when the Resonance node preserves statuses at half duration, but zero-proc secondary statuses never earn refunds.
 
 Explicit kill/detonation refunds bypass the conditional-income cap. They retain the existing resource maximum, generation suspension during Unmake, and doubled income while Mana is negative. These are initial tuning values, not validated build-balance targets.
+
+Close doubles landed weapon-hit Mana within 600/900 cm at ranks 1/2. Debt extends the Overcast floor by 10/20 Mana. Bloodprice heals 10%/20% of actual melee health and shield damage while your Mana is negative. Patience doubles passive regeneration after 4/2 seconds without firing; a missed shot also restarts that wait. Variance raises income for a newly applied status type to 2×/3×; its bonus adds to Seep rather than multiplying Seep. These values live in `caster-resource.json` and are O2 placeholders.
+
+Siphon's `DrainRankOneThreshold` / `DrainRankTwoThreshold` in `abilities.json` raise the incoming health-damage threshold that interrupts the channel to 10%/15% of maximum health. The unpurchased threshold stays 5%. All three are fractions (0.10 means 10%), not damage amounts.

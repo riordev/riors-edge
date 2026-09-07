@@ -9,7 +9,7 @@ Numbers are permanent and never reused.
 
 **O2** — Every number is a placeholder until measured, and a new constant is flagged as one at its declaration. When two implementations are possible, prefer the one that authors nothing.
 
-**O3** — More multipliers compose as an unordered product; a build holds at most three; they are authored only on Core constellation Convergence or Keystone nodes.
+**O3** — More multipliers compose as an unordered product; a build holds at most three; they may be authored on Core constellation Convergence or Keystone nodes and on Aberrant or Unwritten item rewrites.
 
 **O4** — 300–400 hours to a finished build, and a build must be viable and playable by mid-campaign. Breadth of viable options is an explicit product goal — err toward more viable builds, not higher ceilings.
 

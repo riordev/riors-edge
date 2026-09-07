@@ -8,6 +8,7 @@
 #include "Combat/BreakerDamageLibrary.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
+#include "Progression/BreakerProgressionComponent.h"
 #include "TimerManager.h"
 #include "UI/BreakerEffectRenderer.h"
 #include "UI/BreakerUIStyle.h"
@@ -211,8 +212,16 @@ void UBreakerAbility_Siphon::HandleCasterDamaged(const FBreakerDamageResult& Res
 {
     const UBreakerAttributeSet* Attributes = GetBreakerAttributes();
     const float MaxHealth = Attributes ? Attributes->GetMaxHealth() : 0.0f;
-    if (!ShouldBreakChannel(Result.HealthDamage, MaxHealth, BreakThresholdFraction)) return;
+    if (!ShouldBreakChannel(Result.HealthDamage, MaxHealth, EffectiveBreakThreshold(GetBreakerCharacter()))) return;
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, /*bWasCancelled*/ true);
+}
+
+float UBreakerAbility_Siphon::EffectiveBreakThreshold(const AActor* OwnerActor) const
+{
+    const UBreakerProgressionComponent* Progression = OwnerActor ? OwnerActor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    const int32 Rank = Progression ? Progression->GetNodeRank(TEXT("Caster.VoidWhisperer.Drain"), EBreakerPointCurrency::DoctrinePoints) : 0;
+    return FMath::Clamp(Rank >= 2 ? FMath::Max(BreakThresholdFraction, DrainRankTwoThreshold)
+        : Rank == 1 ? FMath::Max(BreakThresholdFraction, DrainRankOneThreshold) : BreakThresholdFraction, 0.0f, 1.0f);
 }
 
 void UBreakerAbility_Siphon::StopChannel()

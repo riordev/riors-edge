@@ -1559,6 +1559,7 @@ void ABreakerCharacter::PoseArm(UStaticMeshComponent* Forearm, UStaticMeshCompon
 
 void ABreakerCharacter::HandlePlayerDeath()
 {
+    ClearHeldGameplayInput();
     // Death zeroes Grit BEFORE anything restores vitals: no banking through a
     // death and no free Hold on respawn (Class-Kits-Tank §1.4).
     if (Grit) Grit->NotifyDeath();
@@ -2240,6 +2241,7 @@ void ABreakerCharacter::OpenMenu(bool bInitialMenu)
 {
     APlayerController* PC = Cast<APlayerController>(GetController());
     if (!PC || !GEngine || !GEngine->GameViewport) return;
+    ClearHeldGameplayInput();
 
     bShowingInitialMenu = bInitialMenu;
     if (!MenuWidget.IsValid())
@@ -2259,6 +2261,20 @@ void ABreakerCharacter::OpenMenu(bool bInitialMenu)
     InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
     InputMode.SetHideCursorDuringCapture(false);
     PC->SetInputMode(InputMode);
+}
+
+void ABreakerCharacter::ClearHeldGameplayInput()
+{
+    // Releases may be consumed by Slate or lost when the dead pawn's input
+    // component is removed. Clear intent before either transition.
+    StopFire();
+    if (Weapon) Weapon->SetAiming(false); // Toggle aim must also disengage.
+    OnAimInput(false);
+    if (UBreakerCharacterMovementComponent* Movement = GetBreakerMovement())
+    {
+        Movement->SetSprinting(false);
+        Movement->SetSlideRequested(false);
+    }
 }
 
 void ABreakerCharacter::OpenMenuScreenForCapture(const FString& ScreenName)

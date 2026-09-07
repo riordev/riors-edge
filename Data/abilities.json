@@ -170,7 +170,9 @@
 				"LeechFraction": 0.4,
 				"BreakThresholdFraction": 0.05,
 				"MaximumRangeCm": 3000,
-				"BreakDistanceCm": 3600
+				"BreakDistanceCm": 3600,
+				"DrainRankOneThreshold": 0.1,
+				"DrainRankTwoThreshold": 0.15
 			},
 			"variants": []
 		},

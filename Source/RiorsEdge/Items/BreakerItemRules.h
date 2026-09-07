@@ -91,6 +91,8 @@ struct RIORSEDGE_API FBreakerItemRuleSet
     // while none does. Two numbers rather than one flag because the rule is a
     // trade and both halves have to be authored.
     bool bRegenGatedOnTraversal = false;
+    // Refractor: consumed by hitscan delivery, including its critical forfeit.
+    bool bHitscanCriticalForks = false;
     float TraversalRegenMultiplier = 1.0f;
 
     bool IsIdentity() const;
@@ -102,6 +104,11 @@ class RIORSEDGE_API UBreakerItemRuleLibrary : public UBlueprintFunctionLibrary
     GENERATED_BODY()
 
 public:
+    // O2 PLACEHOLDER: crowd coverage trades away single-target critical damage.
+    static constexpr float ForkDamageFraction = 0.6f;
+    static constexpr float ForkRadiusCm = 800.0f;
+    static constexpr int32 ForkTargetCount = 2;
+    static bool RollCriticalFork(float CriticalChance, int32 Seed);
     // ---- Rules -----------------------------------------------------------
     static const TArray<FBreakerItemRuleDefinition>& GetRuleDefinitions();
     UFUNCTION(BlueprintPure, Category="Items|Rules")

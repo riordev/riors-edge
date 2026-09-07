@@ -507,7 +507,7 @@ bool FBreakerAbilitiesNumbersTest::RunTest(const FString& Parameters)
         TestEqual(FString::Printf(TEXT("%s: a key the file does not name answers with the default"), *Id),
             Definition->Number(FName(TEXT("Breaker.NoSuchNumber")), 7.0f), 7.0f);
     }
-    TestEqual(TEXT("One hundred and twenty-two numbers across the registry"), KeyCount, 122);
+    TestEqual(TEXT("One hundred and twenty-four numbers across the registry"), KeyCount, 124);
     TestEqual(TEXT("Twenty-eight rows carry numbers; seven classes keep theirs as constexpr or in the body"), RowsWithNumbers, 28);
 
     // Order is the class's declaration order, super first: the Gunsmith
@@ -515,6 +515,12 @@ bool FBreakerAbilitiesNumbersTest::RunTest(const FString& Parameters)
     // and Cleave's first number is its range.
     const UBreakerAbilityDefinition* Turret = UBreakerAbilityDefinition::FindFallback(FName(TEXT("Gunsmith.Turret")));
     const UBreakerAbilityDefinition* Cleave = UBreakerAbilityDefinition::FindFallback(FName(TEXT("Caster.Cleave")));
+    const UBreakerAbilityDefinition* Siphon = UBreakerAbilityDefinition::FindFallback(FName(TEXT("Caster.Siphon")));
+    if (TestNotNull(TEXT("Siphon Drain tuning row is reachable"), Siphon))
+    {
+        TestEqual(TEXT("Drain rank-one threshold is authored"), Siphon->Number(TEXT("DrainRankOneThreshold"), -1), 0.10f);
+        TestEqual(TEXT("Drain rank-two threshold is authored"), Siphon->Number(TEXT("DrainRankTwoThreshold"), -1), 0.15f);
+    }
     const UBreakerAbilityDefinition* Resonance = UBreakerAbilityDefinition::FindFallback(FName(TEXT("Caster.Resonance")));
     if (TestNotNull(TEXT("Resonance resource tuning row is reachable"), Resonance))
     {

@@ -514,6 +514,7 @@ public:
     // Enter/Space, routed from the input component rather than from Slate
     // focus - see ABreakerCharacter::ConfirmMenuKey for why.
     void HandleConfirmKey();
+    FReply HandleDeathConfirmKey(const FKeyEvent& KeyEvent);
     // THE REBIND CAPTURE SEAM, and it is deliberately public and unused inside
     // this class.
     //
@@ -895,6 +896,8 @@ private:
     // ReturnToAnchor, both level travels.
     TSharedRef<SWidget> BuildDeathScreen();
     FBreakerDeathScreenModel DeathModel;
+    bool bDeathActionPending = false;
+    FReply ExecuteDeathAction(bool bRetry);
     // Abilities tab: result line echoed under the slot that was last clicked,
     // so a refusal (e.g. a Caster's "That ability has not been unlocked.")
     // stays readable after the rebuild it triggers.

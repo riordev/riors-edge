@@ -20,6 +20,8 @@
 // wrapper rather than MakeButton's flag.
 
 #include "UI/BreakerMenu.h"
+#include "UI/BreakerDeathInput.h"
+#include "Game/BreakerGameInstance.h"
 
 #include "Characters/BreakerCharacter.h"
 #include "Game/BreakerGameMode.h"
@@ -43,7 +45,7 @@ namespace
     // died on it.
     constexpr int32 BreakerDeathHeadlinePixels = 40;      // 04-death-banners
     constexpr float BreakerDeathColumnWidth = 720.0f;     // O2 PLACEHOLDER
-    constexpr float BreakerDeathButtonWidth = 220.0f;     // O2 PLACEHOLDER
+    constexpr float BreakerDeathButtonWidth = 260.0f;     // O2 PLACEHOLDER
     constexpr float BreakerDeathTallyCellW = 24.0f;       // O2 PLACEHOLDER
     constexpr float BreakerDeathTallyCellH = 8.0f;        // O2 PLACEHOLDER
     constexpr float BreakerDeathTallyGap = 4.0f;          // O2 PLACEHOLDER
@@ -132,6 +134,7 @@ namespace
 void SBreakerMenu::ShowDeath(const FBreakerDeathScreenModel& Model)
 {
     DeathModel = Model;
+    bDeathActionPending = false;
     // Pause, not Main: raised from gameplay under the death beat's black. No
     // screen backs out of this one — both verbs leave the world — so the
     // root is never rebuilt from here; it is set so the menu's own state is
@@ -140,33 +143,41 @@ void SBreakerMenu::ShowDeath(const FBreakerDeathScreenModel& Model)
     Rebuild(EBreakerMenuScreen::Death);
 }
 
+FReply SBreakerMenu::ExecuteDeathAction(bool bRetry)
+{
+    if (CurrentScreen != EBreakerMenuScreen::Death || bDeathActionPending || (bRetry && !DeathModel.bRetry))
+        return FReply::Handled();
+    ABreakerGameMode* Mode = Character.IsValid() && Character->GetWorld()
+        ? Character->GetWorld()->GetAuthGameMode<ABreakerGameMode>() : nullptr;
+    if (!Mode) return FReply::Handled();
+    const UBreakerGameInstance* Session = Mode->GetGameInstance<UBreakerGameInstance>();
+    if (bRetry && (!Session || !Session->PendingRift.IsSet())) return FReply::Handled();
+    bDeathActionPending = true;
+    if (bRetry) Mode->RetryRift(Character.Get());
+    else Mode->ReturnToAnchor(Character.Get());
+    return FReply::Handled();
+}
+
+FReply SBreakerMenu::HandleDeathConfirmKey(const FKeyEvent& KeyEvent)
+{
+    if (CurrentScreen != EBreakerMenuScreen::Death) return FReply::Unhandled();
+    const FKey Key = KeyEvent.GetKey();
+    const bool bConfirm = Key == EKeys::Enter || Key == EKeys::SpaceBar || Key == EKeys::Gamepad_FaceButton_Bottom;
+    // Tab/arrows continue into Slate. An explicitly focused Return button
+    // owns its confirmation; only the root's default chooses Retry.
+    if (!bConfirm || !HasKeyboardFocus()) return FReply::Unhandled();
+    const EBreakerDeathAction Action = BreakerDeathInput::Confirm(KeyEvent.GetKey(), KeyEvent.IsRepeat(), DeathModel.bRetry, bDeathActionPending);
+    if (Action != EBreakerDeathAction::None) ExecuteDeathAction(Action == EBreakerDeathAction::Retry);
+    // The dead pawn cannot resume, and a held confirmation must not activate
+    // the same button again while travel is pending.
+    return FReply::Handled();
+}
 TSharedRef<SWidget> SBreakerMenu::BuildDeathScreen()
 {
     const FBreakerDeathScreenModel& M = DeathModel;
 
-    // ENTER DOES NOT CONFIRM HERE, and this is a recorded gap, not a
-    // nearest-fit. The menu's Enter/Space route is the pawn's input component
-    // (HandleConfirmKey, routed from ABreakerCharacter::ConfirmMenuKey), and
-    // HandlePlayerDeath popped that component with DisableInput before the
-    // beat began. The sheet's "Focus on RETRY on frame one; Enter / face-south
-    // confirms" needs a confirm route that survives the dead pawn; until one
-    // exists the ring says where focus is and the mouse is the only confirm.
-
-    auto Retry = [this]() -> FReply
-    {
-        ABreakerGameMode* GameMode = Character.IsValid() && Character->GetWorld()
-            ? Cast<ABreakerGameMode>(Character->GetWorld()->GetAuthGameMode()) : nullptr;
-        if (GameMode) GameMode->RetryRift(Character.Get());
-        return FReply::Handled();
-    };
-    auto Return = [this]() -> FReply
-    {
-        ABreakerGameMode* GameMode = Character.IsValid() && Character->GetWorld()
-            ? Cast<ABreakerGameMode>(Character->GetWorld()->GetAuthGameMode()) : nullptr;
-        if (GameMode) GameMode->ReturnToAnchor(Character.Get());
-        return FReply::Handled();
-    };
-
+    auto Retry = [this]() { return ExecuteDeathAction(true); };
+    auto Return = [this]() { return ExecuteDeathAction(false); };
     // The verbs: RETRY focused and first while the budget holds; RETURN
     // alone, and therefore focused, when it is spent (the sheet's terminal
     // frame).

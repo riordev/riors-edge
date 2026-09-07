@@ -3,5 +3,15 @@
     "SeepRankOneMultiplier": 1.5,
     "SeepRankTwoMultiplier": 2,
     "AttritionRankOneRefund": 4,
-    "AttritionRankTwoRefund": 8
+    "AttritionRankTwoRefund": 8,
+    "CloseRankOneRangeCm": 600,
+    "CloseRankTwoRangeCm": 900,
+    "DebtRankOneExtension": 10,
+    "DebtRankTwoExtension": 20,
+    "BloodpriceRankOneFraction": 0.1,
+    "BloodpriceRankTwoFraction": 0.2,
+    "PatienceRankOneDelay": 4,
+    "PatienceRankTwoDelay": 2,
+    "VarianceRankOneMultiplier": 2,
+    "VarianceRankTwoMultiplier": 3
 }

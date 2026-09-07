@@ -27,6 +27,7 @@ class RIORSEDGE_API UBreakerAbility_Siphon : public UBreakerCasterAbility
 
 public:
     UBreakerAbility_Siphon();
+    float EffectiveBreakThreshold(const AActor* OwnerActor) const;
 
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
     virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
@@ -55,12 +56,14 @@ public:
     // item-level scalar (O35).
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0")) float DamagePerTick = 14.0f;   // O2 PLACEHOLDER
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0", ClampMax="2")) float LeechFraction = 0.4f;   // O2 PLACEHOLDER
-    // VW6 Drain moves this to 0.15 and then 0.30 — a data row, not a branch.
+    // Baseline tolerance remains; purchased Drain uses the editable rank thresholds.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0", ClampMax="1")) float BreakThresholdFraction = 0.05f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0")) float MaximumRangeCm = 3000.0f;
     // The channel also breaks if the target walks out of this. A channel that
     // follows a target across the map is not what "on one target" means.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0")) float BreakDistanceCm = 3600.0f;
+    UPROPERTY(EditDefaultsOnly, Category="Siphon") float DrainRankOneThreshold = 0.10f; // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, Category="Siphon") float DrainRankTwoThreshold = 0.15f; // O2 PLACEHOLDER
 
 protected:
     // One channel tick: damage the target through the contract, heal the caster

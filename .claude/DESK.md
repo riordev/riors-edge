@@ -5,10 +5,11 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
-## Cycle — remaining Caster progression and ability balance
-- [ ] Finish remaining silent Caster nodes and expose any missing tuning values in data.
-- [ ] Validate ability damage and resource sustain against weapon builds.
-- [ ] Continue menu simplification and complete map-travel validation.
+## Cycle — held input, six Caster nodes and a distinct Unwritten
+- [ ] Release held combat inputs on menu/death, wire death confirmation keys and correct dialogue wrapping.
+- [ ] Wire Close, Debt, Bloodprice, Patience, Drain and Variance to purchased ranks and editable tuning.
+- [ ] Author a reachable named Unwritten that trades single-target critical damage for visible crowd forks.
+Remaining repair work includes the other silent nodes, campaign doctrine reachability, ability/weapon balance, broader clipping, arms/weapon/weakpoint art, audible combat polish and the full rarity identities.
 
 ## Playtest queue (owner, 2026-09-07)
 Continue through the entire repair list in tested batches without stopping after each commit for a playtest. After repairs, execute the content phase below (owner instruction, 2026-09-07).
@@ -18,6 +19,11 @@ Continue through the entire repair list in tested batches without stopping after
 - (movement, weapons) Reduce sprint bob/sway; disallow sprinting while shooting; remove dash except innate Swift; give scoped/unscoped fire a tradeoff. Add base health regeneration after four seconds out of combat (owner suggests 1–2; magnitude to tune).
 - (loot & economy) Fix gear behavior and show base weapon damage. Evaluate Standard 3–4, Uncommon 4–5, Exceptional 4–6 affixes with existing tier caps. Aberrants should have quirky unique rules; Unwrittens should have strong build-defining exotic perks; the no-More restriction does not apply to these two categories. A well-rolled and treated Exceptional should outperform them on some axes.
 - (visuals, sound, enemies) Improve arms and weapon models, integrate weakpoints, add subtle enemy names, and make one weapon/ability/enemy/boss visually polished. Add audible combat feedback. Replace colored ability borders with placeholder icons, radial cooldown recovery and numeric timers; hide irrelevant Riftglass. Smooth the death screen and mouse handoff.
+
+## Repair dependencies found in runtime review
+- Sequence requires three distinct applications, but Caster has only Bleed and Poison. Void is not an applied status. A third functional status or a revised node contract is required; do not fake the third tag.
+- Doctrine progression awards only 2/8. Remaining earned benchmarks need the authored Breach/Field Marshal, Survivor/Erased Earth, and alternate-self finale gameplay. Mission validation must support the separate Act III finale and stable encounter identities before extending content; replaying Fernhall must not counterfeit later completion.
+- Ability assignment repeats the catalogue three times and jumps to the top after a click, while feedback sits below every list. Next UI slice selects one slot and pins wrapped feedback; also close equip modals on Escape and wrap NPC bench refusals.
 
 ## Content phase after the repair list (owner, 2026-09-07)
 - [ ] Author more distinct Fernhall spaces and improve layout/content density.
@@ -101,6 +107,14 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 
 ## Done (last three cycles; older is git)
 
+### Held input, six Caster nodes and Refractor — 599 / 5 / 0
+- [x] Menus/death clear fire, aim, sprint and slide intent. Death confirmation uses Slate, preserves focused Return/navigation and prevents duplicate travel. Wider death buttons and wrapped NPC speaker text inspected in actual Anchor captures.
+- [x] Purchased Close, Debt, Bloodprice, Patience, Drain and Variance now affect combat/resource events, with editable O2 tuning. Runtime purchases and actual Siphon interruption tested; campaign entitlement remains 2/8.
+- [x] Refractor is a reachable named Unwritten necklace: each hitscan pellet's first successful crit-eligible enemy hit may fork to two visible targets for 60% normal nonweak damage, trading away hitscan critical strikes. Real roll/equip/damage/exclusion/O104 tests; no recursive forks or weapon statuses. Generic OnHit listeners still see proc-zero fork damage. Projectile weapons unchanged.
+- [x] All inventory rule cards now print their canonical perk/forfeit descriptions. Refractor card inspected with full text and affixes; no claim runtime beams photographed. Special-item damage permission reflected in intent docs; rarity migration remains open.
+- [x] Final build, canonical census and all604tests complete:599passed/5existing expected/0unexpected. Corrected isolated-world context/reflected-event fixtures and expanded exact legendary population assertions; no damage bands/pins widened. STATE unchanged under Python quarantine.
+
+
 ### Caster resource nodes, sandbox and real Rift travel — 594 / 5 / 0
 - [x] Purchased Seep, FollowThrough, Attrition and Payment now pay through actual status, melee, death and detonation events. New editable resource tuning documents O2 placeholders; lethal final DoT ticks pay once. Campaign still grants only two doctrine points; deeper runtime fixtures do not claim shipped reachability.
 - [x] Cycle rank two displays the next status with owner-only replicated state and immediate purchase/respec updates. Sandbox has Character/Gear/Stats tabs, strict repeat seeds and explicit full-backpack refusal. Five UI captures inspected.
@@ -114,12 +128,5 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - [x] Flat damage now multiplies the combined delivery/DoT Increased bucket. Tests cover both delivery lanes, frozen snapshots, removal and uncaptured baseline fallback without changing the More ceiling.
 - [x] Seven authored enemy-type names use the strings table and existing range/focus/occlusion rules. Ground-level Fernhall capture inspected with SKITTER above its health bar. Capture-only tour targeting and velocity reset added; static capture does not validate full traversal.
 - [x] Final build and all 593 tests complete: 588 passed / 5 existing expected / 0 unexpected. Runtime fixture checks supported spawn capsules, finite roster, separation, actual kills and quest progress. PowerShell reconciliation under Python quarantine; STATE unchanged. Full cross-map loading remains outstanding.
-
-
-### Purchased Caster rewrites and inventory text — 587 / 5 / 0
-- [x] Purchased Multispell Cycle advances on landed damage instead of cast; Fracture carries two distinct cycle positions; Resonance leaves statuses at half duration with unchanged burst damage. Runtime realGAS casts/purchases and programmatic authority impacts tested; collision flight is not simulated. Cycle rank2 preview remains unimplemented.
-- [x] Successful Caster melee grants existing1.5Mana hit rate; ContactCharge replaces with existing4weak-point rate through6/s cap. Actual damage/node purchase tests cover cap/remainder, dodge, DoT, zero, suspension, kill/corpse, nonCaster and no weapon double credit. Other status/kill refunds still lack shipped numeric amounts.
-- [x] Inventory buttons remove default padding and fill their measured content width. Final GEARDAMAGE capture shows full affix names, rarity/slot text and damage values. Empty rarity copy now describes build choice rather than worst-to-best.
-- [x] Final build and all592tests complete:587passed/5existing expected/0unexpected. Fixed fixture lifecycle/old-projectile selection before accepting suite. PowerShell audit under Python quarantine; STATE unchanged, no widened pins.
 
 
