@@ -9,6 +9,8 @@
 #include "Combat/BreakerProjectileBase.h"
 #include "Combat/BreakerStatusComponent.h"
 #include "Combat/BreakerStatusCycleComponent.h"
+#include "Net/UnrealNetwork.h"
+#include "UObject/UnrealType.h"
 #include "Components/SphereComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -77,6 +79,23 @@ bool FBreakerMultispellPurchasedRuntimeTest::RunTest(const FString& Parameters)
     const FGameplayAbilitySpecHandle Fracture = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Fracture::StaticClass(), 1));
     const FGameplayAbilitySpecHandle Resonance = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Resonance::StaticClass(), 1));
     UBreakerStatusCycleComponent* Cycle = UBreakerStatusCycleComponent::FindOrAdd(Caster);
+    if (!TestNotNull(TEXT("Default cycle exists before the first cast"), Cycle)) return false;
+    Cycle->BeginPlay(); // Bind real progression events without Character save loading.
+    TestFalse(TEXT("Unpurchased Cycle does not preview ahead"), Cycle->CanPreviewAhead());
+    // No net driver exists in this isolated world. Initialize the same lazy
+    // class layout the driver would request before collecting lifetime rows;
+    // otherwise uninitialized RepIndex values collide with superclass rows.
+    Cycle->GetClass()->SetUpRuntimeReplicationData();
+    TArray<FLifetimeProperty> Replicated;
+    Cycle->GetLifetimeReplicatedProps(Replicated);
+    for (const TCHAR* Name : { TEXT("AvailableStatuses"), TEXT("Cursor"), TEXT("bAdvanceOnHit"), TEXT("bPreviewAhead") })
+    {
+        const FProperty* Property = FindFProperty<FProperty>(UBreakerStatusCycleComponent::StaticClass(), Name);
+        if (!TestNotNull(TEXT("Cycle property is reflected"), Property)) return false;
+        const FLifetimeProperty* Lifetime = Replicated.FindByPredicate([Property](const FLifetimeProperty& Entry) { return Entry.RepIndex == Property->RepIndex; });
+        if (!TestNotNull(TEXT("Cycle state registered for replication"), Lifetime)) return false;
+        TestTrue(TEXT("Cycle state is owner-only"), Lifetime->Condition == COND_OwnerOnly);
+    }
 
     AActor* Target = World->SpawnActor<AActor>();
     USphereComponent* Body = NewObject<USphereComponent>(Target);
@@ -106,6 +125,7 @@ bool FBreakerMultispellPurchasedRuntimeTest::RunTest(const FString& Parameters)
     HitProjectile(Baseline, nullptr);
 
     if (!Buy(TEXT("Caster.Multispell.Cycle"))) return false;
+    TestFalse(TEXT("First Cycle rank changes timing without granting preview"), Cycle->CanPreviewAhead());
     const int32 BeforeMiss = Cycle->GetCursor();
     ABreakerProjectileBase* Miss = CastFracture(Caster, Fracture);
     if (!TestNotNull(TEXT("cycle miss cast"), Miss)) return false;
@@ -149,6 +169,14 @@ bool FBreakerMultispellPurchasedRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("surviving status duration is halved"), Status->GetActiveStatuses()[0].RemainingDuration, DurationBefore * 0.5f);
     TestEqual(TEXT("rewrite retains the same detonation damage"), BeforeRewriteBurst - Attributes->GetHealth(),
         BeforeBurst - BeforeRewriteBurst, 0.01f);
+    if (!Buy(TEXT("Caster.Multispell.Cycle"))) return false;
+    TestTrue(TEXT("Second purchased Cycle rank immediately enables next-status preview"), Cycle->CanPreviewAhead());
+    const FGameplayTag Predicted = Cycle->PeekNext(1);
+    Cycle->AdvanceCycle();
+    TestEqual(TEXT("Preview predicts the next real cursor position"), Cycle->PeekNext(), Predicted);
+    FText RespecFailure;
+    TestTrue(TEXT("Actual Forge respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, true, RespecFailure));
+    TestFalse(TEXT("Respec immediately removes preview without a cast"), Cycle->CanPreviewAhead());
     return true;
 }
 #endif

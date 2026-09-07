@@ -444,8 +444,8 @@ bool FBreakerAbilitiesFreshTest::RunTest(const FString& Parameters)
 // Every EditDefaultsOnly float and int32 an ability class declares below
 // UBreakerGameplayAbility is a key on its row's "numbers" object, applied
 // onto the class default object at load. The shipped configuration: one
-// key per property on every row, one hundred and eighteen keys across the
-// registry (one hundred and fifteen declarations; the Gunsmith deploy
+// key per property on every row, one hundred and twenty-two keys across the
+// registry (one hundred and nineteen declarations; the Gunsmith deploy
 // base's PlacementRangeCm is carried once by each of its four subclasses),
 // and a missing key answers with the caller's default.
 //
@@ -507,7 +507,7 @@ bool FBreakerAbilitiesNumbersTest::RunTest(const FString& Parameters)
         TestEqual(FString::Printf(TEXT("%s: a key the file does not name answers with the default"), *Id),
             Definition->Number(FName(TEXT("Breaker.NoSuchNumber")), 7.0f), 7.0f);
     }
-    TestEqual(TEXT("One hundred and eighteen numbers across the registry"), KeyCount, 118);
+    TestEqual(TEXT("One hundred and twenty-two numbers across the registry"), KeyCount, 122);
     TestEqual(TEXT("Twenty-eight rows carry numbers; seven classes keep theirs as constexpr or in the body"), RowsWithNumbers, 28);
 
     // Order is the class's declaration order, super first: the Gunsmith
@@ -515,8 +515,16 @@ bool FBreakerAbilitiesNumbersTest::RunTest(const FString& Parameters)
     // and Cleave's first number is its range.
     const UBreakerAbilityDefinition* Turret = UBreakerAbilityDefinition::FindFallback(FName(TEXT("Gunsmith.Turret")));
     const UBreakerAbilityDefinition* Cleave = UBreakerAbilityDefinition::FindFallback(FName(TEXT("Caster.Cleave")));
+    const UBreakerAbilityDefinition* Resonance = UBreakerAbilityDefinition::FindFallback(FName(TEXT("Caster.Resonance")));
+    if (TestNotNull(TEXT("Resonance resource tuning row is reachable"), Resonance))
+    {
+        TestEqual(TEXT("Payment rank-one knob is authored"), Resonance->Number(TEXT("PaymentRankOneManaPerStatus"), -1), 2.0f);
+        TestEqual(TEXT("Payment rank-two knob is authored"), Resonance->Number(TEXT("PaymentRankTwoManaPerStatus"), -1), 4.0f);
+    }
     if (Turret && Cleave)
     {
+        TestEqual(TEXT("Follow Through rank-one knob is authored"), Cleave->Number(TEXT("FollowThroughRankOneKillRefund"), -1), 3.0f);
+        TestEqual(TEXT("Follow Through rank-two knob is authored"), Cleave->Number(TEXT("FollowThroughRankTwoKillRefund"), -1), 6.0f);
         const TArray<FNumericProperty*> TurretNumbers = BreakerAbilityData::NumberProperties(Turret->AbilityClass.Get());
         const TArray<FNumericProperty*> CleaveNumbers = BreakerAbilityData::NumberProperties(Cleave->AbilityClass.Get());
         TestTrue(TEXT("Turret's first number is the deploy base's placement range"),

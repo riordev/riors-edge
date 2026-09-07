@@ -89,6 +89,8 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float BleedDamagePerTick = 6.0f;   // O2 PLACEHOLDER
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float BleedDuration = 4.0f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0.05")) float BleedTickInterval = 1.0f;
+    UPROPERTY(EditDefaultsOnly, Category="Cleave|Mana") float FollowThroughRankOneKillRefund = 3.0f; // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, Category="Cleave|Mana") float FollowThroughRankTwoKillRefund = 6.0f; // O2 PLACEHOLDER
 
 private:
     // LevelScalar and OwnerCombat are read once by the activation and passed

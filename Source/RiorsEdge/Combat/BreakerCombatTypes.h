@@ -268,6 +268,7 @@ struct RIORSEDGE_API FBreakerHitContext
     // Delivery alone cannot distinguish a Cleave swing from a bullet: both
     // draw the weapon pool. Preserve the authored source identity for hooks.
     UPROPERTY(BlueprintReadOnly) FGameplayTagContainer SourceTags;
+    UPROPERTY(BlueprintReadOnly) float ProcCoefficient = 1.0f;
     UPROPERTY(BlueprintReadOnly) bool bWeakPoint = false;
     UPROPERTY(BlueprintReadOnly) EBreakerDamageFamily DamageFamily = EBreakerDamageFamily::Physical;
     UPROPERTY(BlueprintReadOnly) FVector WorldLocation = FVector::ZeroVector;

@@ -79,9 +79,9 @@ carries the whole endgame.
 
 | Rarity | Affixes | Tier cap | Qualitative rule |
 |---|---|---|---|
-| Standard | 1–2 | T4 | — |
-| Uncommon | 2–3 | T2 | — |
-| Exceptional | 3–5 | T-1 | — |
+| Standard | 3–4 | T4 | — |
+| Uncommon | 4–5 | T2 | — |
+| Exceptional | 4–6 | T-1 | — |
 | Aberrant | 4–6 | T-1 | Focused: one affix rolls a tier better |
 | Unwritten | 5–6 | T-1 | One rolled rewrite, drawn from a pool of four |
 

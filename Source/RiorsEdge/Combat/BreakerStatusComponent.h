@@ -21,6 +21,9 @@ struct RIORSEDGE_API FBreakerActiveStatus
     // Who applied this status. Weak: a DoT outliving its applier keeps
     // ticking, it just stops crediting anyone.
     UPROPERTY(BlueprintReadOnly) TWeakObjectPtr<AActor> Instigator = nullptr;
+    // Latest application's resource eligibility follows its attribution even
+    // when the original damage snapshot remains unchanged on refresh.
+    float ResourceProcCoefficient = 1.0f;
     // WHERE the applier stood when the status landed, snapshotted at
     // application exactly like the offensive stats in Spec.Snapshot. Every
     // tick's damage request carries this as its source location so the
@@ -160,6 +163,10 @@ public:
     UPROPERTY(BlueprintAssignable, Category="Combat|Status") FBreakerStatusEvent OnStatusAvoided;
 
 private:
+    UFUNCTION() void HandleAfflictedOwnerDeath();
+    // An expiry tick remains an active damaging status during its callbacks,
+    // even though its remaining time was advanced before damage dispatch.
+    FGameplayTag DeliveringTickTag;
     UPROPERTY() TArray<FBreakerActiveStatus> ActiveStatuses;
     UPROPERTY() TObjectPtr<UBreakerCombatComponent> Combat;
     // Additive against MaximumStacksPerStatus. Separate from the authored cap

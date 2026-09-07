@@ -1,4 +1,5 @@
 #include "UI/BreakerPlaytestHUD.h"
+#include "Combat/BreakerStatusCycleComponent.h"
 
 #include "UI/BreakerDamageFeed.h"
 
@@ -759,6 +760,25 @@ void ABreakerPlaytestHUD::DrawAbilityCluster(const ABreakerCharacter* Character)
     DrawAbilitySlot(Character, Abilities, EBreakerAbilitySlot::ClassAbilityTwo, TEXT("T"),
         S(BreakerUI::HudAbilityTwoX), Bottom - Tile, Tile, S(BreakerUI::HudAbilityMark), RailFor(EBreakerAbilitySlot::ClassAbilityTwo));
 
+    const UBreakerStatusCycleComponent* Cycle = Character->FindComponentByClass<UBreakerStatusCycleComponent>();
+    bool bFracture = false;
+    if (Abilities)
+        for (EBreakerAbilitySlot Slot : { EBreakerAbilitySlot::ClassAbilityOne, EBreakerAbilitySlot::ClassAbilityTwo })
+        {
+            const UBreakerAbilityDefinition* Definition = Abilities->IsSlotGranted(Slot) ? Abilities->GetDefinitionForSlot(Slot) : nullptr;
+            bFracture |= Definition && Abilities->GetEquippedAbilityId(Slot) == FName(TEXT("Caster.Fracture"));
+        }
+    // Visual-only capture fixture: no loadout changes, purchases, or saves.
+    const bool bCaptureCycle = IsCapturePreview() && FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureCycle"));
+    const bool bCaptureAhead = bCaptureCycle && FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureCyclePreview"));
+    if ((bFracture || bCaptureCycle) && Cycle && Cycle->GetCycleLength() > 0)
+    {
+        const FString Current = Cycle->PeekNextEntry().DisplayName.ToString();
+        const FString Label = (Cycle->CanPreviewAhead() || bCaptureAhead)
+            ? BreakerStrings::Format(EBreakerStringKey::CyclePreview, *Current, *Cycle->PeekNextEntry(1).DisplayName.ToString())
+            : BreakerStrings::Format(EBreakerStringKey::CycleCurrent, *Current);
+        DrawSpecTextCentered(Label, S(BreakerUI::HudUltimateX + BreakerUI::HudUltimateTile * 0.5f), Bottom - Ultimate - S(22.0f), BreakerUI::TextPrimary, 11.0f);
+    }
     if (Abilities && Abilities->GetGrantedCount() == 0)
     {
         DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudAbilitiesNoKit),

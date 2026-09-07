@@ -56,11 +56,11 @@ namespace
         FString Pattern;
         for (int32 Index = 0; Index < Applications; ++Index)
         {
-            // Distinct tags so every application is a fresh status rather
-            // than a stack add — the verdict is then readable off the list.
+            // Registered tags; the list is cleared between applications so
+            // the verdict is readable without confusing a refresh with refusal.
             const int32 Before = Status->GetActiveStatuses().Num();
             Status->ApplyStatus(
-                BreakerTriadMakeStatus(*FString::Printf(TEXT("Status.TriadProbe%d"), Index % 2 == 0 ? 0 : 1)),
+                BreakerTriadMakeStatus(Index % 2 == 0 ? TEXT("Status.Bleed") : TEXT("Status.Poison")),
                 EBreakerDamageFamily::Physical, nullptr);
             Pattern += Status->GetActiveStatuses().Num() > Before ? TEXT("L") : TEXT("A");
             // Consume so the next same-tag application is a new status, not a
@@ -103,7 +103,7 @@ bool FBreakerTriadAvoidanceDeterminismTest::RunTest(const FString& Parameters)
     // register a combat component so the lazy re-bind can find it.
     UBreakerCombatComponent* Combat = NewObject<UBreakerCombatComponent>(Target);
     Target->AddOwnedComponent(Combat);
-    Status->ApplyStatus(BreakerTriadMakeStatus(TEXT("Status.TriadBleed")), EBreakerDamageFamily::Physical, nullptr);
+    Status->ApplyStatus(BreakerTriadMakeStatus(TEXT("Status.Bleed")), EBreakerDamageFamily::Physical, nullptr);
     if (!TestEqual(TEXT("The probe status landed"), Status->GetActiveStatuses().Num(), 1)) return false;
     Status->AilmentAvoidanceChance = 1.0f;
     Status->AdvanceStatuses(1.0f);
@@ -157,14 +157,19 @@ bool FBreakerTriadAvoidanceGateTest::RunTest(const FString& Parameters)
     {
         const int32 Before = CappedStatus->GetActiveStatuses().Num();
         CappedStatus->ApplyStatus(
-            BreakerTriadMakeStatus(*FString::Printf(TEXT("Status.TriadGate%d"), Index)),
+            BreakerTriadMakeStatus(Index % 2 == 0 ? TEXT("Status.Bleed") : TEXT("Status.Poison")),
             EBreakerDamageFamily::Physical, nullptr);
         if (CappedStatus->GetActiveStatuses().Num() > Before) ++Landed;
         else ++AvoidedCount;
+        // Reuse real registered tags without counting a refresh as refusal.
+        // Each accepted application must contain exactly its one payload.
+        TestTrue(TEXT("Each application leaves either one status or none"), CappedStatus->GetActiveStatuses().Num() <= 1);
+        CappedStatus->ConsumeAllStatuses();
     }
     TestTrue(TEXT("The capped stream refuses applications"), AvoidedCount > 0);
+    TestTrue(TEXT("The capped stream also lands applications"), Landed > 0);
     TestEqual(TEXT("Every application either landed or was avoided"), Landed + AvoidedCount, 24);
-    TestEqual(TEXT("Refused applications left no status behind"), CappedStatus->GetActiveStatuses().Num(), Landed);
+    TestEqual(TEXT("Every trial starts with an empty status list"), CappedStatus->GetActiveStatuses().Num(), 0);
 
     // Avoidance rolls BEFORE immunity and neither weakens the other: with
     // zero avoidance and a live immunity window, the application is still
@@ -172,7 +177,7 @@ bool FBreakerTriadAvoidanceGateTest::RunTest(const FString& Parameters)
     AActor* Immune = NewObject<AActor>();
     UBreakerStatusComponent* ImmuneStatus = NewObject<UBreakerStatusComponent>(Immune);
     ImmuneStatus->GrantStatusImmunity(5.0f);
-    ImmuneStatus->ApplyStatus(BreakerTriadMakeStatus(TEXT("Status.TriadImmune")), EBreakerDamageFamily::Physical, nullptr);
+    ImmuneStatus->ApplyStatus(BreakerTriadMakeStatus(TEXT("Status.Bleed")), EBreakerDamageFamily::Physical, nullptr);
     TestEqual(TEXT("Immunity still refuses when avoidance is zero"), ImmuneStatus->GetActiveStatuses().Num(), 0);
     return true;
 }

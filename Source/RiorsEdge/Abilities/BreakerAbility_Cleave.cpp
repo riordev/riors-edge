@@ -273,6 +273,7 @@ void UBreakerAbility_Cleave::ApplyCleaveBleed(AActor* Target, const UBreakerAttr
 
     FBreakerStatusApplicationSpec Spec;
     Spec.StatusTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Bleed"), false);
+    Spec.Snapshot.SourceTags.AddTag(BreakerAbilityTags::Ability_Class_Caster_Cleave.GetTag());
     // O35: the per-tick base rides the equipped weapon's item-level scalar,
     // exactly as the weapon's own bleed does. Item level 1 is x1.0.
     Spec.BaseDamagePerTick = BleedDamagePerTick * FMath::Max(0.0f, LevelScalar);

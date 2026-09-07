@@ -1,6 +1,9 @@
 #include "Combat/BreakerStatusCycleComponent.h"
 
 #include "GameFramework/Actor.h"
+#include "Net/UnrealNetwork.h"
+#include "Progression/BreakerProgressionComponent.h"
+#include "Data/BreakerStrings.h"
 
 UBreakerStatusCycleComponent::UBreakerStatusCycleComponent()
 {
@@ -13,9 +16,12 @@ UBreakerStatusCycleComponent* UBreakerStatusCycleComponent::FindOrAdd(AActor* Ow
     if (!Owner) return nullptr;
     if (UBreakerStatusCycleComponent* Existing = Owner->FindComponentByClass<UBreakerStatusCycleComponent>())
     {
+        Existing->SeedDefaultCycle();
         return Existing;
     }
+    if (!Owner->HasAuthority()) return nullptr;
     UBreakerStatusCycleComponent* Created = NewObject<UBreakerStatusCycleComponent>(Owner);
+    Owner->AddInstanceComponent(Created);
     // RegisterComponent ensures on an owner with no world, which is exactly the
     // case in automation. The component is fully usable unregistered — it does
     // not tick and it owns no scene state — so a worldless owner gets a working
@@ -29,6 +35,31 @@ void UBreakerStatusCycleComponent::BeginPlay()
 {
     Super::BeginPlay();
     SeedDefaultCycle();
+    if (GetOwner() && GetOwner()->HasAuthority())
+    {
+        if (UBreakerProgressionComponent* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>())
+            Progression->OnProgressionChanged.AddUniqueDynamic(this, &UBreakerStatusCycleComponent::SyncProgression);
+        SyncProgression();
+    }
+}
+
+void UBreakerStatusCycleComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME_CONDITION(UBreakerStatusCycleComponent, AvailableStatuses, COND_OwnerOnly);
+    DOREPLIFETIME_CONDITION(UBreakerStatusCycleComponent, Cursor, COND_OwnerOnly);
+    DOREPLIFETIME_CONDITION(UBreakerStatusCycleComponent, bAdvanceOnHit, COND_OwnerOnly);
+    DOREPLIFETIME_CONDITION(UBreakerStatusCycleComponent, bPreviewAhead, COND_OwnerOnly);
+}
+
+void UBreakerStatusCycleComponent::OnRep_Cycle() { OnCycleChanged.Broadcast(PeekNext()); }
+
+void UBreakerStatusCycleComponent::SyncProgression()
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+    const UBreakerProgressionComponent* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+    bPreviewAhead = Progression && Progression->GetNodeRank(TEXT("Caster.Multispell.Cycle"), EBreakerPointCurrency::DoctrinePoints) >= 2;
+    OnRep_Cycle();
 }
 
 void UBreakerStatusCycleComponent::SeedDefaultCycle()
@@ -36,16 +67,17 @@ void UBreakerStatusCycleComponent::SeedDefaultCycle()
     // Zero-setup convention: the cycle is playable before any Data Asset
     // exists, exactly like the weapon and ability fallback registries. An
     // authored list wins — seeding only ever fills an EMPTY cycle.
-    if (bSeeded || !AvailableStatuses.IsEmpty()) return;
+    if ((GetOwner() && !GetOwner()->HasAuthority()) || bSeeded || !AvailableStatuses.IsEmpty()) return;
     bSeeded = true;
 
     // Bleed and Poison are what a Caster can actually apply today: Cleave
     // applies Bleed, Rot applies Poison. Void joins when Siphon is in the kit.
     // Every magnitude below is O2 PLACEHOLDER.
     const TCHAR* SeedTags[] = { TEXT("Status.Bleed"), TEXT("Status.Poison") };
-    for (const TCHAR* TagName : SeedTags)
+    const EBreakerStringKey Names[] = { EBreakerStringKey::CycleBleed, EBreakerStringKey::CyclePoison };
+    for (int32 SeedIndex = 0; SeedIndex < UE_ARRAY_COUNT(SeedTags); ++SeedIndex)
     {
-        const FGameplayTag Tag = FGameplayTag::RequestGameplayTag(TagName, false);
+        const FGameplayTag Tag = FGameplayTag::RequestGameplayTag(SeedTags[SeedIndex], false);
         if (!Tag.IsValid()) continue;
         FBreakerCycleEntry Entry;
         Entry.Spec.StatusTag = Tag;
@@ -53,7 +85,7 @@ void UBreakerStatusCycleComponent::SeedDefaultCycle()
         Entry.Spec.Duration = 4.0f;
         Entry.Spec.TickInterval = 1.0f;
         Entry.DamageFamily = EBreakerDamageFamily::Physical;
-        Entry.DisplayName = FText::FromString(Tag.GetTagName().ToString());
+        Entry.DisplayName = FText::FromString(BreakerStrings::Get(Names[SeedIndex]));
         AvailableStatuses.Add(Entry);
     }
 }
@@ -72,6 +104,7 @@ FGameplayTag UBreakerStatusCycleComponent::PeekNext(int32 Lookahead) const
 
 FGameplayTag UBreakerStatusCycleComponent::AdvanceCycle()
 {
+    if (GetOwner() && !GetOwner()->HasAuthority()) return FGameplayTag();
     if (AvailableStatuses.IsEmpty()) return FGameplayTag();
     const FGameplayTag Current = AvailableStatuses[Cursor % AvailableStatuses.Num()].Spec.StatusTag;
     Cursor = (Cursor + 1) % AvailableStatuses.Num();
@@ -81,6 +114,7 @@ FGameplayTag UBreakerStatusCycleComponent::AdvanceCycle()
 
 void UBreakerStatusCycleComponent::SetAdvanceOnHit(bool bOnHit)
 {
+    if (GetOwner() && !GetOwner()->HasAuthority()) return;
     bAdvanceOnHit = bOnHit;
 }
 
@@ -94,6 +128,7 @@ TArray<FGameplayTag> UBreakerStatusCycleComponent::GetAvailableStatusTypes() con
 
 void UBreakerStatusCycleComponent::AddStatusType(const FBreakerCycleEntry& Entry)
 {
+    if (GetOwner() && !GetOwner()->HasAuthority()) return;
     if (!Entry.Spec.StatusTag.IsValid()) return;
     // Idempotent by tag. A status added twice would come round twice as often,
     // which silently doubles its weight in a cycle the HUD claims is uniform.
@@ -102,6 +137,7 @@ void UBreakerStatusCycleComponent::AddStatusType(const FBreakerCycleEntry& Entry
         if (Existing.Spec.StatusTag == Entry.Spec.StatusTag)
         {
             Existing = Entry;
+            OnCycleChanged.Broadcast(PeekNext());
             return;
         }
     }
@@ -111,6 +147,7 @@ void UBreakerStatusCycleComponent::AddStatusType(const FBreakerCycleEntry& Entry
 
 void UBreakerStatusCycleComponent::RemoveStatusType(FGameplayTag StatusTag)
 {
+    if (GetOwner() && !GetOwner()->HasAuthority()) return;
     const int32 Removed = AvailableStatuses.RemoveAll(
         [StatusTag](const FBreakerCycleEntry& Entry) { return Entry.Spec.StatusTag == StatusTag; });
     if (Removed <= 0) return;

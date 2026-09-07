@@ -4,6 +4,9 @@
 #include "AbilitySystemComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Abilities/BreakerAbilityTags.h"
+#include "Abilities/BreakerAbilityDefinition.h"
+#include "Abilities/BreakerAbility_Cleave.h"
+#include "Data/BreakerDataFile.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Game/BreakerGameMode.h"
 #include "GameFramework/Actor.h"
@@ -16,6 +19,45 @@ UBreakerManaComponent::UBreakerManaComponent()
 {
     PrimaryComponentTick.bCanEverTick = true;
     SetIsReplicatedByDefault(true);
+}
+
+bool UBreakerManaComponent::ParseResourceTuning(const FJsonObject& Object, FBreakerCasterResourceTuning& Out, FString& Error)
+{
+    FBreakerCasterResourceTuning Candidate;
+    struct FField { const TCHAR* Name; float* Value; float Minimum; };
+    const FField Fields[] = {
+        { TEXT("StatusApplicationMana"), &Candidate.StatusApplicationMana, 0 },
+        { TEXT("SeepRankOneMultiplier"), &Candidate.SeepRankOneMultiplier, 1 },
+        { TEXT("SeepRankTwoMultiplier"), &Candidate.SeepRankTwoMultiplier, 1 },
+        { TEXT("AttritionRankOneRefund"), &Candidate.AttritionRankOneRefund, 0 },
+        { TEXT("AttritionRankTwoRefund"), &Candidate.AttritionRankTwoRefund, 0 }
+    };
+    if (Object.Values.Num() != UE_ARRAY_COUNT(Fields)) { Error = TEXT("Expected exactly five Caster resource fields."); return false; }
+    for (const FField& Field : Fields)
+    {
+        double Value = 0;
+        if (!Object.TryGetNumberField(Field.Name, Value) || !FMath::IsFinite(Value) || Value < Field.Minimum || Value > MAX_flt)
+        { Error = FString::Printf(TEXT("Invalid Caster resource field %s."), Field.Name); return false; }
+        *Field.Value = static_cast<float>(Value);
+    }
+    Out = Candidate;
+    Error.Reset();
+    return true;
+}
+
+const FBreakerCasterResourceTuning& UBreakerManaComponent::GetResourceTuning()
+{
+    static const FBreakerCasterResourceTuning Tuning = []
+    {
+        FBreakerCasterResourceTuning Values;
+        BreakerDataFile::FBreakerDataErrors Errors;
+        const TSharedPtr<FJsonObject> Object = BreakerDataFile::Load(TEXT("Data/caster-resource.json"), Errors);
+        FString Error;
+        if (!Object || !ParseResourceTuning(*Object, Values, Error))
+            UE_LOG(LogTemp, Error, TEXT("Caster resource tuning refused; compiled O2 defaults used: %s %s"), *Errors.Join(), *Error);
+        return Values;
+    }();
+    return Tuning;
 }
 
 void UBreakerManaComponent::BeginPlay()
@@ -58,9 +100,8 @@ void UBreakerManaComponent::BindOwnerEvents()
     if (!Owner) return;
 
     // Weapon hits ACCELERATE recovery (owner ruling 2026-08-14); passive
-    // regeneration is the primary path and needs no hook. Statuses, kills, and
-    // reloads (Class-Kits 2.1) wait on hooks the combat and status layers do
-    // not publish attacker-side yet.
+    // regeneration is the primary path and needs no hook. Melee/kill events
+    // bind below; accepted status applications notify their applier directly.
     if (UBreakerWeaponComponent* Weapon = Owner->FindComponentByClass<UBreakerWeaponComponent>())
     {
         if (!Weapon->OnShot.IsAlreadyBound(this, &UBreakerManaComponent::HandleShot))
@@ -75,6 +116,8 @@ void UBreakerManaComponent::BindOwnerEvents()
     {
         if (!Combat->OnHitDealt.IsAlreadyBound(this, &UBreakerManaComponent::HandleMeleeHit))
             Combat->OnHitDealt.AddDynamic(this, &UBreakerManaComponent::HandleMeleeHit);
+        if (!Combat->OnKillDealt.IsAlreadyBound(this, &UBreakerManaComponent::HandleCasterKill))
+            Combat->OnKillDealt.AddDynamic(this, &UBreakerManaComponent::HandleCasterKill);
         if (!Combat->OnVitalsRestored.IsAlreadyBound(this, &UBreakerManaComponent::HandleVitalsRestored))
         {
             Combat->OnVitalsRestored.AddDynamic(this, &UBreakerManaComponent::HandleVitalsRestored);
@@ -321,6 +364,48 @@ void UBreakerManaComponent::HandleMeleeHit(const FBreakerHitContext& Hit)
     // Ordinary weapon hits stay on OnShot's normalized volley path, so this
     // listener never multiplies their income by pellet count.
     GrantMana(bContactCharge ? WeakPointGain : WeaponHitGain, false);
+}
+
+void UBreakerManaComponent::NotifyStatusApplication(const FBreakerStatusApplicationSpec& Spec, bool bAlreadyPresent)
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || IsInSafeZone() || Spec.ProcCoefficient <= 0) return;
+    const UBreakerCombatComponent* Combat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>();
+    if (Combat && Combat->IsDead()) return;
+    const UBreakerProgressionComponent* Progression = CachedProgression.Get();
+    const bool bFollowThrough = Progression && Progression->HasNodeTag(BreakerNodeTags::Node_SB_FollowThrough.GetTag());
+    const bool bCleaveBleed = Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Bleed"))
+        && Spec.Snapshot.SourceTags.HasTagExact(BreakerAbilityTags::Ability_Class_Caster_Cleave.GetTag());
+    if (bAlreadyPresent && !(bFollowThrough && bCleaveBleed)) return;
+    const FBreakerCasterResourceTuning& Tuning = GetResourceTuning();
+    const int32 Rank = Progression ? Progression->GetNodeRank(TEXT("Caster.VoidWhisperer.Seep"), EBreakerPointCurrency::DoctrinePoints) : 0;
+    const float Multiplier = Rank >= 2 ? Tuning.SeepRankTwoMultiplier : Rank == 1 ? Tuning.SeepRankOneMultiplier : 1.0f;
+    GrantMana(Tuning.StatusApplicationMana * Multiplier * FMath::Clamp(Spec.ProcCoefficient, 0.0f, 1.0f), false);
+}
+
+void UBreakerManaComponent::NotifyAfflictedVictimDeath()
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || IsInSafeZone()) return;
+    const UBreakerCombatComponent* Combat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>();
+    if (Combat && Combat->IsDead()) return;
+    const UBreakerProgressionComponent* Progression = CachedProgression.Get();
+    const int32 Rank = Progression ? Progression->GetNodeRank(TEXT("Caster.VoidWhisperer.Attrition"), EBreakerPointCurrency::DoctrinePoints) : 0;
+    const FBreakerCasterResourceTuning& Tuning = GetResourceTuning();
+    if (Rank > 0) GrantMana(Rank >= 2 ? Tuning.AttritionRankTwoRefund : Tuning.AttritionRankOneRefund, true);
+}
+
+void UBreakerManaComponent::HandleCasterKill(const FBreakerHitContext& Hit)
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || IsInSafeZone()
+        || Hit.bFromDoT || Hit.ProcCoefficient <= 0 || Hit.Instigator != GetOwner()
+        || !Hit.SourceTags.HasTagExact(BreakerAbilityTags::Ability_Class_Caster_Cleave.GetTag())) return;
+    const UBreakerCombatComponent* Combat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>();
+    if (Combat && Combat->IsDead()) return;
+    const UBreakerProgressionComponent* Progression = CachedProgression.Get();
+    const int32 Rank = Progression ? Progression->GetNodeRank(TEXT("Caster.Spellblade.FollowThrough"), EBreakerPointCurrency::DoctrinePoints) : 0;
+    if (Rank <= 0) return;
+    UBreakerAbilityDefinition::FindFallback(TEXT("Caster.Cleave"));
+    const UBreakerAbility_Cleave* Cleave = GetDefault<UBreakerAbility_Cleave>();
+    GrantMana(Rank >= 2 ? Cleave->FollowThroughRankTwoKillRefund : Cleave->FollowThroughRankOneKillRefund, true);
 }
 
 void UBreakerManaComponent::HandleShot(const FBreakerShotResult& Shot)

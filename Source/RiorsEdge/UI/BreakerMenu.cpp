@@ -1,5 +1,6 @@
 #include "UI/BreakerMenu.h"
 #include "UI/BreakerCoreBoardLayout.h"
+#include "UI/BreakerSandboxModel.h"
 #include "Audio/BreakerSoundDirector.h"
 #include "Data/BreakerStrings.h"
 
@@ -991,6 +992,13 @@ void SBreakerMenu::ShowScreenForCapture(EBreakerMenuScreen Screen)
         // pass's territory); reuse the existing sub-view switch instead, e.g.
         // -BreakerCaptureMenu=INVENTORY -BreakerCaptureBoard=FORGE. Harmless
         // for the skill screen: neither string matches CORE/COMPARE/BRANCH*.
+        else if (Board.StartsWith(TEXT("SANDBOX")))
+        {
+            Screen = EBreakerMenuScreen::DevSandbox;
+            DevSandboxTab = Board == TEXT("SANDBOXGEAR") ? 1 : Board == TEXT("SANDBOXSTATS") ? 2 : 0;
+            // Visual-only fixture for the pinned refusal footer; no item grant.
+            if (DevSandboxTab == 1) DevSandboxStatus = FText::FromString(BreakerStrings::Get(EBreakerStringKey::SandboxFull));
+        }
         else if (Board == TEXT("FORGE")) { Screen = EBreakerMenuScreen::Forge; }
         else if (Board == TEXT("ABILITIES")) { Screen = EBreakerMenuScreen::Abilities; }
         // Settings panes, same pattern: the sidebar shows one pane at a time,
@@ -11027,11 +11035,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildDevSandboxScreen()
 
     Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
     [
-        MenuText(FText::FromString(
-            TEXT("DEV TOOLING. Everything below drives the game's own progression, class and loot calls — and SAVES, so what you set here is what the character IS.")),
-            BreakerUI::TypeCaption, Amber, true)
+        MenuWrappedText(FText::FromString(BreakerStrings::Get(EBreakerStringKey::SandboxNotice)), BreakerUI::TypeCaption, Amber, FMath::Min(1040.0f, MeasureWideScreen().PanelWidth) - 2 * BreakerUI::Space24)
     ];
 
+    if (DevSandboxTab == 0)
+    {
     // ---- 1. Character level ---------------------------------------------
     Body->AddSlot().AutoHeight()[SettingsSectionHeader(TEXT("CHARACTER LEVEL"))];
     if (Progression)
@@ -11068,9 +11076,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildDevSandboxScreen()
         ];
         Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
         [
-            MenuText(FText::FromString(FString::Printf(TEXT("NOW: LEVEL %d  ·  %d TOTAL XP  ·  %d CLASS / %d CORE UNSPENT"),
+            MenuText(FText::FromString(BreakerStrings::Format(EBreakerStringKey::SandboxWallet,
                 CurrentLevel, Progression->GetTotalExperience(),
-                Progression->GetProgressionState().UnspentClassPoints,
+                Progression->GetProgressionState().UnspentDoctrinePoints,
                 Progression->GetProgressionState().UnspentCorePoints)),
                 BreakerUI::TypeCaption, SoftText, true)
         ];
@@ -11171,7 +11179,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildDevSandboxScreen()
         Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)[AreaRow];
         Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
         [
-            MenuText(FText::FromString(TEXT("DRIVES MONSTER STRENGTH AND DROP ITEM LEVEL. RARITY GATES: ABERRANT NEEDS ILVL 25, ANOMALOUS 40.")),
+            MenuText(FText::FromString(BreakerStrings::Get(EBreakerStringKey::SandboxRarityGates)),
                 BreakerUI::TypeCaption, Muted)
         ];
     }
@@ -11225,8 +11233,17 @@ TSharedRef<SWidget> SBreakerMenu::BuildDevSandboxScreen()
     // grants below and the skill screen's point-recovery row -- so its name is
     // now historical rather than descriptive.
 
+    }
+    if (DevSandboxTab == 1)
+    {
     // ---- 4. Seeded gear --------------------------------------------------
     Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)[SettingsSectionHeader(TEXT("SEEDED GEAR"))];
+    Body->AddSlot().AutoHeight().Padding(0, 0, 0, BreakerUI::Space8)
+    [SNew(SHorizontalBox)
+        + SHorizontalBox::Slot().AutoWidth()[MakeChip(BreakerStrings::Get(EBreakerStringKey::SandboxFresh), bDevFreshRoll, Primary,
+            FOnClicked::CreateLambda([this]() { bDevFreshRoll = true; Rebuild(EBreakerMenuScreen::DevSandbox); return FReply::Handled(); }))]
+        + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space8, 0)[MakeChip(BreakerStrings::Get(EBreakerStringKey::SandboxRepeat), !bDevFreshRoll, Primary,
+            FOnClicked::CreateLambda([this]() { bDevFreshRoll = false; Rebuild(EBreakerMenuScreen::DevSandbox); return FReply::Handled(); }))]];
     Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
     [
         SettingsRow(TEXT("SEED"),
@@ -11234,7 +11251,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildDevSandboxScreen()
             [
                 SNew(SEditableTextBox)
                 .Text(FText::FromString(DevSeedString))
-                .HintText(FText::FromString(TEXT("Empty rolls a fresh seed")))
+                .HintText(FText::FromString(BreakerStrings::Get(EBreakerStringKey::SandboxSeedHint)))
                 .OnTextChanged(FOnTextChanged::CreateLambda([this](const FText& NewText)
                 {
                     // Stored WITHOUT rebuilding, same as the create screen's
@@ -11299,8 +11316,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildDevSandboxScreen()
         // without this stepper it is untestable. 0 (untouched) preserves the
         // old behaviour: the gym's area level, character level outside a gym.
         // Stepped, not slid, same reasoning as the area-level row above.
-        const int32 FallbackItemLevel = GameMode ? GameMode->GymAreaLevel
-            : (Progression ? Progression->GetCharacterLevel() : 1);
+        const int32 FallbackItemLevel = BreakerSandbox::ItemLevel(Character.IsValid() ? Character->GetWorld()->GetMapName() : FString(), 0, GameMode ? GameMode->GymAreaLevel : 1, CurrentLevel, UBreakerAffixLibrary::MaxItemLevel);
         const int32 ShownItemLevel = FMath::Clamp(
             DevGrantItemLevel > 0 ? DevGrantItemLevel : FallbackItemLevel,
             1, UBreakerAffixLibrary::MaxItemLevel);
@@ -11350,11 +11366,16 @@ TSharedRef<SWidget> SBreakerMenu::BuildDevSandboxScreen()
                     Rebuild(EBreakerMenuScreen::DevSandbox);
                     return FReply::Handled();
                 }
-                // Empty seed field rolls a fresh one and PRINTS it back into
-                // the field, so an interesting roll can be re-rolled at will —
-                // that is the whole reason the seed is a field and not hidden.
+                // Fresh mode records its draw; Repeat mode requires a valid
+                // recorded or typed seed. A refusal does not grant or save.
                 const FString Trimmed = DevSeedString.TrimStartAndEnd();
-                const int32 Seed = Trimmed.IsEmpty() ? FMath::Rand() : FCString::Atoi(*Trimmed);
+                int32 Seed = 0;
+                if (!BreakerSandbox::Seed(bDevFreshRoll, Trimmed, FMath::Rand(), Seed))
+                {
+                    DevSandboxStatus = FText::FromString(BreakerStrings::Get(EBreakerStringKey::SandboxInvalidSeed));
+                    Rebuild(EBreakerMenuScreen::DevSandbox);
+                    return FReply::Handled();
+                }
                 DevSeedString = FString::FromInt(Seed);
                 // Slot pinned, or drawn from the seed by THE production draw —
                 // the same salted RollDropSlot every kill uses, so "FROM SEED"
@@ -11370,13 +11391,15 @@ TSharedRef<SWidget> SBreakerMenu::BuildDevSandboxScreen()
                 ABreakerGameMode* Mode = (Character.IsValid() && Character->GetWorld())
                     ? Character->GetWorld()->GetAuthGameMode<ABreakerGameMode>() : nullptr;
                 UBreakerProgressionComponent* Prog = Character.IsValid() ? Character->GetProgression() : nullptr;
-                const int32 ItemLevel = FMath::Clamp(
-                    DevGrantItemLevel > 0 ? DevGrantItemLevel
-                        : (Mode ? Mode->GymAreaLevel : (Prog ? Prog->GetCharacterLevel() : 1)),
-                    1, UBreakerAffixLibrary::MaxItemLevel);
+                const int32 ItemLevel = BreakerSandbox::ItemLevel(Character.IsValid() ? Character->GetWorld()->GetMapName() : FString(), DevGrantItemLevel, Mode ? Mode->GymAreaLevel : 1, Prog ? Prog->GetCharacterLevel() : 1, UBreakerAffixLibrary::MaxItemLevel);
                 const FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(
                     TEXT("DevSandbox"), Slot, DevGrantRarity, ItemLevel, Seed);
-                Equip->AddToBackpack(Item);
+                if (!Equip->AddToBackpack(Item, true))
+                {
+                    DevSandboxStatus = FText::FromString(BreakerStrings::Get(EBreakerStringKey::SandboxFull));
+                    Rebuild(EBreakerMenuScreen::DevSandbox);
+                    return FReply::Handled();
+                }
                 if (Character.IsValid()) Character->SaveGameState();
                 DevSandboxStatus = FText::FromString(FString::Printf(
                     TEXT("GRANTED %s %s (ILVL %d, SEED %d) TO BACKPACK — SEE GEAR SCREEN."),
@@ -11387,6 +11410,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildDevSandboxScreen()
         ]
     ];
 
+    }
+    if (DevSandboxTab == 2)
+    {
     // ---- 5. Aggregate readout -------------------------------------------
     // Read-only, and rebuilt by the click that changed it — every mutating
     // control on this screen ends in Rebuild, so these lines are exactly as
@@ -11435,31 +11461,24 @@ TSharedRef<SWidget> SBreakerMenu::BuildDevSandboxScreen()
         ];
     }
 
-    // ---- Status + back ---------------------------------------------------
-    // Fixed-height status slot so a result landing cannot reflow the plate.
-    Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
-    [
-        SNew(SBox).HeightOverride(20.0f)
-        [
-            MenuText(DevSandboxStatus, BreakerUI::TypeCaption, Amber, true)
-        ]
-    ];
-    Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
-    [
-        SNew(SBox).WidthOverride(240.0f)
-        [
-            MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)
-        ]
-    ];
-
-    // Settings-width plate, clamped to the viewport the same way — the widest
-    // row here is the nine-slot chip pack, which is measured against exactly
-    // this width above.
+    }
     const float PanelWidth = FMath::Min(1040.0f, MeasureWideScreen().PanelWidth);
-    return BuildFrame(FText::FromString(TEXT("BREAKPOINT SANDBOX")),
-        FText::FromString(TEXT("DEV — LEVEL / AREA / CLASS / SEEDED GEAR / COMPOSED STATS")), Body, PanelWidth);
+    TSharedRef<SHorizontalBox> Tabs = SNew(SHorizontalBox);
+    const EBreakerStringKey TabKeys[] = { EBreakerStringKey::SandboxCharacter, EBreakerStringKey::SandboxGear, EBreakerStringKey::SandboxStats };
+    for (int32 Index = 0; Index < 3; ++Index)
+        Tabs->AddSlot().AutoWidth().Padding(0, 0, BreakerUI::Space8, 0)
+        [MakeChip(BreakerStrings::Get(TabKeys[Index]), DevSandboxTab == Index, Primary,
+            FOnClicked::CreateLambda([this, Index]() { DevSandboxTab = Index; Rebuild(EBreakerMenuScreen::DevSandbox); return FReply::Handled(); }))];
+    TSharedRef<SVerticalBox> Footer = SNew(SVerticalBox);
+    Footer->AddSlot().AutoHeight().Padding(BreakerUI::Space24, BreakerUI::Space8)
+    [MenuWrappedText(DevSandboxStatus, BreakerUI::TypeCaption, Amber, PanelWidth - 2 * BreakerUI::Space24)];
+    Footer->AddSlot().AutoHeight().Padding(BreakerUI::Space24, BreakerUI::Space8)
+    [SNew(SHorizontalBox)
+        + SHorizontalBox::Slot().AutoWidth()[MakeButton(FText::FromString(BreakerStrings::Get(EBreakerStringKey::SandboxInventory)), FOnClicked::CreateLambda([this]() { Rebuild(EBreakerMenuScreen::Inventory); return FReply::Handled(); }), true)]
+        + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space16, 0)[MakeButton(FText::FromString(BreakerStrings::Get(EBreakerStringKey::SandboxBack)), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), false)]];
+    return BuildZonedFrame(FText::FromString(BreakerStrings::Get(EBreakerStringKey::SandboxTitle)), FText::GetEmpty(), Tabs,
+        SNew(SScrollBox) + SScrollBox::Slot().Padding(BreakerUI::Space24, 0)[Body], Footer, PanelWidth, MeasureWideScreen().PanelHeight, true);
 }
-
 FReply SBreakerMenu::GoBack()
 {
     Rebuild(RootScreen);

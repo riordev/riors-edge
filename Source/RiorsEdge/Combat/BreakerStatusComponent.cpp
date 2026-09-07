@@ -3,6 +3,7 @@
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerDamageLibrary.h"
 #include "Combat/BreakerZoneMath.h"
+#include "Classes/BreakerManaComponent.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
 
@@ -41,7 +42,11 @@ float UBreakerStatusComponent::GetEffectiveAilmentAvoidanceChance() const
 
 void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator)
 {
-    if (!GetOwner() || !GetOwner()->HasAuthority() || Spec.Duration <= 0.0f || Spec.TickInterval <= 0.0f) return;
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !Spec.StatusTag.IsValid()
+        || !FMath::IsFinite(Spec.Duration) || !FMath::IsFinite(Spec.TickInterval)
+        || !FMath::IsFinite(Spec.ProcCoefficient) || Spec.Duration <= 0.0f || Spec.TickInterval <= 0.0f) return;
+    const UBreakerCombatComponent* TargetCombat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>();
+    if (TargetCombat && TargetCombat->IsDead()) return;
 
     // --- StatusDuration, the APPLIER's lane, folded at the door -----------
     // This is the one funnel every application path passes through — weapon
@@ -101,6 +106,11 @@ void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& S
     // stack adds included, because a refresh IS an application.
     if (IsStatusImmune()) return;
 
+    if (UBreakerCombatComponent* OwnerCombat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>())
+        if (!OwnerCombat->OnDeath.IsAlreadyBound(this, &UBreakerStatusComponent::HandleAfflictedOwnerDeath))
+            OwnerCombat->OnDeath.AddDynamic(this, &UBreakerStatusComponent::HandleAfflictedOwnerDeath);
+    UBreakerManaComponent* SourceMana = Instigator ? Instigator->FindComponentByClass<UBreakerManaComponent>() : nullptr;
+
     for (FBreakerActiveStatus& Active : ActiveStatuses)
     {
         if (Active.Spec.StatusTag == Spec.StatusTag)
@@ -115,8 +125,11 @@ void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& S
                 Active.Instigator = Instigator;
                 Active.SourceLocationSnapshot = Instigator->GetActorLocation();
                 Active.bHasSourceLocationSnapshot = true;
+                Active.ResourceProcCoefficient = Spec.ProcCoefficient;
             }
-            OnStatusApplied.Broadcast(Active);
+            const FBreakerActiveStatus Applied = Active;
+            if (SourceMana) SourceMana->NotifyStatusApplication(Spec, true);
+            OnStatusApplied.Broadcast(Applied);
             return;
         }
     }
@@ -128,6 +141,7 @@ void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& S
     Status.RemainingDuration = ScaledDuration;
     Status.TimeUntilNextTick = Spec.TickInterval;
     Status.Instigator = Instigator;
+    Status.ResourceProcCoefficient = Spec.ProcCoefficient;
     // Application-time facing snapshot. Taken from the applier's position NOW,
     // not per tick: the DoT contract snapshots at application, and a tick that
     // re-read the applier's live position would let a shooter flank AFTER the
@@ -138,7 +152,25 @@ void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& S
         Status.bHasSourceLocationSnapshot = true;
     }
     ActiveStatuses.Add(Status);
+    if (SourceMana) SourceMana->NotifyStatusApplication(Spec, false);
     OnStatusApplied.Broadcast(Status);
+}
+
+void UBreakerStatusComponent::HandleAfflictedOwnerDeath()
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+    TSet<AActor*> Credited;
+    // Copy before refunds can notify resource listeners and change state.
+    const TArray<FBreakerActiveStatus> AtDeath = ActiveStatuses;
+    for (const FBreakerActiveStatus& Status : AtDeath)
+    {
+        AActor* Applier = Status.Instigator.Get();
+        if (!Applier || Credited.Contains(Applier)
+            || (Status.RemainingDuration <= 0 && Status.Spec.StatusTag != DeliveringTickTag)
+            || Status.Spec.BaseDamagePerTick <= 0 || Status.ResourceProcCoefficient <= 0) continue;
+        Credited.Add(Applier);
+        if (UBreakerManaComponent* Mana = Applier->FindComponentByClass<UBreakerManaComponent>()) Mana->NotifyAfflictedVictimDeath();
+    }
 }
 
 void UBreakerStatusComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -191,6 +223,7 @@ void UBreakerStatusComponent::AdvanceStatuses(float DeltaTime)
             FBreakerDamageRequest Tick = UBreakerDamageLibrary::MakeSnapshotDotTick(TickSpec, Status.DamageFamily, Status.TicksDelivered, Status.Instigator.Get(),
                 Status.SourceLocationSnapshot, Status.bHasSourceLocationSnapshot);
             Tick.bBypassShield = Status.DamageFamily == EBreakerDamageFamily::Physical;
+            TGuardValue<FGameplayTag> DeliveringTick(DeliveringTickTag, Tag);
             Combat->ReceiveDamage(Tick);
         }
         Index = FindActive();

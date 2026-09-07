@@ -34,4 +34,6 @@ public:
     // MS5 Payment: Mana per distinct status consumed. Zero at base.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Resonance", meta=(ClampMin="0")) float RefundManaPerStatus = 0.0f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Resonance", meta=(ClampMin="0")) float MaximumRangeCm = 4000.0f;
+    UPROPERTY(EditDefaultsOnly, Category="Resonance|Mana") float PaymentRankOneManaPerStatus = 2.0f; // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, Category="Resonance|Mana") float PaymentRankTwoManaPerStatus = 4.0f; // O2 PLACEHOLDER
 };

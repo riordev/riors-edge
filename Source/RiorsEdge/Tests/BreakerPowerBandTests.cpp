@@ -647,10 +647,11 @@ namespace BreakerPowerBandTest
     constexpr int32 RolledBestInSlotSeed = 200;           // O2 PLACEHOLDER (O200)
     constexpr int32 RolledBestInSlotCandidates = 64;      // O2 PLACEHOLDER (O200)
 
-    TArray<FBreakerItemInstance> BreakerPowerBandRolledBestInSlot(int32 ItemLevel, int32 Seed, int32 CandidatesPerSlot)
+    TArray<FBreakerItemInstance> BreakerPowerBandRolledBestInSlot(int32 ItemLevel, int32 Seed, int32 CandidatesPerSlot,
+        bool bAbilityLane = false)
     {
         const FBreakerBuildConditionState State = MeasurementState();
-        const TArray<FBreakerNodeRank> Ranks = OptimizedRanks();
+        const TArray<FBreakerNodeRank> Ranks = bAbilityLane ? AbilityOptimizedRanks() : OptimizedRanks();
 
         constexpr int32 SlotCount = static_cast<int32>(EBreakerEquipSlot::Count);
         // Index 0 is the uncapped rarity every slot falls back to; the capped
@@ -684,7 +685,8 @@ namespace BreakerPowerBandTest
                         static_cast<uint32>(RarityIndex * CandidatesPerSlot + Candidate));
                     FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(
                         TEXT("PowerBand"), Slot, Rarities[RarityIndex], ItemLevel, static_cast<int32>(Salt));
-                    const float Total = Compose({Item}, Ranks, State).Total;
+                    const FComposedBuild CandidateBuild = Compose({Item}, Ranks, State);
+                    const float Total = bAbilityLane ? CandidateBuild.AbilityTotal : CandidateBuild.Total;
                     if (Total > Best[SlotIndex][RarityIndex].Total)
                     {
                         Best[SlotIndex][RarityIndex].Item = MoveTemp(Item);
@@ -1925,6 +1927,29 @@ bool FBreakerPowerBandAbilityLaneTest::RunTest(const FString& Parameters)
             CritVariant.AbilityIncreasedLayer / WeaponBuild.IncreasedLayer,
             CritVariant.AbilityMoreLayer / WeaponBuild.MoreLayer,
             CritVariant.EffectiveCrit / WeaponBuild.EffectiveCrit));
+    }
+
+    // The fixed fixture above predates conditional ability affixes. Report a
+    // second comparison selected from the actual loot pipeline so new content
+    // can be measured, without replacing the existing parity assertion. Both
+    // lanes see the same seeds, candidates, rarity caps and condition state;
+    // only their tree and the score used to choose a piece differ.
+    for (const int32 ItemLevel : { AtCapItemLevel, EndgameItemLevel })
+    {
+        const TArray<FBreakerItemInstance> RolledWeapons = BreakerPowerBandRolledBestInSlot(
+            ItemLevel, RolledBestInSlotSeed, RolledBestInSlotCandidates);
+        const TArray<FBreakerItemInstance> RolledAbilities = BreakerPowerBandRolledBestInSlot(
+            ItemLevel, RolledBestInSlotSeed, RolledBestInSlotCandidates, true);
+        const FComposedBuild Weapon = Compose(RolledWeapons, OptimizedRanks(), State);
+        const FComposedBuild Ability = Compose(RolledAbilities, AbilityOptimizedRanks(), State);
+        TestTrue(TEXT("Rolled weapon comparison has positive power"), Weapon.Total > 0.0f);
+        TestTrue(TEXT("Rolled ability comparison has positive power"), Ability.AbilityTotal > 0.0f);
+        AddInfo(FString::Printf(TEXT("ABILITY LANE  ROLLED (ilvl %d, seed %d, %d candidates/slot/rarity) weapon x%.3f ability x%.3f parity %.3fx — measured, not pinned"),
+            ItemLevel, RolledBestInSlotSeed, RolledBestInSlotCandidates,
+            Weapon.Total, Ability.AbilityTotal, Ability.AbilityTotal / FMath::Max(Weapon.Total, UE_SMALL_NUMBER)));
+        AddInfo(FString::Printf(TEXT("ABILITY LANE  ROLLED decomposition: flat %.3fx x increased %.3fx x more %.3fx x crit %.3fx"),
+            Ability.AbilityFlatLayer / Weapon.FlatLayer, Ability.AbilityIncreasedLayer / Weapon.IncreasedLayer,
+            Ability.AbilityMoreLayer / Weapon.MoreLayer, Ability.EffectiveCrit / Weapon.EffectiveCrit));
     }
 
     // RESPONSE - the assertion the pools were built to make possible.

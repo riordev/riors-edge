@@ -107,7 +107,25 @@
     BREAKER_STRING(EnemySkirmisher, "enemy.skirmisher", "") \
     BREAKER_STRING(EnemyWarden, "enemy.warden", "") \
     BREAKER_STRING(EnemyFieldMarshal, "enemy.fieldMarshal", "") \
-    BREAKER_STRING(EnemyHoldfast, "enemy.holdfast", "")
+    BREAKER_STRING(EnemyHoldfast, "enemy.holdfast", "") \
+    BREAKER_STRING(SandboxCharacter, "sandbox.character", "") \
+    BREAKER_STRING(SandboxGear, "sandbox.gear", "") \
+    BREAKER_STRING(SandboxStats, "sandbox.stats", "") \
+    BREAKER_STRING(SandboxTitle, "sandbox.title", "") \
+    BREAKER_STRING(SandboxInventory, "sandbox.inventory", "") \
+    BREAKER_STRING(SandboxBack, "sandbox.back", "") \
+    BREAKER_STRING(SandboxInvalidSeed, "sandbox.invalidSeed", "") \
+    BREAKER_STRING(SandboxNotice, "sandbox.notice", "") \
+    BREAKER_STRING(SandboxSeedHint, "sandbox.seedHint", "") \
+    BREAKER_STRING(SandboxFresh, "sandbox.fresh", "") \
+    BREAKER_STRING(SandboxRepeat, "sandbox.repeat", "") \
+    BREAKER_STRING(SandboxWallet, "sandbox.wallet", "%d%d%d%d") \
+    BREAKER_STRING(SandboxFull, "sandbox.full", "") \
+    BREAKER_STRING(CycleBleed, "cycle.bleed", "") \
+    BREAKER_STRING(CyclePoison, "cycle.poison", "") \
+    BREAKER_STRING(CycleCurrent, "cycle.current", "%s") \
+    BREAKER_STRING(CyclePreview, "cycle.preview", "%s%s") \
+    BREAKER_STRING(SandboxRarityGates, "sandbox.rarityGates", "")
 
 // The enumerator is an index into the loaded table and nothing else: it is
 // never serialized, so the list may be reordered freely. The key string is

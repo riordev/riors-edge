@@ -44,6 +44,8 @@ class RIORSEDGE_API UBreakerStatusCycleComponent : public UActorComponent
 public:
     UBreakerStatusCycleComponent();
     virtual void BeginPlay() override;
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    bool CanPreviewAhead() const { return bPreviewAhead; }
 
     // Finds the component on an actor, adding it if absent. Same
     // zero-setup pattern as UBreakerAbilityStateComponent::FindOrAdd: an
@@ -81,12 +83,15 @@ public:
     // The shipping cycle. Bleed and Poison are what a Caster can actually apply
     // today (Cleave applies Bleed, Rot applies Poison); Void is added by Siphon
     // when it is built into the kit. Every magnitude is O2 PLACEHOLDER.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Combat|Cycle") TArray<FBreakerCycleEntry> AvailableStatuses;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, ReplicatedUsing=OnRep_Cycle, Category="Combat|Cycle") TArray<FBreakerCycleEntry> AvailableStatuses;
 
 private:
     void SeedDefaultCycle();
+    UFUNCTION() void OnRep_Cycle();
+    UFUNCTION() void SyncProgression();
 
-    int32 Cursor = 0;
-    bool bAdvanceOnHit = false;
+    UPROPERTY(ReplicatedUsing=OnRep_Cycle) int32 Cursor = 0;
+    UPROPERTY(Replicated) bool bAdvanceOnHit = false;
+    UPROPERTY(ReplicatedUsing=OnRep_Cycle) bool bPreviewAhead = false;
     bool bSeeded = false;
 };

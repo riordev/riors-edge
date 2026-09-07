@@ -116,7 +116,9 @@
 				"AnimationLockSeconds": 0.45,
 				"BleedDamagePerTick": 6,
 				"BleedDuration": 4,
-				"BleedTickInterval": 1
+				"BleedTickInterval": 1,
+				"FollowThroughRankOneKillRefund": 3,
+				"FollowThroughRankTwoKillRefund": 6
 			},
 			"variants": []
 		},
@@ -195,7 +197,9 @@
 			{
 				"DurationScalarWhenNotConsuming": 0.5,
 				"RefundManaPerStatus": 0,
-				"MaximumRangeCm": 4000
+				"MaximumRangeCm": 4000,
+				"PaymentRankOneManaPerStatus": 2,
+				"PaymentRankTwoManaPerStatus": 4
 			},
 			"variants": []
 		},

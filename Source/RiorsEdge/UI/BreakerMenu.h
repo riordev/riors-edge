@@ -835,6 +835,8 @@ private:
     // the same reason the create screen's name field does it: a rebuild would
     // destroy the text box mid-word and take focus with it. Empty means "roll
     // me a fresh seed".
+    int32 DevSandboxTab = 0;
+    bool bDevFreshRoll = true;
     FString DevSeedString;
     // Rarity and slot the next GRANT uses. Slot -1 means "draw the slot from
     // the seed through RollDropSlot", i.e. exactly what a real kill does.

@@ -54,6 +54,10 @@ void UBreakerAbility_Resonance::ActivateAbility(const FGameplayAbilitySpecHandle
 
     UBreakerStatusComponent* Status = Target ? Target->FindComponentByClass<UBreakerStatusComponent>() : nullptr;
     const int32 DistinctCount = Status ? Status->GetDistinctStatusTypeCount() : 0;
+    int32 RefundableCount = 0;
+    if (Status)
+        for (const FBreakerActiveStatus& Active : Status->GetActiveStatuses())
+            if (Active.ResourceProcCoefficient > 0.0f) ++RefundableCount;
 
     // Target acquisition and the status count both happen BEFORE the commit,
     // for the reason Closequarter states: charging 40 Mana for a cast that
@@ -135,13 +139,16 @@ void UBreakerAbility_Resonance::ActivateAbility(const FGameplayAbilitySpecHandle
         TargetCombat->ReceiveDamage(Damage);
     }
 
-    if (RefundManaPerStatus > 0.0f)
+    const int32 PaymentRank = Progression ? Progression->GetNodeRank(TEXT("Caster.Multispell.Payment"), EBreakerPointCurrency::DoctrinePoints) : 0;
+    const float RefundPerType = PaymentRank >= 2 ? PaymentRankTwoManaPerStatus
+        : PaymentRank == 1 ? PaymentRankOneManaPerStatus : RefundManaPerStatus;
+    if (RefundPerType > 0.0f)
     {
         if (UBreakerManaComponent* Mana = GetManaComponent())
         {
             // A payback, not generation: metered through the 20/s cap it would
             // read as broken, exactly as Closequarter's refund would.
-            Mana->GrantMana(UBreakerStatusConsumption::RefundForConsumed(DistinctCount, RefundManaPerStatus, Detonation.MaximumCountedStatuses), true);
+            Mana->GrantMana(UBreakerStatusConsumption::RefundForConsumed(RefundableCount, RefundPerType, Detonation.MaximumCountedStatuses), true);
         }
     }
 

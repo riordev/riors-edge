@@ -1,4 +1,5 @@
 #include "Characters/BreakerCharacter.h"
+#include "Combat/BreakerStatusCycleComponent.h"
 
 #include "AbilitySystemComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
@@ -109,6 +110,7 @@ ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer
     Charge = CreateDefaultSubobject<UBreakerChargeComponent>(TEXT("Charge"));
     Abilities = CreateDefaultSubobject<UBreakerAbilityComponent>(TEXT("Abilities"));
     Quests = CreateDefaultSubobject<UBreakerQuestJournal>(TEXT("QuestJournal"));
+    CreateDefaultSubobject<UBreakerStatusCycleComponent>(TEXT("StatusCycle"));
 
     // --- The first-person blockout --------------------------------------
     // Composed engine primitives plus dynamic material instances, exactly the

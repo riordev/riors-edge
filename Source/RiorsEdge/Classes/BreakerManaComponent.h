@@ -8,6 +8,16 @@
 
 class UBreakerAttributeSet;
 class UBreakerProgressionComponent;
+class FJsonObject;
+
+struct FBreakerCasterResourceTuning
+{
+    float StatusApplicationMana = 2.0f; // O2 PLACEHOLDER
+    float SeepRankOneMultiplier = 1.5f; // O2 PLACEHOLDER
+    float SeepRankTwoMultiplier = 2.0f; // O2 PLACEHOLDER
+    float AttritionRankOneRefund = 4.0f; // O2 PLACEHOLDER
+    float AttritionRankTwoRefund = 8.0f; // O2 PLACEHOLDER
+};
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerOvercastChanged, bool, bOvercast);
 
@@ -53,6 +63,10 @@ class RIORSEDGE_API UBreakerManaComponent : public UActorComponent
     GENERATED_BODY()
 
 public:
+    static const FBreakerCasterResourceTuning& GetResourceTuning();
+    static bool ParseResourceTuning(const FJsonObject& Object, FBreakerCasterResourceTuning& Out, FString& Error);
+    void NotifyStatusApplication(const FBreakerStatusApplicationSpec& Spec, bool bAlreadyPresent);
+    void NotifyAfflictedVictimDeath();
     UBreakerManaComponent();
     virtual void BeginPlay() override;
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
@@ -182,6 +196,7 @@ public:
     UFUNCTION() void HandleProgressionChanged();
 
 private:
+    UFUNCTION() void HandleCasterKill(const FBreakerHitContext& Hit);
     UFUNCTION() void HandleShot(const FBreakerShotResult& Shot);
     UFUNCTION() void HandleMeleeHit(const FBreakerHitContext& Hit);
     UFUNCTION() void HandleVitalsRestored();

@@ -11,7 +11,7 @@ Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 - [ ] Continue menu simplification and complete map-travel validation.
 
 ## Playtest queue (owner, 2026-09-07)
-Continue through this queue in tested batches without stopping after each commit for a playtest (owner instruction, 2026-09-07).
+Continue through the entire repair list in tested batches without stopping after each commit for a playtest. After repairs, execute the content phase below (owner instruction, 2026-09-07).
 - (ui, npcs, systems) Reduce menu density and clipping; repair NPC interaction flow, ability assignment and point spending; present Core as the authored tree rather than a node cloud; update the dev sandbox. Finish silent nodes and Caster progression.
 - (maps, story, endgame loop) Finish Fernhall → Rift → reward → return, expand Fernhall into meaningful combat areas, make Anchor a hub, and author one memorable mission. Validate the complete Rift loop before expanding multiplayer/MMO scope.
 - (abilities, build diversity) Improve ability builds versus weapons; investigate intermittent Rot damage, ticks and numbers and Caster Cleave range. Provide an easy ability/ultimate/base-stat tuning surface.
@@ -19,6 +19,13 @@ Continue through this queue in tested batches without stopping after each commit
 - (loot & economy) Fix gear behavior and show base weapon damage. Evaluate Standard 3–4, Uncommon 4–5, Exceptional 4–6 affixes with existing tier caps. Aberrants should have quirky unique rules; Unwrittens should have strong build-defining exotic perks; the no-More restriction does not apply to these two categories. A well-rolled and treated Exceptional should outperform them on some axes.
 - (visuals, sound, enemies) Improve arms and weapon models, integrate weakpoints, add subtle enemy names, and make one weapon/ability/enemy/boss visually polished. Add audible combat feedback. Replace colored ability borders with placeholder icons, radial cooldown recovery and numeric timers; hide irrelevant Riftglass. Smooth the death screen and mouse handoff.
 
+## Content phase after the repair list (owner, 2026-09-07)
+- [ ] Author more distinct Fernhall spaces and improve layout/content density.
+- [ ] Shape Rift runs minute by minute with finished encounters and deliberate enemy combinations.
+- [ ] Strengthen distinct class/build identities and author standout build-defining loot.
+- [ ] Unify asset packs through a coherent visual/audio identity and polished effects for existing combat.
+- [ ] Add mission/quest beats and one or two signature bosses or activities that define the game.
+Prioritize content and encounter composition over additional enemy framework.
 ## Direction (owner, 2026-09-06)
 Push hard on today's build; the owner is out and reads the report. Cycles run in parallel on disjoint files, one build, one suite, one commit per cycle. The affix system is updated as Cycle 13 lands. A story-mission schema is drafted now so the campaign can be fleshed out. The owner's frame to check every system against: characters pick a doctrine (sub-class) a couple of levels in and unlock doctrine points through the main story quest; a Core tree every class shares scales on its own; the doctrine tree is class-specific. A current inventory of abilities, ultimates, doctrines, affixes and their scaling is owed, with each marked live, stub or unreachable.
 
@@ -94,6 +101,14 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 
 ## Done (last three cycles; older is git)
 
+### Caster resource nodes, sandbox and real Rift travel — 594 / 5 / 0
+- [x] Purchased Seep, FollowThrough, Attrition and Payment now pay through actual status, melee, death and detonation events. New editable resource tuning documents O2 placeholders; lethal final DoT ticks pay once. Campaign still grants only two doctrine points; deeper runtime fixtures do not claim shipped reachability.
+- [x] Cycle rank two displays the next status with owner-only replicated state and immediate purchase/respec updates. Sandbox has Character/Gear/Stats tabs, strict repeat seeds and explicit full-backpack refusal. Five UI captures inspected.
+- [x] Added reachable ability debt/ledge affixes without weapon leakage. Honest rolled ability/weapon multiplier parity remains 0.550 at level 50 and 0.365 at level 120; balance work remains open.
+- [x] Isolated real Anchor → Fernhall → authored Rift → Fernhall → Anchor probe passed: 24 kills, exact completion purse, final 2015 XP / 211 Riftglass retained. Accelerated kills validate integration, not combat feel.
+- [x] Final build and all 599 tests complete: 594 passed / 5 existing expected / 0 unexpected. Canonical C++ census and PowerShell reconciliation; STATE unchanged. No test pins widened.
+
+
 ### Fernhall combat pockets, enemy names and DoT scaling — 588 / 5 / 0
 - [x] Ordinary Fernhall now spawns 11 finite enemies across three supported combat pockets, including an elite, Lattice, Warden and Skirmisher. Existing kill quests and XP receive real combat credit; repeated startup does not duplicate spawns. Rift wave behavior remains separate.
 - [x] Flat damage now multiplies the combined delivery/DoT Increased bucket. Tests cover both delivery lanes, frozen snapshots, removal and uncaptured baseline fallback without changing the More ceiling.
@@ -106,12 +121,5 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - [x] Successful Caster melee grants existing1.5Mana hit rate; ContactCharge replaces with existing4weak-point rate through6/s cap. Actual damage/node purchase tests cover cap/remainder, dodge, DoT, zero, suspension, kill/corpse, nonCaster and no weapon double credit. Other status/kill refunds still lack shipped numeric amounts.
 - [x] Inventory buttons remove default padding and fill their measured content width. Final GEARDAMAGE capture shows full affix names, rarity/slot text and damage values. Empty rarity copy now describes build choice rather than worst-to-best.
 - [x] Final build and all592tests complete:587passed/5existing expected/0unexpected. Fixed fixture lifecycle/old-projectile selection before accepting suite. PowerShell audit under Python quarantine; STATE unchanged, no widened pins.
-
-
-### Ordinary gear depth and weapon base damage — 585 / 5 / 0
-- [x] New Standard rolls3–4, Uncommon4–5, Exceptional4–6 affixes; tiercaps4/2/-1 unchanged. 4608seeded rolls cover all8slots, three rarities, level bands, distinct/allowed affixes and category caps. Existing saved items are not rerolled.
-- [x] Weapon cards show shared runtime base damage and pellet count; candidates use their own archetype/ilvl. Preview/equip equivalence tested across8archetypes and3levels, custom held overrides, invalid inputs and no state mutation.
-- [x] Equipped titles use full remaining width and grow vertically. Equipped ISSUE RIFLE24.0 and backpack Rifle56.8/Shotgun23.7x8 captures inspected. Some existing affix/rarity sublines still clip; queue remains open, no claim all inventory text fixed.
-- [x] Final build clean; all590tests complete585passed/5existing expected/0unexpected. String validation passed. PowerShell reconciliation under Python quarantine; STATE unchanged.
 
 

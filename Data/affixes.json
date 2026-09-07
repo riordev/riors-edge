@@ -845,6 +845,46 @@
 			"pairedAffixId": ""
 		},
 		{
+			"id": "Ability.DepletedDamage",
+			"pool": "slice",
+			"displayName": "Ability Damage in Debt",
+			"category": "Prefix",
+			"target": "AbilityDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Gloves",
+				"Waist",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 6,
+			"valueAtT1": 48,
+			"rollWeight": 40,
+			"condition": "ResourceDepleted",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Ability.LedgeDamage",
+			"pool": "slice",
+			"displayName": "Ability Dmg after a Ledge",
+			"category": "Suffix",
+			"target": "AbilityDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Boots",
+				"Gloves",
+				"Waist",
+				"Secondary"
+			],
+			"valueAtT12": 5,
+			"valueAtT1": 48,
+			"rollWeight": 45,
+			"condition": "RecentlyLedgeTraversed",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
 			"id": "Offense.DepletedDamage",
 			"pool": "slice",
 			"displayName": "Damage while Depleted",

@@ -395,6 +395,7 @@ void UBreakerCombatComponent::DispatchHitDealt(const FBreakerDamageRequest& Requ
     Context.Result = Result;
     Context.bFromDoT = Request.bIsDamageOverTime;
     Context.SourceTags = Request.SourceTags;
+    Context.ProcCoefficient = Request.ProcCoefficient;
     Context.bWeakPoint = Result.bWeakPoint;
     Context.DamageFamily = Request.DamageFamily;
     Context.Delivery = Request.Delivery;
