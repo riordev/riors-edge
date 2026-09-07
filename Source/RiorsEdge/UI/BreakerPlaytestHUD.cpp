@@ -321,20 +321,8 @@ void ABreakerPlaytestHUD::DrawHUD()
     bMenuWasOpen = bMenuOpen;
     if (bMenuOpen) return;
 
-    // --- ANCHOR TRIM, AMENDED BY RULING -----------------------------------
-    // The original trim reasoned: the Anchor is a social space, weapons are
-    // holstered for the pawn's whole life and there is nothing to shoot, so
-    // combat chrome is a lie about what the place is for — and it dropped
-    // EVERYTHING but the minimap, quest tracker, XP rail, talk prompt and
-    // instrumentation. That was a reasonable call and it failed its first
-    // playtest: a hub where you lose both your interface and your hands
-    // reads as a loading screen you can walk around.
-    //
-    // RULED (owner, after that playtest): keep the weapon holstered but
-    // visible on the body, and keep HEALTH, RESOURCE and CURRENCY on
-    // screen. The social read survives — ammo, crosshair, wave banner,
-    // damage numbers and enemy bars stay deliberately absent — but the
-    // sense of being in your own character comes back.
+    // The hub keeps vitals, quest guidance and interaction prompts visible.
+    // Ammo and combat markers stay hidden; wallet balances live at vendors.
     if (UBreakerGameInstance::IsAnchorMap(this))
     {
         // No enemy pass runs here, so the blip array is cleared by hand
@@ -343,13 +331,7 @@ void ABreakerPlaytestHUD::DrawHUD()
         // What the player IS — health, resource — at the same corner as the
         // field, so the body does not move between the plaza and the fight.
         DrawVitals(Character);
-        // The currency, above the vitals: the Anchor is where Riftglass is
-        // SPENT, which is exactly why it reads here and not in a wave.
-        if (const UBreakerEquipmentComponent* AnchorEquipment = Character->GetEquipment())
-        {
-            DrawSpecText(BreakerStrings::Format(EBreakerStringKey::HudWalletRiftglass, AnchorEquipment->GetForgeWallet().Riftglass),
-                S(BreakerUI::HudVitalsLeft), S(BreakerUI::HudVitalsTop) - S(20.0f), BreakerUI::Gold, 12.0f);
-        }
+        // Wallet balances belong at the vendor, not permanently over gameplay.
         DrawQuestLine(Character);
         DrawBanners(Center);
         // Who can be talked to and where the way out is, readable from

@@ -93,7 +93,10 @@
     BREAKER_STRING(EquipmentRequirementCard, "equipment.requirementCard", "%d%d") \
     BREAKER_STRING(EquipmentMissingLevelCard, "equipment.missingLevelCard", "") \
     BREAKER_STRING(AbilitiesSwap, "abilities.swap", "") \
-    BREAKER_STRING(AbilitiesMove, "abilities.move", "")
+    BREAKER_STRING(AbilitiesMove, "abilities.move", "") \
+    BREAKER_STRING(SettingsAudioDescription, "settings.audio.description", "") \
+    BREAKER_STRING(SettingsAudioTest, "settings.audio.test", "") \
+    BREAKER_STRING(SettingsAudioMusicUnavailable, "settings.audio.musicUnavailable", "")
 
 // The enumerator is an index into the loaded table and nothing else: it is
 // never serialized, so the list may be reordered freely. The key string is

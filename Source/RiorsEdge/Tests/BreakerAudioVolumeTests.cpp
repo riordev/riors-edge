@@ -1,0 +1,45 @@
+#include "Misc/AutomationTest.h"
+#include "Audio/BreakerSoundDirector.h"
+#include "Audio/BreakerSoundMath.h"
+#include "Components/AudioComponent.h"
+#include "Settings/BreakerGameSettings.h"
+#include "Engine/World.h"
+#include "Misc/ScopeExit.h"
+
+#if WITH_DEV_AUTOMATION_TESTS
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerAudioVolumeRoutingTest,
+    "RiorsEdge.Audio.VolumeRouting", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerAudioVolumeRoutingTest::RunTest(const FString& Parameters)
+{
+    TestEqual(TEXT("Master and effects compose"), BreakerSound::EffectsGain(0.5f, 0.4f), 0.2f);
+    TestEqual(TEXT("Master mutes"), BreakerSound::EffectsGain(0, 1), 0.0f);
+    TestEqual(TEXT("Effects mutes"), BreakerSound::EffectsGain(1, 0), 0.0f);
+    TestEqual(TEXT("Gain clamps at full volume"), BreakerSound::EffectsGain(2, 3), 1.0f);
+
+    UWorld::InitializationValues Initialization;
+    Initialization.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true,
+        ERHIFeatureLevel::Num, &Initialization);
+    if (!TestNotNull(TEXT("Volume fixture world"), World)) return false;
+    ON_SCOPE_EXIT { World->DestroyWorld(false); };
+    ABreakerSoundDirector* Director = World->SpawnActor<ABreakerSoundDirector>();
+    if (!TestNotNull(TEXT("Sound director"), Director)) return false;
+    TArray<UAudioComponent*> Voices;
+    Director->GetComponents(Voices);
+    if (!TestEqual(TEXT("All six player cues have voices"), Voices.Num(), 6)) return false;
+    UBreakerGameSettings* Settings = NewObject<UBreakerGameSettings>();
+    Settings->MasterVolume = 0.5f;
+    Settings->EffectsVolume = 0.4f;
+    Settings->ApplyAudioSettings();
+    for (const UAudioComponent* Voice : Voices)
+        TestEqual(TEXT("Every real voice receives combined gain"), Voice->VolumeMultiplier, 0.2f);
+    Director->ApplyVolumeSettings(0, 1);
+    for (const UAudioComponent* Voice : Voices)
+        TestEqual(TEXT("Every real voice mutes"), Voice->VolumeMultiplier, 0.0f);
+    Director->ApplyVolumeSettings(1, 1);
+    for (const UAudioComponent* Voice : Voices)
+        TestEqual(TEXT("Every real voice unmutes"), Voice->VolumeMultiplier, 1.0f);
+    return true;
+}
+#endif

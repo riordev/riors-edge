@@ -6,6 +6,9 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Sound/SoundWaveProcedural.h"
+#include "Settings/BreakerGameSettings.h"
+#include "EngineUtils.h"
+#include "Engine/World.h"
 
 ABreakerSoundDirector::ABreakerSoundDirector()
 {
@@ -77,6 +80,9 @@ int32 ABreakerSoundDirector::LoadOrSynth(const TCHAR* FileName, void (*Synth)(TA
 void ABreakerSoundDirector::BeginPlay()
 {
     Super::BeginPlay();
+    UBreakerGameSettings* Settings = NewObject<UBreakerGameSettings>(this);
+    Settings->LoadOrDefaults();
+    ApplyVolumeSettings(Settings->MasterVolume, Settings->EffectsVolume);
 
     const int32 FireRate = LoadOrSynth(TEXT("weapon_fire.wav"), &BreakerSound::RenderWeaponFire, FirePcm);
     const int32 HitRate = LoadOrSynth(TEXT("hit_confirm.wav"), &BreakerSound::RenderHitConfirm, HitPcm);
@@ -105,6 +111,35 @@ void ABreakerSoundDirector::BeginPlay()
     AbilityVoice->SetSound(AbilityDefaultWave);
     PlayerDeathWave = MakeWave(PlayerDeathRate);
     PlayerDeathVoice->SetSound(PlayerDeathWave);
+}
+
+void ABreakerSoundDirector::ApplyVolumeSettings(float Master, float Effects)
+{
+    const float Gain = BreakerSound::EffectsGain(Master, Effects);
+    for (UAudioComponent* Voice : { FireVoice.Get(), HitVoice.Get(), KillVoice.Get(),
+        TakeHitVoice.Get(), AbilityVoice.Get(), PlayerDeathVoice.Get() })
+    {
+        if (Voice) Voice->SetVolumeMultiplier(Gain);
+    }
+}
+
+void ABreakerSoundDirector::PlaySettingsTest(UWorld* World)
+{
+    if (!World) return;
+    ABreakerSoundDirector* Director = nullptr;
+    for (TActorIterator<ABreakerSoundDirector> It(World); It; ++It)
+    {
+        Director = *It;
+        break;
+    }
+    if (!Director)
+    {
+        FActorSpawnParameters Params;
+        Params.ObjectFlags |= RF_Transient;
+        Director = World->SpawnActor<ABreakerSoundDirector>(ABreakerSoundDirector::StaticClass(), FTransform::Identity, Params);
+        if (Director) Director->SetLifeSpan(2.0f); // O2 PLACEHOLDER: preview cleanup after its short cue.
+    }
+    if (Director) Director->PlayHitConfirm();
 }
 
 void ABreakerSoundDirector::Trigger(UAudioComponent* Voice, USoundWaveProcedural* Wave, const TArray<int16>& Pcm)

@@ -72,6 +72,9 @@
 		"equipment.requirementCard": "REQUIRES LEVEL %d / YOU ARE %d",
 		"equipment.missingLevelCard": "CHARACTER LEVEL UNAVAILABLE",
 		"abilities.swap": "SWAP SLOTS",
-		"abilities.move": "MOVE TO THIS SLOT"
+		"abilities.move": "MOVE TO THIS SLOT",
+		"settings.audio.description": "Master and effects control combat sounds. Music is not available yet.",
+		"settings.audio.test": "TEST SOUND",
+		"settings.audio.musicUnavailable": "Music is not available yet."
 	}
 }

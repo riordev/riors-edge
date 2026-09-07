@@ -1,4 +1,5 @@
 #include "UI/BreakerMenu.h"
+#include "Audio/BreakerSoundDirector.h"
 #include "Data/BreakerStrings.h"
 
 #include "Save/BreakerCharacterRoster.h"
@@ -13,6 +14,7 @@
 #include "Items/BreakerAffixLibrary.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Items/BreakerItemRequirements.h"
+#include "Movement/BreakerCharacterMovementComponent.h"
 #include "Items/BreakerForgeLibrary.h"
 // The legendary registry: the only items in the game that carry a display
 // name, which is what a card's line one wants.
@@ -3579,19 +3581,14 @@ TSharedRef<SWidget> SBreakerMenu::BuildSettingsAudioSection()
 {
     UBreakerGameSettings* Model = GameSettings.Get();
     TSharedRef<SVerticalBox> Section = SNew(SVerticalBox);
-    // The subtitle is the same honesty the model's own header carries: all
-    // three values persist and route nowhere yet. A player who drags these
-    // and hears no change should be told why on the screen, not left to
-    // conclude the sliders are broken. The sidebar's STUB mark on this pane
-    // states the same fact and both leave together, when the routing lands.
     Section->AddSlot().AutoHeight()
     [
-        BreakerSettingsPaneHeader(TEXT("AUDIO"), TEXT("Three volumes. Saved; not yet routed to the sound path."))
+        BreakerSettingsPaneHeader(TEXT("AUDIO"), BreakerStrings::Get(EBreakerStringKey::SettingsAudioDescription))
     ];
     if (!Model) return Section;
 
-    // All three are the same control over a different float, so they are built
-    // by one lambda rather than copied three times. The member pointer is what
+    // Both volumes use the same control over a different float, so they are built
+    // by one lambda. The member pointer is what
     // keeps it one function: each slider needs to write a DIFFERENT field of
     // the same live object, looked up fresh inside the handler (the model is
     // reloaded on screen entry, so capturing the object here would be a stale
@@ -3619,6 +3616,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSettingsAudioSection()
                         UBreakerGameSettings* Live = GameSettings.Get();
                         if (!Live) return;
                         Live->*Field = UBreakerGameSettingsLibrary::ClampVolume(Value);
+                        Live->ApplyAudioSettings();
                         if (Readout.IsValid())
                         {
                             Readout->SetText(FText::FromString(FString::Printf(TEXT("%.0f%%"), Live->*Field * 100.0f)));
@@ -3639,7 +3637,26 @@ TSharedRef<SWidget> SBreakerMenu::BuildSettingsAudioSection()
     };
     AddVolumeRow(TEXT("Master volume"), &UBreakerGameSettings::MasterVolume, Model->MasterVolume);
     AddVolumeRow(TEXT("Effects volume"), &UBreakerGameSettings::EffectsVolume, Model->EffectsVolume);
-    AddVolumeRow(TEXT("Music volume"), &UBreakerGameSettings::MusicVolume, Model->MusicVolume);
+    Section->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16)
+    [
+        MenuWrappedText(FText::FromString(BreakerStrings::Get(EBreakerStringKey::SettingsAudioMusicUnavailable)),
+            BreakerUI::TypeBody, Muted, 520.0f)
+    ];
+    Section->AddSlot().AutoHeight()
+    [
+        MakeButton(FText::FromString(BreakerStrings::Get(EBreakerStringKey::SettingsAudioTest)), FOnClicked::CreateLambda([this]()
+        {
+            if (UBreakerGameSettings* Live = GameSettings.Get())
+            {
+                Live->Save();
+                Live->ApplyAudioSettings();
+            }
+            UWorld* World = Character.IsValid() ? Character->GetWorld()
+                : (GEngine && GEngine->GameViewport ? GEngine->GameViewport->GetWorld() : nullptr);
+            ABreakerSoundDirector::PlaySettingsTest(World);
+            return FReply::Handled();
+        }))
+    ];
     return Section;
 }
 
@@ -3953,9 +3970,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildSettingsScreen()
     Nav->AddSlot().AutoHeight()[MakeNavGroup(TEXT("PRESENT"))];
     Nav->AddSlot().AutoHeight()[MakeNavRow(TEXT("VIDEO"), 2, true, false)];
     Nav->AddSlot().AutoHeight()[MakeNavRow(TEXT("ACCESSIBILITY"), 4, true, false)];
-    // AUDIO opens and its sliders save; the STUB mark stays until the values
-    // route to a sound path (see BuildSettingsAudioSection).
-    Nav->AddSlot().AutoHeight()[MakeNavRow(TEXT("AUDIO"), 3, true, true)];
+    // Master and effects route live to the combat voices.
+    Nav->AddSlot().AutoHeight()[MakeNavRow(TEXT("AUDIO"), 3, true, false)];
     Nav->AddSlot().FillHeight(1.0f)[SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))];
     // The sidebar's standing fact, from the plate: this screen is the same
     // screen whichever door it was entered through — Main's SETTINGS button
@@ -4734,7 +4750,10 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
             AddTotalRow(TEXT("MOVE SPEED"), FString::Printf(TEXT("x%.2f"), Stats.MoveSpeedMultiplier), Cyan);
             AddTotalRow(TEXT("SLIDE SPEED"), FString::Printf(TEXT("x%.2f"), Stats.SlideSpeedMultiplier), Cyan);
             AddTotalRow(TEXT("AIR CONTROL"), FString::Printf(TEXT("x%.2f"), Stats.AirControlMultiplier), Cyan);
-            AddTotalRow(TEXT("DASH COOLDOWN"), FString::Printf(TEXT("x%.2f"), Stats.DashCooldownMultiplier), Cyan);
+            if (Character->GetBreakerMovement() && Character->GetBreakerMovement()->CanUseDash())
+            {
+                AddTotalRow(TEXT("DASH COOLDOWN"), FString::Printf(TEXT("x%.2f"), Stats.DashCooldownMultiplier), Cyan);
+            }
             // Read the composed attribute, not the gear-only figure. Gear,
             // skill nodes and the point-spend baseline all land in one additive
             // Increased bucket on DamageMultiplier now, and this row printing

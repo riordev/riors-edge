@@ -1152,11 +1152,6 @@ void ABreakerCharacter::UpdateViewmodelKick()
             ? Move->GetLedgeTraversalStrideSpeed()
             : (Move ? FMath::Min(static_cast<float>(Move->Velocity.Size2D()), Move->GetSprintSpeedCap()) : 0.0f);
         const float Delta = MotionWorld->GetDeltaSeconds();
-        if (bStriding)
-        {
-            ViewmodelBobPhase = FBreakerWeaponFeel::AdvanceBobPhase(
-                ViewmodelBobPhase, StrideSpeed, Delta, ViewmodelMotion.StrideLengthCm);
-        }
         const float SpeedFractionTarget = (bStriding && ViewmodelMotion.FullBobSpeed > 0.0f)
             ? FMath::Clamp(StrideSpeed / ViewmodelMotion.FullBobSpeed, 0.0f, 1.0f) : 0.0f;
         // THE SPRINT GAIT (KIT-4): read off actual ground speed between the
@@ -1173,6 +1168,12 @@ void ABreakerCharacter::UpdateViewmodelKick()
             ViewmodelSpeedFraction, SpeedFractionTarget, Delta, ViewmodelMotion.GaitEaseSeconds);
         ViewmodelSprintFraction = FBreakerWeaponFeel::EaseFraction(
             ViewmodelSprintFraction, SprintFractionTarget, Delta, ViewmodelMotion.GaitEaseSeconds);
+        if (bStriding)
+        {
+            ViewmodelBobPhase = FBreakerWeaponFeel::AdvanceBobPhase(
+                ViewmodelBobPhase, StrideSpeed, Delta,
+                FBreakerWeaponFeel::GaitStrideLength(ViewmodelMotion, ViewmodelSprintFraction));
+        }
         // ADS quiets motion exactly as it quiets the kick: through the
         // profile's aim-blended viewmodel multiplier.
         float MotionScale = 1.0f;
@@ -1848,6 +1849,14 @@ void ABreakerCharacter::HandleClassResourceMagazineEmptied(bool bStartedFull)
     if (Scrap) Scrap->NotifyMagazineEmptied(bStartedFull);
 }
 
+float ABreakerCharacter::GetSecondsSinceCombat() const
+{
+    const UWorld* World = GetWorld();
+    if (!World || !Combat) return 0.0f;
+    return BreakerHealthRegen::CombatAge(Combat->GetSecondsSinceDamage(),
+        static_cast<float>(World->GetTimeSeconds() - LastHitDealtTime));
+}
+
 void ABreakerCharacter::UpdateClassResourceStates()
 {
     // Only the two loops with discrete state inputs pay for the derivation,
@@ -1858,12 +1867,7 @@ void ABreakerCharacter::UpdateClassResourceStates()
     UWorld* World = GetWorld();
     if (!World) return;
 
-    // "In combat": took or dealt damage inside the window. The dumbest true
-    // derivation (O2 PLACEHOLDER) — the project has no shared combat-state
-    // concept for it to read instead.
-    const double Now = World->GetTimeSeconds();
-    const bool bInCombat = (Combat && Combat->GetSecondsSinceDamage() < CombatStateWindowSeconds)
-        || (Now - LastHitDealtTime < CombatStateWindowSeconds);
+    const bool bInCombat = GetSecondsSinceCombat() < CombatStateWindowSeconds;
     if (bGritLive) Grit->SetInCombat(bInCombat);
     if (bChargeLive) Charge->SetInCombat(bInCombat);
 

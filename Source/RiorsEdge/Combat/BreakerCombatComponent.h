@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Combat/BreakerCombatTypes.h"
+#include "Combat/BreakerHealthRegenMath.h"
 #include "BreakerCombatComponent.generated.h"
 
 class UBreakerAttributeSet;
@@ -54,6 +55,10 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat") void RestoreVitals();
     UFUNCTION(BlueprintPure, Category="Combat") bool IsDead() const;
     UFUNCTION(BlueprintPure, Category="Combat") float GetSecondsSinceDamage() const;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Combat|Recovery", meta=(ClampMin="0"))
+    float BaseHealthRegenPerSecond = BreakerHealthRegen::RatePerSecond;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Combat|Recovery", meta=(ClampMin="0"))
+    float BaseHealthRegenDelaySeconds = BreakerHealthRegen::DelaySeconds;
 
     // Whether the PREVIOUS non-dodged hit on this owner removed a health band
     // (Attributes/BreakerHealthBands.h). Written at the foot of ReceiveDamage,

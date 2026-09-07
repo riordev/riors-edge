@@ -69,7 +69,7 @@ public:
     static FName SwingWindowKey();
 
     // Class-Kits §2.2 C1: 3 m.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float RangeCm = 300.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float RangeCm = 450.0f; // O2 PLACEHOLDER
     // O2 PLACEHOLDER: no design doc gives the base arc. SB8 Edge widens it to
     // 180, so the base must be narrower than that; 120 is a shape, not balance.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0", ClampMax="360")) float ArcDegrees = 120.0f;

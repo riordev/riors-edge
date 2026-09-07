@@ -359,17 +359,15 @@ public:
     void Save() const;
 
     // The only function that touches engine state: pushes window mode,
-    // vsync and the frame cap through UGameUserSettings, and master volume
-    // through the main audio device's transient master volume. Deliberately
+    // vsync and the frame cap through UGameUserSettings, and master/effects
+    // volume through the sound director's voices. Deliberately
     // isolated so LoadOrDefaults, Save and every clamp/keybind function
     // above stay testable with no engine subsystems spun up.
     //
-    // NOT covered by RiorsEdge.Settings.* — see Tests/BreakerGameSettingsTests
-    // .cpp's header comment. Effects/Music volumes are stored and clamped
-    // but NOT applied here: routing them requires SoundClass/SoundMix
-    // content assets this project does not yet have, which is content
-    // authoring outside this model-and-persistence pass.
+    // Music volume remains stored only until there is a music playback path.
     void ApplyToEngine() const;
+    // Applies master/effects to the game's procedural voices. No music plays yet.
+    void ApplyAudioSettings() const;
 
     // Sets (or replaces) the override for one action. Does not itself reject
     // conflicts — UBreakerGameSettingsLibrary::FindKeybindConflict is

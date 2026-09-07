@@ -79,6 +79,8 @@ public:
 
     UFUNCTION(BlueprintCallable, Category="Movement") void SetSprinting(bool bEnabled);
     UFUNCTION(BlueprintCallable, Category="Movement") void SetSlideRequested(bool bEnabled);
+    // Innate class entitlement; cooldown, direction and movement state are separate gates.
+    UFUNCTION(BlueprintPure, Category="Movement") bool CanUseDash() const;
     UFUNCTION(BlueprintCallable, Category="Movement") bool TryDash(const FVector& RequestedDirection);
     // Ability-Implementation-Spec §4.3: rotates existing horizontal velocity onto
     // Direction with NO magnitude gain. Skim's verb. It owns no cooldown of its

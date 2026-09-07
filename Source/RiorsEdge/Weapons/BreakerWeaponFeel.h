@@ -263,6 +263,7 @@ struct FBreakerViewmodelMotionParams
     float BobLateralCm = 0.55f;           // O2 PLACEHOLDER
     float BobPitchDegrees = 0.25f;        // O2 PLACEHOLDER
     float StrideLengthCm = 360.0f;        // O2 PLACEHOLDER
+    float SprintStrideLengthCm = 720.0f; // O2 PLACEHOLDER: longer stride slows sprint bob.
     // Ground speed at which the bob reaches full amplitude; below it the bob
     // scales linearly, so a creep barely breathes and a sprint works.
     float FullBobSpeed = 510.0f;          // O2 PLACEHOLDER, under the O192 walk speed
@@ -272,9 +273,8 @@ struct FBreakerViewmodelMotionParams
     // the same amplitude at a faster phase — the two gaits read identically
     // in the hands. The sprint fraction (0 at the walk cap, 1 at the sprint
     // cap, driven by ACTUAL ground speed, never the toggle) scales the bob
-    // and settles the gun lower, back and muzzle-down. Firing is not blocked
-    // while sprinting, so the pose stays small: SUBTLE is the ruled
-    // constraint, and the sights must still be reachable from here.
+    // and settles the gun lower, back and muzzle-down. The longer sprint
+    // stride slows the cadence; the pose remains subtle.
     float SprintBobMultiplier = 1.3f;     // O2 PLACEHOLDER, > 1.0 so a sprint bobs harder than a walk
     float SprintLowerCm = 1.5f;           // O2 PLACEHOLDER
     float SprintBackCm = 1.0f;            // O2 PLACEHOLDER
@@ -407,6 +407,7 @@ public:
      * player decelerates mid-cycle.
      */
     static float AdvanceBobPhase(float PhaseRadians, float GroundSpeed, float DeltaSeconds, float StrideLengthCm);
+    static float GaitStrideLength(const FBreakerViewmodelMotionParams& Params, float SprintFraction);
 
     /**
      * The frame's sway + bob offset. TimeSeconds drives the idle sway (slow,

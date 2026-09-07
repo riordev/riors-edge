@@ -2,7 +2,8 @@
 
 #include "Engine/Engine.h"
 #include "GameFramework/GameUserSettings.h"
-#include "AudioDevice.h"
+#include "Audio/BreakerSoundDirector.h"
+#include "UObject/UObjectIterator.h"
 #include "Input/BreakerInputConfig.h"
 #include "InputAction.h"
 #include "InputMappingContext.h"
@@ -569,31 +570,19 @@ void UBreakerGameSettings::ApplyToEngine() const
         EngineSettings->SaveSettings();
     }
 
-    // Master volume only: the engine has a direct, content-free path for
-    // this (the main audio device's transient master volume). Effects/Music
-    // do not — routing them needs SoundClass/SoundMix content assets this
-    // project does not yet have, so those two fields are stored and clamped
-    // but not pushed anywhere yet. See the header comment on ApplyToEngine.
-    // AUDIO IS STORED AND CLAMPED, AND ROUTED NOWHERE. Recorded as a gap
-    // rather than faked: FAudioDevice::SetTransientMasterVolume lives in a
-    // module this target does not link, and adding an audio module dependency
-    // to move one float would be the wrong trade while the project has no
-    // SoundClass/SoundMix assets for Effects and Music to route through
-    // either — two of the three sliders would still do nothing.
-    //
-    // This matters more than it looks: the project has NO AUDIO AT ALL yet
-    // (CONTEXT's asset list calls it the largest single gap between what is
-    // built and what is felt), so a volume slider has nothing to make quieter.
-    // All three values persist correctly and take effect the day sound exists
-    // and this function learns to route them.
-    if (GEngine && !FMath::IsNearlyEqual(MasterVolume, 1.0f))
-    {
-        UE_LOG(LogTemp, Verbose,
-            TEXT("BreakerGameSettings: master volume %.2f is stored but not routed — no audio pipeline exists yet."),
-            MasterVolume);
-    }
+    ApplyAudioSettings();
 }
 
+void UBreakerGameSettings::ApplyAudioSettings() const
+{
+    for (TObjectIterator<ABreakerSoundDirector> It; It; ++It)
+    {
+        if (!It->IsTemplate() && IsValid(*It) && It->GetWorld())
+        {
+            It->ApplyVolumeSettings(MasterVolume, EffectsVolume);
+        }
+    }
+}
 FOnBreakerKeybindOverridesChanged& UBreakerGameSettings::OnKeybindOverridesChanged()
 {
     static FOnBreakerKeybindOverridesChanged Delegate;

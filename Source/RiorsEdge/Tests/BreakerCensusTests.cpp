@@ -449,11 +449,8 @@ bool FBreakerAbilitiesFreshTest::RunTest(const FString& Parameters)
 // base's PlacementRangeCm is carried once by each of its four subclasses),
 // and a missing key answers with the caller's default.
 //
-// The file is the compiled table today, so every authored value equals the
-// initialiser the compiler put on the class default object. That assertion
-// is deleted in the first change that tunes a number in the file alone: from
-// then on the file is the authority and the compiled value is only the
-// failed-load fallback.
+// The file is the tuning authority; compiled initializers are failed-load fallbacks.
+// Verify the loaded class defaults, so editing a magnitude needs no C++ edit.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerAbilitiesNumbersTest,
     "RiorsEdge.Data.Abilities.Numbers",
@@ -500,7 +497,11 @@ bool FBreakerAbilitiesNumbersTest::RunTest(const FString& Parameters)
                 AddError(FString::Printf(TEXT("%s: %s is declared on %s but not carried"), *Id, *Key.ToString(), *Property->GetOwnerClass()->GetName()));
                 continue;
             }
-            TestEqual(FString::Printf(TEXT("%s.%s: the file carries the compiled default"), *Id, *Key.ToString()), *Authored, *Compiled);
+            const void* RuntimeValue = Property->ContainerPtrToValuePtr<void>(Definition->AbilityClass->GetDefaultObject());
+            const float Applied = Property->IsFloatingPoint()
+                ? static_cast<float>(Property->GetFloatingPointPropertyValue(RuntimeValue))
+                : static_cast<float>(Property->GetSignedIntPropertyValue(RuntimeValue));
+            TestEqual(FString::Printf(TEXT("%s.%s: runtime applies the authored value"), *Id, *Key.ToString()), Applied, *Authored);
             TestEqual(FString::Printf(TEXT("%s.%s: Number reads the authored value"), *Id, *Key.ToString()), Definition->Number(Key, -1.0f), *Authored);
         }
         TestEqual(FString::Printf(TEXT("%s: a key the file does not name answers with the default"), *Id),

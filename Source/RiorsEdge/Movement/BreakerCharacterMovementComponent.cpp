@@ -693,8 +693,16 @@ void UBreakerCharacterMovementComponent::SetSlideRequested(bool bEnabled)
     }
 }
 
+bool UBreakerCharacterMovementComponent::CanUseDash() const
+{
+    const UBreakerProgressionComponent* Progression = GetProgression();
+    return Progression && Progression->GetProgressionState().PermanentClass == EBreakerClassId::Swift;
+}
+
 bool UBreakerCharacterMovementComponent::TryDash(const FVector& RequestedDirection)
 {
+    // Dash is Swift's innate movement verb, regardless of which caller requests it.
+    if (!CanUseDash()) return false;
     const UWorld* World = GetWorld();
     // bSliding is an unconditional gate: Terminal Velocity is an AVAILABILITY
     // rewrite of the cooldown term only (Class-Kits.md:192), so a suspended
@@ -727,8 +735,7 @@ bool UBreakerCharacterMovementComponent::TryDash(const FVector& RequestedDirecti
     // Longstride, LEDGER's single-bidder lane): multiplies the whole composed
     // impulse BEFORE the hard cap, so "dash carries further" is what the
     // player reads and the cap still has the last word at high Momentum. Read
-    // per press, not per tick; a pawn with no progression component (an
-    // enemy, a test rig) reads x1.0 and is bit-identical to before.
+    // per press, not per tick, after the class entitlement gate.
     const UBreakerProgressionComponent* DashProgression = GetProgression();
     const float DashDistanceMultiplier = DashProgression
         ? FMath::Max(0.0f, DashProgression->GetNodeStats().DashDistanceMultiplier) : 1.0f;

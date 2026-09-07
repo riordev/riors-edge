@@ -2,6 +2,7 @@
 
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerDamageLibrary.h"
+#include "Combat/BreakerZoneMath.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
 
@@ -150,6 +151,7 @@ void UBreakerStatusComponent::AdvanceStatuses(float DeltaTime)
 {
     // The immunity clock runs whether or not any status is live — it is a
     // window on the OWNER, not on the list.
+    if (DeltaTime <= 0.0f) return;
     if (StatusImmunityRemaining > 0.0f) StatusImmunityRemaining = FMath::Max(0.0f, StatusImmunityRemaining - DeltaTime);
     if (!GetOwner() || !GetOwner()->HasAuthority() || ActiveStatuses.IsEmpty()) return;
     // Lazy re-bind: BeginPlay's bind misses a combat component added after it
@@ -158,31 +160,45 @@ void UBreakerStatusComponent::AdvanceStatuses(float DeltaTime)
     if (!Combat) Combat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>();
     if (!Combat) return;
 
-    for (int32 Index = ActiveStatuses.Num() - 1; Index >= 0; --Index)
+    TArray<FGameplayTag> AdvancingTags;
+    for (const FBreakerActiveStatus& Status : ActiveStatuses) AdvancingTags.Add(Status.Spec.StatusTag);
+    for (const FGameplayTag Tag : AdvancingTags)
     {
-        FBreakerActiveStatus& Status = ActiveStatuses[Index];
-        Status.RemainingDuration -= DeltaTime;
-        Status.TimeUntilNextTick -= DeltaTime;
-
-        if (Status.TimeUntilNextTick <= 0.0f)
+        auto FindActive = [this, Tag]()
         {
-            Status.TimeUntilNextTick += Status.Spec.TickInterval;
+            return ActiveStatuses.IndexOfByPredicate([Tag](const FBreakerActiveStatus& Entry) { return Entry.Spec.StatusTag == Tag; });
+        };
+        int32 Index = FindActive();
+        if (Index == INDEX_NONE) continue;
+        FBreakerActiveStatus& Initial = ActiveStatuses[Index];
+        const float ActiveSeconds = FMath::Min(DeltaTime, FMath::Max(0.0f, Initial.RemainingDuration));
+        Initial.RemainingDuration -= ActiveSeconds;
+        // Status damage is owed for its whole remaining lifetime; do not discard
+        // overdue damage under the zone presentation's burst guard.
+        const int32 Ticks = UBreakerZoneMath::ConsumeTicks(Initial.TimeUntilNextTick, ActiveSeconds, Initial.Spec.TickInterval, MAX_int32);
+        int32 ExpectedDelivered = Initial.TicksDelivered;
+        for (int32 TickIndex = 0; TickIndex < Ticks; ++TickIndex)
+        {
+            // Damage callbacks may consume/clear statuses. Re-find before each tick,
+            // and never continue an old application against its replacement.
+            Index = FindActive();
+            if (Index == INDEX_NONE || ActiveStatuses[Index].TicksDelivered != ExpectedDelivered) break;
+            FBreakerActiveStatus& Status = ActiveStatuses[Index];
             ++Status.TicksDelivered;
-
+            ExpectedDelivered = Status.TicksDelivered;
             FBreakerStatusApplicationSpec TickSpec = Status.Spec;
             TickSpec.InitialStacks = Status.Stacks;
             FBreakerDamageRequest Tick = UBreakerDamageLibrary::MakeSnapshotDotTick(TickSpec, Status.DamageFamily, Status.TicksDelivered, Status.Instigator.Get(),
                 Status.SourceLocationSnapshot, Status.bHasSourceLocationSnapshot);
-            // Physical DoTs — Bleed, Poison — ignore shields and take half
-            // armour mitigation via the damage library's global status rule.
             Tick.bBypassShield = Status.DamageFamily == EBreakerDamageFamily::Physical;
             Combat->ReceiveDamage(Tick);
         }
-
-        if (Status.RemainingDuration <= 0.0f)
+        Index = FindActive();
+        if (Index != INDEX_NONE && ActiveStatuses[Index].RemainingDuration <= 0.0f)
         {
-            OnStatusExpired.Broadcast(Status);
+            const FBreakerActiveStatus Expired = ActiveStatuses[Index];
             ActiveStatuses.RemoveAt(Index);
+            OnStatusExpired.Broadcast(Expired);
         }
     }
 }

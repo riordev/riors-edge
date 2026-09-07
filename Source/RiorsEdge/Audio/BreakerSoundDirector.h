@@ -69,6 +69,8 @@ class RIORSEDGE_API ABreakerSoundDirector : public AActor
 
 public:
     ABreakerSoundDirector();
+    void ApplyVolumeSettings(float Master, float Effects);
+    static void PlaySettingsTest(UWorld* World);
 
     // The trigger was pulled and a round left. Per cosmetic shot, not per
     // pellet: a shotgun blast is one report.

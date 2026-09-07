@@ -151,7 +151,9 @@ void ABreakerZoneActor::AdvanceZone(float DeltaSeconds)
 
     UpdateMembership();
 
-    const int32 Ticks = UBreakerZoneMath::ConsumeTicks(TimeUntilNextTick, DeltaSeconds, Spec.TickInterval, MaximumTicksPerAdvance);
+    const float ActiveSeconds = bExpiryPaused ? FMath::Max(0.0f, DeltaSeconds)
+        : FMath::Min(FMath::Max(0.0f, DeltaSeconds), FMath::Max(0.0f, RemainingDuration));
+    const int32 Ticks = UBreakerZoneMath::ConsumeTicks(TimeUntilNextTick, ActiveSeconds, Spec.TickInterval, MaximumTicksPerAdvance);
     for (int32 Index = 0; Index < Ticks; ++Index)
     {
         DeliverTick();
@@ -179,7 +181,10 @@ void ABreakerZoneActor::UpdateMembership()
     // The same channel weapons trace on, so anything shootable is also
     // zone-able and no actor needs a second collision setup. The sphere is the
     // broad phase; UBreakerZoneMath::IsInsideZone is the actual shape.
-    const float QueryRadius = FMath::Max(Spec.RadiusCm, FMath::Max(Spec.HalfHeightCm, 1.0f));
+    // The broad phase must contain the cylinder's upper/lower outer rim.
+    const float QueryRadius = Spec.HalfHeightCm > 0.0f
+        ? FMath::Sqrt(FMath::Square(Spec.RadiusCm) + FMath::Square(Spec.HalfHeightCm))
+        : FMath::Max(Spec.RadiusCm, 1.0f);
     World->OverlapMultiByChannel(Overlaps, Center, FQuat::Identity, ECC_GameTraceChannel2,
         FCollisionShape::MakeSphere(QueryRadius), QueryParams);
 

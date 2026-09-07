@@ -21,6 +21,10 @@
 // ---------------------------------------------------------------------------
 namespace BreakerSound
 {
+    inline float EffectsGain(float Master, float Effects)
+    {
+        return FMath::Clamp(Master, 0.0f, 1.0f) * FMath::Clamp(Effects, 0.0f, 1.0f);
+    }
     // 32 kHz mono: placeholder transients have no content above 10 kHz worth
     // keeping, and a smaller buffer is a cheaper queue. O2 PLACEHOLDER
     constexpr int32 SampleRate = 32000;

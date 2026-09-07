@@ -98,7 +98,9 @@ TArray<AActor*> UBreakerMeleeSweep::SweepTargets(const UWorld* World, AActor* In
         }
         // Never swing through a wall.
         FHitResult Occlusion;
-        if (World->LineTraceSingleByChannel(Occlusion, Params.Origin, Candidate->GetActorLocation(), ECC_WorldStatic, QueryParams))
+        FCollisionQueryParams OcclusionParams = QueryParams;
+        OcclusionParams.AddIgnoredActor(Candidate);
+        if (World->LineTraceSingleByChannel(Occlusion, Params.Origin, Candidate->GetActorLocation(), ECC_WorldStatic, OcclusionParams))
         {
             continue;
         }

@@ -1704,12 +1704,16 @@ bool FBreakerSprintFeelTest::RunTest(const FString& Parameters)
     // load-bearing on the shipped numbers because a dash IS above the cap.
     const float SprintCap = Movement->GetSprintSpeedCap();
     TestEqual(TEXT("A speed above the sprint cap strides at the cap"),
-        FBreakerWeaponFeel::AdvanceBobPhase(0.0f, FMath::Min(3000.0f, SprintCap), Frame, Params.StrideLengthCm),
-        FBreakerWeaponFeel::AdvanceBobPhase(0.0f, SprintCap, Frame, Params.StrideLengthCm), 0.0f);
+        FBreakerWeaponFeel::AdvanceBobPhase(0.0f, FMath::Min(3000.0f, SprintCap), Frame, FBreakerWeaponFeel::GaitStrideLength(Params, 1.0f)),
+        FBreakerWeaponFeel::AdvanceBobPhase(0.0f, SprintCap, Frame, FBreakerWeaponFeel::GaitStrideLength(Params, 1.0f)), 0.0f);
     TestTrue(TEXT("The shipped dash is above the sprint cap"), Movement->DashSpeedFloor + Movement->DashSpeedBonus > SprintCap);
-    TestTrue(TEXT("The sprint cap advances the phase faster than the walk"),
-        FBreakerWeaponFeel::AdvanceBobPhase(0.0f, SprintCap, Frame, Params.StrideLengthCm)
-        > FBreakerWeaponFeel::AdvanceBobPhase(0.0f, Movement->WalkSpeed, Frame, Params.StrideLengthCm));
+    TestTrue(TEXT("The longer sprint stride slows cadence below the walk"),
+        FBreakerWeaponFeel::AdvanceBobPhase(0.0f, SprintCap, Frame, FBreakerWeaponFeel::GaitStrideLength(Params, 1.0f))
+        < FBreakerWeaponFeel::AdvanceBobPhase(0.0f, Movement->WalkSpeed, Frame, FBreakerWeaponFeel::GaitStrideLength(Params, 0.0f)));
+    TestEqual(TEXT("Shipped sprint stride is 720 cm"), Params.SprintStrideLengthCm, 720.0f);
+    TestEqual(TEXT("Half sprint blends stride continuously"), FBreakerWeaponFeel::GaitStrideLength(Params, 0.5f), 540.0f);
+    TestEqual(TEXT("Gait clamps below walking"), FBreakerWeaponFeel::GaitStrideLength(Params, -1.0f), Params.StrideLengthCm);
+    TestEqual(TEXT("Gait clamps above sprint"), FBreakerWeaponFeel::GaitStrideLength(Params, 2.0f), Params.SprintStrideLengthCm);
 
     // Walk unchanged: one frame at the shipped walk speed over the shipped
     // stride is 2π · 595 / (360 · 60) radians.

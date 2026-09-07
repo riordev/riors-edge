@@ -7,6 +7,7 @@
 #include "Combat/BreakerDamageLibrary.h"
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerShieldMath.h"
+#include "Characters/BreakerCharacter.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
 #include "Items/BreakerEquipmentComponent.h"
@@ -56,6 +57,16 @@ void UBreakerCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType
         const float Next = BreakerShield::RechargeStep(Current, Attributes->GetMaxShield(),
             GetSecondsSinceDamage(), DeltaTime);
         if (Next > Current) Attributes->ApplyShield(Next);
+
+        const ABreakerCharacter* Player = Cast<ABreakerCharacter>(GetOwner());
+        if (Player && !IsDead())
+        {
+            const float Health = Attributes->GetHealth();
+            const float Recovered = BreakerHealthRegen::Step(Health, Attributes->GetMaxHealth(),
+                Player->GetSecondsSinceCombat(), DeltaTime, BaseHealthRegenPerSecond, BaseHealthRegenDelaySeconds);
+            // Passive recovery is not a healing action: it must not generate class resources or heal procs.
+            if (Recovered > Health) Attributes->ApplyHealth(Recovered);
+        }
     }
 }
 

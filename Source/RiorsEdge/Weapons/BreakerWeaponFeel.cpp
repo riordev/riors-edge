@@ -187,6 +187,11 @@ void FBreakerWeaponFeel::IntegrateViewmodel(const FBreakerRecoilProfile& Profile
     IntegrateAxis(State.PitchOffset, State.PitchVelocity);
 }
 
+float FBreakerWeaponFeel::GaitStrideLength(const FBreakerViewmodelMotionParams& Params, float SprintFraction)
+{
+    return FMath::Lerp(Params.StrideLengthCm, Params.SprintStrideLengthCm, FMath::Clamp(SprintFraction, 0.0f, 1.0f));
+}
+
 float FBreakerWeaponFeel::AdvanceBobPhase(float PhaseRadians, float GroundSpeed, float DeltaSeconds, float StrideLengthCm)
 {
     if (StrideLengthCm <= 0.0f || GroundSpeed <= 0.0f || DeltaSeconds <= 0.0f)

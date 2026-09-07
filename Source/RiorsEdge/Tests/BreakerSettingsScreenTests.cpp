@@ -410,7 +410,7 @@ bool FBreakerSettingsScreenControlValuesTest::RunTest(const FString& Parameters)
     {
         TEXT("Look sensitivity"), TEXT("ADS sensitivity"), TEXT("Invert vertical"),
         TEXT("Field of view"), TEXT("Window mode"), TEXT("Frame rate cap"), TEXT("Vertical sync"),
-        TEXT("Master volume"), TEXT("Effects volume"), TEXT("Music volume"),
+        TEXT("Master volume"), TEXT("Effects volume"),
         TEXT("Sprint"), TEXT("Aim"), TEXT("View bob"), TEXT("Screen shake"),
         TEXT("Larger nameplates"), TEXT("Damage number size"),
     };

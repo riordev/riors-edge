@@ -301,7 +301,7 @@ bool FBreakerAbilityGeometrySeamTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Rot's authored radius with no ranks"), Rot->ComputeEffectiveRadiusCm(Owner), 400.0f, 0.0001f);
     TestEqual(TEXT("Rot's authored duration with no ranks"), Rot->ComputeEffectiveDurationSeconds(Owner), 6.0f, 0.0001f);
     TestEqual(TEXT("Cleave's authored arc with no ranks"), Cleave->ComputeEffectiveArcDegrees(Owner), 120.0f, 0.0001f);
-    TestEqual(TEXT("Cleave's authored range with no ranks"), Cleave->ComputeEffectiveRangeCm(Owner), 300.0f, 0.0001f);
+    TestEqual(TEXT("Cleave's authored range with no ranks"), Cleave->ComputeEffectiveRangeCm(Owner), 450.0f, 0.0001f);
 
     // Lingering (VW tree): two ranks of +15% duration reach Rot's zone.
     UBreakerProgressionTree* VoidWhisperer = UBreakerProgressionLibrary::GetCasterVoidWhispererTree();
