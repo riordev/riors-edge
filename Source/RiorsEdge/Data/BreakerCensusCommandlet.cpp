@@ -17,11 +17,97 @@
 #include "Rendering/SkeletalMeshLODModel.h"
 #include "Misc/Parse.h"
 #include "AssetCompilingManager.h"
+#if WITH_EDITOR
+#include "Game/BreakerGameMode.h"
+#include "Engine/World.h"
+#include "Engine/DirectionalLight.h"
+#include "Engine/SkyLight.h"
+#include "Components/DirectionalLightComponent.h"
+#include "Components/SkyLightComponent.h"
+#include "Components/SkyAtmosphereComponent.h"
+#include "GameFramework/PlayerStart.h"
+#include "GameFramework/WorldSettings.h"
+#include "HAL/FileManager.h"
+#include "Misc/PackageName.h"
+#include "Misc/ScopeExit.h"
+#include "UObject/Package.h"
+#include "UObject/SavePackage.h"
+#endif
 
 DEFINE_LOG_CATEGORY_STATIC(LogBreakerCensus, Log, All);
 
 namespace
 {
+    int32 BreakerCreateRescueMap()
+    {
+#if WITH_EDITOR
+        const FString PackageName(TEXT("/Game/Breaker/Maps/Lvl_ErasedEarth"));
+        const FString Filename = FPackageName::LongPackageNameToFilename(PackageName, FPackageName::GetMapPackageExtension());
+        // This is a creation command, never an editor or migration for an existing map.
+        if (FPackageName::DoesPackageExist(PackageName) || IFileManager::Get().FileExists(*Filename)
+            || FindPackage(nullptr, *PackageName))
+        {
+            UE_LOG(LogBreakerCensus, Error, TEXT("[CreateRescueMap] Refusing existing package %s"), *PackageName);
+            return 1;
+        }
+        UPackage* Package = CreatePackage(*PackageName);
+        UWorld::InitializationValues Init;
+        Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
+        UWorld* World = UWorld::CreateWorld(EWorldType::Editor, false, TEXT("Lvl_ErasedEarth"), Package,
+            true, ERHIFeatureLevel::Num, &Init);
+        if (!World)
+        {
+            UE_LOG(LogBreakerCensus, Error, TEXT("[CreateRescueMap] World creation failed"));
+            return 1;
+        }
+        ON_SCOPE_EXIT { World->DestroyWorld(false); };
+        World->SetFlags(RF_Public | RF_Standalone);
+        Package->SetPackageFlags(PKG_ContainsMap);
+        AWorldSettings* Settings = World->GetWorldSettings();
+        APlayerStart* Start = World->SpawnActor<APlayerStart>(FVector(0, 0, 200), FRotator::ZeroRotator);
+        ADirectionalLight* Sun = World->SpawnActor<ADirectionalLight>(FVector(0, 0, 1200), FRotator(-38, -35, 0));
+        ASkyLight* Sky = World->SpawnActor<ASkyLight>();
+        AActor* Atmosphere = World->SpawnActor<AActor>();
+        if (!Settings || !Start || !Sun || !Sky || !Atmosphere)
+        {
+            UE_LOG(LogBreakerCensus, Error, TEXT("[CreateRescueMap] Required map actor creation failed"));
+            return 1;
+        }
+        Settings->DefaultGameMode = ABreakerGameMode::StaticClass();
+        Start->SetActorLabel(TEXT("Rescue Arrival"));
+        Sun->SetActorLabel(TEXT("Garden Daylight"));
+        Sun->GetComponent()->SetMobility(EComponentMobility::Movable);
+        // O2 presentation placeholders: a warm readable afternoon, no baked-light dependency.
+        Sun->GetComponent()->SetIntensity(5.0f);
+        Sun->GetComponent()->SetLightColor(FLinearColor(1.0f, 0.94f, 0.82f));
+        Sun->GetComponent()->SetAtmosphereSunLight(true);
+        Sky->SetActorLabel(TEXT("Garden Sky Fill"));
+        Sky->GetLightComponent()->SetMobility(EComponentMobility::Movable);
+        Sky->GetLightComponent()->SetIntensity(1.0f);
+        Sky->GetLightComponent()->SetRealTimeCapture(true);
+        Atmosphere->SetActorLabel(TEXT("Erased Earth Atmosphere"));
+        USkyAtmosphereComponent* Air = NewObject<USkyAtmosphereComponent>(Atmosphere, TEXT("Atmosphere"));
+        Atmosphere->AddInstanceComponent(Air);
+        Atmosphere->SetRootComponent(Air);
+        Air->RegisterComponent();
+        Package->MarkPackageDirty();
+        if (!IFileManager::Get().MakeDirectory(*FPaths::GetPath(Filename), true)) return 1;
+        FSavePackageArgs SaveArgs;
+        SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
+        SaveArgs.SaveFlags = SAVE_NoError;
+        if (!UPackage::SavePackage(Package, World, *Filename, SaveArgs))
+        {
+            UE_LOG(LogBreakerCensus, Error, TEXT("[CreateRescueMap] Save failed: %s"), *Filename);
+            return 1;
+        }
+        UE_LOG(LogBreakerCensus, Display, TEXT("[CreateRescueMap] Created %s; runtime rescue builder supplies terrain and encounters."), *Filename);
+        return 0;
+#else
+        UE_LOG(LogBreakerCensus, Error, TEXT("[CreateRescueMap] Requires an editor build."));
+        return 1;
+#endif
+    }
+
     int32 BreakerAuditArmMeshes()
     {
 #if WITH_EDITOR
@@ -101,6 +187,7 @@ UBreakerCensusCommandlet::UBreakerCensusCommandlet()
 
 int32 UBreakerCensusCommandlet::Main(const FString& Params)
 {
+    if (FParse::Param(*Params, TEXT("CreateRescueMap"))) return BreakerCreateRescueMap();
     // Optional read-only geometry probe exits BEFORE every canonical data export.
     if (FParse::Param(*Params, TEXT("MeshAudit"))) return BreakerAuditArmMeshes();
     const TArray<UBreakerProgressionTree*>& Trees = UBreakerProgressionLibrary::GetAllFallbackTrees();

@@ -1,4 +1,9 @@
 #include "Interaction/BreakerTravelPoint.h"
+#include "Characters/BreakerCharacter.h"
+#include "Combat/BreakerCombatComponent.h"
+#include "Save/BreakerQuestJournal.h"
+#include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
 
 #include "Components/CapsuleComponent.h"
 #include "Components/PointLightComponent.h"
@@ -11,6 +16,7 @@
 const FName ABreakerTravelPoint::GymDestinationId(TEXT("Gym"));
 const FName ABreakerTravelPoint::HubDestinationId(TEXT("Hub"));
 const FName ABreakerTravelPoint::FernhallDestinationId(TEXT("Fernhall"));
+const FName ABreakerTravelPoint::ErasedEarthDestinationId(TEXT("Earth.Unindustrialized"));
 const FName ABreakerTravelPoint::RiftDestinationId(TEXT("Rift.Local"));
 
 ABreakerTravelPoint::ABreakerTravelPoint()
@@ -91,6 +97,8 @@ void ABreakerTravelPoint::BeginPlay()
 TArray<FBreakerTravelDestination> ABreakerTravelPoint::GetAvailableDestinations() const
 {
     TArray<FBreakerTravelDestination> Available;
+    const APawn* Player = GetWorld() && GetWorld()->GetFirstPlayerController()
+        ? GetWorld()->GetFirstPlayerController()->GetPawn() : nullptr;
     for (const FBreakerTravelDestination& Destination : GetFallbackRegistry())
     {
         // A travel point never offers the place it stands in. Without this the
@@ -104,6 +112,7 @@ TArray<FBreakerTravelDestination> ABreakerTravelPoint::GetAvailableDestinations(
         // and the destination silently falling back to the dev area level.
         if (Destination.bEnabled && !Destination.bDoorOnly && Destination.Id != ExcludedDestinationId)
         {
+            if (Destination.Id == ErasedEarthDestinationId && !CanEnterErasedEarth(Player)) continue;
             Available.Add(Destination);
         }
     }
@@ -112,6 +121,7 @@ TArray<FBreakerTravelDestination> ABreakerTravelPoint::GetAvailableDestinations(
 
 bool ABreakerTravelPoint::SelectDestination(FName DestinationId, APawn* RequestingPawn)
 {
+    if (DestinationId == ErasedEarthDestinationId && !CanEnterErasedEarth(RequestingPawn)) return false;
     FBreakerTravelDestination Destination;
     if (!FindDestination(DestinationId, Destination) || !Destination.bEnabled)
     {
@@ -199,8 +209,22 @@ const TArray<FBreakerTravelDestination>& ABreakerTravelPoint::GetFallbackRegistr
     Registry.Add(Hub);
     Registry.Add(Fernhall);
     Registry.Add(Rift);
+    FBreakerTravelDestination Earth;
+    Earth.Id = ErasedEarthDestinationId;
+    Earth.DisplayName = FText::FromString(TEXT("The Quiet Earth"));
+    Earth.Description = TEXT("A world of stone gardens and broken paths. Find the living signal and bring its survivor home.");
+    Registry.Add(Earth);
 
     return Registry;
+}
+
+bool ABreakerTravelPoint::CanEnterErasedEarth(const APawn* RequestingPawn)
+{
+    const ABreakerCharacter* Player = Cast<ABreakerCharacter>(RequestingPawn);
+    const UBreakerQuestJournal* Journal = Player ? Player->GetQuestJournal() : nullptr;
+    return Player && Player->GetCombat() && !Player->GetCombat()->IsDead() && Journal
+        && Journal->HasFlag(TEXT("Quest.Breach.TurnedIn")) && Journal->HasFlag(TEXT("Quest.Survivor.Accepted"))
+        && !Journal->HasFlag(TEXT("Quest.Survivor.Extracted"));
 }
 
 bool ABreakerTravelPoint::FindDestination(FName DestinationId, FBreakerTravelDestination& OutDestination)

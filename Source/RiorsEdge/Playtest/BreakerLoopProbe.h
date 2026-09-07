@@ -29,6 +29,8 @@ private:
     double MarshalPhotoStarted = 0;
     double MarshalOrderSeen = 0;
     bool bActTwo = false;
+    bool bSurvivorLoop = false;
+    int32 SurvivorRouteObserved = INDEX_NONE;
     bool bSawMarshal = false;
     int32 BreachMaximumWave = 0;
     FName LastCampaignBeat;

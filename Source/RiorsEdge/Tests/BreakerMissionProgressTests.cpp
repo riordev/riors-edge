@@ -2,6 +2,7 @@
 
 #include "Game/BreakerZoneBuilder.h"
 #include "Interaction/BreakerTravelPoint.h"
+#include "Interaction/BreakerNPC.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "Save/BreakerMissionContent.h"
@@ -297,8 +298,10 @@ bool FBreakerMissionTrackerLineTest::RunTest(const FString& Parameters)
                 [&Beat](const FBreakerQuestDefinition& Candidate) { return Candidate.AcceptedFlag == Beat.CompletesOn; });
             if (TestNotNull(Where + TEXT(" accepts a quest by flag (the unverbed branch is never taken)"), Quest))
             {
-                TestEqual(Where + TEXT(" speaks to the giver"), Line,
-                    FString::Printf(UBreakerMissionLibrary::SpeakToVerb, *Quest->Giver.ToUpper()));
+                const FBreakerDialogueRow* Speaker = ABreakerNPC::GetDialogueData().Npcs.FindByPredicate([&Beat](const FBreakerDialogueRow& Row) { return Row.Id == Beat.Npc; });
+                if (TestNotNull(Where + TEXT(" has an authored speaker"), Speaker))
+                    TestEqual(Where + TEXT(" speaks to the beat's NPC"), Line,
+                        FString::Printf(UBreakerMissionLibrary::SpeakToVerb, *Speaker->DisplayName.ToUpper()));
             }
             break;
         }
@@ -309,8 +312,10 @@ bool FBreakerMissionTrackerLineTest::RunTest(const FString& Parameters)
                 [&Beat](const FBreakerQuestDefinition& Candidate) { return Candidate.TurnedInFlag == Beat.CompletesOn; });
             if (TestNotNull(Where + TEXT(" turns in a quest by flag (the unverbed branch is never taken)"), Quest))
             {
-                TestEqual(Where + TEXT(" returns to the giver"), Line,
-                    FString::Printf(UBreakerMissionLibrary::ReturnToVerb, *Quest->Giver.ToUpper()));
+                const FBreakerDialogueRow* Speaker = ABreakerNPC::GetDialogueData().Npcs.FindByPredicate([&Beat](const FBreakerDialogueRow& Row) { return Row.Id == Beat.Npc; });
+                if (TestNotNull(Where + TEXT(" has an authored turn-in NPC"), Speaker))
+                    TestEqual(Where + TEXT(" returns to the beat's NPC"), Line,
+                        FString::Printf(UBreakerMissionLibrary::ReturnToVerb, *Speaker->DisplayName.ToUpper()));
             }
             break;
         }

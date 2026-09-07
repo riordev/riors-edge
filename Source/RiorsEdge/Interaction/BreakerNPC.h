@@ -27,7 +27,9 @@ enum class EBreakerDialogueAction : uint8
     // rules Forge and vendor Anchor interactions that never appear in a pause
     // menu; the Forge was in the shared tab strip, which the pause menu's
     // INVENTORY button opens two clicks deep.
-    OpenForge
+    OpenForge,
+    // Starts/restarts the physically present Survivor's escort; not a flag-only completion.
+    StartSurvivorEscort
 };
 
 USTRUCT(BlueprintType)

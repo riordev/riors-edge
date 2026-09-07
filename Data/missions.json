@@ -240,6 +240,68 @@
 					"doctrinePoints": 2
 				}
 			]
+		},
+		{
+			"id": "Act3.Survivor",
+			"act": 3,
+			"title": "",
+			"quests": [
+				"Quest.Survivor"
+			],
+			"beats": [
+				{
+					"id": "Orders",
+					"kind": "Dialogue",
+					"npc": "Quartermaster",
+					"node": "SurvivorOffer",
+					"completesOn": "Quest.Survivor.Accepted"
+				},
+				{
+					"id": "Travel",
+					"kind": "Travel",
+					"destination": "Earth.Unindustrialized",
+					"completesOn": "Mission.Act3.Survivor.Arrived"
+				},
+				{
+					"id": "Meet",
+					"kind": "Dialogue",
+					"npc": "Survivor",
+					"node": "Meet",
+					"completesOn": "Quest.Survivor.Met"
+				},
+				{
+					"id": "Extraction",
+					"kind": "Encounter",
+					"worldEncounter": "earth.survivor_extraction",
+					"quest": "Quest.Survivor",
+					"objectives": [
+						"Extraction"
+					]
+				},
+				{
+					"id": "Anchor",
+					"kind": "Travel",
+					"destination": "Hub",
+					"completesOn": "Quest.Survivor.ReachedAnchor"
+				},
+				{
+					"id": "SurvivorReturn",
+					"kind": "Return",
+					"npc": "Survivor",
+					"node": "TurnIn",
+					"completesOn": "Quest.Survivor.TurnedIn"
+				},
+				{
+					"id": "Reward",
+					"kind": "Reward",
+					"quest": "Quest.Survivor"
+				},
+				{
+					"id": "Doctrine",
+					"kind": "Unlock",
+					"doctrinePoints": 2
+				}
+			]
 		}
 	]
 }

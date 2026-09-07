@@ -388,7 +388,8 @@ void ABreakerCharacter::BeginPlay()
     if (Quests && Progression && HasAuthority())
     {
         const UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>();
-        const FName Destination = Session ? Session->PendingDestinationId : NAME_None;
+        const FName Destination = Session && UBreakerGameInstance::IsDestinationMap(this, Session->PendingDestinationId)
+            ? Session->PendingDestinationId : NAME_None;
         for (const FName& Flag : UBreakerMissionLibrary::ArrivalFlagsFor(Destination, Quests->GetState()))
         {
             Quests->SetFlag(Flag);

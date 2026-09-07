@@ -460,7 +460,8 @@ namespace
                 case EBreakerMissionBeatKind::Encounter:
                 {
                     if (Beat.WorldEncounter.IsNone()) BreakerMissionCheckRiftId(Beat.Rift, Where, Data, Errors);
-                    else if (Beat.WorldEncounter != FName(TEXT("fernhall.altered_contact")))
+                    else if (Beat.WorldEncounter != FName(TEXT("fernhall.altered_contact"))
+                        && Beat.WorldEncounter != FName(TEXT("earth.survivor_extraction")))
                         Errors.Add(Where + TEXT(": worldEncounter has no authored field encounter"));
                     if (const FBreakerQuestDefinition* Quest = BreakerMissionCheckQuest(Beat.Quest, Where, Mission, Registry, Errors))
                     {
@@ -902,16 +903,16 @@ FString UBreakerMissionLibrary::TrackerLine(const FBreakerMissionBeat& Beat, con
     switch (Beat.Kind)
     {
     case EBreakerMissionBeatKind::Dialogue:
-        if (const FBreakerQuestDefinition* Quest = BreakerMissionQuestByAccepted(Beat.CompletesOn))
+        if (BreakerMissionQuestByAccepted(Beat.CompletesOn))
         {
-            return FString::Printf(SpeakToVerb, *Quest->Giver.ToUpper());
+            return FString::Printf(SpeakToVerb, *BreakerMissionNpcName(Beat.Npc));
         }
         return BreakerMissionNpcName(Beat.Npc);
 
     case EBreakerMissionBeatKind::Return:
-        if (const FBreakerQuestDefinition* Quest = BreakerMissionQuestByTurnedIn(Beat.CompletesOn))
+        if (BreakerMissionQuestByTurnedIn(Beat.CompletesOn))
         {
-            return FString::Printf(ReturnToVerb, *Quest->Giver.ToUpper());
+            return FString::Printf(ReturnToVerb, *BreakerMissionNpcName(Beat.Npc));
         }
         return BreakerMissionNpcName(Beat.Npc);
 

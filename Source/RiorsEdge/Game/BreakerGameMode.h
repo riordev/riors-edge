@@ -504,6 +504,16 @@ public:
 
 private:
     void SpawnFernhallEncounters(const FBreakerZoneMarkers& Markers);
+    void BuildSurvivorMission(APawn* Player);
+    void TickSurvivorMission();
+    void HandleSurvivorExtraction(class ABreakerSurvivor* Survivor, class ABreakerCharacter* Player);
+    TWeakObjectPtr<class ABreakerSurvivor> MissionSurvivor;
+    TArray<TWeakObjectPtr<class ABreakerEnemy>> SurvivorEnemies;
+    TArray<int32> SurvivorEnemyPockets;
+    TArray<bool> SurvivorEnemyDeaths;
+    FVector SurvivorExtraction = FVector::ZeroVector;
+    bool bSurvivorRosterValid = false;
+    bool bAnchorSurvivorSpawned = false;
     void BindFernhallMissionJournal(APawn* Pawn);
     void RefreshFernhallMission(FName ChangedFlag = NAME_None);
     UFUNCTION() void HandleAlteredContactDeath();

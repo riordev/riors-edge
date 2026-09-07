@@ -168,10 +168,9 @@ public:
     // The two verbs are the tracker's own words and live here so the HUD
     // reads them rather than owning a copy. TCHAR arrays, not pointers,
     // because FString::Printf holds its format to an array type.
-    //   Dialogue  -> SpeakToVerb over the giver of the quest whose
-    //                AcceptedFlag the beat completes on.
-    //   Return    -> ReturnToVerb over the giver of the quest whose
-    //                TurnedInFlag the beat completes on.
+    //   Dialogue  -> SpeakToVerb over the beat's NPC when it accepts a quest.
+    //   Return    -> ReturnToVerb over the beat's NPC when it turns in a quest.
+    //                Acceptance and turn-in can happen at different people.
     //   Encounter -> the first of the beat's objectives (beat order) the flag
     //                set does not hold: its text, with "  n/N" when counted.
     //   Boss      -> the objective whose CompletionFlag the beat completes on,

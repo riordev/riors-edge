@@ -123,6 +123,8 @@ public:
     static const FName GymDestinationId;
     static const FName HubDestinationId;
     static const FName FernhallDestinationId;
+    static const FName ErasedEarthDestinationId;
+    static bool CanEnterErasedEarth(const APawn* RequestingPawn);
     // The Local Rift. DOOR-ONLY: it is in the registry so ids validate in one
     // place, and it is offered by ABreakerRiftDoor alone.
     static const FName RiftDestinationId;

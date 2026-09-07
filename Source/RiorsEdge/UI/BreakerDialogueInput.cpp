@@ -2,6 +2,7 @@
 
 #include "Characters/BreakerCharacter.h"
 #include "Interaction/BreakerNPC.h"
+#include "Interaction/BreakerSurvivor.h"
 #include "Save/BreakerQuestJournal.h"
 #include "InputCoreTypes.h"
 
@@ -36,6 +37,14 @@ FReply SBreakerMenu::SelectDialogueChoice(int32 ChoiceIndex)
     NPC->GetVisibleChoices(Node, Journal ? Journal->GetState() : EmptyFlags, Choices);
     if (!Choices.IsValidIndex(ChoiceIndex)) return FReply::Handled();
     const FBreakerDialogueChoice Choice = Choices[ChoiceIndex];
+    if (Choice.Action == EBreakerDialogueAction::StartSurvivorEscort)
+    {
+        ABreakerSurvivor* Survivor = Cast<ABreakerSurvivor>(NPC);
+        if (!Survivor || !Survivor->TryBeginEscort(Character.Get())) return FReply::Handled();
+        Character->AddQuestFlag(Choice.SetsQuestFlag);
+        Character->ResumeFromMenu();
+        return FReply::Handled();
+    }
     Character->AddQuestFlag(Choice.SetsQuestFlag);
     DialogueLeavePressedAt = 0.0;
     if (Choice.Action == EBreakerDialogueAction::OpenQuartermaster)

@@ -2,6 +2,8 @@
 #include "GameFramework/PawnMovementComponent.h"
 
 #include "Game/BreakerHubBuilder.h"
+#include "Game/BreakerErasedEarthBuilder.h"
+#include "Interaction/BreakerSurvivor.h"
 #include "Game/BreakerZoneBuilder.h"
 #include "Game/BreakerGameInstance.h"
 #include "Game/BreakerDeathBudgetMath.h"
@@ -85,6 +87,7 @@ void ABreakerGameMode::Tick(float DeltaSeconds)
     if (bFernhallMissionReady && GetWorld() && GetWorld()->GetFirstPlayerController())
         BindFernhallMissionJournal(GetWorld()->GetFirstPlayerController()->GetPawn());
     ApplyAlteredContactWound();
+    TickSurvivorMission();
 }
 
 void ABreakerGameMode::EndPlay(const EEndPlayReason::Type Reason)
@@ -146,6 +149,8 @@ void ABreakerGameMode::TeleportPawnToHub(APawn* Pawn)
 void ABreakerGameMode::HandleHubTravelSelected(FName DestinationId, APawn* RequestingPawn)
 {
     if (!RequestingPawn) return;
+    if (DestinationId == ABreakerTravelPoint::ErasedEarthDestinationId
+        && !ABreakerTravelPoint::CanEnterErasedEarth(RequestingPawn)) return;
     // TRAVEL IS A LEVEL LOAD NOW, not a teleport. It was a teleport because
     // there was one map and both places were in it; with three maps the
     // destination does not exist until it is loaded.
@@ -177,6 +182,11 @@ void ABreakerGameMode::HandleHubTravelSelected(FName DestinationId, APawn* Reque
     if (DestinationId == ABreakerTravelPoint::FernhallDestinationId)
     {
         UBreakerGameInstance::TravelTo(this, FName(UBreakerGameInstance::FernhallMapName()));
+        return;
+    }
+    if (DestinationId == ABreakerTravelPoint::ErasedEarthDestinationId)
+    {
+        UBreakerGameInstance::TravelTo(this, FName(UBreakerGameInstance::ErasedEarthMapName()));
         return;
     }
     // Any other id is refused rather than guessed at. The old teleport that
@@ -493,6 +503,14 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
         // schedule its exit, or the harness can never photograph the hub.
         ScheduleScreenshots();
         UE_LOG(LogTemp, Log, TEXT("[BreakerMap] anchor — hub built, no gym."));
+        return;
+    }
+
+    if (UBreakerGameInstance::IsErasedEarthMap(this))
+    {
+        BuildSurvivorMission(NewPlayer->GetPawn());
+        bPlaytestTargetsSpawned = true;
+        ScheduleScreenshots();
         return;
     }
 
@@ -3523,6 +3541,110 @@ void ABreakerGameMode::HandleAlteredContactDeath()
     bAlteredContactDeathConsumed = true;
     for (FName Flag : UBreakerMissionLibrary::WorldEncounterCompletionFlagsFor(
         TEXT("fernhall.altered_contact"), Journal->GetState())) Journal->SetFlag(Flag);
+}
+
+void ABreakerGameMode::BuildSurvivorMission(APawn* Player)
+{
+    UWorld* World = GetWorld();
+    if (!World || !Player || MissionSurvivor.IsValid()) return;
+    const FBreakerErasedEarthLayout Layout = UBreakerErasedEarthBuilder::Build(World);
+    SurvivorExtraction = Layout.Extraction;
+    Player->TeleportTo(Layout.PlayerArrival, Layout.ArrivalFacing);
+    if (AController* Controller = Player->GetController()) Controller->SetControlRotation(Layout.ArrivalFacing);
+    FActorSpawnParameters Parameters;
+    Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    ABreakerSurvivor* Survivor = World->SpawnActor<ABreakerSurvivor>(Layout.SurvivorShelter, Layout.ArrivalFacing, Parameters);
+    MissionSurvivor = Survivor;
+    if (Survivor)
+    {
+        Survivor->ConfigureEscort(Layout);
+        Survivor->OnEscortReadyForExtraction.AddUObject(this, &ABreakerGameMode::HandleSurvivorExtraction);
+    }
+    bSurvivorRosterValid = Survivor && Layout.PocketCount == 3 && !Layout.Enemies.IsEmpty();
+    for (const FBreakerErasedEarthEnemySpawn& Spawn : Layout.Enemies)
+    {
+        ABreakerEnemy* Enemy = World->SpawnActor<ABreakerEnemy>(Spawn.EnemyClass, Spawn.Location, FRotator::ZeroRotator, Parameters);
+        if (!Enemy) { bSurvivorRosterValid = false; continue; }
+        Enemy->ConfigureWave(30); // O2: Act III's first erased Earth.
+        UCapsuleComponent* Capsule = Enemy->FindComponentByClass<UCapsuleComponent>();
+        FHitResult Floor;
+        FCollisionQueryParams Query(SCENE_QUERY_STAT(SurvivorEnemyFloor), false, Enemy);
+        const bool bFloor = World->LineTraceSingleByObjectType(Floor, Spawn.Location + FVector(0, 0, 1000),
+            Spawn.Location - FVector(0, 0, 1000), FCollisionObjectQueryParams(ECC_WorldStatic), Query);
+        if (!Capsule || !bFloor || Floor.ImpactNormal.Z < 0.7f)
+        { Enemy->Destroy(); bSurvivorRosterValid = false; continue; }
+        const FVector At = Floor.ImpactPoint + FVector(0, 0, Capsule->GetScaledCapsuleHalfHeight() + 2);
+        if (World->OverlapBlockingTestByChannel(At, FQuat::Identity, ECC_Pawn,
+            FCollisionShape::MakeCapsule(Capsule->GetScaledCapsuleRadius(), Capsule->GetScaledCapsuleHalfHeight()), Query))
+        { Enemy->Destroy(); bSurvivorRosterValid = false; continue; }
+        Enemy->SetActorLocation(At);
+        Enemy->ConfigureEncounter(At, SurvivorEnemies.Num() * 1.3f);
+        Enemy->Tags.Add(FName(*FString::Printf(TEXT("Survivor.Pocket.%d"), Spawn.PocketIndex)));
+        UBreakerKillTelemetryComponent::AttachTo(Enemy);
+        SurvivorEnemies.Add(Enemy);
+        SurvivorEnemyPockets.Add(Spawn.PocketIndex);
+        SurvivorEnemyDeaths.Add(false);
+    }
+    for (const FVector At : {Layout.PlayerArrival + FVector(0, 450, 0), Layout.Extraction + FVector(0, 450, 0)})
+    {
+        if (ABreakerTravelPoint* Gate = World->SpawnActor<ABreakerTravelPoint>(At, FRotator::ZeroRotator, Parameters))
+        {
+            Gate->ExcludedDestinationId = ABreakerTravelPoint::ErasedEarthDestinationId;
+            Gate->OnDestinationSelected.AddUObject(this, &ABreakerGameMode::HandleHubTravelSelected);
+        }
+    }
+    UE_LOG(LogTemp, Display, TEXT("[Survivor] Quiet Earth built: %d finite Vestiges, rosterValid=%d."), SurvivorEnemies.Num(), bSurvivorRosterValid);
+}
+
+void ABreakerGameMode::TickSurvivorMission()
+{
+    UWorld* World = GetWorld();
+    ABreakerCharacter* Player = World && World->GetFirstPlayerController()
+        ? Cast<ABreakerCharacter>(World->GetFirstPlayerController()->GetPawn()) : nullptr;
+    UBreakerQuestJournal* Journal = Player ? Player->GetQuestJournal() : nullptr;
+    if (!HasAuthority() || !Journal) return;
+    if (UBreakerGameInstance::IsAnchorMap(this) && !bAnchorSurvivorSpawned
+        && Journal->HasFlag(TEXT("Quest.Survivor.ReachedAnchor")))
+    {
+        FActorSpawnParameters Parameters;
+        Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+        // The rescued person remains a physical resident after the reward.
+        const FVector At = HubOrigin + Frame.Right * 650 + Frame.Forward * 350 + FVector(0, 0, 90);
+        bAnchorSurvivorSpawned = World->SpawnActor<ABreakerSurvivor>(At, (-Frame.Forward).Rotation(), Parameters) != nullptr;
+    }
+    ABreakerSurvivor* Survivor = MissionSurvivor.Get();
+    if (!Survivor || !bSurvivorRosterValid) return;
+    for (int32 Index = 0; Index < SurvivorEnemies.Num(); ++Index)
+    {
+        if (SurvivorEnemyDeaths[Index]) continue;
+        ABreakerEnemy* Enemy = SurvivorEnemies[Index].Get();
+        const UBreakerCombatComponent* Combat = Enemy ? Enemy->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+        if (Combat && Combat->IsDead()) SurvivorEnemyDeaths[Index] = true;
+        else if (!Enemy) bSurvivorRosterValid = false; // Despawn is not a kill.
+    }
+    for (int32 Pocket = 0; Pocket < 3; ++Pocket)
+    {
+        bool bHasMembers = false, bCleared = bSurvivorRosterValid;
+        for (int32 Index = 0; Index < SurvivorEnemies.Num(); ++Index)
+            if (SurvivorEnemyPockets[Index] == Pocket)
+            { bHasMembers = true; bCleared &= SurvivorEnemyDeaths[Index]; }
+        Survivor->SetPocketCleared(Pocket, bHasMembers && bCleared);
+    }
+}
+
+void ABreakerGameMode::HandleSurvivorExtraction(ABreakerSurvivor* Survivor, ABreakerCharacter* Player)
+{
+    UBreakerQuestJournal* Journal = Player ? Player->GetQuestJournal() : nullptr;
+    const UBreakerCombatComponent* Combat = Player ? Player->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    if (!HasAuthority() || !UBreakerGameInstance::IsErasedEarthMap(this) || !Journal || !Combat || Combat->IsDead()
+        || Survivor != MissionSurvivor.Get() || !Survivor || Survivor->GetEscortPlayer() != Player
+        || !Survivor->IsAtExtraction() || !Survivor->AreAllPocketsCleared() || !bSurvivorRosterValid
+        || SurvivorEnemyDeaths.Contains(false)
+        || FVector::Dist(Player->GetActorLocation(), SurvivorExtraction) > Survivor->ExtractionRadius
+        || FVector::Dist(Survivor->GetActorLocation(), SurvivorExtraction) > Survivor->ExtractionRadius) return;
+    for (FName Flag : UBreakerMissionLibrary::WorldEncounterCompletionFlagsFor(
+        TEXT("earth.survivor_extraction"), Journal->GetState())) Journal->SetFlag(Flag);
+    UE_LOG(LogTemp, Display, TEXT("[Survivor] Physical extraction verified; return to Anchor remains required."));
 }
 
 void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Markers)

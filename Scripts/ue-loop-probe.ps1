@@ -1,6 +1,7 @@
 param(
     [string]$Editor = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe',
     [switch]$ActTwo,
+    [switch]$Survivor,
     [switch]$Photos
 )
 $ErrorActionPreference = 'Stop'
@@ -14,6 +15,7 @@ $projectFile = Join-Path $repoDirectory 'riors_edge.uproject'
 # check with accelerated kills, not a balance or hands-on interaction test.
 $probeOptions = @()
 if ($ActTwo) { $probeOptions += '-BreakerActTwoLoop' }
+if ($Survivor) { $probeOptions += '-BreakerSurvivorLoop' }
 if ($Photos) { $probeOptions += @('-BreakerActTwoPhotos', '-windowed', '-ResX=1920', '-ResY=1080') }
 else { $probeOptions += '-nullrhi' }
 & $Editor $projectFile -game -unattended -nop4 -nosplash -BreakerAutoPlay=Anchor -BreakerLoopProbe @probeOptions "-UserDir=$probeDirectory" "-abslog=$probeLog"

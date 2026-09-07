@@ -27,7 +27,13 @@
 		"Quest.Breach.Offered",
 		"Quest.Breach.Accepted",
 		"Quest.Breach.MarshalDown",
-		"Quest.Breach.TurnedIn"
+		"Quest.Breach.TurnedIn",
+		"Quest.Survivor.Offered",
+		"Quest.Survivor.Accepted",
+		"Quest.Survivor.Met",
+		"Quest.Survivor.Extracted",
+		"Quest.Survivor.ReachedAnchor",
+		"Quest.Survivor.TurnedIn"
 	],
 	"quests": [
 		{
@@ -180,6 +186,46 @@
 				"itemCount": 2,
 				"minimumRarity": "Exceptional",
 				"itemLevel": 20
+			}
+		},
+		{
+			"id": "Quest.Survivor",
+			"title": "SOMEONE STILL HERE",
+			"giver": "THE SURVIVOR",
+			"offeredFlag": "Quest.Survivor.Offered",
+			"acceptedFlag": "Quest.Survivor.Accepted",
+			"turnedInFlag": "Quest.Survivor.TurnedIn",
+			"objectives": [
+				{
+					"id": "Meet",
+					"text": "Find the living voice inside the unindustrialized Earth",
+					"completionFlag": "Quest.Survivor.Met",
+					"progressCounter": "",
+					"requiredCount": 0,
+					"requiresEliteKill": false
+				},
+				{
+					"id": "Extraction",
+					"text": "Escort the Survivor through the Vestiges to the extraction point",
+					"completionFlag": "Quest.Survivor.Extracted",
+					"progressCounter": "",
+					"requiredCount": 0,
+					"requiresEliteKill": false
+				},
+				{
+					"id": "Anchor",
+					"text": "Bring the Survivor inside the Anchor",
+					"completionFlag": "Quest.Survivor.ReachedAnchor",
+					"progressCounter": "",
+					"requiredCount": 0,
+					"requiresEliteKill": false
+				}
+			],
+			"reward":
+			{
+				"itemCount": 2,
+				"minimumRarity": "Exceptional",
+				"itemLevel": 30
 			}
 		}
 	]

@@ -959,6 +959,107 @@
 					]
 				},
 				{
+					"nodeId": "SurvivorLead",
+					"speakerLine": "A voice came through the far side of the Breach. Still answering. Take the new passage; find whoever is left before the signal goes quiet.",
+					"requiredFlags": [
+						"Quest.Breach.TurnedIn"
+					],
+					"blockedByFlags": [
+						"Quest.Survivor.Accepted"
+					],
+					"choices": [
+						{
+							"text": "Tell me where to look.",
+							"nextNodeId": "SurvivorOffer",
+							"setsQuestFlag": "Quest.Survivor.Offered",
+							"requiredFlags": [
+								"Quest.Breach.TurnedIn"
+							],
+							"blockedByFlags": [
+								"Quest.Survivor.Accepted"
+							],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] I need to prepare.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "SurvivorOffer",
+					"speakerLine": "Earth, without the works or the stacks. The Vestiges reached it anyway. If that voice belongs to a person, bring them inside the Anchor. Don't leave them waiting out there.",
+					"requiredFlags": [
+						"Quest.Breach.TurnedIn"
+					],
+					"blockedByFlags": [
+						"Quest.Survivor.Accepted"
+					],
+					"choices": [
+						{
+							"text": "[Accept] I'll bring them back.",
+							"nextNodeId": "SurvivorProgress",
+							"setsQuestFlag": "Quest.Survivor.Accepted",
+							"requiredFlags": [
+								"Quest.Breach.TurnedIn"
+							],
+							"blockedByFlags": [
+								"Quest.Survivor.Accepted"
+							],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] Not yet.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "SurvivorProgress",
+					"speakerLine": "The Earth passage is ready. Find the voice, clear a path, and get them through. The Anchor is the part that matters.",
+					"requiredFlags": [
+						"Quest.Breach.TurnedIn"
+					],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "[Leave] I'm going.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "SurvivorDone",
+					"speakerLine": "They're still themselves. Give them a place to sit. The reports can wait.",
+					"requiredFlags": [
+						"Quest.Survivor.TurnedIn",
+						"Quest.Breach.TurnedIn"
+					],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "[Leave] Let them rest.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
 					"nodeId": "BreachDone",
 					"speakerLine": "The Breach is open for another sweep if you need one. You already earned the requisition. For now, restock and make something of what you learned.",
 					"requiredFlags": [
@@ -966,6 +1067,18 @@
 					],
 					"blockedByFlags": [],
 					"choices": [
+						{
+							"text": "What came through the Breach?",
+							"nextNodeId": "SurvivorOffer",
+							"setsQuestFlag": "Quest.Survivor.Offered",
+							"requiredFlags": [
+								"Quest.Breach.TurnedIn"
+							],
+							"blockedByFlags": [
+								"Quest.Survivor.Accepted"
+							],
+							"action": "None"
+						},
 						{
 							"text": "Show me the regular board.",
 							"nextNodeId": "Start",
@@ -986,6 +1099,44 @@
 				}
 			],
 			"entries": [
+				{
+					"startNodeId": "SurvivorDone",
+					"requiredFlags": [
+						"Quest.Breach.TurnedIn",
+						"Quest.Survivor.TurnedIn"
+					],
+					"blockedByFlags": []
+				},
+				{
+					"startNodeId": "SurvivorProgress",
+					"requiredFlags": [
+						"Quest.Breach.TurnedIn",
+						"Quest.Survivor.Accepted"
+					],
+					"blockedByFlags": [
+						"Quest.Survivor.TurnedIn"
+					]
+				},
+				{
+					"startNodeId": "SurvivorOffer",
+					"requiredFlags": [
+						"Quest.Breach.TurnedIn",
+						"Quest.Survivor.Offered"
+					],
+					"blockedByFlags": [
+						"Quest.Survivor.Accepted"
+					]
+				},
+				{
+					"startNodeId": "SurvivorLead",
+					"requiredFlags": [
+						"Quest.Breach.TurnedIn"
+					],
+					"blockedByFlags": [
+						"Quest.Survivor.Offered",
+						"Quest.Survivor.Accepted"
+					]
+				},
 				{
 					"startNodeId": "BreachDone",
 					"requiredFlags": [
@@ -1122,6 +1273,211 @@
 					],
 					"blockedByFlags": [
 						"Quest.FirstContract.TurnedIn"
+					]
+				}
+			]
+		},
+		{
+			"id": "Survivor",
+			"displayName": "THE SURVIVOR",
+			"startNodeId": "Meet",
+			"nodes": [
+				{
+					"nodeId": "Meet",
+					"speakerLine": "You heard me. Good. I was starting to forget the next word. There were no factories here. The things came all the same. Is there somewhere the noise stops?",
+					"requiredFlags": [
+						"Quest.Breach.TurnedIn",
+						"Quest.Survivor.Accepted"
+					],
+					"blockedByFlags": [
+						"Quest.Survivor.Extracted",
+						"Quest.Survivor.ReachedAnchor",
+						"Quest.Survivor.TurnedIn"
+					],
+					"choices": [
+						{
+							"text": "[Escort] Stay close. I'll get you to the Anchor.",
+							"nextNodeId": "",
+							"setsQuestFlag": "Quest.Survivor.Met",
+							"requiredFlags": [
+								"Quest.Breach.TurnedIn",
+								"Quest.Survivor.Accepted"
+							],
+							"blockedByFlags": [
+								"Quest.Survivor.Extracted"
+							],
+							"action": "StartSurvivorEscort"
+						},
+						{
+							"text": "[Leave] Wait here. I'll clear the way.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Retry",
+					"speakerLine": "I remember you. I can still walk. Tell me when to follow.",
+					"requiredFlags": [
+						"Quest.Breach.TurnedIn",
+						"Quest.Survivor.Accepted",
+						"Quest.Survivor.Met"
+					],
+					"blockedByFlags": [
+						"Quest.Survivor.Extracted",
+						"Quest.Survivor.ReachedAnchor",
+						"Quest.Survivor.TurnedIn"
+					],
+					"choices": [
+						{
+							"text": "[Escort] With me. Let's try again.",
+							"nextNodeId": "",
+							"setsQuestFlag": "Quest.Survivor.Met",
+							"requiredFlags": [
+								"Quest.Breach.TurnedIn",
+								"Quest.Survivor.Accepted"
+							],
+							"blockedByFlags": [
+								"Quest.Survivor.Extracted"
+							],
+							"action": "StartSurvivorEscort"
+						},
+						{
+							"text": "[Leave] Stay here a little longer.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Extracted",
+					"speakerLine": "I can see the opening. Please. All the way through.",
+					"requiredFlags": [
+						"Quest.Breach.TurnedIn",
+						"Quest.Survivor.Extracted"
+					],
+					"blockedByFlags": [
+						"Quest.Survivor.ReachedAnchor"
+					],
+					"choices": [
+						{
+							"text": "[Leave] We're going inside.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "TurnIn",
+					"speakerLine": "It's quiet. I thought I'd forgotten what quiet was. Those people outside, the ones who couldn't answer anymore... you did what you had to. Can I sit here?",
+					"requiredFlags": [
+						"Quest.Breach.TurnedIn",
+						"Quest.Survivor.Accepted",
+						"Quest.Survivor.Met",
+						"Quest.Survivor.Extracted",
+						"Quest.Survivor.ReachedAnchor"
+					],
+					"blockedByFlags": [
+						"Quest.Survivor.TurnedIn"
+					],
+					"choices": [
+						{
+							"text": "[Complete] You're inside. Take your time.",
+							"nextNodeId": "Done",
+							"setsQuestFlag": "Quest.Survivor.TurnedIn",
+							"requiredFlags": [
+								"Quest.Breach.TurnedIn",
+								"Quest.Survivor.Accepted",
+								"Quest.Survivor.Met",
+								"Quest.Survivor.Extracted",
+								"Quest.Survivor.ReachedAnchor"
+							],
+							"blockedByFlags": [
+								"Quest.Survivor.TurnedIn"
+							],
+							"action": "None"
+						},
+						{
+							"text": "[Leave] I'll give you a moment.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Done",
+					"speakerLine": "I remember the path to my house. Every stone. I don't need to tell it to you yet, do I?",
+					"requiredFlags": [
+						"Quest.Breach.TurnedIn"
+					],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "[Leave] No. Not yet.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				}
+			],
+			"entries": [
+				{
+					"startNodeId": "Done",
+					"requiredFlags": [
+						"Quest.Breach.TurnedIn",
+						"Quest.Survivor.TurnedIn"
+					],
+					"blockedByFlags": []
+				},
+				{
+					"startNodeId": "TurnIn",
+					"requiredFlags": [
+						"Quest.Breach.TurnedIn",
+						"Quest.Survivor.Accepted",
+						"Quest.Survivor.Met",
+						"Quest.Survivor.Extracted",
+						"Quest.Survivor.ReachedAnchor"
+					],
+					"blockedByFlags": [
+						"Quest.Survivor.TurnedIn"
+					]
+				},
+				{
+					"startNodeId": "Extracted",
+					"requiredFlags": [
+						"Quest.Breach.TurnedIn",
+						"Quest.Survivor.Extracted"
+					],
+					"blockedByFlags": [
+						"Quest.Survivor.ReachedAnchor"
+					]
+				},
+				{
+					"startNodeId": "Retry",
+					"requiredFlags": [
+						"Quest.Breach.TurnedIn",
+						"Quest.Survivor.Accepted",
+						"Quest.Survivor.Met"
+					],
+					"blockedByFlags": [
+						"Quest.Survivor.Extracted",
+						"Quest.Survivor.ReachedAnchor",
+						"Quest.Survivor.TurnedIn"
 					]
 				}
 			]

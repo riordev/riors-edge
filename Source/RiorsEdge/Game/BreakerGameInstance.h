@@ -149,6 +149,7 @@ public:
     static const TCHAR* AnchorMapName()   { return TEXT("Lvl_Anchor"); }
     static const TCHAR* GymMapName()      { return TEXT("Lvl_Gym"); }
     static const TCHAR* FernhallMapName() { return TEXT("Lvl_Fernhall"); }
+    static const TCHAR* ErasedEarthMapName() { return TEXT("Lvl_ErasedEarth"); }
 
     // What a map is FOR. The game mode is shared across all of them, so it
     // asks this rather than carrying a subclass per map — the alternative is
@@ -159,6 +160,9 @@ public:
     static bool IsAnchorMap(const UObject* WorldContext);
     UFUNCTION(BlueprintPure, Category="Breaker|Session")
     static bool IsFernhallMap(const UObject* WorldContext);
+    static bool IsErasedEarthMap(const UObject* WorldContext);
+    // Session intent alone cannot prove an arrival in a different world.
+    static bool IsDestinationMap(const UObject* WorldContext, FName DestinationId);
     UFUNCTION(BlueprintPure, Category="Breaker|Session")
     static bool IsGymMap(const UObject* WorldContext);
     // The fallback rule itself, name-in bool-out so the suite can hold the

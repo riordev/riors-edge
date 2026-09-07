@@ -157,7 +157,7 @@ bool FBreakerQuestsFreshTest::RunTest(const FString& Parameters)
     const TArray<FBreakerQuestDefinition>& Quests = UBreakerQuestLibrary::GetFallbackQuests();
     const TArray<FName>& Flags = UBreakerQuestLibrary::GetRegisteredFlags();
 
-    TestEqual(TEXT("Act I and Act II author six quests"), Quests.Num(), 6);
+    TestEqual(TEXT("Act I, Act II and the Survivor author seven quests"), Quests.Num(), 7);
     const TArray<FName> ChainOrder = { TEXT("Quest.FirstContract"), TEXT("Quest.KessSalvage"), TEXT("Quest.Pattern"), TEXT("Quest.Deeper") };
     for (int32 Index = 0; Index < ChainOrder.Num() && Index < Quests.Num(); ++Index)
     {
@@ -165,8 +165,8 @@ bool FBreakerQuestsFreshTest::RunTest(const FString& Parameters)
     }
     int32 ObjectiveCount = 0;
     for (const FBreakerQuestDefinition& Quest : Quests) { ObjectiveCount += Quest.Objectives.Num(); }
-    TestEqual(TEXT("Seven objectives across both chapters"), ObjectiveCount, 7);
-    TestEqual(TEXT("Twenty-eight registered flags"), Flags.Num(), 28);
+    TestEqual(TEXT("Ten objectives including the three rescue stages"), ObjectiveCount, 10);
+    TestEqual(TEXT("Thirty-four registered flags"), Flags.Num(), 34);
     TestTrue(TEXT("A quest flag is registered"), UBreakerQuestLibrary::IsRegisteredFlag(BreakerQuestFlags::FirstContractTurnedIn));
     TestFalse(TEXT("A progress counter is not a registered flag"), UBreakerQuestLibrary::IsRegisteredFlag(BreakerQuestFlags::FirstContractKillCounter));
     AddInfo(FString::Printf(TEXT("Quest registry: %d quests, %d objectives, %d flags"), Quests.Num(), ObjectiveCount, Flags.Num()));
@@ -217,18 +217,21 @@ bool FBreakerDialogueFreshTest::RunTest(const FString& Parameters)
     }
 
     const FBreakerDialogueData& Data = ABreakerNPC::GetDialogueData();
-    TestEqual(TEXT("Two npcs"), Data.Npcs.Num(), 2);
+    TestEqual(TEXT("Three authored NPCs"), Data.Npcs.Num(), 3);
     const FBreakerDialogueRow* Kess = Data.Npcs.FindByPredicate([](const FBreakerDialogueRow& Row) { return Row.Id == FName(TEXT("ForgeKeeper")); });
     const FBreakerDialogueRow* Quartermaster = Data.Npcs.FindByPredicate([](const FBreakerDialogueRow& Row) { return Row.Id == FName(TEXT("Quartermaster")); });
-    if (!Kess || !Quartermaster)
+    const FBreakerDialogueRow* Survivor = Data.Npcs.FindByPredicate([](const FBreakerDialogueRow& Row) { return Row.Id == FName(TEXT("Survivor")); });
+    if (!Kess || !Quartermaster || !Survivor)
     {
-        AddError(TEXT("ForgeKeeper and Quartermaster are the two rows"));
+        AddError(TEXT("ForgeKeeper, Quartermaster and Survivor are the three rows"));
         return false;
     }
     TestEqual(TEXT("Kess has ten nodes"), Kess->Nodes.Num(), 10);
     TestEqual(TEXT("Kess has three entries"), Kess->Entries.Num(), 3);
-    TestEqual(TEXT("The Quartermaster has twenty-three nodes"), Quartermaster->Nodes.Num(), 23);
-    TestEqual(TEXT("The Quartermaster has fifteen entries"), Quartermaster->Entries.Num(), 15);
+    TestEqual(TEXT("The Quartermaster has twenty-seven nodes"), Quartermaster->Nodes.Num(), 27);
+    TestEqual(TEXT("The Quartermaster has nineteen entries"), Quartermaster->Entries.Num(), 19);
+    TestEqual(TEXT("The Survivor has five conversation stages"), Survivor->Nodes.Num(), 5);
+    TestEqual(TEXT("The Survivor has four state overrides"), Survivor->Entries.Num(), 4);
 
     int32 NodeCount = 0;
     int32 ChoiceCount = 0;
@@ -239,9 +242,9 @@ bool FBreakerDialogueFreshTest::RunTest(const FString& Parameters)
         EntryCount += Row.Entries.Num();
         for (const FBreakerDialogueNode& Node : Row.Nodes) { ChoiceCount += Node.Choices.Num(); }
     }
-    TestEqual(TEXT("Thirty-three nodes"), NodeCount, 33);
-    TestEqual(TEXT("Seventy-five choices"), ChoiceCount, 75);
-    TestEqual(TEXT("Eighteen entries"), EntryCount, 18);
+    TestEqual(TEXT("Forty-two nodes"), NodeCount, 42);
+    TestEqual(TEXT("Ninety choices"), ChoiceCount, 90);
+    TestEqual(TEXT("Twenty-six entries"), EntryCount, 26);
     AddInfo(FString::Printf(TEXT("Dialogue: %d npcs, %d nodes, %d choices, %d entries"), Data.Npcs.Num(), NodeCount, ChoiceCount, EntryCount));
 
     const FString Fresh = BreakerCensus::ExportDialogue(Data);
@@ -295,13 +298,18 @@ bool FBreakerMissionsFreshTest::RunTest(const FString& Parameters)
     const TArray<FBreakerMissionDefinition>& Missions = UBreakerMissionLibrary::GetMissions();
 
     TestEqual(TEXT("Three authored rifts"), Rifts.Num(), 3);
-    TestEqual(TEXT("Two authored missions"), Missions.Num(), 2);
+    TestEqual(TEXT("Three authored missions"), Missions.Num(), 3);
     const FBreakerMissionDefinition* First = Missions.FindByPredicate([](const FBreakerMissionDefinition& Mission) { return Mission.MissionId == TEXT("Act1.Fernhall"); });
     const FBreakerMissionDefinition* Second = Missions.FindByPredicate([](const FBreakerMissionDefinition& Mission) { return Mission.MissionId == TEXT("Act2.Breach"); });
     if (!TestNotNull(TEXT("Original Act I retained"), First) || !TestNotNull(TEXT("Authored Act II retained"), Second)) return false;
     TestEqual(TEXT("Breach remains act two"), Second->Act, 2);
     TestEqual(TEXT("Breach has two earned quests"), Second->Quests.Num(), 2);
     TestEqual(TEXT("Breach has eleven authored beats"), Second->Beats.Num(), 11);
+    const FBreakerMissionDefinition* Rescue = Missions.FindByPredicate([](const FBreakerMissionDefinition& Mission) { return Mission.MissionId == TEXT("Act3.Survivor"); });
+    if (!TestNotNull(TEXT("Authored Survivor rescue exists"), Rescue)) return false;
+    TestEqual(TEXT("Rescue begins Act III"), Rescue->Act, 3);
+    TestEqual(TEXT("Rescue has one earned quest"), Rescue->Quests.Num(), 1);
+    TestEqual(TEXT("Rescue has eight ordered beats"), Rescue->Beats.Num(), 8);
     const FBreakerMissionDefinition& ActOne = *First;
     TestEqual(TEXT("The mission is Act1.Fernhall"), ActOne.MissionId, FName(TEXT("Act1.Fernhall")));
     TestEqual(TEXT("It is act one"), ActOne.Act, 1);

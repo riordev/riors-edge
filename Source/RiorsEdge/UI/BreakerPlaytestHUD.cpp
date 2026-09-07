@@ -45,6 +45,7 @@
 #include "Save/BreakerQuestContent.h"
 // The mission tracker: the current beat's line outranks the quest line (O195).
 #include "Save/BreakerMissionContent.h"
+#include "Interaction/BreakerSurvivor.h"
 // The player's profile: damage-number scale and the larger-nameplate switch.
 #include "Settings/BreakerGameSettings.h"
 #include "EngineUtils.h"
@@ -1144,6 +1145,22 @@ void ABreakerPlaytestHUD::DrawQuestLine(const ABreakerCharacter* Character)
         if (BeatLine.IsEmpty()) continue;
         DrawSpecTextRight(BeatLine, Right, S(BreakerUI::HudQuestLineTop), BreakerUI::TextSecondary,
             FitSpecPixels(BeatLine, BreakerUI::HudQuestLinePixels, Limit, 11.0f));
+        if (Beat->WorldEncounter == FName(TEXT("earth.survivor_extraction")))
+        {
+            for (TActorIterator<ABreakerSurvivor> It(GetWorld()); It; ++It)
+            {
+                FString Detail;
+                if (It->IsEscortActive())
+                {
+                    const int32 Seconds = FMath::CeilToInt(It->GetLucidityRemaining());
+                    Detail = FString::Printf(TEXT("LUCIDITY %d:%02d  |  STAY CLOSE"), Seconds / 60, Seconds % 60);
+                }
+                else Detail = TEXT("RETURN TO THE SHELTER TO RETRY");
+                DrawSpecTextRight(Detail, Right, S(BreakerUI::HudQuestLineTop + 22), BreakerUI::TextSecondary,
+                    FitSpecPixels(Detail, BreakerUI::HudQuestLinePixels, Limit, 11.0f));
+                break;
+            }
+        }
         return;
     }
 

@@ -5,11 +5,11 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
-## Cycle — Earned Survivor rescue
-- [ ] Author the Act III Survivor quest, dialogue and ordered extraction/Anchor return benchmark, paying two more Doctrine points only for actual rescue.
-- [ ] Build a distinct preindustrial erased-Earth space with a physical Survivor escort, three finite Vestige encounter pockets and retryable failure; no boss replay or generic kill-counter completion.
-- [ ] Wire stable destination/map access, verified extraction and actual Anchor arrival, persistence and replay protection; extend the real campaign loop to six earned Doctrine.
-- [ ] Review, build, census, full suite and inspect the actual rescue space/escort before landing.
+## Cycle — Earned finale benchmark
+- [ ] Author the Researcher reconstruction, stripped Earth recovery and winning Earth alternate-self meeting as one ordered Act III mission.
+- [ ] Build distinct physical destinations and finite encounters; the living alternate self is friendly, and Rior is absent.
+- [ ] Add the Anchor device's atomic SEAL/HOLD choice at level 50, identical endgame access and the final two earned Doctrine points. Keep four unique benchmarks within three acts.
+- [ ] Verify real recovery/travel/meeting, level-49 refusal, level-50 completion, persistence and replay; inspect the actual spaces and complete review/build/census/suite.
 Remaining repairs include the final campaign benchmark, silent nodes/affixes, ability balance, rarity identities, arms/weapon art and audible combat polish.
 ## Playtest queue (owner, 2026-09-07)
 Continue through the entire repair list in tested batches without stopping after each commit for a playtest. After repairs, execute the content phase below (owner instruction, 2026-09-07).
@@ -22,7 +22,7 @@ Continue through the entire repair list in tested batches without stopping after
 
 ## Repair dependencies found in runtime review
 - Sequence requires three distinct applications, but Caster has only Bleed and Poison. Void is not an applied status. A third functional status or a revised node contract is required; do not fake the third tag.
-- Doctrine progression now awards 4/8 through Acts I and II. Remaining earned benchmarks need Survivor/Erased Earth and alternate-self finale gameplay. Mission validation must support the separate Act III finale and stable encounter identities before extending content; replaying Fernhall must not counterfeit later completion.
+- Doctrine progression now awards 6/8 through Acts I, II and the physical Survivor rescue. The final earned benchmark needs alternate-self finale gameplay and level-50 completion. Mission validation must support the separate Act III finale and stable encounter identities; replaying Fernhall must not counterfeit later completion.
 - New special loot now respects its final affix budget. Existing saved items remain unchanged; a migration still needs to be designed.
 
 ## Content phase after the repair list (owner, 2026-09-07)
@@ -106,6 +106,7 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - Four Niagara systems at `/Game/Breaker/FX/NS_<Moment>` with a `Color` user parameter, or a free Fab VFX pack placed there
 
 ## Done (last three cycles; older is git)
+- **Earned Survivor rescue (2026-09-07):** Separate Quiet Earth map, garden/settlement/causeway/terrace blockout, physical swept escort, three finite Vestige pockets (15 enemies), visible lucidity countdown and retryable timeout/death. Ordered dialogue → actual extraction → actual Anchor arrival → rescued resident turn-in pays two Exceptional ilvl30 items and +2 Doctrine (six cumulative); dialogue cannot counterfeit extraction. Destination map verification and all-NPC quest validation corrected. Build/census clean; full suite **632 tests, 627 pass, five known failures, zero unexpected**. Fresh isolated `-Survivor -Photos` campaign **PASS,126 actual deaths,six earned Doctrine**, log `Saved/LoopProbe/92c0720783194c05b0d587a27edef5bc/loop.log`; garden/causeway frames inspected. Probe relocates only test player and accelerates damage, not Survivor movement; no combat pacing/input claim. Environment/NPC art remains visibly placeholder. STATE unchanged under host-Python quarantine.
 ### Swift traversal income and Damage Ramp — 623 / 5 / 0
 - [x] Contact now grants brief income after actual vault/mantle completion, with purchased ranks, fractional timing and the existing income/anti-farm caps. Corrected the wall ray that missed50–80cm vaults; real collision tests cover vault/mantle, obstruction, teleport, death and respec within the currently attainable four-point wallet.
 - [x] Ordinary Primary Damage Ramp rolls a per-stack Increased weapon bonus with ten-stack cap, once-per-shot hitscan/shotgun accrual and actual rocket impact ordering. Purchased Redline Trigger doubles accrual at Redline. Miss/swap/removal/death and stale projectile tokens reset safely; weapon DoT snapshots share the additive contribution.

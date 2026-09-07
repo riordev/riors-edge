@@ -27,7 +27,7 @@ bool FBreakerHubTravelRegistryTest::RunTest(const FString& Parameters)
     // the original claim exactly as strong and adds the new one, rather than
     // loosening a 3 into a 4 and losing what the 3 was asserting.
     //
-    // GENERAL destinations — three: the gym, the way back (the Anchor), and
+    // GENERAL destinations — four: the gym, the way back (the Anchor), Earth, and
     // the Fernhall approach. The old "no third destination without checking
     // the selection UI exists" reason is discharged: SBreakerMenu's travel
     // screen is a real multi-card picker over GetAvailableDestinations.
@@ -51,7 +51,7 @@ bool FBreakerHubTravelRegistryTest::RunTest(const FString& Parameters)
         if (!Destination.bEnabled) continue;
         if (Destination.bDoorOnly) ++DoorOnlyCount; else ++GeneralCount;
     }
-    TestEqual(TEXT("Exactly three general destinations: the gym, the way back, and Fernhall"), GeneralCount, 3);
+    TestEqual(TEXT("Exactly four general destinations: gym, Anchor, Fernhall, and earned Earth"), GeneralCount, 4);
     TestEqual(TEXT("Exactly one door-only destination: the Local Rift"), DoorOnlyCount, 1);
 
     // A travel point never offers the place it stands in, which is what keeps
@@ -63,6 +63,10 @@ bool FBreakerHubTravelRegistryTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("The hub destination is enabled"), Found.bEnabled);
     TestTrue(TEXT("The gym and the hub are different destinations"),
         ABreakerTravelPoint::HubDestinationId != ABreakerTravelPoint::GymDestinationId);
+    TestTrue(TEXT("The earned Earth destination has its actual stable identity"),
+        ABreakerTravelPoint::FindDestination(ABreakerTravelPoint::ErasedEarthDestinationId, Found));
+    TestTrue(TEXT("Earth is enabled general travel, not a generated Rift door"), Found.bEnabled && !Found.bDoorOnly);
+    TestFalse(TEXT("An absent player cannot bypass the earned Earth gate"), ABreakerTravelPoint::CanEnterErasedEarth(nullptr));
 
     // Ids are unique. Nothing in the registry today would break this, but a
     // second entry added later without checking this test would be a silent

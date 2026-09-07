@@ -37,6 +37,12 @@ namespace BreakerQuestFlags
     const FName DeeperSweepDone(TEXT("Quest.Deeper.SweepDone"));
     const FName DeeperTurnedIn(TEXT("Quest.Deeper.TurnedIn"));
     const FName DeeperEliteCounter(TEXT("Quest.Deeper.EliteKills"));
+    const FName SurvivorOffered(TEXT("Quest.Survivor.Offered"));
+    const FName SurvivorAccepted(TEXT("Quest.Survivor.Accepted"));
+    const FName SurvivorMet(TEXT("Quest.Survivor.Met"));
+    const FName SurvivorExtracted(TEXT("Quest.Survivor.Extracted"));
+    const FName SurvivorReachedAnchor(TEXT("Quest.Survivor.ReachedAnchor"));
+    const FName SurvivorTurnedIn(TEXT("Quest.Survivor.TurnedIn"));
 }
 
 // ---------------------------------------------------------------------------
@@ -455,10 +461,11 @@ bool UBreakerQuestLibrary::ValidateQuestContent(FString& OutError)
         Referenced.Add(Quest.TurnedInFlag);
         for (const FBreakerQuestObjective& Objective : Quest.Objectives) Referenced.Add(Objective.CompletionFlag);
     }
-    GatherDialogueFlags(ABreakerNPC::MakeForgeKeeperDialogue(), Referenced);
-    GatherDialogueFlags(ABreakerNPC::MakeQuartermasterDialogue(), Referenced);
-    GatherEntryFlags(ABreakerNPC::MakeForgeKeeperEntries(), Referenced);
-    GatherEntryFlags(ABreakerNPC::MakeQuartermasterEntries(), Referenced);
+    for (const FBreakerDialogueRow& Row : ABreakerNPC::GetDialogueData().Npcs)
+    {
+        GatherDialogueFlags(Row.Nodes, Referenced);
+        GatherEntryFlags(Row.Entries, Referenced);
+    }
 
     for (const FName& Flag : Referenced)
     {
@@ -474,13 +481,10 @@ bool UBreakerQuestLibrary::ValidateQuestContent(FString& OutError)
     // combat and by dialogue respectively, so only the OFFER side is checked
     // here — every quest must be reachable from a conversation.
     TArray<FName> DialogueSets;
-    for (const FBreakerDialogueNode& Node : ABreakerNPC::MakeQuartermasterDialogue())
+    for (const FBreakerDialogueRow& Row : ABreakerNPC::GetDialogueData().Npcs)
     {
-        for (const FBreakerDialogueChoice& Choice : Node.Choices) DialogueSets.Add(Choice.SetsQuestFlag);
-    }
-    for (const FBreakerDialogueNode& Node : ABreakerNPC::MakeForgeKeeperDialogue())
-    {
-        for (const FBreakerDialogueChoice& Choice : Node.Choices) DialogueSets.Add(Choice.SetsQuestFlag);
+        for (const FBreakerDialogueNode& Node : Row.Nodes)
+            for (const FBreakerDialogueChoice& Choice : Node.Choices) DialogueSets.Add(Choice.SetsQuestFlag);
     }
     for (const FBreakerQuestDefinition& Quest : GetFallbackQuests())
     {

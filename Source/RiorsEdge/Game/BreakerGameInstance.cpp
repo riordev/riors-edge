@@ -1,6 +1,7 @@
 #include "Game/BreakerGameInstance.h"
 
 #include "Combat/BreakerEnemy.h"
+#include "Interaction/BreakerTravelPoint.h"
 #include "Containers/Ticker.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
@@ -51,6 +52,22 @@ bool UBreakerGameInstance::IsGymMap(const UObject* WorldContext)
     return IsGymMapName(BreakerCurrentMapName(WorldContext));
 }
 
+bool UBreakerGameInstance::IsErasedEarthMap(const UObject* WorldContext)
+{
+    return BreakerCurrentMapName(WorldContext) == ErasedEarthMapName();
+}
+
+bool UBreakerGameInstance::IsDestinationMap(const UObject* WorldContext, FName DestinationId)
+{
+    const FString Map = BreakerCurrentMapName(WorldContext);
+    if (DestinationId == ABreakerTravelPoint::HubDestinationId) return Map == AnchorMapName();
+    if (DestinationId == ABreakerTravelPoint::FernhallDestinationId) return Map == FernhallMapName();
+    if (DestinationId == ABreakerTravelPoint::ErasedEarthDestinationId) return Map == ErasedEarthMapName();
+    if (DestinationId == ABreakerTravelPoint::GymDestinationId) return Map == GymMapName();
+    if (DestinationId == ABreakerTravelPoint::RiftDestinationId) return Map == FernhallMapName();
+    return false;
+}
+
 bool UBreakerGameInstance::IsGymMapName(const FString& Name)
 {
     // THE FALLBACK IS THE GYM, and it is load-bearing. Every existing entry
@@ -61,7 +78,7 @@ bool UBreakerGameInstance::IsGymMapName(const FString& Name)
     // of the fallback is that every NEW named map must be excluded here by
     // hand, or it silently fills with targets and a boss key — which is why
     // this is a name-in, bool-out function the suite can hold.
-    return Name != FrontEndMapName() && Name != AnchorMapName() && Name != FernhallMapName();
+    return Name != FrontEndMapName() && Name != AnchorMapName() && Name != FernhallMapName() && Name != ErasedEarthMapName();
 }
 
 // ---------------------------------------------------------------------------

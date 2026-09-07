@@ -79,6 +79,13 @@ namespace BreakerQuestFlags
     RIORSEDGE_API extern const FName DeeperSweepDone;
     RIORSEDGE_API extern const FName DeeperTurnedIn;
     RIORSEDGE_API extern const FName DeeperEliteCounter;
+
+    RIORSEDGE_API extern const FName SurvivorOffered;
+    RIORSEDGE_API extern const FName SurvivorAccepted;
+    RIORSEDGE_API extern const FName SurvivorMet;
+    RIORSEDGE_API extern const FName SurvivorExtracted;
+    RIORSEDGE_API extern const FName SurvivorReachedAnchor;
+    RIORSEDGE_API extern const FName SurvivorTurnedIn;
 }
 
 // Derived, never stored. A quest's state is a pure function of the flag set,
