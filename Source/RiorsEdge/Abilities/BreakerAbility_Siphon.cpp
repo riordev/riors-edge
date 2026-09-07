@@ -79,9 +79,11 @@ void UBreakerAbility_Siphon::ActivateAbility(const FGameplayAbilitySpecHandle Ha
     FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(BreakerSiphon), false, Character);
     const FVector TraceEnd = ViewLocation + ViewRotation.Vector() * MaximumRangeCm;
     AActor* Target = nullptr;
+    UBreakerCombatComponent* TargetCombat = nullptr;
     if (World->LineTraceSingleByChannel(Hit, ViewLocation, TraceEnd, ECC_GameTraceChannel2, QueryParams) && Hit.GetActor())
     {
-        if (Hit.GetActor()->FindComponentByClass<UBreakerCombatComponent>()) Target = Hit.GetActor();
+        TargetCombat = Hit.GetActor()->FindComponentByClass<UBreakerCombatComponent>();
+        if (TargetCombat && !TargetCombat->IsDead() && !Hit.GetActor()->IsActorBeingDestroyed()) Target = Hit.GetActor();
     }
 
     if (!Target || !CommitAbility(Handle, ActorInfo, ActivationInfo))
@@ -92,6 +94,10 @@ void UBreakerAbility_Siphon::ActivateAbility(const FGameplayAbilitySpecHandle Ha
 
     ChannelTarget = Target;
     TicksDelivered = 0;
+    // Corpses remain valid actors after death. End the channel on the combat
+    // event, without waiting for another tick or for corpse destruction.
+    BoundTargetCombat = TargetCombat;
+    TargetCombat->OnDeath.AddUniqueDynamic(this, &ThisClass::HandleTargetDied);
 
     // The break condition is a binding, not a poll: the caster's combat
     // component already announces every hit it takes, and polling health would
@@ -143,7 +149,7 @@ void UBreakerAbility_Siphon::TickChannel()
     ABreakerCharacter* Character = GetBreakerCharacter();
     AActor* Target = ChannelTarget.Get();
     UWorld* World = Character ? Character->GetWorld() : nullptr;
-    if (!World || !Target)
+    if (!World || !Target || Target->IsActorBeingDestroyed())
     {
         // The target died or was destroyed. The channel ends; it does not hunt
         // for a new one.
@@ -158,7 +164,7 @@ void UBreakerAbility_Siphon::TickChannel()
     }
 
     UBreakerCombatComponent* TargetCombat = Target->FindComponentByClass<UBreakerCombatComponent>();
-    if (!TargetCombat)
+    if (!TargetCombat || TargetCombat->IsDead())
     {
         EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
         return;
@@ -204,6 +210,11 @@ void UBreakerAbility_Siphon::TickChannel()
         Heal.SetHealer(Character);
         CasterCombat->ApplyHealing(Heal);
     }
+}
+
+void UBreakerAbility_Siphon::HandleTargetDied()
+{
+    EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UBreakerAbility_Siphon::HandleCasterDamaged(const FBreakerDamageResult& Result)
@@ -253,6 +264,11 @@ void UBreakerAbility_Siphon::StopChannel()
         Bound->OnDamageReceived.RemoveDynamic(this, &ThisClass::HandleCasterDamaged);
     }
     BoundCasterCombat = nullptr;
+    if (UBreakerCombatComponent* Bound = BoundTargetCombat.Get())
+    {
+        Bound->OnDeath.RemoveDynamic(this, &ThisClass::HandleTargetDied);
+    }
+    BoundTargetCombat = nullptr;
     ChannelTarget = nullptr;
 }
 

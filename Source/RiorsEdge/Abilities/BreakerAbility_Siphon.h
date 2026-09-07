@@ -73,10 +73,12 @@ protected:
     void StopChannel();
 
     UFUNCTION() void HandleCasterDamaged(const FBreakerDamageResult& Result);
+    UFUNCTION() void HandleTargetDied();
 
 private:
     TWeakObjectPtr<AActor> ChannelTarget;
     TWeakObjectPtr<UBreakerCombatComponent> BoundCasterCombat;
+    TWeakObjectPtr<UBreakerCombatComponent> BoundTargetCombat;
     FTimerHandle ChannelTimer;
     FTimerHandle ChannelEndTimer;
     int32 TicksDelivered = 0;
