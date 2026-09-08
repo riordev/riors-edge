@@ -62,6 +62,7 @@ public:
     UFUNCTION(BlueprintPure, Category="Combat") UBreakerAttributeSet* GetAttributes() const { return Attributes; }
     UFUNCTION(BlueprintPure, Category="Combat") UBreakerCombatComponent* GetCombat() const { return Combat; }
     UFUNCTION(BlueprintPure, Category="Combat") float GetSecondsSinceCombat() const;
+    bool IsInResourceCombat() const { return GetSecondsSinceCombat() < CombatStateWindowSeconds; }
     UFUNCTION(BlueprintPure, Category="Weapon") UBreakerWeaponComponent* GetWeapon() const { return Weapon; }
     bool TryGetViewmodelMuzzle(FVector& OutLocation) const;
     UFUNCTION(BlueprintPure, Category="Equipment") UBreakerEquipmentComponent* GetEquipment() const { return Equipment; }

@@ -526,14 +526,17 @@ void UBreakerChargeComponent::AdvanceLoop(float DeltaTime)
         return;
     }
 
+    ApplyChargeDelta(BreakerResourceGeneration::FlatRate(Owner) * DeltaTime * GetGenerationMultiplier() * BreakerResourceGeneration::Multiplier(Owner));
+
     if (!bInCombat)
     {
-        // OUT OF COMBAT: no generation at all, and the clamp runs. Queued income
+        // OUT OF COMBAT: no conditional generation, and the clamp runs unless the
+        // owned Second Shift rule holds it. Core passive income is paid above. Queued income
         // is dropped rather than banked — it was earned in a combat that has
         // ended, and paying it out now is exactly the pre-combat bar the clamp
         // exists to deny.
         PendingGrants = 0.0f;
-        if (!IsClampSuspended())
+        if (!IsClampSuspended() && !BreakerResourceGeneration::HoldsOutOfCombatDecay(Owner))
         {
             const float Ceiling = FMath::Min(OutOfCombatCeiling, Attributes->GetMaxClassResource());
             const float Rate = OutOfCombatClampSeconds > 0.0f

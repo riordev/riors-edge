@@ -26,6 +26,12 @@ struct RIORSEDGE_API FBreakerNodePrerequisiteGroup
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="1")) int32 MinimumSatisfied = 1;
 };
 
+// Optional presentation roles for the replacement Core wheel. Legacy is inert.
+UENUM(BlueprintType)
+enum class EBreakerCoreNodeRole : uint8
+{
+    Legacy, Gateway, LaneMinor, LaneNotable, Link, Convergence, Keystone
+};
 UCLASS(BlueprintType)
 class RIORSEDGE_API UBreakerProgressionNode : public UPrimaryDataAsset
 {
@@ -52,6 +58,9 @@ public:
     // convention is silent. The UI is another lane's territory this pass —
     // this is the data the consumer gets wired to at integration.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Identity") FName Constellation = NAME_None;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Core Layout") EBreakerCoreNodeRole CoreRole = EBreakerCoreNodeRole::Legacy;
+    // Lane 0..2; links use 0 for A-B and 1 for B-C.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Core Layout") int32 CoreLaneIndex = 0;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rules") EBreakerPointCurrency Currency = EBreakerPointCurrency::CorePoints;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rules") EBreakerClassId RequiredClass = EBreakerClassId::None;

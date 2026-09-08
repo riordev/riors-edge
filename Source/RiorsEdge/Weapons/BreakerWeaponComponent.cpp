@@ -34,6 +34,16 @@
 
 namespace
 {
+    const FBreakerNodeStats& BreakerCoreWeaponStats(const AActor* Owner)
+    {
+        const auto* Progression = Owner ? Owner->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+        static const FBreakerNodeStats Defaults;
+        return Progression ? Progression->GetNodeStats() : Defaults;
+    }
+}
+
+namespace
+{
     // Salts the shared shot seed so the bleed roll never correlates with the
     // spread or critical rolls drawn from the same shot sequence.
     constexpr uint32 BreakerBleedSalt = 0x51ED0000u;
@@ -608,6 +618,7 @@ UBreakerWeaponComponent::UBreakerWeaponComponent()
 void UBreakerWeaponComponent::BeginPlay()
 {
     Super::BeginPlay();
+    BindCoreProgression();
     if (GetOwner() && GetOwner()->HasAuthority())
     {
         InitializeSlotAmmunition();
@@ -1248,6 +1259,7 @@ void UBreakerWeaponComponent::TickRecoil(float DeltaSeconds)
 
 void UBreakerWeaponComponent::EquipArchetype(EBreakerWeaponArchetype NewArchetype)
 {
+    BindCoreProgression();
     if (CurrentArchetype == NewArchetype) return;
     ResetDamageRamp();
     StopFire();
@@ -1262,8 +1274,8 @@ void UBreakerWeaponComponent::EquipArchetype(EBreakerWeaponArchetype NewArchetyp
     bChamberedRoundArmed = false;
     bMagazineDumpBroadcastThisCycle = false;
     const UBreakerWeaponDefinition* Definition = ResolveDefinition();
-    MagazineAmmo = Definition ? Definition->MagazineSize : 0;
-    ReserveAmmo = Definition ? Definition->StartingReserveAmmo : 0;
+    MagazineAmmo = Definition ? GetMagazineCapacityForSlot(CurrentSlot, Definition) : 0;
+    ReserveAmmo = GetStartingReserve(Definition);
     bAmmunitionInitialized = true;
     OnReloadChanged.Broadcast(false);
     OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
@@ -1271,18 +1283,19 @@ void UBreakerWeaponComponent::EquipArchetype(EBreakerWeaponArchetype NewArchetyp
 
 void UBreakerWeaponComponent::InitializeSlotAmmunition()
 {
+    BindCoreProgression();
     bAmmunitionInitialized = true;
     if (SlotOneMagazineAmmo < 0)
     {
         const UBreakerWeaponDefinition* SlotOne = GetPrototypeDefinition(SlotOneArchetype);
-        SlotOneMagazineAmmo = SlotOne->MagazineSize;
-        SlotOneReserveAmmo = SlotOne->StartingReserveAmmo;
+        SlotOneMagazineAmmo = GetMagazineCapacityForSlot(1, SlotOne);
+        SlotOneReserveAmmo = GetStartingReserve(SlotOne);
     }
     if (SlotTwoMagazineAmmo < 0)
     {
         const UBreakerWeaponDefinition* SlotTwo = GetPrototypeDefinition(SlotTwoArchetype);
-        SlotTwoMagazineAmmo = SlotTwo->MagazineSize;
-        SlotTwoReserveAmmo = SlotTwo->StartingReserveAmmo;
+        SlotTwoMagazineAmmo = GetMagazineCapacityForSlot(2, SlotTwo);
+        SlotTwoReserveAmmo = GetStartingReserve(SlotTwo);
     }
 }
 
@@ -1409,14 +1422,14 @@ void UBreakerWeaponComponent::SetSlotArchetype(int32 SlotNumber, EBreakerWeaponA
     if (SlotNumber == 1)
     {
         SlotOneArchetype = NewArchetype;
-        SlotOneMagazineAmmo = Definition->MagazineSize;
-        SlotOneReserveAmmo = Definition->StartingReserveAmmo;
+        SlotOneMagazineAmmo = GetMagazineCapacityForSlot(1, Definition);
+        SlotOneReserveAmmo = GetStartingReserve(Definition);
     }
     else
     {
         SlotTwoArchetype = NewArchetype;
-        SlotTwoMagazineAmmo = Definition->MagazineSize;
-        SlotTwoReserveAmmo = Definition->StartingReserveAmmo;
+        SlotTwoMagazineAmmo = GetMagazineCapacityForSlot(2, Definition);
+        SlotTwoReserveAmmo = GetStartingReserve(Definition);
     }
     if (CurrentSlot == SlotNumber)
     {
@@ -1428,8 +1441,8 @@ void UBreakerWeaponComponent::SetSlotArchetype(int32 SlotNumber, EBreakerWeaponA
         BloomDegrees = 0.0f;
         bChamberedRoundArmed = false;
         bMagazineDumpBroadcastThisCycle = false;
-        MagazineAmmo = Definition->MagazineSize;
-        ReserveAmmo = Definition->StartingReserveAmmo;
+        MagazineAmmo = GetMagazineCapacityForSlot(SlotNumber, Definition);
+        ReserveAmmo = GetStartingReserve(Definition);
         bAmmunitionInitialized = true;
         ResetDamageRamp();
         OnReloadChanged.Broadcast(false);
@@ -2190,7 +2203,8 @@ FBreakerDamageResult UBreakerWeaponComponent::SubmitWeaponDamage(const UBreakerW
     // to 1.0 — every other term here is untouched.
     const float FalloffMultiplier = IsRangeTreatmentOverridden()
         ? 1.0f
-        : FBreakerWeaponMath::DamageMultiplierAtDistance(Definition, DistanceFromMuzzle / GetEffectiveRangeMultiplier());
+        : FBreakerWeaponMath::DamageMultiplierAtDistance(Definition, DistanceFromMuzzle / GetEffectiveRangeMultiplier(),
+            BreakerCoreWeaponStats(GetOwner()).WeaponFalloffStartMultiplier);
     Damage.BaseDamage = BaseDamage * FalloffMultiplier;
     Damage.DamageFamily = EBreakerDamageFamily::Physical;
     SnapshotWeaponElement(Damage);
@@ -2497,7 +2511,9 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
         // PIERCE: the budget is enemies CONTINUED THROUGH, so the first hit is
         // free and PierceCount 0 stops here — the legacy single-hit shot.
         if (EnemiesStruck > Channels.PierceCount) break;
-        CurrentMultiplier = FBreakerWeaponMath::NextPierceMultiplier(CurrentMultiplier, PierceDamageFalloff, HitDamage.bKilled, bOverpenetration);
+        const float LossReduction = FMath::Clamp(BreakerCoreWeaponStats(GetOwner()).PierceLossReductionPercent / 100.0f, 0.0f, 1.0f);
+        const float EffectivePierceRetention = 1.0f - (1.0f - PierceDamageFalloff) * (1.0f - LossReduction);
+        CurrentMultiplier = FBreakerWeaponMath::NextPierceMultiplier(CurrentMultiplier, EffectivePierceRetention, HitDamage.bKilled, bOverpenetration);
         Params.AddIgnoredActor(HitActor);
         TravelledCm += Hit.Distance;
         SegmentStart = Hit.ImpactPoint;
@@ -2695,7 +2711,9 @@ void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Def
     const FVector SpawnLocation = ViewLocation + Direction * 80.0f;
     if (ABreakerRocketProjectile* Rocket = GetWorld()->SpawnActor<ABreakerRocketProjectile>(ABreakerRocketProjectile::StaticClass(), SpawnLocation, Direction.Rotation(), Params))
     {
-        Rocket->InitializeRocket(Damage, Definition->ProjectileSpeed, Definition->ExplosionRadius, GetEffectiveMaximumRange());
+        const auto& Core = BreakerCoreWeaponStats(GetOwner());
+        Rocket->InitializeRocket(Damage, Definition->ProjectileSpeed * Core.ProjectileSpeedMultiplier,
+            Definition->ExplosionRadius * FMath::Sqrt(FMath::Max(0.0f, Core.WeaponSplashAreaMultiplier)), GetEffectiveMaximumRange());
         Rocket->InitializeDamageRamp(this, RampToken);
     }
     else ResolveDamageRampShot(RampToken, false);
@@ -2841,7 +2859,8 @@ int32 UBreakerWeaponComponent::GetEffectiveMagazineSize() const
 int32 UBreakerWeaponComponent::GetMagazineCapacityForSlot(int32 Slot, const UBreakerWeaponDefinition* Definition) const
 {
     const UBreakerEquipmentComponent* Equipment = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>() : nullptr;
-    const float Multiplier = Slot == 1 && Equipment ? Equipment->GetStats().PrimaryMagazineCapacityMultiplier : 1.0f;
+    const float Gear = Slot == 1 && Equipment ? Equipment->GetStats().PrimaryMagazineCapacityMultiplier : 1.0f;
+    const float Multiplier = FMath::Max(0.0f, Gear + BreakerCoreWeaponStats(GetOwner()).WeaponMagazineCapacityMultiplier - 1.0f);
     // Whole rounds round down; temporary Loaded rounds are added afterwards.
     int32 Size = Definition ? FMath::FloorToInt(Definition->MagazineSize * Multiplier) : 0;
     for (const TPair<FName, FMagazineCapacityOverrideEntry>& Override : MagazineCapacityOverrides)
@@ -2877,7 +2896,34 @@ void UBreakerWeaponComponent::SynchronizeMagazineCapacity()
 float UBreakerWeaponComponent::GetEffectiveRangeMultiplier() const
 {
     const UBreakerEquipmentComponent* Equipment = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>() : nullptr;
-    return CurrentSlot == 1 && Equipment ? FMath::Max(1.0f, Equipment->GetStats().PrimaryEffectiveRangeMultiplier) : 1.0f;
+    const float Gear = CurrentSlot == 1 && Equipment ? FMath::Max(1.0f, Equipment->GetStats().PrimaryEffectiveRangeMultiplier) : 1.0f;
+    return FMath::Max(0.01f, Gear + BreakerCoreWeaponStats(GetOwner()).WeaponRangeMultiplier - 1.0f);
+}
+
+float UBreakerWeaponComponent::GetReloadSpeedMultiplier() const
+{
+    return FMath::Max(0.01f, ReloadSpeedMultiplier + BreakerCoreWeaponStats(GetOwner()).WeaponReloadSpeedMultiplier - 1.0f);
+}
+
+float UBreakerWeaponComponent::GetSwapSpeedMultiplier() const
+{
+    return FMath::Max(0.01f, SwapSpeedMultiplier + BreakerCoreWeaponStats(GetOwner()).WeaponSwapSpeedMultiplier - 1.0f);
+}
+
+int32 UBreakerWeaponComponent::GetStartingReserve(const UBreakerWeaponDefinition* Definition) const
+{
+    return Definition ? FMath::Max(0, FMath::FloorToInt(Definition->StartingReserveAmmo
+        * BreakerCoreWeaponStats(GetOwner()).WeaponReserveAmmoMultiplier)) : 0;
+}
+
+void UBreakerWeaponComponent::BindCoreProgression()
+{
+    if (bBoundCoreProgression) return;
+    if (auto* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr)
+    {
+        Progression->OnProgressionChanged.AddDynamic(this, &ThisClass::SynchronizeMagazineCapacity);
+        bBoundCoreProgression = true;
+    }
 }
 
 float UBreakerWeaponComponent::GetEffectiveMaximumRange() const
@@ -2964,7 +3010,7 @@ void UBreakerWeaponComponent::AddReserveAmmoFraction(float Fraction)
     {
         const UBreakerWeaponDefinition* Definition = GetPrototypeDefinition(Archetype);
         if (!Definition) return;
-        const int32 Starting = Definition->StartingReserveAmmo;
+        const int32 Starting = GetStartingReserve(Definition);
         // Round up so small fractions on low-reserve weapons (rocket: 16)
         // still grant at least one round.
         const int32 Granted = FMath::CeilToInt(Starting * Fraction);

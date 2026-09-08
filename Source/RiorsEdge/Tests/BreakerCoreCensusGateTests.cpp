@@ -19,6 +19,8 @@ bool FBreakerCoreCensusGateTest::RunTest(const FString& Parameters)
     Node->NodeId = TEXT("Key");
     Node->RequiredConstellationInvestment = 18;
     Node->RequiredTreeInvestment = 20;
+    Node->Constellation = TEXT("Vector"); Node->CoreRole = EBreakerCoreNodeRole::Keystone;
+    Tree->CoreWedgeOrder = {TEXT("Vector")}; Tree->CoreWedgeSectors.Add(TEXT("Vector"), TEXT("Weapon"));
     FBreakerNodePrerequisiteGroup Group;
     Group.MinimumSatisfied = 2;
     Group.Candidates.Add({ TEXT("LaneA"), 3 });
@@ -31,6 +33,8 @@ bool FBreakerCoreCensusGateTest::RunTest(const FString& Parameters)
     if (!TestEqual(TEXT("Fixture tree exported"), Trees.Num(), 1)) return false;
     const auto T = Trees[0]->AsObject();
     TestTrue(TEXT("Entry policy exported"), T->GetBoolField(TEXT("restrictEntryToOwnedNeighbor")));
+    TestEqual(TEXT("Explicit wedge order exported"), T->GetArrayField(TEXT("coreWedgeOrder"))[0]->AsString(), FString(TEXT("Vector")));
+    TestEqual(TEXT("New wedge sector uses authored map"), T->GetArrayField(TEXT("constellations"))[0]->AsObject()->GetStringField(TEXT("sector")), FString(TEXT("Weapon")));
     TestEqual(TEXT("Entry roster exported"), T->GetArrayField(TEXT("entryNodes")).Num(), 2);
     const auto& Edges = T->GetArrayField(TEXT("adjacencyEdges"));
     if (!TestEqual(TEXT("Actual adjacency exported"), Edges.Num(), 1)) return false;
@@ -39,6 +43,7 @@ bool FBreakerCoreCensusGateTest::RunTest(const FString& Parameters)
     const auto& Nodes = T->GetArrayField(TEXT("nodes"));
     if (!TestEqual(TEXT("Node exported"), Nodes.Num(), 1)) return false;
     const auto N = Nodes[0]->AsObject();
+    TestEqual(TEXT("Role exported without tier inference"), N->GetStringField(TEXT("coreRole")), FString(TEXT("Keystone")));
     TestEqual(TEXT("Local gate kept separate from tree gate"), N->GetNumberField(TEXT("requiredConstellationInvestment")), 18.0);
     TestEqual(TEXT("Tree gate retained"), N->GetNumberField(TEXT("requiredTreeInvestment")), 20.0);
     const auto& Groups = N->GetArrayField(TEXT("prerequisiteGroups"));

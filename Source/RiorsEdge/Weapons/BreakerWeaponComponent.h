@@ -256,8 +256,8 @@ public:
     // axis wins; changing a buff never restarts a reload or swap already begun.
     void PushTempoBonus(FName Key, float ReloadMultiplier, float SwapMultiplier);
     void PopTempoBonus(FName Key);
-    UFUNCTION(BlueprintPure, Category="Weapon") float GetReloadSpeedMultiplier() const { return ReloadSpeedMultiplier; }
-    UFUNCTION(BlueprintPure, Category="Weapon") float GetSwapSpeedMultiplier() const { return SwapSpeedMultiplier; }
+    UFUNCTION(BlueprintPure, Category="Weapon") float GetReloadSpeedMultiplier() const;
+    UFUNCTION(BlueprintPure, Category="Weapon") float GetSwapSpeedMultiplier() const;
     // Authority trigger state, including automatic fire waiting through a reload.
     bool IsTriggerHeld() const { return bTriggerHeld; }
     UFUNCTION(BlueprintPure, Category="Weapon") bool IsAiming() const { return bAiming; }
@@ -606,9 +606,12 @@ public:
     // every live override delta is added; the final capacity is at least one.
     UFUNCTION(BlueprintPure, Category="Weapon|Magazine")
     int32 GetEffectiveMagazineSize() const;
-    void SynchronizeMagazineCapacity();
+    UFUNCTION() void SynchronizeMagazineCapacity();
     float GetEffectiveRangeMultiplier() const;
     float GetEffectiveMaximumRange() const;
+    int32 GetStartingReserve(const UBreakerWeaponDefinition* Definition) const;
+    void BindCoreProgression();
+    bool bBoundCoreProgression = false;
 
     // ---- Gunsmith / Tank weapon-half node rules (2026-08-16) --------------
     // The weapon-side consumers of the Armory/Bastion tags the tree already

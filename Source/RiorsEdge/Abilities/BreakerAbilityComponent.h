@@ -75,6 +75,14 @@ public:
     void InterruptActiveActions();
     UBreakerAbilityComponent();
     virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type Reason) override;
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    bool IsConductionActive() const;
+    float GetConductionCostMultiplier() const;
+    bool IsAbilityCommitInProgress() const { return bAbilityCommitInProgress; }
+    bool BeginAbilityCommit();
+    void EndAbilityCommit() { bAbilityCommitInProgress = false; }
+    void RecordConductionCast();
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
     // Reconciles granted specs against the owner's ability loadout. Revoke then
@@ -181,5 +189,11 @@ private:
     mutable TWeakObjectPtr<UAbilitySystemComponent> CachedAbilitySystem;
     mutable TWeakObjectPtr<UBreakerProgressionComponent> CachedProgression;
     FString CachedLoadoutSignature;
+    UPROPERTY(Replicated) TArray<double> ConductionCastTimes;
+    bool bAbilityCommitInProgress = false;
+    double ConductionClock() const;
+    void BindConductionLifecycle();
+    UFUNCTION() void RefreshConductionOwnership();
+    UFUNCTION() void ClearConduction();
     float PollElapsed = 0.0f;
 };

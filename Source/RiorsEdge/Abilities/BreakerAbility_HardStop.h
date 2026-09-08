@@ -49,7 +49,7 @@ public:
     // Live cost: S4's authored 30, doubled under Spend to Live. CheckCost and
     // ApplyCost both read through this, so an unaffordable doubled cast is
     // refused rather than discounted.
-    virtual float GetResourceCost() const override;
+    virtual float GetUnmodifiedResourceCost() const override;
 
     // Class-Kits §1.2 S4 / §1.4 K10, quoted: the window is 0.6s in both
     // forms. Normally shorter than the 6s cooldown; a reset-driven recast

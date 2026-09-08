@@ -92,6 +92,11 @@ namespace
             Prerequisites.Add(MakeShared<FJsonValueObject>(P));
         }
         Out->SetArrayField(TEXT("prerequisites"), Prerequisites);
+        if (Node.CoreRole != EBreakerCoreNodeRole::Legacy)
+        {
+            Out->SetStringField(TEXT("coreRole"), BreakerCensusEnumName(Node.CoreRole));
+            Out->SetNumberField(TEXT("coreLaneIndex"), Node.CoreLaneIndex);
+        }
         if (Node.RequiredTreeInvestment > 0)
             Out->SetNumberField(TEXT("requiredTreeInvestment"), Node.RequiredTreeInvestment);
         if (Node.RequiredConstellationInvestment > 0)
@@ -169,6 +174,8 @@ TSharedRef<FJsonObject> BreakerCensus::Export(const TArray<UBreakerProgressionTr
         T->SetStringField(TEXT("requiredClass"), BreakerCensusEnumName(Tree->RequiredClass));
         T->SetArrayField(TEXT("entryNodes"), BreakerCensusNames(Tree->EntryNodeIds));
         T->SetBoolField(TEXT("restrictEntryToOwnedNeighbor"), Tree->bRestrictEntryToOwnedNeighbor);
+        if (!Tree->CoreWedgeOrder.IsEmpty())
+            T->SetArrayField(TEXT("coreWedgeOrder"), BreakerCensusNames(Tree->CoreWedgeOrder));
         TArray<TSharedPtr<FJsonValue>> Edges;
         for (const FBreakerNodeEdge& Edge : Tree->AdjacencyEdges)
         {
@@ -198,7 +205,9 @@ TSharedRef<FJsonObject> BreakerCensus::Export(const TArray<UBreakerProgressionTr
             SeenConstellations.Add(Node->Constellation);
             TSharedRef<FJsonObject> C = MakeShared<FJsonObject>();
             C->SetStringField(TEXT("name"), Node->Constellation.ToString());
-            C->SetStringField(TEXT("sector"), BreakerCoreSectorOf(Node->Constellation).ToString());
+            const FName Sector = Tree->CoreWedgeOrder.IsEmpty() ? BreakerCoreSectorOf(Node->Constellation)
+                : Tree->CoreWedgeSectors.FindRef(Node->Constellation);
+            C->SetStringField(TEXT("sector"), Sector.ToString());
             Constellations.Add(MakeShared<FJsonValueObject>(C));
         }
         T->SetArrayField(TEXT("constellations"), Constellations);

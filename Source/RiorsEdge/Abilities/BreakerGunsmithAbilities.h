@@ -165,7 +165,7 @@ public:
     // TK1 Cheap Work / FT5 Requisition: the LIVE price of a cast. Virtual on
     // the base exactly for this (Unmake's precedent) — CheckCost and ApplyCost
     // both read through it, so the discount is one answer, never two.
-    virtual float GetResourceCost() const override;
+    virtual float GetUnmodifiedResourceCost() const override;
 
     // The pure rule, pinned by tests: Cheap Work is Tinkerer-only (mines and
     // Disruptors), Dry-only, 10 less at rank 1 / 18 at rank 2, to a floor of

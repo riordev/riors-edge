@@ -171,9 +171,9 @@ enum class EBreakerNodeStatTarget : uint8
     // a design that wanted a number and could not write it. Attribute exists
     // (MaxClassResource).
     MaxClassResource,
-    // Resource generated per second. Attribute exists (ClassResourceRegen);
-    // gear bids, the class loops do not yet. Named by
-    // Caster.VoidWhisperer.Patience, .Seep and .StandingWater.
+    // Flat: additional resource/second paid once by the active class loop.
+    // Increased: existing composed gear-regeneration attribute contribution.
+    // Keep the serialized target; these are distinct bucket consumers.
     ClassResourceRegen,
     // Rate at which the resource DECAYS. No attribute, and it cannot simply get
     // one: decay is a per-loop rule computed inside each class component
@@ -274,6 +274,15 @@ enum class EBreakerNodeStatTarget : uint8
     LedgeSpeed,
     SafeFallDistance,
     AirJumpCount,
+    WeaponRange,
+    ProjectileSpeed,
+    WeaponSplashArea,
+    WeaponReloadSpeed,
+    WeaponSwapSpeed,
+    WeaponMagazineCapacity,
+    WeaponReserveAmmo,
+    WeaponFalloffStart,
+    PierceLossReduction,
 
     Count UMETA(Hidden)
 };
@@ -336,6 +345,15 @@ inline bool BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget Target)
     case EBreakerNodeStatTarget::LedgeSpeed:
     case EBreakerNodeStatTarget::SafeFallDistance:
     case EBreakerNodeStatTarget::AirJumpCount:
+    case EBreakerNodeStatTarget::WeaponRange:
+    case EBreakerNodeStatTarget::ProjectileSpeed:
+    case EBreakerNodeStatTarget::WeaponSplashArea:
+    case EBreakerNodeStatTarget::WeaponReloadSpeed:
+    case EBreakerNodeStatTarget::WeaponSwapSpeed:
+    case EBreakerNodeStatTarget::WeaponMagazineCapacity:
+    case EBreakerNodeStatTarget::WeaponReserveAmmo:
+    case EBreakerNodeStatTarget::WeaponFalloffStart:
+    case EBreakerNodeStatTarget::PierceLossReduction:
     case EBreakerNodeStatTarget::MaxClassResource:
     case EBreakerNodeStatTarget::ClassResourceRegen:
     case EBreakerNodeStatTarget::FireRate:
@@ -734,6 +752,18 @@ struct RIORSEDGE_API FBreakerNodeStats
     UPROPERTY(BlueprintReadOnly) float LedgeSpeedMultiplier = 1.0f;
     UPROPERTY(BlueprintReadOnly) float BonusSafeFallDistanceMeters = 0.0f;
     UPROPERTY(BlueprintReadOnly) float BonusAirJumpCount = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float ClassResourceRegenPerSecond = 0.0f;
+    UPROPERTY(BlueprintReadOnly) bool bNoOutOfCombatResourceDecay = false;
+    UPROPERTY(BlueprintReadOnly) bool bConduction = false;
+    UPROPERTY(BlueprintReadOnly) float WeaponRangeMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float ProjectileSpeedMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float WeaponSplashAreaMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float WeaponReloadSpeedMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float WeaponSwapSpeedMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float WeaponMagazineCapacityMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float WeaponReserveAmmoMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float WeaponFalloffStartMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float PierceLossReductionPercent = 0.0f;
     // Cooldown reduction as the DIVISOR (DashCooldownReduction's convention:
     // 1.20 == 20% shorter). Floored just above zero so a malformed authored
     // row can never divide by zero or lengthen a cooldown to infinity.

@@ -451,13 +451,10 @@ void UBreakerScrapComponent::AdvanceLoop(float DeltaTime)
         return;
     }
 
-    // THIS IS THE WHOLE LOOP, AND ITS SHORTNESS IS THE DESIGN. There is no
-    // regeneration term because Scrap has no idle income, and no decay term
-    // because Scrap never loses value — §1.2's "no decay, ever, in or out of
-    // combat" is expressed by there being nothing here to express it. Both
-    // absences are load-bearing: idle income on a class whose spend persists in
-    // the world is free permanent power, and decay on a class with no idle
-    // income is a bar that can only fall.
+    ApplyScrapDelta(BreakerResourceGeneration::FlatRate(Owner) * DeltaTime * GetGenerationMultiplier() * BreakerResourceGeneration::Multiplier(Owner));
+
+    // The native Scrap loop has no idle income and never decays. Owned Core
+    // regeneration above is an explicit exception, separate from earned event credits.
     if (PendingGrants <= 0.0f)
     {
         RefreshState();

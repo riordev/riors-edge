@@ -6,11 +6,14 @@ float FBreakerWeaponMath::FireInterval(float RoundsPerMinute)
     return 60.0f / FMath::Max(1.0f, RoundsPerMinute);
 }
 
-float FBreakerWeaponMath::DamageMultiplierAtDistance(const UBreakerWeaponDefinition* Definition, float Distance)
+float FBreakerWeaponMath::DamageMultiplierAtDistance(const UBreakerWeaponDefinition* Definition, float Distance, float FalloffStartMultiplier)
 {
-    if (!Definition || Distance <= Definition->FalloffStart) return 1.0f;
-    if (Distance >= Definition->FalloffEnd) return Definition ? Definition->MinimumFalloffMultiplier : 1.0f;
-    const float Alpha = FMath::GetRangePct(Definition->FalloffStart, Definition->FalloffEnd, Distance);
+    if (!Definition) return 1.0f;
+    const float Start = Definition->FalloffStart * FMath::Max(0.0f, FalloffStartMultiplier);
+    const float End = FMath::Max(Start, Definition->FalloffEnd);
+    if (Distance <= Start) return 1.0f;
+    if (Distance >= End) return Definition->MinimumFalloffMultiplier;
+    const float Alpha = FMath::GetRangePct(Start, End, Distance);
     return FMath::Lerp(1.0f, Definition->MinimumFalloffMultiplier, Alpha);
 }
 

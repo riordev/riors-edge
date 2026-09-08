@@ -24,6 +24,10 @@ static_assert(static_cast<uint8>(EBreakerNodeStatTarget::JumpHeight)==44);
 static_assert(static_cast<uint8>(EBreakerNodeStatTarget::LedgeSpeed)==45);
 static_assert(static_cast<uint8>(EBreakerNodeStatTarget::SafeFallDistance)==46);
 static_assert(static_cast<uint8>(EBreakerNodeStatTarget::AirJumpCount)==47);
+
+static_assert(static_cast<uint8>(EBreakerNodeStatTarget::ClassResourceRegen)==21);
+static_assert(static_cast<uint8>(EBreakerNodeStatTarget::WeaponRange)==48);
+static_assert(static_cast<uint8>(EBreakerNodeStatTarget::PierceLossReduction)==56);
 #if WITH_DEV_AUTOMATION_TESTS
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerResourceGenerationRuntimeTest,"RiorsEdge.Progression.GenericResourceGeneration",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

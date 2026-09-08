@@ -1999,7 +1999,7 @@ void ABreakerCharacter::UpdateClassResourceStates()
     UWorld* World = GetWorld();
     if (!World) return;
 
-    const bool bInCombat = GetSecondsSinceCombat() < CombatStateWindowSeconds;
+    const bool bInCombat = IsInResourceCombat();
     if (bGritLive) Grit->SetInCombat(bInCombat);
     if (bChargeLive) Charge->SetInCombat(bInCombat);
 

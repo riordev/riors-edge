@@ -762,6 +762,8 @@ void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
         return;
     }
 
+    ApplyMomentumDelta(BreakerResourceGeneration::FlatRate(Owner) * DeltaTime * GetGenerationMultiplier() * BreakerResourceGeneration::Multiplier(Owner));
+
     float Rate = 0.0f;
     if (!bAirborne && !bSliding && DisplacementRate >= GroundDisplacementPerSecond)
     {
@@ -811,7 +813,7 @@ void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
     // A running traversal blocks decay for the same reason a slide does: it
     // is a committed movement verb, and the glide deliberately zeroes
     // Velocity, so without this term a vault could tick the decay clock.
-    const bool bDecayBlocked = IsDecaySuspended() || bAirborne || bSliding || bTraversing || Speed >= ThresholdSpeed;
+    const bool bDecayBlocked = BreakerResourceGeneration::HoldsOutOfCombatDecay(Owner) || IsDecaySuspended() || bAirborne || bSliding || bTraversing || Speed >= ThresholdSpeed;
     if (bDecayBlocked)
     {
         SettledElapsed = 0.0f;

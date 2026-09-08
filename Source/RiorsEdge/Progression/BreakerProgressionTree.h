@@ -76,5 +76,9 @@ public:
     // require an owned gateway joined by a direct adjacency edge.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Ring") bool bRestrictEntryToOwnedNeighbor = false;
 
+    // Empty preserves legacy layout. Otherwise lists every wedge clockwise.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Core Layout") TArray<FName> CoreWedgeOrder;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Core Layout") TMap<FName, FName> CoreWedgeSectors;
+
     const UBreakerProgressionNode* FindNode(FName NodeId) const;
 };

@@ -26,6 +26,8 @@
 #include "Misc/Parse.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "TimerManager.h"
+#include "Net/UnrealNetwork.h"
+#include "GameFramework/GameStateBase.h"
 
 UBreakerAbilityComponent::UBreakerAbilityComponent()
 {
@@ -33,9 +35,86 @@ UBreakerAbilityComponent::UBreakerAbilityComponent()
     SetIsReplicatedByDefault(true);
 }
 
+void UBreakerAbilityComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME_CONDITION(UBreakerAbilityComponent, ConductionCastTimes, COND_OwnerOnly);
+}
+
+double UBreakerAbilityComponent::ConductionClock() const
+{
+    const UWorld* World = GetWorld();
+    if (!World) return 0;
+    const auto* State = World->GetGameState();
+    return State ? State->GetServerWorldTimeSeconds() : World->GetTimeSeconds();
+}
+
+bool UBreakerAbilityComponent::IsConductionActive() const
+{
+    const auto* Progression = GetProgression();
+    const auto* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    return Progression && Progression->GetNodeStats().bConduction && Combat && !Combat->IsDead();
+}
+
+float UBreakerAbilityComponent::GetConductionCostMultiplier() const
+{
+    if (!IsConductionActive()) return 1;
+    const double Now = ConductionClock();
+    double Bonus = 0;
+    for (double Time : ConductionCastTimes)
+        Bonus += .4 * FMath::Clamp(1.0 - (Now - Time) / 5.0, 0.0, 1.0);
+    return static_cast<float>(1 + Bonus);
+}
+
+void UBreakerAbilityComponent::BindConductionLifecycle()
+{
+    if (auto* Progression = GetProgression())
+        Progression->OnProgressionChanged.AddUniqueDynamic(this, &ThisClass::RefreshConductionOwnership);
+    if (auto* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr)
+        Combat->OnDeath.AddUniqueDynamic(this, &ThisClass::ClearConduction);
+}
+
+void UBreakerAbilityComponent::ClearConduction()
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+    ConductionCastTimes.Reset();
+    GetOwner()->ForceNetUpdate();
+}
+
+void UBreakerAbilityComponent::RefreshConductionOwnership()
+{
+    if (!IsConductionActive()) ClearConduction();
+}
+
+bool UBreakerAbilityComponent::BeginAbilityCommit()
+{
+    if (bAbilityCommitInProgress) return false;
+    BindConductionLifecycle();
+    RefreshConductionOwnership();
+    bAbilityCommitInProgress = true;
+    return true;
+}
+
+void UBreakerAbilityComponent::RecordConductionCast()
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !IsConductionActive()) return;
+    const double Now = ConductionClock();
+    ConductionCastTimes.RemoveAll([Now](double Time) { return Now - Time >= 5; });
+    ConductionCastTimes.Add(Now);
+    GetOwner()->ForceNetUpdate();
+}
+
+void UBreakerAbilityComponent::EndPlay(const EEndPlayReason::Type Reason)
+{
+    if (auto* Progression = GetProgression()) Progression->OnProgressionChanged.RemoveDynamic(this, &ThisClass::RefreshConductionOwnership);
+    if (auto* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr)
+        Combat->OnDeath.RemoveDynamic(this, &ThisClass::ClearConduction);
+    Super::EndPlay(Reason);
+}
 void UBreakerAbilityComponent::BeginPlay()
 {
     Super::BeginPlay();
+    BindConductionLifecycle();
     RefreshGrants();
 
 #if !UE_BUILD_SHIPPING
@@ -601,6 +680,7 @@ void UBreakerAbilityComponent::InterruptActiveActions()
 
 bool UBreakerAbilityComponent::TryActivateSlot(EBreakerAbilitySlot Slot)
 {
+    if (bAbilityCommitInProgress) return false;
     const UBreakerCombatComponent* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
     if (Combat && Combat->IsStaggered()) return false;
     const FBreakerGrantedAbility* Granted = GrantedBySlot.Find(Slot);
@@ -692,12 +772,14 @@ bool UBreakerAbilityComponent::IsSlotGranted(EBreakerAbilitySlot Slot) const
 
 bool UBreakerAbilityComponent::SlotHasCooldown(EBreakerAbilitySlot Slot) const
 {
+    if (IsConductionActive()) return false;
     const UBreakerAbilityDefinition* Definition = GetDefinitionForSlot(Slot);
     return Definition && Definition->HasCooldown();
 }
 
 float UBreakerAbilityComponent::GetCooldownDuration(EBreakerAbilitySlot Slot) const
 {
+    if (IsConductionActive()) return 0.0f;
     const UBreakerAbilityDefinition* Definition = GetDefinitionForSlot(Slot);
     const UAbilitySystemComponent* ASC = GetAbilitySystem();
     if (Definition && ASC && Definition->HasCooldown() && Definition->CooldownTag.IsValid())
@@ -722,6 +804,7 @@ float UBreakerAbilityComponent::GetCooldownDuration(EBreakerAbilitySlot Slot) co
 
 float UBreakerAbilityComponent::GetCooldownRemaining(EBreakerAbilitySlot Slot) const
 {
+    if (IsConductionActive()) return 0.0f;
     const UBreakerAbilityDefinition* Definition = GetDefinitionForSlot(Slot);
     const UAbilitySystemComponent* ASC = GetAbilitySystem();
     if (!Definition || !ASC || !Definition->HasCooldown() || !Definition->CooldownTag.IsValid())

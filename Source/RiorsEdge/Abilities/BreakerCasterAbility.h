@@ -82,7 +82,7 @@ public:
     // of 0 is exactly the strict rule this replaced.
     static bool CanCastAt(float CurrentMana, float Cost, float Floor = 0.0f);
 
-    virtual float GetResourceCost() const override;
+    virtual float GetUnmodifiedResourceCost() const override;
     // Spec D8: compare against ClassResourceFloor rather than zero. This is
     // also the first time a Caster ability's affordability rule is actually on
     // the GAS activation path — CanCastAt existed but nothing called it, so the

@@ -179,9 +179,9 @@ float UBreakerSupportAbility::CostUnderConduit(float AuthoredCost, float WindowS
     return FMath::Max(0.0f, AuthoredCost * FMath::Max(0.0f, WindowScalar));
 }
 
-float UBreakerSupportAbility::GetResourceCost() const
+float UBreakerSupportAbility::GetUnmodifiedResourceCost() const
 {
-    const float Authored = Super::GetResourceCost();
+    const float Authored = Super::GetUnmodifiedResourceCost();
     const ABreakerCharacter* Character = GetBreakerCharacter();
     const UBreakerAbilityStateComponent* State = Character ? Character->FindComponentByClass<UBreakerAbilityStateComponent>() : nullptr;
     if (!State) return Authored;
@@ -277,11 +277,11 @@ UBreakerAbility_Patch::UBreakerAbility_Patch()
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
 }
 
-float UBreakerAbility_Patch::GetResourceCost() const
+float UBreakerAbility_Patch::GetUnmodifiedResourceCost() const
 {
     // MD11 NO TRIAGE: far cheaper (half, O2 PLACEHOLDER). The self-only and
     // shorter-cooldown halves live in ActivateAbility.
-    const float Authored = Super::GetResourceCost();
+    const float Authored = Super::GetUnmodifiedResourceCost();
     return SupportHasNode(GetBreakerCharacter(), BreakerNodeTags::Node_MD_NoTriage.GetTag()) ? Authored * 0.5f : Authored;
 }
 
@@ -422,10 +422,10 @@ UBreakerAbility_Purge::UBreakerAbility_Purge()
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
 }
 
-float UBreakerAbility_Purge::GetResourceCost() const
+float UBreakerAbility_Purge::GetUnmodifiedResourceCost() const
 {
     // MD11 NO TRIAGE, the Patch twin: far cheaper (half, O2 PLACEHOLDER).
-    const float Authored = Super::GetResourceCost();
+    const float Authored = Super::GetUnmodifiedResourceCost();
     return SupportHasNode(GetBreakerCharacter(), BreakerNodeTags::Node_MD_NoTriage.GetTag()) ? Authored * 0.5f : Authored;
 }
 
@@ -543,7 +543,7 @@ void UBreakerAbility_Cadence::ActivateAbility(const FGameplayAbilitySpecHandle H
     const int32 Rehearsal = SupportNodeRank(Character, TEXT("Support.Conductor.Rehearsal"));
     if (Rehearsal > 0 && bReappliedWhileLive)
         if (auto* Charge = Character->FindComponentByClass<UBreakerChargeComponent>())
-            Charge->GrantCharge(GetResourceCost() * (Rehearsal >= 2 ? .5f : .25f));
+            Charge->GrantCharge(GetLastPaidResourceCost() * (Rehearsal >= 2 ? .5f : .25f));
     bReappliedWhileLive = false;
     const UBreakerAbilityDefinition* Definition = GetAbilityDefinition();
     float Duration = Definition ? Definition->WindowDuration : 8.0f;
@@ -911,11 +911,11 @@ UBreakerAbility_Mark::UBreakerAbility_Mark()
     bRetriggerInstancedAbility = true;
 }
 
-float UBreakerAbility_Mark::GetResourceCost() const
+float UBreakerAbility_Mark::GetUnmodifiedResourceCost() const
 {
     // WA11 HUNTER'S ECONOMY: Mark costs nothing — the floor-recovery answer.
     // (The much-shorter leash is applied at activation.)
-    return SupportHasNode(GetBreakerCharacter(), BreakerNodeTags::Node_WA_HuntersEconomy.GetTag()) ? 0.0f : Super::GetResourceCost();
+    return SupportHasNode(GetBreakerCharacter(), BreakerNodeTags::Node_WA_HuntersEconomy.GetTag()) ? 0.0f : Super::GetUnmodifiedResourceCost();
 }
 
 FName UBreakerAbility_Mark::IncomingModifierKey() { return TEXT("Support.Mark"); }
@@ -1142,7 +1142,7 @@ void UBreakerAbility_Mark::HandleHitDealt(const FBreakerHitContext& Hit)
             {
                 // Refund what THIS build actually pays (a free Hunter's Economy
                 // mark refunds nothing — there is nothing to refund).
-                Charge->GrantCharge(GetResourceCost() * UnspentFraction);
+                Charge->GrantCharge(GetLastPaidResourceCost() * UnspentFraction);
             }
             ShaveOwnCooldownSeconds(GetCooldownSeconds() * UnspentFraction);
         }

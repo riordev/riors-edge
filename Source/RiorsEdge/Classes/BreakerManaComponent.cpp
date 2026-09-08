@@ -602,13 +602,14 @@ void UBreakerManaComponent::AdvanceLoop(float DeltaTime)
     //    regeneration alone already filled the frame's allowance.
     // Overcast doubling still applies, because clearing a debt faster is
     // exactly what the doubling is for.
-    if (PassiveRegenPerSecond > 0.0f)
+    const float CoreFlatRegen = BreakerResourceGeneration::FlatRate(Owner);
+    if (PassiveRegenPerSecond > 0.0f || CoreFlatRegen > 0.0f)
     {
         const int32 Rank = Progression ? Progression->GetNodeRank(TEXT("Caster.VoidWhisperer.Patience"), EBreakerPointCurrency::DoctrinePoints) : 0;
         const FBreakerCasterResourceTuning& Tuning = GetResourceTuning();
         const float Delay = Rank >= 2 ? Tuning.PatienceRankTwoDelay : Tuning.PatienceRankOneDelay;
         const float BonusSeconds = Rank > 0 ? FMath::Clamp(DeltaTime - FMath::Max(0.0f, Delay - PreviousFireAge), 0.0f, DeltaTime) : 0.0f;
-        ApplyManaDelta((PassiveRegenPerSecond * DeltaTime + Tuning.PatienceBonusRegenPerSecond * BonusSeconds)
+        ApplyManaDelta(((PassiveRegenPerSecond + CoreFlatRegen) * DeltaTime + Tuning.PatienceBonusRegenPerSecond * BonusSeconds)
             * GenerationMultiplierForMana(GetMana(), OvercastGenerationMultiplier)
             * BreakerResourceGeneration::Multiplier(GetOwner()));
     }

@@ -41,7 +41,7 @@ public:
     // Pure rule: authored cost times the live window scalar, never negative.
     static float CostUnderConduit(float AuthoredCost, float WindowScalar);
 
-    virtual float GetResourceCost() const override;
+    virtual float GetUnmodifiedResourceCost() const override;
 
     // The ally-or-self resolution every targeted Support verb uses (§3): the
     // ABreakerCharacter under the crosshair within RangeCm, or the caster.
@@ -79,7 +79,7 @@ public:
     UBreakerAbility_Patch();
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
     // MD11 NO TRIAGE: far cheaper. The cooldown half is shaved after commit.
-    virtual float GetResourceCost() const override;
+    virtual float GetUnmodifiedResourceCost() const override;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Patch", meta=(ClampMin="0")) float TargetRangeCm = 2000.0f;   // §U1: 20 m
     // O2 PLACEHOLDER: §U1 authors "a percentage of the target's maximum
@@ -100,7 +100,7 @@ public:
     UBreakerAbility_Purge();
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
     // MD11 NO TRIAGE: far cheaper, self-only (both halves in the cpp).
-    virtual float GetResourceCost() const override;
+    virtual float GetUnmodifiedResourceCost() const override;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Purge", meta=(ClampMin="0")) float TargetRangeCm = 2000.0f;   // O2 PLACEHOLDER (mirrors Patch)
 };
@@ -216,7 +216,7 @@ public:
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
     virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
     // WA11 HUNTER'S ECONOMY: Mark costs nothing (duration halved in the cpp).
-    virtual float GetResourceCost() const override;
+    virtual float GetUnmodifiedResourceCost() const override;
 
     void RefreshDuration(float MinimumRemainingSeconds);
     static FName IncomingModifierKey();

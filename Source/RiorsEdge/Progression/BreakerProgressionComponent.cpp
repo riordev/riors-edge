@@ -1492,6 +1492,18 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     Stats.LedgeSpeedMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::LedgeSpeed));
     Stats.BonusSafeFallDistanceMeters = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::SafeFallDistance));
     Stats.BonusAirJumpCount = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::AirJumpCount));
+    Stats.ClassResourceRegenPerSecond = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::ClassResourceRegen));
+    Stats.WeaponRangeMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::WeaponRange));
+    Stats.ProjectileSpeedMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::ProjectileSpeed));
+    Stats.WeaponSplashAreaMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::WeaponSplashArea));
+    Stats.WeaponReloadSpeedMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::WeaponReloadSpeed));
+    Stats.WeaponSwapSpeedMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::WeaponSwapSpeed));
+    Stats.WeaponMagazineCapacityMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::WeaponMagazineCapacity));
+    Stats.WeaponReserveAmmoMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::WeaponReserveAmmo));
+    Stats.WeaponFalloffStartMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::WeaponFalloffStart));
+    Stats.PierceLossReductionPercent = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::PierceLossReduction));
+    Stats.bNoOutOfCombatResourceDecay = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.SecondShift")));
+    Stats.bConduction = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Conduction")));
     Stats.bCooldownRecoveryAffectsTempo = Stats.GrantedTags.HasTagExact(
         FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Overclock")));
     Stats.BonusPierceCount = Flat(EBreakerNodeStatTarget::Pierce);

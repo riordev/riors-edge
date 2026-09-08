@@ -292,6 +292,60 @@
 			"lane": true,
 			"rider": false,
 			"affixOwned": false
+		},
+		{
+			"name": "WeaponRange",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
+		},
+		{
+			"name": "ProjectileSpeed",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
+		},
+		{
+			"name": "WeaponSplashArea",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
+		},
+		{
+			"name": "WeaponReloadSpeed",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
+		},
+		{
+			"name": "WeaponSwapSpeed",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
+		},
+		{
+			"name": "WeaponMagazineCapacity",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
+		},
+		{
+			"name": "WeaponReserveAmmo",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
+		},
+		{
+			"name": "WeaponFalloffStart",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
+		},
+		{
+			"name": "PierceLossReduction",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
 		}
 	],
 	"conditions": [

@@ -27,6 +27,8 @@ namespace BreakerCoreBoard
         TArray<FName> Entries;
         TArray<FWedge> Wedges;
         TArray<FName> Sectors;
+        bool bUsesCoreRoles = false;
+        bool bValidMetadata = true;
     };
 
     inline FVector2D Polar(const FVector2D& Center, float Radius, float Degrees)
@@ -70,10 +72,101 @@ namespace BreakerCoreBoard
         return Ordered;
     }
 
+    inline FLayout BuildRoleLayout(const UBreakerProgressionTree* Tree, FName Focus)
+    {
+        FLayout Layout; Layout.bUsesCoreRoles = true;
+        Layout.Size = Focus.IsNone() ? FVector2D(3000, 3000) : FVector2D(1480, 1200);
+        Layout.Hub = Focus.IsNone() ? FVector2D(1500, 1500) : FVector2D(700, 600);
+        TSet<FName> SeenWedges, SeenNodes;
+        for (int32 W = 0; W < Tree->CoreWedgeOrder.Num(); ++W)
+        {
+            const FName Name = Tree->CoreWedgeOrder[W];
+            if (Name.IsNone() || SeenWedges.Contains(Name)) { Layout.bValidMetadata = false; break; }
+            SeenWedges.Add(Name);
+            FWedge Wedge; Wedge.Name = Name; Wedge.Sector = Tree->CoreWedgeSectors.FindRef(Name);
+            if (Wedge.Sector.IsNone()) { Layout.bValidMetadata = false; break; }
+            Wedge.AngleDegrees = -90 + W * 360.0f / Tree->CoreWedgeOrder.Num();
+            TMap<int32, const UBreakerProgressionNode*> Slots;
+            bool bMajor = false;
+            for (const UBreakerProgressionNode* Node : Tree->Nodes)
+            {
+                if (!Node || Node->Constellation != Name) continue;
+                const auto Role = Node->CoreRole;
+                int32 Slot = -1;
+                switch (Role)
+                {
+                case EBreakerCoreNodeRole::Gateway: Slot = 0; break;
+                case EBreakerCoreNodeRole::LaneMinor: if (Node->CoreLaneIndex >= 0 && Node->CoreLaneIndex < 3) Slot = 1 + Node->CoreLaneIndex; break;
+                case EBreakerCoreNodeRole::LaneNotable: if (Node->CoreLaneIndex >= 0 && Node->CoreLaneIndex < 3) Slot = 4 + Node->CoreLaneIndex; break;
+                case EBreakerCoreNodeRole::Link: if (Node->CoreLaneIndex >= 0 && Node->CoreLaneIndex < 2) Slot = 7 + Node->CoreLaneIndex; break;
+                case EBreakerCoreNodeRole::Convergence: Slot = 9; break;
+                case EBreakerCoreNodeRole::Keystone: Slot = 10; bMajor = true; break;
+                default: break;
+                }
+                if (Slot < 0 || Slots.Contains(Slot) || Node->NodeId.IsNone() || SeenNodes.Contains(Node->NodeId))
+                { Layout.bValidMetadata = false; break; }
+                Slots.Add(Slot, Node); SeenNodes.Add(Node->NodeId); Wedge.Nodes.Add(Node->NodeId);
+            }
+            const int32 Lanes = bMajor ? 3 : 2;
+            if (!Slots.Contains(0) || !Slots.Contains(9) || Slots.Num() != (bMajor ? 11 : 6)) Layout.bValidMetadata = false;
+            for (int32 Lane = 0; Lane < Lanes; ++Lane)
+                if (!Slots.Contains(1 + Lane) || !Slots.Contains(4 + Lane)) Layout.bValidMetadata = false;
+            if (bMajor && (!Slots.Contains(7) || !Slots.Contains(8))) Layout.bValidMetadata = false;
+            if (!bMajor && (Slots.Contains(3) || Slots.Contains(6) || Slots.Contains(7) || Slots.Contains(8))) Layout.bValidMetadata = false;
+            if (!Layout.bValidMetadata) break;
+            Layout.Wedges.Add(Wedge); Layout.Sectors.AddUnique(Wedge.Sector);
+            if (!Focus.IsNone() && Focus != Name) continue;
+            for (const auto& Entry : Slots)
+            {
+                const int32 Slot = Entry.Key;
+                FVector2D Position;
+                if (Focus.IsNone())
+                {
+                    float Radius = 620, Offset = 0;
+                    const float LaneStep = 100.0f / Tree->CoreWedgeOrder.Num();
+                    if (Slot >= 1 && Slot <= 6)
+                    {
+                        const int32 Lane = (Slot - 1) % 3;
+                        Offset = (Lane - (Lanes - 1) * .5f) * LaneStep;
+                        Radius = Slot <= 3 ? 800 : 1030;
+                    }
+                    else if (Slot == 7 || Slot == 8) { Radius = 915; Offset = (Slot == 7 ? -.5f : .5f) * LaneStep; }
+                    else if (Slot == 9) Radius = 1190;
+                    else if (Slot == 10) Radius = 1340;
+                    Position = Polar(Layout.Hub, Radius, Wedge.AngleDegrees + Offset);
+                }
+                else
+                {
+                    if (Slot == 0) Position = Layout.Hub + FVector2D(-580, 0);
+                    else if (Slot == 9) Position = Layout.Hub + FVector2D(-100, 0);
+                    else if (Slot == 10) Position = Layout.Hub + FVector2D(-370, 0);
+                    else if (Slot == 7 || Slot == 8) Position = Polar(Layout.Hub, 360, Slot == 7 ? -35 : 35);
+                    else
+                    {
+                        const int32 Lane = (Slot - 1) % 3;
+                        const float Angle = (Lane - (Lanes - 1) * .5f) * (bMajor ? 70 : 100);
+                        Position = Polar(Layout.Hub, Slot <= 3 ? 270 : 500, Angle);
+                    }
+                }
+                Layout.Centers.Add(Entry.Value->NodeId, Position);
+            }
+        }
+        if (SeenNodes.Num() != Tree->Nodes.Num() || (!Focus.IsNone() && !SeenWedges.Contains(Focus))) Layout.bValidMetadata = false;
+        if (!Layout.bValidMetadata)
+        {
+            // Do not silently guess a partially authored replacement graph.
+            Layout.Centers.Reset(); Layout.Wedges.Reset(); Layout.Sectors.Reset(); return Layout;
+        }
+        for (const FBreakerNodeEdge& Edge : Tree->AdjacencyEdges)
+            if (Layout.Centers.Contains(Edge.A) && Layout.Centers.Contains(Edge.B)) Layout.Edges.Add(Edge);
+        for (FName Id : Tree->EntryNodeIds) if (Layout.Centers.Contains(Id)) Layout.Entries.Add(Id);
+        return Layout;
+    }
     inline FLayout Build(const UBreakerProgressionTree* Tree, FName Focus = NAME_None)
     {
         FLayout Layout;
         if (!Tree) return Layout;
+        if (!Tree->CoreWedgeOrder.IsEmpty()) return BuildRoleLayout(Tree, Focus);
         Layout.Sectors = { BreakerCoreWheel::SectorMovement, BreakerCoreWheel::SectorWeapon,
             BreakerCoreWheel::SectorDefence, BreakerCoreWheel::SectorAbility, BreakerCoreWheel::SectorElements };
         TArray<FName> Names;

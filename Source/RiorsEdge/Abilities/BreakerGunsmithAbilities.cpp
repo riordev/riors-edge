@@ -533,11 +533,11 @@ float UBreakerGunsmithDeployAbility::EffectiveDeployCost(float BaseCost, EBreake
     return FMath::Max(0.0f, Cost - FMath::Max(0.0f, ReplacementDiscount));
 }
 
-float UBreakerGunsmithDeployAbility::GetResourceCost() const
+float UBreakerGunsmithDeployAbility::GetUnmodifiedResourceCost() const
 {
-    if (bCommittingPlacement) return CommittedPlacementCost;
+
     using namespace BreakerGunsmithAbilityLocal;
-    const float BaseCost = Super::GetResourceCost();
+    const float BaseCost = Super::GetUnmodifiedResourceCost();
     const ABreakerCharacter* Character = GetBreakerCharacter();
     if (!Character) return BaseCost;
 

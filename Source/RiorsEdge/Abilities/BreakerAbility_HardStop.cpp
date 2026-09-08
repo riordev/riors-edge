@@ -62,9 +62,9 @@ bool UBreakerAbility_HardStop::OwnerHasSpendToLive() const
     return Progression && Progression->HasNodeTag(BreakerNodeTags::Node_SpendToLive.GetTag());
 }
 
-float UBreakerAbility_HardStop::GetResourceCost() const
+float UBreakerAbility_HardStop::GetUnmodifiedResourceCost() const
 {
-    return Super::GetResourceCost() * CostMultiplier(OwnerHasSpendToLive());
+    return Super::GetUnmodifiedResourceCost() * CostMultiplier(OwnerHasSpendToLive());
 }
 
 void UBreakerAbility_HardStop::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)

@@ -82,9 +82,9 @@ UBreakerManaComponent* UBreakerCasterAbility::GetManaComponent() const
     return Character ? Character->GetMana() : nullptr;
 }
 
-float UBreakerCasterAbility::GetResourceCost() const
+float UBreakerCasterAbility::GetUnmodifiedResourceCost() const
 {
-    const float Authored = Super::GetResourceCost();
+    const float Authored = Super::GetUnmodifiedResourceCost();
     // Read live, never cached (owner ruling 2026-08-14): the player re-gears
     // mid-fight and a stale efficiency would quote a price the bank is not
     // being charged. 1.0 until the affix layer supplies otherwise.

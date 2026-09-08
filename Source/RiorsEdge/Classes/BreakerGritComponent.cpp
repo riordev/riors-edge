@@ -716,6 +716,8 @@ void UBreakerGritComponent::AdvanceLoop(float DeltaTime)
         return;
     }
 
+    ApplyGritDelta(BreakerResourceGeneration::FlatRate(Owner) * DeltaTime * GetGenerationMultiplier() * BreakerResourceGeneration::Multiplier(Owner));
+
     // ---- Anchor-keyed node rules (B2/B4/B8), one distance query for all ----
     const bool bAnyAnchorNode = RankFooting > 0 || RankHeldGround > 0 || bInterposition;
     const float AnchorDistance = bAnyAnchorNode ? GetOwnAnchorDistanceCm() : TNumericLimits<float>::Max();
@@ -861,7 +863,7 @@ void UBreakerGritComponent::AdvanceLoop(float DeltaTime)
     // Grit decay outright — the banking rewrite, keyed to the panel's presence
     // and bounded by its lifetime and cooldown exactly as the node argues.
     const bool bHeldGround = RankHeldGround > 0 && bNearOwnAnchor;
-    const float Decay = DecayRate(IsLapseWindowOpen(), IsDecaySuspended() || bHeldGround, DecayPerSecond) * GetDecayRateMultiplier();
+    const float Decay = DecayRate(IsLapseWindowOpen(), IsDecaySuspended() || bHeldGround || BreakerResourceGeneration::HoldsOutOfCombatDecay(Owner), DecayPerSecond) * GetDecayRateMultiplier();
     if (Decay > 0.0f) ApplyGritDelta(-Decay * DeltaTime);
     RefreshBand();
 }

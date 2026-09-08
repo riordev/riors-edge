@@ -1,6 +1,7 @@
 #include "Abilities/BreakerGameplayAbility.h"
 
 #include "AbilitySystemComponent.h"
+#include "Abilities/BreakerAbilityComponent.h"
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Abilities/BreakerAbilityTags.h"
 #include "Attributes/BreakerAttributeSet.h"
@@ -46,6 +47,8 @@ bool UBreakerGameplayAbility::CanActivateAbility(const FGameplayAbilitySpecHandl
     const AActor* Avatar = ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
     const UBreakerCombatComponent* Combat = Avatar ? Avatar->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
     if (Combat && Combat->IsStaggered()) return false;
+    const auto* Character = ActorInfo ? Cast<ABreakerCharacter>(ActorInfo->AvatarActor.Get()) : nullptr;
+    if (Character && Character->GetAbilities()->IsAbilityCommitInProgress()) return false;
     return Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags);
 }
 
@@ -59,6 +62,44 @@ const UBreakerAbilityDefinition* UBreakerGameplayAbility::GetAbilityDefinition()
 }
 
 float UBreakerGameplayAbility::GetResourceCost() const
+{
+    if (bCostSnapshotActive) return CommitCostSnapshot;
+    const auto* Character = GetBreakerCharacter();
+    const auto* Abilities = Character ? Character->GetAbilities() : nullptr;
+    return GetUnmodifiedResourceCost() * (GetAbilityDefinition() && Abilities ? Abilities->GetConductionCostMultiplier() : 1.0f);
+}
+
+bool UBreakerGameplayAbility::CommitAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+    const FGameplayAbilityActivationInfo ActivationInfo, FGameplayTagContainer* OptionalRelevantTags)
+{
+    auto* Character = GetBreakerCharacter();
+    auto* Abilities = Character ? Character->GetAbilities() : nullptr;
+    if (Abilities && !Abilities->BeginAbilityCommit()) return false;
+    CommitCostSnapshot = GetResourceCost();
+    bCostSnapshotActive = true;
+    const bool Committed = Super::CommitAbility(Handle, ActorInfo, ActivationInfo, OptionalRelevantTags);
+    bCostSnapshotActive = false;
+    if (Abilities) Abilities->EndAbilityCommit();
+    return Committed;
+}
+
+void UBreakerGameplayAbility::CommitExecute(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+    const FGameplayAbilityActivationInfo ActivationInfo)
+{
+    LastPaidResourceCost = GetResourceCost();
+    Super::CommitExecute(Handle, ActorInfo, ActivationInfo);
+    if (GetAbilityDefinition())
+        if (auto* Character = GetBreakerCharacter()) Character->GetAbilities()->RecordConductionCast();
+}
+
+bool UBreakerGameplayAbility::CheckCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+    FGameplayTagContainer* OptionalRelevantTags) const
+{
+    const auto* Character = GetBreakerCharacter();
+    return (GetAbilityDefinition() && Character && Character->GetAbilities()->IsConductionActive())
+        || Super::CheckCooldown(Handle, ActorInfo, OptionalRelevantTags);
+}
+float UBreakerGameplayAbility::GetUnmodifiedResourceCost() const
 {
     const UBreakerAbilityDefinition* Definition = GetAbilityDefinition();
     const float Authored = Definition ? Definition->ResourceCost : 0.0f;
@@ -76,6 +117,8 @@ float UBreakerGameplayAbility::GetCooldownSeconds() const
     if (!Definition) return 0.0f;
     const FGameplayAbilityActorInfo* Info = GetCurrentActorInfo();
     const AActor* Avatar = Info ? Info->AvatarActor.Get() : nullptr;
+    const auto* Character = Cast<ABreakerCharacter>(Avatar);
+    if (Character && Character->GetAbilities()->IsConductionActive()) return 0.0f;
     return ScaledCooldownSeconds(Definition->CooldownSeconds, AbilityCooldownReductionFor(Avatar));
 }
 
@@ -238,6 +281,7 @@ void UBreakerGameplayAbility::ApplyCost(const FGameplayAbilitySpecHandle Handle,
 void UBreakerGameplayAbility::ApplyCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const
 {
     const UBreakerAbilityDefinition* Definition = GetAbilityDefinition();
+    if (GetCooldownSeconds() <= 0.0f) return;
     // Cost-gated abilities author no cooldown effect at all, so the HUD can
     // tell "no cooldown" from "cooldown of zero" (spec D3).
     if (!Definition || Definition->CooldownSeconds <= 0.0f || !Definition->CooldownTag.IsValid() || !CooldownGameplayEffectClass)

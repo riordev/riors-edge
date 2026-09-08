@@ -54,7 +54,12 @@ public:
     // Unmake makes every Caster ability free for its duration (Class-Kits §2.2).
     // CheckCost and ApplyCost both read through this, so there is exactly one
     // answer to "what does this cost right now".
-    UFUNCTION(BlueprintPure, Category="Abilities") virtual float GetResourceCost() const;
+    UFUNCTION(BlueprintPure, Category="Abilities") float GetResourceCost() const;
+    virtual float GetUnmodifiedResourceCost() const;
+    float GetLastPaidResourceCost() const { return LastPaidResourceCost; }
+    virtual bool CommitAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, FGameplayTagContainer* OptionalRelevantTags = nullptr) override;
+    virtual void CommitExecute(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) override;
+    virtual bool CheckCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
     // The LIVE cooldown: the definition's authored seconds divided by the
     // owner's composed AbilityCooldown reduction. ApplyCooldown and the HUD
     // both read through this, so the timer started and the timer displayed
@@ -139,4 +144,7 @@ protected:
 
 private:
     mutable FGameplayTagContainer CachedCooldownTags;
+    bool bCostSnapshotActive = false;
+    float CommitCostSnapshot = 0.0f;
+    float LastPaidResourceCost = 0.0f;
 };
