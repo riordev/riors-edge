@@ -12,9 +12,11 @@
 #include "Progression/BreakerProgressionLibrary.h"
 #include "Progression/BreakerProgressionNode.h"
 #include "Progression/BreakerProgressionTree.h"
+#include "Save/BreakerMissionContent.h"
+#include "Save/BreakerQuestJournal.h"
 
 // ---------------------------------------------------------------------------
-// 2026-08-14 O33-O40 identity-stack audit pass — Lane 2 (Progression/, Items/)
+// 2026-08-14 O33-O40 identity-stack audit pass â€” Lane 2 (Progression/, Items/)
 // ---------------------------------------------------------------------------
 // This file covers the Progression-side work items from that pass that are not
 // already homed in an existing topic file: the condition-mask width hardening
@@ -28,7 +30,7 @@
 // comment/constant hygiene with no new behaviour to test.
 
 // ---------------------------------------------------------------------------
-// ITEM 1 — condition mask hardening (pre-O30)
+// ITEM 1 â€” condition mask hardening (pre-O30)
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerBuildConditionMaskTest,
@@ -39,7 +41,7 @@ bool FBreakerBuildConditionMaskTest::RunTest(const FString& Parameters)
 {
     // FBreakerBuildConditionState::Mask/Bit widened uint8 -> uint32 because
     // 1u << 8 silently overflows a uint8 to 0, which would make a 9th
-    // condition compile, purchase, and never activate — no warning, no
+    // condition compile, purchase, and never activate â€” no warning, no
     // assert, just a dead node. This is the runtime guard: every condition
     // the enum currently defines must set and read back independently, with
     // no aliasing between bits, and the property has to keep holding as O30's
@@ -66,7 +68,7 @@ bool FBreakerBuildConditionMaskTest::RunTest(const FString& Parameters)
     }
 
     // Always is true unconditionally, even on the default-constructed empty
-    // state — the property every pre-existing conditional-effect call site
+    // state â€” the property every pre-existing conditional-effect call site
     // depends on.
     FBreakerBuildConditionState Empty;
     TestTrue(TEXT("Always reads active even on the empty state"), Empty.IsActive(EBreakerBuildCondition::Always));
@@ -88,9 +90,9 @@ bool FBreakerBuildConditionMaskTest::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// ITEM 2 — loud dead More lanes (Progression side; the Items-side twin in
+// ITEM 2 â€” loud dead More lanes (Progression side; the Items-side twin in
 // BreakerEquipmentComponent.cpp is structurally identical and is unreachable
-// through the real affix pool by construction — RiorsEdge.Items.Affixes
+// through the real affix pool by construction â€” RiorsEdge.Items.Affixes
 // .Breadth already pins that no pool entry authors MorePercent, so there is
 // no black-box path to exercise its warning without mutating the cached pool
 // singleton. Verified by code inspection instead of a test.)
@@ -156,7 +158,7 @@ bool FBreakerDroppedMoreLaneIsLoudTest::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// ITEM 3 — phantom ability grants
+// ITEM 3 â€” phantom ability grants
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerNoPhantomAbilityGrantsTest,
@@ -186,20 +188,20 @@ bool FBreakerNoPhantomAbilityGrantsTest::RunTest(const FString& Parameters)
             }
         }
     }
-    // THE WRITER POPULATION IS ZERO BY RULING (O140): the last grant —
-    // Swift.Marksman.Lead's — retired when ruling 1 made Lead a token
+    // THE WRITER POPULATION IS ZERO BY RULING (O140): the last grant â€”
+    // Swift.Marksman.Lead's â€” retired when ruling 1 made Lead a token
     // unlockable and the grant became a free route around the quartermaster.
     // The check above is therefore vacuous ON PURPOSE, stated rather than
     // discovered: it stands armed for the next writer, and this count pin is
     // what makes a new grant announce itself here instead of arriving
     // unaudited. Whether the readers-with-no-writers path itself survives is
     // the owner's open question in DECISIONS.
-    TestEqual(TEXT("No node ability-grant exists (O140) — a new writer moves this pin deliberately"), GrantsChecked, 0);
+    TestEqual(TEXT("No node ability-grant exists (O140) â€” a new writer moves this pin deliberately"), GrantsChecked, 0);
     return true;
 }
 
 // ---------------------------------------------------------------------------
-// ITEM 4 — Caster fallback class definition
+// ITEM 4 â€” Caster fallback class definition
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerCasterAbilitiesUnlockTest,
@@ -218,7 +220,7 @@ bool FBreakerCasterAbilitiesUnlockTest::RunTest(const FString& Parameters)
     // already equipped and the duplicate rule (an id may sit in only one slot)
     // refuses re-equipping them elsewhere. The equip loop therefore covers the
     // four NON-seeded ids, and the two starters plus the ultimate are asserted
-    // as seeded — which is the stronger form of what this test always meant:
+    // as seeded â€” which is the stronger form of what this test always meant:
     // every one of the seven is reachable on a fresh Caster.
     {
         UBreakerProgressionComponent* Seeded = NewObject<UBreakerProgressionComponent>();
@@ -230,7 +232,7 @@ bool FBreakerCasterAbilitiesUnlockTest::RunTest(const FString& Parameters)
 
     // O100 CHANGED WHAT "REACHABLE" MEANS, AND THIS TEST FOLLOWED IT RATHER
     // THAN BEING WIDENED. The four non-starters are no longer free at level
-    // one — they are bought with a token at the quartermaster. So the assertion
+    // one â€” they are bought with a token at the quartermaster. So the assertion
     // is now the honest one: each is reachable BY PLAYING, at the level the
     // shipped schedule pays its token, and equips once bought.
     //
@@ -282,7 +284,7 @@ bool FBreakerCasterAbilitiesUnlockTest::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// ITEM 5 — Constellation becomes a field, not a string prefix
+// ITEM 5 â€” Constellation becomes a field, not a string prefix
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerCoreConstellationFieldTest,
@@ -313,38 +315,35 @@ bool FBreakerCoreConstellationFieldTest::RunTest(const FString& Parameters)
         CountByConstellation.FindOrAdd(Node->Constellation)++;
     }
 
-    // Velocity is the constellation the UI's hardcoded cluster list is
-    // missing (six nodes, per CONTEXT.md's recorded UNMAPPED gap). Its field
-    // membership must be intact regardless of the UI catching up to it.
-    TestEqual(TEXT("Velocity carries its full atlas wheel"), CountByConstellation.FindRef(TEXT("Velocity")), 10);
-    // Re-pinned per atlas pair, the tree-count convention: pair B added the
-    // VECTOR and ARC wheels (7 -> 9), pair C RESERVOIR (9 -> 10), pairs D-F
-    // the rest. O213 deletes the Travel group: the wheel is its twelve
-    // constellations and nothing else.
-    TestEqual(TEXT("Twelve wheels are represented, and no Travel group (O213)"), CountByConstellation.Num(), 12);
-
-    // O212: five domain sectors, each holding its constellations as wedges.
-    // Every constellation maps to exactly one of the five (NAME_None is a
-    // failure, never a sector), every sector holds at least one wedge, and
-    // the sector vocabulary is exactly five names.
-    const TArray<FName> Sectors = {BreakerCoreWheel::SectorMovement, BreakerCoreWheel::SectorWeapon,
-        BreakerCoreWheel::SectorDefence, BreakerCoreWheel::SectorAbility, BreakerCoreWheel::SectorElements};
-    TestEqual(TEXT("The wheel has exactly five sectors (O212)"), Sectors.Num(), BreakerCoreWheel::SectorCount);
-    TestEqual(TEXT("The five sector names are distinct"), TSet<FName>(Sectors).Num(), BreakerCoreWheel::SectorCount);
+    const TArray<FName> ExpectedRing = {
+        TEXT("Precision"), TEXT("Vector"), TEXT("Ballistics"), TEXT("Loadout"),
+        TEXT("Aegis"), TEXT("Bulwark"), TEXT("Constitution"), TEXT("Ward"), TEXT("Recovery"),
+        TEXT("Arc"), TEXT("Tempo"), TEXT("Reservoir"), TEXT("Duration"),
+        TEXT("Affliction"), TEXT("Entropy"), TEXT("Reaction"), TEXT("Rift"), TEXT("Void"),
+        TEXT("Velocity"), TEXT("Kinesis"), TEXT("Control"), TEXT("Threat")};
+    const TSet<FName> Majors = {TEXT("Precision"), TEXT("Vector"), TEXT("Ballistics"), TEXT("Aegis"), TEXT("Bulwark"),
+        TEXT("Arc"), TEXT("Tempo"), TEXT("Affliction"), TEXT("Entropy"), TEXT("Reaction"), TEXT("Velocity")};
+    TestTrue(TEXT("Every wedge follows the accepted clockwise order"), Core->CoreWedgeOrder == ExpectedRing);
+    TestEqual(TEXT("Exactly twenty-two named constellations"), CountByConstellation.Num(), 22);
+    TestEqual(TEXT("Every wedge has explicit sector metadata"), Core->CoreWedgeSectors.Num(), 22);
+    for (FName Wedge : ExpectedRing)
+        TestEqual(*(Wedge.ToString() + TEXT(" has its exact major/minor node count")), CountByConstellation.FindRef(Wedge), Majors.Contains(Wedge) ? 11 : 6);
+    const TArray<FName> Sectors = {TEXT("Weapon"), TEXT("Defence"), TEXT("Ability"), TEXT("Status"), TEXT("Movement"), TEXT("Utility")};
+    const TArray<int32> ExpectedWedges = {4, 5, 4, 5, 2, 2};
     TMap<FName, int32> WedgesPerSector;
-    for (const TPair<FName, int32>& Pair : CountByConstellation)
+    TArray<FName> OrderedSectors;
+    for (FName Wedge : Core->CoreWedgeOrder)
     {
-        const FName Sector = BreakerCoreSectorOf(Pair.Key);
-        TestFalse(*(Pair.Key.ToString() + TEXT(" maps to a sector, not NAME_None (O212)")), Sector.IsNone());
-        TestTrue(*(Pair.Key.ToString() + TEXT(" maps to one of the five sectors")), Sectors.Contains(Sector));
-        WedgesPerSector.FindOrAdd(Sector)++;
+        const FName Sector = Core->CoreWedgeSectors.FindRef(Wedge);
+        TestFalse(*(Wedge.ToString() + TEXT(" maps to a sector")), Sector.IsNone());
+        TestTrue(*(Wedge.ToString() + TEXT(" maps to an accepted sector")), Sectors.Contains(Sector));
+        ++WedgesPerSector.FindOrAdd(Sector);
+        if (OrderedSectors.IsEmpty() || OrderedSectors.Last() != Sector) OrderedSectors.Add(Sector);
     }
-    for (const FName& Sector : Sectors)
-    {
-        TestTrue(*(Sector.ToString() + TEXT(" holds at least one wedge; the wheel never hides a sector (O212)")),
-            WedgesPerSector.FindRef(Sector) > 0);
-    }
-    TestTrue(TEXT("An unknown constellation has no sector"), BreakerCoreSectorOf(TEXT("Travel")).IsNone());
+    TestTrue(TEXT("Six sector blocks appear once in owner order"), OrderedSectors == Sectors);
+    for (int32 Index = 0; Index < Sectors.Num(); ++Index)
+        TestEqual(*(Sectors[Index].ToString() + TEXT(" has its exact wedge count")), WedgesPerSector.FindRef(Sectors[Index]), ExpectedWedges[Index]);
+    TestTrue(TEXT("An unknown constellation has no authored sector"), Core->CoreWedgeSectors.FindRef(TEXT("Travel")).IsNone());
 
     // Class branch nodes are not a constellation and must stay None.
     for (const UBreakerProgressionTree* Tree : {UBreakerProgressionLibrary::GetSwiftKineticTree(),
@@ -359,7 +358,7 @@ bool FBreakerCoreConstellationFieldTest::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// ITEM 6 — aggregation perf + class filter
+// ITEM 6 â€” aggregation perf + class filter
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerSpentPointsPerfTest,
@@ -384,20 +383,28 @@ bool FBreakerSpentPointsPerfTest::RunTest(const FString& Parameters)
 
     TestEqual(TEXT("Nothing spent before any purchase"), Progression->GetSpentPoints(), 0.0f);
 
-    // Atlas shape, ring-legal: the hexagon walks from the entry to Tunnel
-    // Vision's two stated rims.
-    TestTrue(TEXT("The entry purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Sightline"), Failure));          // cost 1, Core
-    TestTrue(TEXT("Steady purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Steady"), Failure));                // cost 1, Core
-    TestTrue(TEXT("Angle purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Angle"), Failure));                  // cost 1, Core
-    TestTrue(TEXT("Ledger purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Ledger"), Failure));                // cost 1, Core
-    TestTrue(TEXT("Tunnel Vision purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.TunnelVision"), Failure));   // cost 2, Core
-    TestEqual(TEXT("Core spend tracks five purchases"), Progression->GetSpentPoints(), 6.0f, 0.0001f);
+    // A ranked lane, its notable, a sibling minor and the available link
+    // exercise different prices through the actual replacement graph.
+    TestTrue(TEXT("The entry purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Sightline"), Failure));
+    TestTrue(TEXT("Angle purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Angle"), Failure));
+    TestTrue(TEXT("Called Shot purchases after rank one"), Progression->PurchaseNode(Core, TEXT("Core.Precision.CalledShot"), Failure));
+    TestTrue(TEXT("Cadence purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Cadence"), Failure));
+    TestTrue(TEXT("One completed lane opens Steady link"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Steady"), Failure));
+    TestEqual(TEXT("Core spend tracks five differently priced purchases"), Progression->GetSpentPoints(), 6.0f, 0.0001f);
 
-    // O111: a doctrine node needs the doctrine wallet, and the wallet is filled
-    // by commitment. Granted at exactly the shipped budget rather than an
-    // inflated rig figure.
-    Progression->GrantPlaytestPoints(UBreakerProgressionLibrary::DoctrinePointGrant, 0);
-    TestTrue(TEXT("Carry purchases"), Progression->PurchaseNode(Kinetic, TEXT("Swift.Kinetic.Carry"), Failure));               // cost 1, Doctrine
+    // Completed-campaign state is the entitlement fixture; this is not a
+    // campaign playthrough. Commitment itself pays nothing.
+    if (!TestTrue(TEXT("Commit to the real Kinetic branch"), Progression->CommitToBranch(TEXT("Doctrine.Swift.Kinetic"), Failure))) return false;
+    auto* Journal = NewObject<UBreakerQuestJournal>();
+    FBreakerQuestFlagSet CompletedCampaign;
+    for (const FBreakerMissionDefinition& Mission : UBreakerMissionLibrary::GetMissions())
+        for (const FBreakerMissionBeat& Beat : Mission.Beats)
+            for (FName Flag : UBreakerMissionLibrary::BeatCompletionFlags(Beat)) CompletedCampaign.Add(Flag);
+    CompletedCampaign.Add(TEXT("Quest.Finale.Seal"));
+    Journal->RestoreFrom(CompletedCampaign);
+    Progression->SettleDoctrineEntitlement(Journal->GetState());
+    TestEqual(TEXT("Completed benchmarks settle exactly eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), UBreakerProgressionLibrary::DoctrinePointGrant);
+    TestTrue(TEXT("Carry purchases"), Progression->PurchaseNode(Kinetic, TEXT("Swift.Kinetic.Carry"), Failure));
     TestEqual(TEXT("Doctrine spend adds on top of core spend"), Progression->GetSpentPoints(), 7.0f, 0.0001f);
 
     // Respec one currency: its running total resets to zero and the other is
@@ -410,7 +417,7 @@ bool FBreakerSpentPointsPerfTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Both running totals are zero after both respecs"), Progression->GetSpentPoints(), 0.0f, 0.0001f);
 
     // A LOADED state carrying a stale/unknown node id: RULED in the
-    // blocked-questions pass (Part One-U item 20) — the row is DROPPED AND
+    // blocked-questions pass (Part One-U item 20) â€” the row is DROPPED AND
     // CREDITED at the fallback cost the recompute would have charged, so a
     // removed node can never silently tax the save that bought it. This
     // assertion used to RECORD the tax (spent 4.0, the unknown row charged
@@ -422,7 +429,7 @@ bool FBreakerSpentPointsPerfTest::RunTest(const FString& Parameters)
     Loaded.DoctrineNodeRanks.Add({TEXT("Some.Removed.Node"), 3});          // unknown: dropped, +3 credited
     // THE SHIPPED CASE: a travel bead a save bought before O213 deleted the
     // Core.Travel.* ids. Dropped and credited exactly like the hand-made id
-    // above — one Core point back, no rank left — so the first real deletion
+    // above â€” one Core point back, no rank left â€” so the first real deletion
     // this repair was written ahead of is what it is measured against.
     Loaded.CoreNodeRanks.Add({TEXT("Core.Travel.Ring0P1Weapon"), 1});   // deleted (O213): dropped, +1 Core credited
     const int32 DoctrineWalletBefore = Loaded.UnspentDoctrinePoints;
@@ -481,7 +488,7 @@ bool FBreakerClassSwapStopsOldRanksPayingTest::RunTest(const FString& Parameters
 }
 
 // ---------------------------------------------------------------------------
-// ITEM 9 — subclass commitment (O37)
+// ITEM 9 â€” subclass commitment (O37)
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerSubclassCommitmentTest,
@@ -499,7 +506,7 @@ bool FBreakerSubclassCommitmentTest::RunTest(const FString& Parameters)
     // this line is the reason six branch keystones sat unpurchasable for a
     // whole milestone with a green suite: the shipped grant was 10, the gate
     // was 8, a keystone cost 3, and every test that could have caught it
-    // handed itself 30. The headroom is legitimate HERE — this test asserts
+    // handed itself 30. The headroom is legitimate HERE â€” this test asserts
     // commitment semantics, not affordability, and it must be able to reach
     // the nodes it is testing. But any test asserting that content is
     // REACHABLE must run on the shipped entitlement, never on a grant, or it
@@ -570,7 +577,7 @@ bool FBreakerSubclassCommitmentTest::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// ITEM 10 — O39 auto-lock becomes gated (default unchanged)
+// ITEM 10 â€” O39 auto-lock becomes gated (default unchanged)
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerAutoLockGateTest,

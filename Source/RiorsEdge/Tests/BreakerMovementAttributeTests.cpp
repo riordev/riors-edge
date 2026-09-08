@@ -98,15 +98,15 @@ bool FBreakerMovementAttributeCompositionTest::RunTest(const FString& Parameters
     Equipment->BindAttributes(Live);
     Equipment->EquipItem(Boots);
 
-    // Core.Velocity.Slipstream is +5% slide speed (O2 placeholder content).
+    // Core.Velocity.Slide is +8% slide speed (O2 placeholder content).
     FBreakerProgressionState Nodes;
     Nodes.PermanentClass = EBreakerClassId::Swift;
-    Nodes.CoreNodeRanks.Add({TEXT("Core.Velocity.Slipstream"), 1});
+    Nodes.CoreNodeRanks.Add({TEXT("Core.Velocity.Slide"), 1});
     Progression->BindAttributes(Live);
     Progression->LoadProgressionState(Nodes);
 
-    // 10% boots + 5% node in ONE bucket. Multiplied it would be 1.155.
-    TestEqual(TEXT("Gear and node slide speed share one bucket"), Live->GetSlideSpeedMultiplier(), 1.15f, 0.0001f);
+    // 10% boots + 8% node in ONE bucket. Multiplied it would be 1.188.
+    TestEqual(TEXT("Gear and node slide speed share one bucket"), Live->GetSlideSpeedMultiplier(), 1.18f, 0.0001f);
     TestEqual(TEXT("Gear air control reaches the attribute"), Live->GetAirControlMultiplier(), 1.15f, 0.0001f);
     TestEqual(TEXT("Gear dash cooldown reduction reaches the attribute"), Live->GetDashCooldownReduction(), 1.12f, 0.0001f);
 

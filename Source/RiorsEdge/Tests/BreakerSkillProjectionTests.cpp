@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Progression/BreakerProgressionComponent.h"
+#include "Progression/BreakerExperience.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "Progression/BreakerProgressionTree.h"
 #include "Progression/BreakerProgressionNode.h"
@@ -25,7 +26,7 @@ namespace BreakerSkillProjectionTestHelpers
         UBreakerProgressionComponent* Progression = nullptr;
     };
 
-    FRig MakeRig(int32 ClassPoints = 10, int32 CorePoints = 12)
+    FRig MakeRig()
     {
         FRig Rig;
         Rig.Owner = NewObject<AActor>();
@@ -33,7 +34,7 @@ namespace BreakerSkillProjectionTestHelpers
         Rig.Progression = NewObject<UBreakerProgressionComponent>(Rig.Owner);
         Rig.Progression->BindAttributes(Rig.Attributes);
         Rig.Progression->ChoosePermanentClassById(EBreakerClassId::Swift);
-        Rig.Progression->GrantPlaytestPoints(ClassPoints, CorePoints);
+        Rig.Progression->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(12, Rig.Progression->ExperienceCurve));
         return Rig;
     }
 
@@ -54,12 +55,9 @@ bool FBreakerSkillProjectionMirrorTest::RunTest(const FString& Parameters)
 
     FRig Rig = MakeRig();
     FText Reason;
-    // Three ENTRY nodes — the ring gates everything else, and this test
-    // wants owned content, not a traversal exercise.
-    Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Precision.Sightline"), Reason);
-    Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Bulwark.SetStance"), Reason);
-    Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Reservoir.Draw"), Reason);
-
+    // A legal gateway and two lane entries provide owned content for the mirror.
+    for (const TCHAR* Id : {TEXT("Core.Precision.Sightline"), TEXT("Core.Precision.Angle"), TEXT("Core.Precision.Ledger")})
+        if (!TestTrue(Id, Rig.Progression->PurchaseNode(CoreTree(), Id, Reason))) return false;
     const FBreakerSkillSnapshot Snapshot = BreakerSkillProjection::MakeSnapshot(Rig.Progression, Rig.Attributes);
     TestTrue(TEXT("Snapshot sees composed attributes"), Snapshot.bHasComposedAttributes);
     TestTrue(TEXT("Snapshot gathered the fallback node content"), Snapshot.Nodes.Num() > 10);
@@ -108,47 +106,24 @@ bool FBreakerSkillProjectionPurchaseTest::RunTest(const FString& Parameters)
 
     FRig Rig = MakeRig();
     FText Reason;
-    // ATLAS SHAPE: every Core node is a single purchase, and VOLLEY is
-    // entered at its own rim 0 from the virtual hub (O211) — nothing is
-    // bought to reach it, so the weapon-damage projection under test starts
-    // from the live number with no path spend in it.
-
-    const FBreakerSkillSnapshot Snapshot = BreakerSkillProjection::MakeSnapshot(Rig.Progression, Rig.Attributes);
-    const TArray<FBreakerStatLine> OneRank = BreakerSkillProjection::ProjectPurchase(Snapshot, TEXT("Core.Volley.Cyclic"), 1);
-    const FBreakerStatLine& Damage = OneRank[0];
-
-    TestEqual(TEXT("The projection starts from the live damage number"),
-        Damage.Before, Rig.Attributes->GetDamageMultiplier(), 0.0001f);
-    TestTrue(TEXT("Buying a damage node is projected to move damage"), Damage.Changed());
-    // +3% from the node effect and +0.25% from the per-spent-point baseline,
-    // both in the one additive Increased bucket. The baseline was 1% until O27
-    // cut it to a floor; the node's own effect is what carries a purchase now,
-    // which is the point of the ruling.
-    TestEqual(TEXT("Cyclic projects +3.25% damage"), Damage.After - Damage.Before, 0.0325f, 0.0005f);
-
-    // Now actually buy it. The arrow has to have been telling the truth.
-    TestTrue(TEXT("Cyclic is purchasable"), Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Volley.Cyclic"), Reason));
-    TestEqual(TEXT("The real purchase lands exactly where the projection pointed"),
-        Rig.Attributes->GetDamageMultiplier(), Damage.After, 0.0001f);
-
-    // A 2-point inner projects by COST: Salvo's +16% node line plus two
-    // points of baseline. Feed first — Salvo's stated rim gate is Cyclic AND
-    // Feed, and the projection must be made against a purchasable node.
-    TestTrue(TEXT("Feed purchases"), Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Volley.Feed"), Reason));
-    const FBreakerSkillSnapshot AfterOne = BreakerSkillProjection::MakeSnapshot(Rig.Progression, Rig.Attributes);
-    const TArray<FBreakerStatLine> InnerBuy = BreakerSkillProjection::ProjectPurchase(AfterOne, TEXT("Core.Volley.Salvo"), 1);
-    // 16% node + 2 x 0.25% baseline.
-    TestEqual(TEXT("Salvo projects +16.5% damage"), InnerBuy[0].After - InnerBuy[0].Before, 0.165f, 0.0005f);
-    TestTrue(TEXT("Salvo purchases"), Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Volley.Salvo"), Reason));
-    TestEqual(TEXT("The inner lands where the projection pointed"),
-        Rig.Attributes->GetDamageMultiplier(), InnerBuy[0].After, 0.0001f);
-
-    // A node with no damage effect still costs points, and the points pay.
-    // Threshold is the atlas's tag-only rewrite: two points, baseline only.
-    const FBreakerSkillSnapshot AfterMax = BreakerSkillProjection::MakeSnapshot(Rig.Progression, Rig.Attributes);
-    const TArray<FBreakerStatLine> Inert = BreakerSkillProjection::ProjectPurchase(AfterMax, TEXT("Core.Elements.Threshold"), 1);
-    TestEqual(TEXT("A damage-less node still projects its point-spend baseline"),
-        Inert[0].After - Inert[0].Before, 0.005f, 0.0005f);
+    const auto Snapshot = BreakerSkillProjection::MakeSnapshot(Rig.Progression, Rig.Attributes);
+    const auto Gateway = BreakerSkillProjection::ProjectPurchase(Snapshot, TEXT("Core.Precision.Sightline"), 1);
+    TestEqual(TEXT("Projection begins at live damage"), Gateway[0].Before, Rig.Attributes->GetDamageMultiplier(), .0001f);
+    TestEqual(TEXT("Crit-damage gateway pays the one-point damage floor"), Gateway[0].After - Gateway[0].Before, .0025f, .0001f);
+    if (!TestTrue(TEXT("Gateway purchased"), Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Precision.Sightline"), Reason))) return false;
+    TestEqual(TEXT("Gateway lands at its projection"), Rig.Attributes->GetDamageMultiplier(), Gateway[0].After, .0001f);
+    if (!TestTrue(TEXT("Rank-one lane opens notable"), Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Precision.Angle"), Reason))) return false;
+    const auto BeforeNotable = BreakerSkillProjection::MakeSnapshot(Rig.Progression, Rig.Attributes);
+    const auto Notable = BreakerSkillProjection::ProjectPurchase(BeforeNotable, TEXT("Core.Precision.CalledShot"), 1);
+    TestEqual(TEXT("Two-point notable adds twenty percent plus its point floor"), Notable[0].After - Notable[0].Before, .205f, .0001f);
+    if (!TestTrue(TEXT("Called Shot purchased"), Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Precision.CalledShot"), Reason))) return false;
+    TestEqual(TEXT("Notable lands at its projection"), Rig.Attributes->GetDamageMultiplier(), Notable[0].After, .0001f);
+    if (!TestTrue(TEXT("Cadence lane purchased"), Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Precision.Cadence"), Reason))) return false;
+    const auto BeforeCrit = BreakerSkillProjection::MakeSnapshot(Rig.Progression, Rig.Attributes);
+    const auto Crit = BreakerSkillProjection::ProjectPurchase(BeforeCrit, TEXT("Core.Precision.TriggerDiscipline"), 1);
+    TestEqual(TEXT("Crit notable still pays two-point damage floor"), Crit[0].After - Crit[0].Before, .005f, .0001f);
+    if (!TestTrue(TEXT("Trigger Discipline purchased"), Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Precision.TriggerDiscipline"), Reason))) return false;
+    TestEqual(TEXT("Non-Increased damage notable lands at projection"), Rig.Attributes->GetDamageMultiplier(), Crit[0].After, .0001f);
     return true;
 }
 
@@ -185,8 +160,8 @@ bool FBreakerSkillProjectionArithmeticTest::RunTest(const FString& Parameters)
     }
     TArray<FBreakerNodeRank> Committed;
     Committed.Add({TEXT("Core.Precision.Fixate"), 1});          // cost 3
-    Committed.Add({TEXT("Core.Volley.Salvo"), 1});              // cost 2
-    Committed.Add({TEXT("Core.Volley.Cyclic"), 1});             // cost 1
+    Committed.Add({TEXT("Core.Precision.CalledShot"), 1});              // cost 2
+    Committed.Add({TEXT("Core.Precision.Sightline"), 1});             // cost 1
     TestEqual(TEXT("Committed points count cost, not rank"), CommittedPoints(Nodes, Committed), 6);
     TestEqual(TEXT("An unknown node falls back to cost 1"),
         CommittedPoints(Nodes, {{TEXT("Nope"), 4}}), 4);
@@ -242,7 +217,7 @@ bool FBreakerSkillProjectionGuardTest::RunTest(const FString& Parameters)
     const FBreakerSkillSnapshot Fresh = BreakerSkillProjection::MakeSnapshot(Progression, nullptr);
     TestEqual(TEXT("A classless character holds no ranks"), Fresh.Ranks.Num(), 0);
     TestEqual(TEXT("A classless projection is identity"),
-        BreakerSkillProjection::ProjectPurchase(Fresh, TEXT("Core.Volley.Cyclic"), 1)[0].Before, 1.0f, 0.0001f);
+        BreakerSkillProjection::ProjectPurchase(Fresh, TEXT("Core.Precision.Sightline"), 1)[0].Before, 1.0f, 0.0001f);
     return true;
 }
 

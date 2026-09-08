@@ -54,7 +54,7 @@ bool FBreakerPierceDurationRuntimeTest::RunTest(const FString& Parameters)
     if (!Progression->ChoosePermanentClassById(EBreakerClassId::Swift)) return false;
     Progression->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(10, Progression->ExperienceCurve));
     FText Reason;
-    for (FName Node : {FName(TEXT("Core.Affliction.OpenWound")), FName(TEXT("Core.Affliction.Deepen")), FName(TEXT("Core.Affliction.Linger"))})
+    for (FName Node : {FName(TEXT("Core.Affliction.OpenWound")), FName(TEXT("Core.Affliction.Linger"))})
         if (!TestTrue(TEXT("actual legal Core path buys duration"), Progression->PurchaseNode(UBreakerProgressionLibrary::GetCoreSliceTree(), Node, Reason))) return false;
     const float DurationScale = Progression->GetNodeStats().StatusDurationMultiplier;
     if (!TestTrue(TEXT("purchased duration multiplier is nonidentity"), DurationScale > 1)) return false;

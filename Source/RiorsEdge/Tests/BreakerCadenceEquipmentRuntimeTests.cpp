@@ -36,11 +36,8 @@ bool FBreakerCadenceEquipmentRuntimeTest::RunTest(const FString& Parameters)
     // Earned level entitlement fixture, not a claim of playing ten campaign levels here.
     Progression->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(10, Progression->ExperienceCurve));
     FText Reason;
-    for (FName Id : {FName(TEXT("Core.Volley.Cyclic")), FName(TEXT("Core.Volley.Feed")),
-        FName(TEXT("Core.Volley.TriggerDiscipline")), FName(TEXT("Core.Volley.Chambered")),
-        FName(TEXT("Core.Volley.ColdBarrel")), FName(TEXT("Core.Volley.WorkingStock"))})
-        if (!TestTrue(FString::Printf(TEXT("Legal prerequisite %s"), *Id.ToString()),
-            Progression->PurchaseNode(UBreakerProgressionLibrary::GetCoreSliceTree(), Id, Reason))) return false;
+    if (!TestTrue(TEXT("Legal Precision gateway"), Progression->PurchaseNode(
+        UBreakerProgressionLibrary::GetCoreSliceTree(), TEXT("Core.Precision.Sightline"), Reason))) return false;
     auto* Equipment = Player->GetEquipment(); Equipment->BindAttributes(Attributes);
     auto* Weapon = Player->GetWeapon(); Weapon->BeginPlay();
     auto Secondary = UBreakerLootLibrary::RollItem(TEXT("Cadence.Secondary"), EBreakerEquipSlot::Secondary, EBreakerItemRarity::Standard, 1, 91);
@@ -70,14 +67,14 @@ bool FBreakerCadenceEquipmentRuntimeTest::RunTest(const FString& Parameters)
         + Progression->GetAttributeContribution().GetIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier);
     const float BeforeAbilityIncreased = RuledOffer.GetIncreasedPercent(EBreakerAggregatedAttribute::AbilityDamageMultiplier)
         + Progression->GetAttributeContribution().GetIncreasedPercent(EBreakerAggregatedAttribute::AbilityDamageMultiplier);
-    if (!TestTrue(TEXT("Actual Overrev purchase after legal rim path"), Progression->PurchaseNode(
-        UBreakerProgressionLibrary::GetCoreSliceTree(), TEXT("Core.Volley.Overrev"), Reason))) return false;
+    if (!TestTrue(TEXT("Actual Cadence rank after gateway"), Progression->PurchaseNode(
+        UBreakerProgressionLibrary::GetCoreSliceTree(), TEXT("Core.Precision.Cadence"), Reason))) return false;
     Equipment->TickComponent(0, LEVELTICK_All, nullptr);
     TestTrue(TEXT("Purchased rate reaches actual weapon cadence consumer"), Weapon->GetFireRateMultiplier() > BeforeRate);
-    // O27 pays 0.25% shared Increased Damage per spent point. Overrev costs
-    // two points: preserve that real floor, while refusing any extra conversion.
+    // O27 pays 0.25% shared Increased Damage per spent point. Cadence costs
+    // one point: preserve that real floor, while refusing any extra conversion.
     const float SpendDelta = Progression->GetPointSpendDamagePercent() - BeforeSpendPercent;
-    TestEqual(TEXT("Two-point purchase pays its authored shared floor"), SpendDelta, .5f, .0001f);
+    TestEqual(TEXT("One-point purchase pays its authored shared floor"), SpendDelta, .25f, .0001f);
     const float ExpectedWeapon = BeforeDamage * (1 + SpendDelta / (100 + BeforeWeaponIncreased));
     const float ExpectedAbility = BeforeAbility * (1 + SpendDelta / (100 + BeforeAbilityIncreased));
     TestEqual(TEXT("Tree fire rate is not converted again by Cadence"), Attributes->GetDamageMultiplier(), ExpectedWeapon, .001f);

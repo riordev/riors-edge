@@ -52,10 +52,8 @@ bool FBreakerCoreMigrationTest::RunTest(const FString& Parameters)
     Loaded->Serialize(ReadArchive);
     TestEqual(TEXT("missing legacy layout property defaults to one"),Loaded->CoreLayoutVersion,1);
     FString Note;
-    TestTrue(TEXT("inactive current migration accepts legacy layout"),UBreakerSaveGame::MigrateToCurrent(*Loaded,Note));
-    TestEqual(TEXT("inactive feature leaves Core allocated"),Loaded->Progression.CoreNodeRanks.Num(),3);
-    TestEqual(TEXT("inactive feature leaves wallet untouched"),Loaded->Progression.UnspentCorePoints,4);
-    TestTrue(TEXT("explicit new layout migration succeeds"),UBreakerSaveGame::MigrateCoreLayout(*Loaded,2,Note));
+    TestEqual(TEXT("Replacement layout is active"),UBreakerSaveGame::ActiveCoreLayoutVersion,2);
+    if (!TestTrue(TEXT("Normal load migrates legacy Core automatically"),UBreakerSaveGame::MigrateToCurrent(*Loaded,Note))) return false;
     TestEqual(TEXT("exact costs one plus two plus three refunded"),Loaded->Progression.UnspentCorePoints,10);
     TestEqual(TEXT("old meaning cannot survive through reused IDs"),Loaded->Progression.CoreNodeRanks.Num(),0);
     TestEqual(TEXT("layout stamped after success"),Loaded->CoreLayoutVersion,2);
@@ -76,10 +74,52 @@ bool FBreakerCoreMigrationTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("refusal preserves all ranks"),Save->Progression.CoreNodeRanks.Num(),4);
     TestEqual(TEXT("refusal preserves wallet"),Save->Progression.UnspentCorePoints,4);
     TestEqual(TEXT("refusal does not stamp layout"),Save->CoreLayoutVersion,1);
-    // Snapshot conformance is only meaningful while the legacy roster is live.
-    if (UBreakerSaveGame::ActiveCoreLayoutVersion==1)
-        for (const UBreakerProgressionNode* Node:UBreakerProgressionLibrary::GetCoreSliceTree()->Nodes)
-            TestEqual(*FString::Printf(TEXT("frozen legacy cost %s"),*Node->NodeId.ToString()),UBreakerSaveGame::LegacyCoreRankCost(Node->NodeId),Node->CostPerRank);
+    // Frozen prices are independent of the newly authored meanings. In
+    // particular, Deepen changed from a one-point rim to a two-point notable.
+    TestEqual(TEXT("Frozen gateway cost"),UBreakerSaveGame::LegacyCoreRankCost(TEXT("Core.Precision.Sightline")),1);
+    TestEqual(TEXT("Frozen notable cost"),UBreakerSaveGame::LegacyCoreRankCost(TEXT("Core.Precision.CalledShot")),2);
+    TestEqual(TEXT("Frozen convergence cost"),UBreakerSaveGame::LegacyCoreRankCost(TEXT("Core.Precision.Fixate")),3);
+    TestEqual(TEXT("Frozen Deepen price is not repriced from live roster"),UBreakerSaveGame::LegacyCoreRankCost(TEXT("Core.Affliction.Deepen")),1);
+    const auto* Core=UBreakerProgressionLibrary::GetCoreSliceTree();
+    if (!TestNotNull(TEXT("Replacement Core is live"),Core)) return false;
+    TestEqual(TEXT("Live getter exposes every accepted wedge"),Core->CoreWedgeOrder.Num(),22);
+    TestEqual(TEXT("Live getter exposes every accepted node"),Core->Nodes.Num(),187);
+    const auto* Linger=Core->FindNode(TEXT("Core.Affliction.Linger"));
+    if (!TestNotNull(TEXT("Reused Linger identity resolves in replacement"),Linger)) return false;
+    TestEqual(TEXT("Replacement Linger has its authored rank price"),Linger->CostPerRank,1);
+    TestEqual(TEXT("Replacement Linger has three ranks"),Linger->MaxRank,3);
+
+    const auto* Deepen=Core->FindNode(TEXT("Core.Affliction.Deepen"));
+    if (!TestNotNull(TEXT("Changed-price Deepen identity resolves"),Deepen)) return false;
+    TestEqual(TEXT("Replacement Deepen costs two"),Deepen->CostPerRank,2);
+    auto* RepricedLegacy=NewObject<UBreakerSaveGame>();
+    RepricedLegacy->SaveVersion=UBreakerSaveGame::CurrentSaveVersion;
+    RepricedLegacy->Progression.CoreNodeRanks={{TEXT("Core.Affliction.Deepen"),1}};
+    if (!TestTrue(TEXT("Normal migration refunds a changed-price legacy ID"),UBreakerSaveGame::MigrateToCurrent(*RepricedLegacy,Note))) return false;
+    TestEqual(TEXT("Refund uses frozen one-point cost rather than live two"),RepricedLegacy->Progression.UnspentCorePoints,1);
+
+    // A current-format allocation must survive serialization and ordinary
+    // loading unchanged. These saved rows are the migration fixture subject;
+    // acquisition and budget legality are covered by the paid roster tests.
+    auto* Current=NewObject<UBreakerSaveGame>();
+    Current->SaveVersion=UBreakerSaveGame::CurrentSaveVersion;
+    Current->CoreLayoutVersion=UBreakerSaveGame::ActiveCoreLayoutVersion;
+    Current->Progression.UnspentCorePoints=4;
+    Current->Progression.CoreNodeRanks={{TEXT("Core.Affliction.OpenWound"),1},{TEXT("Core.Affliction.Linger"),3}};
+    TArray<uint8> CurrentBytes;
+    FMemoryWriter CurrentWriter(CurrentBytes);
+    FObjectAndNameAsStringProxyArchive CurrentWriteArchive(CurrentWriter,false);
+    Current->Serialize(CurrentWriteArchive);
+    auto* CurrentLoaded=NewObject<UBreakerSaveGame>();
+    FMemoryReader CurrentReader(CurrentBytes);
+    FObjectAndNameAsStringProxyArchive CurrentReadArchive(CurrentReader,false);
+    CurrentLoaded->Serialize(CurrentReadArchive);
+    TestEqual(TEXT("Explicit layout survives serialization"),CurrentLoaded->CoreLayoutVersion,2);
+    if (!TestTrue(TEXT("Current-format load succeeds without refund"),UBreakerSaveGame::MigrateToCurrent(*CurrentLoaded,Note))) return false;
+    TestEqual(TEXT("Current wallet is unchanged"),CurrentLoaded->Progression.UnspentCorePoints,4);
+    if (!TestEqual(TEXT("Current allocation retains both rows"),CurrentLoaded->Progression.CoreNodeRanks.Num(),2)) return false;
+    TestEqual(TEXT("Current ranked identity is unchanged"),CurrentLoaded->Progression.CoreNodeRanks[1].NodeId,FName(TEXT("Core.Affliction.Linger")));
+    TestEqual(TEXT("Current three-rank investment survives"),CurrentLoaded->Progression.CoreNodeRanks[1].Rank,3);
     return true;
 }
 #endif

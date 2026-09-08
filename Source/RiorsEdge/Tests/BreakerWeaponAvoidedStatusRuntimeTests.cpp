@@ -3,6 +3,9 @@
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Fracture.h"
+#include "Abilities/BreakerAbilityComponent.h"
+#include "Combat/BreakerDamageLibrary.h"
+#include "Weapons/BreakerWeaponMath.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
 #include "Classes/BreakerManaComponent.h"
@@ -43,6 +46,7 @@ bool FBreakerWeaponAvoidedStatusRuntimeTest::RunTest(const FString& Parameters)
     {
         auto* Player = World->SpawnActor<ABreakerCharacter>(Location, Rotation, Spawn);
         if (!Player) return Player;
+        Player->bRefuseSavesForPendingCharacter = true;
         Player->SetActorTickEnabled(false); Player->GetBreakerMovement()->SetComponentTickEnabled(false);
         auto* ASC = Player->GetAbilitySystemComponent();
         ASC->InitAbilityActorInfo(Player, Player); ASC->AddAttributeSetSubobject(Player->GetAttributes());
@@ -79,12 +83,11 @@ bool FBreakerWeaponAvoidedStatusRuntimeTest::RunTest(const FString& Parameters)
         const bool bPurchased = Progression->PurchaseNode(UBreakerProgressionLibrary::GetCoreSliceTree(), Id, Reason);
         return TestTrue(*FString::Printf(TEXT("%s: %s"), Id, *Reason.ToString()), bPurchased);
     };
-    for (const TCHAR* Id : {TEXT("Core.Elements.Conductive"), TEXT("Core.Elements.ChargeUp"), TEXT("Core.Elements.Threshold")})
-        if (!Buy(Id)) return false;
-    TestEqual(TEXT("Threshold costs four ordinary Core points"), Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints), 9);
+    // The replacement tree has no deterministic weapon-status bank. No source
+    // Core purchases are needed for the SMG's native random Bleed proc.
     auto* TargetProgression = First->GetProgression();
     TargetProgression->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(4, TargetProgression->ExperienceCurve));
-    for (const TCHAR* Id : {TEXT("Core.Bulwark.SetStance"), TEXT("Core.Bulwark.Read"), TEXT("Core.Bulwark.Parry")})
+    for (const TCHAR* Id : {TEXT("Core.Bulwark.Read"), TEXT("Core.Bulwark.Guard"), TEXT("Core.Bulwark.Parry")})
         if (!TestTrue(TEXT("target purchases real Parry path"), TargetProgression->PurchaseNode(UBreakerProgressionLibrary::GetCoreSliceTree(), Id, Reason))) return false;
     First->GetCombat()->BlockChance = 0; // Isolate active Parry from the purchased passive block chance.
     for (auto* Target : {First, Second})
@@ -113,6 +116,7 @@ bool FBreakerWeaponAvoidedStatusRuntimeTest::RunTest(const FString& Parameters)
     Weapon->ResetAmmunition(); // Normal starting load, once; later reloads spend its reserve.
     auto* Mana = Source->GetMana(); Mana->BindAttributes(Source->GetAttributes());
     Mana->AdvanceLoop(20); Mana->SetComponentTickEnabled(false);
+    const float NormalPassiveRegen = Mana->PassiveRegenPerSecond;
     Mana->PassiveRegenPerSecond = 0; // Isolate hit/status income from passive regeneration.
     if (!TestTrue(TEXT("spend existing Mana to leave income headroom"), Mana->TrySpendMana(50))) return false;
     auto* FirstStatus = First->FindComponentByClass<UBreakerStatusComponent>();
@@ -133,36 +137,89 @@ bool FBreakerWeaponAvoidedStatusRuntimeTest::RunTest(const FString& Parameters)
             if (!World->GetTimerManager().HasBeenTickedThisFrame()) World->GetTimerManager().Tick(.05f);
         }
     };
+    int32 PaidRounds = 0; // Native SMG emits one base pellet; each paid pull advances its sequence once.
     auto Fire = [&]()
     {
         if (Weapon->GetMagazineAmmo() == 0) { Weapon->StartReload(); Advance(40); }
         const int32 Ammo = Weapon->GetMagazineAmmo();
         Weapon->StartFire();
         Weapon->StopFire();
-        return TestEqual(TEXT("every probe fires and spends an actual round"), Weapon->GetMagazineAmmo(), Ammo - 1);
+        if (!TestEqual(TEXT("every probe fires and spends an actual round"), Weapon->GetMagazineAmmo(), Ammo - 1)) return false;
+        ++PaidRounds;
+        return TestEqual(TEXT("observed SMG pull emits one native base pellet"), Weapon->GetLastShot().GetPelletCount(), 1);
     };
     auto Shots = [&](int32 Count)
     {
         for (int32 Shot = 0; Shot < Count; ++Shot) { Advance(3); if (!Fire()) return false; }
         return true;
     };
-    if (!Shots(4)) return false;
-    if (!TestTrue(TEXT("four paid quarter-chance hits earn actual Bleed through Threshold"), FirstStatus->HasStatus(Bleed))) return false;
-    // Four actual weapon hits plus the new status queue eight Mana. The six/s
-    // meter needs two seconds to settle that existing income before avoidance.
-    const float BeforeIncome = Mana->GetMana(); Mana->AdvanceLoop(2);
+    // Replay the native per-hit random stream without setting RNG/private state.
+    // Owner hash and observed paid base-pellet count are the actual seed inputs.
+    const uint32 OwnerHash = GetTypeHash(Source);
+    auto BleedRoll = [&](int32 SeedBasis)
+    {
+        FRandomStream Replay(static_cast<int32>(HashCombine(HashCombine(OwnerHash, static_cast<uint32>(SeedBasis)), 0x51ED0000u)));
+        return Replay.FRand();
+    };
+    auto ShouldProc = [&](int32 SeedBasis)
+    {
+        FBreakerDamageRequest SourceRequest;
+        UBreakerDamageLibrary::FillSourcePools(Source->GetAttributes(), EBreakerDamageDelivery::Weapon, SourceRequest);
+        return BleedRoll(SeedBasis) <= Weapon->WeaponDefinition->BleedChance
+            * Progression->GetNodeStats().StatusChanceMultiplier * FMath::Clamp(SourceRequest.ProcCoefficient, 0.f, 1.f);
+    };
+    auto EarnBleed = [&](UBreakerStatusComponent* Status, bool bChain)
+    {
+        // A bounded positive witness uses only this weapon's remaining native
+        // ammunition; no four-shot guarantee, threshold bank or proc inflation.
+        const int32 Bound = FMath::Min(64, Weapon->GetMagazineAmmo() + Weapon->GetReserveAmmo());
+        for (int32 I = 0; I < Bound; ++I)
+        {
+            bool bRemoved = false; Status->ConsumeStatus(Bleed, bRemoved);
+            if (!Shots(1)) return false;
+            const int32 Seed = bChain ? FBreakerWeaponMath::SecondaryShotSeed(OwnerHash, PaidRounds, 0xC4A15000u, 0) : PaidRounds;
+            const bool bExpected = ShouldProc(Seed);
+            if (!TestEqual(*FString::Printf(TEXT("native proc replay owner=%u round=%d seed=%d draw=%.6f"), OwnerHash, PaidRounds, Seed, BleedRoll(Seed)), Status->HasStatus(Bleed), bExpected)) return false;
+            if (bExpected) return true;
+        }
+        AddError(FString::Printf(TEXT("No positive native Bleed witness within %d paid rounds; owner=%u finalSequence=%d ammo=%d reserve=%d"),
+            Bound, OwnerHash, PaidRounds, Weapon->GetMagazineAmmo(), Weapon->GetReserveAmmo()));
+        return false;
+    };
+    auto AvoidedBleedWitness = [&](UBreakerStatusComponent* Status, bool bChain, TFunctionRef<bool()> Shoot)
+    {
+        const int32 Bound = FMath::Min(64, Weapon->GetMagazineAmmo() + Weapon->GetReserveAmmo());
+        for (int32 I = 0; I < Bound; ++I)
+        {
+            if (!Shoot()) return false;
+            if (!TestFalse(TEXT("avoided native draw never applies Bleed"), Status->HasStatus(Bleed))) return false;
+            const int32 Seed = bChain ? FBreakerWeaponMath::SecondaryShotSeed(OwnerHash, PaidRounds, 0xC4A15000u, 0) : PaidRounds;
+            if (ShouldProc(Seed)) return true; // Same roll would proc on an eligible hit.
+        }
+        AddError(FString::Printf(TEXT("No positive rejected-hit witness within %d paid rounds; owner=%u finalSequence=%d"), Bound, OwnerHash, PaidRounds));
+        return false;
+    };
+    if (!EarnBleed(FirstStatus, false)) return false;
+    // Settle all actual accepted-hit/status income, including streams requiring
+    // more than four draws, before testing that avoidance earns nothing.
+    const float BeforeIncome = Mana->GetMana();
+    const float EarnedIncomeBound = PaidRounds * (Mana->WeaponHitGain + Mana->WeakPointGain)
+        + UBreakerManaComponent::GetResourceTuning().StatusApplicationMana;
+    if (!TestTrue(TEXT("native income meter has positive rate"), Mana->GlobalGenerationCap > 0.f)) return false;
+    Mana->AdvanceLoop(EarnedIncomeBound / Mana->GlobalGenerationCap + 1.f);
     TestTrue(TEXT("accepted status/hits retain normal earned income"), Mana->GetMana() > BeforeIncome);
+    if (!TestTrue(TEXT("native spending preserves avoidance-income headroom"), Mana->TrySpendMana(20))) return false;
     FirstStatus->ConsumeAllStatuses();
     First->GetCombat()->DodgeChance = 1;
     const float DodgeHealth = First->GetAttributes()->GetHealth(), DodgeMana = Mana->GetMana();
-    if (!Shots(4)) return false;
+    if (!AvoidedBleedWitness(FirstStatus, false, [&]() { return Shots(1); })) return false;
     Mana->AdvanceLoop(1);
     TestEqual(TEXT("dodged rounds cause no health damage"), First->GetAttributes()->GetHealth(), DodgeHealth);
     TestFalse(TEXT("dodged rounds cannot apply Bleed"), FirstStatus->HasStatus(Bleed));
     TestEqual(TEXT("dodged rounds give no status income"), Mana->GetMana(), DodgeMana, .001f);
     First->GetCombat()->DodgeChance = 0;
     const float ParryMana = Mana->GetMana();
-    for (int32 Shot = 0; Shot < 4; ++Shot)
+    if (!AvoidedBleedWitness(FirstStatus, false, [&]()
     {
         Advance(42);
         if (!TestTrue(TEXT("actual purchased Parry opens before round"), First->GetCombat()->TryParry())) return false;
@@ -172,28 +229,41 @@ bool FBreakerWeaponAvoidedStatusRuntimeTest::RunTest(const FString& Parameters)
         // health. The actual submitted hit result isolates damage from that.
         TestEqual(TEXT("parried round applies no health damage"), Weapon->GetLastShot().DamageResult.HealthDamage, 0.0f);
         TestEqual(TEXT("parried round applies no shield damage"), Weapon->GetLastShot().DamageResult.ShieldDamage, 0.0f);
-    }
+        return true;
+    })) return false;
     Mana->AdvanceLoop(1);
     TestFalse(TEXT("parried rounds cannot apply Bleed"), FirstStatus->HasStatus(Bleed));
     TestEqual(TEXT("parried rounds give no status income"), Mana->GetMana(), ParryMana, .001f);
 
-    // Acquire an actual piercing channel, then earn the source status by firing.
-    // Enter Vector at Split and follow the actual wrap edge through Line to Wake.
-    for (const TCHAR* Id : {TEXT("Core.Vector.Split"), TEXT("Core.Vector.Line"), TEXT("Core.Vector.Wake"), TEXT("Core.Vector.PierceDiscipline")})
-        if (!Buy(Id)) return false;
-    if (!Shots(4)) return false;
-    if (!TestTrue(TEXT("accepted source earns Bleed after avoided rounds"), FirstStatus->HasStatus(Bleed))) return false;
+    // Acquire the actual replacement gateway's piercing channel.
+    if (!Buy(TEXT("Core.Vector.Line"))) return false;
+    if (!EarnBleed(FirstStatus, false)) return false;
     // Shipped Bleed deliberately does not spread on pierce; Poison does.
     // Earn that separate source through paid Fracture delivery, not ApplyStatus.
     if (!Progression->IsAbilityUnlocked(TEXT("Caster.Fracture")))
         if (!TestTrue(TEXT("actual level token unlocks Fracture"), Progression->SpendAbilityToken(TEXT("Caster.Fracture"), Reason))) return false;
-    const auto Fracture = Source->GetAbilitySystemComponent()->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Fracture::StaticClass(), 1));
+    if (!TestTrue(TEXT("real unlocked Fracture equips"), Source->GetAbilities()->TryEquipAbility(EBreakerAbilitySlot::ClassAbilityOne, TEXT("Caster.Fracture"), Reason))) return false;
+    const auto* FractureSpec = Source->GetAbilitySystemComponent()->FindAbilitySpecFromClass(UBreakerAbility_Fracture::StaticClass());
+    if (!TestNotNull(TEXT("equipped Fracture has native GAS spec"), FractureSpec)) return false;
+    const auto Fracture = FractureSpec->Handle;
+    // Avoidance-income assertions are finished. Restore the native regeneration
+    // removed only for those measurements, then earn the two casts' resource.
+    // Draining queued hit income does not refill a bank whose passive rate is zero.
+    Mana->PassiveRegenPerSecond = NormalPassiveRegen;
+    const float CastCost = Source->GetAbilities()->GetCost(EBreakerAbilitySlot::ClassAbilityOne);
+    if (!TestTrue(TEXT("native passive recovery and bank can fund both casts"), NormalPassiveRegen > 0.f
+        && Source->GetAttributes()->GetMaxClassResource() >= 2.f * CastCost)) return false;
+    Mana->AdvanceLoop(Source->GetAttributes()->GetMaxClassResource() / NormalPassiveRegen + 1.f);
+    if (!TestTrue(TEXT("normal regeneration earns both Fracture costs"), Mana->GetMana() >= 2.f * CastCost)) return false;
     for (int32 Cast = 0; Cast < 2; ++Cast)
     {
         TSet<ABreakerProjectileBase*> Existing;
         for (TActorIterator<ABreakerProjectileBase> It(World); It; ++It) Existing.Add(*It);
         const float BeforeCast = Mana->GetMana();
-        if (!TestTrue(TEXT("real paid Fracture prepares spreading Poison"), Source->GetAbilitySystemComponent()->TryActivateAbility(Fracture))) return false;
+        if (!TestTrue(*FString::Printf(TEXT("real paid Fracture cast %d prepares spreading Poison: mana=%.3f cost=%.3f slot=%s"),
+            Cast + 1, BeforeCast, Source->GetAbilities()->GetCost(EBreakerAbilitySlot::ClassAbilityOne),
+            *Source->GetAbilities()->GetAbilityIdForSlot(EBreakerAbilitySlot::ClassAbilityOne).ToString()),
+            Source->GetAbilities()->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityOne))) return false;
         TestTrue(TEXT("Fracture spends existing Mana"), Mana->GetMana() < BeforeCast);
         if (!BreakerWaitForFractureCast(World, Source->GetAbilitySystemComponent(), Fracture)) return false;
         ABreakerProjectileBase* Projectile = nullptr;
@@ -209,8 +279,10 @@ bool FBreakerWeaponAvoidedStatusRuntimeTest::RunTest(const FString& Parameters)
     const float SecondBefore = Second->GetAttributes()->GetHealth();
     if (!Shots(1)) return false;
     TestTrue(TEXT("pierce still reaches accepted second receiver"), Second->GetAttributes()->GetHealth() < SecondBefore);
-    TestFalse(TEXT("next accepted receiver has not yet earned its own Bleed"), SecondStatus->HasStatus(Bleed));
+    const int32 PierceSeed = FBreakerWeaponMath::SecondaryShotSeed(OwnerHash, PaidRounds, 0x91E4CE00u, 0);
+    TestEqual(TEXT("accepted pierced receiver follows its actual independent Bleed roll"), SecondStatus->HasStatus(Bleed), ShouldProc(PierceSeed));
     TestFalse(TEXT("avoided first receiver cannot spread its earned Poison"), SecondStatus->HasStatus(Poison));
+    SecondStatus->ConsumeAllStatuses();
     First->GetCombat()->DodgeChance = 0; Second->GetCombat()->DodgeChance = 1;
     const float RefusedSecondHealth = Second->GetAttributes()->GetHealth();
     if (!Shots(1)) return false;
@@ -218,12 +290,8 @@ bool FBreakerWeaponAvoidedStatusRuntimeTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("avoided pierced receiver cannot earn original Bleed"), SecondStatus->HasStatus(Bleed));
     TestFalse(TEXT("avoided pierced receiver cannot receive copied Poison"), SecondStatus->HasStatus(Poison));
 
-    // Normalize the deterministic bank through accepted single-body firing,
-    // never by writing its state; its next four eligible applications remain .25.
-    Second->SetActorLocation(SecondPosition + FVector(0, 3000, 0));
-    bool bRemovedBleed = false; FirstStatus->ConsumeStatus(Bleed, bRemovedBleed);
-    for (int32 Shot = 0; Shot < 4 && !FirstStatus->HasStatus(Bleed); ++Shot) if (!Shots(1)) return false;
-    if (!TestTrue(TEXT("paid source firing reaches next deterministic threshold"), FirstStatus->HasStatus(Bleed))) return false;
+    // Poison copying is independent of the original Bleed random draw. Keep
+    // the source's actual paid Poison; do not fabricate a proc-bank alignment.
     const auto* SourcePoison = FirstStatus->GetActiveStatuses().FindByPredicate([Poison](const FBreakerActiveStatus& Status) { return Status.Spec.StatusTag == Poison; });
     if (!TestNotNull(TEXT("actual earned Poison remains on source body"), SourcePoison)) return false;
     const float CopyDamage = SourcePoison->Spec.BaseDamagePerTick * BreakerStatusRules::PierceSpreadPayloadFraction();
@@ -237,20 +305,17 @@ bool FBreakerWeaponAvoidedStatusRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("pierce copy retains only authored fraction of source payload"), Copy->Spec.BaseDamagePerTick, CopyDamage, .001f);
     TestEqual(TEXT("pierce copy uses source remaining duration"), Copy->RemainingDuration, CopyDuration, .001f);
 
-    for (const TCHAR* Id : {TEXT("Core.Vector.Spread"), TEXT("Core.Vector.Carom"), TEXT("Core.Vector.Chainwork")})
+    for (const TCHAR* Id : {TEXT("Core.Vector.Carom"), TEXT("Core.Vector.Chainwork")})
         if (!Buy(Id)) return false;
-    TestEqual(TEXT("all mechanics and connecting rims use thirteen level-earned Core points"), Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints), 0);
+    TestEqual(TEXT("Line, Carom and Chainwork cost four earned Core points"), Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints), 9);
     SecondStatus->ConsumeAllStatuses(); Second->SetActorLocation(FirstPosition + FVector(0, 300, 0));
     Second->GetCombat()->DodgeChance = 1;
     const float ArcHealth = Second->GetAttributes()->GetHealth();
-    if (!Shots(4)) return false;
+    if (!AvoidedBleedWitness(SecondStatus, true, [&]() { return Shots(1); })) return false;
     TestEqual(TEXT("chain recipient actually avoids damage"), Second->GetAttributes()->GetHealth(), ArcHealth);
     TestFalse(TEXT("avoided chain recipient cannot receive Bleed"), SecondStatus->HasStatus(Bleed));
-    FirstStatus->ConsumeAllStatuses();
-    for (int32 Shot = 0; Shot < 4 && !FirstStatus->HasStatus(Bleed); ++Shot) if (!Shots(1)) return false;
-    if (!TestTrue(TEXT("accepted first hits reset bank naturally while chain recipient dodges"), FirstStatus->HasStatus(Bleed))) return false;
     Second->GetCombat()->DodgeChance = 0;
-    if (!Shots(2)) return false;
+    if (!EarnBleed(SecondStatus, true)) return false;
     TestTrue(TEXT("accepted chain still deals damage"), Second->GetAttributes()->GetHealth() < ArcHealth);
     TestTrue(TEXT("accepted chain still earns its own original Bleed"), SecondStatus->HasStatus(Bleed));
     return true;

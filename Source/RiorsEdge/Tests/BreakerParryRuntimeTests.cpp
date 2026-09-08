@@ -1,3 +1,4 @@
+#include "Progression/BreakerExperience.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
@@ -42,11 +43,11 @@ bool FBreakerParryRuntimeTest::RunTest(const FString& Parameters)
     // Only this component begins; the character never begins or reads saves.
     Combat->BeginPlay();
     TestFalse(TEXT("Unowned parry refuses"), Combat->TryParry());
-    Progression->GrantPlaytestPoints(0, 8); // Explicit test wallet, not earned progression.
+    Progression->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(7, Progression->ExperienceCurve)); // Earned seven-point Parry and Counterweight route.
     FText Failure;
     const UBreakerProgressionTree* Core = UBreakerProgressionLibrary::GetCoreSliceTree();
-    for (const TCHAR* Node : { TEXT("Core.Bulwark.SetStance"), TEXT("Core.Bulwark.Read"), TEXT("Core.Bulwark.Parry"),
-        TEXT("Core.Bulwark.Weight"), TEXT("Core.Bulwark.HeldGround"), TEXT("Core.Bulwark.Counterweight") })
+    for (const TCHAR* Node : { TEXT("Core.Bulwark.Read"), TEXT("Core.Bulwark.Guard"), TEXT("Core.Bulwark.Parry"),
+        TEXT("Core.Bulwark.Evade"), TEXT("Core.Bulwark.Counterweight") })
         if (!TestTrue(*FString::Printf(TEXT("Actual node purchase %s"), Node), Progression->PurchaseNode(Core, FName(Node), Failure))) return false;
     Attributes->ApplyShield(0); Attributes->ApplyMaxShield(0);
     Combat->DodgeChance = 0;
@@ -54,7 +55,7 @@ bool FBreakerParryRuntimeTest::RunTest(const FString& Parameters)
     Attributes->ApplyClassResource(0);
     const float BaselineWeapon = Attributes->GetDamageMultiplier();
     const float BaselineAbility = Attributes->GetAbilityDamageMultiplier();
-    TestFalse(TEXT("Counterweight is absent before success"), Combat->IsParryCounterActive());
+    TestFalse(TEXT("Counter opportunity is absent before success"), Combat->IsParryCounterActive());
     AActor* Attacker = World->SpawnActor<AActor>();
     if (!TestNotNull(TEXT("External hit source"), Attacker)) return false;
     FBreakerDamageRequest Hit;
@@ -72,7 +73,8 @@ bool FBreakerParryRuntimeTest::RunTest(const FString& Parameters)
         Progression->RefreshBuildConditions();
     };
     TestTrue(TEXT("Purchased parry activates"), Combat->TryParry());
-    TestEqual(TEXT("Read widens the O2 base window"), Combat->GetParryWindowRemaining(), 0.35f, 0.001f);
+    TestEqual(TEXT("Counterweight widens the authored base window"), Combat->GetParryWindowRemaining(), 0.35f, 0.001f);
+    TestEqual(TEXT("Counterweight reduces actual cooldown by half a second"), Combat->GetParryCooldownRemaining(), 1.5f, .001f);
     TestFalse(TEXT("Repress cannot extend window or reset cooldown"), Combat->TryParry());
     const float WindowBefore = Combat->GetParryWindowRemaining();
     FBreakerDamageRequest Ineligible = Hit; Ineligible.bIsDamageOverTime = true;
@@ -89,13 +91,13 @@ bool FBreakerParryRuntimeTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Zero hit cannot earn a counter"), Combat->ReceiveDamage(Ineligible).bParried);
     TestEqual(TEXT("Ineligible hits leave window intact"), Combat->GetParryWindowRemaining(), WindowBefore, 0.001f);
     TestFalse(TEXT("Ineligible hits earn no counter"), Combat->IsParryCounterActive());
-    Advance(0.30f); // Outside base .25, inside the actually purchased Read extension.
+    Advance(0.30f); // Outside base .25, inside the actually purchased Counterweight extension.
     const float HealthBefore = Attributes->GetHealth();
     const float ResourceBefore = Attributes->GetClassResource();
     Combat->DodgeChance = 1.0f; // If Parry incorrectly routes through dodge, the guaranteed refund exposes it.
     const FBreakerDamageResult Parried = Combat->ReceiveDamage(Hit);
     Combat->DodgeChance = 0.0f;
-    TestTrue(TEXT("Read-extended frontal hit is actually parried"), Parried.bParried);
+    TestTrue(TEXT("Counterweight-extended frontal hit is actually parried"), Parried.bParried);
     TestEqual(TEXT("Successful defense resets the real recovery combat clock"), Player->GetSecondsSinceCombat(), 0.0f, 0.001f);
     TestFalse(TEXT("Parry is not a dodge"), Parried.bDodged);
     TestFalse(TEXT("Parry is not a block"), Parried.bBlocked);
@@ -103,9 +105,10 @@ bool FBreakerParryRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Parry earns no dodge resource refund"), Attributes->GetClassResource(), ResourceBefore);
     TestFalse(TEXT("Success consumes the defense window"), Combat->IsParryActive());
     TestTrue(TEXT("Success starts counter"), Combat->IsParryCounterActive());
-    TestEqual(TEXT("Counter joins the existing Increased bucket immediately"), Attributes->GetDamageMultiplier(), BaselineWeapon + 0.16f, 0.0001f);
+    TestEqual(TEXT("Counterweight changes clocks without adding weapon power"), Attributes->GetDamageMultiplier(), BaselineWeapon, 0.0001f);
     TestEqual(TEXT("Counter adds no ability power"), Attributes->GetAbilityDamageMultiplier(), BaselineAbility, 0.0001f);
-    const FBreakerDamageResult Second = Combat->ReceiveDamage(Hit);
+    FBreakerDamageRequest Followup = Hit; Followup.bCanBeAvoided = false; // Evade now authors passive dodge; isolate consumed Parry.
+    const FBreakerDamageResult Second = Combat->ReceiveDamage(Followup);
     TestFalse(TEXT("Second hit is not parried"), Second.bParried);
     TestTrue(TEXT("Second hit deals actual damage"), Second.HealthDamage > 0);
     // Actual outgoing damage uses the just-published source pool, not a mirrored formula.
@@ -123,8 +126,8 @@ bool FBreakerParryRuntimeTest::RunTest(const FString& Parameters)
     const float CounterDamage = Shot();
     Advance(2.05f);
     TestFalse(TEXT("Counter expires"), Combat->IsParryCounterActive());
-    TestEqual(TEXT("Expiry removes exactly its Increased bid"), Attributes->GetDamageMultiplier(), BaselineWeapon, 0.0001f);
-    TestEqual(TEXT("Real weapon damage difference is the existing sixteen-percent bid"), CounterDamage - Shot(), 16.0f, 0.001f);
+    TestEqual(TEXT("Counter expiry leaves ordinary weapon power unchanged"), Attributes->GetDamageMultiplier(), BaselineWeapon, 0.0001f);
+    TestEqual(TEXT("Counterweight no longer authors legacy conditional damage"), CounterDamage - Shot(), 0.0f, 0.001f);
     TestTrue(TEXT("Cooldown recovers"), Combat->TryParry());
     Advance(0.36f);
     TestFalse(TEXT("Whiffed window expires"), Combat->IsParryActive());

@@ -1,4 +1,22 @@
 {
+	"coreAuthoringSources":
+	{
+		"Source/RiorsEdge/Data/BreakerCensus.cpp": "1c7069b9aefa9e7b144da8245e77d1e13e2b8a59",
+		"Source/RiorsEdge/Progression/BreakerCoreRoster.cpp": "483d8e0fe1d537faf636257f0d47572a46418691",
+		"Source/RiorsEdge/Progression/BreakerCoreRoster.h": "4a1c778afe6d79d0bd0b5af8489a6d0b9b79c69a",
+		"Source/RiorsEdge/Progression/BreakerCoreRosterAbility.cpp": "8645becd01509f7b74bd9e6051e61ae00863416c",
+		"Source/RiorsEdge/Progression/BreakerCoreRosterDefence.cpp": "10ca13c3c4e35d6c6d4140b142cbd7afdbccb59c",
+		"Source/RiorsEdge/Progression/BreakerCoreRosterMovement.cpp": "c4e3d19c0d78b915eb217a8ffdb95577204d9f9f",
+		"Source/RiorsEdge/Progression/BreakerCoreRosterStatus.cpp": "fa408be1a03145cc0f9eb8238af2d7ddc76fe2c5",
+		"Source/RiorsEdge/Progression/BreakerCoreRosterUtility.cpp": "ddd1500c029ac0f2cfa4f50822e95efc968f4c45",
+		"Source/RiorsEdge/Progression/BreakerCoreRosterWeapon.cpp": "668dc0b08541588e995afe28301d8ae2bacb2106",
+		"Source/RiorsEdge/Progression/BreakerCoreTree.cpp": "0d1c3252ee7f95d02fea3445e83f7e71b05e15c2",
+		"Source/RiorsEdge/Progression/BreakerCoreTree.h": "d5cbc90580dd4568eeb1ee21d00f5159dc56bbae",
+		"Source/RiorsEdge/Progression/BreakerProgressionLibrary.cpp": "3c2194e18348d8ea3aa298869166505552aa4ac3",
+		"Source/RiorsEdge/Progression/BreakerProgressionNode.h": "092c6560be0df6e02143690452adec272475a950",
+		"Source/RiorsEdge/Progression/BreakerProgressionTree.h": "aaf54881b733ca884baff936284824ef3d55a931",
+		"Source/RiorsEdge/Progression/BreakerProgressionTypes.h": "fbc1c1b4c86fa38bc0d28927b214bc46cf9963c8"
+	},
 	"budgets":
 	{
 		"core": 65,
@@ -570,30 +588,72 @@
 			"requiredClass": "None",
 			"entryNodes": [
 				"Core.Precision.Sightline",
-				"Core.Volley.Cyclic",
-				"Core.Vector.Split",
-				"Core.Arc.Channel",
-				"Core.Reservoir.Draw",
-				"Core.Elements.Conductive",
-				"Core.Affliction.OpenWound",
+				"Core.Vector.Line",
+				"Core.Ballistics.WeightOfIt",
+				"Core.Loadout.Sling",
 				"Core.Aegis.Footing",
-				"Core.Bulwark.SetStance",
+				"Core.Bulwark.Read",
+				"Core.Constitution.Frame",
+				"Core.Ward.Resist",
+				"Core.Recovery.Mend",
+				"Core.Arc.Prime",
+				"Core.Tempo.Metronome",
+				"Core.Reservoir.Capacity",
+				"Core.Duration.Hold",
+				"Core.Affliction.OpenWound",
+				"Core.Entropy.Attunement",
+				"Core.Reaction.Catalysis",
+				"Core.Rift.Displace",
+				"Core.Void.Erase",
+				"Core.Velocity.Grind",
 				"Core.Kinesis.LightFooting",
-				"Core.Velocity.Freefall",
-				"Core.Ruin.WeightofIt"
+				"Core.Control.Concussive",
+				"Core.Threat.Presence"
 			],
-			"restrictEntryToOwnedNeighbor": false,
+			"restrictEntryToOwnedNeighbor": true,
+			"coreWedgeOrder": [
+				"Precision",
+				"Vector",
+				"Ballistics",
+				"Loadout",
+				"Aegis",
+				"Bulwark",
+				"Constitution",
+				"Ward",
+				"Recovery",
+				"Arc",
+				"Tempo",
+				"Reservoir",
+				"Duration",
+				"Affliction",
+				"Entropy",
+				"Reaction",
+				"Rift",
+				"Void",
+				"Velocity",
+				"Kinesis",
+				"Control",
+				"Threat"
+			],
 			"adjacencyEdges": [
 				{
 					"a": "Core.Precision.Sightline",
-					"b": "Core.Precision.Steady"
-				},
-				{
-					"a": "Core.Precision.Steady",
 					"b": "Core.Precision.Angle"
 				},
 				{
 					"a": "Core.Precision.Angle",
+					"b": "Core.Precision.CalledShot"
+				},
+				{
+					"a": "Core.Precision.Sightline",
+					"b": "Core.Precision.Cadence"
+				},
+				{
+					"a": "Core.Precision.Cadence",
+					"b": "Core.Precision.TriggerDiscipline"
+				},
+				{
+					"a": "Core.Precision.Sightline",
 					"b": "Core.Precision.Ledger"
 				},
 				{
@@ -601,184 +661,364 @@
 					"b": "Core.Precision.LongLens"
 				},
 				{
-					"a": "Core.Precision.LongLens",
-					"b": "Core.Precision.Lead"
-				},
-				{
-					"a": "Core.Precision.Lead",
-					"b": "Core.Precision.Sightline"
-				},
-				{
-					"a": "Core.Precision.Sightline",
-					"b": "Core.Precision.CalledShot"
+					"a": "Core.Precision.CalledShot",
+					"b": "Core.Precision.Steady"
 				},
 				{
 					"a": "Core.Precision.Steady",
-					"b": "Core.Precision.CalledShot"
+					"b": "Core.Precision.TriggerDiscipline"
+				},
+				{
+					"a": "Core.Precision.TriggerDiscipline",
+					"b": "Core.Precision.ColdBarrel"
+				},
+				{
+					"a": "Core.Precision.ColdBarrel",
+					"b": "Core.Precision.LongLens"
 				},
 				{
 					"a": "Core.Precision.CalledShot",
 					"b": "Core.Precision.Fixate"
 				},
 				{
-					"a": "Core.Precision.Angle",
-					"b": "Core.Precision.TunnelVision"
-				},
-				{
-					"a": "Core.Precision.Ledger",
-					"b": "Core.Precision.TunnelVision"
-				},
-				{
-					"a": "Core.Precision.TunnelVision",
+					"a": "Core.Precision.TriggerDiscipline",
 					"b": "Core.Precision.Fixate"
 				},
 				{
 					"a": "Core.Precision.LongLens",
-					"b": "Core.Precision.Deadeye"
-				},
-				{
-					"a": "Core.Precision.Lead",
-					"b": "Core.Precision.Deadeye"
-				},
-				{
-					"a": "Core.Precision.Deadeye",
 					"b": "Core.Precision.Fixate"
 				},
 				{
-					"a": "Core.Volley.Cyclic",
-					"b": "Core.Volley.Feed"
+					"a": "Core.Precision.Fixate",
+					"b": "Core.Precision.Deadeye"
 				},
 				{
-					"a": "Core.Volley.Feed",
-					"b": "Core.Volley.TriggerDiscipline"
-				},
-				{
-					"a": "Core.Volley.TriggerDiscipline",
-					"b": "Core.Volley.Chambered"
-				},
-				{
-					"a": "Core.Volley.Chambered",
-					"b": "Core.Volley.ColdBarrel"
-				},
-				{
-					"a": "Core.Volley.ColdBarrel",
-					"b": "Core.Volley.WorkingStock"
-				},
-				{
-					"a": "Core.Volley.WorkingStock",
-					"b": "Core.Volley.Cyclic"
-				},
-				{
-					"a": "Core.Volley.Cyclic",
-					"b": "Core.Volley.Salvo"
-				},
-				{
-					"a": "Core.Volley.Feed",
-					"b": "Core.Volley.Salvo"
-				},
-				{
-					"a": "Core.Volley.Salvo",
-					"b": "Core.Volley.Barrage"
-				},
-				{
-					"a": "Core.Volley.TriggerDiscipline",
-					"b": "Core.Volley.LastRound"
-				},
-				{
-					"a": "Core.Volley.Chambered",
-					"b": "Core.Volley.LastRound"
-				},
-				{
-					"a": "Core.Volley.LastRound",
-					"b": "Core.Volley.Barrage"
-				},
-				{
-					"a": "Core.Volley.ColdBarrel",
-					"b": "Core.Volley.Overrev"
-				},
-				{
-					"a": "Core.Volley.WorkingStock",
-					"b": "Core.Volley.Overrev"
-				},
-				{
-					"a": "Core.Volley.Overrev",
-					"b": "Core.Volley.Barrage"
-				},
-				{
-					"a": "Core.Vector.Split",
-					"b": "Core.Vector.Overpenetration"
-				},
-				{
-					"a": "Core.Vector.Overpenetration",
-					"b": "Core.Vector.Carom"
-				},
-				{
-					"a": "Core.Vector.Carom",
+					"a": "Core.Vector.Line",
 					"b": "Core.Vector.Spread"
 				},
 				{
 					"a": "Core.Vector.Spread",
+					"b": "Core.Vector.Multishot"
+				},
+				{
+					"a": "Core.Vector.Line",
+					"b": "Core.Vector.Carom"
+				},
+				{
+					"a": "Core.Vector.Carom",
+					"b": "Core.Vector.Chainwork"
+				},
+				{
+					"a": "Core.Vector.Line",
 					"b": "Core.Vector.Wake"
 				},
 				{
 					"a": "Core.Vector.Wake",
-					"b": "Core.Vector.Line"
+					"b": "Core.Vector.Overpenetration"
 				},
 				{
-					"a": "Core.Vector.Line",
-					"b": "Core.Vector.Split"
+					"a": "Core.Vector.Multishot",
+					"b": "Core.Vector.Ricochet"
 				},
 				{
-					"a": "Core.Vector.Split",
-					"b": "Core.Vector.Multishot"
+					"a": "Core.Vector.Ricochet",
+					"b": "Core.Vector.Chainwork"
 				},
 				{
-					"a": "Core.Vector.Overpenetration",
-					"b": "Core.Vector.Multishot"
+					"a": "Core.Vector.Chainwork",
+					"b": "Core.Vector.Lead"
+				},
+				{
+					"a": "Core.Vector.Lead",
+					"b": "Core.Vector.Overpenetration"
 				},
 				{
 					"a": "Core.Vector.Multishot",
 					"b": "Core.Vector.Splinter"
 				},
 				{
-					"a": "Core.Vector.Carom",
-					"b": "Core.Vector.Chainwork"
-				},
-				{
-					"a": "Core.Vector.Spread",
-					"b": "Core.Vector.Chainwork"
-				},
-				{
 					"a": "Core.Vector.Chainwork",
 					"b": "Core.Vector.Splinter"
 				},
 				{
-					"a": "Core.Vector.Wake",
-					"b": "Core.Vector.PierceDiscipline"
-				},
-				{
-					"a": "Core.Vector.Line",
-					"b": "Core.Vector.PierceDiscipline"
-				},
-				{
-					"a": "Core.Vector.PierceDiscipline",
+					"a": "Core.Vector.Overpenetration",
 					"b": "Core.Vector.Splinter"
+				},
+				{
+					"a": "Core.Vector.Splinter",
+					"b": "Core.Vector.Fan"
+				},
+				{
+					"a": "Core.Ballistics.WeightOfIt",
+					"b": "Core.Ballistics.ShapedCharge"
+				},
+				{
+					"a": "Core.Ballistics.ShapedCharge",
+					"b": "Core.Ballistics.Siege"
+				},
+				{
+					"a": "Core.Ballistics.WeightOfIt",
+					"b": "Core.Ballistics.Range"
+				},
+				{
+					"a": "Core.Ballistics.Range",
+					"b": "Core.Ballistics.FlatTrajectory"
+				},
+				{
+					"a": "Core.Ballistics.WeightOfIt",
+					"b": "Core.Ballistics.Concussion"
+				},
+				{
+					"a": "Core.Ballistics.Concussion",
+					"b": "Core.Ballistics.Break"
+				},
+				{
+					"a": "Core.Ballistics.Siege",
+					"b": "Core.Ballistics.Cull"
+				},
+				{
+					"a": "Core.Ballistics.Cull",
+					"b": "Core.Ballistics.FlatTrajectory"
+				},
+				{
+					"a": "Core.Ballistics.FlatTrajectory",
+					"b": "Core.Ballistics.Loud"
+				},
+				{
+					"a": "Core.Ballistics.Loud",
+					"b": "Core.Ballistics.Break"
+				},
+				{
+					"a": "Core.Ballistics.Siege",
+					"b": "Core.Ballistics.Collapse"
+				},
+				{
+					"a": "Core.Ballistics.FlatTrajectory",
+					"b": "Core.Ballistics.Collapse"
+				},
+				{
+					"a": "Core.Ballistics.Break",
+					"b": "Core.Ballistics.Collapse"
+				},
+				{
+					"a": "Core.Ballistics.Collapse",
+					"b": "Core.Ballistics.Overpressure"
+				},
+				{
+					"a": "Core.Loadout.Sling",
+					"b": "Core.Loadout.ReloadDrill"
+				},
+				{
+					"a": "Core.Loadout.ReloadDrill",
+					"b": "Core.Loadout.Magazine"
+				},
+				{
+					"a": "Core.Loadout.Sling",
+					"b": "Core.Loadout.Reserve"
+				},
+				{
+					"a": "Core.Loadout.Reserve",
+					"b": "Core.Loadout.Quickdraw"
+				},
+				{
+					"a": "Core.Loadout.Magazine",
+					"b": "Core.Loadout.TwoGuns"
+				},
+				{
+					"a": "Core.Loadout.Quickdraw",
+					"b": "Core.Loadout.TwoGuns"
+				},
+				{
+					"a": "Core.Aegis.Footing",
+					"b": "Core.Aegis.IronFrame"
+				},
+				{
+					"a": "Core.Aegis.IronFrame",
+					"b": "Core.Aegis.Brace"
+				},
+				{
+					"a": "Core.Aegis.Footing",
+					"b": "Core.Aegis.Plate"
+				},
+				{
+					"a": "Core.Aegis.Plate",
+					"b": "Core.Aegis.Bulk"
+				},
+				{
+					"a": "Core.Aegis.Footing",
+					"b": "Core.Aegis.SecondSkin"
+				},
+				{
+					"a": "Core.Aegis.SecondSkin",
+					"b": "Core.Aegis.AnsweringFire"
+				},
+				{
+					"a": "Core.Aegis.Brace",
+					"b": "Core.Aegis.CleanHands"
+				},
+				{
+					"a": "Core.Aegis.CleanHands",
+					"b": "Core.Aegis.Bulk"
+				},
+				{
+					"a": "Core.Aegis.Bulk",
+					"b": "Core.Aegis.SetStance"
+				},
+				{
+					"a": "Core.Aegis.SetStance",
+					"b": "Core.Aegis.AnsweringFire"
+				},
+				{
+					"a": "Core.Aegis.Brace",
+					"b": "Core.Aegis.Bastion"
+				},
+				{
+					"a": "Core.Aegis.Bulk",
+					"b": "Core.Aegis.Bastion"
+				},
+				{
+					"a": "Core.Aegis.AnsweringFire",
+					"b": "Core.Aegis.Bastion"
+				},
+				{
+					"a": "Core.Aegis.Bastion",
+					"b": "Core.Aegis.Immovable"
+				},
+				{
+					"a": "Core.Bulwark.Read",
+					"b": "Core.Bulwark.Guard"
+				},
+				{
+					"a": "Core.Bulwark.Guard",
+					"b": "Core.Bulwark.Parry"
+				},
+				{
+					"a": "Core.Bulwark.Read",
+					"b": "Core.Bulwark.Evade"
+				},
+				{
+					"a": "Core.Bulwark.Evade",
+					"b": "Core.Bulwark.Counterweight"
+				},
+				{
+					"a": "Core.Bulwark.Read",
+					"b": "Core.Bulwark.Interpose"
+				},
+				{
+					"a": "Core.Bulwark.Interpose",
+					"b": "Core.Bulwark.Riposte"
+				},
+				{
+					"a": "Core.Bulwark.Parry",
+					"b": "Core.Bulwark.Anticipate"
+				},
+				{
+					"a": "Core.Bulwark.Anticipate",
+					"b": "Core.Bulwark.Counterweight"
+				},
+				{
+					"a": "Core.Bulwark.Counterweight",
+					"b": "Core.Bulwark.Footwork"
+				},
+				{
+					"a": "Core.Bulwark.Footwork",
+					"b": "Core.Bulwark.Riposte"
+				},
+				{
+					"a": "Core.Bulwark.Parry",
+					"b": "Core.Bulwark.Wall"
+				},
+				{
+					"a": "Core.Bulwark.Counterweight",
+					"b": "Core.Bulwark.Wall"
+				},
+				{
+					"a": "Core.Bulwark.Riposte",
+					"b": "Core.Bulwark.Wall"
+				},
+				{
+					"a": "Core.Bulwark.Wall",
+					"b": "Core.Bulwark.PerfectGuard"
+				},
+				{
+					"a": "Core.Constitution.Frame",
+					"b": "Core.Constitution.Mass"
+				},
+				{
+					"a": "Core.Constitution.Mass",
+					"b": "Core.Constitution.DeepReserve"
+				},
+				{
+					"a": "Core.Constitution.Frame",
+					"b": "Core.Constitution.Layered"
+				},
+				{
+					"a": "Core.Constitution.Layered",
+					"b": "Core.Constitution.ThirdLayer"
+				},
+				{
+					"a": "Core.Constitution.DeepReserve",
+					"b": "Core.Constitution.Endurance"
+				},
+				{
+					"a": "Core.Constitution.ThirdLayer",
+					"b": "Core.Constitution.Endurance"
+				},
+				{
+					"a": "Core.Ward.Resist",
+					"b": "Core.Ward.Tolerance"
+				},
+				{
+					"a": "Core.Ward.Tolerance",
+					"b": "Core.Ward.Refusal"
+				},
+				{
+					"a": "Core.Ward.Resist",
+					"b": "Core.Ward.Clean"
+				},
+				{
+					"a": "Core.Ward.Clean",
+					"b": "Core.Ward.Insulation"
+				},
+				{
+					"a": "Core.Ward.Refusal",
+					"b": "Core.Ward.Null"
+				},
+				{
+					"a": "Core.Ward.Insulation",
+					"b": "Core.Ward.Null"
+				},
+				{
+					"a": "Core.Recovery.Mend",
+					"b": "Core.Recovery.Knit"
+				},
+				{
+					"a": "Core.Recovery.Knit",
+					"b": "Core.Recovery.FieldDressing"
+				},
+				{
+					"a": "Core.Recovery.Mend",
+					"b": "Core.Recovery.Recharge"
+				},
+				{
+					"a": "Core.Recovery.Recharge",
+					"b": "Core.Recovery.Overheal"
+				},
+				{
+					"a": "Core.Recovery.FieldDressing",
+					"b": "Core.Recovery.SecondLife"
+				},
+				{
+					"a": "Core.Recovery.Overheal",
+					"b": "Core.Recovery.SecondLife"
+				},
+				{
+					"a": "Core.Arc.Prime",
+					"b": "Core.Arc.Channel"
 				},
 				{
 					"a": "Core.Arc.Channel",
 					"b": "Core.Arc.Widen"
-				},
-				{
-					"a": "Core.Arc.Widen",
-					"b": "Core.Arc.Recycle"
-				},
-				{
-					"a": "Core.Arc.Recycle",
-					"b": "Core.Arc.Anchor"
-				},
-				{
-					"a": "Core.Arc.Anchor",
-					"b": "Core.Arc.Prime"
 				},
 				{
 					"a": "Core.Arc.Prime",
@@ -786,51 +1026,111 @@
 				},
 				{
 					"a": "Core.Arc.Vent",
-					"b": "Core.Arc.Channel"
+					"b": "Core.Arc.Reach"
 				},
 				{
-					"a": "Core.Arc.Channel",
-					"b": "Core.Arc.CadenceBreak"
+					"a": "Core.Arc.Prime",
+					"b": "Core.Arc.Anchor"
+				},
+				{
+					"a": "Core.Arc.Anchor",
+					"b": "Core.Arc.Persistence"
 				},
 				{
 					"a": "Core.Arc.Widen",
-					"b": "Core.Arc.CadenceBreak"
-				},
-				{
-					"a": "Core.Arc.CadenceBreak",
-					"b": "Core.Arc.Overflow"
+					"b": "Core.Arc.Recycle"
 				},
 				{
 					"a": "Core.Arc.Recycle",
 					"b": "Core.Arc.Reach"
 				},
 				{
-					"a": "Core.Arc.Anchor",
-					"b": "Core.Arc.Reach"
+					"a": "Core.Arc.Reach",
+					"b": "Core.Arc.Spillover"
+				},
+				{
+					"a": "Core.Arc.Spillover",
+					"b": "Core.Arc.Persistence"
+				},
+				{
+					"a": "Core.Arc.Widen",
+					"b": "Core.Arc.Overflow"
 				},
 				{
 					"a": "Core.Arc.Reach",
 					"b": "Core.Arc.Overflow"
 				},
 				{
-					"a": "Core.Arc.Prime",
-					"b": "Core.Arc.Widening"
-				},
-				{
-					"a": "Core.Arc.Vent",
-					"b": "Core.Arc.Widening"
-				},
-				{
-					"a": "Core.Arc.Widening",
+					"a": "Core.Arc.Persistence",
 					"b": "Core.Arc.Overflow"
 				},
 				{
-					"a": "Core.Reservoir.Draw",
-					"b": "Core.Reservoir.Wellspring"
+					"a": "Core.Arc.Overflow",
+					"b": "Core.Arc.Detonation"
 				},
 				{
-					"a": "Core.Reservoir.Wellspring",
-					"b": "Core.Reservoir.Capacity"
+					"a": "Core.Tempo.Metronome",
+					"b": "Core.Tempo.Quicken"
+				},
+				{
+					"a": "Core.Tempo.Quicken",
+					"b": "Core.Tempo.Reset"
+				},
+				{
+					"a": "Core.Tempo.Metronome",
+					"b": "Core.Tempo.Recovery"
+				},
+				{
+					"a": "Core.Tempo.Recovery",
+					"b": "Core.Tempo.SecondWind"
+				},
+				{
+					"a": "Core.Tempo.Metronome",
+					"b": "Core.Tempo.Flow"
+				},
+				{
+					"a": "Core.Tempo.Flow",
+					"b": "Core.Tempo.Cascade"
+				},
+				{
+					"a": "Core.Tempo.Reset",
+					"b": "Core.Tempo.Prep"
+				},
+				{
+					"a": "Core.Tempo.Prep",
+					"b": "Core.Tempo.SecondWind"
+				},
+				{
+					"a": "Core.Tempo.SecondWind",
+					"b": "Core.Tempo.FollowThrough"
+				},
+				{
+					"a": "Core.Tempo.FollowThrough",
+					"b": "Core.Tempo.Cascade"
+				},
+				{
+					"a": "Core.Tempo.Reset",
+					"b": "Core.Tempo.Overclock"
+				},
+				{
+					"a": "Core.Tempo.SecondWind",
+					"b": "Core.Tempo.Overclock"
+				},
+				{
+					"a": "Core.Tempo.Cascade",
+					"b": "Core.Tempo.Overclock"
+				},
+				{
+					"a": "Core.Tempo.Overclock",
+					"b": "Core.Tempo.Conduction"
+				},
+				{
+					"a": "Core.Reservoir.Capacity",
+					"b": "Core.Reservoir.Draw"
+				},
+				{
+					"a": "Core.Reservoir.Draw",
+					"b": "Core.Reservoir.DeepPockets"
 				},
 				{
 					"a": "Core.Reservoir.Capacity",
@@ -838,114 +1138,42 @@
 				},
 				{
 					"a": "Core.Reservoir.Tithe",
-					"b": "Core.Reservoir.DeepPockets"
+					"b": "Core.Reservoir.Wellspring"
 				},
 				{
 					"a": "Core.Reservoir.DeepPockets",
 					"b": "Core.Reservoir.SecondShift"
 				},
 				{
-					"a": "Core.Reservoir.SecondShift",
-					"b": "Core.Reservoir.Draw"
-				},
-				{
-					"a": "Core.Reservoir.Draw",
-					"b": "Core.Reservoir.ConvergencePoint"
-				},
-				{
 					"a": "Core.Reservoir.Wellspring",
-					"b": "Core.Reservoir.ConvergencePoint"
+					"b": "Core.Reservoir.SecondShift"
 				},
 				{
-					"a": "Core.Reservoir.Capacity",
-					"b": "Core.Reservoir.Spillover"
+					"a": "Core.Duration.Hold",
+					"b": "Core.Duration.Extend"
 				},
 				{
-					"a": "Core.Reservoir.Tithe",
-					"b": "Core.Reservoir.Spillover"
+					"a": "Core.Duration.Extend",
+					"b": "Core.Duration.Uptime"
 				},
 				{
-					"a": "Core.Reservoir.DeepPockets",
-					"b": "Core.Reservoir.Reserve"
+					"a": "Core.Duration.Hold",
+					"b": "Core.Duration.Settle"
 				},
 				{
-					"a": "Core.Reservoir.SecondShift",
-					"b": "Core.Reservoir.Reserve"
+					"a": "Core.Duration.Settle",
+					"b": "Core.Duration.Standing"
 				},
 				{
-					"a": "Core.Elements.Conductive",
-					"b": "Core.Elements.ChargeUp"
+					"a": "Core.Duration.Uptime",
+					"b": "Core.Duration.Afterimage"
 				},
 				{
-					"a": "Core.Elements.ChargeUp",
-					"b": "Core.Elements.Penetrance"
-				},
-				{
-					"a": "Core.Elements.Penetrance",
-					"b": "Core.Elements.Attunement"
-				},
-				{
-					"a": "Core.Elements.Attunement",
-					"b": "Core.Elements.Catalyst"
-				},
-				{
-					"a": "Core.Elements.Catalyst",
-					"b": "Core.Elements.Sympathy"
-				},
-				{
-					"a": "Core.Elements.Sympathy",
-					"b": "Core.Elements.Conductive"
-				},
-				{
-					"a": "Core.Elements.Conductive",
-					"b": "Core.Elements.Threshold"
-				},
-				{
-					"a": "Core.Elements.ChargeUp",
-					"b": "Core.Elements.Threshold"
-				},
-				{
-					"a": "Core.Elements.Threshold",
-					"b": "Core.Elements.ReactionChain"
-				},
-				{
-					"a": "Core.Elements.Penetrance",
-					"b": "Core.Elements.Reaction"
-				},
-				{
-					"a": "Core.Elements.Attunement",
-					"b": "Core.Elements.Reaction"
-				},
-				{
-					"a": "Core.Elements.Reaction",
-					"b": "Core.Elements.ReactionChain"
-				},
-				{
-					"a": "Core.Elements.Catalyst",
-					"b": "Core.Elements.Sequence"
-				},
-				{
-					"a": "Core.Elements.Sympathy",
-					"b": "Core.Elements.Sequence"
-				},
-				{
-					"a": "Core.Elements.Sequence",
-					"b": "Core.Elements.ReactionChain"
+					"a": "Core.Duration.Standing",
+					"b": "Core.Duration.Afterimage"
 				},
 				{
 					"a": "Core.Affliction.OpenWound",
-					"b": "Core.Affliction.Deepen"
-				},
-				{
-					"a": "Core.Affliction.Deepen",
-					"b": "Core.Affliction.Linger"
-				},
-				{
-					"a": "Core.Affliction.Linger",
-					"b": "Core.Affliction.Seep"
-				},
-				{
-					"a": "Core.Affliction.Seep",
 					"b": "Core.Affliction.Bloodlet"
 				},
 				{
@@ -953,36 +1181,20 @@
 					"b": "Core.Affliction.SlowBleed"
 				},
 				{
-					"a": "Core.Affliction.SlowBleed",
-					"b": "Core.Affliction.OpenWound"
-				},
-				{
 					"a": "Core.Affliction.OpenWound",
-					"b": "Core.Affliction.Fester"
-				},
-				{
-					"a": "Core.Affliction.Deepen",
-					"b": "Core.Affliction.Fester"
-				},
-				{
-					"a": "Core.Affliction.Fester",
-					"b": "Core.Affliction.Compound"
-				},
-				{
-					"a": "Core.Affliction.Linger",
-					"b": "Core.Affliction.Bloodwork"
+					"b": "Core.Affliction.Seep"
 				},
 				{
 					"a": "Core.Affliction.Seep",
-					"b": "Core.Affliction.Bloodwork"
+					"b": "Core.Affliction.Fester"
 				},
 				{
-					"a": "Core.Affliction.Bloodwork",
-					"b": "Core.Affliction.Compound"
+					"a": "Core.Affliction.OpenWound",
+					"b": "Core.Affliction.Linger"
 				},
 				{
-					"a": "Core.Affliction.Bloodlet",
-					"b": "Core.Affliction.Attrition"
+					"a": "Core.Affliction.Linger",
+					"b": "Core.Affliction.Deepen"
 				},
 				{
 					"a": "Core.Affliction.SlowBleed",
@@ -990,115 +1202,247 @@
 				},
 				{
 					"a": "Core.Affliction.Attrition",
+					"b": "Core.Affliction.Fester"
+				},
+				{
+					"a": "Core.Affliction.Fester",
+					"b": "Core.Affliction.Bloodwork"
+				},
+				{
+					"a": "Core.Affliction.Bloodwork",
+					"b": "Core.Affliction.Deepen"
+				},
+				{
+					"a": "Core.Affliction.SlowBleed",
 					"b": "Core.Affliction.Compound"
 				},
 				{
-					"a": "Core.Aegis.Footing",
-					"b": "Core.Aegis.Brace"
+					"a": "Core.Affliction.Fester",
+					"b": "Core.Affliction.Compound"
 				},
 				{
-					"a": "Core.Aegis.Brace",
-					"b": "Core.Aegis.Recover"
+					"a": "Core.Affliction.Deepen",
+					"b": "Core.Affliction.Compound"
 				},
 				{
-					"a": "Core.Aegis.Recover",
-					"b": "Core.Aegis.CleanHands"
+					"a": "Core.Affliction.Compound",
+					"b": "Core.Affliction.Hemorrhage"
 				},
 				{
-					"a": "Core.Aegis.CleanHands",
-					"b": "Core.Aegis.SecondOpinion"
+					"a": "Core.Entropy.Attunement",
+					"b": "Core.Entropy.Catalyst"
 				},
 				{
-					"a": "Core.Aegis.SecondOpinion",
-					"b": "Core.Aegis.Bulk"
+					"a": "Core.Entropy.Catalyst",
+					"b": "Core.Entropy.Threshold"
 				},
 				{
-					"a": "Core.Aegis.Bulk",
-					"b": "Core.Aegis.Footing"
+					"a": "Core.Entropy.Attunement",
+					"b": "Core.Entropy.Decay"
 				},
 				{
-					"a": "Core.Aegis.Footing",
-					"b": "Core.Aegis.ShortCircuit"
+					"a": "Core.Entropy.Decay",
+					"b": "Core.Entropy.Density"
 				},
 				{
-					"a": "Core.Aegis.Brace",
-					"b": "Core.Aegis.ShortCircuit"
+					"a": "Core.Entropy.Attunement",
+					"b": "Core.Entropy.Conductive"
 				},
 				{
-					"a": "Core.Aegis.Recover",
-					"b": "Core.Aegis.IronFrame"
+					"a": "Core.Entropy.Conductive",
+					"b": "Core.Entropy.Sympathy"
 				},
 				{
-					"a": "Core.Aegis.CleanHands",
-					"b": "Core.Aegis.IronFrame"
+					"a": "Core.Entropy.Threshold",
+					"b": "Core.Entropy.Penetrance"
 				},
 				{
-					"a": "Core.Aegis.SecondOpinion",
-					"b": "Core.Aegis.AnsweringFire"
+					"a": "Core.Entropy.Penetrance",
+					"b": "Core.Entropy.Density"
 				},
 				{
-					"a": "Core.Aegis.Bulk",
-					"b": "Core.Aegis.AnsweringFire"
+					"a": "Core.Entropy.Density",
+					"b": "Core.Entropy.Sequence"
 				},
 				{
-					"a": "Core.Bulwark.SetStance",
-					"b": "Core.Bulwark.Read"
+					"a": "Core.Entropy.Sequence",
+					"b": "Core.Entropy.Sympathy"
 				},
 				{
-					"a": "Core.Bulwark.Read",
-					"b": "Core.Bulwark.Weight"
+					"a": "Core.Entropy.Threshold",
+					"b": "Core.Entropy.Cascade"
 				},
 				{
-					"a": "Core.Bulwark.Weight",
-					"b": "Core.Bulwark.HeldGround"
+					"a": "Core.Entropy.Density",
+					"b": "Core.Entropy.Cascade"
 				},
 				{
-					"a": "Core.Bulwark.HeldGround",
-					"b": "Core.Bulwark.LineofSight"
+					"a": "Core.Entropy.Sympathy",
+					"b": "Core.Entropy.Cascade"
 				},
 				{
-					"a": "Core.Bulwark.LineofSight",
-					"b": "Core.Bulwark.Loud"
+					"a": "Core.Entropy.Cascade",
+					"b": "Core.Entropy.LongDark"
 				},
 				{
-					"a": "Core.Bulwark.Loud",
-					"b": "Core.Bulwark.SetStance"
+					"a": "Core.Reaction.Catalysis",
+					"b": "Core.Reaction.Ignition"
 				},
 				{
-					"a": "Core.Bulwark.SetStance",
-					"b": "Core.Bulwark.Parry"
+					"a": "Core.Reaction.Ignition",
+					"b": "Core.Reaction.Chain"
 				},
 				{
-					"a": "Core.Bulwark.Read",
-					"b": "Core.Bulwark.Parry"
+					"a": "Core.Reaction.Catalysis",
+					"b": "Core.Reaction.Residue"
 				},
 				{
-					"a": "Core.Bulwark.Parry",
-					"b": "Core.Bulwark.Set"
+					"a": "Core.Reaction.Residue",
+					"b": "Core.Reaction.SecondOrder"
 				},
 				{
-					"a": "Core.Bulwark.Weight",
-					"b": "Core.Bulwark.Counterweight"
+					"a": "Core.Reaction.Catalysis",
+					"b": "Core.Reaction.Feedback"
 				},
 				{
-					"a": "Core.Bulwark.HeldGround",
-					"b": "Core.Bulwark.Counterweight"
+					"a": "Core.Reaction.Feedback",
+					"b": "Core.Reaction.Overlap"
 				},
 				{
-					"a": "Core.Bulwark.Counterweight",
-					"b": "Core.Bulwark.Set"
+					"a": "Core.Reaction.Chain",
+					"b": "Core.Reaction.Spark"
 				},
 				{
-					"a": "Core.Bulwark.LineofSight",
-					"b": "Core.Bulwark.Interposition"
+					"a": "Core.Reaction.Spark",
+					"b": "Core.Reaction.SecondOrder"
 				},
 				{
-					"a": "Core.Bulwark.Loud",
-					"b": "Core.Bulwark.Interposition"
+					"a": "Core.Reaction.SecondOrder",
+					"b": "Core.Reaction.Echo"
 				},
 				{
-					"a": "Core.Bulwark.Interposition",
-					"b": "Core.Bulwark.Set"
+					"a": "Core.Reaction.Echo",
+					"b": "Core.Reaction.Overlap"
+				},
+				{
+					"a": "Core.Reaction.Chain",
+					"b": "Core.Reaction.Resonance"
+				},
+				{
+					"a": "Core.Reaction.SecondOrder",
+					"b": "Core.Reaction.Resonance"
+				},
+				{
+					"a": "Core.Reaction.Overlap",
+					"b": "Core.Reaction.Resonance"
+				},
+				{
+					"a": "Core.Reaction.Resonance",
+					"b": "Core.Reaction.Sympathetic"
+				},
+				{
+					"a": "Core.Rift.Displace",
+					"b": "Core.Rift.Shove"
+				},
+				{
+					"a": "Core.Rift.Shove",
+					"b": "Core.Rift.Impact"
+				},
+				{
+					"a": "Core.Rift.Displace",
+					"b": "Core.Rift.Instability"
+				},
+				{
+					"a": "Core.Rift.Instability",
+					"b": "Core.Rift.HardLanding"
+				},
+				{
+					"a": "Core.Rift.Impact",
+					"b": "Core.Rift.VectorField"
+				},
+				{
+					"a": "Core.Rift.HardLanding",
+					"b": "Core.Rift.VectorField"
+				},
+				{
+					"a": "Core.Void.Erase",
+					"b": "Core.Void.Hollow"
+				},
+				{
+					"a": "Core.Void.Hollow",
+					"b": "Core.Void.Patience"
+				},
+				{
+					"a": "Core.Void.Erase",
+					"b": "Core.Void.Siphon"
+				},
+				{
+					"a": "Core.Void.Siphon",
+					"b": "Core.Void.Debt"
+				},
+				{
+					"a": "Core.Void.Patience",
+					"b": "Core.Void.NothingLeft"
+				},
+				{
+					"a": "Core.Void.Debt",
+					"b": "Core.Void.NothingLeft"
+				},
+				{
+					"a": "Core.Velocity.Grind",
+					"b": "Core.Velocity.Stride"
+				},
+				{
+					"a": "Core.Velocity.Stride",
+					"b": "Core.Velocity.Momentum"
+				},
+				{
+					"a": "Core.Velocity.Grind",
+					"b": "Core.Velocity.Slide"
+				},
+				{
+					"a": "Core.Velocity.Slide",
+					"b": "Core.Velocity.Carry"
+				},
+				{
+					"a": "Core.Velocity.Grind",
+					"b": "Core.Velocity.Sprint"
+				},
+				{
+					"a": "Core.Velocity.Sprint",
+					"b": "Core.Velocity.Downforce"
+				},
+				{
+					"a": "Core.Velocity.Momentum",
+					"b": "Core.Velocity.Traction"
+				},
+				{
+					"a": "Core.Velocity.Traction",
+					"b": "Core.Velocity.Carry"
+				},
+				{
+					"a": "Core.Velocity.Carry",
+					"b": "Core.Velocity.Afterburn"
+				},
+				{
+					"a": "Core.Velocity.Afterburn",
+					"b": "Core.Velocity.Downforce"
+				},
+				{
+					"a": "Core.Velocity.Momentum",
+					"b": "Core.Velocity.TerminalVelocity"
+				},
+				{
+					"a": "Core.Velocity.Carry",
+					"b": "Core.Velocity.TerminalVelocity"
+				},
+				{
+					"a": "Core.Velocity.Downforce",
+					"b": "Core.Velocity.TerminalVelocity"
+				},
+				{
+					"a": "Core.Velocity.TerminalVelocity",
+					"b": "Core.Velocity.NoGround"
 				},
 				{
 					"a": "Core.Kinesis.LightFooting",
@@ -1106,167 +1450,159 @@
 				},
 				{
 					"a": "Core.Kinesis.Loft",
+					"b": "Core.Kinesis.AirWork"
+				},
+				{
+					"a": "Core.Kinesis.LightFooting",
 					"b": "Core.Kinesis.Landing"
 				},
 				{
 					"a": "Core.Kinesis.Landing",
-					"b": "Core.Kinesis.Carry"
-				},
-				{
-					"a": "Core.Kinesis.Carry",
-					"b": "Core.Kinesis.Contact"
-				},
-				{
-					"a": "Core.Kinesis.Contact",
-					"b": "Core.Kinesis.Redirect"
-				},
-				{
-					"a": "Core.Kinesis.Redirect",
-					"b": "Core.Kinesis.LightFooting"
-				},
-				{
-					"a": "Core.Kinesis.LightFooting",
 					"b": "Core.Kinesis.AirJump"
 				},
 				{
-					"a": "Core.Kinesis.Loft",
-					"b": "Core.Kinesis.AirJump"
-				},
-				{
-					"a": "Core.Kinesis.Landing",
-					"b": "Core.Kinesis.Slipcut"
-				},
-				{
-					"a": "Core.Kinesis.Carry",
-					"b": "Core.Kinesis.Slipcut"
-				},
-				{
-					"a": "Core.Kinesis.Contact",
+					"a": "Core.Kinesis.AirWork",
 					"b": "Core.Kinesis.PhantomStep"
 				},
 				{
-					"a": "Core.Kinesis.Redirect",
+					"a": "Core.Kinesis.AirJump",
 					"b": "Core.Kinesis.PhantomStep"
 				},
 				{
-					"a": "Core.Velocity.Freefall",
-					"b": "Core.Velocity.Afterburn"
+					"a": "Core.Control.Concussive",
+					"b": "Core.Control.Jarring"
 				},
 				{
-					"a": "Core.Velocity.Afterburn",
-					"b": "Core.Velocity.Traction"
+					"a": "Core.Control.Jarring",
+					"b": "Core.Control.Shockwave"
 				},
 				{
-					"a": "Core.Velocity.Traction",
-					"b": "Core.Velocity.Slipstream"
+					"a": "Core.Control.Concussive",
+					"b": "Core.Control.Insistent"
 				},
 				{
-					"a": "Core.Velocity.Slipstream",
+					"a": "Core.Control.Insistent",
+					"b": "Core.Control.Interrupt"
+				},
+				{
+					"a": "Core.Control.Shockwave",
+					"b": "Core.Control.Lockstep"
+				},
+				{
+					"a": "Core.Control.Interrupt",
+					"b": "Core.Control.Lockstep"
+				},
+				{
+					"a": "Core.Threat.Presence",
+					"b": "Core.Threat.Loud"
+				},
+				{
+					"a": "Core.Threat.Loud",
+					"b": "Core.Threat.Provocation"
+				},
+				{
+					"a": "Core.Threat.Presence",
+					"b": "Core.Threat.Decoy"
+				},
+				{
+					"a": "Core.Threat.Decoy",
+					"b": "Core.Threat.Bait"
+				},
+				{
+					"a": "Core.Threat.Provocation",
+					"b": "Core.Threat.IgnoreMe"
+				},
+				{
+					"a": "Core.Threat.Bait",
+					"b": "Core.Threat.IgnoreMe"
+				},
+				{
+					"a": "Core.Precision.Sightline",
+					"b": "Core.Vector.Line"
+				},
+				{
+					"a": "Core.Vector.Line",
+					"b": "Core.Ballistics.WeightOfIt"
+				},
+				{
+					"a": "Core.Ballistics.WeightOfIt",
+					"b": "Core.Loadout.Sling"
+				},
+				{
+					"a": "Core.Loadout.Sling",
+					"b": "Core.Aegis.Footing"
+				},
+				{
+					"a": "Core.Aegis.Footing",
+					"b": "Core.Bulwark.Read"
+				},
+				{
+					"a": "Core.Bulwark.Read",
+					"b": "Core.Constitution.Frame"
+				},
+				{
+					"a": "Core.Constitution.Frame",
+					"b": "Core.Ward.Resist"
+				},
+				{
+					"a": "Core.Ward.Resist",
+					"b": "Core.Recovery.Mend"
+				},
+				{
+					"a": "Core.Recovery.Mend",
+					"b": "Core.Arc.Prime"
+				},
+				{
+					"a": "Core.Arc.Prime",
+					"b": "Core.Tempo.Metronome"
+				},
+				{
+					"a": "Core.Tempo.Metronome",
+					"b": "Core.Reservoir.Capacity"
+				},
+				{
+					"a": "Core.Reservoir.Capacity",
+					"b": "Core.Duration.Hold"
+				},
+				{
+					"a": "Core.Duration.Hold",
+					"b": "Core.Affliction.OpenWound"
+				},
+				{
+					"a": "Core.Affliction.OpenWound",
+					"b": "Core.Entropy.Attunement"
+				},
+				{
+					"a": "Core.Entropy.Attunement",
+					"b": "Core.Reaction.Catalysis"
+				},
+				{
+					"a": "Core.Reaction.Catalysis",
+					"b": "Core.Rift.Displace"
+				},
+				{
+					"a": "Core.Rift.Displace",
+					"b": "Core.Void.Erase"
+				},
+				{
+					"a": "Core.Void.Erase",
 					"b": "Core.Velocity.Grind"
 				},
 				{
 					"a": "Core.Velocity.Grind",
-					"b": "Core.Velocity.Downforce"
+					"b": "Core.Kinesis.LightFooting"
 				},
 				{
-					"a": "Core.Velocity.Downforce",
-					"b": "Core.Velocity.Freefall"
+					"a": "Core.Kinesis.LightFooting",
+					"b": "Core.Control.Concussive"
 				},
 				{
-					"a": "Core.Velocity.Freefall",
-					"b": "Core.Velocity.TerminalDescent"
+					"a": "Core.Control.Concussive",
+					"b": "Core.Threat.Presence"
 				},
 				{
-					"a": "Core.Velocity.Afterburn",
-					"b": "Core.Velocity.TerminalDescent"
-				},
-				{
-					"a": "Core.Velocity.TerminalDescent",
-					"b": "Core.Velocity.TerminalVelocity"
-				},
-				{
-					"a": "Core.Velocity.Traction",
-					"b": "Core.Velocity.Redline"
-				},
-				{
-					"a": "Core.Velocity.Slipstream",
-					"b": "Core.Velocity.Redline"
-				},
-				{
-					"a": "Core.Velocity.Redline",
-					"b": "Core.Velocity.TerminalVelocity"
-				},
-				{
-					"a": "Core.Velocity.Grind",
-					"b": "Core.Velocity.NoGround"
-				},
-				{
-					"a": "Core.Velocity.Downforce",
-					"b": "Core.Velocity.NoGround"
-				},
-				{
-					"a": "Core.Velocity.NoGround",
-					"b": "Core.Velocity.TerminalVelocity"
-				},
-				{
-					"a": "Core.Ruin.WeightofIt",
-					"b": "Core.Ruin.Cull"
-				},
-				{
-					"a": "Core.Ruin.Cull",
-					"b": "Core.Ruin.Break"
-				},
-				{
-					"a": "Core.Ruin.Break",
-					"b": "Core.Ruin.ShapedCharge"
-				},
-				{
-					"a": "Core.Ruin.ShapedCharge",
-					"b": "Core.Ruin.Concussion"
-				},
-				{
-					"a": "Core.Ruin.Concussion",
-					"b": "Core.Ruin.Rend"
-				},
-				{
-					"a": "Core.Ruin.Rend",
-					"b": "Core.Ruin.WeightofIt"
-				},
-				{
-					"a": "Core.Ruin.WeightofIt",
-					"b": "Core.Ruin.Execute"
-				},
-				{
-					"a": "Core.Ruin.Cull",
-					"b": "Core.Ruin.Execute"
-				},
-				{
-					"a": "Core.Ruin.Execute",
-					"b": "Core.Ruin.Collapse"
-				},
-				{
-					"a": "Core.Ruin.Break",
-					"b": "Core.Ruin.Siege"
-				},
-				{
-					"a": "Core.Ruin.ShapedCharge",
-					"b": "Core.Ruin.Siege"
-				},
-				{
-					"a": "Core.Ruin.Siege",
-					"b": "Core.Ruin.Collapse"
-				},
-				{
-					"a": "Core.Ruin.Concussion",
-					"b": "Core.Ruin.Overpressure"
-				},
-				{
-					"a": "Core.Ruin.Rend",
-					"b": "Core.Ruin.Overpressure"
-				},
-				{
-					"a": "Core.Ruin.Overpressure",
-					"b": "Core.Ruin.Collapse"
+					"a": "Core.Threat.Presence",
+					"b": "Core.Precision.Sightline"
 				}
 			],
 			"nodes": [
@@ -1279,152 +1615,103 @@
 					"constellation": "Precision",
 					"effects": [
 						{
-							"target": "CriticalChance",
+							"target": "CriticalDamage",
 							"bucket": "Flat",
-							"valuePerRank": 2,
+							"valuePerRank": 6,
 							"condition": "Always",
 							"alsoRequires": []
 						}
 					],
 					"tags": [],
 					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Precision.Steady",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Precision",
-					"effects": [
-						{
-							"target": "RecoilRecovery",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 10,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
+					"prerequisites": [],
+					"coreRole": "Gateway",
+					"coreLaneIndex": 0
 				},
 				{
 					"id": "Core.Precision.Angle",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Precision",
-					"effects": [
-						{
-							"target": "CriticalChance",
-							"bucket": "Flat",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Precision.Ledger",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Precision",
-					"effects": [
-						{
-							"target": "CriticalDamage",
-							"bucket": "Flat",
-							"valuePerRank": 4,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Precision.LongLens",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Precision",
-					"effects": [
-						{
-							"target": "WeaponSpread",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 8,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Precision.Lead",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Precision",
-					"effects": [
-						{
-							"target": "CriticalChance",
-							"bucket": "Flat",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Precision.CalledShot",
 					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
+					"ranks": 3,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "Precision",
 					"effects": [
 						{
-							"target": "CriticalDamage",
+							"target": "CriticalChance",
 							"bucket": "Flat",
-							"valuePerRank": 14,
+							"valuePerRank": 2,
 							"condition": "Always",
 							"alsoRequires": []
 						}
 					],
-					"tags": [
-						"Progression.Node.Core.CalledShot"
-					],
+					"tags": [],
 					"exclusive": [],
 					"prerequisites": [
 						{
 							"id": "Core.Precision.Sightline",
 							"rank": 1
-						},
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Precision.CalledShot",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Precision",
+					"effects": [
 						{
-							"id": "Core.Precision.Steady",
+							"target": "WeaponDamage",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 20,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Precision.Angle",
 							"rank": 1
 						}
 					],
-					"requiredTreeInvestment": 2
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 0
 				},
 				{
-					"id": "Core.Precision.TunnelVision",
+					"id": "Core.Precision.Cadence",
 					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Precision",
+					"effects": [
+						{
+							"target": "FireRate",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 3,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Precision.Sightline",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Precision.TriggerDiscipline",
+					"tier": 3,
 					"ranks": 1,
 					"cost": 2,
 					"cornerstone": false,
@@ -1433,281 +1720,56 @@
 						{
 							"target": "CriticalDamage",
 							"bucket": "Flat",
-							"valuePerRank": 18,
+							"valuePerRank": 25,
 							"condition": "Always",
 							"alsoRequires": []
-						},
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
 						{
-							"target": "Damage",
+							"id": "Core.Precision.Cadence",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Precision.Ledger",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Precision",
+					"effects": [
+						{
+							"target": "WeaponDamage",
 							"bucket": "IncreasedPercent",
-							"valuePerRank": 12,
-							"condition": "TargetElite",
+							"valuePerRank": 5,
+							"condition": "Always",
 							"alsoRequires": []
 						}
 					],
-					"tags": [
-						"Progression.Node.Core.TunnelVision"
-					],
+					"tags": [],
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Core.Precision.Angle",
-							"rank": 1
-						},
-						{
-							"id": "Core.Precision.Ledger",
+							"id": "Core.Precision.Sightline",
 							"rank": 1
 						}
 					],
-					"requiredTreeInvestment": 2
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 2
 				},
 				{
-					"id": "Core.Precision.Deadeye",
-					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "Precision",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Core.Precision.Deadeye"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Core.Precision.LongLens",
-							"rank": 1
-						},
-						{
-							"id": "Core.Precision.Lead",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Core.Precision.Fixate",
+					"id": "Core.Precision.LongLens",
 					"tier": 3,
 					"ranks": 1,
-					"cost": 3,
+					"cost": 2,
 					"cornerstone": false,
 					"constellation": "Precision",
-					"effects": [
-						{
-							"target": "WeaponDamage",
-							"bucket": "MorePercent",
-							"valuePerRank": 22,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Core.Fixate"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Core.Precision.CalledShot",
-							"rank": 1
-						},
-						{
-							"id": "Core.Precision.TunnelVision",
-							"rank": 1
-						},
-						{
-							"id": "Core.Precision.Deadeye",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
-				},
-				{
-					"id": "Core.Volley.Cyclic",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Volley",
-					"effects": [
-						{
-							"target": "WeaponDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Core.Cyclic"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Volley.Feed",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Volley",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Volley.TriggerDiscipline",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Volley",
-					"effects": [
-						{
-							"target": "WeaponDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Core.TriggerDiscipline"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Volley.Chambered",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Volley",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Volley.ColdBarrel",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Volley",
-					"effects": [
-						{
-							"target": "WeaponSpread",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 8,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Volley.WorkingStock",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Volley",
-					"effects": [
-						{
-							"target": "RecoilRecovery",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 10,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Volley.Salvo",
-					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "Volley",
-					"effects": [
-						{
-							"target": "WeaponDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 16,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Core.Salvo"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Core.Volley.Cyclic",
-							"rank": 1
-						},
-						{
-							"id": "Core.Volley.Feed",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Core.Volley.LastRound",
-					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "Volley",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Core.LastRound"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Core.Volley.TriggerDiscipline",
-							"rank": 1
-						},
-						{
-							"id": "Core.Volley.Chambered",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Core.Volley.Overrev",
-					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "Volley",
 					"effects": [
 						{
 							"target": "FireRate",
@@ -1715,157 +1777,167 @@
 							"valuePerRank": 8,
 							"condition": "Always",
 							"alsoRequires": []
+						},
+						{
+							"target": "WeaponRange",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 15,
+							"condition": "Always",
+							"alsoRequires": []
 						}
 					],
 					"tags": [],
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Core.Volley.ColdBarrel",
-							"rank": 1
-						},
-						{
-							"id": "Core.Volley.WorkingStock",
+							"id": "Core.Precision.Ledger",
 							"rank": 1
 						}
 					],
-					"requiredTreeInvestment": 2
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 2
 				},
 				{
-					"id": "Core.Volley.Barrage",
+					"id": "Core.Precision.Steady",
 					"tier": 3,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Precision",
+					"effects": [
+						{
+							"target": "RecoilRecovery",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 12,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Link",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 1,
+							"candidates": [
+								{
+									"id": "Core.Precision.CalledShot",
+									"rank": 1
+								},
+								{
+									"id": "Core.Precision.TriggerDiscipline",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Precision.ColdBarrel",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Precision",
+					"effects": [
+						{
+							"target": "WeaponBaseSpreadReduction",
+							"bucket": "Flat",
+							"valuePerRank": 10,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Link",
+					"coreLaneIndex": 1,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 1,
+							"candidates": [
+								{
+									"id": "Core.Precision.TriggerDiscipline",
+									"rank": 1
+								},
+								{
+									"id": "Core.Precision.LongLens",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Precision.Fixate",
+					"tier": 4,
 					"ranks": 1,
 					"cost": 3,
 					"cornerstone": false,
-					"constellation": "Volley",
+					"constellation": "Precision",
 					"effects": [
 						{
-							"target": "WeaponDamage",
+							"target": "WeaponCriticalDamage",
 							"bucket": "MorePercent",
 							"valuePerRank": 22,
 							"condition": "Always",
 							"alsoRequires": []
 						}
 					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Precision.Sightline",
+							"rank": 1
+						}
+					],
+					"coreRole": "Convergence",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 2,
+							"candidates": [
+								{
+									"id": "Core.Precision.CalledShot",
+									"rank": 1
+								},
+								{
+									"id": "Core.Precision.TriggerDiscipline",
+									"rank": 1
+								},
+								{
+									"id": "Core.Precision.LongLens",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Precision.Deadeye",
+					"tier": 5,
+					"ranks": 1,
+					"cost": 5,
+					"cornerstone": false,
+					"constellation": "Precision",
+					"effects": [],
 					"tags": [
-						"Progression.Node.Core.Barrage"
+						"Progression.Node.Core.Deadeye"
 					],
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Core.Volley.Salvo",
-							"rank": 1
-						},
-						{
-							"id": "Core.Volley.LastRound",
-							"rank": 1
-						},
-						{
-							"id": "Core.Volley.Overrev",
+							"id": "Core.Precision.Fixate",
 							"rank": 1
 						}
 					],
-					"requiredTreeInvestment": 4
-				},
-				{
-					"id": "Core.Vector.Split",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Vector",
-					"effects": [
-						{
-							"target": "WeaponDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Vector.Overpenetration",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Vector",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Vector.Carom",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Vector",
-					"effects": [
-						{
-							"target": "WeaponDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Vector.Spread",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Vector",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Vector.Wake",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Vector",
-					"effects": [
-						{
-							"target": "WeaponDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
+					"coreRole": "Keystone",
+					"coreLaneIndex": 0,
+					"requiredConstellationInvestment": 18
 				},
 				{
 					"id": "Core.Vector.Line",
@@ -1876,20 +1948,49 @@
 					"constellation": "Vector",
 					"effects": [
 						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
+							"target": "Pierce",
+							"bucket": "Flat",
+							"valuePerRank": 1,
 							"condition": "Always",
 							"alsoRequires": []
 						}
 					],
 					"tags": [],
 					"exclusive": [],
-					"prerequisites": []
+					"prerequisites": [],
+					"coreRole": "Gateway",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Vector.Spread",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Vector",
+					"effects": [
+						{
+							"target": "AddedWeaponDamage",
+							"bucket": "Flat",
+							"valuePerRank": 3,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Vector.Line",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 0
 				},
 				{
 					"id": "Core.Vector.Multishot",
-					"tier": 2,
+					"tier": 3,
 					"ranks": 1,
 					"cost": 2,
 					"cornerstone": false,
@@ -1907,19 +2008,43 @@
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Core.Vector.Split",
-							"rank": 1
-						},
-						{
-							"id": "Core.Vector.Overpenetration",
+							"id": "Core.Vector.Spread",
 							"rank": 1
 						}
 					],
-					"requiredTreeInvestment": 2
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Vector.Carom",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Vector",
+					"effects": [
+						{
+							"target": "WeaponDamage",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 5,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Vector.Line",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 1
 				},
 				{
 					"id": "Core.Vector.Chainwork",
-					"tier": 2,
+					"tier": 3,
 					"ranks": 1,
 					"cost": 2,
 					"cornerstone": false,
@@ -1939,17 +2064,41 @@
 						{
 							"id": "Core.Vector.Carom",
 							"rank": 1
-						},
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Vector.Wake",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Vector",
+					"effects": [
 						{
-							"id": "Core.Vector.Spread",
+							"target": "AddedWeaponDamage",
+							"bucket": "Flat",
+							"valuePerRank": 4,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Vector.Line",
 							"rank": 1
 						}
 					],
-					"requiredTreeInvestment": 2
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 2
 				},
 				{
-					"id": "Core.Vector.PierceDiscipline",
-					"tier": 2,
+					"id": "Core.Vector.Overpenetration",
+					"tier": 3,
 					"ranks": 1,
 					"cost": 2,
 					"cornerstone": false,
@@ -1961,6 +2110,13 @@
 							"valuePerRank": 1,
 							"condition": "Always",
 							"alsoRequires": []
+						},
+						{
+							"target": "PierceLossReduction",
+							"bucket": "Flat",
+							"valuePerRank": 15,
+							"condition": "Always",
+							"alsoRequires": []
 						}
 					],
 					"tags": [],
@@ -1969,26 +2125,97 @@
 						{
 							"id": "Core.Vector.Wake",
 							"rank": 1
-						},
-						{
-							"id": "Core.Vector.Line",
-							"rank": 1
 						}
 					],
-					"requiredTreeInvestment": 2
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 2
+				},
+				{
+					"id": "Core.Vector.Ricochet",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Vector",
+					"effects": [
+						{
+							"target": "RicochetCount",
+							"bucket": "Flat",
+							"valuePerRank": 1,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Link",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 1,
+							"candidates": [
+								{
+									"id": "Core.Vector.Multishot",
+									"rank": 1
+								},
+								{
+									"id": "Core.Vector.Chainwork",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Vector.Lead",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Vector",
+					"effects": [
+						{
+							"target": "ProjectileSpeed",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 10,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Link",
+					"coreLaneIndex": 1,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 1,
+							"candidates": [
+								{
+									"id": "Core.Vector.Chainwork",
+									"rank": 1
+								},
+								{
+									"id": "Core.Vector.Overpenetration",
+									"rank": 1
+								}
+							]
+						}
+					]
 				},
 				{
 					"id": "Core.Vector.Splinter",
-					"tier": 3,
+					"tier": 4,
 					"ranks": 1,
 					"cost": 3,
 					"cornerstone": false,
 					"constellation": "Vector",
 					"effects": [
 						{
-							"target": "WeaponDamage",
+							"target": "WeaponBeyondFirstDamage",
 							"bucket": "MorePercent",
-							"valuePerRank": 25,
+							"valuePerRank": 20,
 							"condition": "Always",
 							"alsoRequires": []
 						}
@@ -1997,51 +2224,902 @@
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Core.Vector.Multishot",
-							"rank": 1
-						},
-						{
-							"id": "Core.Vector.Chainwork",
-							"rank": 1
-						},
-						{
-							"id": "Core.Vector.PierceDiscipline",
+							"id": "Core.Vector.Line",
 							"rank": 1
 						}
 					],
-					"requiredTreeInvestment": 4
+					"coreRole": "Convergence",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 2,
+							"candidates": [
+								{
+									"id": "Core.Vector.Multishot",
+									"rank": 1
+								},
+								{
+									"id": "Core.Vector.Chainwork",
+									"rank": 1
+								},
+								{
+									"id": "Core.Vector.Overpenetration",
+									"rank": 1
+								}
+							]
+						}
+					]
 				},
 				{
-					"id": "Core.Arc.Channel",
+					"id": "Core.Vector.Fan",
+					"tier": 5,
+					"ranks": 1,
+					"cost": 5,
+					"cornerstone": false,
+					"constellation": "Vector",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Fan"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Vector.Splinter",
+							"rank": 1
+						}
+					],
+					"coreRole": "Keystone",
+					"coreLaneIndex": 0,
+					"requiredConstellationInvestment": 18
+				},
+				{
+					"id": "Core.Ballistics.WeightOfIt",
 					"tier": 1,
 					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
-					"constellation": "Arc",
+					"constellation": "Ballistics",
 					"effects": [
 						{
-							"target": "AbilityDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 4,
+							"target": "AddedWeaponDamage",
+							"bucket": "Flat",
+							"valuePerRank": 5,
 							"condition": "Always",
 							"alsoRequires": []
 						}
 					],
 					"tags": [],
 					"exclusive": [],
-					"prerequisites": []
+					"prerequisites": [],
+					"coreRole": "Gateway",
+					"coreLaneIndex": 0
 				},
 				{
-					"id": "Core.Arc.Widen",
+					"id": "Core.Ballistics.ShapedCharge",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Ballistics",
+					"effects": [
+						{
+							"target": "AddedWeaponDamage",
+							"bucket": "Flat",
+							"valuePerRank": 5,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Ballistics.WeightOfIt",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Ballistics.Siege",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Ballistics",
+					"effects": [
+						{
+							"target": "WeaponDamage",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 22,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Ballistics.ShapedCharge",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Ballistics.Range",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Ballistics",
+					"effects": [
+						{
+							"target": "WeaponRange",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 8,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Ballistics.WeightOfIt",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Ballistics.FlatTrajectory",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Ballistics",
+					"effects": [
+						{
+							"target": "WeaponFalloffStart",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 40,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Ballistics.Range",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Ballistics.Concussion",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Ballistics",
+					"effects": [
+						{
+							"target": "WeaponSplashArea",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 6,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Ballistics.WeightOfIt",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 2
+				},
+				{
+					"id": "Core.Ballistics.Break",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Ballistics",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Ballistics.Break"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Ballistics.Concussion",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 2
+				},
+				{
+					"id": "Core.Ballistics.Cull",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Ballistics",
+					"effects": [
+						{
+							"target": "WeaponDamage",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 8,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Link",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 1,
+							"candidates": [
+								{
+									"id": "Core.Ballistics.Siege",
+									"rank": 1
+								},
+								{
+									"id": "Core.Ballistics.FlatTrajectory",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Ballistics.Loud",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Ballistics",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Ballistics.Loud"
+					],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Link",
+					"coreLaneIndex": 1,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 1,
+							"candidates": [
+								{
+									"id": "Core.Ballistics.FlatTrajectory",
+									"rank": 1
+								},
+								{
+									"id": "Core.Ballistics.Break",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Ballistics.Collapse",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 3,
+					"cornerstone": false,
+					"constellation": "Ballistics",
+					"effects": [
+						{
+							"target": "WeaponDamage",
+							"bucket": "MorePercent",
+							"valuePerRank": 24,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Ballistics.WeightOfIt",
+							"rank": 1
+						}
+					],
+					"coreRole": "Convergence",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 2,
+							"candidates": [
+								{
+									"id": "Core.Ballistics.Siege",
+									"rank": 1
+								},
+								{
+									"id": "Core.Ballistics.FlatTrajectory",
+									"rank": 1
+								},
+								{
+									"id": "Core.Ballistics.Break",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Ballistics.Overpressure",
+					"tier": 5,
+					"ranks": 1,
+					"cost": 5,
+					"cornerstone": false,
+					"constellation": "Ballistics",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Ballistics.Overpressure"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Ballistics.Collapse",
+							"rank": 1
+						}
+					],
+					"coreRole": "Keystone",
+					"coreLaneIndex": 0,
+					"requiredConstellationInvestment": 18
+				},
+				{
+					"id": "Core.Loadout.Sling",
 					"tier": 1,
 					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
-					"constellation": "Arc",
+					"constellation": "Loadout",
 					"effects": [
 						{
-							"target": "AbilityDamage",
+							"target": "WeaponSwapSpeed",
 							"bucket": "IncreasedPercent",
+							"valuePerRank": 12,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Gateway",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Loadout.ReloadDrill",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Loadout",
+					"effects": [
+						{
+							"target": "WeaponReloadSpeed",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 6,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Loadout.Sling",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Loadout.Magazine",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Loadout",
+					"effects": [
+						{
+							"target": "WeaponMagazineCapacity",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 20,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Loadout.ReloadDrill",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Loadout.Reserve",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Loadout",
+					"effects": [
+						{
+							"target": "WeaponReserveAmmo",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 15,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Loadout.Sling",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Loadout.Quickdraw",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Loadout",
+					"effects": [
+						{
+							"target": "WeaponSwapSpeed",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 25,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [
+						"Progression.Node.Core.Quickdraw"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Loadout.Reserve",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Loadout.TwoGuns",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Loadout",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.TwoGuns"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Loadout.Sling",
+							"rank": 1
+						}
+					],
+					"coreRole": "Convergence",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 2,
+							"candidates": [
+								{
+									"id": "Core.Loadout.Magazine",
+									"rank": 1
+								},
+								{
+									"id": "Core.Loadout.Quickdraw",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Aegis.Footing",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Aegis",
+					"effects": [
+						{
+							"target": "Health",
+							"bucket": "Flat",
+							"valuePerRank": 60,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Gateway",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Aegis.IronFrame",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Aegis",
+					"effects": [
+						{
+							"target": "Health",
+							"bucket": "Flat",
+							"valuePerRank": 50,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Aegis.Footing",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Aegis.Brace",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Aegis",
+					"effects": [
+						{
+							"target": "Armor",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 20,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Aegis.IronFrame",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Aegis.Plate",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Aegis",
+					"effects": [
+						{
+							"target": "Armor",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 12,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Aegis.Footing",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Aegis.Bulk",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Aegis",
+					"effects": [
+						{
+							"target": "FrontShieldPercentMaxHealth",
+							"bucket": "Flat",
+							"valuePerRank": 8,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Aegis.Plate",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Aegis.SecondSkin",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Aegis",
+					"effects": [
+						{
+							"target": "PhysicalDamageReduction",
+							"bucket": "Flat",
+							"valuePerRank": 6,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Aegis.Footing",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 2
+				},
+				{
+					"id": "Core.Aegis.AnsweringFire",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Aegis",
+					"effects": [
+						{
+							"target": "Armor",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 18,
+							"condition": "Always",
+							"alsoRequires": []
+						},
+						{
+							"target": "Health",
+							"bucket": "Flat",
+							"valuePerRank": 80,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Aegis.SecondSkin",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 2
+				},
+				{
+					"id": "Core.Aegis.CleanHands",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Aegis",
+					"effects": [
+						{
+							"target": "Health",
+							"bucket": "Flat",
+							"valuePerRank": 40,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Link",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 1,
+							"candidates": [
+								{
+									"id": "Core.Aegis.Brace",
+									"rank": 1
+								},
+								{
+									"id": "Core.Aegis.Bulk",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Aegis.SetStance",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Aegis",
+					"effects": [
+						{
+							"target": "Armor",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 10,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Link",
+					"coreLaneIndex": 1,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 1,
+							"candidates": [
+								{
+									"id": "Core.Aegis.Bulk",
+									"rank": 1
+								},
+								{
+									"id": "Core.Aegis.AnsweringFire",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Aegis.Bastion",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 3,
+					"cornerstone": false,
+					"constellation": "Aegis",
+					"effects": [
+						{
+							"target": "EffectiveHealth",
+							"bucket": "MorePercent",
+							"valuePerRank": 20,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Aegis.Footing",
+							"rank": 1
+						}
+					],
+					"coreRole": "Convergence",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 2,
+							"candidates": [
+								{
+									"id": "Core.Aegis.Brace",
+									"rank": 1
+								},
+								{
+									"id": "Core.Aegis.Bulk",
+									"rank": 1
+								},
+								{
+									"id": "Core.Aegis.AnsweringFire",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Aegis.Immovable",
+					"tier": 5,
+					"ranks": 1,
+					"cost": 5,
+					"cornerstone": false,
+					"constellation": "Aegis",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Immovable"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Aegis.Bastion",
+							"rank": 1
+						}
+					],
+					"coreRole": "Keystone",
+					"coreLaneIndex": 0,
+					"requiredConstellationInvestment": 18
+				},
+				{
+					"id": "Core.Bulwark.Read",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Bulwark",
+					"effects": [
+						{
+							"target": "BlockChance",
+							"bucket": "Flat",
+							"valuePerRank": 5,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Gateway",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Bulwark.Guard",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Bulwark",
+					"effects": [
+						{
+							"target": "BlockChance",
+							"bucket": "Flat",
 							"valuePerRank": 3,
 							"condition": "Always",
 							"alsoRequires": []
@@ -2049,19 +3127,368 @@
 					],
 					"tags": [],
 					"exclusive": [],
-					"prerequisites": []
+					"prerequisites": [
+						{
+							"id": "Core.Bulwark.Read",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 0
 				},
 				{
-					"id": "Core.Arc.Recycle",
+					"id": "Core.Bulwark.Parry",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Bulwark",
+					"effects": [],
+					"tags": [
+						"Progression.Verb.Parry"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Bulwark.Guard",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Bulwark.Evade",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Bulwark",
+					"effects": [
+						{
+							"target": "DodgeChance",
+							"bucket": "Flat",
+							"valuePerRank": 3,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Bulwark.Read",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Bulwark.Counterweight",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Bulwark",
+					"effects": [
+						{
+							"target": "ParryCooldownReductionSeconds",
+							"bucket": "Flat",
+							"valuePerRank": 0.5,
+							"condition": "Always",
+							"alsoRequires": []
+						},
+						{
+							"target": "ParryWindowAddedSeconds",
+							"bucket": "Flat",
+							"valuePerRank": 0.10000000149011612,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Bulwark.Evade",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Bulwark.Interpose",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Bulwark",
+					"effects": [
+						{
+							"target": "FrontShieldPercentMaxHealth",
+							"bucket": "Flat",
+							"valuePerRank": 6,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Bulwark.Read",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 2
+				},
+				{
+					"id": "Core.Bulwark.Riposte",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Bulwark",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Bulwark.Riposte"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Bulwark.Interpose",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 2
+				},
+				{
+					"id": "Core.Bulwark.Anticipate",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Bulwark",
+					"effects": [
+						{
+							"target": "ParryCooldownRecovery",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 8,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Link",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 1,
+							"candidates": [
+								{
+									"id": "Core.Bulwark.Parry",
+									"rank": 1
+								},
+								{
+									"id": "Core.Bulwark.Counterweight",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Bulwark.Footwork",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Bulwark",
+					"effects": [
+						{
+							"target": "DodgeChance",
+							"bucket": "Flat",
+							"valuePerRank": 3,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Link",
+					"coreLaneIndex": 1,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 1,
+							"candidates": [
+								{
+									"id": "Core.Bulwark.Counterweight",
+									"rank": 1
+								},
+								{
+									"id": "Core.Bulwark.Riposte",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Bulwark.Wall",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 3,
+					"cornerstone": false,
+					"constellation": "Bulwark",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Bulwark.Wall"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Bulwark.Read",
+							"rank": 1
+						}
+					],
+					"coreRole": "Convergence",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 2,
+							"candidates": [
+								{
+									"id": "Core.Bulwark.Parry",
+									"rank": 1
+								},
+								{
+									"id": "Core.Bulwark.Counterweight",
+									"rank": 1
+								},
+								{
+									"id": "Core.Bulwark.Riposte",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Bulwark.PerfectGuard",
+					"tier": 5,
+					"ranks": 1,
+					"cost": 5,
+					"cornerstone": false,
+					"constellation": "Bulwark",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Bulwark.PerfectGuard"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Bulwark.Wall",
+							"rank": 1
+						}
+					],
+					"coreRole": "Keystone",
+					"coreLaneIndex": 0,
+					"requiredConstellationInvestment": 18
+				},
+				{
+					"id": "Core.Constitution.Frame",
 					"tier": 1,
 					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
-					"constellation": "Arc",
+					"constellation": "Constitution",
 					"effects": [
 						{
-							"target": "AbilityDamage",
+							"target": "Health",
+							"bucket": "Flat",
+							"valuePerRank": 80,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Gateway",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Constitution.Mass",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Constitution",
+					"effects": [
+						{
+							"target": "Health",
+							"bucket": "Flat",
+							"valuePerRank": 60,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Constitution.Frame",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Constitution.DeepReserve",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Constitution",
+					"effects": [
+						{
+							"target": "Health",
 							"bucket": "IncreasedPercent",
+							"valuePerRank": 12,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Constitution.Mass",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Constitution.Layered",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Constitution",
+					"effects": [
+						{
+							"target": "ShieldPercentMaxHealth",
+							"bucket": "Flat",
 							"valuePerRank": 4,
 							"condition": "Always",
 							"alsoRequires": []
@@ -2069,27 +3496,391 @@
 					],
 					"tags": [],
 					"exclusive": [],
-					"prerequisites": []
+					"prerequisites": [
+						{
+							"id": "Core.Constitution.Frame",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 1
 				},
 				{
-					"id": "Core.Arc.Anchor",
+					"id": "Core.Constitution.ThirdLayer",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Constitution",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Constitution.ThirdLayer"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Constitution.Layered",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Constitution.Endurance",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Constitution",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Endurance"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Constitution.Frame",
+							"rank": 1
+						}
+					],
+					"coreRole": "Convergence",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 2,
+							"candidates": [
+								{
+									"id": "Core.Constitution.DeepReserve",
+									"rank": 1
+								},
+								{
+									"id": "Core.Constitution.ThirdLayer",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Ward.Resist",
 					"tier": 1,
 					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
-					"constellation": "Arc",
+					"constellation": "Ward",
 					"effects": [
 						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
+							"target": "ElementalResistance",
+							"bucket": "Flat",
+							"valuePerRank": 10,
 							"condition": "Always",
 							"alsoRequires": []
 						}
 					],
 					"tags": [],
 					"exclusive": [],
-					"prerequisites": []
+					"prerequisites": [],
+					"coreRole": "Gateway",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Ward.Tolerance",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Ward",
+					"effects": [
+						{
+							"target": "ElementalResistance",
+							"bucket": "Flat",
+							"valuePerRank": 6,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Ward.Resist",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Ward.Refusal",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Ward",
+					"effects": [
+						{
+							"target": "AilmentAvoidance",
+							"bucket": "Flat",
+							"valuePerRank": 12,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Ward.Tolerance",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Ward.Clean",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Ward",
+					"effects": [
+						{
+							"target": "AilmentAvoidance",
+							"bucket": "Flat",
+							"valuePerRank": 5,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Ward.Resist",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Ward.Insulation",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Ward",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Insulation"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Ward.Clean",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Ward.Null",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Ward",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Null"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Ward.Resist",
+							"rank": 1
+						}
+					],
+					"coreRole": "Convergence",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 2,
+							"candidates": [
+								{
+									"id": "Core.Ward.Refusal",
+									"rank": 1
+								},
+								{
+									"id": "Core.Ward.Insulation",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Recovery.Mend",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Recovery",
+					"effects": [
+						{
+							"target": "HealingReceived",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 15,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Gateway",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Recovery.Knit",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Recovery",
+					"effects": [
+						{
+							"target": "HealthRegenPercentMaxHealth",
+							"bucket": "Flat",
+							"valuePerRank": 0.40000000596046448,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Recovery.Mend",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Recovery.FieldDressing",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Recovery",
+					"effects": [
+						{
+							"target": "HealingReceived",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 30,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Recovery.Knit",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Recovery.Recharge",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Recovery",
+					"effects": [
+						{
+							"target": "ShieldRechargeDelayReduction",
+							"bucket": "Flat",
+							"valuePerRank": 0.40000000596046448,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Recovery.Mend",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Recovery.Overheal",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Recovery",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Recovery.Overheal"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Recovery.Recharge",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Recovery.SecondLife",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Recovery",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.SecondLife"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Recovery.Mend",
+							"rank": 1
+						}
+					],
+					"coreRole": "Convergence",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 2,
+							"candidates": [
+								{
+									"id": "Core.Recovery.FieldDressing",
+									"rank": 1
+								},
+								{
+									"id": "Core.Recovery.Overheal",
+									"rank": 1
+								}
+							]
+						}
+					]
 				},
 				{
 					"id": "Core.Arc.Prime",
@@ -2102,114 +3893,29 @@
 						{
 							"target": "AbilityDamage",
 							"bucket": "IncreasedPercent",
-							"valuePerRank": 4,
+							"valuePerRank": 8,
 							"condition": "Always",
 							"alsoRequires": []
 						}
 					],
 					"tags": [],
 					"exclusive": [],
-					"prerequisites": []
+					"prerequisites": [],
+					"coreRole": "Gateway",
+					"coreLaneIndex": 0
 				},
 				{
-					"id": "Core.Arc.Vent",
-					"tier": 1,
-					"ranks": 1,
+					"id": "Core.Arc.Channel",
+					"tier": 2,
+					"ranks": 3,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "Arc",
 					"effects": [
 						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Arc.CadenceBreak",
-					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "Arc",
-					"effects": [
-						{
-							"target": "AbilityCooldown",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 8,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Core.Arc.Channel",
-							"rank": 1
-						},
-						{
-							"id": "Core.Arc.Widen",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Core.Arc.Reach",
-					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "Arc",
-					"effects": [
-						{
 							"target": "AbilityDamage",
 							"bucket": "IncreasedPercent",
-							"valuePerRank": 16,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Core.Arc.Recycle",
-							"rank": 1
-						},
-						{
-							"id": "Core.Arc.Anchor",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Core.Arc.Widening",
-					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "Arc",
-					"effects": [
-						{
-							"target": "AbilityDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 14,
-							"condition": "Always",
-							"alsoRequires": []
-						},
-						{
-							"target": "AbilityArea",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 8,
+							"valuePerRank": 6,
 							"condition": "Always",
 							"alsoRequires": []
 						}
@@ -2220,26 +3926,23 @@
 						{
 							"id": "Core.Arc.Prime",
 							"rank": 1
-						},
-						{
-							"id": "Core.Arc.Vent",
-							"rank": 1
 						}
 					],
-					"requiredTreeInvestment": 2
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 0
 				},
 				{
-					"id": "Core.Arc.Overflow",
+					"id": "Core.Arc.Widen",
 					"tier": 3,
 					"ranks": 1,
-					"cost": 3,
+					"cost": 2,
 					"cornerstone": false,
 					"constellation": "Arc",
 					"effects": [
 						{
-							"target": "AbilityDamage",
-							"bucket": "MorePercent",
-							"valuePerRank": 28,
+							"target": "AbilityArea",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 15,
 							"condition": "Always",
 							"alsoRequires": []
 						}
@@ -2248,19 +3951,922 @@
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Core.Arc.CadenceBreak",
-							"rank": 1
-						},
-						{
-							"id": "Core.Arc.Reach",
-							"rank": 1
-						},
-						{
-							"id": "Core.Arc.Widening",
+							"id": "Core.Arc.Channel",
 							"rank": 1
 						}
 					],
-					"requiredTreeInvestment": 4
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Arc.Vent",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Arc",
+					"effects": [
+						{
+							"target": "AddedAbilityPower",
+							"bucket": "Flat",
+							"valuePerRank": 4,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Arc.Prime",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Arc.Reach",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Arc",
+					"effects": [
+						{
+							"target": "AbilityDamage",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 25,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Arc.Vent",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Arc.Anchor",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Arc",
+					"effects": [
+						{
+							"target": "AbilityArea",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 6,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Arc.Prime",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 2
+				},
+				{
+					"id": "Core.Arc.Persistence",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Arc",
+					"effects": [
+						{
+							"target": "ZoneAndWindowDuration",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 20,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Arc.Anchor",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 2
+				},
+				{
+					"id": "Core.Arc.Recycle",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Arc",
+					"effects": [
+						{
+							"target": "AddedAbilityPower",
+							"bucket": "Flat",
+							"valuePerRank": 3,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Link",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 1,
+							"candidates": [
+								{
+									"id": "Core.Arc.Widen",
+									"rank": 1
+								},
+								{
+									"id": "Core.Arc.Reach",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Arc.Spillover",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Arc",
+					"effects": [
+						{
+							"target": "AbilityArea",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 8,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Link",
+					"coreLaneIndex": 1,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 1,
+							"candidates": [
+								{
+									"id": "Core.Arc.Reach",
+									"rank": 1
+								},
+								{
+									"id": "Core.Arc.Persistence",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Arc.Overflow",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 3,
+					"cornerstone": false,
+					"constellation": "Arc",
+					"effects": [
+						{
+							"target": "AbilityDamage",
+							"bucket": "MorePercent",
+							"valuePerRank": 26,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Arc.Prime",
+							"rank": 1
+						}
+					],
+					"coreRole": "Convergence",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 2,
+							"candidates": [
+								{
+									"id": "Core.Arc.Widen",
+									"rank": 1
+								},
+								{
+									"id": "Core.Arc.Reach",
+									"rank": 1
+								},
+								{
+									"id": "Core.Arc.Persistence",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Arc.Detonation",
+					"tier": 5,
+					"ranks": 1,
+					"cost": 5,
+					"cornerstone": false,
+					"constellation": "Arc",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Detonation"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Arc.Overflow",
+							"rank": 1
+						}
+					],
+					"coreRole": "Keystone",
+					"coreLaneIndex": 0,
+					"requiredConstellationInvestment": 18
+				},
+				{
+					"id": "Core.Tempo.Metronome",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Tempo",
+					"effects": [
+						{
+							"target": "AbilityCastRate",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 6,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Gateway",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Tempo.Quicken",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Tempo",
+					"effects": [
+						{
+							"target": "AbilityCastRate",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 4,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Tempo.Metronome",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Tempo.Reset",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Tempo",
+					"effects": [
+						{
+							"target": "AbilityDamage",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 15,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Tempo.Quicken",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Tempo.Recovery",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Tempo",
+					"effects": [
+						{
+							"target": "AbilityCooldown",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 5,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Tempo.Metronome",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Tempo.SecondWind",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Tempo",
+					"effects": [
+						{
+							"target": "AbilityCost",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 12,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Tempo.Recovery",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Tempo.Flow",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Tempo",
+					"effects": [
+						{
+							"target": "AbilityChannelRate",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 4,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Tempo.Metronome",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 2
+				},
+				{
+					"id": "Core.Tempo.Cascade",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Tempo",
+					"effects": [
+						{
+							"target": "AbilityCooldown",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 12,
+							"condition": "Always",
+							"alsoRequires": []
+						},
+						{
+							"target": "AbilityCastRate",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 12,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Tempo.Flow",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 2
+				},
+				{
+					"id": "Core.Tempo.Prep",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Tempo",
+					"effects": [
+						{
+							"target": "AbilityCost",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 8,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Link",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 1,
+							"candidates": [
+								{
+									"id": "Core.Tempo.Reset",
+									"rank": 1
+								},
+								{
+									"id": "Core.Tempo.SecondWind",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Tempo.FollowThrough",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Tempo",
+					"effects": [
+						{
+							"target": "AbilityCastRate",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 5,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Link",
+					"coreLaneIndex": 1,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 1,
+							"candidates": [
+								{
+									"id": "Core.Tempo.SecondWind",
+									"rank": 1
+								},
+								{
+									"id": "Core.Tempo.Cascade",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Tempo.Overclock",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 3,
+					"cornerstone": false,
+					"constellation": "Tempo",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Overclock"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Tempo.Metronome",
+							"rank": 1
+						}
+					],
+					"coreRole": "Convergence",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 2,
+							"candidates": [
+								{
+									"id": "Core.Tempo.Reset",
+									"rank": 1
+								},
+								{
+									"id": "Core.Tempo.SecondWind",
+									"rank": 1
+								},
+								{
+									"id": "Core.Tempo.Cascade",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Tempo.Conduction",
+					"tier": 5,
+					"ranks": 1,
+					"cost": 5,
+					"cornerstone": false,
+					"constellation": "Tempo",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Conduction"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Tempo.Overclock",
+							"rank": 1
+						}
+					],
+					"coreRole": "Keystone",
+					"coreLaneIndex": 0,
+					"requiredConstellationInvestment": 18
+				},
+				{
+					"id": "Core.Reservoir.Capacity",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Reservoir",
+					"effects": [
+						{
+							"target": "MaxClassResource",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 10,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Gateway",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Reservoir.Draw",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Reservoir",
+					"effects": [
+						{
+							"target": "ClassResourceGeneration",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 5,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Reservoir.Capacity",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Reservoir.DeepPockets",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Reservoir",
+					"effects": [
+						{
+							"target": "MaxClassResource",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 20,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Reservoir.Draw",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Reservoir.Tithe",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Reservoir",
+					"effects": [
+						{
+							"target": "AbilityCost",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 5,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Reservoir.Capacity",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Reservoir.Wellspring",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Reservoir",
+					"effects": [
+						{
+							"target": "ClassResourceGeneration",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 15,
+							"condition": "Always",
+							"alsoRequires": []
+						},
+						{
+							"target": "ClassResourceRegen",
+							"bucket": "Flat",
+							"valuePerRank": 1,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Reservoir.Tithe",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Reservoir.SecondShift",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Reservoir",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.SecondShift"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Reservoir.Capacity",
+							"rank": 1
+						}
+					],
+					"coreRole": "Convergence",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 2,
+							"candidates": [
+								{
+									"id": "Core.Reservoir.DeepPockets",
+									"rank": 1
+								},
+								{
+									"id": "Core.Reservoir.Wellspring",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Duration.Hold",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Duration",
+					"effects": [
+						{
+							"target": "AbilityDuration",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 10,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Gateway",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Duration.Extend",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Duration",
+					"effects": [
+						{
+							"target": "AbilityDuration",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 6,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Duration.Hold",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Duration.Uptime",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Duration",
+					"effects": [
+						{
+							"target": "BuffAndWindowDuration",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 15,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Duration.Extend",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Duration.Settle",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Duration",
+					"effects": [
+						{
+							"target": "AbilityDamage",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 5,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Duration.Hold",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Duration.Standing",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Duration",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Standing"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Duration.Settle",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Duration.Afterimage",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Duration",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Afterimage"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Duration.Hold",
+							"rank": 1
+						}
+					],
+					"coreRole": "Convergence",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 2,
+							"candidates": [
+								{
+									"id": "Core.Duration.Uptime",
+									"rank": 1
+								},
+								{
+									"id": "Core.Duration.Standing",
+									"rank": 1
+								}
+							]
+						}
+					]
 				},
 				{
 					"id": "Core.Affliction.OpenWound",
@@ -2271,49 +4877,178 @@
 					"constellation": "Affliction",
 					"effects": [
 						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "Always",
-							"alsoRequires": []
-						},
-						{
-							"target": "Damage",
+							"target": "DamageOverTime",
 							"bucket": "IncreasedPercent",
 							"valuePerRank": 10,
-							"condition": "TargetBleeding",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Core.OpenWound"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Affliction.Deepen",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Affliction",
-					"effects": [
-						{
-							"target": "AbilityDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 4,
 							"condition": "Always",
 							"alsoRequires": []
 						}
 					],
 					"tags": [],
 					"exclusive": [],
-					"prerequisites": []
+					"prerequisites": [],
+					"coreRole": "Gateway",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Affliction.Bloodlet",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Affliction",
+					"effects": [
+						{
+							"target": "DamageOverTime",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 7,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Affliction.OpenWound",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Affliction.SlowBleed",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Affliction",
+					"effects": [
+						{
+							"target": "StatusChance",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 15,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Affliction.Bloodlet",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Affliction.Seep",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Affliction",
+					"effects": [
+						{
+							"target": "StatusChance",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 5,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Affliction.OpenWound",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Affliction.Fester",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Affliction",
+					"effects": [
+						{
+							"target": "DamageOverTime",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 25,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Affliction.Seep",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 1
 				},
 				{
 					"id": "Core.Affliction.Linger",
-					"tier": 1,
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Affliction",
+					"effects": [
+						{
+							"target": "StatusDuration",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 8,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Affliction.OpenWound",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 2
+				},
+				{
+					"id": "Core.Affliction.Deepen",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Affliction",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Deepen"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Affliction.Linger",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 2
+				},
+				{
+					"id": "Core.Affliction.Attrition",
+					"tier": 3,
 					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
@@ -2329,51 +5064,28 @@
 					],
 					"tags": [],
 					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Affliction.Seep",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Affliction",
-					"effects": [
+					"prerequisites": [],
+					"coreRole": "Link",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
 						{
-							"target": "AbilityDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "Always",
-							"alsoRequires": []
+							"minimumSatisfied": 1,
+							"candidates": [
+								{
+									"id": "Core.Affliction.SlowBleed",
+									"rank": 1
+								},
+								{
+									"id": "Core.Affliction.Fester",
+									"rank": 1
+								}
+							]
 						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
+					]
 				},
 				{
-					"id": "Core.Affliction.Bloodlet",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Affliction",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Affliction.SlowBleed",
-					"tier": 1,
+					"id": "Core.Affliction.Bloodwork",
+					"tier": 3,
 					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
@@ -2382,108 +5094,35 @@
 						{
 							"target": "StatusChance",
 							"bucket": "IncreasedPercent",
-							"valuePerRank": 10,
+							"valuePerRank": 6,
 							"condition": "Always",
 							"alsoRequires": []
 						}
 					],
 					"tags": [],
 					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Affliction.Fester",
-					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "Affliction",
-					"effects": [
+					"prerequisites": [],
+					"coreRole": "Link",
+					"coreLaneIndex": 1,
+					"prerequisiteGroups": [
 						{
-							"target": "DamageOverTime",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 12,
-							"condition": "Always",
-							"alsoRequires": []
+							"minimumSatisfied": 1,
+							"candidates": [
+								{
+									"id": "Core.Affliction.Fester",
+									"rank": 1
+								},
+								{
+									"id": "Core.Affliction.Deepen",
+									"rank": 1
+								}
+							]
 						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Core.Affliction.OpenWound",
-							"rank": 1
-						},
-						{
-							"id": "Core.Affliction.Deepen",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Core.Affliction.Bloodwork",
-					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "Affliction",
-					"effects": [
-						{
-							"target": "AbilityDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 14,
-							"condition": "TargetBleeding",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Core.Affliction.Linger",
-							"rank": 1
-						},
-						{
-							"id": "Core.Affliction.Seep",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Core.Affliction.Attrition",
-					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "Affliction",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 12,
-							"condition": "TargetLowHealth",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Core.Affliction.Bloodlet",
-							"rank": 1
-						},
-						{
-							"id": "Core.Affliction.SlowBleed",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
+					]
 				},
 				{
 					"id": "Core.Affliction.Compound",
-					"tier": 3,
+					"tier": 4,
 					"ranks": 1,
 					"cost": 3,
 					"cornerstone": false,
@@ -2501,641 +5140,1067 @@
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Core.Affliction.Fester",
-							"rank": 1
-						},
-						{
-							"id": "Core.Affliction.Bloodwork",
-							"rank": 1
-						},
-						{
-							"id": "Core.Affliction.Attrition",
+							"id": "Core.Affliction.OpenWound",
 							"rank": 1
 						}
 					],
-					"requiredTreeInvestment": 4
+					"coreRole": "Convergence",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 2,
+							"candidates": [
+								{
+									"id": "Core.Affliction.SlowBleed",
+									"rank": 1
+								},
+								{
+									"id": "Core.Affliction.Fester",
+									"rank": 1
+								},
+								{
+									"id": "Core.Affliction.Deepen",
+									"rank": 1
+								}
+							]
+						}
+					]
 				},
 				{
-					"id": "Core.Aegis.Footing",
-					"tier": 1,
+					"id": "Core.Affliction.Hemorrhage",
+					"tier": 5,
 					"ranks": 1,
-					"cost": 1,
+					"cost": 5,
 					"cornerstone": false,
-					"constellation": "Aegis",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
+					"constellation": "Affliction",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Hemorrhage"
 					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Aegis.Brace",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Aegis",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Aegis.Recover",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Aegis",
-					"effects": [
-						{
-							"target": "WeaponDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Aegis.CleanHands",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Aegis",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Aegis.SecondOpinion",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Aegis",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Aegis.Bulk",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Aegis",
-					"effects": [
-						{
-							"target": "WeaponDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Aegis.ShortCircuit",
-					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "Aegis",
-					"effects": [
-						{
-							"target": "ClassResourceRegen",
-							"bucket": "Flat",
-							"valuePerRank": 1,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Core.Aegis.Footing",
-							"rank": 1
-						},
-						{
-							"id": "Core.Aegis.Brace",
+							"id": "Core.Affliction.Compound",
 							"rank": 1
 						}
 					],
-					"requiredTreeInvestment": 2
+					"coreRole": "Keystone",
+					"coreLaneIndex": 0,
+					"requiredConstellationInvestment": 18
 				},
 				{
-					"id": "Core.Aegis.IronFrame",
-					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "Aegis",
-					"effects": [
-						{
-							"target": "Health",
-							"bucket": "Flat",
-							"valuePerRank": 40,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Core.Aegis.Recover",
-							"rank": 1
-						},
-						{
-							"id": "Core.Aegis.CleanHands",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Core.Aegis.AnsweringFire",
-					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "Aegis",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 12,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Core.Aegis.SecondOpinion",
-							"rank": 1
-						},
-						{
-							"id": "Core.Aegis.Bulk",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Core.Bulwark.SetStance",
+					"id": "Core.Entropy.Attunement",
 					"tier": 1,
 					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
-					"constellation": "Bulwark",
+					"constellation": "Entropy",
 					"effects": [
 						{
-							"target": "BlockChance",
-							"bucket": "Flat",
+							"target": "EntropyBuildup",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 10,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Gateway",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Entropy.Catalyst",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Entropy",
+					"effects": [
+						{
+							"target": "ElementalBuildup",
+							"bucket": "IncreasedPercent",
 							"valuePerRank": 6,
 							"condition": "Always",
 							"alsoRequires": []
-						},
-						{
-							"target": "Health",
-							"bucket": "Flat",
-							"valuePerRank": 90,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Core.SetStance"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Bulwark.Read",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Bulwark",
-					"effects": [
-						{
-							"target": "WeaponDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Core.Read"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Bulwark.Weight",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Bulwark",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Bulwark.HeldGround",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Bulwark",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Bulwark.LineofSight",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Bulwark",
-					"effects": [
-						{
-							"target": "WeaponDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Bulwark.Loud",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Bulwark",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Bulwark.Parry",
-					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "Bulwark",
-					"effects": [],
-					"tags": [
-						"Progression.Verb.Parry"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Core.Bulwark.SetStance",
-							"rank": 1
-						},
-						{
-							"id": "Core.Bulwark.Read",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Core.Bulwark.Counterweight",
-					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "Bulwark",
-					"effects": [
-						{
-							"target": "WeaponDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 16,
-							"condition": "ParryCounter",
-							"alsoRequires": []
 						}
 					],
 					"tags": [],
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Core.Bulwark.Weight",
-							"rank": 1
-						},
-						{
-							"id": "Core.Bulwark.HeldGround",
+							"id": "Core.Entropy.Attunement",
 							"rank": 1
 						}
 					],
-					"requiredTreeInvestment": 2
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 0
 				},
 				{
-					"id": "Core.Bulwark.Interposition",
-					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "Bulwark",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Core.Bulwark.Interposition"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Core.Bulwark.LineofSight",
-							"rank": 1
-						},
-						{
-							"id": "Core.Bulwark.Loud",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Core.Bulwark.Set",
+					"id": "Core.Entropy.Threshold",
 					"tier": 3,
 					"ranks": 1,
-					"cost": 3,
-					"cornerstone": false,
-					"constellation": "Bulwark",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "MorePercent",
-							"valuePerRank": 20,
-							"condition": "Stationary",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Core.Bulwark.Parry",
-							"rank": 1
-						},
-						{
-							"id": "Core.Bulwark.Counterweight",
-							"rank": 1
-						},
-						{
-							"id": "Core.Bulwark.Interposition",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
-				},
-				{
-					"id": "Core.Kinesis.LightFooting",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Kinesis",
-					"effects": [
-						{
-							"target": "DodgeChance",
-							"bucket": "Flat",
-							"valuePerRank": 5,
-							"condition": "Always",
-							"alsoRequires": []
-						},
-						{
-							"target": "MoveSpeed",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 12,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Kinesis.Loft",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Kinesis",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Core.Loft"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Kinesis.Landing",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Kinesis",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Kinesis.Carry",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Kinesis",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Kinesis.Contact",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Kinesis",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Kinesis.Redirect",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Kinesis",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Kinesis.AirJump",
-					"tier": 2,
-					"ranks": 1,
 					"cost": 2,
 					"cornerstone": false,
-					"constellation": "Kinesis",
+					"constellation": "Entropy",
 					"effects": [
 						{
-							"target": "AirControl",
-							"bucket": "IncreasedPercent",
+							"target": "ElementalThresholdReduction",
+							"bucket": "Flat",
 							"valuePerRank": 15,
 							"condition": "Always",
 							"alsoRequires": []
 						}
 					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Entropy.Catalyst",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Entropy.Decay",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Entropy",
+					"effects": [
+						{
+							"target": "RotDamage",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 7,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Entropy.Attunement",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Entropy.Density",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Entropy",
+					"effects": [],
 					"tags": [
-						"Progression.Verb.AirJump"
+						"Progression.Node.Core.Density"
 					],
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Core.Kinesis.LightFooting",
-							"rank": 1
-						},
-						{
-							"id": "Core.Kinesis.Loft",
+							"id": "Core.Entropy.Decay",
 							"rank": 1
 						}
 					],
-					"requiredTreeInvestment": 2
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 1
 				},
 				{
-					"id": "Core.Kinesis.Slipcut",
+					"id": "Core.Entropy.Conductive",
 					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Entropy",
+					"effects": [
+						{
+							"target": "ElementalDamage",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 6,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Entropy.Attunement",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 2
+				},
+				{
+					"id": "Core.Entropy.Sympathy",
+					"tier": 3,
 					"ranks": 1,
 					"cost": 2,
 					"cornerstone": false,
-					"constellation": "Kinesis",
+					"constellation": "Entropy",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Sympathy"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Entropy.Conductive",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 2
+				},
+				{
+					"id": "Core.Entropy.Penetrance",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Entropy",
+					"effects": [
+						{
+							"target": "ElementalBuildupPenetration",
+							"bucket": "Flat",
+							"valuePerRank": 10,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Link",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 1,
+							"candidates": [
+								{
+									"id": "Core.Entropy.Threshold",
+									"rank": 1
+								},
+								{
+									"id": "Core.Entropy.Density",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Entropy.Sequence",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Entropy",
+					"effects": [
+						{
+							"target": "StatusDuration",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 12,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Link",
+					"coreLaneIndex": 1,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 1,
+							"candidates": [
+								{
+									"id": "Core.Entropy.Density",
+									"rank": 1
+								},
+								{
+									"id": "Core.Entropy.Sympathy",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Entropy.Cascade",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 3,
+					"cornerstone": false,
+					"constellation": "Entropy",
+					"effects": [
+						{
+							"target": "ElementalDamage",
+							"bucket": "MorePercent",
+							"valuePerRank": 22,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Entropy.Attunement",
+							"rank": 1
+						}
+					],
+					"coreRole": "Convergence",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 2,
+							"candidates": [
+								{
+									"id": "Core.Entropy.Threshold",
+									"rank": 1
+								},
+								{
+									"id": "Core.Entropy.Density",
+									"rank": 1
+								},
+								{
+									"id": "Core.Entropy.Sympathy",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Entropy.LongDark",
+					"tier": 5,
+					"ranks": 1,
+					"cost": 5,
+					"cornerstone": false,
+					"constellation": "Entropy",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.LongDark"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Entropy.Cascade",
+							"rank": 1
+						}
+					],
+					"coreRole": "Keystone",
+					"coreLaneIndex": 0,
+					"requiredConstellationInvestment": 18
+				},
+				{
+					"id": "Core.Reaction.Catalysis",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Reaction",
+					"effects": [
+						{
+							"target": "ReactionDamage",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 12,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Gateway",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Reaction.Ignition",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Reaction",
+					"effects": [
+						{
+							"target": "ReactionDamage",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 8,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Reaction.Catalysis",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Reaction.Chain",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Reaction",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Reaction.Chain"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Reaction.Ignition",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Reaction.Residue",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Reaction",
+					"effects": [
+						{
+							"target": "ReactionResiduePercent",
+							"bucket": "Flat",
+							"valuePerRank": 10,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Reaction.Catalysis",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Reaction.SecondOrder",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Reaction",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Reaction.SecondOrder"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Reaction.Residue",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Reaction.Feedback",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Reaction",
+					"effects": [
+						{
+							"target": "ElementalBuildup",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 5,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Reaction.Catalysis",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 2
+				},
+				{
+					"id": "Core.Reaction.Overlap",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Reaction",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Reaction.Overlap"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Reaction.Feedback",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 2
+				},
+				{
+					"id": "Core.Reaction.Spark",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Reaction",
+					"effects": [
+						{
+							"target": "ReactionDamage",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 8,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Link",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 1,
+							"candidates": [
+								{
+									"id": "Core.Reaction.Chain",
+									"rank": 1
+								},
+								{
+									"id": "Core.Reaction.SecondOrder",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Reaction.Echo",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Reaction",
+					"effects": [
+						{
+							"target": "StatusDuration",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 6,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Link",
+					"coreLaneIndex": 1,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 1,
+							"candidates": [
+								{
+									"id": "Core.Reaction.SecondOrder",
+									"rank": 1
+								},
+								{
+									"id": "Core.Reaction.Overlap",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Reaction.Resonance",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 3,
+					"cornerstone": false,
+					"constellation": "Reaction",
+					"effects": [
+						{
+							"target": "ReactionDamage",
+							"bucket": "MorePercent",
+							"valuePerRank": 20,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Reaction.Catalysis",
+							"rank": 1
+						}
+					],
+					"coreRole": "Convergence",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 2,
+							"candidates": [
+								{
+									"id": "Core.Reaction.Chain",
+									"rank": 1
+								},
+								{
+									"id": "Core.Reaction.SecondOrder",
+									"rank": 1
+								},
+								{
+									"id": "Core.Reaction.Overlap",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Reaction.Sympathetic",
+					"tier": 5,
+					"ranks": 1,
+					"cost": 5,
+					"cornerstone": false,
+					"constellation": "Reaction",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Reaction.Sympathetic"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Reaction.Resonance",
+							"rank": 1
+						}
+					],
+					"coreRole": "Keystone",
+					"coreLaneIndex": 0,
+					"requiredConstellationInvestment": 18
+				},
+				{
+					"id": "Core.Rift.Displace",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Rift",
+					"effects": [
+						{
+							"target": "RiftBuildup",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 12,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Gateway",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Rift.Shove",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Rift",
+					"effects": [
+						{
+							"target": "RiftBurstDamage",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 8,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Rift.Displace",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Rift.Impact",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Rift",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Impact"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Rift.Shove",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Rift.Instability",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Rift",
+					"effects": [
+						{
+							"target": "ElementalBuildup",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 6,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Rift.Displace",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Rift.HardLanding",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Rift",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.HardLanding"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Rift.Instability",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Rift.VectorField",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Rift",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.VectorField"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Rift.Displace",
+							"rank": 1
+						}
+					],
+					"coreRole": "Convergence",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 2,
+							"candidates": [
+								{
+									"id": "Core.Rift.Impact",
+									"rank": 1
+								},
+								{
+									"id": "Core.Rift.HardLanding",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Void.Erase",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Void",
+					"effects": [
+						{
+							"target": "VoidBuildup",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 12,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Gateway",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Void.Hollow",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Void",
+					"effects": [
+						{
+							"target": "VoidBurstDamage",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 8,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Void.Erase",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Void.Patience",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Void",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Patience"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Void.Hollow",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Void.Siphon",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Void",
+					"effects": [
+						{
+							"target": "ElementalDamage",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 6,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Void.Erase",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Void.Debt",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Void",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Debt"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Void.Siphon",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Void.NothingLeft",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Void",
+					"effects": [
+						{
+							"target": "VoidDamage",
+							"bucket": "MorePercent",
+							"valuePerRank": 18,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Void.Erase",
+							"rank": 1
+						}
+					],
+					"coreRole": "Convergence",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 2,
+							"candidates": [
+								{
+									"id": "Core.Void.Patience",
+									"rank": 1
+								},
+								{
+									"id": "Core.Void.Debt",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Velocity.Grind",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Velocity",
+					"effects": [
+						{
+							"target": "MoveSpeed",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 8,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Gateway",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Velocity.Stride",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Velocity",
+					"effects": [
+						{
+							"target": "MoveSpeed",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 4,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Velocity.Grind",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Velocity.Momentum",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Velocity",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Velocity.Momentum"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Velocity.Stride",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Velocity.Slide",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Velocity",
 					"effects": [
 						{
 							"target": "SlideSpeed",
@@ -3149,19 +6214,370 @@
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Core.Kinesis.Landing",
-							"rank": 1
-						},
-						{
-							"id": "Core.Kinesis.Carry",
+							"id": "Core.Velocity.Grind",
 							"rank": 1
 						}
 					],
-					"requiredTreeInvestment": 2
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Velocity.Carry",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Velocity",
+					"effects": [
+						{
+							"target": "MoveSpeed",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 12,
+							"condition": "Always",
+							"alsoRequires": []
+						},
+						{
+							"target": "SlideSpeed",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 12,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Velocity.Slide",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Velocity.Sprint",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Velocity",
+					"effects": [
+						{
+							"target": "SprintSpeed",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 5,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Velocity.Grind",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 2
+				},
+				{
+					"id": "Core.Velocity.Downforce",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Velocity",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Velocity.Downforce"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Velocity.Sprint",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 2
+				},
+				{
+					"id": "Core.Velocity.Traction",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Velocity",
+					"effects": [
+						{
+							"target": "MoveSpeed",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 5,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Link",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 1,
+							"candidates": [
+								{
+									"id": "Core.Velocity.Momentum",
+									"rank": 1
+								},
+								{
+									"id": "Core.Velocity.Carry",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Velocity.Afterburn",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Velocity",
+					"effects": [
+						{
+							"target": "Acceleration",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 8,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Link",
+					"coreLaneIndex": 1,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 1,
+							"candidates": [
+								{
+									"id": "Core.Velocity.Carry",
+									"rank": 1
+								},
+								{
+									"id": "Core.Velocity.Downforce",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Velocity.TerminalVelocity",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 3,
+					"cornerstone": false,
+					"constellation": "Velocity",
+					"effects": [
+						{
+							"target": "Damage",
+							"bucket": "MorePercent",
+							"valuePerRank": 22,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Velocity.Grind",
+							"rank": 1
+						}
+					],
+					"coreRole": "Convergence",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 2,
+							"candidates": [
+								{
+									"id": "Core.Velocity.Momentum",
+									"rank": 1
+								},
+								{
+									"id": "Core.Velocity.Carry",
+									"rank": 1
+								},
+								{
+									"id": "Core.Velocity.Downforce",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Velocity.NoGround",
+					"tier": 5,
+					"ranks": 1,
+					"cost": 5,
+					"cornerstone": false,
+					"constellation": "Velocity",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Velocity.NoGround"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Velocity.TerminalVelocity",
+							"rank": 1
+						}
+					],
+					"coreRole": "Keystone",
+					"coreLaneIndex": 0,
+					"requiredConstellationInvestment": 18
+				},
+				{
+					"id": "Core.Kinesis.LightFooting",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Kinesis",
+					"effects": [
+						{
+							"target": "LedgeSpeed",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 10,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [],
+					"coreRole": "Gateway",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Kinesis.Loft",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Kinesis",
+					"effects": [
+						{
+							"target": "JumpHeight",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 6,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Kinesis.LightFooting",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Kinesis.AirWork",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Kinesis",
+					"effects": [
+						{
+							"target": "AirControl",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 25,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Kinesis.Loft",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Kinesis.Landing",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Kinesis",
+					"effects": [
+						{
+							"target": "SafeFallDistance",
+							"bucket": "Flat",
+							"valuePerRank": 2,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Kinesis.LightFooting",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Kinesis.AirJump",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Kinesis",
+					"effects": [
+						{
+							"target": "AirJumpCount",
+							"bucket": "Flat",
+							"valuePerRank": 1,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Kinesis.Landing",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 1
 				},
 				{
 					"id": "Core.Kinesis.PhantomStep",
-					"tier": 2,
+					"tier": 4,
 					"ranks": 1,
 					"cost": 2,
 					"cornerstone": false,
@@ -3173,164 +6589,63 @@
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Core.Kinesis.Contact",
-							"rank": 1
-						},
-						{
-							"id": "Core.Kinesis.Redirect",
+							"id": "Core.Kinesis.LightFooting",
 							"rank": 1
 						}
 					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Core.Velocity.Freefall",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Velocity",
-					"effects": [
+					"coreRole": "Convergence",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
 						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "Airborne",
-							"alsoRequires": []
+							"minimumSatisfied": 2,
+							"candidates": [
+								{
+									"id": "Core.Kinesis.AirWork",
+									"rank": 1
+								},
+								{
+									"id": "Core.Kinesis.AirJump",
+									"rank": 1
+								}
+							]
 						}
-					],
-					"tags": [
-						"Progression.Node.Core.Freefall"
-					],
-					"exclusive": [],
-					"prerequisites": []
+					]
 				},
 				{
-					"id": "Core.Velocity.Afterburn",
+					"id": "Core.Control.Concussive",
 					"tier": 1,
 					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
-					"constellation": "Velocity",
+					"constellation": "Control",
 					"effects": [
 						{
-							"target": "Damage",
+							"target": "StaggerDuration",
 							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "RecentlyDashed",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Core.Afterburn"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Velocity.Traction",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Velocity",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "RecentlyLedgeTraversed",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Core.Traction"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Velocity.Slipstream",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Velocity",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "Sliding",
-							"alsoRequires": []
-						},
-						{
-							"target": "SlideSpeed",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 5,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Core.Slipstream"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Velocity.Grind",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Velocity",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
+							"valuePerRank": 15,
 							"condition": "Always",
 							"alsoRequires": []
 						}
 					],
 					"tags": [],
 					"exclusive": [],
-					"prerequisites": []
+					"prerequisites": [],
+					"coreRole": "Gateway",
+					"coreLaneIndex": 0
 				},
 				{
-					"id": "Core.Velocity.Downforce",
-					"tier": 1,
-					"ranks": 1,
+					"id": "Core.Control.Jarring",
+					"tier": 2,
+					"ranks": 3,
 					"cost": 1,
 					"cornerstone": false,
-					"constellation": "Velocity",
+					"constellation": "Control",
 					"effects": [
 						{
-							"target": "WeaponDamage",
+							"target": "StaggerDuration",
 							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "Airborne",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Velocity.TerminalDescent",
-					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "Velocity",
-					"effects": [
-						{
-							"target": "WeaponDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 16,
-							"condition": "Airborne",
+							"valuePerRank": 8,
+							"condition": "Always",
 							"alsoRequires": []
 						}
 					],
@@ -3338,278 +6653,47 @@
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Core.Velocity.Freefall",
-							"rank": 1
-						},
-						{
-							"id": "Core.Velocity.Afterburn",
+							"id": "Core.Control.Concussive",
 							"rank": 1
 						}
 					],
-					"requiredTreeInvestment": 2
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 0
 				},
 				{
-					"id": "Core.Velocity.Redline",
-					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "Velocity",
-					"effects": [
-						{
-							"target": "AbilityDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 14,
-							"condition": "Redline",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Core.RedlineDoctrine"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Core.Velocity.Traction",
-							"rank": 1
-						},
-						{
-							"id": "Core.Velocity.Slipstream",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Core.Velocity.NoGround",
-					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "Velocity",
-					"effects": [
-						{
-							"target": "ClassResourceDecay",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": -100,
-							"condition": "Airborne",
-							"alsoRequires": []
-						},
-						{
-							"target": "ClassResourceDecay",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 50,
-							"condition": "Grounded",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Core.Velocity.Grind",
-							"rank": 1
-						},
-						{
-							"id": "Core.Velocity.Downforce",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Core.Velocity.TerminalVelocity",
+					"id": "Core.Control.Shockwave",
 					"tier": 3,
 					"ranks": 1,
-					"cost": 3,
-					"cornerstone": false,
-					"constellation": "Velocity",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "MorePercent",
-							"valuePerRank": 30,
-							"condition": "Airborne",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Core.TerminalVelocity"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Core.Velocity.TerminalDescent",
-							"rank": 1
-						},
-						{
-							"id": "Core.Velocity.Redline",
-							"rank": 1
-						},
-						{
-							"id": "Core.Velocity.NoGround",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
-				},
-				{
-					"id": "Core.Ruin.WeightofIt",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Ruin",
-					"effects": [
-						{
-							"target": "WeaponDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Ruin.Cull",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Ruin",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Ruin.Break",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Ruin",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Ruin.ShapedCharge",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Ruin",
-					"effects": [
-						{
-							"target": "WeaponDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Ruin.Concussion",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Ruin",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Ruin.Rend",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Ruin",
-					"effects": [
-						{
-							"target": "AbilityDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Ruin.Execute",
-					"tier": 2,
-					"ranks": 1,
 					"cost": 2,
 					"cornerstone": false,
-					"constellation": "Ruin",
+					"constellation": "Control",
 					"effects": [],
 					"tags": [
-						"Progression.Node.Core.Ruin.Execute"
+						"Progression.Node.Core.Control.Shockwave"
 					],
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Core.Ruin.WeightofIt",
-							"rank": 1
-						},
-						{
-							"id": "Core.Ruin.Cull",
+							"id": "Core.Control.Jarring",
 							"rank": 1
 						}
 					],
-					"requiredTreeInvestment": 2
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 0
 				},
 				{
-					"id": "Core.Ruin.Siege",
+					"id": "Core.Control.Insistent",
 					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
+					"ranks": 3,
+					"cost": 1,
 					"cornerstone": false,
-					"constellation": "Ruin",
+					"constellation": "Control",
 					"effects": [
 						{
-							"target": "Damage",
+							"target": "EnemyStaggerResistanceReduction",
 							"bucket": "IncreasedPercent",
-							"valuePerRank": 16,
-							"condition": "TargetElite",
+							"valuePerRank": 6,
+							"condition": "Always",
 							"alsoRequires": []
 						}
 					],
@@ -3617,482 +6701,102 @@
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Core.Ruin.Break",
-							"rank": 1
-						},
-						{
-							"id": "Core.Ruin.ShapedCharge",
+							"id": "Core.Control.Concussive",
 							"rank": 1
 						}
 					],
-					"requiredTreeInvestment": 2
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 1
 				},
 				{
-					"id": "Core.Ruin.Overpressure",
-					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "Ruin",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 16,
-							"condition": "TargetBandBroken",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Core.Ruin.Concussion",
-							"rank": 1
-						},
-						{
-							"id": "Core.Ruin.Rend",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Core.Ruin.Collapse",
+					"id": "Core.Control.Interrupt",
 					"tier": 3,
 					"ranks": 1,
-					"cost": 3,
-					"cornerstone": false,
-					"constellation": "Ruin",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "MorePercent",
-							"valuePerRank": 30,
-							"condition": "TargetBandBroken",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Core.Ruin.Execute",
-							"rank": 1
-						},
-						{
-							"id": "Core.Ruin.Siege",
-							"rank": 1
-						},
-						{
-							"id": "Core.Ruin.Overpressure",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
-				},
-				{
-					"id": "Core.Reservoir.Draw",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Reservoir",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Reservoir.Wellspring",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Reservoir",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Reservoir.Capacity",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Reservoir",
-					"effects": [
-						{
-							"target": "AbilityDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Reservoir.Tithe",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Reservoir",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Reservoir.DeepPockets",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Reservoir",
-					"effects": [
-						{
-							"target": "AbilityDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Reservoir.SecondShift",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Reservoir",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 2,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Reservoir.ConvergencePoint",
-					"tier": 2,
-					"ranks": 1,
 					"cost": 2,
 					"cornerstone": false,
-					"constellation": "Reservoir",
-					"effects": [
-						{
-							"target": "ClassResourceRegen",
-							"bucket": "Flat",
-							"valuePerRank": 1,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Core.Reservoir.Draw",
-							"rank": 1
-						},
-						{
-							"id": "Core.Reservoir.Wellspring",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Core.Reservoir.Spillover",
-					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "Reservoir",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 10,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Core.Reservoir.Capacity",
-							"rank": 1
-						},
-						{
-							"id": "Core.Reservoir.Tithe",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Core.Reservoir.Reserve",
-					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "Reservoir",
-					"effects": [
-						{
-							"target": "AbilityDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 12,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Core.Reservoir.DeepPockets",
-							"rank": 1
-						},
-						{
-							"id": "Core.Reservoir.SecondShift",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Core.Elements.Conductive",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Elements",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Core.Conductive"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Elements.ChargeUp",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Elements",
-					"effects": [
-						{
-							"target": "AbilityDamage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Core.ChargeUp"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Elements.Penetrance",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Elements",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Core.Penetrance"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Elements.Attunement",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Elements",
-					"effects": [
-						{
-							"target": "StatusChance",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 10,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Elements.Catalyst",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Elements",
-					"effects": [
-						{
-							"target": "CriticalChance",
-							"bucket": "Flat",
-							"valuePerRank": 4,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Core.Catalyst"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Elements.Sympathy",
-					"tier": 1,
-					"ranks": 1,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "Elements",
-					"effects": [
-						{
-							"target": "StatusDuration",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 10,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Core.Elements.Threshold",
-					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "Elements",
+					"constellation": "Control",
 					"effects": [],
 					"tags": [
-						"Progression.Node.Core.Threshold"
+						"Progression.Node.Core.Control.Interrupt"
 					],
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Core.Elements.Conductive",
-							"rank": 1
-						},
-						{
-							"id": "Core.Elements.ChargeUp",
+							"id": "Core.Control.Insistent",
 							"rank": 1
 						}
 					],
-					"requiredTreeInvestment": 2
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 1
 				},
 				{
-					"id": "Core.Elements.Reaction",
-					"tier": 2,
+					"id": "Core.Control.Lockstep",
+					"tier": 4,
 					"ranks": 1,
 					"cost": 2,
 					"cornerstone": false,
-					"constellation": "Elements",
+					"constellation": "Control",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Control.Lockstep"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Control.Concussive",
+							"rank": 1
+						}
+					],
+					"coreRole": "Convergence",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 2,
+							"candidates": [
+								{
+									"id": "Core.Control.Shockwave",
+									"rank": 1
+								},
+								{
+									"id": "Core.Control.Interrupt",
+									"rank": 1
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "Core.Threat.Presence",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Threat",
 					"effects": [
 						{
-							"target": "Damage",
+							"target": "ThreatGenerated",
 							"bucket": "IncreasedPercent",
-							"valuePerRank": 14,
-							"condition": "TargetMultiStatus",
+							"valuePerRank": 20,
+							"condition": "Always",
 							"alsoRequires": []
 						}
 					],
 					"tags": [],
 					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Core.Elements.Penetrance",
-							"rank": 1
-						},
-						{
-							"id": "Core.Elements.Attunement",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
+					"prerequisites": [],
+					"coreRole": "Gateway",
+					"coreLaneIndex": 0
 				},
 				{
-					"id": "Core.Elements.Sequence",
+					"id": "Core.Threat.Loud",
 					"tier": 2,
-					"ranks": 1,
-					"cost": 2,
+					"ranks": 3,
+					"cost": 1,
 					"cornerstone": false,
-					"constellation": "Elements",
+					"constellation": "Threat",
 					"effects": [
 						{
-							"target": "StatusDuration",
+							"target": "ThreatGenerated",
 							"bucket": "IncreasedPercent",
 							"valuePerRank": 10,
 							"condition": "Always",
@@ -4103,51 +6807,117 @@
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Core.Elements.Catalyst",
-							"rank": 1
-						},
-						{
-							"id": "Core.Elements.Sympathy",
+							"id": "Core.Threat.Presence",
 							"rank": 1
 						}
 					],
-					"requiredTreeInvestment": 2
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 0
 				},
 				{
-					"id": "Core.Elements.ReactionChain",
+					"id": "Core.Threat.Provocation",
 					"tier": 3,
 					"ranks": 1,
-					"cost": 3,
+					"cost": 2,
 					"cornerstone": false,
-					"constellation": "Elements",
-					"effects": [
-						{
-							"target": "DamageOverTime",
-							"bucket": "MorePercent",
-							"valuePerRank": 26,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
+					"constellation": "Threat",
+					"effects": [],
 					"tags": [
-						"Progression.Node.Core.ReactionChain"
+						"Progression.Node.Core.Provocation"
 					],
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Core.Elements.Threshold",
-							"rank": 1
-						},
-						{
-							"id": "Core.Elements.Reaction",
-							"rank": 1
-						},
-						{
-							"id": "Core.Elements.Sequence",
+							"id": "Core.Threat.Loud",
 							"rank": 1
 						}
 					],
-					"requiredTreeInvestment": 4
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 0
+				},
+				{
+					"id": "Core.Threat.Decoy",
+					"tier": 2,
+					"ranks": 3,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "Threat",
+					"effects": [
+						{
+							"target": "DeployableHealth",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 15,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Threat.Presence",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneMinor",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Threat.Bait",
+					"tier": 3,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Threat",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Threat.Bait"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Threat.Decoy",
+							"rank": 1
+						}
+					],
+					"coreRole": "LaneNotable",
+					"coreLaneIndex": 1
+				},
+				{
+					"id": "Core.Threat.IgnoreMe",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "Threat",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Core.Threat.IgnoreMe"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Core.Threat.Presence",
+							"rank": 1
+						}
+					],
+					"coreRole": "Convergence",
+					"coreLaneIndex": 0,
+					"prerequisiteGroups": [
+						{
+							"minimumSatisfied": 2,
+							"candidates": [
+								{
+									"id": "Core.Threat.Provocation",
+									"rank": 1
+								},
+								{
+									"id": "Core.Threat.Bait",
+									"rank": 1
+								}
+							]
+						}
+					]
 				}
 			],
 			"constellations": [
@@ -4156,20 +6926,16 @@
 					"sector": "Weapon"
 				},
 				{
-					"name": "Volley",
-					"sector": "Weapon"
-				},
-				{
 					"name": "Vector",
 					"sector": "Weapon"
 				},
 				{
-					"name": "Arc",
-					"sector": "Ability"
+					"name": "Ballistics",
+					"sector": "Weapon"
 				},
 				{
-					"name": "Affliction",
-					"sector": "Elements"
+					"name": "Loadout",
+					"sector": "Weapon"
 				},
 				{
 					"name": "Aegis",
@@ -4180,24 +6946,68 @@
 					"sector": "Defence"
 				},
 				{
-					"name": "Kinesis",
-					"sector": "Movement"
+					"name": "Constitution",
+					"sector": "Defence"
 				},
 				{
-					"name": "Velocity",
-					"sector": "Movement"
+					"name": "Ward",
+					"sector": "Defence"
 				},
 				{
-					"name": "Ruin",
-					"sector": "Weapon"
+					"name": "Recovery",
+					"sector": "Defence"
+				},
+				{
+					"name": "Arc",
+					"sector": "Ability"
+				},
+				{
+					"name": "Tempo",
+					"sector": "Ability"
 				},
 				{
 					"name": "Reservoir",
 					"sector": "Ability"
 				},
 				{
-					"name": "Elements",
-					"sector": "Elements"
+					"name": "Duration",
+					"sector": "Ability"
+				},
+				{
+					"name": "Affliction",
+					"sector": "Status"
+				},
+				{
+					"name": "Entropy",
+					"sector": "Status"
+				},
+				{
+					"name": "Reaction",
+					"sector": "Status"
+				},
+				{
+					"name": "Rift",
+					"sector": "Status"
+				},
+				{
+					"name": "Void",
+					"sector": "Status"
+				},
+				{
+					"name": "Velocity",
+					"sector": "Movement"
+				},
+				{
+					"name": "Kinesis",
+					"sector": "Movement"
+				},
+				{
+					"name": "Control",
+					"sector": "Utility"
+				},
+				{
+					"name": "Threat",
+					"sector": "Utility"
 				}
 			]
 		},

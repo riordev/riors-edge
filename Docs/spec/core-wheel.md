@@ -18,6 +18,18 @@ Each line below: gateway; lane A; lane B; lane C if major; links if major; conve
 
 **Loadout (minor)**: Sling +12% swap speed; Reload Drill +6% reload speed/rank -> Magazine +20% magazine capacity; Reserve +15% reserve ammunition/rank -> Quickdraw +25% swap speed and first shot after swap +30%; Two Guns holstered weapon reloads over6s.
 
+## Defence
+
+**Aegis (major)**: Footing +60Health; Iron Frame +50Health/rank -> Brace +20% Increased Armour; Plate +12% Increased Armour/rank -> Bulk +8% maxHealth as front shield; Second Skin +6% physical DR/rank -> Answering Fire +18% Increased Armour,+80Health; Clean Hands +40Health, Set Stance +10% Increased Armour; Bastion1.20x More effective health; Immovable cannot stagger/displace, FORFEIT cannot exceed walking pace.
+
+**Bulwark (major)**: Read +5% Block Chance; Guard +3% Block Chance/rank -> Parry grants .25s window,2s cooldown; Evade +3% Dodge Chance/rank -> Counterweight parry cooldown-.5s,window+.10s; Interpose +6% maxHealth frontshield/rank -> Riposte successful parry restores8% maxHealth; Anticipate +8% parry cooldown recovery, Footwork +3% Dodge Chance; Wall frontshield fully rebuilds on parry; Perfect Guard parry negates all damage1s instead of one hit, FORFEIT block/dodge zero.
+
+**Constitution (minor)**: Frame +80Health; Mass +60Health/rank -> Deep Reserve +12% maxHealth; Layered +4% maxHealth shield/rank -> Third Layer frontpool also covers rear at half; Endurance feeds combined health/shield/frontpool values into your current/maximum health view; Hold caps and enemy-facing thresholds retain physical health.
+
+**Ward (minor)**: Resist +10% all elemental resistance; Tolerance +6% elemental resistance/rank -> Refusal +12% ailment avoidance; Clean +5% ailment avoidance/rank -> Insulation elemental buildup on you decays twice as fast; Null first ailment applied each fight refused.
+
+**Recovery (minor)**: Mend +15% healing received; Knit regenerate.4% maxHealth/s/rank -> Field Dressing +30% healing received; Recharge shield recharge delay-.4s/rank -> Overheal becomes shield up to15% maxHealth; Second Life regeneration continues in combat at half rate.
+
 ## Ability
 
 **Arc (major)**: Prime +8% Increased Ability Damage; Channel +6% Increased Ability Damage/rank -> Widen +15% Ability Area; Vent +4 Added Ability Power/rank -> Reach +25% Increased Ability Damage; Anchor +6% Ability Area/rank -> Persistence +20% zone/window duration; Recycle +3 Added Ability Power, Spillover +8% Ability Area; Overflow1.26x More ability damage; Detonation zones no longer tick, pay whole remaining damage on expiry (no sustained pressure).
@@ -39,18 +51,6 @@ Each line below: gateway; lane A; lane B; lane C if major; links if major; conve
 **Rift (minor)**: Displace +12% Rift buildup; Shove +8% Rift burst damage/rank -> Impact displacement also hits one enemy in its path; Instability +6% elemental buildup/rank -> Hard Landing enemies shoved into wall take+25% burst; Vector Field Unstable displaces toward you.
 
 **Void (minor)**: Erase +12% Void buildup; Hollow +8% Erased burst damage/rank -> Patience Erased pays40% more,1s later; Siphon +6% Increased elemental damage/rank -> Debt Erased also pays15% of damage dealt during delay; Nothing Left1.18x More Void damage.
-
-## Defence
-
-**Aegis (major)**: Footing +60Health; Iron Frame +50Health/rank -> Brace +20% Increased Armour; Plate +12% Increased Armour/rank -> Bulk +8% maxHealth as front shield; Second Skin +6% physical DR/rank -> Answering Fire +18% Increased Armour,+80Health; Clean Hands +40Health, Set Stance +10% Increased Armour; Bastion1.20x More effective health; Immovable cannot stagger/displace, FORFEIT cannot exceed walking pace.
-
-**Bulwark (major)**: Read +5% Block Chance; Guard +3% Block Chance/rank -> Parry grants .25s window,2s cooldown; Evade +3% Dodge Chance/rank -> Counterweight parry cooldown-.5s,window+.10s; Interpose +6% maxHealth frontshield/rank -> Riposte successful parry restores8% maxHealth; Anticipate +8% parry cooldown recovery, Footwork +3% Dodge Chance; Wall frontshield fully rebuilds on parry; Perfect Guard parry negates all damage1s instead of one hit, FORFEIT block/dodge zero.
-
-**Constitution (minor)**: Frame +80Health; Mass +60Health/rank -> Deep Reserve +12% maxHealth; Layered +4% maxHealth shield/rank -> Third Layer frontpool also covers rear at half; Endurance feeds combined health/shield/frontpool values into your current/maximum health view; Hold caps and enemy-facing thresholds retain physical health.
-
-**Ward (minor)**: Resist +10% all elemental resistance; Tolerance +6% elemental resistance/rank -> Refusal +12% ailment avoidance; Clean +5% ailment avoidance/rank -> Insulation elemental buildup on you decays twice as fast; Null first ailment applied each fight refused.
-
-**Recovery (minor)**: Mend +15% healing received; Knit regenerate.4% maxHealth/s/rank -> Field Dressing +30% healing received; Recharge shield recharge delay-.4s/rank -> Overheal becomes shield up to15% maxHealth; Second Life regeneration continues in combat at half rate.
 
 ## Movement
 

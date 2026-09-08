@@ -114,7 +114,7 @@ public:
     // Missing fields must deserialize as legacy even after activation. Writers
     // must stamp ActiveCoreLayoutVersion when the new roster is enabled.
     UPROPERTY() int32 CoreLayoutVersion = 1;
-    static constexpr int32 ActiveCoreLayoutVersion = 1;
+    static constexpr int32 ActiveCoreLayoutVersion = 2;
     static bool MigrateCoreLayout(UBreakerSaveGame& Save, int32 TargetVersion, FString& OutNote);
     static int32 LegacyCoreRankCost(FName NodeId);
 

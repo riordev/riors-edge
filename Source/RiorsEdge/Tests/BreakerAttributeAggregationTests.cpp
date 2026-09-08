@@ -56,14 +56,14 @@ namespace BreakerAggregationTestHelpers
         OutItems.Add(Helmet);
     }
 
-    // Core.Bulwark.SetStance is +90 flat health; Core.Kinesis.LightFooting is
-    // +12% increased movement speed.
+    // Core.Aegis.Footing is +60 flat health; Core.Velocity.Grind is
+    // +8% increased movement speed.
     FBreakerProgressionState MakeTestNodes()
     {
         FBreakerProgressionState NodeState;
         NodeState.PermanentClass = EBreakerClassId::Swift;
-        NodeState.CoreNodeRanks.Add({TEXT("Core.Bulwark.SetStance"), 1});
-        NodeState.CoreNodeRanks.Add({TEXT("Core.Kinesis.LightFooting"), 1});
+        NodeState.CoreNodeRanks.Add({TEXT("Core.Aegis.Footing"), 1});
+        NodeState.CoreNodeRanks.Add({TEXT("Core.Velocity.Grind"), 1});
         return NodeState;
     }
 }
@@ -164,15 +164,15 @@ bool FBreakerGearAndNodesStackTest::RunTest(const FString& Parameters)
     EquipmentB->BindAttributes(AttributesB);
     for (const FBreakerItemInstance& Item : Gear) EquipmentB->EquipItem(Item);
 
-    // Both layers land: 100 base + 150 gear + 90 node. Under the old
-    // last-recalc-wins bug this read 250 or 190.
-    TestEqual(TEXT("Flat health from gear and nodes both apply"), AttributesA->GetMaxHealth(), 340.0f);
-    TestEqual(TEXT("Health rides the new maximum"), AttributesA->GetHealth(), 340.0f);
+    // Both layers land: 100 base + 150 gear + 60 node. Under the old
+    // last-recalc-wins bug this read 250 or 160.
+    TestEqual(TEXT("Flat health from gear and nodes both apply"), AttributesA->GetMaxHealth(), 310.0f);
+    TestEqual(TEXT("Health rides the new maximum"), AttributesA->GetHealth(), 310.0f);
 
-    // 8% gear + 12% node in ONE additive bucket: 650 * 1.20 = 780. A
-    // multiplicative composition would read 786.24, a last-writer-wins one
-    // 702 or 728.
-    TestEqual(TEXT("Increased move speed is one additive bucket across layers"), AttributesA->GetMoveSpeed(), 780.0f, 0.001f);
+    // 8% gear + 8% node in ONE additive bucket: 650 * 1.16 = 754. A
+    // multiplicative composition would read 758.16, a last-writer-wins one
+    // 702.
+    TestEqual(TEXT("Increased move speed is one additive bucket across layers"), AttributesA->GetMoveSpeed(), 754.0f, 0.001f);
 
     // Order cannot matter.
     TestEqual(TEXT("Gear-then-node and node-then-gear agree on health"), AttributesB->GetMaxHealth(), AttributesA->GetMaxHealth());
@@ -206,12 +206,12 @@ bool FBreakerUnifiedRemovalTest::RunTest(const FString& Parameters)
     Progression->LoadProgressionState(MakeTestNodes());
     const float HealthWithNodesOnly = Attributes->GetMaxHealth();
     const float MoveSpeedWithNodesOnly = Attributes->GetMoveSpeed();
-    TestEqual(TEXT("Nodes alone move health"), HealthWithNodesOnly, 190.0f);
+    TestEqual(TEXT("Nodes alone move health"), HealthWithNodesOnly, 160.0f);
 
     TArray<FBreakerItemInstance> Gear;
     MakeTestGear(Gear);
     for (const FBreakerItemInstance& Item : Gear) Equipment->EquipItem(Item);
-    TestEqual(TEXT("Gear stacks on top of the nodes"), Attributes->GetMaxHealth(), 340.0f);
+    TestEqual(TEXT("Gear stacks on top of the nodes"), Attributes->GetMaxHealth(), 310.0f);
 
     Equipment->UnequipSlot(EBreakerEquipSlot::Boots);
     Equipment->UnequipSlot(EBreakerEquipSlot::Helmet);
@@ -312,7 +312,7 @@ bool FBreakerClassResourceFloorTest::RunTest(const FString& Parameters)
 
     TestEqual(TEXT("Equipping gear and allocating nodes does not touch the floor"), Attributes->GetClassResourceFloor(), -20.0f);
     TestEqual(TEXT("A recalculation does not silently repay the debt"), Attributes->GetClassResource(), -12.0f);
-    TestEqual(TEXT("The aggregated attributes still fold as before"), Attributes->GetMaxHealth(), 340.0f);
+    TestEqual(TEXT("The aggregated attributes still fold as before"), Attributes->GetMaxHealth(), 310.0f);
 
     FText Failure;
     Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure);
@@ -362,25 +362,20 @@ bool FBreakerDamageNodeRaisesWeaponDamageTest::RunTest(const FString& Parameters
     UBreakerProgressionTree* Core = UBreakerProgressionLibrary::GetCoreSliceTree();
     Progression->ApplySliceDefaultsIfFresh();
     FText Failure;
-    // ATLAS SHAPE: single purchases summing in the one bucket. VOLLEY is
-    // entered at its own rim 0 from the virtual hub (O211), so nothing is
-    // bought on the way and the DamageMultiplier attribute this test watches
-    // starts neutral.
+    // The actual Precision route reaches Called Shot through rank-one Angle.
     TestEqual(TEXT("Nothing is bought to reach a wheel"), Attributes->GetDamageMultiplier(), 1.0f, 0.0001f);
-    TestTrue(TEXT("The damage rim purchases as an entry"), Progression->PurchaseNode(Core, TEXT("Core.Volley.Cyclic"), Failure));
+    for (const TCHAR* Id : {TEXT("Core.Precision.Sightline"), TEXT("Core.Precision.Angle"), TEXT("Core.Precision.CalledShot")})
+        if (!TestTrue(TEXT("Legal Precision damage route"), Progression->PurchaseNode(Core, Id, Failure))) return false;
 
-    TestEqual(TEXT("A purchased damage node moves the attribute"), Attributes->GetDamageMultiplier(), 1.03f, 0.0001f);
-    TestEqual(TEXT("A purchased damage node moves the damage a weapon would deal"), WeaponDamageFor(Attributes), 103.0f, 0.001f);
+    TestEqual(TEXT("A purchased damage node moves the attribute"), Attributes->GetDamageMultiplier(), 1.20f, 0.0001f);
+    TestEqual(TEXT("A purchased damage node moves the damage a weapon would deal"), WeaponDamageFor(Attributes), 120.0f, 0.001f);
 
-    // Separate purchases keep paying into ONE additive bucket, walked in
-    // ring order — Feed opens off Cyclic, Trigger Discipline off Feed, and
-    // Salvo's stated AND gate (Cyclic + Feed) is met when adjacency reaches it.
-    TestTrue(TEXT("A shared-pool rim purchases"), Progression->PurchaseNode(Core, TEXT("Core.Volley.Feed"), Failure));
-    TestEqual(TEXT("The shared rim adds its increment"), Attributes->GetDamageMultiplier(), 1.05f, 0.0001f);
-    TestTrue(TEXT("A second weapon rim purchases"), Progression->PurchaseNode(Core, TEXT("Core.Volley.TriggerDiscipline"), Failure));
-    TestTrue(TEXT("The rim-gated inner purchases"), Progression->PurchaseNode(Core, TEXT("Core.Volley.Salvo"), Failure));
-    TestEqual(TEXT("Purchases sum into the one additive bucket"), Attributes->GetDamageMultiplier(), 1.24f, 0.0001f);
-    TestEqual(TEXT("The wheel purchases are worth 24% more damage"), WeaponDamageFor(Attributes), 124.0f, 0.001f);
+    // Separate ranks join the same Increased bucket rather than multiply it.
+    TestTrue(TEXT("Rank-one Ledger purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Ledger"), Failure));
+    TestEqual(TEXT("First ranked increment adds five percent"), Attributes->GetDamageMultiplier(), 1.25f, 0.0001f);
+    TestTrue(TEXT("Optional rank-two Ledger purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Ledger"), Failure));
+    TestEqual(TEXT("Purchases sum into the one additive bucket"), Attributes->GetDamageMultiplier(), 1.30f, 0.0001f);
+    TestEqual(TEXT("The purchases supply thirty percent Increased damage"), WeaponDamageFor(Attributes), 130.0f, 0.001f);
 
     // A respec must hand the damage back exactly, not approximately.
     TestTrue(TEXT("Respec at a Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure));
@@ -415,35 +410,26 @@ bool FBreakerPointSpendDamageBaselineTest::RunTest(const FString& Parameters)
     Progression->ApplySliceDefaultsIfFresh();
     FText Failure;
 
-    // Core.Bulwark.SetStance costs 1 and authors NO damage effect at all: the
-    // whole point is that spending anywhere is felt.
-    TestTrue(TEXT("A node with no damage effect purchases"), Progression->PurchaseNode(Core, TEXT("Core.Bulwark.SetStance"), Failure));
+    // Read grants block only; each paid point still contributes the baseline.
+    TestTrue(TEXT("A node with no damage effect purchases"), Progression->PurchaseNode(Core, TEXT("Core.Bulwark.Read"), Failure));
     TestEqual(TEXT("One committed point is one point"), Progression->GetSpentPoints(), 1.0f, 0.0001f);
     TestEqual(TEXT("A damage-less purchase still raises damage"), Attributes->GetDamageMultiplier(), 1.0025f, 0.0001f);
 
-    // Cost, not node count, is the unit: a 2-point inner is worth two. The
-    // ring is walked inside BULWARK, whose entry SetStance is already owned:
-    // Read and Weight ride the hexagon, Held Ground completes
-    // Counterweight's stated AND gate.
-    TestTrue(TEXT("A weapon rim purchases"), Progression->PurchaseNode(Core, TEXT("Core.Bulwark.Read"), Failure));
-    TestTrue(TEXT("A damage rim purchases"), Progression->PurchaseNode(Core, TEXT("Core.Bulwark.Weight"), Failure));
-    TestTrue(TEXT("A second damage rim purchases"), Progression->PurchaseNode(Core, TEXT("Core.Bulwark.HeldGround"), Failure));
-    TestTrue(TEXT("The 2-point inner purchases"), Progression->PurchaseNode(Core, TEXT("Core.Bulwark.Counterweight"), Failure));
-    TestEqual(TEXT("Committed points count by cost"), Progression->GetSpentPoints(), 6.0f, 0.0001f);
-    // 6 points x 0.25% baseline + the live node lines (3 + 2 + 2).
-    // Counterweight's 16% requires a successful Parry; this fixture has none.
-    TestEqual(TEXT("Baseline and live node damage share one additive bucket"), Attributes->GetDamageMultiplier(), 1.085f, 0.0001f);
-
+    // Actual two-point notables prove the floor counts price, not node count.
+    for (const TCHAR* Id : {TEXT("Core.Bulwark.Guard"), TEXT("Core.Bulwark.Parry"), TEXT("Core.Bulwark.Evade"), TEXT("Core.Bulwark.Counterweight")})
+        if (!TestTrue(TEXT("Legal priced Bulwark route"), Progression->PurchaseNode(Core, Id, Failure))) return false;
+    TestEqual(TEXT("Five nodes cost seven committed points"), Progression->GetSpentPoints(), 7.0f, 0.0001f);
+    TestEqual(TEXT("Defensive purchases contribute only the per-point floor"), Attributes->GetDamageMultiplier(), 1.0175f, 0.0001f);
     // Turning the baseline off must leave exactly the node content behind, so
     // the owner can retune or disable it without touching content.
     const FBreakerProgressionState Allocated = Progression->GetProgressionState();
     Progression->IncreasedDamagePerSpentPoint = 0.0f;
     Progression->LoadProgressionState(Allocated);
-    TestEqual(TEXT("A zeroed baseline leaves only live node damage"), Attributes->GetDamageMultiplier(), 1.07f, 0.0001f);
+    TestEqual(TEXT("A zeroed baseline leaves defensive nodes without damage"), Attributes->GetDamageMultiplier(), 1.0f, 0.0001f);
 
     Progression->IncreasedDamagePerSpentPoint = 2.5f;
     Progression->LoadProgressionState(Allocated);
-    TestEqual(TEXT("The baseline retunes without a content change"), Attributes->GetDamageMultiplier(), 1.22f, 0.0001f);
+    TestEqual(TEXT("The baseline retunes without a content change"), Attributes->GetDamageMultiplier(), 1.175f, 0.0001f);
     return true;
 }
 
@@ -485,19 +471,19 @@ bool FBreakerGearAndTreeDamageShareOneBucketTest::RunTest(const FString& Paramet
 
     FBreakerProgressionState Nodes;
     Nodes.PermanentClass = EBreakerClassId::Swift;
-    Nodes.CoreNodeRanks.Add({TEXT("Core.Volley.Cyclic"), 1});  // +3% weapon
-    Nodes.CoreNodeRanks.Add({TEXT("Core.Volley.Feed"), 1});    // +2% shared
-    Nodes.CoreNodeRanks.Add({TEXT("Core.Volley.Salvo"), 1});   // +16% weapon
+    Nodes.CoreNodeRanks.Add({TEXT("Core.Precision.Sightline"), 1}); // crit damage
+    Nodes.CoreNodeRanks.Add({TEXT("Core.Precision.Angle"), 1}); // crit chance
+    Nodes.CoreNodeRanks.Add({TEXT("Core.Precision.CalledShot"), 1}); // +20% weapon
     Progression->LoadProgressionState(Nodes);
 
-    // 20% gear + 21% tree in ONE bucket = 1.41. Multiplying the layers would
-    // read 1.452; that gap is the whole bug class.
-    TestEqual(TEXT("Gear and tree damage sum, never multiply"), Attributes->GetDamageMultiplier(), 1.41f, 0.0001f);
+    // 20% gear + 20% tree in ONE bucket = 1.40. Multiplying the layers would
+    // read 1.44; that gap is the whole bug class.
+    TestEqual(TEXT("Gear and tree damage sum, never multiply"), Attributes->GetDamageMultiplier(), 1.40f, 0.0001f);
 
     // And removal is exact in both directions.
     Equipment->UnequipSlot(EBreakerEquipSlot::Gloves);
     Equipment->UnequipSlot(EBreakerEquipSlot::Necklace);
-    TestEqual(TEXT("Unequipping leaves exactly the tree damage"), Attributes->GetDamageMultiplier(), 1.21f, 0.0001f);
+    TestEqual(TEXT("Unequipping leaves exactly the tree damage"), Attributes->GetDamageMultiplier(), 1.20f, 0.0001f);
     FText Failure;
     Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure);
     TestEqual(TEXT("A respec restores the true base of 1.0"), Attributes->GetDamageMultiplier(), 1.0f, 0.0001f);

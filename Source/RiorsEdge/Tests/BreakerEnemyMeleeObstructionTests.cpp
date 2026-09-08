@@ -68,7 +68,7 @@ bool FBreakerEnemyMeleeObstructionTest::RunTest(const FString& Parameters)
     auto* Progression = Player->GetProgression();
     Progression->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(4, Progression->ExperienceCurve));
     FText Failure;
-    for (const TCHAR* Node : {TEXT("Core.Bulwark.SetStance"), TEXT("Core.Bulwark.Read"), TEXT("Core.Bulwark.Parry")})
+    for (const TCHAR* Node : {TEXT("Core.Bulwark.Read"), TEXT("Core.Bulwark.Guard"), TEXT("Core.Bulwark.Parry")})
         if (!TestTrue(TEXT("actual Core parry purchase"), Progression->PurchaseNode(UBreakerProgressionLibrary::GetCoreSliceTree(), Node, Failure))) return false;
     auto* Combat = Player->GetCombat(); Combat->BlockChance = 0; Combat->DodgeChance = 0;
     const float BeforeParry = Player->GetAttributes()->GetHealth();

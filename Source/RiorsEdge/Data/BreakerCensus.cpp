@@ -3,6 +3,10 @@
 #include "Abilities/BreakerAbilityData.h"
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Dom/JsonValue.h"
+#include "HAL/FileManager.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "Misc/SecureHash.h"
 #include "Interaction/BreakerNPC.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Policies/PrettyJsonPrintPolicy.h"
@@ -133,6 +137,47 @@ FString BreakerCensus::RelativePath()
 TSharedRef<FJsonObject> BreakerCensus::Export(const TArray<UBreakerProgressionTree*>& Trees)
 {
     TSharedRef<FJsonObject> Census = MakeShared<FJsonObject>();
+
+    // Source/export freshness witness, not a claim that source hashes prove a
+    // rebuilt binary. The build and Census.Fresh suite establish that separately.
+    // Legacy and partial candidate exports remain unchanged until full assembly.
+    const bool bFullCoreRoster = Trees.ContainsByPredicate([](const UBreakerProgressionTree* Tree)
+    {
+        return Tree && Tree->Currency == EBreakerPointCurrency::CorePoints
+            && Tree->bRestrictEntryToOwnedNeighbor && Tree->CoreWedgeOrder.Num() == 22
+            && Tree->Nodes.Num() == 187;
+    });
+    if (bFullCoreRoster)
+    {
+        TArray<FString> RelativeSources = {
+            TEXT("Progression/BreakerCoreTree.cpp"), TEXT("Progression/BreakerCoreTree.h"),
+            TEXT("Progression/BreakerProgressionLibrary.cpp"), TEXT("Progression/BreakerProgressionTypes.h"),
+            TEXT("Progression/BreakerProgressionNode.h"), TEXT("Progression/BreakerProgressionTree.h"),
+            TEXT("Data/BreakerCensus.cpp")
+        };
+        const FString SourceRoot = FPaths::ProjectDir() / TEXT("Source/RiorsEdge");
+        for (const TCHAR* Pattern : {TEXT("BreakerCoreRoster*.cpp"), TEXT("BreakerCoreRoster*.h")})
+        {
+            TArray<FString> Found;
+            IFileManager::Get().FindFiles(Found, *(SourceRoot / TEXT("Progression") / Pattern), true, false);
+            for (const FString& File : Found) RelativeSources.AddUnique(TEXT("Progression/") + File);
+        }
+        RelativeSources.Sort();
+        TSharedRef<FJsonObject> Witness = MakeShared<FJsonObject>();
+        for (const FString& Relative : RelativeSources)
+        {
+            TArray<uint8> Bytes;
+            FString Digest = TEXT("MISSING"); // Reporter refuses missing sources rather than accepting an empty witness.
+            if (FFileHelper::LoadFileToArray(Bytes, *(SourceRoot / Relative)))
+            {
+                FSHAHash Hash;
+                FSHA1::HashBuffer(Bytes.GetData(), Bytes.Num(), Hash.Hash);
+                Digest = Hash.ToString().ToLower();
+            }
+            Witness->SetStringField(TEXT("Source/RiorsEdge/") + Relative, Digest);
+        }
+        Census->SetObjectField(TEXT("coreAuthoringSources"), Witness);
+    }
 
     // Budgets, read from the same constexprs the game grants from, so a
     // ruling that moves a budget moves the census in the same build.

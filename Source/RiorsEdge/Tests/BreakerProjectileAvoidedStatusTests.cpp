@@ -77,7 +77,7 @@ bool FBreakerProjectileAvoidedStatusTest::RunTest(const FString& Parameters)
     auto* Progression = Target->GetProgression();
     Progression->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(4, Progression->ExperienceCurve));
     FText Failure;
-    for (const TCHAR* Node : {TEXT("Core.Bulwark.SetStance"), TEXT("Core.Bulwark.Read"), TEXT("Core.Bulwark.Parry")})
+    for (const TCHAR* Node : {TEXT("Core.Bulwark.Read"), TEXT("Core.Bulwark.Guard"), TEXT("Core.Bulwark.Parry")})
         if (!TestTrue(TEXT("purchases real parry prerequisite path"), Progression->PurchaseNode(UBreakerProgressionLibrary::GetCoreSliceTree(), Node, Failure))) return false;
     if (!TestTrue(TEXT("actual purchased parry starts"), Target->GetCombat()->TryParry())) return false;
     const float HealthBeforeParry = Target->GetAttributes()->GetHealth();

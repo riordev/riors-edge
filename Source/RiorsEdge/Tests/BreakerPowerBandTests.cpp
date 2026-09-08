@@ -5,6 +5,8 @@
 #include "Tests/BreakerStatusEmit.h"
 #include "Tests/BreakerPowerBandFixture.h"
 #include "Attributes/BreakerAttributeAggregation.h"
+#include "Attributes/BreakerAttributeSet.h"
+#include "Combat/BreakerDamageLibrary.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Items/BreakerItemRules.h"
@@ -17,7 +19,7 @@
 #include "Progression/BreakerProgressionTree.h"
 
 // ---------------------------------------------------------------------------
-// THE BUILD VARIANCE BAND (Power-Curve.md §4, authority O27; split into two
+// THE BUILD VARIANCE BAND (Power-Curve.md Â§4, authority O27; split into two
 // bands by O36)
 // ---------------------------------------------------------------------------
 // "The ratio between a baseline build and an optimized one at the SAME area
@@ -37,7 +39,7 @@
 // re-implements the arithmetic; if the fold changes, this moves with it,
 // which is the entire point.
 //
-// Both builds are measured in the SAME movement state — airborne, recently
+// Both builds are measured in the SAME movement state â€” airborne, recently
 // dashed, at Redline. That is the fair comparison the doc asks for: same
 // content, same instant, different build. The baseline is not a character
 // standing still; it is a character who found one conditional line and did not
@@ -48,22 +50,17 @@
 // the desired property, not an accident: accumulation must not be what
 // separates two characters. The point budget does not change between the two
 // O36 bands either, because character level (and so points earned) is capped
-// at 50 regardless of item level — only gear grows past the cap (O29).
+// at 50 regardless of item level â€” only gear grows past the cap (O29).
 // ---------------------------------------------------------------------------
 
 namespace BreakerPowerBandTest
 {
-    // O2 PLACEHOLDER. XP-And-Pacing §4/§7: Class Points stop at 30, Core Points
-    // are ~50 from levels plus ~15 from world content. A level-50 character who
-    // has finished the campaign holds and spends roughly this many. SHARED by
-    // both O36 bands below: the character level cap (and so the point budget)
-    // does not move between "at cap" and "past cap" gear -- O29's whole thesis
-    // is that only GEAR keeps growing past level 50, so the same character,
-    // same choices, is measured at two different item levels.
-    constexpr int32 PowerBandFullPointBudget = 95;
+    // Actual allocation: 65 Core plus the same legal eight-point Kinetic
+    // doctrine on every build. Gear depth never changes this budget.
+    constexpr int32 PowerBandFullPointBudget = 73;
 
     // ---------------------------------------------------------------------
-    // O36 — TWO BANDS, pinned separately.
+    // O36 â€” TWO BANDS, pinned separately.
     // ---------------------------------------------------------------------
     // "The build variance band is authored at two points: AT-CAP (level 50,
     // tiers a level-50 drop can produce): 8-10x stands. ENDGAME (ilvl 120,
@@ -82,7 +79,7 @@ namespace BreakerPowerBandTest
     // mistake as pinning the defence inversion at its current 3.76.
     //
     // Ruled at the CAP. Endgame parity is measured and reported beside it but
-    // deliberately unpinned — whether the figure holds at item level 120 is a
+    // deliberately unpinned â€” whether the figure holds at item level 120 is a
     // different question, because the endgame band is far more crit-driven and
     // crit is currently a weapon-lane story. Divergence between the two is a
     // finding in its own right, not a second edge of this one.
@@ -91,19 +88,19 @@ namespace BreakerPowerBandTest
 
     // The two measurement points. AT-CAP is the character cap; ENDGAME is the
     // top of the item-level ladder. Same character, same choices, same point
-    // budget — only the gear differs, which is the whole thesis.
+    // budget â€” only the gear differs, which is the whole thesis.
     constexpr int32 AtCapItemLevel = 50;
     constexpr int32 EndgameItemLevel = 120;
 
     // ---------------------------------------------------------------------
-    // WHAT A BASELINE IS — one definition, applied identically at both points.
+    // WHAT A BASELINE IS â€” one definition, applied identically at both points.
     // ---------------------------------------------------------------------
     // The two fixtures used to disagree about this, and the disagreement made
     // both numbers uninterpretable rather than only one.
     //
     // At cap the baseline was WorstTier: every one of twenty-four affix lines
     // landing at the absolute floor of the ladder. That is not "hitting 50 is
-    // satisfying with decent power" — it is a character that will never exist,
+    // satisfying with decent power" â€” it is a character that will never exist,
     // and a band measured against an impossible build measures nothing.
     // Endgame, meanwhile, used a hardcoded T3 against T1: a realistically
     // decent roll against a perfect one, which is the right idea.
@@ -115,7 +112,7 @@ namespace BreakerPowerBandTest
     // The definition, owner-ruled: a baseline is a REALISTICALLY DECENT roll,
     // derived from item level exactly as the optimized tier is, and offset by
     // the same number of tiers at both points. The offset is 2 because that is
-    // what the endgame pair already encoded (T3 against T1) — so the endgame
+    // what the endgame pair already encoded (T3 against T1) â€” so the endgame
     // number is unchanged by construction and only the broken half moves.
     //
     // The offset is the knob. Widening it makes the baseline worse and the
@@ -187,29 +184,133 @@ namespace BreakerPowerBandTest
         return Nodes;
     }
 
+    int32 AllocatedCost(const TArray<FBreakerNodeRank>& Ranks, EBreakerPointCurrency Currency)
+    {
+        int32 Cost = 0;
+        for (const auto* Node : AllNodes())
+            if (Node && Node->Currency == Currency)
+                for (const auto& Rank : Ranks)
+                    if (Rank.NodeId == Node->NodeId) Cost += Rank.Rank * Node->CostPerRank;
+        return Cost;
+    }
+
+    // Pure allocation witness, not a privileged character grant. This walks the
+    // actual tree metadata rank-by-rank under prerequisites, adjacency, local and
+    // tree investment gates, neighbor entry, exclusivity and the two real budgets.
+    // Live entitlement acquisition is tested separately by progression tests.
+    bool AllocationWitness(const TArray<FBreakerNodeRank>& Ranks, FString& Failure)
+    {
+        TMap<FName, const UBreakerProgressionNode*> Nodes;
+        TMap<FName, const UBreakerProgressionTree*> Trees;
+        for (const auto* Tree : UBreakerProgressionLibrary::GetAllFallbackTrees())
+            if (Tree) for (const UBreakerProgressionNode* Node : Tree->Nodes)
+                if (Node) { Nodes.Add(Node->NodeId, Node); Trees.Add(Node->NodeId, Tree); }
+        TMap<FName, int32> Owned, Wanted;
+        for (const auto& Rank : Ranks)
+        {
+            const auto* const* Found = Nodes.Find(Rank.NodeId);
+            if (!Found || Wanted.Contains(Rank.NodeId) || Rank.Rank < 1 || Rank.Rank > (*Found)->MaxRank)
+            { Failure = TEXT("Missing, duplicate or invalid rank: ") + Rank.NodeId.ToString(); return false; }
+            if ((*Found)->Currency == EBreakerPointCurrency::DoctrinePoints
+                && Trees[Rank.NodeId]->TreeId != FName(TEXT("Doctrine.Swift.Kinetic")))
+            { Failure = TEXT("Fixture mixes doctrine boards"); return false; }
+            Wanted.Add(Rank.NodeId, Rank.Rank);
+        }
+        const int32 CoreCost = AllocatedCost(Ranks, EBreakerPointCurrency::CorePoints);
+        const int32 DoctrineCost = AllocatedCost(Ranks, EBreakerPointCurrency::DoctrinePoints);
+        if (CoreCost != 65 || DoctrineCost != 8)
+        { Failure = FString::Printf(TEXT("Expected 65 Core + 8 doctrine; got %d + %d"), CoreCost, DoctrineCost); return false; }
+        int32 Pending = 0;
+        for (const auto& Rank : Ranks) Pending += Rank.Rank;
+        while (Pending > 0)
+        {
+            bool bProgress = false;
+            for (const auto& Rank : Ranks)
+            {
+                if (Owned.FindRef(Rank.NodeId) >= Rank.Rank) continue;
+                const auto* Node = Nodes[Rank.NodeId]; const auto* Tree = Trees[Rank.NodeId];
+                int32 TreeSpent = 0, LocalSpent = 0;
+                for (const auto& Pair : Owned)
+                    if (Trees[Pair.Key] == Tree)
+                    {
+                        const int32 Cost = Nodes[Pair.Key]->CostPerRank * Pair.Value;
+                        TreeSpent += Cost;
+                        if (Nodes[Pair.Key]->Constellation == Node->Constellation) LocalSpent += Cost;
+                    }
+                bool bAllowed = TreeSpent >= FMath::Max(Node->RequiredTreeInvestment,
+                    Node->bCornerstone ? Tree->CornerstoneInvestmentGate : 0)
+                    && LocalSpent >= Node->RequiredConstellationInvestment;
+                for (const auto& Requirement : Node->Prerequisites)
+                    bAllowed &= Owned.FindRef(Requirement.NodeId) >= Requirement.RequiredRank;
+                for (const auto& Group : Node->PrerequisiteGroups)
+                {
+                    TSet<FName> Satisfied;
+                    for (const auto& Candidate : Group.Candidates)
+                        if (Owned.FindRef(Candidate.NodeId) >= Candidate.RequiredRank) Satisfied.Add(Candidate.NodeId);
+                    bAllowed &= Satisfied.Num() >= Group.MinimumSatisfied;
+                }
+                for (FName Excluded : Node->MutuallyExclusiveNodeIds) bAllowed &= Owned.FindRef(Excluded) == 0;
+                if (Tree->EntryNodeIds.Contains(Node->NodeId))
+                {
+                    if (Tree->bRestrictEntryToOwnedNeighbor && TreeSpent > 0 && Owned.FindRef(Node->NodeId) == 0)
+                    {
+                        const int32 Index = Tree->CoreWedgeOrder.IndexOfByKey(Node->Constellation);
+                        bool bNeighbor = false;
+                        if (Index != INDEX_NONE)
+                        {
+                            const int32 Count = Tree->CoreWedgeOrder.Num();
+                            for (const auto& Pair : Owned)
+                                if (Trees[Pair.Key] == Tree)
+                                    bNeighbor |= Nodes[Pair.Key]->Constellation == Tree->CoreWedgeOrder[(Index + Count - 1) % Count]
+                                        || Nodes[Pair.Key]->Constellation == Tree->CoreWedgeOrder[(Index + 1) % Count];
+                        }
+                        bAllowed &= bNeighbor;
+                    }
+                }
+                else if (!Tree->AdjacencyEdges.IsEmpty())
+                {
+                    bool bAdjacent = false;
+                    for (const auto& Edge : Tree->AdjacencyEdges)
+                        bAdjacent |= (Edge.A == Node->NodeId && Owned.FindRef(Edge.B) > 0)
+                            || (Edge.B == Node->NodeId && Owned.FindRef(Edge.A) > 0);
+                    bAllowed &= bAdjacent;
+                }
+                if (!bAllowed) continue;
+                ++Owned.FindOrAdd(Node->NodeId); --Pending; bProgress = true;
+            }
+            if (!bProgress)
+            {
+                TArray<FString> Blocked;
+                for (const auto& Rank : Ranks) if (Owned.FindRef(Rank.NodeId) < Rank.Rank) Blocked.Add(Rank.NodeId.ToString());
+                Failure = TEXT("No legal next purchase: ") + FString::Join(Blocked, TEXT(", "));
+                return false;
+            }
+        }
+        Failure.Reset(); return true;
+    }
+
     // Everything one character is, folded once. The field names are the layer
-    // names in the Power-Curve §4 table so the report and the doc can be read
+    // names in the Power-Curve Â§4 table so the report and the doc can be read
     // against each other line by line.
     struct FComposedBuild
     {
         float FlatLayer = 1.0f;        // (Base 1.0 + Added Damage), the multiplicand
         float IncreasedLayer = 1.0f;   // 1 + sum(Increased) / 100, ONE bucket
         float MoreLayer = 1.0f;        // product of at most three Mores (O3)
-        float EffectiveCrit = 1.0f;    // 1 + Chance * (Multiplier - 1)
+        float EffectiveCrit = 1.0f;    // Expected crit factor including critical-only weapon More
         float CriticalChance = 0.0f;
         float CriticalMultiplier = 1.5f;
         float ComposedDamageMultiplier = 1.0f; // FlatLayer * IncreasedLayer * MoreLayer
         float Total = 1.0f;            // ComposedDamageMultiplier * EffectiveCrit
-        // O54's second delivery lane, composed from the same fold. Crit is a
-        // site multiplier and applies to both lanes identically, so AbilityTotal
-        // uses the same EffectiveCrit — the two totals differ only by which
-        // additive bucket and which More product fed them, which is exactly the
-        // comparison the parity figure wants to make.
+        // Ability crit excludes weapon-only Fixate. These are normalized
+        // attribute factors; literal hit bases, tempo and multiplicity are excluded.
         float ComposedAbilityMultiplier = 1.0f;
-        // Structurally 1.0, by ruling: O196 makes the flat layer the weapon's.
-        // Added Damage bids Flat into the WEAPON lane only, and O54's three
-        // pools are three INCREASED pools — the ability lane has no flat half.
-        // Printed so the report says so.
+        float AbilityEffectiveCrit = 1.0f;
+        float LaterTargetTotal = 1.0f;
+        float ExcludedCoreAddedWeaponDamage = 0.0f;
+        float ExcludedCoreAddedAbilityPower = 0.0f;
+        float ExcludedCoreCastRate = 1.0f;
+        float ExcludedFireRate = 1.0f;
         float AbilityFlatLayer = 1.0f;
         float AbilityIncreasedLayer = 1.0f;
         float AbilityMoreLayer = 1.0f;
@@ -223,51 +324,78 @@ namespace BreakerPowerBandTest
         UBreakerEquipmentComponent::AggregateStats(Items, &EquipmentOffer, Conditions);
 
         FBreakerAttributeContribution ProgressionOffer;
-        UBreakerProgressionComponent::AggregateStats(AllNodes(), Ranks, &ProgressionOffer, Conditions);
+        const FBreakerNodeStats NodeStats = UBreakerProgressionComponent::AggregateStats(AllNodes(), Ranks, &ProgressionOffer, Conditions);
         // The one line UBreakerProgressionComponent::RecalculateStats adds after
         // the fold: the per-point accumulation floor, into the same additive
         // bucket. Both builds spend the same budget, so this is identical on
-        // both sides and cannot be what separates them — which is exactly what
+        // both sides and cannot be what separates them â€” which is exactly what
         // O27 asked for.
         // Shared, matching RecalculateStats: the floor lands in both lanes.
         ProgressionOffer.AddSharedIncreasedDamage(
-            PowerBandFullPointBudget * 0.25f); // matches IncreasedDamagePerSpentPoint's default
+            (AllocatedCost(Ranks, EBreakerPointCurrency::CorePoints)
+                + AllocatedCost(Ranks, EBreakerPointCurrency::DoctrinePoints)) * 0.25f); // native cost-weighted floor
 
         // The real aggregator, seeded with UBreakerAttributeSet's authored bases.
         FBreakerAttributeAggregator Aggregator;
+        const auto* AuthoredBases = GetDefault<UBreakerAttributeSet>();
         float Bases[FBreakerAttributeAggregator::AttributeCount] = {};
-        Bases[static_cast<int32>(EBreakerAggregatedAttribute::CriticalChance)] = 0.05f;
-        Bases[static_cast<int32>(EBreakerAggregatedAttribute::CriticalMultiplier)] = 1.5f;
-        Bases[static_cast<int32>(EBreakerAggregatedAttribute::DamageMultiplier)] = 1.0f;
-        Bases[static_cast<int32>(EBreakerAggregatedAttribute::AbilityDamageMultiplier)] = 1.0f;
+        Bases[static_cast<int32>(EBreakerAggregatedAttribute::MoveSpeed)] = AuthoredBases->GetMoveSpeed();
+        Bases[static_cast<int32>(EBreakerAggregatedAttribute::FireRateMultiplier)] = AuthoredBases->GetFireRateMultiplier();
+        Bases[static_cast<int32>(EBreakerAggregatedAttribute::CriticalChance)] = AuthoredBases->GetCriticalChance();
+        Bases[static_cast<int32>(EBreakerAggregatedAttribute::CriticalMultiplier)] = AuthoredBases->GetCriticalMultiplier();
+        Bases[static_cast<int32>(EBreakerAggregatedAttribute::DamageMultiplier)] = AuthoredBases->GetDamageMultiplier();
+        Bases[static_cast<int32>(EBreakerAggregatedAttribute::AbilityDamageMultiplier)] = AuthoredBases->GetAbilityDamageMultiplier();
         Aggregator.CaptureBases(Bases);
         Aggregator.SetContribution(EBreakerAttributeContributor::Equipment, EquipmentOffer);
         Aggregator.SetContribution(EBreakerAttributeContributor::Progression, ProgressionOffer);
 
         FComposedBuild Build;
-        Build.FlatLayer = 1.0f
-            + EquipmentOffer.GetFlat(EBreakerAggregatedAttribute::DamageMultiplier)
-            + ProgressionOffer.GetFlat(EBreakerAggregatedAttribute::DamageMultiplier);
-        Build.IncreasedLayer = 1.0f + (EquipmentOffer.GetIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier)
-            + ProgressionOffer.GetIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier)) / 100.0f;
+        Build.FlatLayer = Aggregator.ComposedFlatFactor(EBreakerAggregatedAttribute::DamageMultiplier);
+        Build.IncreasedLayer = 1.0f + Aggregator.ComposedIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier) / 100.0f;
         Build.MoreLayer = Aggregator.ComposedMoreProduct(EBreakerAggregatedAttribute::DamageMultiplier);
-
         Build.ComposedDamageMultiplier = Aggregator.Compose(EBreakerAggregatedAttribute::DamageMultiplier);
-        // PreAttributeChange's clamps, applied here because the aggregator is
-        // pure arithmetic and the attribute set is what enforces the ranges.
         Build.CriticalChance = FMath::Clamp(Aggregator.Compose(EBreakerAggregatedAttribute::CriticalChance), 0.0f, 1.0f);
         Build.CriticalMultiplier = FMath::Max(1.0f, Aggregator.Compose(EBreakerAggregatedAttribute::CriticalMultiplier));
-        Build.EffectiveCrit = 1.0f + Build.CriticalChance * (Build.CriticalMultiplier - 1.0f);
-        Build.Total = Build.ComposedDamageMultiplier * Build.EffectiveCrit;
-
-        Build.AbilityIncreasedLayer = 1.0f + (EquipmentOffer.GetIncreasedPercent(EBreakerAggregatedAttribute::AbilityDamageMultiplier)
-            + ProgressionOffer.GetIncreasedPercent(EBreakerAggregatedAttribute::AbilityDamageMultiplier)) / 100.0f;
+        Build.AbilityEffectiveCrit = 1.0f + Build.CriticalChance * (Build.CriticalMultiplier - 1.0f);
+        // Normalized attribute multiplier, NOT a fabricated weapon/ability base hit.
+        // Resolve each critical outcome natively: Fixate is selected in the joint
+        // budget, but pays only on critical weapon hits. Splinter needs a later target.
+        auto ExpectedWeapon = [&](bool bBeyondFirst)
+        {
+            float Expected = 0.0f;
+            for (bool bCritical : {false, true})
+            {
+                FBreakerDamageRequest Request;
+                Request.BaseDamage = 1.0f;
+                Request.SourceDamageMultiplier = Build.ComposedDamageMultiplier;
+                Request.SourceFlatFactor = Build.FlatLayer;
+                Request.SourceIncreasedPercent = (Build.IncreasedLayer - 1.0f) * 100.0f;
+                Request.SourceMoreProduct = Build.MoreLayer;
+                Request.bHasSourceSplit = true;
+                Request.WeaponCriticalMoreProduct = Aggregator.GetScopedMoreProduct(false, false, false, false, true, false);
+                Request.WeaponBeyondFirstMoreProduct = Aggregator.GetScopedMoreProduct(false, false, false, false, false, true);
+                Request.bWeaponBeyondFirstTarget = bBeyondFirst;
+                Request.bUseSnapshotCritical = true;
+                Request.bSnapshotCriticalResult = bCritical;
+                Request.CriticalChance = Build.CriticalChance;
+                Request.CriticalMultiplier = Build.CriticalMultiplier;
+                const float Weight = bCritical ? Build.CriticalChance : 1.0f - Build.CriticalChance;
+                Expected += Weight * UBreakerDamageLibrary::ResolveDamage(Request, FBreakerDefenseState()).RawDamage;
+            }
+            return Expected;
+        };
+        Build.Total = ExpectedWeapon(false);
+        Build.LaterTargetTotal = ExpectedWeapon(true);
+        Build.EffectiveCrit = Build.Total / FMath::Max(KINDA_SMALL_NUMBER, Build.ComposedDamageMultiplier);
+        Build.AbilityIncreasedLayer = 1.0f + Aggregator.ComposedIncreasedPercent(EBreakerAggregatedAttribute::AbilityDamageMultiplier) / 100.0f;
         Build.AbilityMoreLayer = Aggregator.ComposedMoreProduct(EBreakerAggregatedAttribute::AbilityDamageMultiplier);
-        Build.AbilityFlatLayer = 1.0f
-            + EquipmentOffer.GetFlat(EBreakerAggregatedAttribute::AbilityDamageMultiplier)
-            + ProgressionOffer.GetFlat(EBreakerAggregatedAttribute::AbilityDamageMultiplier);
+        Build.AbilityFlatLayer = Aggregator.ComposedFlatFactor(EBreakerAggregatedAttribute::AbilityDamageMultiplier);
         Build.ComposedAbilityMultiplier = Aggregator.Compose(EBreakerAggregatedAttribute::AbilityDamageMultiplier);
-        Build.AbilityTotal = Build.ComposedAbilityMultiplier * Build.EffectiveCrit;
+        Build.AbilityTotal = Build.ComposedAbilityMultiplier * Build.AbilityEffectiveCrit;
+        Build.ExcludedCoreAddedWeaponDamage = NodeStats.AddedWeaponDamage;
+        Build.ExcludedCoreAddedAbilityPower = NodeStats.AddedAbilityPower;
+        Build.ExcludedCoreCastRate = NodeStats.AbilityCastRateMultiplier;
+        Build.ExcludedFireRate = Aggregator.Compose(EBreakerAggregatedAttribute::FireRateMultiplier);
         return Build;
     }
 
@@ -276,13 +404,13 @@ namespace BreakerPowerBandTest
     // BASELINE: a full set of gear, every point spent, no direction. Mid-band
     // rolls, Weapon Damage wherever it happened to land, a little crit, one
     // conditional line it did not build around, and no Convergence node at
-    // all — so no More multiplier. O27's "hitting 50 must be satisfying with
+    // all â€” so no More multiplier. O27's "hitting 50 must be satisfying with
     // decent power" is what this build is. ItemLevel/Tier are the caller's:
     // O36 measures this same character at two different gear depths.
     // Built from the ONE authored baseline in Tests/BreakerBaselineLoadout.h,
     // which BreakerPromotedFindingTests reads for the same character. The list
     // used to live here, and time-to-die was measured against a different
-    // character in the other file — eight Health lines against this four — so
+    // character in the other file â€” eight Health lines against this four â€” so
     // the two disagreed by 1.79x on whether the cap met O18.
     TArray<FBreakerItemInstance> BaselineLoadout(int32 ItemLevel, int32 Tier)
     {
@@ -296,80 +424,56 @@ namespace BreakerPowerBandTest
 
     TArray<FBreakerNodeRank> BaselineRanks()
     {
-        // An at-cap character, spent BADLY on purpose: entries, gateways,
-        // defence and utility, no Convergence, no More, and no conditional
-        // line it plays around. WHEEL-LEGAL: every wheel is entered at its
-        // own rim 0 from the virtual hub (O211) and every AND gate's rims are
-        // owned. Bulwark and Aegis wheels complete (minus their hubs),
-        // Kinesis complete, Reservoir complete, a toe into Precision and
-        // Elements. 56 Core points of the 65 budget — the nine that bought
-        // travel beads between wheels have no bead to buy since O213, and
-        // where they go is a fixture decision the owner rules, not one this
-        // list makes for him; the Swift doctrine rows are the same 8-point
-        // doctrine spend as ever.
+        // Broad defence/resource allocation; no convergence or keystone.
+        // Exactly 65 Core + 8 Kinetic points; fixture witness checks routing and costs.
         return {
-            // Precision, from the entry: 4
             {TEXT("Core.Precision.Sightline"), 1},
-            {TEXT("Core.Precision.Steady"), 1},
-            {TEXT("Core.Precision.CalledShot"), 1},
-            // Bulwark, from its entry, hubless by refusal: 12
-            {TEXT("Core.Bulwark.SetStance"), 1},
-            {TEXT("Core.Bulwark.Read"), 1},
-            {TEXT("Core.Bulwark.Weight"), 1},
-            {TEXT("Core.Bulwark.HeldGround"), 1},
-            {TEXT("Core.Bulwark.LineofSight"), 1},
-            {TEXT("Core.Bulwark.Loud"), 1},
-            {TEXT("Core.Bulwark.Parry"), 1},
-            {TEXT("Core.Bulwark.Counterweight"), 1},
-            {TEXT("Core.Bulwark.Interposition"), 1},
-            // Kinesis, complete (no hub exists): 12
-            {TEXT("Core.Kinesis.LightFooting"), 1},
-            {TEXT("Core.Kinesis.Loft"), 1},
-            {TEXT("Core.Kinesis.Landing"), 1},
-            {TEXT("Core.Kinesis.Carry"), 1},
-            {TEXT("Core.Kinesis.Contact"), 1},
-            {TEXT("Core.Kinesis.Redirect"), 1},
-            {TEXT("Core.Kinesis.AirJump"), 1},
-            {TEXT("Core.Kinesis.Slipcut"), 1},
-            {TEXT("Core.Kinesis.PhantomStep"), 1},
-            // Aegis, complete (no hub exists): 12
+            {TEXT("Core.Vector.Line"), 1},
+            {TEXT("Core.Ballistics.WeightOfIt"), 1},
+            {TEXT("Core.Loadout.Sling"), 1},
             {TEXT("Core.Aegis.Footing"), 1},
-            {TEXT("Core.Aegis.Brace"), 1},
-            {TEXT("Core.Aegis.Recover"), 1},
-            {TEXT("Core.Aegis.CleanHands"), 1},
-            {TEXT("Core.Aegis.SecondOpinion"), 1},
-            {TEXT("Core.Aegis.Bulk"), 1},
-            {TEXT("Core.Aegis.ShortCircuit"), 1},
-            {TEXT("Core.Aegis.IronFrame"), 1},
-            {TEXT("Core.Aegis.AnsweringFire"), 1},
-            // Reservoir, from its entry, complete (no hub exists): 12
-            {TEXT("Core.Reservoir.Draw"), 1},
-            {TEXT("Core.Reservoir.Wellspring"), 1},
+            {TEXT("Core.Bulwark.Read"), 1},
+            {TEXT("Core.Constitution.Frame"), 1},
+            {TEXT("Core.Ward.Resist"), 1},
+            {TEXT("Core.Recovery.Mend"), 1},
+            {TEXT("Core.Arc.Prime"), 1},
+            {TEXT("Core.Tempo.Metronome"), 1},
             {TEXT("Core.Reservoir.Capacity"), 1},
-            {TEXT("Core.Reservoir.Tithe"), 1},
+            {TEXT("Core.Duration.Hold"), 1},
+            {TEXT("Core.Aegis.IronFrame"), 3},
+            {TEXT("Core.Aegis.Brace"), 1},
+            {TEXT("Core.Aegis.Plate"), 3},
+            {TEXT("Core.Aegis.Bulk"), 1},
+            {TEXT("Core.Aegis.SecondSkin"), 3},
+            {TEXT("Core.Aegis.AnsweringFire"), 1},
+            {TEXT("Core.Aegis.CleanHands"), 1},
+            {TEXT("Core.Aegis.SetStance"), 1},
+            {TEXT("Core.Bulwark.Guard"), 3},
+            {TEXT("Core.Bulwark.Parry"), 1},
+            {TEXT("Core.Bulwark.Evade"), 3},
+            {TEXT("Core.Bulwark.Counterweight"), 1},
+            {TEXT("Core.Bulwark.Interpose"), 3},
+            {TEXT("Core.Bulwark.Riposte"), 1},
+            {TEXT("Core.Bulwark.Anticipate"), 1},
+            {TEXT("Core.Bulwark.Footwork"), 1},
+            {TEXT("Core.Constitution.Mass"), 3},
+            {TEXT("Core.Constitution.DeepReserve"), 1},
+            {TEXT("Core.Constitution.Layered"), 3},
+            {TEXT("Core.Constitution.ThirdLayer"), 1},
+            {TEXT("Core.Reservoir.Draw"), 3},
             {TEXT("Core.Reservoir.DeepPockets"), 1},
-            {TEXT("Core.Reservoir.SecondShift"), 1},
-            {TEXT("Core.Reservoir.ConvergencePoint"), 1},
-            {TEXT("Core.Reservoir.Spillover"), 1},
-            {TEXT("Core.Reservoir.Reserve"), 1},
-            // A toe into Elements: 4
-            {TEXT("Core.Elements.Conductive"), 1},
-            {TEXT("Core.Elements.ChargeUp"), 1},
-            {TEXT("Core.Elements.Penetrance"), 1},
-            {TEXT("Core.Elements.Attunement"), 1},
-            // The doctrine layer, unchanged.
-            {TEXT("Swift.Marksman.LongLens"), 2},
-            {TEXT("Swift.Marksman.Steady"), 2},
-            {TEXT("Swift.Marksman.Ledger"), 2},
+            {TEXT("Core.Reservoir.Tithe"), 2},
+            {TEXT("Core.Ward.Tolerance"), 1},
             {TEXT("Swift.Kinetic.ReadTheRoom"), 2},
-            {TEXT("Swift.Kinetic.Carry"), 2},
+            {TEXT("Swift.Kinetic.Downforce"), 2},
             {TEXT("Swift.Kinetic.Landing"), 2},
+            {TEXT("Swift.Kinetic.AirWork"), 1},
         };
     }
 
     // OPTIMIZED: the airborne Swift build the Velocity constellation exists
     // for. Top-band rolls on every slot, conditional damage lines chosen to
-    // match the states it actually holds, and three More sources — all of
+    // match the states it actually holds, and three More sources â€” all of
     // which O3 lets count. This is "optimized 50 feels great" (at cap) / "gear
     // depth is real" (at endgame) depending which ItemLevel/Tier is passed.
     TArray<FBreakerItemInstance> OptimizedLoadout(int32 ItemLevel, int32 Tier)
@@ -388,204 +492,143 @@ namespace BreakerPowerBandTest
 
     TArray<FBreakerNodeRank> OptimizedRanks()
     {
-        // An at-cap character, spent WELL: the airborne Swift weapon build
-        // the Velocity wheel exists for. WHEEL-LEGAL like the baseline.
-        // Precision, Volley and Velocity complete to their hubs — three
-        // Mores, Fixate and Barrage on the weapon lane and Terminal Velocity
-        // shared while airborne, the same x1.9349 composed product the
-        // pre-atlas build held — and eight points into Ruin for Execute and
-        // Siege. 54 Core points of the 65 budget: the eleven that bought
-        // weapon travel beads have no bead to buy since O213, and where they
-        // go is the owner's fixture decision, not this list's.
+        // Precision and Ballistics weapon output plus Velocity; no keystone.
+        // Exactly 65 Core + 8 Kinetic points; fixture witness checks routing and costs.
         return {
-            // Precision, complete: 15
             {TEXT("Core.Precision.Sightline"), 1},
-            {TEXT("Core.Precision.Steady"), 1},
-            {TEXT("Core.Precision.Angle"), 1},
-            {TEXT("Core.Precision.Ledger"), 1},
-            {TEXT("Core.Precision.LongLens"), 1},
-            {TEXT("Core.Precision.Lead"), 1},
+            {TEXT("Core.Precision.Angle"), 3},
             {TEXT("Core.Precision.CalledShot"), 1},
-            {TEXT("Core.Precision.TunnelVision"), 1},
-            {TEXT("Core.Precision.Deadeye"), 1},
-            {TEXT("Core.Precision.Fixate"), 1},              // More x1.22, weapon lane
-            // Volley, complete: 15
-            {TEXT("Core.Volley.Cyclic"), 1},
-            {TEXT("Core.Volley.Feed"), 1},
-            {TEXT("Core.Volley.TriggerDiscipline"), 1},
-            {TEXT("Core.Volley.Chambered"), 1},
-            {TEXT("Core.Volley.ColdBarrel"), 1},
-            {TEXT("Core.Volley.WorkingStock"), 1},
-            {TEXT("Core.Volley.Salvo"), 1},
-            {TEXT("Core.Volley.LastRound"), 1},
-            {TEXT("Core.Volley.Overrev"), 1},
-            {TEXT("Core.Volley.Barrage"), 1},                // More x1.22, weapon lane
-            // Reservoir's rim 0, the toe this build keeps: 1
-            {TEXT("Core.Reservoir.Draw"), 1},
-            // Velocity, complete: 15
-            {TEXT("Core.Velocity.Freefall"), 1},             // airborne
-            {TEXT("Core.Velocity.Afterburn"), 1},            // recently dashed
-            {TEXT("Core.Velocity.Traction"), 1},             // ledge-exit window (One-T): owned, not live in this state
-            {TEXT("Core.Velocity.Slipstream"), 1},           // sliding: owned, not live
+            {TEXT("Core.Precision.Cadence"), 3},
+            {TEXT("Core.Precision.TriggerDiscipline"), 1},
+            {TEXT("Core.Precision.Ledger"), 3},
+            {TEXT("Core.Precision.LongLens"), 1},
+            {TEXT("Core.Precision.Steady"), 1},
+            {TEXT("Core.Precision.ColdBarrel"), 1},
+            {TEXT("Core.Precision.Fixate"), 1},
+            {TEXT("Core.Vector.Line"), 1},
+            {TEXT("Core.Threat.Presence"), 1},
+            {TEXT("Core.Control.Concussive"), 1},
+            {TEXT("Core.Kinesis.LightFooting"), 1},
             {TEXT("Core.Velocity.Grind"), 1},
-            {TEXT("Core.Velocity.Downforce"), 1},            // airborne, weapon
-            {TEXT("Core.Velocity.TerminalDescent"), 1},      // airborne, weapon
-            {TEXT("Core.Velocity.Redline"), 1},              // demoted: +14% ability at Redline, no More
-            {TEXT("Core.Velocity.NoGround"), 1},             // decay valve, airborne/grounded
-            {TEXT("Core.Velocity.TerminalVelocity"), 1},     // More x1.30, airborne, SHARED
-            // Ruin, entered at its rim 0, and the finisher pair: 8
-            {TEXT("Core.Ruin.WeightofIt"), 1},
-            {TEXT("Core.Ruin.Cull"), 1},
-            {TEXT("Core.Ruin.Break"), 1},
-            {TEXT("Core.Ruin.ShapedCharge"), 1},
-            {TEXT("Core.Ruin.Execute"), 1},                  // armour ignored below the threshold
-            {TEXT("Core.Ruin.Siege"), 1},                    // TargetElite rider
-            // The doctrine layer, unchanged.
-            {TEXT("Swift.Marksman.LongLens"), 2},
-            {TEXT("Swift.Marksman.Deadeye"), 2},
-            {TEXT("Swift.Marksman.PierceDiscipline"), 2},
-            {TEXT("Swift.Marksman.Culling"), 1},             // conditional Increased lines, not a More (O95)
+            {TEXT("Core.Velocity.Stride"), 3},
+            {TEXT("Core.Velocity.Momentum"), 1},
+            {TEXT("Core.Velocity.Slide"), 3},
+            {TEXT("Core.Velocity.Carry"), 1},
+            {TEXT("Core.Velocity.Sprint"), 3},
+            {TEXT("Core.Velocity.Downforce"), 1},
+            {TEXT("Core.Velocity.Traction"), 1},
+            {TEXT("Core.Velocity.Afterburn"), 1},
+            {TEXT("Core.Velocity.TerminalVelocity"), 1},
+            {TEXT("Core.Ballistics.WeightOfIt"), 1},
+            {TEXT("Core.Ballistics.ShapedCharge"), 3},
+            {TEXT("Core.Ballistics.Siege"), 1},
+            {TEXT("Core.Ballistics.Range"), 3},
+            {TEXT("Core.Ballistics.FlatTrajectory"), 1},
+            {TEXT("Core.Ballistics.Concussion"), 1},
+            {TEXT("Core.Ballistics.Break"), 1},
+            {TEXT("Core.Ballistics.Cull"), 1},
+            {TEXT("Core.Ballistics.Loud"), 1},
+            {TEXT("Core.Ballistics.Collapse"), 1},
             {TEXT("Swift.Kinetic.ReadTheRoom"), 2},
-            {TEXT("Swift.Kinetic.Downforce"), 2},            // airborne
+            {TEXT("Swift.Kinetic.Downforce"), 2},
+            {TEXT("Swift.Kinetic.Landing"), 2},
+            {TEXT("Swift.Kinetic.AirWork"), 1},
         };
     }
 
-    // THE ABILITY-BUILT TREE SPEND (Part One-M, ruled on the 0.48-0.51
-    // estimate now standing as a prediction). Until this existed the parity
-    // test's ability build swapped GEAR ONLY and rode the weapon build's
-    // tree, so the measurement asked "what does an ability loadout get from
-    // a weapon build's tree" — a real number, and not the question O99's
-    // band was written about; the atlas then handed that shared spend eight
-    // weapon travel picks and parity halved announced-but-unsummed.
-    //
-    // An at-cap character, spent WELL for abilities, and a STRUCTURAL
-    // MIRROR of OptimizedRanks: three wheels bought whole, the same Velocity
-    // chain for the same shared More, the same Ruin dip. WHEEL-LEGAL: every
-    // wheel is entered at its own rim 0 (O211). Reservoir complete (12,
-    // hubless), ARC complete to Overflow (15 — the ability More), Velocity
-    // complete to Terminal Velocity (15 — the shared More, airborne like the
-    // measurement state), the weapon fixture's own Ruin dip (8 — Execute and
-    // Siege, with ShapedCharge's weapon line carried as the honest cost of
-    // the mirror) and Rend (1). 51 Core points of the 65 budget: the
-    // fourteen that bought ability travel beads have no bead to buy since
-    // O213, and where they go is the owner's fixture decision.
     TArray<FBreakerNodeRank> AbilityOptimizedRanks()
     {
+        // Arc, Reservoir and Velocity; ability output with resource investment.
+        // Exactly 65 Core + 8 Kinetic points; fixture witness checks routing and costs.
         return {
-            // Reservoir, from its entry, complete (no hub exists): 12
-            {TEXT("Core.Reservoir.Draw"), 1},
-            {TEXT("Core.Reservoir.Wellspring"), 1},
-            {TEXT("Core.Reservoir.Capacity"), 1},
-            {TEXT("Core.Reservoir.Tithe"), 1},
-            {TEXT("Core.Reservoir.DeepPockets"), 1},
-            {TEXT("Core.Reservoir.SecondShift"), 1},
-            {TEXT("Core.Reservoir.ConvergencePoint"), 1},
-            {TEXT("Core.Reservoir.Spillover"), 1},
-            {TEXT("Core.Reservoir.Reserve"), 1},
-            // ARC, complete: 15
-            {TEXT("Core.Arc.Channel"), 1},
-            {TEXT("Core.Arc.Widen"), 1},
-            {TEXT("Core.Arc.Recycle"), 1},
-            {TEXT("Core.Arc.Anchor"), 1},
             {TEXT("Core.Arc.Prime"), 1},
-            {TEXT("Core.Arc.Vent"), 1},
-            {TEXT("Core.Arc.CadenceBreak"), 1},
+            {TEXT("Core.Arc.Channel"), 3},
+            {TEXT("Core.Arc.Widen"), 1},
+            {TEXT("Core.Arc.Vent"), 3},
             {TEXT("Core.Arc.Reach"), 1},
-            {TEXT("Core.Arc.Widening"), 1},
-            {TEXT("Core.Arc.Overflow"), 1},               // More x1.28, ability lane
-            // Velocity, complete — the same chain the weapon build buys, for
-            // the same shared airborne More: 15
-            {TEXT("Core.Velocity.Freefall"), 1},
-            {TEXT("Core.Velocity.Afterburn"), 1},
-            {TEXT("Core.Velocity.Traction"), 1},
-            {TEXT("Core.Velocity.Slipstream"), 1},
+            {TEXT("Core.Arc.Anchor"), 3},
+            {TEXT("Core.Arc.Persistence"), 1},
+            {TEXT("Core.Arc.Recycle"), 1},
+            {TEXT("Core.Arc.Spillover"), 1},
+            {TEXT("Core.Arc.Overflow"), 1},
+            {TEXT("Core.Tempo.Metronome"), 1},
+            {TEXT("Core.Tempo.Quicken"), 1},
+            {TEXT("Core.Tempo.Reset"), 1},
+            {TEXT("Core.Reservoir.Capacity"), 1},
+            {TEXT("Core.Reservoir.Draw"), 3},
+            {TEXT("Core.Reservoir.DeepPockets"), 1},
+            {TEXT("Core.Reservoir.Tithe"), 3},
+            {TEXT("Core.Reservoir.Wellspring"), 1},
+            {TEXT("Core.Reservoir.SecondShift"), 1},
+            {TEXT("Core.Duration.Hold"), 1},
+            {TEXT("Core.Affliction.OpenWound"), 1},
+            {TEXT("Core.Entropy.Attunement"), 1},
+            {TEXT("Core.Reaction.Catalysis"), 1},
+            {TEXT("Core.Rift.Displace"), 1},
+            {TEXT("Core.Void.Erase"), 1},
             {TEXT("Core.Velocity.Grind"), 1},
+            {TEXT("Core.Velocity.Stride"), 3},
+            {TEXT("Core.Velocity.Momentum"), 1},
+            {TEXT("Core.Velocity.Slide"), 3},
+            {TEXT("Core.Velocity.Carry"), 1},
+            {TEXT("Core.Velocity.Sprint"), 3},
             {TEXT("Core.Velocity.Downforce"), 1},
-            {TEXT("Core.Velocity.TerminalDescent"), 1},
-            {TEXT("Core.Velocity.Redline"), 1},
-            {TEXT("Core.Velocity.NoGround"), 1},
-            {TEXT("Core.Velocity.TerminalVelocity"), 1},  // More x1.30, airborne, SHARED
-            // Ruin, entered at its rim 0, and the same finisher pair: 8
-            {TEXT("Core.Ruin.WeightofIt"), 1},
-            {TEXT("Core.Ruin.Cull"), 1},
-            {TEXT("Core.Ruin.Break"), 1},
-            {TEXT("Core.Ruin.ShapedCharge"), 1},
-            {TEXT("Core.Ruin.Execute"), 1},
-            {TEXT("Core.Ruin.Siege"), 1},                 // TargetElite rider
-            // And Rend: 1
-            {TEXT("Core.Ruin.Rend"), 1},
-            // The doctrine layer, IDENTICAL to the weapon fixture's on
-            // purpose: the comparison isolates the Core spend, and doctrine
-            // rows are the class layer, not the question.
-            {TEXT("Swift.Marksman.LongLens"), 2},
-            {TEXT("Swift.Marksman.Deadeye"), 2},
-            {TEXT("Swift.Marksman.PierceDiscipline"), 2},
-            {TEXT("Swift.Marksman.Culling"), 1},
+            {TEXT("Core.Velocity.Traction"), 1},
+            {TEXT("Core.Velocity.Afterburn"), 1},
+            {TEXT("Core.Velocity.TerminalVelocity"), 1},
             {TEXT("Swift.Kinetic.ReadTheRoom"), 2},
             {TEXT("Swift.Kinetic.Downforce"), 2},
+            {TEXT("Swift.Kinetic.Landing"), 2},
+            {TEXT("Swift.Kinetic.AirWork"), 1},
         };
     }
 
-    // THE CRIT-BUYING VARIANT (Part One-N's report order). NOT A FIXTURE:
-    // nothing pins it, nothing emits it — the AbilityLane test PRINTS what it
-    // measures beside the pinned pair, because the seat's question is whether
-    // the mirrored fixture's crit 0.863 is a spend choice (buying crit costs
-    // increased/More elsewhere) or slack (it moves and nothing falls). A
-    // legal ability build built around PRECISION instead of Reservoir:
-    // Precision to its inners for the crit flats (12, no Fixate — a weapon
-    // More buys this lane nothing), the Volley and Vector rim 0s it kept
-    // when they were a toll (2), ARC complete (15), the Reservoir rim 0 (1)
-    // and Velocity complete for the shared More (15). 45 Core points of the
-    // 65 budget: the twenty-one that bought ability travel beads have no
-    // bead to buy since O213. What it gives up against AbilityOptimizedRanks: the
-    // whole Reservoir wheel and the Ruin dip.
     TArray<FBreakerNodeRank> AbilityCritVariantRanks()
     {
+        // Unpinned crit variant: Arc/Velocity with Precision and longer gateway travel.
+        // Exactly 65 Core + 8 Kinetic points; fixture witness checks routing and costs.
         return {
-            // Precision to its inners, no hub: 12
-            {TEXT("Core.Precision.Sightline"), 1},
-            {TEXT("Core.Precision.Steady"), 1},
-            {TEXT("Core.Precision.Angle"), 1},
-            {TEXT("Core.Precision.Ledger"), 1},
-            {TEXT("Core.Precision.LongLens"), 1},
-            {TEXT("Core.Precision.Lead"), 1},
-            {TEXT("Core.Precision.CalledShot"), 1},
-            {TEXT("Core.Precision.TunnelVision"), 1},
-            {TEXT("Core.Precision.Deadeye"), 1},
-            // The Volley and Vector rim 0s: 2
-            {TEXT("Core.Volley.Cyclic"), 1},
-            {TEXT("Core.Vector.Split"), 1},
-            // ARC, complete: 15
-            {TEXT("Core.Arc.Channel"), 1},
-            {TEXT("Core.Arc.Widen"), 1},
-            {TEXT("Core.Arc.Recycle"), 1},
-            {TEXT("Core.Arc.Anchor"), 1},
             {TEXT("Core.Arc.Prime"), 1},
-            {TEXT("Core.Arc.Vent"), 1},
-            {TEXT("Core.Arc.CadenceBreak"), 1},
+            {TEXT("Core.Arc.Channel"), 3},
+            {TEXT("Core.Arc.Widen"), 1},
+            {TEXT("Core.Arc.Vent"), 3},
             {TEXT("Core.Arc.Reach"), 1},
-            {TEXT("Core.Arc.Widening"), 1},
+            {TEXT("Core.Arc.Anchor"), 3},
+            {TEXT("Core.Arc.Persistence"), 1},
+            {TEXT("Core.Arc.Recycle"), 1},
+            {TEXT("Core.Arc.Spillover"), 1},
             {TEXT("Core.Arc.Overflow"), 1},
-            // The Reservoir rim 0: 1
-            {TEXT("Core.Reservoir.Draw"), 1},
-            // Velocity, complete, for the shared More: 15
-            {TEXT("Core.Velocity.Freefall"), 1},
-            {TEXT("Core.Velocity.Afterburn"), 1},
-            {TEXT("Core.Velocity.Traction"), 1},
-            {TEXT("Core.Velocity.Slipstream"), 1},
+            {TEXT("Core.Recovery.Mend"), 1},
+            {TEXT("Core.Ward.Resist"), 1},
+            {TEXT("Core.Constitution.Frame"), 1},
+            {TEXT("Core.Bulwark.Read"), 1},
+            {TEXT("Core.Aegis.Footing"), 1},
+            {TEXT("Core.Loadout.Sling"), 1},
+            {TEXT("Core.Ballistics.WeightOfIt"), 1},
+            {TEXT("Core.Vector.Line"), 1},
+            {TEXT("Core.Threat.Presence"), 1},
+            {TEXT("Core.Control.Concussive"), 1},
+            {TEXT("Core.Kinesis.LightFooting"), 1},
+            {TEXT("Core.Precision.Sightline"), 1},
+            {TEXT("Core.Precision.Angle"), 3},
+            {TEXT("Core.Precision.CalledShot"), 1},
+            {TEXT("Core.Precision.Cadence"), 3},
+            {TEXT("Core.Precision.TriggerDiscipline"), 1},
             {TEXT("Core.Velocity.Grind"), 1},
+            {TEXT("Core.Velocity.Stride"), 3},
+            {TEXT("Core.Velocity.Momentum"), 1},
+            {TEXT("Core.Velocity.Slide"), 3},
+            {TEXT("Core.Velocity.Carry"), 1},
+            {TEXT("Core.Velocity.Sprint"), 3},
             {TEXT("Core.Velocity.Downforce"), 1},
-            {TEXT("Core.Velocity.TerminalDescent"), 1},
-            {TEXT("Core.Velocity.Redline"), 1},
-            {TEXT("Core.Velocity.NoGround"), 1},
+            {TEXT("Core.Velocity.Traction"), 1},
+            {TEXT("Core.Velocity.Afterburn"), 1},
             {TEXT("Core.Velocity.TerminalVelocity"), 1},
-            // The doctrine layer, identical to both fixtures on purpose.
-            {TEXT("Swift.Marksman.LongLens"), 2},
-            {TEXT("Swift.Marksman.Deadeye"), 2},
-            {TEXT("Swift.Marksman.PierceDiscipline"), 2},
-            {TEXT("Swift.Marksman.Culling"), 1},
+            {TEXT("Core.Tempo.Metronome"), 1},
             {TEXT("Swift.Kinetic.ReadTheRoom"), 2},
             {TEXT("Swift.Kinetic.Downforce"), 2},
+            {TEXT("Swift.Kinetic.Landing"), 2},
+            {TEXT("Swift.Kinetic.AirWork"), 1},
         };
     }
 
@@ -614,7 +657,7 @@ namespace BreakerPowerBandTest
     // each of the eight slots it rolls candidates through the real loot
     // pipeline (UBreakerLootLibrary::RollItem, deterministic under a seed) at
     // the band's item level, and keeps per slot the candidate that composes
-    // highest by the band's own metric — Compose({Candidate}, OptimizedRanks(),
+    // highest by the band's own metric â€” Compose({Candidate}, OptimizedRanks(),
     // MeasurementState()).Total, one piece against the same tree and the same
     // rotation state the band is measured in. Nothing here hand-sets a tier or
     // a value; a legendary or a rolled rule that comes out of the pipeline is
@@ -624,7 +667,7 @@ namespace BreakerPowerBandTest
     // three Aberrant pieces are worn at once (EquipLimitForRarity), the rest
     // are Exceptional. Every slot is rolled at all three rarities, and the
     // capped rarities are handed to the slots where they buy the most over
-    // that slot's best Exceptional — greedy, one slot at a time, per-slot
+    // that slot's best Exceptional â€” greedy, one slot at a time, per-slot
     // totals rather than a joint optimum, which is stated so nobody reads
     // "best in slot" as "best loadout". Only ONE slot rolls Anomalous at all,
     // so a legendary (its own equip axis, O37) cannot stack a second Anomalous
@@ -882,7 +925,7 @@ namespace BreakerPowerBandTest
     // ITSELF, which is the part that wants a ruling rather than a number; the
     // arithmetic-share reading (1 + 0.35 * 9/16 = 1.197) is the other
     // candidate and is stated so the choice is visible rather than implied.
-    // Anchored to the AUTHORED bands at their midpoints — never to the
+    // Anchored to the AUTHORED bands at their midpoints â€” never to the
     // measurements, because the at-cap measurement is itself out of band and
     // expected-red, and anchoring a ceiling to a number that is already wrong
     // bakes the error in twice.
@@ -896,7 +939,7 @@ namespace BreakerPowerBandTest
     // minors plus ONE major, and O96 orders both ceilings derived before any
     // rewrite is authored against them. The derivation:
     //
-    // The LAYER: identity has four independently expandable avenues (O33 —
+    // The LAYER: identity has four independently expandable avenues (O33 â€”
     // class, Core axes, gear affixes, rule rewrites) and no avenue may be the
     // trunk, so the rewrite avenue takes an equal LOG share of the authored
     // endgame band midpoint: 16^(1/4) = 2.0. Everything below is arithmetic;
@@ -905,24 +948,24 @@ namespace BreakerPowerBandTest
     // The PARTITION: the major slot inherits the ruled top single step. 1.5 is
     // what O36 already allows at the top of the ladder, the legendary pair
     // already lives under it, and it is 97% spent (the 1.46 the
-    // `rewrite-impact` pin tracks) — deriving a different major ceiling would
+    // `rewrite-impact` pin tracks) â€” deriving a different major ceiling would
     // re-price shipped content as a side effect. The three-minor stack gets
     // what is left: 2.0 / 1.5 = 4/3. A full stack of three minors is worth
-    // less than one major, which is O65's distinction priced — a minor changes
+    // less than one major, which is O65's distinction priced â€” a minor changes
     // the terms of a rule, a major changes the shape of what happens on
     // screen.
     //
     // What this prices TODAY: the stack ceiling implies (4/3)^(1/3) = 1.101
     // per minor. When O63 reclassifies the four rolled rewrites as Aberrant's
     // minor pool, any of them worth more than ~1.10 on an optimized build
-    // must come down or stay major-slot content — that is the breach O96
+    // must come down or stay major-slot content â€” that is the breach O96
     // predicted, now a number instead of a surprise.
     //
     // MinorStack deliberately has NO measuring test: no minor classification
     // exists and the equip caps admit one rule today, so a three-minor stack
     // cannot be composed, and a derivation-only test filed under
     // Progression.RuleBandImpact.MinorStack would retire that invariant
-    // without measuring a stack — the exact partial-test-under-full-name
+    // without measuring a stack â€” the exact partial-test-under-full-name
     // failure the naming comment on the Step test records. The ceiling
     // precedes the content; the measurement arrives with the content.
     // ---- RE-DERIVED, AND THE FIRST DERIVATION WAS WRONG TWICE ------------
@@ -994,15 +1037,15 @@ namespace BreakerPowerBandTest
 // It asserts the ids specifically rather than a rank count, because a count
 // would be satisfied by thirty-four ids that all resolve to nothing.
 //
-// AND EVERY REQUESTED RANK IS ONE THE NODE CAN HOLD — the larger half. One
+// AND EVERY REQUESTED RANK IS ONE THE NODE CAN HOLD â€” the larger half. One
 // line below the silent `if (!Found) continue;` sits an equally silent clamp,
 // BreakerProgressionComponent.cpp:944:
 //     const int32 EffectiveRank = FMath::Min(Rank.Rank, Node->MaxRank);
 // The atlas is ranks-free (MaxRank = 1 everywhere in Core), so a fixture row
 // asking rank 3 of a KEEP id resolves correctly, passes the id half above,
 // and quietly buys one rank. Thirteen rows across the two fixtures do exactly
-// that the moment the atlas lands — Baseline loses 10 ranks across 6 rows,
-// Optimized 12 across 7 — and both compose downward into bands already out of
+// that the moment the atlas lands â€” Baseline loses 10 ranks across 6 rows,
+// Optimized 12 across 7 â€” and both compose downward into bands already out of
 // band, so the symptom is drift shaped exactly like the drift everyone
 // expects. This assertion is landed BEFORE any atlas node so those thirteen
 // rows fail loudly and are re-pointed deliberately, with the arithmetic
@@ -1037,6 +1080,14 @@ bool FBreakerPowerBandFixtureIdsResolveTest::RunTest(const FString& Parameters)
             FString(Label) == TEXT("baseline") ? BaselineRanks()
             : FString(Label) == TEXT("optimized") ? OptimizedRanks()
             : FString(Label) == TEXT("ability-optimized") ? AbilityOptimizedRanks() : AbilityCritVariantRanks();
+        FString WitnessFailure;
+        const bool bWitness = AllocationWitness(Ranks, WitnessFailure);
+        TestTrue(*FString::Printf(TEXT("%s has a legal 65+8 allocation witness: %s"), Label, *WitnessFailure), bWitness);
+        const FComposedBuild Diagnostic = Compose({}, Ranks, MeasurementState());
+        AddInfo(FString::Printf(TEXT("%s: Core=%d doctrine=%d; normalized first-target weapon=%.4f later-target=%.4f ability=%.4f; excluded Core literal AddedWeapon=%.2f AddedAbility=%.2f cast-rate=%.3f; combined fire-rate=%.3f. No hit-base, tempo, multiplicity or full-DPS parity claim."),
+            Label, AllocatedCost(Ranks, EBreakerPointCurrency::CorePoints), AllocatedCost(Ranks, EBreakerPointCurrency::DoctrinePoints),
+            Diagnostic.Total, Diagnostic.LaterTargetTotal, Diagnostic.AbilityTotal,
+            Diagnostic.ExcludedCoreAddedWeaponDamage, Diagnostic.ExcludedCoreAddedAbilityPower, Diagnostic.ExcludedCoreCastRate, Diagnostic.ExcludedFireRate));
         for (const FBreakerNodeRank& Rank : Ranks)
         {
             ++Checked;
@@ -1053,6 +1104,14 @@ bool FBreakerPowerBandFixtureIdsResolveTest::RunTest(const FString& Parameters)
         }
     }
 
+    auto Disconnected = OptimizedRanks();
+    for (auto& Rank : Disconnected)
+        if (Rank.NodeId == FName(TEXT("Core.Vector.Line"))) Rank.NodeId = TEXT("Core.Entropy.Attunement");
+    FString DisconnectedFailure;
+    TestEqual(TEXT("Disconnected witness retains the same 65-point price"),
+        AllocatedCost(Disconnected, EBreakerPointCurrency::CorePoints), 65);
+    TestFalse(TEXT("Witness refuses equal-cost disconnected wedges"), AllocationWitness(Disconnected, DisconnectedFailure));
+
     TestTrue(TEXT("Both fixtures name ranks at all"), Checked > 30);
     TestEqual(*FString::Printf(TEXT("Every fixture id resolves to a real node (%d checked): %s"),
         Checked, Missing.Num() ? *FString::Join(Missing, TEXT("; ")) : TEXT("all resolve")),
@@ -1068,13 +1127,13 @@ bool FBreakerPowerBandFixtureIdsResolveTest::RunTest(const FString& Parameters)
 // own band. NAMING IS LOAD-BEARING: UE's automation tree cannot hold a leaf
 // test at a node that is ALSO a parent. Before this split,
 // "RiorsEdge.Progression.PowerBand.RuleImpact" did exactly that to
-// "RiorsEdge.Progression.PowerBand" — the parent path silently swallowed the
+// "RiorsEdge.Progression.PowerBand" â€” the parent path silently swallowed the
 // leaf test of the same name, so the 8-10x band assertion was never
 // enumerated for as long as that name collision existed (see
 // FBreakerRuleBandImpactTest below, which carries the historical fix). The
 // guard this pass adds: AtCap and Endgame are SIBLINGS under the
 // "RiorsEdge.Progression.PowerBand" node, and no test anywhere in this suite
-// may ever be registered at that bare path — the moment one is, it silently
+// may ever be registered at that bare path â€” the moment one is, it silently
 // swallows whichever sibling the tree happens to enumerate alongside it, the
 // exact failure mode this whole comment documents. If a third PowerBand
 // fixture is ever added, give it a sibling name here too, never the bare one.
@@ -1091,7 +1150,7 @@ bool FBreakerPowerBandAtCapTest::RunTest(const FString& Parameters)
     // O36: "AT-CAP (level 50, tiers a level-50 drop can produce): 8-10x
     // stands." WorstTier is always producible (the floor of every roll);
     // BestTierForItemLevel(AtCapItemLevel) is the best item level alone can
-    // reach at the character cap (T6) — this IS "tiers a level-50 drop can
+    // reach at the character cap (T6) â€” this IS "tiers a level-50 drop can
     // produce", read as the widest legal spread rather than a fixed pair, so
     // the fixture tracks the tier curve instead of hardcoding a value that
     // could silently stop being reachable under a future retune.
@@ -1135,7 +1194,7 @@ bool FBreakerPowerBandAtCapTest::RunTest(const FString& Parameters)
     // (T12..T6) that a level-50 drop is confined to has comparatively little
     // gear-tier spread on its own. Narrower baseline/optimized pairings within
     // [T6,T12] were measured against the exact aggregation formula before this
-    // fixture was authored and land well under O36's 8x floor — the O3 More
+    // fixture was authored and land well under O36's 8x floor â€” the O3 More
     // budget and the node choices (identical in both O36 bands, because
     // character level does not move with item level) carry most of the band
     // here, and gear supplies the rest only at its full available spread.
@@ -1350,14 +1409,14 @@ bool FBreakerPowerBandEndgameTest::RunTest(const FString& Parameters)
     // that resolves the fixture this test inherited from the pre-split single
     // PowerBand test: O29 widened the affix ladder and raised every ceiling
     // anchor ~2.2x, the 8-10x band was authored against the pre-O29 ladder,
-    // and the honest reading was never "the band broke" — it is that O29 MOVED
+    // and the honest reading was never "the band broke" â€” it is that O29 MOVED
     // WHERE THE TOP OF THE BAND LIVES, past the character cap, into gear
     // depth, which is exactly O29's own thesis ("all endgame character power
     // comes from gear"). See FBreakerPowerBandAtCapTest above for the other
     // half of the split: the SAME character, SAME choices, measured at the
     // character cap instead, stays inside the original 8-10x band. Do not
     // "fix" a future measurement outside this range by widening it again
-    // without a new O-ruling — that repeats the mistake this split exists to
+    // without a new O-ruling â€” that repeats the mistake this split exists to
     // correct.
     TestTrue(*FString::Printf(TEXT("ENDGAME band %.2fx is at least %.1fx"), Ratio, EndgameBandMinimum), Ratio >= EndgameBandMinimum);
     TestTrue(*FString::Printf(TEXT("ENDGAME band %.2fx is at most %.1fx"), Ratio, EndgameBandMaximum), Ratio <= EndgameBandMaximum);
@@ -1412,7 +1471,7 @@ bool FBreakerPowerBandEndgameTest::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerRuleBandImpactTest,
     // SIBLING of PowerBand.AtCap / PowerBand.Endgame above, not a child of
-    // either — see their shared naming comment for why UE's automation tree
+    // either â€” see their shared naming comment for why UE's automation tree
     // makes that load-bearing. This test itself was RENAMED off
     // "RiorsEdge.Progression.PowerBand.RuleImpact" for the identical reason,
     // historically: that path silently swallowed RiorsEdge.Progression
@@ -1431,7 +1490,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     // "rewrite impact stays under its PER-BAND ceiling" while measuring one
     // band. Two bands are asserted, so two bands are measured below.
     //
-    // RENAMED AGAIN — ".Step" — for the FIRST reason: O96's ceilings brought a
+    // RENAMED AGAIN â€” ".Step" â€” for the FIRST reason: O96's ceilings brought a
     // sibling (RuleBandImpact.Major below, MinorStack to follow when a stack
     // exists), and a test named for the bare prefix swallows its own children
     // in UE's automation tree exactly as PowerBand.RuleImpact once swallowed
@@ -1442,7 +1501,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
 {
-    // Worst step any single rewrite is worth on an optimized build — the one
+    // Worst step any single rewrite is worth on an optimized build â€” the one
     // figure `make status` tracks for this section. It stays the ENDGAME
     // figure: `rewrite-impact` is pinned against a ceiling derived there, and
     // emitting a max across two bands would move a pinned number sideways
@@ -1496,6 +1555,10 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
 
         const float Step = Ruled.Total / Optimized.Total;
         const float RuledBand = Ruled.Total / Baseline.Total;
+        if (Definition.Rule == EBreakerItemRule::Prolific)
+            AddInfo(FString::Printf(TEXT("PROLIFIC [%s] normalized step decomposition: flat %.5fx, Increased %.5fx, standing More %.5fx, expected crit including critical-only More %.5fx. One helmet uplift; authored aggregation fixture, not a full-DPS or equip-valid loadout claim."),
+                Fixture.Label, Ruled.FlatLayer / Optimized.FlatLayer, Ruled.IncreasedLayer / Optimized.IncreasedLayer,
+                Ruled.MoreLayer / Optimized.MoreLayer, Ruled.EffectiveCrit / Optimized.EffectiveCrit));
 
         // The SAME step measured while STANDING STILL, and it is not a footnote:
         // the band above is measured airborne, recently dashed and at Redline,
@@ -1553,7 +1616,7 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
     // most builds land, its upper edge is a target and not a ceiling, and a
     // rewrite stacking past it is the point of the rewrite. An assertion that
     // fires on the intended outcome is an assertion pointed the wrong way, so
-    // the pair is gone rather than widened — what bounds a rollable rewrite
+    // the pair is gone rather than widened â€” what bounds a rollable rewrite
     // now is its AUTHORED per-step ceiling alone (asserted per rule above:
     // 1.35, Prolific's own 1.5), and `rewrite-impact` pins against
     // MaximumProlificRuleStep. The composed figure stays LOGGED so the report
@@ -1564,7 +1627,7 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
     // budget ruling 6 did not touch.
     const float BandWithWorstRewrite = (EndgameOptimized.Total / EndgameBaseline.Total) * WorstRuleStep;
     AddInfo(FString::Printf(
-        TEXT("ENDGAME BAND with the worst rewrite: %.2fx x %.4f = %.2fx (authored %.0f-%.0fx is where most builds land, O136 — a rewrite past the edge is intended)"),
+        TEXT("ENDGAME BAND with the worst rewrite: %.2fx x %.4f = %.2fx (authored %.0f-%.0fx is where most builds land, O136 â€” a rewrite past the edge is intended)"),
         EndgameOptimized.Total / EndgameBaseline.Total, WorstRuleStep, BandWithWorstRewrite,
         EndgameBandMinimum, EndgameBandMaximum));
 
@@ -1573,15 +1636,15 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// O96/O68 — the MAJOR ceiling, asserted against its full current population.
+// O96/O68 â€” the MAJOR ceiling, asserted against its full current population.
 // No rolled major exists (O63's minor/major classification is unbuilt), and
 // O68 rules that a legendary's authored pair OCCUPIES the major slot rather
-// than sitting beside it — so today the legendaries ARE the majors, and a
+// than sitting beside it â€” so today the legendaries ARE the majors, and a
 // test that waited for rolled majors would leave the ceiling asserted by
 // nothing while three legendaries ship against it. The step method is the
 // Step test's: the rule lands on the optimized helmet and the measurement is
 // what it adds on top of a build that already did everything else right. The
-// PAIR's other half — a legendary's generic affixes (O87) — is the power
+// PAIR's other half â€” a legendary's generic affixes (O87) â€” is the power
 // band's own subject, not this ceiling's: the ceiling governs the rewrite.
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -1596,7 +1659,7 @@ bool FBreakerRuleBandImpactMajorTest::RunTest(const FString& Parameters)
     // The O96 derivation, asserted where it is consumed: the layer is the
     // O33 four-avenue log share of the authored band, and major times
     // minor-stack spans it exactly. If either equality breaks, somebody
-    // edited one constant without re-deriving the pair — which is the
+    // edited one constant without re-deriving the pair â€” which is the
     // authoring-before-deriving failure O96 exists to forbid.
     // THERE IS NO ASSERTION HERE THAT THE LAYER CEILING EQUALS THE BAND
     // HEADROOM, AND THAT IS DELIBERATE. There was one, and it was the same
@@ -1644,7 +1707,7 @@ bool FBreakerRuleBandImpactMajorTest::RunTest(const FString& Parameters)
 
     // COVERAGE IS THE WHOLE RULE TABLE, split two ways with no remainder:
     // every rollable definition is the Step test's, every non-rollable one is
-    // measured here. A future rule kind cannot fall between the two loops —
+    // measured here. A future rule kind cannot fall between the two loops â€”
     // a new enum entry needs a definition, and a definition is one or the
     // other.
     int32 MajorCount = 0;
@@ -1678,7 +1741,7 @@ bool FBreakerRuleBandImpactMajorTest::RunTest(const FString& Parameters)
             // Today every authored forfeit is non-damage (air control, the
             // slot, regen), so a legendary rule never lowers the damage
             // total. A major whose FORFEIT is damage would legitimately break
-            // this pair of floors — re-scope them when one is authored, do
+            // this pair of floors â€” re-scope them when one is authored, do
             // not delete the ceiling above.
             TestTrue(*FString::Printf(TEXT("[%s] %s never lowers an optimized build"),
                 Fixture.Label, *Definition.DisplayName.ToString()), Step >= 1.0f - UE_KINDA_SMALL_NUMBER);
@@ -1721,8 +1784,35 @@ bool FBreakerConditionalDamageTest::RunTest(const FString& Parameters)
     const FComposedBuild InAir = Compose(Loadout, Ranks, Airborne);
 
     TestTrue(TEXT("Going airborne raises the additive bucket"), InAir.IncreasedLayer > Standing.IncreasedLayer + 0.5f);
-    TestTrue(TEXT("Going airborne brings a conditional More online"), InAir.MoreLayer > Standing.MoreLayer);
-    TestTrue(TEXT("A grounded movement build is materially weaker than an airborne one"), InAir.Total > Standing.Total * 1.5f);
+    TestEqual(TEXT("Terminal Velocity is unconditional; airborne changes Increased, not its More"), InAir.MoreLayer, Standing.MoreLayer);
+    // The replacement Core's Velocity More is unconditional. Preserve the
+    // conditional gear/doctrine question without inheriting the old Core's
+    // arbitrary 1.5 total ratio: the live conditional lines must pay exactly
+    // their authored Increased amount, once, with all other factors unchanged.
+    FBreakerAttributeContribution GroundedEquipment, AirborneEquipment, GroundedNodes, AirborneNodes;
+    UBreakerEquipmentComponent::AggregateStats(Loadout, &GroundedEquipment, Grounded);
+    UBreakerEquipmentComponent::AggregateStats(Loadout, &AirborneEquipment, Airborne);
+    UBreakerProgressionComponent::AggregateStats(AllNodes(), Ranks, &GroundedNodes, Grounded);
+    UBreakerProgressionComponent::AggregateStats(AllNodes(), Ranks, &AirborneNodes, Airborne);
+    const auto WeaponLane = EBreakerAggregatedAttribute::DamageMultiplier;
+    const float GearUplift = AirborneEquipment.GetIncreasedPercent(WeaponLane) - GroundedEquipment.GetIncreasedPercent(WeaponLane);
+    const float DoctrineUplift = AirborneNodes.GetIncreasedPercent(WeaponLane) - GroundedNodes.GetIncreasedPercent(WeaponLane);
+    TestTrue(TEXT("Airborne gear pays positive conditional Increased"), GearUplift > 0.0f);
+    TestEqual(TEXT("Two purchased Kinetic Downforce ranks pay their authored 22 percent"), DoctrineUplift, 22.0f, .0001f);
+    TestEqual(TEXT("Conditional gear and doctrine enter one additive bucket exactly once"),
+        (InAir.IncreasedLayer - Standing.IncreasedLayer) * 100.0f, GearUplift + DoctrineUplift, .001f);
+    TestEqual(TEXT("Airborne does not change the flat factor"), InAir.FlatLayer, Standing.FlatLayer, .0001f);
+    TestEqual(TEXT("Airborne does not change expected crit or its scoped More"), InAir.EffectiveCrit, Standing.EffectiveCrit, .0001f);
+    const float ExpectedConditionalRatio = 1.0f + (GearUplift + DoctrineUplift) / (100.0f * Standing.IncreasedLayer);
+    TestEqual(TEXT("Measured conditional benefit equals the authored additive uplift"),
+        InAir.Total / Standing.Total, ExpectedConditionalRatio, .0001f);
+    TArray<FBreakerNodeRank> CoreOnly;
+    for (const auto& Rank : Ranks)
+        if (Rank.NodeId.ToString().StartsWith(TEXT("Core."))) CoreOnly.Add(Rank);
+    TestEqual(TEXT("This replacement Core allocation does not invent an airborne damage condition"),
+        Compose({}, CoreOnly, Airborne).Total, Compose({}, CoreOnly, Grounded).Total, .0001f);
+    AddInfo(FString::Printf(TEXT("Airborne normalized damage benefit %.4fx: gear +%.2f%% and doctrine +%.2f%%; Core's standing More remains %.4fx. This excludes literal added hit bases, tempo and multiplicity."),
+        InAir.Total / Standing.Total, GearUplift, DoctrineUplift, Standing.MoreLayer));
 
     // The empty state is the neutral one: nothing conditional pays, and nothing
     // unconditional is lost. This is what keeps every pre-existing call site
@@ -1745,7 +1835,7 @@ bool FBreakerConditionalDamageTest::RunTest(const FString& Parameters)
 }
 
 // Every slot must be able to raise damage. This is the structural failure
-// Power-Curve §"More options in every avenue" names outright: "helmet, body,
+// Power-Curve Â§"More options in every avenue" names outright: "helmet, body,
 // boots and waist are structurally incapable of increasing damage".
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerAffixBreadthTest,
@@ -1792,7 +1882,7 @@ bool FBreakerAffixBreadthTest::RunTest(const FString& Parameters)
         // O54's half of the same invariant, and the half that was written in
         // the spec and never checked: every slot can raise weapon damage AND
         // every slot can raise ability damage. Before the pool split the second
-        // clause was not merely unchecked, it was unsatisfiable — there was no
+        // clause was not merely unchecked, it was unsatisfiable â€” there was no
         // ability line to roll.
         int32 WeaponLinesOnSlot = 0;
         int32 AbilityLinesOnSlot = 0;
@@ -1907,7 +1997,7 @@ bool FBreakerPowerBandAbilityLaneTest::RunTest(const FString& Parameters)
     // The decomposition, because a single ratio does not say what to author.
     // ALL FOUR RATIOS PRINT, AND THEIR PRODUCT IS ASSERTED EQUAL TO PARITY.
     // This line used to print two ratios with the parenthetical "crit and
-    // More cancel exactly" — true when written (pre-atlas, both lanes held
+    // More cancel exactly" â€” true when written (pre-atlas, both lanes held
     // one More product) and FALSE from 983b925 on (the weapon lane holds
     // Fixate x Barrage x TV = 1.9349 while the ability lane holds TV alone =
     // 1.30), so the printed decomposition multiplied to 0.40 while the
@@ -1917,7 +2007,7 @@ bool FBreakerPowerBandAbilityLaneTest::RunTest(const FString& Parameters)
     const float CapFlatRatio = AbilityBuild.AbilityFlatLayer / WeaponBuild.FlatLayer;
     const float CapIncreasedRatio = AbilityBuild.AbilityIncreasedLayer / WeaponBuild.IncreasedLayer;
     const float CapMoreRatio = AbilityBuild.AbilityMoreLayer / WeaponBuild.MoreLayer;
-    const float CapCritRatio = AbilityBuild.EffectiveCrit / WeaponBuild.EffectiveCrit;
+    const float CapCritRatio = AbilityBuild.AbilityEffectiveCrit / WeaponBuild.EffectiveCrit;
     AddInfo(FString::Printf(TEXT("ABILITY LANE  PARITY (cap) decomposes: flat %.3fx x increased %.3fx x more %.3fx x crit %.3fx"),
         CapFlatRatio, CapIncreasedRatio, CapMoreRatio, CapCritRatio));
     TestEqual(TEXT("the printed decomposition multiplies to the reported parity"),
@@ -1926,7 +2016,7 @@ bool FBreakerPowerBandAbilityLaneTest::RunTest(const FString& Parameters)
     // PARITY AT ENDGAME, measured and reported, deliberately UNPINNED. Whether
     // the cap figure holds at item level 120 is a different question: the
     // endgame band is far more crit-driven and crit is currently a weapon-lane
-    // story, so the two are free to diverge — and if they do, THAT is the
+    // story, so the two are free to diverge â€” and if they do, THAT is the
     // finding, not a second edge of O99. Asserting it against the cap's band
     // would answer a question nobody has asked yet.
     {
@@ -1938,14 +2028,14 @@ bool FBreakerPowerBandAbilityLaneTest::RunTest(const FString& Parameters)
             EndgameItemLevel, EndgameTier, EndgameWeapon.FlatLayer, EndgameWeapon.IncreasedLayer, EndgameWeapon.MoreLayer, EndgameWeapon.Total));
         AddInfo(FString::Printf(TEXT("ABILITY LANE  ability build, ability lane (ilvl %d, T%d) flat x%.3f | increased x%.3f | more x%.3f => x%.2f"),
             EndgameItemLevel, EndgameTier, EndgameAbility.AbilityFlatLayer, EndgameAbility.AbilityIncreasedLayer, EndgameAbility.AbilityMoreLayer, EndgameAbility.AbilityTotal));
-        AddInfo(FString::Printf(TEXT("ABILITY LANE  PARITY (endgame) %.3fx — UNPINNED; divergence from the cap figure is its own finding"),
+        AddInfo(FString::Printf(TEXT("ABILITY LANE  PARITY (endgame) %.3fx â€” UNPINNED; divergence from the cap figure is its own finding"),
             EndgameParity));
         // The same four-ratio form and the same product assertion as the cap
         // decomposition above, for the same Part One-J reason.
         const float EndFlatRatio = EndgameAbility.AbilityFlatLayer / EndgameWeapon.FlatLayer;
         const float EndIncreasedRatio = EndgameAbility.AbilityIncreasedLayer / EndgameWeapon.IncreasedLayer;
         const float EndMoreRatio = EndgameAbility.AbilityMoreLayer / EndgameWeapon.MoreLayer;
-        const float EndCritRatio = EndgameAbility.EffectiveCrit / EndgameWeapon.EffectiveCrit;
+        const float EndCritRatio = EndgameAbility.AbilityEffectiveCrit / EndgameWeapon.EffectiveCrit;
         AddInfo(FString::Printf(TEXT("ABILITY LANE  PARITY (endgame) decomposes: flat %.3fx x increased %.3fx x more %.3fx x crit %.3fx"),
             EndFlatRatio, EndIncreasedRatio, EndMoreRatio, EndCritRatio));
         TestEqual(TEXT("the endgame decomposition multiplies to the reported parity"),
@@ -1953,7 +2043,7 @@ bool FBreakerPowerBandAbilityLaneTest::RunTest(const FString& Parameters)
         // BOTH halves widen with gear depth, and the reason is the same in each:
         // the back-loaded ladder multiplies what a line is worth, so a lane with
         // more lines compounds harder as tiers deepen. The breadth deficit is
-        // not a constant offset that deep gear dilutes — deep gear WIDENS it.
+        // not a constant offset that deep gear dilutes â€” deep gear WIDENS it.
         // That is why parity has to be measured at two points and not one.
         AddInfo(TEXT("ABILITY LANE  the deficit widens with gear depth: a lane with more lines compounds harder up a back-loaded ladder"));
         BreakerStatus::Emit(TEXT("power-band-ability-endgame"), EndgameParity);
@@ -1971,7 +2061,7 @@ bool FBreakerPowerBandAbilityLaneTest::RunTest(const FString& Parameters)
             CritVariant.AbilityFlatLayer / WeaponBuild.FlatLayer,
             CritVariant.AbilityIncreasedLayer / WeaponBuild.IncreasedLayer,
             CritVariant.AbilityMoreLayer / WeaponBuild.MoreLayer,
-            CritVariant.EffectiveCrit / WeaponBuild.EffectiveCrit));
+            CritVariant.AbilityEffectiveCrit / WeaponBuild.EffectiveCrit));
     }
 
     // The fixed fixture above predates conditional ability affixes. Report a
@@ -1989,12 +2079,12 @@ bool FBreakerPowerBandAbilityLaneTest::RunTest(const FString& Parameters)
         const FComposedBuild Ability = Compose(RolledAbilities, AbilityOptimizedRanks(), State);
         TestTrue(TEXT("Rolled weapon comparison has positive power"), Weapon.Total > 0.0f);
         TestTrue(TEXT("Rolled ability comparison has positive power"), Ability.AbilityTotal > 0.0f);
-        AddInfo(FString::Printf(TEXT("ABILITY LANE  ROLLED (ilvl %d, seed %d, %d candidates/slot/rarity) weapon x%.3f ability x%.3f parity %.3fx — measured, not pinned"),
+        AddInfo(FString::Printf(TEXT("ABILITY LANE  ROLLED (ilvl %d, seed %d, %d candidates/slot/rarity) weapon x%.3f ability x%.3f parity %.3fx â€” measured, not pinned"),
             ItemLevel, RolledBestInSlotSeed, RolledBestInSlotCandidates,
             Weapon.Total, Ability.AbilityTotal, Ability.AbilityTotal / FMath::Max(Weapon.Total, UE_SMALL_NUMBER)));
         AddInfo(FString::Printf(TEXT("ABILITY LANE  ROLLED decomposition: flat %.3fx x increased %.3fx x more %.3fx x crit %.3fx"),
             Ability.AbilityFlatLayer / Weapon.FlatLayer, Ability.AbilityIncreasedLayer / Weapon.IncreasedLayer,
-            Ability.AbilityMoreLayer / Weapon.MoreLayer, Ability.EffectiveCrit / Weapon.EffectiveCrit));
+            Ability.AbilityMoreLayer / Weapon.MoreLayer, Ability.AbilityEffectiveCrit / Weapon.EffectiveCrit));
         const auto WholeWeapons = BreakerPowerBandWholeLoadout(ItemLevel, false);
         const auto WholeAbilities = BreakerPowerBandWholeLoadout(ItemLevel, true);
         for (const auto* Selected : { &WholeWeapons, &WholeAbilities })

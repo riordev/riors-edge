@@ -49,7 +49,7 @@ bool FBreakerHistoricalTravelMigrationTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Refusal preserves both ranks"), Bad->Progression.CoreNodeRanks.Num(), 2);
         TestEqual(TEXT("Refusal preserves layout version"), Bad->CoreLayoutVersion, 1);
     }
-    TestEqual(TEXT("This compatibility addition does not activate replacement roster"), UBreakerSaveGame::ActiveCoreLayoutVersion, 1);
+    TestEqual(TEXT("Historical refunds coexist with the active replacement roster"), UBreakerSaveGame::ActiveCoreLayoutVersion, 2);
     return true;
 }
 #endif

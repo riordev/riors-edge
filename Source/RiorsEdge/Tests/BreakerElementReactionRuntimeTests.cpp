@@ -212,7 +212,7 @@ bool FBreakerElementReactionRuntimeTest::RunTest(const FString& Parameters)
     auto* Progression = Player->GetProgression();
     Progression->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(4, Progression->ExperienceCurve));
     FText Failure;
-    for (const TCHAR* Node : {TEXT("Core.Bulwark.SetStance"), TEXT("Core.Bulwark.Read"), TEXT("Core.Bulwark.Parry")})
+    for (const TCHAR* Node : {TEXT("Core.Bulwark.Read"), TEXT("Core.Bulwark.Guard"), TEXT("Core.Bulwark.Parry")})
         if (!TestTrue(TEXT("purchases ordinary parry prerequisites"), Progression->PurchaseNode(UBreakerProgressionLibrary::GetCoreSliceTree(), Node, Failure))) return false;
     Player->GetCombat()->ReceiveDamage(Request(Applier, EBreakerElement::Entropy, PlayerStatus->GetEntropyThreshold()));
     if (!TestTrue(TEXT("parry target owns actually earned Rot"), PlayerStatus->HasStatus(Rot))) return false;

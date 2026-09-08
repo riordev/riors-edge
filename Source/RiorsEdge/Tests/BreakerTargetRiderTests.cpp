@@ -415,7 +415,7 @@ bool FBreakerSourceTagRiderMeleeTest::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// The first library authoring pass: the three rider lines exist ON REAL NODES
+// Live library authoring: Culling retains its rider on a real doctrine node
 // and publish through the real table build (no hand-built tree, no injection).
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -425,53 +425,26 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerTargetRiderLibraryAuthoringTest::RunTest(const FString& Parameters)
 {
-    // A Swift with the three rider-carrying nodes: Open Wound and Tunnel
-    // Vision are Core (class-agnostic), Culling is Marksman. Loaded state, so
-    // the rows are produced by the real RecalculateStats path off the real
-    // fallback trees — LoadProgressionState resolves the Swift class
-    // definition itself.
+    // Live Culling still publishes its target rider. Replacement Open Wound
+    // is unconditional Increased DoT; retired Tunnel Vision is not allocated.
     AActor* Attacker = NewObject<AActor>();
     UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>(Attacker);
     FBreakerProgressionState State;
     State.PermanentClass = EBreakerClassId::Swift;
     State.CoreNodeRanks.Add({TEXT("Core.Affliction.OpenWound"), 1});
-    State.CoreNodeRanks.Add({TEXT("Core.Precision.TunnelVision"), 1});
     State.DoctrineNodeRanks.Add({TEXT("Swift.Marksman.Culling"), 1});
     Progression->LoadProgressionState(State);
 
     const TArray<FBreakerTargetConditionRider>& Riders = Progression->GetTargetConditionRiders();
-    TestEqual(TEXT("The three authored library lines publish exactly three rider rows"), Riders.Num(), 3);
-
-    auto FindRider = [&Riders](EBreakerBuildCondition Condition) -> const FBreakerTargetConditionRider*
-    {
-        return Riders.FindByPredicate([Condition](const FBreakerTargetConditionRider& Rider) { return Rider.Condition == Condition; });
-    };
-    for (const EBreakerBuildCondition Condition : { EBreakerBuildCondition::TargetBleeding,
-        EBreakerBuildCondition::TargetElite, EBreakerBuildCondition::TargetLowHealth })
-    {
-        const FBreakerTargetConditionRider* Rider = FindRider(Condition);
-        if (!TestNotNull(TEXT("Each authored condition has its row"), Rider)) continue;
-        // Structure, not magnitude (O2): the row is Damage-target,
-        // rank-scaled to something positive, and composed with no
-        // AlsoRequires — each line is a single honest condition.
-        TestEqual(TEXT("Rider rows are Damage-target (the one lane ReceiveDamage consumes)"),
-            Rider->StatTarget, EBreakerNodeStatTarget::Damage);
-        TestTrue(TEXT("Rider rows carry a positive rank-scaled percent"), Rider->Percent > 0.0f);
-        TestEqual(TEXT("The authored lines compose no extra requirements"), Rider->AlsoRequires.Num(), 0);
-    }
-
-    // The unconditional halves of the same purchases still pay the ordinary
-    // way: Tunnel Vision's crit damage and Culling's unconditional More reach
-    // the aggregate exactly as before the rider lines were added — the rider
-    // is ADDITIVE authoring, not a re-route of what the nodes already did.
+    if (!TestEqual(TEXT("Culling publishes exactly one live library rider"), Riders.Num(), 1)) return false;
+    const auto& Rider = Riders[0];
+    TestEqual(TEXT("Culling retains its actual low-health condition"), Rider.Condition, EBreakerBuildCondition::TargetLowHealth);
+    TestEqual(TEXT("Culling retains the shared Damage target"), Rider.StatTarget, EBreakerNodeStatTarget::Damage);
+    TestTrue(TEXT("Culling retains positive Increased damage"), Rider.Percent > 0.0f);
+    TestEqual(TEXT("Culling has no extra condition"), Rider.AlsoRequires.Num(), 0);
     const FBreakerNodeStats& Stats = Progression->GetNodeStats();
-    TestTrue(TEXT("Tunnel Vision's flat crit-damage line still aggregates"), Stats.CriticalMultiplierBonus > 0.0f);
-    // O95: Culling authors no More at all now -- a doctrine authors none, and
-    // every slot lives in Core. This build holds NO Core node, so the composed
-    // More product is exactly 1.0 and that is the assertion: the doctrine
-    // contributes nothing to the multiplier layer, by rule.
-    TestEqual(TEXT("A doctrine-only build composes no More at all (O95)"), Stats.DamageMoreMultiplier, 1.0f, 0.0001f);
-
+    TestEqual(TEXT("Replacement Open Wound remains unconditional ten-percent DoT"), Stats.DamageOverTimeMultiplier, 1.10f, .0001f);
+    TestEqual(TEXT("Neither selected node authors a More"), Stats.DamageMoreMultiplier, 1.0f, .0001f);
     // A build without the nodes publishes no rows at all — the whole
     // pre-existing population is untouched by the authoring pass.
     AActor* Bare = NewObject<AActor>();

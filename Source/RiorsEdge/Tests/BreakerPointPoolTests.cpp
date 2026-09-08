@@ -56,7 +56,7 @@ bool FBreakerEveryPoolIsRoutedTest::RunTest(const FString& Parameters)
         EBreakerPointCurrency::CorePoints,
         TEXT("Core.Precision.Sightline"),
         [](FBreakerProgressionState& S, FName Id) { S.CoreNodeRanks.Add({Id, 1}); },
-        [](const FBreakerNodeStats& N) { return N.CriticalChanceBonus > 0.0f; },
+        [](const FBreakerNodeStats& N) { return N.CriticalMultiplierBonus > 0.0f; },
     });
     Cases.Add({
         EBreakerPointCurrency::DoctrinePoints,

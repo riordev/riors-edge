@@ -77,7 +77,7 @@ bool FBreakerCleaveAcceptedHitRuntimeTest::RunTest(const FString& Parameters)
             auto* Progression = Front->GetProgression();
             Progression->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(4, Progression->ExperienceCurve));
             FText Reason;
-            for (const TCHAR* Node : { TEXT("Core.Bulwark.SetStance"), TEXT("Core.Bulwark.Read"), TEXT("Core.Bulwark.Parry") })
+            for (const TCHAR* Node : { TEXT("Core.Bulwark.Read"), TEXT("Core.Bulwark.Guard"), TEXT("Core.Bulwark.Parry") })
                 if (!TestTrue(TEXT("actual earned Core parry purchase"), Progression->PurchaseNode(UBreakerProgressionLibrary::GetCoreSliceTree(), Node, Reason))) return false;
             if (!TestTrue(TEXT("real frontal parry starts"), Front->GetCombat()->TryParry())) return false;
         }

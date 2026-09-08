@@ -99,13 +99,13 @@ void BreakerCoreRoster::AppendStatus(UObject* Outer, TArray<FBreakerCoreWedgeDef
             {Effect(Target::ReactionResiduePercent, Bucket::Flat, 10.0f)}); // O2 PLACEHOLDER
         // MISSING CONSUMER: No consumer yet: the elemental hit transaction still excludes statuses created by that hit. No substitute stat effect.
         const auto* SecondOrder = Node(Outer, TEXT("Core.Reaction.SecondOrder"), TEXT("Second Order"),
-            TEXT("A reaction may consume a status it created this hit."), {}, {TEXT("Progression.Node.Core.Reaction.SecondOrder")});
+            TEXT("NOT IMPLEMENTED: A reaction may consume a status it created this hit. Purchasing this node currently grants no effect."), {}, {TEXT("Progression.Node.Core.Reaction.SecondOrder")});
         const auto* Feedback = Node(Outer, TEXT("Core.Reaction.Feedback"), TEXT("Feedback"),
             TEXT("+5% elemental buildup per rank."),
             {Effect(Target::ElementalBuildup, Bucket::IncreasedPercent, 5.0f)}); // O2 PLACEHOLDER
         // MISSING CONSUMER: No consumer yet: reaction preparation does not fund or queue third-element buildup. No substitute stat effect.
         const auto* Overlap = Node(Outer, TEXT("Core.Reaction.Overlap"), TEXT("Overlap"),
-            TEXT("Reactions apply fresh buildup of the third element."), {}, {TEXT("Progression.Node.Core.Reaction.Overlap")});
+            TEXT("NOT IMPLEMENTED: Reactions apply fresh buildup of the third element. Purchasing this node currently grants no effect."), {}, {TEXT("Progression.Node.Core.Reaction.Overlap")});
         const auto* Spark = Node(Outer, TEXT("Core.Reaction.Spark"), TEXT("Spark"),
             TEXT("+8% Increased reaction damage."),
             {Effect(Target::ReactionDamage, Bucket::IncreasedPercent, 8.0f)}); // O2 PLACEHOLDER
@@ -117,7 +117,7 @@ void BreakerCoreRoster::AppendStatus(UObject* Outer, TArray<FBreakerCoreWedgeDef
             {Effect(Target::ReactionDamage, Bucket::MorePercent, 20.0f)}); // O2 PLACEHOLDER
         // MISSING CONSUMER: No consumer yet: multi-pair hit preparation and per-source/enemy deferred applications are absent. No substitute stat effect.
         const auto* Sympathetic = Node(Outer, TEXT("Core.Reaction.Sympathetic"), TEXT("Sympathetic"),
-            TEXT("Every reaction triggers on all eligible statuses instead of the first pair. FORFEIT: each affected enemy defers your elemental applications for 3s while buildup continues. Allies and physical ailments are exempt."), {}, {TEXT("Progression.Node.Core.Reaction.Sympathetic")});
+            TEXT("NOT IMPLEMENTED: Every reaction triggers on all eligible statuses instead of the first pair. FORFEIT: each affected enemy defers your elemental applications for 3s while buildup continues. Allies and physical ailments are exempt. Purchasing this node currently grants no effect."), {}, {TEXT("Progression.Node.Core.Reaction.Sympathetic")}); // O2 PLACEHOLDER
         Wedges.Add({TEXT("Reaction"), TEXT("Status"), true, Catalysis,
             {{Ignition, Chain}, {Residue, SecondOrder}, {Feedback, Overlap}}, {Spark, Echo}, Resonance, Sympathetic});
     }

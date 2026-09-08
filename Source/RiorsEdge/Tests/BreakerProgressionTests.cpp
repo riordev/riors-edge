@@ -89,7 +89,8 @@ bool FBreakerRespecRestoresAttributesTest::RunTest(const FString& Parameters)
     UBreakerProgressionTree* Core = UBreakerProgressionLibrary::GetCoreSliceTree();
     FText Failure;
     TestTrue(TEXT("Gateway node purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Sightline"), Failure));
-    // Atlas shape: Sightline is a +2 crit rim (O2 PLACEHOLDER).
+    TestTrue(TEXT("Rank-one Angle purchases through Sightline"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Angle"), Failure));
+    // Replacement Sightline gives critical damage; Angle owns critical chance.
     TestEqual(TEXT("A purchased node reaches the attribute"), Attributes->GetCriticalChance(), BaseCritChance + 0.02f, 0.0001f);
 
     TestTrue(TEXT("Respec at a Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure));
@@ -100,7 +101,8 @@ bool FBreakerRespecRestoresAttributesTest::RunTest(const FString& Parameters)
     // Buy/respec cycles must not drift.
     for (int32 Cycle = 0; Cycle < 25; ++Cycle)
     {
-        Progression->PurchaseNode(Core, TEXT("Core.Precision.Sightline"), Failure);
+        TestTrue(TEXT("Cycle gateway purchase"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Sightline"), Failure));
+        TestTrue(TEXT("Cycle rank-one Angle purchase"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Angle"), Failure));
         Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure);
     }
     TestEqual(TEXT("Twenty-five buy/respec cycles do not drift crit chance"), Attributes->GetCriticalChance(), BaseCritChance);

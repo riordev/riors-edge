@@ -66,7 +66,7 @@ bool FBreakerReprisalRuntimeTest::RunTest(const FString& Parameters)
     };
     if(!CastCleave(20)) return false; Clock(.5f);
     Progression->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(5,Progression->ExperienceCurve));
-    if(!Progression->PurchaseNode(UBreakerProgressionLibrary::GetCoreSliceTree(),TEXT("Core.Bulwark.SetStance"),Reason)) return false;
+    if(!Progression->PurchaseNode(UBreakerProgressionLibrary::GetCoreSliceTree(),TEXT("Core.Bulwark.Read"),Reason)) return false;
     int32 Seed=1; int32 LastPassiveBlockSeed=0;
     auto EarnPassiveBlock=[&]()
     {

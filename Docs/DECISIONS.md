@@ -427,3 +427,24 @@ Numbers are permanent and never reused.
 **O233** — Deployables have health and zones have duration; zones are not destructible, and Threat Decoy grants only deployable health.
 
 **O234** — Core lane rank one opens downstream routing while ranks two and three remain optional; later gateways require an owned node in either neighboring wedge, and keystones still require18 prior local points, so cheap travel does not bypass commitment.
+
+**O235** — Core keeps the full 22-wedge roster and Weapon → Defence → Ability → Status → Movement → Utility ring, wrapping Threat to Precision. Its 429 offered points against 65 measure 6.6x; the former uniform-wedge 3–5x density band does not establish a valid band for rank-one routing. A replacement band needs play data; do not change the numerator or widen a pin to conceal this. Cheapest gateway/lane/convergence routes cost 1/4/10 points in a major and 1/4/9 in a minor; one keystone costs23, two46, three69.
+
+Current native route costs; sector totals omit travel outside that sector. “Lane” means one rank-one minor plus its notable in every wedge.
+
+| Sector | Gateways | One lane each | Every convergence | Every node at minimum ranks, including keys | Full ranks |
+|---|---:|---:|---:|---:|---:|
+| Weapon | 4 | 16 | 39 | 78 | 91 |
+| Defence | 5 | 20 | 47 | 73 | 91 |
+| Ability | 4 | 16 | 38 | 64 | 78 |
+| Status | 5 | 20 | 48 | 87 | 104 |
+| Movement | 2 | 8 | 19 | 32 | 39 |
+| Utility | 2 | 8 | 18 | 18 | 26 |
+
+Maximum wedges reached with65, including ring transit; cells show **wedges / minimum cost**.
+
+| Depth | No keystone | One keystone | Two keystones |
+|---|---:|---:|---:|
+| Gateway | 22 / 22 | 22 / 44 | 21 / 65 |
+| Lane | 16 / 64 | 11 / 63 | 6 / 62 |
+| Convergence | 7 / 65 | 5 / 59 | 4 / 64 |

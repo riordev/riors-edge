@@ -16,7 +16,6 @@ namespace BreakerCoreRoster
     RIORSEDGE_API void AppendStatus(UObject* Outer, TArray<FBreakerCoreWedgeDefinition>& Out);
     RIORSEDGE_API void AppendMovement(UObject* Outer, TArray<FBreakerCoreWedgeDefinition>& Out);
     RIORSEDGE_API void AppendUtility(UObject* Outer, TArray<FBreakerCoreWedgeDefinition>& Out);
-    // Candidate authoring is isolated from the live getter and save version.
-    // Activate only with the complete roster and frozen-cost migration.
+    // Builds the full roster; the live getter owns caching and migration activation.
     RIORSEDGE_API UBreakerProgressionTree* BuildCandidate(UObject* Outer, FString& Error);
 }

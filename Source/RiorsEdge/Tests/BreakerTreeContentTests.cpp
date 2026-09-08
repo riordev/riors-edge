@@ -21,10 +21,10 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
 {
     const TArray<UBreakerProgressionTree*>& Trees = UBreakerProgressionLibrary::GetAllFallbackTrees();
-    // Core, plus THREE branches for EVERY class: Swift (Class-Kits §1.3-1.5),
-    // Caster (§2.3-2.5), and — authored 2026-08-16 under the owner's "do all
-    // 5 classes" ruling — Gunsmith (Class-Kits-Gunsmith §4), Tank
-    // (Class-Kits-Tank §3-5) and Support (Class-Kits-Support §4). The count
+    // Core, plus THREE branches for EVERY class: Swift (Class-Kits Â§1.3-1.5),
+    // Caster (Â§2.3-2.5), and â€” authored 2026-08-16 under the owner's "do all
+    // 5 classes" ruling â€” Gunsmith (Class-Kits-Gunsmith Â§4), Tank
+    // (Class-Kits-Tank Â§3-5) and Support (Class-Kits-Support Â§4). The count
     // moved 4 -> 7 when Caster's branch layer landed and 7 -> 16 when the
     // last three classes' did; each move was the point of its pass, not
     // drift. Counted rather than sampled deliberately: a tree silently
@@ -53,7 +53,7 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
             TestTrue(*(Context + TEXT(" has a description")), !Node->Description.IsEmpty());
             TestTrue(*(Context + TEXT(" has at least one rank")), Node->MaxRank >= 1);
 
-            // Cost grammar: 1 minor, 2 notable, 3 convergence, 5 keystone —
+            // Cost grammar: 1 minor, 2 notable, 3 convergence, 5 keystone â€”
             // plus 0 for exactly the GRANTED node (O139): seeded, never
             // purchasable-for-free, and cost 0 is what makes its
             // respec-no-refund property arithmetic. Keyed to the one id so a
@@ -77,72 +77,90 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
         }
     }
 
-    // CONTENT SIZE, CHANGED DELIBERATELY UNDER O27 (was Core 15 / branches 8).
-    //
-    // The pin is not being relaxed to make new content pass — it is being
-    // re-set, because O27 rules that "every avenue (affixes, nodes, weapons)
-    // needs significantly more options than the slice currently has" and that
-    // choices must beat accumulation. Fifteen Core nodes could not carry a
-    // 2.5x additive band with the per-point accumulation baseline cut from 1.0%
-    // to 0.25%; the power that left accumulation had to land somewhere, and it
-    // landed in the nine new Core nodes (the Velocity constellation's six, plus
-    // Called Shot, Salvo and Barrage) and five new Swift branch nodes.
-    //
-    // The numbers below are still EXACT equalities on purpose. The point of the
-    // pin was never the value 15 — it is that content cannot drift without
-    // somebody saying so in a diff.
-    //
-    // Re-set again for the ELEMENTS constellation: the Core board rendered
-    // Elements as a sealed placeholder because its roster was empty, and O5
-    // plus Core-Constellations §6 both say it is designed-but-unshipped rather
-    // than cut. Six nodes joined the Core tree (24 -> 30).
-    // RE-PINNED for the Core atlas (Phase 4), pair by pair, the same way the
-    // Swift pins below moved: the number rises by exactly the wheels authored
-    // in each commit and says so in that commit's diff. PRECISION and VOLLEY
-    // went from four and five nodes to ten each (30 -> 41); the remaining
-    // five pairs raise it to the atlas's 117 wheel nodes. O213 then rules
-    // that no bead is a travel node, so the 153 Core.Travel.* picks are gone
-    // and the wheel is exactly its twelve wheels: nine of ten nodes and three
-    // hubless of nine.
     const UBreakerProgressionTree* Core = UBreakerProgressionLibrary::GetCoreSliceTree();
-    TestEqual(TEXT("Core ships its twelve wheels and nothing between them (O213)"), Core->Nodes.Num(), 117);
-
-    // THE WHEEL'S GRAPH IS VALID DATA: every edge endpoint and every entry
-    // resolves to a real node. The edges are exactly the wheels' own — six
-    // rim links, six rim-to-inner links and three inner-to-hub links per
-    // hubbed wheel (15 x 9), twelve per hubless wheel (12 x 3): 171.
-    int32 EdgeCount = 0;
+    if (!TestNotNull(TEXT("Live Core"), Core)) return false;
+    TestEqual(TEXT("Accepted replacement node count"), Core->Nodes.Num(), 187);
+    TestEqual(TEXT("Every wedge is an entry"), Core->EntryNodeIds.Num(), 22);
+    TestTrue(TEXT("Later entries require an owned neighboring wedge"), Core->bRestrictEntryToOwnedNeighbor);
+    TestEqual(TEXT("Explicit ring order includes every wedge"), Core->CoreWedgeOrder.Num(), 22);
+    int32 EdgeCount = 0, Offered = 0;
+    TMap<EBreakerCoreNodeRole, int32> Roles;
+    TSet<FString> Edges;
     for (const FBreakerNodeEdge& Edge : Core->AdjacencyEdges)
     {
         ++EdgeCount;
         TestNotNull(*(Edge.A.ToString() + TEXT(" (edge A) resolves")), Core->FindNode(Edge.A));
         TestNotNull(*(Edge.B.ToString() + TEXT(" (edge B) resolves")), Core->FindNode(Edge.B));
+        TestTrue(TEXT("Graph has no self edge"), Edge.A != Edge.B);
+        FString A = Edge.A.ToString(), B = Edge.B.ToString();
+        if (A > B) Swap(A, B);
+        const FString Key = A + TEXT("|") + B;
+        TestFalse(TEXT("Each undirected edge is authored once"), Edges.Contains(Key));
+        Edges.Add(Key);
     }
-    TestEqual(TEXT("The wheels carry exactly their own edges"), EdgeCount, 171);
-    // O211: the hub is the only start, and the hub is virtual — every wheel's
-    // rim 0 touches it, so every wheel is an entry and there is no centre
-    // node to buy.
-    TestEqual(TEXT("Twelve entries, one per wheel, ungated"), Core->EntryNodeIds.Num(), 12);
-    for (const FName& Entry : Core->EntryNodeIds)
+    TestEqual(TEXT("Eleven major graphs, eleven minor graphs and twenty-two ring edges"), EdgeCount, 242);
+    for (int32 Index = 0; Index < Core->EntryNodeIds.Num(); ++Index)
     {
-        TestNotNull(*(Entry.ToString() + TEXT(" (entry) resolves")), Core->FindNode(Entry));
+        const FName Entry = Core->EntryNodeIds[Index];
+        const auto* Gateway = Core->FindNode(Entry);
+        if (!TestNotNull(TEXT("Gateway resolves"), Gateway)) return false;
+        TestTrue(TEXT("Every entry carries gateway role"), Gateway->CoreRole == EBreakerCoreNodeRole::Gateway);
+        TestEqual(TEXT("Gateway order agrees with wedge order"), Gateway->Constellation, Core->CoreWedgeOrder[Index]);
+        const FName Next = Core->EntryNodeIds[(Index + 1) % Core->EntryNodeIds.Num()];
+        TestTrue(TEXT("Every neighboring gateway pair connects, including wrap"), Core->AdjacencyEdges.ContainsByPredicate(
+            [&](const FBreakerNodeEdge& E) { return (E.A == Entry && E.B == Next) || (E.B == Entry && E.A == Next); }));
     }
-    TestEqual(TEXT("Core slice spends Core Points"), Core->Currency, EBreakerPointCurrency::CorePoints);
-    // O213: no bead is a travel node, and every rank carries a magnitude. The
-    // deleted ids are never reused (O103): nothing may begin Core.Travel.
+    TestEqual(TEXT("Core spends Core Points"), Core->Currency, EBreakerPointCurrency::CorePoints);
     for (const UBreakerProgressionNode* Node : Core->Nodes)
     {
         const FString Context = Node->NodeId.ToString();
-        TestFalse(*(Context + TEXT(" is not a travel bead (O213)")), Context.StartsWith(TEXT("Core.Travel.")));
-        TestTrue(*(Context + TEXT(" carries a magnitude: an effect, a tag or an ability (O213)")),
+        TestFalse(*(Context + TEXT(" is not a retired travel bead")), Context.StartsWith(TEXT("Core.Travel.")));
+        TestTrue(*(Context + TEXT(" retains an authored effect or rule identity")),
             Node->Effects.Num() > 0 || Node->GrantedTags.Num() > 0 || Node->GrantedAbilityIds.Num() > 0);
+        TestTrue(TEXT("Every Core node has an explicit role"), Node->CoreRole != EBreakerCoreNodeRole::Legacy);
+        ++Roles.FindOrAdd(Node->CoreRole);
+        Offered += Node->MaxRank * Node->CostPerRank;
+        const bool bRanked = Node->CoreRole == EBreakerCoreNodeRole::LaneMinor;
+        TestEqual(TEXT("Only lane minors have three ranks"), Node->MaxRank, bRanked ? 3 : 1);
+        TestEqual(TEXT("Core roles do not add hidden tree-investment gates"), Node->RequiredTreeInvestment, 0);
+        TestEqual(TEXT("Only keystones require eighteen local points"), Node->RequiredConstellationInvestment,
+            Node->CoreRole == EBreakerCoreNodeRole::Keystone ? 18 : 0);
+        for (const auto& Requirement : Node->Prerequisites)
+            TestEqual(TEXT("Onward travel opens at rank one"), Requirement.RequiredRank, 1);
+        for (const auto& Group : Node->PrerequisiteGroups)
+        {
+            TestTrue(TEXT("Counted lane group has a reachable threshold"), Group.MinimumSatisfied > 0 && Group.MinimumSatisfied <= Group.Candidates.Num());
+            for (const auto& Requirement : Group.Candidates)
+            {
+                TestNotNull(TEXT("Counted prerequisite belongs to this tree"), Core->FindNode(Requirement.NodeId));
+                TestEqual(TEXT("Counted lane choice uses only rank one"), Requirement.RequiredRank, 1);
+            }
+        }
+        if (Node->CoreRole == EBreakerCoreNodeRole::Convergence)
+        {
+            if (!TestEqual(TEXT("Convergence has one counted lane gate"), Node->PrerequisiteGroups.Num(), 1)) return false;
+            TestEqual(TEXT("Convergence requires two distinct completed lanes"), Node->PrerequisiteGroups[0].MinimumSatisfied, 2);
+            TestEqual(TEXT("Minor/major convergence price follows its two/three lanes"), Node->CostPerRank, Node->PrerequisiteGroups[0].Candidates.Num());
+        }
+        else
+        {
+            const int32 Cost = Node->CoreRole == EBreakerCoreNodeRole::Keystone ? 5 : Node->CoreRole == EBreakerCoreNodeRole::LaneNotable ? 2 : 1;
+            TestEqual(TEXT("Each role has its exact accepted price"), Node->CostPerRank, Cost);
+        }
     }
+    TestEqual(TEXT("Accepted full-rank offered budget"), Offered, 429);
+    TestEqual(TEXT("Gateway count"), Roles.FindRef(EBreakerCoreNodeRole::Gateway), 22);
+    TestEqual(TEXT("Ranked minor count"), Roles.FindRef(EBreakerCoreNodeRole::LaneMinor), 55);
+    TestEqual(TEXT("Notable count"), Roles.FindRef(EBreakerCoreNodeRole::LaneNotable), 55);
+    TestEqual(TEXT("Link count"), Roles.FindRef(EBreakerCoreNodeRole::Link), 22);
+    TestEqual(TEXT("Convergence count"), Roles.FindRef(EBreakerCoreNodeRole::Convergence), 22);
+    TestEqual(TEXT("Keystone count"), Roles.FindRef(EBreakerCoreNodeRole::Keystone), 11);
 
     // SWIFT BRANCH SIZE AND CEILING, RE-PINNED DELIBERATELY (was 10 / 11 / 10,
     // and "every Swift node is tier 1-3").
     //
     // The old pins described a TRUNCATED Swift: the slice authored tiers 1-3
-    // and dropped every Tier-4 rewrite node Class-Kits §1.3-1.5 specifies —
+    // and dropped every Tier-4 rewrite node Class-Kits Â§1.3-1.5 specifies â€”
     // F9-F11, K9-K11, M9-M11. Those nine are now authored, three per branch, so
     // each count rises by exactly three and the tier ceiling rises from 3 to 4.
     // Nothing was relaxed to make new content pass: the equalities are still
@@ -150,7 +168,7 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
     // content and silent drift. The number moved because somebody added nine
     // nodes on purpose and said so in this diff.
     //
-    // Tier 5 is STILL excluded, and that is not an oversight either — §0.2's
+    // Tier 5 is STILL excluded, and that is not an oversight either â€” Â§0.2's
     // fifth tier is the keystone tier, and the compressed ladder has no fifth
     // tier at all. The keystone used to sit at tier 3, BELOW the rewrites, and
     // now sits at tier 4 beside them: the doctrine wallet is 8 and the keystone
@@ -180,7 +198,7 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
             ++TierFourCount;
 
             // The rewrite tier's grammar, stated as an assertion rather than a
-            // comment: §0.2 prices tier 4 at one rank for two points.
+            // comment: Â§0.2 prices tier 4 at one rank for two points.
             TestEqual(*(Context + TEXT(" tier-4 rewrite is single rank")), Node->MaxRank, 1);
             TestEqual(*(Context + TEXT(" tier-4 rewrite costs 2")), Node->CostPerRank, 2);
             // O3: a class-layer More may live only on a branch keystone, and
@@ -194,11 +212,11 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
             // The old pin here was "tier-4 rewrites author NO stat effect",
             // and it failed exactly as intended when the loop valve landed
             // (2026-08-16): the tier-4 trio's decay downsides ARE stat lines
-            // now — ClassResourceDecay through the valve, AbilityCost for No
+            // now â€” ClassResourceDecay through the valve, AbilityCost for No
             // Safety's discount half, both Class-Kits-transcribed. The re-set
             // pin is the boundary that still holds: a tier-4 rewrite may
             // author ONLY loop-economy lines (decay / cost), never a damage
-            // or combat stat — that would be a different node with a
+            // or combat stat â€” that would be a different node with a
             // different fantasy, and a content decision, not a refactor.
             for (const FBreakerNodeEffect& Effect : Node->Effects)
             {
@@ -217,10 +235,8 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Each Swift branch ships exactly three tier-4 rewrites"), TierFourCount, 3);
     }
 
-    // O3: More multipliers may be authored only on branch keystones and
-    // constellation Convergence/Keystone nodes. In this content that is exactly
-    // "single rank, cost 3 or more" — which is also how SBreakerMenu classifies
-    // a node as a Convergence, so the board cannot disagree with the rule.
+    // Core More placement follows explicit roles. Minor convergences cost
+    // two, so price alone cannot identify a legal convergence.
     int32 MoreNodeCount = 0;
     for (const UBreakerProgressionTree* Tree : Trees)
     {
@@ -231,7 +247,11 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
                 if (Effect.StatBucket != EBreakerNodeStatBucket::MorePercent) continue;
                 ++MoreNodeCount;
                 const FString Context = Node->NodeId.ToString();
-                TestTrue(*(Context + TEXT(" authors More only at Convergence/Keystone cost")), Node->CostPerRank >= 3);
+                if (Node->Currency == EBreakerPointCurrency::CorePoints)
+                    TestTrue(*(Context + TEXT(" authors More only on an explicit convergence or keystone")),
+                        Node->CoreRole == EBreakerCoreNodeRole::Convergence || Node->CoreRole == EBreakerCoreNodeRole::Keystone);
+                else
+                    TestTrue(*(Context + TEXT(" preserves branch More placement")), Node->CostPerRank >= 3);
                 TestEqual(*(Context + TEXT(" More node is single rank")), Node->MaxRank, 1);
                 TestTrue(*(Context + TEXT(" More stays at or under the 1.30x ceiling")),
                     Effect.ValuePerRank <= (UBreakerProgressionComponent::SingleMoreCeiling - 1.0f) * 100.0f + UE_KINDA_SMALL_NUMBER);
@@ -274,7 +294,7 @@ bool FBreakerNodePurchaseFlowTest::RunTest(const FString& Parameters)
 
     TestFalse(TEXT("Unknown node is rejected"), Progression->PurchaseNode(Core, TEXT("Core.Does.Not.Exist"), Failure));
     TestFalse(TEXT("Node from the wrong tree is rejected"), Progression->PurchaseNode(Core, TEXT("Swift.Kinetic.Carry"), Failure));
-    TestFalse(TEXT("Prerequisite is enforced"), Progression->PurchaseNode(Core, TEXT("Core.Precision.TunnelVision"), Failure));
+    TestFalse(TEXT("Prerequisite is enforced"), Progression->PurchaseNode(Core, TEXT("Core.Precision.CalledShot"), Failure));
 
     TestTrue(TEXT("Gateway purchase succeeds"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Sightline"), Failure));
     TestEqual(TEXT("Gateway rank is recorded"), Progression->GetNodeRank(TEXT("Core.Precision.Sightline"), EBreakerPointCurrency::CorePoints), 1);
@@ -282,22 +302,24 @@ bool FBreakerNodePurchaseFlowTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Tree investment tracks spend"), Progression->GetTreeInvestment(Core), 1);
     TestFalse(TEXT("Rank cap is enforced"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Sightline"), Failure));
 
-    // THE RING binds before the wheel's gates: Angle does not touch the
-    // entry, so it refuses until the hexagon is walked to it through Steady.
-    TestFalse(TEXT("The ring refuses a rim nothing owned touches"), Progression->CanPurchaseNode(Core, TEXT("Core.Precision.Angle"), Failure));
-    TestTrue(TEXT("The adjacent rim purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Steady"), Failure));
-    TestTrue(TEXT("The walk opens the next rim"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Angle"), Failure));
-    // ATLAS SHAPE: an inner is gated on its two stated rims — both of them,
-    // and independently of adjacency (Angle alone touches Tunnel Vision, so
-    // the refusal below is the AND prerequisite binding on its own).
-    TestFalse(TEXT("One rim of two is not enough"), Progression->CanPurchaseNode(Core, TEXT("Core.Precision.TunnelVision"), Failure));
-    TestTrue(TEXT("The second rim purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Ledger"), Failure));
-    TestTrue(TEXT("Both rims open the inner"), Progression->CanPurchaseNode(Core, TEXT("Core.Precision.TunnelVision"), Failure));
-    TestTrue(TEXT("The inner purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.TunnelVision"), Failure));
-
-    // Effects are live: crit chance and crit damage both moved.
-    TestEqual(TEXT("Crit chance aggregates from the crit rims"), Progression->GetNodeStats().CriticalChanceBonus, 0.04f, 0.0001f);
-    TestEqual(TEXT("Crit damage aggregates from Ledger and Tunnel Vision"), Progression->GetNodeStats().CriticalMultiplierBonus, 0.22f, 0.0001f);
+    TestTrue(TEXT("Gateway opens its first ranked lane"), Progression->CanPurchaseNode(Core, TEXT("Core.Precision.Angle"), Failure));
+    TestFalse(TEXT("Notable still requires its minor"), Progression->CanPurchaseNode(Core, TEXT("Core.Precision.CalledShot"), Failure));
+    TestTrue(TEXT("Clockwise neighbor is reachable"), Progression->CanPurchaseNode(Core, TEXT("Core.Vector.Line"), Failure));
+    TestTrue(TEXT("Wraparound neighbor is reachable"), Progression->CanPurchaseNode(Core, TEXT("Core.Threat.Presence"), Failure));
+    TestFalse(TEXT("Non-neighbor gateway is refused"), Progression->CanPurchaseNode(Core, TEXT("Core.Ballistics.WeightOfIt"), Failure));
+    TestTrue(TEXT("Angle rank one purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Angle"), Failure));
+    TestTrue(TEXT("Rank one opens Called Shot"), Progression->PurchaseNode(Core, TEXT("Core.Precision.CalledShot"), Failure));
+    TestFalse(TEXT("One completed lane cannot open convergence"), Progression->CanPurchaseNode(Core, TEXT("Core.Precision.Fixate"), Failure));
+    TestTrue(TEXT("Cadence rank one purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Cadence"), Failure));
+    TestTrue(TEXT("Second lane notable purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.TriggerDiscipline"), Failure));
+    TestTrue(TEXT("Two distinct notables open convergence"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Fixate"), Failure));
+    TestEqual(TEXT("Rank-one convergence route costs ten"), Progression->GetTreeInvestment(Core), 10);
+    TestFalse(TEXT("Convergence does not bypass the local keystone gate"), Progression->CanPurchaseNode(Core, TEXT("Core.Precision.Deadeye"), Failure));
+    TestTrue(TEXT("Optional Angle rank two purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Angle"), Failure));
+    TestTrue(TEXT("Optional Angle rank three purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Angle"), Failure));
+    TestFalse(TEXT("Rank four is refused"), Progression->CanPurchaseNode(Core, TEXT("Core.Precision.Angle"), Failure));
+    TestEqual(TEXT("Three Angle ranks aggregate crit chance"), Progression->GetNodeStats().CriticalChanceBonus, 0.06f, 0.0001f);
+    TestEqual(TEXT("Sightline and Trigger Discipline aggregate critical damage"), Progression->GetNodeStats().CriticalMultiplierBonus, 0.31f, 0.0001f);
 
     // The empty Doctrine wallet cannot purchase; commitment selects the board
     // while completed mission benchmarks supply its points.
@@ -401,47 +423,46 @@ bool FBreakerNodeStatAggregationTest::RunTest(const FString& Parameters)
         for (const UBreakerProgressionNode* Node : Tree->Nodes) Nodes.Add(Node);
     }
 
+    // This isolated aggregation fixture supplies real authored rows directly;
+    // paid reachability is tested above, separately from aggregation arithmetic.
     TArray<FBreakerNodeRank> Ranks;
-    Ranks.Add({TEXT("Core.Precision.Sightline"), 1});     // +2 crit chance (atlas rim)
-    Ranks.Add({TEXT("Core.Precision.Lead"), 1});          // +2 crit chance (atlas rim)
-    Ranks.Add({TEXT("Core.Bulwark.SetStance"), 1});       // +6 block, +90 health
-    Ranks.Add({TEXT("Core.Kinesis.LightFooting"), 1});    // +5 dodge, +12% move
-    Ranks.Add({TEXT("Core.Affliction.Fester"), 1});        // +12% DoT (atlas inner)
-    Ranks.Add({TEXT("Swift.Kinetic.AirWork"), 1});        // +12% air control
-    Ranks.Add({TEXT("Swift.Marksman.LongLens"), 2});      // +18 crit damage per rank
+    Ranks.Add({TEXT("Core.Precision.Angle"), 2});
+    Ranks.Add({TEXT("Core.Precision.Sightline"), 1});
+    Ranks.Add({TEXT("Core.Bulwark.Read"), 1});
+    Ranks.Add({TEXT("Core.Bulwark.Evade"), 1});
+    Ranks.Add({TEXT("Core.Aegis.Footing"), 1});
+    Ranks.Add({TEXT("Core.Velocity.Grind"), 1});
+    Ranks.Add({TEXT("Core.Affliction.Fester"), 1});
+    Ranks.Add({TEXT("Swift.Kinetic.AirWork"), 1});
+    Ranks.Add({TEXT("Swift.Marksman.LongLens"), 2});
 
     const FBreakerNodeStats Stats = UBreakerProgressionComponent::AggregateStats(Nodes, Ranks);
     TestEqual(TEXT("Flat crit chance sums into a fraction"), Stats.CriticalChanceBonus, 0.04f, 0.0001f);
-    TestEqual(TEXT("Flat crit damage scales with rank"), Stats.CriticalMultiplierBonus, 0.36f, 0.0001f);
-    TestEqual(TEXT("Block chance converts to a fraction"), Stats.BlockChanceBonus, 0.06f, 0.0001f);
-    TestEqual(TEXT("Dodge chance converts to a fraction"), Stats.DodgeChanceBonus, 0.05f, 0.0001f);
-    TestEqual(TEXT("Health is a flat bonus"), Stats.BonusHealth, 90.0f, 0.0001f);
-    TestEqual(TEXT("Increased move speed becomes a multiplier"), Stats.MoveSpeedMultiplier, 1.12f, 0.0001f);
+    TestEqual(TEXT("Flat crit damage scales with rank"), Stats.CriticalMultiplierBonus, 0.42f, 0.0001f);
+    TestEqual(TEXT("Block chance converts to a fraction"), Stats.BlockChanceBonus, 0.05f, 0.0001f);
+    TestEqual(TEXT("Dodge chance converts to a fraction"), Stats.DodgeChanceBonus, 0.03f, 0.0001f);
+    TestEqual(TEXT("Health is a flat bonus"), Stats.BonusHealth, 60.0f, 0.0001f);
+    TestEqual(TEXT("Increased move speed becomes a multiplier"), Stats.MoveSpeedMultiplier, 1.08f, 0.0001f);
     TestEqual(TEXT("Increased air control becomes a multiplier"), Stats.AirControlMultiplier, 1.12f, 0.0001f);
-    TestEqual(TEXT("Increased DoT reaches the aggregate"), Stats.DamageOverTimeMultiplier, 1.12f, 0.0001f);
-    // NOTHING UNAIMED, twice over now: Long Lens's damage line is gated on
-    // Aiming (Progression.AxisOverlap), and the atlas's Sightline is a pure
-    // crit rim with no damage line at all. Standing there not aiming, the
-    // fixture authors no damage.
-    TestEqual(TEXT("An unaimed build gets no damage line at all"), Stats.DamageMultiplier, 1.0f, 0.0001f);
-    // AND THE ADDITIVITY THIS ASSERTION EXISTS FOR: down sights, Long Lens's
-    // +3% across two ranks lands in ONE bucket -- 3 + 3 = 6, not
-    // 1.03 x 1.03. Across ranks, which is the surviving half of the claim
-    // now that the atlas's Core rims author no unconditional damage here.
+    TestEqual(TEXT("Increased DoT reaches the aggregate"), Stats.DamageOverTimeMultiplier, 1.25f, 0.0001f);
+    // None of these Core rows authors shared Increased Damage. Long Lens
+    // contributes its existing conditional lane only while aiming.
+    TestEqual(TEXT("Unaimed shared damage remains neutral"), Stats.DamageMultiplier, 1.0f, 0.0001f);
     FBreakerBuildConditionState Aiming;
     Aiming.Set(EBreakerBuildCondition::Aiming, true);
     const FBreakerNodeStats Aimed = UBreakerProgressionComponent::AggregateStats(Nodes, Ranks, nullptr, Aiming);
     TestEqual(TEXT("Increased damage stacks additively across ranks"), Aimed.DamageMultiplier, 1.06f, 0.0001f);
     TestEqual(TEXT("Untouched multipliers stay neutral"), Stats.SlideSpeedMultiplier, 1.0f, 0.0001f);
 
-    // Rule tags publish beside stats, and over-asked ranks clamp: the atlas
-    // makes Read a MaxRank-1 rim with a weapon line, so rank 3 pays rank 1.
     TArray<FBreakerNodeRank> VerbRanks;
     VerbRanks.Add({TEXT("Core.Bulwark.Read"), 3});
-    const FBreakerNodeStats InertStats = UBreakerProgressionComponent::AggregateStats(Nodes, VerbRanks);
-    TestTrue(TEXT("Read publishes its tag"), InertStats.GrantedTags.HasTag(BreakerNodeTags::Node_Read.GetTag()));
-    TestFalse(TEXT("Read without Parry grants no verb"), InertStats.GrantedTags.HasTag(BreakerNodeTags::Verb_Parry.GetTag()));
-    TestEqual(TEXT("Read's weapon line pays exactly one clamped rank"), InertStats.DamageMultiplier, 1.03f, 0.0001f);
+    const FBreakerNodeStats ReadStats = UBreakerProgressionComponent::AggregateStats(Nodes, VerbRanks);
+    TestFalse(TEXT("Read without Parry grants no verb"), ReadStats.GrantedTags.HasTag(BreakerNodeTags::Verb_Parry.GetTag()));
+    TestEqual(TEXT("Read clamps to its single five-percent block rank"), ReadStats.BlockChanceBonus, 0.05f, 0.0001f);
+    TestEqual(TEXT("Read no longer supplies an unrelated weapon-damage line"), ReadStats.DamageMultiplier, 1.0f, 0.0001f);
+    VerbRanks.Add({TEXT("Core.Bulwark.Parry"), 1});
+    const FBreakerNodeStats ParryStats = UBreakerProgressionComponent::AggregateStats(Nodes, VerbRanks);
+    TestTrue(TEXT("Parry publishes its actual verb"), ParryStats.GrantedTags.HasTag(BreakerNodeTags::Verb_Parry.GetTag()));
 
     // Ranks beyond the node's cap cannot inflate the aggregate.
     TArray<FBreakerNodeRank> OverRanks;
@@ -459,7 +480,7 @@ bool FBreakerNodeStatAggregationTest::RunTest(const FString& Parameters)
 
 // ---------------------------------------------------------------------------
 // Multi-rank More validator (owner ruling 2026-08-16). Rank never scales a
-// More — AggregateStats refuses to multiply one by rank — so a node with
+// More â€” AggregateStats refuses to multiply one by rank â€” so a node with
 // MaxRank > 1 authoring a MorePercent effect is authored nonsense: it
 // promises ranks it cannot pay. UBreakerProgressionComponent::
 // IsNodeMoreAuthoringLegal is the static rule; this test runs it over EVERY
@@ -526,13 +547,9 @@ bool FBreakerMultiRankMoreValidatorTest::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// O141: AT MOST ONE target-gated More exists in the game, and Collapse is it.
-// A single x1.30 hit-time rider already takes an ability build to 98.5% of
-// the 1.30^3 ceiling, so a second would deliver almost nothing past the first
-// and read as a line that does not work — authoring one is not a tuning
-// question, it is a request to revisit the ceiling, which is a different and
-// larger ruling. This pin is where the next author meets that rule before
-// shipping a dead line.
+// Replacement Core has no legacy target-rider More. Its two conditional
+// weapon Mores use selected source scopes in the joint strongest-three pool.
+// Keep the existing test identity while checking both sides of that boundary.
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerOneHitTimeMoreTest,
@@ -541,7 +558,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerOneHitTimeMoreTest::RunTest(const FString& Parameters)
 {
-    TArray<FString> Found;
+    TArray<FString> Found, ScopedWeaponMores;
     int32 EffectsWalked = 0;
     for (const UBreakerProgressionTree* Tree : UBreakerProgressionLibrary::GetAllFallbackTrees())
     {
@@ -552,6 +569,12 @@ bool FBreakerOneHitTimeMoreTest::RunTest(const FString& Parameters)
             for (const FBreakerNodeEffect& Effect : Node->Effects)
             {
                 ++EffectsWalked;
+                if (Effect.StatBucket == EBreakerNodeStatBucket::MorePercent
+                    && (Effect.StatTarget == EBreakerNodeStatTarget::WeaponCriticalDamage || Effect.StatTarget == EBreakerNodeStatTarget::WeaponBeyondFirstDamage))
+                {
+                    ScopedWeaponMores.Add(Node->NodeId.ToString());
+                    TestFalse(TEXT("Selected source scope is not an extra target rider"), Effect.RequiresTargetState());
+                }
                 if (Effect.StatBucket == EBreakerNodeStatBucket::MorePercent && Effect.RequiresTargetState())
                 {
                     Found.Add(Node->NodeId.ToString());
@@ -560,10 +583,10 @@ bool FBreakerOneHitTimeMoreTest::RunTest(const FString& Parameters)
         }
     }
     TestTrue(TEXT("The walk saw real content"), EffectsWalked > 100);
-    TestEqual(*FString::Printf(TEXT("Exactly one target-gated More exists (O141): %s"),
-        Found.Num() ? *FString::Join(Found, TEXT("; ")) : TEXT("none")), Found.Num(), 1);
-    TestTrue(TEXT("...and it is Collapse"),
-        Found.Num() == 1 && Found[0] == TEXT("Core.Ruin.Collapse"));
+    TestEqual(TEXT("Replacement authors no legacy hit-time rider More"), Found.Num(), 0);
+    TestEqual(TEXT("Exactly two selected conditional weapon scopes"), ScopedWeaponMores.Num(), 2);
+    TestTrue(TEXT("Critical scope belongs to Fixate"), ScopedWeaponMores.Contains(TEXT("Core.Precision.Fixate")));
+    TestTrue(TEXT("Later-target scope belongs to Splinter"), ScopedWeaponMores.Contains(TEXT("Core.Vector.Splinter")));
     return true;
 }
 

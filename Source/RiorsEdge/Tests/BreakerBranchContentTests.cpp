@@ -4,7 +4,9 @@
 #include "GameFramework/Actor.h"
 #include "Abilities/BreakerAbilityTags.h"
 #include "Attributes/BreakerAttributeSet.h"
+#include "Attributes/BreakerAttributeAggregation.h"
 #include "Progression/BreakerProgressionComponent.h"
+#include "Progression/BreakerExperience.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "Progression/BreakerProgressionNode.h"
 #include "Progression/BreakerProgressionTree.h"
@@ -273,93 +275,47 @@ bool FBreakerElementsConstellationTest::RunTest(const FString& Parameters)
 
     TArray<const UBreakerProgressionNode*> ElementNodes;
     for (const UBreakerProgressionNode* Node : Core->Nodes)
+        if (Node->Constellation == FName(TEXT("Entropy"))) ElementNodes.Add(Node);
+    TestEqual(TEXT("Entropy ships its entire major wedge"), ElementNodes.Num(), 11);
+    for (const auto* Node : ElementNodes)
     {
-        // Constellation membership rides the node-id prefix; SBreakerMenu's
-        // cluster layout reads the same string, so a node named any other way
-        // would render outside the Elements cluster.
-        if (Node->NodeId.ToString().StartsWith(TEXT("Core.Elements."))) ElementNodes.Add(Node);
+        TestEqual(TEXT("Entropy spends Core points"), Node->Currency, EBreakerPointCurrency::CorePoints);
+        TestEqual(TEXT("Entropy remains generic"), Node->RequiredClass, EBreakerClassId::None);
+        TestTrue(TEXT("Authored effect or rule identity"), !Node->Effects.IsEmpty() || !Node->GrantedTags.IsEmpty());
+        for (const auto& Effect : Node->Effects)
+            if (Effect.StatBucket == EBreakerNodeStatBucket::MorePercent)
+                TestEqual(TEXT("More belongs to convergence"), Node->CoreRole, EBreakerCoreNodeRole::Convergence);
     }
-    // ATLAS SHAPE (Phase 4 pair C): a full wheel of ten. The six shipped ids
-    // hold with their tags; the four new nodes carry none (dead-tag headroom
-    // is one and a tag may only arrive consumed). The old no-More assertion
-    // is superseded BY RULING — the atlas's nine-More roster spends the slot
-    // §2.4 used to reserve, on the hub and only the hub.
-    TestEqual(TEXT("Elements ships its full wheel of ten"), ElementNodes.Num(), 10);
-
-    for (const UBreakerProgressionNode* Node : ElementNodes)
-    {
-        const FString Context = Node->NodeId.ToString();
-        TestEqual(*(Context + TEXT(" spends core points")), Node->Currency, EBreakerPointCurrency::CorePoints);
-        TestEqual(*(Context + TEXT(" is class-agnostic")), Node->RequiredClass, EBreakerClassId::None);
-        // Every Elements node must still MOVE something today: a stat line on
-        // a live lane, or a rule tag with a live consumer (Threshold).
-        TestTrue(*(Context + TEXT(" authors an effect or carries a tag")),
-            Node->Effects.Num() > 0 || Node->GrantedTags.Num() > 0);
-        // The More lives on the hub alone (O3: Convergence nodes only).
-        if (Node->NodeId != FName(TEXT("Core.Elements.ReactionChain")))
-        {
-            for (const FBreakerNodeEffect& Effect : Node->Effects)
-            {
-                TestTrue(*(Context + TEXT(" authors no More multiplier")), Effect.StatBucket != EBreakerNodeStatBucket::MorePercent);
-            }
-        }
-    }
-
-    // --- Purchasable end to end, and the effects land ----------------------
-    UBreakerAttributeSet* Attributes = NewObject<UBreakerAttributeSet>();
-    AActor* Owner = BranchContentMakeOwner();
-    UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>(Owner);
-    Progression->IncreasedDamagePerSpentPoint = 0.0f;
+    auto* Attributes = NewObject<UBreakerAttributeSet>();
+    auto* Progression = NewObject<UBreakerProgressionComponent>(BranchContentMakeOwner());
+    Progression->IncreasedDamagePerSpentPoint = 0;
     Progression->BindAttributes(Attributes);
-    Progression->ApplySliceDefaultsIfFresh();
-    Progression->GrantPlaytestPoints(0, 40);
-
+    Progression->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(29, Progression->ExperienceCurve));
     const float BaseDoT = Attributes->GetDamageOverTimeMultiplier();
     const float BaseCritChance = Attributes->GetCriticalChance();
     const float BaseDamage = Attributes->GetDamageMultiplier();
-
-    // The wheel walk, the atlas way: ELEMENTS is entered at its own rim 0
-    // from the virtual hub (O211) — no path is bought to reach it. The Primed
-    // baselines are captured before the wheel so its own deltas stay clean.
-    const float PrimedDoT = Attributes->GetDamageOverTimeMultiplier();
-    const float PrimedCritChance = Attributes->GetCriticalChance();
-    const float PrimedDamage = Attributes->GetDamageMultiplier();
-
-    for (const TCHAR* Rim : {TEXT("Core.Elements.Conductive"), TEXT("Core.Elements.ChargeUp"),
-        TEXT("Core.Elements.Penetrance"), TEXT("Core.Elements.Attunement"),
-        TEXT("Core.Elements.Catalyst"), TEXT("Core.Elements.Sympathy")})
-    {
-        TestTrue(*FString::Printf(TEXT("%s purchases"), Rim), BranchContentBuyToMax(*this, Progression, Core, Rim));
-    }
-    for (const TCHAR* Inner : {TEXT("Core.Elements.Threshold"), TEXT("Core.Elements.Reaction"), TEXT("Core.Elements.Sequence")})
-    {
-        TestTrue(*FString::Printf(TEXT("%s purchases"), Inner), BranchContentBuyToMax(*this, Progression, Core, Inner));
-    }
-    TestTrue(TEXT("Reaction Chain purchases behind its three inners"), BranchContentBuyToMax(*this, Progression, Core, TEXT("Core.Elements.ReactionChain")));
-
-    // The hub's More lives on the DOT LANE (the no-shared-hub ruling), so
-    // the wheel's only DoT contribution is exactly that multiplier...
-    TestEqual(TEXT("Reaction Chain's More composes on the DoT attribute"),
-        Attributes->GetDamageOverTimeMultiplier(), PrimedDoT * 1.26f, 0.0001f);
-    TestEqual(TEXT("Catalyst's crit chance reaches the attribute set"),
-        Attributes->GetCriticalChance() - PrimedCritChance, 0.04f, 0.0001f);
-    // ...and the damage attribute carries only the generic lines — no hub
-    // More rides the shared pool any more.
-    TestEqual(TEXT("The damage attribute carries the generic lines alone"),
-        Attributes->GetDamageMultiplier(), PrimedDamage + 0.06f, 0.0001f);
-    // And the two status lanes carry the wheel's re-targeted rims plus
-    // Sequence's stat half: +10% chance, +20% duration.
-    TestEqual(TEXT("Attunement feeds the StatusChance lane"),
-        Progression->GetNodeStats().StatusChanceMultiplier, 1.10f, 0.0001f);
-    TestEqual(TEXT("Sympathy and Sequence feed the StatusDuration lane"),
-        Progression->GetNodeStats().StatusDurationMultiplier, 1.20f, 0.0001f);
-
-    // --- Respec restores exactly -------------------------------------------
+    for (const TCHAR* Id : {TEXT("Core.Entropy.Attunement"), TEXT("Core.Entropy.Catalyst"), TEXT("Core.Entropy.Threshold"),
+        TEXT("Core.Entropy.Decay"), TEXT("Core.Entropy.Density"), TEXT("Core.Entropy.Conductive"), TEXT("Core.Entropy.Sympathy"),
+        TEXT("Core.Entropy.Penetrance"), TEXT("Core.Entropy.Sequence"), TEXT("Core.Entropy.Cascade"), TEXT("Core.Entropy.LongDark")})
+        if (!BranchContentBuyToMax(*this, Progression, Core, Id)) return false;
+    TestEqual(TEXT("Complete major costs twenty-six"), Progression->GetConstellationInvestment(Core, TEXT("Entropy")), 26);
+    const auto& Stats = Progression->GetNodeStats();
+    TestEqual(TEXT("Entropy does not change generic physical DoT"), Attributes->GetDamageOverTimeMultiplier(), BaseDoT, .0001f);
+    TestEqual(TEXT("Entropy does not author crit chance"), Attributes->GetCriticalChance(), BaseCritChance, .0001f);
+    TestEqual(TEXT("Elemental scope does not inflate generic weapon damage"), Attributes->GetDamageMultiplier(), BaseDamage, .0001f);
+    TestEqual(TEXT("Ranked Rot damage authored"), Stats.RotDamageIncreasedPercent, 21.f, .0001f);
+    TestEqual(TEXT("Ranked thresholds authored"), Stats.ElementalThresholdMultiplier, .85f, .0001f);
+    TestEqual(TEXT("Sequence duration reaches lane"), Stats.StatusDurationMultiplier, 1.12f, .0001f);
+    TestTrue(TEXT("Purchased Density reaches primitive"), Stats.bRotDensity);
+    TestTrue(TEXT("Purchased Long Dark reaches primitive"), Stats.bLongDark);
+    TestEqual(TEXT("Elemental convergence occupies one shared More slot"), Stats.DamageMoreSourceCount, 1);
     FText Failure;
-    TestTrue(TEXT("Core respec at a Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure));
-    TestEqual(TEXT("Respec restores damage over time exactly"), Attributes->GetDamageOverTimeMultiplier(), BaseDoT, 0.0001f);
-    TestEqual(TEXT("Respec restores crit chance exactly"), Attributes->GetCriticalChance(), BaseCritChance, 0.0001f);
-    TestEqual(TEXT("Respec restores the damage multiplier exactly"), Attributes->GetDamageMultiplier(), BaseDamage, 0.0001f);
+    if (!TestTrue(TEXT("Core respec"), Progression->RespecCore(Failure))) return false;
+    TestFalse(TEXT("Respec clears Long Dark"), Progression->GetNodeStats().bLongDark);
+    TestEqual(TEXT("Respec clears Rot bonus"), Progression->GetNodeStats().RotDamageIncreasedPercent, 0.f);
+    TestEqual(TEXT("Respec restores physical DoT"), Attributes->GetDamageOverTimeMultiplier(), BaseDoT, .0001f);
+    TestEqual(TEXT("Respec restores critical chance"), Attributes->GetCriticalChance(), BaseCritChance, .0001f);
+    TestEqual(TEXT("Respec restores generic damage"), Attributes->GetDamageMultiplier(), BaseDamage, .0001f);
     return true;
 }
 
@@ -372,33 +328,17 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerMoreCeilingWithNewContentTest::RunTest(const FString& Parameters)
 {
-    // O3 is a hard cap of three composed More multipliers per BUILD. The content
-    // carries SEVEN More options against that cap, which is the shape O27 asks
-    // for — more options than the cap, so which three you hold is a decision —
-    // but the cap itself must not move, and no content pass may add an eighth
-    // without an owner ruling. The tier-4 block at the end of this test is the
-    // guard added when Swift's rewrite tier landed.
+    // Pure aggregation stress fixture: all authored Mores, not a legal allocation.
+    // Actual budget/reachability is verified by CoreRoster.RingReachability.
     TArray<const UBreakerProgressionNode*> Nodes;
-    for (const UBreakerProgressionTree* Tree : UBreakerProgressionLibrary::GetAllFallbackTrees())
-    {
+    for (const auto* Tree : UBreakerProgressionLibrary::GetAllFallbackTrees())
         for (const UBreakerProgressionNode* Node : Tree->Nodes) Nodes.Add(Node);
-    }
-
-    // Every More node in the content, so a build that could hold them all does
-    // not get to. NINE under the atlas — the owner's ruled roster, one per
-    // hub Convergence — and the aggregator must keep the strongest three
-    // across every lane from ONE budget (O74).
     TArray<FBreakerNodeRank> Ranks;
-    Ranks.Add({TEXT("Core.Precision.Fixate"), 1});            // x1.22 weapon lane
-    Ranks.Add({TEXT("Core.Volley.Barrage"), 1});              // x1.22 weapon lane
-    Ranks.Add({TEXT("Core.Vector.Splinter"), 1});             // x1.25 weapon lane
-    Ranks.Add({TEXT("Core.Elements.ReactionChain"), 1});      // x1.26 DoT lane
-    Ranks.Add({TEXT("Core.Bulwark.Set"), 1});                 // x1.20 stationary, SHARED (conditional hubs keep both lanes)
-    Ranks.Add({TEXT("Core.Arc.Overflow"), 1});                // x1.28 ability lane
-    Ranks.Add({TEXT("Core.Affliction.Compound"), 1});         // x1.24 DoT lane
-    Ranks.Add({TEXT("Core.Velocity.TerminalVelocity"), 1});   // x1.30 airborne, SHARED
-    Ranks.Add({TEXT("Core.Ruin.Collapse"), 1});               // x1.30 SHARED, TargetBandBroken — HIT-TIME (O141): pays via the rider path, never this sort
-    Ranks.Add({TEXT("Core.Velocity.Redline"), 1});            // DEMOTED: +14% ability line, no More
+    for (const auto* Node : Nodes)
+        if (Node->Currency == EBreakerPointCurrency::CorePoints && Node->Effects.ContainsByPredicate(
+            [](const FBreakerNodeEffect& Effect) { return Effect.StatBucket == EBreakerNodeStatBucket::MorePercent; }))
+            Ranks.Add({Node->NodeId, 1});
+    TestEqual(TEXT("Literal roster offers ten More convergences"), Ranks.Num(), 10);
     // O95: these three author no More any more. They stay in the fixture
     // deliberately -- owning every doctrine keystone must not change the
     // multiplier layer at all, and that is asserted below.
@@ -406,28 +346,17 @@ bool FBreakerMoreCeilingWithNewContentTest::RunTest(const FString& Parameters)
     Ranks.Add({TEXT("Swift.Marksman.Culling"), 1});           // weapon pool, no More
     Ranks.Add({TEXT("Swift.Frenzy.Bloodrhythm"), 1});         // fire rate, no More
 
+    FBreakerAttributeContribution MoreOffer;
     const FBreakerNodeStats Stats = UBreakerProgressionComponent::AggregateStats(
-        Nodes, Ranks, nullptr, FBreakerBuildConditionState::All());
+        Nodes, Ranks, &MoreOffer, FBreakerBuildConditionState::All());
 
-    // Eight STANDING sources — the ruled atlas roster minus Collapse, which
-    // O141 moved to the hit-time rider path: it spends ceiling headroom at
-    // the hit, never a slot, so counting it here would tell the player it
-    // competes for the three when it structurally cannot. The skill screen's
-    // "N / 3 MORE" keeps meaning slot competition. Redline contributes none:
-    // its demotion from the tenth More is the pair-F change this fixture
-    // witnesses.
-    TestEqual(TEXT("Every authored STANDING More source is counted honestly"), Stats.DamageMoreSourceCount, 8);
-    TestTrue(TEXT("More options outnumber the O3 cap, so holding three is a choice"),
-        Stats.DamageMoreSourceCount > UBreakerProgressionComponent::MaxDamageMoreSources);
-    // Strongest three across lanes, post-O141: Terminal Velocity (1.30
-    // SHARED, airborne), Overflow (1.28 ability) and Reaction Chain (1.26
-    // DoT) — Collapse no longer stands for selection at all. The weapon lane
-    // therefore composes the shared winner alone; the ability lane the
-    // shared winner and its own. One budget, spent once (O74); Collapse's
-    // x1.30 arrives at the hit on top of whichever product the target's
-    // band-break earns, clamped to the same one ceiling.
-    TestEqual(TEXT("The weapon lane composes the shared winner alone"), Stats.DamageMoreMultiplier, 1.30f, 0.0001f);
-    TestEqual(TEXT("The ability lane composes shared + ability winners"), Stats.AbilityDamageMoreMultiplier, 1.30f * 1.28f, 0.0001f);
+    TestEqual(TEXT("All ten scoped More sources counted"), Stats.DamageMoreSourceCount, 10);
+    TestTrue(TEXT("More choices exceed shared three slots"), Stats.DamageMoreSourceCount > UBreakerProgressionComponent::MaxDamageMoreSources);
+    // Raw magnitude selects Overflow1.26, Collapse1.24 and Compound1.24.
+    // Other scope-specific sources cannot become generic weapon multipliers.
+    TestEqual(TEXT("Weapon composes selected Collapse only"), Stats.DamageMoreMultiplier, 1.24f, .0001f);
+    TestEqual(TEXT("Ability composes selected Overflow only"), Stats.AbilityDamageMoreMultiplier, 1.26f, .0001f);
+    TestEqual(TEXT("Physical DoT composes selected Compound only"), MoreOffer.GetMore(EBreakerAggregatedAttribute::DamageOverTimeMultiplier), 1.24f, .0001f);
     // A hard upper bound stated independently of the content, so a future node
     // authored above the ceiling fails here rather than in a playtest.
     const float AbsoluteCeiling = FMath::Pow(UBreakerProgressionComponent::SingleMoreCeiling,
@@ -475,13 +404,9 @@ bool FBreakerMoreCeilingWithNewContentTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("The nine tier-4 rewrites add no More source"), Rewritten.DamageMoreSourceCount, Stats.DamageMoreSourceCount);
     TestEqual(TEXT("The nine tier-4 rewrites do not move the composed More product"),
         Rewritten.DamageMoreMultiplier, Stats.DamageMoreMultiplier, 0.0001f);
-    // Restated absolutely rather than relatively, so this still means something
-    // if the baseline above is ever re-pinned: the worst case a single legal
-    // character can hold is 1.30 x 1.22 x 1.22 = 1.9349, against O3/O34's
-    // ceiling of 1.30^3 = 2.197. The Swift expansion did not touch either
-    // number, because Swift's three keystone Mores (1.20 / 1.20 / 1.18) are all
-    // smaller than the three Core Mores the aggregator keeps, and a character
-    // may hold only ONE keystone anyway.
+    // This is the same all-source aggregation stress case, not a legal
+    // allocation or a generic product of differently scoped More sources.
+    // Adding Swift rewrites must leave its bounded weapon lane unchanged.
     TestTrue(TEXT("Worst case with the tier-4 content stays under the O3 ceiling"),
         Rewritten.DamageMoreMultiplier <= AbsoluteCeiling + UE_KINDA_SMALL_NUMBER);
     // WHAT THIS DOES NOT COVER: the aggregator is exercised with every

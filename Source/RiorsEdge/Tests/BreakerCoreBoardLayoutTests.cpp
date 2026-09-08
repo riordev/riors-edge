@@ -12,10 +12,11 @@ bool FBreakerCoreBoardLayoutTest::RunTest(const FString& Parameters)
     const UBreakerProgressionTree* Tree = UBreakerProgressionLibrary::GetCoreSliceTree();
     if (!TestNotNull(TEXT("Shipped Core exists"), Tree)) return false;
     const BreakerCoreBoard::FLayout Overview = BreakerCoreBoard::Build(Tree);
-    TestEqual(TEXT("Five sector atlas"), Overview.Sectors.Num(), 5);
-    TestEqual(TEXT("Every shipped node appears"), Overview.Centers.Num(), 117);
-    TestEqual(TEXT("Every actual edge appears"), Overview.Edges.Num(), 171);
-    TestEqual(TEXT("Every virtual hub entry appears"), Overview.Entries.Num(), 12);
+    TestTrue(TEXT("Shipped metadata selects role layout"), Overview.bUsesCoreRoles && Overview.bValidMetadata);
+    TestEqual(TEXT("Six authored sectors"), Overview.Sectors.Num(), 6);
+    TestEqual(TEXT("Every shipped node appears"), Overview.Centers.Num(), 187);
+    TestEqual(TEXT("Every actual edge appears"), Overview.Edges.Num(), 242);
+    TestEqual(TEXT("Every authored gateway appears"), Overview.Entries.Num(), 22);
     TArray<FVector2D> OverviewPoints;
     Overview.Centers.GenerateValueArray(OverviewPoints);
     for (int32 Index = 0; Index < OverviewPoints.Num(); ++Index)
@@ -32,15 +33,32 @@ bool FBreakerCoreBoardLayoutTest::RunTest(const FString& Parameters)
     for (int32 Index = 0; Index < Overview.Wedges.Num(); ++Index)
     {
         const BreakerCoreBoard::FWedge& Wedge = Overview.Wedges[Index];
-        const FVector2D Cluster = BreakerCoreBoard::Polar(Overview.Hub, 520, Wedge.AngleDegrees);
+        float GatewayRadius = 0, ConvergenceRadius = 0, KeystoneRadius = 0;
+        float MinLaneRadius = MAX_flt, MaxLaneRadius = 0;
         for (FName Id : Wedge.Nodes)
-            TestTrue(TEXT("Each constellation stays a compact circular cluster"),
-                FVector2D::Distance(Cluster, Overview.Centers[Id]) <= 110.01f);
-        const FVector2D Label = BreakerCoreBoard::Polar(Overview.Hub, BreakerCoreBoard::OverviewLabelRadius, Wedge.AngleDegrees);
+        {
+            const auto* Node = Tree->FindNode(Id);
+            if (!TestNotNull(TEXT("Drawn node resolves to real authoring"), Node)) return false;
+            const FVector2D Delta = Overview.Centers[Id] - Overview.Hub;
+            const float Angle = FMath::RadiansToDegrees(FMath::Atan2(Delta.Y, Delta.X));
+            TestTrue(TEXT("Each node stays within its own radial wedge"),
+                FMath::Abs(FMath::FindDeltaAngleDegrees(Wedge.AngleDegrees, Angle)) < 180.0f / Overview.Wedges.Num());
+            const float Radius = Delta.Size();
+            if (Node->CoreRole == EBreakerCoreNodeRole::Gateway) GatewayRadius = Radius;
+            else if (Node->CoreRole == EBreakerCoreNodeRole::Convergence) ConvergenceRadius = Radius;
+            else if (Node->CoreRole == EBreakerCoreNodeRole::Keystone) KeystoneRadius = Radius;
+            else { MinLaneRadius = FMath::Min(MinLaneRadius, Radius); MaxLaneRadius = FMath::Max(MaxLaneRadius, Radius); }
+        }
+        TestTrue(TEXT("Branches remain visibly between gateway and convergence"),
+            GatewayRadius < MinLaneRadius && MaxLaneRadius < ConvergenceRadius);
+        TestTrue(TEXT("A major's keystone sits beyond its convergence"), KeystoneRadius == 0 || KeystoneRadius > ConvergenceRadius);
+        // This is the actual role-layout label radius used by SBreakerMenu.
+        const FVector2D Label = BreakerCoreBoard::Polar(Overview.Hub, 1450.0f, Wedge.AngleDegrees);
         for (int32 Other = Index + 1; Other < Overview.Wedges.Num(); ++Other)
             TestFalse(TEXT("Overview focus targets never overlap"), Overlaps(Label,
-                BreakerCoreBoard::Polar(Overview.Hub, BreakerCoreBoard::OverviewLabelRadius, Overview.Wedges[Other].AngleDegrees), OverviewHit));
+                BreakerCoreBoard::Polar(Overview.Hub, 1450.0f, Overview.Wedges[Other].AngleDegrees), OverviewHit));
         const BreakerCoreBoard::FLayout Focus = BreakerCoreBoard::Build(Tree, Wedge.Name);
+        TestTrue(TEXT("Focus retains valid real role metadata"), Focus.bUsesCoreRoles && Focus.bValidMetadata);
         TestEqual(TEXT("Focus keeps every member"), Focus.Centers.Num(), Wedge.Nodes.Num());
         int32 ExpectedEdges = 0;
         for (const FBreakerNodeEdge& Edge : Tree->AdjacencyEdges)

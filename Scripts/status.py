@@ -43,6 +43,7 @@ shipped that confusion four times in other forms.
 """
 
 import json
+import hashlib
 import os
 import re
 import subprocess
@@ -306,8 +307,9 @@ def parse_tag_map(sources):
 # --------------------------------------------------------------------------
 # The same nodes parse_nodes finds, read off the built objects instead of the
 # authoring text. Every section below consumes the ONE dict shape, so the two
-# modes are interchangeable at the section level and any number that differs
-# between them is a defect in one parser, never a reconciliation.
+# legacy modes are interchangeable at the section level. Activated Core is
+# explicitly native-canonical in both modes; only Doctrine has independent
+# source/census inventory parity after that activation.
 
 def load_census():
     """The exported census, refused with the same loudness parse_nodes refuses.
@@ -797,6 +799,138 @@ def classify(node):
     return "notable"
 
 
+# The replacement Core is built by helpers, not literal MakeNode rows. Its
+# inventory is native-canonical; identifier/shape checks below are freshness
+# guards, not a second implementation of the builder or its effect semantics.
+CORE_SOURCE_FIXED = (
+    "Progression/BreakerCoreTree.cpp", "Progression/BreakerCoreTree.h",
+    "Progression/BreakerProgressionLibrary.cpp", "Progression/BreakerProgressionTypes.h",
+    "Progression/BreakerProgressionNode.h", "Progression/BreakerProgressionTree.h",
+    "Data/BreakerCensus.cpp",
+)
+CORE_INVENTORY_NOTE = (
+    "Core inventory: fresh native census of the activated builder; no independent "
+    "Core source-parser agreement is claimed. Doctrine IDs, ranks, costs, effect targets, "
+    "conditions and tags are cross-checked against source. Source hashes bind the "
+    "export to authoring files, not to rebuilt binaries; native Census.Fresh and "
+    "the build/suite remain required."
+)
+
+
+def core_builder_is_live(lib_text):
+    """Only a call inside the actual live getter opts into native Core inventory."""
+    text = strip_cpp_comments(lib_text)
+    match = re.search(r'UBreakerProgressionTree\s*\*\s*UBreakerProgressionLibrary::GetCoreSliceTree\s*\(\s*\)\s*\{', text)
+    if not match:
+        raise ParseError("Live GetCoreSliceTree definition missing; Core activation cannot be determined.")
+    depth = 1
+    end = None
+    for token in re.finditer(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|[{}]', text[match.end():]):
+        if token.group() == "{": depth += 1
+        elif token.group() == "}": depth -= 1
+        if depth == 0:
+            end = match.end() + token.start()
+            break
+    if end is None:
+        raise ParseError("Unclosed live Core getter; refusing activation guess.")
+    body = text[match.end():end]
+    code = re.sub(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'', ' ', body)
+    live = bool(re.search(r'\bBreakerCoreRoster\s*::\s*BuildCandidate\s*\(', code))
+    if live and re.search(r'\bMakeNode\s*\(', code):
+        raise ParseError("Live Core getter mixes native builder and legacy MakeNode authoring.")
+    return live
+
+
+def expected_core_source_hashes(sources):
+    paths = set(CORE_SOURCE_FIXED)
+    paths.update(rel for rel in non_test_sources(sources)
+                 if re.fullmatch(r'Progression/BreakerCoreRoster[^/]*\.(?:cpp|h)', rel))
+    if "Progression/BreakerCoreRoster.cpp" not in paths or "Progression/BreakerCoreRoster.h" not in paths:
+        raise ParseError("Activated Core roster assembly/header missing.")
+    hashes = {}
+    for rel in sorted(paths):
+        path = os.path.join(SRC, *rel.split("/"))
+        if path not in sources:
+            raise ParseError(f"Activated Core authoring source missing: {rel}")
+        key = "Source/RiorsEdge/" + rel
+        try:
+            with open(path, "rb") as handle:
+                hashes[key] = hashlib.sha1(handle.read()).hexdigest()
+        except OSError as error:
+            raise ParseError(f"Cannot fingerprint {key}: {error}")
+    return hashes
+
+
+def validate_native_core(census, sources, roster_spec):
+    """Reject old/missing exports, incomplete sectors and source/export drift."""
+    witness = census.get("coreAuthoringSources")
+    expected = expected_core_source_hashes(sources)
+    if not isinstance(witness, dict) or {k: str(v).lower() for k, v in witness.items()} != expected:
+        raise ParseError("Core census source witness is missing/stale. Rebuild, export census, and run Census.Fresh; do not relabel an old census.")
+    cores = [tree for tree in census["trees"] if tree.get("currency") == "CorePoints"]
+    if len(cores) != 1 or cores[0].get("id") != "Core.Slice":
+        raise ParseError("Activated builder requires exactly one native Core.Slice; its role roster must be fresh.")
+    core = cores[0]
+    wedges = re.findall(r'^\*\*([A-Za-z]+) \((major|minor)\)\*\*:', roster_spec, re.M)
+    if len(wedges) != 22 or len({name for name, _ in wedges}) != 22:
+        raise ParseError("Accepted Core spec must expose all 22 distinct major/minor wedge rows.")
+    if core.get("coreWedgeOrder") != [name for name, _ in wedges]:
+        raise ParseError("Native Core wedge order does not match the accepted 22-wedge roster.")
+    authored_ids = []
+    for rel, text in non_test_sources(sources).items():
+        if re.fullmatch(r'Progression/BreakerCoreRoster[^/]*\.cpp', rel):
+            authored_ids.extend(re.findall(r'\bNode\s*\(\s*Outer\s*,\s*TEXT\("(Core\.[^"]+)"\)', strip_cpp_comments(text)))
+    expected_count = sum(11 if kind == "major" else 6 for _, kind in wedges)
+    expected_points = sum(26 if kind == "major" else 13 for _, kind in wedges)
+    raw = core.get("nodes", [])
+    ids = [node.get("id") for node in raw]
+    if (len(authored_ids) != expected_count or len(set(authored_ids)) != expected_count
+            or len(ids) != expected_count or len(set(ids)) != expected_count or set(ids) != set(authored_ids)):
+        raise ParseError("Native Core node identities disagree with complete sector authoring (missing, duplicate, stale, or unsupported authoring shape).")
+    offered = sum(int(node["ranks"]) * int(node["cost"]) for node in raw)
+    if offered != expected_points:
+        raise ParseError(f"Native Core offers {offered} points; accepted roster requires {expected_points}.")
+    for name, kind in wedges:
+        rows = [node for node in raw if node.get("constellation") == name]
+        if len(rows) != (11 if kind == "major" else 6):
+            raise ParseError(f"Native Core wedge {name} has an incomplete node roster.")
+        if sum(int(node["ranks"]) * int(node["cost"]) for node in rows) != (26 if kind == "major" else 13):
+            raise ParseError(f"Native Core wedge {name} has stale rank/cost authoring.")
+    return core
+
+
+def activated_core_inventory(sources, census, tag_map, roster_spec=None):
+    lib = sources[os.path.join(SRC, *LIB.split("/"))]
+    if not core_builder_is_live(lib):
+        return None
+    census = load_census() if census is None else census
+    if roster_spec is None:
+        roster_spec = read(os.path.join(SPEC, "core-wheel.md"))
+    core = validate_native_core(census, sources, roster_spec)
+    parsed = [node for node in parse_nodes(lib)
+              if not node["id"].startswith("Core.") and node["tree"] != "GetCoreSliceTree"]
+    native = census_nodes(census, tag_map)
+    doctrine_trees = {tree["id"] for tree in census["trees"] if tree.get("currency") == "DoctrinePoints"}
+    doctrine = [node for node in native if node["tree"] in doctrine_trees]
+    source_ids = [node["id"] for node in parsed]
+    native_ids = [node["id"] for node in doctrine]
+    if len(set(source_ids)) != len(source_ids) or len(set(native_ids)) != len(native_ids) or set(source_ids) != set(native_ids):
+        raise ParseError("Doctrine source/native census identities differ; refusing mixed inventory.")
+    def signature(node):
+        return (tuple(node[key] for key in ("tier", "ranks", "cost", "cornerstone", "more")),
+                tuple(sorted(node["effects"])), tuple(sorted(set(node["conditions"]))),
+                tuple(sorted(set(tag_map.get(tag, tag) for tag in node["tags"]))))
+    by_id = {node["id"]: node for node in doctrine}
+    for node in parsed:
+        built = by_id[node["id"]]
+        if signature(node) != signature(built):
+            raise ParseError(f"Doctrine source/native census mismatch: {node['id']}")
+        node["tree"] = built["tree"]
+    # Core rows come only from the native tree. Dead legacy literals never join.
+    inventory = [node for node in native if node["tree"] == core["id"]] + parsed
+    return inventory, census
+
+
 def build_sections(sources, census=None):
     """Every section, from source (census=None) or from Data/progression.json.
 
@@ -813,7 +947,15 @@ def build_sections(sources, census=None):
 
     declared_tags = parse_declared_tags(lib)
     tag_map = parse_tag_map(sources)
-    if census is None:
+    activated = activated_core_inventory(sources, census, tag_map)
+    if activated:
+        nodes, native_census = activated
+        targets, paid, rider_delivered, affix_owned = parse_lane_register(types)
+        conditions = parse_conditions(conds_text)
+        core_budget, doctrine_budget = parse_point_budgets()
+        authored_conds = {c for n in nodes for c in n["conditions"]}
+        currency_of = {t["id"]: t["currency"] for t in native_census["trees"]}
+    elif census is None:
         nodes = parse_nodes(lib)
         targets, paid, rider_delivered, affix_owned = parse_lane_register(types)
         conditions = parse_conditions(conds_text)
@@ -1472,13 +1614,16 @@ def judge(section, pin):
     return ("ok" if lo <= v <= hi else "violated"), f"band {lo}–{hi}{tgt}"
 
 
-def render(sections, asserted, suite, pins, emitted, unknown_emitted, open_gates=()):
+def render(sections, asserted, suite, pins, emitted, unknown_emitted, open_gates=(), inventory_note=None):
     L = []
     a = L.append
     a("# State")
     a("")
     a("Generated by `make status`. Every number here is measured.")
     a("Do not edit this file; edit the generator or the thing it measures.")
+    if inventory_note:
+        a("")
+        a(inventory_note)
     # No commit stamp, deliberately. A generated file that carries the hash it
     # was generated from is permanently dirty after every commit, and a file
     # that always shows a diff is one people stop reading diffs on — which
@@ -1629,7 +1774,8 @@ def main():
                                 pins.get(key))[0]
     open_gates = [(r, k) for r, k in gated if states.get(k) == "ok"]
 
-    text, violations = render(sections, asserted, suite, pins, emitted, unknown_emitted, open_gates)
+    inventory_note = CORE_INVENTORY_NOTE if core_builder_is_live(sources[os.path.join(SRC, *LIB.split("/"))]) else None
+    text, violations = render(sections, asserted, suite, pins, emitted, unknown_emitted, open_gates, inventory_note)
 
     with open(OUT, "w", encoding="utf-8", newline="\n") as f:
         f.write(text)

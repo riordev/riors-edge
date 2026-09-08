@@ -74,7 +74,7 @@ bool FBreakerChainDeliveryRuntimeTest::RunTest(const FString& Parameters)
     ABreakerCharacter* Player = Caster(World);
     const UBreakerProgressionTree* Tree = UBreakerProgressionLibrary::GetCasterMultispellTree();
     FText Error;
-    for (const TCHAR* Entry : { TEXT("Core.Affliction.OpenWound"), TEXT("Core.Affliction.Deepen") })
+    for (const TCHAR* Entry : { TEXT("Core.Affliction.OpenWound") })
         if (!TestTrue(TEXT("Actual Core adjacency path to Linger"), Player->GetProgression()->PurchaseNode(
             UBreakerProgressionLibrary::GetCoreSliceTree(), Entry, Error))) return false;
     if (!TestTrue(TEXT("Actual Linger purchase supplies nonunit duration scaling"), Player->GetProgression()->PurchaseNode(

@@ -182,7 +182,7 @@ bool FBreakerSaveMigrationV5ToV6Test::RunTest(const FString& Parameters)
     Save->Progression.UnspentClassPoints = 7;
     Save->Progression.LevelClassPointsGranted = 30;
     Save->Progression.CommittedBranch = TEXT("Swift.Kinetic");
-    // Core state is NOT this step's business and is asserted untouched below.
+    // The current migration chain also refunds the old Core layout at frozen cost.
     Save->Progression.CoreNodeRanks.Add({TEXT("Core.Precision.Sightline"), 1});
     Save->Progression.UnspentCorePoints = 11;
 
@@ -204,15 +204,15 @@ bool FBreakerSaveMigrationV5ToV6Test::RunTest(const FString& Parameters)
         Save->Progression.UnspentDoctrinePoints, 0);
     TestEqual(TEXT("No doctrine ranks are invented"), Save->Progression.DoctrineNodeRanks.Num(), 0);
 
-    // Core is another pool's business.
-    TestEqual(TEXT("Core ranks survive untouched"), Save->Progression.CoreNodeRanks.Num(), 1);
-    TestEqual(TEXT("The core wallet survives untouched"), Save->Progression.UnspentCorePoints, 11);
+    // The v5 Doctrine migration and current Core migration compose independently.
+    TestEqual(TEXT("Legacy Core ranks clear in the full current migration chain"), Save->Progression.CoreNodeRanks.Num(), 0);
+    TestEqual(TEXT("Frozen one-point Core purchase refunds exactly"), Save->Progression.UnspentCorePoints, 12);
 
     // Idempotent: a save already at v6 is not stepped again.
     FString SecondNote;
     TestTrue(TEXT("A current save loads"), UBreakerSaveGame::MigrateToCurrent(*Save, SecondNote));
     TestTrue(TEXT("A current save reports no migration"), SecondNote.IsEmpty());
-    TestEqual(TEXT("The core wallet is still untouched"), Save->Progression.UnspentCorePoints, 11);
+    TestEqual(TEXT("Replaying migration does not duplicate Core refund"), Save->Progression.UnspentCorePoints, 12);
 
     // A commitment naming anything OUTSIDE the frozen fifteen is left alone.
     // This is the half that cannot be recovered if it is wrong: the step must
