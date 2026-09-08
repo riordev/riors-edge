@@ -53,8 +53,12 @@ struct RIORSEDGE_API FBreakerRiftDefinition
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Rift", meta=(ClampMin="0", ClampMax="100"))
     int32 AreaLevel = 0;
 
-    // Which death rule this rift runs under. Every rift today is Campaign;
-    // Endgame arrives with O122's consumable entry.
+    // Which death rule this rift runs under. Every rift today is Campaign, and
+    // O243 rules that it stays that way until entry costs something: O122's
+    // two rules ship in ONE commit or the limit is a loading screen. The
+    // endgame decrement below is wired and deliberately unreachable — the
+    // commit that authors a consumable entry (Anomalies) is the commit that
+    // sets this to Endgame. Do not flip it on its own.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Rift")
     EBreakerRiftTier Tier = EBreakerRiftTier::Campaign;
 

@@ -131,9 +131,13 @@ public:
      * the composed cone. 1.0 with the bar inactive (every non-Swift owner is
      * bit-identical) and 1.0 at an empty bar, linear down to
      * MomentumSpreadFloor at a full bar. Tighten-only: an empty bar is the
-     * baseline the weapon already has, never a penalty (O92).
+     * baseline the weapon already has, never a penalty (O92) — a bar that
+     * punished an empty state would rebuild the exact trap O92 deletes.
+     * O240 keeps the tighten-only SHAPE and moves the floor: 0.6 took 40%
+     * off the cone, which reads as a different weapon rather than a hot
+     * streak. The shape is ruled; the figure is still the owner's ear.
      */
-    static constexpr float MomentumSpreadFloor = 0.6f;   // O2 PLACEHOLDER
+    static constexpr float MomentumSpreadFloor = 0.75f;   // O2 PLACEHOLDER (O240: shape ruled, figure not)
     static float MomentumSpreadMultiplier(float MomentumFraction, bool bActive);
 
     /**

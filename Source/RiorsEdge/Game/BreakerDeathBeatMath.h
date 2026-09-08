@@ -37,9 +37,12 @@ struct RIORSEDGE_API FBreakerDeathBeatTimeline
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Death Beat", meta=(ClampMin="0.05")) float FadeInSeconds = 0.4f;   // O2 PLACEHOLDER
     // How far the eye sinks toward the floor at full drop.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Death Beat", meta=(ClampMin="0")) float CameraDropCm = 60.0f;   // O2 PLACEHOLDER
-    // The head lolls: a roll about the view axis and a pitch toward the
-    // ground. No spec line names the roll; its figure is O2 in full.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Death Beat", meta=(ClampMin="-45", ClampMax="45")) float CameraRollDegrees = 9.0f;   // O2 PLACEHOLDER
+    // The head lolls: a pitch toward the ground. THE ROLL IS ZERO BY RULING
+    // (O241). No spec line ever named it — spec.md authors the 12 degree pitch
+    // alone — and an unauthored figure that ships becomes canon by accident.
+    // The channel stays, so restoring the loll is one number the day the beat
+    // reads flat; it is not deleted, it is unauthored.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Death Beat", meta=(ClampMin="-45", ClampMax="45")) float CameraRollDegrees = 0.0f;   // O241
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Death Beat", meta=(ClampMin="-45", ClampMax="45")) float CameraPitchDegrees = -12.0f;   // O2 PLACEHOLDER
 };
 

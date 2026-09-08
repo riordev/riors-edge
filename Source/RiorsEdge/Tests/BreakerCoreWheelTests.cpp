@@ -108,10 +108,15 @@ bool FBreakerCoreRespecFreeThenRiftglassTest::RunTest(const FString& Parameters)
 {
     using namespace BreakerCoreWheel;
 
-    // O213: free until level N, Riftglass after. N is a placeholder until
-    // ruled; whatever it lands on, it is a level a character reaches inside
-    // the Core pool's own ladder.
-    TestTrue(TEXT("N sits inside [1, CorePointCapLevel] (O213: N unruled, O2 PLACEHOLDER)"),
+    // O213 free until level N, Riftglass after; O239 rules N as the level the
+    // ability token schedule completes at. THE TRIPWIRE: the two constants
+    // live in different headers because the wheel's maths stays world-free,
+    // so nothing but this line stops them drifting apart the way the mantle
+    // height once did (pawn 150 against grammar 145). Moving
+    // AbilityCompletionLevel without moving N is a red, which is the point.
+    TestEqual(TEXT("N is the ability schedule's completion level (O239)"),
+        CoreRespecFreeUntilLevel, UBreakerProgressionLibrary::AbilityCompletionLevel);
+    TestTrue(TEXT("N sits inside [1, CorePointCapLevel]"),
         CoreRespecFreeUntilLevel >= 1 && CoreRespecFreeUntilLevel <= UBreakerProgressionLibrary::CorePointCapLevel);
     TestTrue(TEXT("the Riftglass price is a price"), CoreRespecRiftglass > 0);
 

@@ -28,10 +28,15 @@ namespace BreakerCoreWheel
     constexpr int32 SectorCount = 5;
 
     // ---- O213: the respec price --------------------------------------------
-    // Free below this level; Riftglass at or above it. N is UNRULED — O213
-    // names it and gives it no value — so this is a placeholder standing where
-    // the ruling will land, held inside [1, CorePointCapLevel] by the test.
-    constexpr int32 CoreRespecFreeUntilLevel = 30;   // O2 PLACEHOLDER (O213: N unruled)
+    // Free below this level; Riftglass at or above it. O239 rules N as the
+    // level the ability token schedule completes at: free while the game is
+    // still handing the player pieces, priced once the kit is whole and a
+    // respec is a decision rather than a correction. NOT an independent
+    // number — RiorsEdge.Progression.CoreRespec.FreeThenRiftglass pins it
+    // equal to UBreakerProgressionLibrary::AbilityCompletionLevel so the two
+    // cannot drift apart. Restated here rather than included: this header is
+    // world-free and the library carries a generated header.
+    constexpr int32 CoreRespecFreeUntilLevel = 30;   // O239 (= AbilityCompletionLevel)
     // The one price, once the character is past N. Sized to read as a
     // rift-completion purse rather than a salvage pile; not felt yet.
     constexpr int32 CoreRespecRiftglass = 40;        // O2 PLACEHOLDER

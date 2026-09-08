@@ -5,6 +5,19 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
+## Cycle — the ruled-but-unbuilt slice (O245-O251)
+
+The ruling pass landed O239-O251. Five of them rule intent the code does not
+yet honour; each is one slice, sized so no two share a build.
+
+- [ ] O245 Volatile credit. `BreakerModifierComponent.cpp` SpawnVolatileBlast sets the request's instigator to the detonating enemy, so a blast kill broadcasts `OnKillDealt` on the CORPSE and the Feed / Scrap / deployable hooks credit the player nothing. The player who pops a Volatile to wipe a pack currently earns nothing for it. Credit the killer of the Volatile. This is the defect behind the "keep one number?" question — judge O217's 9x only after credit works.
+- [ ] O246 Delete the compiled ability defaults. 36 `MakeFallback` rows restate `Data/abilities.json`. The deletion commit MUST also replace `RiorsEdge.Data.Abilities.Fresh` (which proves JSON matches C++, and loses its referent) with a schema/completeness test: every registered id has a row, every field in range. Do not delete without the swap — that trades drift for an unvalidated data file.
+- [ ] O247 Provoke grants threat. Keep the 4s forced-target window; add a one-time threat grant scaled by `ThreatGeneratedMultiplier` so the Tank still holds the pack when the window closes. `BreakerEnemyThreatMath` already scores and prefers; `ThreatGenerated` is a live stat target with no content behind it. KIT writes the ability, FIELD owns the threat seam — declare the crossing.
+- [ ] O248 Grandfather over-budget special items. Flag legacy items, keep them legal, bind the budget to new rolls only. Never strip an owner's affixes at load.
+- [ ] O249 Drop Chance above the cap converts to rarity weight. Closes the `DropChanceReachesEveryRank` expected-red; delete its pin in the same commit.
+- [ ] O250 The Warden's front stops re-arming on `OnVitalsRestored`.
+- [ ] O251 An occluded enemy yields its bar with its marks. Visual — run `/photograph` and read the frames.
+
 ## Cycle — New Core wheel primitives
 - [x] Full Core activated with frozen legacy-cost refund and layout version2:117→187 nodes,171→429 offered,2.63→6.6x. Exactly22 wedges in the requested closed ring, neighbour restriction enabled. All-start reach,23/46/69 keystone costs, migrations and purchase/projection tests pass. Native census refreshed;820 tests,816 passing,4 enumerated findings,0 unexpected. Python status emits;12 Python instrument/route tests pass. Empty lanes54→1; native authored count295→365;3 Reaction consumer gaps explicitly visible in node descriptions. Live1080 overview/720 Precision captures inspected; hover/pan remain playtest checks.
 - Density is measured in O235:65 points reaches22 gateways,7 convergences, or4 convergences with two keystones. Replacement density band needs play data. Normalized at-cap4.80→4.17, endgame14.47→13.02, ability ratio.542→.526; these exclude literal added hit bases, tempo and multiplicity. Preserved controlled Prolific step1.47→1.512 exceeds unchanged1.5; reviewed finding enumerated with deletion condition, no assertion or numerical pin widened. Its eight-Anomalous fixture is not a legal equipment loadout, so it does not establish a legal full-DPS breach.
@@ -179,7 +192,6 @@ The owner will playtest after the remaining Entropy pass is finished. Continue i
 - [x] First-contract seven outdoor kills earn159 XP; authored120 XP turn-in now reaches279/level2 with an ordinary Core point. Duplicate/restored/unearned turns cannot repay. Level5 ability-token gate and global curve unchanged. Actual dialogue offer shows data-derived item/XP reward at720p without clipping.
 - [x] Feed the Forge now requires physical residue from six actual Vestige deaths. Owned drops use F collection with a count-bearing prompt, distant labels, range/LOS/death/quest guards and no backpack cost. Kills alone cannot complete it. Partial counters survive, duplicates cannot repay, revival resets source claims, leftovers clear on completion. Actual Fernhall six-collection and restored3/6 fixtures pass;720p/1080p pickup frames inspected. Residue mesh remains a placeholder; network and human interaction acceptance remain unclaimed.
 - Next implementation slices: separate damage numbers from enemy plate bounds and finish legal sustained build comparisons. Keep existing parity failures until the actual shortfall is resolved. Attunement currently specifies Entropy; future element selection needs selection timing, persistence and overlapping-buff rules before adding a control.
-- Loot migration needs a deliberate policy for existing over-budget special items; do not silently remove owner affixes. Guaranteed boss drops currently saturate Drop Chance and need an explicit excess-chance benefit before this pinned failure can close.
 - Environment/audio slices after the repair queue: Fernhall facade/material separation, grounded distance-driven footsteps using verified shipped samples, and region-owned ambience with suitable sound assets. Extra destinations and their map remain separate playable-content work.
 - Resonance is an untyped Elemental status-count detonation; its purchased preservation keeps earned Rot at half remaining duration/budget without triggering Wither. Tank incoming resource uses the actual hit proc coefficient, including proc-zero reactions.
 - Step3: split-budget Fracture preserves adjacent elements and one direct hit; Cascade skips elemental entries. Actual Siphon unlock appends Void through progression, including existing unlocks.
@@ -217,14 +229,7 @@ Push hard on today's build; the owner is out and reads the report. Cycles run in
 No playtest until the core loop has more oomph. The next blocks are the ones that change what a trigger pull, a shield and a kill feel like: flat damage that is really the weapon's, a boss that fights back with a shield you break, and a Niagara pass with a sound for every verb. Content plumbing waits behind them.
 
 ## Open questions for the owner
-- (systems) O213's level N for the free Core respec. Landed as 30, O2 PLACEHOLDER.
-- (bosses) The third boss ("mobility and sustain") has no story name and no act; the Act III climax is a meeting, not a fight. Name it and its act, or drop the third.
-- (persistence) The amended O82 spends the endgame death budget at runtime; O122 says the two rules ship together or the limit is a loading screen, and `BreakerRiftDefinition.h` states O122's side. Every rift is Campaign today, so the decrement is wired but unreachable. Which stands?
-- (movement) Crouch: the player has no crouch verb on its input; the slide is the crouch and the design's keybind sheet shows "L CTRL · HOLD CROUCH" as the slide key. A separate crouch verb, or crouch = the slide key held? Until ruled, the HOLD|TOGGLE rows cover sprint and aim only.
-- (weapons) Momentum on the gun is built as tighten-only: the cone shrinks to 0.6x at a full bar (O2 PLACEHOLDER) and tracers brighten to 1.75x; an empty bar is baseline (O92). If "follows the bar" meant something else, say what.
-- (enemies) A Volatile blast hits enemies at the player's number (O217): 9x chassis damage kills every trash body inside the inner radius. Keep one number, or rule an enemy fraction after a playtest.
-- (abilities) Class numbers ride `Data/abilities.json` and are written onto the class defaults at load; the compiled members stay as the failed-load fallback. Delete the compiled defaults later (as cycle 17 deleted the registry's costs), or keep them?
-- (fun interactions) Provoke-as-a-status still needs a threat ruling; elemental semantics are defined by O222–O225.
+- None open. O239-O249 answered the eight that stood here; each ruling is in Docs/DECISIONS.md and its site carries the reason.
 
 ## Plumbing the design asks for, in the order that unblocks the most
 - Not to build without a system and a ruling: subtitles, text scale, reduce-flash, Forge Attune-to-rift, a MATERIALS tab, pad glyphs, the gamepad toggle, the class-select yard with 3D figures (waits on O14 models).
@@ -244,23 +249,21 @@ No playtest until the core loop has more oomph. The next blocks are the ones tha
 ## Later (infrastructure only when it unblocks a felt item this week)
 - Inventory equipped titles, affix names, rarity sublines and base damage fit the inspected1920x1080GEARDAMAGE capture after button padding/alignment repair. Other menus/resolutions remain in the clipping queue.
 - `KeystoneAtShippedBudget` and `NodePurchaseFlow` now pass through completed campaign journal fixtures at level50; their expected-red entries were retired after the physical mission probe reached eight and survived reload. All original numeric purchase/refund/Core assertions remain unchanged.
-- Arrival and rift-completion flags are set only when the beat is current (the kill-counter rule). If arrival should count unconditionally, drop the flag-set argument on the two seams.
+- RULED AS BUILT: arrival and rift-completion flags stay current-beat only (the kill-counter rule). Unconditional arrival would let a player pre-complete beats by wandering, which the patrol-kill rule already forbids. No change.
 - The enemy chip re-arm inside a hold reads `GetSecondsSinceDamage() <= DeltaSeconds`; settled chips are not pruned (they hold the last fraction) and the map is bounded by live enemies in range.
-- An occluded, unfocused enemy still draws its bar; only its marks and the BOSS word yield. Say if the bar should yield too.
+- O251: an occluded enemy yields its bar with its marks. Today only the marks and the BOSS word yield; the bar follows them in the O251 slice.
 - The Chevron mark as specified is a corner bracket; BarsVertical sits one unit off centre. Both drawn as the sheet says.
 - `BreakerUI::HudEnemyBarWidth/Height` are unread; delete on the next token pass.
 - `PrepareEnemyForModifierGrant` in the game-mode tests is an empty stub with live callers.
 - `DoctrinePointsPerBenchmark` and the doctrine grant are constexprs the census writes; a JSON getter for `budgets.doctrine` would let the mission validator read one source.
-- `CameraRollDegrees` 9 on the death beat is in no spec line (spec.md names the 12° pitch only); keep as O2 or zero it.
 - With the modifier disc and light retired (O203), the Volatile corpse's fuse has no visual tell until the Niagara pass; recorded at the site.
-- The Warden's front re-arms on every `OnVitalsRestored`, so a Wakeful revive gives a second front and a second punish window. If "gone for the fight" should survive a Wakeful rise, that is a ruling.
-- The front break exposes the weak point but does not raise the apparatus; the player who broke the front stands at the front. Whether the break should also run the raise is an owner call. `EnterPhase` clears `bOrderRaiseActive` without closing the apparatus (a gate crossed mid-raise leaves the weak point open).
+- O250: the front is gone for the fight. It re-arms on every `OnVitalsRestored` today, so a Wakeful revive still grants a second front; the O250 slice drops that re-arm.
+- RULED AS BUILT: the break exposes the weak point and does NOT raise the apparatus. The break is the player's outcome; the raise is the boss's own beat, and coupling them removes its agency.
 - Equipment conditional-damage diagnostic totals include conditional Increased Fire Rate because they lack a target filter. Flat armour/crit and More are already excluded. No current C++ HUD/combat consumer reads these fields; defer behind visible repairs.
 - Deposit/withdraw return a bool and log the reason; the stash screen re-derives the refusal line. A result enum on the component (LEDGER) is the fix.
 - The HUD paints every travel point's overhead prompt in rift teal; the stash point's prompt inherits it (GLASS, the HUD pass).
 - `GatherDialogueFlags` / `GatherEntryFlags` in `BreakerQuestContent.cpp` carry no Breaker prefix (pre-existing).
 - `player_death.wav` is not in the shipped-samples list until a sample is authored; the synth is the floor.
-- The content spec's rule "The campaign is post-slice" now sits beside a Story missions section in present tense. Keep the rule or delete it.
 - `Offense.WallRideDamage` is a dead row (its condition is never true); delete it when the leans are next touched.
 - After the Boots-only MoveSpeed row: the Gloves `Core.MoveSpeed` roll in `Items.Equipment.AttributeContribution` (~BreakerItemTests.cpp:425) grants a slot a line it cannot roll; move it to Boots in the next build. The Sidearm lean on `Core.MoveSpeed` in `affixes.json` is inert (leans apply on weapon slots); delete the row when the leans are next touched.
 - The death beat's black is a camera fade and its teleport lands at the end of black; `HoldBlack`/`ReleaseBlack` on the game instance are the seam to move the teleport to the start of black and reveal through the arrival gate. Felt only if the respawn frame reads cold.

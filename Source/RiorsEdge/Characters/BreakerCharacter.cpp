@@ -796,14 +796,15 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
         Input->BindAction(InputConfig->Sprint, ETriggerEvent::Started, this, &ThisClass::StartSprint);
         Input->BindAction(InputConfig->Sprint, ETriggerEvent::Completed, this, &ThisClass::StopSprint);
     }
-    // CROUCH HAS NO VERB ON THE PLAYER'S INPUT. The movement rules list it
-    // (walk, sprint, crouch, dash, slide, vault, mantle) and the settings
-    // screen's hold/toggle pair would naturally cover it, but UBreakerInputConfig
-    // carries no Crouch action and the movement component has no crouch state:
-    // the slide is the only lowered stance the player can take today. Recorded
-    // rather than bound to the slide key as a nearest fit. OWNER QUESTION
-    // (.claude/DESK.md): is crouch a verb of its own, or is the slide the
-    // crouch? A crouch toggle setting waits on the answer.
+    // THE SLIDE IS THE CROUCH (O242). There is deliberately no Crouch action
+    // on UBreakerInputConfig and no crouch state on the movement component:
+    // the slide is the lowered stance, and one key holds it. Crouch earns its
+    // keep in shooters through cover peeking and standing-still accuracy —
+    // cover geometry and the aim blend already serve both here — and a static
+    // stance fights a kit whose identity is slide-jump, vault, mantle, dash.
+    // This is a ruling, not a gap: the HOLD|TOGGLE rows cover sprint and aim,
+    // and the slide key is the crouch key. Reopen only if a playtest shows
+    // players trying to crouch to shoot.
     if (InputConfig->Dash) Input->BindAction(InputConfig->Dash, ETriggerEvent::Started, this, &ThisClass::HandleDashInput);
     if (InputConfig->Slide) {
         Input->BindAction(InputConfig->Slide, ETriggerEvent::Started, this, &ThisClass::StartSlide);

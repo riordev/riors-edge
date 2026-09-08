@@ -39,8 +39,6 @@ or it will not survive a hundred repetitions.
 **Group content never gates progression points.** A solo player reaches the
 full budget.
 
-**The campaign is post-slice.** The slice proves the loop, not the story.
-
 **Elites are modifier-driven, not stat-driven**, and every modifier passes
 three tests: it is **readable in graybox** with zero art; it is **answerable by
 base-kit movement**; and it is **not a stat**. A flat damage increase is the

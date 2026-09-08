@@ -127,8 +127,6 @@ Numbers are permanent and never reused.
 
 **O72** — Widen the stat-target and condition vocabularies before authoring to node count.
 
-**O73** — The campaign is post-slice.
-
 **O74** — The single More ceiling spans the ability-damage lane. There is no per-lane ceiling.
 
 **O75** — An elite's loot floor rises one rarity step at three modifiers.
@@ -454,3 +452,30 @@ Maximum wedges reached with65, including ring transit; cells show **wedges / min
 **O237** — Caster periodic applications retain their applying hit critical sample and never roll again; longer Rot windows redistribute unchanged finite damage, and Terminal or Long Dark persistence pays only remaining funded damage, never replenishing reaction credit.
 
 **O238** — Generic StatusDuration extends periodic elemental tick windows and redistributes their finite budget; Erased delayed payments and Unstable markers keep authored timers.
+
+**O239** — Core respec is free below the level the ability token schedule completes at, and costs Riftglass at or above it: free while the game is still handing the player pieces, priced once the kit is whole. N is not an independent number and is pinned equal to AbilityCompletionLevel.
+
+**O240** — Momentum on the gun stays tighten-only: an empty bar is baseline and never a penalty, because a bar that punishes its empty state rebuilds the trap O92 deletes. The full-bar floor is a felt figure, not a ruled one.
+
+**O241** — The death beat's camera roll is zero. Only the pitch is authored; an unauthored figure that ships becomes canon by accident. The channel stays for the day the beat reads flat.
+
+**O242** — The slide is the crouch. There is no separate crouch verb: cover geometry and the aim blend serve what crouch is for, and a static stance fights a movement kit built on slide-jump, vault, mantle and dash.
+
+**O243** — A rift's tier flips to Endgame only in the commit that makes entry consumable. The death budget stays wired and unreachable until then, because a limit without a stake is a loading screen.
+
+**O244** — The third boss leaves the campaign and becomes the endgame's first: Act III's climax is a meeting and stays one. It is named the day its class exists.
+
+**O245** — A Volatile blast credits the killer of the Volatile, not the corpse. Kills it deals pay the player's kill hooks; the single monster-scaled number of O217 stands until a playtest says otherwise.
+
+**O246** — An ability's numbers have one home in Data/. Compiled defaults are deleted once a schema test replaces the freshness pin that compares them; a fallback that restates the data is drift waiting to happen.
+
+**O247** — Provoke is a forced-target window that also grants threat, not a status. The forced window is the burst and the threat grant is its tail, so the Tank still holds the pack when the window closes.
+
+**O248** — Special items rolled over their affix budget are grandfathered, never stripped. The budget binds new rolls; a save that deletes an owner's affixes is worse than an item that outlives its rule.
+
+**O249** — Drop Chance above its cap converts to rarity weight. A stat that saturates is a stat the player stops reading.
+
+**O250** — A broken Warden front is gone for the fight. A revive restores the body, never the front: a rescue must not hand the boss a second punish window the player already paid to remove.
+
+**O251** — An occluded enemy yields its bar with its marks. A bar drawn through a wall is the readability problem the focus rule exists to solve, and half a nameplate yielding is worse than none.
+
