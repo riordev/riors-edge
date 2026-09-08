@@ -1944,7 +1944,7 @@ bool UBreakerWeaponComponent::FireOnce()
 
     if (Definition->bProjectile)
     {
-        FireProjectile(Definition, ViewLocation, ViewRotation, Spread, FiredBurstIndex, RecoilSeed, ShotAimAlpha, RampToken, ExtraPellets, Trigger);
+        FireProjectile(Definition, ViewLocation, ViewRotation, Spread, FiredBurstIndex, RecoilSeed, ShotAimAlpha, RampToken, ExtraPellets, Trigger, Channels);
         if (MagazineAmmo <= 0 && ReserveAmmo > 0) StartReload();
         return true;
     }
@@ -2318,6 +2318,21 @@ void UBreakerWeaponComponent::PruneShotChannelBonuses() const
     }
 }
 
+float UBreakerWeaponComponent::GetEffectiveRicochetSeekRadius() const
+{
+    const auto* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    float Radius = RicochetSeekRadiusCm;
+    if (const int32 Rank = Progression ? Progression->GetNodeRank(BreakerAngleNodeId, EBreakerPointCurrency::DoctrinePoints) : 0)
+        Radius = FMath::Max(Radius, Rank >= 2 ? 2000.f : 1200.f); // Existing Angle rank-two/rank-one authored reach.
+    return Radius;
+}
+
+AActor* UBreakerWeaponComponent::FindRocketRicochetTarget(const FVector& Origin, float RadiusCm, const AActor* Projectile) const
+{
+    // The seek starts inside the stopped projectile's own collision sphere.
+    return FindNearestChainTarget(Origin, RadiusCm, { Projectile });
+}
+
 AActor* UBreakerWeaponComponent::FindNearestChainTarget(const FVector& Origin, float RadiusCm, const TArray<const AActor*>& ExcludedActors) const
 {
     // The enemy query behind chain arcs and ricochet seeks: nearest living
@@ -2454,11 +2469,7 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
     const bool bOverpenetration = Progression && Progression->HasNodeTag(BreakerOverpenetrationTag());
     // Angle (§1.5 M4, transcribed): ricochet seeks within 12 m at rank 1 and
     // 20 m at rank 2, overriding the authored base radius when larger.
-    float SeekRadiusCm = RicochetSeekRadiusCm;
-    if (const int32 AngleRank = Progression ? Progression->GetNodeRank(BreakerAngleNodeId, EBreakerPointCurrency::DoctrinePoints) : 0)
-    {
-        SeekRadiusCm = FMath::Max(SeekRadiusCm, AngleRank >= 2 ? 2000.0f : 1200.0f);   // Class-Kits §1.5 M4 R2/R1
-    }
+    const float SeekRadiusCm = GetEffectiveRicochetSeekRadius();
 
     FCollisionQueryParams Params(SCENE_QUERY_STAT(BreakerWeaponTrace), true, GetOwner());
     TArray<const AActor*> StruckActors;
@@ -2834,7 +2845,7 @@ void UBreakerWeaponComponent::SnapshotWeaponElement(FBreakerDamageRequest& Reque
     if (State) State->SnapshotSympatheticEntropy(Request);
 }
 
-void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed, float ShotAimAlpha, uint32 RampToken, int32 ExtraPellets, const TSharedRef<FBreakerWeaponTriggerContext>& Trigger)
+void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed, float ShotAimAlpha, uint32 RampToken, int32 ExtraPellets, const TSharedRef<FBreakerWeaponTriggerContext>& Trigger, const FBreakerShotChannels& Channels)
 {
     FBreakerDamageRequest Damage = Trigger->Source;
     Damage.WeaponTrigger = Trigger;
@@ -2886,6 +2897,7 @@ void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Def
             Rocket->InitializeRocket(ProjectileDamage, Definition->ProjectileSpeed * Core.ProjectileSpeedMultiplier,
                 Definition->ExplosionRadius * FMath::Sqrt(FMath::Max(0.0f, Core.WeaponSplashAreaMultiplier)), GetEffectiveMaximumRange());
             Rocket->InitializeDamageRamp(this, RampToken);
+            Rocket->InitializeRicochet(this, Channels.RicochetCount, GetEffectiveRicochetSeekRadius(), RicochetDamageMultiplier);
             for (ABreakerRocketProjectile* Sibling : Siblings) Rocket->IgnoreSibling(Sibling);
             Siblings.Add(Rocket);
         }

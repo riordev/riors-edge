@@ -28,6 +28,8 @@ public:
     // Optional weapon range limits straight flight; other callers keep MaximumLifetime.
     void InitializeRocket(const FBreakerDamageRequest& InDamage, float Speed, float InExplosionRadius, float MaximumTravelCm = 0.0f);
     void InitializeDamageRamp(UBreakerWeaponComponent* Weapon, uint32 Token);
+    void InitializeRicochet(UBreakerWeaponComponent* Weapon, int32 Count, float SeekRadius, float DamageRetention);
+    bool HasRicocheted() const { return bRicochetConsumed; }
     void IgnoreSibling(ABreakerRocketProjectile* Other);
     // Real authoritative impact seam; duplicate impacts are latched.
     void Explode(const FVector& Location, AActor* DirectImpactTarget = nullptr);
@@ -75,7 +77,12 @@ protected:
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void Tick(float DeltaSeconds) override;
-    UFUNCTION() void HandleImpact(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComponent, FVector NormalImpulse, const FHitResult& Hit);
+    UFUNCTION() void HandleStopped(const FHitResult& Hit);
+    TWeakObjectPtr<UBreakerWeaponComponent> RicochetWeapon;
+    float RicochetRadius = 0;
+    float RicochetRetention = 1;
+    bool bCanRicochet = false;
+    bool bRicochetConsumed = false;
     TWeakObjectPtr<UBreakerWeaponComponent> RampWeapon;
     uint32 RampToken = 0;
     UFUNCTION(NetMulticast, Unreliable) void MulticastExplosionCosmetics(const FVector& Location, float Radius);

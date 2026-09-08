@@ -539,6 +539,9 @@ public:
     // A bounced round arrives at this fraction of the pellet's current damage.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Channels", meta=(ClampMin="0", ClampMax="1")) float RicochetDamageMultiplier = 0.65f;   // O2 PLACEHOLDER
 
+    float GetEffectiveRicochetSeekRadius() const;
+    AActor* FindRocketRicochetTarget(const FVector& Origin, float RadiusCm, const AActor* Projectile) const;
+
     // Master switch, so the owner can A/B the whole layer in the editor.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Feel") bool bRecoilEnabled = true;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Feel") bool bViewmodelKickEnabled = true;
@@ -899,7 +902,7 @@ private:
     // cadence cannot drift by a callback's worth per shot.
     void AdvanceBurstFire();
     void ScheduleBurstFire(float DelaySeconds);
-    void FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed, float ShotAimAlpha, uint32 RampToken, int32 ExtraPellets, const TSharedRef<FBreakerWeaponTriggerContext>& Trigger);
+    void FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed, float ShotAimAlpha, uint32 RampToken, int32 ExtraPellets, const TSharedRef<FBreakerWeaponTriggerContext>& Trigger, const FBreakerShotChannels& Channels);
     // LevelScalar is resolved once per trigger pull and passed down, so every
     // pellet and the bleed it may apply share one item-level reading.
     // SeedBasis is the hit's own draw seed (the base pellet's ShotSequence

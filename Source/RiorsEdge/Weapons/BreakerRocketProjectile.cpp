@@ -9,6 +9,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "TimerManager.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "UI/BreakerGlowMaterial.h"
@@ -176,13 +177,52 @@ void ABreakerRocketProjectile::BeginPlay()
     else ApplyShapeColor(Exhaust, BreakerUI::Orange);
 
     if (GetInstigator()) Collision->IgnoreActorWhenMoving(GetInstigator(), true);
-    Collision->OnComponentHit.AddDynamic(this, &ThisClass::HandleImpact);
+    Movement->OnProjectileStop.AddDynamic(this, &ThisClass::HandleStopped);
     SetLifeSpan(RangeLifetime > 0.0f ? RangeLifetime : MaximumLifetime);
 }
 
-void ABreakerRocketProjectile::HandleImpact(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComponent, FVector NormalImpulse, const FHitResult& Hit)
+void ABreakerRocketProjectile::InitializeRicochet(UBreakerWeaponComponent* Weapon, int32 Count, float SeekRadius, float DamageRetention)
 {
-    if (HasAuthority()) Explode(Hit.ImpactPoint.IsNearlyZero() ? GetActorLocation() : FVector(Hit.ImpactPoint), OtherActor);
+    RicochetWeapon = Weapon;
+    bCanRicochet = Count > 0;
+    bRicochetConsumed = false;
+    RicochetRadius = FMath::Max(0.f, SeekRadius);
+    RicochetRetention = FMath::Clamp(DamageRetention, 0.f, 1.f);
+}
+
+void ABreakerRocketProjectile::HandleStopped(const FHitResult& Hit)
+{
+    if (!HasAuthority() || bExploded) return;
+    AActor* HitActor = Hit.GetActor();
+    if (bCanRicochet && !bRicochetConsumed
+        && !(HitActor && HitActor->FindComponentByClass<UBreakerCombatComponent>()))
+    {
+        bCanRicochet = false;
+        UBreakerWeaponComponent* Weapon = RicochetWeapon.Get();
+        // Query from the stopped sphere centre, outside the struck wall.
+        AActor* Target = Weapon ? Weapon->FindRocketRicochetTarget(GetActorLocation(), RicochetRadius, this) : nullptr;
+        const FVector Direction = Target ? (Target->GetActorLocation()-GetActorLocation()).GetSafeNormal() : FVector::ZeroVector;
+        if (IsValid(Target) && !Direction.IsNearlyZero())
+        {
+            bRicochetConsumed = true; // Claim before any continuation callback.
+            Damage.BaseDamage *= RicochetRetention;
+            Damage.ProcCoefficient = FMath::Min(Damage.ProcCoefficient, .5f); // Canonical ricochet proc ceiling; zero remains zero.
+            // UE StopSimulating has already cleared UpdatedComponent/velocity.
+            // Defer rearming until its movement update has fully returned;
+            // never reset the actor lifetime, payload, trigger or ramp token.
+            GetWorldTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this,[this,Direction]()
+            {
+                if (bExploded || IsActorBeingDestroyed() || !Movement || !Collision) return;
+                Movement->SetUpdatedComponent(Collision);
+                Movement->Velocity = Direction * Movement->InitialSpeed;
+                SetActorRotation(Direction.Rotation());
+                Movement->Activate(true);
+                Movement->UpdateComponentVelocity();
+            }));
+            return;
+        }
+    }
+    Explode(Hit.ImpactPoint.IsNearlyZero() ? GetActorLocation() : FVector(Hit.ImpactPoint), HitActor);
 }
 
 void ABreakerRocketProjectile::Explode(const FVector& Location, AActor* DirectImpactTarget)

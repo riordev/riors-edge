@@ -10,6 +10,7 @@
 #include "Components/BoxComponent.h"
 #include "Components/SphereComponent.h"
 #include "Weapons/BreakerRocketProjectile.h"
+#include "GameFramework/ProjectileMovementComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -103,11 +104,8 @@ bool FBreakerBulkRuntimeTest::RunTest(const FString& Parameters)
         Shot->DispatchBeginPlay();
         if (bDirect)
         {
-            auto* Collision = Shot->FindComponentByClass<USphereComponent>();
-            FHitResult Hit;
-            Hit.ImpactPoint = Anchor->GetActorLocation();
-            Collision->OnComponentHit.Broadcast(Collision, Anchor, Anchor->GetRootComponent()->IsA<UPrimitiveComponent>()
-                ? Cast<UPrimitiveComponent>(Anchor->GetRootComponent()) : nullptr, FVector::ZeroVector, Hit);
+            FHitResult Hit(Anchor, Cast<UPrimitiveComponent>(Anchor->GetRootComponent()), Anchor->GetActorLocation(), FVector::UpVector);
+            Shot->FindComponentByClass<UProjectileMovementComponent>()->StopSimulating(Hit);
         }
         else Shot->Explode(Anchor->GetActorLocation());
         Shot->Destroy();
