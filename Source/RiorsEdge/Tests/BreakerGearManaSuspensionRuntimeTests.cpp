@@ -71,7 +71,9 @@ bool FBreakerGearManaSuspensionRuntimeTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("Paid starter cast makes room in normal Mana bank"), ASC->TryActivateAbility(Fracture))) return false;
     const float BeforeRegen = Mana->GetMana();
     Equipment->TickComponent(.5f, LEVELTICK_All, nullptr);
-    TestEqual(TEXT("Gear regeneration pays normally before Unmake"), Mana->GetMana() - BeforeRegen, GearRegen * .5f, .001f);
+    TestEqual(TEXT("Equipment does not independently pay regeneration"), Mana->GetMana(), BeforeRegen, .001f);
+    Mana->AdvanceLoop(.5f);
+    TestEqual(TEXT("Active loop pays gear plus native recovery once"), Mana->GetMana() - BeforeRegen, (GearRegen + Mana->PassiveRegenPerSecond) * .5f, .001f);
     Mana->AdvanceLoop(30);
     const auto Unmake = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Unmake::StaticClass(), 1));
     const float BeforeUltimate = Mana->GetMana();
@@ -80,6 +82,7 @@ bool FBreakerGearManaSuspensionRuntimeTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Actual ultimate owns Mana suspension"), Mana->IsGenerationSuspended());
     const float SuspendedMana = Mana->GetMana();
     Equipment->TickComponent(.5f, LEVELTICK_All, nullptr);
+    Mana->AdvanceLoop(.5f);
     TestEqual(TEXT("Overrun cannot regenerate through Unmake"), Mana->GetMana(), SuspendedMana, .0001f);
 
     auto Kill = [&]()
@@ -110,7 +113,8 @@ bool FBreakerGearManaSuspensionRuntimeTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Cancel releases the actual suspension"), Mana->IsGenerationSuspended());
     const float BeforeResume = Mana->GetMana();
     Equipment->TickComponent(.5f, LEVELTICK_All, nullptr);
-    TestEqual(TEXT("Gear regeneration resumes"), Mana->GetMana() - BeforeResume, GearRegen * .5f, .001f);
+    Mana->AdvanceLoop(.5f);
+    TestEqual(TEXT("Gear regeneration resumes through active loop"), Mana->GetMana() - BeforeResume, (GearRegen + Mana->PassiveRegenPerSecond) * .5f, .001f);
     const float BeforeKill = Mana->GetMana();
     if (!TestTrue(TEXT("Another actual kill after cancellation"), Kill())) return false;
     TestEqual(TEXT("Gear resource on kill resumes"), Mana->GetMana() - BeforeKill,

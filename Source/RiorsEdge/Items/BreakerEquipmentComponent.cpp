@@ -154,31 +154,8 @@ void UBreakerEquipmentComponent::TickComponent(float DeltaTime, ELevelTick TickT
     // has to be rebuilt when the state changes. Cheap: the comparison is one
     // byte and the rebuild only runs on an actual transition.
     RefreshBuildConditions();
-    // Resource regeneration, applied from the COMPOSED ClassResourceRegen
-    // attribute rather than from this component's own cached stat. Two changes,
-    // both of them corrections rather than features:
-    //
-    //  - It reads the shared bucket, so the day the class loops bid their
-    //    PassiveRegenPerSecond here instead of ticking it themselves, gear and
-    //    class regeneration are additive with no further work and an Increased
-    //    Regeneration line can multiply both. Today nothing else bids, so the
-    //    composed value equals gear's flat and behaviour is bit-identical.
-    //  - It writes through UBreakerAttributeSet::ApplyClassResource, not the
-    //    GAS-generated SetClassResource. The generated setter ensure()s when
-    //    there is no owning ability system, so a rig without one could not
-    //    observe the tick at all and the Resource Regeneration affix was the
-    //    last resource path unexercisable in automation. ApplyClassResource
-    //    routes through the same PreAttributeChange clamp -- [Floor, Max] --
-    //    so the live result is identical, including Overcast's negative floor
-    //    which the old Min-against-Max here did not even know about.
-    if (Attributes && GetOwner() && GetOwner()->HasAuthority())
-    {
-        const float RegenPerSecond = Attributes->GetClassResourceRegen();
-        if (RegenPerSecond > 0.0f && !BreakerEquipmentResourceIncomeSuspended(GetOwner()))
-        {
-            Attributes->ApplyClassResource(Attributes->GetClassResource() + RegenPerSecond * DeltaTime);
-        }
-    }
+    // Resource regeneration is composed here but paid only by the active class
+    // loop, which owns suspension, safe-zone gates and generation modifiers.
 }
 
 void UBreakerEquipmentComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

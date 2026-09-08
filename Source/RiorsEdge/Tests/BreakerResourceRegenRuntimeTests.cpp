@@ -18,6 +18,8 @@
 #include "Progression/BreakerProgressionNode.h"
 #include "Progression/BreakerProgressionTree.h"
 #include "Classes/BreakerResourceGeneration.h"
+#include "Items/BreakerEquipmentComponent.h"
+#include "Items/BreakerLootLibrary.h"
 #if WITH_DEV_AUTOMATION_TESTS
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerResourceRegenRuntimeTest,"RiorsEdge.Progression.ResourceRegenAndSecondShift",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -39,6 +41,8 @@ bool FBreakerResourceRegenRuntimeTest::RunTest(const FString& Parameters)
         auto* Node=NewObject<UBreakerProgressionNode>(Tree); Node->NodeId=TEXT("Test.Resource.Regen.Rank"); Node->Currency=Tree->Currency;
         FBreakerNodeEffect Effect; Effect.StatTarget=EBreakerNodeStatTarget::ClassResourceRegen;
         Effect.StatBucket=EBreakerNodeStatBucket::Flat; Effect.ValuePerRank=1; Node->Effects.Add(Effect);
+        Effect.StatBucket=EBreakerNodeStatBucket::IncreasedPercent; Effect.ValuePerRank=50; Node->Effects.Add(Effect);
+        Effect.StatTarget=EBreakerNodeStatTarget::ClassResourceGeneration; Effect.ValuePerRank=25; Node->Effects.Add(Effect);
         Node->GrantedTags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.SecondShift"))); Tree->Nodes.Add(Node);
         auto* Class=NewObject<UBreakerClassDefinition>(); Class->ClassId=ClassId; Class->BranchTrees.Add(Tree);
         if (!TestTrue(TEXT("Native class selected"),Progression->ChoosePermanentClass(Class))) return false;
@@ -46,6 +50,15 @@ bool FBreakerResourceRegenRuntimeTest::RunTest(const FString& Parameters)
         auto* Mana=Player->GetMana(); auto* Momentum=Player->GetMomentum(); auto* Grit=Player->GetGrit();
         auto* Charge=Player->GetCharge(); auto* Scrap=Player->GetScrap();
         Mana->BindAttributes(Attr); Momentum->BindAttributes(Attr); Grit->BindAttributes(Attr); Charge->BindAttributes(Attr); Scrap->BindAttributes(Attr);
+        auto* Equipment=Player->GetEquipment(); Equipment->BindAttributes(Attr); Equipment->SetComponentTickEnabled(false);
+        FBreakerItemInstance Gear; bool Found=false;
+        for(int32 Seed=1;Seed<=8192;++Seed)
+        {
+            Gear=UBreakerLootLibrary::RollItem(TEXT("Test.Regen.Drop"),EBreakerEquipSlot::Gloves,EBreakerItemRarity::Standard,1,Seed);
+            if(Gear.Affixes.ContainsByPredicate([](const FBreakerRolledAffix& A){return A.AffixId==TEXT("Core.ResourceRegen");})) {Found=true;break;}
+        }
+        if(!TestTrue(TEXT("Actual ordinary regen drop found"),Found) || !TestTrue(TEXT("Unmodified rolled gear equips"),Equipment->EquipItem(Gear))) return false;
+        const float GearRate=Attr->GetClassResourceRegen();
         Player->GetBreakerMovement()->SetComponentTickEnabled(false);
         Player->GetBreakerMovement()->SetMovementMode(MOVE_Walking);
         for(int32 Frame=0;Frame<160;++Frame) World->Tick(LEVELTICK_All,.05f);
@@ -60,14 +73,20 @@ bool FBreakerResourceRegenRuntimeTest::RunTest(const FString& Parameters)
         // Bank setup isolates income/decay; this is not a campaign acquisition fixture.
         Attr->ApplyClassResource(50);
         const float NativeRegen=ClassId==EBreakerClassId::Caster ? Mana->PassiveRegenPerSecond : 0;
+        const float BeforeEquipment=Attr->GetClassResource();
+        Equipment->TickComponent(.25f,LEVELTICK_All,nullptr);
+        TestEqual(TEXT("Equipment cannot double-pay composed regen"),Attr->GetClassResource(),BeforeEquipment,.001f);
+        const float Composed=(GearRate+1)*1.5f;
+        TestEqual(TEXT("Core and gear Flat share the Increased bucket"),Attr->GetClassResourceRegen(),Composed,.001f);
         AdvanceAll(.25f);
         TestEqual(FString::Printf(TEXT("Class %d: five components pay only one flat tick"),int32(ClassId)),
-            Attr->GetClassResource(),50+(NativeRegen+1)*.25f,.001f);
+            Attr->GetClassResource(),50+(NativeRegen+Composed)*1.25f*.25f,.001f);
         TestTrue(TEXT("Second Shift is active only outside actual combat"),BreakerResourceGeneration::HoldsOutOfCombatDecay(Player));
         if(ClassId==EBreakerClassId::Caster)
         {
             Mana->PushGenerationSuspension(TEXT("Test.Regen.Suspension")); const float Before=Attr->GetClassResource();
-            AdvanceAll(.25f); TestEqual(TEXT("Mana suspension blocks both native and Core regen"),Attr->GetClassResource(),Before,.001f);
+            Equipment->TickComponent(.25f,LEVELTICK_All,nullptr);
+            AdvanceAll(.25f); TestEqual(TEXT("Mana suspension blocks native and composed supplemental regen"),Attr->GetClassResource(),Before,.001f);
             Mana->PopGenerationSuspension(TEXT("Test.Regen.Suspension"));
         }
         FBreakerDamageRequest Hit; Hit.BaseDamage=1; Hit.DamageFamily=EBreakerDamageFamily::TrueDamage;
@@ -77,7 +96,7 @@ bool FBreakerResourceRegenRuntimeTest::RunTest(const FString& Parameters)
         TestFalse(TEXT("Second Shift does not suppress in-combat decay"),BreakerResourceGeneration::HoldsOutOfCombatDecay(Player));
         for(int32 Frame=0;Frame<160;++Frame) World->Tick(LEVELTICK_All,.05f);
         if(!TestTrue(TEXT("Actual respec removes both authored benefits"),Progression->RespecCore(Reason))) return false;
-        TestEqual(TEXT("Flat rate removed"),BreakerResourceGeneration::FlatRate(Player),0.f);
+        TestEqual(TEXT("Respec removes Core contribution while retaining actual gear"),BreakerResourceGeneration::FlatRate(Player),GearRate,.001f);
         TestFalse(TEXT("Decay hold removed"),BreakerResourceGeneration::HoldsOutOfCombatDecay(Player));
         // Put Support above its authored OOC ceiling; 50 is already below the native60 clamp.
         const float DecayBank = ClassId==EBreakerClassId::Support ? Charge->OutOfCombatCeiling+10.0f : 50.0f;

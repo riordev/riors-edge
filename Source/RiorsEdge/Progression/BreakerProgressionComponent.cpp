@@ -1492,7 +1492,7 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     Stats.LedgeSpeedMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::LedgeSpeed));
     Stats.BonusSafeFallDistanceMeters = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::SafeFallDistance));
     Stats.BonusAirJumpCount = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::AirJumpCount));
-    Stats.ClassResourceRegenPerSecond = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::ClassResourceRegen));
+
     Stats.WeaponRangeMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::WeaponRange));
     Stats.ProjectileSpeedMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::ProjectileSpeed));
     Stats.WeaponSplashAreaMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::WeaponSplashArea));
@@ -1502,6 +1502,12 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     Stats.WeaponReserveAmmoMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::WeaponReserveAmmo));
     Stats.WeaponFalloffStartMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::WeaponFalloffStart));
     Stats.PierceLossReductionPercent = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::PierceLossReduction));
+    Stats.ElementalBuildupIncreasedPercent = IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::ElementalBuildup)];
+    Stats.EntropyBuildupIncreasedPercent = IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::EntropyBuildup)];
+    Stats.VoidBuildupIncreasedPercent = IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::VoidBuildup)];
+    Stats.RiftBuildupIncreasedPercent = IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::RiftBuildup)];
+    Stats.ElementalBuildupPenetrationPercent = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::ElementalBuildupPenetration));
+    Stats.ElementalThresholdMultiplier = FMath::Clamp(1.0f - Flat(EBreakerNodeStatTarget::ElementalThresholdReduction) / 100.0f, 0.01f, 1.0f);
     Stats.bNoOutOfCombatResourceDecay = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.SecondShift")));
     Stats.bConduction = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Conduction")));
     Stats.bCooldownRecoveryAffectsTempo = Stats.GrantedTags.HasTagExact(
@@ -1590,6 +1596,7 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
         // else in this codebase.
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::ResourceCostMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::AbilityCost)]);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::MaxClassResource, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::MaxClassResource)]);
+        OutContribution->AddFlat(EBreakerAggregatedAttribute::ClassResourceRegen, FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::ClassResourceRegen)));
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::ClassResourceRegen, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::ClassResourceRegen)]);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::FireRateMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::FireRate)]);
         // The dash lane. The comment that used to sit here said there was

@@ -75,8 +75,8 @@ namespace BreakerCoreBoard
     inline FLayout BuildRoleLayout(const UBreakerProgressionTree* Tree, FName Focus)
     {
         FLayout Layout; Layout.bUsesCoreRoles = true;
-        Layout.Size = Focus.IsNone() ? FVector2D(3000, 3000) : FVector2D(1480, 1200);
-        Layout.Hub = Focus.IsNone() ? FVector2D(1500, 1500) : FVector2D(700, 600);
+        Layout.Size = Focus.IsNone() ? FVector2D(3200, 3200) : FVector2D(1480, 1200);
+        Layout.Hub = Focus.IsNone() ? FVector2D(1600, 1600) : FVector2D(700, 600);
         TSet<FName> SeenWedges, SeenNodes;
         for (int32 W = 0; W < Tree->CoreWedgeOrder.Num(); ++W)
         {
@@ -137,15 +137,15 @@ namespace BreakerCoreBoard
                 }
                 else
                 {
-                    if (Slot == 0) Position = Layout.Hub + FVector2D(-580, 0);
-                    else if (Slot == 9) Position = Layout.Hub + FVector2D(-100, 0);
-                    else if (Slot == 10) Position = Layout.Hub + FVector2D(-370, 0);
-                    else if (Slot == 7 || Slot == 8) Position = Polar(Layout.Hub, 360, Slot == 7 ? -35 : 35);
+                    if (Slot == 0) Position = FVector2D(100,600);
+                    else if (Slot == 9) Position = FVector2D(1100,600);
+                    else if (Slot == 10) Position = FVector2D(1350,600);
+                    else if (Slot == 7 || Slot == 8) Position = FVector2D(600,Slot == 7 ? 450 : 750);
                     else
                     {
                         const int32 Lane = (Slot - 1) % 3;
-                        const float Angle = (Lane - (Lanes - 1) * .5f) * (bMajor ? 70 : 100);
-                        Position = Polar(Layout.Hub, Slot <= 3 ? 270 : 500, Angle);
+                        const float Y = bMajor ? 300 + Lane * 300 : 380 + Lane * 440;
+                        Position = FVector2D(Slot <= 3 ? 420 : 760,Y);
                     }
                 }
                 Layout.Centers.Add(Entry.Value->NodeId, Position);

@@ -77,6 +77,8 @@ namespace
     FGameplayTag BreakerCoreDeadeyeTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Precision.Deadeye"), false); }
     FGameplayTag BreakerCoreLastRoundTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.LastRound"), false); }
     FGameplayTag BreakerCoreThresholdTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Threshold"), false); }
+    FGameplayTag BreakerCoreQuickdrawTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Quickdraw"), false); }
+    FGameplayTag BreakerCoreTwoGunsTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.TwoGuns"), false); }
 
     // Gunsmith Armory / Tank Bastion tags this component consumes (2026-08-16,
     // the weapon-half pay pass). Same posture as the Marksman tags above:
@@ -1147,7 +1149,7 @@ void UBreakerWeaponComponent::UpdateFeelTickEnabled()
 {
     const bool bBusy = RecoilPitchAccumulated != 0.0f || RecoilYawAccumulated != 0.0f
         || BloomDegrees > 0.0f || !Viewmodel.IsAtRest();
-    SetComponentTickEnabled(bBusy);
+    SetComponentTickEnabled(bBusy || OwnerHasNodeTag(BreakerCoreTwoGunsTag()));
 }
 
 void UBreakerWeaponComponent::ApplyShotFeel(const FBreakerShotResult& Shot)
@@ -1195,7 +1197,52 @@ void UBreakerWeaponComponent::ApplyShotFeel(const FBreakerShotResult& Shot)
 void UBreakerWeaponComponent::TickComponent(float DeltaSeconds, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaSeconds, TickType, ThisTickFunction);
+    TickHolsteredReload(DeltaSeconds);
     TickRecoil(DeltaSeconds);
+}
+
+void UBreakerWeaponComponent::TickHolsteredReload(float DeltaSeconds)
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+    const auto* Combat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>();
+    if (!OwnerHasNodeTag(BreakerCoreTwoGunsTag()) || (Combat && Combat->IsDead()))
+    {
+        HolsteredReloadCredit = 0.0;
+        if (Combat && Combat->IsDead()) bQuickdrawArmed = false;
+        return;
+    }
+    if (!bAmmunitionInitialized || !FMath::IsFinite(DeltaSeconds) || DeltaSeconds <= 0.0f) return;
+    const int32 Slot = CurrentSlot == 1 ? 2 : 1;
+    int32& Magazine = Slot == 1 ? SlotOneMagazineAmmo : SlotTwoMagazineAmmo;
+    int32& Reserve = Slot == 1 ? SlotOneReserveAmmo : SlotTwoReserveAmmo;
+    const auto* Definition = GetPrototypeDefinition(Slot == 1 ? SlotOneArchetype : SlotTwoArchetype);
+    const int32 Capacity = GetMagazineCapacityForSlot(Slot, Definition);
+    if (Magazine < 0 || Magazine >= Capacity || Reserve <= 0)
+    {
+        HolsteredReloadCredit = 0.0;
+        return;
+    }
+    // A full magazine transfers over six seconds. Fractional rounds never
+    // become ammunition; switching or losing the rule discards that credit.
+    HolsteredReloadCredit += static_cast<double>(DeltaSeconds) * Capacity / 6.0;
+    const int32 Transfer = FMath::Min3(Capacity - Magazine, Reserve,
+        static_cast<int32>(FMath::FloorToInt(FMath::Min(HolsteredReloadCredit + UE_KINDA_SMALL_NUMBER, static_cast<double>(Capacity)))));
+    Magazine += Transfer;
+    Reserve -= Transfer;
+    HolsteredReloadCredit = FMath::Max(0.0, HolsteredReloadCredit - Transfer);
+    if (Magazine >= Capacity || Reserve <= 0) HolsteredReloadCredit = 0.0;
+}
+
+void UBreakerWeaponComponent::ApplyQuickdrawSourceBonus(FBreakerDamageRequest& Request) const
+{
+    if (!bResolvingQuickdrawShot) return;
+    UBreakerDamageLibrary::AddSourceIncreased(Request, 30.0f);
+}
+
+void UBreakerWeaponComponent::ClearLoadoutRuleState()
+{
+    bQuickdrawArmed = false;
+    HolsteredReloadCredit = 0.0;
 }
 
 void UBreakerWeaponComponent::TickRecoil(float DeltaSeconds)
@@ -1261,6 +1308,8 @@ void UBreakerWeaponComponent::EquipArchetype(EBreakerWeaponArchetype NewArchetyp
 {
     BindCoreProgression();
     if (CurrentArchetype == NewArchetype) return;
+    bQuickdrawArmed = false;
+    HolsteredReloadCredit = 0.0;
     ResetDamageRamp();
     StopFire();
     if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(ReloadTimer);
@@ -1323,6 +1372,9 @@ void UBreakerWeaponComponent::EquipSlot(int32 SlotNumber)
     }
     if (CurrentSlot == SlotNumber) return;
 
+    bQuickdrawArmed = false;
+    HolsteredReloadCredit = 0.0;
+
     StopFire();
     if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(ReloadTimer);
     InitializeSlotAmmunition();
@@ -1364,6 +1416,8 @@ void UBreakerWeaponComponent::EquipSlot(int32 SlotNumber)
 void UBreakerWeaponComponent::FinishSwap()
 {
     bSwapping = false;
+    const auto* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    bQuickdrawArmed = OwnerHasNodeTag(BreakerCoreQuickdrawTag()) && (!Combat || !Combat->IsDead());
     LastSwapInTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
     OnSwapChanged.Broadcast(false, CurrentSlot);
 }
@@ -1417,6 +1471,7 @@ void UBreakerWeaponComponent::SetSlotArchetype(int32 SlotNumber, EBreakerWeaponA
         return;
     }
     if (GetSlotArchetype(SlotNumber) == NewArchetype) return;
+    ClearLoadoutRuleState();
 
     const UBreakerWeaponDefinition* Definition = GetPrototypeDefinition(NewArchetype);
     if (SlotNumber == 1)
@@ -1728,6 +1783,11 @@ bool UBreakerWeaponComponent::FireOnce()
     if (!CanFire()) return false;
     const UBreakerWeaponDefinition* Definition = ResolveDefinition();
     if (!Definition) return false;
+    // Claim before ammo/damage callbacks. All pellets and the launched rocket
+    // share this pull's snapshot; failed attempts do not spend it.
+    TGuardValue<bool> QuickdrawShot(bResolvingQuickdrawShot,
+        bQuickdrawArmed && OwnerHasNodeTag(BreakerCoreQuickdrawTag()));
+    bQuickdrawArmed = false;
     // Existing stacks apply to the entire shot; its result can only help later shots.
     const uint32 RampToken = BeginDamageRampShot();
 
@@ -2254,6 +2314,7 @@ FBreakerDamageResult UBreakerWeaponComponent::SubmitWeaponDamage(const UBreakerW
     // O55: a gun shot is Weapon-delivered, which is the whole of the decision
     // at this site.
     UBreakerDamageLibrary::FillSourcePools(SourceAttributes, EBreakerDamageDelivery::Weapon, Damage);
+    ApplyQuickdrawSourceBonus(Damage);
     Damage.RandomSeed = DamageSeed;
     Damage.SourceLocation = GetOwner()->GetActorLocation();
     Damage.bHasSourceLocation = true;
@@ -2694,6 +2755,7 @@ void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Def
     // from the halves snapshotted here. The rocket carries the fire-time split
     // exactly as it carries the fire-time modifiers below.
     UBreakerDamageLibrary::FillSourcePools(SourceAttributes, EBreakerDamageDelivery::Weapon, Damage);
+    ApplyQuickdrawSourceBonus(Damage);
     Damage.RandomSeed = HashCombine(GetTypeHash(GetOwner()), ShotSequence);
     Damage.SetInstigator(GetOwner());
     // The rocket carries an already-composed request; modifiers active at the
@@ -2872,6 +2934,9 @@ int32 UBreakerWeaponComponent::GetMagazineCapacityForSlot(int32 Slot, const UBre
 
 void UBreakerWeaponComponent::SynchronizeMagazineCapacity()
 {
+    if (!OwnerHasNodeTag(BreakerCoreQuickdrawTag())) bQuickdrawArmed = false;
+    if (!OwnerHasNodeTag(BreakerCoreTwoGunsTag())) HolsteredReloadCredit = 0.0;
+    UpdateFeelTickEnabled();
     if (!GetOwner() || !GetOwner()->HasAuthority() || !bAmmunitionInitialized || bSynchronizingMagazineCapacity) return;
     TGuardValue<bool> Guard(bSynchronizingMagazineCapacity, true);
     const int32 PreviousMagazine = MagazineAmmo;
@@ -2919,6 +2984,8 @@ int32 UBreakerWeaponComponent::GetStartingReserve(const UBreakerWeaponDefinition
 void UBreakerWeaponComponent::BindCoreProgression()
 {
     if (bBoundCoreProgression) return;
+    if (auto* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr)
+        Combat->OnDeath.AddUniqueDynamic(this, &ThisClass::ClearLoadoutRuleState);
     if (auto* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr)
     {
         Progression->OnProgressionChanged.AddDynamic(this, &ThisClass::SynchronizeMagazineCapacity);
@@ -2976,6 +3043,8 @@ float UBreakerWeaponComponent::GetSecondsSinceLastShot() const
 void UBreakerWeaponComponent::ResetAmmunition()
 {
     if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+    bQuickdrawArmed = false;
+    HolsteredReloadCredit = 0.0;
     StopFire();
     GetWorld()->GetTimerManager().ClearTimer(ReloadTimer);
     SlotOneMagazineAmmo = -1;

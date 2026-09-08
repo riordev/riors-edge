@@ -44,6 +44,25 @@ enum class EBreakerDamageDelivery : uint8
 };
 
 USTRUCT(BlueprintType)
+struct RIORSEDGE_API FBreakerElementSourceSnapshot
+{
+    GENERATED_BODY()
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float ElementalBuildupIncreasedPercent = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float EntropyBuildupIncreasedPercent = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float VoidBuildupIncreasedPercent = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float RiftBuildupIncreasedPercent = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float ElementalBuildupPenetrationPercent = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float ElementalThresholdMultiplier = 1;
+};
+
+USTRUCT(BlueprintType)
+struct RIORSEDGE_API FBreakerElementRawDamage
+{
+    GENERATED_BODY()
+    UPROPERTY(BlueprintReadOnly) EBreakerElement Element = EBreakerElement::None;
+    UPROPERTY(BlueprintReadOnly) float RawDamage = 0;
+};
+USTRUCT(BlueprintType)
 struct RIORSEDGE_API FBreakerDamageRequest
 {
     GENERATED_BODY()
@@ -134,6 +153,7 @@ struct RIORSEDGE_API FBreakerDamageRequest
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float ElementalFraction = 0.0f;
     // Empty retains the legacy single-element request. Nonempty owns conversion.
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FBreakerElementShare> ElementShares;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) FBreakerElementSourceSnapshot ElementSource;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bCanApplyElementBuildup = true;
     // Paid at fire/cast time by an actually maintained Sympathetic buff.
     // These values change buildup only, never the hit or Rot damage snapshot.
@@ -174,6 +194,10 @@ struct RIORSEDGE_API FBreakerDamageResult
     GENERATED_BODY()
 
     UPROPERTY(BlueprintReadOnly) float RawDamage = 0.0f;
+    // Resolved damage amounts are separate from authored conversion fractions.
+    UPROPERTY(BlueprintReadOnly) bool bHasElementRawAllocation = false;
+    UPROPERTY(BlueprintReadOnly) TArray<FBreakerElementRawDamage> ElementRawDamage;
+    UPROPERTY(BlueprintReadOnly) float UnconvertedRawDamage = 0;
     UPROPERTY(BlueprintReadOnly) float MitigatedDamage = 0.0f;
     UPROPERTY(BlueprintReadOnly) float ShieldDamage = 0.0f;
     UPROPERTY(BlueprintReadOnly) float HealthDamage = 0.0f;

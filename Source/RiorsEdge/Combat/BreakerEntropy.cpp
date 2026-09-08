@@ -1,4 +1,5 @@
 #include "Combat/BreakerEntropy.h"
+#include "Combat/BreakerElementSourceMath.h"
 #include "Combat/BreakerStatusComponent.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Items/BreakerEquipmentComponent.h"
@@ -89,15 +90,16 @@ void UBreakerStatusComponent::ApplyEntropyHit(const FBreakerDamageRequest& Reque
     const auto Rot = FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"));
     if (HasStatus(Rot)) return; // A live damage budget is never refreshed or multiplied.
     const auto& Tuning = BreakerEntropyTuning();
-    const float Threshold = GetEntropyThreshold();
-    const float Snapshot = Result.RawDamage * FMath::Clamp(Request.ElementalFraction, 0.0f, 1.0f);
+    const float Threshold = BreakerElementSource::Threshold(Request, GetEntropyThreshold());
+    const float Snapshot = BreakerElementSource::RawPart(Request, Result);
     const float Bonus = FMath::IsFinite(Request.ElementBuildupFlat) ? FMath::Max(0.0f, Request.ElementBuildupFlat) : 0;
     // Damage-independent means a fully mitigated landed hit still contributes
     // the purchased flat amount. Avoidance, immunity and invalid hits do not.
     const float Ordinary = Result.ShieldDamage + Result.HealthDamage > 0 ? Snapshot : 0;
     if (Snapshot <= 0) return;
     const float Buildup = (Ordinary + Bonus) * FMath::Clamp(Request.ProcCoefficient, 0.0f, 1.0f)
-        * (1.0f - GetEntropyResistancePercent() / 100.0f);
+        * BreakerElementSource::BuildupMultiplier(Request)
+        * BreakerElementSource::ResistanceFactor(Request, GetEntropyResistancePercent());
     if (Threshold <= 0 || !FMath::IsFinite(Buildup) || Buildup <= 0) return;
     if (FMath::IsFinite(Request.ElementBuildupFadeSeconds) && Request.ElementBuildupFadeSeconds > 0)
     {

@@ -94,6 +94,9 @@ public:
     // A null attribute set (an enemy, a hazard, a bare test rig) leaves the
     // request at the identity: multiplier 1.0, flat factor 1.0, no split,
     // delivery unchanged except as named.
+    static void SnapshotElementSource(const AActor* Source, FBreakerDamageRequest& Request);
+    // Add a delivery-specific Increased rider while keeping every source field consistent.
+    static void AddSourceIncreased(FBreakerDamageRequest& Request, float IncreasedPercent);
     static void FillSourcePools(const class UBreakerAttributeSet* SourceAttributes,
         EBreakerDamageDelivery Delivery, FBreakerDamageRequest& Request);
 

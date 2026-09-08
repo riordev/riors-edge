@@ -9,6 +9,7 @@
 #include "UI/BreakerUIStyle.h"
 #include "Progression/BreakerProgressionTypes.h"
 #include "UObject/StrongObjectPtr.h"
+#include "Progression/BreakerProgressionTree.h"
 // Complete type: the roster is held by value in a TStrongObjectPtr below.
 #include "Save/BreakerCharacterRoster.h"
 // Complete type: the settings model is held the same way, for the same reason.
@@ -830,6 +831,7 @@ private:
     // seven-plate map. Survives a purchase rebuild, so buying inside an
     // expanded constellation does not throw the player back to the map.
     FName SkillExpandedConstellation = NAME_None;
+    TStrongObjectPtr<UBreakerProgressionTree> CoreLayoutPreviewTree;
     EBreakerMenuScreen PendingScreen = EBreakerMenuScreen::Main;
     bool bRebuildScheduled = false;
     // ---- Breakpoint sandbox state ----------------------------------------

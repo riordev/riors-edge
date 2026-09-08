@@ -28,6 +28,12 @@ static_assert(static_cast<uint8>(EBreakerNodeStatTarget::AirJumpCount)==47);
 static_assert(static_cast<uint8>(EBreakerNodeStatTarget::ClassResourceRegen)==21);
 static_assert(static_cast<uint8>(EBreakerNodeStatTarget::WeaponRange)==48);
 static_assert(static_cast<uint8>(EBreakerNodeStatTarget::PierceLossReduction)==56);
+static_assert(static_cast<uint8>(EBreakerNodeStatTarget::ElementalBuildup)==57);
+static_assert(static_cast<uint8>(EBreakerNodeStatTarget::EntropyBuildup)==58);
+static_assert(static_cast<uint8>(EBreakerNodeStatTarget::VoidBuildup)==59);
+static_assert(static_cast<uint8>(EBreakerNodeStatTarget::RiftBuildup)==60);
+static_assert(static_cast<uint8>(EBreakerNodeStatTarget::ElementalBuildupPenetration)==61);
+static_assert(static_cast<uint8>(EBreakerNodeStatTarget::ElementalThresholdReduction)==62);
 #if WITH_DEV_AUTOMATION_TESTS
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerResourceGenerationRuntimeTest,"RiorsEdge.Progression.GenericResourceGeneration",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

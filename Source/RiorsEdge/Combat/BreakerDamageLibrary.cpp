@@ -2,6 +2,9 @@
 
 #include "Attributes/BreakerAttributeAggregation.h"
 #include "Attributes/BreakerAttributeSet.h"
+#include "Combat/BreakerElementSharesMath.h"
+#include "Progression/BreakerProgressionComponent.h"
+#include "GameFramework/Actor.h"
 
 float UBreakerDamageLibrary::ComposeSourcePools(float WeaponIncreasedPercent, float AbilityIncreasedPercent,
     float SharedIncreasedPercent, float MoreProduct, EBreakerDamageDelivery Delivery)
@@ -15,10 +18,25 @@ float UBreakerDamageLibrary::ComposeSourcePools(float WeaponIncreasedPercent, fl
     return IncreasedFactor * FMath::Max(0.0f, MoreProduct);
 }
 
+void UBreakerDamageLibrary::SnapshotElementSource(const AActor* Source, FBreakerDamageRequest& Request)
+{
+    Request.ElementSource = FBreakerElementSourceSnapshot();
+    const auto* Progression = Source ? Source->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    if (!Progression) return;
+    const auto& Stats = Progression->GetNodeStats();
+    auto& Snapshot = Request.ElementSource;
+    Snapshot.ElementalBuildupIncreasedPercent = Stats.ElementalBuildupIncreasedPercent;
+    Snapshot.EntropyBuildupIncreasedPercent = Stats.EntropyBuildupIncreasedPercent;
+    Snapshot.VoidBuildupIncreasedPercent = Stats.VoidBuildupIncreasedPercent;
+    Snapshot.RiftBuildupIncreasedPercent = Stats.RiftBuildupIncreasedPercent;
+    Snapshot.ElementalBuildupPenetrationPercent = Stats.ElementalBuildupPenetrationPercent;
+    Snapshot.ElementalThresholdMultiplier = Stats.ElementalThresholdMultiplier;
+}
 void UBreakerDamageLibrary::FillSourcePools(const UBreakerAttributeSet* SourceAttributes,
     EBreakerDamageDelivery Delivery, FBreakerDamageRequest& Request)
 {
     Request.Delivery = Delivery;
+    SnapshotElementSource(SourceAttributes ? SourceAttributes->GetTypedOuter<AActor>() : nullptr, Request);
     if (!SourceAttributes)
     {
         Request.SourceDamageMultiplier = 1.0f;
@@ -51,6 +69,21 @@ void UBreakerDamageLibrary::FillSourcePools(const UBreakerAttributeSet* SourceAt
     Request.SourceIncreasedPercent = Aggregator.ComposedIncreasedPercent(Lane);
     Request.SourceMoreProduct = FMath::Max(Aggregator.ComposedMoreProduct(Lane), UE_SMALL_NUMBER);
     Request.bHasSourceSplit = true;
+}
+
+void UBreakerDamageLibrary::AddSourceIncreased(FBreakerDamageRequest& Request, float IncreasedPercent)
+{
+    if (!FMath::IsFinite(IncreasedPercent)) return;
+    if (!Request.bHasSourceSplit)
+    {
+        Request.SourceFlatFactor = Request.SourceDamageMultiplier;
+        Request.SourceIncreasedPercent = 0.0f;
+        Request.SourceMoreProduct = 1.0f;
+        Request.bHasSourceSplit = true;
+    }
+    Request.SourceIncreasedPercent += IncreasedPercent;
+    Request.SourceDamageMultiplier = FMath::Max(0.0f, Request.SourceFlatFactor)
+        * FMath::Max(0.0f, 1.0f + Request.SourceIncreasedPercent / 100.0f) * FMath::Max(0.0f, Request.SourceMoreProduct);
 }
 
 float UBreakerDamageLibrary::CalculateArmorMitigation(float Armor, float ArmorPenetration)
@@ -99,6 +132,17 @@ FBreakerDamageResult UBreakerDamageLibrary::ResolveDamage(const FBreakerDamageRe
         }
     }
     if (Result.bCritical) Result.RawDamage *= FMath::Max(1.0f, Request.CriticalMultiplier);
+    // Allocate the single resolved source/weakpoint/critical result, never roll or scale each share again.
+    Result.bHasElementRawAllocation = true;
+    const auto Shares = BreakerElementShares::Resolve(Request);
+    for (const auto& Share : Shares)
+    {
+        FBreakerElementRawDamage Part;
+        Part.Element = Share.Element;
+        Part.RawDamage = Result.RawDamage * Share.Fraction;
+        Result.ElementRawDamage.Add(Part);
+    }
+    Result.UnconvertedRawDamage = Result.RawDamage * (1.0f - BreakerElementShares::TotalFraction(Shares));
 
     // Passive dodge and block resolve before mitigation and never affect
     // DoTs. Dodge fully evades; block reduces.

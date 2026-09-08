@@ -1,4 +1,5 @@
 #include "Combat/BreakerRift.h"
+#include "Combat/BreakerElementSourceMath.h"
 #include "Combat/BreakerStatusComponent.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerDamageLibrary.h"
@@ -98,14 +99,15 @@ uint64 UBreakerStatusComponent::ApplyRiftHit(const FBreakerDamageRequest& Reques
         || HasStatus(Unstable) || DeliveringTickTag == Unstable
         || !FMath::IsFinite(Result.RawDamage) || !FMath::IsFinite(Request.ProcCoefficient)
         || !FMath::IsFinite(Request.ElementalFraction) || Result.RawDamage <= 0) return 0;
-    const float Snapshot = Result.RawDamage * FMath::Clamp(Request.ElementalFraction, 0.0f, 1.0f);
+    const float Snapshot = BreakerElementSource::RawPart(Request, Result);
     const float Budget = Snapshot * BreakerRift::DamageFraction();
-    const float Threshold = GetRiftThreshold();
+    const float Threshold = BreakerElementSource::Threshold(Request, GetRiftThreshold());
     if (!FMath::IsFinite(Budget) || Budget <= 0 || !FMath::IsFinite(Threshold) || Threshold <= 0) return 0;
     const float Bonus = FMath::IsFinite(Request.ElementBuildupFlat) ? FMath::Max(0.0f, Request.ElementBuildupFlat) : 0;
     const float Ordinary = Result.ShieldDamage + Result.HealthDamage > 0 ? Snapshot : 0;
     const float Buildup = (Ordinary + Bonus) * FMath::Clamp(Request.ProcCoefficient, 0.0f, 1.0f)
-        * (1.0f - GetRiftResistancePercent() / 100.0f);
+        * BreakerElementSource::BuildupMultiplier(Request)
+        * BreakerElementSource::ResistanceFactor(Request, GetRiftResistancePercent());
     if (!FMath::IsFinite(Buildup) || Buildup <= 0) return 0;
     if (FMath::IsFinite(Request.ElementBuildupFadeSeconds) && Request.ElementBuildupFadeSeconds > 0)
     {

@@ -644,6 +644,12 @@ protected:
     UFUNCTION() void OnRep_Swapping();
 
 private:
+    void TickHolsteredReload(float DeltaSeconds);
+    UFUNCTION() void ClearLoadoutRuleState();
+    void ApplyQuickdrawSourceBonus(FBreakerDamageRequest& Request) const;
+    double HolsteredReloadCredit = 0.0;
+    bool bQuickdrawArmed = false;
+    bool bResolvingQuickdrawShot = false;
     void SnapshotWeaponElement(FBreakerDamageRequest& Request) const;
     int32 GetMagazineCapacityForSlot(int32 Slot, const UBreakerWeaponDefinition* Definition) const;
     bool bSynchronizingMagazineCapacity = false;

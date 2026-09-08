@@ -1,6 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
@@ -18,8 +19,9 @@ namespace BreakerResourceGeneration
     {
         const auto* Combat = Owner ? Owner->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
         if (!Owner || Owner->IsActorBeingDestroyed() || !Combat || Combat->IsDead()) return 0.0f;
-        const auto* Progression = Owner->FindComponentByClass<UBreakerProgressionComponent>();
-        const float Rate = Progression ? Progression->GetNodeStats().ClassResourceRegenPerSecond : 0.0f;
+        const auto* Character = Cast<ABreakerCharacter>(Owner);
+        const auto* Attributes = Character ? Character->GetAttributes() : nullptr;
+        const float Rate = Attributes ? Attributes->GetClassResourceRegen() : 0.0f;
         return FMath::IsFinite(Rate) ? FMath::Max(0.0f, Rate) : 0.0f;
     }
     inline bool HoldsOutOfCombatDecay(const AActor* Owner)

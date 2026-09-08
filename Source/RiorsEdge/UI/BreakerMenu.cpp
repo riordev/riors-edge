@@ -1,5 +1,6 @@
 #include "UI/BreakerMenu.h"
 #include "UI/BreakerCoreBoardLayout.h"
+#include "UI/BreakerCoreLayoutPreview.h"
 #include "UI/BreakerDoctrineBoardLayout.h"
 #include "UI/BreakerSandboxModel.h"
 #include "EngineUtils.h"
@@ -493,6 +494,7 @@ namespace
         float RailWidth = 420.0f;
         // Usable width of the board viewport, scrollbar allowance removed.
         float BoardViewWidth = 1300.0f;
+        float GameUIScale = 1.0f;
     };
 
     // Shared by BOTH wide screens. The loadout used to hard-code 1760 and
@@ -516,6 +518,7 @@ namespace
         // at 1280x720 the .667 scale must not shrink a physical-sized box twice.
         const float GameUIScale = GetDefault<UUserInterfaceSettings>()->GetDPIScaleBasedOnSize(
             FIntPoint(FMath::RoundToInt(Viewport.X), FMath::RoundToInt(Viewport.Y)));
+        Metrics.GameUIScale = FMath::Max(.01f, GameUIScale);
         const FVector2D PanelSize = BreakerWideScreenLayout::SolvePanelSize(Viewport, GameUIScale);
         Metrics.PanelWidth = PanelSize.X;
         Metrics.PanelHeight = PanelSize.Y;
@@ -7982,6 +7985,17 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
     UBreakerProgressionComponent* Progression = Character.IsValid() ? Character->GetProgression() : nullptr;
     const UBreakerAttributeSet* SkillAttributes = Character.IsValid() ? Character->GetAttributes() : nullptr;
     const TArray<const UBreakerProgressionTree*> Trees = ProgressionGatherTrees(Progression);
+#if !UE_BUILD_SHIPPING
+    FString Probe;
+    if (!CoreLayoutPreviewTree.IsValid() && FParse::Value(FCommandLine::Get(), TEXT("BreakerCoreLayoutProbe="), Probe))
+    {
+        CoreLayoutPreviewTree.Reset(BreakerCoreLayoutPreview::Create());
+        SkillBoardTab = 1;
+        SkillExpandedConstellation = Probe.Equals(TEXT("Overview"), ESearchCase::IgnoreCase) ? NAME_None : FName(*Probe);
+        ResetBoardView();
+    }
+#endif
+    const bool bStructuralPreview = CoreLayoutPreviewTree.IsValid();
 
     // Read the viewport once. Everything below is laid out against these
     // numbers rather than against 1920x1080, which is why the screen no longer
@@ -8003,6 +8017,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         if (Tree->Currency == EBreakerPointCurrency::DoctrinePoints) ClassTrees.Add(Tree);
         else CoreTrees.Add(Tree);
     }
+    if (bStructuralPreview) { ClassTrees.Reset(); CoreTrees.Reset(); CoreTrees.Add(CoreLayoutPreviewTree.Get()); }
     if (SkillBoardTab == 0 && ClassTrees.IsEmpty() && !CoreTrees.IsEmpty()) SkillBoardTab = 1;
     if (SkillBoardTab == 1 && CoreTrees.IsEmpty() && !ClassTrees.IsEmpty()) SkillBoardTab = 0;
     const bool bCoreBoard = SkillBoardTab == 1;
@@ -8136,7 +8151,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             }))
             .OnClicked(FOnClicked::CreateLambda([this, Tree, Node, bPurchasable, LockReason]()
             {
-                if (!Node) return FReply::Handled();
+                if (!Node || CoreLayoutPreviewTree.IsValid()) return FReply::Handled();
                 if (!bPurchasable)
                 {
                     // The action is never silently swallowed: it is disclosed.
@@ -8280,7 +8295,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         const UBreakerProgressionTree* CoreTree = CoreTrees[0];
         const bool bFocused = !SkillExpandedConstellation.IsNone();
         const BreakerCoreBoard::FLayout Layout = BreakerCoreBoard::Build(CoreTree, SkillExpandedConstellation);
-        const TSet<FName> Dark = BreakerCoreDarkConstellations(CoreTree);
+        if (!Layout.bValidMetadata) return MakeEmptyBoard(TEXT("[ INCOMPLETE CORE LAYOUT ]\n\nA wedge is missing a role, lane, or sector. No guessed graph is shown."));
+        const bool bRoleLayout = Layout.bUsesCoreRoles;
+        const float FitScale = FMath::Max(.01f, Metrics.GameUIScale * FMath::Min(Metrics.BoardViewWidth / Layout.Size.X, FMath::Max(320.0f, Metrics.PanelHeight - 272.0f) / Layout.Size.Y));
+        const float RoleMarkerSize = bFocused ? 28.0f / FitScale : 44.0f;
+        const TSet<FName> Dark = bStructuralPreview ? TSet<FName>() : BreakerCoreDarkConstellations(CoreTree);
         int32 TreeSpent = 0, TreeTotal = 0;
         ProgressionTreeInvestment(Progression, CoreTree, TreeSpent, TreeTotal);
         TSharedRef<SCanvas> Canvas = SNew(SCanvas);
@@ -8291,7 +8310,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         auto DrawLink = [&](FVector2D A, FVector2D B, const FLinearColor& Color, float Width)
         {
             const FVector2D Direction = (B - A).GetSafeNormal();
-            AddCanvasSegment(Canvas, A + Direction * 23.0f, B - Direction * 23.0f, Color, Width);
+            const float EndInset = bRoleLayout ? RoleMarkerSize * .5f : 23.0f;
+            const float DrawWidth = bRoleLayout && bFocused ? Width / FitScale : Width;
+            AddCanvasSegment(Canvas, A + Direction * EndInset, B - Direction * EndInset, Color, DrawWidth);
         };
         // The overview is an atlas, not a field of undersized purchase targets.
         // Its full-height constellation buttons open the same graph at 1:1.
@@ -8302,12 +8323,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 const FVector2D Angles = BreakerCoreBoard::SectorAngles(Layout, Layout.Sectors[Sector]);
                 const float Angle = Angles.X;
                 AddCanvasSegment(Canvas, BreakerCoreBoard::Polar(Layout.Hub, 100.0f, Angles.Y),
-                    BreakerCoreBoard::Polar(Layout.Hub, 690.0f, Angles.Y), BorderRest, 1.0f);
-                AddLabel(BreakerCoreBoard::Polar(Layout.Hub, 155.0f, Angle), FVector2D(180, 36),
+                    BreakerCoreBoard::Polar(Layout.Hub, (bRoleLayout ? 1400.0f : 690.0f), Angles.Y), BorderRest, 1.0f);
+                if (!bRoleLayout) AddLabel(BreakerCoreBoard::Polar(Layout.Hub, 155.0f, Angle), FVector2D(180, 36),
                     MenuText(FText::FromString(Layout.Sectors[Sector].ToString().ToUpper()), 18, Muted, true));
             }
         }
-        for (const FName Entry : Layout.Entries)
+        if (!bRoleLayout) for (const FName Entry : Layout.Entries)
         {
             const bool bOwned = ProgressionGetNodeRank(Progression, Entry, CoreTree->Currency) > 0;
             DrawLink(Layout.Hub, Layout.Centers[Entry], bOwned ? Cyan : BorderEmphasis, bOwned ? 3.0f : 2.0f);
@@ -8319,7 +8340,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             DrawLink(Layout.Centers[Edge.A], Layout.Centers[Edge.B],
                 bOwnedA && bOwnedB ? Cyan : (bOwnedA || bOwnedB ? Muted : BorderEmphasis), bOwnedA && bOwnedB ? 3.0f : 2.0f);
         }
-        AddLabel(Layout.Hub, FVector2D(76, 52),
+        if (!bRoleLayout) AddLabel(Layout.Hub, FVector2D(76, 52),
             MakePlate(MenuText(FText::FromString(TEXT("CORE")), 16, Primary, true), PanelRaised, Amber, FMargin(8)));
         for (const UBreakerProgressionNode* Node : CoreTree->Nodes)
         {
@@ -8332,19 +8353,48 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             const bool bSealed = Dark.Contains(Node->Constellation);
             if (bSealed) { bPurchasable = false; LockReason = TEXT("SEALED"); ShortReason = LockReason; }
             const bool bOwned = Rank > 0;
-            const ESkillMarkerKind Kind = ClassifyNode(Node);
+            if (bStructuralPreview) { bPurchasable = false; LockReason = TEXT("STRUCTURAL PREVIEW"); ShortReason = TEXT("READ ONLY"); }
+            const ESkillMarkerKind Kind = !bRoleLayout ? ClassifyNode(Node)
+                : Node->CoreRole == EBreakerCoreNodeRole::Keystone ? ESkillMarkerKind::Keystone
+                : Node->CoreRole == EBreakerCoreNodeRole::Convergence ? ESkillMarkerKind::Convergence
+                : Node->CoreRole == EBreakerCoreNodeRole::LaneNotable ? ESkillMarkerKind::Notable : ESkillMarkerKind::Minor;
             const FSkillNodeView View = MakeSkillNodeView(Node, Rank, bPurchasable, LockReason, TreeSpent, Snapshot);
             const FBreakerMenuSkillRung Rung = BreakerMenuSkillLadderRung(Kind, bOwned, bPurchasable,
                 BreakerMenuSkillKeystoneRefused(Progression, CoreTree, Node));
-            const float RingWidth = MarkerRingThickness(Kind, bOwned || bPurchasable);
-            const TSharedRef<SWidget> Core = MakeMarkerCore(Kind, Rung.Core, Rung.Fill, 44.0f);
+            const float RingWidth = bRoleLayout ? (bFocused ? 1.5f / FitScale : 3.0f) : MarkerRingThickness(Kind, bOwned || bPurchasable);
+            const FLinearColor MarkerFill = bRoleLayout && !bOwned ? PanelRaised : Rung.Fill;
+            const FLinearColor MarkerRing = bRoleLayout && !bOwned ? Muted : Rung.Ring;
+            const TSharedRef<SWidget> Core = MakeMarkerCore(Kind, bRoleLayout ? Primary : Rung.Core, MarkerFill, bRoleLayout ? RoleMarkerSize : 44.0f);
             TSharedRef<SWidget> Marker = bFocused && !bSealed
-                ? WireMarker(CoreTree, Node, View, bPurchasable, LockReason, Rung.Fill, Rung.Ring, RingWidth, Core)
+                ? WireMarker(CoreTree, Node, View, bPurchasable, LockReason, MarkerFill, MarkerRing, RingWidth, Core)
                 : BorderWrap(SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
-                    .BorderBackgroundColor(Rung.Fill).Padding(0).HAlign(HAlign_Center).VAlign(VAlign_Center)[Core], Rung.Ring, RingWidth);
-            if (MarkerIsDiamond(Kind)) Marker = RotateFortyFive(Marker);
-            AddLabel(*Center, bFocused ? FVector2D(44, 44) : FVector2D(32, 32), Marker);
-            if (bFocused)
+                    .BorderBackgroundColor(MarkerFill).Padding(0).HAlign(HAlign_Center).VAlign(VAlign_Center)[Core], MarkerRing, RingWidth);
+            if (MarkerIsDiamond(Kind))
+            {
+                Marker = RotateFortyFive(Marker);
+                if (bRoleLayout) Marker = SNew(SBox).HAlign(HAlign_Center).VAlign(VAlign_Center)
+                    [SNew(SBox).WidthOverride(RoleMarkerSize / 1.414214f).HeightOverride(RoleMarkerSize / 1.414214f)[Marker]];
+            }
+            if (bRoleLayout && !bFocused)
+            {
+                const FName WedgeId = Node->Constellation;
+                Marker = SNew(SButton).ContentPadding(0).ButtonColorAndOpacity(Rung.Fill)
+                    .ToolTipText(FText::FromString(View.Name + TEXT(" — ") + RankLabel(Rank, Node->MaxRank)))
+                    .OnClicked(FOnClicked::CreateLambda([this, WedgeId]()
+                    { SkillExpandedConstellation = WedgeId; ResetBoardView(); Rebuild(EBreakerMenuScreen::SkillTrees); return FReply::Handled(); }))
+                    [Marker];
+            }
+            AddLabel(*Center, bRoleLayout ? FVector2D(RoleMarkerSize, RoleMarkerSize) : bFocused ? FVector2D(44, 44) : FVector2D(32, 32), Marker);
+            if (bFocused && bRoleLayout && Node->CoreRole == EBreakerCoreNodeRole::LaneMinor)
+            {
+                TSharedRef<SHorizontalBox> Pips = SNew(SHorizontalBox);
+                for (int32 Pip = 0; Pip < Node->MaxRank; ++Pip)
+                    Pips->AddSlot().AutoWidth().Padding(3 / FitScale,0)[SNew(SBox).WidthOverride(5 / FitScale).HeightOverride(3 / FitScale)
+                        [SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                        .BorderBackgroundColor(Pip < Rank ? Cyan : BorderEmphasis).Padding(0)]];
+                AddLabel(*Center + FVector2D(0, RoleMarkerSize * .5f + 7 / FitScale), FVector2D(33 / FitScale,3 / FitScale), Pips);
+            }
+            if (bFocused && !bRoleLayout)
             {
                 const FString State = Rank >= Node->MaxRank ? FString(TEXT("MAXED"))
                     : bPurchasable ? FString::Printf(TEXT("%d PT -> RANK %d"), Node->CostPerRank, Rank + 1)
@@ -8357,12 +8407,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     [MenuText(FText::FromString(State), 11, bPurchasable ? Amber : Muted, true)]);
             }
         }
-        if (!bFocused)
+        if (!bFocused && !bRoleLayout)
         {
             for (const BreakerCoreBoard::FWedge& Wedge : Layout.Wedges)
             {
                 const FName WedgeId = Wedge.Name;
-                AddLabel(BreakerCoreBoard::Polar(Layout.Hub, BreakerCoreBoard::OverviewLabelRadius, Wedge.AngleDegrees), BreakerCoreBoard::OverviewHitSize(),
+                AddLabel(BreakerCoreBoard::Polar(Layout.Hub, (bRoleLayout ? 1450.0f : BreakerCoreBoard::OverviewLabelRadius), Wedge.AngleDegrees), BreakerCoreBoard::OverviewHitSize(),
                     MakeButton(FText::FromString(Wedge.Name.ToString().ToUpper()), FOnClicked::CreateLambda([this, WedgeId]()
                     {
                         SkillExpandedConstellation = WedgeId;
@@ -8394,7 +8444,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 return FReply::Handled();
             }), false)];
         Heading->AddSlot().FillWidth(1).VAlign(VAlign_Center)
-            [MenuText(FText::FromString(bFocused ? SkillExpandedConstellation.ToString().ToUpper() : TEXT("CORE CONSTELLATIONS")),
+            [MenuText(FText::FromString(bStructuralPreview ? FString(TEXT("STRUCTURAL PREVIEW — ")) + (bFocused ? SkillExpandedConstellation.ToString().ToUpper() : TEXT("187 NODES / 22 WEDGES")) : bFocused ? SkillExpandedConstellation.ToString().ToUpper() : TEXT("CORE CONSTELLATIONS")),
                 BreakerUI::TypeH2, Primary, true)];
         Heading->AddSlot().AutoWidth().VAlign(VAlign_Center)
             [MenuText(FText::FromString(FString::Printf(TEXT("%d / %d INVESTED"), TreeSpent, TreeTotal)), BreakerUI::TypeCaption, Muted, true)];
@@ -8706,6 +8756,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             {
                 UBreakerProgressionComponent* Prog = Character.IsValid() ? Character->GetProgression() : nullptr;
                 FText FailureReason;
+                if (CoreLayoutPreviewTree.IsValid()) return FReply::Handled();
                 if (ProgressionRespec(Prog, BoardCurrency, bAtForge, FailureReason))
                 {
                     SkillTreeStatus = FText::FromString(FString::Printf(TEXT("%s POINTS REFUNDED"), *CurrencyLabel(BoardCurrency)));
@@ -8759,12 +8810,36 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
     // beneath it in its own scroll so a long node card can never push the
     // totals off the plate. The column's width is fixed by this box, so
     // populating the detail cannot reflow the board.
+    TSharedRef<SWidget> RailTop = MakeBuildTotalsPlate(Snapshot, ClassSpent, CoreSpent);
+    if (bCoreBoard && SkillExpandedConstellation.IsNone() && !CoreTrees.IsEmpty() && !CoreTrees[0]->CoreWedgeOrder.IsEmpty())
+    {
+        TSharedRef<SVerticalBox> Chooser = SNew(SVerticalBox);
+        Chooser->AddSlot().AutoHeight().Padding(0,0,0,8)
+            [MenuText(FText::FromString(TEXT("CONSTELLATIONS")), 16, Primary, true)];
+        const auto& Order = CoreTrees[0]->CoreWedgeOrder;
+        for (int32 Index=0; Index<Order.Num(); Index+=2)
+        {
+            TSharedRef<SHorizontalBox> Row=SNew(SHorizontalBox);
+            for (int32 Column=0; Column<2 && Index+Column<Order.Num(); ++Column)
+            {
+                const FName WedgeId=Order[Index+Column];
+                Row->AddSlot().FillWidth(1).Padding(2)
+                    [SNew(SBox).HeightOverride(28)[SNew(SButton).ContentPadding(FMargin(4,0))
+                    .ButtonColorAndOpacity(WedgeId==SkillExpandedConstellation ? BorderEmphasis : PanelRaised)
+                    .OnClicked(FOnClicked::CreateLambda([this,WedgeId]()
+                    {SkillExpandedConstellation=WedgeId; ResetBoardView(); Rebuild(EBreakerMenuScreen::SkillTrees); return FReply::Handled();}))
+                    [MenuText(FText::FromString(WedgeId.ToString().ToUpper()),12,Primary,true)]]];
+            }
+            Chooser->AddSlot().AutoHeight()[Row];
+        }
+        RailTop=MakePlate(Chooser,PanelRaised,BorderEmphasis,FMargin(8));
+    }
     TSharedRef<SWidget> RailColumn = SNew(SBox).WidthOverride(Metrics.RailWidth)
     [
         SNew(SVerticalBox)
         + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
         [
-            MakeBuildTotalsPlate(Snapshot, ClassSpent, CoreSpent)
+            RailTop
         ]
         + SVerticalBox::Slot().FillHeight(1.0f)
         [
@@ -8802,7 +8877,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 // O2: node numbers are not balanced yet.
                 SNew(SBox).Clipping(EWidgetClipping::ClipToBounds)
                 [
-                    MenuText(FText::FromString(bCoreBoard && SkillExpandedConstellation.IsNone()
+                    MenuText(FText::FromString(bStructuralPreview ? FString(TEXT("READ ONLY STRUCTURE · SELECT A WEDGE · HOVER NODES FOR DETAILS · WHEEL ZOOM")) : bCoreBoard && SkillExpandedConstellation.IsNone()
                         ? BreakerStrings::Get(EBreakerStringKey::CoreOverviewHint)
                         : FString(TEXT("LMB BUY 1 RANK · SHIFT+LMB BUY TO MAX · HOVER FOR BEFORE / AFTER · WHEEL ZOOM · DRAG PAN · ESC BACK"))),
                         BreakerUI::TypeCaption, Muted, true)
@@ -8813,7 +8888,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 // Scoped to the board and LABELLED with its scope. The count
                 // is only useful if the player can look up and find that many
                 // gold nodes.
-                MenuText(FText::FromString(FString::Printf(TEXT("%d PURCHASABLE %s"),
+                MenuText(FText::FromString(bStructuralPreview ? FString(TEXT("NO PURCHASES")) : FString::Printf(TEXT("%d PURCHASABLE %s"),
                         PurchasableCount, bCountSpansBoard ? TEXT("ON THIS BOARD") : TEXT("ON THIS BRANCH"))),
                     BreakerUI::TypeH2, PurchasableCount > 0 ? Amber : Muted, true)
             ],
