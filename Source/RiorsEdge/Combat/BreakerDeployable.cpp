@@ -774,6 +774,7 @@ void ABreakerDeployable::DetonateMine(int32 MineIndex)
         Damage.CriticalChance = OwnerAttributes ? OwnerAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
         Damage.CriticalMultiplier = OwnerAttributes ? OwnerAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
         UBreakerDamageLibrary::FillSourcePools(OwnerAttributes, EBreakerDamageDelivery::Ability, Damage);
+        Damage.bRadialDamage = true;
         Damage.SourceLocation = Mine.Location;
         Damage.bHasSourceLocation = true;
         Damage.SetInstigator(OwnerActor);
@@ -943,6 +944,7 @@ void ABreakerDeployable::DetonateRadialBlast(const FVector& Center, float Damage
         Damage.CriticalChance = OwnerAttributes ? OwnerAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
         Damage.CriticalMultiplier = OwnerAttributes ? OwnerAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
         UBreakerDamageLibrary::FillSourcePools(OwnerAttributes, EBreakerDamageDelivery::Ability, Damage);
+        Damage.bRadialDamage = true;
         Damage.SourceLocation = Center;
         Damage.bHasSourceLocation = true;
         Damage.SetInstigator(OwnerActor);
@@ -1392,4 +1394,11 @@ void ABreakerDeployable::EnforceDensityCapForPlacement(AActor* OwnerCharacter, E
         CullOldest(false, TypeAboutToPlace);
         CountOwnedDeployables(OwnerCharacter, Total, TypeAboutToPlace, OfType);
     }
+}
+
+bool ABreakerDeployable::RejectsIncidentalAreaDamage(const FBreakerDamageRequest& Request) const
+{
+    return Type == EBreakerDeployableType::AnchorPoint && !bDestroyed && !IsActorBeingDestroyed()
+        && LifetimeRemaining > 0 && Request.bRadialDamage && Request.IntendedTarget.Get() != this
+        && OwnerHasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Tank.Bastion.Bulk")));
 }

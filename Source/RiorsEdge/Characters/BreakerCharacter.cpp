@@ -383,11 +383,7 @@ void ABreakerCharacter::BeginPlay()
         // Every flag re-reads the mission position: a turn-in that reaches a
         // doctrine Unlock beat pays it here, in the same call that set the
         // flag, before the journal's write-through persists it (O43).
-        Quests->OnFlagSet.AddWeakLambda(this, [this](FName Flag)
-        {
-            GrantQuestRewardForFlag(Flag);
-            if (Progression && Quests) Progression->SettleDoctrineEntitlement(Quests->GetState());
-        });
+        BindQuestRewardEvents();
         if (Combat) Combat->OnKillDealt.AddDynamic(this, &ThisClass::HandleQuestKill);
     }
     if (HasAuthority()) LoadGameState();
@@ -2664,6 +2660,16 @@ void ABreakerCharacter::HandleQuestKill(const FBreakerHitContext& Hit)
     UBreakerQuestLibrary::NotifyEnemyKilled(*Quests, bEliteOrAbove);
 }
 
+void ABreakerCharacter::BindQuestRewardEvents()
+{
+    if (!HasAuthority() || !Quests || QuestRewardEventsHandle.IsValid()) return;
+    QuestRewardEventsHandle = Quests->OnFlagSet.AddWeakLambda(this, [this](FName Flag)
+    {
+        GrantQuestRewardForFlag(Flag);
+        if (Progression && Quests) Progression->SettleDoctrineEntitlement(Quests->GetState());
+    });
+}
+
 void ABreakerCharacter::GrantQuestRewardForFlag(FName Flag)
 {
     if (!Equipment || !HasAuthority()) return;
@@ -2674,6 +2680,11 @@ void ABreakerCharacter::GrantQuestRewardForFlag(FName Flag)
         if (Quest.TurnedInFlag == Flag) { Paid = Quest; bFound = true; break; }
     }
     if (!bFound) return;
+
+    // A flag alone cannot pay an unearned contract.
+    if (!Quests || !Quests->HasFlag(Paid.AcceptedFlag)
+        || !UBreakerQuestLibrary::AreAllObjectivesComplete(Paid, Quests->GetState())) return;
+    if (Progression && Paid.Reward.Experience > 0) Progression->AwardExperience(Paid.Reward.Experience);
 
     for (int32 Index = 0; Index < Paid.Reward.ItemCount; ++Index)
     {

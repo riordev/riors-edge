@@ -139,6 +139,8 @@ struct RIORSEDGE_API FBreakerQuestReward
 {
     GENERATED_BODY()
 
+    // Optional earned turn-in XP; existing quests default to no XP reward.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 Experience = 0;
     // O2 PLACEHOLDER.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 ItemCount = 1;
     // O2 PLACEHOLDER.

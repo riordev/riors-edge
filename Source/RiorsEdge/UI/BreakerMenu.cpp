@@ -7,6 +7,7 @@
 #include "Data/BreakerStrings.h"
 
 #include "Save/BreakerCharacterRoster.h"
+#include "Save/BreakerQuestContent.h"
 #include "Characters/BreakerCharacter.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Layout/SScrollBox.h"
@@ -1005,6 +1006,19 @@ void SBreakerMenu::ShowScreenForCapture(EBreakerMenuScreen Screen)
     {
         Board = Board.ToUpper();
         if (Board == TEXT("CORE")) { SkillBoardTab = 1; }
+        else if (Board == TEXT("QUESTREWARD") && Character.IsValid())
+        {
+            // Select the actual first-contract offer without granting flags or rewards.
+            for (TActorIterator<ABreakerNPC> It(Character->GetWorld()); It; ++It)
+                for (const FBreakerDialogueNode& Node : It->DialogueNodes)
+                    if (Node.Choices.ContainsByPredicate([](const FBreakerDialogueChoice& Choice)
+                        { return Choice.SetsQuestFlag == BreakerQuestFlags::FirstContractAccepted; }))
+                    {
+                        DialogueNPC = *It;
+                        DialogueNodeId = Node.NodeId;
+                        Screen = EBreakerMenuScreen::Dialogue;
+                    }
+        }
         else if (Board == TEXT("DIALOGUE") && Character.IsValid())
         {
             // Photograph the longest real authored speaker line. No journal
@@ -10501,6 +10515,25 @@ TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()
     for (const FBreakerDialogueChoice& Choice : VisibleChoices)
     {
         ++ChoiceNumber;
+        TSharedRef<SVerticalBox> ChoiceContent = SNew(SVerticalBox);
+        const float ContentWrap = ChoiceLineWrap - 32.0f - 2.0f * BreakerUI::Space16;
+        ChoiceContent->AddSlot().AutoHeight()
+        [MenuWrappedText(FText::FromString(Choice.Text), BreakerUI::TypeBody, SoftText, ContentWrap, true)];
+        for (const FBreakerQuestDefinition& Quest : UBreakerQuestLibrary::GetFallbackQuests())
+        {
+            if (Choice.SetsQuestFlag.IsNone()
+                || (Choice.SetsQuestFlag != Quest.AcceptedFlag && Choice.SetsQuestFlag != Quest.TurnedInFlag)) continue;
+            TArray<FString> Rewards;
+            if (Quest.Reward.ItemCount > 0)
+                Rewards.Add(FString::Printf(TEXT("%d %s %s"), Quest.Reward.ItemCount,
+                    *RarityName(Quest.Reward.MinimumRarity), Quest.Reward.ItemCount == 1 ? TEXT("item") : TEXT("items")));
+            if (Quest.Reward.Experience > 0) Rewards.Add(FString::Printf(TEXT("%d XP"), Quest.Reward.Experience));
+            if (!Rewards.IsEmpty())
+                ChoiceContent->AddSlot().AutoHeight().Padding(0, BreakerUI::Space4, 0, 0)
+                [MenuWrappedText(FText::FromString(TEXT("ON TURN-IN  ·  ") + FString::Join(Rewards, TEXT("  ·  "))),
+                    BreakerUI::TypeCaption, Muted, ContentWrap)];
+            break;
+        }
         Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
         [
             SNew(SBox).MinDesiredHeight(56.0f)   // O2 PLACEHOLDER
@@ -10529,8 +10562,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()
                 ]
                 + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
                 [
-                    MenuWrappedText(FText::FromString(Choice.Text), BreakerUI::TypeBody, SoftText,
-                        ChoiceLineWrap - 32.0f - 2.0f * BreakerUI::Space16, true)
+                    ChoiceContent
                 ]
             ],
             BorderEmphasis)

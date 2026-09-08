@@ -96,6 +96,7 @@ public:
     void InitializeDeployable(EBreakerDeployableType InType, AActor* InOwnerCharacter, float InScrapCost);
 
     UFUNCTION(BlueprintPure, Category="Deployable") EBreakerDeployableType GetDeployableType() const { return Type; }
+    bool RejectsIncidentalAreaDamage(const FBreakerDamageRequest& Request) const;
     UFUNCTION(BlueprintPure, Category="Deployable") AActor* GetOwningCharacter() const { return OwningCharacter.Get(); }
     UFUNCTION(BlueprintPure, Category="Deployable") float GetScrapCost() const { return ScrapCost; }
     UFUNCTION(BlueprintPure, Category="Deployable") float GetRemainingLifetime() const { return LifetimeRemaining; }

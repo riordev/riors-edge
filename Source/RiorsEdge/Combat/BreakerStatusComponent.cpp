@@ -47,6 +47,13 @@ float UBreakerStatusComponent::GetEffectiveAilmentAvoidanceChance() const
     return FMath::Clamp(Chance, 0.0f, MaxAilmentAvoidanceChance);
 }
 
+void UBreakerStatusComponent::ApplyPierceSpread(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator)
+{
+    const FBreakerStatusRule* Rule = BreakerStatusRules::FindRule(Spec.StatusTag);
+    if (!Rule || !Rule->bSpreadsOnPierce || Spec.ProcCoefficient != 0.0f) return;
+    ApplyStatusInternal(Spec, DamageFamily, Instigator, true);
+}
+
 void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator)
 {
     // Entropy is earned through accepted-hit buildup, never a carried status payload.

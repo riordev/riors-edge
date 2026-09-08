@@ -638,9 +638,8 @@ void UBreakerAbility_AnchorPoint::ActivateAbility(const FGameplayAbilitySpecHand
     if (ABreakerDeployable* Panel = World->SpawnActor<ABreakerDeployable>(ABreakerDeployable::StaticClass(), PlaceLocation, PanelFacing, SpawnParams))
     {
         // B6 BULK: half again the health (R2: double), applied to the fraction
-        // BEFORE the deployable computes its pool from it. The shrug-off-AoE
-        // half WAITS: no aimed-at-vs-splash attribution exists on any damage
-        // request. B11 halves the panel's exposure a different way below.
+        // BEFORE the deployable computes its pool from it. Incidental radial
+        // damage is rejected at the live panel's receiver; direct impacts remain valid.
         const int32 BulkRank = BreakerTankNodeRank(Character, TEXT("Tank.Bastion.Bulk"));
         if (BulkRank > 0)
         {

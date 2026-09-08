@@ -106,6 +106,8 @@ public:
     // F prefers a pickup over NPC dialogue when both are in range — picking
     // items up is by far the more frequent action.
     UFUNCTION(BlueprintPure, Category="Interaction") ABreakerLootPickup* FindNearbyPickup() const;
+    // Bind earned rewards independently of save loading; repeated binding is inert.
+    void BindQuestRewardEvents();
     UFUNCTION(BlueprintCallable, Category="Interaction") void AddQuestFlag(FName Flag);
     UFUNCTION(BlueprintPure, Category="Interaction") bool HasQuestFlag(FName Flag) const;
     UFUNCTION(BlueprintPure, Category="Interaction") const TArray<FName>& GetQuestFlags() const;
@@ -458,6 +460,7 @@ private:
     // Pays a quest out exactly once. Flags are monotonic and the journal
     // broadcasts a flag only on the transition, so "exactly once" is a
     // property of the flag rather than a bookkeeping field that can drift.
+    FDelegateHandle QuestRewardEventsHandle;
     void GrantQuestRewardForFlag(FName Flag);
     void EndShotCosmetics();
 

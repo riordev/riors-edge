@@ -2439,10 +2439,8 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
         // Sightline needs nothing of its own — it pushes pierce 64 onto the
         // channel stack and this leg loop is the one it already composes
         // through.
-        // RECORDED GAP: the copy's Duration is the source's remaining budget,
-        // and ApplyStatus then scales Duration by the applier's StatusDuration
-        // lane at the door, so a build with that lane pays it twice on a
-        // spread copy. The door is Combat's; the fold-in belongs there.
+        // Copies carry the source's already-scaled remaining lifetime; the
+        // dedicated copy door must not apply StatusDuration a second time.
         if (EnemiesStruck == 0 && bAcceptedStatusHit)
         {
             if (const UBreakerStatusComponent* FirstBodyStatus = HitActor->FindComponentByClass<UBreakerStatusComponent>())
@@ -2464,7 +2462,7 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
                 {
                     // Physical, like every DoT this component applies; a
                     // copy of a Poison is still a Poison.
-                    PiercedStatus->ApplyStatus(Spread, EBreakerDamageFamily::Physical, GetOwner());
+                    PiercedStatus->ApplyPierceSpread(Spread, EBreakerDamageFamily::Physical, GetOwner());
                 }
             }
         }

@@ -29,7 +29,7 @@ public:
     void InitializeRocket(const FBreakerDamageRequest& InDamage, float Speed, float InExplosionRadius, float MaximumTravelCm = 0.0f);
     void InitializeDamageRamp(UBreakerWeaponComponent* Weapon, uint32 Token);
     // Real authoritative impact seam; duplicate impacts are latched.
-    void Explode(const FVector& Location);
+    void Explode(const FVector& Location, AActor* DirectImpactTarget = nullptr);
     bool HasExploded() const { return bExploded; }
 
     UPROPERTY(BlueprintAssignable, Category="Rocket") FBreakerRocketExploded OnExploded;

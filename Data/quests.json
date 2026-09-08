@@ -76,7 +76,8 @@
 			{
 				"itemCount": 1,
 				"minimumRarity": "Exceptional",
-				"itemLevel": 1
+				"itemLevel": 1,
+				"experience": 120
 			}
 		},
 		{

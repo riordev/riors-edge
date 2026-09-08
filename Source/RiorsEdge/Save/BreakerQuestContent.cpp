@@ -179,6 +179,17 @@ namespace
         }
 
         bOk = BreakerQuestReadInt(Row, TEXT("itemLevel"), Where, Out.ItemLevel, Errors) && bOk;
+        if (Row.HasField(TEXT("experience")))
+        {
+            double Value = 0.0;
+            if (!Row.TryGetNumberField(TEXT("experience"), Value) || !FMath::IsFinite(Value)
+                || Value < 0.0 || Value > MAX_int32 || FMath::TruncToDouble(Value) != Value)
+            {
+                Errors.Add(Where + TEXT(": experience must be a nonnegative integer"));
+                bOk = false;
+            }
+            else Out.Experience = static_cast<int32>(Value);
+        }
         return bOk;
     }
 

@@ -255,6 +255,7 @@ namespace
         Writer.WriteValue(TEXT("itemCount"), Quest.Reward.ItemCount);
         Writer.WriteValue(TEXT("minimumRarity"), BreakerCensusEnumName(Quest.Reward.MinimumRarity));
         Writer.WriteValue(TEXT("itemLevel"), Quest.Reward.ItemLevel);
+        if (Quest.Reward.Experience > 0) Writer.WriteValue(TEXT("experience"), Quest.Reward.Experience);
         Writer.WriteObjectEnd();
         Writer.WriteObjectEnd();
     }

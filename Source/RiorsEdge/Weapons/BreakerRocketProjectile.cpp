@@ -173,10 +173,10 @@ void ABreakerRocketProjectile::BeginPlay()
 
 void ABreakerRocketProjectile::HandleImpact(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComponent, FVector NormalImpulse, const FHitResult& Hit)
 {
-    if (HasAuthority()) Explode(Hit.ImpactPoint.IsNearlyZero() ? GetActorLocation() : FVector(Hit.ImpactPoint));
+    if (HasAuthority()) Explode(Hit.ImpactPoint.IsNearlyZero() ? GetActorLocation() : FVector(Hit.ImpactPoint), OtherActor);
 }
 
-void ABreakerRocketProjectile::Explode(const FVector& Location)
+void ABreakerRocketProjectile::Explode(const FVector& Location, AActor* DirectImpactTarget)
 {
     if (!HasAuthority() || bExploded) return;
     bExploded = true;
@@ -193,6 +193,8 @@ void ABreakerRocketProjectile::Explode(const FVector& Location)
         if (Distance > ExplosionRadius) continue;
 
         FBreakerDamageRequest AreaDamage = Damage;
+        AreaDamage.bRadialDamage = true;
+        AreaDamage.IntendedTarget = DirectImpactTarget;
         AreaDamage.BaseDamage *= FMath::Lerp(1.0f, EdgeDamageFraction, Distance / ExplosionRadius);
         AreaDamage.bWeakPointHit = false;
         AreaDamage.SourceLocation = Location;

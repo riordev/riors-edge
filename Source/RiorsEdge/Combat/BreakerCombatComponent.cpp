@@ -1,4 +1,5 @@
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerDeployable.h"
 #include "Combat/BreakerElementSharesMath.h"
 
 #include "AbilitySystemInterface.h"
@@ -221,6 +222,7 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
 {
     FBreakerDamageResult Result;
     if (!Attributes || !GetOwner() || !GetOwner()->HasAuthority() || IsDead()) return Result;
+    if (const auto* Deployable = Cast<ABreakerDeployable>(GetOwner()); Deployable && Deployable->RejectsIncidentalAreaDamage(Request)) return Result;
     const TArray<FBreakerElementShare> ElementShares = BreakerElementShares::Resolve(Request);
     const bool bCanDispatchElements = !bDispatchingElementHit;
     // Hold before attribute writes and through all callbacks/flushes. A DoT

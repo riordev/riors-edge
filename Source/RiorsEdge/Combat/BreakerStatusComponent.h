@@ -67,6 +67,8 @@ public:
     // Instigator is remembered weakly so every tick this application produces
     // credits the applier through the attacker-side hit events.
     void ApplyStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator);
+    // A depth-two pierce copy carries its already-scaled remaining lifetime.
+    void ApplyPierceSpread(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator);
     void ApplyEntropyHit(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result);
     float GetEntropyBuildup() const;
     float GetEntropyThreshold() const;

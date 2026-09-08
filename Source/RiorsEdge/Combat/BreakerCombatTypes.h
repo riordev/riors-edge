@@ -136,6 +136,10 @@ struct RIORSEDGE_API FBreakerDamageRequest
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float ElementBuildupFlat = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float ElementBuildupFadeSeconds = 0.0f;
 
+    // Spatial delivery is independent of damage family and proc attribution.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bRadialDamage = false;
+    UPROPERTY() TWeakObjectPtr<AActor> IntendedTarget;
+
     void SetInstigator(AActor* InInstigator) { Instigator = InInstigator; }
 };
 
