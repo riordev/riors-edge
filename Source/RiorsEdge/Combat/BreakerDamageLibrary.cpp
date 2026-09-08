@@ -72,6 +72,8 @@ void UBreakerDamageLibrary::FillSourcePools(const UBreakerAttributeSet* SourceAt
     const auto* SourceProgression = SourceActor ? SourceActor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
     Request.bWeaponArmorShred = Delivery == EBreakerDamageDelivery::Weapon && !Request.bIsDamageOverTime && SourceProgression
         && SourceProgression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Ballistics.Break")));
+    Request.bWeaponSplashAdditionalTarget = Delivery == EBreakerDamageDelivery::Weapon && !Request.bIsDamageOverTime && SourceProgression
+        && SourceProgression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Ballistics.Loud")));
     Request.WeaponCriticalMoreProduct = SourceAttributes && Delivery == EBreakerDamageDelivery::Weapon
         ? SourceAttributes->GetAttributeAggregator().GetScopedMoreProduct(false, false, false, false, true) : 1.0f;
     Request.WeaponBeyondFirstMoreProduct = SourceAttributes && Delivery == EBreakerDamageDelivery::Weapon

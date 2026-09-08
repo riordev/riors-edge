@@ -78,6 +78,8 @@ Each line below: gateway; lane A; lane B; lane C if major; links if major; conve
 
 ## Primitive contracts
 
+- Loud snapshots with a direct weapon source. Each blast chooses one nearest living enemy outside its radius and within twice that radius before damage callbacks, with stable ties. The extra recipient receives the blast's existing edge damage; ordinary in-radius targets retain their normal falloff and no target cap. Invalidated recipients do not transfer the extra hit to another enemy.
+
 - Splinter selects its weapon More in the shared three slots and snapshots it for one accepted trigger pull. The first live enemy contact claims the first-target identity, including avoided hits; further pellets on that enemy remain first-target hits. Other enemies reached by pierce, chain, forks or sibling rocket blasts receive the selected later-target contribution. Destroying the first enemy does not reset that identity; a new trigger starts a new selection.
 - Reaction Chain pays one nearest live enemy within5m half the primary reaction's already-funded raw payout. It carries the original creditor and cannot generate buildup, fresh critical rolls or another reaction. Both payouts are claimed before callbacks; invalid or dead recipients cannot redirect the child payment.
 

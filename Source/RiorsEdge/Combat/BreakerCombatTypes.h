@@ -122,6 +122,7 @@ struct RIORSEDGE_API FBreakerDamageRequest
     UPROPERTY() bool bWeaponBeyondFirstTarget = false;
     TSharedPtr<FBreakerWeaponTriggerContext> WeaponTrigger;
     UPROPERTY() bool bWeaponArmorShred = false;
+    UPROPERTY() bool bWeaponSplashAdditionalTarget = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHasSourceSplit = false;
     // O54/O55: which pool the source multiplier above was drawn from. Weapon is
     // the default because it is what every pre-split request meant, and because
