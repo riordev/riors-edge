@@ -290,7 +290,7 @@ float FBreakerAttributeAggregator::ComposedMoreCeiling()
     return FMath::Pow(SingleMoreCeiling, static_cast<float>(MaxComposedMoreSources));
 }
 
-float FBreakerAttributeAggregator::GetScopedMoreProduct(bool bElemental, bool bVoid, bool bReaction, bool bEffectiveHealth) const
+float FBreakerAttributeAggregator::GetScopedMoreProduct(bool bElemental, bool bVoid, bool bReaction, bool bEffectiveHealth, bool bWeaponCritical) const
 {
     float Product = 1.0f;
     for (const FBreakerDamageMoreSource& Source : GetSelectedDamageMoreSources())
@@ -298,7 +298,8 @@ float FBreakerAttributeAggregator::GetScopedMoreProduct(bool bElemental, bool bV
         const bool bApplies = (bElemental && Source.Lane == EBreakerDamageMoreLane::Elemental)
             || (bVoid && Source.Lane == EBreakerDamageMoreLane::Void)
             || (bReaction && Source.Lane == EBreakerDamageMoreLane::Reaction)
-            || (bEffectiveHealth && Source.Lane == EBreakerDamageMoreLane::EffectiveHealth);
+            || (bEffectiveHealth && Source.Lane == EBreakerDamageMoreLane::EffectiveHealth)
+            || (bWeaponCritical && Source.Lane == EBreakerDamageMoreLane::WeaponCritical);
         if (bApplies) Product *= FMath::Min(Source.Multiplier, SingleMoreCeiling);
     }
     return Product;

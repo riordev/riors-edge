@@ -91,6 +91,7 @@ void UBreakerAbility_Overdrive::ActivateAbility(const FGameplayAbilitySpecHandle
     if (UBreakerAbilityStateComponent* State = UBreakerAbilityStateComponent::FindOrAdd(Character))
     {
         State->StartWindow(WindowKey(), Duration);
+        State->OnWindowEnded.AddUniqueDynamic(this, &ThisClass::HandleWindowEnded);
     }
     if (UBreakerMomentumComponent* Momentum = Character->FindComponentByClass<UBreakerMomentumComponent>())
     {
@@ -102,7 +103,7 @@ void UBreakerAbility_Overdrive::ActivateAbility(const FGameplayAbilitySpecHandle
         // Expiry is the teardown: the modifier chain prunes itself, so nothing
         // has to survive the ability instance to pop it. RemoveOutgoingModifier
         // stays available for an early exit (Bloodrhythm's no-hit timeout).
-        Combat->PushOutgoingModifier(OutgoingModifierKey(), /*FlatBonus=*/0.0f, OutgoingMoreMultiplier, Duration);
+        Combat->PushWindowOutgoingModifier(OutgoingModifierKey(), /*FlatBonus=*/0.0f, OutgoingMoreMultiplier, Duration);
     }
     if (UBreakerCharacterMovementComponent* Movement = Character->GetBreakerMovement())
     {
@@ -110,7 +111,7 @@ void UBreakerAbility_Overdrive::ActivateAbility(const FGameplayAbilitySpecHandle
         {
             // Composes multiplicatively with the gear and tree multipliers and
             // expires on its own; no teardown path to get wrong.
-            Movement->PushSpeedMultiplier(WindowKey(), Variant.SpeedMultiplier, Duration);
+            Movement->PushWindowSpeedMultiplier(WindowKey(), Variant.SpeedMultiplier, Duration);
         }
     }
 
@@ -176,12 +177,8 @@ void UBreakerAbility_Overdrive::ActivateAbility(const FGameplayAbilitySpecHandle
             // it pushed had already come down. Whichever of the two timers
             // fires first wins; the teardown is idempotent, so a second firing
             // is harmless.
-            if (UWorld* World = GetWorld())
-            {
-                World->GetTimerManager().SetTimer(
-                    BloodrhythmWindowEndHandle, this, &UBreakerAbility_Overdrive::HandleBloodrhythmTimeout,
-                    Duration, /*bLoop=*/false);
-            }
+            // The ordinary state expiry now ends numerical leases naturally;
+            // the no-hit timer remains an explicit cancellation.
         }
         else
         {
@@ -280,6 +277,27 @@ void UBreakerAbility_Overdrive::HandleBloodrhythmHit(const FBreakerHitContext& H
     ArmBloodrhythmTimeout();
 }
 
+void UBreakerAbility_Overdrive::HandleWindowEnded(FName Key)
+{
+    if (Key != WindowKey()) return;
+    auto* Character = GetBreakerCharacter();
+    if (!Character) return;
+    const auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>();
+    const bool bNatural = State && State->IsNaturalWindowEnd(Key);
+    if (auto* Combat = Character->GetCombat())
+    {
+        if (bNatural) Combat->FinishWindowOutgoingModifier(OutgoingModifierKey());
+        else Combat->RemoveOutgoingModifier(OutgoingModifierKey());
+    }
+    if (auto* Movement = Character->GetBreakerMovement())
+    {
+        if (bNatural) Movement->FinishWindowSpeedMultiplier(WindowKey());
+        else Movement->PopSpeedMultiplier(WindowKey());
+    }
+    if (bBloodrhythmActive && CurrentActorInfo)
+        EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+}
+
 void UBreakerAbility_Overdrive::ArmBloodrhythmTimeout()
 {
     UWorld* World = GetWorld();
@@ -327,6 +345,12 @@ void UBreakerAbility_Overdrive::HandleBloodrhythmTimeout()
 
 void UBreakerAbility_Overdrive::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
+    if (bWasCancelled)
+        if (auto* Character = GetBreakerCharacter())
+        {
+            if (auto* Combat = Character->GetCombat()) Combat->RemoveOutgoingModifier(OutgoingModifierKey());
+            if (auto* Movement = Character->GetBreakerMovement()) Movement->PopSpeedMultiplier(WindowKey());
+        }
     // Unbind and disarm on EVERY exit, including cancellation and the natural
     // end of the window, not only the timeout path. An InstancedPerActor
     // ability is reused for the next cast, so a surviving binding would make

@@ -107,7 +107,7 @@ void UBreakerAbility_Skim::ActivateAbility(const FGameplayAbilitySpecHandle Hand
         // pushed as a max-speed multiplier the player accelerates into rather
         // than as an impulse. That keeps the no-self-acceleration rule intact
         // while making the new line read as a commitment, not a shrug.
-        Movement->PushSpeedMultiplier(BurstKey(), BurstSpeedMultiplier, BurstSeconds);
+        Movement->PushWindowSpeedMultiplier(BurstKey(), BurstSpeedMultiplier, BurstSeconds);
 
         // The cut, drawn where it happened: two cyan chevron strokes opening
         // along the NEW line at the feet — the departure point, deliberately

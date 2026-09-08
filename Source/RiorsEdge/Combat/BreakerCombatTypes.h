@@ -114,6 +114,9 @@ struct RIORSEDGE_API FBreakerDamageRequest
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float SourceFlatFactor = 1.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float SourceIncreasedPercent = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float SourceMoreProduct = 1.0f;
+    // Selected at emission; applied only to a direct critical weapon hit.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float WeaponCriticalMoreProduct = 1.0f;
+    UPROPERTY() bool bWeaponArmorShred = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHasSourceSplit = false;
     // O54/O55: which pool the source multiplier above was drawn from. Weapon is
     // the default because it is what every pre-split request meant, and because

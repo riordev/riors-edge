@@ -30,6 +30,8 @@ struct RIORSEDGE_API FBreakerActiveStatus
     UPROPERTY(BlueprintReadOnly) bool bPersistentRot = false;
     UPROPERTY() TWeakObjectPtr<UBreakerStatusComponent> LongDarkSource;
     uint64 ApplicationSerial = 0;
+    UPROPERTY() bool bSympathyOnExpiry = false;
+    UPROPERTY() float SympathyDurationSnapshot = 0.0f;
     // Who applied this status. Weak: a DoT outliving its applier keeps
     // ticking, it just stops crediting anyone.
     UPROPERTY(BlueprintReadOnly) TWeakObjectPtr<AActor> Instigator = nullptr;
@@ -217,6 +219,7 @@ private:
     void AdvanceRiftBuildup(float DeltaSeconds);
     void ResetRiftBuildup();
     void AdvanceRotStatus(uint64 ApplicationSerial, float DeltaSeconds);
+    void SpreadExpiredRot(const FBreakerActiveStatus& Expired);
     void SpreadNewestStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator, float ScaledDuration, const FBreakerDamageRequest* ApplyingHit);
     UFUNCTION() void HandleAfflictedOwnerDeath();
     bool CanMaintainLongDark() const;

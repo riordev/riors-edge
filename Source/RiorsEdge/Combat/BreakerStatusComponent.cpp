@@ -1,6 +1,7 @@
 #include "Combat/BreakerStatusComponent.h"
 
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerDamageLibrary.h"
 #include "Combat/BreakerZoneMath.h"
 #include "Combat/BreakerStatusRules.h"
@@ -298,6 +299,16 @@ uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicat
     Status.ThreatSource = ApplyingHit ? ApplyingHit->ThreatSource : TWeakObjectPtr<AActor>();
     Status.bHasThreatSource = ApplyingHit && (ApplyingHit->bHasThreatSource || !ApplyingHit->ThreatSource.IsExplicitlyNull());
     Status.ResourceProcCoefficient = Spec.ProcCoefficient;
+    if (bRot && !Spec.bLongDarkSnapshot && Spec.ProcCoefficient > 0 && Instigator)
+        if (const auto* SourceProgression = Instigator->FindComponentByClass<UBreakerProgressionComponent>())
+        {
+            Status.bSympathyOnExpiry = SourceProgression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Sympathy")));
+            Status.SympathyDurationSnapshot = ScaledDuration;
+            if (Status.bSympathyOnExpiry)
+                if (auto* SourceStatus = Instigator->FindComponentByClass<UBreakerStatusComponent>())
+                    if (auto* SourceCombat = Instigator->FindComponentByClass<UBreakerCombatComponent>())
+                        SourceCombat->OnDeath.AddUniqueDynamic(SourceStatus, &UBreakerStatusComponent::HandleAfflictedOwnerDeath);
+        }
     // Application-time facing snapshot. Taken from the applier's position NOW,
     // not per tick: the DoT contract snapshots at application, and a tick that
     // re-read the applier's live position would let a shooter flank AFTER the
@@ -369,9 +380,47 @@ void UBreakerStatusComponent::SpreadNewestStatus(const FBreakerStatusApplication
     Nearest->ApplyStatusInternal(Copy, DamageFamily, Instigator, true, 0, nullptr, ApplyingHit);
 }
 
+void UBreakerStatusComponent::SpreadExpiredRot(const FBreakerActiveStatus& Expired)
+{
+    if (!Expired.bSympathyOnExpiry || Expired.bPersistentRot || !GetOwner() || !GetOwner()->HasAuthority()
+        || GetOwner()->IsActorBeingDestroyed() || !GetWorld() || Expired.InitialDamageBudget <= 0) return;
+    AActor* Source = Expired.Instigator.Get();
+    const auto* SourceCombat = IsValid(Source) ? Source->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    const auto* OwnerCombat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>();
+    if (!SourceCombat || SourceCombat->IsDead() || Source->IsActorBeingDestroyed() || !OwnerCombat || OwnerCombat->IsDead()) return;
+    UBreakerStatusComponent* Nearest = nullptr;
+    double NearestSquared = FMath::Square(400.0); // O2 PLACEHOLDER, authored 4m Sympathy radius.
+    const FVector Origin = GetOwner()->GetActorLocation();
+    for (TObjectIterator<UBreakerStatusComponent> It; It; ++It)
+    {
+        auto* Candidate = *It; auto* Enemy = Cast<ABreakerEnemy>(Candidate->GetOwner());
+        if (!IsValid(Enemy) || Enemy == GetOwner() || Enemy->IsActorBeingDestroyed() || Enemy->GetWorld() != GetWorld()
+            || Candidate->HasStatus(Expired.Spec.StatusTag) || Candidate->IsStatusImmune()) continue;
+        const auto* EnemyCombat = Enemy->FindComponentByClass<UBreakerCombatComponent>();
+        if (!EnemyCombat || EnemyCombat->IsDead()) continue;
+        const double Distance = FVector::DistSquared(Origin,Enemy->GetActorLocation());
+        if (Distance > NearestSquared || (Distance == NearestSquared && Nearest
+            && Enemy->GetUniqueID() >= Nearest->GetOwner()->GetUniqueID())) continue;
+        Nearest = Candidate; NearestSquared = Distance;
+    }
+    if (!Nearest) return;
+    FBreakerStatusApplicationSpec Copy = Expired.Spec;
+    Copy.Duration = Expired.SympathyDurationSnapshot;
+    Copy.ProcCoefficient = 0; Copy.bLongDarkSnapshot = false;
+    FBreakerDamageRequest Attribution; Attribution.SetInstigator(Source); Expired.CopyThreatTo(Attribution);
+    Nearest->ApplyStatusInternal(Copy,Expired.DamageFamily,Source,true,Expired.InitialDamageBudget,
+        Expired.bHasSourceLocationSnapshot ? &Expired.SourceLocationSnapshot : nullptr,&Attribution);
+}
+
 void UBreakerStatusComponent::HandleAfflictedOwnerDeath()
 {
     if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+    // Death permanently withdraws pending expiry copies, even if either actor
+    // revives before its ordinary Rot clock finishes.
+    for (TObjectIterator<UBreakerStatusComponent> It; It; ++It)
+        if (It->GetWorld() == GetWorld())
+            for (auto& Active : It->ActiveStatuses)
+                if (*It == this || Active.Instigator.Get() == GetOwner()) Active.bSympathyOnExpiry = false;
     // Keep the transaction guard until its owning outer hit flushes, even
     // if another callback revives this actor before that flush.
     PendingReactionStatus.UnpaidDamageBudget = 0;

@@ -238,7 +238,7 @@ float UBreakerAttributeSet::ComposeShieldCapacity() const
 {
     const float HealthCapacity = FMath::Max(0.0f, GetMaxHealth());
     return FMath::Max(NativeShieldBase + EquipmentShieldCapacity + HealthCapacity * CoreShieldHealthFraction,
-        HealthCapacity * FMath::Max(TankShieldHealthFloor, SupportShieldHealthFloor)) + HealthCapacity * TemporaryShieldHealthFraction;
+        HealthCapacity * FMath::Max3(TankShieldHealthFloor, SupportShieldHealthFloor, CoreOverhealHealthFloor)) + HealthCapacity * TemporaryShieldHealthFraction;
 }
 
 void UBreakerAttributeSet::RecomposeShieldCapacity()
@@ -280,6 +280,11 @@ void UBreakerAttributeSet::SetTankShieldHealthFloor(float Fraction)
 void UBreakerAttributeSet::SetSupportShieldHealthFloor(float Fraction)
 {
     SupportShieldHealthFloor = FMath::IsFinite(Fraction) ? FMath::Max(0.0f, Fraction) : 0.0f;
+    RecomposeShieldCapacity();
+}
+void UBreakerAttributeSet::SetCoreOverhealHealthFloor(float Fraction)
+{
+    CoreOverhealHealthFloor = FMath::IsFinite(Fraction) ? FMath::Max(0.0f, Fraction) : 0.0f;
     RecomposeShieldCapacity();
 }
 void UBreakerAttributeSet::SetTemporaryShieldHealthFraction(float Fraction)

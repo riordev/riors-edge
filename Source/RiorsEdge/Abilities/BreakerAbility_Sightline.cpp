@@ -54,6 +54,7 @@ void UBreakerAbility_Sightline::HandleShot(const FBreakerShotResult& Shot)
             // any future cancel.
             State->CloseWindow(WindowKey());
         }
+        else if (auto* Weapon = Character->GetWeapon()) Weapon->PopShotChannelBonus(ChannelKey());
     }
 }
 
@@ -67,7 +68,9 @@ void UBreakerAbility_Sightline::HandleWindowEnded(FName Key)
     {
         if (UBreakerWeaponComponent* Weapon = Character->FindComponentByClass<UBreakerWeaponComponent>())
         {
-            Weapon->PopShotChannelBonus(ChannelKey());
+            const auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>();
+            if (State && State->IsNaturalWindowEnd(Key)) Weapon->FinishWindowShotChannelBonus(ChannelKey());
+            else Weapon->PopShotChannelBonus(ChannelKey());
         }
     }
 }
@@ -103,7 +106,7 @@ void UBreakerAbility_Sightline::ActivateAbility(const FGameplayAbilitySpecHandle
         // pierce is not overwritten, merely irrelevant for one shot. Duration
         // is the lazy-expiry safety net; HandleShot/HandleWindowEnded is the
         // deterministic end.
-        Weapon->PushShotChannelBonus(ChannelKey(), 0.0f, AllTargetsPierceCount, 0, 0, Duration);
+        Weapon->PushWindowShotChannelBonus(ChannelKey(), 0.0f, AllTargetsPierceCount, 0, 0, Duration);
         if (UBreakerAbilityStateComponent* State = UBreakerAbilityStateComponent::FindOrAdd(Character))
         {
             State->StartWindow(WindowKey(), Duration);

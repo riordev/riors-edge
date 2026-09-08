@@ -97,6 +97,7 @@ public:
     static void SnapshotElementSource(const AActor* Source, FBreakerDamageRequest& Request);
     // Add a delivery-specific Increased rider while keeping every source field consistent.
     static void AddSourceIncreased(FBreakerDamageRequest& Request, float IncreasedPercent);
+    static void ResolveConditionalMores(FBreakerDamageRequest& Request);
     static void FillSourcePools(const class UBreakerAttributeSet* SourceAttributes,
         EBreakerDamageDelivery Delivery, FBreakerDamageRequest& Request);
 

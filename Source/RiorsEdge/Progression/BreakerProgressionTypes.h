@@ -309,6 +309,7 @@ enum class EBreakerNodeStatTarget : uint8
     StaggerDuration,
     EnemyStaggerResistanceReduction,
     WeaponBaseSpreadReduction,
+    WeaponCriticalDamage,
 
     Count UMETA(Hidden)
 };
@@ -406,6 +407,7 @@ inline bool BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget Target)
     case EBreakerNodeStatTarget::StaggerDuration:
     case EBreakerNodeStatTarget::EnemyStaggerResistanceReduction:
     case EBreakerNodeStatTarget::WeaponBaseSpreadReduction:
+    case EBreakerNodeStatTarget::WeaponCriticalDamage:
     case EBreakerNodeStatTarget::MaxClassResource:
     case EBreakerNodeStatTarget::ClassResourceRegen:
     case EBreakerNodeStatTarget::FireRate:

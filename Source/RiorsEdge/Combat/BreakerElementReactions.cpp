@@ -177,6 +177,7 @@ void UBreakerStatusComponent::AdvanceRotStatus(uint64 ApplicationSerial, float D
     {
         const FBreakerActiveStatus Expired = ActiveStatuses[Index];
         ActiveStatuses.RemoveAt(Index);
+        SpreadExpiredRot(Expired);
         OnStatusExpired.Broadcast(Expired);
     }
 }

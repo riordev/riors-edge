@@ -257,7 +257,11 @@ void UBreakerAbilityStateComponent::AdvanceTime(float DeltaSeconds)
     RefreshAttunementWindowEnds();
     for (const FName Key : Expired)
     {
-        if (!IsWindowActive(Key)) OnWindowEnded.Broadcast(Key);
+        if (!IsWindowActive(Key))
+        {
+            TGuardValue<FName> NaturalEnd(NaturalWindowEnd, Key);
+            OnWindowEnded.Broadcast(Key);
+        }
     }
 }
 
@@ -325,6 +329,7 @@ void UBreakerAbilityStateComponent::CloseWindow(FName Key)
     RefreshAttunementWindowEnds();
     if (bRemoved || bOwnedRemoved)
     {
+        TGuardValue<FName> ExplicitEnd(NaturalWindowEnd, NAME_None);
         OnWindowEnded.Broadcast(Key);
     }
 }

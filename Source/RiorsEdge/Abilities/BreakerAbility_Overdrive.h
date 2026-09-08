@@ -78,6 +78,7 @@ private:
     // ActivateAbility: it listens for hits and runs a resettable no-hit clock.
     UFUNCTION() void HandleBloodrhythmHit(const FBreakerHitContext& Hit);
     UFUNCTION() void HandleBloodrhythmTimeout();
+    UFUNCTION() void HandleWindowEnded(FName Key);
     void ArmBloodrhythmTimeout();
 
     // Guards every Bloodrhythm-only path. The ability is InstancedPerActor and

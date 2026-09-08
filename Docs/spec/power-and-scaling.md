@@ -214,7 +214,7 @@ Every lane permitted to touch outgoing player damage.
 | Increased — Weapon | One additive bucket, no cap of its own |
 | Increased — Ability | One additive bucket, no cap of its own |
 | Increased — Shared | Joins whichever of the two applies |
-| More | Strongest three gear/tree sources; ONE 1.30^3 ceiling across delivery, DoT, Elemental, Void, Reaction and Effective Health scopes |
+| More | Strongest three gear/tree sources; ONE 1.30^3 ceiling across delivery, critical weapon hits, DoT, Elemental, Void, Reaction and Effective Health scopes |
 | Crit | Site multiplier, build-gated |
 | Weak point | Site multiplier, skill-gated, [1.0, 2.0], outside the More budget |
 | Weak point, gate removed | A build multiplier. Inside the accounting the skill gate stood in for, and crit does not also multiply on that hit |

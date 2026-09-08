@@ -42,6 +42,13 @@
 
 namespace
 {
+    bool BreakerEnemyOwnsIgnoreMe(const AActor* Actor)
+    {
+        const auto* Progression = IsValid(Actor) ? Actor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+        const FGameplayTag IgnoreMe = FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Threat.IgnoreMe"), false);
+        return Progression && IgnoreMe.IsValid() && Progression->HasNodeTag(IgnoreMe);
+    }
+
     // Muted Vestige-ish grey-violet for the humanoid body parts. Local copy of
     // the dressing helper so the enemy never pulls in game mode internals.
     // The COLOUR is not a local copy: it is the same symbol the paint state
@@ -867,13 +874,19 @@ void ABreakerEnemy::HandleThreatDamage(const FBreakerHitContext& Hit)
 {
     if (!HasAuthority() || bDead || (Combat && Combat->IsDead()) || Hit.Target != this) return;
     AActor* Source = Hit.ThreatSource.Get();
+    if (!IsEligibleThreatTarget(Source)) return;
     AActor* StatOwner = Source;
     if (const auto* Deployable = Cast<ABreakerDeployable>(Source)) StatOwner = Deployable->GetOwningCharacter();
+    const bool bIgnoreMe = BreakerEnemyOwnsIgnoreMe(StatOwner);
+    if (bIgnoreMe && Source == StatOwner) return;
     const auto* Progression = StatOwner ? StatOwner->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
     const float Multiplier = Progression ? Progression->GetNodeStats().ThreatGeneratedMultiplier : 1.0f;
     const float Earned = BreakerEnemyThreat::Earned(Hit.Result.HealthDamage, Hit.Result.ShieldDamage)
-        * (FMath::IsFinite(Multiplier) ? FMath::Max(0.0f, Multiplier) : 1.0f);
-    if (Earned <= 0 || !IsEligibleThreatTarget(Source)) return;
+        * (FMath::IsFinite(Multiplier) ? FMath::Max(0.0f, Multiplier) : 1.0f)
+        * (bIgnoreMe ? 2.0f : 1.0f); // O2 PLACEHOLDER: owned deployables only.
+    // Ignore Me's ally doubling still needs an authoritative party relation.
+    // Another spawned character is not proof of membership; do not infer it.
+    if (Earned <= 0) return;
     float& Score = ThreatLedger.FindOrAdd(Source);
     Score = FMath::Min(static_cast<double>(Score) + Earned, static_cast<double>(MAX_flt));
 }
@@ -886,6 +899,9 @@ AActor* ABreakerEnemy::SelectThreatTarget()
     {
         AActor* Candidate = It.Key().Get();
         if (!IsEligibleThreatTarget(Candidate)) { It.RemoveCurrent(); continue; }
+        // Existing personal credit is inactive while the rule is owned; it is
+        // not rewritten into credit for a deployable or erased by a respec.
+        if (Candidate->IsA<ABreakerCharacter>() && BreakerEnemyOwnsIgnoreMe(Candidate)) continue;
         const float Distance = FVector::DistSquared2D(GetActorLocation(), Candidate->GetActorLocation());
         if (Distance > FMath::Square(DetectionRange)) continue;
         if (It.Value() > 0 && (!Best || BreakerEnemyThreat::Prefer(It.Value(), Candidate == CurrentThreatTarget.Get(), Distance,

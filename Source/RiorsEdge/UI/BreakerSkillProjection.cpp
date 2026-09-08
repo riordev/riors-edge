@@ -1,6 +1,7 @@
 #include "UI/BreakerSkillProjection.h"
 
 #include "Attributes/BreakerAttributeSet.h"
+#include "Combat/BreakerCombatComponent.h"
 #include "GameFramework/Actor.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Items/BreakerItemTypes.h"
@@ -48,6 +49,7 @@ namespace
         EffectiveHealthMore,
         MaxShield,
         MaxFrontShield,
+        WeaponCriticalMore,
         Count
     };
 
@@ -83,6 +85,7 @@ namespace
         { TEXT("EFFECTIVE HEALTH MORE"), EBreakerStatFormat::Multiplier, false },
         { TEXT("BASE MAX SHIELD"), EBreakerStatFormat::Absolute, false },
         { TEXT("MAX FRONT POOL"), EBreakerStatFormat::Absolute, false },
+        { TEXT("CRITICAL WEAPON MORE"), EBreakerStatFormat::Multiplier, false },
     };
 
     static_assert(UE_ARRAY_COUNT(StatRows) == static_cast<int32>(EStatRow::Count),
@@ -146,10 +149,12 @@ namespace
         OutValues[static_cast<int32>(EStatRow::VoidMore)] = Scoped.GetScopedMoreProduct(false, true, false, false);
         OutValues[static_cast<int32>(EStatRow::ReactionMore)] = Scoped.GetScopedMoreProduct(false, false, true, false);
         OutValues[static_cast<int32>(EStatRow::EffectiveHealthMore)] = Scoped.GetScopedMoreProduct(false, false, false, true);
+        OutValues[static_cast<int32>(EStatRow::WeaponCriticalMore)] = Scoped.GetScopedMoreProduct(false, false, false, false, true);
         const float Health = OutValues[static_cast<int32>(EStatRow::MaxHealth)];
         OutValues[static_cast<int32>(EStatRow::MaxShield)] = FMath::Max(
             Snapshot.NativeShieldCapacity + Snapshot.EquipmentShieldCapacity + Health * Stats.ShieldPercentMaxHealth * .01f,
-            Health * Snapshot.ClassShieldHealthFloor);
+            Health * FMath::Max(Snapshot.ClassShieldHealthFloor,
+                Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Recovery.Overheal"))) ? UBreakerCombatComponent::CoreOverhealHealthFraction : 0.0f));
         OutValues[static_cast<int32>(EStatRow::MaxFrontShield)] = Health * Stats.FrontShieldPercentMaxHealth * .01f;
     }
 }
@@ -191,7 +196,8 @@ namespace
             0.0f, Stats.PhysicalDamageReductionCap);
         const float Surviving = FMath::Max(1.0f - Reduction / 100.0f, 0.01f);
         const float Ward = FMath::Max(Snapshot.NativeShieldCapacity + Stats.BaseShieldFromGear
-            + MaxHealth * CoreStats.ShieldPercentMaxHealth * .01f, MaxHealth * Snapshot.ClassShieldHealthFloor);
+            + MaxHealth * CoreStats.ShieldPercentMaxHealth * .01f, MaxHealth * FMath::Max(Snapshot.ClassShieldHealthFloor,
+                CoreStats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Recovery.Overheal"))) ? UBreakerCombatComponent::CoreOverhealHealthFraction : 0.0f));
         const float Front = MaxHealth * CoreStats.FrontShieldPercentMaxHealth * .01f;
         Out.EffectiveHealthVsPhysical = (MaxHealth + Ward + Front) * Hypothetical.GetScopedMoreProduct(false, false, false, true) / Surviving;
         return Out;

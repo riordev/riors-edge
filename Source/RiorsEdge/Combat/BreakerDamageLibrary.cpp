@@ -7,6 +7,18 @@
 #include "Progression/BreakerProgressionComponent.h"
 #include "GameFramework/Actor.h"
 
+namespace
+{
+    bool BreakerCriticalResult(const FBreakerDamageRequest& Request)
+    {
+        if (Request.bForceCriticalStrike && !Request.bIsDamageOverTime) return true;
+        if (!Request.bCanCritical) return false;
+        if (Request.bUseSnapshotCritical) return Request.bSnapshotCriticalResult;
+        FRandomStream Random(Request.RandomSeed);
+        return Random.FRand() < FMath::Clamp(Request.CriticalChance, 0.0f, 1.0f);
+    }
+}
+
 float UBreakerDamageLibrary::ComposeSourcePools(float WeaponIncreasedPercent, float AbilityIncreasedPercent,
     float SharedIncreasedPercent, float MoreProduct, EBreakerDamageDelivery Delivery)
 {
@@ -56,6 +68,12 @@ void UBreakerDamageLibrary::FillSourcePools(const UBreakerAttributeSet* SourceAt
     EBreakerDamageDelivery Delivery, FBreakerDamageRequest& Request)
 {
     Request.Delivery = Delivery;
+    const auto* SourceActor = SourceAttributes ? SourceAttributes->GetTypedOuter<AActor>() : nullptr;
+    const auto* SourceProgression = SourceActor ? SourceActor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    Request.bWeaponArmorShred = Delivery == EBreakerDamageDelivery::Weapon && !Request.bIsDamageOverTime && SourceProgression
+        && SourceProgression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Ballistics.Break")));
+    Request.WeaponCriticalMoreProduct = SourceAttributes && Delivery == EBreakerDamageDelivery::Weapon
+        ? SourceAttributes->GetAttributeAggregator().GetScopedMoreProduct(false, false, false, false, true) : 1.0f;
     Request.bForceCriticalStrike = SourceAttributes && SourceAttributes->GetAttributeAggregator().HasDeadeye();
     SnapshotElementSource(SourceAttributes ? SourceAttributes->GetTypedOuter<AActor>() : nullptr, Request);
     if (!SourceAttributes)
@@ -115,6 +133,23 @@ void UBreakerDamageLibrary::AddSourceIncreased(FBreakerDamageRequest& Request, f
         * FMath::Max(0.0f, 1.0f + Request.SourceIncreasedPercent / 100.0f) * FMath::Max(0.0f, Request.SourceMoreProduct);
 }
 
+void UBreakerDamageLibrary::ResolveConditionalMores(FBreakerDamageRequest& Request)
+{
+    const float Selected = Request.WeaponCriticalMoreProduct;
+    Request.WeaponCriticalMoreProduct = 1.0f; // Claim before reuse or derived payout.
+    if (Request.bIsDamageOverTime || Request.Delivery != EBreakerDamageDelivery::Weapon
+        || !FMath::IsFinite(Selected) || Selected <= 1.0f) return;
+    Request.bSnapshotCriticalResult = BreakerCriticalResult(Request);
+    Request.bUseSnapshotCritical = true;
+    if (!Request.bSnapshotCriticalResult) return;
+    AddSourceIncreased(Request, 0.0f); // Establish an honest split for native requests.
+    const float Standing = FMath::Max(1.0f, Request.SourceMoreProduct);
+    Request.SourceMoreProduct = Standing * FMath::Min(Selected,
+        FMath::Max(1.0f, FBreakerAttributeAggregator::ComposedMoreCeiling() / Standing));
+    Request.SourceDamageMultiplier = FMath::Max(0.0f, Request.SourceFlatFactor)
+        * FMath::Max(0.0f, 1.0f + Request.SourceIncreasedPercent / 100.0f) * Request.SourceMoreProduct;
+}
+
 float UBreakerDamageLibrary::CalculateArmorMitigation(float Armor, float ArmorPenetration)
 {
     const float EffectiveArmor = FMath::Max(0.0f, Armor - FMath::Max(0.0f, ArmorPenetration));
@@ -140,8 +175,10 @@ float UBreakerDamageLibrary::GetFacingArmorMultiplier(const FVector& Forward, co
     return Dot > FMath::Clamp(RearCosine, -1.0f, 1.0f) ? 1.0f : FMath::Max(0.0f, RearArmorMultiplier);
 }
 
-FBreakerDamageResult UBreakerDamageLibrary::ResolveDamage(const FBreakerDamageRequest& Request, const FBreakerDefenseState& Defense)
+FBreakerDamageResult UBreakerDamageLibrary::ResolveDamage(const FBreakerDamageRequest& Input, const FBreakerDefenseState& Defense)
 {
+    FBreakerDamageRequest Request = Input;
+    ResolveConditionalMores(Request);
     FBreakerDamageResult Result;
     Result.RawDamage = FMath::Max(0.0f, Request.BaseDamage) * FMath::Max(0.0f, Request.SourceDamageMultiplier);
     Result.bWeakPoint = Request.bWeakPointHit;
@@ -151,16 +188,7 @@ FBreakerDamageResult UBreakerDamageLibrary::ResolveDamage(const FBreakerDamageRe
     // where an out-of-bounds author gets caught loudly.
     if (Result.bWeakPoint) Result.RawDamage *= FMath::Clamp(Request.WeakPointMultiplier, WeakPointMultiplierFloor, WeakPointMultiplierCeiling);
 
-    if (Request.bForceCriticalStrike && !Request.bIsDamageOverTime) Result.bCritical = true;
-    else if (Request.bCanCritical)
-    {
-        if (Request.bUseSnapshotCritical) Result.bCritical = Request.bSnapshotCriticalResult;
-        else
-        {
-            FRandomStream Random(Request.RandomSeed);
-            Result.bCritical = Random.FRand() < FMath::Clamp(Request.CriticalChance, 0.0f, 1.0f);
-        }
-    }
+    Result.bCritical = BreakerCriticalResult(Request);
     if (Result.bCritical) Result.RawDamage *= FMath::Max(1.0f, Request.CriticalMultiplier);
     // Allocate one critical result. Elemental Increased joins the delivery bucket,
     // while selected elemental/Void Mores affect only their matching raw portions.

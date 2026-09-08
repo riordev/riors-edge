@@ -478,6 +478,8 @@ public:
     // Keyed additive channel bonus. Re-pushing a key replaces rather than
     // stacks; Duration <= 0 means no expiry, popped explicitly.
     UFUNCTION(BlueprintCallable, Category="Weapon|Channels") void PushShotChannelBonus(FName Key, float AdditionalProjectiles, int32 PierceBonus, int32 ChainBonus, int32 RicochetBonus, float Duration = -1.0f);
+    void PushWindowShotChannelBonus(FName Key, float AdditionalProjectiles, int32 PierceBonus, int32 ChainBonus, int32 RicochetBonus, float Duration);
+    void FinishWindowShotChannelBonus(FName Key);
     UFUNCTION(BlueprintCallable, Category="Weapon|Channels") void PopShotChannelBonus(FName Key);
 
     // ---- Fire cadence (ability windows) -----------------------------------
@@ -500,6 +502,9 @@ public:
     // explicitly, which Slipcut does.
     UFUNCTION(BlueprintCallable, Category="Weapon|Damage") void PushFireRateMultiplier(FName Key, float Multiplier, float Duration = -1.0f);
     UFUNCTION(BlueprintCallable, Category="Weapon|Damage") void PopFireRateMultiplier(FName Key);
+    void PushWindowFireRateMultiplier(FName Key, float Multiplier, float Duration);
+    void FinishWindowFireRateMultiplier(FName Key);
+    UFUNCTION() void InvalidateAfterimage();
 
     // The momentum coupling table, the identity mechanic: Momentum STATE
     // manipulates projectiles. Pure and static so the suite pins the table
@@ -770,12 +775,15 @@ private:
     struct FFireRateMultiplierEntry
     {
         float Multiplier = 1.0f;
+        bool bAfterimage = false;
+        bool bWindow = false;
         // Negative = no expiry; popped explicitly.
         double ExpiryTime = -1.0;
     };
     // Mutable for the same lazy-expiry-in-const-read reason as
     // RangeTreatmentOverrides above (GetFireRateMultiplier is const).
     mutable TMap<FName, FFireRateMultiplierEntry> FireRateMultipliers;
+    float LastWindowFireRate = 1.0f;
     void PruneFireRateMultipliers() const;
     // Re-arms a live non-burst automatic timer at the current composed
     // interval; see PushFireRateMultiplier's header note for why.
@@ -790,6 +798,8 @@ private:
     struct FShotChannelBonusEntry
     {
         FBreakerShotChannels Channels;
+        bool bAfterimage = false;
+        bool bWindow = false;
         // Negative = no expiry; popped explicitly.
         double ExpiryTime = -1.0;
     };

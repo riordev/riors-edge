@@ -81,6 +81,7 @@ public:
     // Closing broadcasts OnWindowEnded exactly like a natural expiry, so
     // listeners have one teardown path.
     UFUNCTION(BlueprintCallable, Category="Abilities|State") void CloseWindow(FName Key);
+    bool IsNaturalWindowEnd(FName Key) const { return NaturalWindowEnd == Key; }
     UFUNCTION(BlueprintPure, Category="Abilities|State") bool IsWindowActive(FName Key) const;
     UFUNCTION(BlueprintPure, Category="Abilities|State") float GetWindowRemaining(FName Key) const;
     UFUNCTION(BlueprintPure, Category="Abilities|State") int32 GetActiveWindowCount() const;
@@ -133,6 +134,7 @@ private:
     // The component keeps its own clock rather than reading world time, so the
     // rules are testable without a world and behave identically under pause.
     float Clock = 0.0f;
+    FName NaturalWindowEnd;
 
     struct FWindowState
     {

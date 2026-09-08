@@ -30,6 +30,8 @@ struct RIORSEDGE_API FBreakerOutgoingModifier
     UPROPERTY(BlueprintReadOnly) float MoreMultiplier = 1.0f;
     // Negative means "never expires on its own".
     UPROPERTY(BlueprintReadOnly) float ExpiryTime = -1.0f;
+    bool bWindowContribution = false;
+    bool bAfterimage = false;
 };
 
 struct FBreakerStaggerApplication
@@ -118,6 +120,9 @@ public:
     // shared with the tree's selection, never restated here).
     UFUNCTION(BlueprintCallable, Category="Combat|Outgoing")
     void PushOutgoingModifier(FName Key, float FlatBonus, float MoreMultiplier, float ExpirySeconds);
+    void PushWindowOutgoingModifier(FName Key, float FlatBonus, float MoreMultiplier, float Duration);
+    void UpdateWindowOutgoingModifier(FName Key, float FlatBonus, float MoreMultiplier);
+    void FinishWindowOutgoingModifier(FName Key);
 
     UFUNCTION(BlueprintCallable, Category="Combat|Outgoing")
     void RemoveOutgoingModifier(FName Key);
@@ -222,6 +227,8 @@ public:
     // healing is not the revive system.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat|Healing")
     FBreakerHealResult ApplyHealing(const FBreakerHealRequest& Request);
+    UFUNCTION() void RefreshCoreOverhealCapacity();
+    static constexpr float CoreOverhealHealthFraction = 0.15f; // O2 PLACEHOLDER
 
     // Convenience form matching the spec's signature, for callers with nothing
     // to say beyond "heal this much".
@@ -345,6 +352,7 @@ private:
     UPROPERTY(Replicated) float PerfectGuardEnd = -1.0f;
     TMap<TWeakObjectPtr<AActor>, double> MeleeDefenseSuppressionExpiry;
     void PruneExpiredOutgoingModifiers();
+    UFUNCTION() void InvalidateAfterimageContributions();
     // STAGE 6 (Hook-And-Condition-Vocabulary §3.2-§3.3): target-conditional
     // damage, resolved on the TARGET side because ReceiveDamage is the one
     // call site that knows both actors and is reached by every damage event.
@@ -385,6 +393,7 @@ private:
     // Keyed for the same reason, and summed rather than multiplied because
     // armour reduction is authored FLAT.
     TMap<FName, float> ArmorReductions;
+    TArray<double> WeaponArmorShredExpiries;
     UPROPERTY() TObjectPtr<UBreakerAttributeSet> Attributes;
     // The front pool (O198): standing amount, the amount it was armed with,
     // and the once-per-fight latch. 0 / 0 / false is "no front pool" — every

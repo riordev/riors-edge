@@ -113,11 +113,11 @@ void UBreakerAbility_CadenceBreak::HandleShot(const FBreakerShotResult& Shot)
     {
         if (Stacks > 0)
         {
-            Combat->PushOutgoingModifier(ModifierKey(), Stacks * FlatDamagePerStack, 1.0f, State->GetWindowRemaining(WindowKey()));
+            Combat->UpdateWindowOutgoingModifier(ModifierKey(), Stacks * FlatDamagePerStack, 1.0f);
         }
         else
         {
-            Combat->RemoveOutgoingModifier(ModifierKey());
+            Combat->UpdateWindowOutgoingModifier(ModifierKey(), 0.0f, 1.0f);
         }
     }
 }
@@ -133,7 +133,9 @@ void UBreakerAbility_CadenceBreak::HandleWindowEnded(FName Key)
     {
         if (UBreakerCombatComponent* Combat = Character->FindComponentByClass<UBreakerCombatComponent>())
         {
-            Combat->RemoveOutgoingModifier(ModifierKey());
+            const auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>();
+            if (State && State->IsNaturalWindowEnd(Key)) Combat->FinishWindowOutgoingModifier(ModifierKey());
+            else Combat->RemoveOutgoingModifier(ModifierKey());
         }
     }
 }
@@ -187,6 +189,7 @@ void UBreakerAbility_CadenceBreak::ActivateAbility(const FGameplayAbilitySpecHan
 
     const UBreakerAbilityDefinition* Definition = GetAbilityDefinition();
     const float Duration = Definition ? Definition->WindowDuration : 3.0f;   // Class-Kits §1.2 S2: 3s
+    if (auto* Combat = Character->GetCombat()) Combat->PushWindowOutgoingModifier(ModifierKey(), 0.0f, 1.0f, Duration);
     if (UBreakerAbilityStateComponent* State = UBreakerAbilityStateComponent::FindOrAdd(Character))
     {
         State->StartWindow(WindowKey(), Duration);

@@ -105,6 +105,9 @@ public:
     // no timers, no tick cost when nothing is pushed.
     UFUNCTION(BlueprintCallable, Category="Movement") void PushSpeedMultiplier(FName Key, float Multiplier, float Duration);
     UFUNCTION(BlueprintCallable, Category="Movement") void PopSpeedMultiplier(FName Key);
+    void PushWindowSpeedMultiplier(FName Key, float Multiplier, float Duration);
+    void FinishWindowSpeedMultiplier(FName Key);
+    UFUNCTION() void InvalidateAfterimageSpeed();
     UFUNCTION(BlueprintPure, Category="Movement") float GetSpeedMultiplier() const;
 
     // Keystone-rewrite availability suspensions (Swift's Terminal Velocity,
@@ -551,6 +554,8 @@ private:
     struct FSpeedMultiplierEntry
     {
         float Multiplier = 1.0f;
+        bool bAfterimage = false;
+        bool bWindow = false;
         // Negative = no expiry; popped explicitly.
         double ExpiryTime = -1.0;
     };

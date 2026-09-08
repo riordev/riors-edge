@@ -5,6 +5,7 @@
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbilityStateComponent.h"
+#include "Abilities/BreakerWindowLaneMath.h"
 #include "Classes/BreakerChargeComponent.h"
 #include "Combat/BreakerZoneActor.h"
 #include "Combat/BreakerZoneMath.h"
@@ -33,12 +34,13 @@ namespace
     {
         if (!Request.bHasSourceSplit) return 1.0f;
         const TArray<FBreakerElementShare> Shares = BreakerElementShares::Resolve(Request);
-        if (Shares.IsEmpty()) return 1.0f;
+        const float Critical = Request.Delivery == EBreakerDamageDelivery::Weapon && !Request.bIsDamageOverTime
+            && FMath::IsFinite(Request.WeaponCriticalMoreProduct) ? FMath::Max(1.0f, Request.WeaponCriticalMoreProduct) : 1.0f;
         const bool bVoid = Shares.ContainsByPredicate([](const FBreakerElementShare& Share)
         { return Share.Element == EBreakerElement::Void && Share.Fraction > 0; });
-        float Product = FMath::Max(1.0f, Request.ElementSource.ElementalMoreProduct);
+        float Product = Critical * (Shares.IsEmpty() ? 1.0f : FMath::Max(1.0f, Request.ElementSource.ElementalMoreProduct));
         if (bVoid) Product *= FMath::Max(1.0f, Request.ElementSource.VoidMoreProduct);
-        if (Request.bCanApplyElementBuildup) Product *= FMath::Max(1.0f, Request.ElementSource.ReactionMoreProduct);
+        if (!Shares.IsEmpty() && Request.bCanApplyElementBuildup) Product *= FMath::Max(1.0f, Request.ElementSource.ReactionMoreProduct);
         // Standing scoped products have priority over temporary headroom. A
         // later-assigned element also clamps at direct/status resolution.
         const float Ceiling = FBreakerAttributeAggregator::ComposedMoreCeiling();
@@ -58,7 +60,10 @@ void UBreakerCombatComponent::BeginPlay()
     if (GetOwner() && GetOwner()->HasAuthority())
     {
         if (UBreakerProgressionComponent* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>())
+        {
             Progression->OnProgressionChanged.AddUniqueDynamic(this, &ThisClass::RefreshParryPermission);
+            Progression->OnProgressionChanged.AddUniqueDynamic(this, &ThisClass::RefreshCoreOverhealCapacity);
+        }
         RefreshParryPermission();
     }
     if (const IAbilitySystemInterface* AbilityOwner = Cast<IAbilitySystemInterface>(GetOwner()))
@@ -68,11 +73,13 @@ void UBreakerCombatComponent::BeginPlay()
             Attributes = const_cast<UBreakerAttributeSet*>(ASC->GetSet<UBreakerAttributeSet>());
         }
     }
+    RefreshCoreOverhealCapacity();
 }
 
 void UBreakerCombatComponent::BindAttributes(UBreakerAttributeSet* InAttributes)
 {
     Attributes = InAttributes;
+    RefreshCoreOverhealCapacity();
 }
 
 void UBreakerCombatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -537,6 +544,7 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
             if (const auto* SourceProgression = Attacker->FindComponentByClass<UBreakerProgressionComponent>(); SourceProgression
                 && SourceProgression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Control.Interrupt"))))
                 UBreakerDamageLibrary::AddSourceIncreased(ResolvedRequest, 15.0f);
+    UBreakerDamageLibrary::ResolveConditionalMores(ResolvedRequest);
     Result = UBreakerDamageLibrary::ResolveDamage(ResolvedRequest, Defense);
     if (Result.bDodged)
     {
@@ -578,6 +586,17 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     // setters when there is an ability system, and writable (rather than an
     // ensure) when there is not, which is what lets automation exercise a
     // whole damage submission instead of only the pure resolver.
+    if (ResolvedRequest.bWeaponArmorShred && ResolvedRequest.Delivery == EBreakerDamageDelivery::Weapon
+        && !ResolvedRequest.bIsDamageOverTime && !Result.bKilled && Result.HealthDamage + Result.ShieldDamage > 0
+        && GetOwner()->IsA<ABreakerEnemy>() && GetWorld())
+    {
+        const double Now = GetWorld()->GetTimeSeconds();
+        WeaponArmorShredExpiries.RemoveAll([Now](double Expiry) { return Expiry <= Now; });
+        // O2 PLACEHOLDER: authored Break is three independent four-second
+        // stacks. The enabling hit pays old armour; callbacks see the new stack.
+        if (WeaponArmorShredExpiries.Num() >= 3) WeaponArmorShredExpiries.RemoveAt(0);
+        WeaponArmorShredExpiries.Add(Now + 4.0);
+    }
     Attributes->ApplyShield(Result.RemainingShield);
     Attributes->ApplyHealth(Result.RemainingHealth);
     UBreakerStatusComponent* ElementStatus = GetOwner()->FindComponentByClass<UBreakerStatusComponent>();
@@ -904,6 +923,57 @@ void UBreakerCombatComponent::PushOutgoingModifier(FName Key, float FlatBonus, f
     OutgoingModifiers.Add(Modifier);
 }
 
+void UBreakerCombatComponent::PushWindowOutgoingModifier(FName Key, float FlatBonus, float MoreMultiplier, float Duration)
+{
+    if (!GetOwner() || Key.IsNone() || !FMath::IsFinite(Duration) || Duration <= 0
+        || !FMath::IsFinite(FlatBonus) || !FMath::IsFinite(MoreMultiplier)) return;
+    PushOutgoingModifier(Key, FlatBonus, MoreMultiplier, Duration);
+    auto* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+    for (auto& Entry : OutgoingModifiers)
+    {
+        if (Entry.Key != Key) continue;
+        Entry.bWindowContribution = true;
+        Entry.bAfterimage = Progression && Progression->HasNodeTag(
+            FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage")));
+    }
+    if (Progression) Progression->OnProgressionChanged.AddUniqueDynamic(this, &ThisClass::InvalidateAfterimageContributions);
+    OnDeath.AddUniqueDynamic(this, &ThisClass::InvalidateAfterimageContributions);
+}
+
+void UBreakerCombatComponent::UpdateWindowOutgoingModifier(FName Key, float FlatBonus, float MoreMultiplier)
+{
+    if (!FMath::IsFinite(FlatBonus) || !FMath::IsFinite(MoreMultiplier)) return;
+    const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0;
+    for (auto& Entry : OutgoingModifiers)
+    {
+        if (Entry.Key != Key || !Entry.bWindowContribution || Entry.ExpiryTime <= Now) continue;
+        // A magnitude update cannot extend the lease, acquire a newly bought
+        // tail, or grow an already expired Cadence Break streak.
+        Entry.FlatBonus = FlatBonus;
+        Entry.MoreMultiplier = FMath::Clamp(MoreMultiplier, 0.0f, FBreakerAttributeAggregator::SingleMoreCeiling);
+    }
+}
+
+void UBreakerCombatComponent::FinishWindowOutgoingModifier(FName Key)
+{
+    OutgoingModifiers.RemoveAll([Key](const FBreakerOutgoingModifier& Entry)
+    {
+        return Entry.Key == Key && (!Entry.bWindowContribution || !Entry.bAfterimage);
+    });
+    PruneExpiredOutgoingModifiers();
+}
+
+void UBreakerCombatComponent::InvalidateAfterimageContributions()
+{
+    const auto* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    const bool bOwned = Progression && Progression->HasNodeTag(
+        FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage")));
+    for (auto& Entry : OutgoingModifiers)
+        if (!bOwned) Entry.bAfterimage = false;
+    if (IsDead()) OutgoingModifiers.RemoveAll([](const FBreakerOutgoingModifier& Entry) { return Entry.bWindowContribution; });
+    PruneExpiredOutgoingModifiers();
+}
+
 void UBreakerCombatComponent::RemoveOutgoingModifier(FName Key)
 {
     OutgoingModifiers.RemoveAll([Key](const FBreakerOutgoingModifier& Modifier) { return Modifier.Key == Key; });
@@ -915,7 +985,7 @@ void UBreakerCombatComponent::PruneExpiredOutgoingModifiers()
     const float Now = static_cast<float>(GetWorld()->GetTimeSeconds());
     OutgoingModifiers.RemoveAll([Now](const FBreakerOutgoingModifier& Modifier)
     {
-        return Modifier.ExpiryTime >= 0.0f && Modifier.ExpiryTime <= Now;
+        return FBreakerWindowLaneMath::Scale(Now, Modifier.ExpiryTime, Modifier.bAfterimage) == 0;
     });
 }
 
@@ -936,8 +1006,8 @@ float UBreakerCombatComponent::GetComposedMoreMultiplier() const
     const float Now = GetWorld() ? static_cast<float>(GetWorld()->GetTimeSeconds()) : -1.0f;
     for (const FBreakerOutgoingModifier& Modifier : OutgoingModifiers)
     {
-        if (Now >= 0.0f && Modifier.ExpiryTime >= 0.0f && Modifier.ExpiryTime <= Now) continue;
-        Product *= Modifier.MoreMultiplier;
+        const float Scale = FBreakerWindowLaneMath::Scale(Now, Modifier.ExpiryTime, Modifier.bAfterimage);
+        Product *= FBreakerWindowLaneMath::Multiplier(Modifier.MoreMultiplier, Scale);
     }
 
     // O34: ONE More ceiling. The chain spends whatever headroom the attribute
@@ -1137,7 +1207,20 @@ float UBreakerCombatComponent::GetEffectiveArmor() const
 {
     const float Base = Attributes ? Attributes->GetArmor() : 0.0f;
     const UBreakerStatusComponent* Status = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerStatusComponent>() : nullptr;
-    return FMath::Max(0.0f, Base - GetComposedArmorReduction()) * (Status ? Status->GetArmorMultiplier() : 1.0f);
+    const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0;
+    int32 LiveShredStacks = 0;
+    for (double Expiry : WeaponArmorShredExpiries) if (Expiry > Now) ++LiveShredStacks;
+    const float ShredMultiplier = 1.0f - .08f * FMath::Min(3, LiveShredStacks); // O2 PLACEHOLDER
+    return FMath::Max(0.0f, Base - GetComposedArmorReduction()) * ShredMultiplier * (Status ? Status->GetArmorMultiplier() : 1.0f);
+}
+
+void UBreakerCombatComponent::RefreshCoreOverhealCapacity()
+{
+    if (!Attributes || !GetOwner() || !GetOwner()->HasAuthority()) return;
+    const auto* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+    const FGameplayTag Overheal = FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Recovery.Overheal"), false);
+    const bool bOwned = Progression && Overheal.IsValid() && Progression->HasNodeTag(Overheal);
+    Attributes->SetCoreOverhealHealthFloor(bOwned ? CoreOverhealHealthFraction : 0.0f);
 }
 
 FBreakerHealResult UBreakerCombatComponent::ApplyHealing(const FBreakerHealRequest& Request)
@@ -1147,6 +1230,7 @@ FBreakerHealResult UBreakerCombatComponent::ApplyHealing(const FBreakerHealReque
     // Healing is not revival. A heal landing on a corpse would resurrect it
     // without any of the state a real revive has to restore.
     if (IsDead() || IsBeneficialEffectSuppressed()) return Result;
+    RefreshCoreOverhealCapacity();
 
     FBreakerVitalsState Vitals;
     Vitals.Health = Attributes->GetHealth();
@@ -1155,9 +1239,20 @@ FBreakerHealResult UBreakerCombatComponent::ApplyHealing(const FBreakerHealReque
     Vitals.MaxShield = Attributes->GetMaxShield();
 
     FBreakerHealRequest Effective = Request;
+    const auto* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+    const FGameplayTag Overheal = FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Recovery.Overheal"), false);
+    if (Progression && Overheal.IsValid() && Progression->HasNodeTag(Overheal) && Vitals.MaxShield > 0.0f)
+    {
+        // Both rules authorize the same earned excess. Resolve once against
+        // the larger cap, never convert the same units in two payouts.
+        const float CoreFraction = FMath::Clamp(Vitals.MaxHealth * CoreOverhealHealthFraction / Vitals.MaxShield, 0.0f, 1.0f);
+        Effective.OverhealToShieldFraction = FMath::Max(CoreFraction,
+            Request.bOverhealToShield ? FMath::Clamp(Request.OverhealToShieldFraction, 0.0f, 1.0f) : 0.0f);
+        Effective.bOverhealToShield = true;
+    }
     if (!Request.bConversionOnly)
     {
-        if (const auto* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>())
+        if (Progression)
             Effective.HealingMultiplier *= Progression->GetNodeStats().HealingReceivedMultiplier;
         if (const UBreakerStatusComponent* Status = GetOwner()->FindComponentByClass<UBreakerStatusComponent>())
             Effective.HealingMultiplier *= Status->GetHealingReceivedMultiplier();
@@ -1264,7 +1359,9 @@ void UBreakerCombatComponent::ApplyOutgoingModifiers(FBreakerDamageRequest& Requ
     if (OutgoingModifiers.IsEmpty() && WeaponFlatDamage.IsEmpty()) return;
 
     float Flat = 0.0f;
-    for (const FBreakerOutgoingModifier& Modifier : OutgoingModifiers) Flat += Modifier.FlatBonus;
+    const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0;
+    for (const FBreakerOutgoingModifier& Modifier : OutgoingModifiers)
+        Flat += Modifier.FlatBonus * FBreakerWindowLaneMath::Scale(Now, Modifier.ExpiryTime, Modifier.bAfterimage);
     const FGameplayTag AbilitySource = FGameplayTag::RequestGameplayTag(TEXT("Ability"), false);
     const FGameplayTag MeleeSource = FGameplayTag::RequestGameplayTag(TEXT("Damage.Melee"), false);
     if (Request.Delivery == EBreakerDamageDelivery::Weapon
@@ -1321,6 +1418,7 @@ void UBreakerCombatComponent::AddClassResource(float Amount)
 void UBreakerCombatComponent::RestoreVitals()
 {
     if (!Attributes || !GetOwner() || !GetOwner()->HasAuthority()) return;
+    WeaponArmorShredExpiries.Reset();
     EndStagger();
     StaggerImmunityEndTime = 0;
     if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(StaggerTimer);

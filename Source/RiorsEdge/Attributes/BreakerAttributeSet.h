@@ -184,6 +184,7 @@ public:
     void SetCoreShieldHealthFraction(float Fraction);
     void SetTankShieldHealthFloor(float Fraction);
     void SetSupportShieldHealthFloor(float Fraction);
+    void SetCoreOverhealHealthFloor(float Fraction);
     void SetTemporaryShieldHealthFraction(float Fraction);
     void BeginShieldCapacityUpdate() { ++ShieldCapacityUpdateDepth; }
     void EndShieldCapacityUpdate();
@@ -248,6 +249,7 @@ private:
     float CoreShieldHealthFraction = 0.0f;
     float TankShieldHealthFloor = 0.0f;
     float SupportShieldHealthFloor = 0.0f;
+    float CoreOverhealHealthFloor = 0.0f;
     float TemporaryShieldHealthFraction = 0.0f;
     bool bWritingComposedShield = false;
     int32 ShieldCapacityUpdateDepth = 0;

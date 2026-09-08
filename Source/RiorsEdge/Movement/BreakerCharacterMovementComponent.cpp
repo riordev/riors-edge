@@ -1,4 +1,5 @@
 #include "Movement/BreakerCharacterMovementComponent.h"
+#include "Abilities/BreakerWindowLaneMath.h"
 #include "Classes/BreakerMomentumComponent.h"
 #include "Combat/BreakerCombatComponent.h"
 
@@ -676,6 +677,42 @@ void UBreakerCharacterMovementComponent::PushSpeedMultiplier(FName Key, float Mu
     SpeedMultipliers.Add(Key, Entry);
 }
 
+void UBreakerCharacterMovementComponent::PushWindowSpeedMultiplier(FName Key, float Multiplier, float Duration)
+{
+    if (!GetOwner() || Key.IsNone() || !FMath::IsFinite(Duration) || Duration <= 0
+        || !FMath::IsFinite(Multiplier) || Multiplier <= 0) return;
+    PushSpeedMultiplier(Key, Multiplier, Duration);
+    auto* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+    if (auto* Entry = SpeedMultipliers.Find(Key))
+    {
+        Entry->bWindow = true;
+        Entry->bAfterimage = Progression && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage")));
+    }
+    if (Progression) Progression->OnProgressionChanged.AddUniqueDynamic(this, &ThisClass::InvalidateAfterimageSpeed);
+    if (auto* Combat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>())
+        Combat->OnDeath.AddUniqueDynamic(this, &ThisClass::InvalidateAfterimageSpeed);
+}
+
+void UBreakerCharacterMovementComponent::FinishWindowSpeedMultiplier(FName Key)
+{
+    const auto* Entry = SpeedMultipliers.Find(Key);
+    if (!Entry || !Entry->bAfterimage) PopSpeedMultiplier(Key);
+}
+
+void UBreakerCharacterMovementComponent::InvalidateAfterimageSpeed()
+{
+    const auto* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    const auto* Progression = GetProgression();
+    const bool bOwned = Progression && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage")));
+    for (auto It = SpeedMultipliers.CreateIterator(); It; ++It)
+    {
+        if (!It.Value().bWindow) continue;
+        if (Combat && Combat->IsDead()) It.RemoveCurrent();
+        else if (!bOwned) It.Value().bAfterimage = false;
+    }
+    PruneSpeedMultipliers();
+}
+
 void UBreakerCharacterMovementComponent::PopSpeedMultiplier(FName Key)
 {
     SpeedMultipliers.Remove(Key);
@@ -691,7 +728,7 @@ void UBreakerCharacterMovementComponent::PruneSpeedMultipliers() const
     const double Now = World->GetTimeSeconds();
     for (auto It = SpeedMultipliers.CreateIterator(); It; ++It)
     {
-        if (It.Value().ExpiryTime >= 0.0 && It.Value().ExpiryTime <= Now)
+        if (FBreakerWindowLaneMath::Scale(Now, It.Value().ExpiryTime, It.Value().bAfterimage) == 0)
         {
             It.RemoveCurrent();
         }
@@ -767,7 +804,8 @@ float UBreakerCharacterMovementComponent::GetSpeedMultiplier() const
     Active.Reserve(SpeedMultipliers.Num());
     for (const TPair<FName, FSpeedMultiplierEntry>& Pair : SpeedMultipliers)
     {
-        const float Value = Pair.Value.Multiplier;
+        const float Value = FBreakerWindowLaneMath::Multiplier(Pair.Value.Multiplier,
+            FBreakerWindowLaneMath::Scale(GetWorld() ? GetWorld()->GetTimeSeconds() : 0, Pair.Value.ExpiryTime, Pair.Value.bAfterimage));
         Active.Add(bNoGround && Value > 1.0f ? 1.0f + 2.0f * (Value - 1.0f) : Value);
     }
     return ComposeSpeedMultipliers(Active);

@@ -103,6 +103,7 @@ void UBreakerAbility_Slipcut::HandleReloadChanged(bool bReloading)
         {
             State->CloseWindow(WindowKey());
         }
+        else if (auto* Weapon = FindWeapon()) Weapon->PopFireRateMultiplier(CadenceKey());
     }
 }
 
@@ -114,6 +115,13 @@ void UBreakerAbility_Slipcut::HandleWindowEnded(FName Key)
     }
     if (UBreakerWeaponComponent* Weapon = FindWeapon())
     {
+        const auto* Character = GetBreakerCharacter();
+        const auto* State = Character ? Character->FindComponentByClass<UBreakerAbilityStateComponent>() : nullptr;
+        if (State && State->IsNaturalWindowEnd(Key))
+        {
+            Weapon->FinishWindowFireRateMultiplier(CadenceKey());
+            return;
+        }
         // The explicit pop re-arms a held automatic trigger at true cadence;
         // the push's expiry is only the safety net behind this line.
         Weapon->PopFireRateMultiplier(CadenceKey());
@@ -163,7 +171,7 @@ void UBreakerAbility_Slipcut::ActivateAbility(const FGameplayAbilitySpecHandle H
     {
         // Duration doubles as the lazy-expiry safety net; the deterministic
         // end is HandleWindowEnded's explicit pop.
-        Weapon->PushFireRateMultiplier(CadenceKey(), CadenceMultiplier, Duration);
+        Weapon->PushWindowFireRateMultiplier(CadenceKey(), CadenceMultiplier, Duration);
         if (UBreakerAbilityStateComponent* State = UBreakerAbilityStateComponent::FindOrAdd(Character))
         {
             State->StartWindow(WindowKey(), Duration);

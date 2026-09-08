@@ -4,6 +4,7 @@
 
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Abilities/BreakerAbilityStateComponent.h"
+#include "Abilities/BreakerWindowLaneMath.h"
 #include "Abilities/BreakerAbility_Lead.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "AbilitySystemInterface.h"
@@ -1135,6 +1136,54 @@ void UBreakerWeaponComponent::PopFireRateMultiplier(FName Key)
     }
 }
 
+void UBreakerWeaponComponent::PushWindowFireRateMultiplier(FName Key, float Multiplier, float Duration)
+{
+    if (!GetOwner() || Key.IsNone() || !FMath::IsFinite(Duration) || Duration <= 0
+        || !FMath::IsFinite(Multiplier) || Multiplier <= 0) return;
+    PushFireRateMultiplier(Key, Multiplier, Duration);
+    if (auto* Entry = FireRateMultipliers.Find(Key))
+    {
+        Entry->bWindow = true;
+        Entry->bAfterimage = Duration > 0 && OwnerHasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage")));
+    }
+    if (auto* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>())
+        Progression->OnProgressionChanged.AddUniqueDynamic(this, &ThisClass::InvalidateAfterimage);
+    if (auto* Combat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>())
+        Combat->OnDeath.AddUniqueDynamic(this, &ThisClass::InvalidateAfterimage);
+    LastWindowFireRate = GetFireRateMultiplier();
+    UpdateFeelTickEnabled();
+}
+
+void UBreakerWeaponComponent::InvalidateAfterimage()
+{
+    const auto* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    const bool bDead = Combat && Combat->IsDead();
+    const bool bOwned = OwnerHasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage")));
+    for (auto It = FireRateMultipliers.CreateIterator(); It; ++It)
+    {
+        if (!It.Value().bWindow) continue;
+        if (bDead) It.RemoveCurrent();
+        else if (!bOwned) It.Value().bAfterimage = false;
+    }
+    PruneFireRateMultipliers();
+    for (auto It = ShotChannelBonuses.CreateIterator(); It; ++It)
+    {
+        if (!It.Value().bWindow) continue;
+        if (bDead) It.RemoveCurrent();
+        else if (!bOwned) It.Value().bAfterimage = false;
+    }
+    PruneShotChannelBonuses();
+    RefreshAutomaticFireInterval();
+    UpdateFeelTickEnabled();
+}
+
+void UBreakerWeaponComponent::FinishWindowFireRateMultiplier(FName Key)
+{
+    const auto* Entry = FireRateMultipliers.Find(Key);
+    if (!Entry || !Entry->bAfterimage) PopFireRateMultiplier(Key);
+    else RefreshAutomaticFireInterval();
+}
+
 void UBreakerWeaponComponent::PruneFireRateMultipliers() const
 {
     const UWorld* World = GetWorld();
@@ -1142,7 +1191,7 @@ void UBreakerWeaponComponent::PruneFireRateMultipliers() const
     const double Now = World->GetTimeSeconds();
     for (auto It = FireRateMultipliers.CreateIterator(); It; ++It)
     {
-        if (It.Value().ExpiryTime >= 0.0 && It.Value().ExpiryTime <= Now)
+        if (FBreakerWindowLaneMath::Scale(Now, It.Value().ExpiryTime, It.Value().bAfterimage) == 0)
         {
             It.RemoveCurrent();
         }
@@ -1167,7 +1216,7 @@ void UBreakerWeaponComponent::UpdateFeelTickEnabled()
 {
     const bool bBusy = RecoilPitchAccumulated != 0.0f || RecoilYawAccumulated != 0.0f
         || BloomDegrees > 0.0f || !Viewmodel.IsAtRest();
-    SetComponentTickEnabled(bBusy || OwnerHasNodeTag(BreakerCoreTwoGunsTag()));
+    SetComponentTickEnabled(bBusy || !FireRateMultipliers.IsEmpty() || OwnerHasNodeTag(BreakerCoreTwoGunsTag()));
 }
 
 void UBreakerWeaponComponent::ApplyShotFeel(const FBreakerShotResult& Shot)
@@ -1215,6 +1264,9 @@ void UBreakerWeaponComponent::ApplyShotFeel(const FBreakerShotResult& Shot)
 void UBreakerWeaponComponent::TickComponent(float DeltaSeconds, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaSeconds, TickType, ThisTickFunction);
+    const float CurrentRate = GetFireRateMultiplier();
+    if (CurrentRate != LastWindowFireRate) RefreshAutomaticFireInterval();
+    LastWindowFireRate = CurrentRate;
     TickHolsteredReload(DeltaSeconds);
     TickRecoil(DeltaSeconds);
 }
@@ -1552,7 +1604,9 @@ float UBreakerWeaponComponent::GetFireRateMultiplier() const
     PruneFireRateMultipliers();
     for (const TPair<FName, FFireRateMultiplierEntry>& Pair : FireRateMultipliers)
     {
-        Composed *= Pair.Value.Multiplier;
+        const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0;
+        Composed *= FBreakerWindowLaneMath::Multiplier(Pair.Value.Multiplier,
+            FBreakerWindowLaneMath::Scale(Now, Pair.Value.ExpiryTime, Pair.Value.bAfterimage));
     }
     // Floored for the same reason PreAttributeChange floors the attribute: a
     // multiplier at zero turns the fire interval into an infinity, which
@@ -2089,6 +2143,7 @@ bool UBreakerWeaponComponent::ResolveWeakPointHit(const FHitResult& Hit, const F
 FBreakerShotChannels UBreakerWeaponComponent::GetShotChannels() const
 {
     FBreakerShotChannels Channels;
+    float WindowPierce = 0, WindowChain = 0, WindowRicochet = 0;
     const AActor* Owner = GetOwner();
     if (!Owner) return Channels;
     const UBreakerWeaponDefinition* Definition = ResolveDefinition();
@@ -2109,17 +2164,25 @@ FBreakerShotChannels UBreakerWeaponComponent::GetShotChannels() const
         const FBreakerNodeStats& Stats = Progression->GetNodeStats();
         Channels.AdditionalProjectiles += FMath::Max(0.0f, Stats.BonusProjectileCount);
         if (Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Fan")))) Channels.AdditionalProjectiles += 2.0f;
-        Channels.PierceCount += FMath::Max(0, FMath::FloorToInt32(Stats.BonusPierceCount));
-        Channels.ChainCount += FMath::Max(0, FMath::FloorToInt32(Stats.BonusChainCount));
-        Channels.RicochetCount += FMath::Max(0, FMath::FloorToInt32(Stats.BonusRicochetCount));
+        WindowPierce += FMath::Max(0.0f, Stats.BonusPierceCount);
+        WindowChain += FMath::Max(0.0f, Stats.BonusChainCount);
+        WindowRicochet += FMath::Max(0.0f, Stats.BonusRicochetCount);
     }
 
     // 2. Keyed ability-window pushes (Sidearm Rig's +1 Pierce is the first).
     PruneShotChannelBonuses();
     for (const TPair<FName, FShotChannelBonusEntry>& Bonus : ShotChannelBonuses)
     {
-        Channels += Bonus.Value.Channels;
+        const float Scale = FBreakerWindowLaneMath::Scale(GetWorld() ? GetWorld()->GetTimeSeconds() : 0,
+            Bonus.Value.ExpiryTime, Bonus.Value.bAfterimage);
+        Channels.AdditionalProjectiles += Bonus.Value.Channels.AdditionalProjectiles * Scale;
+        WindowPierce += Bonus.Value.Channels.PierceCount * Scale;
+        WindowChain += Bonus.Value.Channels.ChainCount * Scale;
+        WindowRicochet += Bonus.Value.Channels.RicochetCount * Scale;
     }
+    Channels.PierceCount += FMath::FloorToInt(WindowPierce);
+    Channels.ChainCount += FMath::FloorToInt(WindowChain);
+    Channels.RicochetCount += FMath::FloorToInt(WindowRicochet);
 
     // 3. Momentum manipulates projectiles — the Swift identity mechanic. The
     // gate is the momentum component's own IsActiveForOwner, which is already
@@ -2187,6 +2250,27 @@ void UBreakerWeaponComponent::PushShotChannelBonus(FName Key, float AdditionalPr
     ShotChannelBonuses.Add(Key, Entry);
 }
 
+void UBreakerWeaponComponent::PushWindowShotChannelBonus(FName Key, float AdditionalProjectiles, int32 PierceBonus, int32 ChainBonus, int32 RicochetBonus, float Duration)
+{
+    if (!GetOwner() || Key.IsNone() || !FMath::IsFinite(Duration) || Duration <= 0 || !FMath::IsFinite(AdditionalProjectiles)) return;
+    PushShotChannelBonus(Key,AdditionalProjectiles,PierceBonus,ChainBonus,RicochetBonus,Duration);
+    if (auto* Entry = ShotChannelBonuses.Find(Key))
+    {
+        Entry->bWindow = true;
+        Entry->bAfterimage = OwnerHasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage")));
+    }
+    if (auto* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>())
+        Progression->OnProgressionChanged.AddUniqueDynamic(this, &ThisClass::InvalidateAfterimage);
+    if (auto* Combat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>())
+        Combat->OnDeath.AddUniqueDynamic(this, &ThisClass::InvalidateAfterimage);
+}
+
+void UBreakerWeaponComponent::FinishWindowShotChannelBonus(FName Key)
+{
+    const auto* Entry = ShotChannelBonuses.Find(Key);
+    if (!Entry || !Entry->bAfterimage) PopShotChannelBonus(Key);
+}
+
 void UBreakerWeaponComponent::PopShotChannelBonus(FName Key)
 {
     ShotChannelBonuses.Remove(Key);
@@ -2199,7 +2283,7 @@ void UBreakerWeaponComponent::PruneShotChannelBonuses() const
     const double Now = World->GetTimeSeconds();
     for (auto It = ShotChannelBonuses.CreateIterator(); It; ++It)
     {
-        if (It.Value().ExpiryTime >= 0.0 && It.Value().ExpiryTime <= Now)
+        if (FBreakerWindowLaneMath::Scale(Now, It.Value().ExpiryTime, It.Value().bAfterimage) == 0)
         {
             It.RemoveCurrent();
         }

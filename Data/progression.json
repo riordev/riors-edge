@@ -502,6 +502,12 @@
 			"lane": true,
 			"rider": false,
 			"affixOwned": false
+		},
+		{
+			"name": "WeaponCriticalDamage",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
 		}
 	],
 	"conditions": [

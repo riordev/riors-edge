@@ -1350,7 +1350,8 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
             }
             else if (BreakerDamagePoolFor(Effect.StatTarget) != EBreakerDamagePool::None
                 || Effect.StatTarget == EBreakerNodeStatTarget::ElementalDamage || Effect.StatTarget == EBreakerNodeStatTarget::VoidDamage
-                || Effect.StatTarget == EBreakerNodeStatTarget::ReactionDamage || Effect.StatTarget == EBreakerNodeStatTarget::EffectiveHealth)
+                || Effect.StatTarget == EBreakerNodeStatTarget::ReactionDamage || Effect.StatTarget == EBreakerNodeStatTarget::EffectiveHealth
+                || Effect.StatTarget == EBreakerNodeStatTarget::WeaponCriticalDamage)
             {
                 // Rank does NOT scale a More multiplier — a rank-2 x1.25 would
                 // be x1.5625, which no node table means. Every More node in the
@@ -1378,6 +1379,7 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
                 case EBreakerNodeStatTarget::VoidDamage: Lane = EBreakerMoreLane::Void; break;
                 case EBreakerNodeStatTarget::ReactionDamage: Lane = EBreakerMoreLane::Reaction; break;
                 case EBreakerNodeStatTarget::EffectiveHealth: Lane = EBreakerMoreLane::EffectiveHealth; break;
+                case EBreakerNodeStatTarget::WeaponCriticalDamage: Lane = EBreakerMoreLane::WeaponCritical; break;
                 default: break;
                 }
                 MoreSources.Add({ 1.0f + FMath::Max(0.0f, Effect.ValuePerRank) / 100.0f, Lane });
@@ -1681,15 +1683,17 @@ bool UBreakerProgressionComponent::IsNodeMoreAuthoringLegal(const UBreakerProgre
 
     for (const FBreakerNodeEffect& Effect : Node->Effects)
     {
-        const bool bScopedTarget = Effect.StatTarget >= EBreakerNodeStatTarget::ElementalDamage
-            && Effect.StatTarget <= EBreakerNodeStatTarget::EffectiveHealth;
+        const bool bScopedTarget = (Effect.StatTarget >= EBreakerNodeStatTarget::ElementalDamage
+            && Effect.StatTarget <= EBreakerNodeStatTarget::EffectiveHealth)
+            || Effect.StatTarget == EBreakerNodeStatTarget::WeaponCriticalDamage;
         if (bScopedTarget)
         {
             const bool bSupportsIncreased = Effect.StatTarget <= EBreakerNodeStatTarget::ReactionDamage;
             const bool bSupportsMore = Effect.StatTarget == EBreakerNodeStatTarget::ElementalDamage
                 || Effect.StatTarget == EBreakerNodeStatTarget::VoidDamage
                 || Effect.StatTarget == EBreakerNodeStatTarget::ReactionDamage
-                || Effect.StatTarget == EBreakerNodeStatTarget::EffectiveHealth;
+                || Effect.StatTarget == EBreakerNodeStatTarget::EffectiveHealth
+                || Effect.StatTarget == EBreakerNodeStatTarget::WeaponCriticalDamage;
             if (Effect.RequiresTargetState()
                 || !((bSupportsIncreased && Effect.StatBucket == EBreakerNodeStatBucket::IncreasedPercent)
                     || (bSupportsMore && Effect.StatBucket == EBreakerNodeStatBucket::MorePercent)))
