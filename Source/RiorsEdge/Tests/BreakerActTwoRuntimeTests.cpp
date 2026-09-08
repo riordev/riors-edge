@@ -13,6 +13,7 @@
 #include "EngineUtils.h"
 #include "Game/BreakerGameInstance.h"
 #include "Game/BreakerGameMode.h"
+#include "Game/BreakerLocalMapComponent.h"
 #include "Game/BreakerZoneBuilder.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/WorldSettings.h"
@@ -63,6 +64,9 @@ bool FBreakerActTwoRuntimeTest::RunTest(const FString& Parameters)
         ABreakerCharacter* Player = World->SpawnActor<ABreakerCharacter>();
         APlayerController* Controller = World->SpawnActor<APlayerController>();
         if (!TestNotNull(TEXT("Player"), Player) || !TestNotNull(TEXT("Controller"), Controller)) return false;
+        // Map tracking uses the real persistence entry point; this isolated
+        // fixture must never write the owner's legacy character slot.
+        Player->bRefuseSavesForPendingCharacter = true;
         Controller->Possess(Player);
         // Character BeginPlay loads disk saves: bind only the real combat path.
         Player->GetAbilitySystemComponent()->InitAbilityActorInfo(Player, Player);
@@ -74,6 +78,14 @@ bool FBreakerActTwoRuntimeTest::RunTest(const FString& Parameters)
         QuestKill.BindUFunction(Player, TEXT("HandleQuestKill"));
         Player->GetCombat()->OnKillDealt.Add(QuestKill);
         UBreakerQuestJournal* Journal = Player->GetQuestJournal();
+        auto* Map = Player->GetLocalMap();
+        auto ContactMarkers = [&]()
+        {
+            auto Markers = Map->GetMarkers();
+            Markers.RemoveAll([](const auto& Marker)
+                { return !Marker.Id.ToString().EndsWith(TEXT(".encounter.fernhall.altered_contact")); });
+            return Markers;
+        };
         if (Stage != 2) Journal->RestoreFrom(Carried);
         auto Kill = [&](ABreakerEnemy* Enemy)
         {
@@ -105,13 +117,31 @@ bool FBreakerActTwoRuntimeTest::RunTest(const FString& Parameters)
                 return Count;
             };
             TestEqual(TEXT("No Act II contact before accepted investigation"), Contacts().Num(), 0);
+            TestTrue(TEXT("No contact guidance before investigation"), ContactMarkers().IsEmpty());
             TestEqual(TEXT("No Breach door before report and orders"), Doors(), 0);
             Journal->SetFlag(TEXT("Quest.AlteredContact.Accepted"));
             TestEqual(TEXT("Acceptance alone cannot prepay arrival"), Contacts().Num(), 0);
+            TestTrue(TEXT("Acceptance alone does not fabricate map contact"), ContactMarkers().IsEmpty());
             for (FName Flag : UBreakerMissionLibrary::ArrivalFlagsFor(TEXT("Fernhall"), Journal->GetState())) Journal->SetFlag(Flag);
             TArray<ABreakerEnemy*> Found = Contacts();
             if (!TestEqual(TEXT("Live journal opens exactly one authored contact"), Found.Num(), 1)) return false;
             ABreakerEnemy* Contact = Found[0];
+            const auto Markers = ContactMarkers();
+            if (!TestEqual(TEXT("Current mission has one actual contact marker"), Markers.Num(), 1)) return false;
+            const FName ContactMarkerId = Markers[0].Id;
+            TestEqual(TEXT("Contact retains fixed regional level"), Contact->GetAreaLevel(), 16);
+            TestTrue(TEXT("Contact marker uses live position"), Markers[0].Location.Equals(Contact->GetActorLocation()));
+            TestTrue(TEXT("Current contact visible without exploration"), Map->IsVisible(Markers[0]));
+            TestFalse(TEXT("Guidance does not grant contact discovery"), Map->IsDiscovered(ContactMarkerId));
+            TestTrue(TEXT("Current contact can be tracked"), Map->Track(ContactMarkerId));
+            FBreakerLocalMapMarker TrackedContact;
+            TestTrue(TEXT("Tracking resolves live contact"), Map->GetTrackedMarker(TrackedContact));
+            const FVector ContactOrigin = Contact->GetActorLocation();
+            Contact->SetActorLocation(ContactOrigin + FVector(10,0,0));
+            TestTrue(TEXT("Tracking follows live contact movement"), Map->GetTrackedMarker(TrackedContact)
+                && TrackedContact.Location.Equals(Contact->GetActorLocation()));
+            TestEqual(TEXT("Movement preserves stable encounter identity"), TrackedContact.Id, ContactMarkerId);
+            Contact->SetActorLocation(ContactOrigin);
             TestTrue(TEXT("Contact is the ordinary Drudge class"), Contact->IsA<ABreakerAlteredEnemy>());
             TestFalse(TEXT("Contact does not respawn"), Contact->DoesRespawn());
             TestFalse(TEXT("Contact cannot finish a rift"), Contact->IsRiftTerminator());
@@ -137,8 +167,12 @@ bool FBreakerActTwoRuntimeTest::RunTest(const FString& Parameters)
             for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
                 if (*It != Contact) { TestTrue(TEXT("Unrelated patrol dies through combat"), Kill(*It)); break; }
             TestFalse(TEXT("Unrelated actual death cannot finish contact"), Journal->HasFlag(TEXT("Quest.AlteredContact.ContactDown")));
+            TestEqual(TEXT("Patrol death preserves contact guidance"), ContactMarkers().Num(), 1);
             TestTrue(TEXT("Dedicated contact actually dies through combat"), Kill(Contact));
             TestTrue(TEXT("Bound dedicated death grants objective"), Journal->HasFlag(TEXT("Quest.AlteredContact.ContactDown")));
+            TestTrue(TEXT("Completed contact marker retires immediately"), ContactMarkers().IsEmpty());
+            TestFalse(TEXT("Completed contact cannot remain a tracked target"), Map->GetTrackedMarker(TrackedContact));
+            TestFalse(TEXT("Tracking never fabricated discovery"), Map->IsDiscovered(ContactMarkerId));
             TestEqual(TEXT("Contact death alone does not create Breach door"), Doors(), 0);
             Journal->SetFlag(TEXT("Quest.AlteredContact.TurnedIn"));
             TestEqual(TEXT("Report alone still requires Breach orders"), Doors(), 0);
@@ -198,6 +232,7 @@ bool FBreakerActTwoRuntimeTest::RunTest(const FString& Parameters)
             // Character save restore mutates this same journal without OnFlagSet.
             // Do not SetFlag: the real mode must notice the loaded progress.
             Journal->RestoreFrom(Carried);
+            TestTrue(TEXT("Restored completed contact has no map objective"), ContactMarkers().IsEmpty());
             TestEqual(TEXT("Silent restore itself emits no door update"), BreachDoors(), 0);
             Mode->Tick(0.0f);
             TestEqual(TEXT("Mode notices same-journal restored orders and creates door"), BreachDoors(), 1);

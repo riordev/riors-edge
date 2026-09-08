@@ -298,12 +298,25 @@ EBreakerForgeResult UBreakerForgeLibrary::Attune(FBreakerItemInstance& Item, FBr
     Rerolled.Reserve(Item.Affixes.Num());
     int32 PrefixCount = 0;
     int32 SuffixCount = 0;
+    // Old drops could exceed both category budgets combined. Those items may
+    // exhaust legal draws and retain a later original line; do not consume
+    // that line's identity earlier and introduce a duplicate at the fallback.
+    TSet<FName> PendingLegacyIds;
+    if (Item.Affixes.Num() > 8)
+        for (const FBreakerRolledAffix& Existing : Item.Affixes) PendingLegacyIds.Add(Existing.AffixId);
+    // Historical drops appended their signatures after ordinary lines. Reserve
+    // every locked seat before the first draw, independent of stored order.
     for (const FBreakerRolledAffix& Existing : Item.Affixes)
     {
+        if (!Locked.Contains(Existing.AffixId)) continue;
+        if (Existing.Category == EBreakerAffixCategory::Prefix) ++PrefixCount; else ++SuffixCount;
+    }
+    for (const FBreakerRolledAffix& Existing : Item.Affixes)
+    {
+        PendingLegacyIds.Remove(Existing.AffixId);
         if (Locked.Contains(Existing.AffixId))
         {
             Rerolled.Add(Existing);
-            if (Existing.Category == EBreakerAffixCategory::Prefix) ++PrefixCount; else ++SuffixCount;
             continue;
         }
 
@@ -315,6 +328,8 @@ EBreakerForgeResult UBreakerForgeLibrary::Attune(FBreakerItemInstance& Item, FBr
         for (const FBreakerAffixDefinition& Affix : Pool)
         {
             if (!UBreakerAffixLibrary::IsEligibleForItem(Affix, Item, Existing.Tier)) continue;
+            if (Locked.Contains(Affix.AffixId)) continue;
+            if (PendingLegacyIds.Contains(Affix.AffixId)) continue;
             if (Rerolled.ContainsByPredicate([&Affix](const FBreakerRolledAffix& Taken) { return Taken.AffixId == Affix.AffixId; })) continue;
             if (Affix.Category == EBreakerAffixCategory::Prefix && PrefixCount >= 4) continue;
             if (Affix.Category == EBreakerAffixCategory::Suffix && SuffixCount >= 4) continue;
@@ -326,6 +341,7 @@ EBreakerForgeResult UBreakerForgeLibrary::Attune(FBreakerItemInstance& Item, FBr
             // Nothing legal left: keep the line rather than dropping it, so an
             // attune can never make an item smaller than it was.
             Rerolled.Add(Existing);
+            if (Existing.Category == EBreakerAffixCategory::Prefix) ++PrefixCount; else ++SuffixCount;
             continue;
         }
 

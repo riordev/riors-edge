@@ -3,7 +3,10 @@ param(
     [switch]$ActTwo,
     [switch]$Survivor,
     [switch]$Finale,
-    [switch]$Photos
+    [switch]$Photos,
+    [switch]$ContactMap,
+    [int]$Width = 1920,
+    [int]$Height = 1080
 )
 $ErrorActionPreference = 'Stop'
 $repoDirectory = Split-Path -Parent $PSScriptRoot
@@ -18,7 +21,8 @@ $probeOptions = @()
 if ($ActTwo) { $probeOptions += '-BreakerActTwoLoop' }
 if ($Survivor) { $probeOptions += '-BreakerSurvivorLoop' }
 if ($Finale) { $probeOptions += '-BreakerFinaleLoop' }
-if ($Photos) { $probeOptions += @('-BreakerActTwoPhotos', '-windowed', '-ResX=1920', '-ResY=1080') }
+if ($ContactMap) { $probeOptions += @('-BreakerActTwoLoop', '-BreakerContactMapPhoto') }
+if ($Photos -or $ContactMap) { $probeOptions += @('-BreakerActTwoPhotos', '-windowed', "-ResX=$Width", "-ResY=$Height") }
 else { $probeOptions += '-nullrhi' }
 & $Editor $projectFile -game -unattended -nop4 -nosplash -BreakerAutoPlay=Anchor -BreakerLoopProbe @probeOptions "-UserDir=$probeDirectory" "-abslog=$probeLog"
 $probeExit = $LASTEXITCODE

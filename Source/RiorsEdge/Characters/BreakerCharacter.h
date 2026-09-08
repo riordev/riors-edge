@@ -432,12 +432,11 @@ public:
     // the viewmodel presents lowered. Set once in BeginPlay from the map role
     // — a pawn never outlives a map, so it cannot go stale.
     bool IsWeaponsHolstered() const { return bWeaponsHolstered; }
+    // Named-screen rendering for isolated command-line capture probes.
+    void OpenMenuScreenForCapture(const FString& ScreenName);
 private:
     bool bWeaponsHolstered = false;
     void OpenMenu(bool bInitialMenu);
-    // Dev capture only (-BreakerCaptureMenu=<name>): opens the front end on a
-    // named screen so a screenshot run can photograph it.
-    void OpenMenuScreenForCapture(const FString& ScreenName);
     UFUNCTION() void HandleShotCosmetics(const FBreakerShotResult& Shot);
     UFUNCTION() void HandlePlayerDeath();
     // O82 (amended): the campaign respawn. After the death beat, back to the

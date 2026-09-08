@@ -7,11 +7,13 @@
 #include "Interaction/BreakerNPC.h"
 #include "Interaction/BreakerSurvivor.h"
 #include "Interaction/BreakerFinaleActor.h"
+#include "Interaction/BreakerFeedstockPickup.h"
 #include "Save/BreakerMissionContent.h"
 #include "Save/BreakerQuestJournal.h"
 #include "Game/BreakerGameInstance.h"
 #include "Game/BreakerGameMode.h"
 #include "Game/BreakerZoneBuilder.h"
+#include "Game/BreakerLocalMapComponent.h"
 #include "Interaction/BreakerRiftDoor.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
@@ -176,6 +178,8 @@ bool UBreakerLoopProbe::TickActTwo(ABreakerCharacter* Player, ABreakerGameMode* 
         if (--PhotoDelay == 1) FScreenshotRequest::RequestScreenshot(PendingPhoto, true, false);
         return true;
     }
+    if (bContactPhotoTaken && FParse::Param(FCommandLine::Get(), TEXT("BreakerContactMapPhoto")))
+        return Finish(IFileManager::Get().FileExists(*PendingPhoto), TEXT("Actual Act II contact map capture; accelerated campaign actions, not combat balance"));
     UWorld* World = Player->GetWorld();
     UBreakerQuestJournal* Journal = Player->GetQuestJournal();
     UBreakerGameInstance* Session = Cast<UBreakerGameInstance>(GetGameInstance());
@@ -348,6 +352,16 @@ bool UBreakerLoopProbe::TickActTwo(ABreakerCharacter* Player, ABreakerGameMode* 
             const FString Directory = FPaths::ProjectSavedDir() / TEXT("Screenshots");
             IFileManager::Get().MakeDirectory(*Directory, true);
             PendingPhoto = Directory / (bContact ? TEXT("acttwo-contact.png") : TEXT("acttwo-marshal.png"));
+            if (bContact && FParse::Param(FCommandLine::Get(), TEXT("BreakerContactMapPhoto")))
+            {
+                auto* Map = Player->GetLocalMap();
+                bool bTracked = false;
+                for (const auto& Marker : Map->GetMarkers())
+                    if (Marker.bObjective && Marker.Location.Equals(Target)) bTracked = Map->Track(Marker.Id);
+                if (!bTracked) return Finish(false, TEXT("Live contact objective cannot be tracked"));
+                Player->OpenMenuScreenForCapture(TEXT("MAP"));
+                PendingPhoto = Directory / TEXT("acttwo-contact-map.png");
+            }
             PhotoDelay = 2;
             if (bMarshal)
             {
@@ -367,6 +381,18 @@ bool UBreakerLoopProbe::TickActTwo(ABreakerCharacter* Player, ABreakerGameMode* 
         Enemy->FindComponentByClass<UBreakerCombatComponent>()->ReceiveDamage(Hit);
         if (Enemy->IsDeadEnemy()) ++KilledEnemies;
     }
+    // Feedstock requires collecting the actual death drops. Accelerated kills
+    // alone do not complete this objective; relocation still uses the normal
+    // ownership, range, visibility and journal checks at the pickup.
+    bool bCollectedFeedstock = false;
+    for (TActorIterator<ABreakerFeedstockPickup> It(World); It; ++It)
+    {
+        if (It->GetOwner() != Player || It->IsActorBeingDestroyed()) continue;
+        Player->TeleportTo(It->GetActorLocation() + FVector(0,0,100), Player->GetActorRotation());
+        if (!It->TryCollect(Player)) return Finish(false, TEXT("Physical Forge feedstock collection refused"));
+        bCollectedFeedstock = true;
+    }
+    if (bCollectedFeedstock) return true;
     // Finite field populations legitimately require another visit for some
     // objectives. Travel back out and in; never manufacture elite kills.
     if (Living.IsEmpty() && !Mode->IsRiftInstance() && Beat->WorldEncounter.IsNone())
@@ -460,7 +486,8 @@ bool UBreakerLoopProbe::TickProbe(float DeltaSeconds)
     ABreakerCharacter* Player = Controller ? Cast<ABreakerCharacter>(Controller->GetPawn()) : nullptr;
     if (!Mode || !Player) return true;
     if (DepartedWorld.Get() == World) return true;
-    Player->ResumeFromMenu();
+    if (!(bContactPhotoTaken && FParse::Param(FCommandLine::Get(), TEXT("BreakerContactMapPhoto"))))
+        Player->ResumeFromMenu();
     if (bActTwo)
     {
         if (Stage == 0 && !UBreakerGameInstance::IsAnchorMap(World)) return true;

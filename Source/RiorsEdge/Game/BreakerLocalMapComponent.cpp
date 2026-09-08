@@ -1,6 +1,7 @@
 #include "Game/BreakerLocalMapComponent.h"
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerAlteredEnemy.h"
 #include "Game/BreakerGameInstance.h"
 #include "Game/BreakerGameMode.h"
 #include "Game/BreakerZoneBuilder.h"
@@ -90,6 +91,30 @@ TArray<FBreakerLocalMapMarker> UBreakerLocalMapComponent::GetMarkers() const
         Marker.Detail = FText::FromString(TEXT("SERVICE / CONTACT"));
         Marker.bObjective = Beat && (Beat->Kind == EBreakerMissionBeatKind::Dialogue || Beat->Kind == EBreakerMissionBeatKind::Return)
             && !It->DialogueId.IsNone() && It->DialogueId == Beat->Npc;
+    }
+    // This authored world encounter already has a dedicated live actor. Guide
+    // the current investigation to that actor without inventing discovery or
+    // marking every ordinary enemy as a map site.
+    if (Beat && Beat->Kind == EBreakerMissionBeatKind::Encounter
+        && Beat->WorldEncounter == FName(TEXT("fernhall.altered_contact")))
+    {
+        ABreakerAlteredEnemy* Contact = nullptr;
+        for (TActorIterator<ABreakerAlteredEnemy> It(World); It; ++It)
+        {
+            if (!IsValid(*It) || !It->Tags.Contains(TEXT("Fernhall.AlteredContact"))) continue;
+            const auto* Combat = It->FindComponentByClass<UBreakerCombatComponent>();
+            if (!Combat || Combat->IsDead()) continue;
+            if (!Contact || It->GetUniqueID() < Contact->GetUniqueID()) Contact = *It;
+        }
+        if (Contact)
+        {
+            auto& Marker = Out.AddDefaulted_GetRef();
+            Marker.Id = FName(*(Region + TEXT(".encounter.") + Beat->WorldEncounter.ToString()));
+            Marker.Location = Contact->GetActorLocation();
+            Marker.Label = GetCampaignObjective();
+            Marker.Detail = FText::FromString(FString::Printf(TEXT("CONTACT / LEVEL %d"), Contact->GetAreaLevel()));
+            Marker.bObjective = true;
+        }
     }
     Out.Sort([](const auto& A, const auto& B) { return A.Id.LexicalLess(B.Id); });
     return Out;
