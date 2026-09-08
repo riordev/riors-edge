@@ -4,6 +4,7 @@
 #include "Combat/BreakerDamageLibrary.h"
 #include "Combat/BreakerRiftDisplacement.h"
 #include "Items/BreakerEquipmentComponent.h"
+#include "Progression/BreakerProgressionComponent.h"
 #include "Data/BreakerDataFile.h"
 #include "UI/BreakerRiftFeedback.h"
 
@@ -65,6 +66,8 @@ float UBreakerStatusComponent::GetRiftResistancePercent() const
     float Value = FMath::IsFinite(RiftResistancePercent) ? RiftResistancePercent : 0;
     if (const auto* Gear = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>() : nullptr)
         Value += Gear->GetStats().ElementalResistancePercent;
+    if (const auto* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr)
+        Value += Progression->GetNodeStats().ElementalResistancePercent;
     return FMath::Clamp(Value, 0.0f, 100.0f);
 }
 

@@ -93,6 +93,8 @@ public:
     // Static and actor-parameterised like AbilityDamageScalarFor, for the
     // same reason: application sites and tests share one seam.
     static float AbilityAreaMultiplierFor(const AActor* OwnerActor);
+    static float AbilityCastRateMultiplierFor(const AActor* OwnerActor);
+    static float AbilityChannelRateMultiplierFor(const AActor* OwnerActor);
     static float AbilityDurationMultiplierFor(const AActor* OwnerActor);
     static float AbilityBaseDamageFor(const AActor* OwnerActor, float ScaledAuthoredBase);
     // The cooldown DIVISOR (DashCooldownReduction's convention: 1.20 == 20%

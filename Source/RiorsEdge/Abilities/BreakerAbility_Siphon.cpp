@@ -130,8 +130,8 @@ void UBreakerAbility_Siphon::ActivateAbility(const FGameplayAbilitySpecHandle Ha
         BeamHandle = Effects->AddBeam(Character, Target, 5.0f, BreakerUI::Cyan, 2.6f, BeamTiming, 50.0f);
     }
 
-    World->GetTimerManager().SetTimer(ChannelTimer, this, &ThisClass::TickChannel,
-        FMath::Max(0.05f, TickIntervalSeconds), true, FMath::Max(0.05f, TickIntervalSeconds));
+    const float Interval = FMath::Max(0.05f, TickIntervalSeconds / AbilityChannelRateMultiplierFor(Character));
+    World->GetTimerManager().SetTimer(ChannelTimer, this, &ThisClass::TickChannel, Interval, true, Interval);
     // A hard end, independent of the tick timer. A channel whose only exit is
     // its own tick handler outlives its duration whenever a tick is skipped.
     TWeakObjectPtr<UBreakerAbility_Siphon> WeakThis(this);

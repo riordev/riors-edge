@@ -2,6 +2,7 @@
 #include "Combat/BreakerStatusComponent.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Items/BreakerEquipmentComponent.h"
+#include "Progression/BreakerProgressionComponent.h"
 #include "Data/BreakerDataFile.h"
 
 namespace
@@ -72,6 +73,8 @@ float UBreakerStatusComponent::GetEntropyResistancePercent() const
     float Value = FMath::IsFinite(EntropyResistancePercent) ? EntropyResistancePercent : 0;
     if (const auto* Gear = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>() : nullptr)
         Value += Gear->GetStats().ElementalResistancePercent;
+    if (const auto* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr)
+        Value += Progression->GetNodeStats().ElementalResistancePercent;
     return FMath::Clamp(Value, 0.0f, 100.0f);
 }
 

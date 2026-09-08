@@ -155,7 +155,8 @@ with a silent node draws dark and unselectable until its plumbing exists
 bead is a travel node: every rank carries a magnitude. Core respec is free
 until level N and costs Riftglass after; Doctrine respec stays the Forge's (O213).
 
-Wedges are reachable from either neighbor. Major wedges have11 nodes and26
+The first gateway is freely chosen; later gateways require an owned neighboring
+gateway. Interior nodes cannot substitute for neighboring gateways. Major wedges have11 nodes and26
 offered points; minor wedges have6 nodes and13 offered points.
 The full roster has11 majors and11 minors:22 wedges,187 nodes and429 offered
 points against65 spendable, a6.6x ratio. All named wedges remain in the design.
@@ -188,6 +189,13 @@ decisions.
 
 The local spending gate belongs to Core. Doctrine commitment and tier rules
 remain separate from Core wedge investment.
+The census exports gateway entries, adjacency, counted lane groups and local spending gates.
+Physical reduction, elemental buildup resistance and ailment avoidance add percentage
+points before their existing caps. Health and armour Increased scale their own pools.
+Cast/channel rate scales authored clocks: deployment delay and Siphon tick spacing
+snapshot at activation; costs and channel duration remain unchanged. Instant abilities
+need an authored clock before cast rate can affect them. Overclock adds half the
+cooldown recovery bonus to each rate; it does not feed the converted bonus back into itself.
 Twenty-point constellations would buy three keystones and collapse the choice;
 thirty-two-point ones would make the third constellation meaningless.
 

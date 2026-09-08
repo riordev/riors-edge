@@ -82,6 +82,29 @@ float UBreakerGameplayAbility::ScaledCooldownSeconds(float AuthoredSeconds, floa
     return AuthoredSeconds / FMath::Max(0.01f, ReductionDivisor);
 }
 
+float UBreakerGameplayAbility::AbilityCastRateMultiplierFor(const AActor* OwnerActor)
+{
+    const auto* Progression = OwnerActor ? OwnerActor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    float Rate = Progression ? Progression->GetNodeStats().AbilityCastRateMultiplier : 1.0f;
+    if (Progression && Progression->GetNodeStats().bCooldownRecoveryAffectsTempo)
+    {
+        const float Recovery = Progression->GetNodeStats().AbilityCooldownReduction;
+        if (FMath::IsFinite(Recovery)) Rate += 0.5f * FMath::Max(0.0f, Recovery - 1.0f);
+    }
+    return FMath::IsFinite(Rate) ? FMath::Max(1.0f, Rate) : 1.0f;
+}
+
+float UBreakerGameplayAbility::AbilityChannelRateMultiplierFor(const AActor* OwnerActor)
+{
+    const auto* Progression = OwnerActor ? OwnerActor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    float Rate = Progression ? Progression->GetNodeStats().AbilityChannelRateMultiplier : 1.0f;
+    if (Progression && Progression->GetNodeStats().bCooldownRecoveryAffectsTempo)
+    {
+        const float Recovery = Progression->GetNodeStats().AbilityCooldownReduction;
+        if (FMath::IsFinite(Recovery)) Rate += 0.5f * FMath::Max(0.0f, Recovery - 1.0f);
+    }
+    return FMath::IsFinite(Rate) ? FMath::Max(1.0f, Rate) : 1.0f;
+}
 float UBreakerGameplayAbility::AbilityAreaMultiplierFor(const AActor* OwnerActor)
 {
     const UBreakerProgressionComponent* Progression = OwnerActor ? OwnerActor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;

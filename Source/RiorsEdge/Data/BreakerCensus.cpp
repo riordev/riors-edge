@@ -92,6 +92,30 @@ namespace
             Prerequisites.Add(MakeShared<FJsonValueObject>(P));
         }
         Out->SetArrayField(TEXT("prerequisites"), Prerequisites);
+        if (Node.RequiredTreeInvestment > 0)
+            Out->SetNumberField(TEXT("requiredTreeInvestment"), Node.RequiredTreeInvestment);
+        if (Node.RequiredConstellationInvestment > 0)
+            Out->SetNumberField(TEXT("requiredConstellationInvestment"), Node.RequiredConstellationInvestment);
+        if (!Node.PrerequisiteGroups.IsEmpty())
+        {
+            TArray<TSharedPtr<FJsonValue>> Groups;
+            for (const FBreakerNodePrerequisiteGroup& Group : Node.PrerequisiteGroups)
+            {
+                TSharedRef<FJsonObject> G = MakeShared<FJsonObject>();
+                G->SetNumberField(TEXT("minimumSatisfied"), Group.MinimumSatisfied);
+                TArray<TSharedPtr<FJsonValue>> Candidates;
+                for (const FBreakerNodePrerequisite& Candidate : Group.Candidates)
+                {
+                    TSharedRef<FJsonObject> C = MakeShared<FJsonObject>();
+                    C->SetStringField(TEXT("id"), Candidate.NodeId.ToString());
+                    C->SetNumberField(TEXT("rank"), Candidate.RequiredRank);
+                    Candidates.Add(MakeShared<FJsonValueObject>(C));
+                }
+                G->SetArrayField(TEXT("candidates"), Candidates);
+                Groups.Add(MakeShared<FJsonValueObject>(G));
+            }
+            Out->SetArrayField(TEXT("prerequisiteGroups"), Groups);
+        }
         return Out;
     }
 }
@@ -143,6 +167,17 @@ TSharedRef<FJsonObject> BreakerCensus::Export(const TArray<UBreakerProgressionTr
         T->SetStringField(TEXT("id"), Tree->TreeId.ToString());
         T->SetStringField(TEXT("currency"), BreakerCensusEnumName(Tree->Currency));
         T->SetStringField(TEXT("requiredClass"), BreakerCensusEnumName(Tree->RequiredClass));
+        T->SetArrayField(TEXT("entryNodes"), BreakerCensusNames(Tree->EntryNodeIds));
+        T->SetBoolField(TEXT("restrictEntryToOwnedNeighbor"), Tree->bRestrictEntryToOwnedNeighbor);
+        TArray<TSharedPtr<FJsonValue>> Edges;
+        for (const FBreakerNodeEdge& Edge : Tree->AdjacencyEdges)
+        {
+            TSharedRef<FJsonObject> E = MakeShared<FJsonObject>();
+            E->SetStringField(TEXT("a"), Edge.A.ToString());
+            E->SetStringField(TEXT("b"), Edge.B.ToString());
+            Edges.Add(MakeShared<FJsonValueObject>(E));
+        }
+        T->SetArrayField(TEXT("adjacencyEdges"), Edges);
         TArray<TSharedPtr<FJsonValue>> Nodes;
         for (const UBreakerProgressionNode* Node : Tree->Nodes)
         {

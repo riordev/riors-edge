@@ -35,6 +35,8 @@ void UBreakerStatusComponent::GrantStatusImmunity(float DurationSeconds)
 float UBreakerStatusComponent::GetEffectiveAilmentAvoidanceChance() const
 {
     float Chance = AilmentAvoidanceChance;
+    if (const auto* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr)
+        Chance += Progression->GetNodeStats().AilmentAvoidancePercent / 100.0f;
     // Gear's leg, read from GetStats() exactly as the combat component reads
     // Physical DR — one consumer, one clamp, no attribute lane to audit.
     if (const AActor* Owner = GetOwner())

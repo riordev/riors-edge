@@ -298,7 +298,9 @@ bool FBreakerSwiftChannelLanesTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("DashDistance keeps its position"), static_cast<int32>(EBreakerNodeStatTarget::DashDistance), static_cast<int32>(EBreakerNodeStatTarget::RicochetCount) + 1);
     TestEqual(TEXT("AddedWeaponDamage appends"), static_cast<int32>(EBreakerNodeStatTarget::AddedWeaponDamage), static_cast<int32>(EBreakerNodeStatTarget::DashDistance) + 1);
     TestEqual(TEXT("AddedAbilityPower appends"), static_cast<int32>(EBreakerNodeStatTarget::AddedAbilityPower), static_cast<int32>(EBreakerNodeStatTarget::AddedWeaponDamage) + 1);
-    TestEqual(TEXT("AddedAbilityPower is last"), static_cast<int32>(EBreakerNodeStatTarget::AddedAbilityPower), static_cast<int32>(EBreakerNodeStatTarget::Count) - 1);
+    TestEqual(TEXT("AddedAbilityPower keeps its serialized position"), static_cast<int32>(EBreakerNodeStatTarget::AddedAbilityPower), 35);
+    TestEqual(TEXT("Physical reduction appends after literal lanes"), static_cast<int32>(EBreakerNodeStatTarget::PhysicalDamageReduction), 36);
+    TestEqual(TEXT("Channel rate is the current tail"), static_cast<int32>(EBreakerNodeStatTarget::AbilityChannelRate), static_cast<int32>(EBreakerNodeStatTarget::Count) - 1);
 
     // And the lanes actually pay: a rank-2 node authoring all four Flat lines
     // lands on the FBreakerNodeStats fields the weapon reads.

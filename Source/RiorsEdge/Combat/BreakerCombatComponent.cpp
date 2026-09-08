@@ -312,11 +312,15 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     if (Request.DamageFamily != EBreakerDamageFamily::TrueDamage)
     {
         float ReductionPercent = 0.0f;
-        if (const UBreakerEquipmentComponent* Equipment = GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>())
+        if (Request.DamageFamily == EBreakerDamageFamily::Physical)
         {
-            ReductionPercent += Request.DamageFamily == EBreakerDamageFamily::Physical
-                ? Equipment->GetStats().PhysicalDamageReductionPercent * (1.0f - BreakerElementShares::TotalFraction(ElementShares))
-                : 0.0f;
+            const auto* Equipment = GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>();
+            const float Cap = Equipment ? Equipment->GetStats().PhysicalDamageReductionCap
+                : FBreakerEquipmentStats::DefaultPhysicalDamageReductionCap;
+            const float Gear = Equipment ? Equipment->GetStats().PhysicalDamageReductionPercent : 0.0f;
+            const float Core = Progression ? Progression->GetNodeStats().PhysicalDamageReductionPercent : 0.0f;
+            ReductionPercent += FMath::Clamp(Gear + Core, 0.0f, Cap)
+                * (1.0f - BreakerElementShares::TotalFraction(ElementShares));
         }
         // The tree's lane joins gear's family bucket here — points summed,
         // ONE 1-R application — never a second multiplier beside it. It pays

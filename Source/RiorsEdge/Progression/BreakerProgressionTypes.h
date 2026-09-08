@@ -259,6 +259,14 @@ enum class EBreakerNodeStatTarget : uint8
 
     AddedWeaponDamage,
     AddedAbilityPower,
+    // Flat percentage POINTS, not relative Increased modifiers. These join
+    // their defensive percentages before the existing consumer clamps.
+    PhysicalDamageReduction,
+    ElementalResistance,
+    AilmentAvoidance,
+    // Relative Increased rate percentages; composed multipliers are >= 1.
+    AbilityCastRate,
+    AbilityChannelRate,
 
     Count UMETA(Hidden)
 };
@@ -309,6 +317,11 @@ inline bool BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget Target)
     case EBreakerNodeStatTarget::AbilityCost:
     case EBreakerNodeStatTarget::AddedWeaponDamage:
     case EBreakerNodeStatTarget::AddedAbilityPower:
+    case EBreakerNodeStatTarget::PhysicalDamageReduction:
+    case EBreakerNodeStatTarget::ElementalResistance:
+    case EBreakerNodeStatTarget::AilmentAvoidance:
+    case EBreakerNodeStatTarget::AbilityCastRate:
+    case EBreakerNodeStatTarget::AbilityChannelRate:
     case EBreakerNodeStatTarget::MaxClassResource:
     case EBreakerNodeStatTarget::ClassResourceRegen:
     case EBreakerNodeStatTarget::FireRate:
@@ -508,6 +521,8 @@ inline bool BreakerStatTargetIsRiderDelivered(EBreakerNodeStatTarget Target)
 // list rather than being remembered as an author it no longer has.
 inline bool BreakerStatTargetIsAffixOwned(EBreakerNodeStatTarget Target)
 {
+    // The replacement Core explicitly authors PhysicalDamageReduction. It is
+    // a distinct family-specific lane, not this legacy all-incoming target.
     return Target == EBreakerNodeStatTarget::IncomingDamageReduction;
 }
 
@@ -692,6 +707,12 @@ struct RIORSEDGE_API FBreakerNodeStats
     UPROPERTY(BlueprintReadOnly) float AbilityDurationMultiplier = 1.0f;
     UPROPERTY(BlueprintReadOnly) float AddedWeaponDamage = 0.0f;
     UPROPERTY(BlueprintReadOnly) float AddedAbilityPower = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float PhysicalDamageReductionPercent = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float ElementalResistancePercent = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float AilmentAvoidancePercent = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float AbilityCastRateMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float AbilityChannelRateMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) bool bCooldownRecoveryAffectsTempo = false;
     // Cooldown reduction as the DIVISOR (DashCooldownReduction's convention:
     // 1.20 == 20% shorter). Floored just above zero so a malformed authored
     // row can never divide by zero or lengthen a cooldown to infinity.

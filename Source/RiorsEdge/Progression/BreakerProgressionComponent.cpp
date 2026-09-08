@@ -369,6 +369,28 @@ bool UBreakerProgressionComponent::CanPurchaseNode(const UBreakerProgressionTree
     // adjacency is how you reach a wheel, prerequisites are what it charges
     // once you are there. Trees with no edges (every doctrine) skip this
     // entirely, bit-identically to before the ring existed.
+    if (Tree->bRestrictEntryToOwnedNeighbor && Tree->Currency == EBreakerPointCurrency::CorePoints
+        && Tree->EntryNodeIds.Contains(NodeId) && GetNodeRank(NodeId, Node->Currency) == 0
+        && GetProgressionState().CoreNodeRanks.ContainsByPredicate([](const FBreakerNodeRank& Rank) { return Rank.Rank > 0; }))
+    {
+        bool bAdjacentGatewayOwned = false;
+        for (const FBreakerNodeEdge& Edge : Tree->AdjacencyEdges)
+        {
+            const FName Neighbor = Edge.A == NodeId ? Edge.B : (Edge.B == NodeId ? Edge.A : NAME_None);
+            const UBreakerProgressionNode* NeighborNode = Tree->FindNode(Neighbor);
+            if (Neighbor != NodeId && NeighborNode && NeighborNode->Currency == Node->Currency
+                && Tree->EntryNodeIds.Contains(Neighbor) && GetNodeRank(Neighbor, Node->Currency) > 0)
+            {
+                bAdjacentGatewayOwned = true;
+                break;
+            }
+        }
+        if (!bAdjacentGatewayOwned)
+        {
+            OutFailureReason = LOCTEXT("GatewayUnreached", "Reach this wedge through either neighboring gateway.");
+            return false;
+        }
+    }
     if (Tree->AdjacencyEdges.Num() > 0 && !Tree->EntryNodeIds.Contains(NodeId))
     {
         bool bConnected = false;
@@ -1458,6 +1480,13 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     Stats.BonusProjectileCount = Flat(EBreakerNodeStatTarget::ProjectileCount);
     Stats.AddedWeaponDamage = Flat(EBreakerNodeStatTarget::AddedWeaponDamage);
     Stats.AddedAbilityPower = Flat(EBreakerNodeStatTarget::AddedAbilityPower);
+    Stats.PhysicalDamageReductionPercent = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::PhysicalDamageReduction));
+    Stats.ElementalResistancePercent = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::ElementalResistance));
+    Stats.AilmentAvoidancePercent = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::AilmentAvoidance));
+    Stats.AbilityCastRateMultiplier = FMath::Max(1.0f, Increased(EBreakerNodeStatTarget::AbilityCastRate));
+    Stats.AbilityChannelRateMultiplier = FMath::Max(1.0f, Increased(EBreakerNodeStatTarget::AbilityChannelRate));
+    Stats.bCooldownRecoveryAffectsTempo = Stats.GrantedTags.HasTagExact(
+        FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Overclock")));
     Stats.BonusPierceCount = Flat(EBreakerNodeStatTarget::Pierce);
     Stats.BonusChainCount = Flat(EBreakerNodeStatTarget::ChainCount);
     Stats.BonusRicochetCount = Flat(EBreakerNodeStatTarget::RicochetCount);
@@ -1498,6 +1527,7 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
         // composed multiplicatively through ComposeMore under the O3 cap
         // enforced above.
         OutContribution->AddFlat(EBreakerAggregatedAttribute::MaxHealth, Stats.BonusHealth);
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::MaxHealth, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::Health)]);
         OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalChance, Stats.CriticalChanceBonus);
         OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalMultiplier, Stats.CriticalMultiplierBonus);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::MoveSpeed, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::MoveSpeed)]);
@@ -1552,6 +1582,7 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
         // only shape two layers can share one bucket in.
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DashCooldownReduction, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::DashCooldown)]);
         OutContribution->AddFlat(EBreakerAggregatedAttribute::Armor, FlatByTarget[static_cast<int32>(EBreakerNodeStatTarget::Armor)]);
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::Armor, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::Armor)]);
         // Individual damage More effects were submitted at collection time.
         // The aggregator selects jointly with equipment; local products above
         // remain progression-only display statistics.

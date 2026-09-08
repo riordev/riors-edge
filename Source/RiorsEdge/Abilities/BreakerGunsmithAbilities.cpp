@@ -591,6 +591,8 @@ void UBreakerGunsmithDeployAbility::ActivateAbility(const FGameplayAbilitySpecHa
     const UBreakerScrapComponent* Scrap = Character->FindComponentByClass<UBreakerScrapComponent>();
     if (IsTinkererDeployable(DeployableType) && BreakerGunsmithAbilityLocal::BreakerOwnerNodeRank(Character, TEXT("Gunsmith.Tinkerer.DeadGround")) > 0)
         Delay = Scrap && Scrap->GetScrapState() == EBreakerScrapState::Surplus ? Delay * 2.0f : 0.0f;
+    // Snapshot after the authored rewrite; an instant placement remains instant.
+    Delay /= AbilityCastRateMultiplierFor(Character);
     if (Delay <= 0) CompletePlacement();
     else World->GetTimerManager().SetTimer(PlacementTimer, this, &UBreakerGunsmithDeployAbility::CompletePlacement, Delay, false);
 }

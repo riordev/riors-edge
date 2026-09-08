@@ -72,5 +72,9 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Ring") TArray<FBreakerNodeEdge> AdjacencyEdges;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Ring") TArray<FName> EntryNodeIds;
 
+    // Core-only: choose any first gateway while Core is empty; later gateways
+    // require an owned gateway joined by a direct adjacency edge.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Ring") bool bRestrictEntryToOwnedNeighbor = false;
+
     const UBreakerProgressionNode* FindNode(FName NodeId) const;
 };
