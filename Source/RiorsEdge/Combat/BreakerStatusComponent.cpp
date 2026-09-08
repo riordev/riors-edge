@@ -276,6 +276,10 @@ uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicat
     FBreakerActiveStatus Status;
     Status.Spec = Spec;
     Status.UnpaidDamageBudget = (bErased || bUnstable || bRot) ? UnpaidDamageBudget : 0.0f;
+    Status.InitialDamageBudget = Status.UnpaidDamageBudget;
+    Status.bHasReactionCreditSnapshot = Spec.bHasReactionCreditSnapshot;
+    Status.InitialReactionBudget = Spec.bHasReactionCreditSnapshot && FMath::IsFinite(Spec.ReactionCreditMultiplier)
+        ? Status.InitialDamageBudget * FMath::Max(0.0f, Spec.ReactionCreditMultiplier) : Status.InitialDamageBudget;
     Status.ApplicationSerial = NextApplicationSerial++;
     Status.DamageFamily = DamageFamily;
     Status.Stacks = FMath::Clamp(Spec.InitialStacks, 1, ApplicationStackCap);

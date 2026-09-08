@@ -72,11 +72,11 @@ condition gates as weapon flat damage and never contribute to the weapon pool.
 
 **There is ONE More ceiling across damage pools.** Gear and tree sources enter
 one selection: the strongest three, each at most 1.30x, compose as an unordered
-product bounded by 1.30^3. Weapon, ability, shared and damage-over-time sources
-spend this same budget. A shared source spends one slot. Individual authored
+product bounded by 1.30^3. Weapon, ability, shared, DoT, elemental, Void,
+reaction and Effective Health sources spend this budget. Shared spends one slot. Authored
 sources retain their identity across contributors; ties resolve consistently.
 The ceiling derives from the source count and per-source limit rather than a
-separate constant. Non-damage statistics do not spend damage source slots.
+separate constant. Effective Health is the supplied Core's explicit defensive exception.
 
 **Temporary ability windows ARE Mores** and compete for the same headroom. On a
 build already holding three, a window buys little. That competition is the
@@ -214,7 +214,7 @@ Every lane permitted to touch outgoing player damage.
 | Increased — Weapon | One additive bucket, no cap of its own |
 | Increased — Ability | One additive bucket, no cap of its own |
 | Increased — Shared | Joins whichever of the two applies |
-| More | ONE ceiling, unordered product, 1.30^3, spanning every pool |
+| More | Strongest three gear/tree sources; ONE 1.30^3 ceiling across delivery, DoT, Elemental, Void, Reaction and Effective Health scopes |
 | Crit | Site multiplier, build-gated |
 | Weak point | Site multiplier, skill-gated, [1.0, 2.0], outside the More budget |
 | Weak point, gate removed | A build multiplier. Inside the accounting the skill gate stood in for, and crit does not also multiply on that hit |
@@ -278,7 +278,7 @@ encounter ranks and modifiers to **content and modes**.
 | The at-cap band lands in 8–10x | `Progression.PowerBand.AtCap` |
 | The endgame band lands in 12–20x | `Progression.PowerBand.Endgame` |
 | Rewrite impact stays under its per-band ceiling | `Progression.RuleBandImpact.Step` |
-| Gear and tree sources share three slots and the composed More ceiling | `Attributes.JointMoreSelection`, `Items.ReserveSurgeRuntime` |
+| Gear and tree sources share three slots and the composed More ceiling | `Attributes.JointMoreSelection`, `Attributes.ScopedMoreCompetition`, `Items.ReserveSurgeRuntime` |
 | An ability-lane More counts inside the same ceiling as a weapon-lane one | `Progression.PowerBand.AbilityLaneMore` |
 | A hit whose weak-point gate was removed does not also take crit | `Combat.Ceiling.GateRemoval` |
 | Every damage submission passes through the outgoing-modifier chain | `Combat.Ceiling.AbilitySubmissionConformance` |

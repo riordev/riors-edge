@@ -2,6 +2,7 @@
 
 #include "Attributes/BreakerAttributeAggregation.h"
 #include "Attributes/BreakerAttributeSet.h"
+#include "AbilitySystemComponent.h"
 #include "Combat/BreakerElementSharesMath.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "GameFramework/Actor.h"
@@ -21,10 +22,17 @@ float UBreakerDamageLibrary::ComposeSourcePools(float WeaponIncreasedPercent, fl
 void UBreakerDamageLibrary::SnapshotElementSource(const AActor* Source, FBreakerDamageRequest& Request)
 {
     Request.ElementSource = FBreakerElementSourceSnapshot();
+    auto& Snapshot = Request.ElementSource;
+    const auto* ASC = Source ? Source->FindComponentByClass<UAbilitySystemComponent>() : nullptr;
+    if (const auto* Attributes = ASC ? ASC->GetSet<UBreakerAttributeSet>() : nullptr)
+    {
+        Snapshot.ElementalMoreProduct = Attributes->GetScopedMoreProduct(true, false, false, false);
+        Snapshot.VoidMoreProduct = Attributes->GetScopedMoreProduct(false, true, false, false);
+        Snapshot.ReactionMoreProduct = Attributes->GetScopedMoreProduct(false, false, true, false);
+    }
     const auto* Progression = Source ? Source->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
     if (!Progression) return;
     const auto& Stats = Progression->GetNodeStats();
-    auto& Snapshot = Request.ElementSource;
     Snapshot.ElementalBuildupIncreasedPercent = Stats.ElementalBuildupIncreasedPercent;
     Snapshot.EntropyBuildupIncreasedPercent = Stats.EntropyBuildupIncreasedPercent;
     Snapshot.VoidBuildupIncreasedPercent = Stats.VoidBuildupIncreasedPercent;
@@ -32,6 +40,11 @@ void UBreakerDamageLibrary::SnapshotElementSource(const AActor* Source, FBreaker
     Snapshot.ElementalBuildupPenetrationPercent = Stats.ElementalBuildupPenetrationPercent;
     Snapshot.ElementalThresholdMultiplier = Stats.ElementalThresholdMultiplier;
     Snapshot.bRotDensity = Stats.bRotDensity;
+    Snapshot.ElementalDamageIncreasedPercent = Stats.ElementalDamageIncreasedPercent;
+    Snapshot.RotDamageIncreasedPercent = Stats.RotDamageIncreasedPercent;
+    Snapshot.VoidBurstDamageIncreasedPercent = Stats.VoidBurstDamageIncreasedPercent;
+    Snapshot.RiftBurstDamageIncreasedPercent = Stats.RiftBurstDamageIncreasedPercent;
+    Snapshot.ReactionDamageIncreasedPercent = Stats.ReactionDamageIncreasedPercent;
 }
 void UBreakerDamageLibrary::FillSourcePools(const UBreakerAttributeSet* SourceAttributes,
     EBreakerDamageDelivery Delivery, FBreakerDamageRequest& Request)
@@ -52,6 +65,11 @@ void UBreakerDamageLibrary::FillSourcePools(const UBreakerAttributeSet* SourceAt
         ? EBreakerAggregatedAttribute::AbilityDamageMultiplier
         : EBreakerAggregatedAttribute::DamageMultiplier;
 
+    // The supplied set is authoritative even for a non-ASC emission fixture.
+    Request.ElementSource.ElementalMoreProduct = SourceAttributes->GetScopedMoreProduct(true, false, false, false);
+    Request.ElementSource.VoidMoreProduct = SourceAttributes->GetScopedMoreProduct(false, true, false, false);
+    Request.ElementSource.ReactionMoreProduct = SourceAttributes->GetScopedMoreProduct(false, false, true, false);
+
     const float Composed = Delivery == EBreakerDamageDelivery::Ability
         ? SourceAttributes->GetAbilityDamageMultiplier()
         : SourceAttributes->GetDamageMultiplier();
@@ -66,9 +84,12 @@ void UBreakerDamageLibrary::FillSourcePools(const UBreakerAttributeSet* SourceAt
     // lane's share of the shared pool is already inside the Increased sum;
     // nothing here adds it again.
     const FBreakerAttributeAggregator& Aggregator = SourceAttributes->GetAttributeAggregator();
-    Request.SourceFlatFactor = Aggregator.ComposedFlatFactor(Lane);
-    Request.SourceIncreasedPercent = Aggregator.ComposedIncreasedPercent(Lane);
-    Request.SourceMoreProduct = FMath::Max(Aggregator.ComposedMoreProduct(Lane), UE_SMALL_NUMBER);
+    // Before contributor binding, native attributes already have valid defaults
+    // but the aggregator has no captured base. Preserve that real source value
+    // instead of advertising a zero Flat factor beside nonzero composed damage.
+    Request.SourceFlatFactor = Aggregator.HasCapturedBases() ? Aggregator.ComposedFlatFactor(Lane) : Composed;
+    Request.SourceIncreasedPercent = Aggregator.HasCapturedBases() ? Aggregator.ComposedIncreasedPercent(Lane) : 0.0f;
+    Request.SourceMoreProduct = Aggregator.HasCapturedBases() ? FMath::Max(Aggregator.ComposedMoreProduct(Lane), UE_SMALL_NUMBER) : 1.0f;
     Request.bHasSourceSplit = true;
 }
 
@@ -133,17 +154,36 @@ FBreakerDamageResult UBreakerDamageLibrary::ResolveDamage(const FBreakerDamageRe
         }
     }
     if (Result.bCritical) Result.RawDamage *= FMath::Max(1.0f, Request.CriticalMultiplier);
-    // Allocate the single resolved source/weakpoint/critical result, never roll or scale each share again.
+    // Allocate one critical result. Elemental Increased joins the delivery bucket,
+    // while selected elemental/Void Mores affect only their matching raw portions.
     Result.bHasElementRawAllocation = true;
     const auto Shares = BreakerElementShares::Resolve(Request);
+    const float DeliveryRaw = Result.RawDamage;
+    const float SourceIncreased = Request.bHasSourceSplit ? Request.SourceIncreasedPercent : 0.0f;
+    const float ElementIncreased = FMath::IsFinite(Request.ElementSource.ElementalDamageIncreasedPercent)
+        ? Request.ElementSource.ElementalDamageIncreasedPercent : 0.0f;
+    const float SiteFactor = (Result.bWeakPoint ? FMath::Clamp(Request.WeakPointMultiplier, WeakPointMultiplierFloor, WeakPointMultiplierCeiling) : 1.0f)
+        * (Result.bCritical ? FMath::Max(1.0f, Request.CriticalMultiplier) : 1.0f);
+    const float ElementBase = Request.bHasSourceSplit
+        ? FMath::Max(0.0f, Request.BaseDamage) * FMath::Max(0.0f, Request.SourceFlatFactor)
+            * FMath::Max(0.0f, Request.SourceMoreProduct) * SiteFactor : DeliveryRaw;
+    const float ElementIncreasedFactor = FMath::Max(0.0f, 1.0f + (SourceIncreased + ElementIncreased) / 100.0f);
+    auto ValidMore = [](float Value) { return FMath::IsFinite(Value) ? FMath::Max(1.0f, Value) : 1.0f; };
+    Result.UnconvertedRawDamage = DeliveryRaw * (1.0f - BreakerElementShares::TotalFraction(Shares));
+    Result.RawDamage = Result.UnconvertedRawDamage;
     for (const auto& Share : Shares)
     {
         FBreakerElementRawDamage Part;
         Part.Element = Share.Element;
-        Part.RawDamage = Result.RawDamage * Share.Fraction;
+        const float StandingMore = Request.bHasSourceSplit ? FMath::Max(1.0f, Request.SourceMoreProduct) : 1.0f;
+        const float ScopedMore = FMath::Min(ValidMore(Request.ElementSource.ElementalMoreProduct)
+            * (Share.Element == EBreakerElement::Void ? ValidMore(Request.ElementSource.VoidMoreProduct) : 1.0f),
+            FMath::Max(1.0f, FBreakerAttributeAggregator::ComposedMoreCeiling() / StandingMore));
+        Part.RawDamage = ElementBase * Share.Fraction * ElementIncreasedFactor
+            * ScopedMore;
         Result.ElementRawDamage.Add(Part);
+        Result.RawDamage += Part.RawDamage;
     }
-    Result.UnconvertedRawDamage = Result.RawDamage * (1.0f - BreakerElementShares::TotalFraction(Shares));
 
     // Passive dodge and block resolve before mitigation and never affect
     // DoTs. Dodge fully evades; block reduces.
@@ -180,6 +220,13 @@ FBreakerDamageResult UBreakerDamageLibrary::ResolveDamage(const FBreakerDamageRe
     }
 
     Result.MitigatedDamage = Result.RawDamage * (1.0f - Mitigation) * FMath::Max(0.0f, Defense.IncomingDamageMultiplier);
+    if (Request.DamageFamily != EBreakerDamageFamily::TrueDamage)
+    {
+        const float PhysicalWeight = Request.DamageFamily == EBreakerDamageFamily::Physical && Result.RawDamage > 0
+            ? FMath::Clamp(Result.UnconvertedRawDamage / Result.RawDamage, 0.0f, 1.0f) : 0.0f;
+        const float Reduction = Defense.SharedDamageReductionPercent + Defense.PhysicalDamageReductionPercent * PhysicalWeight;
+        Result.MitigatedDamage *= FMath::Max(0.0f, 1.0f - Reduction / 100.0f);
+    }
     if (Result.bBlocked) Result.MitigatedDamage *= 1.0f - FMath::Clamp(Defense.BlockMitigation, 0.0f, 1.0f);
     if (FMath::IsFinite(Defense.IncomingHitCap) && Defense.IncomingHitCap > 0)
         Result.MitigatedDamage = FMath::Min(Result.MitigatedDamage, Defense.IncomingHitCap);

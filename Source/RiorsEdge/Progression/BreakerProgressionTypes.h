@@ -294,6 +294,13 @@ enum class EBreakerNodeStatTarget : uint8
     HealingReceived,
     HealthRegenPercentMaxHealth,
     ShieldRechargeDelayReduction,
+    ElementalDamage,
+    RotDamage,
+    VoidBurstDamage,
+    RiftBurstDamage,
+    ReactionDamage,
+    VoidDamage,
+    EffectiveHealth,
 
     Count UMETA(Hidden)
 };
@@ -376,6 +383,13 @@ inline bool BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget Target)
     case EBreakerNodeStatTarget::HealingReceived:
     case EBreakerNodeStatTarget::HealthRegenPercentMaxHealth:
     case EBreakerNodeStatTarget::ShieldRechargeDelayReduction:
+    case EBreakerNodeStatTarget::ElementalDamage:
+    case EBreakerNodeStatTarget::RotDamage:
+    case EBreakerNodeStatTarget::VoidBurstDamage:
+    case EBreakerNodeStatTarget::RiftBurstDamage:
+    case EBreakerNodeStatTarget::ReactionDamage:
+    case EBreakerNodeStatTarget::VoidDamage:
+    case EBreakerNodeStatTarget::EffectiveHealth:
     case EBreakerNodeStatTarget::MaxClassResource:
     case EBreakerNodeStatTarget::ClassResourceRegen:
     case EBreakerNodeStatTarget::FireRate:
@@ -797,6 +811,11 @@ struct RIORSEDGE_API FBreakerNodeStats
     UPROPERTY(BlueprintReadOnly) float HealingReceivedMultiplier = 1.0f;
     UPROPERTY(BlueprintReadOnly) float HealthRegenPercentMaxHealth = 0.0f;
     UPROPERTY(BlueprintReadOnly) float ShieldRechargeDelayReduction = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float ElementalDamageIncreasedPercent = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float RotDamageIncreasedPercent = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float VoidBurstDamageIncreasedPercent = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float RiftBurstDamageIncreasedPercent = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float ReactionDamageIncreasedPercent = 0.0f;
     UPROPERTY(BlueprintReadOnly) bool bRotDensity = false;
     UPROPERTY(BlueprintReadOnly) bool bHemorrhage = false;
     UPROPERTY(BlueprintReadOnly) bool bDeepen = false;
@@ -957,4 +976,7 @@ struct RIORSEDGE_API FBreakerStatusApplicationSpec
     // DoTs snapshot this structure at application. Later source-stat changes
     // do not rewrite an already-running effect.
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FBreakerDamageSnapshot Snapshot;
+    // Funded at application, then carried unchanged by status copies.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float ReactionCreditMultiplier = 1.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHasReactionCreditSnapshot = false;
 };

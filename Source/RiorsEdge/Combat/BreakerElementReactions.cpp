@@ -58,6 +58,13 @@ uint64 UBreakerStatusComponent::PrepareElementReaction(const FBreakerDamageReque
     PendingReactionStatus.UnpaidDamageBudget = ConsumedTag == Rot
         ? BreakerElementReactions::RemainingRotBudget(*Candidate)
         : (FMath::IsFinite(Candidate->UnpaidDamageBudget) ? FMath::Max(0.0f, Candidate->UnpaidDamageBudget) : 0);
+    if (Candidate->bHasReactionCreditSnapshot)
+    {
+        const float Fraction = Candidate->InitialDamageBudget > 0 && FMath::IsFinite(Candidate->InitialDamageBudget)
+            ? FMath::Clamp(PendingReactionStatus.UnpaidDamageBudget / Candidate->InitialDamageBudget, 0.0f, 1.0f) : 0;
+        PendingReactionStatus.UnpaidDamageBudget = FMath::IsFinite(Candidate->InitialReactionBudget)
+            ? FMath::Max(0.0f, Candidate->InitialReactionBudget) * Fraction : 0;
+    }
     PendingReactionTag = ReactionTag;
     PendingReactionToken = NextReactionToken++;
     const uint64 Token = PendingReactionToken;

@@ -194,6 +194,8 @@ public:
     float GetAttributeBase(EBreakerAggregatedAttribute Attribute) const { return Aggregator.GetBase(Attribute); }
     float GetComposedAttribute(EBreakerAggregatedAttribute Attribute) const { return Aggregator.Compose(Attribute); }
     const FBreakerAttributeAggregator& GetAttributeAggregator() const { return Aggregator; }
+    float GetScopedMoreProduct(bool bElemental, bool bVoid, bool bReaction, bool bEffectiveHealth) const
+    { return Aggregator.GetScopedMoreProduct(bElemental, bVoid, bReaction, bEffectiveHealth); }
 
 protected:
     UFUNCTION() void OnRep_Health(const FGameplayAttributeData& OldValue) const;

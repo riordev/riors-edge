@@ -1335,7 +1335,9 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
 
             if (Effect.StatBucket == EBreakerNodeStatBucket::Flat) FlatByTarget[Target] += Value;
             else if (Effect.StatBucket == EBreakerNodeStatBucket::IncreasedPercent) IncreasedByTarget[Target] += Value;
-            else if (BreakerDamagePoolFor(Effect.StatTarget) != EBreakerDamagePool::None)
+            else if (BreakerDamagePoolFor(Effect.StatTarget) != EBreakerDamagePool::None
+                || Effect.StatTarget == EBreakerNodeStatTarget::ElementalDamage || Effect.StatTarget == EBreakerNodeStatTarget::VoidDamage
+                || Effect.StatTarget == EBreakerNodeStatTarget::ReactionDamage || Effect.StatTarget == EBreakerNodeStatTarget::EffectiveHealth)
             {
                 // Rank does NOT scale a More multiplier — a rank-2 x1.25 would
                 // be x1.5625, which no node table means. Every More node in the
@@ -1355,6 +1357,14 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
                 case EBreakerDamagePool::Ability:        Lane = EBreakerMoreLane::Ability; break;
                 case EBreakerDamagePool::Shared:         Lane = EBreakerMoreLane::Shared;  break;
                 case EBreakerDamagePool::DamageOverTime: Lane = EBreakerMoreLane::Dot;     break;
+                default: break;
+                }
+                switch (Effect.StatTarget)
+                {
+                case EBreakerNodeStatTarget::ElementalDamage: Lane = EBreakerMoreLane::Elemental; break;
+                case EBreakerNodeStatTarget::VoidDamage: Lane = EBreakerMoreLane::Void; break;
+                case EBreakerNodeStatTarget::ReactionDamage: Lane = EBreakerMoreLane::Reaction; break;
+                case EBreakerNodeStatTarget::EffectiveHealth: Lane = EBreakerMoreLane::EffectiveHealth; break;
                 default: break;
                 }
                 MoreSources.Add({ 1.0f + FMath::Max(0.0f, Effect.ValuePerRank) / 100.0f, Lane });
@@ -1378,7 +1388,7 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
                 {
                     WarnedOnceNodeIds.Add(Node->NodeId);
                     UE_LOG(LogTemp, Warning,
-                        TEXT("[BreakerProgression] node '%s' authors a MorePercent effect on stat target %d, but only the damage pools (Damage, WeaponDamage, AbilityDamage, DamageOverTime) compose a More product — this effect is silently dropped."),
+                        TEXT("[BreakerProgression] node '%s' authors a MorePercent effect on stat target %d, but only delivery, DoT, elemental, Void, reaction and effective-health scopes compose a More product — this effect is silently dropped."),
                         *Node->NodeId.ToString(), Target);
                 }
             }
@@ -1517,6 +1527,11 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     Stats.bRotDensity = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Density")));
     Stats.bDeepen = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Deepen")));
     Stats.bHemorrhage = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Hemorrhage")));
+    Stats.ElementalDamageIncreasedPercent = IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::ElementalDamage)];
+    Stats.RotDamageIncreasedPercent = IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::RotDamage)];
+    Stats.VoidBurstDamageIncreasedPercent = IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::VoidBurstDamage)];
+    Stats.RiftBurstDamageIncreasedPercent = IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::RiftBurstDamage)];
+    Stats.ReactionDamageIncreasedPercent = IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::ReactionDamage)];
     Stats.bNoOutOfCombatResourceDecay = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.SecondShift")));
     Stats.bConduction = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Conduction")));
     Stats.bCooldownRecoveryAffectsTempo = Stats.GrantedTags.HasTagExact(
@@ -1633,10 +1648,27 @@ bool UBreakerProgressionComponent::IsNodeMoreAuthoringLegal(const UBreakerProgre
     // therefore content that promises ranks it cannot pay (owner ruling
     // 2026-08-16: fail it statically rather than reprice it silently).
     if (!Node) return true;
-    if (Node->MaxRank <= 1) return true;
+
     for (const FBreakerNodeEffect& Effect : Node->Effects)
     {
-        if (Effect.StatBucket == EBreakerNodeStatBucket::MorePercent)
+        const bool bScopedTarget = Effect.StatTarget >= EBreakerNodeStatTarget::ElementalDamage
+            && Effect.StatTarget <= EBreakerNodeStatTarget::EffectiveHealth;
+        if (bScopedTarget)
+        {
+            const bool bSupportsIncreased = Effect.StatTarget <= EBreakerNodeStatTarget::ReactionDamage;
+            const bool bSupportsMore = Effect.StatTarget == EBreakerNodeStatTarget::ElementalDamage
+                || Effect.StatTarget == EBreakerNodeStatTarget::VoidDamage
+                || Effect.StatTarget == EBreakerNodeStatTarget::ReactionDamage
+                || Effect.StatTarget == EBreakerNodeStatTarget::EffectiveHealth;
+            if (Effect.RequiresTargetState()
+                || !((bSupportsIncreased && Effect.StatBucket == EBreakerNodeStatBucket::IncreasedPercent)
+                    || (bSupportsMore && Effect.StatBucket == EBreakerNodeStatBucket::MorePercent)))
+            {
+                if (OutReason) *OutReason = FString::Printf(TEXT("node '%s' authors an unsupported scoped damage bucket or target-state rider"), *Node->NodeId.ToString());
+                return false;
+            }
+        }
+        if (Effect.StatBucket == EBreakerNodeStatBucket::MorePercent && Node->MaxRank > 1)
         {
             if (OutReason)
             {

@@ -127,11 +127,13 @@ void UBreakerStatusComponent::ApplyEntropyHit(const FBreakerDamageRequest& Reque
     const int32 TickCount = FMath::Max(1, FMath::FloorToInt(Tuning.Duration / Tuning.Tick))
         + (Request.ElementSource.bRotDensity ? 2 : 0);
     Spec.TickInterval = Request.ElementSource.bRotDensity ? Tuning.Duration / TickCount : Tuning.Tick;
-    Spec.BaseDamagePerTick = Snapshot * Tuning.Damage / TickCount;
+    const float Budget = BreakerElementSource::StatusBudget(Request, Snapshot * Tuning.Damage);
+    Spec.BaseDamagePerTick = Budget / TickCount;
     Spec.ProcCoefficient = FMath::Clamp(Request.ProcCoefficient, 0.0f, 1.0f);
     Spec.Snapshot.SourcePower = 1.0f;
     Spec.Snapshot.CriticalChance = 0;
     Spec.Snapshot.bRolledCritical = false;
     Spec.Snapshot.SourceTags = Request.SourceTags;
-    ApplyStatusInternal(Spec, EBreakerDamageFamily::Elemental, Request.Instigator.Get(), true, Snapshot * Tuning.Damage, nullptr, &Request);
+    BreakerElementSource::SnapshotReactionCredit(Request, Spec);
+    ApplyStatusInternal(Spec, EBreakerDamageFamily::Elemental, Request.Instigator.Get(), true, Budget, nullptr, &Request);
 }

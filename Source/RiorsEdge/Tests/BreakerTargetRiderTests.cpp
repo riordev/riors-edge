@@ -603,6 +603,21 @@ bool FBreakerHitTimeMoreRiderTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("a saturated product gains nothing from the rider"),
         MeasureRiddenMore(Ceiling), Ceiling, 0.001f);
 
+    {
+        FBreakerRiderVictimRig Victim = BreakerMakeRiderVictim();
+        FBreakerDamageRequest Arm = BreakerMakeSplitRequest(Attacker, 0.0f, 1.0f);
+        Arm.BaseDamage = 30.0f;
+        Victim.Combat->ReceiveDamage(Arm);
+        FBreakerDamageRequest Hit = BreakerMakeSplitRequest(Attacker, 0.0f, 1.0f);
+        Hit.BaseDamage = 4.0f;
+        Hit.Element = EBreakerElement::Void; Hit.ElementalFraction = 1.0f;
+        Hit.ElementSource.ElementalMoreProduct = 1.30f;
+        Hit.ElementSource.VoidMoreProduct = 1.30f;
+        Hit.ElementSource.ReactionMoreProduct = 1.30f;
+        TestEqual(TEXT("target More cannot consume headroom reserved by three relevant scopes"),
+            Victim.Combat->ReceiveDamage(Hit).RawDamage, 4.0f * 1.30f * 1.30f, .001f);
+    }
+
     // The recomposition identity with the Increased half intact:
     // (1 + 20/100) x 1.0 x 1.30 = 1.56.
     {

@@ -26,6 +26,25 @@
 #include "Weapons/BreakerWeaponComponent.h"
 #include "TimerManager.h"
 
+namespace
+{
+    float BreakerRequestScopedMoreReservation(const FBreakerDamageRequest& Request)
+    {
+        if (!Request.bHasSourceSplit) return 1.0f;
+        const TArray<FBreakerElementShare> Shares = BreakerElementShares::Resolve(Request);
+        if (Shares.IsEmpty()) return 1.0f;
+        const bool bVoid = Shares.ContainsByPredicate([](const FBreakerElementShare& Share)
+        { return Share.Element == EBreakerElement::Void && Share.Fraction > 0; });
+        float Product = FMath::Max(1.0f, Request.ElementSource.ElementalMoreProduct);
+        if (bVoid) Product *= FMath::Max(1.0f, Request.ElementSource.VoidMoreProduct);
+        if (Request.bCanApplyElementBuildup) Product *= FMath::Max(1.0f, Request.ElementSource.ReactionMoreProduct);
+        // Standing scoped products have priority over temporary headroom. A
+        // later-assigned element also clamps at direct/status resolution.
+        const float Ceiling = FBreakerAttributeAggregator::ComposedMoreCeiling();
+        return FMath::Min(Product, FMath::Max(1.0f, Ceiling / FMath::Max(1.0f, Request.SourceMoreProduct)));
+    }
+}
+
 UBreakerCombatComponent::UBreakerCombatComponent()
 {
     PrimaryComponentTick.bCanEverTick = true;
@@ -307,22 +326,11 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
             }
         }
     }
-    // Gear-rolled damage reduction folds into the incoming multiplier so the
-    // resolution order stays single-path. Physical DR and Elemental
-    // resistance are the same mechanism aimed at different families (the
-    // defense triad, owner ruling 2026-08-16/17): each pays only against its
-    // own family, and TrueDamage answers to neither — that is what True
-    // means. The Elemental branch is authored ahead of any enemy that deals
-    // Elemental damage, deliberately: the stat's consumer exists TODAY so
-    // the day elemental incoming lands (O5/O38) the gear line pays with no
-    // further wiring — and until then the branch is simply never taken,
-    // because no request arrives carrying the family.
-    // O224: resistance belongs to buildup. Physical gear reduction applies only
-    // to the unconverted share; shared incoming reduction and armour affect both.
+    // Resistance changes buildup only. Physical DR weights the actual unconverted
+    // damage after elemental amplification, not the original conversion fractions.
     const UBreakerProgressionComponent* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
     if (Request.DamageFamily != EBreakerDamageFamily::TrueDamage)
     {
-        float ReductionPercent = 0.0f;
         if (Request.DamageFamily == EBreakerDamageFamily::Physical)
         {
             const auto* Equipment = GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>();
@@ -330,8 +338,7 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
                 : FBreakerEquipmentStats::DefaultPhysicalDamageReductionCap;
             const float Gear = Equipment ? Equipment->GetStats().PhysicalDamageReductionPercent : 0.0f;
             const float Core = Progression ? Progression->GetNodeStats().PhysicalDamageReductionPercent : 0.0f;
-            ReductionPercent += FMath::Clamp(Gear + Core, 0.0f, Cap)
-                * (1.0f - BreakerElementShares::TotalFraction(ElementShares));
+            Defense.PhysicalDamageReductionPercent = FMath::Clamp(Gear + Core, 0.0f, Cap);
         }
         // The tree's lane joins gear's family bucket here — points summed,
         // ONE 1-R application — never a second multiplier beside it. It pays
@@ -340,13 +347,16 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
         // now that two layers can sum past 100.
         if (Progression)
         {
-            ReductionPercent += Progression->GetNodeStats().IncomingDamageReductionPercent;
+            Defense.SharedDamageReductionPercent = Progression->GetNodeStats().IncomingDamageReductionPercent;
         }
-        Defense.IncomingDamageMultiplier *= FMath::Max(0.0f, 1.0f - ReductionPercent / 100.0f);
     }
     // Pushed incoming modifiers compose on top, in the same stage: Caster's
     // Overcast penalty, and defensive windows when they land.
     Defense.IncomingDamageMultiplier *= GetComposedIncomingDamageMultiplier();
+    // Effective-health More increases the durability of every existing pool,
+    // including against true damage. It neither creates capacity nor heals;
+    // the selected source competes in the same three slots as offensive Mores.
+    Defense.IncomingDamageMultiplier /= Attributes->GetScopedMoreProduct(false, false, false, true);
     Defense.IncomingHitCap = GetIncomingHitCap();
     Defense.DodgeChance = DodgeChance;
     Defense.BlockChance = BlockChance;
@@ -605,7 +615,8 @@ void UBreakerCombatComponent::ApplyTargetConditionRiders(FBreakerDamageRequest& 
     if (bRiderMoreFired)
     {
         const float Ceiling = FBreakerAttributeAggregator::ComposedMoreCeiling();
-        const float RiderBudget = FMath::Max(1.0f, Ceiling / FMath::Max(StandingMore, UE_SMALL_NUMBER));
+        const float ScopedStanding = StandingMore * BreakerRequestScopedMoreReservation(Request);
+        const float RiderBudget = FMath::Max(1.0f, Ceiling / FMath::Max(ScopedStanding, UE_SMALL_NUMBER));
         const float PaidRiderMore = FMath::Min(RiderMoreProduct, RiderBudget);
         if (PaidRiderMore < RiderMoreProduct - UE_KINDA_SMALL_NUMBER)
         {
@@ -622,6 +633,7 @@ void UBreakerCombatComponent::ApplyTargetConditionRiders(FBreakerDamageRequest& 
         }
         Request.SourceMoreProduct = StandingMore * PaidRiderMore;
     }
+    Request.SourceIncreasedPercent += RiderPercent;
     Request.SourceDamageMultiplier = FlatFactor * IncreasedFactor * FMath::Max(0.0f, Request.SourceMoreProduct);
 }
 
@@ -1112,7 +1124,9 @@ void UBreakerCombatComponent::ApplyOutgoingModifiers(FBreakerDamageRequest& Requ
     // through this pass, or the target-side recomposition would silently
     // shed (or double) the window. Harmless when the split is absent — the
     // default SourceMoreProduct is 1.0 and bHasSourceSplit stays false.
-    const float ChainMoreProduct = GetComposedMoreMultiplier();
+    const float RequestStanding = FMath::Max(1.0f, Request.SourceMoreProduct) * BreakerRequestScopedMoreReservation(Request);
+    const float RequestBudget = FMath::Max(1.0f, FBreakerAttributeAggregator::ComposedMoreCeiling() / RequestStanding);
+    const float ChainMoreProduct = FMath::Min(GetComposedMoreMultiplier(), RequestBudget);
     Request.BaseDamage = FMath::Max(0.0f, Request.BaseDamage + Flat);
     Request.SourceDamageMultiplier *= ChainMoreProduct;
     Request.SourceMoreProduct *= ChainMoreProduct;

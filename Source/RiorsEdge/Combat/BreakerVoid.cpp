@@ -101,7 +101,7 @@ void UBreakerStatusComponent::ApplyVoidHit(const FBreakerDamageRequest& Request,
         || !FMath::IsFinite(Result.RawDamage) || !FMath::IsFinite(Request.ProcCoefficient)
         || !FMath::IsFinite(Request.ElementalFraction) || Result.RawDamage <= 0) return;
     const float Snapshot = BreakerElementSource::RawPart(Request, Result);
-    const float Budget = Snapshot * BreakerVoid::DamageFraction();
+    const float Budget = BreakerElementSource::StatusBudget(Request, Snapshot * BreakerVoid::DamageFraction());
     const float Threshold = BreakerElementSource::Threshold(Request, GetVoidThreshold());
     if (!FMath::IsFinite(Budget) || Budget <= 0 || !FMath::IsFinite(Threshold) || Threshold <= 0) return;
     const float Bonus = FMath::IsFinite(Request.ElementBuildupFlat) ? FMath::Max(0.0f, Request.ElementBuildupFlat) : 0;
@@ -144,6 +144,7 @@ void UBreakerStatusComponent::ApplyVoidHit(const FBreakerDamageRequest& Request,
     Spec.Snapshot.CriticalChance = 0;
     Spec.Snapshot.bRolledCritical = false;
     Spec.Snapshot.SourceTags = Request.SourceTags;
+    BreakerElementSource::SnapshotReactionCredit(Request, Spec);
     ApplyStatusInternal(Spec, EBreakerDamageFamily::Elemental, Request.Instigator.Get(), true, Budget, nullptr, &Request);
 }
 

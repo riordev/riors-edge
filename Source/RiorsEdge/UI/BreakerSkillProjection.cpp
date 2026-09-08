@@ -41,6 +41,10 @@ namespace
         AirControl,
         DodgeChance,
         BlockChance,
+        ElementalMore,
+        VoidMore,
+        ReactionMore,
+        EffectiveHealthMore,
         Count
     };
 
@@ -70,6 +74,10 @@ namespace
         { TEXT("AIR CONTROL"),   EBreakerStatFormat::Multiplier,    true  },
         { TEXT("DODGE CHANCE"),  EBreakerStatFormat::PercentPoints, true  },
         { TEXT("BLOCK CHANCE"),  EBreakerStatFormat::PercentPoints, true  },
+        { TEXT("ELEMENTAL MORE"), EBreakerStatFormat::Multiplier, false },
+        { TEXT("VOID MORE"), EBreakerStatFormat::Multiplier, false },
+        { TEXT("REACTION MORE"), EBreakerStatFormat::Multiplier, false },
+        { TEXT("EFFECTIVE HEALTH MORE"), EBreakerStatFormat::Multiplier, false },
     };
 
     static_assert(UE_ARRAY_COUNT(StatRows) == static_cast<int32>(EStatRow::Count),
@@ -123,6 +131,14 @@ namespace
         OutValues[static_cast<int32>(EStatRow::AirControl)] = Stats.AirControlMultiplier;
         OutValues[static_cast<int32>(EStatRow::DodgeChance)] = Stats.DodgeChanceBonus;
         OutValues[static_cast<int32>(EStatRow::BlockChance)] = Stats.BlockChanceBonus;
+        // All four read the same selection, including equipment competition.
+        // These are scoped products, not complete damage/EHP estimates.
+        FBreakerAttributeAggregator Scoped = bComposed ? Snapshot.Aggregator : FBreakerAttributeAggregator();
+        Scoped.SetContribution(EBreakerAttributeContributor::Progression, Offer);
+        OutValues[static_cast<int32>(EStatRow::ElementalMore)] = Scoped.GetScopedMoreProduct(true, false, false, false);
+        OutValues[static_cast<int32>(EStatRow::VoidMore)] = Scoped.GetScopedMoreProduct(false, true, false, false);
+        OutValues[static_cast<int32>(EStatRow::ReactionMore)] = Scoped.GetScopedMoreProduct(false, false, true, false);
+        OutValues[static_cast<int32>(EStatRow::EffectiveHealthMore)] = Scoped.GetScopedMoreProduct(false, false, false, true);
     }
 }
 
@@ -154,13 +170,15 @@ namespace
         Out.CriticalChance = FMath::Clamp(Hypothetical.Compose(EBreakerAggregatedAttribute::CriticalChance), 0.0f, 1.0f);
         Out.CriticalDamage = Hypothetical.Compose(EBreakerAggregatedAttribute::CriticalMultiplier);
 
-        // Effective health against physical: the health pool divided by what
-        // survives mitigation. The reduction comes back from AggregateStats
-        // ALREADY CAPPED, so this cannot report a defence the game would refuse
-        // to grant — including the raised cap a rule rewrite can buy.
+        // Physical pool estimate: shared gear/Core reduction cap and selected
+        // durability More. Avoidance and temporary protection are not priced.
         const float MaxHealth = Hypothetical.Compose(EBreakerAggregatedAttribute::MaxHealth);
-        const float Surviving = FMath::Max(1.0f - Stats.PhysicalDamageReductionPercent / 100.0f, 0.01f);
-        Out.EffectiveHealthVsPhysical = MaxHealth / Surviving;
+        FBreakerAttributeContribution CoreOffer;
+        const FBreakerNodeStats CoreStats = BreakerSkillProjection::BuildOffer(Snapshot, Snapshot.Ranks, CoreOffer);
+        const float Reduction = FMath::Clamp(Stats.PhysicalDamageReductionPercent + CoreStats.PhysicalDamageReductionPercent,
+            0.0f, Stats.PhysicalDamageReductionCap);
+        const float Surviving = FMath::Max(1.0f - Reduction / 100.0f, 0.01f);
+        Out.EffectiveHealthVsPhysical = MaxHealth * Hypothetical.GetScopedMoreProduct(false, false, false, true) / Surviving;
         return Out;
     }
 

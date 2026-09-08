@@ -148,7 +148,7 @@ enum class EBreakerAttributeContributor : uint8
     Count
 };
 
-enum class EBreakerDamageMoreLane : uint8 { Weapon, Ability, Shared, Dot };
+enum class EBreakerDamageMoreLane : uint8 { Weapon, Ability, Shared, Dot, Elemental, Void, Reaction, EffectiveHealth };
 struct FBreakerDamageMoreSource
 {
     FName Key;
@@ -262,8 +262,8 @@ struct RIORSEDGE_API FBreakerAttributeAggregator
     // and the chain now queries ComposedMoreProduct() below and spends whatever
     // headroom the attribute side left. Temporary windows ARE Mores and count
     // within this budget.
-    // Damage only: no other aggregated attribute has an authored More budget,
-    // and silently clamping (say) move speed would be a balance decision hiding
+    // Delivery, DoT and explicit elemental/reaction/durability scopes share this budget;
+    // silently clamping another attribute (say move speed) would be a decision hiding
     // in a safety net.
     static constexpr int32 MaxComposedMoreSources = 3;
     static constexpr float SingleMoreCeiling = 1.30f;
@@ -275,6 +275,8 @@ struct RIORSEDGE_API FBreakerAttributeAggregator
     // live contributions on every call, so it is correct for equipment and
     // progression submissions alike with nothing to cache or invalidate.
     float ComposedMoreProduct(EBreakerAggregatedAttribute Attribute) const;
+    // Additional scopes only: delivery Mores are already baked by FillSourcePools.
+    float GetScopedMoreProduct(bool bElemental, bool bVoid, bool bReaction, bool bEffectiveHealth) const;
     int32 GetDamageMoreSourceCount() const;
     int32 GetSelectedDamageMoreSourceCount() const;
     TArray<FBreakerDamageMoreSource> GetSelectedDamageMoreSources() const;

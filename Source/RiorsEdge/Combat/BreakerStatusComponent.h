@@ -22,6 +22,9 @@ struct RIORSEDGE_API FBreakerActiveStatus
     // An elemental status owns one finite snapshot. Consumption transfers this unpaid
     // amount; payout claims it before any damage callback can re-enter.
     UPROPERTY(BlueprintReadOnly) float UnpaidDamageBudget = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float InitialDamageBudget = 0;
+    UPROPERTY(BlueprintReadOnly) float InitialReactionBudget = 0;
+    UPROPERTY(BlueprintReadOnly) bool bHasReactionCreditSnapshot = false;
     uint64 ApplicationSerial = 0;
     // Who applied this status. Weak: a DoT outliving its applier keeps
     // ticking, it just stops crediting anyone.

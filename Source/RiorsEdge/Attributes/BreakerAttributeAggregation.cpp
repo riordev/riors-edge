@@ -251,3 +251,17 @@ float FBreakerAttributeAggregator::ComposedMoreCeiling()
 {
     return FMath::Pow(SingleMoreCeiling, static_cast<float>(MaxComposedMoreSources));
 }
+
+float FBreakerAttributeAggregator::GetScopedMoreProduct(bool bElemental, bool bVoid, bool bReaction, bool bEffectiveHealth) const
+{
+    float Product = 1.0f;
+    for (const FBreakerDamageMoreSource& Source : GetSelectedDamageMoreSources())
+    {
+        const bool bApplies = (bElemental && Source.Lane == EBreakerDamageMoreLane::Elemental)
+            || (bVoid && Source.Lane == EBreakerDamageMoreLane::Void)
+            || (bReaction && Source.Lane == EBreakerDamageMoreLane::Reaction)
+            || (bEffectiveHealth && Source.Lane == EBreakerDamageMoreLane::EffectiveHealth);
+        if (bApplies) Product *= FMath::Min(Source.Multiplier, SingleMoreCeiling);
+    }
+    return Product;
+}

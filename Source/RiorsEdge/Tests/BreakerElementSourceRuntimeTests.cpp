@@ -149,6 +149,29 @@ bool FBreakerElementSourceRuntimeTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Void raw allocation"), Result.ElementRawDamage[1].RawDamage, 200.0f);
     }
     TestEqual(TEXT("Unconverted raw remainder"), Result.UnconvertedRawDamage, 100.0f);
+    // The next native cast exercises the actual new damage scopes, rather than
+    // only checking a hypothetical source projection.
+    auto* DamageNode = NewObject<UBreakerProgressionNode>(Tree);
+    DamageNode->NodeId = TEXT("Test.Core.ElementDamage"); DamageNode->Currency = Tree->Currency;
+    for (const auto Pair : { TPair<EBreakerNodeStatTarget, float>(EBreakerNodeStatTarget::Damage, 100),
+        { EBreakerNodeStatTarget::ElementalDamage, 50 } })
+    {
+        FBreakerNodeEffect Effect; Effect.StatTarget = Pair.Key; Effect.ValuePerRank = Pair.Value;
+        Effect.StatBucket = EBreakerNodeStatBucket::IncreasedPercent; DamageNode->Effects.Add(Effect);
+    }
+    FBreakerNodeEffect VoidMore; VoidMore.StatTarget = EBreakerNodeStatTarget::VoidDamage;
+    VoidMore.StatBucket = EBreakerNodeStatBucket::MorePercent; VoidMore.ValuePerRank = 18;
+    DamageNode->Effects.Add(VoidMore); Tree->Nodes.Add(DamageNode);
+    if (!TestTrue(TEXT("Earned damage schema purchase"), Caster->GetProgression()->PurchaseNode(Tree, DamageNode->NodeId, Reason))) return false;
+    Status->ConsumeAllStatuses(); Caster->GetMana()->AdvanceLoop(20);
+    const float DamageBefore = Health->GetHealth();
+    const float CostBefore = Caster->GetAttributes()->GetClassResource();
+    if (!TestTrue(TEXT("Native Siphon with purchased damage scopes activates"), ASC->TryActivateAbility(Handle))) return false;
+    for (int32 Step = 0; Step < 20 && Health->GetHealth() == DamageBefore; ++Step) Advance(1);
+    TestTrue(TEXT("Scoped cast pays actual Mana"), Caster->GetAttributes()->GetClassResource() < CostBefore);
+    TestEqual(TEXT("Native Void delivery adds Increased once then pays selected Void More"),
+        DamageBefore - Health->GetHealth(), ScaledBase * 2.5025f * 1.18f, .02f); // Includes the existing 0.25% spent-point floor.
+    ASC->CancelAbilityHandle(Handle);
     return true;
 }
 #endif

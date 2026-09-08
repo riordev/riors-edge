@@ -100,7 +100,7 @@ uint64 UBreakerStatusComponent::ApplyRiftHit(const FBreakerDamageRequest& Reques
         || !FMath::IsFinite(Result.RawDamage) || !FMath::IsFinite(Request.ProcCoefficient)
         || !FMath::IsFinite(Request.ElementalFraction) || Result.RawDamage <= 0) return 0;
     const float Snapshot = BreakerElementSource::RawPart(Request, Result);
-    const float Budget = Snapshot * BreakerRift::DamageFraction();
+    const float Budget = BreakerElementSource::StatusBudget(Request, Snapshot * BreakerRift::DamageFraction());
     const float Threshold = BreakerElementSource::Threshold(Request, GetRiftThreshold());
     if (!FMath::IsFinite(Budget) || Budget <= 0 || !FMath::IsFinite(Threshold) || Threshold <= 0) return 0;
     const float Bonus = FMath::IsFinite(Request.ElementBuildupFlat) ? FMath::Max(0.0f, Request.ElementBuildupFlat) : 0;
@@ -141,6 +141,7 @@ uint64 UBreakerStatusComponent::ApplyRiftHit(const FBreakerDamageRequest& Reques
     Spec.Snapshot.CriticalChance = 0;
     Spec.Snapshot.bRolledCritical = false;
     Spec.Snapshot.SourceTags = Request.SourceTags;
+    BreakerElementSource::SnapshotReactionCredit(Request, Spec);
     const FVector* SourceLocation = Request.bHasSourceLocation && !Request.SourceLocation.ContainsNaN()
         ? &Request.SourceLocation : nullptr;
     return ApplyStatusInternal(Spec, EBreakerDamageFamily::Elemental, Request.Instigator.Get(), true, Budget, SourceLocation, &Request);

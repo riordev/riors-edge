@@ -54,6 +54,16 @@ struct RIORSEDGE_API FBreakerElementSourceSnapshot
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float ElementalBuildupPenetrationPercent = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float ElementalThresholdMultiplier = 1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bRotDensity = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float ElementalDamageIncreasedPercent = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float RotDamageIncreasedPercent = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float VoidBurstDamageIncreasedPercent = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float RiftBurstDamageIncreasedPercent = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float ReactionDamageIncreasedPercent = 0;
+    // Each is an extra scope from the one already-selected gear/tree budget.
+    // Weapon/Ability/Shared are carried separately in SourceMoreProduct.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float ElementalMoreProduct = 1;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float VoidMoreProduct = 1;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float ReactionMoreProduct = 1;
 };
 
 USTRUCT(BlueprintType)
@@ -177,6 +187,9 @@ struct RIORSEDGE_API FBreakerDefenseState
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float Shield = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float Armor = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float IncomingDamageMultiplier = 1.0f;
+    // Percentage points, weighted by resolved physical raw damage after conversion.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float PhysicalDamageReductionPercent = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float SharedDamageReductionPercent = 0;
     // Absolute post-mitigation budget for one hit, across shields and health.
     // Zero disables the cap; RawDamage is never changed by this defense.
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float IncomingHitCap = 0.0f;

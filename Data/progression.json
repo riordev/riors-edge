@@ -412,6 +412,48 @@
 			"lane": true,
 			"rider": false,
 			"affixOwned": false
+		},
+		{
+			"name": "ElementalDamage",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
+		},
+		{
+			"name": "RotDamage",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
+		},
+		{
+			"name": "VoidBurstDamage",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
+		},
+		{
+			"name": "RiftBurstDamage",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
+		},
+		{
+			"name": "ReactionDamage",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
+		},
+		{
+			"name": "VoidDamage",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
+		},
+		{
+			"name": "EffectiveHealth",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
 		}
 	],
 	"conditions": [
