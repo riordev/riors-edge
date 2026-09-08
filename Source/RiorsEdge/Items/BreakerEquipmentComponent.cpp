@@ -14,6 +14,7 @@
 #include "Items/BreakerItemBaseStats.h"
 #include "Items/BreakerLootLibrary.h"
 #include "Net/UnrealNetwork.h"
+#include "Misc/ScopeExit.h"
 #include "Weapons/BreakerWeaponComponent.h"
 
 namespace
@@ -254,24 +255,32 @@ bool UBreakerEquipmentComponent::EquipItemDisplacing(const FBreakerItemInstance&
         bEjectForLimit = true;
         LimitVictimSlot = Chosen->Slot;
     }
-    UnequipSlot(Item.Slot);
-    if (bEjectForLimit)
+    // Slot replacement is one capacity transaction. UnequipSlot recalculates
+    // immediately, but that intermediate empty slot must not discard shield
+    // which still fits the completed equipment configuration.
     {
-        UnequipSlot(LimitVictimSlot);
+        UBreakerAttributeSet* CapacityAttributes = Attributes;
+        if (CapacityAttributes) CapacityAttributes->BeginShieldCapacityUpdate();
+        ON_SCOPE_EXIT { if (CapacityAttributes) CapacityAttributes->EndShieldCapacityUpdate(); };
+        UnequipSlot(Item.Slot);
+        if (bEjectForLimit)
+        {
+            UnequipSlot(LimitVictimSlot);
+        }
+        // A legendary whose rule claims another slot ejects whatever is standing in
+        // it. Cadence occupies both hands, so it and a Secondary cannot be worn
+        // together — in EITHER direction, which is why the conflict test is
+        // symmetric and why this ejects rather than refusing. Nothing in this
+        // component refuses an equip; the rarity cap does not, and a rule inventing
+        // a second, harsher failure mode would be a worse experience than a
+        // disclosed swap.
+        if (Preview.bRuleDisplaces && Preview.RuleDisplaced.IsValid())
+        {
+            UnequipSlot(Preview.RuleDisplaced.Slot);
+        }
+        Equipped.Add(Item);
+        RecalculateStats();
     }
-    // A legendary whose rule claims another slot ejects whatever is standing in
-    // it. Cadence occupies both hands, so it and a Secondary cannot be worn
-    // together — in EITHER direction, which is why the conflict test is
-    // symmetric and why this ejects rather than refusing. Nothing in this
-    // component refuses an equip; the rarity cap does not, and a rule inventing
-    // a second, harsher failure mode would be a worse experience than a
-    // disclosed swap.
-    if (Preview.bRuleDisplaces && Preview.RuleDisplaced.IsValid())
-    {
-        UnequipSlot(Preview.RuleDisplaced.Slot);
-    }
-    Equipped.Add(Item);
-    RecalculateStats();
     OnEquipmentChanged.Broadcast();
     return true;
 }
@@ -964,6 +973,7 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
     constexpr int32 TargetCount = static_cast<int32>(EBreakerStatTarget::Count);
     float FlatByTarget[TargetCount] = {};
     float IncreasedByTarget[TargetCount] = {};
+    float PositiveMoveSpeedPercent = 0;
     // What the conditional lines are worth right now and what they would be
     // worth with everything satisfied. Display figures only; the live half is
     // already inside IncreasedByTarget.
@@ -1046,6 +1056,8 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
                 if (Definition->StatBucket == EBreakerStatBucket::IncreasedPercent) ActiveConditionalPercent += Value;
             }
             const int32 Target = static_cast<int32>(Definition->StatTarget);
+            if (Definition->StatTarget == EBreakerStatTarget::MoveSpeed && Definition->StatBucket == EBreakerStatBucket::IncreasedPercent)
+                PositiveMoveSpeedPercent += FMath::Max(0.0f, Value);
             // Preserve benefit/penalty signs for Deadeye before the display
             // total nets them. The contribution still sums the same raw value.
             if (OutContribution && Definition->StatTarget == EBreakerStatTarget::CriticalDamage
@@ -1252,6 +1264,10 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         OutContribution->AddFlat(EBreakerAggregatedAttribute::MaxClassResource, Stats.BonusMaxResource);
         OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalChance, Stats.CriticalChanceBonus);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::MoveSpeed, MoveSpeedPercent);
+        // Preserve penalties while doubling only the positive bonus that
+        // survives the ordinary gear cap. No Ground is applied by the fold.
+        OutContribution->SetPositiveMovementIncreased(PositiveMoveSpeedPercent - FMath::Max(0.0f,
+            IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::MoveSpeed)] - MoveSpeedPercent));
         // Slide speed, air control and dash cooldown reduction were the last
         // stats that reached gameplay WITHOUT passing through the aggregator:
         // the movement component read the composed multipliers below and the
@@ -1376,22 +1392,13 @@ void UBreakerEquipmentComponent::ApplyStatsToAttributes()
     // the true bases and every other contributor. Recalculating in any order,
     // any number of times, converges to the same numbers.
     if (!Attributes || !HasAttributeAuthority()) return;
+    Attributes->BeginShieldCapacityUpdate();
     Attributes->ApplyAttributeContribution(EBreakerAttributeContributor::Equipment, CachedContribution);
 
-    // O106 REWRITE: gear owns the BASE of MaxShield — Shield-archetype
-    // pieces are the pool's source, and MaxShield stays deliberately outside
-    // the aggregation pass (a single system owns it outright; that system is
-    // now this one). The class conversion ceilings (Charge MD5/MD9, Grit
-    // §T1, both 25%-of-max-health) are RAISE-ONLY per their own tick, so
-    // this hard set can dip below a ceiling for at most one class tick
-    // before it is re-raised; a non-Tank/Support has no ceiling and reads
-    // the gear base exactly. Current shield clamps into the new cap so
-    // unequipping a Shield piece can never leave a bar above its maximum.
-    Attributes->ApplyMaxShield(CachedStats.BaseShieldFromGear);
-    if (Attributes->GetShield() > Attributes->GetMaxShield())
-    {
-        Attributes->ApplyShield(Attributes->GetMaxShield());
-    }
+    // Gear contributes its own capacity input alongside native, Core and class
+    // inputs. Commit health and capacity together, clamping current shield once.
+    Attributes->SetEquipmentShieldCapacity(CachedStats.BaseShieldFromGear);
+    Attributes->EndShieldCapacityUpdate();
 }
 
 void UBreakerEquipmentComponent::OnRep_Equipped()

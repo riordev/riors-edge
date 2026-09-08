@@ -32,6 +32,16 @@ struct RIORSEDGE_API FBreakerOutgoingModifier
     UPROPERTY(BlueprintReadOnly) float ExpiryTime = -1.0f;
 };
 
+struct FBreakerStaggerApplication
+{
+    TWeakObjectPtr<AActor> Source;
+    float Seconds = 0;
+    float DurationMultiplier = 1;
+    float ResistanceReduction = 0;
+    bool bLockstep = false;
+    bool bShockwave = false;
+};
+
 UCLASS(ClassGroup=Combat, BlueprintType, meta=(BlueprintSpawnableComponent))
 class RIORSEDGE_API UBreakerCombatComponent : public UActorComponent
 {
@@ -39,6 +49,7 @@ class RIORSEDGE_API UBreakerCombatComponent : public UActorComponent
 
 public:
     bool ApplyStagger(float Seconds);
+    bool ApplyStaggerFrom(AActor* Source, float Seconds, bool bAllowShockwave = true);
     void GrantStaggerImmunity(float Seconds);
     bool IsStaggered() const;
     bool IsStaggerImmune() const;
@@ -275,9 +286,10 @@ public:
     // reads or writes it beyond routing the spill on to it.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Defense|Front")
     void ArmFrontShield(float Amount);
-    UFUNCTION(BlueprintPure, Category="Defense|Front") float GetFrontShield() const { return FrontShield; }
-    UFUNCTION(BlueprintPure, Category="Defense|Front") float GetFrontShieldMax() const { return FrontShieldMax; }
-    UFUNCTION(BlueprintPure, Category="Defense|Front") bool IsFrontShieldBroken() const { return bFrontShieldBroken; }
+    void RefreshCoreFrontShieldCapacity();
+    UFUNCTION(BlueprintPure, Category="Defense|Front") float GetFrontShield() const { return FrontShield + CoreFrontShield; }
+    UFUNCTION(BlueprintPure, Category="Defense|Front") float GetFrontShieldMax() const { return FrontShieldMax + CoreFrontShieldMax; }
+    UFUNCTION(BlueprintPure, Category="Defense|Front") bool IsFrontShieldBroken() const { return GetFrontShield() <= 0 && (bFrontShieldBroken || CoreFrontShieldMax > 0); }
     // What a bar draws as "shield": the attribute shield plus the standing
     // front pool. A broken pool contributes nothing to either figure, so the
     // bar reads "gone for the fight" rather than an empty segment.
@@ -319,6 +331,7 @@ private:
     double StaggerImmunityEndTime = 0;
     FTimerHandle StaggerTimer;
     void EndStagger();
+    bool ApplyStaggerResolved(const FBreakerStaggerApplication& Application);
     bool HasParryPermission() const;
     bool HasPerfectGuardPermission() const;
     float ParryClock() const;
@@ -379,6 +392,8 @@ private:
     float FrontShield = 0.0f;
     float FrontShieldMax = 0.0f;
     bool bFrontShieldBroken = false;
+    UPROPERTY(Replicated) float CoreFrontShield = 0.0f;
+    UPROPERTY(Replicated) float CoreFrontShieldMax = 0.0f;
     // TargetBandBroken's one bit — see WasBandBrokenByPreviousHit above.
     bool bBandBrokenByPreviousHit = false;
     bool bDeathBroadcast = false;

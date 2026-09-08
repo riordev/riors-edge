@@ -191,6 +191,13 @@ struct RIORSEDGE_API FBreakerAttributeContribution
     void AddDamageMoreSource(FName Key, EBreakerDamageMoreLane Lane, float Multiplier);
     void SetDeadeye(bool bEnabled) { bDeadeye = bEnabled; }
     bool HasDeadeye() const { return bDeadeye; }
+    void SetVelocityRules(bool NoGround, bool WeaponConversion, bool AbilityConversion)
+    { bNoGround = NoGround; bMoveToWeapon = WeaponConversion; bMoveToAbility = AbilityConversion; }
+    bool HasNoGround() const { return bNoGround; }
+    bool ConvertsMovementToWeapon() const { return bMoveToWeapon; }
+    bool ConvertsMovementToAbility() const { return bMoveToAbility; }
+    float GetPositiveMovementIncreased() const { return PositiveMovementIncreased; }
+    void SetPositiveMovementIncreased(float Value) { PositiveMovementIncreased = FMath::Max(0.0f, Value); }
     float GetPositiveCriticalFlat() const { return PositiveCriticalFlat; }
     float GetPositiveCriticalIncreased() const { return PositiveCriticalIncreased; }
     float GetPositiveCriticalMore() const { return PositiveCriticalMore; }
@@ -207,6 +214,10 @@ struct RIORSEDGE_API FBreakerAttributeContribution
 
 private:
     bool bDeadeye = false;
+    bool bNoGround = false;
+    bool bMoveToWeapon = false;
+    bool bMoveToAbility = false;
+    float PositiveMovementIncreased = 0;
     float PositiveCriticalFlat = 0.0f;
     float PositiveCriticalIncreased = 0.0f;
     float PositiveCriticalMore = 1.0f;

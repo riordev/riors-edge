@@ -1,6 +1,7 @@
 #include "UI/BreakerSkillProjection.h"
 
 #include "Attributes/BreakerAttributeSet.h"
+#include "GameFramework/Actor.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Items/BreakerItemTypes.h"
 #include "Progression/BreakerClassDefinition.h"
@@ -45,6 +46,8 @@ namespace
         VoidMore,
         ReactionMore,
         EffectiveHealthMore,
+        MaxShield,
+        MaxFrontShield,
         Count
     };
 
@@ -78,6 +81,8 @@ namespace
         { TEXT("VOID MORE"), EBreakerStatFormat::Multiplier, false },
         { TEXT("REACTION MORE"), EBreakerStatFormat::Multiplier, false },
         { TEXT("EFFECTIVE HEALTH MORE"), EBreakerStatFormat::Multiplier, false },
+        { TEXT("BASE MAX SHIELD"), EBreakerStatFormat::Absolute, false },
+        { TEXT("MAX FRONT POOL"), EBreakerStatFormat::Absolute, false },
     };
 
     static_assert(UE_ARRAY_COUNT(StatRows) == static_cast<int32>(EStatRow::Count),
@@ -141,6 +146,11 @@ namespace
         OutValues[static_cast<int32>(EStatRow::VoidMore)] = Scoped.GetScopedMoreProduct(false, true, false, false);
         OutValues[static_cast<int32>(EStatRow::ReactionMore)] = Scoped.GetScopedMoreProduct(false, false, true, false);
         OutValues[static_cast<int32>(EStatRow::EffectiveHealthMore)] = Scoped.GetScopedMoreProduct(false, false, false, true);
+        const float Health = OutValues[static_cast<int32>(EStatRow::MaxHealth)];
+        OutValues[static_cast<int32>(EStatRow::MaxShield)] = FMath::Max(
+            Snapshot.NativeShieldCapacity + Snapshot.EquipmentShieldCapacity + Health * Stats.ShieldPercentMaxHealth * .01f,
+            Health * Snapshot.ClassShieldHealthFloor);
+        OutValues[static_cast<int32>(EStatRow::MaxFrontShield)] = Health * Stats.FrontShieldPercentMaxHealth * .01f;
     }
 }
 
@@ -180,7 +190,10 @@ namespace
         const float Reduction = FMath::Clamp(Stats.PhysicalDamageReductionPercent + CoreStats.PhysicalDamageReductionPercent,
             0.0f, Stats.PhysicalDamageReductionCap);
         const float Surviving = FMath::Max(1.0f - Reduction / 100.0f, 0.01f);
-        Out.EffectiveHealthVsPhysical = MaxHealth * Hypothetical.GetScopedMoreProduct(false, false, false, true) / Surviving;
+        const float Ward = FMath::Max(Snapshot.NativeShieldCapacity + Stats.BaseShieldFromGear
+            + MaxHealth * CoreStats.ShieldPercentMaxHealth * .01f, MaxHealth * Snapshot.ClassShieldHealthFloor);
+        const float Front = MaxHealth * CoreStats.FrontShieldPercentMaxHealth * .01f;
+        Out.EffectiveHealthVsPhysical = (MaxHealth + Ward + Front) * Hypothetical.GetScopedMoreProduct(false, false, false, true) / Surviving;
         return Out;
     }
 
@@ -274,6 +287,17 @@ FBreakerSkillSnapshot BreakerSkillProjection::MakeSnapshot(const UBreakerProgres
     if (Attributes && Attributes->HasCapturedAttributeBases())
     {
         Snapshot.Aggregator = Attributes->GetAttributeAggregator();
+        Snapshot.NativeShieldCapacity = Attributes->GetNativeShieldCapacity();
+        Snapshot.EquipmentShieldCapacity = Attributes->GetEquipmentShieldCapacity();
+        Snapshot.ClassShieldHealthFloor = Attributes->GetClassShieldHealthFloor();
+        if (const AActor* Owner = Progression->GetOwner())
+            if (const auto* Gear = Owner->FindComponentByClass<UBreakerEquipmentComponent>())
+                Snapshot.EquipmentShieldCapacity = Gear->GetStats().BaseShieldFromGear;
+        if (State.PermanentClass == EBreakerClassId::Tank
+            || (State.PermanentClass == EBreakerClassId::Support
+                && (Progression->HasNodeTag(BreakerNodeTags::Node_MD_Overflow.GetTag())
+                    || Progression->GetNodeRank(TEXT("Support.Medic.SecondOpinion"), EBreakerPointCurrency::DoctrinePoints) > 0)))
+            Snapshot.ClassShieldHealthFloor = .25f;
         Snapshot.bHasComposedAttributes = true;
     }
     return Snapshot;

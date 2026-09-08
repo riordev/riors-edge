@@ -55,6 +55,11 @@ struct RIORSEDGE_API FBreakerElementSourceSnapshot
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float ElementalThresholdMultiplier = 1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bRotDensity = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bLongDark = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bVoidPatience = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bVoidDebt = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bVectorField = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bRiftImpact = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHardLanding = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float ElementalDamageIncreasedPercent = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float RotDamageIncreasedPercent = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float VoidBurstDamageIncreasedPercent = 0;

@@ -4,6 +4,9 @@
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerDamageLibrary.h"
 #include "Combat/BreakerRiftDisplacement.h"
+#include "Combat/BreakerEnemy.h"
+#include "Components/CapsuleComponent.h"
+#include "Engine/World.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Data/BreakerDataFile.h"
@@ -14,6 +17,7 @@ namespace
     struct FBreakerRiftTuning
     {
         float Threshold = 0, Damage = 0, Marker = 0, Timeout = 0, Displacement = 0;
+        float ImpactFraction = 0, HardLandingFraction = 0;
     };
 
     const FBreakerRiftTuning& BreakerRiftTuning()
@@ -36,6 +40,8 @@ namespace
             Read(TEXT("riftMarkerSeconds"), Value.Marker, 3600);
             Read(TEXT("riftBuildupTimeoutSeconds"), Value.Timeout, 3600);
             Read(TEXT("riftDisplacementCm"), Value.Displacement, 10000);
+            Read(TEXT("riftImpactDamageFraction"), Value.ImpactFraction, 1);
+            Read(TEXT("riftHardLandingDamageFraction"), Value.HardLandingFraction, 1);
             if (!ensureAlwaysMsgf(Errors.IsClean(), TEXT("%s"), *Errors.Join())) return FBreakerRiftTuning();
             return Value;
         }();
@@ -43,6 +49,49 @@ namespace
     }
 }
 
+namespace
+{
+    TWeakObjectPtr<AActor> BreakerFindRiftImpact(AActor* Target, AActor* Applier, const BreakerRiftDisplacement::FResult& Move)
+    {
+        if (!Target || !Target->GetWorld() || Move.DistanceCm <= 0) return nullptr;
+        const auto* Capsule = Cast<UCapsuleComponent>(Target->GetRootComponent());
+        if (!Capsule) return nullptr;
+        TWeakObjectPtr<AActor> Nearest;
+        float NearestDistance = TNumericLimits<float>::Max();
+        auto Consider = [&](AActor* Candidate, float Distance)
+        {
+            auto* Enemy = Cast<ABreakerEnemy>(Candidate);
+            auto* Sink = IsValid(Enemy) ? Enemy->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+            if (!Sink || Sink->IsDead() || Enemy->IsActorBeingDestroyed() || Enemy == Target || Enemy == Applier) return false;
+            if (!Nearest.IsValid() || Distance < NearestDistance - UE_KINDA_SMALL_NUMBER
+                || (FMath::IsNearlyEqual(Distance, NearestDistance) && Enemy->GetUniqueID() < Nearest->GetUniqueID()))
+            { Nearest = Enemy; NearestDistance = Distance; }
+            return true;
+        };
+        TArray<FHitResult> Hits;
+        FCollisionQueryParams Query(SCENE_QUERY_STAT(BreakerRiftImpact), false, Target);
+        if (Applier) Query.AddIgnoredActor(Applier);
+        // Channel sweeps report only their first blocking actor. Repeat while
+        // excluding encountered enemies so equal-distance blockers share the
+        // same stable selection policy; geometry remains blocking throughout.
+        bool bFoundEnemy = false;
+        do
+        {
+            Hits.Reset(); bFoundEnemy = false;
+            Target->GetWorld()->SweepMultiByChannel(Hits, Move.Start, Move.End, Capsule->GetComponentQuat(),
+                ECC_GameTraceChannel2, FCollisionShape::MakeCapsule(Capsule->GetScaledCapsuleRadius(), Capsule->GetScaledCapsuleHalfHeight()), Query);
+            for (const auto& Hit : Hits)
+            {
+                if (Consider(Hit.GetActor(), FMath::Max(0.0f, Hit.Time) * Move.DistanceCm))
+                { Query.AddIgnoredActor(Hit.GetActor()); bFoundEnemy = true; }
+            }
+        } while (bFoundEnemy);
+        // The movement stops two centimetres before a blocking capsule. Its
+        // terminal enemy still receives the collision, even if its hitbox is smaller.
+        Consider(Move.TerminalActor.Get(), Move.DistanceCm);
+        return Nearest;
+    }
+}
 float BreakerRift::ThresholdHealthFraction() { return BreakerRiftTuning().Threshold; }
 float BreakerRift::DamageFraction() { return BreakerRiftTuning().Damage; }
 float BreakerRift::MarkerSeconds() { return BreakerRiftTuning().Marker; }
@@ -133,6 +182,9 @@ uint64 UBreakerStatusComponent::ApplyRiftHit(const FBreakerDamageRequest& Reques
     ResetRiftBuildup();
     FBreakerStatusApplicationSpec Spec;
     Spec.StatusTag = Unstable;
+    Spec.bVectorFieldSnapshot = Request.ElementSource.bVectorField;
+    Spec.bRiftImpactSnapshot = Request.ElementSource.bRiftImpact;
+    Spec.bHardLandingSnapshot = Request.ElementSource.bHardLanding;
     Spec.Duration = BreakerRift::MarkerSeconds();
     Spec.TickInterval = Spec.Duration;
     Spec.BaseDamagePerTick = 0;
@@ -166,8 +218,9 @@ void UBreakerStatusComponent::FlushRiftActivation(uint64 ApplicationSerial)
     ++ActiveStatuses[Index].TicksDelivered;
     TGuardValue<FGameplayTag> Delivering(DeliveringTickTag, Unstable);
     // O2: existing stagger immunity refuses displacement only, never damage.
+    BreakerRiftDisplacement::FResult Displacement;
     if (!Combat->IsStaggerImmune() && Status.bHasSourceLocationSnapshot)
-        BreakerRiftDisplacement::Apply(Target, Status.SourceLocationSnapshot, BreakerRift::DisplacementCm());
+        Displacement = BreakerRiftDisplacement::ApplyDetailed(Target, Status.SourceLocationSnapshot, BreakerRift::DisplacementCm(), Status.Spec.bVectorFieldSnapshot);
     if (!IsValid(Target) || Target->IsActorBeingDestroyed() || Combat->IsDead()) return;
     FBreakerStatusApplicationSpec BurstSpec = Status.Spec;
     BurstSpec.BaseDamagePerTick = Status.UnpaidDamageBudget;
@@ -181,6 +234,27 @@ void UBreakerStatusComponent::FlushRiftActivation(uint64 ApplicationSerial)
     Burst.bCanApplyElementBuildup = false;
     Burst.bCanCritical = false;
     Burst.bBypassShield = false;
+    // These local entitlements belong to the already-claimed activation. No
+    // callback can discover an unpaid secondary budget on the live marker.
+    const TWeakObjectPtr<AActor> ImpactTarget = Status.Spec.bRiftImpactSnapshot
+        ? BreakerFindRiftImpact(Target, Status.Instigator.Get(), Displacement) : TWeakObjectPtr<AActor>();
+    const float WallDamage = Status.Spec.bHardLandingSnapshot && Displacement.bReachedWall
+        ? Status.UnpaidDamageBudget * BreakerRiftTuning().HardLandingFraction : 0;
     BreakerRiftFeedback::PlayActivation(Target, Status.Instigator.Get());
     Combat->ReceiveDamage(Burst);
+    FBreakerDamageRequest Extra = Burst;
+    Extra.ProcCoefficient = 0;
+    if (WallDamage > 0 && IsValid(Target) && !Target->IsActorBeingDestroyed() && IsValid(Combat) && !Combat->IsDead())
+    {
+        Extra.BaseDamage = WallDamage;
+        Combat->ReceiveDamage(Extra);
+    }
+    AActor* ImpactActor = ImpactTarget.Get();
+    auto* ImpactCombat = IsValid(ImpactActor) && !ImpactActor->IsActorBeingDestroyed()
+        ? ImpactActor->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    if (ImpactCombat && !ImpactCombat->IsDead())
+    {
+        Extra.BaseDamage = Status.UnpaidDamageBudget * BreakerRiftTuning().ImpactFraction;
+        ImpactCombat->ReceiveDamage(Extra);
+    }
 }

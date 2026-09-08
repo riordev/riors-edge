@@ -25,6 +25,7 @@
 #include "Abilities/BreakerAbilityComponent.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "TimerManager.h"
+#include "EngineUtils.h"
 
 namespace
 {
@@ -90,6 +91,8 @@ void UBreakerCombatComponent::GetLifetimeReplicatedProps(TArray<FLifetimePropert
     DOREPLIFETIME_CONDITION(UBreakerCombatComponent, ParryCounterEnd, COND_OwnerOnly);
     DOREPLIFETIME_CONDITION(UBreakerCombatComponent, PerfectGuardEnd, COND_OwnerOnly);
     DOREPLIFETIME(UBreakerCombatComponent, bStaggerActive);
+    DOREPLIFETIME_CONDITION(UBreakerCombatComponent, CoreFrontShield, COND_OwnerOnly);
+    DOREPLIFETIME_CONDITION(UBreakerCombatComponent, CoreFrontShieldMax, COND_OwnerOnly);
 }
 
 float UBreakerCombatComponent::GetStaggerRemaining() const
@@ -120,11 +123,43 @@ void UBreakerCombatComponent::GrantStaggerImmunity(float Seconds)
 
 bool UBreakerCombatComponent::ApplyStagger(float Seconds)
 {
+    return ApplyStaggerFrom(nullptr, Seconds);
+}
+
+bool UBreakerCombatComponent::ApplyStaggerFrom(AActor* Source, float Seconds, bool bAllowShockwave)
+{
+    FBreakerStaggerApplication Application;
+    Application.Source = Source; Application.Seconds = Seconds;
+    const auto* Progression = IsValid(Source) && !Source->IsActorBeingDestroyed()
+        ? Source->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    if (Progression)
+    {
+        Application.DurationMultiplier = Progression->GetNodeStats().StaggerDurationMultiplier;
+        Application.ResistanceReduction = Progression->GetNodeStats().EnemyStaggerResistanceReductionPercent * .01f;
+        Application.bLockstep = Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Control.Lockstep")));
+        Application.bShockwave = bAllowShockwave && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Control.Shockwave")));
+    }
+    return ApplyStaggerResolved(Application);
+}
+
+bool UBreakerCombatComponent::ApplyStaggerResolved(const FBreakerStaggerApplication& Application)
+{
     AActor* Owner = GetOwner();
+    AActor* Source = Application.Source.Get();
+    const float Seconds = Application.Seconds;
     if (!Owner || !Owner->HasAuthority() || Owner->IsActorBeingDestroyed() || !GetWorld() || IsDead()
-        || IsStaggerImmune() || !FMath::IsFinite(Seconds) || Seconds <= 0 || !FMath::IsFinite(StaggerResistance)) return false;
-    const float Duration = Seconds * (1.0f - FMath::Clamp(StaggerResistance, 0.0f, 1.0f));
-    if (Duration <= 0) return false;
+        || !FMath::IsFinite(Seconds) || Seconds <= 0 || !FMath::IsFinite(StaggerResistance)) return false;
+    const bool bEnemyTarget = Owner->IsA<ABreakerEnemy>() && Source != Owner && !(Source && Source->IsA<ABreakerEnemy>());
+    const bool bImmune = IsStaggerImmune();
+    const bool bLockstep = bEnemyTarget && Application.bLockstep;
+    const bool bShockwave = bEnemyTarget && Application.bShockwave;
+    if (bImmune && !bLockstep) return false;
+    const float DurationMultiplier = Application.DurationMultiplier;
+    const float Reduction = bEnemyTarget ? Application.ResistanceReduction : 0.0f;
+    // Lockstep bypasses binary enemy immunity, not full numeric resistance.
+    const float Duration = Seconds * FMath::Max(0.0f, DurationMultiplier)
+        * (1.0f - FMath::Clamp(StaggerResistance - Reduction, 0.0f, 1.0f)) * (bImmune ? .5f : 1.0f);
+    if (!FMath::IsFinite(Duration) || Duration <= 0) return false;
     StaggerEndTime = FMath::Max(StaggerEndTime, GetWorld()->GetTimeSeconds() + Duration);
     bStaggerActive = true;
     GetWorld()->GetTimerManager().SetTimer(StaggerTimer, this, &ThisClass::EndStagger, GetStaggerRemaining(), false);
@@ -132,6 +167,26 @@ bool UBreakerCombatComponent::ApplyStagger(float Seconds)
     if (auto* Enemy = Cast<ABreakerEnemy>(Owner)) Enemy->InterruptCombatAction();
     if (auto* Abilities = Owner->FindComponentByClass<UBreakerAbilityComponent>()) Abilities->InterruptActiveActions();
     if (IsValid(Owner) && !Owner->IsActorBeingDestroyed()) Owner->ForceNetUpdate();
+    Source = Application.Source.Get();
+    if (bShockwave && IsValid(Source) && !Source->IsActorBeingDestroyed() && IsValid(Owner) && !Owner->IsActorBeingDestroyed())
+    {
+        TArray<ABreakerEnemy*> Nearby;
+        const FVector Origin = Owner->GetActorLocation();
+        for (TActorIterator<ABreakerEnemy> It(GetWorld()); It; ++It)
+            if (*It != Owner && *It != Source && !It->IsActorBeingDestroyed()
+                && FVector::DistSquared(Origin, It->GetActorLocation()) <= FMath::Square(300.0f)) Nearby.Add(*It);
+        Nearby.Sort([&](const ABreakerEnemy& A, const ABreakerEnemy& B)
+        {
+            const double DA = FVector::DistSquared(Origin, A.GetActorLocation());
+            const double DB = FVector::DistSquared(Origin, B.GetActorLocation());
+            return DA == DB ? A.GetUniqueID() < B.GetUniqueID() : DA < DB;
+        });
+        FBreakerStaggerApplication Secondary = Application;
+        Secondary.bShockwave = false;
+        for (ABreakerEnemy* Enemy : Nearby)
+            if (auto* Combat = Enemy->FindComponentByClass<UBreakerCombatComponent>())
+                if (Combat->ApplyStaggerResolved(Secondary)) break;
+    }
     return true;
 }
 
@@ -235,7 +290,7 @@ void UBreakerCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType
     // their shields through the Warded modifier's recharge, and a shielded
     // target dummy that refilled itself would quietly move every TTK probe.
     if (Attributes && GetOwner() && GetOwner()->HasAuthority()
-        && Cast<APawn>(GetOwner()) && Cast<APawn>(GetOwner())->IsPlayerControlled())
+        && !IsDead() && Cast<APawn>(GetOwner()) && Cast<APawn>(GetOwner())->IsPlayerControlled())
     {
         const auto* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
         const float Current = Attributes->GetShield();
@@ -243,6 +298,11 @@ void UBreakerCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType
             GetSecondsSinceDamage(), DeltaTime, FMath::Max(0.0f, BreakerShield::RechargeDelaySeconds -
                 (Progression ? Progression->GetNodeStats().ShieldRechargeDelayReduction : 0.0f)));
         if (Next > Current) Attributes->ApplyShield(Next);
+        RefreshCoreFrontShieldCapacity();
+        if (!IsDead())
+            CoreFrontShield = BreakerShield::RechargeStep(CoreFrontShield, CoreFrontShieldMax,
+                GetSecondsSinceDamage(), DeltaTime, FMath::Max(0.0f, BreakerShield::RechargeDelaySeconds -
+                    (Progression ? Progression->GetNodeStats().ShieldRechargeDelayReduction : 0.0f)));
 
         const ABreakerCharacter* Player = Cast<ABreakerCharacter>(GetOwner());
         if (Player && !IsDead())
@@ -271,6 +331,7 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
 {
     FBreakerDamageResult Result;
     if (!Attributes || !GetOwner() || !GetOwner()->HasAuthority() || IsDead()) return Result;
+    RefreshCoreFrontShieldCapacity();
     if (const auto* Deployable = Cast<ABreakerDeployable>(GetOwner()); Deployable && Deployable->RejectsIncidentalAreaDamage(Request)) return Result;
     const TArray<FBreakerElementShare> ElementShares = BreakerElementShares::Resolve(Request);
     const bool bCanDispatchElements = !bDispatchingElementHit;
@@ -301,6 +362,13 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
         ParryCounterEnd = ParryClock() + FMath::Max(0.0f, ParryCounterSeconds);
         if (HasPerfectGuardPermission()) PerfectGuardEnd = ParryClock() + FMath::Max(0.0f, PerfectGuardSeconds);
         const auto* ParryProgression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+        if (ParryProgression && ParryProgression->HasNodeTag(
+            FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Bulwark.Wall"))))
+        {
+            FrontShield = FrontShieldMax;
+            CoreFrontShield = CoreFrontShieldMax;
+            bFrontShieldBroken = false;
+        }
         if (ParryProgression && ParryProgression->HasNodeTag(
             FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Bulwark.Riposte"))))
         {
@@ -336,9 +404,14 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     // Decided per hit off the request's own source location, the same
     // geometry IsRearArcHit answers with, so presentation and payment agree.
     const float WardBefore = Defense.Shield;
-    const bool bFrontPoolStands = FrontShieldMax > 0.0f && !bFrontShieldBroken && FrontShield > 0.0f
-        && !Request.bBypassShield && Request.bHasSourceLocation && !IsRearArcHit(Request.SourceLocation);
-    if (bFrontPoolStands) Defense.Shield += FrontShield;
+    const auto* FrontProgression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+    const bool bRear = Request.bHasSourceLocation && IsRearArcHit(Request.SourceLocation);
+    const bool bThirdLayer = FrontProgression && FrontProgression->HasNodeTag(
+        FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Constitution.ThirdLayer")));
+    const float FrontEfficiency = bRear ? (bThirdLayer ? .5f : 0.0f) : 1.0f;
+    const float AvailableFront = GetFrontShield() * FrontEfficiency;
+    const bool bFrontPoolStands = AvailableFront > 0.0f && !Request.bBypassShield && Request.bHasSourceLocation;
+    if (bFrontPoolStands) Defense.Shield += AvailableFront;
     // Flat strippers (Rot, Disruptor) come off here, clamped at zero: negative
     // armour would invert the mitigation formula into a damage bonus.
     Defense.Armor = GetEffectiveArmor();
@@ -397,6 +470,9 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     // Pushed incoming modifiers compose on top, in the same stage: Caster's
     // Overcast penalty, and defensive windows when they land.
     Defense.IncomingDamageMultiplier *= GetComposedIncomingDamageMultiplier();
+    if (Progression && Request.Instigator.Get() != GetOwner() && Progression->HasNodeTag(
+        FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Velocity.NoGround"))))
+        Defense.IncomingDamageMultiplier *= 1.30f;
     // Effective-health More increases the durability of every existing pool,
     // including against true damage. It neither creates capacity nor heals;
     // the selected source competes in the same three slots as offensive Mores.
@@ -447,6 +523,11 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     // actually fired against this target with the source split present.
     FBreakerDamageRequest ResolvedRequest = Request;
     ApplyTargetConditionRiders(ResolvedRequest);
+    if (!ResolvedRequest.bIsDamageOverTime && GetOwner()->IsA<ABreakerEnemy>() && IsStaggered())
+        if (const AActor* Attacker = ResolvedRequest.Instigator.Get(); Attacker && Attacker != GetOwner())
+            if (const auto* SourceProgression = Attacker->FindComponentByClass<UBreakerProgressionComponent>(); SourceProgression
+                && SourceProgression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Control.Interrupt"))))
+                UBreakerDamageLibrary::AddSourceIncreased(ResolvedRequest, 15.0f);
     Result = UBreakerDamageLibrary::ResolveDamage(ResolvedRequest, Defense);
     if (Result.bDodged)
     {
@@ -463,12 +544,15 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     bool bFrontBrokeThisHit = false;
     if (bFrontPoolStands)
     {
-        const BreakerShield::FFrontSpend Spend = BreakerShield::SpendFrontPool(FrontShield, Result.ShieldDamage);
-        FrontShield = Spend.Remaining;
+        const BreakerShield::FFrontSpend Spend = BreakerShield::SpendFrontPool(AvailableFront, Result.ShieldDamage);
+        const float RawSpend = (AvailableFront - Spend.Remaining) / FrontEfficiency;
+        const float CoreSpend = FMath::Min(CoreFrontShield, RawSpend);
+        CoreFrontShield = FMath::Max(0.0f, CoreFrontShield - CoreSpend);
+        FrontShield = FMath::Max(0.0f, FrontShield - (RawSpend - CoreSpend));
+        if (FrontShieldMax > 0.0f && FrontShield <= 0.0f) bFrontShieldBroken = true;
         Result.RemainingShield = FMath::Max(0.0f, WardBefore - Spend.Spill);
         if (Spend.bBroke)
         {
-            bFrontShieldBroken = true;
             bFrontBrokeThisHit = true;
         }
     }
@@ -488,6 +572,7 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     Attributes->ApplyShield(Result.RemainingShield);
     Attributes->ApplyHealth(Result.RemainingHealth);
     UBreakerStatusComponent* ElementStatus = GetOwner()->FindComponentByClass<UBreakerStatusComponent>();
+    if (ElementStatus) ElementStatus->AccrueVoidDebt(ResolvedRequest, Result);
     uint64 PendingRiftActivation = 0;
     uint64 PendingReaction = 0;
     if (UBreakerStatusComponent* Status = ElementStatus; Status && bCanDispatchElements)
@@ -754,16 +839,26 @@ void UBreakerCombatComponent::ArmFrontShield(float Amount)
     bFrontShieldBroken = false;
 }
 
+void UBreakerCombatComponent::RefreshCoreFrontShieldCapacity()
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !Attributes) return;
+    const auto* Player = Cast<ABreakerCharacter>(GetOwner());
+    const auto* Progression = Player ? Player->GetProgression() : nullptr;
+    CoreFrontShieldMax = Progression ? Attributes->GetMaxHealth()
+        * FMath::Max(0.0f, Progression->GetNodeStats().FrontShieldPercentMaxHealth) * .01f : 0.0f;
+    CoreFrontShield = FMath::Min(CoreFrontShield, CoreFrontShieldMax);
+}
+
 float UBreakerCombatComponent::GetDisplayShield() const
 {
     const float Ward = Attributes ? Attributes->GetShield() : 0.0f;
-    return Ward + (bFrontShieldBroken ? 0.0f : FrontShield);
+    return Ward + (bFrontShieldBroken ? 0.0f : FrontShield) + CoreFrontShield;
 }
 
 float UBreakerCombatComponent::GetDisplayMaxShield() const
 {
     const float Ward = Attributes ? Attributes->GetMaxShield() : 0.0f;
-    return Ward + (bFrontShieldBroken ? 0.0f : FrontShieldMax);
+    return Ward + (bFrontShieldBroken ? 0.0f : FrontShieldMax) + CoreFrontShieldMax;
 }
 
 void UBreakerCombatComponent::PushOutgoingModifier(FName Key, float FlatBonus, float MoreMultiplier, float ExpirySeconds)
@@ -1225,6 +1320,8 @@ void UBreakerCombatComponent::RestoreVitals()
     // the reset path unexercisable in automation exactly like the resource one.
     Attributes->ApplyHealth(Attributes->GetMaxHealth());
     Attributes->ApplyShield(Attributes->GetMaxShield());
+    RefreshCoreFrontShieldCapacity();
+    CoreFrontShield = CoreFrontShieldMax;
     bDeathBroadcast = false;
     OnVitalsRestored.Broadcast();
 }

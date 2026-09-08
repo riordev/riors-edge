@@ -12,6 +12,10 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Movement/BreakerCharacterMovementComponent.h"
+#include "Items/BreakerEquipmentComponent.h"
+#include "Items/BreakerLootLibrary.h"
+#include "Progression/BreakerClassDefinition.h"
+#include "Progression/BreakerProgressionNode.h"
 #include "Progression/BreakerExperience.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
@@ -98,10 +102,29 @@ bool FBreakerInterpositionRuntimeTest::RunTest(const FString& Parameters)
     CheckPosition(-500, BaselineCap);
     CheckPosition(-200, BaselineCap + Bonus);
     CheckPosition(-200, BaselineCap + Bonus);
+    auto* Core = NewObject<UBreakerProgressionTree>(); Core->TreeId = TEXT("Test.Anchor.CoreShield");
+    Core->Currency = EBreakerPointCurrency::CorePoints;
+    auto* Layer = NewObject<UBreakerProgressionNode>(Core); Layer->NodeId = TEXT("Test.Anchor.Layer");
+    Layer->Currency = Core->Currency;
+    FBreakerNodeEffect Capacity; Capacity.StatTarget = EBreakerNodeStatTarget::ShieldPercentMaxHealth;
+    Capacity.StatBucket = EBreakerNodeStatBucket::Flat; Capacity.ValuePerRank = 40;
+    Layer->Effects.Add(Capacity); Core->Nodes.Add(Layer);
+    auto* Definition = DuplicateObject<UBreakerClassDefinition>(Progression->ClassDefinition, Progression);
+    Definition->BranchTrees.Add(Core); Progression->ClassDefinition = Definition;
+    if (!TestTrue(TEXT("Level-earned Core shield purchase beside paid Anchor"), Progression->PurchaseNode(Core, Layer->NodeId, Reason))) return false;
+    auto* Gear = Tank->GetEquipment(); Gear->BindAttributes(Attributes);
+    FBreakerItemInstance Body;
+    for (int32 Seed = 1; Seed <= 100; ++Seed)
+    { Body = UBreakerLootLibrary::RollItem(TEXT("Test.Anchor.Shield"), EBreakerEquipSlot::BodyArmour, EBreakerItemRarity::Standard, 1, Seed); if (Body.ArmourArchetype == EBreakerArmourArchetype::Shield) break; }
+    if (!TestTrue(TEXT("Actual shield armour equips beside paid Anchor"), Body.ArmourArchetype == EBreakerArmourArchetype::Shield && Gear->EquipItem(Body))) return false;
+    const float CombinedBase = Gear->GetStats().BaseShieldFromGear + Attributes->GetMaxHealth() * .4f;
+    CheckPosition(-200, CombinedBase + Attributes->GetMaxHealth() * .1f);
+    CheckPosition(200, CombinedBase);
+    CheckPosition(-200, CombinedBase + Attributes->GetMaxHealth() * .1f);
     Anchor->Destroy();
-    TestEqual(TEXT("actual destruction delegate immediately removes headroom"), Attributes->GetMaxShield(), BaselineCap, .001f);
+    TestEqual(TEXT("actual destruction delegate immediately removes headroom"), Attributes->GetMaxShield(), CombinedBase, .001f);
     Grit->AdvanceLoop(.05f);
-    TestEqual(TEXT("destroyed Anchor removes headroom"), Attributes->GetMaxShield(), BaselineCap, .001f);
+    TestEqual(TEXT("destroyed Anchor removes headroom"), Attributes->GetMaxShield(), CombinedBase, .001f);
     TestEqual(TEXT("destroyed Anchor never paid shield"), Attributes->GetShield(), BaselineShield, .001f);
     return true;
 }

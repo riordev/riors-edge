@@ -73,6 +73,9 @@ struct RIORSEDGE_API FBreakerSkillSnapshot
     // A copy of the character's live aggregator: true bases, live gear
     // contribution, live progression contribution.
     FBreakerAttributeAggregator Aggregator;
+    float NativeShieldCapacity = 0.0f;
+    float EquipmentShieldCapacity = 0.0f;
+    float ClassShieldHealthFloor = 0.0f;
     // False when the character has no attribute set with captured bases (no
     // ability system, a menu opened outside play). The tree-layer rows still
     // read true; the composed rows fall back to the tree layer alone and are

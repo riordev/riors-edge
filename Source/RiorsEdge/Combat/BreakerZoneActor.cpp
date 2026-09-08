@@ -7,6 +7,7 @@
 #include "Progression/BreakerProgressionComponent.h"
 
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerDamageLibrary.h"
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerStatusComponent.h"
 #include "Combat/BreakerZoneMath.h"
@@ -84,6 +85,13 @@ void ABreakerZoneActor::BeginPlay()
 
 void ABreakerZoneActor::EndPlay(const EEndPlayReason::Type Reason)
 {
+    CancelDetonation();
+    if (AActor* Caster = ZoneInstigator.Get())
+    {
+        Caster->OnDestroyed.RemoveDynamic(this, &ThisClass::CancelDetonationOnDestroyed);
+        if (auto* Combat = Caster->FindComponentByClass<UBreakerCombatComponent>())
+            Combat->OnDeath.RemoveDynamic(this, &ThisClass::CancelDetonation);
+    }
     ResetRimEffect();
     ReleaseLongDarkPause();
     // Unconditional teardown, including a level transition and a destroyed
@@ -108,6 +116,8 @@ void ABreakerZoneActor::ConfigureZone(const FBreakerZoneSpec& InSpec, AActor* In
     bRadiusGrowthConsumed = false;
     ResetRimEffect();
     ZoneInstigator = InInstigator;
+    ActiveAge = 0.0;
+    SnapshotDamageRules(InSpec);
     AcquireLongDarkPause();
     LastAdvanceWorldTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0;
     BreakerZoneActorLocal::BreakerLiveZones.AddUnique(this);
@@ -121,6 +131,7 @@ void ABreakerZoneActor::ConfigureZone(const FBreakerZoneSpec& InSpec, AActor* In
     // to anyone who recasts it on top of itself.
     TimeUntilNextTick = FMath::Max(0.05f, Spec.TickInterval);
     TicksDelivered = 0;
+    bExpiring = false;
     bReleased = false;
     // Deliberately no SetLifeSpan: the zone owns its own clock (RemainingDuration
     // is pausable, a lifespan timer is not), and SetLifeSpan dereferences the
@@ -140,6 +151,71 @@ void ABreakerZoneActor::RefreshDuration(float NewDuration)
     // spamming Rot cannot bank duration.
     RemainingDuration = FMath::Max(RemainingDuration, static_cast<double>(FMath::Max(0.0f, NewDuration)));
     SyncRimLifetime();
+}
+
+void ABreakerZoneActor::RefreshPaidPayload(const FBreakerZoneSpec& NewSpec)
+{
+    if (!HasAuthority() || bReleased) return;
+    RefreshDuration(NewSpec.Duration);
+    Spec.TickDamage = NewSpec.TickDamage;
+    SnapshotDamageRules(NewSpec);
+}
+
+void ABreakerZoneActor::SnapshotDamageRules(const FBreakerZoneSpec& NewSpec)
+{
+    AActor* Caster = ZoneInstigator.Get();
+    const auto* Progression = Caster ? Caster->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    bStanding = Progression && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Standing")));
+    bDetonation = Progression && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Detonation")));
+    bDetonationPending = false;
+    if (!Caster) return;
+    auto* Combat = Caster->FindComponentByClass<UBreakerCombatComponent>();
+    if (Combat) Combat->OnDeath.AddUniqueDynamic(this, &ThisClass::CancelDetonation);
+    Caster->OnDestroyed.AddUniqueDynamic(this, &ThisClass::CancelDetonationOnDestroyed);
+    const int32 Count = UBreakerZoneMath::FundedTicks(NewSpec.Duration, NewSpec.TickInterval);
+    if (!bDetonation || Count <= 0 || NewSpec.TickDamage.BaseDamage <= 0 || (Combat && Combat->IsDead())) return;
+    DetonationDamage = NewSpec.TickDamage;
+    DetonationDamage.SetInstigator(Caster);
+    // Standing applies only to the funded slices whose scheduled age matured.
+    if (bStanding) UBreakerDamageLibrary::AddSourceIncreased(DetonationDamage,
+        UBreakerZoneMath::StandingIncreased(NewSpec.Duration, NewSpec.TickInterval, ActiveAge));
+    if (Combat) Combat->ApplyOutgoingModifiers(DetonationDamage);
+    DetonationDamage.BaseDamage *= Count;
+    bDetonationPending = true;
+}
+
+void ABreakerZoneActor::CancelDetonation()
+{
+    bDetonationPending = false;
+}
+
+void ABreakerZoneActor::CancelDetonationOnDestroyed(AActor* Actor)
+{
+    CancelDetonation();
+}
+
+void ABreakerZoneActor::DeliverDetonation()
+{
+    if (!bDetonationPending) return;
+    bDetonationPending = false; // Claim before damage/death callbacks can reenter.
+    AActor* Caster = ZoneInstigator.Get();
+    const auto* SourceCombat = Caster ? Caster->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    if (!Caster || (SourceCombat && SourceCombat->IsDead())) return;
+    const TArray<TWeakObjectPtr<AActor>> Snapshot = Occupants;
+    int32 Index = 0;
+    for (const auto& Held : Snapshot)
+    {
+        AActor* Occupant = Held.Get();
+        if (!ShouldAffectActor(Occupant)) continue;
+        if (auto* Combat = Occupant->FindComponentByClass<UBreakerCombatComponent>())
+        {
+            FBreakerDamageRequest Request = DetonationDamage;
+            Request.SourceLocation = GetActorLocation();
+            Request.bHasSourceLocation = true;
+            Request.RandomSeed = HashCombine(Request.RandomSeed, static_cast<uint32>(++Index));
+            Combat->ReceiveDamage(Request);
+        }
+    }
 }
 
 bool ABreakerZoneActor::GrowRadiusOnce(float AdditionalRadiusCm)
@@ -279,6 +355,7 @@ void ABreakerZoneActor::Tick(float DeltaSeconds)
 
 void ABreakerZoneActor::AdvanceZone(float DeltaSeconds)
 {
+    if (bExpiring) return;
     if (!HasAuthority() || bReleased) return;
     if (LongDarkOwner.IsValid() && !HasLongDarkPause()) ReleaseLongDarkPause();
 
@@ -302,16 +379,21 @@ void ABreakerZoneActor::AdvanceZone(float DeltaSeconds)
     LastAdvanceWorldTime = Now;
     const double AgingSeconds = Elapsed - PausedSeconds;
     const double ActiveSeconds = FMath::Min(Elapsed, FMath::Max(0.0, RemainingDuration) + PausedSeconds);
+    const double FirstTickAge = ActiveAge + TimeUntilNextTick;
     const int32 Ticks = UBreakerZoneMath::ConsumeTicks(TimeUntilNextTick, ActiveSeconds, Spec.TickInterval, MaximumTicksPerAdvance);
     for (int32 Index = 0; Index < Ticks; ++Index)
     {
-        DeliverTick();
+        DeliverTick(FirstTickAge + Index * FMath::Max(0.05f, Spec.TickInterval));
     }
+
+    ActiveAge += ActiveSeconds;
 
     RemainingDuration -= AgingSeconds;
     SyncRimLifetime();
     if (RemainingDuration <= 0.0f && !IsExpiryPaused())
     {
+        bExpiring = true;
+        DeliverDetonation();
         ReleaseAllOccupants();
         OnZoneExpired.Broadcast();
         Destroy();
@@ -390,7 +472,7 @@ bool ABreakerZoneActor::ShouldAffectActor(AActor* Candidate) const
     return true;
 }
 
-void ABreakerZoneActor::DeliverTick()
+void ABreakerZoneActor::DeliverTick(double ScheduledAge)
 {
     ++TicksDelivered;
     AActor* Caster = ZoneInstigator.Get();
@@ -409,9 +491,10 @@ void ABreakerZoneActor::DeliverTick()
         UBreakerCombatComponent* Combat = Occupant->FindComponentByClass<UBreakerCombatComponent>();
         if (!Combat) continue;
 
-        if (Spec.TickDamage.BaseDamage > 0.0f)
+        if (!bDetonation && Spec.TickDamage.BaseDamage > 0.0f)
         {
             FBreakerDamageRequest Request = Spec.TickDamage;
+            if (bStanding && ScheduledAge >= 3.0 - 1.e-6) UBreakerDamageLibrary::AddSourceIncreased(Request, 10.0f);
             // The caster is the Instigator on every tick, which is what makes
             // kill credit, OnHitDealt/OnKillDealt and outgoing-damage modifiers
             // work for a puddle exactly as they do for a bullet.
@@ -513,6 +596,7 @@ void ABreakerZoneActor::ReleaseAllOccupants()
 {
     if (bReleased) return;
     bReleased = true;
+    CancelDetonation();
     for (const TWeakObjectPtr<AActor>& Held : Occupants)
     {
         AActor* Occupant = Held.Get();

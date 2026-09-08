@@ -12,6 +12,9 @@
   "voidThresholdHealthFraction": 0.1,
   "voidDamageFraction": 0.5,
   "voidDelaySeconds": 2.0,
+  "voidPatienceDamageFraction": 0.7,
+  "voidPatienceDelaySeconds": 3.0,
+  "voidDebtFraction": 0.15,
   "voidBuildupTimeoutSeconds": 4.0,
   "alteredAttackVoidFraction": 0.5,
   "alteredVoidResistancePercent": 25.0,
@@ -19,5 +22,7 @@
   "riftDamageFraction": 0.5,
   "riftBuildupTimeoutSeconds": 4.0,
   "riftMarkerSeconds": 1.0,
-  "riftDisplacementCm": 200.0
+  "riftDisplacementCm": 200.0,
+  "riftImpactDamageFraction": 1.0,
+  "riftHardLandingDamageFraction": 0.25
 }

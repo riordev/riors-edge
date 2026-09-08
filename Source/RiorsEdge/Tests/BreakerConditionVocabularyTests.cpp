@@ -460,7 +460,9 @@ bool FBreakerConditionVocabularyStatTargetTest::RunTest(const FString& Parameter
     // gear-migration note.
     //
     // This number goes up in the same commit as the lane, never before it.
-    TestEqual(TEXT("stat targets with an aggregation lane today"), Wired, 76);
+    TestEqual(TEXT("stat targets with an aggregation lane today"), Wired, 80);
+    TestTrue(TEXT("Core front capacity has an aggregation lane"), BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget::FrontShieldPercentMaxHealth));
+    TestTrue(TEXT("Core shield capacity has an aggregation lane"), BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget::ShieldPercentMaxHealth));
     TestTrue(TEXT("Parry window seconds have an aggregation lane"), BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget::ParryWindowAddedSeconds));
     TestTrue(TEXT("Parry cooldown seconds have an aggregation lane"), BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget::ParryCooldownReductionSeconds));
     TestTrue(TEXT("Parry cooldown recovery has an aggregation lane"), BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget::ParryCooldownRecovery));

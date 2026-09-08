@@ -404,11 +404,7 @@ void UBreakerAbility_Rend::ActivateAbility(const FGameplayAbilitySpecHandle Hand
         // for a Tank is zero — see ShieldCeilingHealthFraction's declaration.
         if (SourceAttributes)
         {
-            const float Ceiling = SourceAttributes->GetMaxHealth() * ShieldCeilingHealthFraction;
-            if (Ceiling > SourceAttributes->GetMaxShield())
-            {
-                GetBreakerAttributes()->ApplyMaxShield(Ceiling);
-            }
+            GetBreakerAttributes()->SetTankShieldHealthFloor(ShieldCeilingHealthFraction);
         }
         FBreakerHealRequest Heal;
         Heal.Amount = TotalPostMitigation * HealFraction;
@@ -1084,7 +1080,7 @@ void UBreakerAbility_GroundZero::HandlePlungeLanded(const FHitResult& Hit)
     // Shared O80 interrupt state preserves unrelated movement modifiers.
     for (const TWeakObjectPtr<UBreakerCombatComponent>& Target : DamagedTargets)
         if (UBreakerCombatComponent* EnemyCombat = Target.Get(); EnemyCombat && !EnemyCombat->IsDead())
-            EnemyCombat->ApplyStagger(EffectiveStagger);
+            EnemyCombat->ApplyStaggerFrom(Character, EffectiveStagger);
 
     if (IsActive()) EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }

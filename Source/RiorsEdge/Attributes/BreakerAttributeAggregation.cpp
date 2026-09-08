@@ -18,6 +18,8 @@ namespace
 void FBreakerAttributeContribution::Reset()
 {
     bDeadeye = false;
+    bNoGround = bMoveToWeapon = bMoveToAbility = false;
+    PositiveMovementIncreased = 0;
     PositiveCriticalFlat = PositiveCriticalIncreased = 0.0f;
     PositiveCriticalMore = 1.0f;
     DamageMoreSources.Reset();
@@ -41,6 +43,7 @@ void FBreakerAttributeContribution::AddIncreasedPercent(EBreakerAggregatedAttrib
     const int32 Index = AttributeIndex(Attribute);
     if (Index != INDEX_NONE) IncreasedPercent[Index] += Percent;
     if (Attribute == EBreakerAggregatedAttribute::CriticalMultiplier) PositiveCriticalIncreased += FMath::Max(0.0f, Percent);
+    if (Attribute == EBreakerAggregatedAttribute::MoveSpeed) PositiveMovementIncreased += FMath::Max(0.0f, Percent);
 }
 
 void FBreakerAttributeContribution::AddSharedIncreasedDamage(float Percent)
@@ -124,7 +127,8 @@ float FBreakerAttributeContribution::GetMore(EBreakerAggregatedAttribute Attribu
 
 bool FBreakerAttributeContribution::IsIdentity() const
 {
-    if (bDeadeye || PositiveCriticalFlat != 0.0f || PositiveCriticalIncreased != 0.0f
+    if (bDeadeye || bNoGround || bMoveToWeapon || bMoveToAbility || PositiveMovementIncreased != 0
+        || PositiveCriticalFlat != 0.0f || PositiveCriticalIncreased != 0.0f
         || PositiveCriticalMore != 1.0f || !DamageMoreSources.IsEmpty()) return false;
     for (int32 Index = 0; Index < AttributeCount; ++Index)
     {
@@ -207,6 +211,7 @@ float FBreakerAttributeAggregator::ComposedFlatFactor(EBreakerAggregatedAttribut
 
 float FBreakerAttributeAggregator::ComposedIncreasedPercent(EBreakerAggregatedAttribute Attribute) const
 {
+    const auto& Rules = GetContribution(EBreakerAttributeContributor::Progression);
     const int32 Index = AttributeIndex(Attribute);
     if (Index == INDEX_NONE) return 0.0f;
 
@@ -215,8 +220,18 @@ float FBreakerAttributeAggregator::ComposedIncreasedPercent(EBreakerAggregatedAt
     for (int32 Contributor = 0; Contributor < ContributorCount; ++Contributor)
     {
         IncreasedPercent += Contributions[Contributor].GetIncreasedPercent(Attribute);
+        if (Attribute == EBreakerAggregatedAttribute::MoveSpeed && Rules.HasNoGround())
+            IncreasedPercent += Contributions[Contributor].GetPositiveMovementIncreased();
         if (Attribute == EBreakerAggregatedAttribute::CriticalMultiplier && HasDeadeye())
             IncreasedPercent -= 0.5f * Contributions[Contributor].GetPositiveCriticalIncreased();
+    }
+    const bool bConverts = (Attribute == EBreakerAggregatedAttribute::DamageMultiplier && Rules.ConvertsMovementToWeapon())
+        || (Attribute == EBreakerAggregatedAttribute::AbilityDamageMultiplier && Rules.ConvertsMovementToAbility());
+    if (bConverts)
+    {
+        const float BaseSpeed = GetBase(EBreakerAggregatedAttribute::MoveSpeed);
+        if (BaseSpeed > UE_KINDA_SMALL_NUMBER)
+            IncreasedPercent += FMath::Max(0.0f, Compose(EBreakerAggregatedAttribute::MoveSpeed) / BaseSpeed - 1.0f) * 50.0f;
     }
     return IncreasedPercent;
 }

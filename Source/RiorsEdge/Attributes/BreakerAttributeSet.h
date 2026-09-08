@@ -171,6 +171,14 @@ public:
     // the class's authored ceiling through here (Class-Kits-Tank §T1: 25% of
     // maximum health).
     void ApplyMaxShield(float NewValue);
+    void SetEquipmentShieldCapacity(float Amount);
+    void SetCoreShieldHealthFraction(float Fraction);
+    void SetTankShieldHealthFloor(float Fraction);
+    void SetSupportShieldHealthFloor(float Fraction);
+    void SetTemporaryShieldHealthFraction(float Fraction);
+    void BeginShieldCapacityUpdate() { ++ShieldCapacityUpdateDepth; }
+    void EndShieldCapacityUpdate();
+    virtual void PostAttributeChange(const FGameplayAttribute& Attribute, float OldValue, float NewValue) override;
     // Same reason, for the monster chassis. ABreakerEnemy::ApplyChassis wrote
     // MaxHealth through the generated setter, so constructing an enemy outside
     // a world ensured — which meant the chassis curve could only ever be tested
@@ -194,6 +202,9 @@ public:
     float GetAttributeBase(EBreakerAggregatedAttribute Attribute) const { return Aggregator.GetBase(Attribute); }
     float GetComposedAttribute(EBreakerAggregatedAttribute Attribute) const { return Aggregator.Compose(Attribute); }
     const FBreakerAttributeAggregator& GetAttributeAggregator() const { return Aggregator; }
+    float GetNativeShieldCapacity() const { return NativeShieldBase; }
+    float GetEquipmentShieldCapacity() const { return EquipmentShieldCapacity; }
+    float GetClassShieldHealthFloor() const { return FMath::Max(TankShieldHealthFloor, SupportShieldHealthFloor); }
     float GetScopedMoreProduct(bool bElemental, bool bVoid, bool bReaction, bool bEffectiveHealth) const
     { return Aggregator.GetScopedMoreProduct(bElemental, bVoid, bReaction, bEffectiveHealth); }
 
@@ -221,6 +232,18 @@ protected:
 
 private:
     FBreakerAttributeAggregator Aggregator;
+    // Native base starts at the constructor's zero, never a captured composed
+    // value. Named capacity sources cannot overwrite or refill one another.
+    float NativeShieldBase = 0.0f;
+    float EquipmentShieldCapacity = 0.0f;
+    float CoreShieldHealthFraction = 0.0f;
+    float TankShieldHealthFloor = 0.0f;
+    float SupportShieldHealthFloor = 0.0f;
+    float TemporaryShieldHealthFraction = 0.0f;
+    bool bWritingComposedShield = false;
+    int32 ShieldCapacityUpdateDepth = 0;
+    float ComposeShieldCapacity() const;
+    void RecomposeShieldCapacity();
 
     // Re-derives every aggregated attribute from the captured bases and the
     // current contributions. The only place those attributes are written by

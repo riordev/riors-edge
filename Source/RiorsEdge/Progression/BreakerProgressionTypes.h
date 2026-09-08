@@ -304,6 +304,10 @@ enum class EBreakerNodeStatTarget : uint8
     ParryWindowAddedSeconds,
     ParryCooldownReductionSeconds,
     ParryCooldownRecovery,
+    FrontShieldPercentMaxHealth,
+    ShieldPercentMaxHealth,
+    StaggerDuration,
+    EnemyStaggerResistanceReduction,
 
     Count UMETA(Hidden)
 };
@@ -396,6 +400,10 @@ inline bool BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget Target)
     case EBreakerNodeStatTarget::ParryWindowAddedSeconds:
     case EBreakerNodeStatTarget::ParryCooldownReductionSeconds:
     case EBreakerNodeStatTarget::ParryCooldownRecovery:
+    case EBreakerNodeStatTarget::FrontShieldPercentMaxHealth:
+    case EBreakerNodeStatTarget::ShieldPercentMaxHealth:
+    case EBreakerNodeStatTarget::StaggerDuration:
+    case EBreakerNodeStatTarget::EnemyStaggerResistanceReduction:
     case EBreakerNodeStatTarget::MaxClassResource:
     case EBreakerNodeStatTarget::ClassResourceRegen:
     case EBreakerNodeStatTarget::FireRate:
@@ -825,6 +833,15 @@ struct RIORSEDGE_API FBreakerNodeStats
     UPROPERTY(BlueprintReadOnly) float ParryWindowAddedSeconds = 0.0f;
     UPROPERTY(BlueprintReadOnly) float ParryCooldownReductionSeconds = 0.0f;
     UPROPERTY(BlueprintReadOnly) float ParryCooldownRecoveryMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float FrontShieldPercentMaxHealth = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float ShieldPercentMaxHealth = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float StaggerDurationMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float EnemyStaggerResistanceReductionPercent = 0.0f;
+    UPROPERTY(BlueprintReadOnly) bool bVectorField = false;
+    UPROPERTY(BlueprintReadOnly) bool bRiftImpact = false;
+    UPROPERTY(BlueprintReadOnly) bool bHardLanding = false;
+    UPROPERTY(BlueprintReadOnly) bool bVoidPatience = false;
+    UPROPERTY(BlueprintReadOnly) bool bVoidDebt = false;
     UPROPERTY(BlueprintReadOnly) bool bRotDensity = false;
     UPROPERTY(BlueprintReadOnly) bool bLongDark = false;
     UPROPERTY(BlueprintReadOnly) bool bHemorrhage = false;
@@ -982,6 +999,10 @@ struct RIORSEDGE_API FBreakerStatusApplicationSpec
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHasAilmentRuleSnapshot = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHemorrhageSnapshot = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bLongDarkSnapshot = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bVectorFieldSnapshot = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bRiftImpactSnapshot = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHardLandingSnapshot = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bVoidDebtSnapshot = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 AdditionalStackCapSnapshot = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float ProcCoefficient = 1.0f;
     // DoTs snapshot this structure at application. Later source-stat changes

@@ -279,10 +279,6 @@ private:
     UFUNCTION() void HandleInterpositionAnchorDestroyed(AActor* Actor);
     TWeakObjectPtr<UBreakerEquipmentComponent> InterpositionEquipment;
     TWeakObjectPtr<ABreakerDeployable> InterpositionAnchor;
-    bool bOwnsInterpositionHeadroom = false;
-    float InterpositionUnboostedMax = 0.0f;
-    float InterpositionLastWrittenMax = 0.0f;
-    float InterpositionGearBase = 0.0f;
     bool IsInSafeZone() const;
     void ApplyGritDelta(float Delta);
     void RefreshBand();

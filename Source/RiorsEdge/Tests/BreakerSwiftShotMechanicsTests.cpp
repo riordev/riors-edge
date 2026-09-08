@@ -306,7 +306,11 @@ bool FBreakerSwiftChannelLanesTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Parry window seconds append"), static_cast<int32>(EBreakerNodeStatTarget::ParryWindowAddedSeconds), 75);
     TestEqual(TEXT("Parry cooldown seconds append"), static_cast<int32>(EBreakerNodeStatTarget::ParryCooldownReductionSeconds), 76);
     TestEqual(TEXT("Parry recovery appends"), static_cast<int32>(EBreakerNodeStatTarget::ParryCooldownRecovery), 77);
-    TestEqual(TEXT("Parry recovery is the current tail"), static_cast<int32>(EBreakerNodeStatTarget::ParryCooldownRecovery), static_cast<int32>(EBreakerNodeStatTarget::Count) - 1);
+    TestEqual(TEXT("Core front capacity appends"), static_cast<int32>(EBreakerNodeStatTarget::FrontShieldPercentMaxHealth), 78);
+    TestEqual(TEXT("Core shield capacity appends"), static_cast<int32>(EBreakerNodeStatTarget::ShieldPercentMaxHealth), 79);
+    TestEqual(TEXT("Stagger duration appends"), static_cast<int32>(EBreakerNodeStatTarget::StaggerDuration), 80);
+    TestEqual(TEXT("Stagger resistance reduction appends"), static_cast<int32>(EBreakerNodeStatTarget::EnemyStaggerResistanceReduction), 81);
+    TestEqual(TEXT("Stagger resistance reduction is the current tail"), static_cast<int32>(EBreakerNodeStatTarget::EnemyStaggerResistanceReduction), static_cast<int32>(EBreakerNodeStatTarget::Count) - 1);
 
     // And the lanes actually pay: a rank-2 node authoring all four Flat lines
     // lands on the FBreakerNodeStats fields the weapon reads.

@@ -8,16 +8,23 @@
 
 float BreakerRiftDisplacement::Apply(AActor* Target, const FVector& SourceLocation, float DistanceCm)
 {
+    return ApplyDetailed(Target, SourceLocation, DistanceCm, false).DistanceCm;
+}
+
+BreakerRiftDisplacement::FResult BreakerRiftDisplacement::ApplyDetailed(AActor* Target, const FVector& SourceLocation, float DistanceCm, bool bTowardSource)
+{
+    FResult Result;
     const auto* Progression = Target ? Target->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
-    if (Progression && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Immovable")))) return 0;
+    if (Progression && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Immovable")))) return Result;
     auto* Pawn = Cast<APawn>(Target);
     auto* Capsule = Pawn ? Cast<UCapsuleComponent>(Pawn->GetRootComponent()) : nullptr;
     UWorld* World = Pawn ? Pawn->GetWorld() : nullptr;
     if (!World || !Capsule || !Pawn->HasAuthority() || Pawn->IsActorBeingDestroyed()
-        || SourceLocation.ContainsNaN() || !FMath::IsFinite(DistanceCm) || DistanceCm <= 0) return 0;
+        || SourceLocation.ContainsNaN() || !FMath::IsFinite(DistanceCm) || DistanceCm <= 0) return Result;
     const FVector Start = Pawn->GetActorLocation();
-    const FVector Away = (Start - SourceLocation).GetSafeNormal2D();
-    if (Away.IsNearlyZero()) return 0;
+    Result.Start = Result.End = Start;
+    const FVector Away = (bTowardSource ? SourceLocation - Start : Start - SourceLocation).GetSafeNormal2D();
+    if (Away.IsNearlyZero()) return Result;
     const float Radius = Capsule->GetScaledCapsuleRadius();
     const float HalfHeight = Capsule->GetScaledCapsuleHalfHeight();
     float WalkableZ = .7f;
@@ -31,7 +38,7 @@ float BreakerRiftDisplacement::Apply(AActor* Target, const FVector& SourceLocati
     if (World->SweepSingleByChannel(Block, Start, Start + Away * DistanceCm, Capsule->GetComponentQuat(),
         ECC_Pawn, FCollisionShape::MakeCapsule(Radius, HalfHeight), Query))
     {
-        if (Block.bStartPenetrating) return 0;
+        if (Block.bStartPenetrating) return Result;
         Allowed = FMath::Max(0.0f, DistanceCm * Block.Time - 2.0f);
     }
     // Check the footprint along the route, not just its destination. A short
@@ -49,7 +56,7 @@ float BreakerRiftDisplacement::Apply(AActor* Target, const FVector& SourceLocati
         }
         return true;
     };
-    if (!Supported(Start)) return 0;
+    if (!Supported(Start)) return Result;
     float SafeDistance = 0;
     const int32 Steps = FMath::Max(1, FMath::CeilToInt(Allowed / 10.0f));
     for (int32 Step = 1; Step <= Steps; ++Step)
@@ -58,8 +65,21 @@ float BreakerRiftDisplacement::Apply(AActor* Target, const FVector& SourceLocati
         if (!Supported(Start + Away * Candidate)) break;
         SafeDistance = Candidate;
     }
-    if (SafeDistance <= 0) return 0;
+    if (SafeDistance <= 0) return Result;
     FHitResult ActualHit;
     Pawn->SetActorLocation(Start + Away * SafeDistance, true, &ActualHit, ETeleportType::None);
-    return FVector::Dist2D(Start, Pawn->GetActorLocation());
+    Result.End = Pawn->GetActorLocation();
+    Result.DistanceCm = FVector::Dist2D(Start, Result.End);
+    // A ledge can truncate the route before its geometric wall. Only a
+    // reached obstruction earns impact; floor support failure is not a wall.
+    const bool bReachedPlannedBlock = Block.bBlockingHit && Result.DistanceCm > 0
+        && Result.DistanceCm + .1f >= Allowed && SafeDistance + .1f >= Allowed;
+    const FHitResult* Terminal = ActualHit.bBlockingHit ? &ActualHit : bReachedPlannedBlock ? &Block : nullptr;
+    if (Terminal && Result.DistanceCm > 0)
+    {
+        Result.TerminalActor = Terminal->GetActor();
+        Result.bReachedWall = !Cast<APawn>(Terminal->GetActor()) && Terminal->ImpactNormal.Z < WalkableZ
+            && FVector::DotProduct(Away, Terminal->ImpactNormal) < -UE_SMALL_NUMBER;
+    }
+    return Result;
 }

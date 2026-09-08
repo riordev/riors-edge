@@ -472,6 +472,30 @@
 			"lane": true,
 			"rider": false,
 			"affixOwned": false
+		},
+		{
+			"name": "FrontShieldPercentMaxHealth",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
+		},
+		{
+			"name": "ShieldPercentMaxHealth",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
+		},
+		{
+			"name": "StaggerDuration",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
+		},
+		{
+			"name": "EnemyStaggerResistanceReduction",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
 		}
 	],
 	"conditions": [

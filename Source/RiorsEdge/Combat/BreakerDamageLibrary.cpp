@@ -41,6 +41,11 @@ void UBreakerDamageLibrary::SnapshotElementSource(const AActor* Source, FBreaker
     Snapshot.ElementalThresholdMultiplier = Stats.ElementalThresholdMultiplier;
     Snapshot.bRotDensity = Stats.bRotDensity;
     Snapshot.bLongDark = Stats.bLongDark;
+    Snapshot.bVoidPatience = Stats.bVoidPatience;
+    Snapshot.bVoidDebt = Stats.bVoidDebt;
+    Snapshot.bVectorField = Stats.bVectorField;
+    Snapshot.bRiftImpact = Stats.bRiftImpact;
+    Snapshot.bHardLanding = Stats.bHardLanding;
     Snapshot.ElementalDamageIncreasedPercent = Stats.ElementalDamageIncreasedPercent;
     Snapshot.RotDamageIncreasedPercent = Stats.RotDamageIncreasedPercent;
     Snapshot.VoidBurstDamageIncreasedPercent = Stats.VoidBurstDamageIncreasedPercent;

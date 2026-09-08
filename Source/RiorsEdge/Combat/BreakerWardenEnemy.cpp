@@ -401,7 +401,7 @@ void ABreakerWardenEnemy::ResolveSlam()
         Damage.SetInstigator(this);
         const FBreakerDamageResult Result = TargetCombat->ReceiveDamage(Damage);
         if (!Result.bDodged && Result.HealthDamage + Result.ShieldDamage > 0 && !TargetCombat->IsDead())
-            TargetCombat->ApplyStagger(SlamStaggerSeconds);
+            TargetCombat->ApplyStaggerFrom(this, SlamStaggerSeconds);
 
         if (UBreakerEnemyModifierComponent* Mods = GetModifierComponent())
         {

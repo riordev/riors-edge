@@ -1,4 +1,5 @@
 #include "Progression/BreakerProgressionComponent.h"
+#include "Combat/BreakerCombatComponent.h"
 
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Game/BreakerGameMode.h"
@@ -1341,7 +1342,12 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
                 if (OutContribution && Effect.StatTarget == EBreakerNodeStatTarget::CriticalDamage)
                     OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalMultiplier, Value / 100.0f);
             }
-            else if (Effect.StatBucket == EBreakerNodeStatBucket::IncreasedPercent) IncreasedByTarget[Target] += Value;
+            else if (Effect.StatBucket == EBreakerNodeStatBucket::IncreasedPercent)
+            {
+                IncreasedByTarget[Target] += Value;
+                if (OutContribution && Effect.StatTarget == EBreakerNodeStatTarget::MoveSpeed)
+                    OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::MoveSpeed, Value);
+            }
             else if (BreakerDamagePoolFor(Effect.StatTarget) != EBreakerDamagePool::None
                 || Effect.StatTarget == EBreakerNodeStatTarget::ElementalDamage || Effect.StatTarget == EBreakerNodeStatTarget::VoidDamage
                 || Effect.StatTarget == EBreakerNodeStatTarget::ReactionDamage || Effect.StatTarget == EBreakerNodeStatTarget::EffectiveHealth)
@@ -1543,6 +1549,15 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     Stats.ParryWindowAddedSeconds = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::ParryWindowAddedSeconds));
     Stats.ParryCooldownReductionSeconds = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::ParryCooldownReductionSeconds));
     Stats.ParryCooldownRecoveryMultiplier = FMath::Max(0.01f, Increased(EBreakerNodeStatTarget::ParryCooldownRecovery));
+    Stats.FrontShieldPercentMaxHealth = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::FrontShieldPercentMaxHealth));
+    Stats.ShieldPercentMaxHealth = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::ShieldPercentMaxHealth));
+    Stats.StaggerDurationMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::StaggerDuration));
+    Stats.EnemyStaggerResistanceReductionPercent = (Increased(EBreakerNodeStatTarget::EnemyStaggerResistanceReduction) - 1.0f) * 100.0f;
+    Stats.bVectorField = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.VectorField")));
+    Stats.bRiftImpact = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Impact")));
+    Stats.bHardLanding = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.HardLanding")));
+    Stats.bVoidPatience = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Patience")));
+    Stats.bVoidDebt = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Debt")));
     Stats.bNoOutOfCombatResourceDecay = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.SecondShift")));
     Stats.bConduction = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Conduction")));
     Stats.bCooldownRecoveryAffectsTempo = Stats.GrantedTags.HasTagExact(
@@ -1588,9 +1603,12 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
         // enforced above.
         OutContribution->AddFlat(EBreakerAggregatedAttribute::MaxHealth, Stats.BonusHealth);
         OutContribution->SetDeadeye(Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Deadeye"))));
+        OutContribution->SetVelocityRules(
+            Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Velocity.NoGround"))),
+            Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Velocity.Momentum"))),
+            Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Velocity.Downforce"))));
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::MaxHealth, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::Health)]);
         OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalChance, Stats.CriticalChanceBonus);
-        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::MoveSpeed, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::MoveSpeed)]);
         // Slide speed and air control join gear's percentages in the same
         // additive bucket, exactly as move speed already did. Until this
         // existed the movement component multiplied the tree multiplier by the
@@ -1896,7 +1914,12 @@ void UBreakerProgressionComponent::ApplyStatsToAttributes()
     // One submission, no absolute writes. A respec submits an empty
     // contribution, which restores exactly the pre-purchase composition.
     if (!Attributes || !GetOwner() || !GetOwner()->HasAuthority()) return;
+    Attributes->BeginShieldCapacityUpdate();
     Attributes->ApplyAttributeContribution(EBreakerAttributeContributor::Progression, CachedContribution);
+    Attributes->SetCoreShieldHealthFraction(CachedStats.ShieldPercentMaxHealth * .01f);
+    Attributes->EndShieldCapacityUpdate();
+    if (auto* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr)
+        Combat->RefreshCoreFrontShieldCapacity();
 }
 
 void UBreakerProgressionComponent::PublishNodeTagsToAbilitySystem()

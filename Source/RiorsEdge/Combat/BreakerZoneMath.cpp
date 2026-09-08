@@ -1,5 +1,20 @@
 #include "Combat/BreakerZoneMath.h"
 
+int32 UBreakerZoneMath::FundedTicks(float Duration, float Interval)
+{
+    if (!FMath::IsFinite(Duration) || !FMath::IsFinite(Interval) || Duration <= 0 || Interval <= 0) return 0;
+    return static_cast<int32>(FMath::Min(1000000.0, FMath::FloorToDouble(static_cast<double>(Duration) / FMath::Max(0.05f, Interval) + 1.e-6)));
+}
+
+float UBreakerZoneMath::StandingIncreased(float Duration, float Interval, double StartingAge)
+{
+    const int32 Count = FundedTicks(Duration, Interval);
+    if (Count == 0) return 0;
+    const double Step = FMath::Max(0.05f, Interval);
+    const int32 FirstMature = static_cast<int32>(FMath::Clamp(FMath::CeilToDouble((3.0 - StartingAge) / Step - 1.e-6), 1.0, static_cast<double>(Count) + 1.0));
+    return 10.0f * (Count - FirstMature + 1) / Count;
+}
+
 bool UBreakerZoneMath::IsInsideZone(const FVector& ZoneCenter, float RadiusCm, float HalfHeightCm, const FVector& Point)
 {
     if (RadiusCm <= 0.0f) return false;

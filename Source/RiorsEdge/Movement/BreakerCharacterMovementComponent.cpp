@@ -760,11 +760,15 @@ bool UBreakerCharacterMovementComponent::IsDashCooldownSuspended() const
 float UBreakerCharacterMovementComponent::GetSpeedMultiplier() const
 {
     PruneSpeedMultipliers();
+    const auto* Progression = GetProgression();
+    const bool bNoGround = Progression && Progression->HasNodeTag(
+        FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Velocity.NoGround")));
     TArray<float> Active;
     Active.Reserve(SpeedMultipliers.Num());
     for (const TPair<FName, FSpeedMultiplierEntry>& Pair : SpeedMultipliers)
     {
-        Active.Add(Pair.Value.Multiplier);
+        const float Value = Pair.Value.Multiplier;
+        Active.Add(bNoGround && Value > 1.0f ? 1.0f + 2.0f * (Value - 1.0f) : Value);
     }
     return ComposeSpeedMultipliers(Active);
 }

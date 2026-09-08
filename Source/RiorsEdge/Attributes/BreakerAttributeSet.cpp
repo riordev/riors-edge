@@ -86,7 +86,16 @@ void UBreakerAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribut
     if (Attribute == GetHealthAttribute()) NewValue = FMath::Clamp(NewValue, 0.0f, GetMaxHealth());
     else if (Attribute == GetMaxHealthAttribute()) NewValue = FMath::Max(1.0f, NewValue);
     else if (Attribute == GetShieldAttribute()) NewValue = FMath::Clamp(NewValue, 0.0f, GetMaxShield());
-    else if (Attribute == GetMaxShieldAttribute()) NewValue = FMath::Max(0.0f, NewValue);
+    else if (Attribute == GetMaxShieldAttribute())
+    {
+        NewValue = FMath::IsFinite(NewValue) ? FMath::Max(0.0f, NewValue) : 0.0f;
+        const AActor* Owner = GetTypedOuter<AActor>();
+        if (!bWritingComposedShield && (!Owner || Owner->HasAuthority()))
+        {
+            NativeShieldBase = NewValue;
+            NewValue = ComposeShieldCapacity();
+        }
+    }
     else if (Attribute == GetArmorAttribute()) NewValue = FMath::Max(0.0f, NewValue);
     // Spec D8. The floor is 0 unless a class opened it, so for every class but
     // an Overcasting Caster this is the identical [0, Max] clamp it replaced —
@@ -200,12 +209,68 @@ void UBreakerAttributeSet::ApplyShield(float NewValue)
 
 void UBreakerAttributeSet::ApplyMaxShield(float NewValue)
 {
-    WriteAttributeValue(GetMaxShieldAttribute(), MaxShield, NewValue);
+    NativeShieldBase = FMath::IsFinite(NewValue) ? FMath::Max(0.0f, NewValue) : 0.0f;
+    RecomposeShieldCapacity();
+}
+
+float UBreakerAttributeSet::ComposeShieldCapacity() const
+{
+    const float HealthCapacity = FMath::Max(0.0f, GetMaxHealth());
+    return FMath::Max(NativeShieldBase + EquipmentShieldCapacity + HealthCapacity * CoreShieldHealthFraction,
+        HealthCapacity * FMath::Max(TankShieldHealthFloor, SupportShieldHealthFloor)) + HealthCapacity * TemporaryShieldHealthFraction;
+}
+
+void UBreakerAttributeSet::RecomposeShieldCapacity()
+{
+    const AActor* Owner = GetTypedOuter<AActor>();
+    if (bWritingComposedShield || ShieldCapacityUpdateDepth > 0 || (Owner && !Owner->HasAuthority())) return;
+    TGuardValue<bool> Composing(bWritingComposedShield, true);
+    WriteAttributeValue(GetMaxShieldAttribute(), MaxShield, ComposeShieldCapacity());
+    if (GetShield() > GetMaxShield()) ApplyShield(GetMaxShield());
+}
+
+void UBreakerAttributeSet::EndShieldCapacityUpdate()
+{
+    if (ShieldCapacityUpdateDepth > 0) --ShieldCapacityUpdateDepth;
+    if (ShieldCapacityUpdateDepth == 0) RecomposeShieldCapacity();
+}
+
+void UBreakerAttributeSet::PostAttributeChange(const FGameplayAttribute& Attribute, float OldValue, float NewValue)
+{
+    Super::PostAttributeChange(Attribute, OldValue, NewValue);
+    if (Attribute == GetMaxHealthAttribute() && !FMath::IsNearlyEqual(OldValue, NewValue)) RecomposeShieldCapacity();
+}
+
+void UBreakerAttributeSet::SetEquipmentShieldCapacity(float Amount)
+{
+    EquipmentShieldCapacity = FMath::IsFinite(Amount) ? FMath::Max(0.0f, Amount) : 0.0f;
+    RecomposeShieldCapacity();
+}
+void UBreakerAttributeSet::SetCoreShieldHealthFraction(float Fraction)
+{
+    CoreShieldHealthFraction = FMath::IsFinite(Fraction) ? FMath::Max(0.0f, Fraction) : 0.0f;
+    RecomposeShieldCapacity();
+}
+void UBreakerAttributeSet::SetTankShieldHealthFloor(float Fraction)
+{
+    TankShieldHealthFloor = FMath::IsFinite(Fraction) ? FMath::Max(0.0f, Fraction) : 0.0f;
+    RecomposeShieldCapacity();
+}
+void UBreakerAttributeSet::SetSupportShieldHealthFloor(float Fraction)
+{
+    SupportShieldHealthFloor = FMath::IsFinite(Fraction) ? FMath::Max(0.0f, Fraction) : 0.0f;
+    RecomposeShieldCapacity();
+}
+void UBreakerAttributeSet::SetTemporaryShieldHealthFraction(float Fraction)
+{
+    TemporaryShieldHealthFraction = FMath::IsFinite(Fraction) ? FMath::Max(0.0f, Fraction) : 0.0f;
+    RecomposeShieldCapacity();
 }
 
 void UBreakerAttributeSet::ApplyMaxHealth(float NewValue)
 {
     WriteAttributeValue(GetMaxHealthAttribute(), MaxHealth, NewValue);
+    RecomposeShieldCapacity();
 }
 
 void UBreakerAttributeSet::RecomputeAggregatedAttributes()
@@ -250,6 +315,7 @@ void UBreakerAttributeSet::RecomputeAggregatedAttributes()
     WriteAttributeValue(GetFireRateMultiplierAttribute(), FireRateMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::FireRateMultiplier));
     WriteAttributeValue(GetResourceCostMultiplierAttribute(), ResourceCostMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::ResourceCostMultiplier));
     WriteAttributeValue(GetClassResourceRegenAttribute(), ClassResourceRegen, Aggregator.Compose(EBreakerAggregatedAttribute::ClassResourceRegen));
+    RecomposeShieldCapacity();
 }
 
 UAbilitySystemComponent* UBreakerAttributeSet::FindOwningAbilitySystemSafe() const

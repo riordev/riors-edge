@@ -96,16 +96,16 @@ void UBreakerGritComponent::ReleaseInterpositionHeadroom()
     if (InterpositionAnchor.IsValid())
         InterpositionAnchor->OnDestroyed.RemoveDynamic(this, &UBreakerGritComponent::HandleInterpositionAnchorDestroyed);
     InterpositionAnchor.Reset();
-    if (bOwnsInterpositionHeadroom && Attributes)
+    if (Attributes)
     {
-        // Only undo our own write. A gear rebuild may already have replaced it.
-        if (FMath::IsNearlyEqual(Attributes->GetMaxShield(), InterpositionLastWrittenMax))
-            Attributes->ApplyMaxShield(InterpositionUnboostedMax);
-        if (Attributes->GetShield() > Attributes->GetMaxShield())
-            Attributes->ApplyShield(Attributes->GetMaxShield());
-        PreviousShield = FMath::Min(PreviousShield, Attributes->GetShield());
+        const float ShieldBeforeRelease = Attributes->GetShield();
+        Attributes->SetTemporaryShieldHealthFraction(0.0f);
+        // Only a capacity loss may erase the shield-clock edge. An ordinary
+        // refresh with no Anchor must preserve a damage-driven break for
+        // Reciprocity's next loop observation.
+        if (Attributes->GetShield() < ShieldBeforeRelease)
+            PreviousShield = FMath::Min(PreviousShield, Attributes->GetShield());
     }
-    bOwnsInterpositionHeadroom = false;
 }
 
 void UBreakerGritComponent::HandleInterpositionOwnerDeath()
@@ -120,15 +120,6 @@ void UBreakerGritComponent::HandleInterpositionAnchorDestroyed(AActor* Actor)
 
 void UBreakerGritComponent::HandleInterpositionEquipmentChanged()
 {
-    // Inventory broadcasts need not rebuild stats. A changed gear base, however,
-    // is an explicit external write even when it coincides with our last value.
-    if (bOwnsInterpositionHeadroom && InterpositionEquipment.IsValid()
-        && !FMath::IsNearlyEqual(InterpositionGearBase, InterpositionEquipment->GetStats().BaseShieldFromGear))
-    {
-        InterpositionUnboostedMax = FMath::Max(InterpositionEquipment->GetStats().BaseShieldFromGear,
-            bIsTank && Attributes ? Attributes->GetMaxHealth() * 0.25f : 0.0f);
-        bOwnsInterpositionHeadroom = false;
-    }
     RefreshInterpositionHeadroom();
 }
 
@@ -166,16 +157,7 @@ void UBreakerGritComponent::RefreshInterpositionHeadroom()
         InterpositionAnchor = MatchingAnchor;
         MatchingAnchor->OnDestroyed.AddUniqueDynamic(this, &UBreakerGritComponent::HandleInterpositionAnchorDestroyed);
     }
-    const float CurrentMax = Attributes->GetMaxShield();
-    if (!bOwnsInterpositionHeadroom || !FMath::IsNearlyEqual(CurrentMax, InterpositionLastWrittenMax))
-        InterpositionUnboostedMax = CurrentMax;
-    InterpositionGearBase = InterpositionEquipment.IsValid() ? InterpositionEquipment->GetStats().BaseShieldFromGear : 0.0f;
-    InterpositionUnboostedMax = FMath::Max3(InterpositionUnboostedMax, InterpositionGearBase, Attributes->GetMaxHealth() * 0.25f);
-    InterpositionLastWrittenMax = InterpositionUnboostedMax + Attributes->GetMaxHealth() * FMath::Max(0.0f, InterpositionHeadroomHealthFraction);
-    bOwnsInterpositionHeadroom = true;
-    Attributes->ApplyMaxShield(InterpositionLastWrittenMax);
-    if (Attributes->GetShield() > InterpositionLastWrittenMax)
-        Attributes->ApplyShield(InterpositionLastWrittenMax);
+    Attributes->SetTemporaryShieldHealthFraction(InterpositionHeadroomHealthFraction);
 }
 
 UBreakerCombatComponent* UBreakerGritComponent::ResolveCombat()
@@ -376,6 +358,7 @@ void UBreakerGritComponent::HandleProgressionChanged()
     }
     const UBreakerProgressionComponent* Progression = CachedProgression.Get();
     bIsTank = Progression && Progression->GetProgressionState().PermanentClass == EBreakerClassId::Tank;
+    if (Attributes) Attributes->SetTankShieldHealthFloor(bIsTank ? .25f : 0.0f);
     if (!bIsTank) PendingGrants = 0.0f;
 
     // Node-rank cache: read once per progression change, never per frame.
@@ -755,11 +738,7 @@ void UBreakerGritComponent::AdvanceLoop(float DeltaTime)
     // 25% of maximum health, and until this write existed MaxShield was 0 for
     // every player, so the entire conversion path granted nothing. Raise-only,
     // so a larger ceiling from any future source survives. O2 PLACEHOLDER.
-    const float LeechShieldCeiling = Attributes->GetMaxHealth() * 0.25f;   // §T1
-    if (LeechShieldCeiling > Attributes->GetMaxShield())
-    {
-        Attributes->ApplyMaxShield(LeechShieldCeiling);
-    }
+    Attributes->SetTankShieldHealthFloor(.25f); // §T1, O2 PLACEHOLDER
     // Shield GAIN resets the hold clock; after the hold, the shield bleeds.
     // Built for the Leech nodes; base numbers are §T1's 3s / 4%/s.
     const float ShieldNow = Attributes->GetShield();

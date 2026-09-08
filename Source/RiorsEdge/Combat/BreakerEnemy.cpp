@@ -662,7 +662,7 @@ void ABreakerEnemy::SetModifierShield(float Amount)
 {
     if (!Attributes) return;
     const float Clamped = FMath::Max(0.0f, Amount);
-    Attributes->SetMaxShield(Clamped);
+    Attributes->ApplyMaxShield(Clamped);
     Attributes->SetShield(Clamped);
 }
 

@@ -13,6 +13,7 @@ namespace
     struct FBreakerVoidTuning
     {
         float Threshold = 0, Damage = 0, Delay = 0, Timeout = 0, AlteredFraction = 0, AlteredResistance = 0;
+        float PatienceDamage = 0, PatienceDelay = 0, DebtFraction = 0;
     };
 
     const FBreakerVoidTuning& BreakerVoidTuning()
@@ -33,6 +34,9 @@ namespace
             Read(TEXT("voidThresholdHealthFraction"), Value.Threshold, 1);
             Read(TEXT("voidDamageFraction"), Value.Damage, 1);
             Read(TEXT("voidDelaySeconds"), Value.Delay, 3600);
+            Read(TEXT("voidPatienceDamageFraction"), Value.PatienceDamage, 1);
+            Read(TEXT("voidPatienceDelaySeconds"), Value.PatienceDelay, 3600);
+            Read(TEXT("voidDebtFraction"), Value.DebtFraction, 1, true);
             Read(TEXT("voidBuildupTimeoutSeconds"), Value.Timeout, 3600);
             Read(TEXT("alteredAttackVoidFraction"), Value.AlteredFraction, 1, true);
             Read(TEXT("alteredVoidResistancePercent"), Value.AlteredResistance, 100, true);
@@ -101,7 +105,8 @@ void UBreakerStatusComponent::ApplyVoidHit(const FBreakerDamageRequest& Request,
         || !FMath::IsFinite(Result.RawDamage) || !FMath::IsFinite(Request.ProcCoefficient)
         || !FMath::IsFinite(Request.ElementalFraction) || Result.RawDamage <= 0) return;
     const float Snapshot = BreakerElementSource::RawPart(Request, Result);
-    const float Budget = BreakerElementSource::StatusBudget(Request, Snapshot * BreakerVoid::DamageFraction());
+    const float Fraction = Request.ElementSource.bVoidPatience ? BreakerVoidTuning().PatienceDamage : BreakerVoid::DamageFraction();
+    const float Budget = BreakerElementSource::StatusBudget(Request, Snapshot * Fraction);
     const float Threshold = BreakerElementSource::Threshold(Request, GetVoidThreshold());
     if (!FMath::IsFinite(Budget) || Budget <= 0 || !FMath::IsFinite(Threshold) || Threshold <= 0) return;
     const float Bonus = FMath::IsFinite(Request.ElementBuildupFlat) ? FMath::Max(0.0f, Request.ElementBuildupFlat) : 0;
@@ -136,7 +141,8 @@ void UBreakerStatusComponent::ApplyVoidHit(const FBreakerDamageRequest& Request,
     ResetVoidBuildup();
     FBreakerStatusApplicationSpec Spec;
     Spec.StatusTag = Erased;
-    Spec.Duration = BreakerVoid::DelaySeconds();
+    Spec.Duration = Request.ElementSource.bVoidPatience ? BreakerVoidTuning().PatienceDelay : BreakerVoid::DelaySeconds();
+    Spec.bVoidDebtSnapshot = Request.ElementSource.bVoidDebt;
     Spec.TickInterval = Spec.Duration;
     Spec.BaseDamagePerTick = 0;
     Spec.ProcCoefficient = FMath::Clamp(Request.ProcCoefficient, 0.0f, 1.0f);
@@ -185,4 +191,28 @@ void UBreakerStatusComponent::DeliverVoidBurst(uint64 ApplicationSerial)
         ActiveStatuses.RemoveAt(RemainingIndex);
         OnStatusExpired.Broadcast(Expired);
     }
+}
+
+void UBreakerStatusComponent::AccrueVoidDebt(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result)
+{
+    // Called before this hit can create Erased: only an existing delay earns
+    // debt. Already claimed payouts and reaction transactions cannot recurse.
+    const auto Erased = FGameplayTag::RequestGameplayTag(TEXT("Status.Erased"));
+    if (!GetOwner() || !GetOwner()->HasAuthority() || GetOwner()->IsActorBeingDestroyed()
+        || Result.bKilled || Result.bDodged || Result.bParried || IsElementTransactionActive()
+        || DeliveringTickTag == Erased || !FMath::IsFinite(Result.HealthDamage) || !FMath::IsFinite(Result.ShieldDamage)
+        || Request.DamageTypeTag.MatchesTag(FGameplayTag::RequestGameplayTag(TEXT("Reaction")))) return;
+    auto* Active = ActiveStatuses.FindByPredicate([Erased](const FBreakerActiveStatus& Entry)
+    { return Entry.Spec.StatusTag == Erased && Entry.Spec.bVoidDebtSnapshot && Entry.RemainingDuration > 0 && Entry.UnpaidDamageBudget > 0; });
+    if (!Active) return;
+    const float Earned = (FMath::Max(0.0f, Result.HealthDamage) + FMath::Max(0.0f, Result.ShieldDamage)) * BreakerVoidTuning().DebtFraction;
+    if (!FMath::IsFinite(Earned) || Earned <= 0
+        || !FMath::IsFinite(Active->UnpaidDamageBudget + Earned)
+        || !FMath::IsFinite(Active->InitialDamageBudget + Earned)
+        || !FMath::IsFinite(Active->InitialReactionBudget + Earned)) return;
+    // This accepted damage has already paid its source and defence stages.
+    // Add it without applying this status owner's offensive multipliers again.
+    Active->UnpaidDamageBudget += Earned;
+    Active->InitialDamageBudget += Earned;
+    Active->InitialReactionBudget += Earned;
 }

@@ -115,6 +115,10 @@ public:
     // VW4: a recast refreshes, it never stacks.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Zone")
     void RefreshDuration(float NewDuration);
+
+    // A paid recast replaces the funded damage payload, retaining membership,
+    // radius growth and the original Standing age.
+    void RefreshPaidPayload(const FBreakerZoneSpec& NewSpec);
     // One accepted radius increment per configured zone, independent of refresh count.
     bool GrowRadiusOnce(float AdditionalRadiusCm);
 
@@ -197,7 +201,11 @@ protected:
     UFUNCTION() void OnRep_Spec();
 
 private:
-    void DeliverTick();
+    void DeliverTick(double ScheduledAge);
+    void SnapshotDamageRules(const FBreakerZoneSpec& NewSpec);
+    void DeliverDetonation();
+    UFUNCTION() void CancelDetonation();
+    UFUNCTION() void CancelDetonationOnDestroyed(AActor* Actor);
     void ApplyStatusToOccupant(AActor* Occupant) const;
     void UpdateMembership();
     void ApplyArmorStrip(AActor* Occupant) const;
@@ -224,6 +232,12 @@ private:
     double RemainingDuration = 0.0;
     double TimeUntilNextTick = 0.0;
     int32 TicksDelivered = 0;
+    double ActiveAge = 0.0;
+    bool bStanding = false;
+    bool bDetonation = false;
+    bool bDetonationPending = false;
+    bool bExpiring = false;
+    FBreakerDamageRequest DetonationDamage;
     bool bExpiryPaused = false;
     void AcquireLongDarkPause();
     void ReleaseLongDarkPause();

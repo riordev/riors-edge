@@ -89,6 +89,7 @@ public:
     float GetEntropyResistancePercent() const;
     UPROPERTY(EditAnywhere, Category="Status|Entropy") float EntropyResistancePercent = 0.0f;
     void ApplyVoidHit(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result);
+    void AccrueVoidDebt(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result);
     float GetVoidBuildup() const;
     float GetVoidThreshold() const;
     float GetVoidResistancePercent() const;

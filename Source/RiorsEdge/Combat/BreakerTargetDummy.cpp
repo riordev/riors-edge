@@ -112,7 +112,7 @@ void ABreakerTargetDummy::ConfigureProfile(EBreakerTargetProfile NewProfile)
     if (!Attributes) return;
     Attributes->SetMaxHealth(Profile == EBreakerTargetProfile::Armored ? 180.0f : 120.0f);
     Attributes->SetHealth(Attributes->GetMaxHealth());
-    Attributes->SetMaxShield(Profile == EBreakerTargetProfile::Shielded ? 100.0f : 0.0f);
+    Attributes->ApplyMaxShield(Profile == EBreakerTargetProfile::Shielded ? 100.0f : 0.0f);
     Attributes->SetShield(Attributes->GetMaxShield());
     Attributes->SetArmor(Profile == EBreakerTargetProfile::Armored ? 100.0f : 0.0f);
     PrimaryActorTick.SetTickFunctionEnable(Profile == EBreakerTargetProfile::Moving);

@@ -23,6 +23,9 @@ class RIORSEDGE_API UBreakerZoneMath : public UBlueprintFunctionLibrary
     GENERATED_BODY()
 
 public:
+    // Full finite schedule, independent of the live cadence's hitch guard.
+    static int32 FundedTicks(float Duration, float Interval);
+    static float StandingIncreased(float Duration, float Interval, double StartingAge);
     // Membership. A zone with a positive half-height is a vertical cylinder;
     // with zero it is a sphere. Cylinder is the default for ground effects
     // because a 4 m Rot puddle must catch a target standing on a crate inside

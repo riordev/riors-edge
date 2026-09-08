@@ -262,6 +262,7 @@ void UBreakerChargeComponent::HandleProgressionChanged()
             || Progression->GetNodeRank(TEXT("Support.Medic.SecondOpinion"), EBreakerPointCurrency::DoctrinePoints) > 0;
     }
     if (!bBloodDebt) BloodDebtPool = 0.0f;
+    if (Attributes) Attributes->SetSupportShieldHealthFloor(bIsSupport && bShieldConversionNodes ? .25f : 0.0f);
 }
 
 bool UBreakerChargeComponent::IsActiveForOwner() const
@@ -508,16 +509,10 @@ void UBreakerChargeComponent::AdvanceLoop(float DeltaTime)
 
     // MD5/MD9's shield conversions need a ceiling to exist: MaxShield
     // initialises to 0 for every player, and a conversion into a zero-cap bar
-    // grants nothing. Node-gated and raise-only. O2 PLACEHOLDER fraction,
+    // grants nothing. Its named class floor composes with gear and Core.
+    // O2 PLACEHOLDER fraction,
     // borrowed from Tank §T1's 25%-of-max-health cap.
-    if (bShieldConversionNodes)
-    {
-        const float ShieldCeiling = Attributes->GetMaxHealth() * 0.25f;
-        if (ShieldCeiling > Attributes->GetMaxShield())
-        {
-            Attributes->ApplyMaxShield(ShieldCeiling);
-        }
-    }
+    Attributes->SetSupportShieldHealthFloor(bShieldConversionNodes ? .25f : 0.0f);
 
     if (IsInSafeZone())
     {

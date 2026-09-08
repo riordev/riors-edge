@@ -89,36 +89,6 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     // search, the spawned volume and the refresh all share one reading.
     const float EffectiveRadiusCm = ComputeEffectiveRadiusCm(Character);
     const float EffectiveDuration = ComputeEffectiveDurationSeconds(Character);
-    auto RefreshExisting = [&](ABreakerZoneActor* Existing)
-    {
-        Existing->RefreshDuration(EffectiveDuration);
-        if (Character->GetProgression()->GetNodeRank(TEXT("Caster.VoidWhisperer.Lingering"), EBreakerPointCurrency::DoctrinePoints) >= 2)
-            Existing->GrowRadiusOnce(LingeringRefreshGrowthCm);
-    };
-    if (bFollowCaster)
-        for (const TWeakObjectPtr<ABreakerZoneActor>& Held : ABreakerZoneActor::GetLiveZones())
-            if (ABreakerZoneActor* Existing = Held.Get())
-                if (Existing->GetWorld() == World && Existing->GetZoneInstigator() == Character
-                    && Existing->GetSpec().ZoneTag == ZoneTag && Existing->GetFollowActor() == Character
-                    && Existing->GetRemainingDuration() > 0.0f)
-                {
-                    RefreshExisting(Existing);
-                    EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
-                    return;
-                }
-
-    // VW4's anti-stack rule lives at the SPAWNER, once, exactly as the spec
-    // requires — never per ability. A recast on top of a live Rot refreshes it;
-    // two Rots do not stack their armour strip, and the zone actor's key makes
-    // sure even genuinely separate puddles cannot double-strip.
-    if (ABreakerZoneActor* Existing = ABreakerZoneActor::FindRefreshableZone(World, ZoneTag, Character, Center, EffectiveRadiusCm, 0.5f))
-    {
-        RefreshExisting(Existing);
-        if (bFollowCaster) Existing->SetFollowActor(Character);
-        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
-        return;
-    }
-
     const UBreakerAttributeSet* SourceAttributes = GetBreakerAttributes();
     const UBreakerCombatComponent* OwnerCombat = Character->FindComponentByClass<UBreakerCombatComponent>();
     // O35: one item-level reading for the whole cast's Entropy hits.
@@ -148,6 +118,36 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     if (const auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>()) State->SnapshotSympatheticEntropy(Spec.TickDamage);
 
     // Rot now builds Entropy on accepted zone hits; physical Poison remains a separate status.
+
+    auto RefreshExisting = [&](ABreakerZoneActor* Existing)
+    {
+        Existing->RefreshPaidPayload(Spec);
+        if (Character->GetProgression()->GetNodeRank(TEXT("Caster.VoidWhisperer.Lingering"), EBreakerPointCurrency::DoctrinePoints) >= 2)
+            Existing->GrowRadiusOnce(LingeringRefreshGrowthCm);
+    };
+    if (bFollowCaster)
+        for (const TWeakObjectPtr<ABreakerZoneActor>& Held : ABreakerZoneActor::GetLiveZones())
+            if (ABreakerZoneActor* Existing = Held.Get())
+                if (Existing->GetWorld() == World && Existing->GetZoneInstigator() == Character
+                    && Existing->GetSpec().ZoneTag == ZoneTag && Existing->GetFollowActor() == Character
+                    && Existing->GetRemainingDuration() > 0.0f)
+                {
+                    RefreshExisting(Existing);
+                    EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+                    return;
+                }
+
+    // VW4's anti-stack rule lives at the SPAWNER, once, exactly as the spec
+    // requires — never per ability. A recast on top of a live Rot refreshes it;
+    // two Rots do not stack their armour strip, and the zone actor's key makes
+    // sure even genuinely separate puddles cannot double-strip.
+    if (ABreakerZoneActor* Existing = ABreakerZoneActor::FindRefreshableZone(World, ZoneTag, Character, Center, EffectiveRadiusCm, 0.5f))
+    {
+        RefreshExisting(Existing);
+        if (bFollowCaster) Existing->SetFollowActor(Character);
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+        return;
+    }
 
     FActorSpawnParameters SpawnParams;
     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
