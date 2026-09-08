@@ -294,13 +294,11 @@ void ABreakerGameMode::CompleteRiftRun(APawn* Player)
 
 void ABreakerGameMode::HandleRiftEntryRequested(const FBreakerRiftDefinition& Rift, APawn* RequestingPawn)
 {
-    if (!RequestingPawn) return;
-    if (Rift.EncounterId == FName(TEXT("breach.marshalling")))
+    FText EntryFailure;
+    if (!ABreakerRiftDoor::CanEnterRift(Rift, RequestingPawn, EntryFailure))
     {
-        const ABreakerCharacter* Character = Cast<ABreakerCharacter>(RequestingPawn);
-        const UBreakerQuestJournal* Journal = Character ? Character->GetQuestJournal() : nullptr;
-        if (!Journal || !Journal->HasFlag(TEXT("Quest.AlteredContact.TurnedIn"))
-            || !Journal->HasFlag(TEXT("Quest.Breach.Accepted"))) return;
+        UE_LOG(LogTemp, Display, TEXT("[Rift] entry refused: %s"), *EntryFailure.ToString());
+        return;
     }
     UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>();
     if (!Session) return;

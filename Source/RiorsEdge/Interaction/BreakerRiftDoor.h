@@ -29,10 +29,8 @@
 // Walking up to the rift asks one question, and it is not "where would you
 // like to go".
 //
-// O122 GOVERNS ENTRY: a campaign rift is entered FREELY. No key, no cost, no
-// condition — so this actor refuses nothing and holds no entry gate. The
-// consumable half belongs to endgame rifts and is not represented here; a
-// gate on a free instance would be a loading screen with a lock drawn on it.
+// Campaign entry carries no key or currency cost. Authored story prerequisites
+// for the Breach share one eligibility check with the menu and game mode.
 //
 // The door does NOT travel. It hands its authored definition to whoever binds
 // OnRiftEntryRequested, in the same division of labour ABreakerTravelPoint
@@ -65,6 +63,7 @@ public:
     // to the base, so a door is still a legal travel point if a future layout
     // ever gives one an ordinary destination.
     virtual bool SelectDestination(FName DestinationId, APawn* RequestingPawn) override;
+    static bool CanEnterRift(const FBreakerRiftDefinition& Definition, const APawn* Pawn, FText& OutReason);
 
     // A DOOR NAMES THE PLACE IT OPENS, not its own kind. "Fernhall Substation"
     // over "F ENTER RIFT" is the NPC idiom; "TRAVEL" over "F ENTER RIFT" was

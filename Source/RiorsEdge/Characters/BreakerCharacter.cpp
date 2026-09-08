@@ -65,6 +65,8 @@
 #include "Items/BreakerLootLibrary.h"
 #include "Interaction/BreakerNPC.h"
 #include "Interaction/BreakerTravelPoint.h"
+#include "Interaction/BreakerRiftDoor.h"
+#include "Game/BreakerZoneBuilder.h"
 #include "Items/BreakerLootPickup.h"
 #include "Game/BreakerGameMode.h"
 #include "EngineUtils.h"
@@ -2428,6 +2430,16 @@ void ABreakerCharacter::OpenMenuScreenForCapture(const FString& ScreenName)
     else if (Wanted == TEXT("CHARACTERCREATE") || Wanted == TEXT("CREATE")) Screen = EBreakerMenuScreen::CharacterCreate;
     else if (Wanted == TEXT("DEVSANDBOX") || Wanted == TEXT("SANDBOX")) Screen = EBreakerMenuScreen::DevSandbox;
 #if !UE_BUILD_SHIPPING
+    // Isolated native door fixture for inspecting the real prerequisite row.
+    else if (Wanted == TEXT("BREACHREFUSAL"))
+    {
+        if (auto* Door = GetWorld()->SpawnActor<ABreakerRiftDoor>())
+        {
+            Door->Rift = UBreakerZoneBuilder::FernhallRiftFor(TEXT("breach"));
+            MenuWidget->ShowTravel(Door);
+            return;
+        }
+    }
     // O100. GUARDED, unlike its neighbours, and deliberately: the quartermaster
     // is the one screen in this table with NO in-game path except an NPC
     // conversation, so this switch is the only thing that can open it without

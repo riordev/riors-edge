@@ -1,4 +1,38 @@
 #include "Interaction/BreakerRiftDoor.h"
+#include "Characters/BreakerCharacter.h"
+#include "Combat/BreakerCombatComponent.h"
+#include "Save/BreakerQuestJournal.h"
+
+bool ABreakerRiftDoor::CanEnterRift(const FBreakerRiftDefinition& Definition, const APawn* Pawn, FText& OutReason)
+{
+    OutReason = FText::GetEmpty();
+    const auto* Character = Cast<ABreakerCharacter>(Pawn);
+    if (!IsValid(Character) || !Character->GetCombat() || Character->GetCombat()->IsDead())
+    {
+        OutReason = NSLOCTEXT("Breaker", "RiftEntryLiving", "You must be alive to enter a Rift.");
+        return false;
+    }
+    if (!Definition.IsSet())
+    {
+        OutReason = NSLOCTEXT("Breaker", "RiftEntryUnset", "This Rift is unavailable.");
+        return false;
+    }
+    if (Definition.EncounterId == FName(TEXT("breach.marshalling")))
+    {
+        const auto* Journal = Character->GetQuestJournal();
+        if (!Journal || !Journal->HasFlag(TEXT("Quest.AlteredContact.TurnedIn")))
+        {
+            OutReason = NSLOCTEXT("Breaker", "RiftEntryUniform", "Complete A DIFFERENT UNIFORM first.");
+            return false;
+        }
+        if (!Journal->HasFlag(TEXT("Quest.Breach.Accepted")))
+        {
+            OutReason = NSLOCTEXT("Breaker", "RiftEntryBreach", "Accept THE BREACH first.");
+            return false;
+        }
+    }
+    return true;
+}
 
 ABreakerRiftDoor::ABreakerRiftDoor()
 {
@@ -30,6 +64,8 @@ bool ABreakerRiftDoor::SelectDestination(FName DestinationId, APawn* RequestingP
 {
     if (DestinationId == ABreakerTravelPoint::RiftDestinationId)
     {
+        FText Reason;
+        if (!CanEnterRift(Rift, RequestingPawn, Reason)) return false;
         // Validated against the same registry every other id is, so a stale
         // selection — one made before a destination was disabled — fails
         // closed here exactly as it does in the base.
@@ -38,10 +74,8 @@ bool ABreakerRiftDoor::SelectDestination(FName DestinationId, APawn* RequestingP
         {
             return false;
         }
-        // O122: entry is FREE. There is deliberately no condition between this
-        // line and the broadcast — no key, no cost, no quest flag. If one ever
-        // appears it belongs to endgame rifts and it arrives with the
-        // consumable half, not as a quiet addition here.
+        // Campaign entry has no key or currency cost. The authored Breach
+        // mission prerequisites are checked above before this request.
         OnRiftEntryRequested.Broadcast(Rift, RequestingPawn);
         return true;
     }

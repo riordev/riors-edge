@@ -31,6 +31,7 @@
 #include "Progression/BreakerProgressionTree.h"
 #include "Interaction/BreakerNPC.h"
 #include "Interaction/BreakerTravelPoint.h"
+#include "Interaction/BreakerRiftDoor.h"
 #include "Interaction/BreakerStashPoint.h"
 // The breakpoint sandbox's three suppliers: the XP curve arithmetic, the
 // seeded loot roll, and the gym's area level (a public BlueprintReadWrite
@@ -919,6 +920,11 @@ void SBreakerMenu::ShowTravel(ABreakerTravelPoint* InTravelPoint)
     {
         const TArray<FBreakerTravelDestination> Available = InTravelPoint->GetAvailableDestinations();
         if (Available.Num() > 0) SelectedTravelDestinationId = Available[0].Id;
+        if (SelectedTravelDestinationId == ABreakerTravelPoint::RiftDestinationId)
+        {
+            if (const auto* Door = Cast<ABreakerRiftDoor>(InTravelPoint))
+                ABreakerRiftDoor::CanEnterRift(Door->Rift, Character.Get(), TravelStatus);
+        }
     }
     // Pause, not Main, and for the same reason ShowDialogue does it: this
     // screen is entered from gameplay by walking into a thing and pressing F,
@@ -10658,6 +10664,20 @@ TSharedRef<SWidget> SBreakerMenu::BuildTravelScreen()
                     ABreakerTravelPoint* Live = TravelPoint.Get();
                     if (!Live) { if (Character.IsValid()) Character->ResumeFromMenu(); return FReply::Handled(); }
 
+                    if (DestinationId == ABreakerTravelPoint::RiftDestinationId)
+                    {
+                        if (const auto* Door = Cast<ABreakerRiftDoor>(Live))
+                        {
+                            FText Reason;
+                            if (!ABreakerRiftDoor::CanEnterRift(Door->Rift, Character.Get(), Reason))
+                            {
+                                TravelStatus = Reason;
+                                Rebuild(EBreakerMenuScreen::Travel);
+                                return FReply::Handled();
+                            }
+                        }
+                    }
+
                     // The travel point does not teleport anyone — it broadcasts
                     // OnDestinationSelected and whoever bound it decides what
                     // travel means. So a TRUE here means the request was
@@ -10688,7 +10708,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildTravelScreen()
     // Always present, so the list cannot change height when a refusal lands.
     Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
     [
-        SNew(SBox).HeightOverride(20.0f)
+        SNew(SBox).MinDesiredHeight(20.0f)
         [
             MenuText(TravelStatus, BreakerUI::TypeCaption, Harm, true)
         ]

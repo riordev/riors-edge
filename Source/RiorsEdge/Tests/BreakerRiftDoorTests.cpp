@@ -1,6 +1,9 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Misc/ScopeExit.h"
+#include "Characters/BreakerCharacter.h"
+#include "Engine/World.h"
 
 #include "Game/BreakerRiftDefinition.h"
 #include "Interaction/BreakerRiftDoor.h"
@@ -109,7 +112,14 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerRiftDoorEntryTest::RunTest(const FString& Parameters)
 {
-    ABreakerRiftDoor* Door = NewObject<ABreakerRiftDoor>();
+    UWorld::InitializationValues Init;
+    Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
+    auto* World = UWorld::CreateWorld(EWorldType::Game,false,NAME_None,nullptr,true,ERHIFeatureLevel::Num,&Init);
+    if (!World) return false;
+    ON_SCOPE_EXIT { World->DestroyWorld(false); };
+    auto* Door = World->SpawnActor<ABreakerRiftDoor>();
+    auto* Player = World->SpawnActor<ABreakerCharacter>();
+    if (!Door || !Player) return false;
     Door->Rift.AreaName = FText::FromString(TEXT("Fernhall Substation"));
     Door->Rift.AreaLevel = 5;
     Door->Rift.Tier = EBreakerRiftTier::Campaign;
@@ -123,11 +133,12 @@ bool FBreakerRiftDoorEntryTest::RunTest(const FString& Parameters)
             Carried = Rift;
         });
 
-    // O122: a campaign rift is entered FREELY. No key, no cost, no condition —
-    // so selection succeeds with nothing else set up, and this assertion is what
-    // makes a future entry gate a deliberate change rather than a quiet one.
-    TestTrue(TEXT("entering a campaign rift is refused by nothing"),
+    TestFalse(TEXT("a missing player cannot request travel"),
         Door->SelectDestination(ABreakerTravelPoint::RiftDestinationId, nullptr));
+    TestEqual(TEXT("missing player raises no travel event"), Raised, 0);
+    // O122: the actual player needs no key, cost, or quest flag.
+    TestTrue(TEXT("entering a campaign rift is refused by nothing"),
+        Door->SelectDestination(ABreakerTravelPoint::RiftDestinationId, Player));
     TestEqual(TEXT("the door raised its entry delegate once"), Raised, 1);
 
     // THE DEFINITION TRAVELS WITH THE REQUEST, which is the whole reason the
