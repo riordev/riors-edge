@@ -208,6 +208,8 @@ Every lane permitted to touch outgoing player damage.
 | Lane | Bucket / cap |
 |---|---|
 | Flat | Summed first |
+| Added weapon damage | Literal hit damage after item-level base scaling, before falloff, secondary-copy fractions and source Increased/More; weapon-delivered melee shares this base |
+| Added ability power | Literal ability base after item-level scaling, before delivery power/falloff and Increased/More; snapshots inherit it once, utility zeroes remain zero |
 | Maintained weapon flat | Metronome and Conduit source contributions add to shot base before Increased/More; ability-tagged, melee and DoT requests excluded |
 | Increased — Weapon | One additive bucket, no cap of its own |
 | Increased — Ability | One additive bucket, no cap of its own |
@@ -227,9 +229,7 @@ Every lane permitted to touch outgoing player damage.
 | DoT | The same additive bucket as direct damage |
 
 ### The bands
-
-The ratio between a baseline build and an optimized one at the same area level,
-authored at two points because the two are different games.
+The ratio between a baseline and optimized build at the same area level is authored at two points because the two are different games.
 
 | Band | Where | Target |
 |---|---|---|

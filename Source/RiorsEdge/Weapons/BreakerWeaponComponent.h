@@ -329,9 +329,10 @@ public:
     UFUNCTION(BlueprintPure, Category="Weapon|Damage") int32 GetEquippedItemLevel() const;
     // (1 + w)^(ilvl - 1) for the weapon as it stands right now.
     UFUNCTION(BlueprintPure, Category="Weapon|Damage") float GetItemLevelDamageScalar() const;
-    // The number every damage path in this component uses as its base: the
-    // active definition's Damage, scaled to the equipped item level. For a
-    // multi-pellet weapon this is still PER PELLET, exactly as Damage was.
+    // Authored per-pellet base scaled only by item level, for ability-delivered coefficients.
+    UFUNCTION(BlueprintPure, Category="Weapon|Damage") float GetItemLevelBaseDamage() const;
+    UFUNCTION(BlueprintPure, Category="Weapon|Damage") float GetItemLevelFullBlastDamage() const;
+    // Weapon-delivered per-pellet base includes literal AddedWeaponDamage after item scaling.
     UFUNCTION(BlueprintPure, Category="Weapon|Damage") float GetScaledBaseDamage() const;
     // Candidates use their own archetype and item level. The currently held
     // item's exact identity also honors an authored active definition override.
@@ -834,6 +835,7 @@ private:
     // Steady's posture read (§1.5 M2's R2 clause needs airborne).
     bool IsOwnerAirborne() const;
 
+    float GetScaledBaseDamageForDefinition(const UBreakerWeaponDefinition* Definition) const;
     const UBreakerWeaponDefinition* ResolveDefinition() const;
     FBreakerRecoilProfile ResolveRecoilProfile() const;
     // The owner's tree aggregate, or null with no progression component — the

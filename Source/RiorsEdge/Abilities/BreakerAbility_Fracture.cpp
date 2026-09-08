@@ -56,7 +56,7 @@ void UBreakerAbility_Fracture::ActivateAbility(const FGameplayAbilitySpecHandle 
     FBreakerDamageRequest Damage;
     // O35: flat ability damage rides the equipped weapon's item-level scalar
     // (exactly 1.0 at item level 1, preserving the authored base hit there).
-    Damage.BaseDamage = ImpactDamage * AbilityDamageScalarFor(Character);
+    Damage.BaseDamage = AbilityBaseDamageFor(Character, ImpactDamage * AbilityDamageScalarFor(Character));
     Damage.DamageFamily = EBreakerDamageFamily::Physical;
     Damage.SourceTags.AddTag(BreakerAbilityTags::Ability_Class_Caster_Fracture.GetTag());
     Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
@@ -115,7 +115,8 @@ void UBreakerAbility_Fracture::ActivateAbility(const FGameplayAbilitySpecHandle 
         // the applied copy rides the weapon scalar exactly as the impact hit
         // does. Scaled on the COPY, never on the cycle's own entry, so the
         // authored cycle survives an equipment change untouched.
-        Entry.Spec.BaseDamagePerTick *= AbilityDamageScalarFor(Character);
+        Entry.Spec.BaseDamagePerTick = AbilityBaseDamageFor(Character,
+            Entry.Spec.BaseDamagePerTick * AbilityDamageScalarFor(Character));
 
         // Snapshot the caster's offensive stats onto the status HERE, at cast,
         // not at impact: the DoT contract snapshots at application and this is

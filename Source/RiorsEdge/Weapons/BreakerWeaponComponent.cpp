@@ -777,13 +777,28 @@ float UBreakerWeaponComponent::GetItemLevelDamageScalar() const
     return FBreakerWeaponMath::ItemLevelDamageScalar(GetEquippedItemLevel(), ItemLevelDamageGrowth);
 }
 
-float UBreakerWeaponComponent::GetScaledBaseDamage() const
+float UBreakerWeaponComponent::GetItemLevelBaseDamage() const
 {
     const UBreakerWeaponDefinition* Definition = ResolveDefinition();
-    if (!Definition) return 0.0f;
-    return FBreakerWeaponMath::WeaponBaseDamage(Definition->Damage, GetEquippedItemLevel(), ItemLevelDamageGrowth);
+    return Definition && Definition->Damage > 0.0f
+        ? FBreakerWeaponMath::WeaponBaseDamage(Definition->Damage, GetEquippedItemLevel(), ItemLevelDamageGrowth) : 0.0f;
 }
 
+float UBreakerWeaponComponent::GetScaledBaseDamageForDefinition(const UBreakerWeaponDefinition* Definition) const
+{
+    if (!Definition || Definition->Damage <= 0.0f) return 0.0f;
+    const float Scaled = FBreakerWeaponMath::WeaponBaseDamage(Definition->Damage, GetEquippedItemLevel(), ItemLevelDamageGrowth);
+    const auto* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    const float Added = Progression ? Progression->GetNodeStats().AddedWeaponDamage : 0.0f;
+    // Literal damage is added once after item-level scaling. Copies and source
+    // pools operate on this complete base; utility weapons remain damage-free.
+    return FMath::Max(0.0f, Scaled + (FMath::IsFinite(Added) ? Added : 0.0f));
+}
+
+float UBreakerWeaponComponent::GetScaledBaseDamage() const
+{
+    return GetScaledBaseDamageForDefinition(ResolveDefinition());
+}
 FBreakerWeaponBaseDamagePreview UBreakerWeaponComponent::GetItemBaseDamagePreview(const FBreakerItemInstance& Item) const
 {
     FBreakerWeaponBaseDamagePreview Preview;
@@ -817,6 +832,12 @@ float UBreakerWeaponComponent::GetScaledFullBlastDamage() const
     const UBreakerWeaponDefinition* Definition = ResolveDefinition();
     if (!Definition) return 0.0f;
     return GetScaledBaseDamage() * FMath::Max(1, Definition->PelletsPerShot);
+}
+
+float UBreakerWeaponComponent::GetItemLevelFullBlastDamage() const
+{
+    const UBreakerWeaponDefinition* Definition = ResolveDefinition();
+    return Definition ? GetItemLevelBaseDamage() * FMath::Max(1, Definition->PelletsPerShot) : 0.0f;
 }
 
 FBreakerRecoilProfile UBreakerWeaponComponent::ResolveRecoilProfile() const
@@ -1822,7 +1843,7 @@ bool UBreakerWeaponComponent::FireOnce()
     // and any bleed those pellets apply share this one reading, so a shot can
     // never straddle an equipment change.
     const float LevelScalar = GetItemLevelDamageScalar();
-    const float ScaledBaseDamage = FMath::Max(0.0f, Definition->Damage) * LevelScalar;
+    const float ScaledBaseDamage = GetScaledBaseDamageForDefinition(Definition);
 
     // ---- Projectile channels (owner ruling 2026-08-16) --------------------
     // Composed once per trigger pull, so every pellet of this shot fires with
@@ -2643,7 +2664,7 @@ void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Def
     FBreakerDamageRequest Damage;
     // Same multiplicand as the hitscan path: the rocket's payload is a weapon
     // base damage number and scales with item level identically.
-    Damage.BaseDamage = FMath::Max(0.0f, Definition->Damage) * GetItemLevelDamageScalar();
+    Damage.BaseDamage = GetScaledBaseDamageForDefinition(Definition);
     Damage.DamageFamily = EBreakerDamageFamily::Physical;
     // The complete request retains this selection through travel and swaps.
     SnapshotWeaponElement(Damage);

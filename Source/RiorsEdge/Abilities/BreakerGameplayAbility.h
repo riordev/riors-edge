@@ -94,6 +94,7 @@ public:
     // same reason: application sites and tests share one seam.
     static float AbilityAreaMultiplierFor(const AActor* OwnerActor);
     static float AbilityDurationMultiplierFor(const AActor* OwnerActor);
+    static float AbilityBaseDamageFor(const AActor* OwnerActor, float ScaledAuthoredBase);
     // The cooldown DIVISOR (DashCooldownReduction's convention: 1.20 == 20%
     // shorter). Never at or below zero — the aggregator floors it.
     static float AbilityCooldownReductionFor(const AActor* OwnerActor);

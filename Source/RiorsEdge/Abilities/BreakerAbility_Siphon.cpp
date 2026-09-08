@@ -177,7 +177,7 @@ void UBreakerAbility_Siphon::TickChannel()
     // O35: flat ability damage rides the equipped weapon's item-level scalar.
     // Read per tick, not snapshotted at channel start, because a channel is a
     // repeated LIVE hit — the same reason it carries no bIsDamageOverTime.
-    Damage.BaseDamage = DamagePerTick * AbilityDamageScalarFor(Character);
+    Damage.BaseDamage = AbilityBaseDamageFor(Character, DamagePerTick * AbilityDamageScalarFor(Character));
     // O5: Elemental is the pipeline family until the resistance model lands;
     // O225: Siphon retains its damage and leech, without the retired Void debuff.
     Damage.DamageFamily = EBreakerDamageFamily::Elemental;

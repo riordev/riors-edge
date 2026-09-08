@@ -19,8 +19,8 @@ promise the game does not keep.
 
 - **Class** owns resource loops and identity mechanics — behaviour no other
   class can produce.
-- **Trees** grant the few remaining verbs and rewrite rules. A rewrite changes
-  how a system resolves rather than scaling its output.
+- **Core** scales generic axes across distinct stages and rewrites rules.
+  **Doctrines** change class behavior and ability identity.
 - **Affixes** scale verbs the player already owns, and own the raw
   percentages. They make existing actions better, cheaper, faster or longer;
   they do not introduce actions.
@@ -33,9 +33,9 @@ committed to; an item rewrite is a build found.
 mantle, passive block and passive dodge are base kit. Dash is innate to Swift.
 Trees improve movement verbs; gear never grants one.
 
-**A node that reads as a flat percentage is doing the affix layer's job.**
-With almost no verbs left to grant, a node is a conditional quality change, a
-rule rewrite, or a More — never a duplicate of an affix line.
+**Core choices span stages, rather than repeating one damage bucket.**
+Base, Increased, More, Site, Rate, Multiplicity and Stream give lanes distinct
+jobs. Ranked generic magnitudes are permitted; doctrine identity stays separate.
 
 **Core sets the axis; the class layer changes what the axis does.** Three
 permitted class-layer forms, and one forbidden:
@@ -62,9 +62,9 @@ the Core side it is arithmetic on the pool: a third keystone costs more than the
 pool holds. On the doctrine side it is the shape of the wallet — eight points,
 four picks of two, and the keystone is one of them.
 
-**Tree More multipliers belong to Core: one per constellation, on its Convergence
-or Keystone only.** Composed cap of three across the build. Two Core Mores plus
-one item-layer slot is the intended composition. A doctrine authors none — its
+**Tree More multipliers belong to Core convergences.** The strongest three
+applicable gear/tree Mores share one ceiling; no slot is reserved for either
+source. New Core convergences author at most1.26x each. A doctrine authors none — its
 keystone earns its place by rewriting the ultimate, not by multiplying a number,
 and a doctrine spending one of eight points on a multiplier would be buying what
 Core already sells.
@@ -128,19 +128,14 @@ repeatable source exists — a repeatable source is an infinite power track.
 
 ### Density — the ratio is a target, not an accident
 
-**A tree offers roughly 3–5x the points a character can spend.** Most of a
-build is refusal; that is what makes a choice a choice. Against the Core
-budget that is on the order of 200–325 offered nodes.
+**Density counts offered points, not nodes.** Doctrine density retains its
+own target. Core density is derived from the authored major/minor roster
+against65 spendable points; its deliberately wider shape is not a3–5x overrun.
 
-**Composition is under re-derivation, and the old 60 / 30 / 10 is why.** Sixty
-percent ranked minors means sixty percent unconditional stat lines — which this
-spec calls the affix layer's job two paragraphs above, and which O76 gives to
-affixes outright. That ratio came from a game with no competing affix layer.
-
-The problem it was pointing at is real and unchanged: a tree with nothing to
-fill a constellation between the interesting picks reads as small however large
-it is. What fills it here cannot be unconditional stat lines. It is conditional
-lines — the tree's own texture, cheap and characterful — and small rules.
+**Composition follows the major/minor shapes.** Ranked lanes supply generic
+axes; notables change stage, convergences combine lanes, and major keystones
+pair a rule rewrite with a forfeit. Core owns no named class resource, ability
+identity or ultimate. Magnitudes are tuning placeholders; the shape is design.
 
 **The gate is vocabulary, not count, and the ordering is explicit: widen the
 stat-target and condition vocabularies first, then author to the ratio.**
@@ -148,23 +143,22 @@ Authoring more nodes against a narrow vocabulary produces more near-identical
 nodes. A tree reads small when it is repetitive, and count without vocabulary
 makes it worse, not better.
 
-Both ratios are reported per tree with pinned ceilings, so the gap is a number
-on every build rather than something rediscovered later.
+Measure offered points and ranked-node composition independently for each tree.
 
 ### The Core tree
 
 **The wheel is one tree every class shares, its points level-driven (O211).**
-Five domain sectors — movement, weapon, defence, ability, elements — hold their
+Six domain sectors — weapon, ability, status, defence, movement, utility — hold their
 constellations as wedges and the wheel never hides a sector; a constellation
 with a silent node draws dark and unselectable until its plumbing exists
 (O212). Class flavour on the Core is a lit recommendation, never a lock. No
 bead is a travel node: every rank carries a magnitude. Core respec is free
 until level N and costs Riftglass after; Doctrine respec stays the Forge's (O213).
 
-Five constellations ship. Elements is designed and lands with the resistance
-step rather than being cut.
-
-Each constellation is 11 nodes totalling 26 points:
+Wedges are reachable from either neighbor. Major wedges have11 nodes and26
+offered points; minor wedges have6 nodes and13 offered points.
+The full roster has11 majors and11 minors:22 wedges,187 nodes and429 offered
+points against65 spendable, a6.6x ratio. All named wedges remain in the design.
 
 ```
 Gateway (1)
@@ -175,7 +169,16 @@ Gateway (1)
   Convergence (3)  requires two lanes complete
   Keystone (5)     requires 18 spent here
                                        TOTAL   = 26
+
+Minor: Gateway(1), Lane A(3+2), Lane B(3+2), Convergence(2) =13
+Minor convergence requires both completed lanes.
 ```
+
+Each ranked lane node costs one point per rank, up to three. A notable requires
+all three ranks of its lane. Major convergence requires two completed lanes;
+its keystone requires convergence and18 points already spent in that wedge.
+The keystone's five-point purchase cannot count toward its own gate. Its
+minimum23-point path permits two for46 and rejects three for69 against65.
 
 **A Core keystone is expensive enough that two is a character and three is not
 a choice.** That is the intent, and it is arithmetic on the POOL: whatever a
@@ -183,15 +186,8 @@ keystone's gate and charge come to, three must exceed 65, and two must leave
 enough that the character is still playing a build rather than servicing two
 decisions.
 
-Stated as the shape rather than the sum on purpose. The cap used to be derived
-from one specific gate against one specific constellation, which made a rule out
-of numbers that are being replaced — and a derivation like that rots silently,
-because the argument still reads fine after the structure under it is gone.
-
-The gate that enforces it is Core's alone. Doctrines have none: theirs was
-priced against a budget that no longer exists and made every keystone in the
-game unbuyable, which is what a gate does when the budget it is keyed to moves
-without it.
+The local spending gate belongs to Core. Doctrine commitment and tier rules
+remain separate from Core wedge investment.
 Twenty-point constellations would buy three keystones and collapse the choice;
 thirty-two-point ones would make the third constellation meaningless.
 
@@ -283,17 +279,11 @@ It does not own:
 | Offered-to-spendable ratio per tree stays inside its band | `Progression.TreeDensity.Offered` |
 | Node-shape composition per tree stays inside its band | `Progression.TreeDensity.Composition` |
 
-The last two are targets the trees do not currently meet. The Core tree offers
-30 nodes against a budget that can buy nearly all of them, so almost nothing in
-it is a refusal and the two-keystone cap never bites, because there are not two
-full constellations to fill.
-
 ## Open
 
 - The class branch tier shape: the shipped four-tier gating, or the 26-point
   five-tier target. Decided together with density.
 - Where the Core tree's hub sits, or whether it keeps one — a hub that is one
   of the axes privileges that axis.
-- Whether the count of offered More options grows if the axis count grows.
 - Whether the conditional-payout ratio differs by condition count. The stated
   direction is that it barely should.

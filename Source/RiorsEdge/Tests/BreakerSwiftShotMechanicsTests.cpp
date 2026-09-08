@@ -295,8 +295,10 @@ bool FBreakerSwiftChannelLanesTest::RunTest(const FString& Parameters)
     // insertion — the originals must not shift.
     TestEqual(TEXT("RicochetCount appended after ChainCount"),
         static_cast<int32>(EBreakerNodeStatTarget::RicochetCount), static_cast<int32>(EBreakerNodeStatTarget::ChainCount) + 1);
-    TestEqual(TEXT("DashDistance is the last entry before Count (O139)"),
-        static_cast<int32>(EBreakerNodeStatTarget::DashDistance), static_cast<int32>(EBreakerNodeStatTarget::Count) - 1);
+    TestEqual(TEXT("DashDistance keeps its position"), static_cast<int32>(EBreakerNodeStatTarget::DashDistance), static_cast<int32>(EBreakerNodeStatTarget::RicochetCount) + 1);
+    TestEqual(TEXT("AddedWeaponDamage appends"), static_cast<int32>(EBreakerNodeStatTarget::AddedWeaponDamage), static_cast<int32>(EBreakerNodeStatTarget::DashDistance) + 1);
+    TestEqual(TEXT("AddedAbilityPower appends"), static_cast<int32>(EBreakerNodeStatTarget::AddedAbilityPower), static_cast<int32>(EBreakerNodeStatTarget::AddedWeaponDamage) + 1);
+    TestEqual(TEXT("AddedAbilityPower is last"), static_cast<int32>(EBreakerNodeStatTarget::AddedAbilityPower), static_cast<int32>(EBreakerNodeStatTarget::Count) - 1);
 
     // And the lanes actually pay: a rank-2 node authoring all four Flat lines
     // lands on the FBreakerNodeStats fields the weapon reads.

@@ -121,19 +121,20 @@ namespace BreakerTankAbilityLocal
     // Breach Charge and Ground Zero all mean the whole trigger pull by
     // "weapon damage", so all three read the full-blast accessor through
     // this one seam.
-    float BreakerTankAbilityBaseDamage(const ABreakerCharacter* Character, float WeaponCoefficient, float UnarmedDamage)
+    float BreakerTankAbilityBaseDamage(const ABreakerCharacter* Character, float WeaponCoefficient, float UnarmedDamage,
+        bool bAbilityDelivered = false)
     {
         float WeaponDamage = 0.0f;
         if (const UBreakerWeaponComponent* Weapon = Character ? Character->GetWeapon() : nullptr)
         {
             if (Weapon->GetActiveDefinition())
             {
-                WeaponDamage = Weapon->GetScaledFullBlastDamage();
+                WeaponDamage = bAbilityDelivered ? Weapon->GetItemLevelFullBlastDamage() : Weapon->GetScaledFullBlastDamage();
             }
         }
         const float ScaledUnarmed = UnarmedDamage * UBreakerGameplayAbility::AbilityDamageScalarFor(Character);
         const float Base = WeaponDamage > 0.0f ? WeaponDamage * WeaponCoefficient : ScaledUnarmed;
-        return FMath::Max(0.0f, Base);
+        return bAbilityDelivered ? UBreakerGameplayAbility::AbilityBaseDamageFor(Character, Base) : FMath::Max(0.0f, Base);
     }
 
     // One radial damage application against enemies only, linear falloff to
@@ -947,7 +948,7 @@ void UBreakerAbility_BreachCharge::Detonate(FVector BlastLocation)
         Mods.ChainFlatPerStack = 6.0f * AbilityDamageScalarFor(Character);   // O2 PLACEHOLDER, flat bucket
     }
 
-    const float BaseDamage = BreakerTankAbilityLocal::BreakerTankAbilityBaseDamage(Character, WeaponDamageCoefficient, UnarmedDamage);
+    const float BaseDamage = BreakerTankAbilityLocal::BreakerTankAbilityBaseDamage(Character, WeaponDamageCoefficient, UnarmedDamage, true);
     BreakerTankAbilityLocal::BreakerTankRadialDamage(World, Character, BlastLocation, EnemyRadius, BaseDamage, EdgeDamageFraction, /*bApplyFalloff=*/true, Mods);
     BreakerTankAbilityLocal::BreakerTankBlastFlash(World, BlastLocation, EnemyRadius);
 
@@ -1066,7 +1067,7 @@ void UBreakerAbility_GroundZero::HandlePlungeLanded(const FHitResult& Hit)
         Mods.ChainFlatPerStack = 6.0f * AbilityDamageScalarFor(Character);   // O2 PLACEHOLDER
     }
 
-    const float BaseDamage = BreakerTankAbilityLocal::BreakerTankAbilityBaseDamage(Character, WeaponDamageCoefficient, UnarmedDamage) * Power;
+    const float BaseDamage = BreakerTankAbilityLocal::BreakerTankAbilityBaseDamage(Character, WeaponDamageCoefficient, UnarmedDamage, true) * Power;
     TArray<TWeakObjectPtr<UBreakerCombatComponent>> DamagedTargets;
     BreakerTankAbilityLocal::BreakerTankRadialDamage(World, Character, Center, EnemyRadius, BaseDamage, 0.5f, /*bApplyFalloff=*/true, Mods, &DamagedTargets);
     // The same flash as Breach Charge, sharing the radial seam's geometry --

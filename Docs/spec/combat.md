@@ -2,17 +2,8 @@
 
 ## What this system is for
 
-To resolve every damage event in the game — weapon, ability, status tick,
-hazard, enemy — through one ordered pipeline, so that a number the player sees
-can be explained by a rule rather than by whichever system happened to touch it
-last.
-
-It fails quietly. Two systems each adding a step to the order, and nobody
-composing the result, is how armour shred stacks into negative armour and a
-status build stops working against bosses. The failure is never a crash; it is
-a number that is wrong in a way no one can trace, in a game where the only
-feedback channel for whether gear is doing anything is that number.
-
+Resolve weapon, ability, status, hazard and enemy damage through one ordered
+pipeline so every number follows an explicit rule.
 ## The rules
 
 **Every damage event resolves in exactly this order.** A system may not insert
@@ -35,7 +26,6 @@ a step without writing it here first.
 9. **Shield-break, damage, dodge, block and death events.**
 
 True damage skips 5 and 6.
-
 **Armour composition, with an explicit floor:**
 
 ```
@@ -251,21 +241,14 @@ element model. It does not own:
 
 ## Enemy threat
 
-Enemies accumulate threat from accepted health and shield damage. Avoided or
-refused hits earn none. A deployable is the direct threat source of its own
-attack; its owner remains the source of reward and kill credit.
-
-The highest positive eligible threat wins. Equal threat retains the current
-target, then prefers the nearer target. Without positive eligible threat,
-enemies select the nearest living player outside a safe zone. Suppressing
-threat generation does not make a solo player untargetable. Dead, destroyed
-and safe-zone targets, plus hidden deployables, are ineligible. Death, reuse and encounter reset
-clear the ledger; threat has no timed decay.
-
-Target-dependent effects use the actual selected or committed attack target,
-not the player nearest the enemy. Deployables must receive actual attacks as
-well as selection. Zones require a health chassis before zone-health bonuses
-can apply.
+Accepted health and shield damage earn threat; refused hits earn none.
+Direct producers own threat; their owners retain reward and kill credit.
+Highest eligible threat wins; ties retain the current target, then prefer nearer.
+Without positive threat, acquire the nearest living player outside safe zones.
+Zero threat never makes a solo player untargetable. Dead, destroyed, safe-zone
+targets and hidden deployables are ineligible. Death, reuse and encounter reset
+clear threat; it has no timed decay. Effects read the actual selected/committed
+target. Deployables receive real attacks; zone-health requires a health chassis.
 
 ## Asserted invariants
 

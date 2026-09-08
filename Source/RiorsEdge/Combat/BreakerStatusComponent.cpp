@@ -63,6 +63,15 @@ void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& S
     ApplyStatusInternal(Spec, DamageFamily, Instigator, false);
 }
 
+void UBreakerStatusComponent::ApplyStatusFromHit(const FBreakerStatusApplicationSpec& Spec,
+    EBreakerDamageFamily DamageFamily, const FBreakerDamageRequest& ApplyingHit)
+{
+    if (Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"))
+        || Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Erased"))
+        || Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Unstable"))) return;
+    ApplyStatusInternal(Spec, DamageFamily, ApplyingHit.Instigator.Get(), false, 0, nullptr, &ApplyingHit);
+}
+
 float UBreakerStatusComponent::GetArmorMultiplier() const
 {
     const UBreakerCombatComponent* OwnerCombat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
@@ -87,7 +96,7 @@ float UBreakerStatusComponent::GetHealingReceivedMultiplier() const
     return 1.0f - Reduction / 100.0f;
 }
 
-uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicationSpec& InputSpec, EBreakerDamageFamily DamageFamily, AActor* Instigator, bool bDurationAlreadyScaled, float UnpaidDamageBudget, const FVector* SourceLocationOverride)
+uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicationSpec& InputSpec, EBreakerDamageFamily DamageFamily, AActor* Instigator, bool bDurationAlreadyScaled, float UnpaidDamageBudget, const FVector* SourceLocationOverride, const FBreakerDamageRequest* ApplyingHit)
 {
     // Caller may have passed an entry in a live status array; callbacks can
     // consume or reallocate it. Accepted application owns its payload.
@@ -197,13 +206,15 @@ uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicat
             if (Instigator)
             {
                 Active.Instigator = Instigator;
+                Active.ThreatSource = ApplyingHit ? ApplyingHit->ThreatSource : TWeakObjectPtr<AActor>();
+                Active.bHasThreatSource = ApplyingHit && (ApplyingHit->bHasThreatSource || !ApplyingHit->ThreatSource.IsExplicitlyNull());
                 Active.SourceLocationSnapshot = Instigator->GetActorLocation();
                 Active.bHasSourceLocationSnapshot = true;
                 Active.ResourceProcCoefficient = Spec.ProcCoefficient;
             }
             const FBreakerActiveStatus Applied = Active;
             if (SourceMana) SourceMana->NotifyStatusApplication(Spec, true, GetOwner());
-            SpreadNewestStatus(Spec, DamageFamily, Instigator, ScaledDuration);
+            SpreadNewestStatus(Spec, DamageFamily, Instigator, ScaledDuration, ApplyingHit);
             OnStatusApplied.Broadcast(Applied);
             return Applied.ApplicationSerial;
         }
@@ -218,6 +229,8 @@ uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicat
     Status.RemainingDuration = ScaledDuration;
     Status.TimeUntilNextTick = Spec.TickInterval;
     Status.Instigator = Instigator;
+    Status.ThreatSource = ApplyingHit ? ApplyingHit->ThreatSource : TWeakObjectPtr<AActor>();
+    Status.bHasThreatSource = ApplyingHit && (ApplyingHit->bHasThreatSource || !ApplyingHit->ThreatSource.IsExplicitlyNull());
     Status.ResourceProcCoefficient = Spec.ProcCoefficient;
     // Application-time facing snapshot. Taken from the applier's position NOW,
     // not per tick: the DoT contract snapshots at application, and a tick that
@@ -238,12 +251,12 @@ uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicat
         BreakerEntropyFeedback::PlayActivation(GetOwner(), Instigator);
     if (bErased) BreakerVoidFeedback::PlayActivation(GetOwner(), Instigator);
     if (SourceMana) SourceMana->NotifyStatusApplication(Spec, false, GetOwner());
-    SpreadNewestStatus(Spec, DamageFamily, Instigator, ScaledDuration);
+    SpreadNewestStatus(Spec, DamageFamily, Instigator, ScaledDuration, ApplyingHit);
     OnStatusApplied.Broadcast(Status);
     return Status.ApplicationSerial;
 }
 
-void UBreakerStatusComponent::SpreadNewestStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator, float ScaledDuration)
+void UBreakerStatusComponent::SpreadNewestStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator, float ScaledDuration, const FBreakerDamageRequest* ApplyingHit)
 {
     if (Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Erased"))
         || Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Unstable"))) return;
@@ -280,7 +293,7 @@ void UBreakerStatusComponent::SpreadNewestStatus(const FBreakerStatusApplication
     FBreakerStatusApplicationSpec Copy = Spec;
     Copy.Duration = ScaledDuration;
     Copy.ProcCoefficient = 0;
-    Nearest->ApplyStatusInternal(Copy, DamageFamily, Instigator, true);
+    Nearest->ApplyStatusInternal(Copy, DamageFamily, Instigator, true, 0, nullptr, ApplyingHit);
 }
 
 void UBreakerStatusComponent::HandleAfflictedOwnerDeath()
@@ -397,6 +410,7 @@ void UBreakerStatusComponent::AdvanceStatuses(float DeltaTime)
             FBreakerDamageRequest Tick = UBreakerDamageLibrary::MakeSnapshotDotTick(TickSpec, Status.DamageFamily, Status.TicksDelivered, Status.Instigator.Get(),
                 Status.SourceLocationSnapshot, Status.bHasSourceLocationSnapshot);
             Tick.bBypassShield = Status.DamageFamily == EBreakerDamageFamily::Physical;
+            Status.CopyThreatTo(Tick);
             TGuardValue<FGameplayTag> DeliveringTick(DeliveringTickTag, Tag);
             Combat->ReceiveDamage(Tick);
         }

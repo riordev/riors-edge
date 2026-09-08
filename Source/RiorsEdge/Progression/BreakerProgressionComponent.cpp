@@ -1456,6 +1456,8 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     // reads this struct directly (see the lane-register comment in
     // BreakerProgressionTypes.h for the single-bidder reasoning).
     Stats.BonusProjectileCount = Flat(EBreakerNodeStatTarget::ProjectileCount);
+    Stats.AddedWeaponDamage = Flat(EBreakerNodeStatTarget::AddedWeaponDamage);
+    Stats.AddedAbilityPower = Flat(EBreakerNodeStatTarget::AddedAbilityPower);
     Stats.BonusPierceCount = Flat(EBreakerNodeStatTarget::Pierce);
     Stats.BonusChainCount = Flat(EBreakerNodeStatTarget::ChainCount);
     Stats.BonusRicochetCount = Flat(EBreakerNodeStatTarget::RicochetCount);

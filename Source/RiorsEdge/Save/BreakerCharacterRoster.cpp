@@ -135,6 +135,7 @@ FGuid UBreakerCharacterRoster::CreateCharacter(const FString& CharacterName, EBr
         return FGuid();
     }
     Save->SaveVersion = UBreakerSaveGame::CurrentSaveVersion;
+    Save->CoreLayoutVersion = UBreakerSaveGame::ActiveCoreLayoutVersion;
     Save->Progression.PermanentClass = ClassId;
     Save->Progression.CharacterLevel = 1;
     // Born folded: a new character has no wallet of its own to move, and
@@ -243,6 +244,7 @@ FGuid UBreakerCharacterRoster::AdoptLegacySaveIfPresent()
     // explicit is what makes the omission visible in review. Kept in the same
     // order as the declarations in BreakerSaveGame.h so the two can be diffed.
     Copy->SaveVersion = Legacy->SaveVersion;
+    Copy->CoreLayoutVersion = Legacy->CoreLayoutVersion;
     Copy->Progression = Legacy->Progression;
     Copy->EquippedItems = Legacy->EquippedItems;
     Copy->BackpackItems = Legacy->BackpackItems;

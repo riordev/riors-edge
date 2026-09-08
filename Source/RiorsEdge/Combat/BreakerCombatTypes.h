@@ -125,6 +125,8 @@ struct RIORSEDGE_API FBreakerDamageRequest
     UPROPERTY(BlueprintReadWrite) TWeakObjectPtr<AActor> Instigator = nullptr;
     // Direct threat producer; reward/kill attribution remains with Instigator.
     UPROPERTY(BlueprintReadWrite) TWeakObjectPtr<AActor> ThreatSource = nullptr;
+    // Preserve an explicitly attributed producer after its weak pointer expires.
+    UPROPERTY(BlueprintReadWrite) bool bHasThreatSource = false;
     // Environmental falls cannot be dodged/blocked; all existing hits opt in.
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bCanBeAvoided = true;
 

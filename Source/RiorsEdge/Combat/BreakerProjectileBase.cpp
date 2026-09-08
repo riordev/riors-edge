@@ -225,9 +225,11 @@ void ABreakerProjectileBase::ResolveImpact(AActor* HitActor, const FVector& Loca
             // status produces has to credit the player, or a DoT applied by a
             // projectile generates no Mana and counts toward nobody's kill.
             AActor* Applier = Damage.Instigator.IsValid() ? Damage.Instigator.Get() : static_cast<AActor*>(GetInstigator());
+            FBreakerDamageRequest ApplyingHit = Damage;
+            ApplyingHit.SetInstigator(Applier);
             for (const FBreakerCarriedStatus& Carried : ImpactStatuses)
             {
-                Status->ApplyStatus(Carried.Spec, Carried.DamageFamily, Applier);
+                Status->ApplyStatusFromHit(Carried.Spec, Carried.DamageFamily, ApplyingHit);
             }
         }
     }

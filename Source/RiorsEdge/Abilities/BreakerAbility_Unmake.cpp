@@ -96,6 +96,7 @@ void UBreakerCascadeEchoListener::HandleStatusApplied(const FBreakerActiveStatus
 
     FBreakerStatusApplicationSpec Echo = UBreakerAbility_Unmake::MakeCascadeEchoSpec(
         Entry.Spec, UBreakerGameplayAbility::AbilityDamageScalarFor(CasterCharacter));
+    Echo.BaseDamagePerTick = UBreakerGameplayAbility::AbilityBaseDamageFor(CasterCharacter, Echo.BaseDamagePerTick);
 
     // Snapshot NOW, at the application that triggered the echo — Fracture's
     // own contract: one critical roll per application decides every tick.

@@ -103,6 +103,7 @@ void UBreakerStatusComponent::FlushElementReaction(uint64 Token)
         EBreakerDamageFamily::Elemental, 1, Consumed.Instigator.Get(),
         Consumed.SourceLocationSnapshot, Consumed.bHasSourceLocationSnapshot);
     Payment.DamageTypeTag = PendingReactionTag;
+    Consumed.CopyThreatTo(Payment);
     Payment.bCanCritical = false;
     Payment.bCanApplyElementBuildup = false;
     Payment.bBypassShield = false;
@@ -152,6 +153,7 @@ void UBreakerStatusComponent::AdvanceRotStatus(uint64 ApplicationSerial, float D
                     EBreakerDamageFamily::Elemental, Active.TicksDelivered, Active.Instigator.Get(),
                     Active.SourceLocationSnapshot, Active.bHasSourceLocationSnapshot);
                 Tick.Element = EBreakerElement::Entropy;
+                Active.CopyThreatTo(Tick);
                 Tick.ElementalFraction = 1;
                 Tick.bCanApplyElementBuildup = false;
                 Tick.bCanCritical = false;

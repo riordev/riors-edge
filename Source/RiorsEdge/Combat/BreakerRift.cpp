@@ -138,7 +138,7 @@ uint64 UBreakerStatusComponent::ApplyRiftHit(const FBreakerDamageRequest& Reques
     Spec.Snapshot.SourceTags = Request.SourceTags;
     const FVector* SourceLocation = Request.bHasSourceLocation && !Request.SourceLocation.ContainsNaN()
         ? &Request.SourceLocation : nullptr;
-    return ApplyStatusInternal(Spec, EBreakerDamageFamily::Elemental, Request.Instigator.Get(), true, Budget, SourceLocation);
+    return ApplyStatusInternal(Spec, EBreakerDamageFamily::Elemental, Request.Instigator.Get(), true, Budget, SourceLocation, &Request);
 }
 
 void UBreakerStatusComponent::FlushRiftActivation(uint64 ApplicationSerial)
@@ -170,6 +170,7 @@ void UBreakerStatusComponent::FlushRiftActivation(uint64 ApplicationSerial)
         EBreakerDamageFamily::Elemental, 1, Status.Instigator.Get(),
         Status.SourceLocationSnapshot, Status.bHasSourceLocationSnapshot);
     Burst.Element = EBreakerElement::Rift;
+    Status.CopyThreatTo(Burst);
     Burst.ElementalFraction = 1;
     Burst.bCanApplyElementBuildup = false;
     Burst.bCanCritical = false;

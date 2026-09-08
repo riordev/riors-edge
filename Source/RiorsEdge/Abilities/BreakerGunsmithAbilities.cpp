@@ -864,7 +864,8 @@ void UBreakerAbility_FieldAssembly::HandleMachinistKill(const FBreakerHitContext
     const AActor* Victim = Hit.Target.Get();
     if (!Character || !World || !Victim) return;
     const UBreakerWeaponComponent* Weapon = Character->GetWeapon();
-    const float BaseDamage = (Weapon ? Weapon->GetScaledBaseDamage() : 0.0f) * MachinistDetonationCoefficient;
+    const float BaseDamage = AbilityBaseDamageFor(Character,
+        (Weapon ? Weapon->GetItemLevelBaseDamage() : 0.0f) * MachinistDetonationCoefficient);
     if (BaseDamage <= 0.0f) return;
     TGuardValue<bool> DetonationGuard(bBreakerMachinistDetonating, true);
 

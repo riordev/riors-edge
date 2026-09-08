@@ -136,7 +136,7 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     // The footprint shares Entropy's projectile, activation and meter palette.
     Spec.ZoneColor = BreakerFX::ColorForStatusTag(FGameplayTag::RequestGameplayTag(TEXT("Status.Rot")), FLinearColor::White);
 
-    Spec.TickDamage.BaseDamage = ZoneDamagePerTick * LevelScalar;
+    Spec.TickDamage.BaseDamage = AbilityBaseDamageFor(Character, ZoneDamagePerTick * LevelScalar);
     Spec.TickDamage.DamageFamily = EBreakerDamageFamily::Elemental;
     Spec.TickDamage.Element = EBreakerElement::Entropy;
     Spec.TickDamage.ElementalFraction = 1.0f;

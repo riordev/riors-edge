@@ -440,7 +440,9 @@ void ABreakerZoneActor::ApplyStatusToOccupant(AActor* Occupant) const
     if (!IsValid(Occupant) || !Spec.bAppliesStatus || Spec.StatusSpec.Duration <= 0.0f) return;
     if (UBreakerStatusComponent* Status = Occupant->FindComponentByClass<UBreakerStatusComponent>())
     {
-        Status->ApplyStatus(Spec.StatusSpec, Spec.StatusFamily, ZoneInstigator.Get());
+        FBreakerDamageRequest ApplyingHit = Spec.TickDamage;
+        ApplyingHit.SetInstigator(ZoneInstigator.Get());
+        Status->ApplyStatusFromHit(Spec.StatusSpec, Spec.StatusFamily, ApplyingHit);
     }
 }
 FName ABreakerZoneActor::ArmorKey() const

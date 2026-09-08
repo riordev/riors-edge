@@ -139,7 +139,7 @@ void UBreakerStatusComponent::ApplyVoidHit(const FBreakerDamageRequest& Request,
     Spec.Snapshot.CriticalChance = 0;
     Spec.Snapshot.bRolledCritical = false;
     Spec.Snapshot.SourceTags = Request.SourceTags;
-    ApplyStatusInternal(Spec, EBreakerDamageFamily::Elemental, Request.Instigator.Get(), true, Budget);
+    ApplyStatusInternal(Spec, EBreakerDamageFamily::Elemental, Request.Instigator.Get(), true, Budget, nullptr, &Request);
 }
 
 void UBreakerStatusComponent::DeliverVoidBurst(uint64 ApplicationSerial)
@@ -162,6 +162,7 @@ void UBreakerStatusComponent::DeliverVoidBurst(uint64 ApplicationSerial)
         EBreakerDamageFamily::Elemental, 1, Status.Instigator.Get(),
         Status.SourceLocationSnapshot, Status.bHasSourceLocationSnapshot);
     Burst.Element = EBreakerElement::Void;
+    Status.CopyThreatTo(Burst);
     Burst.ElementalFraction = 1;
     Burst.bCanApplyElementBuildup = false;
     Burst.bCanCritical = false;

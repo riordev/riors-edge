@@ -257,6 +257,9 @@ enum class EBreakerNodeStatTarget : uint8
     // migration the register comment demands of DashCooldown.
     DashDistance,
 
+    AddedWeaponDamage,
+    AddedAbilityPower,
+
     Count UMETA(Hidden)
 };
 
@@ -304,6 +307,8 @@ inline bool BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget Target)
     // rather than multiplying beside it, which is the whole reason the
     // attribute stores the divisor.
     case EBreakerNodeStatTarget::AbilityCost:
+    case EBreakerNodeStatTarget::AddedWeaponDamage:
+    case EBreakerNodeStatTarget::AddedAbilityPower:
     case EBreakerNodeStatTarget::MaxClassResource:
     case EBreakerNodeStatTarget::ClassResourceRegen:
     case EBreakerNodeStatTarget::FireRate:
@@ -685,6 +690,8 @@ struct RIORSEDGE_API FBreakerNodeStats
     // radius/arc/range (AbilityArea) and window/zone duration (AbilityDuration).
     UPROPERTY(BlueprintReadOnly) float AbilityAreaMultiplier = 1.0f;
     UPROPERTY(BlueprintReadOnly) float AbilityDurationMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float AddedWeaponDamage = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float AddedAbilityPower = 0.0f;
     // Cooldown reduction as the DIVISOR (DashCooldownReduction's convention:
     // 1.20 == 20% shorter). Floored just above zero so a malformed authored
     // row can never divide by zero or lengthen a cooldown to infinity.

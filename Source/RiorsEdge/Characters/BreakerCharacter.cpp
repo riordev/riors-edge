@@ -527,6 +527,7 @@ void ABreakerCharacter::SaveGameState()
         Save->QuestCounters = Quests->GetState().Counters;
     }
     Save->SaveVersion = UBreakerSaveGame::CurrentSaveVersion;
+    Save->CoreLayoutVersion = UBreakerSaveGame::ActiveCoreLayoutVersion;
     Save->DiscoveredMapSites = LocalMap->GetDiscovered();
     Save->TrackedMapSite = LocalMap->GetTracked();
     UGameplayStatics::SaveGameToSlot(Save, ActiveSaveSlotName(), 0);

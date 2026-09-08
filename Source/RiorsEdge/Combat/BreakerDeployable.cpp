@@ -1,4 +1,5 @@
 #include "Combat/BreakerDeployable.h"
+#include "Abilities/BreakerGameplayAbility.h"
 
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
@@ -352,7 +353,7 @@ float ABreakerDeployable::OwnerWeaponBaseDamage() const
     // rides gear depth exactly as the gun does and is worthless without one.
     const AActor* OwnerActor = OwningCharacter.Get();
     const UBreakerWeaponComponent* Weapon = OwnerActor ? OwnerActor->FindComponentByClass<UBreakerWeaponComponent>() : nullptr;
-    return Weapon ? Weapon->GetScaledBaseDamage() : 0.0f;
+    return Weapon ? Weapon->GetItemLevelBaseDamage() : 0.0f;
 }
 
 void ABreakerDeployable::Tick(float DeltaSeconds)
@@ -411,7 +412,7 @@ void ABreakerDeployable::TickTurret(float DeltaSeconds)
 
     if (!bTurretFreeShotPending && Now - LastTurretShotTime < TurretFireInterval) return;
 
-    const float BaseDamage = OwnerWeaponBaseDamage() * TurretDamageCoefficient;
+    const float BaseDamage = UBreakerGameplayAbility::AbilityBaseDamageFor(OwningCharacter.Get(), OwnerWeaponBaseDamage() * TurretDamageCoefficient);
     if (BaseDamage <= 0.0f) return;
 
     // Base rule (§G3): nearest valid target with line of sight. Deliberately
@@ -748,7 +749,7 @@ void ABreakerDeployable::DetonateMine(int32 MineIndex)
         OwnerHasNodeTag(BreakerNodeTags::Node_TK_Ordnance.GetTag()), World->GetTimeSeconds(), LastMineDetonationTime);
     LastMineDetonationTime = World->GetTimeSeconds();
 
-    const float BaseDamage = OwnerWeaponBaseDamage() * MineDamageCoefficient;
+    const float BaseDamage = UBreakerGameplayAbility::AbilityBaseDamageFor(OwningCharacter.Get(), OwnerWeaponBaseDamage() * MineDamageCoefficient);
     if (BaseDamage <= 0.0f) return;
 
     AActor* OwnerActor = OwningCharacter.Get();
@@ -922,7 +923,7 @@ void ABreakerDeployable::DestroyDeployableWithCause(EBreakerDeployableDestructio
 void ABreakerDeployable::DetonateRadialBlast(const FVector& Center, float DamageCoefficient, float RadiusCm, float ProcCoefficient)
 {
     UWorld* World = GetWorld();
-    const float BaseDamage = OwnerWeaponBaseDamage() * DamageCoefficient;
+    const float BaseDamage = UBreakerGameplayAbility::AbilityBaseDamageFor(OwningCharacter.Get(), OwnerWeaponBaseDamage() * DamageCoefficient);
     if (!World || BaseDamage <= 0.0f || RadiusCm <= 0.0f) return;
 
     AActor* OwnerActor = OwningCharacter.Get();

@@ -26,6 +26,10 @@ struct RIORSEDGE_API FBreakerActiveStatus
     // Who applied this status. Weak: a DoT outliving its applier keeps
     // ticking, it just stops crediting anyone.
     UPROPERTY(BlueprintReadOnly) TWeakObjectPtr<AActor> Instigator = nullptr;
+    UPROPERTY(BlueprintReadOnly) TWeakObjectPtr<AActor> ThreatSource = nullptr;
+    UPROPERTY(BlueprintReadOnly) bool bHasThreatSource = false;
+    void CopyThreatTo(FBreakerDamageRequest& Request) const
+    { Request.ThreatSource = ThreatSource; Request.bHasThreatSource = bHasThreatSource; }
     // Latest application's resource eligibility follows its attribution even
     // when the original damage snapshot remains unchanged on refresh.
     float ResourceProcCoefficient = 1.0f;
@@ -67,6 +71,7 @@ public:
     // Instigator is remembered weakly so every tick this application produces
     // credits the applier through the attacker-side hit events.
     void ApplyStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator);
+    void ApplyStatusFromHit(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, const FBreakerDamageRequest& ApplyingHit);
     // A depth-two pierce copy carries its already-scaled remaining lifetime.
     void ApplyPierceSpread(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator);
     void ApplyEntropyHit(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result);
@@ -195,14 +200,14 @@ public:
     UPROPERTY(BlueprintAssignable, Category="Combat|Status") FBreakerStatusEvent OnStatusAvoided;
 
 private:
-    uint64 ApplyStatusInternal(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator, bool bDurationAlreadyScaled, float UnpaidDamageBudget = 0.0f, const FVector* SourceLocationOverride = nullptr);
+    uint64 ApplyStatusInternal(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator, bool bDurationAlreadyScaled, float UnpaidDamageBudget = 0.0f, const FVector* SourceLocationOverride = nullptr, const FBreakerDamageRequest* ApplyingHit = nullptr);
     void AdvanceVoidBuildup(float DeltaSeconds);
     void ResetVoidBuildup();
     void DeliverVoidBurst(uint64 ApplicationSerial);
     void AdvanceRiftBuildup(float DeltaSeconds);
     void ResetRiftBuildup();
     void AdvanceRotStatus(uint64 ApplicationSerial, float DeltaSeconds);
-    void SpreadNewestStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator, float ScaledDuration);
+    void SpreadNewestStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator, float ScaledDuration, const FBreakerDamageRequest* ApplyingHit);
     UFUNCTION() void HandleAfflictedOwnerDeath();
     // An expiry tick remains an active damaging status during its callbacks,
     // even though its remaining time was advanced before damage dispatch.

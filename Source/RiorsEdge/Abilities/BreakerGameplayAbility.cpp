@@ -94,6 +94,14 @@ float UBreakerGameplayAbility::AbilityDurationMultiplierFor(const AActor* OwnerA
     return Progression ? Progression->GetNodeStats().AbilityDurationMultiplier : 1.0f;
 }
 
+float UBreakerGameplayAbility::AbilityBaseDamageFor(const AActor* OwnerActor, float ScaledAuthoredBase)
+{
+    if (!FMath::IsFinite(ScaledAuthoredBase) || ScaledAuthoredBase <= 0.0f) return 0.0f;
+    const auto* Progression = OwnerActor ? OwnerActor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    const float Added = Progression ? Progression->GetNodeStats().AddedAbilityPower : 0.0f;
+    return FMath::Max(0.0f, ScaledAuthoredBase + (FMath::IsFinite(Added) ? Added : 0.0f));
+}
+
 float UBreakerGameplayAbility::AbilityCooldownReductionFor(const AActor* OwnerActor)
 {
     const UBreakerProgressionComponent* Progression = OwnerActor ? OwnerActor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
