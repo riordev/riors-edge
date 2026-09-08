@@ -143,7 +143,7 @@ public:
 protected:
     virtual void BeginPlay() override;
     virtual void Tick(float DeltaSeconds) override;
-    virtual void TickEngagedBehaviour(class ABreakerCharacter* Player, float Distance, float DeltaSeconds,
+    virtual void TickEngagedBehaviour(AActor* Player, float Distance, float DeltaSeconds,
         FVector& OutDirection, float& OutSpeedScale) override;
     virtual void HandleDeath() override;
     virtual void SetBodyVisible(bool bVisible) override;

@@ -552,6 +552,7 @@ void ABreakerDeployable::TickTurret(float DeltaSeconds)
     // are personal ability windows (Overdrive's shape), and a turret firing
     // during one would double-dip a buff authored for the player's own hands.
     Damage.SetInstigator(OwnerActor);
+    Damage.ThreatSource = this;
 
     if (UBreakerCombatComponent* TargetCombat = Target->FindComponentByClass<UBreakerCombatComponent>())
     {
@@ -778,6 +779,7 @@ void ABreakerDeployable::DetonateMine(int32 MineIndex)
         Damage.SourceLocation = Mine.Location;
         Damage.bHasSourceLocation = true;
         Damage.SetInstigator(OwnerActor);
+        Damage.ThreatSource = this;
 
         const FBreakerDamageResult Result = CandidateCombat->ReceiveDamage(Damage);
         if (OwnerActor)
@@ -948,6 +950,7 @@ void ABreakerDeployable::DetonateRadialBlast(const FVector& Center, float Damage
         Damage.SourceLocation = Center;
         Damage.bHasSourceLocation = true;
         Damage.SetInstigator(OwnerActor);
+        Damage.ThreatSource = this;
 
         const FBreakerDamageResult Result = CandidateCombat->ReceiveDamage(Damage);
         if (OwnerActor)

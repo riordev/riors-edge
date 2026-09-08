@@ -615,6 +615,7 @@ void UBreakerCombatComponent::DispatchHitDealt(const FBreakerDamageRequest& Requ
 
     FBreakerHitContext Context;
     Context.Instigator = Dealer;
+    Context.ThreatSource = Request.ThreatSource.IsExplicitlyNull() ? Dealer : Request.ThreatSource.Get();
     Context.Target = GetOwner();
     Context.Result = Result;
     Context.bFromDoT = Request.bIsDamageOverTime;

@@ -123,7 +123,7 @@ void ABreakerRangedEnemy::BeginPlay()
     StateLabel = TEXT("LATTICE PATROL");
 }
 
-void ABreakerRangedEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float Distance, float DeltaSeconds,
+void ABreakerRangedEnemy::TickEngagedBehaviour(AActor* Player, float Distance, float DeltaSeconds,
     FVector& OutDirection, float& OutSpeedScale)
 {
     UWorld* World = GetWorld();
@@ -213,6 +213,7 @@ void ABreakerRangedEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float 
     // --- Fire cycle: wind-up (the tell), then the shot ---------------------
     if (bWindingUp)
     {
+        CommitAttackTarget(Player);
         // Through the keyed telegraph seam, sampled per frame: unkeyed this is
         // exactly the authored WindupSeconds; Interdiction stretches the tell
         // (and the emitter ramp with it — the bloom slows to match, so the
@@ -241,6 +242,7 @@ void ABreakerRangedEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float 
         && Distance <= MaxEngagementDistance + BandHysteresis
         && (Now - LastAttackTime) >= ShotCooldown)
     {
+        CommitAttackTarget(Player);
         bWindingUp = true;
         WindupStartTime = Now;
         StateLabel = TEXT("AIMING");

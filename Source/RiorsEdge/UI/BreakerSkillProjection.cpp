@@ -347,7 +347,17 @@ TArray<FBreakerStatLine> BreakerSkillProjection::Project(const FBreakerSkillSnap
 
 TArray<FBreakerStatLine> BreakerSkillProjection::ProjectPurchase(const FBreakerSkillSnapshot& Snapshot, FName NodeId, int32 RankDelta)
 {
-    return Project(Snapshot, WithRankDelta(Snapshot.Ranks, NodeId, RankDelta));
+    const UBreakerProgressionNode* const* Found = Snapshot.Nodes.FindByPredicate(
+        [NodeId](const UBreakerProgressionNode* Node) { return Node && Node->NodeId == NodeId; });
+    if (!Found) return CurrentTotals(Snapshot);
+    const FBreakerNodeRank* Owned = Snapshot.Ranks.FindByPredicate(
+        [NodeId](const FBreakerNodeRank& Rank) { return Rank.NodeId == NodeId; });
+    const int32 BeforeRank = Owned ? Owned->Rank : 0;
+    const int64 RequestedRank = static_cast<int64>(BeforeRank) + RankDelta;
+    const int32 AfterRank = static_cast<int32>(FMath::Clamp<int64>(RequestedRank, 0, FMath::Max(0, (*Found)->MaxRank)));
+    // An unavailable fourth rank must not invent another point-spend bonus
+    // while AggregateStats correctly clamps the node's own effect at three.
+    return Project(Snapshot, WithRankDelta(Snapshot.Ranks, NodeId, AfterRank - BeforeRank));
 }
 
 TArray<FBreakerStatLine> BreakerSkillProjection::CurrentTotals(const FBreakerSkillSnapshot& Snapshot)

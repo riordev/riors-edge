@@ -5,7 +5,19 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
-## Cycle — Progression and combat (step 3)
+## Cycle — New Core wheel primitives
+- [x] Accepted-damage threat selects player/deployable targets with stable ties, live-target feedback and unchanged reward attribution. Native target switching, actual melee damage to a turret, destroyed/dead target pruning and the real starting-player safe-zone path pass. Projectile request copies preserve direct source; derived status attribution remains below.
+- [ ] Carry direct deployable threat attribution through derived status/reaction snapshots; direct attacks/projectile copies carry it, reconstructed status requests currently retain reward-owner attribution.
+- [x] Counted lane prerequisites and local wedge investment support ranked lanes, two-of-three convergence and an18-point gate independent of other wedges. Real level-earned purchases/refusals and exact respec refund pass; replacement roster remains separate.
+- [x] Frozen117 legacy Core purchase costs and atomic once-only refund migration are tested through an archive missing the new version field. Migration stays inactive until replacement roster/save writers activate together. Unknown allocations refuse rather than guessing cost; older retired layouts need historical-cost coverage before activation.
+- [x] Composed projection pins the existing0.25-per-point baseline against gear and refuses phantom fourth-rank/unknown-node gains. This is the existing additive floor, not a new relative-power target.
+- Validation: editor build passes;733 declared/started,730 passed,3 existing pinned failures,0 unexpected via the seat's quarantine auditor. STATE remains unchanged under the host Python quarantine. No new wheel layout or visual completion claimed.
+- [ ] Build the supplied generic stat/rule vocabulary before authoring its nodes; validate actual delivery, resources, defensive routing and forfeits.
+- [ ] Replace the wheel, save version and UI together; inspect ranked nodes, adjacent wedge routes, purchase/refusal and refund flows.
+- [ ] Measure composed purchase steps and offered density from the actual new roster; regenerate the census and status with a trusted runtime.
+- Owner roster question: the detailed list contains 11 majors and 11 minors (22 wedges,187 nodes,429 offered points,6.6x), while the header says20/170/390/6.0x. Preserve every named wedge unless the owner identifies removals.
+
+## Progression and combat (step 3)
 - [x] Hard Stop protection now expires after its real window: cleanup is Combat-owned so GAS ability teardown cannot delete it. Both base/Spend to Live paid runtime damage checks pass; repeated paid cast replaces the deadline. Explicit cooldown-reset diagnostic is separate from ordinary player reachability.
 - [x] Gear regeneration and Resource on Kill respect paid Unmake Mana suspension; actual Overrun/ordinary sustain rolls prove normal income, suspension, healing continuity and resume after cancellation.
 - [x] Loot pickup validates live nearby same-world collectors and static LOS; claim precedes acquisition callbacks to prevent duplicate transfers. Full backpack preserves the drop and releases claim. Shared Character finder/RPC and actual rolled transfer/reentry/death/range/wall/capacity checks pass.
@@ -56,8 +68,7 @@ Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 - [x] Implement Collapse, Wither and Tear, consuming only the first status's unpaid damage; accepted-hit, callback, hitch, shortened-duration and cancellation tests pass.
 O221–O225 are recorded in DECISIONS and combat intent. Element magnitudes remain O2 tuning in Data/elements.json. Element implementation is validated; human balance and audible-mix acceptance remain part of the eventual playtest.
 ## Current owner direction
-Continue steps2–6 in ordered batches: element integration, non-Core combat/progression, loot, interface, then Fernhall/Rift campaign flow and content. Core redesign remains owner-owned.
-Core redesign is owner-owned and on hold for implementation here. Continue the seven-step pass through existing behavior repairs, non-Core progression, loot, interface, content and feedback; do not change Core structure or author replacement Core nodes while the owner works on it. Step7 is a larger polish effort and must not be rushed to claim completion.
+Implement the owner's supplied Core wheel through independent, validated primitive batches, then activate the authored layout and save migration together. Continue the seven-step pass after this work. Report progress during execution without stopping after each intermediate commit. Step7 is a larger polish effort and must not be rushed to claim completion.
 Finish steps 1-7: Entropy, remaining elements/reactions, progression/combat, loot, interface, Fernhall/Rift content, then the full visual/audio identity pass. Anchor and Fernhall environment presentation belongs in step 6 and is prioritized before the additional destinations. Step 6 includes two additional larger persistent destinations alongside Fernhall, campaign traversal and return Rift activities, and an in-game destination map. Ordinary enemies retain fixed regional level ranges; tougher return Rifts supply later challenge. Automated checks and inspected captures validate implementation; human balance acceptance remains separate.
 
 ## Playtest queue (owner, 2026-09-07)

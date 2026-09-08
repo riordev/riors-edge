@@ -465,7 +465,7 @@ FVector ABreakerBossEnemy::PickOrderTargetOffset()
     return Chosen;
 }
 
-void ABreakerBossEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float Distance, float DeltaSeconds,
+void ABreakerBossEnemy::TickEngagedBehaviour(AActor* Player, float Distance, float DeltaSeconds,
     FVector& OutDirection, float& OutSpeedScale)
 {
     if (!Player || !GetWorld()) return;

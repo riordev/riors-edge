@@ -179,7 +179,7 @@ void ABreakerSkirmisherEnemy::SetCrouched(bool bInCrouched)
     }
 }
 
-void ABreakerSkirmisherEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float Distance, float DeltaSeconds,
+void ABreakerSkirmisherEnemy::TickEngagedBehaviour(AActor* Player, float Distance, float DeltaSeconds,
     FVector& OutDirection, float& OutSpeedScale)
 {
     if (!Player || !GetWorld()) return;
@@ -301,6 +301,7 @@ void ABreakerSkirmisherEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, fl
             RoundTimer -= DeltaSeconds;
             if (RoundTimer <= 0.0f)
             {
+                CommitAttackTarget(Player);
                 FireRound(Player);
                 --RoundsLeftInBurst;
                 RoundTimer = RoundIntervalSeconds;
@@ -315,6 +316,7 @@ void ABreakerSkirmisherEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, fl
         }
         else
         {
+            CommitAttackTarget(Player);
             AimElapsed += DeltaSeconds;
             // The aim glow is this archetype's wind-up, so it reads the same
             // keyed telegraph seam as the lunge and LATTICE's emitter: unkeyed

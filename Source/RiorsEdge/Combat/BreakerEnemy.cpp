@@ -1,4 +1,6 @@
 #include "Combat/BreakerEnemy.h"
+#include "Combat/BreakerEnemyThreatMath.h"
+#include "Combat/BreakerDeployable.h"
 #include "AI/BreakerEnemyController.h"
 #include "AI/BreakerEnemyMovementComponent.h"
 #include "AI/BreakerLocomotionMath.h"
@@ -345,6 +347,7 @@ void ABreakerEnemy::BeginPlay()
     AbilitySystem->InitAbilityActorInfo(this, this);
     Combat->OnDeath.AddDynamic(this, &ThisClass::HandleDeath);
     Combat->OnDamageReceived.AddDynamic(this, &ThisClass::HandleDamageReceived);
+    Combat->OnDamageTaken.AddUniqueDynamic(this, &ThisClass::HandleThreatDamage);
     // The reaction layer paints these six, and since O128 it is the ONLY
     // thing that paints them. The family paint goes in before the first
     // registration so a part never lands on a default that a later layer has
@@ -742,6 +745,7 @@ UAbilitySystemComponent* ABreakerEnemy::GetAbilitySystemComponent() const { retu
 
 void ABreakerEnemy::ConfigureEncounter(const FVector& NewLeashOrigin, float NewPatrolPhase)
 {
+    ClearThreat();
     LeashOrigin = NewLeashOrigin;
     PatrolPhase = NewPatrolPhase;
 }
@@ -837,6 +841,69 @@ FVector ABreakerEnemy::ComputeCappedFacing(const FVector& CurrentForward, const 
     return Current.RotateAngleAxis(SignedStepDegrees, FVector::UpVector);
 }
 
+bool ABreakerEnemy::IsEligibleThreatTarget(const AActor* Candidate) const
+{
+    if (!IsValid(Candidate) || Candidate->IsActorBeingDestroyed() || Candidate->GetWorld() != GetWorld()
+        || (!Candidate->IsA<ABreakerCharacter>() && !Candidate->IsA<ABreakerDeployable>())) return false;
+    const auto* TargetCombat = Candidate->FindComponentByClass<UBreakerCombatComponent>();
+    if (!TargetCombat || TargetCombat->IsDead()) return false;
+    if (const auto* Deployable = Cast<ABreakerDeployable>(Candidate))
+    {
+        if (Deployable->IsHidden()) return false;
+        const auto* DeployableOwner = Deployable->GetOwningCharacter();
+        const auto* OwnerCombat = IsValid(DeployableOwner) ? DeployableOwner->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+        if (!OwnerCombat || OwnerCombat->IsDead() || Deployable->GetRemainingLifetime() <= 0) return false;
+    }
+    const auto* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<ABreakerGameMode>() : nullptr;
+    return !GameMode || !GameMode->IsInSafeZone(Candidate->GetActorLocation());
+}
+
+void ABreakerEnemy::ClearThreat()
+{
+    ThreatLedger.Reset(); CurrentThreatTarget.Reset(); CommittedAttackTarget.Reset();
+}
+
+void ABreakerEnemy::HandleThreatDamage(const FBreakerHitContext& Hit)
+{
+    if (!HasAuthority() || bDead || (Combat && Combat->IsDead()) || Hit.Target != this) return;
+    AActor* Source = Hit.ThreatSource.Get();
+    const float Earned = BreakerEnemyThreat::Earned(Hit.Result.HealthDamage, Hit.Result.ShieldDamage);
+    if (Earned <= 0 || !IsEligibleThreatTarget(Source)) return;
+    float& Score = ThreatLedger.FindOrAdd(Source);
+    Score = FMath::Min(static_cast<double>(Score) + Earned, static_cast<double>(MAX_flt));
+}
+
+AActor* ABreakerEnemy::SelectThreatTarget()
+{
+    AActor* Best = nullptr;
+    float BestScore = 0, BestDistance = TNumericLimits<float>::Max();
+    for (auto It = ThreatLedger.CreateIterator(); It; ++It)
+    {
+        AActor* Candidate = It.Key().Get();
+        if (!IsEligibleThreatTarget(Candidate)) { It.RemoveCurrent(); continue; }
+        const float Distance = FVector::DistSquared2D(GetActorLocation(), Candidate->GetActorLocation());
+        if (Distance > FMath::Square(DetectionRange)) continue;
+        if (It.Value() > 0 && (!Best || BreakerEnemyThreat::Prefer(It.Value(), Candidate == CurrentThreatTarget.Get(), Distance,
+            BestScore, Best == CurrentThreatTarget.Get(), BestDistance)))
+        { Best = Candidate; BestScore = It.Value(); BestDistance = Distance; }
+    }
+    if (!Best)
+    {
+        for (TActorIterator<ABreakerCharacter> It(GetWorld()); It; ++It)
+        {
+            if (!IsEligibleThreatTarget(*It)) continue;
+            const float Distance = FVector::DistSquared2D(GetActorLocation(), It->GetActorLocation());
+            if (Distance <= FMath::Square(DetectionRange) && Distance < BestDistance)
+            { Best = *It; BestDistance = Distance; }
+        }
+        // No eligible local combatants means this encounter's threat is over.
+        if (!Best) ClearThreat();
+    }
+    CurrentThreatTarget = Best;
+    CommittedAttackTarget.Reset();
+    return Best;
+}
+
 void ABreakerEnemy::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
@@ -853,26 +920,11 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
     }
 
     if (Combat && Combat->IsStaggered()) { StateLabel = TEXT("STAGGERED"); return; }
-    ABreakerCharacter* NearestPlayer = nullptr;
-    float NearestDistanceSq = TNumericLimits<float>::Max();
-    for (TActorIterator<ABreakerCharacter> It(GetWorld()); It; ++It)
-    {
-        const float DistanceSq = FVector::DistSquared2D(GetActorLocation(), It->GetActorLocation());
-        if (DistanceSq < NearestDistanceSq)
-        {
-            NearestDistanceSq = DistanceSq;
-            NearestPlayer = *It;
-        }
-    }
-
-    // Players standing in the safe zone are off-limits, and enemies stop at
-    // its edge rather than following them in.
+    AActor* NearestPlayer = SelectThreatTarget();
+    const float NearestDistanceSq = NearestPlayer
+        ? FVector::DistSquared2D(GetActorLocation(), NearestPlayer->GetActorLocation())
+        : TNumericLimits<float>::Max();
     const ABreakerGameMode* GameMode = GetWorld()->GetAuthGameMode<ABreakerGameMode>();
-    if (NearestPlayer && GameMode && GameMode->IsInSafeZone(NearestPlayer->GetActorLocation()))
-    {
-        NearestPlayer = nullptr;
-    }
-
     // The modifier layer's only view of the world: a bare AActor* whose
     // POSITION it may read. It never learns what class this is, let alone what
     // level or gear it carries (O27).
@@ -961,7 +1013,7 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
     }
 }
 
-void ABreakerEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float Distance, float DeltaSeconds,
+void ABreakerEnemy::TickEngagedBehaviour(AActor* Player, float Distance, float DeltaSeconds,
     FVector& OutDirection, float& OutSpeedScale)
 {
     // The melee chase, in three gears. Extracted verbatim from Tick so a
@@ -973,7 +1025,7 @@ void ABreakerEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float Distan
     const FVector ToPlayer = (Player->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
     OutDirection = ToPlayer;
     StateLabel = Distance <= AttackRange ? TEXT("ATTACK") : TEXT("CHASE");
-    if (Distance <= AttackRange) PerformAttack(Player);
+    if (Distance <= AttackRange) { CommitAttackTarget(Player); PerformAttack(Player); }
 
     // THE ARRIVAL RING. Hold zeroes the RADIAL component and nothing else, so
     // a body at the ring stops closing, keeps facing its target and keeps
@@ -1064,6 +1116,7 @@ void ABreakerEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float Distan
 
     if (bLungeWindingUp)
     {
+        CommitAttackTarget(Player);
         // Crouched and slow. It has already chosen where it is going.
         // The wind-up length reads through the keyed telegraph seam, sampled
         // per frame: unkeyed the multiplier is exactly 1.0 and this IS the
@@ -1100,6 +1153,7 @@ void ABreakerEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float Distan
     else if (Distance <= LungeRange && Distance > AttackRange
         && (Now - LungeStartTime) >= (LungeDuration + LungeCooldown))
     {
+        CommitAttackTarget(Player);
         bLungeWindingUp = true;
         LungeWindupStartTime = Now;
         OutSpeedScale = LungeWindupMoveScale;
@@ -1128,7 +1182,7 @@ void ABreakerEnemy::ApplyAuthoredAttackElement(FBreakerDamageRequest& Request) c
         ? BreakerVoid::AlteredAttackFraction() : BreakerEntropy::VestigeMeleeFraction();
 }
 
-void ABreakerEnemy::PerformAttack(APawn* TargetPawn)
+void ABreakerEnemy::PerformAttack(AActor* TargetPawn)
 {
     if (!TargetPawn || !GetWorld() || GetWorld()->GetTimeSeconds() - LastAttackTime < AttackCooldown) return;
     // The AI's broad-phase distance is planar. A real strike must also reach
@@ -1252,6 +1306,7 @@ void ABreakerEnemy::SetBodyVisible(bool bVisible)
 
 void ABreakerEnemy::HandleDeath()
 {
+    ClearThreat();
     // WAKEFUL runs first, and it runs by an explicit call rather than by
     // binding OnDeath alongside this handler. Delegate broadcast order is
     // registration order, which is an accident of component initialisation and
@@ -1378,6 +1433,7 @@ void ABreakerEnemy::ParkPooledBody()
     // A parked body is still: its path is dropped and its velocity zeroed,
     // so a revive never inherits a chase from a previous life.
     if (ABreakerEnemyController* EnemyController = Cast<ABreakerEnemyController>(GetController())) EnemyController->StopChase();
+    ClearThreat();
     if (Mover) Mover->ResetForRevive();
     // Statuses stop the silent way: zeroing durations lets each expire
     // through its own teardown on the component's next tick (popping the
@@ -1405,6 +1461,7 @@ void ABreakerEnemy::ReviveFromPool(const FVector& SpawnLocation)
     SetActorEnableCollision(true);
     SetActorTickEnabled(true);
     SetActorLocation(SpawnLocation);
+    ClearThreat();
     if (Mover) Mover->ResetForRevive();
     SetActorScale3D(PooledBaseScale);
     BodyCollision->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
@@ -1683,6 +1740,7 @@ void ABreakerEnemy::RespawnEnemy()
     FTimerHandle RespawnTimer;
     GetWorldTimerManager().SetTimer(RespawnTimer, [this]()
     {
+        ClearThreat();
         SetActorLocation(LeashOrigin);
         BodyCollision->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
         BodyHitBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);

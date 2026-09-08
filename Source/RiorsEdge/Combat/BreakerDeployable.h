@@ -65,10 +65,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerDeployableEvent, class ABrea
 // use.
 //
 // WHAT IS DELIBERATELY ABSENT, recorded rather than implied (§2.3-§2.4):
-//  * No enemy TARGETING of deployables: enemy AI acquires the player only, so
-//    "enemies target deployables opportunistically" has no seam to land in.
-//    Deployables still DIE to enemy fire that hits them (they carry a real
-//    UBreakerCombatComponent, so a stray projectile resolves damage normally).
+//  * Damaging deployables now draw enemy threat through their direct damage
+//    identity; owner reward attribution remains separate. Non-damaging objects
+//    do not invent passive threat.
 //  * No cast-time on placement (0.4s deploy animation): there is no animation
 //    layer to hang it on. Placement is instant; the weakness §2.3 wants is
 //    recorded as missing, not faked with an input lock.
@@ -109,9 +108,8 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Deployable")
     void SetLifetimePaused(bool bPaused) { bLifetimePaused = bPaused; }
 
-    // Minefield (§3): invisible until it first acts. Enemy perception exclusion
-    // is vacuous today — enemies do not perceive deployables at all — so the
-    // visual half is the whole implementable rule.
+    // Minefield (§3): invisible until it first acts. Hidden deployables are
+    // excluded from enemy threat acquisition until revealed.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Deployable")
     void SetHiddenUntilAction(bool bHiddenUntilActed);
 

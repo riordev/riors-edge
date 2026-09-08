@@ -339,6 +339,30 @@ bool UBreakerProgressionComponent::CanPurchaseNode(const UBreakerProgressionTree
             return false;
         }
     }
+    for (const FBreakerNodePrerequisiteGroup& Group : Node->PrerequisiteGroups)
+    {
+        TSet<FName> Completed;
+        for (const FBreakerNodePrerequisite& Candidate : Group.Candidates)
+        {
+            const UBreakerProgressionNode* Required = Tree->FindNode(Candidate.NodeId);
+            if (Required && Required->Currency == Node->Currency && Candidate.RequiredRank > 0
+                && Candidate.RequiredRank <= Required->MaxRank
+                && GetNodeRank(Candidate.NodeId, Node->Currency) >= Candidate.RequiredRank)
+                Completed.Add(Candidate.NodeId);
+        }
+        if (Group.MinimumSatisfied <= 0 || Completed.Num() < Group.MinimumSatisfied)
+        {
+            OutFailureReason = LOCTEXT("PrerequisiteGroup", "Complete more required lanes before purchasing this node.");
+            return false;
+        }
+    }
+    if (Node->RequiredConstellationInvestment > 0
+        && (Node->Constellation.IsNone()
+            || GetConstellationInvestment(Tree, Node->Constellation) < Node->RequiredConstellationInvestment))
+    {
+        OutFailureReason = LOCTEXT("ConstellationInvestment", "Spend more points in this wedge before purchasing this node.");
+        return false;
+    }
     // THE RING (owner ruling, Phase 4): in a tree that carries a connectivity
     // graph, a node is bought FROM the graph — it is an entry, or it touches
     // a node already owned. This layers UNDER the AND Prerequisites above:
@@ -975,6 +999,22 @@ int32 UBreakerProgressionComponent::GetTreeInvestment(const UBreakerProgressionT
     for (const UBreakerProgressionNode* Node : Tree->Nodes)
     {
         if (Node) Total += GetNodeRank(Node->NodeId, Tree->Currency) * Node->CostPerRank;
+    }
+    return Total;
+}
+
+int32 UBreakerProgressionComponent::GetConstellationInvestment(const UBreakerProgressionTree* Tree, FName Constellation) const
+{
+    if (!Tree || Constellation.IsNone()) return 0;
+    int32 Total = 0;
+    TSet<FName> Counted;
+    for (const UBreakerProgressionNode* Node : Tree->Nodes)
+    {
+        if (!Node || Node->Currency != Tree->Currency || Node->Constellation != Constellation
+            || Counted.Contains(Node->NodeId)) continue;
+        Counted.Add(Node->NodeId);
+        Total += FMath::Clamp(GetNodeRank(Node->NodeId, Tree->Currency), 0, Node->MaxRank)
+            * FMath::Max(0, Node->CostPerRank);
     }
     return Total;
 }

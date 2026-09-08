@@ -137,12 +137,12 @@ public:
 
 protected:
     virtual void BeginPlay() override;
-    virtual void TickEngagedBehaviour(class ABreakerCharacter* Player, float Distance, float DeltaSeconds,
+    virtual void TickEngagedBehaviour(AActor* Player, float Distance, float DeltaSeconds,
         FVector& OutDirection, float& OutSpeedScale) override;
     virtual void SetBodyVisible(bool bVisible) override;
     // The base contact attack is replaced by the sweep, which has a wind-up and
     // an arc. Left empty rather than deleted so nothing inherited calls it.
-    virtual void PerformAttack(APawn* TargetPawn) override {}
+    virtual void PerformAttack(AActor* TargetPawn) override {}
 
     // Bound to the combat component's OnFrontShieldBroken. The base hides the
     // slab, stops it blocking, and plays the Gold impact moment at the slab —

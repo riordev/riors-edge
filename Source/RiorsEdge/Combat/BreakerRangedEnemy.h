@@ -121,11 +121,11 @@ public:
 
 protected:
     virtual void BeginPlay() override;
-    virtual void TickEngagedBehaviour(class ABreakerCharacter* Player, float Distance, float DeltaSeconds,
+    virtual void TickEngagedBehaviour(AActor* Player, float Distance, float DeltaSeconds,
         FVector& OutDirection, float& OutSpeedScale) override;
     virtual void SetBodyVisible(bool bVisible) override;
     // The base melee contact attack is not this archetype's damage path.
-    virtual void PerformAttack(APawn* TargetPawn) override {}
+    virtual void PerformAttack(AActor* TargetPawn) override {}
 
     void FireVolley(const AActor* Target);
     void UpdateTelegraph(float Alpha);

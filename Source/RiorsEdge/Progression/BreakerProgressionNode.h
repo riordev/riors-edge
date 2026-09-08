@@ -16,6 +16,16 @@ struct RIORSEDGE_API FBreakerNodePrerequisite
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="1")) int32 RequiredRank = 1;
 };
 
+// Every group must pass; candidates within a group are counted by distinct ID.
+USTRUCT(BlueprintType)
+struct RIORSEDGE_API FBreakerNodePrerequisiteGroup
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly) TArray<FBreakerNodePrerequisite> Candidates;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="1")) int32 MinimumSatisfied = 1;
+};
+
 UCLASS(BlueprintType)
 class RIORSEDGE_API UBreakerProgressionNode : public UPrimaryDataAsset
 {
@@ -48,6 +58,7 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rules", meta=(ClampMin="1")) int32 MaxRank = 1;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rules", meta=(ClampMin="1")) int32 CostPerRank = 1;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rules") TArray<FBreakerNodePrerequisite> Prerequisites;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rules") TArray<FBreakerNodePrerequisiteGroup> PrerequisiteGroups;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rules") TArray<FName> MutuallyExclusiveNodeIds;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rules") bool bCornerstone = false;
     // Presentation/layout tier (1-5). The purchasable gate is
@@ -55,6 +66,8 @@ public:
     // so content can be authored against the design doc's tier tables.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rules", meta=(ClampMin="1")) int32 Tier = 1;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rules", meta=(ClampMin="0")) int32 RequiredTreeInvestment = 0;
+    // Already-spent points in this node's constellation; zero preserves legacy behavior.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rules", meta=(ClampMin="0")) int32 RequiredConstellationInvestment = 0;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grants") TArray<TSubclassOf<UGameplayAbility>> GrantedAbilities;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grants") TArray<TSubclassOf<UGameplayEffect>> GrantedEffects;

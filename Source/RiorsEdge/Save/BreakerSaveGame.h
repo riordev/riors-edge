@@ -111,6 +111,12 @@ public:
     static constexpr int32 CurrentSaveVersion = 9;
 
     UPROPERTY() int32 SaveVersion = 1;
+    // Missing fields must deserialize as legacy even after activation. Writers
+    // must stamp ActiveCoreLayoutVersion when the new roster is enabled.
+    UPROPERTY() int32 CoreLayoutVersion = 1;
+    static constexpr int32 ActiveCoreLayoutVersion = 1;
+    static bool MigrateCoreLayout(UBreakerSaveGame& Save, int32 TargetVersion, FString& OutNote);
+    static int32 LegacyCoreRankCost(FName NodeId);
 
     // The v4 -> v5 step, exposed so the suite can prove it in isolation like
     // MigrateQuestFlagsV1ToV2. Pure on the struct: no world, no slot, no class

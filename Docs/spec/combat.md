@@ -249,6 +249,24 @@ element model. It does not own:
   modes**;
 - how a damage number is drawn — **art and UI**.
 
+## Enemy threat
+
+Enemies accumulate threat from accepted health and shield damage. Avoided or
+refused hits earn none. A deployable is the direct threat source of its own
+attack; its owner remains the source of reward and kill credit.
+
+The highest positive eligible threat wins. Equal threat retains the current
+target, then prefers the nearer target. Without positive eligible threat,
+enemies select the nearest living player outside a safe zone. Suppressing
+threat generation does not make a solo player untargetable. Dead, destroyed
+and safe-zone targets, plus hidden deployables, are ineligible. Death, reuse and encounter reset
+clear the ledger; threat has no timed decay.
+
+Target-dependent effects use the actual selected or committed attack target,
+not the player nearest the enemy. Deployables must receive actual attacks as
+well as selection. Zones require a health chassis before zone-health bonuses
+can apply.
+
 ## Asserted invariants
 
 | Invariant | Test |
@@ -265,6 +283,7 @@ element model. It does not own:
 | Healing refuses a dead actor and reports overheal at full value | `Combat.Healing.ThroughContract` |
 | Every damage submission passes through the outgoing-modifier chain | `Combat.Ceiling.AbilitySubmissionConformance` |
 | Reactions consume one earned budget and cannot chain | `Combat.Elements.ReactionMatrix` |
+| Threat uses accepted damage and direct producers while rewards retain their owner | `Combat.Threat.NativeTargeting` |
 
 ## Stagger and landing
 

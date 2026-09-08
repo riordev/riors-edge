@@ -6,6 +6,7 @@
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "Progression/BreakerProgressionTree.h"
+#include "Progression/BreakerProgressionNode.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Items/BreakerItemTypes.h"
 #include "UI/BreakerSkillProjection.h"
@@ -336,6 +337,45 @@ bool FBreakerEquipDeltaTest::RunTest(const FString& Parameters)
         Defence[4].Label.Contains(TEXT("PHYSICAL")));
     TestTrue(*FString::Printf(TEXT("Physical reduction raises effective health (%.1f -> %.1f)"),
         Defence[4].Before, Defence[4].After), Defence[4].After > Defence[4].Before);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerRankedProjectionFloorTest,
+    "RiorsEdge.UI.SkillProjection.RankedComposedSpendFloor",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerRankedProjectionFloorTest::RunTest(const FString& Parameters)
+{
+    UBreakerProgressionNode* Minor = NewObject<UBreakerProgressionNode>();
+    Minor->NodeId = TEXT("Projection.RankedMinor");
+    Minor->MaxRank = 3;
+    Minor->CostPerRank = 1;
+    FBreakerSkillSnapshot Snapshot;
+    Snapshot.Nodes.Add(Minor);
+    Snapshot.IncreasedDamagePerSpentPoint = GetDefault<UBreakerProgressionComponent>()->IncreasedDamagePerSpentPoint;
+    Snapshot.bHasComposedAttributes = true;
+    Snapshot.Aggregator.SetBase(EBreakerAggregatedAttribute::DamageMultiplier, 1.0f);
+    Snapshot.Aggregator.SetBase(EBreakerAggregatedAttribute::AbilityDamageMultiplier, 1.0f);
+    FBreakerAttributeContribution Gear;
+    Gear.AddSharedIncreasedDamage(300.0f);
+    Snapshot.Aggregator.SetContribution(EBreakerAttributeContributor::Equipment, Gear);
+    // Pin the existing authored baseline, without exaggerating the displayed
+    // relative gain once gear has filled the additive bucket.
+    TestEqual(TEXT("Authored spend floor remains 0.25 percentage points"), Snapshot.IncreasedDamagePerSpentPoint, 0.25f);
+    for (int32 Rank = 0; Rank < 3; ++Rank)
+    {
+        const TArray<FBreakerStatLine> Lines = BreakerSkillProjection::ProjectPurchase(Snapshot, Minor->NodeId, 1);
+        for (int32 Lane = 0; Lane < 2; ++Lane)
+        {
+            TestFalse(TEXT("Floor is tested against composed gear, not tree-only"), Lines[Lane].bTreeOnly);
+            TestEqual(TEXT("Each purchased rank pays the real composed floor"), Lines[Lane].After - Lines[Lane].Before, 0.0025f, 0.000001f);
+        }
+        Snapshot.Ranks = BreakerSkillProjection::WithRankDelta(Snapshot.Ranks, Minor->NodeId, 1);
+    }
+    for (const FBreakerStatLine& Line : BreakerSkillProjection::ProjectPurchase(Snapshot, Minor->NodeId, 1))
+        TestFalse(TEXT("Max rank cannot project phantom point-spend power"), Line.Changed());
+    for (const FBreakerStatLine& Line : BreakerSkillProjection::ProjectPurchase(Snapshot, TEXT("Unknown"), 1))
+        TestFalse(TEXT("Unknown nodes cannot project phantom power"), Line.Changed());
     return true;
 }
 

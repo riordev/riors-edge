@@ -120,6 +120,7 @@ public:
     UFUNCTION(BlueprintPure, Category="Progression") int32 GetNodeRank(FName NodeId, EBreakerPointCurrency Currency) const;
     UFUNCTION(BlueprintPure, Category="Progression") int32 GetUnspentPoints(EBreakerPointCurrency Currency) const;
     UFUNCTION(BlueprintPure, Category="Progression") int32 GetTreeInvestment(const UBreakerProgressionTree* Tree) const;
+    UFUNCTION(BlueprintPure, Category="Progression") int32 GetConstellationInvestment(const UBreakerProgressionTree* Tree, FName Constellation) const;
     UFUNCTION(BlueprintPure, Category="Progression") const FBreakerProgressionState& GetProgressionState() const { return State; }
     UFUNCTION(BlueprintCallable, Category="Progression") void LoadProgressionState(const FBreakerProgressionState& NewState);
 

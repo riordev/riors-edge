@@ -140,11 +140,11 @@ public:
 
 protected:
     virtual void BeginPlay() override;
-    virtual void TickEngagedBehaviour(class ABreakerCharacter* Player, float Distance, float DeltaSeconds,
+    virtual void TickEngagedBehaviour(AActor* Player, float Distance, float DeltaSeconds,
         FVector& OutDirection, float& OutSpeedScale) override;
     virtual void SetBodyVisible(bool bVisible) override;
     // No contact attack: it is a shooter.
-    virtual void PerformAttack(APawn* TargetPawn) override {}
+    virtual void PerformAttack(AActor* TargetPawn) override {}
 
     UFUNCTION() void HandleFlinchSource(const FBreakerHitContext& Hit);
 

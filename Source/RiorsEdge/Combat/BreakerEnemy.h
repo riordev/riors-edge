@@ -197,6 +197,10 @@ public:
     UFUNCTION(BlueprintPure, Category="Enemy") float GetAttackDamage() const { return AttackDamage; }
     UFUNCTION(BlueprintPure, Category="Enemy") bool IsDeadEnemy() const { return bDead; }
     bool IsLungeWindingUp() const { return bLungeWindingUp; }
+    AActor* GetThreatTarget() const { return CurrentThreatTarget.Get(); }
+    AActor* GetCommittedAttackTarget() const { return CommittedAttackTarget.Get(); }
+    bool IsEligibleThreatTarget(const AActor* Candidate) const;
+    void ClearThreat();
     // Read-only views of the authored tuning. Public so tools, the playtest
     // report and the automation suite can assert against what an archetype
     // SHIPS with, without opening the tuning itself for writing.
@@ -376,7 +380,8 @@ protected:
     void RespawnEnemy();
     // Family owns authored attacks; modifier payloads retain their own definitions.
     void ApplyAuthoredAttackElement(FBreakerDamageRequest& Request) const;
-    virtual void PerformAttack(APawn* TargetPawn);
+    virtual void PerformAttack(AActor* TargetPawn);
+    void CommitAttackTarget(AActor* Target) { CommittedAttackTarget = Target; }
     // Shows/hides the whole humanoid assembly across death and respawn.
     // Virtual so archetypes with extra presentation (a charging emitter) can
     // clear it on the same edges.
@@ -420,7 +425,7 @@ protected:
     // archetypes override it to hold an engagement band instead of closing.
     // Everything shared — target selection, the safe-zone rules, applying the
     // move, and the ground snap — stays in Tick and is not overridable.
-    virtual void TickEngagedBehaviour(class ABreakerCharacter* Player, float Distance, float DeltaSeconds,
+    virtual void TickEngagedBehaviour(AActor* Player, float Distance, float DeltaSeconds,
         FVector& OutDirection, float& OutSpeedScale);
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UCapsuleComponent> BodyCollision;
@@ -691,6 +696,11 @@ protected:
     // Whoever this enemy is currently engaging, handed to the modifier layer as
     // a bare AActor*. The modifier layer reads its POSITION and nothing else.
     TWeakObjectPtr<AActor> ModifierTrackedTarget;
+    TWeakObjectPtr<AActor> CurrentThreatTarget;
+    TWeakObjectPtr<AActor> CommittedAttackTarget;
+    TMap<TWeakObjectPtr<AActor>, float> ThreatLedger;
+    UFUNCTION() void HandleThreatDamage(const FBreakerHitContext& Hit);
+    AActor* SelectThreatTarget();
     // Wakeful needs to know how the killing blow landed.
     bool bLastHitWasWeakPoint = false;
 

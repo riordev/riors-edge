@@ -134,6 +134,13 @@ bool UBreakerSaveGame::MigrateToCurrent(UBreakerSaveGame& Save, FString& OutNote
         return false;
     }
 
+    FString CoreNote;
+    if (!MigrateCoreLayout(Save, ActiveCoreLayoutVersion, CoreNote))
+    {
+        OutNote = CoreNote;
+        return false;
+    }
+
     // A file written before the field existed deserializes to the default 1,
     // and a hand-edited 0 or negative means the same thing: the oldest shape we
     // know how to read. Clamp rather than refuse — refusing here would strand a
@@ -209,6 +216,7 @@ bool UBreakerSaveGame::MigrateToCurrent(UBreakerSaveGame& Save, FString& OutNote
     {
         OutNote = FString::Printf(TEXT("migrated save to version %d in %d step(s)"), Save.SaveVersion, Steps);
     }
+    if (!CoreNote.IsEmpty()) OutNote += (OutNote.IsEmpty() ? TEXT("") : TEXT("; ")) + CoreNote;
     return true;
 }
 
@@ -294,4 +302,172 @@ void UBreakerSaveGame::MigrateClassCurrencyV5ToV6(FBreakerProgressionState& Prog
             break;
         }
     }
+}
+
+int32 UBreakerSaveGame::LegacyCoreRankCost(FName NodeId)
+{
+    // Frozen pre-replacement roster. Never derive this from the current tree:
+    // reused IDs and changed costs would reinterpret the player's old spend.
+    static const TMap<FName,int32> Costs = {
+        { TEXT("Core.Precision.Sightline"), 1 },
+        { TEXT("Core.Precision.Steady"), 1 },
+        { TEXT("Core.Precision.Angle"), 1 },
+        { TEXT("Core.Precision.Ledger"), 1 },
+        { TEXT("Core.Precision.LongLens"), 1 },
+        { TEXT("Core.Precision.Lead"), 1 },
+        { TEXT("Core.Precision.CalledShot"), 2 },
+        { TEXT("Core.Precision.TunnelVision"), 2 },
+        { TEXT("Core.Precision.Deadeye"), 2 },
+        { TEXT("Core.Precision.Fixate"), 3 },
+        { TEXT("Core.Volley.Cyclic"), 1 },
+        { TEXT("Core.Volley.Feed"), 1 },
+        { TEXT("Core.Volley.TriggerDiscipline"), 1 },
+        { TEXT("Core.Volley.Chambered"), 1 },
+        { TEXT("Core.Volley.ColdBarrel"), 1 },
+        { TEXT("Core.Volley.WorkingStock"), 1 },
+        { TEXT("Core.Volley.Salvo"), 2 },
+        { TEXT("Core.Volley.LastRound"), 2 },
+        { TEXT("Core.Volley.Overrev"), 2 },
+        { TEXT("Core.Volley.Barrage"), 3 },
+        { TEXT("Core.Vector.Split"), 1 },
+        { TEXT("Core.Vector.Overpenetration"), 1 },
+        { TEXT("Core.Vector.Carom"), 1 },
+        { TEXT("Core.Vector.Spread"), 1 },
+        { TEXT("Core.Vector.Wake"), 1 },
+        { TEXT("Core.Vector.Line"), 1 },
+        { TEXT("Core.Vector.Multishot"), 2 },
+        { TEXT("Core.Vector.Chainwork"), 2 },
+        { TEXT("Core.Vector.PierceDiscipline"), 2 },
+        { TEXT("Core.Vector.Splinter"), 3 },
+        { TEXT("Core.Arc.Channel"), 1 },
+        { TEXT("Core.Arc.Widen"), 1 },
+        { TEXT("Core.Arc.Recycle"), 1 },
+        { TEXT("Core.Arc.Anchor"), 1 },
+        { TEXT("Core.Arc.Prime"), 1 },
+        { TEXT("Core.Arc.Vent"), 1 },
+        { TEXT("Core.Arc.CadenceBreak"), 2 },
+        { TEXT("Core.Arc.Reach"), 2 },
+        { TEXT("Core.Arc.Widening"), 2 },
+        { TEXT("Core.Arc.Overflow"), 3 },
+        { TEXT("Core.Affliction.OpenWound"), 1 },
+        { TEXT("Core.Affliction.Deepen"), 1 },
+        { TEXT("Core.Affliction.Linger"), 1 },
+        { TEXT("Core.Affliction.Seep"), 1 },
+        { TEXT("Core.Affliction.Bloodlet"), 1 },
+        { TEXT("Core.Affliction.SlowBleed"), 1 },
+        { TEXT("Core.Affliction.Fester"), 2 },
+        { TEXT("Core.Affliction.Bloodwork"), 2 },
+        { TEXT("Core.Affliction.Attrition"), 2 },
+        { TEXT("Core.Affliction.Compound"), 3 },
+        { TEXT("Core.Aegis.Footing"), 1 },
+        { TEXT("Core.Aegis.Brace"), 1 },
+        { TEXT("Core.Aegis.Recover"), 1 },
+        { TEXT("Core.Aegis.CleanHands"), 1 },
+        { TEXT("Core.Aegis.SecondOpinion"), 1 },
+        { TEXT("Core.Aegis.Bulk"), 1 },
+        { TEXT("Core.Aegis.ShortCircuit"), 2 },
+        { TEXT("Core.Aegis.IronFrame"), 2 },
+        { TEXT("Core.Aegis.AnsweringFire"), 2 },
+        { TEXT("Core.Bulwark.SetStance"), 1 },
+        { TEXT("Core.Bulwark.Read"), 1 },
+        { TEXT("Core.Bulwark.Weight"), 1 },
+        { TEXT("Core.Bulwark.HeldGround"), 1 },
+        { TEXT("Core.Bulwark.LineofSight"), 1 },
+        { TEXT("Core.Bulwark.Loud"), 1 },
+        { TEXT("Core.Bulwark.Parry"), 2 },
+        { TEXT("Core.Bulwark.Counterweight"), 2 },
+        { TEXT("Core.Bulwark.Interposition"), 2 },
+        { TEXT("Core.Bulwark.Set"), 3 },
+        { TEXT("Core.Kinesis.LightFooting"), 1 },
+        { TEXT("Core.Kinesis.Loft"), 1 },
+        { TEXT("Core.Kinesis.Landing"), 1 },
+        { TEXT("Core.Kinesis.Carry"), 1 },
+        { TEXT("Core.Kinesis.Contact"), 1 },
+        { TEXT("Core.Kinesis.Redirect"), 1 },
+        { TEXT("Core.Kinesis.AirJump"), 2 },
+        { TEXT("Core.Kinesis.Slipcut"), 2 },
+        { TEXT("Core.Kinesis.PhantomStep"), 2 },
+        { TEXT("Core.Velocity.Freefall"), 1 },
+        { TEXT("Core.Velocity.Afterburn"), 1 },
+        { TEXT("Core.Velocity.Traction"), 1 },
+        { TEXT("Core.Velocity.Slipstream"), 1 },
+        { TEXT("Core.Velocity.Grind"), 1 },
+        { TEXT("Core.Velocity.Downforce"), 1 },
+        { TEXT("Core.Velocity.TerminalDescent"), 2 },
+        { TEXT("Core.Velocity.Redline"), 2 },
+        { TEXT("Core.Velocity.NoGround"), 2 },
+        { TEXT("Core.Velocity.TerminalVelocity"), 3 },
+        { TEXT("Core.Ruin.WeightofIt"), 1 },
+        { TEXT("Core.Ruin.Cull"), 1 },
+        { TEXT("Core.Ruin.Break"), 1 },
+        { TEXT("Core.Ruin.ShapedCharge"), 1 },
+        { TEXT("Core.Ruin.Concussion"), 1 },
+        { TEXT("Core.Ruin.Rend"), 1 },
+        { TEXT("Core.Ruin.Execute"), 2 },
+        { TEXT("Core.Ruin.Siege"), 2 },
+        { TEXT("Core.Ruin.Overpressure"), 2 },
+        { TEXT("Core.Ruin.Collapse"), 3 },
+        { TEXT("Core.Reservoir.Draw"), 1 },
+        { TEXT("Core.Reservoir.Wellspring"), 1 },
+        { TEXT("Core.Reservoir.Capacity"), 1 },
+        { TEXT("Core.Reservoir.Tithe"), 1 },
+        { TEXT("Core.Reservoir.DeepPockets"), 1 },
+        { TEXT("Core.Reservoir.SecondShift"), 1 },
+        { TEXT("Core.Reservoir.ConvergencePoint"), 2 },
+        { TEXT("Core.Reservoir.Spillover"), 2 },
+        { TEXT("Core.Reservoir.Reserve"), 2 },
+        { TEXT("Core.Elements.Conductive"), 1 },
+        { TEXT("Core.Elements.ChargeUp"), 1 },
+        { TEXT("Core.Elements.Penetrance"), 1 },
+        { TEXT("Core.Elements.Attunement"), 1 },
+        { TEXT("Core.Elements.Catalyst"), 1 },
+        { TEXT("Core.Elements.Sympathy"), 1 },
+        { TEXT("Core.Elements.Threshold"), 2 },
+        { TEXT("Core.Elements.Reaction"), 2 },
+        { TEXT("Core.Elements.Sequence"), 2 },
+        { TEXT("Core.Elements.ReactionChain"), 3 },
+    };
+    const int32* Cost = Costs.Find(NodeId);
+    return Cost ? *Cost : 0;
+}
+
+
+bool UBreakerSaveGame::MigrateCoreLayout(UBreakerSaveGame& Save, int32 TargetVersion, FString& OutNote)
+{
+    OutNote.Reset();
+    if (Save.CoreLayoutVersion == TargetVersion) return true;
+    if (Save.CoreLayoutVersion != 1 || TargetVersion != 2)
+    {
+        OutNote = FString::Printf(TEXT("unsupported Core layout migration %d -> %d"),Save.CoreLayoutVersion,TargetVersion);
+        return false;
+    }
+    int64 Refunded = Save.Progression.UnspentCorePoints;
+    if (Refunded < 0)
+    {
+        OutNote = TEXT("invalid negative Core wallet; save left unchanged");
+        return false;
+    }
+    TSet<FName> Seen;
+    for (const FBreakerNodeRank& Rank : Save.Progression.CoreNodeRanks)
+    {
+        if (Rank.Rank == 0) continue;
+        const int32 Cost = LegacyCoreRankCost(Rank.NodeId);
+        if (Rank.Rank < 0 || Cost <= 0 || Seen.Contains(Rank.NodeId))
+        {
+            OutNote = FString::Printf(TEXT("unrecognized or invalid legacy Core allocation %s; save left unchanged"),*Rank.NodeId.ToString());
+            return false;
+        }
+        Seen.Add(Rank.NodeId);
+        Refunded += static_cast<int64>(Rank.Rank) * Cost;
+        if (Refunded > MAX_int32)
+        {
+            OutNote = TEXT("Core refund exceeds wallet capacity; save left unchanged");
+            return false;
+        }
+    }
+    Save.Progression.UnspentCorePoints = static_cast<int32>(Refunded);
+    Save.Progression.CoreNodeRanks.Reset();
+    Save.CoreLayoutVersion = TargetVersion;
+    OutNote = TEXT("Core layout updated; previous Core allocation refunded");
+    return true;
 }

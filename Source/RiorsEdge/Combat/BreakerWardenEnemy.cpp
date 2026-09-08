@@ -232,7 +232,7 @@ void ABreakerWardenEnemy::SetBodyVisible(bool bVisible)
     if (SlamRingVisual) SlamRingVisual->SetVisibility(false, true);
 }
 
-void ABreakerWardenEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float Distance, float DeltaSeconds,
+void ABreakerWardenEnemy::TickEngagedBehaviour(AActor* Player, float Distance, float DeltaSeconds,
     FVector& OutDirection, float& OutSpeedScale)
 {
     if (!Player || !GetWorld()) return;
@@ -256,6 +256,7 @@ void ABreakerWardenEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float 
     // archetype teaches "get behind it and hold the trigger".
     if (bSlamWindup)
     {
+        CommitAttackTarget(Player);
         const float Alpha = UBreakerRangedBehaviorLibrary::GetTelegraphAlpha(
             static_cast<float>(Now - SlamWindupStart), SlamWindupSeconds);
         UpdateSlamTelegraph(Alpha, true);
@@ -273,6 +274,7 @@ void ABreakerWardenEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float 
 
     if (Distance <= SlamRadiusCm && (Now - LastSlamTime) >= SlamCooldownSeconds)
     {
+        CommitAttackTarget(Player);
         bSlamWindup = true;
         SlamWindupStart = Now;
         OutDirection = FVector::ZeroVector;
@@ -284,6 +286,7 @@ void ABreakerWardenEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float 
     // --- Sweep: the frontal arc.
     if (bSweepWindup)
     {
+        CommitAttackTarget(Player);
         const float Alpha = UBreakerRangedBehaviorLibrary::GetTelegraphAlpha(
             static_cast<float>(Now - SweepWindupStart), SweepWindupSeconds);
         UpdateSweepTelegraph(Alpha);
@@ -301,6 +304,7 @@ void ABreakerWardenEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float 
 
     if (Distance <= SweepRangeCm && (Now - LastSweepTime) >= SweepCooldownSeconds)
     {
+        CommitAttackTarget(Player);
         bSweepWindup = true;
         SweepWindupStart = Now;
         OutSpeedScale = SweepWindupMoveScale;
@@ -379,10 +383,10 @@ void ABreakerWardenEnemy::ResolveSlam()
 
     // Pawns only, and never another enemy: same friendly-fire rule the death
     // chain, the enemy projectile and the Volatile detonation already use.
-    for (TActorIterator<APawn> It(GetWorld()); It; ++It)
+    for (TActorIterator<AActor> It(GetWorld()); It; ++It)
     {
-        APawn* Candidate = *It;
-        if (!Candidate || Candidate == this || Candidate->IsA<ABreakerEnemy>()) continue;
+        AActor* Candidate = *It;
+        if (!IsEligibleThreatTarget(Candidate)) continue;
         if (FVector::DistSquared(Candidate->GetActorLocation(), Center) > RadiusSq) continue;
         UBreakerCombatComponent* TargetCombat = Candidate->FindComponentByClass<UBreakerCombatComponent>();
         if (!TargetCombat) continue;
