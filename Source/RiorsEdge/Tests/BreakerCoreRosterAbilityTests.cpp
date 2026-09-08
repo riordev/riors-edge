@@ -115,6 +115,12 @@ bool FBreakerCoreRosterAbilityRuntimeTest::RunTest(const FString& Parameters)
     auto* P = Player->GetProgression(); P->BindAttributes(Attr);
     if (!TestTrue(TEXT("Actual Caster class selected"), P->ChoosePermanentClassById(EBreakerClassId::Caster))) return false;
     auto* Definition = DuplicateObject<UBreakerClassDefinition>(P->ClassDefinition, Player);
+    // Candidate IDs deliberately match the replacement roster. The collector
+    // searches class trees before global fallbacks, so remove the copied live
+    // Core definition to make this candidate the authoritative fixture schema.
+    // Retain Doctrine and the actual registered class kit/loadout.
+    Definition->BranchTrees.RemoveAll([](const TObjectPtr<UBreakerProgressionTree>& Existing)
+    { return Existing && Existing->Currency == EBreakerPointCurrency::CorePoints; });
     FString Error; auto* Tree = AbilityCandidate(Definition, Error); if (!TestNotNull(*Error, Tree)) return false;
     Definition->BranchTrees.Add(Tree); P->ClassDefinition = Definition;
     P->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(10, P->ExperienceCurve));

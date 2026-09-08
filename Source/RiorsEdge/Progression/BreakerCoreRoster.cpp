@@ -27,5 +27,6 @@ UBreakerProgressionTree* BreakerCoreRoster::BuildCandidate(UObject* Outer, FStri
     AppendAbility(Outer, Wedges);
     AppendStatus(Outer, Wedges);
     AppendMovement(Outer, Wedges);
+    AppendUtility(Outer, Wedges);
     return BreakerCoreTree::Build(Outer, TEXT("Core.Replacement"), FText::FromString(TEXT("Core")), Wedges, Error);
 }
