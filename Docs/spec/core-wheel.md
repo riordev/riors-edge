@@ -137,6 +137,8 @@ Each line below: gateway; lane A; lane B; lane C if major; links if major; conve
 
 - Cadence base reload/swap contributions use the actual per-owner window end, retaining half for two seconds when the casting source owned Afterimage. Overlapping casters take the strongest multiplier rather than adding; leaving the aura cancels that copy, while an owned extension delays its tail. Source/recipient death, source destruction/respec, cancellation, removal and recast revoke old contributions. Reload and swap snapshot their starting tempo.
 
+Generic StatusDuration snapshots the source lane for periodic elemental tick windows, including deferred applications. Sequence and Echo extend Rot by redistributing its unchanged finite funding; Erased payout delay and Unstable marker retain authored timers.
+
 ## Asserted invariants
 
 | Invariant | Test |
@@ -154,6 +156,7 @@ Each line below: gateway; lane A; lane B; lane C if major; links if major; conve
 | Shield and front-pool contributions grant capacity without free fill | `Progression.CoreShieldRuntime` |
 | Zone Detonation spends a finite snapshotted budget only on natural expiry | `Combat.Zone.CoreStandingDetonationRuntime` |
 | Overlap seeds carry no damage and wait for a later direct hit to fund application | `Combat.Elements.CoreOverlapRuntime` |
+| Paid Sequence and Echo extend periodic elemental payments without adding funding or delaying Erased/Unstable | `Combat.Elements.StatusDurationRuntime` |
 | Caster Rot retains the original critical sample and longer lifetime redistributes unchanged funding | `Abilities.Caster.RotFundingRuntime` |
 | Terminal and Long Dark never pay beyond finite tick funding | `Abilities.Caster.TerminalRuntime` |
 | Reaction Residue retains only unpaid funding and cannot manufacture new damage | `Combat.Elements.CoreReactionResidueRuntime` |

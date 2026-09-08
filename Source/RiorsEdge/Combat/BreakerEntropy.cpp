@@ -129,11 +129,18 @@ void UBreakerStatusComponent::ApplyEntropyHit(const FBreakerDamageRequest& Reque
     FBreakerStatusApplicationSpec Spec;
     Spec.StatusTag = Rot;
     Spec.bLongDarkSnapshot = Request.ElementSource.bLongDark;
+    const AActor* DurationSource = Request.Instigator.Get();
+    const auto* DurationProgression = DurationSource ? DurationSource->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    const float StatusDurationScale = Request.bHasCasterRotSnapshot ? Request.PeriodicStatusDurationMultiplier
+        : (DurationProgression ? DurationProgression->GetNodeStats().StatusDurationMultiplier : 1.0f);
+    // Both periodic lifetime contributions are accepted-hit snapshots. Replays
+    // retain them through source respec; finite applying-hit funding is unchanged.
     Spec.Duration = Tuning.Duration * (Request.bHasCasterRotSnapshot ? Request.CasterRotLifetimeMultiplier
-        : BreakerCasterStatusRules::RotLifetimeMultiplier(Request.Instigator.Get()));
+        : BreakerCasterStatusRules::RotLifetimeMultiplier(Request.Instigator.Get())) * StatusDurationScale;
+    if (!FMath::IsFinite(Spec.Duration) || Spec.Duration <= 0.0f) return;
     const int32 TickCount = FMath::Max(1, FMath::FloorToInt(Spec.Duration / Tuning.Tick))
         + (Request.ElementSource.bRotDensity ? 2 : 0);
-    Spec.TickInterval = Request.ElementSource.bRotDensity ? Spec.Duration / TickCount : Tuning.Tick;
+    Spec.TickInterval = Spec.Duration / TickCount; // Redistribute every finite tick across the full extended window.
     const float Budget = BreakerElementSource::StatusBudget(Request, Snapshot * Tuning.Damage)
         * (Request.bHasCasterRotSnapshot ? Request.CasterRotCriticalMultiplier : BreakerCasterStatusRules::RotCriticalBudgetMultiplier(Request, Result));
     Spec.BaseDamagePerTick = Budget / TickCount;

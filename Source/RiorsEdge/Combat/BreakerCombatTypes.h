@@ -194,6 +194,7 @@ struct RIORSEDGE_API FBreakerDamageRequest
     // Accepted-hit rules retained while Sympathetic defers the application.
     bool bHasCasterRotSnapshot = false;
     float CasterRotLifetimeMultiplier = 1;
+    float PeriodicStatusDurationMultiplier = 1;
     float CasterRotCriticalMultiplier = 1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bCanApplyElementBuildup = true;
     // Paid at fire/cast time by an actually maintained Sympathetic buff.

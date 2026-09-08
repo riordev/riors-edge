@@ -1,4 +1,7 @@
 #include "Combat/BreakerZoneActor.h"
+#include "Progression/BreakerCoreWheelMath.h"
+#include "Items/BreakerEquipmentComponent.h"
+#include "Items/BreakerLootLibrary.h"
 #include "Combat/BreakerDamageLibrary.h"
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerElementSourceMath.h"
@@ -41,7 +44,7 @@ bool FBreakerCasterRotFundingRuntimeTest::RunTest(const FString& Parameters)
     ON_SCOPE_EXIT{World->DestroyWorld(false);GEngine->DestroyWorldContext(World);GFrameCounter=Frame;};
     auto Clock=[&](float Seconds){for(float T=0;T<Seconds;T+=.01f){++GFrameCounter;World->Tick(LEVELTICK_All,.01f);}};
     auto* Player=World->SpawnActor<ABreakerCharacter>();if(!Player)return false;
-    Player->SetActorTickEnabled(false);Player->GetBreakerMovement()->SetComponentTickEnabled(false);
+    Player->bRefuseSavesForPendingCharacter=true;Player->SetActorTickEnabled(false);Player->GetBreakerMovement()->SetComponentTickEnabled(false);
     auto* ASC=Player->GetAbilitySystemComponent();auto* Attributes=Player->GetAttributes();
     ASC->InitAbilityActorInfo(Player,Player);ASC->AddAttributeSetSubobject(Attributes);
     auto* Combat=Player->GetCombat();Combat->BindAttributes(Attributes);
@@ -141,6 +144,8 @@ bool FBreakerCasterRotFundingRuntimeTest::RunTest(const FString& Parameters)
     const auto* InitialRot=EnemyStatus->GetActiveStatuses().FindByPredicate([&](const auto& A){return A.Spec.StatusTag==Rot;});
     if(!TestNotNull(TEXT("Owned-zone hit earns reaction fuel on native enemy"),InitialRot))return false;
     const float ExpectedDeferredBudget=InitialRot->InitialDamageBudget;
+    const float BeforeDeferredDuration=InitialRot->Spec.Duration;
+    TestEqual(TEXT("Paid Reaction Echo authors six percent status duration"),Progression->GetNodeStats().StatusDurationMultiplier,1.06f,.0001f);
     const float InitialCriticalFactor=BreakerCasterStatusRules::RotCriticalBudgetMultiplier(DeferredHit,InitialResult);
     TestEqual(TEXT("Original owned-zone status snapshot promotes the recorded sample"),InitialCriticalFactor,DeferredHit.CriticalMultiplier,.001f);
     auto Trigger=DeferredHit;Trigger.Element=EBreakerElement::Rift;Trigger.BaseDamage=1;Trigger.bCanCritical=false;
@@ -153,12 +158,26 @@ bool FBreakerCasterRotFundingRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Deferred hit retains original noncritical damage"),DeferredResult.RawDamage,InitialResult.RawDamage,.001f);
     TestEqual(TEXT("Deferred hit's recorded sample is unchanged"),DeferredResult.CriticalRollSample,InitialResult.CriticalRollSample);
     if(!TestTrue(TEXT("Actual Doctrine respec before lockout ends"),Progression->RespecAtForge(Tree->Currency,true,Reason)))return false;
+    auto* Equipment=Player->GetEquipment();
+    const auto CoreCost=BreakerCoreRespecCost(Progression->GetCharacterLevel());
+    if(!TestTrue(TEXT("Level-thirty Core respec has a real wallet price"),!CoreCost.IsFree()))return false;
+    for(int32 Seed=1;Seed<=100&&!Equipment->GetForgeWallet().CanAfford(CoreCost);++Seed)
+    {
+        const auto Item=UBreakerLootLibrary::RollItem(TEXT("Test.RotDuration.Salvage"),EBreakerEquipSlot::Boots,EBreakerItemRarity::Standard,30,Seed);
+        if(!Equipment->AddToBackpack(Item)||!Equipment->SalvageFromBackpack(Item.ItemId))return false;
+    }
+    const int32 WalletBeforeCoreRespec=Equipment->GetForgeWallet().Get();
+    if(!TestTrue(TEXT("Ordinary salvage funds actual Core respec"),Equipment->GetForgeWallet().CanAfford(CoreCost)))return false;
+    if(!TestTrue(TEXT("Actual paid Core respec before deferred unlock"),Progression->RespecCore(Reason)))return false;
+    TestEqual(TEXT("Core respec debits its exact authored price"),Equipment->GetForgeWallet().Get(),WalletBeforeCoreRespec-CoreCost.Amount);
+    TestEqual(TEXT("Future hits lose Echo's duration contribution"),Progression->GetNodeStats().StatusDurationMultiplier,1.f,.0001f);
     Zone->Destroy();
     TestEqual(TEXT("Future hits no longer receive owned-zone promotion"),BreakerCasterStatusRules::RotCriticalBudgetMultiplier(DeferredHit,DeferredResult),1.f);
     EnemyStatus->AdvanceStatuses(3.f);
     const auto* Resumed=EnemyStatus->GetActiveStatuses().FindByPredicate([&](const auto& A){return A.Spec.StatusTag==Rot;});
     if(!TestNotNull(TEXT("Funded Rot resumes after source leaves its zone and respecs"),Resumed))return false;
     TestEqual(TEXT("Resumed Rot retains exactly the originally promoted budget"),Resumed->InitialDamageBudget,ExpectedDeferredBudget,.001f);
+    TestEqual(TEXT("Deferred periodic duration survives paid Core respec"),Resumed->Spec.Duration,BeforeDeferredDuration,.001f);
     TestEqual(TEXT("Deferred Rot preserves original applying-hit sample"),Resumed->Spec.Snapshot.CriticalRollSample,DeferredResult.CriticalRollSample);
     TestTrue(TEXT("Deferred Rot retains original applying source"),Resumed->Instigator.Get()==Player);
     return true;

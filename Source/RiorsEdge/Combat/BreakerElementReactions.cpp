@@ -355,6 +355,9 @@ bool UBreakerStatusComponent::DeferSympatheticElement(const FBreakerDamageReques
     {
         Bank.Request.bHasCasterRotSnapshot = true;
         Bank.Request.CasterRotLifetimeMultiplier = BreakerCasterStatusRules::RotLifetimeMultiplier(Request.Instigator.Get());
+        const AActor* DurationSource = Request.Instigator.Get();
+        const auto* DurationProgression = DurationSource ? DurationSource->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+        Bank.Request.PeriodicStatusDurationMultiplier = DurationProgression ? DurationProgression->GetNodeStats().StatusDurationMultiplier : 1.0f;
         Bank.Request.CasterRotCriticalMultiplier = BreakerCasterStatusRules::RotCriticalBudgetMultiplier(Request, Result);
     }
     Bank.Result = Result;
