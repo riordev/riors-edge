@@ -439,7 +439,7 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     // ignores armour — resolved here, the one site that knows both actors
     // (the Stage-6 seam). The threshold reads the defender's live fraction;
     // armour alone is zeroed, so resistance, block and dodge stand.
-    if (Attributes->GetMaxHealth() > 0.0f
+    if (!Request.bFundedWeaponSplash && Attributes->GetMaxHealth() > 0.0f
         && Attributes->GetHealth() / Attributes->GetMaxHealth() <= ExecuteHealthFraction)
     {
         if (const AActor* ExecuteAttacker = Request.Instigator.Get())
@@ -531,17 +531,17 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     // ApplyTargetConditionRiders leaves it bit-identical unless a rider
     // actually fired against this target with the source split present.
     FBreakerDamageRequest ResolvedRequest = Request;
-    ApplyTargetConditionRiders(ResolvedRequest);
+    if (!ResolvedRequest.bFundedWeaponSplash) ApplyTargetConditionRiders(ResolvedRequest);
     // A live target rider joins the applying hit's additive bucket. Funded
     // periodic/reaction payouts never receive the rider a second time.
-    if (!ResolvedRequest.bIsDamageOverTime)
+    if (!ResolvedRequest.bIsDamageOverTime && !ResolvedRequest.bFundedWeaponSplash)
         if (const auto* Enemy = Cast<ABreakerEnemy>(GetOwner()))
             if (const auto* Lure = Cast<ABreakerDeployable>(Enemy->GetThreatTarget());
                 Lure && Enemy->IsEligibleThreatTarget(Lure) && Lure->GetOwningCharacter() == ResolvedRequest.Instigator.Get())
                 if (const auto* SourceProgression = Lure->GetOwningCharacter()->FindComponentByClass<UBreakerProgressionComponent>();
                     SourceProgression && SourceProgression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Threat.Bait"))))
                     UBreakerDamageLibrary::AddSourceIncreased(ResolvedRequest, 12.0f); // O2 PLACEHOLDER
-    if (!ResolvedRequest.bIsDamageOverTime && GetOwner()->IsA<ABreakerEnemy>() && IsStaggered())
+    if (!ResolvedRequest.bIsDamageOverTime && !ResolvedRequest.bFundedWeaponSplash && GetOwner()->IsA<ABreakerEnemy>() && IsStaggered())
         if (const AActor* Attacker = ResolvedRequest.Instigator.Get(); Attacker && Attacker != GetOwner())
             if (const auto* SourceProgression = Attacker->FindComponentByClass<UBreakerProgressionComponent>(); SourceProgression
                 && SourceProgression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Control.Interrupt"))))
@@ -598,6 +598,56 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
         // stacks. The enabling hit pays old armour; callbacks see the new stack.
         if (WeaponArmorShredExpiries.Num() >= 3) WeaponArmorShredExpiries.RemoveAt(0);
         WeaponArmorShredExpiries.Add(Now + 4.0);
+    }
+    // Each ordinary weapon hit funds its own authored splash. Prepare before
+    // vitals/death callbacks; children carry only earned pre-defense damage.
+    FBreakerDamageRequest Overpressure;
+    TArray<TWeakObjectPtr<ABreakerEnemy>> OverpressureTargets;
+    if (ResolvedRequest.bWeaponOverpressure && !ResolvedRequest.bFundedWeaponSplash
+        && !ResolvedRequest.bIsDamageOverTime && ResolvedRequest.Delivery == EBreakerDamageDelivery::Weapon
+        && Result.RawDamage > 0 && Result.HealthDamage + Result.ShieldDamage > 0
+        && GetOwner()->IsA<ABreakerEnemy>() && GetWorld())
+    {
+        const FVector Center = ResolvedRequest.bHasImpactLocation ? ResolvedRequest.ImpactLocation : GetOwner()->GetActorLocation();
+        const float Radius = FMath::IsFinite(ResolvedRequest.WeaponOverpressureRadius)
+            ? FMath::Max(0.f, ResolvedRequest.WeaponOverpressureRadius) : 0.f;
+        ABreakerEnemy* Extra = nullptr;
+        double ExtraDistance = FMath::Square(static_cast<double>(Radius) * 2.);
+        for (TActorIterator<ABreakerEnemy> It(GetWorld()); It; ++It)
+        {
+            ABreakerEnemy* Candidate = *It;
+            if (!IsValid(Candidate) || Candidate == GetOwner() || Candidate == ResolvedRequest.Instigator.Get()
+                || Candidate->IsActorBeingDestroyed()) continue;
+            const auto* Combat = Candidate->FindComponentByClass<UBreakerCombatComponent>();
+            if (!Combat || Combat->IsDead()) continue;
+            const double Distance = FVector::DistSquared(Candidate->GetActorLocation(), Center);
+            if (Distance <= Radius * Radius) OverpressureTargets.Add(Candidate);
+            else if (ResolvedRequest.bWeaponSplashAdditionalTarget && Distance <= ExtraDistance
+                && (Distance < ExtraDistance || !Extra || Candidate->GetUniqueID() < Extra->GetUniqueID()))
+            { Extra = Candidate; ExtraDistance = Distance; }
+        }
+        if (Extra) OverpressureTargets.Add(Extra);
+        OverpressureTargets.Sort([](const TWeakObjectPtr<ABreakerEnemy>& A, const TWeakObjectPtr<ABreakerEnemy>& B)
+            { return A->GetUniqueID() < B->GetUniqueID(); });
+        Overpressure.BaseDamage = Result.RawDamage * .4f; // O2 PLACEHOLDER: authored forty-percent splash.
+        Overpressure.DamageFamily = ResolvedRequest.DamageFamily;
+        // Reconstruct conversion fractions from earned raw amounts, not the
+        // applying hit's authored fractions (which predate scoped bonuses).
+        for (const auto& Part : Result.ElementRawDamage)
+        {
+            FBreakerElementShare Share; Share.Element = Part.Element; Share.Fraction = Part.RawDamage / Result.RawDamage;
+            Overpressure.ElementShares.Add(Share);
+        }
+        Overpressure.bFundedWeaponSplash = true;
+        Overpressure.bCanCritical = false; Overpressure.bCanApplyElementBuildup = false;
+        Overpressure.ProcCoefficient = 0;
+        Overpressure.bRadialDamage = true;
+        Overpressure.SourceLocation = Center; Overpressure.bHasSourceLocation = true;
+        Overpressure.ImpactLocation = Center; Overpressure.bHasImpactLocation = true;
+        Overpressure.SetInstigator(ResolvedRequest.Instigator.Get());
+        Overpressure.ThreatSource = ResolvedRequest.ThreatSource;
+        Overpressure.bHasThreatSource = ResolvedRequest.bHasThreatSource;
+        Overpressure.RandomSeed = ResolvedRequest.RandomSeed;
     }
     Attributes->ApplyShield(Result.RemainingShield);
     Attributes->ApplyHealth(Result.RemainingHealth);
@@ -679,6 +729,19 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
         OnDeath.Broadcast();
     }
     DispatchHitDealt(Request, Result);
+    for (const auto& Target : OverpressureTargets)
+    {
+        AActor* Source = Overpressure.Instigator.Get();
+        const auto* SourceCombat = IsValid(Source) ? Source->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+        if (!IsValid(Source) || Source->IsActorBeingDestroyed() || !SourceCombat || SourceCombat->IsDead()) break;
+        if (ABreakerEnemy* Enemy = Target.Get(); IsValid(Enemy) && !Enemy->IsActorBeingDestroyed())
+            if (auto* Combat = Enemy->FindComponentByClass<UBreakerCombatComponent>(); Combat && !Combat->IsDead())
+            {
+                FBreakerDamageRequest Splash = Overpressure;
+                Splash.RandomSeed = HashCombine(Overpressure.RandomSeed, GetTypeHash(Enemy));
+                Combat->ReceiveDamage(Splash);
+            }
+    }
     // Rift is a separate earned hit. Finish this hit's events first so a
     // lethal activation cannot be followed by stale outer-hit band/death state.
     if (PendingRiftActivation != 0 && IsValid(ElementStatus))
@@ -814,6 +877,7 @@ void UBreakerCombatComponent::DispatchHitDealt(const FBreakerDamageRequest& Requ
     Context.Target = GetOwner();
     Context.Result = Result;
     Context.bFromDoT = Request.bIsDamageOverTime;
+    Context.bFundedWeaponSplash = Request.bFundedWeaponSplash;
     Context.SourceTags = Request.SourceTags;
     Context.ProcCoefficient = Request.ProcCoefficient;
     Context.bWeakPoint = Result.bWeakPoint;

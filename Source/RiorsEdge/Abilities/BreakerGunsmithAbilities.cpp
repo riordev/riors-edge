@@ -851,6 +851,7 @@ void UBreakerAbility_FieldAssembly::ActivateAbility(const FGameplayAbilitySpecHa
 
 void UBreakerAbility_FieldAssembly::HandleMachinistKill(const FBreakerHitContext& Hit)
 {
+    if (Hit.bFundedWeaponSplash) return;
     // The Mine Cluster mapping entry: the kill detonates at the victim, at the
     // owner's scaled weapon base and the turret's proc discipline (0.5), so
     // the window cannot become a proc engine. Enemies only; radial falloff to

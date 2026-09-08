@@ -498,6 +498,7 @@ void UBreakerAbility_Bloodline::ActivateAbility(const FGameplayAbilitySpecHandle
 
 void UBreakerAbility_Bloodline::HandleHitDealt(const FBreakerHitContext& Hit)
 {
+    if (Hit.bFundedWeaponSplash) return;
     if (!bBloodlineActive) return;
     ABreakerCharacter* Character = GetBreakerCharacter();
     if (!Character) return;

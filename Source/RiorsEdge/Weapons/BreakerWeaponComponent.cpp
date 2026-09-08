@@ -3055,7 +3055,8 @@ float UBreakerWeaponComponent::GetEffectiveRangeMultiplier() const
 {
     const UBreakerEquipmentComponent* Equipment = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>() : nullptr;
     const float Gear = CurrentSlot == 1 && Equipment ? FMath::Max(1.0f, Equipment->GetStats().PrimaryEffectiveRangeMultiplier) : 1.0f;
-    return FMath::Max(0.01f, Gear + BreakerCoreWeaponStats(GetOwner()).WeaponRangeMultiplier - 1.0f);
+    const float Composed = FMath::Max(0.01f, Gear + BreakerCoreWeaponStats(GetOwner()).WeaponRangeMultiplier - 1.0f);
+    return Composed * (OwnerHasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Ballistics.Overpressure"))) ? .5f : 1.f);
 }
 
 float UBreakerWeaponComponent::GetReloadSpeedMultiplier() const

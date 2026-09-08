@@ -68,10 +68,15 @@ void UBreakerDamageLibrary::FillSourcePools(const UBreakerAttributeSet* SourceAt
     EBreakerDamageDelivery Delivery, FBreakerDamageRequest& Request)
 {
     Request.Delivery = Delivery;
+    if (Request.bFundedWeaponSplash) return; // Funded payload is already composed.
     const auto* SourceActor = SourceAttributes ? SourceAttributes->GetTypedOuter<AActor>() : nullptr;
     const auto* SourceProgression = SourceActor ? SourceActor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    Request.bWeaponOverpressure = Delivery == EBreakerDamageDelivery::Weapon && !Request.bIsDamageOverTime && SourceProgression
+        && SourceProgression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Ballistics.Overpressure")));
     Request.bWeaponArmorShred = Delivery == EBreakerDamageDelivery::Weapon && !Request.bIsDamageOverTime && SourceProgression
         && SourceProgression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Ballistics.Break")));
+    Request.WeaponOverpressureRadius = 300.f * FMath::Sqrt(SourceProgression // O2 PLACEHOLDER: authored three-metre base radius.
+        ? FMath::Max(0.f, SourceProgression->GetNodeStats().WeaponSplashAreaMultiplier) : 1.f);
     Request.bWeaponSplashAdditionalTarget = Delivery == EBreakerDamageDelivery::Weapon && !Request.bIsDamageOverTime && SourceProgression
         && SourceProgression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Ballistics.Loud")));
     Request.WeaponCriticalMoreProduct = SourceAttributes && Delivery == EBreakerDamageDelivery::Weapon

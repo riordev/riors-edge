@@ -256,6 +256,7 @@ void UBreakerAbility_Overdrive::ActivateAbility(const FGameplayAbilitySpecHandle
 
 void UBreakerAbility_Overdrive::HandleBloodrhythmHit(const FBreakerHitContext& Hit)
 {
+    if (Hit.bFundedWeaponSplash) return;
     if (!bBloodrhythmActive) return;
 
     // "Every weapon hit refunds Momentum." The refund goes through GrantMomentum

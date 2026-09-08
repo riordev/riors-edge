@@ -78,6 +78,8 @@ Each line below: gateway; lane A; lane B; lane C if major; links if major; conve
 
 ## Primitive contracts
 
+- Overpressure snapshots its weapon-only permission and three-metre radius, scaled by the square root of weapon splash area, at emission. Each accepted ordinary weapon hit funds40% of its pre-defense damage to nearby enemies other than its original victim, including each ordinary rocket-blast hit. Children preserve the earned physical/elemental split, pass through each recipient's defenses, and cannot gain source bonuses, fresh critical rolls, buildup or recursive damage procs. Loud adds one nearest outside recipient within a further radius at the same payout. Recipients and funding are captured before callbacks; source death cancels remaining children, while respec cannot reprice them. Effective weapon range is halved after ordinary composition.
+
 - Residue reads the original status owner's purchased percentage when the reaction begins. Retaining fraction r keeps r of both unpaid normal damage and its funded reaction credit, while the immediate reaction pays only1-r of that credit. The remainder keeps its existing finite lifetime and tick phase, cannot gain new Void debt, persist through Long Dark or spread on expiry, and is installed before consumption callbacks so death and cleansing cannot be undone. Chain pays half the reduced immediate reaction.
 
 - Loud snapshots with a direct weapon source. Each blast chooses one nearest living enemy outside its radius and within twice that radius before damage callbacks, with stable ties. The extra recipient receives the blast's existing edge damage; ordinary in-radius targets retain their normal falloff and no target cap. Invalidated recipients do not transfer the extra hit to another enemy.

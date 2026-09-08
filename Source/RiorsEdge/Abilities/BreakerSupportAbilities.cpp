@@ -1665,6 +1665,7 @@ void UBreakerAbility_Conduit::HandleTriagePulse()
 }
 void UBreakerAbility_Conduit::HandleBlackoutHit(const FBreakerHitContext& Hit)
 {
+    if (Hit.bFundedWeaponSplash) return;
     if (!bConduitActive || !Hit.Target || !BlackoutTargets.Contains(Hit.Target)) return;
     if (ABreakerCharacter* Character = GetBreakerCharacter())
     {

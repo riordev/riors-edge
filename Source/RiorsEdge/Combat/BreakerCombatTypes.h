@@ -123,6 +123,10 @@ struct RIORSEDGE_API FBreakerDamageRequest
     TSharedPtr<FBreakerWeaponTriggerContext> WeaponTrigger;
     UPROPERTY() bool bWeaponArmorShred = false;
     UPROPERTY() bool bWeaponSplashAdditionalTarget = false;
+    UPROPERTY() bool bWeaponOverpressure = false;
+    UPROPERTY() float WeaponOverpressureRadius = 0.f; // Captured runtime value, not authored tuning.
+    // Already-funded direct splash: no new source bonuses, status or proc generation.
+    UPROPERTY() bool bFundedWeaponSplash = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHasSourceSplit = false;
     // O54/O55: which pool the source multiplier above was drawn from. Weapon is
     // the default because it is what every pre-split request meant, and because
@@ -364,6 +368,7 @@ struct RIORSEDGE_API FBreakerHitContext
     UPROPERTY(BlueprintReadOnly) TObjectPtr<AActor> Target = nullptr;
     UPROPERTY(BlueprintReadOnly) FBreakerDamageResult Result;
     UPROPERTY(BlueprintReadOnly) bool bFromDoT = false;
+    UPROPERTY(BlueprintReadOnly) bool bFundedWeaponSplash = false;
     // Delivery alone cannot distinguish a Cleave swing from a bullet: both
     // draw the weapon pool. Preserve the authored source identity for hooks.
     UPROPERTY(BlueprintReadOnly) FGameplayTagContainer SourceTags;
