@@ -109,6 +109,11 @@ Wall uses 12.5% (O2 tuning). Small hits below the cap are unchanged. Active
 caps compose by minimum, including True damage and damage-over-time ticks.
 Vein removes the cap. Expiry, cancellation and death clear its protection.
 
+Detonation releases its stored damage on a second ultimate press or normal
+window expiry, without another resource payment. It pays once at 70% of
+damage taken in an 8 m radius, without falloff or self-damage. Cancellation,
+death or loss of the keystone discards the stored damage.
+
 Interposition grants its solo owner shield capacity behind a live owned Anchor
 Point within 4 m. The starting headroom is 10% of maximum health (O2 tuning).
 Entering grants no shield. Leaving, losing the node, death or Anchor removal

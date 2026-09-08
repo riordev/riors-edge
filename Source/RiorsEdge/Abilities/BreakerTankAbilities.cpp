@@ -1165,6 +1165,16 @@ void UBreakerAbility_Hold::ActivateAbility(const FGameplayAbilitySpecHandle Hand
     }
 
     bHoldActive = true;
+    if (bDetonation)
+    {
+        if (Combat) Combat->OnDeath.AddDynamic(this, &UBreakerAbility_Hold::HandleDetonationOwnerDeath);
+        if (UAbilitySystemComponent* ASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr)
+        {
+            DetonationASC = ASC;
+            DetonationTagHandle = ASC->RegisterGameplayTagEvent(FGameplayTag::RequestGameplayTag(TEXT("Keystone.Tank.Detonation")), EGameplayTagEventType::NewOrRemoved)
+                .AddUObject(this, &UBreakerAbility_Hold::HandleDetonationTagChanged);
+        }
+    }
     World->GetTimerManager().SetTimer(WindowTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { CloseHold(); }), Duration, false);
 
     // The ultimates' violet ignition (Overdrive's precedent), feet-anchored
@@ -1211,6 +1221,34 @@ void UBreakerAbility_Hold::HandleDamageTaken(const FBreakerHitContext& Hit)
     }
 }
 
+bool UBreakerAbility_Hold::CanPayDetonation() const
+{
+    const ABreakerCharacter* Character = GetBreakerCharacter();
+    const UBreakerCombatComponent* Combat = BoundCombat.Get();
+    const UAbilitySystemComponent* ASC = DetonationASC.Get();
+    return bDetonation && Character && Character->HasAuthority() && !Character->IsActorBeingDestroyed()
+        && Combat && !Combat->IsDead() && ASC
+        && ASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(TEXT("Keystone.Tank.Detonation")));
+}
+
+bool UBreakerAbility_Hold::TryReleaseDetonation()
+{
+    if (!bHoldActive || !IsActive() || !CurrentActorInfo || !CanPayDetonation()) return false;
+    CloseHold();
+    return true;
+}
+
+void UBreakerAbility_Hold::HandleDetonationOwnerDeath()
+{
+    if (bHoldActive && CurrentActorInfo)
+        EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+}
+
+void UBreakerAbility_Hold::HandleDetonationTagChanged(FGameplayTag Tag, int32 NewCount)
+{
+    if (NewCount <= 0) HandleDetonationOwnerDeath();
+}
+
 void UBreakerAbility_Hold::CloseHold()
 {
     if (CurrentActorInfo)
@@ -1225,40 +1263,35 @@ void UBreakerAbility_Hold::EndAbility(const FGameplayAbilitySpecHandle Handle, c
     {
         bHoldActive = false;
         ABreakerCharacter* Character = GetBreakerCharacter();
-
-        // §2.1 Detonation: the absorbed damage releases as a radial blast —
-        // 70%, 8 m, NO falloff, self-exempt (the one self-damage exemption in
-        // the class, and it is on the ultimate). Released here, at the window
-        // end, because the second input binding it wants does not exist.
-        if (bDetonation && !bWasCancelled && AbsorbedDamage > 0.0f && Character)
-        {
-            BreakerTankAbilityLocal::BreakerTankRadialDamage(Character->GetWorld(), Character,
-                Character->GetActorLocation(), DetonationRadiusCm,
-                AbsorbedDamage * DetonationReleaseFraction, 1.0f, /*bApplyFalloff=*/false);
-        }
+        // Claim once before cleanup callbacks. Cancellation, death, and loss of
+        // the rewrite discard the ledger; natural expiry remains a fallback.
+        const float ReleaseDamage = !bWasCancelled && CanPayDetonation()
+            ? AbsorbedDamage * DetonationReleaseFraction : 0.0f;
         AbsorbedDamage = 0.0f;
-
-        if (Character)
-        {
-            if (UBreakerGritComponent* Grit = Character->FindComponentByClass<UBreakerGritComponent>())
-            {
-                Grit->PopLoopOverride(WindowKey());
-            }
-            if (UBreakerAbilityStateComponent* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>())
-            {
-                State->CloseWindow(WindowKey());
-            }
-        }
         if (UBreakerCombatComponent* Combat = BoundCombat.Get())
         {
+            Combat->OnDeath.RemoveDynamic(this, &UBreakerAbility_Hold::HandleDetonationOwnerDeath);
             Combat->RemoveIncomingHitCap(WindowKey());
             Combat->OnDamageTaken.RemoveDynamic(this, &UBreakerAbility_Hold::HandleDamageTaken);
         }
-        BoundCombat.Reset();
-        if (UWorld* World = GetWorld())
+        if (UAbilitySystemComponent* ASC = DetonationASC.Get())
+            ASC->RegisterGameplayTagEvent(FGameplayTag::RequestGameplayTag(TEXT("Keystone.Tank.Detonation")), EGameplayTagEventType::NewOrRemoved).Remove(DetonationTagHandle);
+        if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(WindowTimer);
+        if (Character)
         {
-            World->GetTimerManager().ClearTimer(WindowTimer);
+            if (UBreakerGritComponent* Grit = Character->FindComponentByClass<UBreakerGritComponent>())
+                Grit->PopLoopOverride(WindowKey());
+            if (UBreakerAbilityStateComponent* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>())
+                State->CloseWindow(WindowKey());
         }
+        // Window-close listeners may kill the owner or remove the rewrite.
+        if (ReleaseDamage > 0.0f && CanPayDetonation())
+            BreakerTankAbilityLocal::BreakerTankRadialDamage(Character->GetWorld(), Character,
+                Character->GetActorLocation(), DetonationRadiusCm,
+                ReleaseDamage, 1.0f, /*bApplyFalloff=*/false);
+        DetonationTagHandle.Reset();
+        DetonationASC.Reset();
+        BoundCombat.Reset();
     }
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

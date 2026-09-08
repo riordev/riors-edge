@@ -4,6 +4,7 @@
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Abilities/BreakerGameplayAbility.h"
 #include "Abilities/BreakerGunsmithAbilities.h"
+#include "Abilities/BreakerTankAbilities.h"
 #include "Abilities/BreakerAbilityStateComponent.h"
 #include "Abilities/BreakerAbilityTags.h"
 #include "Combat/BreakerEnemy.h"
@@ -620,6 +621,20 @@ bool UBreakerAbilityComponent::TryActivateSlot(EBreakerAbilitySlot Slot)
         return false;
     }
     FGameplayAbilitySpec* Spec = ASC->FindAbilitySpecFromHandle(Granted->Handle);
+    if (Spec && Spec->Ability && Spec->Ability->IsA<UBreakerAbility_Hold>())
+    {
+        if (GetOwner() && !GetOwner()->HasAuthority())
+        {
+            // Hold is server-only: both presses inspect the authoritative instance.
+            ServerActivateSlot(Slot);
+            return true;
+        }
+        if (Spec->IsActive())
+        {
+            UBreakerAbility_Hold* Hold = Cast<UBreakerAbility_Hold>(Spec->GetPrimaryInstance());
+            return Hold && Hold->TryReleaseDetonation();
+        }
+    }
     if (Spec && Spec->Ability && Spec->Ability->IsA<UBreakerGunsmithDeployAbility>())
     {
         if (GetOwner() && !GetOwner()->HasAuthority())

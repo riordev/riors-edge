@@ -3465,7 +3465,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetTankDemolitionistTree()
     // point-blank — dies if authored unconditional. Hold's Detonation row
     // resolves off the tag below. Tank's three Mores stay reserved, not spent.
     Node = MakeNode(TEXT("Tank.Demolitionist.Detonation"), TEXT("Detonation"),
-        TEXT("Branch keystone. Rewrites Hold for the Tank who fights inside their own blast radius."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 4, 1, 2);
+        TEXT("Branch keystone. Hold stores damage taken. Press the ultimate again to release 70% in an 8 m blast, without self-damage; expiry also releases it."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Tank.Demolitionist.Fragmentation"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_Detonation.GetTag());

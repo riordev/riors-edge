@@ -230,6 +230,8 @@ public:
     virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
     static FName WindowKey();
+    // A second ultimate press releases the active Detonation without paying again.
+    bool TryReleaseDetonation();
 
     // §2.1: generation TRIPLES against a raised cap (20/s -> 60/s); the Grit
     // component multiplies its cap by the same override, so one push does both.
@@ -240,15 +242,18 @@ public:
     // Instant rather than over 1.5s — no heal-over-time primitive exists.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hold", meta=(ClampMin="0", ClampMax="1")) float VeinHealFraction = 0.6f;   // §2.1 placeholder
     // §2.1 Detonation: releases 70% of absorbed damage, 8 m, no falloff.
-    // Released at the WINDOW'S END rather than on command: the second input
-    // binding §6.0 asks for does not exist, and this is the one ability in the
-    // game that needs one. Recorded, not solved.
+    // Second input releases early; natural expiry remains the fallback.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hold", meta=(ClampMin="0", ClampMax="1")) float DetonationReleaseFraction = 0.7f;   // §2.1 placeholder
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hold", meta=(ClampMin="0")) float DetonationRadiusCm = 800.0f;   // §2.1: 8 m
 
 private:
     UFUNCTION() void HandleDamageTaken(const FBreakerHitContext& Hit);
     void CloseHold();
+    bool CanPayDetonation() const;
+    UFUNCTION() void HandleDetonationOwnerDeath();
+    void HandleDetonationTagChanged(FGameplayTag Tag, int32 NewCount);
+    FDelegateHandle DetonationTagHandle;
+    TWeakObjectPtr<UAbilitySystemComponent> DetonationASC;
 
     FTimerHandle WindowTimer;
     TWeakObjectPtr<UBreakerCombatComponent> BoundCombat;
