@@ -1055,7 +1055,13 @@ void UBreakerCombatComponent::InvalidateAfterimageContributions()
         FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage")));
     for (auto& Entry : OutgoingModifiers)
         if (!bOwned) Entry.bAfterimage = false;
-    for (auto& Entry : WeaponFlatWindows) if (!bOwned) Entry.Value.bAfterimage = false;
+    for (auto& Entry : WeaponFlatWindows)
+    {
+        const AActor* Source = Entry.Value.Source.Get();
+        const auto* SourceProgression = Source ? Source->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+        if (!SourceProgression || !SourceProgression->HasNodeTag(
+            FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage")))) Entry.Value.bAfterimage = false;
+    }
     if (IsDead())
     {
         for (const auto& Entry : WeaponFlatWindows) WeaponFlatDamage.Remove(Entry.Key);
@@ -1074,8 +1080,14 @@ void UBreakerCombatComponent::PruneExpiredOutgoingModifiers()
 {
     if (!GetWorld()) return;
     for (auto It = WeaponFlatWindows.CreateIterator(); It; ++It)
-        if (FBreakerWindowLaneMath::Scale(GetWorld()->GetTimeSeconds(), It.Value().EndTime, It.Value().bAfterimage) == 0)
+    {
+        const AActor* Source = It.Value().Source.Get();
+        const auto* SourceCombat = Source ? Source->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+        if (!Source || Source->IsActorBeingDestroyed() || Source->GetWorld() != GetWorld()
+            || (SourceCombat && SourceCombat->IsDead()) || IsDead()
+            || FBreakerWindowLaneMath::Scale(GetWorld()->GetTimeSeconds(), It.Value().EndTime, It.Value().bAfterimage) == 0)
         { WeaponFlatDamage.Remove(It.Key()); It.RemoveCurrent(); }
+    }
     const float Now = static_cast<float>(GetWorld()->GetTimeSeconds());
     OutgoingModifiers.RemoveAll([Now](const FBreakerOutgoingModifier& Modifier)
     {
@@ -1449,19 +1461,24 @@ void UBreakerCombatComponent::PopWeaponFlatDamage(FName Key)
     WeaponFlatWindows.Remove(Key);
 }
 
-void UBreakerCombatComponent::PushWindowWeaponFlatDamage(FName Key, float FlatBonus, float Duration)
+void UBreakerCombatComponent::PushWindowWeaponFlatDamage(FName Key, float FlatBonus, float Duration, AActor* Source)
 {
     if (!GetOwner() || !GetWorld() || Key.IsNone() || !FMath::IsFinite(FlatBonus)
         || !FMath::IsFinite(Duration) || Duration <= 0) return;
+    if (!Source) Source = GetOwner();
+    if (!IsValid(Source) || Source->IsActorBeingDestroyed() || Source->GetWorld() != GetWorld()) return;
     PushWeaponFlatDamage(Key, FlatBonus);
-    const auto* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+    auto* Progression = Source->FindComponentByClass<UBreakerProgressionComponent>();
     FWeaponFlatWindow Window;
+    Window.Source = Source;
     Window.EndTime = GetWorld()->GetTimeSeconds() + Duration;
     Window.bAfterimage = Progression && Progression->HasNodeTag(
         FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage")));
     WeaponFlatWindows.Add(Key, Window);
-    if (auto* MutableProgression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>())
-        MutableProgression->OnProgressionChanged.AddUniqueDynamic(this, &ThisClass::InvalidateAfterimageContributions);
+    if (Progression)
+        Progression->OnProgressionChanged.AddUniqueDynamic(this, &ThisClass::InvalidateAfterimageContributions);
+    if (auto* SourceCombat = Source->FindComponentByClass<UBreakerCombatComponent>())
+        SourceCombat->OnDeath.AddUniqueDynamic(this, &ThisClass::InvalidateAfterimageContributions);
     OnDeath.AddUniqueDynamic(this, &ThisClass::InvalidateAfterimageContributions);
 }
 

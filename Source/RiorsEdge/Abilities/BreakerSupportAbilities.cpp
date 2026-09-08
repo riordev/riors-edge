@@ -751,6 +751,7 @@ void UBreakerAbility_Metronome::ActivateAbility(const FGameplayAbilitySpecHandle
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return;
     }
+    ClearRampTails();
     const int32 RehearsalRank = SupportNodeRank(Character, TEXT("Support.Conductor.Rehearsal"));
     const bool bRefresh = RehearsalRank > 0 && bReappliedWhileLive && World->GetTimeSeconds() < RehearsalUntil;
     if (bRefresh && Charge) Charge->GrantCharge(PaidCost * (RehearsalRank >= 2 ? .5f : .25f)); // O2 PLACEHOLDER
@@ -770,9 +771,12 @@ void UBreakerAbility_Metronome::ActivateAbility(const FGameplayAbilitySpecHandle
         if (Holder != Character && FVector::DistSquared(Holder->GetActorLocation(), Character->GetActorLocation()) > FMath::Square(RecipientRadiusCm)) continue;
         FHolderRamp Ramp;
         if (bRefresh) if (const auto* Previous = RehearsalRamps.Find(Holder)) Ramp = *Previous;
+        const float HolderDuration = Duration + (Holder == Character ? SelfTail : 0);
+        Ramp.EndTime = World->GetTimeSeconds() + HolderDuration;
         Holders.Add(Holder, Ramp);
+        Holder->GetCombat()->PushWindowWeaponFlatDamage(RampOwnerKey, 0, HolderDuration, Character);
         auto* State = UBreakerAbilityStateComponent::FindOrAdd(Holder);
-        State->StartOwnedWindow(WindowKey(), RampOwnerKey, Duration + (Holder == Character ? SelfTail : 0));
+        State->StartOwnedWindow(WindowKey(), RampOwnerKey, HolderDuration);
         State->OnWindowEnded.AddUniqueDynamic(this, &ThisClass::HandleMetronomeWindowEnded);
         Holder->GetCombat()->OnHitDealt.AddUniqueDynamic(this, &ThisClass::HandleHitDealt);
         Holder->GetCombat()->OnDeath.AddUniqueDynamic(this, &ThisClass::HandleMetronomeDeath);
@@ -783,7 +787,7 @@ void UBreakerAbility_Metronome::ActivateAbility(const FGameplayAbilitySpecHandle
     World->GetTimerManager().SetTimer(WindowTimer, this, &ThisClass::RefreshHolders, .05f, true);
 }
 
-void UBreakerAbility_Metronome::RemoveHolder(ABreakerCharacter* Holder)
+void UBreakerAbility_Metronome::RemoveHolder(ABreakerCharacter* Holder, bool bNaturalExpiry)
 {
     if (!Holder) return;
     Holders.Remove(Holder);
@@ -791,7 +795,12 @@ void UBreakerAbility_Metronome::RemoveHolder(ABreakerCharacter* Holder)
     {
         Combat->OnHitDealt.RemoveDynamic(this, &ThisClass::HandleHitDealt);
         Combat->OnDeath.RemoveDynamic(this, &ThisClass::HandleMetronomeDeath);
-        Combat->PopWeaponFlatDamage(RampOwnerKey);
+        if (bNaturalExpiry)
+        {
+            TailRecipients.Add(Holder);
+            Combat->FinishWindowWeaponFlatDamage(RampOwnerKey);
+        }
+        else Combat->PopWeaponFlatDamage(RampOwnerKey);
     }
     if (auto* State = Holder->FindComponentByClass<UBreakerAbilityStateComponent>())
     {
@@ -821,13 +830,19 @@ void UBreakerAbility_Metronome::RefreshHolders()
         if (!Holder) { Holders.Remove(Weak); continue; }
         auto* State = Holder->FindComponentByClass<UBreakerAbilityStateComponent>();
         if (Holder->IsActorBeingDestroyed() || Holder->GetCombat()->IsDead() || !State || State->GetOwnedWindowRemaining(WindowKey(), RampOwnerKey) <= 0)
-        { RemoveHolder(Holder); continue; }
+        {
+            const FHolderRamp* Expiring = Holders.Find(Weak);
+            const bool bNatural = State && !Holder->IsActorBeingDestroyed() && !Holder->GetCombat()->IsDead()
+                && Expiring && (State->IsNaturalWindowEnd(WindowKey()) || Now >= Expiring->EndTime);
+            RemoveHolder(Holder, bNatural);
+            continue;
+        }
         FHolderRamp* Ramp = Holders.Find(Weak);
         const bool bTempo = Tempo >= 2 || (Tempo == 1 && Holder == Character);
         const float Gap = StreakGapSeconds * (bTempo ? 1.5f : 1.0f); // O2 PLACEHOLDER
         if (Now - Ramp->LastHitTime >= Gap) Ramp->Stacks = 0;
         Ramp->Stacks = FMath::Min(Ramp->Stacks, static_cast<float>(MaximumStacks + (bTempo ? 3 : 0))); // O2 PLACEHOLDER
-        Holder->GetCombat()->PushWeaponFlatDamage(RampOwnerKey, FlatDamagePerStack * Ramp->Stacks * (bDownbeat ? 2.0f : 1.0f));
+        Holder->GetCombat()->UpdateWindowWeaponFlatDamage(RampOwnerKey, FlatDamagePerStack * Ramp->Stacks * (bDownbeat ? 2.0f : 1.0f));
         Living.Add(Holder);
         RefreshBuffUptime(Holder);
     }
@@ -858,6 +873,21 @@ void UBreakerAbility_Metronome::HandleHitDealt(const FBreakerHitContext& Hit)
     RefreshHolders();
 }
 
+void UBreakerAbility_Metronome::ClearRampTails()
+{
+    const auto Previous = TailRecipients;
+    TailRecipients.Reset();
+    for (const auto& Weak : Previous)
+        if (auto* Holder = Weak.Get()) if (auto* Combat = Holder->GetCombat()) Combat->PopWeaponFlatDamage(RampOwnerKey);
+}
+
+void UBreakerAbility_Metronome::OnRemoveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)
+{
+    ClearRampTails();
+    if (IsActive()) EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+    Super::OnRemoveAbility(ActorInfo, Spec);
+}
+
 void UBreakerAbility_Metronome::HandleMetronomeDeath() { RefreshHolders(); }
 void UBreakerAbility_Metronome::HandleMetronomeWindowEnded(FName Key) { if (Key == WindowKey()) RefreshHolders(); }
 void UBreakerAbility_Metronome::CloseMetronome()
@@ -869,7 +899,9 @@ void UBreakerAbility_Metronome::EndAbility(const FGameplayAbilitySpecHandle Hand
 {
     if (bMetronomeActive)
     {
+        const bool bNaturalCompletion = Holders.IsEmpty() && !bWasCancelled;
         bMetronomeActive = false;
+        if (!bNaturalCompletion) ClearRampTails();
         RehearsalRamps.Reset(); bReappliedWhileLive = false; RehearsalUntil = 0;
         ABreakerCharacter* Character = GetBreakerCharacter();
         TArray<TWeakObjectPtr<ABreakerCharacter>> Previous;

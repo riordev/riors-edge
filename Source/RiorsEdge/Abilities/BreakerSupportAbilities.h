@@ -173,6 +173,7 @@ public:
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
     virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
+    virtual void OnRemoveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec) override;
     static FName WindowKey();
     static FName OutgoingModifierKey();
 
@@ -186,15 +187,17 @@ private:
     UFUNCTION() void HandleMetronomeDeath();
     UFUNCTION() void HandleMetronomeWindowEnded(FName Key);
     void RefreshHolders();
-    void RemoveHolder(ABreakerCharacter* Holder);
+    void RemoveHolder(ABreakerCharacter* Holder, bool bNaturalExpiry = false);
+    void ClearRampTails();
     void CloseMetronome();
 
     FTimerHandle WindowTimer;
     bool bMetronomeActive = false;
     bool bRefreshingHolders = false;
-    struct FHolderRamp { float Stacks = 0; double LastHitTime = -1000; };
+    struct FHolderRamp { float Stacks = 0; double LastHitTime = -1000; double EndTime = 0; };
     TMap<TWeakObjectPtr<ABreakerCharacter>, FHolderRamp> Holders;
     TMap<TWeakObjectPtr<ABreakerCharacter>, FHolderRamp> RehearsalRamps;
+    TSet<TWeakObjectPtr<ABreakerCharacter>> TailRecipients;
     FName RampOwnerKey;
     double RehearsalUntil = 0;
     // CO4 Rehearsal: a re-application refreshes stacks-intact and refunds.
