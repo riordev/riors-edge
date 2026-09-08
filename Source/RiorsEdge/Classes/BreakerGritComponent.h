@@ -9,6 +9,8 @@
 class UBreakerAttributeSet;
 class UBreakerCombatComponent;
 class UBreakerProgressionComponent;
+class UBreakerEquipmentComponent;
+class ABreakerDeployable;
 
 UENUM(BlueprintType)
 enum class EBreakerGritBand : uint8
@@ -61,6 +63,7 @@ class RIORSEDGE_API UBreakerGritComponent : public UActorComponent
 public:
     UBreakerGritComponent();
     virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type Reason) override;
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
     // The whole per-frame loop, split out of TickComponent for the reason the
     // Mana and Momentum loops record: TickComponent asserts on an unregistered
@@ -169,10 +172,8 @@ public:
     // measured against the nearest LIVE Anchor Point this Tank owns.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grit|Nodes", meta=(ClampMin="0")) float AnchorNearRadiusCm = 300.0f;   // B4: 3 m
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grit|Nodes", meta=(ClampMin="0")) float InterpositionRadiusCm = 400.0f;   // B8: 4 m
-    // B8's solo headroom stand-in: shield trickle as a fraction of max health
-    // per second while inside the field. O2 PLACEHOLDER, recorded substitution
-    // (no ally exists to share with; the field pays its owner).
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grit|Nodes", meta=(ClampMin="0")) float InterpositionShieldFractionPerSecond = 0.02f;   // O2 PLACEHOLDER
+    // O2: temporary solo capacity behind the owned panel; grants no shield.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grit|Nodes", meta=(ClampMin="0")) float InterpositionHeadroomHealthFraction = 0.10f;
     // B9 (Conversion): flat damage per point of CURRENT shield. O2 PLACEHOLDER.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grit|Nodes", meta=(ClampMin="0")) float ConversionFlatPerShieldPoint = 0.1f;   // O2 PLACEHOLDER
 
@@ -271,6 +272,17 @@ public:
     UFUNCTION() void HandleProgressionChanged();
 
 private:
+    void RefreshInterpositionHeadroom();
+    void ReleaseInterpositionHeadroom();
+    UFUNCTION() void HandleInterpositionEquipmentChanged();
+    UFUNCTION() void HandleInterpositionOwnerDeath();
+    UFUNCTION() void HandleInterpositionAnchorDestroyed(AActor* Actor);
+    TWeakObjectPtr<UBreakerEquipmentComponent> InterpositionEquipment;
+    TWeakObjectPtr<ABreakerDeployable> InterpositionAnchor;
+    bool bOwnsInterpositionHeadroom = false;
+    float InterpositionUnboostedMax = 0.0f;
+    float InterpositionLastWrittenMax = 0.0f;
+    float InterpositionGearBase = 0.0f;
     bool IsInSafeZone() const;
     void ApplyGritDelta(float Delta);
     void RefreshBand();

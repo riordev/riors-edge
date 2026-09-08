@@ -8,6 +8,7 @@
 #include "Combat/BreakerEnemy.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "Items/BreakerEquipmentComponent.h"
 #include "Game/BreakerGameMode.h"
 #include "GameFramework/Actor.h"
 #include "Progression/BreakerProgressionComponent.h"
@@ -60,11 +61,120 @@ void UBreakerGritComponent::BeginPlay()
         {
             CachedCombat = Combat;
             Combat->OnHealed.AddDynamic(this, &UBreakerGritComponent::HandleOwnerHealed);
+            Combat->OnDeath.AddDynamic(this, &UBreakerGritComponent::HandleInterpositionOwnerDeath);
         }
+    }
+    if (GetOwner())
+    {
+        InterpositionEquipment = GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>();
+        if (InterpositionEquipment.IsValid())
+            InterpositionEquipment->OnEquipmentChanged.AddDynamic(this, &UBreakerGritComponent::HandleInterpositionEquipmentChanged);
     }
     HandleProgressionChanged();
     CachedBand = BandForFraction(GetGritFraction());
     PreviousShield = Attributes ? Attributes->GetShield() : 0.0f;
+}
+
+void UBreakerGritComponent::EndPlay(const EEndPlayReason::Type Reason)
+{
+    ReleaseInterpositionHeadroom();
+    if (InterpositionEquipment.IsValid())
+        InterpositionEquipment->OnEquipmentChanged.RemoveDynamic(this, &UBreakerGritComponent::HandleInterpositionEquipmentChanged);
+    if (CachedProgression.IsValid())
+        CachedProgression->OnProgressionChanged.RemoveDynamic(this, &UBreakerGritComponent::HandleProgressionChanged);
+    if (CachedCombat.IsValid())
+    {
+        CachedCombat->OnDeath.RemoveDynamic(this, &UBreakerGritComponent::HandleInterpositionOwnerDeath);
+        CachedCombat->OnHealed.RemoveDynamic(this, &UBreakerGritComponent::HandleOwnerHealed);
+    }
+    Super::EndPlay(Reason);
+}
+
+void UBreakerGritComponent::ReleaseInterpositionHeadroom()
+{
+    if (InterpositionAnchor.IsValid())
+        InterpositionAnchor->OnDestroyed.RemoveDynamic(this, &UBreakerGritComponent::HandleInterpositionAnchorDestroyed);
+    InterpositionAnchor.Reset();
+    if (bOwnsInterpositionHeadroom && Attributes)
+    {
+        // Only undo our own write. A gear rebuild may already have replaced it.
+        if (FMath::IsNearlyEqual(Attributes->GetMaxShield(), InterpositionLastWrittenMax))
+            Attributes->ApplyMaxShield(InterpositionUnboostedMax);
+        if (Attributes->GetShield() > Attributes->GetMaxShield())
+            Attributes->ApplyShield(Attributes->GetMaxShield());
+        PreviousShield = FMath::Min(PreviousShield, Attributes->GetShield());
+    }
+    bOwnsInterpositionHeadroom = false;
+}
+
+void UBreakerGritComponent::HandleInterpositionOwnerDeath()
+{
+    ReleaseInterpositionHeadroom();
+}
+
+void UBreakerGritComponent::HandleInterpositionAnchorDestroyed(AActor* Actor)
+{
+    ReleaseInterpositionHeadroom();
+}
+
+void UBreakerGritComponent::HandleInterpositionEquipmentChanged()
+{
+    // Inventory broadcasts need not rebuild stats. A changed gear base, however,
+    // is an explicit external write even when it coincides with our last value.
+    if (bOwnsInterpositionHeadroom && InterpositionEquipment.IsValid()
+        && !FMath::IsNearlyEqual(InterpositionGearBase, InterpositionEquipment->GetStats().BaseShieldFromGear))
+    {
+        InterpositionUnboostedMax = FMath::Max(InterpositionEquipment->GetStats().BaseShieldFromGear,
+            bIsTank && Attributes ? Attributes->GetMaxHealth() * 0.25f : 0.0f);
+        bOwnsInterpositionHeadroom = false;
+    }
+    RefreshInterpositionHeadroom();
+}
+
+void UBreakerGritComponent::RefreshInterpositionHeadroom()
+{
+    AActor* Owner = GetOwner();
+    UBreakerCombatComponent* Combat = ResolveCombat();
+    ABreakerDeployable* MatchingAnchor = nullptr;
+    if (Owner && Owner->HasAuthority() && Attributes && bIsTank && bInterposition
+        && Combat && !Combat->IsDead() && !Owner->IsActorBeingDestroyed())
+    {
+        for (const TWeakObjectPtr<ABreakerDeployable>& Weak : ABreakerDeployable::GetLiveDeployables())
+        {
+            ABreakerDeployable* Anchor = Weak.Get();
+            if (!Anchor || Anchor->IsActorBeingDestroyed() || Anchor->GetDeployableType() != EBreakerDeployableType::AnchorPoint
+                || Anchor->GetOwningCharacter() != Owner || Anchor->GetRemainingLifetime() <= 0.0f) continue;
+            const FVector Offset = Owner->GetActorLocation() - Anchor->GetActorLocation();
+            if (Offset.SizeSquared() <= FMath::Square(InterpositionRadiusCm)
+                && FVector::DotProduct(Offset, Anchor->GetActorForwardVector()) < 0.0f)
+            {
+                MatchingAnchor = Anchor;
+                break;
+            }
+        }
+    }
+    if (!MatchingAnchor)
+    {
+        ReleaseInterpositionHeadroom();
+        return;
+    }
+    if (InterpositionAnchor.Get() != MatchingAnchor)
+    {
+        if (InterpositionAnchor.IsValid())
+            InterpositionAnchor->OnDestroyed.RemoveDynamic(this, &UBreakerGritComponent::HandleInterpositionAnchorDestroyed);
+        InterpositionAnchor = MatchingAnchor;
+        MatchingAnchor->OnDestroyed.AddUniqueDynamic(this, &UBreakerGritComponent::HandleInterpositionAnchorDestroyed);
+    }
+    const float CurrentMax = Attributes->GetMaxShield();
+    if (!bOwnsInterpositionHeadroom || !FMath::IsNearlyEqual(CurrentMax, InterpositionLastWrittenMax))
+        InterpositionUnboostedMax = CurrentMax;
+    InterpositionGearBase = InterpositionEquipment.IsValid() ? InterpositionEquipment->GetStats().BaseShieldFromGear : 0.0f;
+    InterpositionUnboostedMax = FMath::Max3(InterpositionUnboostedMax, InterpositionGearBase, Attributes->GetMaxHealth() * 0.25f);
+    InterpositionLastWrittenMax = InterpositionUnboostedMax + Attributes->GetMaxHealth() * FMath::Max(0.0f, InterpositionHeadroomHealthFraction);
+    bOwnsInterpositionHeadroom = true;
+    Attributes->ApplyMaxShield(InterpositionLastWrittenMax);
+    if (Attributes->GetShield() > InterpositionLastWrittenMax)
+        Attributes->ApplyShield(InterpositionLastWrittenMax);
 }
 
 UBreakerCombatComponent* UBreakerGritComponent::ResolveCombat()
@@ -286,6 +396,7 @@ void UBreakerGritComponent::HandleProgressionChanged()
         bInterposition = Progression->HasNodeTag(BreakerNodeTags::Node_B_Interposition.GetTag());
         bConversion = Progression->HasNodeTag(BreakerNodeTags::Node_B_Conversion.GetTag());
     }
+    RefreshInterpositionHeadroom();
 }
 
 bool UBreakerGritComponent::IsActiveForOwner() const
@@ -583,6 +694,7 @@ void UBreakerGritComponent::AdvanceLoop(float DeltaTime)
 {
     AActor* Owner = GetOwner();
     if (!Owner || !Owner->HasAuthority() || !Attributes || DeltaTime <= 0.0f) return;
+    RefreshInterpositionHeadroom();
     if (!IsActiveForOwner())
     {
         PendingGrants = 0.0f;
@@ -680,20 +792,6 @@ void UBreakerGritComponent::AdvanceLoop(float DeltaTime)
         }
     }
 
-    // B8 Interposition's solo half: alone, the sharing field pays its owner —
-    // a shield trickle while standing inside it. Recorded substitution for the
-    // ally share (O2 PLACEHOLDER magnitude); the field is a radius, not the
-    // panel-backed wedge, until the panel owns real geometry.
-    if (bInterposition && bInCombat && AnchorDistance <= InterpositionRadiusCm)
-    {
-        const float MaxShield = Attributes->GetMaxShield();
-        if (MaxShield > 0.0f && ShieldAfterDecay < MaxShield)
-        {
-            const float Trickle = Attributes->GetMaxHealth() * InterpositionShieldFractionPerSecond * DeltaTime;
-            ShieldAfterDecay = FMath::Min(MaxShield, ShieldAfterDecay + Trickle);
-            Attributes->ApplyShield(ShieldAfterDecay);
-        }
-    }
     PreviousShield = ShieldAfterDecay;
 
     // L10 Reciprocity's payout: 20% of what broke, over 2s, AFTER the break.

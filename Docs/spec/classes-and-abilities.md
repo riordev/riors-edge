@@ -109,6 +109,12 @@ Wall uses 12.5% (O2 tuning). Small hits below the cap are unchanged. Active
 caps compose by minimum, including True damage and damage-over-time ticks.
 Vein removes the cap. Expiry, cancellation and death clear its protection.
 
+Interposition grants its solo owner shield capacity behind a live owned Anchor
+Point within 4 m. The starting headroom is 10% of maximum health (O2 tuning).
+Entering grants no shield. Leaving, losing the node, death or Anchor removal
+restores the underlying capacity and clamps excess shield; repeated entry
+does not accumulate capacity.
+
 ### The five loops
 
 | Class | Resource | Shape | Spends on |
