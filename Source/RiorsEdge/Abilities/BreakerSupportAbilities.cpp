@@ -541,6 +541,9 @@ void UBreakerAbility_Cadence::ActivateAbility(const FGameplayAbilitySpecHandle H
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return;
     }
+    ClearTempoTails();
+    bAfterimageAtCast = SupportHasNode(Character, FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage")));
+    Character->GetProgression()->OnProgressionChanged.AddUniqueDynamic(this, &ThisClass::HandleCadenceProgressionChanged);
     const int32 Rehearsal = SupportNodeRank(Character, TEXT("Support.Conductor.Rehearsal"));
     if (Rehearsal > 0 && bReappliedWhileLive)
         if (auto* Charge = Character->FindComponentByClass<UBreakerChargeComponent>())
@@ -585,19 +588,53 @@ void UBreakerAbility_Cadence::ActivateAbility(const FGameplayAbilitySpecHandle H
     BreakerSupportAbilityLocal::BreakerSupportCastFlash(Character, BreakerUI::Orange, 45.0f);
 }
 
-void UBreakerAbility_Cadence::RemoveRecipient(ABreakerCharacter* Recipient)
+void UBreakerAbility_Cadence::RemoveRecipient(ABreakerCharacter* Recipient, bool bNatural)
 {
     if (!Recipient) return;
     Recipients.Remove(Recipient);
     InsideRecipients.Remove(Recipient);
-    if (auto* Weapon = Recipient->GetWeapon()) Weapon->PopTempoBonus(TempoOwnerKey);
+    if (auto* Weapon = Recipient->GetWeapon())
+    {
+        if (bNatural) { TempoTailRecipients.Add(Recipient); Weapon->FinishWindowTempoBonus(TempoOwnerKey); }
+        else Weapon->PopTempoBonus(TempoOwnerKey);
+    }
     if (Recipient != GetBreakerCharacter()) Recipient->GetCombat()->OnDeath.RemoveDynamic(this, &ThisClass::HandleCadenceDeath);
     if (auto* State = Recipient->FindComponentByClass<UBreakerAbilityStateComponent>())
     {
         State->OnWindowEnded.RemoveDynamic(this, &ThisClass::HandleCadenceWindowEnded);
+        State->OnOwnedWindowEnded.RemoveDynamic(this, &ThisClass::HandleCadenceOwnedWindowEnded);
         State->CloseOwnedWindow(WindowKey(), TempoOwnerKey);
     }
     RefreshBuffUptime(Recipient);
+}
+
+void UBreakerAbility_Cadence::HandleCadenceProgressionChanged()
+{
+    if (!SupportHasNode(GetBreakerCharacter(), FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage"))))
+        bAfterimageAtCast = false;
+}
+
+void UBreakerAbility_Cadence::HandleCadenceOwnedWindowEnded(AActor* Holder, FName Key, FName OwnerKey, bool bNatural)
+{
+    auto* Recipient = Cast<ABreakerCharacter>(Holder);
+    if (!bCadenceActive || Key != WindowKey() || OwnerKey != TempoOwnerKey || !Recipients.Contains(Recipient)) return;
+    const auto* Source = GetBreakerCharacter();
+    RemoveRecipient(Recipient, bNatural && Source && !Source->IsActorBeingDestroyed() && !Source->GetCombat()->IsDead()
+        && Recipient && !Recipient->IsActorBeingDestroyed() && !Recipient->GetCombat()->IsDead());
+}
+
+void UBreakerAbility_Cadence::ClearTempoTails()
+{
+    const auto Previous = TempoTailRecipients;
+    TempoTailRecipients.Reset();
+    for (const auto& Weak : Previous) if (auto* Holder = Weak.Get()) Holder->GetWeapon()->PopTempoBonus(TempoOwnerKey);
+}
+
+void UBreakerAbility_Cadence::OnRemoveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)
+{
+    ClearTempoTails();
+    if (IsActive()) EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+    Super::OnRemoveAbility(ActorInfo, Spec);
 }
 
 void UBreakerAbility_Cadence::HandleCadenceWindowEnded(FName Key)
@@ -639,6 +676,9 @@ void UBreakerAbility_Cadence::RefreshAura()
             if (!Recipients.Contains(Recipient))
             {
                 Recipients.Add(Recipient);
+                TempoTailRecipients.Remove(Recipient);
+                Recipient->GetWeapon()->PushWindowTempoBonus(TempoOwnerKey, ReloadTempoMultiplier, SwapTempoMultiplier, Character, bAfterimageAtCast);
+                State->OnOwnedWindowEnded.AddUniqueDynamic(this, &ThisClass::HandleCadenceOwnedWindowEnded);
                 State->StartOwnedWindow(WindowKey(), TempoOwnerKey, AuraRemaining + (Recipient == Character ? SelfTailSeconds : 0));
                 State->OnWindowEnded.AddUniqueDynamic(this, &ThisClass::HandleCadenceWindowEnded);
                 Recipient->GetCombat()->OnDeath.AddUniqueDynamic(this, &ThisClass::HandleCadenceDeath);
@@ -670,9 +710,7 @@ void UBreakerAbility_Cadence::RefreshAura()
         const bool bDownbeat = SupportHasNode(Character, FGameplayTag::RequestGameplayTag(TEXT("Keystone.Support.Downbeat"), false))
             && SourceState && SourceState->IsWindowActive(ConduitWindowKey());
         const float BonusScale = bDownbeat ? 2.0f : 1.0f;
-        Recipient->GetWeapon()->PushTempoBonus(TempoOwnerKey,
-            1.0f + FMath::Max(0.0f, ReloadTempoMultiplier - 1.0f) * BonusScale,
-            1.0f + FMath::Max(0.0f, SwapTempoMultiplier - 1.0f) * BonusScale);
+        Recipient->GetWeapon()->UpdateWindowTempoBonus(TempoOwnerKey, BonusScale);
         RefreshBuffUptime(Recipient);
     }
     InsideRecipients = MoveTemp(Inside);
@@ -706,10 +744,13 @@ void UBreakerAbility_Cadence::EndAbility(const FGameplayAbilitySpecHandle Handle
 {
     if (bCadenceActive)
     {
+        const bool bNaturalCompletion = Recipients.IsEmpty() && !bWasCancelled;
         bCadenceActive = false;
+        if (!bNaturalCompletion) ClearTempoTails();
         bReappliedWhileLive = false;
         if (auto* Character = GetBreakerCharacter())
         {
+            Character->GetProgression()->OnProgressionChanged.RemoveDynamic(this, &ThisClass::HandleCadenceProgressionChanged);
             if (auto* Charge = Character->FindComponentByClass<UBreakerChargeComponent>()) Charge->SetMaintainedBuffActive(TempoOwnerKey, false);
             Character->GetCombat()->OnDeath.RemoveDynamic(this, &ThisClass::HandleCadenceDeath);
             if (auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>())

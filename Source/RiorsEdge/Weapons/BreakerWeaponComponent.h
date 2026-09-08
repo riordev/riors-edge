@@ -256,6 +256,9 @@ public:
     // axis wins; changing a buff never restarts a reload or swap already begun.
     void PushTempoBonus(FName Key, float ReloadMultiplier, float SwapMultiplier);
     void PopTempoBonus(FName Key);
+    void PushWindowTempoBonus(FName Key, float ReloadMultiplier, float SwapMultiplier, AActor* Source, bool bAllowTail);
+    void UpdateWindowTempoBonus(FName Key, float LiveBonusScale);
+    void FinishWindowTempoBonus(FName Key);
     UFUNCTION(BlueprintPure, Category="Weapon") float GetReloadSpeedMultiplier() const;
     UFUNCTION(BlueprintPure, Category="Weapon") float GetSwapSpeedMultiplier() const;
     // Authority trigger state, including automatic fire waiting through a reload.
@@ -666,6 +669,18 @@ private:
     bool bAmmunitionInitialized = false;
     TMap<FName, FVector2D> TempoBonuses;
     void RecalculateTempoBonuses();
+    void RefreshWindowTempoBonuses();
+    UFUNCTION() void InvalidateTempoWindows();
+    UFUNCTION() void HandleTempoSourceDestroyed(AActor* Source);
+    struct FTempoWindow
+    {
+        TWeakObjectPtr<AActor> Source;
+        float EndTime = -1;
+        float LiveBonusScale = 1;
+        bool bAfterimage = false;
+    };
+    TMap<FName, FTempoWindow> TempoWindows;
+    FTimerHandle TempoExpiryTimer;
     UPROPERTY(Replicated) float ReloadSpeedMultiplier = 1.0f;
     UPROPERTY(Replicated) float SwapSpeedMultiplier = 1.0f;
     float GetEffectiveBloomDegrees() const;

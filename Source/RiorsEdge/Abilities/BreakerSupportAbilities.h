@@ -117,6 +117,7 @@ public:
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
     virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
+    virtual void OnRemoveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec) override;
     static FName WindowKey();
 
     UFUNCTION() void HandleBatonOccupantEntered(AActor* Occupant);
@@ -135,10 +136,15 @@ public:
 private:
     void ShaveTick();
     void RefreshAura();
-    void RemoveRecipient(ABreakerCharacter* Recipient);
+    void RemoveRecipient(ABreakerCharacter* Recipient, bool bNatural = false);
+    void ClearTempoTails();
+    UFUNCTION() void HandleCadenceOwnedWindowEnded(AActor* Holder, FName Key, FName OwnerKey, bool bNatural);
+    UFUNCTION() void HandleCadenceProgressionChanged();
     UFUNCTION() void HandleCadenceWindowEnded(FName Key);
     UFUNCTION() void HandleCadenceDeath();
     FName TempoOwnerKey;
+    bool bAfterimageAtCast = false;
+    TSet<TWeakObjectPtr<ABreakerCharacter>> TempoTailRecipients;
     TSet<TWeakObjectPtr<ABreakerCharacter>> Recipients;
     TSet<TWeakObjectPtr<ABreakerCharacter>> InsideRecipients;
     double AuraEndTime = 0;

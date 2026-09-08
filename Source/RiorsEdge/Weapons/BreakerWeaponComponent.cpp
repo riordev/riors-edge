@@ -674,6 +674,7 @@ void UBreakerWeaponComponent::PushTempoBonus(FName Key, float ReloadMultiplier, 
     if (!GetOwner() || !GetOwner()->HasAuthority() || Key.IsNone()
         || !FMath::IsFinite(ReloadMultiplier) || !FMath::IsFinite(SwapMultiplier)
         || ReloadMultiplier <= 0.0f || SwapMultiplier <= 0.0f) return;
+    TempoWindows.Remove(Key);
     TempoBonuses.Add(Key, FVector2D(FMath::Max(1.0f, ReloadMultiplier), FMath::Max(1.0f, SwapMultiplier)));
     RecalculateTempoBonuses();
 }
@@ -681,20 +682,98 @@ void UBreakerWeaponComponent::PushTempoBonus(FName Key, float ReloadMultiplier, 
 void UBreakerWeaponComponent::PopTempoBonus(FName Key)
 {
     if (!GetOwner() || !GetOwner()->HasAuthority()) return;
-    if (TempoBonuses.Remove(Key) > 0) RecalculateTempoBonuses();
+    TempoWindows.Remove(Key);
+    if (TempoBonuses.Remove(Key) > 0) RefreshWindowTempoBonuses();
+}
+
+void UBreakerWeaponComponent::PushWindowTempoBonus(FName Key, float ReloadMultiplier, float SwapMultiplier, AActor* Source, bool bAllowTail)
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !GetWorld() || Key.IsNone() || !FMath::IsFinite(ReloadMultiplier)
+        || !FMath::IsFinite(SwapMultiplier) || ReloadMultiplier <= 0 || SwapMultiplier <= 0
+        || !IsValid(Source) || Source->IsActorBeingDestroyed() || Source->GetWorld() != GetWorld()) return;
+    PushTempoBonus(Key, ReloadMultiplier, SwapMultiplier);
+    if (!TempoBonuses.Contains(Key)) return;
+    auto* Progression = Source->FindComponentByClass<UBreakerProgressionComponent>();
+    FTempoWindow Window; Window.Source = Source;
+    Window.bAfterimage = bAllowTail && Progression && Progression->HasNodeTag(
+        FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage")));
+    TempoWindows.Add(Key, Window);
+    if (Progression) Progression->OnProgressionChanged.AddUniqueDynamic(this, &ThisClass::InvalidateTempoWindows);
+    if (auto* Combat = Source->FindComponentByClass<UBreakerCombatComponent>())
+        Combat->OnDeath.AddUniqueDynamic(this, &ThisClass::InvalidateTempoWindows);
+    if (auto* Combat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>())
+        Combat->OnDeath.AddUniqueDynamic(this, &ThisClass::InvalidateTempoWindows);
+    Source->OnDestroyed.AddUniqueDynamic(this, &ThisClass::HandleTempoSourceDestroyed);
+    RefreshWindowTempoBonuses();
+}
+
+void UBreakerWeaponComponent::UpdateWindowTempoBonus(FName Key, float LiveBonusScale)
+{
+    auto* Window = TempoWindows.Find(Key);
+    if (!Window || Window->EndTime >= 0 || !FMath::IsFinite(LiveBonusScale)) return;
+    Window->LiveBonusScale = FMath::Max(0.0f, LiveBonusScale);
+    RefreshWindowTempoBonuses();
+}
+
+void UBreakerWeaponComponent::FinishWindowTempoBonus(FName Key)
+{
+    auto* Window = TempoWindows.Find(Key);
+    if (!Window || !Window->bAfterimage) { PopTempoBonus(Key); return; }
+    if (Window->EndTime < 0) Window->EndTime = GetWorld()->GetTimeSeconds();
+    RefreshWindowTempoBonuses();
+}
+
+void UBreakerWeaponComponent::HandleTempoSourceDestroyed(AActor*) { InvalidateTempoWindows(); }
+void UBreakerWeaponComponent::InvalidateTempoWindows()
+{
+    for (auto& Entry : TempoWindows)
+    {
+        const auto* Source = Entry.Value.Source.Get();
+        const auto* Progression = Source ? Source->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+        if (!Progression || !Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage"))))
+            Entry.Value.bAfterimage = false;
+    }
+    RefreshWindowTempoBonuses();
+}
+
+void UBreakerWeaponComponent::RefreshWindowTempoBonuses()
+{
+    RecalculateTempoBonuses();
+    if (!GetWorld()) return;
+    GetWorld()->GetTimerManager().ClearTimer(TempoExpiryTimer);
+    float Next = TNumericLimits<float>::Max();
+    for (const auto& Entry : TempoWindows)
+        if (Entry.Value.EndTime >= 0) Next = FMath::Min(Next, Entry.Value.EndTime + FBreakerWindowLaneMath::TailSeconds);
+    if (Next < TNumericLimits<float>::Max())
+        GetWorld()->GetTimerManager().SetTimer(TempoExpiryTimer, this, &ThisClass::RefreshWindowTempoBonuses,
+            FMath::Max(.001f, Next - GetWorld()->GetTimeSeconds()), false);
 }
 
 void UBreakerWeaponComponent::RecalculateTempoBonuses()
 {
+    const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0;
+    const auto* OwnCombat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    for (auto It = TempoWindows.CreateIterator(); It; ++It)
+    {
+        const auto* Source = It.Value().Source.Get();
+        const auto* Combat = Source ? Source->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+        if (!Source || Source->IsActorBeingDestroyed() || (Combat && Combat->IsDead()) || (OwnCombat && OwnCombat->IsDead())
+            || FBreakerWindowLaneMath::Scale(Now, It.Value().EndTime, It.Value().bAfterimage) == 0)
+        { TempoBonuses.Remove(It.Key()); It.RemoveCurrent(); }
+    }
     ReloadSpeedMultiplier = 1.0f;
     SwapSpeedMultiplier = 1.0f;
     for (const auto& Entry : TempoBonuses)
     {
-        ReloadSpeedMultiplier = FMath::Max(ReloadSpeedMultiplier, static_cast<float>(Entry.Value.X));
-        SwapSpeedMultiplier = FMath::Max(SwapSpeedMultiplier, static_cast<float>(Entry.Value.Y));
+        const auto* Window = TempoWindows.Find(Entry.Key);
+        // Downbeat's live enhancement retains its current behavior. This
+        // slice tails only Cadence's base contribution, not that extra lane.
+        const float Scale = Window ? (Window->EndTime < 0 ? Window->LiveBonusScale
+            : FBreakerWindowLaneMath::Scale(Now, Window->EndTime, Window->bAfterimage)) : 1.0f;
+        ReloadSpeedMultiplier = FMath::Max(ReloadSpeedMultiplier, 1.0f + (static_cast<float>(Entry.Value.X) - 1.0f) * Scale);
+        SwapSpeedMultiplier = FMath::Max(SwapSpeedMultiplier, 1.0f + (static_cast<float>(Entry.Value.Y) - 1.0f) * Scale);
     }
 }
-
 float UBreakerWeaponComponent::GetDamageRampPerStack() const
 {
     const UBreakerEquipmentComponent* Equipment = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>() : nullptr;
@@ -3101,11 +3180,13 @@ float UBreakerWeaponComponent::GetEffectiveRangeMultiplier() const
 
 float UBreakerWeaponComponent::GetReloadSpeedMultiplier() const
 {
+    if (GetOwner() && GetOwner()->HasAuthority()) const_cast<UBreakerWeaponComponent*>(this)->RecalculateTempoBonuses();
     return FMath::Max(0.01f, ReloadSpeedMultiplier + BreakerCoreWeaponStats(GetOwner()).WeaponReloadSpeedMultiplier - 1.0f);
 }
 
 float UBreakerWeaponComponent::GetSwapSpeedMultiplier() const
 {
+    if (GetOwner() && GetOwner()->HasAuthority()) const_cast<UBreakerWeaponComponent*>(this)->RecalculateTempoBonuses();
     return FMath::Max(0.01f, SwapSpeedMultiplier + BreakerCoreWeaponStats(GetOwner()).WeaponSwapSpeedMultiplier - 1.0f);
 }
 

@@ -248,13 +248,17 @@ void UBreakerAbilityStateComponent::AdvanceTime(float DeltaSeconds)
     {
         Windows.Remove(Key);
     }
+    TArray<TPair<FName, FName>> ExpiredOwners;
     for (auto Group = OwnedWindows.CreateIterator(); Group; ++Group)
     {
         for (auto Owner = Group.Value().CreateIterator(); Owner; ++Owner)
-            if (Owner.Value() <= Clock) Owner.RemoveCurrent();
+            if (Owner.Value() <= Clock) { ExpiredOwners.Emplace(Group.Key(), Owner.Key()); Owner.RemoveCurrent(); }
         if (Group.Value().IsEmpty()) { Expired.AddUnique(Group.Key()); Group.RemoveCurrent(); }
     }
     RefreshAttunementWindowEnds();
+    for (const auto& Ended : ExpiredOwners)
+        if (GetOwnedWindowRemaining(Ended.Key, Ended.Value) <= 0)
+            OnOwnedWindowEnded.Broadcast(GetOwner(), Ended.Key, Ended.Value, true);
     for (const FName Key : Expired)
     {
         if (!IsWindowActive(Key))
@@ -290,6 +294,7 @@ void UBreakerAbilityStateComponent::CloseOwnedWindow(FName Key, FName OwnerKey)
     if (!Group || Group->Remove(OwnerKey) == 0) return;
     if (Group->IsEmpty()) OwnedWindows.Remove(Key);
     RefreshAttunementWindowEnds();
+    OnOwnedWindowEnded.Broadcast(GetOwner(), Key, OwnerKey, false);
     if (!IsWindowActive(Key)) OnWindowEnded.Broadcast(Key);
 }
 
@@ -325,7 +330,11 @@ void UBreakerAbilityStateComponent::ExtendWindow(FName Key, float ExtraSeconds)
 void UBreakerAbilityStateComponent::CloseWindow(FName Key)
 {
     const bool bRemoved = Windows.Remove(Key) > 0;
+    TArray<FName> RemovedOwners;
+    if (const auto* Group = OwnedWindows.Find(Key)) Group->GetKeys(RemovedOwners);
     const bool bOwnedRemoved = OwnedWindows.Remove(Key) > 0;
+    for (FName OwnerKey : RemovedOwners)
+        if (GetOwnedWindowRemaining(Key, OwnerKey) <= 0) OnOwnedWindowEnded.Broadcast(GetOwner(), Key, OwnerKey, false);
     RefreshAttunementWindowEnds();
     if (bRemoved || bOwnedRemoved)
     {

@@ -6,6 +6,7 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerWindowEnded, FName, WindowKey);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FBreakerMaintainedRecipientsChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FBreakerOwnedWindowEnded, AActor*, Holder, FName, WindowKey, FName, OwnerKey, bool, bNatural);
 struct FBreakerDamageRequest;
 
 // SI-9 (Ability-Implementation-Spec §2.5). Eleven abilities and a dozen tree
@@ -117,6 +118,7 @@ public:
     UFUNCTION(BlueprintCallable, Category="Abilities|State") void AdvanceTime(float DeltaSeconds);
 
     UPROPERTY(BlueprintAssignable, Category="Abilities|State") FBreakerWindowEnded OnWindowEnded;
+    FBreakerOwnedWindowEnded OnOwnedWindowEnded;
 
     // Class-Kits S2/F9 use 1.0s; 3.0s is this component's default gap, quoted
     // from the task brief rather than from a design doc. O2 PLACEHOLDER.
