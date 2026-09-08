@@ -6,6 +6,7 @@ pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
 ## Cycle — New Core wheel primitives
+- [x] Source census parser accepts literal descriptions and dereferenced description identifiers without changing node/tier/rank/cost captures. The omitted node was Caster.Multispell.Sequence: source291→292, native292, ID differences0. Exact regex checked independently in PowerShell against source/native IDs and escaped-literal/dynamic fixtures. Python execution and STATE regeneration remain quarantined; no claim of a Python runtime check. Editor build and full suite audit791/788/3 pins/0 unexpected pass.
 - [x] Splinter selects a later-target weapon More in the shared three slots. One trigger retains its first enemy across pellets, pierce, chain, forks and sibling rocket impacts; emitted source pools survive respec. Native paid weapon delivery and competing gear sources pass; autonomous rocket geometry remains separate.
 - [x] Reaction Chain pays one nearest enemy within5m half the funded primary payout, with original source attribution and no new buildup/proc chain. Callback reentry and invalid recipient checks pass.
 - [x] Provoke flat damage and Answering Fire proximity income retain half lane contributions for Afterimage; natural expiry, absence, respec/rebuy and actual death cleanup pass. Cadence Break's acquired stacks retain their measured half tail. Remaining Gunsmith/Support windows are pending.

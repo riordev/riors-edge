@@ -120,7 +120,7 @@ TYPES = "Progression/BreakerProgressionTypes.h"
 
 MAKENODE = re.compile(
     r'MakeNode\(\s*TEXT\("([^"]+)"\)\s*,\s*TEXT\("[^"]*"\)\s*,\s*'
-    r'TEXT\("(?:[^"\\]|\\.)*"\)\s*,\s*[^,]+,\s*[^,]+,\s*'
+    r'(?:TEXT\("(?:[^"\\]|\\.)*"\)|\*[A-Za-z_]\w*)\s*,\s*[^,]+,\s*[^,]+,\s*'
     r'(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)',
     re.S,
 )
