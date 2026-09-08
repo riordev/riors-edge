@@ -52,6 +52,14 @@ UBreakerAbility_Closequarter::UBreakerAbility_Closequarter()
     SetAssetTags(Tags);
 }
 
+float UBreakerAbility_Closequarter::GetAuthoredResourceCost() const
+{
+    const auto* Character = GetBreakerCharacter();
+    const auto* Progression = Character ? Character->GetProgression() : nullptr;
+    return Progression && Progression->HasNodeTag(BreakerNodeTags::Node_SB_NoDistance.GetTag())
+        ? FMath::Max(0.0f, NoDistanceManaCost) : Super::GetAuthoredResourceCost();
+}
+
 FVector UBreakerAbility_Closequarter::ArrivalPoint(const FVector& CasterLocation, const FVector& TargetLocation, float StandoffCm)
 {
     FVector Approach = TargetLocation - CasterLocation;

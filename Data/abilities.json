@@ -129,6 +129,7 @@
 			"windowDuration": 0,
 			"numbers":
 			{
+				"NoDistanceManaCost": 50,
 				"MaximumRangeCm": 1200,
 				"StandoffCm": 200,
 				"RefundHealthFraction": 0.4,

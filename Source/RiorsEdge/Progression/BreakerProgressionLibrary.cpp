@@ -2372,6 +2372,12 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterSpellbladeTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Edge.GetTag());
     Tree->Nodes.Add(Node);
 
+    Node = MakeNode(TEXT("Caster.Spellblade.NoDistance"), TEXT("No Distance"),
+        TEXT("Closequarter refunds Mana on arrival at any target health. Its base Mana cost rises to 50."),
+        EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Caster.Spellblade.MomentumTransfer"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_NoDistance.GetTag());
+    Tree->Nodes.Add(Node);
     // The branch keystone, and THE FIRST TAG RIDER IN THE CONTENT.
     //
     // This comment used to say there was "no way to key an effect to 'this hit

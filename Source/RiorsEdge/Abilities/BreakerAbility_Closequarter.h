@@ -40,6 +40,7 @@ class RIORSEDGE_API UBreakerAbility_Closequarter : public UBreakerCasterAbility
 
 public:
     UBreakerAbility_Closequarter();
+    virtual float GetAuthoredResourceCost() const override;
 
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
@@ -82,6 +83,9 @@ public:
     // mirror of UBreakerAbility_Cleave::AnimationLockFor's combined flag.
     UFUNCTION(BlueprintPure, Category="Closequarter")
     static float EffectiveRangeCm(bool bEdgeworkDuringUnmake, float AuthoredRangeCm, float UnrestrictedRangeCm);
+
+    // O2 PLACEHOLDER: No Distance's authored price before ordinary modifiers.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Closequarter", meta=(ClampMin="0")) float NoDistanceManaCost = 50.0f;
 
     // Class-Kits §2.2 C2: 12 m reach, arriving 2 m short.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Closequarter", meta=(ClampMin="0")) float MaximumRangeCm = 1200.0f;

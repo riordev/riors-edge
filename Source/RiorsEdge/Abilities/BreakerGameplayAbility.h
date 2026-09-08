@@ -56,6 +56,7 @@ public:
     // answer to "what does this cost right now".
     UFUNCTION(BlueprintPure, Category="Abilities") float GetResourceCost() const;
     virtual float GetUnmodifiedResourceCost() const;
+    virtual float GetAuthoredResourceCost() const;
     float GetLastPaidResourceCost() const { return LastPaidResourceCost; }
     virtual bool CommitAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, FGameplayTagContainer* OptionalRelevantTags = nullptr) override;
     virtual void CommitExecute(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) override;

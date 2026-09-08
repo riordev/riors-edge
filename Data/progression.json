@@ -5358,6 +5358,26 @@
 					"requiredTreeInvestment": 4
 				},
 				{
+					"id": "Caster.Spellblade.NoDistance",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.Spellblade.NoDistance"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Caster.Spellblade.MomentumTransfer",
+							"rank": 1
+						}
+					],
+					"requiredTreeInvestment": 6
+				},
+				{
 					"id": "Caster.Spellblade.Edgework",
 					"tier": 4,
 					"ranks": 1,

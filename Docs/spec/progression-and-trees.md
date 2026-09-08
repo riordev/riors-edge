@@ -206,7 +206,7 @@ the first lane — the only way to build a two-notable splash with no keystone.
 
 Three doctrines per class, one committed to per character, changed only at the
 Forge. A doctrine is the subclass: committing grants a visible identity as well
-as mechanics. As shipped, a doctrine is **12 nodes** with tier gates at
+as mechanics. A doctrine offers **12 nodes** with tier gates at
 0 / 2 / 4 / 6 invested. The keystone is an ordinary tier-4 node: gated at 6
 invested, costing 2, with no cornerstone gate of its own.
 
@@ -216,10 +216,13 @@ budget is for, and it is why the keystone costs what every other pick costs: it
 competes with the tier-4 rewrites for the last of the four rather than sitting
 above them.
 
-**A doctrine's whole budget is eight points, and it arrives at once.** That is
-what makes the board a set of refusals rather than a ladder: eight against
-roughly twenty-six offered means most of a doctrine is declined, and the
-declining happens in one sitting rather than being spread across thirty levels.
+**A doctrine's budget is eight points, earned two at each of four campaign benchmarks.**
+Commitment selects the branch and pays nothing. Eight against roughly twenty-four
+offered leaves most of a doctrine declined.
+
+Spellblade's No Distance costs two points after six invested and Momentum Transfer.
+It raises Closequarter's authored cost to50 before ordinary cost modifiers and permits
+the existing arrival refund against any target health; it grants no damage More.
 
 **The old five-tier target shape is withdrawn rather than renumbered.** It
 argued three distinct build shapes from a thirty-point class budget — one branch

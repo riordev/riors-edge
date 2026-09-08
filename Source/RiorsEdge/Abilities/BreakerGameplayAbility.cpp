@@ -99,10 +99,15 @@ bool UBreakerGameplayAbility::CheckCooldown(const FGameplayAbilitySpecHandle Han
     return (GetAbilityDefinition() && Character && Character->GetAbilities()->IsConductionActive())
         || Super::CheckCooldown(Handle, ActorInfo, OptionalRelevantTags);
 }
-float UBreakerGameplayAbility::GetUnmodifiedResourceCost() const
+float UBreakerGameplayAbility::GetAuthoredResourceCost() const
 {
     const UBreakerAbilityDefinition* Definition = GetAbilityDefinition();
-    const float Authored = Definition ? Definition->ResourceCost : 0.0f;
+    return Definition ? Definition->ResourceCost : 0.0f;
+}
+
+float UBreakerGameplayAbility::GetUnmodifiedResourceCost() const
+{
+    const float Authored = GetAuthoredResourceCost();
     if (Authored <= 0.0f) return 0.0f;
     const UBreakerAttributeSet* Attributes = GetBreakerAttributes();
     const float Multiplier = Attributes ? Attributes->GetResourceCostMultiplier() : 1.0f;
