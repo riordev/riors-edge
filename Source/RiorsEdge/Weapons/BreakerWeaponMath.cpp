@@ -161,12 +161,11 @@ int32 FBreakerWeaponMath::ReserveCapRounds(int32 StartingReserve, float CapMulti
     return FMath::CeilToInt(FMath::Max(0, StartingReserve) * Multiplier);
 }
 
-bool FBreakerWeaponMath::SpreadReadsStationary(bool bEmplacementOwned, float AnchorDistanceCm, float AnchorNearRadiusCm)
+bool FBreakerWeaponMath::SpreadReadsStationary(bool bEmplacementOwned, float AnchorDistanceCm, float AnchorNearRadiusCm, bool bBehindPanel)
 {
-    // B7: owned, and physically at the anchor by the Grit layer's own radius.
-    // No anchor standing reads as an infinite distance, which fails here
-    // honestly rather than needing a separate "none" case.
-    return bEmplacementOwned && AnchorNearRadiusCm > 0.0f && AnchorDistanceCm <= AnchorNearRadiusCm;
+    return bEmplacementOwned && bBehindPanel && FMath::IsFinite(AnchorDistanceCm)
+        && FMath::IsFinite(AnchorNearRadiusCm) && AnchorDistanceCm >= 0.0f
+        && AnchorNearRadiusCm > 0.0f && AnchorDistanceCm <= AnchorNearRadiusCm;
 }
 
 int32 FBreakerWeaponMath::ClampMagazineCapacityDelta(int32 EffectiveSizeWithoutEntry, int32 DeltaRounds)

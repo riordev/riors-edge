@@ -209,13 +209,10 @@ public:
     /**
      * Emplacement (Class-Kits-Tank, Bastion B7, weapon half): "behind your
      * own Anchor Point your spread reads as stationary." True when the node
-     * is owned and the owner stands within the anchor-proximity radius the
-     * Grit layer already measures (B2/B4/B8's own geometry, one definition of
-     * "at your anchor" for the whole class). The weapon zeroes its speed
-     * fraction — movement spread reads exactly as standing still — and
-     * touches nothing else about the cone.
+     * is owned and the owner stands behind a live owned panel within the
+     * existing proximity radius. Only movement spread reads as stationary.
      */
-    static bool SpreadReadsStationary(bool bEmplacementOwned, float AnchorDistanceCm, float AnchorNearRadiusCm);
+    static bool SpreadReadsStationary(bool bEmplacementOwned, float AnchorDistanceCm, float AnchorNearRadiusCm, bool bBehindPanel);
 
     /**
      * Capacity-delta clamp for PushMagazineCapacityOverride's shrink form

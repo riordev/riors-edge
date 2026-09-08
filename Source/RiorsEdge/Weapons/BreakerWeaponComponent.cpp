@@ -1,4 +1,5 @@
 #include "Weapons/BreakerWeaponComponent.h"
+#include "Combat/BreakerDeployable.h"
 #include "Characters/BreakerCharacter.h"
 
 #include "Abilities/BreakerAbilityDefinition.h"
@@ -919,14 +920,22 @@ const FBreakerNodeStats* UBreakerWeaponComponent::GetOwnerNodeStats() const
 
 bool UBreakerWeaponComponent::IsSpreadReadingStationary() const
 {
-    // B7 Emplacement's weapon half. The tag read is first so every non-Tank
-    // build pays no component lookup beyond it; the geometry is the Grit
-    // layer's own anchor-near radius, one definition of "at your anchor" for
-    // B2/B4/B7/B8 alike.
     if (!OwnerHasNodeTag(BreakerBastionEmplacementTag())) return false;
-    const UBreakerGritComponent* Grit = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerGritComponent>() : nullptr;
-    if (!Grit) return false;
-    return FBreakerWeaponMath::SpreadReadsStationary(true, Grit->GetOwnAnchorDistanceCm(), Grit->AnchorNearRadiusCm);
+    const AActor* Owner = GetOwner();
+    const UBreakerGritComponent* Grit = Owner ? Owner->FindComponentByClass<UBreakerGritComponent>() : nullptr;
+    if (!Grit || !Grit->IsActiveForOwner() || Owner->IsActorBeingDestroyed()) return false;
+    // Match Interposition's actual rear half-space, retaining Emplacement's
+    // existing 3 m radius. Footing/Held Ground keep their radial rules.
+    for (const TWeakObjectPtr<ABreakerDeployable>& Weak : ABreakerDeployable::GetLiveDeployables())
+    {
+        const ABreakerDeployable* Anchor = Weak.Get();
+        if (!Anchor || Anchor->IsActorBeingDestroyed() || Anchor->GetOwningCharacter() != Owner
+            || Anchor->GetDeployableType() != EBreakerDeployableType::AnchorPoint || Anchor->GetRemainingLifetime() <= 0.0f) continue;
+        const FVector Offset = Owner->GetActorLocation() - Anchor->GetActorLocation();
+        const bool bBehind = FVector::DotProduct(Offset, Anchor->GetActorForwardVector()) < -KINDA_SMALL_NUMBER;
+        if (FBreakerWeaponMath::SpreadReadsStationary(true, Offset.Size(), Grit->AnchorNearRadiusCm, bBehind)) return true;
+    }
+    return false;
 }
 
 bool UBreakerWeaponComponent::IsOwnerAirborne() const

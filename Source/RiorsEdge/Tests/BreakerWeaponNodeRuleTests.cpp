@@ -209,11 +209,12 @@ bool FBreakerEmplacementStationarySpreadTest::RunTest(const FString& Parameters)
     using namespace BreakerWeaponNodeRuleTest;
 
     // The pure rule: node AND proximity, by the Grit layer's own radius.
-    TestFalse(TEXT("Unowned, no posture rewrite at any distance"), FBreakerWeaponMath::SpreadReadsStationary(false, 0.0f, 300.0f));
-    TestTrue(TEXT("Owned and at the anchor reads stationary"), FBreakerWeaponMath::SpreadReadsStationary(true, 200.0f, 300.0f));
-    TestTrue(TEXT("The radius edge is inclusive, matching the Grit rules"), FBreakerWeaponMath::SpreadReadsStationary(true, 300.0f, 300.0f));
-    TestFalse(TEXT("Beyond the radius the posture is honest"), FBreakerWeaponMath::SpreadReadsStationary(true, 400.0f, 300.0f));
-    TestFalse(TEXT("A zeroed radius grants nothing"), FBreakerWeaponMath::SpreadReadsStationary(true, 0.0f, 0.0f));
+    TestFalse(TEXT("Unowned, no posture rewrite at any distance"), FBreakerWeaponMath::SpreadReadsStationary(false, 0.0f, 300.0f, true));
+    TestTrue(TEXT("Owned and at the anchor reads stationary"), FBreakerWeaponMath::SpreadReadsStationary(true, 200.0f, 300.0f, true));
+    TestTrue(TEXT("The radius edge is inclusive, matching the Grit rules"), FBreakerWeaponMath::SpreadReadsStationary(true, 300.0f, 300.0f, true));
+    TestFalse(TEXT("Beyond the radius the posture is honest"), FBreakerWeaponMath::SpreadReadsStationary(true, 400.0f, 300.0f, true));
+    TestFalse(TEXT("Front and panel-plane positions retain movement spread"), FBreakerWeaponMath::SpreadReadsStationary(true, 200.0f, 300.0f, false));
+    TestFalse(TEXT("A zeroed radius grants nothing"), FBreakerWeaponMath::SpreadReadsStationary(true, 0.0f, 0.0f, true));
 
     // Bought for real, through Bastion's own gates.
     FBreakerWeaponNodeRig Rig = BreakerMakeWeaponNodeRig(EBreakerClassId::Tank, 30);
