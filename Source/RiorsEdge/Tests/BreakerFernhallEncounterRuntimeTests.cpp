@@ -19,6 +19,7 @@
 #include "Game/BreakerZoneBuilder.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/WorldSettings.h"
+#include "Interaction/BreakerFeedstockPickup.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Save/BreakerAccountSave.h"
@@ -187,7 +188,17 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
             TestTrue(TEXT("Entry elite completes the accepted elite objective"), Journal->HasFlag(TEXT("Quest.FirstContract.EliteDown")));
         }
         else
-            TestTrue(TEXT("A return visit supplies the existing feedstock objective"), Journal->HasFlag(TEXT("Quest.KessSalvage.FeedstockTaken")));
+        {
+            TestFalse(TEXT("Return kills alone do not collect feedstock"), Journal->HasFlag(TEXT("Quest.KessSalvage.FeedstockTaken")));
+            TArray<ABreakerFeedstockPickup*> Residue;
+            for (TActorIterator<ABreakerFeedstockPickup> It(World); It; ++It) Residue.Add(*It);
+            for (auto* Pickup : Residue)
+            {
+                Player->SetActorLocation(Pickup->GetActorLocation() + FVector(0,0,100));
+                Pickup->TryCollect(Player);
+            }
+            TestTrue(TEXT("A return visit supplies physically collected feedstock"), Journal->HasFlag(TEXT("Quest.KessSalvage.FeedstockTaken")));
+        }
         Mode->HandleStartingNewPlayer_Implementation(Controller);
         int32 AfterRepeat = 0;
         for (TActorIterator<ABreakerEnemy> It(World); It; ++It) ++AfterRepeat;

@@ -253,8 +253,11 @@ bool FBreakerQuestChainTest::RunTest(const FString& Parameters)
     Journal->SetFlag(Salvage.OfferedFlag);
     Journal->SetFlag(Salvage.AcceptedFlag);
     const int32 FeedstockRequired = Salvage.Objectives[0].RequiredCount;
-    for (int32 i = 0; i < FeedstockRequired - 1; ++i) UBreakerQuestLibrary::NotifyEnemyKilled(*Journal, false);
-    UBreakerQuestLibrary::NotifyEnemyKilled(*Journal, true); // the spill's own elite counts too
+    for (int32 i = 0; i < FeedstockRequired; ++i) UBreakerQuestLibrary::NotifyEnemyKilled(*Journal, true);
+    TestFalse(TEXT("Kills alone cannot collect physical feedstock"), Journal->HasFlag(KessSalvageFeedstock));
+    // Pure quest-layer progression; actual physical pickup is covered by FeedstockRuntime.
+    for (int32 i = 0; i < FeedstockRequired; ++i)
+        Journal->AddProgress(Salvage.Objectives[0].ProgressCounter, 1, FeedstockRequired, Salvage.Objectives[0].CompletionFlag);
     TestTrue(TEXT("The feedstock is taken"), Journal->HasFlag(KessSalvageFeedstock));
     TestEqual(TEXT("Q2 ready"), StateOf(Salvage), EBreakerQuestState::ReadyToTurnIn);
     TestEqual(TEXT("Kess opens on the salvage turn-in"), Kess->ResolveStartNodeId(Journal->GetState()), FName(TEXT("SalvageTurnIn")));

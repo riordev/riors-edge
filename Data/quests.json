@@ -94,7 +94,8 @@
 					"completionFlag": "Quest.KessSalvage.FeedstockTaken",
 					"progressCounter": "Quest.KessSalvage.Kills",
 					"requiredCount": 6,
-					"requiresEliteKill": false
+					"requiresEliteKill": false,
+					"progressSource": "FeedstockPickup"
 				}
 			],
 			"reward":

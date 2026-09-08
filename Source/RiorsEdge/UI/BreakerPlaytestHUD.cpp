@@ -1,4 +1,5 @@
 #include "UI/BreakerPlaytestHUD.h"
+#include "Interaction/BreakerFeedstockPickup.h"
 #include "Game/BreakerLocalMapComponent.h"
 #include "Combat/BreakerStatusCycleComponent.h"
 
@@ -219,12 +220,13 @@ namespace BreakerHUD
     static constexpr float InteractPlateNamePixels = 14.0f;
 
     // The one non-loot interactable the prompt plates this frame, in F's own
-    // precedence (loot > travel > talk): null when a pickup is nearer, or
+    // precedence (feedstock > loot > travel > talk): null when a pickup wins, or
     // when nothing is in reach. The over-actor labels skip this actor so the
     // plate and the label never print the same name at the same anchor.
     static const AActor* BreakerHUDPlatedInteractable(const ABreakerCharacter* Character)
     {
         if (!Character) return nullptr;
+        if (Character->FindNearbyFeedstock()) return nullptr;
 #if BREAKER_HAS_LOOT_PICKUP
         if (Character->FindNearbyPickup()) return nullptr;
 #endif
@@ -1438,12 +1440,27 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
 
 void ABreakerPlaytestHUD::DrawInteractPrompt(const ABreakerCharacter* Character, const FVector2D& Center)
 {
-    // ONE PROMPT, MIRRORING F'S OWN PRECEDENCE (loot beats travel beats
+    // ONE PROMPT, MIRRORING F'S OWN PRECEDENCE (feedstock beats loot beats travel beats
     // talk — InteractWithNearbyNPC's order, restated here so the prompt can
     // never advertise a verb the key would not perform). This used to be an
     // NPC-only prompt, which made "F TALK" the sole key-bearing affordance
     // in the game; travel and loot now speak too.
     if (!Character) return;
+    if (const auto* Feedstock = Character->FindNearbyFeedstock())
+    {
+        FString Label(TEXT("COLLECT FEEDSTOCK"));
+        for (const auto& Quest : UBreakerQuestLibrary::GetFallbackQuests())
+            if (Quest.QuestId == FName(TEXT("Quest.KessSalvage")))
+                for (const auto& Objective : Quest.Objectives)
+                    if (Objective.ObjectiveId == FName(TEXT("Feedstock")))
+                    {
+                        const int32 Count = Character->GetQuestJournal()->GetState().Counters.FindRef(Objective.ProgressCounter);
+                        Label += FString::Printf(TEXT("  %d/%d"), FMath::Clamp(Count, 0, Objective.RequiredCount), Objective.RequiredCount);
+                    }
+        const FVector Projected = Project(Feedstock->GetActorLocation() + FVector(0,0,40), false);
+        if (Projected.Z > 0) DrawInteractPlate(Projected.X, Projected.Y, BreakerUI::Gold, 1, Label, true);
+        return;
+    }
 #if BREAKER_HAS_LOOT_PICKUP
     if (Character->FindNearbyPickup())
     {
@@ -1652,6 +1669,18 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
 void ABreakerPlaytestHUD::DrawLootPickups(const ABreakerCharacter* Character)
 {
     if (!Character || !Canvas) return;
+    const ABreakerFeedstockPickup* NearestFeedstock = Character->FindNearbyFeedstock();
+    if (GetWorld() && PlayerOwner && PlayerOwner->PlayerCameraManager)
+    {
+        const FVector Eye = PlayerOwner->PlayerCameraManager->GetCameraLocation();
+        for (TActorIterator<ABreakerFeedstockPickup> It(GetWorld()); It; ++It)
+        {
+            if (!IsValid(*It) || It->IsActorBeingDestroyed() || It->GetOwner() != Character || *It == NearestFeedstock) continue;
+            if (FVector::Dist(Eye, It->GetActorLocation()) > BreakerHUD::PickupChipDistance) continue;
+            const FVector Projected = Project(It->GetActorLocation() + FVector(0,0,40), false);
+            if (Projected.Z > 0) DrawInteractPlate(Projected.X, Projected.Y, BreakerUI::Gold, 1, TEXT("FEEDSTOCK"), false);
+        }
+    }
 #if BREAKER_HAS_LOOT_PICKUP
     UWorld* World = GetWorld();
     if (World && PlayerOwner && PlayerOwner->PlayerCameraManager)
@@ -1659,7 +1688,7 @@ void ABreakerPlaytestHUD::DrawLootPickups(const ABreakerCharacter* Character)
         const FVector CameraLocation = PlayerOwner->PlayerCameraManager->GetCameraLocation();
         // F's own answer to "which one", so the tile can never sit on a drop
         // the key would not take.
-        const ABreakerLootPickup* Nearest = Character->FindNearbyPickup();
+        const ABreakerLootPickup* Nearest = Character->FindNearbyFeedstock() ? nullptr : Character->FindNearbyPickup();
         const UBreakerEquipmentComponent* Equipment = Character->GetEquipment();
         const bool bBackpackFull = Equipment
             && Equipment->GetBackpack().Num() >= UBreakerEquipmentComponent::BackpackCapacity;

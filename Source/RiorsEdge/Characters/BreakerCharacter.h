@@ -106,6 +106,7 @@ public:
     // F prefers a pickup over NPC dialogue when both are in range — picking
     // items up is by far the more frequent action.
     UFUNCTION(BlueprintPure, Category="Interaction") ABreakerLootPickup* FindNearbyPickup() const;
+    UFUNCTION(BlueprintPure, Category="Interaction") class ABreakerFeedstockPickup* FindNearbyFeedstock() const;
     // Bind earned rewards independently of save loading; repeated binding is inert.
     void BindQuestRewardEvents();
     UFUNCTION(BlueprintCallable, Category="Interaction") void AddQuestFlag(FName Flag);
@@ -396,6 +397,7 @@ private:
     void ToggleCharacterSheet();
     void InteractWithNearbyNPC();
     UFUNCTION(Server, Reliable) void ServerPickupLoot(ABreakerLootPickup* Pickup);
+    UFUNCTION(Server, Reliable) void ServerCollectFeedstock(ABreakerFeedstockPickup* Pickup);
     void StartWave();
     void ActivateAbilityOne();
     void ActivateAbilityTwo();

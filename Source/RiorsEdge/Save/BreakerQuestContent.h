@@ -112,6 +112,9 @@ enum class EBreakerQuestState : uint8
     Complete
 };
 
+UENUM(BlueprintType)
+enum class EBreakerQuestProgressSource : uint8 { Kill, FeedstockPickup };
+
 // One objective. Completion is a FLAG; the counter is how a "kill 8" objective
 // gets there. An objective with no counter is completed directly by whatever
 // sets its flag (a conversation, a zone entry, a pickup).
@@ -120,6 +123,7 @@ struct RIORSEDGE_API FBreakerQuestObjective
 {
     GENERATED_BODY()
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerQuestProgressSource ProgressSource = EBreakerQuestProgressSource::Kill;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FName ObjectiveId = NAME_None;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FString Text;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FName CompletionFlag = NAME_None;

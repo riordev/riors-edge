@@ -1,4 +1,5 @@
 #include "Characters/BreakerCharacter.h"
+#include "Interaction/BreakerFeedstockPickup.h"
 #include "Audio/BreakerFootstepComponent.h"
 #include "Game/BreakerLocalMapComponent.h"
 #include "Characters/BreakerFirstPersonArms.h"
@@ -2565,6 +2566,25 @@ ABreakerTravelPoint* ABreakerCharacter::FindNearbyTravelPoint() const
     return Nearest;
 }
 
+ABreakerFeedstockPickup* ABreakerCharacter::FindNearbyFeedstock() const
+{
+    if (!GetWorld()) return nullptr;
+    ABreakerFeedstockPickup* Nearest = nullptr;
+    float NearestDistanceSq = TNumericLimits<float>::Max();
+    for (TActorIterator<ABreakerFeedstockPickup> It(GetWorld()); It; ++It)
+    {
+        if (!IsValid(*It) || !It->CanCollect(this)) continue;
+        const float DistanceSq = FVector::DistSquared(GetActorLocation(), It->GetActorLocation());
+        if (DistanceSq < NearestDistanceSq) { Nearest = *It; NearestDistanceSq = DistanceSq; }
+    }
+    return Nearest;
+}
+
+void ABreakerCharacter::ServerCollectFeedstock_Implementation(ABreakerFeedstockPickup* Pickup)
+{
+    if (IsValid(Pickup)) Pickup->TryCollect(this);
+}
+
 ABreakerLootPickup* ABreakerCharacter::FindNearbyPickup() const
 {
     if (!GetWorld()) return nullptr;
@@ -2591,7 +2611,15 @@ void ABreakerCharacter::InteractWithNearbyNPC()
 {
     if (MenuWidget.IsValid()) return;
 
-    // Loot wins the F key when both are candidates.
+    // Quest residue wins over gear so a full backpack never blocks collection.
+    if (ABreakerFeedstockPickup* Feedstock = FindNearbyFeedstock())
+    {
+        if (HasAuthority()) Feedstock->TryCollect(this);
+        else ServerCollectFeedstock(Feedstock);
+        return;
+    }
+
+    // Gear wins over services when both are candidates.
     if (ABreakerLootPickup* Pickup = FindNearbyPickup())
     {
         if (HasAuthority()) Pickup->TryPickup(this);
@@ -2657,6 +2685,7 @@ void ABreakerCharacter::HandleQuestKill(const FBreakerHitContext& Hit)
     const ABreakerEnemy* Enemy = Cast<ABreakerEnemy>(Hit.Target);
     if (!Enemy) return;
     const bool bEliteOrAbove = Enemy->GetMonsterRank() != EBreakerMonsterRank::Trash;
+    ABreakerFeedstockPickup::SpawnForKill(this, Hit);
     UBreakerQuestLibrary::NotifyEnemyKilled(*Quests, bEliteOrAbove);
 }
 

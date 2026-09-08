@@ -248,6 +248,8 @@ namespace
             Writer.WriteValue(TEXT("progressCounter"), BreakerCensusNameOrEmpty(Objective.ProgressCounter));
             Writer.WriteValue(TEXT("requiredCount"), Objective.RequiredCount);
             Writer.WriteValue(TEXT("requiresEliteKill"), Objective.bRequiresEliteKill);
+            if (Objective.ProgressSource != EBreakerQuestProgressSource::Kill)
+                Writer.WriteValue(TEXT("progressSource"), BreakerCensusEnumName(Objective.ProgressSource));
             Writer.WriteObjectEnd();
         }
         Writer.WriteArrayEnd();

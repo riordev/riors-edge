@@ -129,6 +129,16 @@ namespace
             return false;
         }
         Out.ObjectiveId = FName(*Id);
+        if (Row.HasField(TEXT("progressSource")))
+        {
+            FString Source;
+            if (!Row.TryGetStringField(TEXT("progressSource"), Source)
+                || !BreakerDataFile::ParseEnum(Source, Out.ProgressSource))
+            {
+                Errors.Add(QuestId + TEXT(": invalid objective progressSource"));
+                return false;
+            }
+        }
         const FString Where = QuestId + TEXT(".") + Id;
 
         bool bOk = BreakerQuestReadString(Row, TEXT("text"), Where, Out.Text, Errors);
@@ -422,6 +432,7 @@ int32 UBreakerQuestLibrary::NotifyEnemyKilled(UBreakerQuestJournal& Journal, boo
         if (ComputeQuestState(Quest, Journal.GetState()) != EBreakerQuestState::Active) continue;
         for (const FBreakerQuestObjective& Objective : Quest.Objectives)
         {
+            if (Objective.ProgressSource != EBreakerQuestProgressSource::Kill) continue;
             if (Objective.RequiredCount <= 0 || Objective.ProgressCounter == NAME_None) continue;
             if (Objective.bRequiresEliteKill && !bEliteOrAbove) continue;
             if (Journal.HasFlag(Objective.CompletionFlag)) continue;

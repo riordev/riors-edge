@@ -31,6 +31,7 @@
 #include "Combat/BreakerWardenEnemy.h"
 #include "Interaction/BreakerNPC.h"
 #include "Playtest/BreakerKillTelemetryComponent.h"
+#include "Playtest/BreakerFeedstockCapture.h"
 #include "Playtest/BreakerPlaytestComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -741,6 +742,7 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
         }
         bPlaytestTargetsSpawned = true;
         BuildZoneCaptureTour(Markers);
+        BreakerScheduleFeedstockCapture(GetWorld());
         ScheduleScreenshots();
         UE_LOG(LogTemp, Log, TEXT("[BreakerMap] fernhall — %s."),
             bRiftInstance ? TEXT("RIFT INSTANCE, waves live") : TEXT("the yard, no gym field"));

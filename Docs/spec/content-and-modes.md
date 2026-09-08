@@ -186,6 +186,11 @@ dialogue node; every string has one home (O195).
 when its flag is set. Every gate is derived from beat order — the previous
 beat's completion — and is never authored on the beat.
 
+Feed the Forge requires collecting residue from six defeated Vestiges in
+Fernhall or its entry Rift. Kills leave owned physical pickups; collection
+advances the existing quest counter without occupying backpack space. Residue
+persists until collected, the objective completes, or the player leaves the map.
+
 **The beat vocabulary is closed.** Each kind names what it plays as and what
 it consumes:
 
