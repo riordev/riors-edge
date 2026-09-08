@@ -18,6 +18,8 @@ UBreakerStatusCycleComponent* UBreakerStatusCycleComponent::FindOrAdd(AActor* Ow
     if (UBreakerStatusCycleComponent* Existing = Owner->FindComponentByClass<UBreakerStatusCycleComponent>())
     {
         Existing->SeedDefaultCycle();
+        Existing->BindProgression();
+        Existing->SyncProgression();
         return Existing;
     }
     if (!Owner->HasAuthority()) return nullptr;
@@ -29,6 +31,8 @@ UBreakerStatusCycleComponent* UBreakerStatusCycleComponent::FindOrAdd(AActor* Ow
     // cycle rather than an ensure.
     if (Owner->GetWorld()) Created->RegisterComponent();
     Created->SeedDefaultCycle();
+    Created->BindProgression();
+    Created->SyncProgression();
     return Created;
 }
 
@@ -36,12 +40,28 @@ void UBreakerStatusCycleComponent::BeginPlay()
 {
     Super::BeginPlay();
     SeedDefaultCycle();
-    if (GetOwner() && GetOwner()->HasAuthority())
-    {
-        if (UBreakerProgressionComponent* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>())
-            Progression->OnProgressionChanged.AddUniqueDynamic(this, &UBreakerStatusCycleComponent::SyncProgression);
-        SyncProgression();
-    }
+    BindProgression();
+    SyncProgression();
+}
+
+void UBreakerStatusCycleComponent::BindProgression()
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+    UBreakerProgressionComponent* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+    if (BoundProgression.Get() == Progression) return;
+    if (BoundProgression.IsValid())
+        BoundProgression->OnProgressionChanged.RemoveDynamic(this, &UBreakerStatusCycleComponent::SyncProgression);
+    BoundProgression = Progression;
+    if (Progression)
+        Progression->OnProgressionChanged.AddUniqueDynamic(this, &UBreakerStatusCycleComponent::SyncProgression);
+}
+
+void UBreakerStatusCycleComponent::EndPlay(const EEndPlayReason::Type Reason)
+{
+    if (BoundProgression.IsValid())
+        BoundProgression->OnProgressionChanged.RemoveDynamic(this, &UBreakerStatusCycleComponent::SyncProgression);
+    BoundProgression.Reset();
+    Super::EndPlay(Reason);
 }
 
 void UBreakerStatusCycleComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -59,8 +79,38 @@ void UBreakerStatusCycleComponent::SyncProgression()
 {
     if (!GetOwner() || !GetOwner()->HasAuthority()) return;
     const UBreakerProgressionComponent* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
-    bPreviewAhead = Progression && Progression->GetNodeRank(TEXT("Caster.Multispell.Cycle"), EBreakerPointCurrency::DoctrinePoints) >= 2;
-    OnRep_Cycle();
+    const bool bCaster = Progression && Progression->GetProgressionState().PermanentClass == EBreakerClassId::Caster;
+    const bool bNewPreview = bCaster && Progression->GetNodeRank(TEXT("Caster.Multispell.Cycle"), EBreakerPointCurrency::DoctrinePoints) >= 2;
+    bool bChanged = bPreviewAhead != bNewPreview;
+    bPreviewAhead = bNewPreview;
+    const FGameplayTag Erased = FGameplayTag::RequestGameplayTag(TEXT("Status.Erased"));
+    const bool bHasSiphon = bCaster && Progression->IsAbilityUnlocked(TEXT("Caster.Siphon"));
+    const int32 Existing = AvailableStatuses.IndexOfByPredicate([Erased](const FBreakerCycleEntry& Entry)
+        { return Entry.Spec.StatusTag == Erased; });
+    if (bHasSiphon && Existing == INDEX_NONE)
+    {
+        FBreakerCycleEntry Void;
+        Void.Element = EBreakerElement::Void;
+        Void.DamageFamily = EBreakerDamageFamily::Elemental;
+        Void.Spec.StatusTag = Erased;
+        Void.DisplayName = FText::FromString(BreakerStrings::Get(EBreakerStringKey::CycleVoid));
+        AvailableStatuses.Add(Void);
+        bOwnsSiphonEntry = true;
+        bChanged = true;
+    }
+    else if (!bHasSiphon && bOwnsSiphonEntry)
+    {
+        bOwnsSiphonEntry = false;
+        if (Existing != INDEX_NONE)
+        {
+            AvailableStatuses.RemoveAt(Existing);
+            // Preserve the next surviving position if authored entries follow Void.
+            if (Cursor > Existing) --Cursor;
+            Cursor = AvailableStatuses.IsEmpty() ? 0 : Cursor % AvailableStatuses.Num();
+            bChanged = true;
+        }
+    }
+    if (bChanged) OnRep_Cycle();
 }
 
 void UBreakerStatusCycleComponent::SeedDefaultCycle()
@@ -71,7 +121,8 @@ void UBreakerStatusCycleComponent::SeedDefaultCycle()
     if ((GetOwner() && !GetOwner()->HasAuthority()) || bSeeded || !AvailableStatuses.IsEmpty()) return;
     bSeeded = true;
 
-    // Cleave, Rot and Siphon provide the three real status families.
+    // The starter cycle retains its three authored positions. Siphon unlock
+    // appends the real Void delivery separately in SyncProgression.
     // Every magnitude below is O2 PLACEHOLDER.
     const TCHAR* SeedTags[] = { TEXT("Status.Bleed"), TEXT("Status.Poison") };
     const EBreakerStringKey Names[] = { EBreakerStringKey::CycleBleed, EBreakerStringKey::CyclePoison };
@@ -135,6 +186,9 @@ void UBreakerStatusCycleComponent::AddStatusType(const FBreakerCycleEntry& Entry
 {
     if (GetOwner() && !GetOwner()->HasAuthority()) return;
     if (!Entry.Spec.StatusTag.IsValid()) return;
+    // Explicit authoring takes ownership of this entry; progression must not
+    // later delete a custom payload when an unlock or class changes.
+    if (Entry.Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Erased"))) bOwnsSiphonEntry = false;
     // Idempotent by tag. A status added twice would come round twice as often,
     // which silently doubles its weight in a cycle the HUD claims is uniform.
     for (FBreakerCycleEntry& Existing : AvailableStatuses)
@@ -153,6 +207,7 @@ void UBreakerStatusCycleComponent::AddStatusType(const FBreakerCycleEntry& Entry
 void UBreakerStatusCycleComponent::RemoveStatusType(FGameplayTag StatusTag)
 {
     if (GetOwner() && !GetOwner()->HasAuthority()) return;
+    if (StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Erased"))) bOwnsSiphonEntry = false;
     const int32 Removed = AvailableStatuses.RemoveAll(
         [StatusTag](const FBreakerCycleEntry& Entry) { return Entry.Spec.StatusTag == StatusTag; });
     if (Removed <= 0) return;

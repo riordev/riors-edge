@@ -5,6 +5,8 @@
 #include "Combat/BreakerCombatTypes.h"
 #include "BreakerStatusCycleComponent.generated.h"
 
+class UBreakerProgressionComponent;
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerCycleChanged, FGameplayTag, NextStatusTag);
 
 // One authored entry in the cycle: a status this character can apply, and the
@@ -46,6 +48,7 @@ class RIORSEDGE_API UBreakerStatusCycleComponent : public UActorComponent
 public:
     UBreakerStatusCycleComponent();
     virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type Reason) override;
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
     bool CanPreviewAhead() const { return bPreviewAhead; }
 
@@ -82,13 +85,15 @@ public:
 
     UPROPERTY(BlueprintAssignable, Category="Combat|Cycle") FBreakerCycleChanged OnCycleChanged;
 
-    // The shipping cycle. Bleed and Poison are what a Caster can actually apply
-    // today (Cleave applies Bleed, Rot applies Poison); Void is added by Siphon
-    // when it is built into the kit. Every magnitude is O2 PLACEHOLDER.
+    // Starter Bleed/Poison/Entropy remains three positions. Unlocking Siphon
+    // appends Void once; its Erased tag is preview identity, never a free status.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, ReplicatedUsing=OnRep_Cycle, Category="Combat|Cycle") TArray<FBreakerCycleEntry> AvailableStatuses;
 
 private:
     void SeedDefaultCycle();
+    void BindProgression();
+    TWeakObjectPtr<UBreakerProgressionComponent> BoundProgression;
+    bool bOwnsSiphonEntry = false;
     UFUNCTION() void OnRep_Cycle();
     UFUNCTION() void SyncProgression();
 

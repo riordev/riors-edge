@@ -108,6 +108,8 @@ direct hit. Duplicate elements merge; physical carried statuses are unchanged.
 The first eligible reaction in selection order consumes an existing status
 and prevents all new buildup from that impact. A status earned by that impact
 cannot react with another of its selections. Sympathetic pays Entropy once.
+The starter cycle is Bleed, Poison, Entropy. Unlocking Siphon appends Void
+once, including an existing unlocked character whose cycle is created later.
 
 Hold caps each damage application after mitigation and before shield/health
 spending. Its editable starting cap is 25% of current maximum health; solo
