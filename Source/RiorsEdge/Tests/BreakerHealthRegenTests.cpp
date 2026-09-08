@@ -1,3 +1,7 @@
+#include "AbilitySystemComponent.h"
+#include "Progression/BreakerProgressionComponent.h"
+#include "Progression/BreakerProgressionLibrary.h"
+#include "Progression/BreakerExperience.h"
 #include "Misc/AutomationTest.h"
 #include "Combat/BreakerHealthRegenMath.h"
 #include "Combat/BreakerCombatComponent.h"
@@ -18,12 +22,13 @@ bool FBreakerHealthRegenRuleTest::RunTest(const FString& Parameters)
 {
     using namespace BreakerHealthRegen;
     const UBreakerCombatComponent* Defaults = GetDefault<UBreakerCombatComponent>();
-    TestEqual(TEXT("shipped recovery rate"), Defaults->BaseHealthRegenPerSecond, 2.0f);
+    TestEqual(TEXT("shipped recovery percent of physical maximum per second"), Defaults->BaseHealthRegenPercentPerSecond, 2.0f);
     TestEqual(TEXT("shipped recovery delay"), Defaults->BaseHealthRegenDelaySeconds, 4.0f);
     TestEqual(TEXT("no recovery before delay"), Step(50, 100, 3.99f, 1), 50.0f);
     TestEqual(TEXT("no elapsed recovery at boundary"), Step(50, 100, 4, 1), 50.0f);
     TestEqual(TEXT("crossing delay earns only elapsed recovery"), Step(50, 100, 4.25f, 1), 50.5f);
     TestEqual(TEXT("one quiet second pays two health"), Step(50, 100, 5, 1), 52.0f);
+    TestEqual(TEXT("larger health pool pays proportional recovery"), Step(50, 250, 5, 1), 55.0f);
     TestEqual(TEXT("recovery caps at maximum"), Step(99, 100, 10, 1), 100.0f);
     TestEqual(TEXT("a corpse stays dead"), Step(0, 100, 10, 1), 0.0f);
     TestEqual(TEXT("full health stays full"), Step(100, 100, 10, 1), 100.0f);
@@ -71,9 +76,18 @@ bool FBreakerPlayerRecoveryTickTest::RunTest(const FString& Parameters)
     UBreakerCombatComponent* Combat = Player->GetCombat();
     UBreakerAttributeSet* Attributes = Player->GetAttributes();
     Combat->BindAttributes(Attributes);
+    auto* ASC=Player->GetAbilitySystemComponent();ASC->InitAbilityActorInfo(Player,Player);ASC->AddAttributeSetSubobject(Attributes);
+    auto* Progression=Player->GetProgression();Progression->BindAttributes(Attributes);
+    if(!Progression->ChoosePermanentClassById(EBreakerClassId::Swift))return false;
+    Progression->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(2,Progression->ExperienceCurve));
+    const float BeforeMaximum=Attributes->GetMaxHealth();
+    FText Reason;
+    if(!TestTrue(TEXT("Earned native maximum health purchase"),Progression->PurchaseNode(UBreakerProgressionLibrary::GetCoreSliceTree(),TEXT("Core.Aegis.Footing"),Reason)))return false;
+    TestTrue(TEXT("Purchased health changes physical maximum"),Attributes->GetMaxHealth()>BeforeMaximum);
     Attributes->ApplyHealth(50.0f);
     Combat->TickComponent(1.0f, LEVELTICK_All, nullptr);
-    TestEqual(TEXT("A quiet player actually recovers health"), Attributes->GetHealth(), 52.0f);
+    const float ExpectedRecovered=50.0f+Attributes->GetMaxHealth()*.02f;
+    TestEqual(TEXT("Native recovery scales with purchased physical maximum"), Attributes->GetHealth(), ExpectedRecovered,.001f);
 
     FBreakerDamageRequest Hit;
     Hit.BaseDamage = 10.0f;
@@ -81,7 +95,7 @@ bool FBreakerPlayerRecoveryTickTest::RunTest(const FString& Parameters)
     Hit.bBypassShield = true;
     Combat->ReceiveDamage(Hit);
     const float AfterHit = Attributes->GetHealth();
-    TestTrue(TEXT("The player received the hit"), AfterHit < 52.0f);
+    TestTrue(TEXT("The player received the hit"), AfterHit < ExpectedRecovered);
     Combat->TickComponent(1.0f, LEVELTICK_All, nullptr);
     TestEqual(TEXT("The real incoming-hit clock stops recovery"), Attributes->GetHealth(), AfterHit);
     Attributes->ApplyHealth(0.0f);

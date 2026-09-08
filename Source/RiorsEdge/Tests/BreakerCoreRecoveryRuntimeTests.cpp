@@ -67,7 +67,7 @@ bool FBreakerCoreRecoveryRuntimeTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("Clock advance retains live player eligibility"),Player->IsPlayerControlled() && Player->GetController()==Controller && !Combat->IsDead())) return false;
     const float AtTick=Attr->GetHealth();
     Combat->TickComponent(1,LEVELTICK_All,nullptr);
-    TestEqual(TEXT("Existing passive payout includes max-health rate"),Attr->GetHealth()-AtTick,2+Attr->GetMaxHealth()*.012f,.001f);
+    TestEqual(TEXT("Existing passive payout includes max-health rate"),Attr->GetHealth()-AtTick,Attr->GetMaxHealth()*(.02f+.012f),.001f);
     TestTrue(TEXT("Passive recovery never reduces health"),Attr->GetHealth()>=Before);
     FBreakerDamageRequest Hit; Hit.BaseDamage=1; Hit.bCanBeAvoided=false; Hit.bCanCritical=false; Hit.bBypassShield=true;
     Combat->ReceiveDamage(Hit); const float CombatHealth=Attr->GetHealth();
@@ -75,7 +75,7 @@ bool FBreakerCoreRecoveryRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Ordinary regeneration stops in combat"),Attr->GetHealth(),CombatHealth);
     if (!TestTrue(TEXT("Second earned point purchases Second Life"),Progression->PurchaseNode(Tree,Rule->NodeId,Reason))) return false;
     const float SecondBefore=Attr->GetHealth(); Combat->TickComponent(1,LEVELTICK_All,nullptr);
-    TestEqual(TEXT("Second Life pays half the same composed regeneration"),Attr->GetHealth()-SecondBefore,(2+Attr->GetMaxHealth()*.012f)*.5f,.001f);
+    TestEqual(TEXT("Second Life pays half the same composed regeneration"),Attr->GetHealth()-SecondBefore,(Attr->GetMaxHealth()*(.02f+.012f))*.5f,.001f);
     Attr->ApplyMaxShield(100); Attr->ApplyShield(0); Advance(58);
     const float ShieldBefore=Attr->GetShield(); Combat->TickComponent(.1f,LEVELTICK_All,nullptr);
     TestTrue(TEXT("Purchased delay allows existing shield recharge before four seconds"),Attr->GetShield()>ShieldBefore);
@@ -86,7 +86,7 @@ bool FBreakerCoreRecoveryRuntimeTest::RunTest(const FString& Parameters)
     Advance(100);
     Attr->ApplyHealth(Attr->GetMaxHealth()*.25f);
     const float RespecBefore=Attr->GetHealth(); Combat->TickComponent(1,LEVELTICK_All,nullptr);
-    TestEqual(TEXT("Respec restores baseline two HP"),Attr->GetHealth()-RespecBefore,2.0f,.001f);
+    TestEqual(TEXT("Respec restores baseline two percent"),Attr->GetHealth()-RespecBefore,Attr->GetMaxHealth()*.02f,.001f);
     return true;
 }
 #endif

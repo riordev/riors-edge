@@ -101,7 +101,7 @@ public:
     UFUNCTION(BlueprintPure, Category="Combat") bool IsDead() const;
     UFUNCTION(BlueprintPure, Category="Combat") float GetSecondsSinceDamage() const;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Combat|Recovery", meta=(ClampMin="0"))
-    float BaseHealthRegenPerSecond = BreakerHealthRegen::RatePerSecond;
+    float BaseHealthRegenPercentPerSecond = BreakerHealthRegen::PercentMaxHealthPerSecond;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Combat|Recovery", meta=(ClampMin="0"))
     float BaseHealthRegenDelaySeconds = BreakerHealthRegen::DelaySeconds;
 

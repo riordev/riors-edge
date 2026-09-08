@@ -339,8 +339,8 @@ void UBreakerCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType
         if (Player && !IsDead())
         {
             const float Health = Attributes->GetHealth();
-            const float Rate = BaseHealthRegenPerSecond + Attributes->GetMaxHealth() *
-                (Progression ? FMath::Max(0.0f, Progression->GetNodeStats().HealthRegenPercentMaxHealth) * .01f : 0.0f);
+            const float Rate = Attributes->GetMaxHealth() * (FMath::Max(0.0f, BaseHealthRegenPercentPerSecond) * .01f +
+                (Progression ? FMath::Max(0.0f, Progression->GetNodeStats().HealthRegenPercentMaxHealth) * .01f : 0.0f));
             const float QuietSeconds = FMath::Min(FMath::Max(0.0f, DeltaTime), FMath::Max(0.0f, Player->GetSecondsSinceCombat() - BaseHealthRegenDelaySeconds));
             const bool bSecondLife = Progression && Progression->GetNodeStats().bHealthRegenInCombat;
             const float EffectiveSeconds = QuietSeconds + (bSecondLife ? .5f * (FMath::Max(0.0f, DeltaTime) - QuietSeconds) : 0.0f);

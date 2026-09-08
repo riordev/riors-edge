@@ -4,6 +4,8 @@
 
 Resolve weapon, ability, status, hazard and enemy damage through one ordered
 pipeline so every number follows an explicit rule.
+Base player recovery restores 2% of physical maximum health per second after four seconds without incoming or outgoing combat (O2 PLACEHOLDER rate). It adds to Core regeneration, never revives, and generates no healing procs; Second Life retains half the composed rate in combat.
+
 ## The rules
 
 **Every damage event resolves in exactly this order.** A system may not insert
@@ -254,6 +256,7 @@ target. Deployables receive real attacks; zone-health requires a health chassis.
 
 | Invariant | Test |
 |---|---|
+| Base recovery scales with purchased physical health and respects combat/death | `Combat.PlayerRecoveryTick` |
 | Effective armour never goes negative, at any combination of flat and bypass reduction | `Combat.Armor.Floor` |
 | The boss cap clamps total reduction, not mitigation | `Combat.Armor.BossCap` |
 | A dodge returns zero damage and raises no on-hit effect | `Combat.Defense.DodgeShortCircuits` |
