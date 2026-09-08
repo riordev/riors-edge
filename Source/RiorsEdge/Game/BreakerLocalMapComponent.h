@@ -10,6 +10,7 @@ struct FBreakerLocalMapMarker
     FText Detail;
     FVector Location = FVector::ZeroVector;
     bool bRift = false;
+    bool bObjective = false;
 };
 
 // Local geography is read from live services and authored floor meshes.
@@ -24,6 +25,8 @@ public:
     TArray<FBreakerLocalMapMarker> GetMarkers() const;
     TArray<FBox2D> GetGround() const;
     bool IsDiscovered(FName Id) const { return Discovered.Contains(Id); }
+    bool IsVisible(const FBreakerLocalMapMarker& Marker) const { return Marker.bObjective || IsDiscovered(Marker.Id); }
+    FText GetCampaignObjective() const;
     const TArray<FName>& GetDiscovered() const { return Discovered; }
     FName GetTracked() const { return Tracked; }
     void Restore(const TArray<FName>& Sites, FName Target) { Discovered = Sites; Tracked = Target; }

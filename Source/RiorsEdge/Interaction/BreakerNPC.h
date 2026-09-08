@@ -116,6 +116,8 @@ class RIORSEDGE_API ABreakerNPC : public AActor
 
 public:
     ABreakerNPC();
+    // Authored dialogue identity for campaign targeting, independent of display copy.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest") FName DialogueId;
     // Presentation only: paints the person palette onto the basic shapes.
     // Dynamic material instances need a live world, so this cannot happen in
     // the constructor (which also runs on the CDO).

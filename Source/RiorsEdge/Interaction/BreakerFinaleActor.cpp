@@ -41,6 +41,7 @@ void ABreakerFinaleActor::RefreshPresentation()
     const FString RowId = bDevice ? TEXT("FinaleDevice") : TEXT("FinaleFragment");
     if (const auto* Row = GetDialogueData().Npcs.FindByPredicate([&](const FBreakerDialogueRow& Entry) { return Entry.Id == RowId; }))
     {
+        DialogueId = Row->Id;
         DisplayName = FText::FromString(Row->DisplayName); StartNodeId = Row->StartNodeId;
         DialogueNodes = Row->Nodes; EntryOverrides = Row->Entries;
     }

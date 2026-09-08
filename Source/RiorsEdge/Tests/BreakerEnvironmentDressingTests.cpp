@@ -2,6 +2,8 @@
 #include "Misc/ScopeExit.h"
 #include "Game/BreakerEnvironmentDressing.h"
 #include "Engine/Engine.h"
+#include "EngineUtils.h"
+#include "Game/BreakerZoneBuilder.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerEnvironmentDressingTest,
@@ -37,6 +39,40 @@ bool FBreakerEnvironmentDressingTest::RunTest(const FString& Parameters)
             Actor->Destroy();
         }
     }
+    FBreakerZoneMarkers Markers;
+    if (!TestTrue(TEXT("Actual district assembles"), UBreakerZoneBuilder::BuildFernhallYard(World, Markers))) return false;
+    TArray<FBreakerZonePiece> Pieces;
+    if (!UBreakerZoneBuilder::CollectZonePieces(UBreakerZoneBuilder::FernhallMeshFolder(), Pieces)) return false;
+    TArray<FBox> YardBounds;
+    for (const auto& Piece : Pieces)
+        if (Piece.Name == TEXT("flr_yard") || Piece.Name == TEXT("flr_yard_sub"))
+            if (const auto* Mesh = Cast<UStaticMesh>(Piece.MeshPath.TryLoad())) YardBounds.Add(Mesh->GetBoundingBox());
+    if (!TestEqual(TEXT("Both authored yard floors exist"), YardBounds.Num(), 2)) return false;
+    int32 YardCounts[2] = {0,0};
+    for (TActorIterator<AStaticMeshActor> It(World); It; ++It)
+    {
+        if (!It->Tags.Contains(TEXT("FernhallSurfaceDetail"))) continue;
+        auto* Component = It->GetStaticMeshComponent();
+        TestFalse(TEXT("District overlays preserve combat collision"), It->GetActorEnableCollision());
+        TestEqual(TEXT("District overlays never answer traces"), Component->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+        TestFalse(TEXT("District overlays preserve navigation"), Component->CanEverAffectNavigation());
+        const FBox Box = Component->CalcBounds(Component->GetComponentTransform()).GetBox();
+        bool bContained = false;
+        for (int32 Yard = 0; Yard < YardBounds.Num(); ++Yard)
+        {
+            const FBox& Floor = YardBounds[Yard];
+            if (Box.Min.X >= Floor.Min.X && Box.Max.X <= Floor.Max.X
+                && Box.Min.Y >= Floor.Min.Y && Box.Max.Y <= Floor.Max.Y)
+            {
+                ++YardCounts[Yard]; bContained = true; break;
+            }
+        }
+        TestTrue(TEXT("Every overlay lies within its authored floor footprint"), bContained);
+        TestTrue(TEXT("Surface dressing stays a shallow overlay"), Box.GetSize().Z <= 2.1);
+        TestNotNull(TEXT("Surface dressing has an assigned material"), Component->GetMaterial(0));
+    }
+    TestTrue(TEXT("First authored yard has surface treatment"), YardCounts[0] > 0);
+    TestTrue(TEXT("Second authored yard has surface treatment"), YardCounts[1] > 0);
     return true;
 }
 #endif

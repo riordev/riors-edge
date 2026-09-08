@@ -31,6 +31,7 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Characters/BreakerCharacter.h"
+#include "Abilities/BreakerSupportAbilities.h"
 #include "Combat/BreakerBossEnemy.h"
 #include "Combat/BreakerAlteredEnemy.h"
 #include "Combat/BreakerHoldfastEnemy.h"
@@ -726,8 +727,10 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
 
         // Ordinary captions drop at the authored name distance. Boss identity
         // occupies the existing boss line, so there is no competing BOSS label.
-        const bool bShowName = !bBeyondDraw && (bBossRank || Distance <= BreakerEnemyBarMath::NameDropCm);
-        const FString Name = bShowName ? BreakerStrings::Get(BreakerEnemyBar::BreakerEnemyNameKey(*Enemy)) : FString();
+        const bool bTellWindup = UBreakerAbility_Mark::ShouldShowTell(Character, Enemy);
+        const bool bShowName = !bBeyondDraw && (bBossRank || bTellWindup || Distance <= BreakerEnemyBarMath::NameDropCm);
+        const FString Name = bShowName ? BreakerStrings::Get(BreakerEnemyBar::BreakerEnemyNameKey(*Enemy))
+            + (bTellWindup ? TEXT("  /  ATTACK INCOMING") : TEXT("")) : FString();
         const float NamePixels = bShowName ? (bBossRank ? BreakerEnemyBarMath::BossNameFor(Scale)
             : BreakerEnemyBar::NamePixels * Scale) : 0.0f;
         const float NameLinePad = BreakerEnemyBar::NameLinePixels - BreakerEnemyBar::NamePixels;
@@ -910,7 +913,7 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
                 const FVector2D NameSize = MeasureSpecText(Name, NamePixels, ESpecFontRole::Display);
                 ReservePlate(Projected.X - NameSize.X * .5f, NameY, NameSize.X, NameSize.Y);
                 DrawSpecTextCentered(Name, Projected.X, NameY,
-                    bBossRank ? BreakerUI::TealName : BreakerUI::TextSecondary, NamePixels, BarAlpha, ESpecFontRole::Display);
+                    bTellWindup ? BreakerUI::Gold : (bBossRank ? BreakerUI::TealName : BreakerUI::TextSecondary), NamePixels, BarAlpha, ESpecFontRole::Display);
             }
             if (Marks.Num() > 0)
             {

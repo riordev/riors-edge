@@ -196,6 +196,7 @@ public:
     UFUNCTION(BlueprintPure, Category="Enemy") float GetMonsterMaxHealth() const;
     UFUNCTION(BlueprintPure, Category="Enemy") float GetAttackDamage() const { return AttackDamage; }
     UFUNCTION(BlueprintPure, Category="Enemy") bool IsDeadEnemy() const { return bDead; }
+    bool IsLungeWindingUp() const { return bLungeWindingUp; }
     // Read-only views of the authored tuning. Public so tools, the playtest
     // report and the automation suite can assert against what an archetype
     // SHIPS with, without opening the tuning itself for writing.

@@ -32,6 +32,7 @@
 #include "Interaction/BreakerNPC.h"
 #include "Playtest/BreakerKillTelemetryComponent.h"
 #include "Playtest/BreakerFeedstockCapture.h"
+#include "Playtest/BreakerTellCapture.h"
 #include "Playtest/BreakerPlaytestComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -743,6 +744,7 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
         bPlaytestTargetsSpawned = true;
         BuildZoneCaptureTour(Markers);
         BreakerScheduleFeedstockCapture(GetWorld());
+        BreakerScheduleTellCapture(GetWorld());
         ScheduleScreenshots();
         UE_LOG(LogTemp, Log, TEXT("[BreakerMap] fernhall — %s."),
             bRiftInstance ? TEXT("RIFT INSTANCE, waves live") : TEXT("the yard, no gym field"));
@@ -3637,6 +3639,7 @@ ABreakerNPC* ABreakerGameMode::SpawnFinaleResident(FName RowId, const FVector& A
     ABreakerNPC* NPC = GetWorld()->SpawnActorDeferred<ABreakerNPC>(ABreakerNPC::StaticClass(), Transform,
         nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
     if (!NPC) return nullptr;
+    NPC->DialogueId = Row->Id;
     NPC->DisplayName = FText::FromString(Row->DisplayName);
     NPC->StartNodeId = Row->StartNodeId; NPC->DialogueNodes = Row->Nodes; NPC->EntryOverrides = Row->Entries;
     NPC->Tags.Add(RowId);

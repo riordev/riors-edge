@@ -285,6 +285,9 @@ at rank two (O2). Actual proc coefficient scales all yields; zero proc pays
 nothing. Blood Debt cashes out only on the caster's weapon hit. Overlapping
 Marks use the strongest vulnerability and Tell reduction without multiplying
 identical effects; ending one cast preserves the others.
+Tell shows an attack warning beside the marked target's health bar while its
+actual melee, Lattice or Warden attack is winding up. The marking caster must
+still own Tell; idle targets do not show a warning.
 
 ## Open
 

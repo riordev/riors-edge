@@ -191,12 +191,28 @@ namespace
                 }
                 Box(X, Side * 1570, 135, FVector(140,28,240), Timber, false, TEXT("Runtime_HubStreetDoor"));
                 // A pitched awning gives the pedestrian level its own silhouette.
-                const FLinearColor Cloth = (Bay % 2) ? HubPaletteRust : HubPaletteOffWhite;
+                const FLinearColor Cloth = Side > 0 ? HubPaletteOffWhite : HubPaletteRust;
                 auto* Awning = Box(X, Side * 1410, 280, FVector(740,380,18), Cloth, false, TEXT("Runtime_HubStreetAwning"));
                 if (Awning) Awning->SetActorRotation(FRotator(0,Yaw.Yaw,Side * 7.0f));
                 for (const float Post : {-340.0f, 340.0f})
                     Box(X+Post,Side*1240,130,FVector(16,16,260),Timber,true,TEXT("Runtime_HubAwningPost"));
                 Box(X+330,Side*1910,Height+120,FVector(90,100,210),HubPaletteStone,true,TEXT("Runtime_HubRoofChimney"));
+                // Residential side: shutters and planted doorsteps. Workshop
+                // side: vent banks and a broad lintel, not another window copy.
+                if (Side > 0)
+                {
+                    for (float Across : {-330.0f,0.0f,330.0f})
+                        for (float Shutter : {-1.0f,1.0f})
+                            Box(X+Across+Shutter*105,Side*1540,470,FVector(45,22,180),
+                                HubPaletteMoss*.8f,false,TEXT("Runtime_HubResidentialShutter"));
+                    BreakerPlaceEnvironmentDressing(World,TEXT("Bush_Common"),Frame.At(X+410,Side*1450,0),110,Yaw.Yaw+Bay*47);
+                }
+                else
+                {
+                    for (int32 Vent=0;Vent<5;++Vent)
+                        Box(X+280,Side*1538,430+Vent*25,FVector(210,30,10),Slate,false,TEXT("Runtime_HubWorkshopVent"));
+                    Box(X,Side*1535,285,FVector(260,45,30),HubPaletteRust,false,TEXT("Runtime_HubWorkshopLintel"));
+                }
             }
             // Shop rear wings frame existing NPCs, without moving their access.
             Box(2780,Side*970,440,FVector(900,1450,880),Plaster,true,TEXT("Runtime_HubServiceWing"));
@@ -230,7 +246,8 @@ namespace
                 BreakerPlaceEnvironmentDressing(World, TEXT("Fern_1"), Frame.At(X - 90, Side * 850, 75), 85, Yaw.Yaw + 70);
             }
             BreakerPlaceEnvironmentDressing(World, TEXT("CommonTree_1"), Frame.At(-1800, Side * 1190, 0), 700, Yaw.Yaw + Side * 20);
-            BreakerPlaceEnvironmentDressing(World, TEXT("Column_Pipes"), Frame.At(2260, Side * 1520, 0), 660, Yaw.Yaw);
+            if (Side < 0)
+                BreakerPlaceEnvironmentDressing(World, TEXT("Column_Pipes"), Frame.At(2260, Side * 1520, 0), 660, Yaw.Yaw);
             BreakerPlaceEnvironmentDressing(World, TEXT("Column_MetalSupport"), Frame.At(2250, Side * 400, 0), 560, Yaw.Yaw);
             BreakerPlaceEnvironmentDressing(World, TEXT("Door_Metal"), Frame.At(2300, Side * 970, 0), 330, Yaw.Yaw + 90);
         }

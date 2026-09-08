@@ -222,6 +222,8 @@ public:
     static FName IncomingModifierKey();
     // WA6 Tell's softening key, on the ENEMY's keyed outgoing-damage seam.
     static FName TellModifierKey();
+    // Owner-local Tell presentation, only during an actual marked attack windup.
+    static bool ShouldShowTell(const ABreakerCharacter* Viewer, const class ABreakerEnemy* Enemy);
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="0")) float TargetRangeCm = 3000.0f;   // O2 PLACEHOLDER (§U5 authors no range)
     // O2 PLACEHOLDER: "takes increased damage" with no magnitude authored.

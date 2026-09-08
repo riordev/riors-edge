@@ -9,6 +9,8 @@
 #include "Classes/BreakerChargeComponent.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerEnemy.h"
+#include "Combat/BreakerRangedEnemy.h"
+#include "Combat/BreakerWardenEnemy.h"
 #include "Combat/BreakerStatusComponent.h"
 #include "Combat/BreakerZoneActor.h"
 #include "Engine/World.h"
@@ -918,6 +920,19 @@ float UBreakerAbility_Mark::GetResourceCost() const
 
 FName UBreakerAbility_Mark::IncomingModifierKey() { return TEXT("Support.Mark"); }
 FName UBreakerAbility_Mark::TellModifierKey() { return TEXT("Support.Mark.Tell"); }
+
+bool UBreakerAbility_Mark::ShouldShowTell(const ABreakerCharacter* Viewer, const ABreakerEnemy* Enemy)
+{
+    if (!IsValid(Viewer) || !IsValid(Enemy) || Enemy->IsDeadEnemy() || Viewer->GetCombat()->IsDead()
+        || Viewer->GetProgression()->GetProgressionState().PermanentClass != EBreakerClassId::Support
+        || !SupportHasNode(Viewer, BreakerNodeTags::Node_WA_Tell.GetTag())) return false;
+    const auto* State = Viewer->FindComponentByClass<UBreakerAbilityStateComponent>();
+    if (!State || !State->IsMarked(Enemy)) return false;
+    const auto* Ranged = Cast<ABreakerRangedEnemy>(Enemy);
+    const auto* Warden = Cast<ABreakerWardenEnemy>(Enemy);
+    return Enemy->IsLungeWindingUp() || (Ranged && Ranged->IsWindingUp())
+        || (Warden && (Warden->IsSweeping() || Warden->IsSlamming()));
+}
 
 void UBreakerAbility_Mark::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {

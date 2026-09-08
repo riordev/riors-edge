@@ -47,14 +47,15 @@ public:
         int32 Index = 0;
         for (const auto& Marker : Markers)
         {
-            if (!Player->GetLocalMap()->IsDiscovered(Marker.Id)) continue;
+            if (!Player->GetLocalMap()->IsVisible(Marker)) continue;
             ++Index;
             const FVector2D P = Point(FVector2D(Marker.Location));
             const bool Tracked = Player->GetLocalMap()->GetTracked() == Marker.Id;
-            const auto Colour = Marker.bRift ? BreakerUI::TealName : BreakerUI::Gold;
+            const auto Colour = Marker.bObjective ? BreakerUI::Gold : Marker.bRift ? BreakerUI::TealName : BreakerUI::TextSecondary;
             if (Tracked) Line({Here, P}, Colour.CopyWithNewOpacity(.6f), 1);
             const double Radius = Tracked ? 10 : 7;
             Line({P + FVector2D(0,-Radius), P + FVector2D(Radius,0), P + FVector2D(0,Radius), P + FVector2D(-Radius,0), P + FVector2D(0,-Radius)}, Colour, Tracked ? 2 : 1);
+            if (Marker.bObjective) Line({P + FVector2D(-12,-12), P + FVector2D(12,-12), P + FVector2D(12,12), P + FVector2D(-12,12), P + FVector2D(-12,-12)}, Colour, 1);
             FSlateDrawElement::MakeText(Elements, Layer + 2, Geometry.ToPaintGeometry(FVector2D(30,20), FSlateLayoutTransform(P + FVector2D(12,-10))),
                 FString::FromInt(Index), BreakerBodyFont(12), ESlateDrawEffect::None, Colour);
         }
@@ -77,9 +78,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildLocalMapScreen()
     int32 Index = 0;
     for (const auto& Marker : Map->GetMarkers())
     {
-        if (!Map->IsDiscovered(Marker.Id)) continue;
+        if (!Map->IsVisible(Marker)) continue;
         const FString Detail = Marker.Detail.IsEmpty() ? TEXT("") : Marker.Detail.ToString() + TEXT("   ·   ");
-        const FString Caption = FString::Printf(TEXT("%d   %s\n%s%dm"), ++Index, *Marker.Label.ToString(), *Detail,
+        const FString Caption = FString::Printf(TEXT("%d   %s%s\n%s%dm"), ++Index, Marker.bObjective ? TEXT("OBJECTIVE · ") : TEXT(""), *Marker.Label.ToString(), *Detail,
             FMath::RoundToInt(FVector::Dist2D(Player->GetActorLocation(), Marker.Location) / 100));
         List->AddSlot().AutoHeight().Padding(0,0,0,8)
         [
@@ -93,13 +94,16 @@ TSharedRef<SWidget> SBreakerMenu::BuildLocalMapScreen()
     [MakeButton(FText::FromString(TEXT("CLEAR TRACKING")), FOnClicked::CreateLambda([this]()
         { if (Character.IsValid()) Character->GetLocalMap()->Track(NAME_None); Rebuild(EBreakerMenuScreen::LocalMap); return FReply::Handled(); }))];
     TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
+    if (!Map->GetCampaignObjective().IsEmpty())
+        Body->AddSlot().AutoHeight().Padding(0,0,0,12)
+        [SNew(STextBlock).Text(Map->GetCampaignObjective()).Font(BreakerBodyFont(14)).AutoWrapText(true).ColorAndOpacity(BreakerUI::Gold)];
     Body->AddSlot().AutoHeight()
     [SNew(SBox).HeightOverride(620)
         [SNew(SHorizontalBox)
             + SHorizontalBox::Slot().FillWidth(1).Padding(0,0,20,0)[SNew(SBreakerLocalMapCanvas).Player(Player)]
             + SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(260)[SNew(SScrollBox) + SScrollBox::Slot()[List]]]]];
     Body->AddSlot().AutoHeight().Padding(0,12)
-    [SNew(STextBlock).Text(FText::FromString(TEXT("NORTH ↑   ·   TRIANGLE: YOU   ·   SELECT A DISCOVERED SITE TO TRACK\nSites are discovered nearby. Survey lines show floor footprints; the tracking line shows direction, not a navigable path.")))
+    [SNew(STextBlock).Text(FText::FromString(TEXT("NORTH ↑   ·   TRIANGLE: YOU   ·   GOLD SQUARE: CAMPAIGN OBJECTIVE\nSelect an objective or discovered site to track. Survey lines show floor footprints; the tracking line shows direction.")))
         .Font(BreakerBodyFont(12)).AutoWrapText(true).ColorAndOpacity(BreakerUI::TextSecondary)];
     Body->AddSlot().AutoHeight()
     [MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateLambda([this]()

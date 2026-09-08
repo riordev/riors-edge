@@ -641,6 +641,7 @@ ABreakerNPC* ABreakerNPC::SpawnForgeKeeper(UWorld* World, const FVector& Locatio
     ABreakerNPC* NPC = SpawnNPC(World, Location, Rotation);
     if (!NPC) return nullptr;
     const FBreakerDialogueRow& Row = BreakerDialogueRowById(BreakerDialogueForgeKeeperId);
+    NPC->DialogueId = Row.Id;
     NPC->DisplayName = FText::FromString(Row.DisplayName);
     NPC->StartNodeId = Row.StartNodeId;
     NPC->DialogueNodes = Row.Nodes;
@@ -662,6 +663,7 @@ ABreakerNPC* ABreakerNPC::SpawnQuartermaster(UWorld* World, const FVector& Locat
     ABreakerNPC* NPC = SpawnNPC(World, Location, Rotation);
     if (!NPC) return nullptr;
     const FBreakerDialogueRow& Row = BreakerDialogueRowById(BreakerDialogueQuartermasterId);
+    NPC->DialogueId = Row.Id;
     NPC->DisplayName = FText::FromString(Row.DisplayName);
     NPC->StartNodeId = Row.StartNodeId;
     NPC->DialogueNodes = Row.Nodes;

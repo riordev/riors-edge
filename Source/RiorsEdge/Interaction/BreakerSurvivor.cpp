@@ -20,6 +20,7 @@ void ABreakerSurvivor::BeginPlay()
         [](const FBreakerDialogueRow& Entry) { return Entry.Id == TEXT("Survivor"); });
     if (Row)
     {
+        DialogueId = Row->Id;
         DisplayName = FText::FromString(Row->DisplayName);
         StartNodeId = Row->StartNodeId;
         DialogueNodes = Row->Nodes;

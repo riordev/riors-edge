@@ -61,7 +61,7 @@ namespace
             false));
         Table.Add(BreakerMakeRuleDefinition(EBreakerItemRule::Cadence,
             LOCTEXT("Rule_Cadence", "CADENCE"),
-            LOCTEXT("Rule_Cadence_Desc", "Fire Rate also grants Increased Damage at half its value. Cannot be worn with a Secondary."),
+            LOCTEXT("Rule_Cadence_Desc", "Half of gear Increased Fire Rate also grants Increased Weapon Damage. Cannot be worn with a Secondary."),
             false));
         Table.Add(BreakerMakeRuleDefinition(EBreakerItemRule::Overrun,
             LOCTEXT("Rule_Overrun", "OVERRUN"),

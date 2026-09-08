@@ -7,8 +7,28 @@
 #include "Interaction/BreakerNPC.h"
 #include "Interaction/BreakerRiftDoor.h"
 #include "Interaction/BreakerTravelPoint.h"
+#include "Save/BreakerMissionContent.h"
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
+
+namespace
+{
+    const FBreakerMissionBeat* BreakerMapCurrentBeat(const AActor* Owner)
+    {
+        const auto* Player = Cast<ABreakerCharacter>(Owner);
+        if (!Player || !Player->GetQuestJournal()) return nullptr;
+        for (const auto& Mission : UBreakerMissionLibrary::GetMissions())
+            if (const auto* Beat = UBreakerMissionLibrary::CurrentBeat(Mission, Player->GetQuestJournal()->GetState())) return Beat;
+        return nullptr;
+    }
+}
+
+FText UBreakerLocalMapComponent::GetCampaignObjective() const
+{
+    const auto* Player = Cast<ABreakerCharacter>(GetOwner());
+    const auto* Beat = BreakerMapCurrentBeat(GetOwner());
+    return Player && Beat ? FText::FromString(UBreakerMissionLibrary::TrackerLine(*Beat, Player->GetQuestJournal()->GetState())) : FText::GetEmpty();
+}
 
 UBreakerLocalMapComponent::UBreakerLocalMapComponent()
 {
@@ -31,6 +51,7 @@ TArray<FBreakerLocalMapMarker> UBreakerLocalMapComponent::GetMarkers() const
     TArray<FBreakerLocalMapMarker> Out;
     UWorld* World = GetWorld();
     if (!World) return Out;
+    const auto* Beat = BreakerMapCurrentBeat(GetOwner());
     const auto* Mode = Cast<ABreakerGameMode>(World->GetAuthGameMode());
     const FString Region = UGameplayStatics::GetCurrentLevelName(this, true) + (Mode && Mode->IsRiftInstance() ? TEXT(".instance") : TEXT(""));
     for (TActorIterator<ABreakerTravelPoint> It(World); It; ++It)
@@ -40,6 +61,14 @@ TArray<FBreakerLocalMapMarker> UBreakerLocalMapComponent::GetMarkers() const
         Marker.Location = It->GetActorLocation(); Marker.Label = It->GetDisplayName(); Marker.Detail = It->GetDisplayDetail();
         const auto* Door = Cast<ABreakerRiftDoor>(*It);
         Marker.bRift = Door != nullptr;
+        if (Beat)
+        {
+            if ((Beat->Kind == EBreakerMissionBeatKind::Encounter || Beat->Kind == EBreakerMissionBeatKind::Boss)
+                && Door && !Beat->Rift.IsNone()) Marker.bObjective = Door->Rift.EncounterId == Beat->Rift;
+            else if (Beat->Kind == EBreakerMissionBeatKind::Travel)
+                Marker.bObjective = It->GetAvailableDestinations().ContainsByPredicate([Beat](const auto& Destination)
+                    { return Destination.Id == Beat->Destination; });
+        }
         // Generic gates have no authored registry id. Their fixed site coordinates
         // distinguish separate gates without depending on transient actor names.
         const FVector Position = It->GetActorLocation();
@@ -59,6 +88,8 @@ TArray<FBreakerLocalMapMarker> UBreakerLocalMapComponent::GetMarkers() const
             FMath::RoundToInt(Position.X), FMath::RoundToInt(Position.Y), FMath::RoundToInt(Position.Z));
         Marker.Id = FName(*(Region + TEXT(".npc.") + Site));
         Marker.Detail = FText::FromString(TEXT("SERVICE / CONTACT"));
+        Marker.bObjective = Beat && (Beat->Kind == EBreakerMissionBeatKind::Dialogue || Beat->Kind == EBreakerMissionBeatKind::Return)
+            && !It->DialogueId.IsNone() && It->DialogueId == Beat->Npc;
     }
     Out.Sort([](const auto& A, const auto& B) { return A.Id.LexicalLess(B.Id); });
     return Out;
@@ -106,7 +137,7 @@ bool UBreakerLocalMapComponent::DiscoverNearby(FVector Location)
 
 bool UBreakerLocalMapComponent::Track(FName Id)
 {
-    if (!Id.IsNone() && (!IsDiscovered(Id) || !GetMarkers().ContainsByPredicate([Id](const auto& Marker) { return Marker.Id == Id; }))) return false;
+    if (!Id.IsNone() && !GetMarkers().ContainsByPredicate([this, Id](const auto& Marker) { return Marker.Id == Id && IsVisible(Marker); })) return false;
     Tracked = Id;
     if (auto* Player = Cast<ABreakerCharacter>(GetOwner())) Player->SaveGameState();
     return true;
@@ -115,6 +146,6 @@ bool UBreakerLocalMapComponent::Track(FName Id)
 bool UBreakerLocalMapComponent::GetTrackedMarker(FBreakerLocalMapMarker& Out) const
 {
     if (Tracked.IsNone()) return false;
-    for (const auto& Marker : GetMarkers()) if (Marker.Id == Tracked && IsDiscovered(Marker.Id)) { Out = Marker; return true; }
+    for (const auto& Marker : GetMarkers()) if (Marker.Id == Tracked && IsVisible(Marker)) { Out = Marker; return true; }
     return false;
 }

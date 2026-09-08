@@ -58,12 +58,62 @@ namespace
     // SOMEWHERE before the rift actor exists, dressing in moss.
     FLinearColor BreakerZoneColorFor(const FString& Name)
     {
-        if (Name == TEXT("flr_riftpad")) return BreakerZoneOffWhite;
+        if (Name.StartsWith(TEXT("flr_riftpad"))) return BreakerZoneOffWhite;
+        if (Name == TEXT("flr_yard")) return FLinearColor(.36f,.36f,.31f);
+        if (Name == TEXT("flr_yard_sub")) return FLinearColor(.17f,.20f,.19f);
+        if (Name.StartsWith(TEXT("flr_seam"))) return FLinearColor(.43f,.42f,.35f);
         if (BreakerZoneNameHasPrefix(Name, TEXT("wall_"))) return BreakerZoneConcrete;
         if (BreakerZoneNameHasPrefix(Name, TEXT("blk_full_"))) return BreakerZoneStone;
         if (BreakerZoneNameHasPrefix(Name, TEXT("blk_chest_"))) return BreakerZoneRust;
         if (BreakerZoneNameHasPrefix(Name, TEXT("flr_"))) return BreakerZoneEarth;
         return BreakerZoneMoss;
+    }
+
+    void BreakerZoneBuildSurfaceDetail(UWorld* World, const TArray<FBreakerZonePiece>& Pieces)
+    {
+        UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+        if (!Cube) return;
+        auto Strip = [&](FVector Position, FVector Size, FLinearColor Color)
+        {
+            auto* Actor = World->SpawnActor<AStaticMeshActor>(Position, FRotator::ZeroRotator);
+            if (!Actor) return;
+            auto* Mesh = Actor->GetStaticMeshComponent();
+            Mesh->SetMobility(EComponentMobility::Movable);
+            Mesh->SetStaticMesh(Cube); Mesh->SetWorldScale3D(Size / 100.0f);
+            Mesh->SetCollisionProfileName(TEXT("NoCollision"));
+            Mesh->SetCanEverAffectNavigation(false); Mesh->SetCastShadow(false);
+            BreakerZoneApplyColor(Mesh, Color);
+            Mesh->SetMobility(EComponentMobility::Static);
+            Actor->SetActorEnableCollision(false);
+            Actor->Tags.Add(TEXT("FernhallSurfaceDetail"));
+        };
+        for (const auto& Piece : Pieces)
+        {
+            const bool bEntry = Piece.Name == TEXT("flr_yard");
+            const bool bIndustrial = Piece.Name == TEXT("flr_yard_sub");
+            if (!bEntry && !bIndustrial) continue;
+            const auto* Floor = Cast<UStaticMesh>(Piece.MeshPath.TryLoad());
+            if (!Floor) continue;
+            const FBox Bounds = Floor->GetBoundingBox();
+            const FVector Centre = Bounds.GetCenter();
+            const float Z = Bounds.Max.Z + 1.5f;
+            // O2 surface treatment: broad service walk, recessed-looking joints,
+            // and paired drains. These are visual overlays, never new floor collision.
+            const float HalfLength = Bounds.GetExtent().X - 100;
+            if (HalfLength <= 0) continue;
+            for (float X = -HalfLength + 150; X < HalfLength; X += 300)
+                Strip(FVector(Centre.X+X,Centre.Y,Z), FVector(292,760,2),
+                    bIndustrial ? FLinearColor(.29f,.31f,.28f) : FLinearColor(.47f,.46f,.39f));
+            for (float Side : {-1.0f,1.0f})
+            {
+                Strip(FVector(Centre.X,Centre.Y+Side*420,Z), FVector(HalfLength*2,34,2), BreakerZoneStone*.55f);
+                for (float X = -HalfLength+100; X < HalfLength; X += 400)
+                    Strip(FVector(Centre.X+X,Centre.Y+Side*420,Z+1), FVector(9,34,2), BreakerZoneRust);
+                if (bIndustrial)
+                    for (float X = -HalfLength+250; X < HalfLength; X += 900)
+                        Strip(FVector(Centre.X+X,Centre.Y+Side*540,Z), FVector(220,24,2), BreakerZoneOffWhite);
+            }
+        }
     }
 
     void BreakerZoneBuildSkyline(UWorld* World, const TArray<FBreakerZonePiece>& Pieces)
@@ -643,6 +693,7 @@ bool UBreakerZoneBuilder::BuildFernhallYard(UWorld* World, FBreakerZoneMarkers& 
         ++Spawned;
     }
 
+    BreakerZoneBuildSurfaceDetail(World, Pieces);
     BreakerZoneBuildSkyline(World, Pieces);
 
     // The builder measures its own grammar at assembly so a playtest log shows
