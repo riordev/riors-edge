@@ -1,4 +1,5 @@
 #include "Combat/BreakerEntropy.h"
+#include "Classes/BreakerCasterStatusRules.h"
 #include "Combat/BreakerElementSourceMath.h"
 #include "Combat/BreakerStatusComponent.h"
 #include "Combat/BreakerCombatComponent.h"
@@ -128,14 +129,18 @@ void UBreakerStatusComponent::ApplyEntropyHit(const FBreakerDamageRequest& Reque
     FBreakerStatusApplicationSpec Spec;
     Spec.StatusTag = Rot;
     Spec.bLongDarkSnapshot = Request.ElementSource.bLongDark;
-    Spec.Duration = Tuning.Duration;
-    const int32 TickCount = FMath::Max(1, FMath::FloorToInt(Tuning.Duration / Tuning.Tick))
+    Spec.Duration = Tuning.Duration * (Request.bHasCasterRotSnapshot ? Request.CasterRotLifetimeMultiplier
+        : BreakerCasterStatusRules::RotLifetimeMultiplier(Request.Instigator.Get()));
+    const int32 TickCount = FMath::Max(1, FMath::FloorToInt(Spec.Duration / Tuning.Tick))
         + (Request.ElementSource.bRotDensity ? 2 : 0);
-    Spec.TickInterval = Request.ElementSource.bRotDensity ? Tuning.Duration / TickCount : Tuning.Tick;
-    const float Budget = BreakerElementSource::StatusBudget(Request, Snapshot * Tuning.Damage);
+    Spec.TickInterval = Request.ElementSource.bRotDensity ? Spec.Duration / TickCount : Tuning.Tick;
+    const float Budget = BreakerElementSource::StatusBudget(Request, Snapshot * Tuning.Damage)
+        * (Request.bHasCasterRotSnapshot ? Request.CasterRotCriticalMultiplier : BreakerCasterStatusRules::RotCriticalBudgetMultiplier(Request, Result));
     Spec.BaseDamagePerTick = Budget / TickCount;
     Spec.ProcCoefficient = FMath::Clamp(Request.ProcCoefficient, 0.0f, 1.0f);
     Spec.Snapshot.SourcePower = 1.0f;
+    Spec.Snapshot.bHasCriticalRollSample = Result.bHasCriticalRollSample;
+    Spec.Snapshot.CriticalRollSample = Result.CriticalRollSample;
     Spec.Snapshot.CriticalChance = 0;
     Spec.Snapshot.bRolledCritical = false;
     Spec.Snapshot.SourceTags = Request.SourceTags;

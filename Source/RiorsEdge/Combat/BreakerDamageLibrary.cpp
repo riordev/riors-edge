@@ -9,13 +9,15 @@
 
 namespace
 {
-    bool BreakerCriticalResult(const FBreakerDamageRequest& Request)
+    bool BreakerCriticalResult(const FBreakerDamageRequest& Request, bool& HasSample, float& Sample)
     {
+        HasSample = Request.bHasCriticalRollSample; Sample = Request.CriticalRollSample;
         if (Request.bForceCriticalStrike && !Request.bIsDamageOverTime) return true;
         if (!Request.bCanCritical) return false;
         if (Request.bUseSnapshotCritical) return Request.bSnapshotCriticalResult;
         FRandomStream Random(Request.RandomSeed);
-        return Random.FRand() < FMath::Clamp(Request.CriticalChance, 0.0f, 1.0f);
+        Sample = Random.FRand(); HasSample = true;
+        return Sample < FMath::Clamp(Request.CriticalChance, 0.0f, 1.0f);
     }
 }
 
@@ -152,7 +154,7 @@ void UBreakerDamageLibrary::ResolveConditionalMores(FBreakerDamageRequest& Reque
     float Selected = 1.0f;
     if (FMath::IsFinite(Critical) && Critical > 1.0f)
     {
-        Request.bSnapshotCriticalResult = BreakerCriticalResult(Request);
+        Request.bSnapshotCriticalResult = BreakerCriticalResult(Request, Request.bHasCriticalRollSample, Request.CriticalRollSample);
         Request.bUseSnapshotCritical = true;
         if (Request.bSnapshotCriticalResult) Selected *= Critical;
     }
@@ -204,7 +206,7 @@ FBreakerDamageResult UBreakerDamageLibrary::ResolveDamage(const FBreakerDamageRe
     // where an out-of-bounds author gets caught loudly.
     if (Result.bWeakPoint) Result.RawDamage *= FMath::Clamp(Request.WeakPointMultiplier, WeakPointMultiplierFloor, WeakPointMultiplierCeiling);
 
-    Result.bCritical = BreakerCriticalResult(Request);
+    Result.bCritical = BreakerCriticalResult(Request, Result.bHasCriticalRollSample, Result.CriticalRollSample);
     if (Result.bCritical) Result.RawDamage *= FMath::Max(1.0f, Request.CriticalMultiplier);
     // Allocate one critical result. Elemental Increased joins the delivery bucket,
     // while selected elemental/Void Mores affect only their matching raw portions.

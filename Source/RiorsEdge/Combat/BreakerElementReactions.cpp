@@ -5,6 +5,7 @@
 #include "Combat/BreakerElementSourceMath.h"
 #include "Combat/BreakerEnemy.h"
 #include "Classes/BreakerManaComponent.h"
+#include "Classes/BreakerCasterStatusRules.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "EngineUtils.h"
 #include "UI/BreakerReactionFeedback.h"
@@ -350,6 +351,12 @@ bool UBreakerStatusComponent::DeferSympatheticElement(const FBreakerDamageReques
     Bank.Decay.GraceRemaining = GraceSeconds;
     Bank.Decay.FadeRemaining = FMath::IsFinite(Request.ElementBuildupFadeSeconds) ? FMath::Max(0.f, Request.ElementBuildupFadeSeconds) : 0.f;
     Bank.Request = Request;
+    if (Request.Element == EBreakerElement::Entropy && !Bank.Request.bHasCasterRotSnapshot)
+    {
+        Bank.Request.bHasCasterRotSnapshot = true;
+        Bank.Request.CasterRotLifetimeMultiplier = BreakerCasterStatusRules::RotLifetimeMultiplier(Request.Instigator.Get());
+        Bank.Request.CasterRotCriticalMultiplier = BreakerCasterStatusRules::RotCriticalBudgetMultiplier(Request, Result);
+    }
     Bank.Result = Result;
     Bank.bHasSnapshot = true;
     return true;

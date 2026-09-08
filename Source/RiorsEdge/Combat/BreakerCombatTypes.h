@@ -158,6 +158,8 @@ struct RIORSEDGE_API FBreakerDamageRequest
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bIsDamageOverTime = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bUseSnapshotCritical = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bSnapshotCriticalResult = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHasCriticalRollSample = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float CriticalRollSample = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 RandomSeed = 0;
     // Where the hit came from, for frontal block checks. Optional so tests
     // and hazards without a position keep working.
@@ -189,6 +191,10 @@ struct RIORSEDGE_API FBreakerDamageRequest
     // Empty retains the legacy single-element request. Nonempty owns conversion.
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FBreakerElementShare> ElementShares;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FBreakerElementSourceSnapshot ElementSource;
+    // Accepted-hit rules retained while Sympathetic defers the application.
+    bool bHasCasterRotSnapshot = false;
+    float CasterRotLifetimeMultiplier = 1;
+    float CasterRotCriticalMultiplier = 1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bCanApplyElementBuildup = true;
     // Paid at fire/cast time by an actually maintained Sympathetic buff.
     // These values change buildup only, never the hit or Rot damage snapshot.
@@ -250,6 +256,8 @@ struct RIORSEDGE_API FBreakerDamageResult
     UPROPERTY(BlueprintReadOnly) float RemainingShield = 0.0f;
     UPROPERTY(BlueprintReadOnly) float RemainingHealth = 0.0f;
     UPROPERTY(BlueprintReadOnly) bool bCritical = false;
+    UPROPERTY(BlueprintReadOnly) bool bHasCriticalRollSample = false;
+    UPROPERTY(BlueprintReadOnly) float CriticalRollSample = 0;
     UPROPERTY(BlueprintReadOnly) bool bDodged = false;
     UPROPERTY(BlueprintReadOnly) bool bParried = false;
     UPROPERTY(BlueprintReadOnly) bool bBlocked = false;

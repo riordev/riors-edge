@@ -1479,9 +1479,9 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterVoidWhispererTree(
     // What that leaves behind is recorded at the lane it leaves behind.
     // Historical Class-Kits VW9. O2 PLACEHOLDER: +25 critical-chance points.
     // Physical applications retain the original critical sample and check own-zone geometry.
-    // WAITING ON: Rot's separate critical funding rule; never double its applying hit's crit.
+    // Rot retains the applying hit sample and replaces its critical factor at most once.
     Node = MakeNode(TEXT("Caster.VoidWhisperer.SnapshotDiscipline"), TEXT("Snapshot Discipline"),
-        TEXT("Bleed and Poison applied while standing inside your own zone gain 25 percentage points Critical Chance using their original roll. Rot support awaits its funding rule."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+        TEXT("Your periodic statuses applied inside your own zone gain 25 percentage points Critical Chance using the applying sample. An already-critical hit is never multiplied twice."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Zonework"));
     Node->GrantedTags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Caster.VoidWhisperer.SnapshotDiscipline")));
     Tree->Nodes.Add(Node);
@@ -1498,9 +1498,9 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterVoidWhispererTree(
     // Historical Class-Kits VW11/O10. O2 PLACEHOLDER: double tick frequency,
     // 25% incoming penalty instead of the historical 15% Overcast penalty.
     // Physical cadence snapshots at application; the existing incoming modifier is replaced.
-    // WAITING ON: Rot's finite funding exception for the authored extra ticks.
+    // Rot doubles its lifetime and redistributes the same finite damage budget.
     Node = MakeNode(TEXT("Caster.VoidWhisperer.LongDebt"), TEXT("Long Debt"),
-        TEXT("Bleed and Poison applied while Mana is negative snapshot double tick frequency for their lifetime. While Mana is negative, you take 25% increased damage instead of 15%. Rot support awaits its funding rule."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+        TEXT("While Mana is negative, Bleed and Poison snapshot double tick frequency; Rot lasts twice as long with the same total funded damage. You take 25% increased damage instead of 15%."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Drain"));
     Node->GrantedTags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Caster.VoidWhisperer.LongDebt")));
     Tree->Nodes.Add(Node);
