@@ -824,7 +824,7 @@ private:
     int32 ResolvePelletImpacts(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FVector& Direction,
         const FBreakerShotChannels& Channels, float ScaledBaseDamage, const UBreakerAttributeSet* SourceAttributes,
         const AActor* MarkedTarget, float LeadMinimumRangeCm, float LevelScalar, int32 PelletSeed,
-        FBreakerShotResult& Shot, struct FBreakerPelletImpact& Pellet, const TSharedRef<FBreakerWeaponTriggerContext>& Trigger);
+        FBreakerShotResult& Shot, struct FBreakerPelletImpact& Pellet, const TSharedRef<FBreakerWeaponTriggerContext>& Trigger, float PelletProcCoefficient);
     // Nearest legal enemy (combat component, alive, unstruck, line of sight)
     // to Origin within RadiusCm. The world query half of chain/ricochet.
     AActor* FindNearestChainTarget(const FVector& Origin, float RadiusCm, const TArray<const AActor*>& ExcludedActors) const;
@@ -836,9 +836,9 @@ private:
         float ArmorPenetrationOverride, const FVector& ImpactPoint, int32 DamageSeed,
         // O104: a weak point GRANTED by a rule rather than earned by hitting one
         // takes the weak-point multiplier instead of crit, not as well as it.
-        // Defaulted false so the legs that cannot carry a mark -- chain arcs --
-        // keep their existing behaviour without restating it.
-        bool bWeakPointIsGranted = false, bool bForkHit = false);
+        // Every caller states ancestry and proc strength; a secondary delivery
+        // cannot silently regain a neutral default coefficient.
+        bool bWeakPointIsGranted, bool bForkHit, float ProcCoefficient);
 
     // ---- Marksman / Frenzy rule-half state (Class-Kits §1.3 / §1.5) --------
     // Server-side timestamps of recent trigger pulls, pruned to Loaded's 2s
@@ -908,7 +908,7 @@ private:
     // SeedBasis is the hit's own draw seed (the base pellet's ShotSequence
     // value, or a secondary leg's salted seed), so a pierced or chained hit's
     // bleed roll neither collides with the primary sequence nor repeats it.
-    void ApplyBleedOnHit(const UBreakerWeaponDefinition* Definition, AActor* Target, const UBreakerAttributeSet* SourceAttributes, float LevelScalar, int32 SeedBasis);
+    void ApplyBleedOnHit(const UBreakerWeaponDefinition* Definition, AActor* Target, const UBreakerAttributeSet* SourceAttributes, float LevelScalar, int32 SeedBasis, float ProcCoefficient);
     void FinishReload();
     void FinishSwap();
     bool CanFire() const;

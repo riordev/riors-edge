@@ -2021,7 +2021,8 @@ bool UBreakerWeaponComponent::FireOnce()
         // the channels at zero it performs exactly one trace and one damage
         // submission, the legacy path to the bit.
         PiercedThisPull += ResolvePelletImpacts(Definition, ViewLocation, Direction, Channels, ScaledBaseDamage,
-            SourceAttributes, MostRecentMarkedTarget, LeadMinimumRangeCm, LevelScalar, PelletSeed, Shot, Pellet, Trigger);
+            SourceAttributes, MostRecentMarkedTarget, LeadMinimumRangeCm, LevelScalar, PelletSeed, Shot, Pellet, Trigger,
+            bExtraPellet ? 0.f : Trigger->Source.ProcCoefficient);
     }
 
     // Pierce Discipline (Class-Kits §1.5 M6, transcribed): each target pierced
@@ -2374,9 +2375,11 @@ AActor* UBreakerWeaponComponent::FindNearestChainTarget(const FVector& Origin, f
 FBreakerDamageResult UBreakerWeaponComponent::SubmitWeaponDamage(const UBreakerWeaponDefinition* Definition, UBreakerCombatComponent* TargetCombat,
     const TSharedRef<FBreakerWeaponTriggerContext>& Trigger, float BaseDamage, float DistanceFromMuzzle, bool bWeakPoint,
     float ArmorPenetrationOverride, const FVector& ImpactPoint, int32 DamageSeed,
-    bool bWeakPointIsGranted, bool bForkHit)
+    bool bWeakPointIsGranted, bool bForkHit, float ProcCoefficient)
 {
     FBreakerDamageRequest Damage = Trigger->Source;
+    Damage.ProcCoefficient = FMath::IsFinite(ProcCoefficient) && FMath::IsFinite(Damage.ProcCoefficient)
+        ? FMath::Min(FMath::Clamp(Damage.ProcCoefficient,0.f,1.f),FMath::Clamp(ProcCoefficient,0.f,1.f)) : 0.f;
     // The multiplicand: archetype base carried up the item-level curve, then
     // falloff. While a range-treatment override is active (Standing Wave's
     // Overdrive rewrite), the falloff computation itself is short-circuited
@@ -2456,7 +2459,7 @@ FBreakerDamageResult UBreakerWeaponComponent::SubmitWeaponDamage(const UBreakerW
 int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FVector& Direction,
     const FBreakerShotChannels& Channels, float ScaledBaseDamage, const UBreakerAttributeSet* SourceAttributes,
     const AActor* MarkedTarget, float LeadMinimumRangeCm, float LevelScalar, int32 PelletSeed,
-    FBreakerShotResult& Shot, FBreakerPelletImpact& Pellet, const TSharedRef<FBreakerWeaponTriggerContext>& Trigger)
+    FBreakerShotResult& Shot, FBreakerPelletImpact& Pellet, const TSharedRef<FBreakerWeaponTriggerContext>& Trigger, float PelletProcCoefficient)
 {
     const UBreakerAbilityStateComponent* AbilityState = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerAbilityStateComponent>() : nullptr;
     const uint32 OwnerHash = GetTypeHash(GetOwner());
@@ -2544,16 +2547,19 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
             // RICOCHET: the shot hit the world. Spend a bounce seeking the
             // nearest enemy in line of sight of the impact; a bounce that
             // finds nobody dies on the wall, honestly.
-            if (RicochetsRemaining > 0)
+            if (RicochetsRemaining > 0 && !bRicochetLeg)
             {
-                if (AActor* Sought = FindNearestChainTarget(Hit.ImpactPoint, SeekRadiusCm, StruckActors))
+                // Start outside the contacted surface; a ray originating exactly
+                // on it can report the same wall as an initial obstruction.
+                const FVector SeekOrigin = Hit.ImpactPoint + Hit.ImpactNormal;
+                if (AActor* Sought = FindNearestChainTarget(SeekOrigin, SeekRadiusCm, StruckActors))
                 {
                     --RicochetsRemaining;
                     bRicochetLeg = true;
                     CurrentMultiplier *= FMath::Clamp(RicochetDamageMultiplier, 0.0f, 1.0f);
                     TravelledCm += Hit.Distance;
-                    SegmentStart = Hit.ImpactPoint;
-                    SegmentDirection = (Sought->GetActorLocation() - Hit.ImpactPoint).GetSafeNormal();
+                    SegmentStart = SeekOrigin;
+                    SegmentDirection = (Sought->GetActorLocation() - SeekOrigin).GetSafeNormal();
                     if (SegmentDirection.IsNearlyZero()) break;
                     continue;
                 }
@@ -2597,7 +2603,7 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
             ? static_cast<int32>(HashCombine(OwnerHash, static_cast<uint32>(PelletSeed)))
             : FBreakerWeaponMath::SecondaryShotSeed(OwnerHash, PelletSeed, BreakerPierceSalt, SecondarySeedIndex++);
         const float ArmorPenetration = (EnemiesStruck > 0 && bSightline) ? 1.0f : Definition->ArmorPenetration;
-        if (EnemiesStruck == 0 && !Definition->bProjectile)
+        if (EnemiesStruck == 0 && !Definition->bProjectile && PelletProcCoefficient > 0 && !bRicochetLeg)
         {
             const UBreakerEquipmentComponent* Equipment = GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>();
             if (Equipment && UBreakerItemRuleLibrary::ResolveRules(Equipment->GetEquipped()).bHitscanCriticalForks)
@@ -2615,7 +2621,7 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
         }
         const FBreakerDamageResult HitDamage = SubmitWeaponDamage(Definition, TargetCombat, Trigger,
             ScaledBaseDamage * CurrentMultiplier, DistanceFromMuzzleCm, bWeakPoint, ArmorPenetration, Hit.ImpactPoint, DamageSeed,
-            bGrantedWeakPoint);
+            bGrantedWeakPoint, false, bRicochetLeg ? FMath::Min(PelletProcCoefficient, .5f) : PelletProcCoefficient);
         if (EnemiesStruck == 0 && (HitDamage.bDodged || HitDamage.HealthDamage + HitDamage.ShieldDamage <= 0.0f))
         {
             bForkPending = false;
@@ -2637,7 +2643,8 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
             && !HitDamage.bKilled && !TargetCombat->IsDead()
             && HitDamage.HealthDamage + HitDamage.ShieldDamage > 0.0f;
         if (bAcceptedStatusHit)
-            ApplyBleedOnHit(Definition, HitActor, SourceAttributes, LevelScalar, EnemiesStruck == 0 ? PelletSeed : DamageSeed);
+            ApplyBleedOnHit(Definition, HitActor, SourceAttributes, LevelScalar, EnemiesStruck == 0 ? PelletSeed : DamageSeed,
+                bRicochetLeg ? FMath::Min(PelletProcCoefficient, .5f) : PelletProcCoefficient);
 
         // SPREAD ON PIERCE (KIT-3; O186; combat.md's proc coefficient law).
         // Declared crossing Weapons -> Combat: the weapon reads the target's
@@ -2653,7 +2660,7 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
         // through.
         // Copies carry the source's already-scaled remaining lifetime; the
         // dedicated copy door must not apply StatusDuration a second time.
-        if (EnemiesStruck == 0 && bAcceptedStatusHit)
+        if (EnemiesStruck == 0 && bAcceptedStatusHit && PelletProcCoefficient > 0)
         {
             if (const UBreakerStatusComponent* FirstBodyStatus = HitActor->FindComponentByClass<UBreakerStatusComponent>())
             {
@@ -2678,7 +2685,7 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
                 }
             }
         }
-        bRicochetLeg = false;
+        // Ricochet ancestry persists: no new ricochet or chain may descend.
 
         StruckActors.Add(HitActor);
         ++EnemiesStruck;
@@ -2702,7 +2709,7 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
     // so chain-on-kill would duplicate a rule the branch already sells —
     // chain-on-hit is the distinct mechanic the owner's ruling adds, and it
     // is the one a player can rely on feeling every shot at Redline.
-    if (EnemiesStruck > 0 && Channels.ChainCount > 0)
+    if (EnemiesStruck > 0 && Channels.ChainCount > 0 && !bRicochetLeg)
     {
         FVector ArcOrigin = LastEnemyImpact;
         float ArcMultiplier = ScaledBaseDamage > 0.0f ? CurrentMultiplier : 0.0f;
@@ -2726,7 +2733,7 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
             // worthless at exactly the ranges Marksman fights at.
             const int32 ArcSeed = FBreakerWeaponMath::SecondaryShotSeed(OwnerHash, PelletSeed, BreakerChainSalt, Arc);
             const FBreakerDamageResult ArcDamage = SubmitWeaponDamage(Definition, TargetCombat, Trigger,
-                ScaledBaseDamage * ArcMultiplier, LastEnemyDistanceCm, false, Definition->ArmorPenetration, ArcImpact, ArcSeed);
+                ScaledBaseDamage * ArcMultiplier, LastEnemyDistanceCm, false, Definition->ArmorPenetration, ArcImpact, ArcSeed, false, false, PelletProcCoefficient);
             Shot.DamageResult.RawDamage += ArcDamage.RawDamage;
             Shot.DamageResult.MitigatedDamage += ArcDamage.MitigatedDamage;
             Shot.DamageResult.ShieldDamage += ArcDamage.ShieldDamage;
@@ -2736,7 +2743,7 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
             Shot.DamageResult.bKilled |= ArcDamage.bKilled;
             if (!ArcDamage.bDodged && !ArcDamage.bParried && !ArcDamage.bKilled
                 && !TargetCombat->IsDead() && ArcDamage.HealthDamage + ArcDamage.ShieldDamage > 0.0f)
-                ApplyBleedOnHit(Definition, Target, SourceAttributes, LevelScalar, ArcSeed);
+                ApplyBleedOnHit(Definition, Target, SourceAttributes, LevelScalar, ArcSeed, PelletProcCoefficient);
 
             StruckActors.Add(Target);
             ArcOrigin = ArcImpact;
@@ -2760,7 +2767,7 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
             Leg.HitActor = Target;
             const FBreakerDamageResult Result = SubmitWeaponDamage(Definition, Combat, Trigger,
                 ForkBaseDamage, ForkDistanceCm, false, Definition->ArmorPenetration, Leg.End,
-                FBreakerWeaponMath::SecondaryShotSeed(OwnerHash, PelletSeed, BreakerForkSalt, Fork + 1), false, true);
+                FBreakerWeaponMath::SecondaryShotSeed(OwnerHash, PelletSeed, BreakerForkSalt, Fork + 1), false, true, 0.f);
             Shot.DamageResult.RawDamage += Result.RawDamage;
             Shot.DamageResult.MitigatedDamage += Result.MitigatedDamage;
             Shot.DamageResult.ShieldDamage += Result.ShieldDamage;
@@ -2770,11 +2777,12 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
             StruckActors.Add(Target);
         }
     }
-    return FMath::Max(0, EnemiesStruck - 1);
+    return PelletProcCoefficient > 0 ? FMath::Max(0, EnemiesStruck - 1) : 0;
 }
 
-void UBreakerWeaponComponent::ApplyBleedOnHit(const UBreakerWeaponDefinition* Definition, AActor* Target, const UBreakerAttributeSet* SourceAttributes, float LevelScalar, int32 SeedBasis)
+void UBreakerWeaponComponent::ApplyBleedOnHit(const UBreakerWeaponDefinition* Definition, AActor* Target, const UBreakerAttributeSet* SourceAttributes, float LevelScalar, int32 SeedBasis, float ProcCoefficient)
 {
+    if (!FMath::IsFinite(ProcCoefficient) || ProcCoefficient <= 0) return;
     if (!Definition || !Target || Definition->BleedChance <= 0.0f || Definition->BleedDamagePerTick <= 0.0f || Definition->BleedDuration <= 0.0f) return;
     UBreakerStatusComponent* Status = Target->FindComponentByClass<UBreakerStatusComponent>();
     if (!Status) return;
@@ -2786,7 +2794,8 @@ void UBreakerWeaponComponent::ApplyBleedOnHit(const UBreakerWeaponDefinition* De
     // roll simply always lands — a guarantee, not an error — which is why the
     // multiplier needs no cap here.
     const FBreakerNodeStats* BleedNodeStats = GetOwnerNodeStats();
-    const float EffectiveBleedChance = Definition->BleedChance * (BleedNodeStats ? BleedNodeStats->StatusChanceMultiplier : 1.0f);
+    const float EffectiveBleedChance = Definition->BleedChance * (BleedNodeStats ? BleedNodeStats->StatusChanceMultiplier : 1.0f)
+        * FMath::Clamp(ProcCoefficient,0.f,1.f);
     // Core.Elements.Threshold: application stops rolling and becomes
     // deterministic. The chance BANKS across hits (the multishot-accumulator
     // shape) and the status lands exactly when the bank crosses one — same
@@ -2802,6 +2811,7 @@ void UBreakerWeaponComponent::ApplyBleedOnHit(const UBreakerWeaponDefinition* De
     else if (Stream.FRand() > EffectiveBleedChance) return;
 
     FBreakerStatusApplicationSpec Spec;
+    Spec.ProcCoefficient = FMath::Clamp(ProcCoefficient,0.f,1.f);
     Spec.StatusTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Bleed"), false);
     // The DoT's base is a weapon base damage number like any other, so it rides
     // the same item-level curve. Leaving it flat would make bleed a smaller and
