@@ -222,7 +222,7 @@ offered leaves most of a doctrine declined.
 
 Spellblade's No Distance costs two points after six invested and Momentum Transfer.
 It raises Closequarter's authored cost to50 before ordinary cost modifiers and permits
-the existing arrival refund against any target health; it grants no damage More.
+the existing arrival refund against any target health; it grants no damage More. Multispell's Interference costs two after six invested and Resonance; it selects Resonance's authored fixed-per-status curve with its three-status threshold bonus.
 
 **The old five-tier target shape is withdrawn rather than renumbered.** It
 argued three distinct build shapes from a thirty-point class budget — one branch

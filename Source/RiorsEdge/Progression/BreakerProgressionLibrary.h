@@ -138,6 +138,7 @@ namespace BreakerNodeTags
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Fracture);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Resonance);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Cascade);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Interference);
 
     // Gunsmith / ARMORY (Class-Kits-Gunsmith §4.1). Authored 2026-08-16 under
     // the owner's "do all 5 classes" ruling — the branch layer the kits-playable

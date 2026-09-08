@@ -90,8 +90,10 @@ void UBreakerAbility_Resonance::ActivateAbility(const FGameplayAbilitySpecHandle
     // burst rides the equipped weapon's item-level scalar. Applied to the
     // RESULT of the curve, not its parameters, so the §2.7.5 ratio bound is
     // untouched at every item level (a common scalar cancels out of the ratio).
+    const EBreakerDetonationCurve SelectedCurve = Progression && Progression->HasNodeTag(BreakerNodeTags::Node_MS_Interference.GetTag())
+        ? EBreakerDetonationCurve::FixedPlusThreshold : Curve;
     const float BaseDamage = AbilityBaseDamageFor(Character,
-        UBreakerStatusConsumption::DetonationDamage(DistinctCount, Detonation, Curve)
+        UBreakerStatusConsumption::DetonationDamage(DistinctCount, Detonation, SelectedCurve)
         * AbilityDamageScalarFor(Character));
     const UBreakerAttributeSet* SourceAttributes = GetBreakerAttributes();
 

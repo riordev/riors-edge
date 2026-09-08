@@ -139,6 +139,7 @@ namespace BreakerNodeTags
     UE_DEFINE_GAMEPLAY_TAG(Node_MS_Fracture, "Progression.Node.Caster.Multispell.Fracture");
     UE_DEFINE_GAMEPLAY_TAG(Node_MS_Resonance, "Progression.Node.Caster.Multispell.Resonance");
     UE_DEFINE_GAMEPLAY_TAG(Node_MS_Cascade, "Progression.Node.Caster.Multispell.Cascade");
+    UE_DEFINE_GAMEPLAY_TAG(Node_MS_Interference, "Progression.Node.Caster.Multispell.Interference");
 
     // Gunsmith / ARMORY (Class-Kits-Gunsmith §4.1). AR5's DISPLAY name, "Last
     // Round", collides with Core.Volley.LastRound and nothing else, and AR10's
@@ -2617,6 +2618,12 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Resonance.GetTag());
     Tree->Nodes.Add(Node);
 
+    Node = MakeNode(TEXT("Caster.Multispell.Interference"), TEXT("Interference"),
+        TEXT("Resonance uses a lower fixed damage amount per distinct status and adds a flat bonus at three or more statuses."),
+        EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Caster.Multispell.Resonance"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Interference.GetTag());
+    Tree->Nodes.Add(Node);
     // The branch keystone O3 permits (3 of 3 for Caster; Caster's budget is
     // now fully allocated across its three branches, same shape as Swift's).
     // Class-Kits MS12's designed line was "1.25x More vs targets carrying 3+

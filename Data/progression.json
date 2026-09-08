@@ -5758,6 +5758,26 @@
 					"requiredTreeInvestment": 4
 				},
 				{
+					"id": "Caster.Multispell.Interference",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.Multispell.Interference"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Caster.Multispell.Resonance",
+							"rank": 1
+						}
+					],
+					"requiredTreeInvestment": 6
+				},
+				{
 					"id": "Caster.Multispell.Cascade",
 					"tier": 4,
 					"ranks": 1,
