@@ -1,6 +1,8 @@
 #include "Items/BreakerLootPickup.h"
 
 #include "Characters/BreakerCharacter.h"
+#include "Combat/BreakerCombatComponent.h"
+#include "Engine/World.h"
 #include "Components/PointLightComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -242,17 +244,32 @@ FText ABreakerLootPickup::GetDisplayLabel() const
     return FText::FromString(FString::Printf(TEXT("%s %s"), *RarityName, *SlotName));
 }
 
+bool ABreakerLootPickup::CanPickup(const ABreakerCharacter* Character) const
+{
+    if (bTransferClaimed || IsActorBeingDestroyed() || !IsValid(Character) || !Item.IsValid()
+        || Character->GetWorld() != GetWorld() || !GetWorld() || !Character->GetCombat()
+        || Character->GetCombat()->IsDead() || !Character->GetEquipment()
+        || FVector::DistSquared(Character->GetActorLocation(),GetActorLocation()) > FMath::Square(InteractionRange)) return false;
+    FCollisionQueryParams Query(SCENE_QUERY_STAT(LootPickupVisibility),false,Character);
+    Query.AddIgnoredActor(this);
+    FHitResult Hit;
+    return !GetWorld()->LineTraceSingleByObjectType(Hit,Character->GetActorLocation(),GetActorLocation(),
+        FCollisionObjectQueryParams(ECC_WorldStatic),Query);
+}
+
 bool ABreakerLootPickup::TryPickup(ABreakerCharacter* Character)
 {
-    if (!Character || !HasAuthority()) return false;
+    if (!HasAuthority() || !CanPickup(Character)) return false;
     UBreakerEquipmentComponent* Equipment = Character->GetEquipment();
     if (!Equipment) return false;
     // One-AB: a full backpack REFUSES the pickup and the drop stays on the
     // ground — a drop the player can see and cannot take is a readable
     // problem where a drop that vanished is a bug report. The player's answer
     // is DiscardBackpackBelowRarity or SalvageFromBackpack, not this actor.
+    bTransferClaimed = true;
     if (!Equipment->AddToBackpack(Item, /*bRefuseWhenFull=*/true))
     {
+        bTransferClaimed = false;
         return false;
     }
     Destroy();

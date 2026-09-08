@@ -87,16 +87,17 @@ void UBreakerAbility_HardStop::ActivateAbility(const FGameplayAbilitySpecHandle 
     // S4's protective window, through the incoming-damage chain Combat/
     // exposes (PushIncomingDamageModifier lands at the same stage as
     // gear-rolled physical reduction; 0.0 is immune). Server-side fact, so
-    // authority only; the window is strictly shorter than the cooldown, so
-    // the timed removal can never strip a newer window's entry.
+    // authority only. Reusing the timer replaces an earlier cleanup if a
+    // cooldown reset allows another cast before this protection expires.
     if (Character->HasAuthority() && World)
     {
         if (UBreakerCombatComponent* Combat = Character->FindComponentByClass<UBreakerCombatComponent>())
         {
             Combat->PushIncomingDamageModifier(IncomingModifierKey(), IncomingMultiplier(OwnerHasSpendToLive(), DamageReductionFraction));
             TWeakObjectPtr<UBreakerCombatComponent> WeakCombat(Combat);
-            FTimerHandle RemoveHandle;
-            World->GetTimerManager().SetTimer(RemoveHandle, FTimerDelegate::CreateWeakLambda(this, [WeakCombat]()
+            // The protection outlives this instant ability. Binding to Combat
+            // keeps GAS EndAbility from clearing its cleanup timer.
+            World->GetTimerManager().SetTimer(ProtectionTimer, FTimerDelegate::CreateWeakLambda(Combat, [WeakCombat]()
             {
                 if (UBreakerCombatComponent* Restored = WeakCombat.Get())
                 {

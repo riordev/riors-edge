@@ -52,8 +52,8 @@ public:
     virtual float GetResourceCost() const override;
 
     // Class-Kits §1.2 S4 / §1.4 K10, quoted: the window is 0.6s in both
-    // forms. Strictly shorter than the 6s cooldown, so two windows can never
-    // overlap and the timed removal can never strip a newer window's entry.
+    // forms. Normally shorter than the 6s cooldown; a reset-driven recast
+    // replaces the cleanup timer so its refreshed protection keeps its lifetime.
     static constexpr float WindowSeconds = 0.6f;
     // O2 PLACEHOLDER: stands in for the Damage Reduction While Airborne affix
     // value (Class-Kits §1.2 S4), which has no row in Items/BreakerAffixLibrary
@@ -61,5 +61,6 @@ public:
     static constexpr float DamageReductionFraction = 0.30f;
 
 private:
+    FTimerHandle ProtectionTimer;
     bool OwnerHasSpendToLive() const;
 };

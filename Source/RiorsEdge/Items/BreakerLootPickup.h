@@ -41,6 +41,7 @@ public:
     // Authority-only: moves the item into the character's backpack and
     // destroys this actor. Returns false when nothing was transferred.
     UFUNCTION(BlueprintCallable, Category="Loot") bool TryPickup(ABreakerCharacter* Character);
+    UFUNCTION(BlueprintPure, Category="Loot") bool CanPickup(const ABreakerCharacter* Character) const;
 
     // Rarity chroma shared with the HUD. Anomalous keeps its rift teal — it is
     // a rift-class object, so the object-chroma law permits it.
@@ -64,6 +65,7 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UPointLightComponent> RarityLight;
 
 private:
+    bool bTransferClaimed = false;
     UPROPERTY(ReplicatedUsing=OnRep_Item) FBreakerItemInstance Item;
     float BobTime = 0.0f;
     FVector VisualBaseLocation = FVector::ZeroVector;

@@ -9,12 +9,21 @@
 #include "AbilitySystemComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Classes/BreakerManaComponent.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Items/BreakerItemBaseStats.h"
 #include "Items/BreakerLootLibrary.h"
 #include "Net/UnrealNetwork.h"
 #include "Weapons/BreakerWeaponComponent.h"
 
+namespace
+{
+    bool BreakerEquipmentResourceIncomeSuspended(const AActor* Owner)
+    {
+        const auto* Mana = Owner ? Owner->FindComponentByClass<UBreakerManaComponent>() : nullptr;
+        return Mana && Mana->IsActiveForOwner() && Mana->IsGenerationSuspended();
+    }
+}
 UBreakerEquipmentComponent::UBreakerEquipmentComponent()
 {
     PrimaryComponentTick.bCanEverTick = true;
@@ -103,7 +112,7 @@ void UBreakerEquipmentComponent::HandleKillDealt(const FBreakerHitContext& Hit)
         // overheal clamp and to every listener, and gear is not exempt.
         Combat->ApplyHealingAmount(CachedStats.LifeOnKill, GetOwner(), FGameplayTag());
     }
-    if (CachedStats.ResourceOnKill > 0.0f && Attributes)
+    if (CachedStats.ResourceOnKill > 0.0f && Attributes && !BreakerEquipmentResourceIncomeSuspended(GetOwner()))
     {
         // Through UBreakerAttributeSet::ApplyClassResource rather than
         // UBreakerCombatComponent::AddClassResource, and the difference is only
@@ -165,7 +174,7 @@ void UBreakerEquipmentComponent::TickComponent(float DeltaTime, ELevelTick TickT
     if (Attributes && GetOwner() && GetOwner()->HasAuthority())
     {
         const float RegenPerSecond = Attributes->GetClassResourceRegen();
-        if (RegenPerSecond > 0.0f)
+        if (RegenPerSecond > 0.0f && !BreakerEquipmentResourceIncomeSuspended(GetOwner()))
         {
             Attributes->ApplyClassResource(Attributes->GetClassResource() + RegenPerSecond * DeltaTime);
         }

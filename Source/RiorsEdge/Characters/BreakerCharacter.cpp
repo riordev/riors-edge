@@ -2592,6 +2592,7 @@ ABreakerLootPickup* ABreakerCharacter::FindNearbyPickup() const
     float NearestDistanceSq = TNumericLimits<float>::Max();
     for (TActorIterator<ABreakerLootPickup> It(GetWorld()); It; ++It)
     {
+        if (!It->CanPickup(this)) continue;
         const float DistanceSq = FVector::DistSquared(GetActorLocation(), It->GetActorLocation());
         if (DistanceSq <= FMath::Square(It->GetInteractionRange()) && DistanceSq < NearestDistanceSq)
         {
@@ -2604,7 +2605,7 @@ ABreakerLootPickup* ABreakerCharacter::FindNearbyPickup() const
 
 void ABreakerCharacter::ServerPickupLoot_Implementation(ABreakerLootPickup* Pickup)
 {
-    if (Pickup) Pickup->TryPickup(this);
+    if (IsValid(Pickup)) Pickup->TryPickup(this);
 }
 
 void ABreakerCharacter::InteractWithNearbyNPC()
