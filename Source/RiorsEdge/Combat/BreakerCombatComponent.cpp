@@ -523,6 +523,15 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     // actually fired against this target with the source split present.
     FBreakerDamageRequest ResolvedRequest = Request;
     ApplyTargetConditionRiders(ResolvedRequest);
+    // A live target rider joins the applying hit's additive bucket. Funded
+    // periodic/reaction payouts never receive the rider a second time.
+    if (!ResolvedRequest.bIsDamageOverTime)
+        if (const auto* Enemy = Cast<ABreakerEnemy>(GetOwner()))
+            if (const auto* Lure = Cast<ABreakerDeployable>(Enemy->GetThreatTarget());
+                Lure && Enemy->IsEligibleThreatTarget(Lure) && Lure->GetOwningCharacter() == ResolvedRequest.Instigator.Get())
+                if (const auto* SourceProgression = Lure->GetOwningCharacter()->FindComponentByClass<UBreakerProgressionComponent>();
+                    SourceProgression && SourceProgression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Threat.Bait"))))
+                    UBreakerDamageLibrary::AddSourceIncreased(ResolvedRequest, 12.0f); // O2 PLACEHOLDER
     if (!ResolvedRequest.bIsDamageOverTime && GetOwner()->IsA<ABreakerEnemy>() && IsStaggered())
         if (const AActor* Attacker = ResolvedRequest.Instigator.Get(); Attacker && Attacker != GetOwner())
             if (const auto* SourceProgression = Attacker->FindComponentByClass<UBreakerProgressionComponent>(); SourceProgression

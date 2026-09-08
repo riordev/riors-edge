@@ -310,7 +310,8 @@ bool FBreakerSwiftChannelLanesTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Core shield capacity appends"), static_cast<int32>(EBreakerNodeStatTarget::ShieldPercentMaxHealth), 79);
     TestEqual(TEXT("Stagger duration appends"), static_cast<int32>(EBreakerNodeStatTarget::StaggerDuration), 80);
     TestEqual(TEXT("Stagger resistance reduction appends"), static_cast<int32>(EBreakerNodeStatTarget::EnemyStaggerResistanceReduction), 81);
-    TestEqual(TEXT("Stagger resistance reduction is the current tail"), static_cast<int32>(EBreakerNodeStatTarget::EnemyStaggerResistanceReduction), static_cast<int32>(EBreakerNodeStatTarget::Count) - 1);
+    TestEqual(TEXT("Base spread reduction appends"), static_cast<int32>(EBreakerNodeStatTarget::WeaponBaseSpreadReduction), 82);
+    TestEqual(TEXT("Base spread reduction is the current tail"), static_cast<int32>(EBreakerNodeStatTarget::WeaponBaseSpreadReduction), static_cast<int32>(EBreakerNodeStatTarget::Count) - 1);
 
     // And the lanes actually pay: a rank-2 node authoring all four Flat lines
     // lands on the FBreakerNodeStats fields the weapon reads.

@@ -1027,12 +1027,15 @@ float UBreakerWeaponComponent::GetNextShotSpreadDegrees() const
             FMath::Lerp(Definition->HipSpreadDegrees, Definition->AimSpreadDegrees, Alpha))
             + (bBurstReset ? 0.0f : FMath::Max(0.0f, BloomDegrees)) + FMath::Max(0.0f, RawMovement);
     }
-    const float BaseSpread = FMath::Lerp(Definition->HipSpreadDegrees, Definition->AimSpreadDegrees, Alpha);
+    const FBreakerNodeStats* NodeStats = GetOwnerNodeStats();
+    // Literal base-cone reduction precedes bloom and movement. Fan's early
+    // return deliberately excludes this reduction along with other accuracy.
+    const float BaseSpread = FMath::Lerp(Definition->HipSpreadDegrees, Definition->AimSpreadDegrees, Alpha)
+        * FMath::Max(0.0f, 1.0f - (NodeStats ? NodeStats->WeaponBaseSpreadReductionPercent : 0.0f) * .01f);
     const float Movement = FBreakerWeaponMath::SteadyMovementSpreadDegrees(
         RawMovement, Alpha, GetClassNodeRank(BreakerSteadyNodeId), IsOwnerAirborne());
     const float Composed = FBreakerWeaponFeel::EffectiveSpreadDegrees(Profile, BaseSpread,
         bBurstReset ? 0.0f : GetEffectiveBloomDegrees(), bBurstReset ? 0 : BurstShotIndex, Movement);
-    const FBreakerNodeStats* NodeStats = GetOwnerNodeStats();
     const UBreakerMomentumComponent* Momentum = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerMomentumComponent>() : nullptr;
     return Composed / (NodeStats ? NodeStats->WeaponSpreadReduction : 1.0f)
         * FBreakerWeaponMath::MomentumSpreadMultiplier(

@@ -12,6 +12,14 @@
     GAMEPLAYATTRIBUTE_VALUE_SETTER(PropertyName) \
     GAMEPLAYATTRIBUTE_VALUE_INITTER(PropertyName)
 
+// Owner-facing health reads may include defensive layers. The underlying GAS
+// attributes remain physical pools for damage, healing and capacity arithmetic.
+struct RIORSEDGE_API FBreakerOwnerHealthView
+{
+    float Current = 0.0f;
+    float Maximum = 0.0f;
+};
+
 UCLASS()
 class RIORSEDGE_API UBreakerAttributeSet : public UAttributeSet
 {
@@ -21,6 +29,7 @@ public:
     UBreakerAttributeSet();
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
     virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
+    FBreakerOwnerHealthView GetOwnerHealthView() const;
 
     // The authored critical baseline, declared ONCE. The constructor's base
     // table initialises from these, and every damage site that cannot reach a

@@ -1501,6 +1501,7 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     // reads this struct directly (see the lane-register comment in
     // BreakerProgressionTypes.h for the single-bidder reasoning).
     Stats.BonusProjectileCount = Flat(EBreakerNodeStatTarget::ProjectileCount);
+    Stats.WeaponBaseSpreadReductionPercent = Flat(EBreakerNodeStatTarget::WeaponBaseSpreadReduction);
     Stats.AddedWeaponDamage = Flat(EBreakerNodeStatTarget::AddedWeaponDamage);
     Stats.AddedAbilityPower = Flat(EBreakerNodeStatTarget::AddedAbilityPower);
     Stats.PhysicalDamageReductionPercent = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::PhysicalDamageReduction));

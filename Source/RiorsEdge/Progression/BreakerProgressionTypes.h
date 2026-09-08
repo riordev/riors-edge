@@ -308,6 +308,7 @@ enum class EBreakerNodeStatTarget : uint8
     ShieldPercentMaxHealth,
     StaggerDuration,
     EnemyStaggerResistanceReduction,
+    WeaponBaseSpreadReduction,
 
     Count UMETA(Hidden)
 };
@@ -404,6 +405,7 @@ inline bool BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget Target)
     case EBreakerNodeStatTarget::ShieldPercentMaxHealth:
     case EBreakerNodeStatTarget::StaggerDuration:
     case EBreakerNodeStatTarget::EnemyStaggerResistanceReduction:
+    case EBreakerNodeStatTarget::WeaponBaseSpreadReduction:
     case EBreakerNodeStatTarget::MaxClassResource:
     case EBreakerNodeStatTarget::ClassResourceRegen:
     case EBreakerNodeStatTarget::FireRate:
@@ -772,6 +774,7 @@ struct RIORSEDGE_API FBreakerNodeStats
     // shot rhythm rather than a rounding loss); pierce/chain/ricochet floor at
     // consumption. Consumed by UBreakerWeaponComponent::GetShotChannels.
     UPROPERTY(BlueprintReadOnly) float BonusProjectileCount = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float WeaponBaseSpreadReductionPercent = 0.0f;
     UPROPERTY(BlueprintReadOnly) float BonusPierceCount = 0.0f;
     UPROPERTY(BlueprintReadOnly) float BonusChainCount = 0.0f;
     UPROPERTY(BlueprintReadOnly) float BonusRicochetCount = 0.0f;

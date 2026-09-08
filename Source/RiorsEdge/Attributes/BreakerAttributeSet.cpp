@@ -1,8 +1,29 @@
 #include "Attributes/BreakerAttributeSet.h"
 
 #include "AbilitySystemGlobals.h"
+#include "Combat/BreakerCombatComponent.h"
 #include "GameFramework/Actor.h"
 #include "Net/UnrealNetwork.h"
+#include "Progression/BreakerProgressionComponent.h"
+
+FBreakerOwnerHealthView UBreakerAttributeSet::GetOwnerHealthView() const
+{
+    FBreakerOwnerHealthView View{GetHealth(), GetMaxHealth()};
+    const AActor* Owner = GetTypedOuter<AActor>();
+    const UBreakerProgressionComponent* Progression = Owner ? Owner->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    const FGameplayTag Endurance = FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Endurance"), false);
+    if (!Progression || !Endurance.IsValid() || !Progression->HasNodeTag(Endurance)) return View;
+    View.Current += GetShield();
+    View.Maximum += GetMaxShield();
+    if (const UBreakerCombatComponent* Combat = Owner->FindComponentByClass<UBreakerCombatComponent>())
+    {
+        View.Current += Combat->GetFrontShield();
+        // A broken archetype pool remains part of maximum capacity. The display
+        // shield helper intentionally hides it, and is not the health denominator.
+        View.Maximum += Combat->GetFrontShieldMax();
+    }
+    return View;
+}
 
 UBreakerAttributeSet::UBreakerAttributeSet()
 {

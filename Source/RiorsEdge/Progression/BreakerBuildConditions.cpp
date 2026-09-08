@@ -65,15 +65,17 @@ namespace
         return false;
     }
 
-    bool TryGetHealthFraction(const AActor* Actor, float& OutFraction)
+    bool TryGetHealthFraction(const AActor* Actor, float& OutFraction, bool bOwnerView = false)
     {
         const UAbilitySystemComponent* ASC = Actor->FindComponentByClass<UAbilitySystemComponent>();
         if (!ASC) return false;
         const UBreakerAttributeSet* Attributes = ASC->GetSet<UBreakerAttributeSet>();
         if (!Attributes) return false;
-        const float Max = Attributes->GetMaxHealth();
+        const FBreakerOwnerHealthView View = bOwnerView ? Attributes->GetOwnerHealthView()
+            : FBreakerOwnerHealthView{Attributes->GetHealth(), Attributes->GetMaxHealth()};
+        const float Max = View.Maximum;
         if (Max <= 0.0f) return false;
-        OutFraction = Attributes->GetHealth() / Max;
+        OutFraction = View.Current / Max;
         return true;
     }
 }
@@ -272,7 +274,7 @@ FBreakerBuildConditionState FBreakerBuildConditionState::EvaluateForActor(const 
     }
 
     float HealthFraction = 0.0f;
-    if (TryGetHealthFraction(Actor, HealthFraction))
+    if (TryGetHealthFraction(Actor, HealthFraction, true))
     {
         State.Set(EBreakerBuildCondition::HealthHigh, HealthFraction >= HighVitalFraction);
         State.Set(EBreakerBuildCondition::HealthLow, HealthFraction <= LowVitalFraction);
