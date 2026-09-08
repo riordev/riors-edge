@@ -11,6 +11,7 @@ namespace BreakerCoreRoster
         const TCHAR* Description, std::initializer_list<FBreakerNodeEffect> Effects = {},
         std::initializer_list<const TCHAR*> Tags = {});
     RIORSEDGE_API void AppendWeapon(UObject* Outer, TArray<FBreakerCoreWedgeDefinition>& Out);
+    RIORSEDGE_API void AppendDefence(UObject* Outer, TArray<FBreakerCoreWedgeDefinition>& Out);
     // Candidate authoring is isolated from the live getter and save version.
     // Activate only with the complete roster and frozen-cost migration.
     RIORSEDGE_API UBreakerProgressionTree* BuildCandidate(UObject* Outer, FString& Error);

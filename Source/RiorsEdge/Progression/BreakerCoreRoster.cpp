@@ -23,5 +23,6 @@ UBreakerProgressionTree* BreakerCoreRoster::BuildCandidate(UObject* Outer, FStri
 {
     TArray<FBreakerCoreWedgeDefinition> Wedges;
     AppendWeapon(Outer, Wedges);
+    AppendDefence(Outer, Wedges);
     return BreakerCoreTree::Build(Outer, TEXT("Core.Replacement"), FText::FromString(TEXT("Core")), Wedges, Error);
 }
