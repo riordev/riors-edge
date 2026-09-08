@@ -104,6 +104,8 @@ void ABreakerZoneActor::ConfigureZone(const FBreakerZoneSpec& InSpec, AActor* In
 {
     if (!HasAuthority()) return;
     Spec = InSpec;
+    bRadiusGrowthConsumed = false;
+    ResetRimEffect();
     ZoneInstigator = InInstigator;
     AcquireLongDarkPause();
     LastAdvanceWorldTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0;
@@ -136,6 +138,21 @@ void ABreakerZoneActor::RefreshDuration(float NewDuration)
     // Refresh, never extend: VW4's rule is that a recast resets the clock, so
     // spamming Rot cannot bank duration.
     RemainingDuration = FMath::Max(RemainingDuration, static_cast<double>(FMath::Max(0.0f, NewDuration)));
+}
+
+bool ABreakerZoneActor::GrowRadiusOnce(float AdditionalRadiusCm)
+{
+    if (!HasAuthority() || bReleased || RemainingDuration <= 0 || bRadiusGrowthConsumed
+        || !FMath::IsFinite(AdditionalRadiusCm) || AdditionalRadiusCm <= 0
+        || !FMath::IsFinite(Spec.RadiusCm + AdditionalRadiusCm)) return false;
+    bRadiusGrowthConsumed = true; // Claim before membership callbacks can reenter.
+    Spec.RadiusCm += AdditionalRadiusCm;
+    ResetRimEffect();
+    RefreshPresentation();
+    SubmitRimEffect();
+    ForceNetUpdate();
+    UpdateMembership();
+    return true;
 }
 
 void ABreakerZoneActor::SetFollowActor(AActor* Follow)
@@ -520,8 +537,18 @@ ABreakerZoneActor* ABreakerZoneActor::FindRefreshableZone(const UWorld* World, F
 
 void ABreakerZoneActor::OnRep_Spec()
 {
+    ResetRimEffect();
     RefreshPresentation();
     SubmitRimEffect();
+}
+
+void ABreakerZoneActor::ResetRimEffect()
+{
+    if (ABreakerEffectRenderer* Renderer = RimRenderer.Get())
+        for (int32 Handle : RimHandles) Renderer->EndEffect(Handle, 0.0f);
+    RimHandles.Reset();
+    RimRenderer.Reset();
+    bRimSubmitted = false;
 }
 
 void ABreakerZoneActor::SubmitRimEffect()

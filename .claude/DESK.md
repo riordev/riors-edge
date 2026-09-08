@@ -15,6 +15,7 @@ Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 - [x] Replace Interposition's solo shield trickle with temporary headroom behind the owned Anchor; paid cast checks rear/front/range, repeated entry and destruction without free shield.
 - [x] Detonation second ultimate press releases its paid stored damage once; expiry remains a fallback, cancellation/death/keystone loss discard it.
 - [ ] Finish remaining live solo node gaps.
+- [x] Lingering rank two grows an overlapping refreshed Rot by one metre once per zone, including its membership and replicated footprint. Paid four-point path proves rank-one refusal, growth, new enemy damage, repeat prevention and fresh-zone reset. Suite: 702 started, 699 passed, 3 known failures, no unexpected failures. Overhead base/grown captures inspected; flat fill clipping into raised paving and static rim lifetime refresh/pause remain visual work.
 - [x] Emplacement's moving weapon spread requires the rear of a live owned Anchor within its existing radius. Actual six-point purchase and paid Anchor prove moving versus stationary cones, front/side/rear/range, rotation and destruction. Suite: 701 started, 698 passed, 3 known failures, no unexpected failures.
 - [ ] Finish ability-versus-weapon balance with sustained actual delivery; retain existing parity findings until their conditions are resolved.
 - [x] Repair Cleave wall-only occlusion and reject Bleed on avoided/lethal hits; actual paid casts cover aligned enemies, wall, dodge, purchased parry and lethal melee income.

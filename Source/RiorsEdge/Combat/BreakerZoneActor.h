@@ -115,6 +115,8 @@ public:
     // VW4: a recast refreshes, it never stacks.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Zone")
     void RefreshDuration(float NewDuration);
+    // One accepted radius increment per configured zone, independent of refresh count.
+    bool GrowRadiusOnce(float AdditionalRadiusCm);
 
     // VW8 Wellspring: the zone rides an actor instead of the ground.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Zone")
@@ -184,6 +186,7 @@ protected:
     // the visible expiry. The disc says roughly where; the rim says exactly
     // whether a target is inside. Once per life — see the flag.
     void SubmitRimEffect();
+    void ResetRimEffect();
 
     UPROPERTY(VisibleAnywhere) TObjectPtr<USceneComponent> Root;
     UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Footprint;
@@ -235,6 +238,7 @@ private:
     double LastAdvanceWorldTime = 0;
     FDelegateHandle LongDarkTagHandle;
     bool bReleased = false;
+    bool bRadiusGrowthConsumed = false;
     // The rim is claimed from a shared pool on fixed clips, so it must be
     // submitted exactly once per zone life: ConfigureZone and OnRep_Spec can
     // each fire more than once and a resubmission would stack rings.

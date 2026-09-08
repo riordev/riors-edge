@@ -4,6 +4,9 @@
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerStatusComponent.h"
 #include "Combat/BreakerEntropy.h"
+#include "Combat/BreakerZoneActor.h"
+#include "Abilities/BreakerAbility_Rot.h"
+#include "UI/BreakerEffectMath.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/PawnMovementComponent.h"
@@ -24,6 +27,37 @@ void BreakerStartEntropyCapture(ABreakerCharacter* Character)
         if (!World || !Character->GetController()) return;
         Character->GetCombat()->RestoreVitals();
         Character->GetController()->SetControlRotation(FRotator::ZeroRotator);
+        if (FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureLingering")))
+        {
+            // Visual comparison only; purchased-node/cost delivery has its own
+            // runtime test. Both footprints use the real zone presentation.
+            const auto* Rot = GetDefault<UBreakerAbility_Rot>();
+            const FVector Origin = Character->GetActorLocation();
+            for (int32 Side = 0; Side < 2; ++Side)
+            {
+                FVector Center = Origin + FVector(1000, Side == 0 ? -550 : 550, 0);
+                FHitResult Floor;
+                FCollisionQueryParams Params(SCENE_QUERY_STAT(BreakerLingeringCapture), false, Character);
+                if (World->LineTraceSingleByChannel(Floor, Center + FVector(0,0,500), Center - FVector(0,0,2000), ECC_GameTraceChannel2, Params))
+                    Center = Floor.ImpactPoint;
+                auto* Zone = World->SpawnActor<ABreakerZoneActor>(Center, FRotator::ZeroRotator);
+                if (!Zone) continue;
+                FBreakerZoneSpec Spec;
+                Spec.RadiusCm = Rot->RadiusCm;
+                Spec.Duration = 20; // O2 visual fixture lifetime, not ability tuning.
+                Spec.ZoneColor = BreakerFX::ColorForStatusTag(FGameplayTag::RequestGameplayTag(TEXT("Status.Rot")), FLinearColor::White);
+                Zone->ConfigureZone(Spec, Character);
+                if (Side == 1) Zone->GrowRadiusOnce(Rot->LingeringRefreshGrowthCm);
+                UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] Lingering side=%d radius=%.1f"), Side, Zone->GetSpec().RadiusCm);
+            }
+            if (auto* Movement = Character->GetMovementComponent())
+            { Movement->StopMovementImmediately(); Movement->SetComponentTickEnabled(false); }
+            Character->SetActorLocation(Origin + FVector(0,0,1000));
+            FVector Eye; FRotator View;
+            Character->GetActorEyesViewPoint(Eye, View);
+            Character->GetController()->SetControlRotation((Origin + FVector(1000,0,-100) - Eye).Rotation());
+            return;
+        }
         int32 Index = 0;
         AActor* SourceEnemy = nullptr;
         AActor* FocusEnemy = nullptr;

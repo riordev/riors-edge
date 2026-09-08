@@ -89,6 +89,12 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     // search, the spawned volume and the refresh all share one reading.
     const float EffectiveRadiusCm = ComputeEffectiveRadiusCm(Character);
     const float EffectiveDuration = ComputeEffectiveDurationSeconds(Character);
+    auto RefreshExisting = [&](ABreakerZoneActor* Existing)
+    {
+        Existing->RefreshDuration(EffectiveDuration);
+        if (Character->GetProgression()->GetNodeRank(TEXT("Caster.VoidWhisperer.Lingering"), EBreakerPointCurrency::DoctrinePoints) >= 2)
+            Existing->GrowRadiusOnce(LingeringRefreshGrowthCm);
+    };
     if (bFollowCaster)
         for (const TWeakObjectPtr<ABreakerZoneActor>& Held : ABreakerZoneActor::GetLiveZones())
             if (ABreakerZoneActor* Existing = Held.Get())
@@ -96,7 +102,7 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
                     && Existing->GetSpec().ZoneTag == ZoneTag && Existing->GetFollowActor() == Character
                     && Existing->GetRemainingDuration() > 0.0f)
                 {
-                    Existing->RefreshDuration(EffectiveDuration);
+                    RefreshExisting(Existing);
                     EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
                     return;
                 }
@@ -107,7 +113,7 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     // sure even genuinely separate puddles cannot double-strip.
     if (ABreakerZoneActor* Existing = ABreakerZoneActor::FindRefreshableZone(World, ZoneTag, Character, Center, EffectiveRadiusCm, 0.5f))
     {
-        Existing->RefreshDuration(EffectiveDuration);
+        RefreshExisting(Existing);
         if (bFollowCaster) Existing->SetFollowActor(Character);
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
         return;

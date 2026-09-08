@@ -64,6 +64,7 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot|Nodes", meta=(ClampMin="0")) float StandingWaterRankOneManaPerSecond = 2.0f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot|Nodes", meta=(ClampMin="0")) float StandingWaterRankTwoManaPerSecond = 4.0f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot|Nodes", meta=(ClampMin="0")) float ZoneworkAdditionalArmorReduction = 20.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot|Nodes", meta=(ClampMin="0")) float LingeringRefreshGrowthCm = 100.0f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot|Nodes", meta=(ClampMin="0")) float WellspringSelfPlacementRadiusCm = 150.0f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot|Nodes", meta=(ClampMin="0", ClampMax="1")) float WellspringMinimumGroundNormalZ = 0.7f;
 };

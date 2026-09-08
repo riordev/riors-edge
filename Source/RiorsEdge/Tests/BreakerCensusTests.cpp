@@ -523,7 +523,7 @@ bool FBreakerAbilitiesNumbersTest::RunTest(const FString& Parameters)
         TestEqual(FString::Printf(TEXT("%s: a key the file does not name answers with the default"), *Id),
             Definition->Number(FName(TEXT("Breaker.NoSuchNumber")), 7.0f), 7.0f);
     }
-    TestEqual(TEXT("One hundred and forty numbers after retiring Rot Poison tuning"), KeyCount, 140);
+    TestEqual(TEXT("One hundred and forty-one numbers including Lingering refresh growth"), KeyCount, 141);
     TestEqual(TEXT("Twenty-eight rows carry numbers; seven classes keep theirs as constexpr or in the body"), RowsWithNumbers, 28);
 
     // Order is the class's declaration order, super first: the Gunsmith
@@ -543,6 +543,7 @@ bool FBreakerAbilitiesNumbersTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Standing Water first rank is authored"), Rot->Number(TEXT("StandingWaterRankOneManaPerSecond"), -1), 2.0f);
         TestEqual(TEXT("Standing Water second rank is authored"), Rot->Number(TEXT("StandingWaterRankTwoManaPerSecond"), -1), 4.0f);
         TestEqual(TEXT("Zonework flat strip is authored"), Rot->Number(TEXT("ZoneworkAdditionalArmorReduction"), -1), 20.0f);
+        TestEqual(TEXT("Lingering one-time growth is authored"), Rot->Number(TEXT("LingeringRefreshGrowthCm"), -1), 100.0f);
         TestEqual(TEXT("Wellspring self-placement reach is authored"), Rot->Number(TEXT("WellspringSelfPlacementRadiusCm"), -1), 150.0f);
         TestEqual(TEXT("Wellspring ground normal is authored"), Rot->Number(TEXT("WellspringMinimumGroundNormalZ"), -1), 0.7f);
     }

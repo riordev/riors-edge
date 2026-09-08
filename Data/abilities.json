@@ -156,6 +156,7 @@
 				"StandingWaterRankOneManaPerSecond": 2,
 				"StandingWaterRankTwoManaPerSecond": 4,
 				"ZoneworkAdditionalArmorReduction": 20,
+				"LingeringRefreshGrowthCm": 100,
 				"WellspringSelfPlacementRadiusCm": 150,
 				"WellspringMinimumGroundNormalZ": 0.7
 			},

@@ -2446,10 +2446,9 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterVoidWhispererTree(
     // at all. The AbilityDuration lane gives the fantasy a perceptible half:
     // zones linger longer per rank (O2 PLACEHOLDER, consumed by Rot's
     // ComputeEffectiveDurationSeconds on both the spawn and refresh paths).
-    // VW4 R2's "radius grows by 1 m, once" stays waiting — a one-shot flat
-    // growth on refresh is a zone rule, not a lane.
+    // R2's flat radius growth is claimed once by the existing zone on refresh.
     Node = MakeNode(TEXT("Caster.VoidWhisperer.Lingering"), TEXT("Lingering"),
-        TEXT("Zones linger longer, and a second overlapping zone refreshes duration instead of stacking. Explicit anti-stack rule."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 2, 2, 1);
+        TEXT("Zones linger longer, and overlapping zones refresh instead of stacking. R2: refreshing a zone increases its radius by 1 m, once per zone."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.StandingWater"));
     AddEffect(Node, EBreakerNodeStatTarget::AbilityDuration, EBreakerNodeStatBucket::IncreasedPercent, 15.0f); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Lingering.GetTag());
