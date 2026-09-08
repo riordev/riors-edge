@@ -413,3 +413,15 @@ Numbers are permanent and never reused.
 **O226** — Large persistent destinations retain fixed regional enemy levels; tougher return Rifts supply later challenge. The campaign passes through these destinations and leaves them available for revisits, supported by an in-game map.
 
 **O227** — Starter Caster builds should sustain casting competitively with rifles. Patience improves that baseline; purchasing it is not the requirement for sustained casting. Exact recovery magnitudes remain O2 tuning.
+
+**O228** — Afterimage leaves a two-second tail at half of each window's lane contributions, using each lane's existing quantization; anything that is not a lane contribution ends normally.
+
+**O229** — Endurance feeds combined health, shield and front-pool current/capacity into the owner's current/maximum health view without changing condition rules; Hold's cap and enemy-facing thresholds retain physical health values.
+
+**O230** — Ignore Me generates zero threat while allies and deployables generate double; when no non-zero-threat entity exists, targeting falls through to existing selection.
+
+**O231** — Sympathetic's statuses are consumed by the triggering hit, never by another reaction; each affected enemy defers the owner's elemental status applications for three seconds from reaction firing while buildup continues, then applies eligible accumulated buildup; allies, Bleed and Poison are exempt.
+
+**O232** — Ballistics Loud adds the nearest enemy outside the original blast within one further blast radius, without imposing a target cap on ordinary splash.
+
+**O233** — Deployables have health and zones have duration; zones are not destructible, and Threat Decoy grants only deployable health.
