@@ -78,11 +78,15 @@ float UBreakerCombatComponent::GetStaggerRemaining() const
 
 bool UBreakerCombatComponent::IsStaggered() const
 {
+    const auto* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    if (Progression && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Immovable")))) return false;
     return bStaggerActive && (!GetOwner() || !GetOwner()->HasAuthority() || GetStaggerRemaining() > 0);
 }
 
 bool UBreakerCombatComponent::IsStaggerImmune() const
 {
+    const auto* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    if (Progression && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Immovable")))) return true;
     const ABreakerEnemy* Enemy = Cast<ABreakerEnemy>(GetOwner());
     return (Enemy && Enemy->bStaggerImmune) || (GetWorld() && GetWorld()->GetTimeSeconds() < StaggerImmunityEndTime);
 }
@@ -194,17 +198,23 @@ void UBreakerCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType
     if (Attributes && GetOwner() && GetOwner()->HasAuthority()
         && Cast<APawn>(GetOwner()) && Cast<APawn>(GetOwner())->IsPlayerControlled())
     {
+        const auto* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
         const float Current = Attributes->GetShield();
         const float Next = BreakerShield::RechargeStep(Current, Attributes->GetMaxShield(),
-            GetSecondsSinceDamage(), DeltaTime);
+            GetSecondsSinceDamage(), DeltaTime, FMath::Max(0.0f, BreakerShield::RechargeDelaySeconds -
+                (Progression ? Progression->GetNodeStats().ShieldRechargeDelayReduction : 0.0f)));
         if (Next > Current) Attributes->ApplyShield(Next);
 
         const ABreakerCharacter* Player = Cast<ABreakerCharacter>(GetOwner());
         if (Player && !IsDead())
         {
             const float Health = Attributes->GetHealth();
-            const float Recovered = BreakerHealthRegen::Step(Health, Attributes->GetMaxHealth(),
-                Player->GetSecondsSinceCombat(), DeltaTime, BaseHealthRegenPerSecond, BaseHealthRegenDelaySeconds);
+            const float Rate = BaseHealthRegenPerSecond + Attributes->GetMaxHealth() *
+                (Progression ? FMath::Max(0.0f, Progression->GetNodeStats().HealthRegenPercentMaxHealth) * .01f : 0.0f);
+            const float QuietSeconds = FMath::Min(FMath::Max(0.0f, DeltaTime), FMath::Max(0.0f, Player->GetSecondsSinceCombat() - BaseHealthRegenDelaySeconds));
+            const bool bSecondLife = Progression && Progression->GetNodeStats().bHealthRegenInCombat;
+            const float EffectiveSeconds = QuietSeconds + (bSecondLife ? .5f * (FMath::Max(0.0f, DeltaTime) - QuietSeconds) : 0.0f);
+            const float Recovered = FMath::Min(Attributes->GetMaxHealth(), Health + FMath::Max(0.0f, Rate) * EffectiveSeconds);
             // Passive recovery is not a healing action: it must not generate class resources or heal procs.
             if (Recovered > Health) Attributes->ApplyHealth(Recovered);
         }
@@ -241,6 +251,7 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
         ParryCounterEnd = ParryClock() + FMath::Max(0.0f, ParryCounterSeconds);
         // Incoming pressure still counts as combat for recovery; recording
         // the clock does not broadcast damage, block or dodge procs.
+        if (auto* Player = Cast<ABreakerCharacter>(GetOwner())) Player->NotifyCombatActivityBoundary();
         LastDamageTime = GetWorld()->GetTimeSeconds();
         Result.bParried = true;
         Result.RemainingHealth = Attributes->GetHealth();
@@ -472,6 +483,7 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
             BreakerHealthBands::IndexOf(Result.RemainingHealth, MaxHealth, Segments)
             < BreakerHealthBands::IndexOf(Defense.Health, MaxHealth, Segments);
     }
+    if (auto* Player = Cast<ABreakerCharacter>(GetOwner())) Player->NotifyCombatActivityBoundary();
     LastDamageTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
     // Interposition's clock arms on the SUCCESSFUL block itself, so the
     // window measures from the block the player felt, not from the swing.
@@ -976,8 +988,13 @@ FBreakerHealResult UBreakerCombatComponent::ApplyHealing(const FBreakerHealReque
     Vitals.MaxShield = Attributes->GetMaxShield();
 
     FBreakerHealRequest Effective = Request;
-    if (const UBreakerStatusComponent* Status = GetOwner()->FindComponentByClass<UBreakerStatusComponent>())
-        Effective.HealingMultiplier *= Status->GetHealingReceivedMultiplier();
+    if (!Request.bConversionOnly)
+    {
+        if (const auto* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>())
+            Effective.HealingMultiplier *= Progression->GetNodeStats().HealingReceivedMultiplier;
+        if (const UBreakerStatusComponent* Status = GetOwner()->FindComponentByClass<UBreakerStatusComponent>())
+            Effective.HealingMultiplier *= Status->GetHealingReceivedMultiplier();
+    }
     Result = UBreakerDamageLibrary::ResolveHealing(Effective, Vitals);
     if (Result.RequestedAmount <= 0.0f) return Result;
 

@@ -867,7 +867,12 @@ void ABreakerEnemy::HandleThreatDamage(const FBreakerHitContext& Hit)
 {
     if (!HasAuthority() || bDead || (Combat && Combat->IsDead()) || Hit.Target != this) return;
     AActor* Source = Hit.ThreatSource.Get();
-    const float Earned = BreakerEnemyThreat::Earned(Hit.Result.HealthDamage, Hit.Result.ShieldDamage);
+    AActor* StatOwner = Source;
+    if (const auto* Deployable = Cast<ABreakerDeployable>(Source)) StatOwner = Deployable->GetOwningCharacter();
+    const auto* Progression = StatOwner ? StatOwner->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    const float Multiplier = Progression ? Progression->GetNodeStats().ThreatGeneratedMultiplier : 1.0f;
+    const float Earned = BreakerEnemyThreat::Earned(Hit.Result.HealthDamage, Hit.Result.ShieldDamage)
+        * (FMath::IsFinite(Multiplier) ? FMath::Max(0.0f, Multiplier) : 1.0f);
     if (Earned <= 0 || !IsEligibleThreatTarget(Source)) return;
     float& Score = ThreatLedger.FindOrAdd(Source);
     Score = FMath::Min(static_cast<double>(Score) + Earned, static_cast<double>(MAX_flt));
@@ -1266,7 +1271,13 @@ void ABreakerEnemy::PopAimErrorMultiplier(FName Key)
 
 float ABreakerEnemy::GetComposedAimErrorMultiplier() const
 {
-    return BreakerEnemyComposeSeamLane(AimErrorMultipliers);
+    float Multiplier = BreakerEnemyComposeSeamLane(AimErrorMultipliers);
+    const AActor* Target = CommittedAttackTarget.Get();
+    const auto* Progression = Target ? Target->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    if (IsEligibleThreatTarget(Target) && Progression
+        && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Provocation"))))
+        Multiplier /= 0.9f;
+    return Multiplier;
 }
 
 void ABreakerEnemy::PushOutgoingDamageMultiplier(FName Key, float Multiplier)

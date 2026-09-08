@@ -382,6 +382,36 @@
 			"lane": true,
 			"rider": false,
 			"affixOwned": false
+		},
+		{
+			"name": "ThreatGenerated",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
+		},
+		{
+			"name": "DeployableHealth",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
+		},
+		{
+			"name": "HealingReceived",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
+		},
+		{
+			"name": "HealthRegenPercentMaxHealth",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
+		},
+		{
+			"name": "ShieldRechargeDelayReduction",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
 		}
 	],
 	"conditions": [

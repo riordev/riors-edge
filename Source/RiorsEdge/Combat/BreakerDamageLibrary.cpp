@@ -31,6 +31,7 @@ void UBreakerDamageLibrary::SnapshotElementSource(const AActor* Source, FBreaker
     Snapshot.RiftBuildupIncreasedPercent = Stats.RiftBuildupIncreasedPercent;
     Snapshot.ElementalBuildupPenetrationPercent = Stats.ElementalBuildupPenetrationPercent;
     Snapshot.ElementalThresholdMultiplier = Stats.ElementalThresholdMultiplier;
+    Snapshot.bRotDensity = Stats.bRotDensity;
 }
 void UBreakerDamageLibrary::FillSourcePools(const UBreakerAttributeSet* SourceAttributes,
     EBreakerDamageDelivery Delivery, FBreakerDamageRequest& Request)
@@ -257,7 +258,7 @@ FBreakerHealResult UBreakerDamageLibrary::ResolveHealing(const FBreakerHealReque
     if (Requested <= 0.0f) return Result;
 
     const float MissingHealth = FMath::Max(0.0f, Vitals.MaxHealth - Vitals.Health);
-    Result.HealthHealed = FMath::Min(Requested, MissingHealth);
+    Result.HealthHealed = Request.bConversionOnly ? 0.0f : FMath::Min(Requested, MissingHealth);
     Result.RemainingHealth = Vitals.Health + Result.HealthHealed;
     Result.Overheal = Requested - Result.HealthHealed;
 

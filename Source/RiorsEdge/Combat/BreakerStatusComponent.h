@@ -57,6 +57,7 @@ class RIORSEDGE_API UBreakerStatusComponent : public UActorComponent
     GENERATED_BODY()
 
 public:
+    static void SnapshotAilmentRules(FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator);
     // O2 PLACEHOLDER: Chain's rank buys reach, never extra generations.
     UPROPERTY(EditDefaultsOnly, Category="Status|Chain") float ChainRankOneRangeCm = 600.0f;
     UPROPERTY(EditDefaultsOnly, Category="Status|Chain") float ChainRankTwoRangeCm = 900.0f;
@@ -213,6 +214,9 @@ private:
     // even though its remaining time was advanced before damage dispatch.
     FGameplayTag DeliveringTickTag;
     bool bAdvancingStatuses = false;
+    bool bNullSpent = false;
+    uint64 NullCombatEpoch = 0;
+    double NullRefusedAt = -1000.0;
     UPROPERTY() TArray<FBreakerActiveStatus> ActiveStatuses;
     UPROPERTY() TObjectPtr<UBreakerCombatComponent> Combat;
     // Additive against MaximumStacksPerStatus. Separate from the authored cap

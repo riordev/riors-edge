@@ -124,8 +124,10 @@ void UBreakerStatusComponent::ApplyEntropyHit(const FBreakerDamageRequest& Reque
     FBreakerStatusApplicationSpec Spec;
     Spec.StatusTag = Rot;
     Spec.Duration = Tuning.Duration;
-    Spec.TickInterval = Tuning.Tick;
-    Spec.BaseDamagePerTick = Snapshot * Tuning.Damage / FMath::Max(1, FMath::FloorToInt(Tuning.Duration / Tuning.Tick));
+    const int32 TickCount = FMath::Max(1, FMath::FloorToInt(Tuning.Duration / Tuning.Tick))
+        + (Request.ElementSource.bRotDensity ? 2 : 0);
+    Spec.TickInterval = Request.ElementSource.bRotDensity ? Tuning.Duration / TickCount : Tuning.Tick;
+    Spec.BaseDamagePerTick = Snapshot * Tuning.Damage / TickCount;
     Spec.ProcCoefficient = FMath::Clamp(Request.ProcCoefficient, 0.0f, 1.0f);
     Spec.Snapshot.SourcePower = 1.0f;
     Spec.Snapshot.CriticalChance = 0;

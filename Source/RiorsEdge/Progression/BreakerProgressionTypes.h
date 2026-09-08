@@ -289,6 +289,11 @@ enum class EBreakerNodeStatTarget : uint8
     RiftBuildup,
     ElementalBuildupPenetration,
     ElementalThresholdReduction,
+    ThreatGenerated,
+    DeployableHealth,
+    HealingReceived,
+    HealthRegenPercentMaxHealth,
+    ShieldRechargeDelayReduction,
 
     Count UMETA(Hidden)
 };
@@ -366,6 +371,11 @@ inline bool BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget Target)
     case EBreakerNodeStatTarget::RiftBuildup:
     case EBreakerNodeStatTarget::ElementalBuildupPenetration:
     case EBreakerNodeStatTarget::ElementalThresholdReduction:
+    case EBreakerNodeStatTarget::ThreatGenerated:
+    case EBreakerNodeStatTarget::DeployableHealth:
+    case EBreakerNodeStatTarget::HealingReceived:
+    case EBreakerNodeStatTarget::HealthRegenPercentMaxHealth:
+    case EBreakerNodeStatTarget::ShieldRechargeDelayReduction:
     case EBreakerNodeStatTarget::MaxClassResource:
     case EBreakerNodeStatTarget::ClassResourceRegen:
     case EBreakerNodeStatTarget::FireRate:
@@ -782,6 +792,15 @@ struct RIORSEDGE_API FBreakerNodeStats
     UPROPERTY(BlueprintReadOnly) float RiftBuildupIncreasedPercent = 0.0f;
     UPROPERTY(BlueprintReadOnly) float ElementalBuildupPenetrationPercent = 0.0f;
     UPROPERTY(BlueprintReadOnly) float ElementalThresholdMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float ThreatGeneratedMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float DeployableHealthMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float HealingReceivedMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float HealthRegenPercentMaxHealth = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float ShieldRechargeDelayReduction = 0.0f;
+    UPROPERTY(BlueprintReadOnly) bool bRotDensity = false;
+    UPROPERTY(BlueprintReadOnly) bool bHemorrhage = false;
+    UPROPERTY(BlueprintReadOnly) bool bDeepen = false;
+    UPROPERTY(BlueprintReadOnly) bool bHealthRegenInCombat = false;
     // Cooldown reduction as the DIVISOR (DashCooldownReduction's convention:
     // 1.20 == 20% shorter). Floored just above zero so a malformed authored
     // row can never divide by zero or lengthen a cooldown to infinity.
@@ -931,6 +950,9 @@ struct RIORSEDGE_API FBreakerStatusApplicationSpec
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float Duration = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float TickInterval = 1.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 InitialStacks = 1;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHasAilmentRuleSnapshot = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHemorrhageSnapshot = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 AdditionalStackCapSnapshot = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float ProcCoefficient = 1.0f;
     // DoTs snapshot this structure at application. Later source-stat changes
     // do not rewrite an already-running effect.

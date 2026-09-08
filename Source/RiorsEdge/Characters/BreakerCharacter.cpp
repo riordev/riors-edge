@@ -1878,6 +1878,7 @@ void ABreakerCharacter::UpdateDeathBeat(float DeltaSeconds)
 
 void ABreakerCharacter::HandleClassResourceKill(const FBreakerHitContext& Hit)
 {
+    NotifyCombatActivityBoundary();
     LastHitDealtTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
     if (Scrap)
     {
@@ -1897,6 +1898,7 @@ void ABreakerCharacter::HandleClassResourceKill(const FBreakerHitContext& Hit)
 void ABreakerCharacter::HandleClassResourceHitDealt(const FBreakerHitContext& Hit)
 {
     // Timestamp only: "recently dealt a hit" is half the in-combat derivation.
+    NotifyCombatActivityBoundary();
     LastHitDealtTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
 }
 
@@ -1979,6 +1981,14 @@ void ABreakerCharacter::HandleClassResourceReloadCompleted(bool bAnyRoundFired)
 void ABreakerCharacter::HandleClassResourceMagazineEmptied(bool bStartedFull)
 {
     if (Scrap) Scrap->NotifyMagazineEmptied(bStartedFull);
+}
+
+void ABreakerCharacter::NotifyCombatActivityBoundary()
+{
+    if (!HasAuthority() || !GetWorld()) return;
+    const double Now = GetWorld()->GetTimeSeconds();
+    if (!IsInResourceCombat() && Now - LastCombatBoundaryNotification >= CombatStateWindowSeconds) ++CombatEpoch;
+    LastCombatBoundaryNotification = Now;
 }
 
 float ABreakerCharacter::GetSecondsSinceCombat() const

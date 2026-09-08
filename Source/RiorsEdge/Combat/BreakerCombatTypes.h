@@ -53,6 +53,7 @@ struct RIORSEDGE_API FBreakerElementSourceSnapshot
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float RiftBuildupIncreasedPercent = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float ElementalBuildupPenetrationPercent = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float ElementalThresholdMultiplier = 1;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bRotDensity = false;
 };
 
 USTRUCT(BlueprintType)
@@ -254,6 +255,8 @@ struct RIORSEDGE_API FBreakerHealRequest
     // of being multiplied in at each call site — the bug class that
     // GearWeaponDamageMultiplier already cost this project once.
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float HealingMultiplier = 1.0f;
+    // Already-resolved overheal converted to shield; never amplified or routed back into health.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bConversionOnly = false;
     // Leech and Rend route overheal into shield; Support's Charge loop requires
     // that overheal generate nothing, which is why Overheal is REPORTED
     // separately rather than silently discarded (Class-Kits §5, criterion 4).

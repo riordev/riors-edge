@@ -1,4 +1,5 @@
 #include "Combat/BreakerRiftDisplacement.h"
+#include "Progression/BreakerProgressionComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
@@ -7,6 +8,8 @@
 
 float BreakerRiftDisplacement::Apply(AActor* Target, const FVector& SourceLocation, float DistanceCm)
 {
+    const auto* Progression = Target ? Target->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    if (Progression && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Immovable")))) return 0;
     auto* Pawn = Cast<APawn>(Target);
     auto* Capsule = Pawn ? Cast<UCapsuleComponent>(Pawn->GetRootComponent()) : nullptr;
     UWorld* World = Pawn ? Pawn->GetWorld() : nullptr;

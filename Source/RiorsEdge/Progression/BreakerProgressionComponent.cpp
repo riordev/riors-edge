@@ -1508,6 +1508,15 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     Stats.RiftBuildupIncreasedPercent = IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::RiftBuildup)];
     Stats.ElementalBuildupPenetrationPercent = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::ElementalBuildupPenetration));
     Stats.ElementalThresholdMultiplier = FMath::Clamp(1.0f - Flat(EBreakerNodeStatTarget::ElementalThresholdReduction) / 100.0f, 0.01f, 1.0f);
+    Stats.ThreatGeneratedMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::ThreatGenerated));
+    Stats.DeployableHealthMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::DeployableHealth));
+    Stats.HealingReceivedMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::HealingReceived));
+    Stats.HealthRegenPercentMaxHealth = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::HealthRegenPercentMaxHealth));
+    Stats.ShieldRechargeDelayReduction = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::ShieldRechargeDelayReduction));
+    Stats.bHealthRegenInCombat = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.SecondLife")));
+    Stats.bRotDensity = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Density")));
+    Stats.bDeepen = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Deepen")));
+    Stats.bHemorrhage = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Hemorrhage")));
     Stats.bNoOutOfCombatResourceDecay = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.SecondShift")));
     Stats.bConduction = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Conduction")));
     Stats.bCooldownRecoveryAffectsTempo = Stats.GrantedTags.HasTagExact(

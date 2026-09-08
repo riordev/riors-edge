@@ -63,6 +63,9 @@ public:
     UFUNCTION(BlueprintPure, Category="Combat") UBreakerCombatComponent* GetCombat() const { return Combat; }
     UFUNCTION(BlueprintPure, Category="Combat") float GetSecondsSinceCombat() const;
     bool IsInResourceCombat() const { return GetSecondsSinceCombat() < CombatStateWindowSeconds; }
+    // Called before incoming/outgoing clocks change, preserving a quiet gap even without a tick.
+    void NotifyCombatActivityBoundary();
+    uint64 GetCombatEpoch() const { return CombatEpoch; }
     UFUNCTION(BlueprintPure, Category="Weapon") UBreakerWeaponComponent* GetWeapon() const { return Weapon; }
     bool TryGetViewmodelMuzzle(FVector& OutLocation) const;
     UFUNCTION(BlueprintPure, Category="Equipment") UBreakerEquipmentComponent* GetEquipment() const { return Equipment; }
@@ -571,4 +574,6 @@ private:
     float ClassResourcePollInterval = 0.25f; // O2 PLACEHOLDER
     float ClassResourcePollElapsed = 0.0f;
     double LastHitDealtTime = -1000.0;
+    uint64 CombatEpoch = 0;
+    double LastCombatBoundaryNotification = -1000.0;
 };

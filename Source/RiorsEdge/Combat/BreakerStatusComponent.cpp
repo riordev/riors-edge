@@ -98,6 +98,33 @@ float UBreakerStatusComponent::GetHealingReceivedMultiplier() const
     return 1.0f - Reduction / 100.0f;
 }
 
+void UBreakerStatusComponent::SnapshotAilmentRules(FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator)
+{
+    const auto* Rule = BreakerStatusRules::FindRule(Spec.StatusTag);
+    const bool bPhysicalAilment = DamageFamily == EBreakerDamageFamily::Physical
+        && Rule && Rule->bDealsPeriodicDamage && Spec.BaseDamagePerTick > 0;
+    if (!Spec.bHasAilmentRuleSnapshot)
+    {
+        Spec.bHasAilmentRuleSnapshot = true;
+        Spec.bHemorrhageSnapshot = false;
+        Spec.AdditionalStackCapSnapshot = 0;
+        if (bPhysicalAilment && Instigator)
+        {
+            if (const auto* SourceProgression = Instigator->FindComponentByClass<UBreakerProgressionComponent>())
+            {
+                const auto& Stats = SourceProgression->GetNodeStats();
+                Spec.bHemorrhageSnapshot = Stats.bHemorrhage;
+                Spec.AdditionalStackCapSnapshot = Stats.bDeepen ? 1 : 0;
+                if (Spec.bHemorrhageSnapshot)
+                {
+                    Spec.Duration *= .5f;
+                    Spec.TickInterval *= .5f;
+                }
+            }
+        }
+    }
+}
+
 uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicationSpec& InputSpec, EBreakerDamageFamily DamageFamily, AActor* Instigator, bool bDurationAlreadyScaled, float UnpaidDamageBudget, const FVector* SourceLocationOverride, const FBreakerDamageRequest* ApplyingHit)
 {
     // Caller may have passed an entry in a live status array; callbacks can
@@ -122,6 +149,16 @@ uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicat
     const UBreakerCombatComponent* TargetCombat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>();
     if (TargetCombat && TargetCombat->IsDead()) return 0;
 
+    // These offensive rules belong to this application, not the recipient's global cap.
+    // Copies retain the rewritten clock and snapshot, so Pierce/Chain cannot halve it again.
+    const bool bPhysicalAilment = DamageFamily == EBreakerDamageFamily::Physical
+        && Rule && Rule->bDealsPeriodicDamage && Spec.BaseDamagePerTick > 0;
+    SnapshotAilmentRules(Spec, DamageFamily, Instigator);
+    for (const auto& Active : ActiveStatuses)
+        if (Active.Spec.StatusTag == Spec.StatusTag
+            && (Active.Spec.bHemorrhageSnapshot || Spec.bHemorrhageSnapshot)) return 0;
+    const int32 ApplicationStackCap = GetEffectiveStackCap()
+        + (bPhysicalAilment ? FMath::Clamp(Spec.AdditionalStackCapSnapshot, 0, 1) : 0);
     // --- StatusDuration, the APPLIER's lane, folded at the door -----------
     // This is the one funnel every application path passes through — weapon
     // bleed, Cleave, zones, projectile-carried specs — so the tree's
@@ -190,6 +227,20 @@ uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicat
     // The immunity window refuses NEW applications outright — refreshes and
     // stack adds included, because a refresh IS an application.
     if (IsStatusImmune()) return 0;
+    // Null consumes its one refusal before any avoidance listener can re-enter.
+    if (auto* Player = Cast<ABreakerCharacter>(GetOwner()); Player && (bPhysicalAilment || bRot || bErased || bUnstable))
+    {
+        Player->NotifyCombatActivityBoundary(); // A direct ailment can be the first hostile event, before damage.
+        if (NullCombatEpoch != Player->GetCombatEpoch()) { NullCombatEpoch = Player->GetCombatEpoch(); bNullSpent = false; }
+        const auto* Progression = Player->GetProgression();
+        if (!bNullSpent && Progression && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Null"))))
+        {
+            bNullSpent = true;
+            FBreakerActiveStatus Avoided; Avoided.Spec = Spec; Avoided.DamageFamily = DamageFamily; Avoided.Instigator = Instigator;
+            OnStatusAvoided.Broadcast(Avoided);
+            return 0;
+        }
+    }
 
     if (UBreakerCombatComponent* OwnerCombat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>())
         if (!OwnerCombat->OnDeath.IsAlreadyBound(this, &UBreakerStatusComponent::HandleAfflictedOwnerDeath))
@@ -200,7 +251,7 @@ uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicat
     {
         if (Active.Spec.StatusTag == Spec.StatusTag)
         {
-            Active.Stacks = bEffectOnly ? 1 : FMath::Min(Active.Stacks + FMath::Max(1, Spec.InitialStacks), GetEffectiveStackCap());
+            Active.Stacks = bEffectOnly ? 1 : FMath::Max(Active.Stacks, FMath::Min(Active.Stacks + FMath::Max(1, Spec.InitialStacks), ApplicationStackCap));
             Active.RemainingDuration = FMath::Max(Active.RemainingDuration, ScaledDuration);
             // Refresh credit to whoever most recently reapplied it — and the
             // facing snapshot with it, because credit and angle belong to the
@@ -227,7 +278,7 @@ uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicat
     Status.UnpaidDamageBudget = (bErased || bUnstable || bRot) ? UnpaidDamageBudget : 0.0f;
     Status.ApplicationSerial = NextApplicationSerial++;
     Status.DamageFamily = DamageFamily;
-    Status.Stacks = FMath::Clamp(Spec.InitialStacks, 1, GetEffectiveStackCap());
+    Status.Stacks = FMath::Clamp(Spec.InitialStacks, 1, ApplicationStackCap);
     Status.RemainingDuration = ScaledDuration;
     Status.TimeUntilNextTick = Spec.TickInterval;
     Status.Instigator = Instigator;
@@ -350,13 +401,16 @@ void UBreakerStatusComponent::AdvanceStatuses(float DeltaTime)
     // window on the OWNER, not on the list.
     if (bAdvancingStatuses || !FMath::IsFinite(DeltaTime) || DeltaTime <= 0.0f) return;
     TGuardValue<bool> AdvancingStatuses(bAdvancingStatuses, true);
-    EntropyBuildupRemaining = FMath::Max(0.0f, EntropyBuildupRemaining - DeltaTime);
+    const auto* Player = Cast<ABreakerCharacter>(GetOwner());
+    const auto* Progression = Player ? Player->GetProgression() : nullptr;
+    const float BuildupSeconds = DeltaTime * (Progression && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Insulation"))) ? 2.0f : 1.0f);
+    EntropyBuildupRemaining = FMath::Max(0.0f, EntropyBuildupRemaining - BuildupSeconds);
     if (EntropyBuildupRemaining <= 0) EntropyBuildup = 0;
     for (auto& Contribution : EntropyProtectedContributions)
-        Contribution.Decay = BreakerBuildup::Advance(Contribution.Decay, DeltaTime);
+        Contribution.Decay = BreakerBuildup::Advance(Contribution.Decay, BuildupSeconds);
     EntropyProtectedContributions.RemoveAll([](const FEntropyProtectedContribution& Contribution) { return Contribution.Decay.Amount <= 0; });
-    AdvanceVoidBuildup(DeltaTime);
-    AdvanceRiftBuildup(DeltaTime);
+    AdvanceVoidBuildup(BuildupSeconds);
+    AdvanceRiftBuildup(BuildupSeconds);
     if (StatusImmunityRemaining > 0.0f) StatusImmunityRemaining = FMath::Max(0.0f, StatusImmunityRemaining - DeltaTime);
     if (!GetOwner() || !GetOwner()->HasAuthority() || ActiveStatuses.IsEmpty()) return;
     // Lazy re-bind: BeginPlay's bind misses a combat component added after it

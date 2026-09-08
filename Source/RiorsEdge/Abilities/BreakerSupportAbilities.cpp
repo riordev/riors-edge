@@ -125,6 +125,7 @@ namespace BreakerSupportAbilityLocal
                 Convert.ProcCoefficient = ProcCoefficient;
                 Convert.Amount = Unrouted * 0.5f;   // O2 PLACEHOLDER ("a fraction of its value")
                 Convert.bOverhealToShield = true;
+                Convert.bConversionOnly = true;
                 Convert.SetHealer(Healer);
                 OverflowShield = TargetCombat->ApplyHealing(Convert).ShieldGranted;
             }

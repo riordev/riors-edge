@@ -1,4 +1,5 @@
 #include "Abilities/BreakerAbility_Fracture.h"
+#include "Combat/BreakerStatusComponent.h"
 
 #include "Abilities/BreakerAbilityTags.h"
 #include "Abilities/BreakerAbilityStateComponent.h"
@@ -132,6 +133,7 @@ void UBreakerAbility_Fracture::ActivateAbility(const FGameplayAbilitySpecHandle 
         FRandomStream Stream(static_cast<int32>(HashCombine(Damage.RandomSeed, static_cast<uint32>(Index))));
         Entry.Spec.Snapshot.bRolledCritical = Stream.FRand() < Entry.Spec.Snapshot.CriticalChance;
 
+        UBreakerStatusComponent::SnapshotAilmentRules(Entry.Spec, Entry.DamageFamily, Character);
         FBreakerCarriedStatus Carried;
         Carried.Spec = Entry.Spec;
         Carried.DamageFamily = Entry.DamageFamily;

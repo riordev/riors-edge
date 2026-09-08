@@ -67,6 +67,8 @@ public:
     virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) override;
     virtual void OnTeleported() override;
     virtual void Launch(FVector const& LaunchVel) override;
+    virtual void ApplyAccumulatedForces(float DeltaSeconds) override;
+    bool HasImmovable() const;
     // Called after the owner's Breach charge queues its actual launch.
     void NotifyOwnBlastLaunch();
     float GetLastLandedFallDistanceCm() const { return LastLandedFallDistanceCm; }

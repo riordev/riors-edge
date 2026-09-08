@@ -214,6 +214,11 @@ void ABreakerDeployable::InitializeDeployable(EBreakerDeployableType InType, AAc
         }
     }
 
+    if (const auto* Progression = InOwnerCharacter ? InOwnerCharacter->FindComponentByClass<UBreakerProgressionComponent>() : nullptr)
+    {
+        const float Multiplier = Progression->GetNodeStats().DeployableHealthMultiplier;
+        Health *= FMath::IsFinite(Multiplier) ? FMath::Max(0.0f, Multiplier) : 1.0f;
+    }
     if (Attributes)
     {
         Attributes->ApplyMaxHealth(Health);

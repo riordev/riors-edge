@@ -523,9 +523,20 @@ void UBreakerCharacterMovementComponent::ClearBlastRecovery()
     bOwnBlastRecoveryPending = false;
 }
 
+bool UBreakerCharacterMovementComponent::HasImmovable() const
+{
+    const auto* Progression = GetProgression();
+    return Progression && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Immovable")));
+}
+void UBreakerCharacterMovementComponent::ApplyAccumulatedForces(float DeltaSeconds)
+{
+    if (HasImmovable()) { PendingImpulseToApply = FVector::ZeroVector; PendingForceToApply = FVector::ZeroVector; PendingLaunchVelocity = FVector::ZeroVector; }
+    Super::ApplyAccumulatedForces(DeltaSeconds);
+}
 void UBreakerCharacterMovementComponent::Launch(FVector const& LaunchVel)
 {
     ClearBlastRecovery();
+    if (HasImmovable()) { PendingLaunchVelocity = FVector::ZeroVector; return; }
     Super::Launch(LaunchVel);
 }
 
@@ -541,6 +552,7 @@ void UBreakerCharacterMovementComponent::NotifyOwnBlastLaunch()
 
 float UBreakerCharacterMovementComponent::GetMaxSpeed() const
 {
+    if (HasImmovable()) return GetWalkSpeedCap();
     if (IsOwnerStaggered()) return 0.0f;
     if (bSliding)
     {
@@ -759,6 +771,7 @@ float UBreakerCharacterMovementComponent::GetSpeedMultiplier() const
 
 void UBreakerCharacterMovementComponent::SetSprinting(bool bEnabled)
 {
+    if (HasImmovable()) bEnabled = false;
     const bool bEnteringSprint = bEnabled && !bWantsToSprint;
     bWantsToSprint = bEnabled;
     // Entering sprint ends automatic/burst fire; leaving sprint does not resume it.
@@ -776,6 +789,7 @@ void UBreakerCharacterMovementComponent::SetSprinting(bool bEnabled)
 
 void UBreakerCharacterMovementComponent::SetSlideRequested(bool bEnabled)
 {
+    if (HasImmovable()) bEnabled = false;
     if (bEnabled && !bSlideRequested)
     {
         bSlideRequestConsumed = false;
@@ -790,6 +804,7 @@ void UBreakerCharacterMovementComponent::SetSlideRequested(bool bEnabled)
 
 bool UBreakerCharacterMovementComponent::CanUseDash() const
 {
+    if (HasImmovable()) return false;
     if (IsOwnerStaggered()) return false;
     const UBreakerProgressionComponent* Progression = GetProgression();
     return Progression && Progression->GetProgressionState().PermanentClass == EBreakerClassId::Swift;
@@ -1271,6 +1286,8 @@ float UBreakerCharacterMovementComponent::LedgeTraversalAlpha(float ElapsedSecon
 FVector UBreakerCharacterMovementComponent::LedgeTraversalLocation(const FVector& Start, const FVector& Target, float Alpha)
 {
     const float A = FMath::Clamp(Alpha, 0.0f, 1.0f);
+    if (A >= 1.0f) return Target;
+    if (A <= 0.0f) return Start;
     const float Smoothed = A * A * (3.0f - 2.0f * A);
 
     // TWO-PHASE PATH (found by photographing the glide, not by reading it):
@@ -1306,6 +1323,8 @@ FVector UBreakerCharacterMovementComponent::LedgeTraversalLocation(const FVector
         const float CrossZ = RiseDist > 0.0f ? Target.Z : Start.Z;
         return FVector(Start.X + Flat.X * CrossAlpha, Start.Y + Flat.Y * CrossAlpha, CrossZ);
     }
+    // Rise/cross fractions can sum just below one; an ascending path has no drop leg.
+    if (DropDist <= UE_KINDA_SMALL_NUMBER) return Target;
     const float DropAlpha = FMath::Clamp(
         (Smoothed - RiseFraction - CrossFraction) / FMath::Max(1.0f - RiseFraction - CrossFraction, UE_KINDA_SMALL_NUMBER), 0.0f, 1.0f);
     return FVector(Target.X, Target.Y, FMath::Lerp(Start.Z, Target.Z, DropAlpha));
@@ -1362,6 +1381,13 @@ bool UBreakerCharacterMovementComponent::TryBeginLedgeTraversal()
 
 void UBreakerCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSeconds)
 {
+    if (HasImmovable())
+    {
+        bWantsToSprint = false; SetSlideRequested(false); BoostedSpeedCeiling = 0;
+        PendingLaunchVelocity = FVector::ZeroVector; PendingImpulseToApply = FVector::ZeroVector; PendingForceToApply = FVector::ZeroVector;
+        const FVector Horizontal = FVector(Velocity.X, Velocity.Y, 0).GetClampedToMaxSize(GetWalkSpeedCap());
+        Velocity.X = Horizontal.X; Velocity.Y = Horizontal.Y;
+    }
     Super::UpdateCharacterStateBeforeMovement(DeltaSeconds);
     if (bWantsLedgeTraversal && !IsTraversingLedge())
     {
@@ -1404,6 +1430,19 @@ void UBreakerCharacterMovementComponent::BeginLedgeTraversal(const FBreakerLedge
     TraversalExitVelocity = FVector(Velocity.X, Velocity.Y, 0.0f);
     Velocity = FVector::ZeroVector;
     SetMovementMode(MOVE_Custom, CustomModeLedgeTraversal);
+    const float PathLength = FVector::Dist2D(TraversalStart, TraversalTarget) + FMath::Abs(TraversalTarget.Z - TraversalStart.Z);
+    if (HasImmovable()) TraversalDuration = FMath::Max(TraversalDuration, 1.5f * PathLength / FMath::Max(1.0f, GetWalkSpeedCap()));
+    else if (Progression && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.PhantomStep"))))
+    {
+        const float HighZ = FMath::Max(TraversalStart.Z, TraversalTarget.Z);
+        const FVector Points[] = { FVector(TraversalStart.X, TraversalStart.Y, HighZ), FVector(TraversalTarget.X, TraversalTarget.Y, HighZ), TraversalTarget };
+        for (const FVector& Point : Points)
+        {
+            FHitResult Hit; SafeMoveUpdatedComponent(Point - UpdatedComponent->GetComponentLocation(), UpdatedComponent->GetComponentQuat(), true, Hit);
+            if (Hit.bBlockingHit) { FinishLedgeTraversal(false); return; }
+        }
+        FinishLedgeTraversal(true);
+    }
 }
 
 void UBreakerCharacterMovementComponent::FinishLedgeTraversal(bool bCompleted)
@@ -1417,6 +1456,7 @@ void UBreakerCharacterMovementComponent::FinishLedgeTraversal(bool bCompleted)
     // The old execution's exact exit rule: a completed glide keeps the
     // carried horizontal velocity, a blocked abort exits dead.
     Velocity = bCompleted ? TraversalExitVelocity : FVector::ZeroVector;
+    if (HasImmovable()) Velocity = Velocity.GetClampedToMaxSize(GetWalkSpeedCap());
     if (bCompleted)
     {
         // Only a COMPLETED traversal records (Part One-T) or broadcasts — a
@@ -1450,15 +1490,39 @@ void UBreakerCharacterMovementComponent::PhysLedgeTraversal(float DeltaTime, int
     }
     TraversalElapsed += DeltaTime;
     const float Alpha = LedgeTraversalAlpha(TraversalElapsed, TraversalDuration);
-    const FVector Desired = LedgeTraversalLocation(TraversalStart, TraversalTarget, Alpha);
+    FVector Desired = LedgeTraversalLocation(TraversalStart, TraversalTarget, Alpha);
     FHitResult Hit;
-    SafeMoveUpdatedComponent(Desired - UpdatedComponent->GetComponentLocation(),
-        UpdatedComponent->GetComponentQuat(), true, Hit);
+    if (HasImmovable())
+    {
+        // Preserve the authored rise/cross/drop route when one clock step crosses
+        // a corner. A clamped straight chord clips the ledge's solid front edge.
+        // Spend walking distance along each leg, including acquisition mid-glide.
+        const FVector Current = UpdatedComponent->GetComponentLocation();
+        const float HighZ = FMath::Max(Current.Z, Desired.Z);
+        const FVector Points[] = { FVector(Current.X, Current.Y, HighZ), FVector(Desired.X, Desired.Y, HighZ), Desired };
+        float Budget = FMath::Max(0.0f, GetWalkSpeedCap() * DeltaTime);
+        for (const FVector& Point : Points)
+        {
+            const FVector Delta = Point - UpdatedComponent->GetComponentLocation();
+            const float Distance = Delta.Size();
+            if (Distance <= UE_KINDA_SMALL_NUMBER) continue;
+            if (Budget <= UE_KINDA_SMALL_NUMBER) break;
+            const FVector Step = Delta.GetClampedToMaxSize(Budget);
+            SafeMoveUpdatedComponent(Step, UpdatedComponent->GetComponentQuat(), true, Hit);
+            Budget = FMath::Max(0.0f, Budget - Step.Size());
+            if (Hit.bBlockingHit || Step.Size() + UE_KINDA_SMALL_NUMBER < Distance) break;
+        }
+    }
+    else
+    {
+        SafeMoveUpdatedComponent(Desired - UpdatedComponent->GetComponentLocation(),
+            UpdatedComponent->GetComponentQuat(), true, Hit);
+    }
     if (Hit.bBlockingHit)
     {
         FinishLedgeTraversal(false);
     }
-    else if (Alpha >= 1.0f)
+    else if (Alpha >= 1.0f && UpdatedComponent->GetComponentLocation().Equals(TraversalTarget, 0.1f))
     {
         FinishLedgeTraversal(true);
     }
