@@ -5370,6 +5370,26 @@
 					"requiredTreeInvestment": 4
 				},
 				{
+					"id": "Caster.Spellblade.Reprisal",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.Spellblade.Reprisal"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Caster.Spellblade.Bloodprice",
+							"rank": 1
+						}
+					],
+					"requiredTreeInvestment": 6
+				},
+				{
 					"id": "Caster.Spellblade.NoDistance",
 					"tier": 4,
 					"ranks": 1,

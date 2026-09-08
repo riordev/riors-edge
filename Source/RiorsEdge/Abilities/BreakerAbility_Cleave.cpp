@@ -112,6 +112,22 @@ float UBreakerAbility_Cleave::ComputeSwingBaseDamage(const AActor* OwnerActor) c
     return SwingDamage(WeaponDamage, WeaponDamageCoefficient, ScaledUnarmed);
 }
 
+float UBreakerAbility_Cleave::GetAuthoredResourceCost() const
+{
+    const auto* Character = GetBreakerCharacter();
+    const auto* Combat = Character ? Character->GetCombat() : nullptr;
+    return Combat && Combat->HasReprisalCharge() ? 0.0f : Super::GetAuthoredResourceCost();
+}
+
+void UBreakerAbility_Cleave::CommitExecute(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo)
+{
+    // CommitAbility has already frozen this cast's quoted price. Claim before
+    // applying its cost or broadcasting any callbacks; rejected casts never
+    // reach CommitExecute and keep their still-live opportunity.
+    if (auto* Character = GetBreakerCharacter())
+        if (auto* Combat = Character->GetCombat()) Combat->ClaimReprisalCharge();
+    Super::CommitExecute(Handle, ActorInfo, ActivationInfo);
+}
 void UBreakerAbility_Cleave::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
     ABreakerCharacter* Character = GetBreakerCharacter();

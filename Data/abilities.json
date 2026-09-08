@@ -118,7 +118,8 @@
 				"BleedDuration": 4,
 				"BleedTickInterval": 1,
 				"FollowThroughRankOneKillRefund": 3,
-				"FollowThroughRankTwoKillRefund": 6
+				"FollowThroughRankTwoKillRefund": 6,
+				"ReprisalWindowSeconds": 2
 			},
 			"variants": []
 		},

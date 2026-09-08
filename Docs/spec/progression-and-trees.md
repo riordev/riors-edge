@@ -222,18 +222,18 @@ offered leaves most of a doctrine declined.
 
 Spellblade's No Distance costs two points after six invested and Momentum Transfer.
 It raises Closequarter's authored cost to50 before ordinary cost modifiers and permits
-the existing arrival refund against any target health; it grants no damage More. Multispell's Interference costs two after six invested and Resonance; it selects Resonance's authored fixed-per-status curve with its three-status threshold bonus.
+the existing arrival refund against any target health; it grants no damage More.
+Reprisal costs two after six invested and Bloodprice: a surviving passive block
+grants one free Cleave within two seconds. A refused cast keeps the opportunity;
+committing consumes it before callbacks. Death, expiry and respec clear it.
+Multispell's Interference costs two after six invested and Resonance; it selects
+Resonance's authored fixed-per-status curve with its three-status threshold bonus.
 
-**The old five-tier target shape is withdrawn rather than renumbered.** It
-argued three distinct build shapes from a thirty-point class budget — one branch
-complete plus a splash, two to the rewrite tier, three to the ability tier — and
-that budget no longer exists. An eight-point pool cannot complete a branch and
-splash, so the argument does not survive its premise; what replaces it has to be
-derived against eight, and has not been. The shipped gating stands.
+The eight-point budget leaves one two-point tier-four choice after six earlier
+points. It does not buy a complete doctrine; prerequisites still gate each choice.
 
-**A doctrine authors no More multiplier.** All three slots live in Core. A
-doctrine pays in rules: conversion, condition change, rule rewrite.
-
+**A doctrine authors no More multiplier.** Core and eligible gear rewrites compete
+for the three slots. A doctrine pays in conversion, conditions and rule rewrites.
 
 ### The axes
 

@@ -116,6 +116,7 @@ namespace BreakerNodeTags
     // yet. A node granting a tag nothing reads is the failure this project has
     // shipped four times.
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_NoDistance);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_Reprisal);
 
     // Caster / VOID WHISPERER (Class-Kits §2.4).
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_VW_Seep);

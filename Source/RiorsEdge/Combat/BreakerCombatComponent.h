@@ -64,6 +64,11 @@ public:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
     // O2 tuning: a single timed defensive input, granted by the Core tree.
     bool TryParry();
+    bool HasReprisalCharge() const;
+    bool ClaimReprisalCharge();
+    double ReprisalExpiryTime = -1.0;
+    UFUNCTION() void InvalidateReprisalOwnership();
+    UFUNCTION() void ClearReprisalCharge();
     bool IsParryUnlocked() const { return HasParryPermission(); }
     bool IsParryAvailable() const;
     bool IsParryActive() const;

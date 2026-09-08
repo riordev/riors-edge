@@ -117,6 +117,7 @@ namespace BreakerNodeTags
     UE_DEFINE_GAMEPLAY_TAG(Node_SB_Edge, "Progression.Node.Caster.Spellblade.Edge");
     UE_DEFINE_GAMEPLAY_TAG(Node_SB_Edgework, "Progression.Node.Caster.Spellblade.Edgework");
     UE_DEFINE_GAMEPLAY_TAG(Node_SB_NoDistance, "Progression.Node.Caster.Spellblade.NoDistance");
+    UE_DEFINE_GAMEPLAY_TAG(Node_SB_Reprisal, "Progression.Node.Caster.Spellblade.Reprisal");
 
     // Caster / VOID WHISPERER (Class-Kits §2.4).
     UE_DEFINE_GAMEPLAY_TAG(Node_VW_Seep, "Progression.Node.Caster.VoidWhisperer.Seep");
@@ -2373,6 +2374,12 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterSpellbladeTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Edge.GetTag());
     Tree->Nodes.Add(Node);
 
+    Node = MakeNode(TEXT("Caster.Spellblade.Reprisal"), TEXT("Reprisal"),
+        TEXT("After a passive Block proc, your next Cleave within two seconds costs no Mana."),
+        EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Caster.Spellblade.Bloodprice"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Reprisal.GetTag());
+    Tree->Nodes.Add(Node);
     Node = MakeNode(TEXT("Caster.Spellblade.NoDistance"), TEXT("No Distance"),
         TEXT("Closequarter refunds Mana on arrival at any target health. Its base Mana cost rises to 50."),
         EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);

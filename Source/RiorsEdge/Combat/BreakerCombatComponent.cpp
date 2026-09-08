@@ -5,6 +5,7 @@
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbilityStateComponent.h"
+#include "Abilities/BreakerAbilityDefinition.h"
 #include "Abilities/BreakerWindowLaneMath.h"
 #include "Classes/BreakerChargeComponent.h"
 #include "Combat/BreakerZoneActor.h"
@@ -268,6 +269,27 @@ void UBreakerCombatComponent::RefreshParryPermission()
     bPerfectGuardOwned = HasPerfectGuardPermission();
     if (!bPerfectGuardOwned) PerfectGuardEnd = -1.0f;
     if (!bParryOwned || IsDead()) ClearParryWindows();
+}
+bool UBreakerCombatComponent::HasReprisalCharge() const
+{
+    const auto* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    return !IsDead() && GetWorld() && GetWorld()->GetTimeSeconds() < ReprisalExpiryTime
+        && Progression && Progression->HasNodeTag(BreakerNodeTags::Node_SB_Reprisal.GetTag());
+}
+
+bool UBreakerCombatComponent::ClaimReprisalCharge()
+{
+    const bool bAvailable = HasReprisalCharge();
+    ReprisalExpiryTime = -1.0;
+    return bAvailable;
+}
+
+void UBreakerCombatComponent::ClearReprisalCharge() { ReprisalExpiryTime = -1.0; }
+
+void UBreakerCombatComponent::InvalidateReprisalOwnership()
+{
+    const auto* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    if (!Progression || !Progression->HasNodeTag(BreakerNodeTags::Node_SB_Reprisal.GetTag())) ClearReprisalCharge();
 }
 bool UBreakerCombatComponent::TryParry()
 {
@@ -716,6 +738,19 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     if (Result.bBlocked)
     {
         LastSuccessfulBlockTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+        if (!Result.bParried && !Result.bKilled && !IsDead() && GetWorld())
+            if (auto* ReprisalProgression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>())
+                if (ReprisalProgression->HasNodeTag(BreakerNodeTags::Node_SB_Reprisal.GetTag()))
+                {
+                    const auto* Cleave = UBreakerAbilityDefinition::FindFallback(TEXT("Caster.Cleave"));
+                    const float Seconds = Cleave ? Cleave->Number(TEXT("ReprisalWindowSeconds"), 0.0f) : 0.0f;
+                    if (FMath::IsFinite(Seconds) && Seconds > 0)
+                    {
+                        ReprisalExpiryTime = LastSuccessfulBlockTime + Seconds;
+                        ReprisalProgression->OnProgressionChanged.AddUniqueDynamic(this, &ThisClass::InvalidateReprisalOwnership);
+                        OnDeath.AddUniqueDynamic(this, &ThisClass::ClearReprisalCharge);
+                    }
+                }
     }
     OnDamageReceived.Broadcast(Result);
     if (Result.bKilled && !bDeathBroadcast)

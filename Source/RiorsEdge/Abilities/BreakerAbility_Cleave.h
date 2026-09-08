@@ -27,6 +27,8 @@ class RIORSEDGE_API UBreakerAbility_Cleave : public UBreakerCasterAbility
 
 public:
     UBreakerAbility_Cleave();
+    virtual float GetAuthoredResourceCost() const override;
+    virtual void CommitExecute(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) override;
 
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
@@ -91,6 +93,7 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0.05")) float BleedTickInterval = 1.0f;
     UPROPERTY(EditDefaultsOnly, Category="Cleave|Mana") float FollowThroughRankOneKillRefund = 3.0f; // O2 PLACEHOLDER
     UPROPERTY(EditDefaultsOnly, Category="Cleave|Mana") float FollowThroughRankTwoKillRefund = 6.0f; // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float ReprisalWindowSeconds = 2.0f; // O2 PLACEHOLDER
 
 private:
     // LevelScalar and OwnerCombat are read once by the activation and passed
