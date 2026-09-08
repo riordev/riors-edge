@@ -454,6 +454,24 @@
 			"lane": true,
 			"rider": false,
 			"affixOwned": false
+		},
+		{
+			"name": "ParryWindowAddedSeconds",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
+		},
+		{
+			"name": "ParryCooldownReductionSeconds",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
+		},
+		{
+			"name": "ParryCooldownRecovery",
+			"lane": true,
+			"rider": false,
+			"affixOwned": false
 		}
 	],
 	"conditions": [

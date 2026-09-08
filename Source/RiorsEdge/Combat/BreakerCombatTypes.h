@@ -54,6 +54,7 @@ struct RIORSEDGE_API FBreakerElementSourceSnapshot
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float ElementalBuildupPenetrationPercent = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float ElementalThresholdMultiplier = 1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bRotDensity = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bLongDark = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float ElementalDamageIncreasedPercent = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float RotDamageIncreasedPercent = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float VoidBurstDamageIncreasedPercent = 0;
@@ -125,6 +126,9 @@ struct RIORSEDGE_API FBreakerDamageRequest
     // Struct default only — live requests are filled from the attribute set
     // (or its named fallback constants). O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float CriticalMultiplier = 1.5f;
+    // Emission-time Core rewrite. Periodic status ticks use their application
+    // snapshot instead; this never consults the owner's later loadout.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bForceCriticalStrike = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float WeakPointMultiplier = 1.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float ArmorPenetration = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float ProcCoefficient = 1.0f;

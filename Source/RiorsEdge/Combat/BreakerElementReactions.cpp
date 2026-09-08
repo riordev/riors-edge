@@ -132,17 +132,18 @@ void UBreakerStatusComponent::AdvanceRotStatus(uint64 ApplicationSerial, float D
         const int32 Index = Find();
         if (Index == INDEX_NONE || !Combat || Combat->IsDead()) return;
         FBreakerActiveStatus& Active = ActiveStatuses[Index];
-        if (Active.RemainingDuration <= 0) break;
-        const double Step = FMath::Min3(RemainingFrame,
-            static_cast<double>(Active.RemainingDuration), static_cast<double>(FMath::Max(0.0f, Active.TimeUntilNextTick)));
+        if (Active.bPersistentRot && !IsLongDarkLeaseValid(Active)) { RemoveLongDarkApplication(ApplicationSerial); return; }
+        if (!Active.bPersistentRot && Active.RemainingDuration <= 0) break;
+        const double ActiveFrame = Active.bPersistentRot ? RemainingFrame : FMath::Min(RemainingFrame, static_cast<double>(Active.RemainingDuration));
+        const double Step = FMath::Min(ActiveFrame, static_cast<double>(FMath::Max(0.0f, Active.TimeUntilNextTick)));
         Active.RemainingDuration = FMath::Max(0.0f, Active.RemainingDuration - static_cast<float>(Step));
         Active.TimeUntilNextTick = FMath::Max(0.0f, Active.TimeUntilNextTick - static_cast<float>(Step));
         RemainingFrame = FMath::Max(0.0, RemainingFrame - Step);
         if (Active.TimeUntilNextTick <= BreakerRotClockTolerance)
         {
             Active.TimeUntilNextTick = Active.Spec.TickInterval;
-            const float TickBudget = FMath::Min(Active.UnpaidDamageBudget,
-                FMath::Max(0.0f, Active.Spec.BaseDamagePerTick) * FMath::Max(1, Active.Stacks));
+            const float SnapshotTick = FMath::Max(0.0f, Active.Spec.BaseDamagePerTick) * FMath::Max(1, Active.Stacks);
+            const float TickBudget = Active.bPersistentRot ? SnapshotTick : FMath::Min(Active.UnpaidDamageBudget, SnapshotTick);
             if (TickBudget > 0)
             {
                 // Claim this one boundary before its callback. Remaining
@@ -172,7 +173,7 @@ void UBreakerStatusComponent::AdvanceRotStatus(uint64 ApplicationSerial, float D
         else if (Step <= 0) break;
     }
     const int32 Index = Find();
-    if (Index != INDEX_NONE && ActiveStatuses[Index].RemainingDuration <= BreakerRotClockTolerance)
+    if (Index != INDEX_NONE && !ActiveStatuses[Index].bPersistentRot && ActiveStatuses[Index].RemainingDuration <= BreakerRotClockTolerance)
     {
         const FBreakerActiveStatus Expired = ActiveStatuses[Index];
         ActiveStatuses.RemoveAt(Index);

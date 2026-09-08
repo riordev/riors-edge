@@ -460,7 +460,10 @@ bool FBreakerConditionVocabularyStatTargetTest::RunTest(const FString& Parameter
     // gear-migration note.
     //
     // This number goes up in the same commit as the lane, never before it.
-    TestEqual(TEXT("stat targets with an aggregation lane today"), Wired, 73);
+    TestEqual(TEXT("stat targets with an aggregation lane today"), Wired, 76);
+    TestTrue(TEXT("Parry window seconds have an aggregation lane"), BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget::ParryWindowAddedSeconds));
+    TestTrue(TEXT("Parry cooldown seconds have an aggregation lane"), BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget::ParryCooldownReductionSeconds));
+    TestTrue(TEXT("Parry cooldown recovery has an aggregation lane"), BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget::ParryCooldownRecovery));
     TestTrue(*FString::Printf(TEXT("%d stat targets still await a lane"), TargetCount - Wired), TargetCount > Wired);
 
     // The pre-existing ten specifically, so that a future reshuffle cannot quiet

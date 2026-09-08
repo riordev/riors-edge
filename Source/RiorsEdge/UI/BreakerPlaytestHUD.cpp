@@ -3015,7 +3015,7 @@ float ABreakerPlaytestHUD::DrawStatusReadout(const ABreakerCharacter* Character,
             ? Entry.Spec.StatusTag.GetTagName().ToString() : BreakerStrings::Get(EBreakerStringKey::HudStatusUnnamed);
         int32 SeparatorIndex = INDEX_NONE;
         if (ShortName.FindLastChar(TEXT('.'), SeparatorIndex)) ShortName = ShortName.RightChop(SeparatorIndex + 1);
-        const FString Text = bUnstable ? BreakerStrings::Format(EBreakerStringKey::HudUnstableTimer, FMath::Max(Entry.RemainingDuration, 0.0f)) : bErased ? BreakerStrings::Format(EBreakerStringKey::HudErasedTimer, FMath::Max(Entry.RemainingDuration, 0.0f)) : bRot ? BreakerStrings::Format(EBreakerStringKey::HudRotTimer, FMath::Max(Entry.RemainingDuration, 0.0f)) : Entry.Stacks > 1
+        const FString Text = Entry.bPersistentRot ? BreakerStrings::Get(EBreakerStringKey::HudRotPersistent) : bUnstable ? BreakerStrings::Format(EBreakerStringKey::HudUnstableTimer, FMath::Max(Entry.RemainingDuration, 0.0f)) : bErased ? BreakerStrings::Format(EBreakerStringKey::HudErasedTimer, FMath::Max(Entry.RemainingDuration, 0.0f)) : bRot ? BreakerStrings::Format(EBreakerStringKey::HudRotTimer, FMath::Max(Entry.RemainingDuration, 0.0f)) : Entry.Stacks > 1
             ? FString::Printf(TEXT("%s %d  %.1f"), *ShortName.ToUpper(), Entry.Stacks,
                 FMath::Max(Entry.RemainingDuration, 0.0f))
             : FString::Printf(TEXT("%s  %.1f"), *ShortName.ToUpper(),
@@ -3030,7 +3030,7 @@ float ABreakerPlaytestHUD::DrawStatusReadout(const ABreakerCharacter* Character,
             StatusColor, Pixels, 1.0f, ESpecFontRole::Mono);
         if (bRot || bErased || bUnstable)
         {
-            const float Remaining = FMath::Clamp(Entry.RemainingDuration / FMath::Max(Entry.Spec.Duration, UE_SMALL_NUMBER), 0.0f, 1.0f);
+            const float Remaining = Entry.bPersistentRot ? 1.0f : FMath::Clamp(Entry.RemainingDuration / FMath::Max(Entry.Spec.Duration, UE_SMALL_NUMBER), 0.0f, 1.0f);
             DrawRect(BreakerUI::BorderRest, X, RowBottom - S(2.0f), Width, S(2.0f));
             DrawRect(StatusColor, X, RowBottom - S(2.0f), Width * Remaining, S(2.0f));
         }

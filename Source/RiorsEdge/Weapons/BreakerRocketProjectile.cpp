@@ -148,14 +148,21 @@ void ABreakerRocketProjectile::InitializeDamageRamp(UBreakerWeaponComponent* Wea
     RampToken = Token;
 }
 
-void ABreakerRocketProjectile::EndPlay(const EEndPlayReason::Type EndPlayReason)
+void ABreakerRocketProjectile::IgnoreSibling(ABreakerRocketProjectile* Other)
 {
-    if (HasAuthority() && RampToken != 0)
-        if (UBreakerWeaponComponent* Weapon = RampWeapon.Get()) Weapon->ResolveDamageRampShot(RampToken, false);
-    RampToken = 0;
-    Super::EndPlay(EndPlayReason);
+    if (!Other || Other == this) return;
+    Collision->IgnoreActorWhenMoving(Other, true);
+    Other->Collision->IgnoreActorWhenMoving(this, true);
 }
 
+void ABreakerRocketProjectile::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    const uint32 ClaimedToken = RampToken;
+    RampToken = 0;
+    if (HasAuthority() && ClaimedToken != 0)
+        if (UBreakerWeaponComponent* Weapon = RampWeapon.Get()) Weapon->ResolveDamageRampProjectile(ClaimedToken, false);
+    Super::EndPlay(EndPlayReason);
+}
 void ABreakerRocketProjectile::BeginPlay()
 {
     Super::BeginPlay();
@@ -180,6 +187,8 @@ void ABreakerRocketProjectile::Explode(const FVector& Location, AActor* DirectIm
 {
     if (!HasAuthority() || bExploded) return;
     bExploded = true;
+    const uint32 ClaimedToken = RampToken;
+    RampToken = 0;
     bool bDealtDamage = false;
 
     TArray<AActor*> Candidates;
@@ -211,8 +220,7 @@ void ABreakerRocketProjectile::Explode(const FVector& Location, AActor* DirectIm
         bDealtDamage |= !Result.bDodged && Result.HealthDamage + Result.ShieldDamage > 0.0f;
     }
 
-    if (UBreakerWeaponComponent* Weapon = RampWeapon.Get()) Weapon->ResolveDamageRampShot(RampToken, bDealtDamage);
-    RampToken = 0;
+    if (UBreakerWeaponComponent* Weapon = RampWeapon.Get()) Weapon->ResolveDamageRampProjectile(ClaimedToken, bDealtDamage);
 
     MulticastExplosionCosmetics(Location, ExplosionRadius);
     // The rocket is its own explosion: it stops, goes inert, blooms to the

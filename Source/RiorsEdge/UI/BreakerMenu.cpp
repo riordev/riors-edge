@@ -11595,7 +11595,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterSheetScreen()
             Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
             [
                 Row(*Name.ToUpper(),
-                    FString::Printf(TEXT("%d  %.1fs"), Entry.Stacks, FMath::Max(Entry.RemainingDuration, 0.0f)),
+                    Entry.bPersistentRot ? BreakerStrings::Get(EBreakerStringKey::HudRotPersistent)
+                        : FString::Printf(TEXT("%d  %.1fs"), Entry.Stacks, FMath::Max(Entry.RemainingDuration, 0.0f)),
                     BreakerUI::Harm, FString())
             ];
         }

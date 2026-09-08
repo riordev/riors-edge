@@ -301,6 +301,9 @@ enum class EBreakerNodeStatTarget : uint8
     ReactionDamage,
     VoidDamage,
     EffectiveHealth,
+    ParryWindowAddedSeconds,
+    ParryCooldownReductionSeconds,
+    ParryCooldownRecovery,
 
     Count UMETA(Hidden)
 };
@@ -390,6 +393,9 @@ inline bool BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget Target)
     case EBreakerNodeStatTarget::ReactionDamage:
     case EBreakerNodeStatTarget::VoidDamage:
     case EBreakerNodeStatTarget::EffectiveHealth:
+    case EBreakerNodeStatTarget::ParryWindowAddedSeconds:
+    case EBreakerNodeStatTarget::ParryCooldownReductionSeconds:
+    case EBreakerNodeStatTarget::ParryCooldownRecovery:
     case EBreakerNodeStatTarget::MaxClassResource:
     case EBreakerNodeStatTarget::ClassResourceRegen:
     case EBreakerNodeStatTarget::FireRate:
@@ -816,7 +822,11 @@ struct RIORSEDGE_API FBreakerNodeStats
     UPROPERTY(BlueprintReadOnly) float VoidBurstDamageIncreasedPercent = 0.0f;
     UPROPERTY(BlueprintReadOnly) float RiftBurstDamageIncreasedPercent = 0.0f;
     UPROPERTY(BlueprintReadOnly) float ReactionDamageIncreasedPercent = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float ParryWindowAddedSeconds = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float ParryCooldownReductionSeconds = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float ParryCooldownRecoveryMultiplier = 1.0f;
     UPROPERTY(BlueprintReadOnly) bool bRotDensity = false;
+    UPROPERTY(BlueprintReadOnly) bool bLongDark = false;
     UPROPERTY(BlueprintReadOnly) bool bHemorrhage = false;
     UPROPERTY(BlueprintReadOnly) bool bDeepen = false;
     UPROPERTY(BlueprintReadOnly) bool bHealthRegenInCombat = false;
@@ -971,6 +981,7 @@ struct RIORSEDGE_API FBreakerStatusApplicationSpec
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 InitialStacks = 1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHasAilmentRuleSnapshot = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHemorrhageSnapshot = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bLongDarkSnapshot = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 AdditionalStackCapSnapshot = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float ProcCoefficient = 1.0f;
     // DoTs snapshot this structure at application. Later source-stat changes

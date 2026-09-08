@@ -1046,6 +1046,11 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
                 if (Definition->StatBucket == EBreakerStatBucket::IncreasedPercent) ActiveConditionalPercent += Value;
             }
             const int32 Target = static_cast<int32>(Definition->StatTarget);
+            // Preserve benefit/penalty signs for Deadeye before the display
+            // total nets them. The contribution still sums the same raw value.
+            if (OutContribution && Definition->StatTarget == EBreakerStatTarget::CriticalDamage
+                && Definition->StatBucket == EBreakerStatBucket::Flat)
+                OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalMultiplier, Value / 100.0f);
             if (Definition->StatBucket == EBreakerStatBucket::Flat) FlatByTarget[Target] += Value;
             else if (Definition->StatBucket == EBreakerStatBucket::IncreasedPercent) IncreasedByTarget[Target] += Value;
             else if (Definition->StatBucket == EBreakerStatBucket::MorePercent)
@@ -1246,7 +1251,6 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         OutContribution->AddFlat(EBreakerAggregatedAttribute::MaxHealth, Stats.BonusHealth + Stats.BaseHealthFromGear);
         OutContribution->AddFlat(EBreakerAggregatedAttribute::MaxClassResource, Stats.BonusMaxResource);
         OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalChance, Stats.CriticalChanceBonus);
-        OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalMultiplier, Stats.CriticalMultiplierBonus);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::MoveSpeed, MoveSpeedPercent);
         // Slide speed, air control and dash cooldown reduction were the last
         // stats that reached gameplay WITHOUT passing through the aggregator:

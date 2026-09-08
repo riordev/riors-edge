@@ -13,6 +13,8 @@
 #include "Engine/World.h"
 #include "Movement/BreakerCharacterMovementComponent.h"
 #include "Progression/BreakerExperience.h"
+#include "Progression/BreakerClassDefinition.h"
+#include "Progression/BreakerProgressionNode.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "Progression/BreakerProgressionTree.h"
@@ -116,9 +118,25 @@ bool FBreakerEmplacementRuntimeTest::RunTest(const FString& Parameters)
         Check(-Forward * 400, false, TEXT("behind but outside radius"));
     }
     Position(-Anchor->GetActorForwardVector() * 200);
+    // Fan must also forfeit a doctrine's stationary-spread substitution.
+    // Keep the real paid Anchor and purchased Emplacement, adding only the
+    // temporary Core schema through the already-earned Core budget.
+    auto* Definition = DuplicateObject<UBreakerClassDefinition>(Progression->ClassDefinition, Tank);
+    auto* FanTree = NewObject<UBreakerProgressionTree>(Definition);
+    FanTree->TreeId = TEXT("Test.Core.Fan.Emplacement"); FanTree->Currency = EBreakerPointCurrency::CorePoints;
+    auto* Fan = NewObject<UBreakerProgressionNode>(FanTree);
+    Fan->NodeId = TEXT("Test.Core.Fan.Emplacement.Rule"); Fan->Currency = FanTree->Currency;
+    Fan->GrantedTags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Fan")));
+    FanTree->Nodes.Add(Fan); Definition->BranchTrees.Add(FanTree); Progression->ClassDefinition = Definition;
+    if (!TestTrue(TEXT("Earned Core point purchases Fan beside real Emplacement"), Progression->PurchaseNode(FanTree, Fan->NodeId, Reason))) return false;
+    const float FanMovingSpread = Weapon->GetNextShotSpreadDegrees();
+    Movement->Velocity = FVector::ZeroVector;
+    const float FanStationarySpread = Weapon->GetNextShotSpreadDegrees();
+    TestTrue(TEXT("Fan restores movement spread despite owned live Emplacement"), FanMovingSpread > FanStationarySpread);
+    Movement->Velocity = FVector(200, 0, 0);
     Anchor->Destroy();
     TestFalse(TEXT("destroyed panel immediately stops posture rewrite"), Weapon->IsSpreadReadingStationary());
-    TestEqual(TEXT("destroyed panel restores ordinary moving spread"), Weapon->GetNextShotSpreadDegrees(), OrdinaryMovingSpread, .001f);
+    TestEqual(TEXT("destroying panel cannot change Fan's already-unreduced moving spread"), Weapon->GetNextShotSpreadDegrees(), FanMovingSpread, .001f);
     return true;
 }
 #endif

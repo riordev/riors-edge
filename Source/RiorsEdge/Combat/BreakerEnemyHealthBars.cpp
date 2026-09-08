@@ -747,12 +747,13 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         const float PipRowH = bBossRank ? Gap + BreakerEnemyBarMath::BossPipSizeFor(Scale).Y * ScaleUnit : 0.0f;
         const auto* Status = Enemy->FindComponentByClass<UBreakerStatusComponent>();
         const FBreakerActiveStatus* Rot = Status ? Status->GetActiveStatuses().FindByPredicate([](const auto& Entry)
-            { return Entry.Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot")) && Entry.RemainingDuration > 0; }) : nullptr;
+            { return Entry.Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot")) && (Entry.bPersistentRot || Entry.RemainingDuration > 0); }) : nullptr;
         const float Threshold = Status ? Status->GetEntropyThreshold() : 0;
         const float Buildup = Status && Threshold > UE_SMALL_NUMBER ? FMath::Clamp(Status->GetEntropyBuildup() / Threshold, 0.0f, 1.0f) : 0;
         const bool bShowEntropy = bShowName && !bSightBlocked && (Rot || Buildup > 0);
         const float EntropyPixels = BreakerEnemyBar::NamePixels * Scale;
-        const FString EntropyText = Rot ? BreakerStrings::Format(EBreakerStringKey::HudRotTimer, Rot->RemainingDuration)
+        const FString EntropyText = Rot && Rot->bPersistentRot ? BreakerStrings::Get(EBreakerStringKey::HudRotPersistent)
+            : Rot ? BreakerStrings::Format(EBreakerStringKey::HudRotTimer, Rot->RemainingDuration)
             : FString::Printf(TEXT("%s %d%%"), *BreakerStrings::Get(EBreakerStringKey::HudEntropy), FMath::Clamp(FMath::RoundToInt(Buildup * 100), 1, 100));
         const FVector2D EntropyTextSize = bShowEntropy ? MeasureSpecText(EntropyText, EntropyPixels, ESpecFontRole::Mono) : FVector2D::ZeroVector;
         const float EntropyRailH = FMath::Max(1.0f, 2.0f * Scale * ScaleUnit); // O2 presentation.
@@ -879,7 +880,7 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
                 ReservePlate(Projected.X - EntropyTextSize.X * .5f, EntropyY, EntropyTextSize.X, EntropyTextSize.Y);
                 DrawSpecTextCentered(EntropyText, Projected.X, EntropyY, Rot ? BreakerUI::Orange : BreakerUI::Gold, EntropyPixels, BarAlpha, ESpecFontRole::Mono);
                 const float RailY = EntropyY + EntropyTextSize.Y + Gap;
-                const float Fill = Rot ? FMath::Clamp(Rot->RemainingDuration / FMath::Max(Rot->Spec.Duration, UE_SMALL_NUMBER), 0.0f, 1.0f) : Buildup;
+                const float Fill = Rot && Rot->bPersistentRot ? 1.0f : Rot ? FMath::Clamp(Rot->RemainingDuration / FMath::Max(Rot->Spec.Duration, UE_SMALL_NUMBER), 0.0f, 1.0f) : Buildup;
                 ReservePlate(Bar.X, RailY, Bar.W, EntropyRailH);
                 DrawRect(BreakerUI::Alpha(BreakerUI::BorderRest, BarAlpha), Bar.X, RailY, Bar.W, EntropyRailH);
                 DrawRect(BreakerUI::Alpha(Rot ? BreakerUI::Orange : BreakerUI::Gold, BarAlpha), Bar.X, RailY, Bar.W * Fill, EntropyRailH);

@@ -141,6 +141,9 @@ bool FBreakerDamageRampRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("swap resets all stacks"), Weapon->GetDamageRampStacks(), 0);
     TestFalse(TEXT("Secondary cannot use Primary affix"), Weapon->IsDamageRampEquipped());
     Weapon->EquipSlot(1);
+    // This section validates ordering between single-projectile pulls.
+    // The earlier eight-pellet hitscan fixture now also affects rocket emission.
+    Weapon->WeaponDefinition->PelletsPerShot = 1;
     Weapon->WeaponDefinition->bProjectile = true;
     auto FireRocket = [&]() -> ABreakerRocketProjectile*
     {

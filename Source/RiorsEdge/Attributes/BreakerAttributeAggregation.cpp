@@ -17,6 +17,9 @@ namespace
 
 void FBreakerAttributeContribution::Reset()
 {
+    bDeadeye = false;
+    PositiveCriticalFlat = PositiveCriticalIncreased = 0.0f;
+    PositiveCriticalMore = 1.0f;
     DamageMoreSources.Reset();
     for (int32 Index = 0; Index < AttributeCount; ++Index)
     {
@@ -30,12 +33,14 @@ void FBreakerAttributeContribution::AddFlat(EBreakerAggregatedAttribute Attribut
 {
     const int32 Index = AttributeIndex(Attribute);
     if (Index != INDEX_NONE) Flat[Index] += Value;
+    if (Attribute == EBreakerAggregatedAttribute::CriticalMultiplier) PositiveCriticalFlat += FMath::Max(0.0f, Value);
 }
 
 void FBreakerAttributeContribution::AddIncreasedPercent(EBreakerAggregatedAttribute Attribute, float Percent)
 {
     const int32 Index = AttributeIndex(Attribute);
     if (Index != INDEX_NONE) IncreasedPercent[Index] += Percent;
+    if (Attribute == EBreakerAggregatedAttribute::CriticalMultiplier) PositiveCriticalIncreased += FMath::Max(0.0f, Percent);
 }
 
 void FBreakerAttributeContribution::AddSharedIncreasedDamage(float Percent)
@@ -60,6 +65,7 @@ void FBreakerAttributeContribution::ComposeMore(EBreakerAggregatedAttribute Attr
     }
     const int32 Index = AttributeIndex(Attribute);
     if (Index != INDEX_NONE) MoreMultiplier[Index] *= Multiplier;
+    if (Attribute == EBreakerAggregatedAttribute::CriticalMultiplier && Multiplier > 1.0f) PositiveCriticalMore *= Multiplier;
 }
 
 void FBreakerAttributeContribution::AddDamageMoreSource(FName Key, EBreakerDamageMoreLane Lane, float Multiplier)
@@ -118,7 +124,8 @@ float FBreakerAttributeContribution::GetMore(EBreakerAggregatedAttribute Attribu
 
 bool FBreakerAttributeContribution::IsIdentity() const
 {
-    if (!DamageMoreSources.IsEmpty()) return false;
+    if (bDeadeye || PositiveCriticalFlat != 0.0f || PositiveCriticalIncreased != 0.0f
+        || PositiveCriticalMore != 1.0f || !DamageMoreSources.IsEmpty()) return false;
     for (int32 Index = 0; Index < AttributeCount; ++Index)
     {
         if (Flat[Index] != 0.0f || IncreasedPercent[Index] != 0.0f || MoreMultiplier[Index] != 1.0f) return false;
@@ -169,6 +176,7 @@ const FBreakerAttributeContribution& FBreakerAttributeAggregator::GetContributio
 
 float FBreakerAttributeAggregator::Compose(EBreakerAggregatedAttribute Attribute) const
 {
+    if (Attribute == EBreakerAggregatedAttribute::CriticalChance && HasDeadeye()) return 1.0f;
     const int32 Index = AttributeIndex(Attribute);
     if (Index == INDEX_NONE) return 0.0f;
 
@@ -191,6 +199,8 @@ float FBreakerAttributeAggregator::ComposedFlatFactor(EBreakerAggregatedAttribut
     for (int32 Contributor = 0; Contributor < ContributorCount; ++Contributor)
     {
         Flat += Contributions[Contributor].GetFlat(Attribute);
+        if (Attribute == EBreakerAggregatedAttribute::CriticalMultiplier && HasDeadeye())
+            Flat -= 0.5f * Contributions[Contributor].GetPositiveCriticalFlat();
     }
     return Bases[Index] + Flat;
 }
@@ -205,6 +215,8 @@ float FBreakerAttributeAggregator::ComposedIncreasedPercent(EBreakerAggregatedAt
     for (int32 Contributor = 0; Contributor < ContributorCount; ++Contributor)
     {
         IncreasedPercent += Contributions[Contributor].GetIncreasedPercent(Attribute);
+        if (Attribute == EBreakerAggregatedAttribute::CriticalMultiplier && HasDeadeye())
+            IncreasedPercent -= 0.5f * Contributions[Contributor].GetPositiveCriticalIncreased();
     }
     return IncreasedPercent;
 }
@@ -221,7 +233,18 @@ float FBreakerAttributeAggregator::ComposedMoreProduct(EBreakerAggregatedAttribu
         More *= Contributions[Contributor].GetMore(Attribute);
     }
 
+    if (Attribute == EBreakerAggregatedAttribute::CriticalMultiplier && HasDeadeye())
+    {
+        float Positive = 1.0f;
+        for (const auto& Contribution : Contributions) Positive *= Contribution.GetPositiveCriticalMore();
+        More = More / Positive * (1.0f + (Positive - 1.0f) * 0.5f);
+    }
     return More;
+}
+
+bool FBreakerAttributeAggregator::HasDeadeye() const
+{
+    return GetContribution(EBreakerAttributeContributor::Progression).HasDeadeye();
 }
 
 int32 FBreakerAttributeAggregator::GetDamageMoreSourceCount() const

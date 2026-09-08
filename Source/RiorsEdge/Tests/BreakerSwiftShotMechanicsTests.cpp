@@ -302,7 +302,11 @@ bool FBreakerSwiftChannelLanesTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Physical reduction appends after literal lanes"), static_cast<int32>(EBreakerNodeStatTarget::PhysicalDamageReduction), 36);
     TestEqual(TEXT("Channel rate keeps its serialized position"), static_cast<int32>(EBreakerNodeStatTarget::AbilityChannelRate), 40);
     TestEqual(TEXT("Shield recharge delay reduction preserves its serialized position"), static_cast<int32>(EBreakerNodeStatTarget::ShieldRechargeDelayReduction), 67);
-    TestEqual(TEXT("Effective health is the current tail"), static_cast<int32>(EBreakerNodeStatTarget::EffectiveHealth), static_cast<int32>(EBreakerNodeStatTarget::Count) - 1);
+    TestEqual(TEXT("Effective health preserves its serialized position"), static_cast<int32>(EBreakerNodeStatTarget::EffectiveHealth), 74);
+    TestEqual(TEXT("Parry window seconds append"), static_cast<int32>(EBreakerNodeStatTarget::ParryWindowAddedSeconds), 75);
+    TestEqual(TEXT("Parry cooldown seconds append"), static_cast<int32>(EBreakerNodeStatTarget::ParryCooldownReductionSeconds), 76);
+    TestEqual(TEXT("Parry recovery appends"), static_cast<int32>(EBreakerNodeStatTarget::ParryCooldownRecovery), 77);
+    TestEqual(TEXT("Parry recovery is the current tail"), static_cast<int32>(EBreakerNodeStatTarget::ParryCooldownRecovery), static_cast<int32>(EBreakerNodeStatTarget::Count) - 1);
 
     // And the lanes actually pay: a rank-2 node authoring all four Flat lines
     // lands on the FBreakerNodeStats fields the weapon reads.

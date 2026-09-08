@@ -54,12 +54,15 @@ public:
     bool IsParryAvailable() const;
     bool IsParryActive() const;
     bool IsParryCounterActive() const;
+    bool IsPerfectGuardActive() const;
     float GetParryCooldownRemaining() const;
     float GetParryWindowRemaining() const;
     UPROPERTY(EditDefaultsOnly, Category="Combat|Parry") float ParryWindowSeconds = 0.25f;
     UPROPERTY(EditDefaultsOnly, Category="Combat|Parry") float ParryCooldownSeconds = 2.0f;
     UPROPERTY(EditDefaultsOnly, Category="Combat|Parry") float ReadParryBonusSeconds = 0.10f;
     UPROPERTY(EditDefaultsOnly, Category="Combat|Parry") float ParryCounterSeconds = 2.0f;
+    UPROPERTY(EditDefaultsOnly, Category="Combat|Parry") float PerfectGuardSeconds = 1.0f; // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, Category="Combat|Parry") float RiposteHealingFraction = 0.08f; // O2 PLACEHOLDER
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
@@ -317,13 +320,16 @@ private:
     FTimerHandle StaggerTimer;
     void EndStagger();
     bool HasParryPermission() const;
+    bool HasPerfectGuardPermission() const;
     float ParryClock() const;
     void ClearParryWindows();
     UFUNCTION() void RefreshParryPermission();
     UPROPERTY(Replicated) bool bParryOwned = false;
+    UPROPERTY(Replicated) bool bPerfectGuardOwned = false;
     UPROPERTY(Replicated) float ParryWindowEnd = -1.0f;
     UPROPERTY(Replicated) float ParryCooldownEnd = -1.0f;
     UPROPERTY(Replicated) float ParryCounterEnd = -1.0f;
+    UPROPERTY(Replicated) float PerfectGuardEnd = -1.0f;
     TMap<TWeakObjectPtr<AActor>, double> MeleeDefenseSuppressionExpiry;
     void PruneExpiredOutgoingModifiers();
     // STAGE 6 (Hook-And-Condition-Vocabulary §3.2-§3.3): target-conditional

@@ -129,8 +129,10 @@ namespace
         OutValues[static_cast<int32>(EStatRow::MoveSpeed)] = Stats.MoveSpeedMultiplier;
         OutValues[static_cast<int32>(EStatRow::SlideSpeed)] = Stats.SlideSpeedMultiplier;
         OutValues[static_cast<int32>(EStatRow::AirControl)] = Stats.AirControlMultiplier;
-        OutValues[static_cast<int32>(EStatRow::DodgeChance)] = Stats.DodgeChanceBonus;
-        OutValues[static_cast<int32>(EStatRow::BlockChance)] = Stats.BlockChanceBonus;
+        const bool bPerfectGuard = Stats.GrantedTags.HasTagExact(
+            FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Bulwark.PerfectGuard")));
+        OutValues[static_cast<int32>(EStatRow::DodgeChance)] = bPerfectGuard ? 0.0f : Stats.DodgeChanceBonus;
+        OutValues[static_cast<int32>(EStatRow::BlockChance)] = bPerfectGuard ? 0.0f : Stats.BlockChanceBonus;
         // All four read the same selection, including equipment competition.
         // These are scoped products, not complete damage/EHP estimates.
         FBreakerAttributeAggregator Scoped = bComposed ? Snapshot.Aggregator : FBreakerAttributeAggregator();

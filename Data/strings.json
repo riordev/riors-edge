@@ -122,6 +122,7 @@
         "hud.damage.unstable": "UNSTABLE %s",
         "hud.damage.collapse": "COLLAPSE %s",
         "hud.damage.wither": "WITHER %s",
-        "hud.damage.tear": "TEAR %s"
+        "hud.damage.tear": "TEAR %s",
+        "hud.rotPersistent": "ROT PERSISTENT"
 	}
 }

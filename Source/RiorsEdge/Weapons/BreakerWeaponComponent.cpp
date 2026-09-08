@@ -711,6 +711,7 @@ int32 UBreakerWeaponComponent::SynchronizeDamageRampEquipment()
     {
         DamageRampStacks = 0;
         PendingDamageRampShots.Reset();
+        PendingDamageRampProjectiles.Reset();
         DamageRampItemId = CurrentItem;
     }
     return DamageRampStacks;
@@ -721,6 +722,7 @@ void UBreakerWeaponComponent::ResetDamageRamp()
     if (!GetOwner() || !GetOwner()->HasAuthority()) return;
     DamageRampStacks = 0;
     PendingDamageRampShots.Reset();
+    PendingDamageRampProjectiles.Reset();
     if (UBreakerEquipmentComponent* Equipment = GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>()) Equipment->RefreshDamageRampContribution();
 }
 
@@ -740,6 +742,15 @@ uint32 UBreakerWeaponComponent::BeginDamageRampShot()
     return 0;
 }
 
+void UBreakerWeaponComponent::ResolveDamageRampProjectile(uint32 Token, bool bHit)
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority() || Token == 0) return;
+    int32* Remaining = PendingDamageRampProjectiles.Find(Token);
+    if (!Remaining) { ResolveDamageRampShot(Token, bHit); return; }
+    // A trigger earns one stack if any sibling hits. A miss is final only
+    // after every sibling has failed; a rocket claims its token before callbacks.
+    if (bHit || --*Remaining <= 0) ResolveDamageRampShot(Token, bHit);
+}
 void UBreakerWeaponComponent::ResolveDamageRampShot(uint32 Token, bool bDealtDamage)
 {
     // Concurrent rockets advance/reset in actual impact order, not launch order.
@@ -747,6 +758,7 @@ void UBreakerWeaponComponent::ResolveDamageRampShot(uint32 Token, bool bDealtDam
     if (!GetOwner() || !GetOwner()->HasAuthority()) return;
     SynchronizeDamageRampEquipment();
     if (Token == 0 || PendingDamageRampShots.Remove(Token) == 0) return;
+    PendingDamageRampProjectiles.Remove(Token);
     if (!bDealtDamage) DamageRampStacks = 0;
     else
     {
@@ -920,7 +932,7 @@ float UBreakerWeaponComponent::GetSpeedFraction() const
     // reads as stationary — the speed fraction is the ONE movement input to
     // spread, so zeroing it here changes the fired cone, the predicted cone
     // and the HUD crosshair together and nothing else about the shot.
-    if (IsSpreadReadingStationary()) return 0.0f;
+    if (IsSpreadReadingStationary() && !OwnerHasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Fan")))) return 0.0f;
     return FMath::Clamp(static_cast<float>(GetOwner()->GetVelocity().Size2D()) / MoveSpreadReferenceSpeed, 0.0f, 1.0f);
 }
 
@@ -1004,25 +1016,28 @@ float UBreakerWeaponComponent::GetNextShotSpreadDegrees() const
     const UBreakerWeaponDefinition* Definition = ResolveDefinition();
     if (!Definition) return 0.0f;
     const float Alpha = GetAimAlpha();
-    // Partway into ADS is partway to the aimed cone, not the whole thing.
+    const FBreakerRecoilProfile Profile = FBreakerWeaponFeel::ProfileAtAimAlpha(ResolveRecoilProfile(), Alpha);
+    const bool bBurstReset = GetWorld() && GetWorld()->GetTimeSeconds() - LastShotTime > Profile.BurstResetSeconds;
+    const float RawMovement = FBreakerWeaponFeel::MovementSpreadDegrees(Profile, GetSpeedFraction(), Alpha);
+    if (OwnerHasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Fan"))))
+    {
+        // Fan retains the hip floor, raw bloom and movement penalties. Natural
+        // bloom recovery still works; aim, first-shot and build reductions do not.
+        return FMath::Max(Definition->HipSpreadDegrees,
+            FMath::Lerp(Definition->HipSpreadDegrees, Definition->AimSpreadDegrees, Alpha))
+            + (bBurstReset ? 0.0f : FMath::Max(0.0f, BloomDegrees)) + FMath::Max(0.0f, RawMovement);
+    }
     const float BaseSpread = FMath::Lerp(Definition->HipSpreadDegrees, Definition->AimSpreadDegrees, Alpha);
-    const FBreakerRecoilProfile Profile = ResolveRecoilProfile();
-    // GetMovementSpreadDegrees, not the raw feel-layer read: Steady's rule
-    // (§1.5 M2) must shape the predicted cone exactly as it shapes the shot.
-    const float Movement = GetMovementSpreadDegrees();
-    const float Composed = FBreakerWeaponFeel::EffectiveSpreadDegrees(Profile, BaseSpread, GetEffectiveBloomDegrees(), BurstShotIndex, Movement);
-    // The tree's WeaponSpread lane, divisor convention, applied to the same
-    // composed cone the fire path divides so the crosshair cannot lie.
+    const float Movement = FBreakerWeaponMath::SteadyMovementSpreadDegrees(
+        RawMovement, Alpha, GetClassNodeRank(BreakerSteadyNodeId), IsOwnerAirborne());
+    const float Composed = FBreakerWeaponFeel::EffectiveSpreadDegrees(Profile, BaseSpread,
+        bBurstReset ? 0.0f : GetEffectiveBloomDegrees(), bBurstReset ? 0 : BurstShotIndex, Movement);
     const FBreakerNodeStats* NodeStats = GetOwnerNodeStats();
-    const float TreeSpread = NodeStats ? Composed / NodeStats->WeaponSpreadReduction : Composed;
-    // Momentum on the gun (KIT-2): the Swift bar tightens the predicted cone
-    // by the same multiplier the fire path applies, read from the same
-    // component, so the crosshair and the round agree about the bar.
     const UBreakerMomentumComponent* Momentum = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerMomentumComponent>() : nullptr;
-    return TreeSpread * FBreakerWeaponMath::MomentumSpreadMultiplier(
-        Momentum ? Momentum->GetEffectiveMomentumFraction() : 0.0f, Momentum && Momentum->IsActiveForOwner());
+    return Composed / (NodeStats ? NodeStats->WeaponSpreadReduction : 1.0f)
+        * FBreakerWeaponMath::MomentumSpreadMultiplier(
+            Momentum ? Momentum->GetEffectiveMomentumFraction() : 0.0f, Momentum && Momentum->IsActiveForOwner());
 }
-
 FVector UBreakerWeaponComponent::GetViewmodelLocationOffset() const
 {
     // -X is toward the player: the weapon is driven back into the shoulder.
@@ -1847,40 +1862,22 @@ bool UBreakerWeaponComponent::FireOnce()
     // shot, which is the whole reason to ever leave the sights.
     const float ShotAimAlpha = GetAimAlpha();
     const FBreakerRecoilProfile AimedProfile = FBreakerWeaponFeel::ProfileAtAimAlpha(RecoilProfile, ShotAimAlpha);
-    const float BaseSpread = FMath::Lerp(Definition->HipSpreadDegrees, Definition->AimSpreadDegrees, ShotAimAlpha);
-    // Steady (Class-Kits §1.5 M2): with the node owned, aiming while moving
-    // no longer widens spread — R1 grounded, R2 airborne too. Same pure rule
-    // the predicted-cone accessors apply, fed the same aim progress.
-    const float MovementSpread = FBreakerWeaponMath::SteadyMovementSpreadDegrees(
-        FBreakerWeaponFeel::MovementSpreadDegrees(AimedProfile, GetSpeedFraction(), ShotAimAlpha),
-        ShotAimAlpha, GetClassNodeRank(BreakerSteadyNodeId), IsOwnerAirborne());
-    // The tree's WeaponSpread lane divides the fired cone exactly as it
-    // divides GetNextShotSpreadDegrees' predicted one — one convention, both
-    // sites, or the HUD and the round disagree about the purchase.
-    const FBreakerNodeStats* SpreadNodeStats = GetOwnerNodeStats();
-    // Momentum, read once per trigger pull and shared by every rule below
-    // (the spread multiplier here, Called Shot's gate, Pierce Discipline's
-    // grant, Ledger's refund, Mark Economy's jump).
+    const float Spread = GetNextShotSpreadDegrees();
     UBreakerMomentumComponent* Momentum = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerMomentumComponent>() : nullptr;
-    // Momentum on the gun (KIT-2): the Swift bar tightens the fired cone by
-    // the same multiplier GetNextShotSpreadDegrees applies to the predicted
-    // one — both sites or the crosshair lies about the bar.
-    const float Spread = FBreakerWeaponFeel::EffectiveSpreadDegrees(AimedProfile, BaseSpread, GetEffectiveBloomDegrees(), BurstShotIndex, MovementSpread)
-        / (SpreadNodeStats ? SpreadNodeStats->WeaponSpreadReduction : 1.0f)
-        * FBreakerWeaponMath::MomentumSpreadMultiplier(
-            Momentum ? Momentum->GetEffectiveMomentumFraction() : 0.0f, Momentum && Momentum->IsActiveForOwner());
-
     // Recoil state for this shot, resolved before the pellets so the cosmetic
     // event can carry it to every machine and they all kick identically.
     const int32 FiredBurstIndex = BurstShotIndex;
     const int32 RecoilSeed = static_cast<int32>(HashCombine(GetTypeHash(GetOwner()), static_cast<uint32>(ShotSequence + 1)));
     ++BurstShotIndex;
-    BloomDegrees = FBreakerWeaponFeel::BloomAfterShot(AimedProfile, BloomDegrees, ShotAimAlpha > 0.0f);
+    BloomDegrees = FBreakerWeaponFeel::BloomAfterShot(AimedProfile, BloomDegrees, ShotAimAlpha > 0.0f && !OwnerHasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Fan"))));
     UpdateFeelTickEnabled();
+
+    const FBreakerShotChannels Channels = GetShotChannels();
+    const int32 ExtraPellets = FBreakerWeaponMath::ConsumeMultishot(Channels.AdditionalProjectiles, MultishotAccumulator);
 
     if (Definition->bProjectile)
     {
-        FireProjectile(Definition, ViewLocation, ViewRotation, Spread, FiredBurstIndex, RecoilSeed, ShotAimAlpha, RampToken);
+        FireProjectile(Definition, ViewLocation, ViewRotation, Spread, FiredBurstIndex, RecoilSeed, ShotAimAlpha, RampToken, ExtraPellets);
         if (MagazineAmmo <= 0 && ReserveAmmo > 0) StartReload();
         return true;
     }
@@ -1917,14 +1914,6 @@ bool UBreakerWeaponComponent::FireOnce()
     // never straddle an equipment change.
     const float LevelScalar = GetItemLevelDamageScalar();
     const float ScaledBaseDamage = GetScaledBaseDamageForDefinition(Definition);
-
-    // ---- Projectile channels (owner ruling 2026-08-16) --------------------
-    // Composed once per trigger pull, so every pellet of this shot fires with
-    // one reading of the tree, the ability windows and the Momentum state.
-    const FBreakerShotChannels Channels = GetShotChannels();
-    // MULTISHOT: whole extra pellets fire now; the fraction banks across
-    // pulls. Zero channels drain nothing and the accumulator stays untouched.
-    const int32 ExtraPellets = FBreakerWeaponMath::ConsumeMultishot(Channels.AdditionalProjectiles, MultishotAccumulator);
 
     const UBreakerAttributeSet* SourceAttributes = nullptr;
     if (const IAbilitySystemInterface* AbilityOwner = Cast<IAbilitySystemInterface>(GetOwner()))
@@ -2116,6 +2105,7 @@ FBreakerShotChannels UBreakerWeaponComponent::GetShotChannels() const
     {
         const FBreakerNodeStats& Stats = Progression->GetNodeStats();
         Channels.AdditionalProjectiles += FMath::Max(0.0f, Stats.BonusProjectileCount);
+        if (Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Fan")))) Channels.AdditionalProjectiles += 2.0f;
         Channels.PierceCount += FMath::Max(0, FMath::FloorToInt32(Stats.BonusPierceCount));
         Channels.ChainCount += FMath::Max(0, FMath::FloorToInt32(Stats.BonusChainCount));
         Channels.RicochetCount += FMath::Max(0, FMath::FloorToInt32(Stats.BonusRicochetCount));
@@ -2729,9 +2719,8 @@ void UBreakerWeaponComponent::SnapshotWeaponElement(FBreakerDamageRequest& Reque
     if (State) State->SnapshotSympatheticEntropy(Request);
 }
 
-void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed, float ShotAimAlpha, uint32 RampToken)
+void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed, float ShotAimAlpha, uint32 RampToken, int32 ExtraPellets)
 {
-    const FVector Direction = FBreakerWeaponMath::ApplyConeSpread(ViewRotation.Vector(), Spread, ++ShotSequence);
 
     const UBreakerAttributeSet* SourceAttributes = nullptr;
     if (const IAbilitySystemInterface* AbilityOwner = Cast<IAbilitySystemInterface>(GetOwner()))
@@ -2756,7 +2745,7 @@ void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Def
     // exactly as it carries the fire-time modifiers below.
     UBreakerDamageLibrary::FillSourcePools(SourceAttributes, EBreakerDamageDelivery::Weapon, Damage);
     ApplyQuickdrawSourceBonus(Damage);
-    Damage.RandomSeed = HashCombine(GetTypeHash(GetOwner()), ShotSequence);
+    Damage.RandomSeed = HashCombine(GetTypeHash(GetOwner()), ShotSequence + 1);
     Damage.SetInstigator(GetOwner());
     // The rocket carries an already-composed request; modifiers active at the
     // moment of firing are the ones that count, not those at detonation.
@@ -2769,17 +2758,32 @@ void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Def
     Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     Params.Owner = GetOwner();
     Params.Instigator = Cast<APawn>(GetOwner());
-    // Spawn ahead of the view so the rocket clears the shooter's capsule.
-    const FVector SpawnLocation = ViewLocation + Direction * 80.0f;
-    if (ABreakerRocketProjectile* Rocket = GetWorld()->SpawnActor<ABreakerRocketProjectile>(ABreakerRocketProjectile::StaticClass(), SpawnLocation, Direction.Rotation(), Params))
+    const int32 BaseCount = FMath::Max(1, Definition->PelletsPerShot);
+    const int32 Count = BaseCount + FMath::Max(0, ExtraPellets);
+    if (RampToken != 0) PendingDamageRampProjectiles.Add(RampToken, Count);
+    TArray<ABreakerRocketProjectile*> Siblings;
+    FVector CosmeticEnd = ViewLocation;
+    const auto& Core = BreakerCoreWeaponStats(GetOwner());
+    for (int32 Index = 0; Index < Count; ++Index)
     {
-        const auto& Core = BreakerCoreWeaponStats(GetOwner());
-        Rocket->InitializeRocket(Damage, Definition->ProjectileSpeed * Core.ProjectileSpeedMultiplier,
-            Definition->ExplosionRadius * FMath::Sqrt(FMath::Max(0.0f, Core.WeaponSplashAreaMultiplier)), GetEffectiveMaximumRange());
-        Rocket->InitializeDamageRamp(this, RampToken);
+        const int32 Seed = Index < BaseCount ? ++ShotSequence
+            : FBreakerWeaponMath::SecondaryShotSeed(GetTypeHash(GetOwner()), ShotSequence, BreakerMultishotSalt, Index - BaseCount);
+        const FVector Direction = FBreakerWeaponMath::ApplyConeSpread(ViewRotation.Vector(), Spread, Seed);
+        const FVector SpawnLocation = ViewLocation + Direction * 80.0f;
+        if (Index == 0) CosmeticEnd = SpawnLocation + Direction * 400.0f;
+        FBreakerDamageRequest ProjectileDamage = Damage;
+        ProjectileDamage.RandomSeed = HashCombine(GetTypeHash(GetOwner()), Seed);
+        if (ABreakerRocketProjectile* Rocket = GetWorld()->SpawnActor<ABreakerRocketProjectile>(
+            ABreakerRocketProjectile::StaticClass(), SpawnLocation, Direction.Rotation(), Params))
+        {
+            Rocket->InitializeRocket(ProjectileDamage, Definition->ProjectileSpeed * Core.ProjectileSpeedMultiplier,
+                Definition->ExplosionRadius * FMath::Sqrt(FMath::Max(0.0f, Core.WeaponSplashAreaMultiplier)), GetEffectiveMaximumRange());
+            Rocket->InitializeDamageRamp(this, RampToken);
+            for (ABreakerRocketProjectile* Sibling : Siblings) Rocket->IgnoreSibling(Sibling);
+            Siblings.Add(Rocket);
+        }
+        else ResolveDamageRampProjectile(RampToken, false);
     }
-    else ResolveDamageRampShot(RampToken, false);
-
     FBreakerShotResult Shot;
     Shot.bFired = true;
     Shot.BurstShotIndex = BurstIndex;
@@ -2788,7 +2792,7 @@ void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Def
     Shot.bAimedShot = bAiming;
     Shot.AimAlpha = ShotAimAlpha;
     Shot.TraceStart = ViewLocation;
-    Shot.TraceEnd = SpawnLocation + Direction * 400.0f;
+    Shot.TraceEnd = CosmeticEnd;
     MulticastShotCosmetics(Shot);
 }
 

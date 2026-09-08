@@ -189,6 +189,11 @@ struct RIORSEDGE_API FBreakerAttributeContribution
     // keystones and Anomalous rule rewrites (O3 caps the composed budget).
     void ComposeMore(EBreakerAggregatedAttribute Attribute, float Multiplier);
     void AddDamageMoreSource(FName Key, EBreakerDamageMoreLane Lane, float Multiplier);
+    void SetDeadeye(bool bEnabled) { bDeadeye = bEnabled; }
+    bool HasDeadeye() const { return bDeadeye; }
+    float GetPositiveCriticalFlat() const { return PositiveCriticalFlat; }
+    float GetPositiveCriticalIncreased() const { return PositiveCriticalIncreased; }
+    float GetPositiveCriticalMore() const { return PositiveCriticalMore; }
     const TArray<FBreakerDamageMoreSource>& GetDamageMoreSources() const { return DamageMoreSources; }
     static TArray<FBreakerDamageMoreSource> SelectDamageMoreSources(const TArray<FBreakerDamageMoreSource>& Sources);
     static float DamageMoreProduct(const TArray<FBreakerDamageMoreSource>& Selected, EBreakerAggregatedAttribute Attribute);
@@ -201,6 +206,10 @@ struct RIORSEDGE_API FBreakerAttributeContribution
     bool IsIdentity() const;
 
 private:
+    bool bDeadeye = false;
+    float PositiveCriticalFlat = 0.0f;
+    float PositiveCriticalIncreased = 0.0f;
+    float PositiveCriticalMore = 1.0f;
     float Flat[AttributeCount];
     float IncreasedPercent[AttributeCount];
     float MoreMultiplier[AttributeCount];
@@ -277,6 +286,7 @@ struct RIORSEDGE_API FBreakerAttributeAggregator
     float ComposedMoreProduct(EBreakerAggregatedAttribute Attribute) const;
     // Additional scopes only: delivery Mores are already baked by FillSourcePools.
     float GetScopedMoreProduct(bool bElemental, bool bVoid, bool bReaction, bool bEffectiveHealth) const;
+    bool HasDeadeye() const;
     int32 GetDamageMoreSourceCount() const;
     int32 GetSelectedDamageMoreSourceCount() const;
     TArray<FBreakerDamageMoreSource> GetSelectedDamageMoreSources() const;

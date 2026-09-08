@@ -273,6 +273,15 @@ uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicat
         }
     }
 
+    UBreakerStatusComponent* LeaseSource = nullptr;
+    if (bRot && Spec.bLongDarkSnapshot)
+    {
+        LeaseSource = Instigator ? Instigator->FindComponentByClass<UBreakerStatusComponent>() : nullptr;
+        if (LeaseSource && LeaseSource->bChangingLongDarkLease) return 0;
+        // An emitted hit can outlive a respec/death; it keeps finite damage,
+        // but cannot acquire a new permanent ownership lease afterwards.
+        if (!LeaseSource || !LeaseSource->CanMaintainLongDark()) { Spec.bLongDarkSnapshot = false; LeaseSource = nullptr; }
+    }
     FBreakerActiveStatus Status;
     Status.Spec = Spec;
     Status.UnpaidDamageBudget = (bErased || bUnstable || bRot) ? UnpaidDamageBudget : 0.0f;
@@ -303,6 +312,13 @@ uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicat
         Status.SourceLocationSnapshot = Instigator->GetActorLocation();
         Status.bHasSourceLocationSnapshot = true;
     }
+    if (LeaseSource)
+    {
+        Status.bPersistentRot = true;
+        Status.LongDarkSource = LeaseSource;
+        if (!LeaseSource->ReserveLongDarkLease(this, Status.ApplicationSerial)) return 0;
+        GetOwner()->OnDestroyed.AddUniqueDynamic(this, &ThisClass::HandleLongDarkOwnerDestroyed);
+    }
     ActiveStatuses.Add(Status);
     if (Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot")))
         BreakerEntropyFeedback::PlayActivation(GetOwner(), Instigator);
@@ -315,7 +331,7 @@ uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicat
 
 void UBreakerStatusComponent::SpreadNewestStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator, float ScaledDuration, const FBreakerDamageRequest* ApplyingHit)
 {
-    if (Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Erased"))
+    if (Spec.bLongDarkSnapshot || Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Erased"))
         || Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Unstable"))) return;
     if (!Instigator || Spec.ProcCoefficient <= 0 || GetDistinctStatusTypeCount() < 2 || !GetWorld()) return;
     const UBreakerCombatComponent* SourceCombat = Instigator->FindComponentByClass<UBreakerCombatComponent>();
@@ -371,7 +387,7 @@ void UBreakerStatusComponent::HandleAfflictedOwnerDeath()
     {
         AActor* Applier = Status.Instigator.Get();
         if (!Applier || Credited.Contains(Applier)
-            || (Status.RemainingDuration <= 0 && Status.Spec.StatusTag != DeliveringTickTag)
+            || (Status.RemainingDuration <= 0 && !Status.bPersistentRot && Status.Spec.StatusTag != DeliveringTickTag)
             || (Status.Spec.BaseDamagePerTick <= 0 && Status.UnpaidDamageBudget <= 0
                 && Status.Spec.StatusTag != DeliveringTickTag)
             || Status.ResourceProcCoefficient <= 0) continue;
@@ -525,6 +541,7 @@ TArray<FBreakerActiveStatus> UBreakerStatusComponent::ConsumeAllStatuses()
             Status.UnpaidDamageBudget = BreakerElementReactions::RemainingRotBudget(Status);
     Consumed = MoveTemp(ActiveStatuses);
     ActiveStatuses.Reset();
+    for (const FBreakerActiveStatus& Status : Consumed) ReleaseLongDarkLink(Status);
     for (const FBreakerActiveStatus& Status : Consumed) OnStatusConsumed.Broadcast(Status);
     return Consumed;
 }
@@ -543,6 +560,7 @@ FBreakerActiveStatus UBreakerStatusComponent::ConsumeStatus(FGameplayTag StatusT
         Consumed = ActiveStatuses[Index];
         ActiveStatuses.RemoveAt(Index);
         bOutFound = true;
+        ReleaseLongDarkLink(Consumed);
         OnStatusConsumed.Broadcast(Consumed);
         return Consumed;
     }
@@ -570,10 +588,11 @@ void UBreakerStatusComponent::ScaleRemainingDurations(float Scalar)
         // A scalar of zero means gone, and gone is gone by exactly one route:
         // it broadcasts as a consumption, because a caller that shortened a
         // duration to nothing did consume it.
-        if (ActiveStatuses[Index].RemainingDuration <= 0.0f)
+        if (ActiveStatuses[Index].RemainingDuration <= 0.0f && (!ActiveStatuses[Index].bPersistentRot || Clamped == 0.0f))
         {
             const FBreakerActiveStatus Removed = ActiveStatuses[Index];
             ActiveStatuses.RemoveAt(Index);
+            ReleaseLongDarkLink(Removed);
             OnStatusConsumed.Broadcast(Removed);
         }
     }

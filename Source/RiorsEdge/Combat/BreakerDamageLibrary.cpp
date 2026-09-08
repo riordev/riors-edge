@@ -40,6 +40,7 @@ void UBreakerDamageLibrary::SnapshotElementSource(const AActor* Source, FBreaker
     Snapshot.ElementalBuildupPenetrationPercent = Stats.ElementalBuildupPenetrationPercent;
     Snapshot.ElementalThresholdMultiplier = Stats.ElementalThresholdMultiplier;
     Snapshot.bRotDensity = Stats.bRotDensity;
+    Snapshot.bLongDark = Stats.bLongDark;
     Snapshot.ElementalDamageIncreasedPercent = Stats.ElementalDamageIncreasedPercent;
     Snapshot.RotDamageIncreasedPercent = Stats.RotDamageIncreasedPercent;
     Snapshot.VoidBurstDamageIncreasedPercent = Stats.VoidBurstDamageIncreasedPercent;
@@ -50,6 +51,7 @@ void UBreakerDamageLibrary::FillSourcePools(const UBreakerAttributeSet* SourceAt
     EBreakerDamageDelivery Delivery, FBreakerDamageRequest& Request)
 {
     Request.Delivery = Delivery;
+    Request.bForceCriticalStrike = SourceAttributes && SourceAttributes->GetAttributeAggregator().HasDeadeye();
     SnapshotElementSource(SourceAttributes ? SourceAttributes->GetTypedOuter<AActor>() : nullptr, Request);
     if (!SourceAttributes)
     {
@@ -144,7 +146,8 @@ FBreakerDamageResult UBreakerDamageLibrary::ResolveDamage(const FBreakerDamageRe
     // where an out-of-bounds author gets caught loudly.
     if (Result.bWeakPoint) Result.RawDamage *= FMath::Clamp(Request.WeakPointMultiplier, WeakPointMultiplierFloor, WeakPointMultiplierCeiling);
 
-    if (Request.bCanCritical)
+    if (Request.bForceCriticalStrike && !Request.bIsDamageOverTime) Result.bCritical = true;
+    else if (Request.bCanCritical)
     {
         if (Request.bUseSnapshotCritical) Result.bCritical = Request.bSnapshotCriticalResult;
         else

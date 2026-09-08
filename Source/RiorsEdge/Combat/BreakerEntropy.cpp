@@ -123,6 +123,7 @@ void UBreakerStatusComponent::ApplyEntropyHit(const FBreakerDamageRequest& Reque
     EntropyProtectedContributions.Reset();
     FBreakerStatusApplicationSpec Spec;
     Spec.StatusTag = Rot;
+    Spec.bLongDarkSnapshot = Request.ElementSource.bLongDark;
     Spec.Duration = Tuning.Duration;
     const int32 TickCount = FMath::Max(1, FMath::FloorToInt(Tuning.Duration / Tuning.Tick))
         + (Request.ElementSource.bRotDensity ? 2 : 0);

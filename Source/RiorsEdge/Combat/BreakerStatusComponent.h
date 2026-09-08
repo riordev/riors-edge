@@ -7,6 +7,7 @@
 #include "BreakerStatusComponent.generated.h"
 
 class UBreakerCombatComponent;
+class UBreakerStatusComponent;
 
 USTRUCT(BlueprintType)
 struct RIORSEDGE_API FBreakerActiveStatus
@@ -25,6 +26,9 @@ struct RIORSEDGE_API FBreakerActiveStatus
     UPROPERTY(BlueprintReadOnly) float InitialDamageBudget = 0;
     UPROPERTY(BlueprintReadOnly) float InitialReactionBudget = 0;
     UPROPERTY(BlueprintReadOnly) bool bHasReactionCreditSnapshot = false;
+    // Persistence is a live ownership lease, separate from the finite funding clock.
+    UPROPERTY(BlueprintReadOnly) bool bPersistentRot = false;
+    UPROPERTY() TWeakObjectPtr<UBreakerStatusComponent> LongDarkSource;
     uint64 ApplicationSerial = 0;
     // Who applied this status. Weak: a DoT outliving its applier keeps
     // ticking, it just stops crediting anyone.
@@ -66,6 +70,7 @@ public:
     UPROPERTY(EditDefaultsOnly, Category="Status|Chain") float ChainRankTwoRangeCm = 900.0f;
     UBreakerStatusComponent();
     virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
     // Reapplying a status the target already has adds stacks (capped) and
@@ -213,6 +218,17 @@ private:
     void AdvanceRotStatus(uint64 ApplicationSerial, float DeltaSeconds);
     void SpreadNewestStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator, float ScaledDuration, const FBreakerDamageRequest* ApplyingHit);
     UFUNCTION() void HandleAfflictedOwnerDeath();
+    bool CanMaintainLongDark() const;
+    bool ReserveLongDarkLease(UBreakerStatusComponent* Target, uint64 Serial);
+    bool IsLongDarkLeaseValid(const FBreakerActiveStatus& Status) const;
+    void ReleaseLongDarkLink(const FBreakerActiveStatus& Status);
+    void RemoveLongDarkApplication(uint64 Serial);
+    void RevokeLongDarkLease();
+    UFUNCTION() void HandleLongDarkOwnerStateChanged();
+    UFUNCTION() void HandleLongDarkOwnerDestroyed(AActor* DestroyedActor);
+    TWeakObjectPtr<UBreakerStatusComponent> LongDarkTarget;
+    uint64 LongDarkSerial = 0;
+    bool bChangingLongDarkLease = false;
     // An expiry tick remains an active damaging status during its callbacks,
     // even though its remaining time was advanced before damage dispatch.
     FGameplayTag DeliveringTickTag;

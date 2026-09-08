@@ -1333,7 +1333,14 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
             // all, in any bucket.
             if (!bLive) continue;
 
-            if (Effect.StatBucket == EBreakerNodeStatBucket::Flat) FlatByTarget[Target] += Value;
+            if (Effect.StatBucket == EBreakerNodeStatBucket::Flat)
+            {
+                FlatByTarget[Target] += Value;
+                // Preserve each critical bonus's sign before netting: Deadeye
+                // halves positive bonuses while leaving penalties intact.
+                if (OutContribution && Effect.StatTarget == EBreakerNodeStatTarget::CriticalDamage)
+                    OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalMultiplier, Value / 100.0f);
+            }
             else if (Effect.StatBucket == EBreakerNodeStatBucket::IncreasedPercent) IncreasedByTarget[Target] += Value;
             else if (BreakerDamagePoolFor(Effect.StatTarget) != EBreakerDamagePool::None
                 || Effect.StatTarget == EBreakerNodeStatTarget::ElementalDamage || Effect.StatTarget == EBreakerNodeStatTarget::VoidDamage
@@ -1525,6 +1532,7 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     Stats.ShieldRechargeDelayReduction = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::ShieldRechargeDelayReduction));
     Stats.bHealthRegenInCombat = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.SecondLife")));
     Stats.bRotDensity = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Density")));
+    Stats.bLongDark = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.LongDark")));
     Stats.bDeepen = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Deepen")));
     Stats.bHemorrhage = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Hemorrhage")));
     Stats.ElementalDamageIncreasedPercent = IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::ElementalDamage)];
@@ -1532,6 +1540,9 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     Stats.VoidBurstDamageIncreasedPercent = IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::VoidBurstDamage)];
     Stats.RiftBurstDamageIncreasedPercent = IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::RiftBurstDamage)];
     Stats.ReactionDamageIncreasedPercent = IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::ReactionDamage)];
+    Stats.ParryWindowAddedSeconds = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::ParryWindowAddedSeconds));
+    Stats.ParryCooldownReductionSeconds = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::ParryCooldownReductionSeconds));
+    Stats.ParryCooldownRecoveryMultiplier = FMath::Max(0.01f, Increased(EBreakerNodeStatTarget::ParryCooldownRecovery));
     Stats.bNoOutOfCombatResourceDecay = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.SecondShift")));
     Stats.bConduction = Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Conduction")));
     Stats.bCooldownRecoveryAffectsTempo = Stats.GrantedTags.HasTagExact(
@@ -1576,9 +1587,9 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
         // composed multiplicatively through ComposeMore under the O3 cap
         // enforced above.
         OutContribution->AddFlat(EBreakerAggregatedAttribute::MaxHealth, Stats.BonusHealth);
+        OutContribution->SetDeadeye(Stats.GrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Deadeye"))));
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::MaxHealth, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::Health)]);
         OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalChance, Stats.CriticalChanceBonus);
-        OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalMultiplier, Stats.CriticalMultiplierBonus);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::MoveSpeed, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::MoveSpeed)]);
         // Slide speed and air control join gear's percentages in the same
         // additive bucket, exactly as move speed already did. Until this

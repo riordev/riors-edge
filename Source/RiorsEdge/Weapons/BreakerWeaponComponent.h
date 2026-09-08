@@ -291,6 +291,7 @@ public:
     int32 SynchronizeDamageRampEquipment();
     // A pending rocket reports its real damage once; invalidated old tokens are ignored.
     void ResolveDamageRampShot(uint32 Token, bool bDealtDamage);
+    void ResolveDamageRampProjectile(uint32 Token, bool bHit);
     // Ammo economy (O2 placeholder): grants Fraction of each slot's
     // StartingReserveAmmo into that slot's reserve, capped at 2x starting
     // reserve so drops top a player up without making reserve meaningless.
@@ -870,6 +871,7 @@ private:
     FGuid DamageRampItemId;
     uint32 NextDamageRampToken = 0;
     TSet<uint32> PendingDamageRampShots;
+    TMap<uint32, int32> PendingDamageRampProjectiles;
     uint32 BeginDamageRampShot();
     void ResetDamageRamp();
     UFUNCTION() void HandleDamageRampDeath();
@@ -883,7 +885,7 @@ private:
     // cadence cannot drift by a callback's worth per shot.
     void AdvanceBurstFire();
     void ScheduleBurstFire(float DelaySeconds);
-    void FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed, float ShotAimAlpha, uint32 RampToken);
+    void FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed, float ShotAimAlpha, uint32 RampToken, int32 ExtraPellets);
     // LevelScalar is resolved once per trigger pull and passed down, so every
     // pellet and the bleed it may apply share one item-level reading.
     // SeedBasis is the hit's own draw seed (the base pellet's ShotSequence

@@ -84,9 +84,11 @@ void UBreakerCombatComponent::GetLifetimeReplicatedProps(TArray<FLifetimePropert
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME_CONDITION(UBreakerCombatComponent, bParryOwned, COND_OwnerOnly);
+    DOREPLIFETIME_CONDITION(UBreakerCombatComponent, bPerfectGuardOwned, COND_OwnerOnly);
     DOREPLIFETIME_CONDITION(UBreakerCombatComponent, ParryWindowEnd, COND_OwnerOnly);
     DOREPLIFETIME_CONDITION(UBreakerCombatComponent, ParryCooldownEnd, COND_OwnerOnly);
     DOREPLIFETIME_CONDITION(UBreakerCombatComponent, ParryCounterEnd, COND_OwnerOnly);
+    DOREPLIFETIME_CONDITION(UBreakerCombatComponent, PerfectGuardEnd, COND_OwnerOnly);
     DOREPLIFETIME(UBreakerCombatComponent, bStaggerActive);
 }
 
@@ -157,7 +159,19 @@ bool UBreakerCombatComponent::HasParryPermission() const
 
 bool UBreakerCombatComponent::IsParryAvailable() const
 {
-    return HasParryPermission() && !IsDead() && !IsStaggered() && GetParryCooldownRemaining() <= 0.0f;
+    return HasParryPermission() && !IsDead() && !IsStaggered() && !IsPerfectGuardActive() && GetParryCooldownRemaining() <= 0.0f;
+}
+bool UBreakerCombatComponent::HasPerfectGuardPermission() const
+{
+    if (!GetOwner()) return false;
+    if (!GetOwner()->HasAuthority()) return bPerfectGuardOwned;
+    const auto* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+    return Progression && Progression->HasNodeTag(
+        FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Bulwark.PerfectGuard")));
+}
+bool UBreakerCombatComponent::IsPerfectGuardActive() const
+{
+    return HasParryPermission() && HasPerfectGuardPermission() && !IsDead() && PerfectGuardEnd > ParryClock();
 }
 bool UBreakerCombatComponent::IsParryActive() const
 {
@@ -178,7 +192,7 @@ float UBreakerCombatComponent::GetParryWindowRemaining() const
 void UBreakerCombatComponent::ClearParryWindows()
 {
     const bool bHadCounter = ParryCounterEnd >= 0.0f;
-    ParryWindowEnd = ParryCooldownEnd = ParryCounterEnd = -1.0f;
+    ParryWindowEnd = ParryCooldownEnd = ParryCounterEnd = PerfectGuardEnd = -1.0f;
     if (bHadCounter && GetOwner())
         if (UBreakerProgressionComponent* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>())
             Progression->RefreshBuildConditions();
@@ -187,6 +201,8 @@ void UBreakerCombatComponent::RefreshParryPermission()
 {
     if (!GetOwner() || !GetOwner()->HasAuthority()) return;
     bParryOwned = HasParryPermission();
+    bPerfectGuardOwned = HasPerfectGuardPermission();
+    if (!bPerfectGuardOwned) PerfectGuardEnd = -1.0f;
     if (!bParryOwned || IsDead()) ClearParryWindows();
 }
 bool UBreakerCombatComponent::TryParry()
@@ -195,8 +211,12 @@ bool UBreakerCombatComponent::TryParry()
     RefreshParryPermission();
     const UBreakerProgressionComponent* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
     const float Bonus = Progression->HasNodeTag(BreakerNodeTags::Node_Read.GetTag()) ? ReadParryBonusSeconds : 0.0f;
-    ParryWindowEnd = ParryClock() + FMath::Max(0.0f, ParryWindowSeconds + Bonus);
-    ParryCooldownEnd = ParryClock() + FMath::Max(0.0f, ParryCooldownSeconds);
+    const auto& Stats = Progression->GetNodeStats();
+    // Snapshot both clocks at the accepted input. A later numeric purchase
+    // cannot lengthen an active window or retroactively recover its cooldown.
+    ParryWindowEnd = ParryClock() + FMath::Max(0.0f, ParryWindowSeconds + Bonus + Stats.ParryWindowAddedSeconds);
+    ParryCooldownEnd = ParryClock() + FMath::Max(0.0f, ParryCooldownSeconds - Stats.ParryCooldownReductionSeconds)
+        / FMath::Max(0.01f, Stats.ParryCooldownRecoveryMultiplier);
     return true;
 }
 
@@ -260,6 +280,17 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     const bool bElementHit = !ElementShares.IsEmpty() && Request.bCanApplyElementBuildup
         && !Request.bIsDamageOverTime && FMath::IsFinite(Request.ProcCoefficient) && Request.ProcCoefficient > 0;
     TGuardValue<bool> ElementDispatchGuard(bDispatchingElementHit, bDispatchingElementHit || bElementHit);
+    if (IsPerfectGuardActive() && Request.BaseDamage > 0.0f && Request.Instigator.Get() != GetOwner())
+    {
+        // Follow-up hostile hits are negated, including rear hits and DoTs.
+        // They are not new parry successes and cannot repeat healing/counters.
+        if (auto* Player = Cast<ABreakerCharacter>(GetOwner())) Player->NotifyCombatActivityBoundary();
+        LastDamageTime = GetWorld()->GetTimeSeconds();
+        Result.bParried = true;
+        Result.RemainingHealth = Attributes->GetHealth();
+        Result.RemainingShield = Attributes->GetShield();
+        return Result;
+    }
     const FVector TowardSource = (Request.SourceLocation - GetOwner()->GetActorLocation()).GetSafeNormal2D();
     if (IsParryActive() && Request.BaseDamage > 0.0f && !Request.bIsDamageOverTime
         && Request.Instigator.Get() != GetOwner()
@@ -268,6 +299,19 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     {
         ParryWindowEnd = -1.0f;
         ParryCounterEnd = ParryClock() + FMath::Max(0.0f, ParryCounterSeconds);
+        if (HasPerfectGuardPermission()) PerfectGuardEnd = ParryClock() + FMath::Max(0.0f, PerfectGuardSeconds);
+        const auto* ParryProgression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+        if (ParryProgression && ParryProgression->HasNodeTag(
+            FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Bulwark.Riposte"))))
+        {
+            // Consume the single-hit window before healing callbacks can
+            // submit another hit. Ordinary healing amplification applies once.
+            FBreakerHealRequest Heal;
+            Heal.Amount = Attributes->GetMaxHealth() * FMath::Max(0.0f, RiposteHealingFraction);
+            Heal.SetHealer(GetOwner());
+            Heal.SourceTag = FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Bulwark.Riposte"));
+            ApplyHealing(Heal);
+        }
         // Incoming pressure still counts as combat for recovery; recording
         // the clock does not broadcast damage, block or dodge procs.
         if (auto* Player = Cast<ABreakerCharacter>(GetOwner())) Player->NotifyCombatActivityBoundary();
@@ -378,6 +422,13 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
         }
     }
 
+    // Perfect Guard forfeits passive avoidance even while its active window
+    // is absent. Apply after every ordinary bonus, including Interposition.
+    if (HasPerfectGuardPermission())
+    {
+        Defense.DodgeChance = 0.0f;
+        Defense.BlockChance = 0.0f;
+    }
     const double SuppressionNow = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
     for (auto It = MeleeDefenseSuppressionExpiry.CreateIterator(); It; ++It)
         if (!It.Key().IsValid() || It.Value() <= SuppressionNow) It.RemoveCurrent();
