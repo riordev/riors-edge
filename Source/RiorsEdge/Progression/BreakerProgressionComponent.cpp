@@ -1571,6 +1571,7 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     Stats.VoidBurstDamageIncreasedPercent = IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::VoidBurstDamage)];
     Stats.RiftBurstDamageIncreasedPercent = IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::RiftBurstDamage)];
     Stats.ReactionDamageIncreasedPercent = IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::ReactionDamage)];
+    Stats.ReactionResiduePercent = FMath::Clamp(Flat(EBreakerNodeStatTarget::ReactionResiduePercent), 0.0f, 100.0f);
     Stats.ParryWindowAddedSeconds = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::ParryWindowAddedSeconds));
     Stats.ParryCooldownReductionSeconds = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::ParryCooldownReductionSeconds));
     Stats.ParryCooldownRecoveryMultiplier = FMath::Max(0.01f, Increased(EBreakerNodeStatTarget::ParryCooldownRecovery));
@@ -1705,6 +1706,12 @@ bool UBreakerProgressionComponent::IsNodeMoreAuthoringLegal(const UBreakerProgre
 
     for (const FBreakerNodeEffect& Effect : Node->Effects)
     {
+        if (Effect.StatTarget == EBreakerNodeStatTarget::ReactionResiduePercent
+            && (Effect.StatBucket != EBreakerNodeStatBucket::Flat || Effect.RequiresTargetState()))
+        {
+            if (OutReason) *OutReason = FString::Printf(TEXT("node '%s' must author Residue as flat percentage points without a target-state rider"), *Node->NodeId.ToString());
+            return false;
+        }
         const bool bScopedTarget = (Effect.StatTarget >= EBreakerNodeStatTarget::ElementalDamage
             && Effect.StatTarget <= EBreakerNodeStatTarget::EffectiveHealth)
             || Effect.StatTarget == EBreakerNodeStatTarget::WeaponCriticalDamage

@@ -51,6 +51,7 @@ namespace
         MaxFrontShield,
         WeaponCriticalMore,
         WeaponBeyondFirstMore,
+        ReactionResidue,
         Count
     };
 
@@ -88,6 +89,7 @@ namespace
         { TEXT("MAX FRONT POOL"), EBreakerStatFormat::Absolute, false },
         { TEXT("CRITICAL WEAPON MORE"), EBreakerStatFormat::Multiplier, false },
         { TEXT("LATER TARGET MORE"), EBreakerStatFormat::Multiplier, false },
+        { TEXT("STATUS RETAINED"), EBreakerStatFormat::PercentPoints, true },
     };
 
     static_assert(UE_ARRAY_COUNT(StatRows) == static_cast<int32>(EStatRow::Count),
@@ -154,6 +156,7 @@ namespace
         OutValues[static_cast<int32>(EStatRow::WeaponCriticalMore)] = Scoped.GetScopedMoreProduct(false, false, false, false, true);
         OutValues[static_cast<int32>(EStatRow::WeaponBeyondFirstMore)] = Scoped.GetScopedMoreProduct(false, false, false, false, false, true);
         const float Health = OutValues[static_cast<int32>(EStatRow::MaxHealth)];
+        OutValues[static_cast<int32>(EStatRow::ReactionResidue)] = Stats.ReactionResiduePercent * .01f;
         OutValues[static_cast<int32>(EStatRow::MaxShield)] = FMath::Max(
             Snapshot.NativeShieldCapacity + Snapshot.EquipmentShieldCapacity + Health * Stats.ShieldPercentMaxHealth * .01f,
             Health * FMath::Max(Snapshot.ClassShieldHealthFloor,

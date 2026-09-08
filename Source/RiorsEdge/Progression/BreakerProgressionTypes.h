@@ -310,6 +310,7 @@ enum class EBreakerNodeStatTarget : uint8
     WeaponBaseSpreadReduction,
     WeaponCriticalDamage,
     WeaponBeyondFirstDamage,
+    ReactionResiduePercent,
 
     Count UMETA(Hidden)
 };
@@ -409,6 +410,7 @@ inline bool BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget Target)
     case EBreakerNodeStatTarget::WeaponBaseSpreadReduction:
     case EBreakerNodeStatTarget::WeaponCriticalDamage:
     case EBreakerNodeStatTarget::WeaponBeyondFirstDamage:
+    case EBreakerNodeStatTarget::ReactionResiduePercent:
     case EBreakerNodeStatTarget::MaxClassResource:
     case EBreakerNodeStatTarget::ClassResourceRegen:
     case EBreakerNodeStatTarget::FireRate:
@@ -836,6 +838,7 @@ struct RIORSEDGE_API FBreakerNodeStats
     UPROPERTY(BlueprintReadOnly) float VoidBurstDamageIncreasedPercent = 0.0f;
     UPROPERTY(BlueprintReadOnly) float RiftBurstDamageIncreasedPercent = 0.0f;
     UPROPERTY(BlueprintReadOnly) float ReactionDamageIncreasedPercent = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float ReactionResiduePercent = 0.0f;
     UPROPERTY(BlueprintReadOnly) float ParryWindowAddedSeconds = 0.0f;
     UPROPERTY(BlueprintReadOnly) float ParryCooldownReductionSeconds = 0.0f;
     UPROPERTY(BlueprintReadOnly) float ParryCooldownRecoveryMultiplier = 1.0f;

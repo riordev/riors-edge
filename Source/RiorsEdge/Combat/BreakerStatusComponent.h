@@ -212,6 +212,7 @@ public:
     UPROPERTY(BlueprintAssignable, Category="Combat|Status") FBreakerStatusEvent OnStatusAvoided;
 
 private:
+    FBreakerActiveStatus ConsumeReactionStatus(FGameplayTag Tag, float Fraction, float ReactionBudget, bool& bFound);
     uint64 ApplyStatusInternal(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator, bool bDurationAlreadyScaled, float UnpaidDamageBudget = 0.0f, const FVector* SourceLocationOverride = nullptr, const FBreakerDamageRequest* ApplyingHit = nullptr);
     void AdvanceVoidBuildup(float DeltaSeconds);
     void ResetVoidBuildup();

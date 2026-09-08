@@ -84,6 +84,10 @@ uint64 UBreakerStatusComponent::PrepareElementReaction(const FBreakerDamageReque
         PendingReactionStatus.UnpaidDamageBudget = FMath::IsFinite(Candidate->InitialReactionBudget)
             ? FMath::Max(0.0f, Candidate->InitialReactionBudget) * Fraction : 0;
     }
+    const float AuthoredResidue = CreditorProgression ? CreditorProgression->GetNodeStats().ReactionResiduePercent : 0.0f;
+    const float Residue = FMath::IsFinite(AuthoredResidue) ? FMath::Clamp(AuthoredResidue / 100.0f, 0.0f, 1.0f) : 0.0f;
+    const float RemainingReaction = PendingReactionStatus.UnpaidDamageBudget;
+    PendingReactionStatus.UnpaidDamageBudget *= 1.0f - Residue;
     PendingReactionTag = ReactionTag;
     PendingReactionToken = NextReactionToken++;
     const uint64 Token = PendingReactionToken;
@@ -91,7 +95,7 @@ uint64 UBreakerStatusComponent::PrepareElementReaction(const FBreakerDamageReque
     // another element/reaction; death cancels this budget without dropping
     // the guard before the outer hit has finished dispatching its callbacks.
     bool bFound = false;
-    const FBreakerActiveStatus Consumed = ConsumeStatus(ConsumedTag, bFound);
+    const FBreakerActiveStatus Consumed = ConsumeReactionStatus(ConsumedTag, Residue, RemainingReaction, bFound);
     if (!bFound || Consumed.ApplicationSerial != PendingReactionStatus.ApplicationSerial)
         PendingReactionStatus.UnpaidDamageBudget = 0;
     return Token;

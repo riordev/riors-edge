@@ -595,6 +595,45 @@ TArray<FBreakerActiveStatus> UBreakerStatusComponent::ConsumeAllStatuses()
     return Consumed;
 }
 
+FBreakerActiveStatus UBreakerStatusComponent::ConsumeReactionStatus(FGameplayTag Tag, float Fraction, float ReactionBudget, bool& bFound)
+{
+    bFound = false;
+    FBreakerActiveStatus Consumed;
+    if (!GetOwner() || !GetOwner()->HasAuthority()) return Consumed;
+    const int32 Index = ActiveStatuses.IndexOfByPredicate([Tag](const auto& Entry) { return Entry.Spec.StatusTag == Tag; });
+    if (Index == INDEX_NONE) return Consumed;
+    Consumed = ActiveStatuses[Index];
+    const bool bRot = Tag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"));
+    const float NormalBudget = bRot ? BreakerElementReactions::RemainingRotBudget(Consumed) : Consumed.UnpaidDamageBudget;
+    Consumed.UnpaidDamageBudget = NormalBudget;
+    ActiveStatuses.RemoveAt(Index);
+    bFound = true;
+    if (Fraction > 0 && FMath::IsFinite(NormalBudget) && NormalBudget > 0
+        && FMath::IsFinite(Consumed.RemainingDuration) && Consumed.RemainingDuration > 0)
+    {
+        FBreakerActiveStatus Retained = Consumed;
+        Retained.ApplicationSerial = NextApplicationSerial++;
+        Retained.UnpaidDamageBudget = NormalBudget * Fraction;
+        Retained.InitialDamageBudget = Retained.UnpaidDamageBudget;
+        Retained.InitialReactionBudget = FMath::IsFinite(ReactionBudget) ? FMath::Max(0.0f, ReactionBudget) * Fraction : 0;
+        Retained.bHasReactionCreditSnapshot = true;
+        if (bRot) Retained.Spec.BaseDamagePerTick *= Fraction;
+        Retained.bPersistentRot = false;
+        Retained.LongDarkSource.Reset();
+        Retained.Spec.bLongDarkSnapshot = false;
+        Retained.Spec.bVoidDebtSnapshot = false;
+        Retained.bSympathyOnExpiry = false;
+        Retained.SympathyDurationSnapshot = 0;
+        Retained.Spec.ProcCoefficient = 0;
+        Retained.ResourceProcCoefficient = 0;
+        // Install before any external callback. Cleansing/death owns removal;
+        // never restore the remainder after a callback returns.
+        ActiveStatuses.Add(Retained);
+    }
+    ReleaseLongDarkLink(Consumed);
+    OnStatusConsumed.Broadcast(Consumed);
+    return Consumed;
+}
 FBreakerActiveStatus UBreakerStatusComponent::ConsumeStatus(FGameplayTag StatusTag, bool& bOutFound)
 {
     bOutFound = false;
