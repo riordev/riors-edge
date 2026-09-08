@@ -117,6 +117,7 @@ namespace BreakerNodeTags
     // shipped four times.
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_NoDistance);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_Reprisal);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_Overreach);
 
     // Caster / VOID WHISPERER (Class-Kits §2.4).
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_VW_Seep);
@@ -140,6 +141,7 @@ namespace BreakerNodeTags
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Resonance);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Cascade);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Interference);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Prepared);
 
     // Gunsmith / ARMORY (Class-Kits-Gunsmith §4.1). Authored 2026-08-16 under
     // the owner's "do all 5 classes" ruling — the branch layer the kits-playable

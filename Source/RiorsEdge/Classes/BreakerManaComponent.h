@@ -21,6 +21,8 @@ struct FBreakerCasterResourceTuning
     float CloseRankTwoRangeCm = 900.0f; // O2 PLACEHOLDER
     float DebtRankOneExtension = 10.0f; // O2 PLACEHOLDER
     float DebtRankTwoExtension = 20.0f; // O2 PLACEHOLDER
+    float PreparedOvercastFloor = -35.0f; // O2 PLACEHOLDER
+    float OverreachIncomingDamageTaken = 0.30f; // O2 PLACEHOLDER
     float BloodpriceRankOneFraction = 0.1f; // O2 PLACEHOLDER
     float BloodpriceRankTwoFraction = 0.2f; // O2 PLACEHOLDER
     float PatienceRankOneDelay = 4.0f; // O2 PLACEHOLDER
@@ -110,6 +112,7 @@ public:
     // 0.15 for +15%. Zero when not Overcast. Combat consumes this later; this
     // component only publishes it.
     UFUNCTION(BlueprintPure, Category="Mana") float GetOvercastIncomingDamageTaken() const;
+    bool IsOverreachActive() const;
     // Deepest the bank may be driven; negative. Spellblade SB4 lowers it.
     UFUNCTION(BlueprintPure, Category="Mana") float GetOvercastFloor() const;
     // Deepens (or restores) the floor at runtime — SB4 and MS10 (spec §5,

@@ -13,17 +13,17 @@ measurement without judging it.
 
 | Section | Direction | Value | Pin | State |
 |---|---|---|---|---|
-| Silent nodes | ceiling | 3 of 365 authored | ceiling 54 | ok |
+| Silent nodes | ceiling | 7 of 371 authored | ceiling 54 | ok |
 | Stat targets with no aggregation lane | ceiling | 1 of 88 | ceiling 6 | ok |
 | Aggregation lanes carrying nothing | ceiling | 1 of 86 lanes | ceiling 9 | ok |
-| Node tags with no consumer | ceiling | 129 of 207 declared | ceiling 143 | ok |
+| Node tags with no consumer | ceiling | 129 of 209 declared | ceiling 143 | ok |
 | Conditions no content authors | ceiling | 19 of 27 | ceiling 12 | **OUT** |
 | Resource generation entry points with no caller | ceiling | 3 of 21 | ceiling 0 | **OUT** |
 | Asserted invariants with no test | ceiling | 35 of 128 asserted across 8 specs | ceiling 42, target 20 | ok |
-| Offered-to-spendable ratio, per tree | floor | 2.25 worst tree | floor 3.0 | **OUT** |
-| Trees sitting exactly on the offered-to-spendable floor | ceiling | 9 of 16 | no pin — measurement only | — |
+| Offered-to-spendable ratio, per tree | floor | 3.0 worst tree | floor 3.0 | ok |
+| Trees sitting exactly on the offered-to-spendable floor | ceiling | 12 of 16 | no pin — measurement only | — |
 | Node-shape composition, per tree | band | 39 % ranked minors, all trees | no pin — measurement only | — |
-| Scaffolding nodes | ceiling | 3 of 365 authored | ceiling 50 | ok |
+| Scaffolding nodes | ceiling | 7 of 371 authored | ceiling 50 | ok |
 | Conditions that can never be true | ceiling | 5.0 | ceiling 5, target 1 | ok |
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
 | Build variance band, at cap | band | 4.17 | band 8.0–10.0 | **OUT** |
@@ -36,7 +36,7 @@ measurement without judging it.
 
 ## Tests
 
-- passing: 816
+- passing: 819
 - expected red: 4
 - **unexpected red: 0**
 - asserted invariants with no test: 35
@@ -53,11 +53,13 @@ A test that was never written is the worst of the three: it looks asserted.
 
 ## Silent nodes
 
-**ceiling** · 3 of 365 authored · ceiling 54
+**ceiling** · 7 of 371 authored · ceiling 54
 
 Authored, purchasable, costs a point, and produces no observable change. Counted against BOTH consumption axes — tag and node id.
 
 - Core.Slice: 3
+- Doctrine.Caster.VoidWhisperer: 3
+- Doctrine.Caster.Multispell: 1
 
 ## Stat targets with no aggregation lane
 
@@ -77,7 +79,7 @@ Plumbing with no author, counted across BOTH authoring layers: node effects, and
 
 ## Node tags with no consumer
 
-**ceiling** · 129 of 207 declared · ceiling 143
+**ceiling** · 129 of 209 declared · ceiling 143
 
 A tag nothing reads. Some are legitimately reserved; most are a promise the game does not keep.
 
@@ -203,14 +205,14 @@ A named test that was never written looks asserted and is not. This is worse tha
 
 ## Offered-to-spendable ratio, per tree
 
-**floor** · 2.25 worst tree · floor 3.0  ·  **OUT**
+**floor** · 3.0 worst tree · floor 3.0
 
 Most of a build should be refusal. A CEILING here would lock the trees at their current size and report green while doing it. READ IT BESIDE the no-margin count below: for a doctrine built to the standard shape this ratio is fixed by construction and reports nothing about authoring.
 
 - Core.Slice: 187 nodes, 429 points offered, 6.6x budget
-- Doctrine.Caster.Multispell: 10 nodes, 20 points offered, 2.5x budget
-- Doctrine.Caster.Spellblade: 11 nodes, 22 points offered, 2.75x budget
-- Doctrine.Caster.VoidWhisperer: 9 nodes, 18 points offered, 2.25x budget
+- Doctrine.Caster.Multispell: 12 nodes, 24 points offered, 3.0x budget
+- Doctrine.Caster.Spellblade: 12 nodes, 24 points offered, 3.0x budget
+- Doctrine.Caster.VoidWhisperer: 12 nodes, 24 points offered, 3.0x budget
 - Doctrine.Gunsmith.Armory: 12 nodes, 24 points offered, 3.0x budget
 - Doctrine.Gunsmith.FieldTech: 12 nodes, 24 points offered, 3.0x budget
 - Doctrine.Gunsmith.Tinkerer: 12 nodes, 24 points offered, 3.0x budget
@@ -226,10 +228,13 @@ Most of a build should be refusal. A CEILING here would lock the trees at their 
 
 ## Trees sitting exactly on the offered-to-spendable floor
 
-**ceiling** · 9 of 16 · no pin — measurement only
+**ceiling** · 12 of 16 · no pin — measurement only
 
 A tree here is one node-price change away from red, and the floor section reports ok until the run it fails on. This falls when a tree is authored above its shape's arithmetic, never by moving a pin.
 
+- Doctrine.Caster.Multispell: 3.0x, exactly the floor
+- Doctrine.Caster.Spellblade: 3.0x, exactly the floor
+- Doctrine.Caster.VoidWhisperer: 3.0x, exactly the floor
 - Doctrine.Gunsmith.Armory: 3.0x, exactly the floor
 - Doctrine.Gunsmith.FieldTech: 3.0x, exactly the floor
 - Doctrine.Gunsmith.Tinkerer: 3.0x, exactly the floor
@@ -244,12 +249,12 @@ A tree here is one node-price change away from red, and the floor section report
 
 **band** · 39 % ranked minors, all trees · no pin — measurement only
 
-A tree that is almost entirely notable-shaped has nothing to fill a constellation with between the interesting picks. Of these, 3 are SCAFFOLDING — no stat line, no condition, and no rule anything reads — a strict subset of the silent nodes above, where the remainder are shaped and merely unpaid. UNPINNED pending a re-derived band: 60% ranked minors means 60% unconditional stat lines, and O76 gives raw percentages to affixes outright, so the authored 55-65 target cannot be reached without breaking another rule. Until it is re-derived this section reports and judges nothing.
+A tree that is almost entirely notable-shaped has nothing to fill a constellation with between the interesting picks. Of these, 7 are SCAFFOLDING — no stat line, no condition, and no rule anything reads — a strict subset of the silent nodes above, where the remainder are shaped and merely unpaid. UNPINNED pending a re-derived band: 60% ranked minors means 60% unconditional stat lines, and O76 gives raw percentages to affixes outright, so the authored 55-65 target cannot be reached without breaking another rule. Until it is re-derived this section reports and judges nothing.
 
 - Core.Slice: 70% ranked minor, 25% notable, 5% convergence/keystone
-- Doctrine.Caster.Multispell: 10% ranked minor, 80% notable, 10% convergence/keystone
-- Doctrine.Caster.Spellblade: 0% ranked minor, 91% notable, 9% convergence/keystone
-- Doctrine.Caster.VoidWhisperer: 11% ranked minor, 78% notable, 11% convergence/keystone
+- Doctrine.Caster.Multispell: 8% ranked minor, 83% notable, 8% convergence/keystone
+- Doctrine.Caster.Spellblade: 0% ranked minor, 92% notable, 8% convergence/keystone
+- Doctrine.Caster.VoidWhisperer: 8% ranked minor, 83% notable, 8% convergence/keystone
 - Doctrine.Gunsmith.Armory: 0% ranked minor, 92% notable, 8% convergence/keystone
 - Doctrine.Gunsmith.FieldTech: 0% ranked minor, 92% notable, 8% convergence/keystone
 - Doctrine.Gunsmith.Tinkerer: 0% ranked minor, 92% notable, 8% convergence/keystone
@@ -265,7 +270,7 @@ A tree that is almost entirely notable-shaped has nothing to fill a constellatio
 
 ## Scaffolding nodes
 
-**ceiling** · 3 of 365 authored · ceiling 50
+**ceiling** · 7 of 371 authored · ceiling 50
 
 No stat line, no condition, and no rule anything reads. A STRICT SUBSET of the silent nodes: the difference is the silent nodes that ARE shaped and merely point at an unpaid target, which is a wiring problem where this is an authoring one.
 

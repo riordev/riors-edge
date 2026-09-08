@@ -39,6 +39,8 @@ bool UBreakerManaComponent::ParseResourceTuning(const FJsonObject& Object, FBrea
         { TEXT("CloseRankTwoRangeCm"), &Candidate.CloseRankTwoRangeCm, 0 },
         { TEXT("DebtRankOneExtension"), &Candidate.DebtRankOneExtension, 0 },
         { TEXT("DebtRankTwoExtension"), &Candidate.DebtRankTwoExtension, 0 },
+        { TEXT("PreparedOvercastFloor"), &Candidate.PreparedOvercastFloor, -MAX_flt },
+        { TEXT("OverreachIncomingDamageTaken"), &Candidate.OverreachIncomingDamageTaken, 0 },
         { TEXT("BloodpriceRankOneFraction"), &Candidate.BloodpriceRankOneFraction, 0 },
         { TEXT("BloodpriceRankTwoFraction"), &Candidate.BloodpriceRankTwoFraction, 0 },
         { TEXT("PatienceRankOneDelay"), &Candidate.PatienceRankOneDelay, 0 },
@@ -61,6 +63,8 @@ bool UBreakerManaComponent::ParseResourceTuning(const FJsonObject& Object, FBrea
     }
     if (Candidate.BloodpriceRankOneFraction > 1 || Candidate.BloodpriceRankTwoFraction > 1)
     { Error = TEXT("Bloodprice fractions must be between zero and one."); return false; }
+    if (Candidate.PreparedOvercastFloor > 0)
+    { Error = TEXT("Prepared floor must be non-positive."); return false; }
     Out = Candidate;
     Error.Reset();
     return true;
@@ -201,6 +205,8 @@ void UBreakerManaComponent::HandleProgressionChanged()
     const int32 Rank = bIsCaster && Progression ? Progression->GetNodeRank(TEXT("Caster.Multispell.Sequence"), EBreakerPointCurrency::DoctrinePoints) : 0;
     if (Rank != ObservedSequenceRank) ClearSequenceApplications();
     ObservedSequenceRank = Rank;
+    // Ownership may change while the bank remains negative.
+    SyncOvercastDamagePenalty();
 }
 
 void UBreakerManaComponent::HandleVitalsRestored()
@@ -256,7 +262,9 @@ float UBreakerManaComponent::GetOvercastFloor() const
     const UBreakerProgressionComponent* Progression = CachedProgression.Get();
     const int32 Rank = IsActiveForOwner() && Progression ? Progression->GetNodeRank(TEXT("Caster.Spellblade.Debt"), EBreakerPointCurrency::DoctrinePoints) : 0;
     const FBreakerCasterResourceTuning& Tuning = GetResourceTuning();
-    return FMath::Min(0.0f, OvercastFloor) - (Rank >= 2 ? Tuning.DebtRankTwoExtension : Rank == 1 ? Tuning.DebtRankOneExtension : 0.0f);
+    const float ExistingFloor = FMath::Min(0.0f, OvercastFloor) - (Rank >= 2 ? Tuning.DebtRankTwoExtension : Rank == 1 ? Tuning.DebtRankOneExtension : 0.0f);
+    const bool bPrepared = IsActiveForOwner() && Progression && Progression->HasNodeTag(BreakerNodeTags::Node_MS_Prepared.GetTag());
+    return bPrepared ? FMath::Min(ExistingFloor, Tuning.PreparedOvercastFloor) : ExistingFloor;
 }
 
 void UBreakerManaComponent::SyncClassResourceFloor()
@@ -289,9 +297,16 @@ bool UBreakerManaComponent::IsOvercast() const
     return IsActiveForOwner() && IsOvercastValue(GetMana());
 }
 
+bool UBreakerManaComponent::IsOverreachActive() const
+{
+    const auto* Progression = CachedProgression.Get();
+    return IsOvercast() && Progression && Progression->HasNodeTag(BreakerNodeTags::Node_SB_Overreach.GetTag());
+}
+
 float UBreakerManaComponent::GetOvercastIncomingDamageTaken() const
 {
-    return IsOvercast() ? FMath::Max(0.0f, OvercastIncomingDamageTaken) : 0.0f;
+    if (!IsOvercast()) return 0.0f;
+    return FMath::Max(0.0f, IsOverreachActive() ? GetResourceTuning().OverreachIncomingDamageTaken : OvercastIncomingDamageTaken);
 }
 
 bool UBreakerManaComponent::CanAffordSpend(float Cost) const
@@ -355,7 +370,7 @@ void UBreakerManaComponent::SyncOvercastDamagePenalty()
 
     if (bOvercast)
     {
-        Combat->PushIncomingDamageModifier(OvercastDamageModifierKey(), OvercastIncomingMultiplier(true, OvercastIncomingDamageTaken));
+        Combat->PushIncomingDamageModifier(OvercastDamageModifierKey(), OvercastIncomingMultiplier(true, GetOvercastIncomingDamageTaken()));
     }
     else
     {

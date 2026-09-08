@@ -119,6 +119,7 @@ namespace BreakerNodeTags
     UE_DEFINE_GAMEPLAY_TAG(Node_SB_Edgework, "Progression.Node.Caster.Spellblade.Edgework");
     UE_DEFINE_GAMEPLAY_TAG(Node_SB_NoDistance, "Progression.Node.Caster.Spellblade.NoDistance");
     UE_DEFINE_GAMEPLAY_TAG(Node_SB_Reprisal, "Progression.Node.Caster.Spellblade.Reprisal");
+    UE_DEFINE_GAMEPLAY_TAG(Node_SB_Overreach, "Progression.Node.Caster.Spellblade.Overreach");
 
     // Caster / VOID WHISPERER (Class-Kits §2.4).
     UE_DEFINE_GAMEPLAY_TAG(Node_VW_Seep, "Progression.Node.Caster.VoidWhisperer.Seep");
@@ -142,6 +143,7 @@ namespace BreakerNodeTags
     UE_DEFINE_GAMEPLAY_TAG(Node_MS_Resonance, "Progression.Node.Caster.Multispell.Resonance");
     UE_DEFINE_GAMEPLAY_TAG(Node_MS_Cascade, "Progression.Node.Caster.Multispell.Cascade");
     UE_DEFINE_GAMEPLAY_TAG(Node_MS_Interference, "Progression.Node.Caster.Multispell.Interference");
+    UE_DEFINE_GAMEPLAY_TAG(Node_MS_Prepared, "Progression.Node.Caster.Multispell.Prepared");
 
     // Gunsmith / ARMORY (Class-Kits-Gunsmith §4.1). AR5's DISPLAY name, "Last
     // Round", collides with Core.Volley.LastRound and nothing else, and AR10's
@@ -1332,6 +1334,13 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterSpellbladeTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Edge.GetTag());
     Tree->Nodes.Add(Node);
 
+    Node = MakeNode(TEXT("Caster.Spellblade.Overreach"), TEXT("Overreach"),
+        TEXT("While Mana is negative, all Caster abilities are free. Your Overcast incoming-damage penalty rises to 30%."),
+        EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Caster.Spellblade.Debt"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Overreach.GetTag());
+    Tree->Nodes.Add(Node);
+
     Node = MakeNode(TEXT("Caster.Spellblade.Reprisal"), TEXT("Reprisal"),
         TEXT("After a passive Block proc, your next Cleave within two seconds costs no Mana."),
         EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
@@ -1468,6 +1477,34 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterVoidWhispererTree(
     // from the A4 ruling that built the lane for it. O95 supersedes it: a
     // doctrine authors no multiplier, so the argument goes with the number.
     // What that leaves behind is recorded at the lane it leaves behind.
+    // Historical Class-Kits VW9. O2 PLACEHOLDER: +25 critical-chance points.
+    // WAITING ON: own-zone membership at DoT application and a source critical
+    // chance snapshot override. Ordinary CriticalChance would affect all hits.
+    Node = MakeNode(TEXT("Caster.VoidWhisperer.SnapshotDiscipline"), TEXT("Snapshot Discipline"),
+        TEXT("NOT IMPLEMENTED: DoTs applied while standing inside your own zone snapshot as if your Critical Chance were 25 percentage points higher. Purchasing this node currently grants no effect."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Zonework"));
+    Node->GrantedTags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Caster.VoidWhisperer.SnapshotDiscipline")));
+    Tree->Nodes.Add(Node);
+
+    // Historical Class-Kits VW10. O2 PLACEHOLDER: target below 25% health.
+    // WAITING ON: source-owned DoT expiry policy tracking the target's health.
+    // Core Long Dark only owns one Rot and is not this all-DoT rule.
+    Node = MakeNode(TEXT("Caster.VoidWhisperer.Terminal"), TEXT("Terminal"),
+        TEXT("NOT IMPLEMENTED: Your DoTs do not expire on targets below 25% health; they persist until death or cleanse. Purchasing this node currently grants no effect."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Attrition"));
+    Node->GrantedTags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Caster.VoidWhisperer.Terminal")));
+    Tree->Nodes.Add(Node);
+
+    // Historical Class-Kits VW11/O10. O2 PLACEHOLDER: double tick frequency,
+    // 25% incoming penalty instead of the historical 15% Overcast penalty.
+    // WAITING ON: negative-Mana application-time interval snapshot for all
+    // Caster DoTs and the distinct keyed Overcast penalty replacement.
+    Node = MakeNode(TEXT("Caster.VoidWhisperer.LongDebt"), TEXT("Long Debt"),
+        TEXT("NOT IMPLEMENTED: DoTs applied while Mana is negative snapshot double tick frequency for their lifetime. While Mana is negative, you take 25% increased damage instead of 15%. Purchasing this node currently grants no effect."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Drain"));
+    Node->GrantedTags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Caster.VoidWhisperer.LongDebt")));
+    Tree->Nodes.Add(Node);
+
     Node = MakeNode(TEXT("Caster.VoidWhisperer.LongDark"), TEXT("Long Dark"),
         TEXT("Branch keystone. Rewrites Unmake: duration extends to 12s at 50% cost instead of free, and zones placed during it stop aging until that Unmake ends. Their damage continues."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Attrition"));
@@ -1583,6 +1620,15 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Resonance.GetTag());
     Tree->Nodes.Add(Node);
 
+    // Status income already shares baseline Overcast doubling. Prepared adds
+    // deeper debt allowance, never a second doubling of that same income.
+    Node = MakeNode(TEXT("Caster.Multispell.Prepared"), TEXT("Prepared"),
+        TEXT("Your Mana can run to -35 before a cast is refused."),
+        EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Caster.Multispell.Reservoir"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Prepared.GetTag());
+    Tree->Nodes.Add(Node);
+
     Node = MakeNode(TEXT("Caster.Multispell.Interference"), TEXT("Interference"),
         TEXT("Resonance uses a lower fixed damage amount per distinct status and adds a flat bonus at three or more statuses."),
         EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
@@ -1603,6 +1649,16 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
     // BuildTargetConditionRiders and resolved in ReceiveDamage, joining the
     // one additive bucket while it holds. Same trigger, same magnitude
     // number, honest bucket. Caster's third More SLOT stays unspent.
+    // Historical Class-Kits MS11. O2 PLACEHOLDER: one reaction per target per
+    // 0.5s; each refused reaction queues 10 Mana through conditional income.
+    // WAITING ON: source/target reaction throttle before status consumption and
+    // capped Mana compensation for that refusal. No flat regen substitute.
+    Node = MakeNode(TEXT("Caster.Multispell.ConductorRule"), TEXT("Conductor's Rule"),
+        TEXT("NOT IMPLEMENTED: Only one reaction may trigger per target per 0.5s. Reactions that would have triggered instead grant 10 Mana through the conditional income cap. Purchasing this node currently grants no effect."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Caster.Multispell.Chain"));
+    Node->GrantedTags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Caster.Multispell.ConductorRule")));
+    Tree->Nodes.Add(Node);
+
     Node = MakeNode(TEXT("Caster.Multispell.Cascade"), TEXT("Cascade"),
         TEXT("Branch keystone. Rewrites Unmake: your status applications during it echo the next physical status in Fracture's cycle. Echoes cannot trigger further echoes. Damage is Increased by 25% against targets carrying 3 or more distinct status types."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Caster.Multispell.Sequence"));

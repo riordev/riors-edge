@@ -257,6 +257,12 @@ void UBreakerAbility_Unmake::BindCascadeActor(AActor* Actor)
 
 void UBreakerAbility_Unmake::HandleCascadeOwnerDeath() { EndCascadeListening(); }
 
+void UBreakerAbility_Unmake::HandleUnmakeOwnerDeath()
+{
+    if (IsActive())
+        EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+}
+
 void UBreakerAbility_Unmake::HandleCascadeKeystoneChanged(FGameplayTag Tag, int32 Count)
 {
     if (Count <= 0) EndCascadeListening();
@@ -330,6 +336,11 @@ void UBreakerAbility_Unmake::ActivateAbility(const FGameplayAbilitySpecHandle Ha
         return;
     }
 
+    // Every variant owns its death cleanup, including the base ultimate.
+    // Ending Cascade listeners alone cannot release the Mana suspension.
+    if (auto* Combat = Character->GetCombat())
+        Combat->OnDeath.AddUniqueDynamic(this, &ThisClass::HandleUnmakeOwnerDeath);
+
     // The window IS the ultimate: every Caster ability reads its payload as
     // the cost scalar through UBreakerCasterAbility::GetResourceCost.
     if (UBreakerAbilityStateComponent* State = UBreakerAbilityStateComponent::FindOrAdd(Character))
@@ -391,6 +402,8 @@ void UBreakerAbility_Unmake::EndAbility(const FGameplayAbilitySpecHandle Handle,
     EndCascadeListening();
     if (ABreakerCharacter* Character = GetBreakerCharacter())
     {
+        if (auto* Combat = Character->GetCombat())
+            Combat->OnDeath.RemoveDynamic(this, &ThisClass::HandleUnmakeOwnerDeath);
         if (UWorld* World = Character->GetWorld())
         {
             World->GetTimerManager().ClearTimer(WindowTimer);

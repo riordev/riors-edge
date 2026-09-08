@@ -2,18 +2,13 @@
 
 ## What this system is for
 
-A class is how you act: the verbs you have and the resource you spend to use them. It is one of four avenues a character's identity can come from, and it
-must never be the only trunk — a Core-tree build or a gear build has to be a real answer to "what is your character", not a supporting layer under a class
-choice.
+A class is how you act: the verbs you have and the resource you spend. Core and gear must also support independent build identities.
 
-It fails when the resource is decoration. If a loop generates without being played toward, or spends without changing what the player can do next, the
-class is a colour on a bar and the abilities are cooldowns with a theme. Selection is permanent, so a class that fails this way is a mistake the player
-cannot take back.
+Resource generation must reward deliberate play, and spending must change what the player can do next. Permanent class selection makes this consequential.
 
 ## The rules
 
-**Five classes, five resources.** Caster spends Mana, Swift builds Momentum, Gunsmith banks Scrap, Tank earns Grit, Support accrues Charge. All five ship
-playable, and class selection is permanent per character.
+**Five classes, five resources.** Caster spends Mana, Swift builds Momentum, Gunsmith banks Scrap, Tank earns Grit, Support accrues Charge. Selection is permanent per character.
 
 **A class is offered only once its kit executes.** The gate is derived from whether the abilities run, never from a list someone maintains — a row-count
 proxy would offer a permanent, irreversible lock onto nothing.
@@ -61,6 +56,8 @@ reads finished and plays wrong.
 it does not restate it.
 
 ## The model
+
+Each Caster doctrine offers twelve nodes, twenty-four points and four final-tier choices against eight spendable points. Overreach makes Caster abilities, including Unmake, free while Mana is negative and replaces the incoming penalty with30%. Prepared lowers the existing Overcast floor to at most-35; ordinary capped income and recovery remain. Both magnitudes are O2 placeholders in `Data/caster-resource.json`. Death ends every Unmake variant's window and generation suspension before respawn.
 
 Cascade echoes the next physical status in Fracture's shared cycle, skipping elemental buildup entries. Echoes have zero proc and cannot echo again. The
 ultimate includes targets spawned during its window; closing that window, death or loss of Cascade cancels queued echoes.

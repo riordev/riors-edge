@@ -12,7 +12,7 @@
 		"Source/RiorsEdge/Progression/BreakerCoreRosterWeapon.cpp": "668dc0b08541588e995afe28301d8ae2bacb2106",
 		"Source/RiorsEdge/Progression/BreakerCoreTree.cpp": "0d1c3252ee7f95d02fea3445e83f7e71b05e15c2",
 		"Source/RiorsEdge/Progression/BreakerCoreTree.h": "d5cbc90580dd4568eeb1ee21d00f5159dc56bbae",
-		"Source/RiorsEdge/Progression/BreakerProgressionLibrary.cpp": "3c2194e18348d8ea3aa298869166505552aa4ac3",
+		"Source/RiorsEdge/Progression/BreakerProgressionLibrary.cpp": "2072baa7db7548e33f87ac28e4c3572e5676cd43",
 		"Source/RiorsEdge/Progression/BreakerProgressionNode.h": "092c6560be0df6e02143690452adec272475a950",
 		"Source/RiorsEdge/Progression/BreakerProgressionTree.h": "aaf54881b733ca884baff936284824ef3d55a931",
 		"Source/RiorsEdge/Progression/BreakerProgressionTypes.h": "fbc1c1b4c86fa38bc0d28927b214bc46cf9963c8"
@@ -8180,6 +8180,26 @@
 					"requiredTreeInvestment": 4
 				},
 				{
+					"id": "Caster.Spellblade.Overreach",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.Spellblade.Overreach"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Caster.Spellblade.Debt",
+							"rank": 1
+						}
+					],
+					"requiredTreeInvestment": 6
+				},
+				{
 					"id": "Caster.Spellblade.Reprisal",
 					"tier": 4,
 					"ranks": 1,
@@ -8410,6 +8430,66 @@
 					"requiredTreeInvestment": 4
 				},
 				{
+					"id": "Caster.VoidWhisperer.SnapshotDiscipline",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.VoidWhisperer.SnapshotDiscipline"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Caster.VoidWhisperer.Zonework",
+							"rank": 1
+						}
+					],
+					"requiredTreeInvestment": 6
+				},
+				{
+					"id": "Caster.VoidWhisperer.Terminal",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.VoidWhisperer.Terminal"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Caster.VoidWhisperer.Attrition",
+							"rank": 1
+						}
+					],
+					"requiredTreeInvestment": 6
+				},
+				{
+					"id": "Caster.VoidWhisperer.LongDebt",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.VoidWhisperer.LongDebt"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Caster.VoidWhisperer.Drain",
+							"rank": 1
+						}
+					],
+					"requiredTreeInvestment": 6
+				},
+				{
 					"id": "Caster.VoidWhisperer.LongDark",
 					"tier": 4,
 					"ranks": 1,
@@ -8600,6 +8680,26 @@
 					"requiredTreeInvestment": 4
 				},
 				{
+					"id": "Caster.Multispell.Prepared",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.Multispell.Prepared"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Caster.Multispell.Reservoir",
+							"rank": 1
+						}
+					],
+					"requiredTreeInvestment": 6
+				},
+				{
 					"id": "Caster.Multispell.Interference",
 					"tier": 4,
 					"ranks": 1,
@@ -8614,6 +8714,26 @@
 					"prerequisites": [
 						{
 							"id": "Caster.Multispell.Resonance",
+							"rank": 1
+						}
+					],
+					"requiredTreeInvestment": 6
+				},
+				{
+					"id": "Caster.Multispell.ConductorRule",
+					"tier": 4,
+					"ranks": 1,
+					"cost": 2,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.Multispell.ConductorRule"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Caster.Multispell.Chain",
 							"rank": 1
 						}
 					],

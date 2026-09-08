@@ -92,6 +92,7 @@ public:
     static FBreakerStatusApplicationSpec MakeCascadeEchoSpec(FBreakerStatusApplicationSpec CycleSpec, float DamageScalar);
 
 private:
+    UFUNCTION() void HandleUnmakeOwnerDeath();
     void BeginCascadeListening(UWorld* World, ABreakerCharacter* Character);
     void EndCascadeListening();
     void BindCascadeActor(AActor* Actor);

@@ -84,6 +84,9 @@ UBreakerManaComponent* UBreakerCasterAbility::GetManaComponent() const
 
 float UBreakerCasterAbility::GetUnmodifiedResourceCost() const
 {
+    // Overreach includes Unmake: its existing suspension can retain debt.
+    // Ordinary free casts do not delay or suspend native Mana recovery.
+    if (const auto* Mana = GetManaComponent(); Mana && Mana->IsOverreachActive()) return 0.0f;
     const float Authored = Super::GetUnmodifiedResourceCost();
     // Read live, never cached (owner ruling 2026-08-14): the player re-gears
     // mid-fight and a stale efficiency would quote a price the bank is not

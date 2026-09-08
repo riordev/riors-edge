@@ -8,6 +8,8 @@
     "CloseRankTwoRangeCm": 900,
     "DebtRankOneExtension": 10,
     "DebtRankTwoExtension": 20,
+    "PreparedOvercastFloor": -35,
+    "OverreachIncomingDamageTaken": 0.30,
     "BloodpriceRankOneFraction": 0.1,
     "BloodpriceRankTwoFraction": 0.2,
     "PatienceRankOneDelay": 4,
