@@ -2,129 +2,89 @@
 
 ## What this system is for
 
-A class is how you act: the verbs you have and the resource you spend to use
-them. It is one of four avenues a character's identity can come from, and it
-must never be the only trunk — a Core-tree build or a gear build has to be a
-real answer to "what is your character", not a supporting layer under a class
+A class is how you act: the verbs you have and the resource you spend to use them. It is one of four avenues a character's identity can come from, and it
+must never be the only trunk — a Core-tree build or a gear build has to be a real answer to "what is your character", not a supporting layer under a class
 choice.
 
-It fails when the resource is decoration. If a loop generates without being
-played toward, or spends without changing what the player can do next, the
-class is a colour on a bar and the abilities are cooldowns with a theme.
-Selection is permanent, so a class that fails this way is a mistake the player
+It fails when the resource is decoration. If a loop generates without being played toward, or spends without changing what the player can do next, the
+class is a colour on a bar and the abilities are cooldowns with a theme. Selection is permanent, so a class that fails this way is a mistake the player
 cannot take back.
 
 ## The rules
 
-**Five classes, five resources.** Caster spends Mana, Swift builds Momentum,
-Gunsmith banks Scrap, Tank earns Grit, Support accrues Charge. All five ship
+**Five classes, five resources.** Caster spends Mana, Swift builds Momentum, Gunsmith banks Scrap, Tank earns Grit, Support accrues Charge. All five ship
 playable, and class selection is permanent per character.
 
-**A class is offered only once its kit executes.** The gate is derived from
-whether the abilities run, never from a list someone maintains — a row-count
+**A class is offered only once its kit executes.** The gate is derived from whether the abilities run, never from a list someone maintains — a row-count
 proxy would offer a permanent, irreversible lock onto nothing.
 
-**Generation is capped per second, per source.** This is the anti-farm rule and
-it is not optional: it is what stops sprint-looping for Momentum and self-harm for
-Grit. Generation events carry a proc coefficient, so a tick generates at its
-coefficient rather than at full value.
+**Generation is capped per second, per source.** This is the anti-farm rule and it is not optional: it is what stops sprint-looping for Momentum and self-harm for
+Grit. Generation events carry a proc coefficient, so a tick generates at its coefficient rather than at full value.
 
-**No resource decays in a menu, at a Forge, or in the Anchor.** Decay is barred
-in SAFE states — that enumeration is the rule. It is not "decay only in
-combat": a loop may move in the field between fights, and one that converges on
-a midpoint out of combat is moving toward a resting value rather than bleeding
+**No resource decays in a menu, at a Forge, or in the Anchor.** Decay is barred in SAFE states — that enumeration is the rule. It is not "decay only in
+combat": a loop may move in the field between fights, and one that converges on a midpoint out of combat is moving toward a resting value rather than bleeding
 toward nothing.
 
 **Cost reduction joins the additive bucket. It never becomes a More.**
 
-**Every class generates solo.** Solo is the primary balance target, and every
-Support branch has a self path. A generation source that only fires with allies
+**Every class generates solo.** Solo is the primary balance target, and every Support branch has a self path. A generation source that only fires with allies
 present is a class that does not work alone.
 
-**Every build must be able to make an impact in every encounter.** Builds may
-excel in some situations and be weak in others; none may be unable to
+**Every build must be able to make an impact in every encounter.** Builds may excel in some situations and be weak in others; none may be unable to
 participate.
 
-**Two abilities plus one ultimate are equipped**, from the class's registered
-kit. Starters are per-class authored — one or two free at level one. Swift is
-the one-starter class: Skim plus an enhanced-dash tree node granted at level
-one, and its second slot stands visibly empty until the first unlock — the
-empty slot is the first thing the quartermaster fills. Many against two slots
-is a loadout decision rather than a rotation.
+**Two abilities plus one ultimate are equipped**, from the class's registered kit. Starters are per-class authored — one or two free at level one. Swift is
+the one-starter class: Skim plus an enhanced-dash tree node granted at level one, and its second slot stands visibly empty until the first unlock — the
+empty slot is the first thing the quartermaster fills. Many against two slots is a loadout decision rather than a rotation.
 
-**The remaining class abilities unlock one at a time, per character.** The
-ultimate and the starters are free and never unlock; every remaining class
-ability is bought with a one-time token at the quartermaster, an Anchor
-interaction. Tokens rather than
-the crafting currency, because that currency is account-wide and would let an
-established account buy out a new character's kit at level one. One token per
-unlockable means acquisition is an ordering choice — which ability first —
-rather than a scarcity one.
+**The remaining class abilities unlock one at a time, per character.** The ultimate and the starters are free and never unlock; every remaining class
+ability is bought with a one-time token at the quartermaster, an Anchor interaction. Tokens rather than
+the crafting currency, because that currency is account-wide and would let an established account buy out a new character's kit at level one. One token per
+unlockable means acquisition is an ordering choice — which ability first — rather than a scarcity one.
 
-**Branch keystones rewrite the ultimate; they never replace it.** One ultimate
-per class, available from level one, with three distinct behaviours from three
+**Branch keystones rewrite the ultimate; they never replace it.** One ultimate per class, available from level one, with three distinct behaviours from three
 keystones and no additional ultimate assets.
 
-**Ability damage draws its own additive pool plus the shared one**, and rides
-gear depth through the equipped weapon's item-level scalar, anchored to exactly
-1.0 at the bottom so nothing moves at the anchor. Depth keeps an ability's base
-from decaying against the content curve; breadth is what lets an ability build
-compete. **Which pool applies is decided by what delivers the damage, not by
-what triggers it** — an ability that swings the equipped weapon deals
+**Ability damage draws its own additive pool plus the shared one**, and rides gear depth through the equipped weapon's item-level scalar, anchored to exactly
+1.0 at the bottom so nothing moves at the anchor. Depth keeps an ability's base from decaying against the content curve; breadth is what lets an ability build
+compete. **Which pool applies is decided by what delivers the damage, not by what triggers it** — an ability that swings the equipped weapon deals
 weapon-delivered damage.
 
-**Temporary ability windows are More multipliers and compete inside the same
-budget as tree keystones.** A window bought on a build already holding three
+**Temporary ability windows are More multipliers and compete inside the same budget as tree keystones.** A window bought on a build already holding three
 Mores buys little, and that competition is the design.
 
-**Behavioural gaps are recorded, never faked.** Where an ability needs a
-primitive the game does not have — threat, stagger, status immunity, a lethal
-save — the absence is written at the ability's own site and the ability ships
-honestly short. Substituting a nearest-fit primitive silently is how a kit
+**Behavioural gaps are recorded, never faked.** Where an ability needs a primitive the game does not have — threat, stagger, status immunity, a lethal
+save — the absence is written at the ability's own site and the ability ships honestly short. Substituting a nearest-fit primitive silently is how a kit
 reads finished and plays wrong.
 
-**A class ability may not author a magnitude on a stat target the Core tree
-already carries on the same axis.** The class layer changes what an axis does;
+**A class ability may not author a magnitude on a stat target the Core tree already carries on the same axis.** The class layer changes what an axis does;
 it does not restate it.
 
 ## The model
 
-Cascade echoes the next physical status in Fracture's shared cycle, skipping
-elemental buildup entries. Echoes have zero proc and cannot echo again. The
-ultimate includes targets spawned during its window; closing that window,
-death or loss of Cascade cancels queued echoes.
+Cascade echoes the next physical status in Fracture's shared cycle, skipping elemental buildup entries. Echoes have zero proc and cannot echo again. The
+ultimate includes targets spawned during its window; closing that window, death or loss of Cascade cancels queued echoes.
 
-Long Dark pauses the lifetime of owned zones placed during its Unmake window.
-Damage and membership continue. That window ending, owner death or loss of
-the keystone releases the pause; later ultimates cannot rearm an old zone.
-Refreshing a zone placed before the window does not acquire this pause.
+Long Dark pauses the lifetime of owned zones placed during its Unmake window. Damage and membership continue. That window ending, owner death or loss of
+the keystone releases the pause; later ultimates cannot rearm an old zone. Refreshing a zone placed before the window does not acquire this pause.
 
-Lingering rank two expands a refreshed overlapping Rot by one metre once per
-zone. New zones start at their ordinary radius; further refreshes do not grow
+Lingering rank two expands a refreshed overlapping Rot by one metre once per zone. New zones start at their ordinary radius; further refreshes do not grow
 them again. The footprint and affected enemies use the expanded radius.
 
-Resonance deals an untyped Elemental detonation based on status count. It does
-not apply elemental buildup or reactions. Its preservation node halves status
+Resonance deals an untyped Elemental detonation based on status count. It does not apply elemental buildup or reactions. Its preservation node halves status
 durations instead of consuming them; this also reduces unpaid Rot damage.
 
-Fracture's selected elemental positions share one conversion budget and one
-direct hit. Duplicate elements merge; physical carried statuses are unchanged.
-The first eligible reaction in selection order consumes an existing status
-and prevents all new buildup from that impact. A status earned by that impact
-cannot react with another of its selections. Sympathetic pays Entropy once.
-The starter cycle is Bleed, Poison, Entropy. Unlocking Siphon appends Void
+Fracture's selected elemental positions share one conversion budget and one direct hit. Duplicate elements merge; physical carried statuses are unchanged.
+The first eligible reaction in selection order consumes an existing status and prevents all new buildup from that impact. A status earned by that impact
+cannot react with another of its selections. Sympathetic pays Entropy once. The starter cycle is Bleed, Poison, Entropy. Unlocking Siphon appends Void
 once, including an existing unlocked character whose cycle is created later.
 
-Hold caps each damage application after mitigation and before shield/health
-spending. Its editable starting cap is 25% of current maximum health; solo
-Wall uses 12.5% (O2 tuning). Small hits below the cap are unchanged. Active
-caps compose by minimum, including True damage and damage-over-time ticks.
+Hold caps each damage application after mitigation and before shield/health spending. Its editable starting cap is 25% of current maximum health; solo
+Wall uses 12.5% (O2 tuning). Small hits below the cap are unchanged. Active caps compose by minimum, including True damage and damage-over-time ticks.
 Vein removes the cap. Expiry, cancellation and death clear its protection.
 
-Detonation releases its stored damage on a second ultimate press or normal
-window expiry, without another resource payment. It pays once at 70% of
-damage taken in an 8 m radius, without falloff or self-damage. Cancellation,
-death or loss of the keystone discards the stored damage.
+Detonation releases its stored damage on a second ultimate press or normal window expiry, without another resource payment. It pays once at 70% of
+damage taken in an 8 m radius, without falloff or self-damage. Cancellation, death or loss of the keystone discards the stored damage.
 
 Interposition grants its solo owner shield capacity behind a live owned Anchor
 Point within 4 m. The starting headroom is 10% of maximum health (O2 tuning).
