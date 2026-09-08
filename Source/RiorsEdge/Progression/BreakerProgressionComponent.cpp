@@ -1605,7 +1605,10 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     // — not a defensive fiction. Delivered by PushLoopValveOverrides below.
     Stats.ClassResourceDecayMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::ClassResourceDecay));
     Stats.AbilityAreaMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::AbilityArea));
-    Stats.AbilityDurationMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::AbilityDuration));
+    Stats.AbilityDurationPercent = IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::AbilityDuration)];
+    Stats.AbilityDurationMultiplier = FMath::Max(0.0f, 1.0f + Stats.AbilityDurationPercent * .01f);
+    Stats.ZoneAndWindowDurationPercent = IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::ZoneAndWindowDuration)];
+    Stats.BuffAndWindowDurationPercent = IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::BuffAndWindowDuration)];
     // The divisor convention (DashCooldownReduction's): 1.20 == 20% shorter.
     // Floored just above zero so no authored row can divide a cooldown by zero.
     Stats.AbilityCooldownReduction = FMath::Max(0.01f, Increased(EBreakerNodeStatTarget::AbilityCooldown));
@@ -1706,6 +1709,12 @@ bool UBreakerProgressionComponent::IsNodeMoreAuthoringLegal(const UBreakerProgre
 
     for (const FBreakerNodeEffect& Effect : Node->Effects)
     {
+        if ((Effect.StatTarget == EBreakerNodeStatTarget::ZoneAndWindowDuration || Effect.StatTarget == EBreakerNodeStatTarget::BuffAndWindowDuration)
+            && (Effect.StatBucket != EBreakerNodeStatBucket::IncreasedPercent || Effect.RequiresTargetState()))
+        {
+            if (OutReason) *OutReason = FString::Printf(TEXT("node '%s' must author scoped duration as Increased without a target-state rider"), *Node->NodeId.ToString());
+            return false;
+        }
         if (Effect.StatTarget == EBreakerNodeStatTarget::ReactionResiduePercent
             && (Effect.StatBucket != EBreakerNodeStatBucket::Flat || Effect.RequiresTargetState()))
         {

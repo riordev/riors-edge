@@ -165,10 +165,21 @@ float UBreakerGameplayAbility::AbilityAreaMultiplierFor(const AActor* OwnerActor
     return Progression ? Progression->GetNodeStats().AbilityAreaMultiplier : 1.0f;
 }
 
-float UBreakerGameplayAbility::AbilityDurationMultiplierFor(const AActor* OwnerActor)
+float UBreakerGameplayAbility::AbilityDurationMultiplierFor(const AActor* OwnerActor, EBreakerAbilityDurationKind Kind)
 {
     const UBreakerProgressionComponent* Progression = OwnerActor ? OwnerActor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
-    return Progression ? Progression->GetNodeStats().AbilityDurationMultiplier : 1.0f;
+    if (!Progression) return 1.0f;
+    return ComposeAbilityDurationMultiplier(Progression->GetNodeStats(), Kind);
+}
+
+float UBreakerGameplayAbility::ComposeAbilityDurationMultiplier(const FBreakerNodeStats& Stats, EBreakerAbilityDurationKind Kind)
+{
+    float Percent = Stats.AbilityDurationPercent;
+    if (Kind == EBreakerAbilityDurationKind::Zone || Kind == EBreakerAbilityDurationKind::Window)
+        Percent += Stats.ZoneAndWindowDurationPercent;
+    if (Kind == EBreakerAbilityDurationKind::Buff || Kind == EBreakerAbilityDurationKind::Window)
+        Percent += Stats.BuffAndWindowDurationPercent;
+    return FMath::Max(0.0f, 1.0f + Percent * .01f);
 }
 
 float UBreakerGameplayAbility::AbilityBaseDamageFor(const AActor* OwnerActor, float ScaledAuthoredBase)

@@ -386,7 +386,8 @@ void UBreakerAbility_Overhaul::ActivateAbility(const FGameplayAbilitySpecHandle 
     }
     LastDrawnRounds = Drawn;
 
-    const float Duration = Definition ? Definition->WindowDuration : 10.0f;
+    const float Duration = (Definition ? Definition->WindowDuration : 10.0f)
+        * AbilityDurationMultiplierFor(Character, EBreakerAbilityDurationKind::Window);
     if (UBreakerAbilityStateComponent* State = UBreakerAbilityStateComponent::FindOrAdd(Character))
     {
         State->StartWindow(WindowKey(), Duration);

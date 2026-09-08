@@ -5,6 +5,9 @@
 #include "GameplayEffect.h"
 #include "BreakerGameplayAbility.generated.h"
 
+enum class EBreakerAbilityDurationKind : uint8 { Generic, Zone, Window, Buff };
+struct FBreakerNodeStats;
+
 class ABreakerCharacter;
 class UBreakerAbilityDefinition;
 class UBreakerAttributeSet;
@@ -101,7 +104,8 @@ public:
     static float AbilityAreaMultiplierFor(const AActor* OwnerActor);
     static float AbilityCastRateMultiplierFor(const AActor* OwnerActor);
     static float AbilityChannelRateMultiplierFor(const AActor* OwnerActor);
-    static float AbilityDurationMultiplierFor(const AActor* OwnerActor);
+    static float ComposeAbilityDurationMultiplier(const FBreakerNodeStats& Stats, EBreakerAbilityDurationKind Kind);
+    static float AbilityDurationMultiplierFor(const AActor* OwnerActor, EBreakerAbilityDurationKind Kind = EBreakerAbilityDurationKind::Generic);
     static float AbilityBaseDamageFor(const AActor* OwnerActor, float ScaledAuthoredBase);
     // The cooldown DIVISOR (DashCooldownReduction's convention: 1.20 == 20%
     // shorter). Never at or below zero — the aggregator floors it.

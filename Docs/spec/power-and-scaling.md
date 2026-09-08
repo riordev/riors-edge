@@ -227,7 +227,7 @@ Every lane permitted to touch outgoing player damage.
 | Reload and swap tempo | Strongest active source on each axis; divide authored duration by speed, snapshot when the action starts, conserve ammunition |
 | Target-conditional riders | The same additive bucket, never a multiplier |
 | DoT | The same additive bucket as direct damage |
-
+| Ability duration | Generic and matching zone/window or buff/window Increased contributions add once before the zero floor; snapshot at activation, excluding animation locks and fixed Afterimage tails |
 ### The bands
 The ratio between a baseline and optimized build at the same area level is authored at two points because the two are different games.
 

@@ -1,6 +1,7 @@
 #include "UI/BreakerSkillProjection.h"
 
 #include "Attributes/BreakerAttributeSet.h"
+#include "Abilities/BreakerGameplayAbility.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "GameFramework/Actor.h"
 #include "Items/BreakerEquipmentComponent.h"
@@ -52,6 +53,9 @@ namespace
         WeaponCriticalMore,
         WeaponBeyondFirstMore,
         ReactionResidue,
+        ZoneDuration,
+        WindowDuration,
+        BuffDuration,
         Count
     };
 
@@ -90,6 +94,9 @@ namespace
         { TEXT("CRITICAL WEAPON MORE"), EBreakerStatFormat::Multiplier, false },
         { TEXT("LATER TARGET MORE"), EBreakerStatFormat::Multiplier, false },
         { TEXT("STATUS RETAINED"), EBreakerStatFormat::PercentPoints, true },
+        { TEXT("ZONE DURATION"), EBreakerStatFormat::Multiplier, true },
+        { TEXT("WINDOW DURATION"), EBreakerStatFormat::Multiplier, true },
+        { TEXT("BUFF DURATION"), EBreakerStatFormat::Multiplier, true },
     };
 
     static_assert(UE_ARRAY_COUNT(StatRows) == static_cast<int32>(EStatRow::Count),
@@ -155,6 +162,9 @@ namespace
         OutValues[static_cast<int32>(EStatRow::EffectiveHealthMore)] = Scoped.GetScopedMoreProduct(false, false, false, true);
         OutValues[static_cast<int32>(EStatRow::WeaponCriticalMore)] = Scoped.GetScopedMoreProduct(false, false, false, false, true);
         OutValues[static_cast<int32>(EStatRow::WeaponBeyondFirstMore)] = Scoped.GetScopedMoreProduct(false, false, false, false, false, true);
+        OutValues[static_cast<int32>(EStatRow::ZoneDuration)] = UBreakerGameplayAbility::ComposeAbilityDurationMultiplier(Stats, EBreakerAbilityDurationKind::Zone);
+        OutValues[static_cast<int32>(EStatRow::WindowDuration)] = UBreakerGameplayAbility::ComposeAbilityDurationMultiplier(Stats, EBreakerAbilityDurationKind::Window);
+        OutValues[static_cast<int32>(EStatRow::BuffDuration)] = UBreakerGameplayAbility::ComposeAbilityDurationMultiplier(Stats, EBreakerAbilityDurationKind::Buff);
         const float Health = OutValues[static_cast<int32>(EStatRow::MaxHealth)];
         OutValues[static_cast<int32>(EStatRow::ReactionResidue)] = Stats.ReactionResiduePercent * .01f;
         OutValues[static_cast<int32>(EStatRow::MaxShield)] = FMath::Max(

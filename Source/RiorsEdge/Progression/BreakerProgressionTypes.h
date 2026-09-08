@@ -311,6 +311,8 @@ enum class EBreakerNodeStatTarget : uint8
     WeaponCriticalDamage,
     WeaponBeyondFirstDamage,
     ReactionResiduePercent,
+    ZoneAndWindowDuration,
+    BuffAndWindowDuration,
 
     Count UMETA(Hidden)
 };
@@ -464,6 +466,8 @@ inline bool BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget Target)
     case EBreakerNodeStatTarget::ClassResourceDecay:
     case EBreakerNodeStatTarget::AbilityArea:
     case EBreakerNodeStatTarget::AbilityDuration:
+    case EBreakerNodeStatTarget::ZoneAndWindowDuration:
+    case EBreakerNodeStatTarget::BuffAndWindowDuration:
     case EBreakerNodeStatTarget::AbilityCooldown:
     // ---- Wired 2026-08-26, the enhanced-dash passive (ORDERS ruling 1) ---
     // DashDistance: a single-bidder Increased lane composed onto
@@ -795,6 +799,9 @@ struct RIORSEDGE_API FBreakerNodeStats
     // radius/arc/range (AbilityArea) and window/zone duration (AbilityDuration).
     UPROPERTY(BlueprintReadOnly) float AbilityAreaMultiplier = 1.0f;
     UPROPERTY(BlueprintReadOnly) float AbilityDurationMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float AbilityDurationPercent = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float ZoneAndWindowDurationPercent = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float BuffAndWindowDurationPercent = 0.0f;
     UPROPERTY(BlueprintReadOnly) float AddedWeaponDamage = 0.0f;
     UPROPERTY(BlueprintReadOnly) float AddedAbilityPower = 0.0f;
     UPROPERTY(BlueprintReadOnly) float PhysicalDamageReductionPercent = 0.0f;

@@ -45,7 +45,7 @@ float UBreakerAbility_Rot::ComputeEffectiveDurationSeconds(const AActor* OwnerAc
 {
     // The AbilityDuration lane. Lingering's "zones linger" line lands here —
     // and on the refresh path below, so a refreshed puddle lingers too.
-    return FMath::Max(0.0f, DurationSeconds) * FMath::Max(0.0f, AbilityDurationMultiplierFor(OwnerActor));
+    return FMath::Max(0.0f, DurationSeconds) * FMath::Max(0.0f, AbilityDurationMultiplierFor(OwnerActor, EBreakerAbilityDurationKind::Zone));
 }
 
 bool UBreakerAbility_Rot::ShouldFollowCaster(const AActor* OwnerActor, bool bGroundHit, const FVector& HitPoint, const FVector& HitNormal) const
