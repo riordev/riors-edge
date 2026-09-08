@@ -136,3 +136,22 @@ Each line below: gateway; lane A; lane B; lane C if major; links if major; conve
 - Sympathy snapshots on finite Rot application. Natural expiry removes the original before copying its original finite duration, damage and reaction funding to one nearest eligible enemy within4m. The copy cannot spread again or trigger Chain; source attribution survives respec. Death, cleansing, consumption and Long Dark do not produce expiry copies.
 
 - Cadence base reload/swap contributions use the actual per-owner window end, retaining half for two seconds when the casting source owned Afterimage. Overlapping casters take the strongest multiplier rather than adding; leaving the aura cancels that copy, while an owned extension delays its tail. Source/recipient death, source destruction/respec, cancellation, removal and recast revoke old contributions. Reload and swap snapshot their starting tempo.
+
+## Asserted invariants
+
+| Invariant | Test |
+|---|---|
+| The authored roster contains exactly 22 wedges, 187 nodes and 429 offered points in the declared sector ring | `Progression.CoreRoster.Authoring` |
+| Each shipped wedge has exactly two ring neighbours; all legal starts reach the full ring | `Progression.CoreRoster.RingReachability` |
+| Ranked lanes, two-lane convergence and the18-point local keystone gate retain their exact prices | `Progression.CoreTreeBuilder` |
+| Rank-one routing permits optional deepening without opening non-neighbouring wedges | `Progression.CoreWedgeReachRuntime` |
+| Structural layout places all187 roles without overlapping nodes | `UI.CoreRoleLayout187` |
+| Legacy purchases refund atomically exactly once through frozen costs | `Save.CoreLayoutMigration` |
+| Historical travel IDs use their frozen costs and malformed IDs refuse migration | `Save.HistoricalTravelMigration` |
+| Applicable critical weapon Mores share the same three slots with gear | `Combat.CoreFixateRuntime` |
+| Later-target More selection preserves one trigger identity across sibling hits | `Weapons.CoreSplinterRuntime` |
+| Endurance changes the owner health view without changing physical healing or Hold caps | `Progression.CoreEnduranceRuntime` |
+| Shield and front-pool contributions grant capacity without free fill | `Progression.CoreShieldRuntime` |
+| Zone Detonation spends a finite snapshotted budget only on natural expiry | `Combat.Zone.CoreStandingDetonationRuntime` |
+| Reaction Residue retains only unpaid funding and cannot manufacture new damage | `Combat.Elements.CoreReactionResidueRuntime` |
+| Afterimage Cadence tempo halves the source contribution after its actual owned expiry | `Abilities.AfterimageCadenceTempo` |

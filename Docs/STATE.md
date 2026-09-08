@@ -11,21 +11,21 @@ measurement without judging it.
 
 | Section | Direction | Value | Pin | State |
 |---|---|---|---|---|
-| Silent nodes | ceiling | 33 of 292 authored | ceiling 54 | ok |
-| Stat targets with no aggregation lane | ceiling | 1 of 34 | ceiling 6 | ok |
-| Aggregation lanes carrying nothing | ceiling | 0 of 32 lanes | ceiling 9 | ok |
-| Node tags with no consumer | ceiling | 139 of 205 declared | ceiling 143 | ok |
-| Conditions no content authors | ceiling | 12 of 26 | ceiling 12 | ok |
-| Resource generation entry points with no caller | ceiling | 3 of 18 | ceiling 0 | **OUT** |
-| Asserted invariants with no test | ceiling | 37 of 111 asserted across 7 specs | ceiling 42, target 20 | ok |
+| Silent nodes | ceiling | 0 of 295 authored | ceiling 54 | ok |
+| Stat targets with no aggregation lane | ceiling | 1 of 88 | ceiling 6 | ok |
+| Aggregation lanes carrying nothing | ceiling | 54 of 86 lanes | ceiling 9 | **OUT** |
+| Node tags with no consumer | ceiling | 129 of 207 declared | ceiling 143 | ok |
+| Conditions no content authors | ceiling | 12 of 27 | ceiling 12 | ok |
+| Resource generation entry points with no caller | ceiling | 3 of 21 | ceiling 0 | **OUT** |
+| Asserted invariants with no test | ceiling | 37 of 128 asserted across 8 specs | ceiling 42, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 2.25 worst tree | floor 3.0 | **OUT** |
 | Trees sitting exactly on the offered-to-spendable floor | ceiling | 9 of 16 | no pin — measurement only | — |
-| Node-shape composition, per tree | band | 34 % ranked minors, all trees | no pin — measurement only | — |
-| Scaffolding nodes | ceiling | 33 of 292 authored | ceiling 50 | ok |
+| Node-shape composition, per tree | band | 33 % ranked minors, all trees | no pin — measurement only | — |
+| Scaffolding nodes | ceiling | 0 of 295 authored | ceiling 50 | ok |
 | Conditions that can never be true | ceiling | 5.0 | ceiling 5, target 1 | ok |
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
-| Build variance band, at cap | band | 5.63 | band 8.0–10.0 | **OUT** |
-| Build variance band, endgame | band | 13.89 | band 12.0–20.0 | ok |
+| Build variance band, at cap | band | 4.8 | band 8.0–10.0 | **OUT** |
+| Build variance band, endgame | band | 14.47 | band 12.0–20.0 | ok |
 | Ability lane throughput against weapon lane, at cap | band | 0.54 | band 0.85–1.15 | **OUT** |
 | Ability lane throughput against weapon lane, endgame | band | 0.31 | no pin — measurement only | — |
 | Monster damage growth against gear defence growth | ceiling | 0.63 | ceiling 1.0 | ok |
@@ -34,8 +34,8 @@ measurement without judging it.
 
 ## Tests
 
-- passing: 567
-- expected red: 5
+- passing: 804
+- expected red: 3
 - **unexpected red: 0**
 - asserted invariants with no test: 37
 
@@ -45,32 +45,18 @@ A test that was never written is the worst of the three: it looks asserted.
 **Expected red**
 
 - `RiorsEdge.Items.Drops.DropChanceReachesEveryRank`
-- `RiorsEdge.Progression.BuiltClassTrees.KeystoneAtShippedBudget`
-- `RiorsEdge.Progression.NodePurchaseFlow`
 - `RiorsEdge.Progression.PowerBand.AbilityLane`
 - `RiorsEdge.Progression.PowerBand.AtCap`
 
 ## Silent nodes
 
-**ceiling** · 33 of 292 authored · ceiling 54
+**ceiling** · 0 of 295 authored · ceiling 54
 
 Authored, purchasable, costs a point, and produces no observable change. Counted against BOTH consumption axes — tag and node id.
 
-- GetCasterVoidWhispererTree: 7
-- GetCasterMultispellTree: 7
-- GetCasterSpellbladeTree: 6
-- GetSwiftKineticTree: 3
-- GetSupportConductorTree: 3
-- GetTankDemolitionistTree: 2
-- GetCoreSliceTree: 1
-- GetSwiftMarksmanTree: 1
-- GetSwiftFrenzyTree: 1
-- GetGunsmithTinkererTree: 1
-- GetSupportWardenTree: 1
-
 ## Stat targets with no aggregation lane
 
-**ceiling** · 1 of 34 · ceiling 6
+**ceiling** · 1 of 88 · ceiling 6
 
 A node authored against one of these is silently unpaid. 1 further target(s) are delivered by a rider and are correctly laneless: MeleeDamage.
 
@@ -78,13 +64,55 @@ A node authored against one of these is silently unpaid. 1 further target(s) are
 
 ## Aggregation lanes carrying nothing
 
-**ceiling** · 0 of 32 lanes · ceiling 9
+**ceiling** · 54 of 86 lanes · ceiling 9  ·  **OUT**
 
 Plumbing with no author, counted across BOTH authoring layers: node effects, and shipped affix lines landing in the same composed value. A lane listed here is fed by neither.
 
+- AddedWeaponDamage
+- AddedAbilityPower
+- PhysicalDamageReduction
+- ElementalResistance
+- AilmentAvoidance
+- AbilityCastRate
+- AbilityChannelRate
+- ClassResourceGeneration
+- SprintSpeed
+- Acceleration
+- JumpHeight
+- LedgeSpeed
+- SafeFallDistance
+- AirJumpCount
+- WeaponRange
+- ProjectileSpeed
+- WeaponSplashArea
+- WeaponReloadSpeed
+- WeaponSwapSpeed
+- WeaponMagazineCapacity
+- WeaponReserveAmmo
+- WeaponFalloffStart
+- PierceLossReduction
+- ElementalBuildup
+- EntropyBuildup
+- VoidBuildup
+- RiftBuildup
+- ElementalBuildupPenetration
+- ElementalThresholdReduction
+- ThreatGenerated
+- DeployableHealth
+- HealingReceived
+- HealthRegenPercentMaxHealth
+- ShieldRechargeDelayReduction
+- ElementalDamage
+- RotDamage
+- VoidBurstDamage
+- RiftBurstDamage
+- ReactionDamage
+- VoidDamage
+- …and 14 more
+
 ## Node tags with no consumer
 
-**ceiling** · 139 of 205 declared · ceiling 143
+**ceiling** · 129 of 207 declared · ceiling 143
 
 A tag nothing reads. Some are legitimately reserved; most are a promise the game does not keep.
 
@@ -94,9 +122,7 @@ A tag nothing reads. Some are legitimately reserved; most are a promise the game
 - Node_Cyclic
 - Node_OpenWound
 - Node_SetStance
-- Node_Read
 - Node_Loft
-- Verb_Parry
 - Verb_AirJump
 - Node_Freefall
 - Node_Slipstream
@@ -128,11 +154,13 @@ A tag nothing reads. Some are legitimately reserved; most are a promise the game
 - Node_Deadeye
 - Node_Culling
 - Node_FrenzyTrigger
-- …and 99 more
+- Node_Loaded
+- Node_ShortLeash
+- …and 89 more
 
 ## Conditions no content authors
 
-**ceiling** · 12 of 26 · ceiling 12
+**ceiling** · 12 of 27 · ceiling 12
 
 Vocabulary that exists and pays for nothing. Widening the vocabulary ahead of its consumers is what produced most of this list.
 
@@ -151,7 +179,7 @@ Vocabulary that exists and pays for nothing. Widening the vocabulary ahead of it
 
 ## Resource generation entry points with no caller
 
-**ceiling** · 3 of 18 · ceiling 0  ·  **OUT**
+**ceiling** · 3 of 21 · ceiling 0  ·  **OUT**
 
 A generation hook nothing calls is a resource bar that sits at zero forever. Test callers do not count: a hook exercised only by the suite is a hook the game never fires.
 
@@ -161,7 +189,7 @@ A generation hook nothing calls is a resource bar that sits at zero forever. Tes
 
 ## Asserted invariants with no test
 
-**ceiling** · 37 of 111 asserted across 7 specs · ceiling 42, target 20
+**ceiling** · 37 of 128 asserted across 8 specs · ceiling 42, target 20
 
 A named test that was never written looks asserted and is not. This is worse than a red test, and it is the reason this section exists.
 
@@ -183,11 +211,9 @@ A named test that was never written looks asserted and is not. This is worse tha
 - Combat.Armor.BossCap  —  combat.md
 - Combat.Defense.DodgeShortCircuits  —  combat.md
 - Combat.FacingArmor.Coverage  —  combat.md
-- Combat.ProcCoefficient.Law  —  combat.md
 - Combat.ProcCoefficient.SpreadDepth  —  combat.md
 - Combat.Status.SnapshotStability  —  combat.md
 - Weapons.TraceFollowsAim  —  combat.md
-- Combat.Elements.ReactionMatrix  —  combat.md
 - Encounter.Modifiers.ForbiddenPairs  —  content-and-modes.md
 - Encounter.Modifiers.Diversity  —  content-and-modes.md
 - Game.WaveBudget.Caps  —  content-and-modes.md
@@ -195,6 +221,8 @@ A named test that was never written looks asserted and is not. This is worse tha
 - Game.CoverRegistry.IsLayoutLegal  —  content-and-modes.md
 - Game.Tiles.MovementContract  —  content-and-modes.md
 - Encounter.Revive.PressurePause  —  content-and-modes.md
+- Progression.CoreRoster.Authoring  —  core-wheel.md
+- Progression.CoreRoster.RingReachability  —  core-wheel.md
 - Progression.RuleBandImpact.MinorStack  —  items-and-crafting.md
 - Progression.PowerBand.Singular  —  items-and-crafting.md
 - Progression.PowerBand.AbilityLaneMore  —  power-and-scaling.md
@@ -209,8 +237,8 @@ A named test that was never written looks asserted and is not. This is worse tha
 
 Most of a build should be refusal. A CEILING here would lock the trees at their current size and report green while doing it. READ IT BESIDE the no-margin count below: for a doctrine built to the standard shape this ratio is fixed by construction and reports nothing about authoring.
 
-- GetCasterMultispellTree: 9 nodes, 18 points offered, 2.25x budget
-- GetCasterSpellbladeTree: 9 nodes, 18 points offered, 2.25x budget
+- GetCasterMultispellTree: 10 nodes, 20 points offered, 2.5x budget
+- GetCasterSpellbladeTree: 11 nodes, 22 points offered, 2.75x budget
 - GetCasterVoidWhispererTree: 9 nodes, 18 points offered, 2.25x budget
 - GetCoreSliceTree: 117 nodes, 171 points offered, 2.63x budget
 - GetGunsmithArmoryTree: 12 nodes, 24 points offered, 3.0x budget
@@ -244,14 +272,14 @@ A tree here is one node-price change away from red, and the floor section report
 
 ## Node-shape composition, per tree
 
-**band** · 34 % ranked minors, all trees · no pin — measurement only
+**band** · 33 % ranked minors, all trees · no pin — measurement only
 
-A tree that is almost entirely notable-shaped has nothing to fill a constellation with between the interesting picks. Of these, 33 are SCAFFOLDING — no stat line, no condition, and no rule anything reads — a strict subset of the silent nodes above, where the remainder are shaped and merely unpaid. UNPINNED pending a re-derived band: 60% ranked minors means 60% unconditional stat lines, and O76 gives raw percentages to affixes outright, so the authored 55-65 target cannot be reached without breaking another rule. Until it is re-derived this section reports and judges nothing.
+A tree that is almost entirely notable-shaped has nothing to fill a constellation with between the interesting picks. Of these, 0 are SCAFFOLDING — no stat line, no condition, and no rule anything reads — a strict subset of the silent nodes above, where the remainder are shaped and merely unpaid. UNPINNED pending a re-derived band: 60% ranked minors means 60% unconditional stat lines, and O76 gives raw percentages to affixes outright, so the authored 55-65 target cannot be reached without breaking another rule. Until it is re-derived this section reports and judges nothing.
 
-- GetCasterMultispellTree: 11% ranked minor, 78% notable, 11% convergence/keystone
-- GetCasterSpellbladeTree: 0% ranked minor, 89% notable, 11% convergence/keystone
+- GetCasterMultispellTree: 10% ranked minor, 80% notable, 10% convergence/keystone
+- GetCasterSpellbladeTree: 0% ranked minor, 91% notable, 9% convergence/keystone
 - GetCasterVoidWhispererTree: 11% ranked minor, 78% notable, 11% convergence/keystone
-- GetCoreSliceTree: 74% ranked minor, 19% notable, 8% convergence/keystone
+- GetCoreSliceTree: 73% ranked minor, 20% notable, 8% convergence/keystone
 - GetGunsmithArmoryTree: 0% ranked minor, 92% notable, 8% convergence/keystone
 - GetGunsmithFieldTechTree: 0% ranked minor, 92% notable, 8% convergence/keystone
 - GetGunsmithTinkererTree: 0% ranked minor, 92% notable, 8% convergence/keystone
@@ -267,7 +295,7 @@ A tree that is almost entirely notable-shaped has nothing to fill a constellatio
 
 ## Scaffolding nodes
 
-**ceiling** · 33 of 292 authored · ceiling 50
+**ceiling** · 0 of 295 authored · ceiling 50
 
 No stat line, no condition, and no rule anything reads. A STRICT SUBSET of the silent nodes: the difference is the silent nodes that ARE shaped and merely point at an unpaid target, which is a wiring problem where this is an authoring one.
 
