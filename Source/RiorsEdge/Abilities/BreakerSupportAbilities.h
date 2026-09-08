@@ -301,6 +301,10 @@ public:
 
 private:
     void PressureTick();
+    UFUNCTION() void InvalidatePressure();
+    UFUNCTION() void RefreshPressurePermission();
+    TWeakObjectPtr<UBreakerCombatComponent> PressureCombat;
+    TWeakObjectPtr<class UBreakerProgressionComponent> PressureProgression;
     // Pushes the keyed cut on one enemy and books it for the pop.
     void ApplyAccuracyCut(AActor* Occupant);
 

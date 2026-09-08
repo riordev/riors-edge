@@ -1328,6 +1328,7 @@ void UBreakerAbility_Suppress::ActivateAbility(const FGameplayAbilitySpecHandle 
     // WA5 PRESSURE: enemies inside pay Charge at a slow, COUNT-INDEPENDENT
     // rate — the occupancy bool drives a once-a-second trickle; one enemy pays
     // exactly what six do.
+    InvalidatePressure();
     PressureRank = SupportNodeRank(Character, TEXT("Support.Warden.Pressure"));
 
     FActorSpawnParameters SpawnParams;
@@ -1342,17 +1343,46 @@ void UBreakerAbility_Suppress::ActivateAbility(const FGameplayAbilitySpecHandle 
         ActiveZone->OnZoneExpired.AddDynamic(this, &UBreakerAbility_Suppress::HandleZoneExpired);
         if (PressureRank > 0)
         {
-            World->GetTimerManager().SetTimer(PressureTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { PressureTick(); }), 1.0f, /*bLoop=*/true);
+            PressureCombat = Character->GetCombat();
+            PressureProgression = Character->GetProgression();
+            PressureCombat->OnDeath.AddUniqueDynamic(this, &UBreakerAbility_Suppress::InvalidatePressure);
+            PressureProgression->OnProgressionChanged.AddUniqueDynamic(this, &UBreakerAbility_Suppress::RefreshPressurePermission);
         }
     }
 
     // The ability ends now; the zone owns the 6s. The 10s cooldown guarantees
     // no second Suppress races this zone's teardown handlers.
     EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+    // GAS clears this ability's timers on EndAbility. Pressure belongs to the
+    // surviving zone lease, so install its timer after that normal teardown.
+    RefreshPressurePermission();
+    if (ActiveZone && PressureRank > 0)
+        World->GetTimerManager().SetTimer(PressureTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { PressureTick(); }), 1.0f, /*bLoop=*/true);
+}
+
+void UBreakerAbility_Suppress::InvalidatePressure()
+{
+    PressureRank = 0;
+    if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(PressureTimer);
+    if (auto* Combat = PressureCombat.Get()) Combat->OnDeath.RemoveDynamic(this, &UBreakerAbility_Suppress::InvalidatePressure);
+    if (auto* Progression = PressureProgression.Get()) Progression->OnProgressionChanged.RemoveDynamic(this, &UBreakerAbility_Suppress::RefreshPressurePermission);
+    PressureCombat.Reset(); PressureProgression.Reset();
+}
+
+void UBreakerAbility_Suppress::RefreshPressurePermission()
+{
+    const auto* Character = GetBreakerCharacter();
+    if (!Character || Character->IsActorBeingDestroyed() || Character->GetCombat()->IsDead()
+        || Character->GetProgression()->GetProgressionState().PermanentClass != EBreakerClassId::Support)
+    { InvalidatePressure(); return; }
+    PressureRank = FMath::Min(PressureRank, SupportNodeRank(Character, TEXT("Support.Warden.Pressure")));
+    if (PressureRank <= 0) InvalidatePressure();
 }
 
 void UBreakerAbility_Suppress::PressureTick()
 {
+    RefreshPressurePermission();
+    if (PressureRank <= 0) return;
     // Count-independent by construction: the question is "is anyone inside",
     // never "how many".
     if (!ActiveZone || SlowedEnemies.Num() == 0) return;
@@ -1436,6 +1466,7 @@ void UBreakerAbility_Suppress::HandleOccupantExited(AActor* Occupant)
 
 void UBreakerAbility_Suppress::HandleZoneExpired()
 {
+    InvalidatePressure();
     for (const TWeakObjectPtr<AActor>& Slowed : SlowedEnemies)
     {
         if (ABreakerEnemy* Enemy = Cast<ABreakerEnemy>(Slowed.Get()))

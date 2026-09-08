@@ -699,6 +699,24 @@ bool UBreakerAbilityComponent::SlotHasCooldown(EBreakerAbilitySlot Slot) const
 float UBreakerAbilityComponent::GetCooldownDuration(EBreakerAbilitySlot Slot) const
 {
     const UBreakerAbilityDefinition* Definition = GetDefinitionForSlot(Slot);
+    const UAbilitySystemComponent* ASC = GetAbilitySystem();
+    if (Definition && ASC && Definition->HasCooldown() && Definition->CooldownTag.IsValid())
+    {
+        FGameplayTagContainer Tags;
+        Tags.AddTag(Definition->CooldownTag);
+        const auto Query = FGameplayEffectQuery::MakeQuery_MatchAnyOwningTags(Tags);
+        float LongestRemaining = 0.0f;
+        float ActiveDuration = 0.0f;
+        for (const TPair<float, float>& Pair : ASC->GetActiveEffectsTimeRemainingAndDuration(Query))
+        {
+            if (Pair.Key > LongestRemaining)
+            {
+                LongestRemaining = Pair.Key;
+                ActiveDuration = Pair.Value;
+            }
+        }
+        if (LongestRemaining > 0.0f) return ActiveDuration;
+    }
     return Definition ? Definition->CooldownSeconds : 0.0f;
 }
 
@@ -723,6 +741,19 @@ float UBreakerAbilityComponent::GetCooldownRemaining(EBreakerAbilitySlot Slot) c
 
 float UBreakerAbilityComponent::GetCost(EBreakerAbilitySlot Slot) const
 {
+    const FBreakerGrantedAbility* Granted = GrantedBySlot.Find(Slot);
+    if (Granted)
+    {
+        if (const UAbilitySystemComponent* ASC = GetAbilitySystem())
+        {
+            if (const FGameplayAbilitySpec* Spec = ASC->FindAbilitySpecFromHandle(Granted->Handle))
+            {
+                if (const auto* Ability = Cast<UBreakerGameplayAbility>(Spec->GetPrimaryInstance()))
+                    return Ability->GetResourceCost();
+            }
+        }
+    }
+    // Before the granted instance exists, retain the authored preview cost.
     const UBreakerAbilityDefinition* Definition = GetDefinitionForSlot(Slot);
     return Definition ? Definition->ResourceCost : 0.0f;
 }
