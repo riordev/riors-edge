@@ -142,6 +142,8 @@ public:
     // own window and the boost rides the window rather than the enemy.
     UFUNCTION(BlueprintCallable, Category="Grit|Nodes") void PushProximityRateBoost(FName Key, float Multiplier, float Duration);
     UFUNCTION(BlueprintCallable, Category="Grit|Nodes") void PopProximityRateBoost(FName Key);
+    void PushWindowProximityRateBoost(FName Key, float Multiplier, float Duration);
+    UFUNCTION() void InvalidateAfterimageProximity();
     UFUNCTION(BlueprintPure, Category="Grit|Nodes") float GetProximityRateMultiplier() const;
 
     // Demolitionist D11 (Chain Reaction): per-target blast timestamps. Returns
@@ -327,6 +329,8 @@ private:
     struct FProximityBoostEntry
     {
         float Multiplier = 1.0f;
+        bool bWindow = false;
+        bool bAfterimage = false;
         double ExpiryTime = -1.0;
     };
     mutable TMap<FName, FProximityBoostEntry> ProximityBoosts;

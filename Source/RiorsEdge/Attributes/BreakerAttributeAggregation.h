@@ -148,7 +148,7 @@ enum class EBreakerAttributeContributor : uint8
     Count
 };
 
-enum class EBreakerDamageMoreLane : uint8 { Weapon, Ability, Shared, Dot, Elemental, Void, Reaction, EffectiveHealth, WeaponCritical };
+enum class EBreakerDamageMoreLane : uint8 { Weapon, Ability, Shared, Dot, Elemental, Void, Reaction, EffectiveHealth, WeaponCritical, WeaponBeyondFirst };
 struct FBreakerDamageMoreSource
 {
     FName Key;
@@ -296,7 +296,7 @@ struct RIORSEDGE_API FBreakerAttributeAggregator
     // progression submissions alike with nothing to cache or invalidate.
     float ComposedMoreProduct(EBreakerAggregatedAttribute Attribute) const;
     // Additional scopes only: delivery Mores are already baked by FillSourcePools.
-    float GetScopedMoreProduct(bool bElemental, bool bVoid, bool bReaction, bool bEffectiveHealth, bool bWeaponCritical = false) const;
+    float GetScopedMoreProduct(bool bElemental, bool bVoid, bool bReaction, bool bEffectiveHealth, bool bWeaponCritical = false, bool bWeaponBeyondFirst = false) const;
     bool HasDeadeye() const;
     int32 GetDamageMoreSourceCount() const;
     int32 GetSelectedDamageMoreSourceCount() const;

@@ -205,10 +205,9 @@ enum class EBreakerNodeStatTarget : uint8
     RecoilRecovery,
     // Spread / accuracy. Named by Swift.Marksman.Steady.
     WeaponSpread,
-    // Projectile count. Named by Core.Volley.LastRound and the Salvo/Barrage
-    // pair. Whole projectiles, so it is a Flat-bucket stat and rounds down; a
-    // "+50% projectiles" line is meaningless on a single-shot weapon and the
-    // aggregation lane must say so rather than silently firing 1.5 bullets.
+    // Flat additional projectiles. Accepted trigger pulls bank the composed
+    // nonnegative fraction, emit whole extras and retain the remainder across
+    // slot/build changes. Afterimage halves contributions before this consumer.
     ProjectileCount,
     // Pierce count / falloff. Named by Swift.Marksman.PierceDiscipline,
     // .Overpenetration and .Sightline.
@@ -310,6 +309,7 @@ enum class EBreakerNodeStatTarget : uint8
     EnemyStaggerResistanceReduction,
     WeaponBaseSpreadReduction,
     WeaponCriticalDamage,
+    WeaponBeyondFirstDamage,
 
     Count UMETA(Hidden)
 };
@@ -408,6 +408,7 @@ inline bool BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget Target)
     case EBreakerNodeStatTarget::EnemyStaggerResistanceReduction:
     case EBreakerNodeStatTarget::WeaponBaseSpreadReduction:
     case EBreakerNodeStatTarget::WeaponCriticalDamage:
+    case EBreakerNodeStatTarget::WeaponBeyondFirstDamage:
     case EBreakerNodeStatTarget::MaxClassResource:
     case EBreakerNodeStatTarget::ClassResourceRegen:
     case EBreakerNodeStatTarget::FireRate:

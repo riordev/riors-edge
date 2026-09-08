@@ -277,5 +277,6 @@ private:
     bool bFlushingReaction = false;
     FGameplayTag PendingReactionTag;
     FBreakerActiveStatus PendingReactionStatus;
+    TWeakObjectPtr<AActor> PendingReactionChainTarget;
     uint32 ApplicationsAttempted = 0;
 };

@@ -2,6 +2,9 @@
 #include "Combat/BreakerStatusComponent.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerDamageLibrary.h"
+#include "Combat/BreakerEnemy.h"
+#include "Progression/BreakerProgressionComponent.h"
+#include "EngineUtils.h"
 #include "UI/BreakerReactionFeedback.h"
 #include "Misc/ScopeExit.h"
 
@@ -54,6 +57,22 @@ uint64 UBreakerStatusComponent::PrepareElementReaction(const FBreakerDamageReque
     const FBreakerActiveStatus* Candidate = ActiveStatuses.FindByPredicate([ConsumedTag](const auto& Entry)
     { return Entry.Spec.StatusTag == ConsumedTag; });
     if (!Candidate) return 0;
+    PendingReactionChainTarget.Reset();
+    const AActor* Creditor = Candidate->Instigator.Get();
+    const auto* CreditorProgression = Creditor ? Creditor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    if (CreditorProgression && CreditorProgression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Reaction.Chain"))))
+    {
+        double BestDistance = FMath::Square(500.0); // O2 PLACEHOLDER, authored 5m.
+        for (TActorIterator<ABreakerEnemy> It(GetWorld()); It; ++It)
+        {
+            auto* Enemy = *It; const auto* EnemyCombat = Enemy->FindComponentByClass<UBreakerCombatComponent>();
+            if (Enemy == Target || Enemy == Creditor || !IsValid(Enemy) || Enemy->IsActorBeingDestroyed() || !EnemyCombat || EnemyCombat->IsDead()) continue;
+            const double Distance = FVector::DistSquared(Target->GetActorLocation(),Enemy->GetActorLocation());
+            if (Distance > BestDistance || (Distance == BestDistance && PendingReactionChainTarget.IsValid()
+                && Enemy->GetUniqueID() >= PendingReactionChainTarget->GetUniqueID())) continue;
+            PendingReactionChainTarget = Enemy; BestDistance = Distance;
+        }
+    }
     PendingReactionStatus = *Candidate;
     PendingReactionStatus.UnpaidDamageBudget = ConsumedTag == Rot
         ? BreakerElementReactions::RemainingRotBudget(*Candidate)
@@ -89,6 +108,7 @@ void UBreakerStatusComponent::FlushElementReaction(uint64 Token)
             PendingReactionToken = 0;
             PendingReactionTag = FGameplayTag();
             PendingReactionStatus = FBreakerActiveStatus();
+            PendingReactionChainTarget.Reset();
         }
     };
     AActor* Target = GetOwner();
@@ -99,6 +119,10 @@ void UBreakerStatusComponent::FlushElementReaction(uint64 Token)
     const float Budget = Consumed.UnpaidDamageBudget;
     if (!FMath::IsFinite(Budget) || Budget <= 0) return;
     PendingReactionStatus.UnpaidDamageBudget = 0;
+    // Both payouts are claimed before feedback, damage or death callbacks.
+    // The one authored half-strength child is multiplicity, not new funding.
+    const TWeakObjectPtr<AActor> Child = PendingReactionChainTarget;
+    PendingReactionChainTarget.Reset();
     FBreakerStatusApplicationSpec Spec = Consumed.Spec;
     Spec.BaseDamagePerTick = Budget;
     Spec.InitialStacks = 1;
@@ -118,6 +142,17 @@ void UBreakerStatusComponent::FlushElementReaction(uint64 Token)
     Payment.ElementalFraction = 0;
     BreakerReactionFeedback::Play(Target, Consumed.Instigator.Get(), PendingReactionTag);
     Combat->ReceiveDamage(Payment);
+    AActor* ChildActor = Child.Get();
+    AActor* Source = Consumed.Instigator.Get();
+    const auto* SourceCombat = IsValid(Source) ? Source->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    if (!IsValid(ChildActor) || ChildActor->IsActorBeingDestroyed() || !IsValid(Source) || Source->IsActorBeingDestroyed()
+        || !SourceCombat || SourceCombat->IsDead()) return;
+    auto* ChildCombat = ChildActor->FindComponentByClass<UBreakerCombatComponent>();
+    if (!ChildCombat || ChildCombat->IsDead()) return;
+    FBreakerDamageRequest ChildPayment = Payment;
+    ChildPayment.BaseDamage *= .5f; // O2 PLACEHOLDER, authored half-strength child.
+    ChildPayment.ImpactLocation = ChildActor->GetActorLocation(); ChildPayment.bHasImpactLocation = true;
+    ChildCombat->ReceiveDamage(ChildPayment);
 }
 
 void UBreakerStatusComponent::AdvanceRotStatus(uint64 ApplicationSerial, float DeltaSeconds)

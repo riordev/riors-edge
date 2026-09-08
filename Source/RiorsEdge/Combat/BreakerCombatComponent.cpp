@@ -38,7 +38,9 @@ namespace
             && FMath::IsFinite(Request.WeaponCriticalMoreProduct) ? FMath::Max(1.0f, Request.WeaponCriticalMoreProduct) : 1.0f;
         const bool bVoid = Shares.ContainsByPredicate([](const FBreakerElementShare& Share)
         { return Share.Element == EBreakerElement::Void && Share.Fraction > 0; });
-        float Product = Critical * (Shares.IsEmpty() ? 1.0f : FMath::Max(1.0f, Request.ElementSource.ElementalMoreProduct));
+        const float BeyondFirst = Request.Delivery == EBreakerDamageDelivery::Weapon && !Request.bIsDamageOverTime
+            && FMath::IsFinite(Request.WeaponBeyondFirstMoreProduct) ? FMath::Max(1.0f, Request.WeaponBeyondFirstMoreProduct) : 1.0f;
+        float Product = Critical * BeyondFirst * (Shares.IsEmpty() ? 1.0f : FMath::Max(1.0f, Request.ElementSource.ElementalMoreProduct));
         if (bVoid) Product *= FMath::Max(1.0f, Request.ElementSource.VoidMoreProduct);
         if (!Shares.IsEmpty() && Request.bCanApplyElementBuildup) Product *= FMath::Max(1.0f, Request.ElementSource.ReactionMoreProduct);
         // Standing scoped products have priority over temporary headroom. A

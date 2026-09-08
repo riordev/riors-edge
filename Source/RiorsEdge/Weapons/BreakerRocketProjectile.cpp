@@ -1,4 +1,6 @@
 #include "Weapons/BreakerRocketProjectile.h"
+#include "Combat/BreakerWeaponTriggerContext.h"
+#include "Combat/BreakerEnemy.h"
 #include "Weapons/BreakerWeaponComponent.h"
 
 #include "Combat/BreakerCombatComponent.h"
@@ -193,15 +195,24 @@ void ABreakerRocketProjectile::Explode(const FVector& Location, AActor* DirectIm
 
     TArray<AActor*> Candidates;
     UGameplayStatics::GetAllActorsOfClass(this, AActor::StaticClass(), Candidates);
+    Candidates.Sort([Location, DirectImpactTarget](const AActor& A, const AActor& B)
+    {
+        if (&A == DirectImpactTarget || &B == DirectImpactTarget) return &A == DirectImpactTarget && &B != DirectImpactTarget;
+        const double DA = FVector::DistSquared(A.GetActorLocation(), Location);
+        const double DB = FVector::DistSquared(B.GetActorLocation(), Location);
+        return DA != DB ? DA < DB : A.GetUniqueID() < B.GetUniqueID();
+    });
     for (AActor* Candidate : Candidates)
     {
         if (!Candidate || Candidate == GetInstigator()) continue;
         UBreakerCombatComponent* Combat = Candidate->FindComponentByClass<UBreakerCombatComponent>();
-        if (!Combat) continue;
+        if (!Combat || Combat->IsDead() || Candidate->IsActorBeingDestroyed()) continue;
         const float Distance = FVector::Dist(Candidate->GetActorLocation(), Location);
         if (Distance > ExplosionRadius) continue;
 
         FBreakerDamageRequest AreaDamage = Damage;
+        if (AreaDamage.WeaponTrigger && Candidate->IsA<ABreakerEnemy>())
+            AreaDamage.bWeaponBeyondFirstTarget = AreaDamage.WeaponTrigger->ClaimTarget(Candidate);
         AreaDamage.bRadialDamage = true;
         AreaDamage.IntendedTarget = DirectImpactTarget;
         AreaDamage.BaseDamage *= FMath::Lerp(1.0f, EdgeDamageFraction, Distance / ExplosionRadius);

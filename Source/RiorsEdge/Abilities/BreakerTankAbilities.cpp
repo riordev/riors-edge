@@ -782,7 +782,7 @@ void UBreakerAbility_Provoke::ActivateAbility(const FGameplayAbilitySpecHandle H
         const float FlatBonus = WeaponBase * FlatDamagePerEnemyFraction * Stacks;
         if (UBreakerCombatComponent* Combat = Character->FindComponentByClass<UBreakerCombatComponent>())
         {
-            Combat->PushOutgoingModifier(OutgoingModifierKey(), FlatBonus, 1.0f, EffectiveDuration);
+            Combat->PushWindowOutgoingModifier(OutgoingModifierKey(), FlatBonus, 1.0f, EffectiveDuration);
         }
 
         // B5 ANSWERING FIRE: enemies you have Provoked pay proximity Grit at
@@ -795,7 +795,7 @@ void UBreakerAbility_Provoke::ActivateAbility(const FGameplayAbilitySpecHandle H
         {
             if (UBreakerGritComponent* Grit = Character->FindComponentByClass<UBreakerGritComponent>())
             {
-                Grit->PushProximityRateBoost(OutgoingModifierKey(), AnsweringRank >= 2 ? 2.0f : 1.5f, EffectiveDuration);   // node text
+                Grit->PushWindowProximityRateBoost(OutgoingModifierKey(), AnsweringRank >= 2 ? 2.0f : 1.5f, EffectiveDuration);   // node text
             }
         }
     }

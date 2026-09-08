@@ -78,6 +78,9 @@ Each line below: gateway; lane A; lane B; lane C if major; links if major; conve
 
 ## Primitive contracts
 
+- Splinter selects its weapon More in the shared three slots and snapshots it for one accepted trigger pull. The first live enemy contact claims the first-target identity, including avoided hits; further pellets on that enemy remain first-target hits. Other enemies reached by pierce, chain, forks or sibling rocket blasts receive the selected later-target contribution. Destroying the first enemy does not reset that identity; a new trigger starts a new selection.
+- Reaction Chain pays one nearest live enemy within5m half the primary reaction's already-funded raw payout. It carries the original creditor and cannot generate buildup, fresh critical rolls or another reaction. Both payouts are claimed before callbacks; invalid or dead recipients cannot redirect the child payment.
+
 - Resource efficiency applies once before class price/window rewrites, to every class; affordability, HUD and actual debit read the same live cost. Caster retains its negative resource floor and Unmake window.
 - Generic generation scales normal earned loop income. Direct grants and refunds remain unchanged; existing generation suspension remains authoritative. Scrap snapshots earned credit at enqueue and scales throughput, while destruction refunds retain their original amount. Flat regeneration and no-decay are distinct rules.
 - Sprint speed has its own lane, leaving walking unchanged. Acceleration scales the engine acceleration limit. Jump-height bonuses scale impulse by their square root, preserving the authored base and existing gravity curve. Additional air jumps do not acquire Swift's innate directional rewrite.

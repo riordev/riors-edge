@@ -1,4 +1,5 @@
 #include "Classes/BreakerGritComponent.h"
+#include "Abilities/BreakerWindowLaneMath.h"
 #include "Classes/BreakerResourceGeneration.h"
 
 #include "AbilitySystemInterface.h"
@@ -589,6 +590,35 @@ void UBreakerGritComponent::PushProximityRateBoost(FName Key, float Multiplier, 
     ProximityBoosts.Add(Key, Entry);
 }
 
+void UBreakerGritComponent::PushWindowProximityRateBoost(FName Key, float Multiplier, float Duration)
+{
+    if (!GetOwner() || Key.IsNone() || !FMath::IsFinite(Duration) || Duration <= 0
+        || !FMath::IsFinite(Multiplier) || Multiplier < 0) return;
+    PushProximityRateBoost(Key, Multiplier, Duration);
+    auto* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+    if (auto* Entry = ProximityBoosts.Find(Key))
+    {
+        Entry->bWindow = true;
+        Entry->bAfterimage = Progression && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage")));
+    }
+    if (Progression) Progression->OnProgressionChanged.AddUniqueDynamic(this, &ThisClass::InvalidateAfterimageProximity);
+    if (auto* Combat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>())
+        Combat->OnDeath.AddUniqueDynamic(this, &ThisClass::InvalidateAfterimageProximity);
+}
+
+void UBreakerGritComponent::InvalidateAfterimageProximity()
+{
+    const auto* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    const auto* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    const bool bOwned = Progression && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage")));
+    for (auto It = ProximityBoosts.CreateIterator(); It; ++It)
+    {
+        if (!It.Value().bWindow) continue;
+        if (Combat && Combat->IsDead()) It.RemoveCurrent();
+        else if (!bOwned) It.Value().bAfterimage = false;
+    }
+}
+
 void UBreakerGritComponent::PopProximityRateBoost(FName Key)
 {
     ProximityBoosts.Remove(Key);
@@ -601,8 +631,9 @@ float UBreakerGritComponent::GetProximityRateMultiplier() const
     float Composed = 1.0f;
     for (auto It = ProximityBoosts.CreateIterator(); It; ++It)
     {
-        if (IsLoopOverrideExpired(It.Value().ExpiryTime, Now)) { It.RemoveCurrent(); continue; }
-        Composed *= It.Value().Multiplier;
+        const float Scale = FBreakerWindowLaneMath::Scale(Now, It.Value().ExpiryTime, It.Value().bAfterimage);
+        if (Scale == 0) { It.RemoveCurrent(); continue; }
+        Composed *= FBreakerWindowLaneMath::Multiplier(It.Value().Multiplier, Scale);
     }
     return Composed;
 }

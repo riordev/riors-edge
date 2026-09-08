@@ -5,6 +5,8 @@
 #include "Progression/BreakerProgressionTypes.h"
 #include "BreakerCombatTypes.generated.h"
 
+struct FBreakerWeaponTriggerContext;
+
 UENUM(BlueprintType)
 enum class EBreakerElement : uint8 { None, Entropy, Void, Rift };
 
@@ -116,6 +118,9 @@ struct RIORSEDGE_API FBreakerDamageRequest
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float SourceMoreProduct = 1.0f;
     // Selected at emission; applied only to a direct critical weapon hit.
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float WeaponCriticalMoreProduct = 1.0f;
+    UPROPERTY() float WeaponBeyondFirstMoreProduct = 1.0f;
+    UPROPERTY() bool bWeaponBeyondFirstTarget = false;
+    TSharedPtr<FBreakerWeaponTriggerContext> WeaponTrigger;
     UPROPERTY() bool bWeaponArmorShred = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHasSourceSplit = false;
     // O54/O55: which pool the source multiplier above was drawn from. Weapon is

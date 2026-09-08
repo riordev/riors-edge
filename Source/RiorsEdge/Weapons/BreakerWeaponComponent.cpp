@@ -1,4 +1,6 @@
 #include "Weapons/BreakerWeaponComponent.h"
+#include "Combat/BreakerWeaponTriggerContext.h"
+#include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerDeployable.h"
 #include "Characters/BreakerCharacter.h"
 
@@ -1931,10 +1933,18 @@ bool UBreakerWeaponComponent::FireOnce()
 
     const FBreakerShotChannels Channels = GetShotChannels();
     const int32 ExtraPellets = FBreakerWeaponMath::ConsumeMultishot(Channels.AdditionalProjectiles, MultishotAccumulator);
+    const auto Trigger = MakeShared<FBreakerWeaponTriggerContext>();
+    const auto* TriggerASC = GetOwner()->FindComponentByClass<UAbilitySystemComponent>();
+    const auto* TriggerAttributes = TriggerASC ? TriggerASC->GetSet<UBreakerAttributeSet>() : nullptr;
+    UBreakerDamageLibrary::FillSourcePools(TriggerAttributes, EBreakerDamageDelivery::Weapon, Trigger->Source);
+    Trigger->Source.CriticalChance = TriggerAttributes ? TriggerAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
+    Trigger->Source.CriticalMultiplier = TriggerAttributes ? TriggerAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
+    SnapshotWeaponElement(Trigger->Source);
+    ApplyQuickdrawSourceBonus(Trigger->Source);
 
     if (Definition->bProjectile)
     {
-        FireProjectile(Definition, ViewLocation, ViewRotation, Spread, FiredBurstIndex, RecoilSeed, ShotAimAlpha, RampToken, ExtraPellets);
+        FireProjectile(Definition, ViewLocation, ViewRotation, Spread, FiredBurstIndex, RecoilSeed, ShotAimAlpha, RampToken, ExtraPellets, Trigger);
         if (MagazineAmmo <= 0 && ReserveAmmo > 0) StartReload();
         return true;
     }
@@ -2011,7 +2021,7 @@ bool UBreakerWeaponComponent::FireOnce()
         // the channels at zero it performs exactly one trace and one damage
         // submission, the legacy path to the bit.
         PiercedThisPull += ResolvePelletImpacts(Definition, ViewLocation, Direction, Channels, ScaledBaseDamage,
-            SourceAttributes, MostRecentMarkedTarget, LeadMinimumRangeCm, LevelScalar, PelletSeed, Shot, Pellet);
+            SourceAttributes, MostRecentMarkedTarget, LeadMinimumRangeCm, LevelScalar, PelletSeed, Shot, Pellet, Trigger);
     }
 
     // Pierce Discipline (Class-Kits §1.5 M6, transcribed): each target pierced
@@ -2329,11 +2339,11 @@ AActor* UBreakerWeaponComponent::FindNearestChainTarget(const FVector& Origin, f
 }
 
 FBreakerDamageResult UBreakerWeaponComponent::SubmitWeaponDamage(const UBreakerWeaponDefinition* Definition, UBreakerCombatComponent* TargetCombat,
-    const UBreakerAttributeSet* SourceAttributes, float BaseDamage, float DistanceFromMuzzle, bool bWeakPoint,
+    const TSharedRef<FBreakerWeaponTriggerContext>& Trigger, float BaseDamage, float DistanceFromMuzzle, bool bWeakPoint,
     float ArmorPenetrationOverride, const FVector& ImpactPoint, int32 DamageSeed,
     bool bWeakPointIsGranted, bool bForkHit)
 {
-    FBreakerDamageRequest Damage;
+    FBreakerDamageRequest Damage = Trigger->Source;
     // The multiplicand: archetype base carried up the item-level curve, then
     // falloff. While a range-treatment override is active (Standing Wave's
     // Overdrive rewrite), the falloff computation itself is short-circuited
@@ -2344,7 +2354,6 @@ FBreakerDamageResult UBreakerWeaponComponent::SubmitWeaponDamage(const UBreakerW
             BreakerCoreWeaponStats(GetOwner()).WeaponFalloffStartMultiplier);
     Damage.BaseDamage = BaseDamage * FalloffMultiplier;
     Damage.DamageFamily = EBreakerDamageFamily::Physical;
-    SnapshotWeaponElement(Damage);
     Damage.WeakPointMultiplier = Definition->WeakPointMultiplier;
     Damage.ArmorPenetration = ArmorPenetrationOverride;
     Damage.bWeakPointHit = bWeakPoint;
@@ -2360,7 +2369,7 @@ FBreakerDamageResult UBreakerWeaponComponent::SubmitWeaponDamage(const UBreakerW
     Damage.bCanCritical = UBreakerDamageLibrary::CanCriticalOnWeakPoint(
         bWeakPoint && !bWeakPointIsGranted, bWeakPointIsGranted,
         OwnerHasNodeTag(BreakerCoreDeadeyeTag()));
-    Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
+    Damage.CriticalChance = Trigger->Source.CriticalChance;
     // Core.Volley.LastRound: the magazine's final round cannot be a non-crit
     // — chance forced to certainty, never the multiplier, and bCanCritical
     // still outranks it (O104's granted-weak-point suppression stands unless
@@ -2369,7 +2378,7 @@ FBreakerDamageResult UBreakerWeaponComponent::SubmitWeaponDamage(const UBreakerW
     {
         Damage.CriticalChance = 1.0f;
     }
-    Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
+    Damage.CriticalMultiplier = Trigger->Source.CriticalMultiplier;
     const UBreakerEquipmentComponent* Equipment = GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>();
     if (!Definition->bProjectile && Equipment && UBreakerItemRuleLibrary::ResolveRules(Equipment->GetEquipped()).bHitscanCriticalForks)
     {
@@ -2390,8 +2399,9 @@ FBreakerDamageResult UBreakerWeaponComponent::SubmitWeaponDamage(const UBreakerW
     // target-conditional rider join the additive bucket instead of multiplying.
     // O55: a gun shot is Weapon-delivered, which is the whole of the decision
     // at this site.
-    UBreakerDamageLibrary::FillSourcePools(SourceAttributes, EBreakerDamageDelivery::Weapon, Damage);
-    ApplyQuickdrawSourceBonus(Damage);
+    if (TargetCombat && !TargetCombat->IsDead() && !TargetCombat->GetOwner()->IsActorBeingDestroyed()
+        && TargetCombat->GetOwner()->IsA<ABreakerEnemy>())
+        Damage.bWeaponBeyondFirstTarget = Trigger->ClaimTarget(TargetCombat->GetOwner());
     Damage.RandomSeed = DamageSeed;
     Damage.SourceLocation = GetOwner()->GetActorLocation();
     Damage.bHasSourceLocation = true;
@@ -2413,7 +2423,7 @@ FBreakerDamageResult UBreakerWeaponComponent::SubmitWeaponDamage(const UBreakerW
 int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FVector& Direction,
     const FBreakerShotChannels& Channels, float ScaledBaseDamage, const UBreakerAttributeSet* SourceAttributes,
     const AActor* MarkedTarget, float LeadMinimumRangeCm, float LevelScalar, int32 PelletSeed,
-    FBreakerShotResult& Shot, FBreakerPelletImpact& Pellet)
+    FBreakerShotResult& Shot, FBreakerPelletImpact& Pellet, const TSharedRef<FBreakerWeaponTriggerContext>& Trigger)
 {
     const UBreakerAbilityStateComponent* AbilityState = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerAbilityStateComponent>() : nullptr;
     const uint32 OwnerHash = GetTypeHash(GetOwner());
@@ -2574,7 +2584,7 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
                 ForkBaseDamage = ScaledBaseDamage * CurrentMultiplier * UBreakerItemRuleLibrary::ForkDamageFraction;
             }
         }
-        const FBreakerDamageResult HitDamage = SubmitWeaponDamage(Definition, TargetCombat, SourceAttributes,
+        const FBreakerDamageResult HitDamage = SubmitWeaponDamage(Definition, TargetCombat, Trigger,
             ScaledBaseDamage * CurrentMultiplier, DistanceFromMuzzleCm, bWeakPoint, ArmorPenetration, Hit.ImpactPoint, DamageSeed,
             bGrantedWeakPoint);
         if (EnemiesStruck == 0 && (HitDamage.bDodged || HitDamage.HealthDamage + HitDamage.ShieldDamage <= 0.0f))
@@ -2686,7 +2696,7 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
             // price, and paying falloff twice would make chain quietly
             // worthless at exactly the ranges Marksman fights at.
             const int32 ArcSeed = FBreakerWeaponMath::SecondaryShotSeed(OwnerHash, PelletSeed, BreakerChainSalt, Arc);
-            const FBreakerDamageResult ArcDamage = SubmitWeaponDamage(Definition, TargetCombat, SourceAttributes,
+            const FBreakerDamageResult ArcDamage = SubmitWeaponDamage(Definition, TargetCombat, Trigger,
                 ScaledBaseDamage * ArcMultiplier, LastEnemyDistanceCm, false, Definition->ArmorPenetration, ArcImpact, ArcSeed);
             Shot.DamageResult.RawDamage += ArcDamage.RawDamage;
             Shot.DamageResult.MitigatedDamage += ArcDamage.MitigatedDamage;
@@ -2719,7 +2729,7 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
             Leg.End = Target->GetActorLocation();
             Leg.bHit = true;
             Leg.HitActor = Target;
-            const FBreakerDamageResult Result = SubmitWeaponDamage(Definition, Combat, SourceAttributes,
+            const FBreakerDamageResult Result = SubmitWeaponDamage(Definition, Combat, Trigger,
                 ForkBaseDamage, ForkDistanceCm, false, Definition->ArmorPenetration, Leg.End,
                 FBreakerWeaponMath::SecondaryShotSeed(OwnerHash, PelletSeed, BreakerForkSalt, Fork + 1), false, true);
             Shot.DamageResult.RawDamage += Result.RawDamage;
@@ -2806,32 +2816,24 @@ void UBreakerWeaponComponent::SnapshotWeaponElement(FBreakerDamageRequest& Reque
     if (State) State->SnapshotSympatheticEntropy(Request);
 }
 
-void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed, float ShotAimAlpha, uint32 RampToken, int32 ExtraPellets)
+void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed, float ShotAimAlpha, uint32 RampToken, int32 ExtraPellets, const TSharedRef<FBreakerWeaponTriggerContext>& Trigger)
 {
-
-    const UBreakerAttributeSet* SourceAttributes = nullptr;
-    if (const IAbilitySystemInterface* AbilityOwner = Cast<IAbilitySystemInterface>(GetOwner()))
-    {
-        if (const UAbilitySystemComponent* ASC = AbilityOwner->GetAbilitySystemComponent()) SourceAttributes = ASC->GetSet<UBreakerAttributeSet>();
-    }
-    FBreakerDamageRequest Damage;
+    FBreakerDamageRequest Damage = Trigger->Source;
+    Damage.WeaponTrigger = Trigger;
     // Same multiplicand as the hitscan path: the rocket's payload is a weapon
     // base damage number and scales with item level identically.
     Damage.BaseDamage = GetScaledBaseDamageForDefinition(Definition);
     Damage.DamageFamily = EBreakerDamageFamily::Physical;
-    // The complete request retains this selection through travel and swaps.
-    SnapshotWeaponElement(Damage);
+    // The complete request retains the trigger's selection through travel and swaps.
     Damage.WeakPointMultiplier = 1.0f;
     Damage.ArmorPenetration = Definition->ArmorPenetration;
-    Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
-    Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
+    Damage.CriticalChance = Trigger->Source.CriticalChance;
+    Damage.CriticalMultiplier = Trigger->Source.CriticalMultiplier;
     // The same source block as the hitscan path, and the reason the split lives
     // on the REQUEST at all: a rocket has no target at fire time, so its
     // target-conditional riders can only resolve at impact, in ReceiveDamage,
     // from the halves snapshotted here. The rocket carries the fire-time split
     // exactly as it carries the fire-time modifiers below.
-    UBreakerDamageLibrary::FillSourcePools(SourceAttributes, EBreakerDamageDelivery::Weapon, Damage);
-    ApplyQuickdrawSourceBonus(Damage);
     Damage.RandomSeed = HashCombine(GetTypeHash(GetOwner()), ShotSequence + 1);
     Damage.SetInstigator(GetOwner());
     // The rocket carries an already-composed request; modifiers active at the

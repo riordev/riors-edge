@@ -74,6 +74,8 @@ void UBreakerDamageLibrary::FillSourcePools(const UBreakerAttributeSet* SourceAt
         && SourceProgression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Ballistics.Break")));
     Request.WeaponCriticalMoreProduct = SourceAttributes && Delivery == EBreakerDamageDelivery::Weapon
         ? SourceAttributes->GetAttributeAggregator().GetScopedMoreProduct(false, false, false, false, true) : 1.0f;
+    Request.WeaponBeyondFirstMoreProduct = SourceAttributes && Delivery == EBreakerDamageDelivery::Weapon
+        ? SourceAttributes->GetAttributeAggregator().GetScopedMoreProduct(false, false, false, false, false, true) : 1.0f;
     Request.bForceCriticalStrike = SourceAttributes && SourceAttributes->GetAttributeAggregator().HasDeadeye();
     SnapshotElementSource(SourceAttributes ? SourceAttributes->GetTypedOuter<AActor>() : nullptr, Request);
     if (!SourceAttributes)
@@ -135,13 +137,20 @@ void UBreakerDamageLibrary::AddSourceIncreased(FBreakerDamageRequest& Request, f
 
 void UBreakerDamageLibrary::ResolveConditionalMores(FBreakerDamageRequest& Request)
 {
-    const float Selected = Request.WeaponCriticalMoreProduct;
+    const float Critical = Request.WeaponCriticalMoreProduct;
+    const float BeyondFirst = Request.WeaponBeyondFirstMoreProduct;
     Request.WeaponCriticalMoreProduct = 1.0f; // Claim before reuse or derived payout.
-    if (Request.bIsDamageOverTime || Request.Delivery != EBreakerDamageDelivery::Weapon
-        || !FMath::IsFinite(Selected) || Selected <= 1.0f) return;
-    Request.bSnapshotCriticalResult = BreakerCriticalResult(Request);
-    Request.bUseSnapshotCritical = true;
-    if (!Request.bSnapshotCriticalResult) return;
+    Request.WeaponBeyondFirstMoreProduct = 1.0f;
+    if (Request.bIsDamageOverTime || Request.Delivery != EBreakerDamageDelivery::Weapon) return;
+    float Selected = 1.0f;
+    if (FMath::IsFinite(Critical) && Critical > 1.0f)
+    {
+        Request.bSnapshotCriticalResult = BreakerCriticalResult(Request);
+        Request.bUseSnapshotCritical = true;
+        if (Request.bSnapshotCriticalResult) Selected *= Critical;
+    }
+    if (Request.bWeaponBeyondFirstTarget && FMath::IsFinite(BeyondFirst) && BeyondFirst > 1.0f) Selected *= BeyondFirst;
+    if (Selected <= 1.0f) return;
     AddSourceIncreased(Request, 0.0f); // Establish an honest split for native requests.
     const float Standing = FMath::Max(1.0f, Request.SourceMoreProduct);
     Request.SourceMoreProduct = Standing * FMath::Min(Selected,

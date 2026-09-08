@@ -817,7 +817,7 @@ private:
     int32 ResolvePelletImpacts(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FVector& Direction,
         const FBreakerShotChannels& Channels, float ScaledBaseDamage, const UBreakerAttributeSet* SourceAttributes,
         const AActor* MarkedTarget, float LeadMinimumRangeCm, float LevelScalar, int32 PelletSeed,
-        FBreakerShotResult& Shot, struct FBreakerPelletImpact& Pellet);
+        FBreakerShotResult& Shot, struct FBreakerPelletImpact& Pellet, const TSharedRef<FBreakerWeaponTriggerContext>& Trigger);
     // Nearest legal enemy (combat component, alive, unstruck, line of sight)
     // to Origin within RadiusCm. The world query half of chain/ricochet.
     AActor* FindNearestChainTarget(const FVector& Origin, float RadiusCm, const TArray<const AActor*>& ExcludedActors) const;
@@ -825,7 +825,7 @@ private:
     // pierce continuations, chain arcs and ricochet legs so a stat can never
     // apply to some of them and not others.
     FBreakerDamageResult SubmitWeaponDamage(const UBreakerWeaponDefinition* Definition, class UBreakerCombatComponent* TargetCombat,
-        const UBreakerAttributeSet* SourceAttributes, float BaseDamage, float DistanceFromMuzzle, bool bWeakPoint,
+        const TSharedRef<FBreakerWeaponTriggerContext>& Trigger, float BaseDamage, float DistanceFromMuzzle, bool bWeakPoint,
         float ArmorPenetrationOverride, const FVector& ImpactPoint, int32 DamageSeed,
         // O104: a weak point GRANTED by a rule rather than earned by hitting one
         // takes the weak-point multiplier instead of crit, not as well as it.
@@ -895,7 +895,7 @@ private:
     // cadence cannot drift by a callback's worth per shot.
     void AdvanceBurstFire();
     void ScheduleBurstFire(float DelaySeconds);
-    void FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed, float ShotAimAlpha, uint32 RampToken, int32 ExtraPellets);
+    void FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed, float ShotAimAlpha, uint32 RampToken, int32 ExtraPellets, const TSharedRef<FBreakerWeaponTriggerContext>& Trigger);
     // LevelScalar is resolved once per trigger pull and passed down, so every
     // pellet and the bleed it may apply share one item-level reading.
     // SeedBasis is the hit's own draw seed (the base pellet's ShotSequence
