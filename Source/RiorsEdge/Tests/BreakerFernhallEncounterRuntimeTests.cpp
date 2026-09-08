@@ -83,6 +83,7 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
         TestFalse(TEXT("Ordinary Fernhall stays outside a rift"), Mode->IsRiftInstance());
         TestFalse(TEXT("Outdoor patrols do not activate the wave controller"), Mode->IsWaveActive());
         TArray<ABreakerEnemy*> Enemies;
+        int32 CourtyardCount = 0, CourtyardMelee = 0, CourtyardLattices = 0;
         TArray<FVector> PocketCenters;
         PocketCenters.Init(FVector::ZeroVector, 3);
         int32 PocketCounts[] = { 0, 0, 0 };
@@ -93,16 +94,29 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
         for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
         {
             ABreakerEnemy* Enemy = *It;
-            Enemies.Add(Enemy);
+            const bool bCourtyard = Enemy->Tags.Contains(TEXT("Fernhall.Outdoor.Courtyard"));
+            if (!bCourtyard) Enemies.Add(Enemy);
             TestFalse(TEXT("Outdoor enemy is finite"), Enemy->DoesRespawn());
             TestFalse(TEXT("Outdoor enemy cannot complete a rift"), Enemy->IsRiftTerminator());
             Elites += Enemy->GetMonsterRank() != EBreakerMonsterRank::Trash ? 1 : 0;
             int32 Pocket = INDEX_NONE;
             for (int32 Index = 0; Index < 3; ++Index)
                 if (Enemy->Tags.Contains(FName(*FString::Printf(TEXT("Fernhall.Outdoor.%d"), Index)))) Pocket = Index;
-            if (!TestTrue(TEXT("Every body belongs to an authored outdoor pocket"), Pocket != INDEX_NONE)) return false;
-            PocketCenters[Pocket] += Enemy->GetActorLocation();
-            ++PocketCounts[Pocket];
+            if (!TestTrue(TEXT("Every body belongs to an authored pocket or courtyard"), Pocket != INDEX_NONE || bCourtyard)) return false;
+            if (bCourtyard)
+            {
+                ++CourtyardCount;
+                CourtyardMelee += Enemy->GetClass() == ABreakerEnemy::StaticClass();
+                CourtyardLattices += Enemy->GetClass() == ABreakerRangedEnemy::StaticClass();
+                TestEqual(TEXT("Courtyard remains entry level"), Enemy->GetAreaLevel(), 5);
+                TestEqual(TEXT("Courtyard roster remains ordinary"), Enemy->GetMonsterRank(), EBreakerMonsterRank::Trash);
+                TestEqual(TEXT("Courtyard roster is Vestige"), Enemy->GetFamily(), EBreakerEnemyFamily::Vestige);
+            }
+            else
+            {
+                PocketCenters[Pocket] += Enemy->GetActorLocation();
+                ++PocketCounts[Pocket];
+            }
             if (Pocket == 1 && Enemy->IsA<ABreakerRangedEnemy>()) ++EntryLattices;
             if (Pocket == 2)
             {
@@ -126,6 +140,9 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
                 FVector::Dist2D(Player->GetActorLocation(), Enemy->GetActorLocation()) > Enemy->GetDetectionRange());
         }
         if (!TestEqual(TEXT("Eleven existing enemies populate each fresh visit"), Enemies.Num(), 11)) return false;
+        TestEqual(TEXT("Four additional courtyard enemies"), CourtyardCount, 4);
+        TestEqual(TEXT("Three ordinary courtyard melee"), CourtyardMelee, 3);
+        TestEqual(TEXT("One courtyard Lattice"), CourtyardLattices, 1);
         TestEqual(TEXT("Roster retains one elite for the initial contract"), Elites, 1);
         const int32 ExpectedCounts[] = { 4, 3, 4 };
         for (int32 Index = 0; Index < 3; ++Index)
@@ -181,7 +198,7 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
             TestTrue(TEXT("Actual outdoor enemy dies to combat damage"),
                 Enemy->FindComponentByClass<UBreakerCombatComponent>()->ReceiveDamage(Kill).bKilled);
         }
-        TestTrue(TEXT("Outdoor kills grant normal XP"), Player->GetProgression()->GetProgressionState().TotalExperience > XpBefore);
+        TestEqual(TEXT("Original entry kills retain exact natural XP"), Player->GetProgression()->GetProgressionState().TotalExperience - XpBefore, 159);
         if (Visit == 0)
         {
             TestTrue(TEXT("Entry encounters complete the accepted spill objective"), Journal->HasFlag(TEXT("Quest.FirstContract.SpillThinned")));
@@ -200,9 +217,15 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
             TestTrue(TEXT("A return visit supplies physically collected feedstock"), Journal->HasFlag(TEXT("Quest.KessSalvage.FeedstockTaken")));
         }
         Mode->HandleStartingNewPlayer_Implementation(Controller);
-        int32 AfterRepeat = 0;
-        for (TActorIterator<ABreakerEnemy> It(World); It; ++It) ++AfterRepeat;
-        TestEqual(TEXT("Repeated startup cannot duplicate outdoor population"), AfterRepeat, 11);
+        int32 AfterRepeat = 0, CourtyardAfterRepeat = 0;
+        for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
+        {
+            ++AfterRepeat;
+            CourtyardAfterRepeat += It->Tags.Contains(TEXT("Fernhall.Outdoor.Courtyard")) ? 1 : 0;
+        }
+        TestEqual(TEXT("Repeated startup preserves courtyard quartet"), CourtyardAfterRepeat, 4);
+        TestEqual(TEXT("Repeated startup preserves original population"), AfterRepeat - CourtyardAfterRepeat, 11);
+        TestEqual(TEXT("Repeated startup preserves original eleven plus courtyard four"), AfterRepeat, 15);
         TestFalse(TEXT("Clearing outdoor encounters never starts waves"), Mode->IsWaveActive());
     }
     return true;

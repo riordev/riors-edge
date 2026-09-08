@@ -360,6 +360,9 @@ public:
     // cannot reach it. Shots land in Saved/Screenshots.
     void ScheduleScreenshots();
     void CaptureScreenshot();
+    void FinishScreenshot();
+    FDelegateHandle ScreenshotProcessedHandle;
+    bool bScreenshotPending = false;
     // A CORE ticker, not a world timer. Opening the front end calls
     // SetPause(true), which stops world timers dead -- so the first attempt at
     // menu capture opened the screen and then photographed nothing, forever.

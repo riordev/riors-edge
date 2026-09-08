@@ -98,7 +98,7 @@ TArray<FBreakerLocalMapMarker> UBreakerLocalMapComponent::GetMarkers() const
 TArray<FBox2D> UBreakerLocalMapComponent::GetGround() const
 {
     TArray<FBox2D> Ground;
-    if (UBreakerGameInstance::IsAnchorMap(this) && GetWorld())
+    if (GetWorld())
     {
         for (TActorIterator<AActor> It(GetWorld()); It; ++It)
         {
@@ -106,7 +106,6 @@ TArray<FBox2D> UBreakerLocalMapComponent::GetGround() const
             FVector Origin, Extent; It->GetActorBounds(false, Origin, Extent);
             Ground.Emplace(FVector2D(Origin - Extent), FVector2D(Origin + Extent));
         }
-        return Ground;
     }
     if (!UBreakerGameInstance::IsFernhallMap(this)) return Ground;
     TArray<FBreakerZonePiece> Pieces;

@@ -93,6 +93,13 @@ supports readable routes and combat sightlines. Anchor's market street and
 service spaces receive the same authored environmental treatment; a flat floor
 with isolated interactable actors does not establish a settlement.
 
+Fernhall's entry district opens into a maintenance courtyard through a bent
+service passage. The turn interrupts long firing lanes; separated full-height
+cover and low barriers provide routes around a Lattice supported by three
+ordinary Vestiges. The group uses the entry region's fixed level and ordinary
+kill rewards. It is an optional outdoor fight, not another Rift wave or a
+quest completion trigger. Its floor and connection appear on the local survey.
+
 Ordinary enemies use fixed regional level ranges. Returning with a stronger
 build makes familiar patrols easier. Higher-difficulty Rift activities provide
 later challenges without raising the ordinary region to the player's level.

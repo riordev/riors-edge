@@ -7,6 +7,8 @@
 #include "Interaction/BreakerFinaleActor.h"
 #include "Game/BreakerFinaleEarthBuilder.h"
 #include "Game/BreakerZoneBuilder.h"
+#include "Game/BreakerFernhallCourtyardBuilder.h"
+#include "Game/BreakerFernhallCourtyardEncounter.h"
 #include "Game/BreakerGameInstance.h"
 #include "Game/BreakerDeathBudgetMath.h"
 #include "Game/BreakerWorldBasics.h"
@@ -97,6 +99,8 @@ void ABreakerGameMode::Tick(float DeltaSeconds)
 
 void ABreakerGameMode::EndPlay(const EEndPlayReason::Type Reason)
 {
+    FScreenshotRequest::OnScreenshotRequestProcessed().Remove(ScreenshotProcessedHandle);
+    FTSTicker::GetCoreTicker().RemoveTicker(ScreenshotTickHandle);
     // A console command registered against a game-mode instance outlives the
     // world unless it is unregistered: the next PIE session's `Breaker.Boss`
     // would call through a dangling this.
@@ -570,7 +574,7 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
     if (UBreakerGameInstance::IsFernhallMap(this))
     {
         FBreakerZoneMarkers Markers;
-        if (UBreakerZoneBuilder::BuildFernhallYard(GetWorld(), Markers))
+        if (!UBreakerZoneBuilder::BuildFernhallYard(GetWorld(), Markers)) return;
         {
             // The entry yard's frame. A zone has exactly one player start
             // (FBreakerZoneMarkers::IsComplete), and the arrival yard's rift
@@ -1605,9 +1609,8 @@ void ABreakerGameMode::ScheduleScreenshots()
                 const UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>();
                 if (Session && Session->IsArrivalCoverUp()) return true;
             }
-            if (FPlatformTime::Seconds() >= NextScreenshotTime)
+            if (!bScreenshotPending && FPlatformTime::Seconds() >= NextScreenshotTime)
             {
-                NextScreenshotTime = FPlatformTime::Seconds() + FMath::Max(0.1f, ScreenshotIntervalSeconds);
                 CaptureScreenshot();
             }
             return ScreenshotsRemaining > 0;
@@ -1700,6 +1703,22 @@ void ABreakerGameMode::BuildZoneCaptureTour(const FBreakerZoneMarkers& Markers)
         }
     }
 
+    if (FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureCourtyard")))
+    {
+        TArray<FBreakerZonePiece> Pieces;
+        BreakerFernhallCourtyard::FPlan Plan;
+        FString Error;
+        if (UBreakerZoneBuilder::CollectZonePieces(UBreakerZoneBuilder::FernhallMeshFolder(), Pieces)
+            && BreakerFernhallCourtyard::MakePlan(Pieces, Plan, Error))
+        {
+            Vantages.Reset();
+            for (const FVector& Eye : {Plan.At(-650,0,100), Plan.At(1600,2050,100), Plan.At(3300,5500,100)})
+            {
+                const FVector Target = Eye.Equals(Plan.At(-650,0,100)) ? Plan.At(1600,0,100) : Plan.At(3000,3900,150);
+                Vantages.Add({Eye, (Target - Eye).Rotation()});
+            }
+        }
+    }
     for (const FVantage& Vantage : Vantages)
     {
         FActorSpawnParameters Params;
@@ -1784,17 +1803,28 @@ void ABreakerGameMode::CaptureScreenshot()
     // what needs looking at.
     const FString Path = FPaths::ProjectSavedDir() / TEXT("Screenshots") /
         FString::Printf(TEXT("breaker_%02d.png"), ScreenshotIndex);
+    bScreenshotPending = true;
+    ScreenshotProcessedHandle = FScreenshotRequest::OnScreenshotRequestProcessed().AddWeakLambda(this, [this]()
+    {
+        FScreenshotRequest::OnScreenshotRequestProcessed().Remove(ScreenshotProcessedHandle);
+        ScreenshotProcessedHandle.Reset();
+        FinishScreenshot();
+    });
     FScreenshotRequest::RequestScreenshot(Path, /*bShowUI*/ true, /*bAddFilenameSuffix*/ false);
     UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] shot %d -> %s"), ScreenshotIndex, *Path);
+}
+
+void ABreakerGameMode::FinishScreenshot()
+{
+    // The viewport has consumed this request. Moving before this callback can
+    // put the next viewpoint into the current file despite correct log indexes.
+    bScreenshotPending = false;
+    NextScreenshotTime = FPlatformTime::Seconds() + FMath::Max(0.1f, ScreenshotIntervalSeconds);
     ++ScreenshotIndex;
 
     if (--ScreenshotsRemaining > 0)
     {
-        // Cut to the vantage for the NEXT shot now, a whole interval ahead of
-        // it. Setting the view target in the same frame as the request races
-        // the camera update and would silently shift every image by one -- and
-        // "silently" is the word that matters, because a mislabelled vantage
-        // is worse than no vantage at all.
+        // Move only after the saved frame, then allow a full settling interval.
         if (TourCameras.Num() > 0)
         {
             if (APlayerController* PC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr)
@@ -3984,6 +4014,10 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
         }
     }
     UE_LOG(LogTemp, Display, TEXT("[Fernhall] %d finite outdoor enemies placed across three pockets; no wave controller."), Spawned);
+    BreakerFernhallCourtyard::FPlan Courtyard;
+    FString CourtyardError;
+    if (BreakerFernhallCourtyard::MakePlan(YardPieces, Courtyard, CourtyardError))
+        BreakerSpawnFernhallCourtyardEncounter(World, Courtyard);
 }
 void ABreakerGameMode::StartNextWave()
 {

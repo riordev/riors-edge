@@ -1,5 +1,7 @@
 #include "Game/BreakerZoneBuilder.h"
 #include "Game/BreakerEnvironmentDressing.h"
+#include "Game/BreakerFernhallCourtyardBuilder.h"
+#include "EngineUtils.h"
 
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetRegistry/AssetData.h"
@@ -130,16 +132,16 @@ namespace
         UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
         if (!EntryFloor || !SubFloor || !Mound || !Building || !Cube) return;
 
-        auto Place = [&](UStaticMesh* Mesh, const TCHAR* Label, FVector Centre, FVector Size, FLinearColor Color)
+        auto Place = [&](UStaticMesh* Mesh, const TCHAR* Label, FVector Centre, FVector Size, FLinearColor Color) -> AStaticMeshActor*
         {
             const FBoxSphereBounds Bounds = Mesh->GetBounds();
             const FVector Full = Bounds.BoxExtent * 2;
-            if (Full.GetMin() <= UE_SMALL_NUMBER) return;
+            if (Full.GetMin() <= UE_SMALL_NUMBER) return nullptr;
             const FVector Scale(Size.X / Full.X, Size.Y / Full.Y, Size.Z / Full.Z);
             // Imported Fernhall vertices already contain world placement.
             // Subtract their scaled origin, rather than moving the old yard twice.
             auto* Actor = World->SpawnActor<AStaticMeshActor>(Centre - Bounds.Origin * Scale, FRotator::ZeroRotator);
-            if (!Actor) return;
+            if (!Actor) return nullptr;
             auto* Component = Actor->GetStaticMeshComponent();
             Component->SetMobility(EComponentMobility::Movable);
             Component->SetStaticMesh(Mesh); Component->SetWorldScale3D(Scale);
@@ -153,6 +155,7 @@ namespace
 #if WITH_EDITOR
             Actor->SetActorLabel(FString::Printf(TEXT("FernhallSkyline_%s"), Label));
 #endif
+            return Actor;
         };
         const FVector EntryCentre = EntryFloor->GetBounds().Origin;
         const FVector SubCentre = SubFloor->GetBounds().Origin;
@@ -188,10 +191,11 @@ namespace
             {
                 const float Height = 1100.0f + ((Index + Yard) % 3) * 320.0f;
                 const float X = Centre.X + (Index - 1) * 2800.0f;
-                Place(Building, TEXT("Roofline"), FVector(X, Edge + Side * 650, Height * .5f),
+                auto* Roof = Place(Building, TEXT("Roofline"), FVector(X, Edge + Side * 650, Height * .5f),
                     FVector(1700, 850, Height), BreakerZoneConcrete * .82f);
-                Place(Cube, TEXT("RoofServiceHousing"), FVector(X + 340, Edge + Side * 680, Height + 140),
+                auto* Housing = Place(Cube, TEXT("RoofServiceHousing"), FVector(X + 340, Edge + Side * 680, Height + 140),
                     FVector(450, 420, 280), BreakerZoneRust * .65f);
+                if (Housing) Housing->SetOwner(Roof);
             }
         }
         // A recognizable industrial destination beyond the far Substation wall:
@@ -651,10 +655,20 @@ bool UBreakerZoneBuilder::BuildFernhallYard(UWorld* World, FBreakerZoneMarkers& 
     if (!CollectZonePieces(FernhallMeshFolder(), Pieces)) return false;
     if (!ExtractMarkers(Pieces, OutMarkers)) return false;
 
+    BreakerFernhallCourtyard::FPlan Courtyard;
+    FString CourtyardError;
+    if (!BreakerFernhallCourtyard::MakePlan(Pieces, Courtyard, CourtyardError)
+        || !BreakerFernhallCourtyard::Build(World, Courtyard))
+    {
+        UE_LOG(LogTemp, Error, TEXT("[Zone] Maintenance courtyard refused: %s"), *CourtyardError);
+        return false;
+    }
+
     int32 Spawned = 0;
     for (const FBreakerZonePiece& Piece : Pieces)
     {
         if (BreakerZoneNameHasPrefix(Piece.Name, TEXT("marker_"))) continue;
+        if (Piece.Name == Courtyard.ReplacedBoundaryPiece) continue;
         UStaticMesh* Mesh = Cast<UStaticMesh>(Piece.MeshPath.TryLoad());
         if (!Mesh)
         {
@@ -695,6 +709,29 @@ bool UBreakerZoneBuilder::BuildFernhallYard(UWorld* World, FBreakerZoneMarkers& 
 
     BreakerZoneBuildSurfaceDetail(World, Pieces);
     BreakerZoneBuildSkyline(World, Pieces);
+    // Existing outward scenery must not visually bury the new playable route.
+    TArray<FBox> ClearAreas = Courtyard.GroundFootprints;
+    FBox Approach(ForceInit);
+    Approach += Courtyard.At(-800,-600);
+    Approach += Courtyard.At(Courtyard.EntranceFloorStart,600);
+    ClearAreas.Add(Approach);
+    TSet<AActor*> RemovedScenery;
+    TMap<AActor*, AActor*> RoofDependents;
+    for (TActorIterator<AStaticMeshActor> It(World); It; ++It)
+        if (It->Tags.Contains(TEXT("FernhallSkylineDressing")) && It->GetOwner()) RoofDependents.Add(*It, It->GetOwner());
+    for (TActorIterator<AStaticMeshActor> It(World); It; ++It)
+    {
+        if (It->Tags.Contains(TEXT("FernhallMaintenance"))) continue;
+        if (!It->Tags.Contains(TEXT("FernhallSkylineDressing"))
+            && !It->Tags.Contains(TEXT("BreakerEnvironmentDressing"))) continue;
+        const FBox Bounds = It->GetStaticMeshComponent()->Bounds.GetBox();
+        for (const FBox& Ground : ClearAreas)
+            if (Bounds.Min.X <= Ground.Max.X && Bounds.Max.X >= Ground.Min.X
+                && Bounds.Min.Y <= Ground.Max.Y && Bounds.Max.Y >= Ground.Min.Y)
+            { RemovedScenery.Add(*It); It->Destroy(); break; }
+    }
+    for (const auto& Pair : RoofDependents)
+        if (RemovedScenery.Contains(Pair.Value) && IsValid(Pair.Key)) Pair.Key->Destroy();
 
     // The builder measures its own grammar at assembly so a playtest log shows
     // the same numbers the suite asserts — and shouts if the placed yard has
