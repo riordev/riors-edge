@@ -12,8 +12,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerCasterCompleteDoctrineAuthoringTest,"Ri
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FBreakerCasterCompleteDoctrineAuthoringTest::RunTest(const FString&)
 {
-    // Declaration and paid reachability only: these four rule tags have no
-    // runtime consumer yet. This test deliberately makes no combat claim.
+    // Declaration and paid reachability only. Dedicated runtime tests prove
+    // the implemented consumers; this shape test makes no combat claim.
     for (const auto* Tree : {UBreakerProgressionLibrary::GetCasterSpellbladeTree(),UBreakerProgressionLibrary::GetCasterVoidWhispererTree(),UBreakerProgressionLibrary::GetCasterMultispellTree()})
     {
         TestEqual(TEXT("Each fully authored Caster doctrine has twelve nodes"),Tree->Nodes.Num(),12);
@@ -35,8 +35,8 @@ bool FBreakerCasterCompleteDoctrineAuthoringTest::RunTest(const FString&)
         const auto* Node=Tree->FindNode(FName(Ids[Index]));
         if (!TestNotNull(TEXT("Historical final-tier declaration exists"),Node)) return false;
         TestEqual(TEXT("Literal historical name"),Node->DisplayName.ToString(),FString(Names[Index]));
-        TestTrue(TEXT("Player sees implementation status before intended rule"),Node->Description.ToString().StartsWith(TEXT("NOT IMPLEMENTED")));
-        TestTrue(TEXT("Player sees the actual current purchase outcome"),Node->Description.ToString().EndsWith(TEXT("Purchasing this node currently grants no effect.")));
+        if (Index == 1)
+            TestTrue(TEXT("Terminal remains explicitly pending its funding rule"),Node->Description.ToString().StartsWith(TEXT("NOT IMPLEMENTED")));
         TestEqual(TEXT("Final authored tier"),Node->Tier,4); TestEqual(TEXT("Single rank"),Node->MaxRank,1);
         TestEqual(TEXT("Two-point price"),Node->CostPerRank,2); TestEqual(TEXT("Six-point branch gate"),Node->RequiredTreeInvestment,6);
         TestTrue(TEXT("Caster class lock"),Node->RequiredClass==EBreakerClassId::Caster);

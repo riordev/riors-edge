@@ -130,6 +130,11 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Zone")
     void SetFollowActor(AActor* Follow);
     AActor* GetFollowActor() const { return FollowActor.Get(); }
+    FVector GetCurrentFootprintCenter() const
+    {
+        const AActor* Follow = FollowActor.Get();
+        return Follow ? Follow->GetActorLocation() + FollowOffset : GetActorLocation();
+    }
     static float OwnedOccupiedSeconds(AActor* Owner, FGameplayTag Tag, float DeltaSeconds);
 
     // Long Dark (VW12): zones placed inside the window stop ageing until it

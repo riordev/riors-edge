@@ -56,7 +56,7 @@ float BreakerVoid::BuildupTimeoutSeconds() { return BreakerVoidTuning().Timeout;
 
 float UBreakerStatusComponent::GetVoidBuildup() const
 {
-    float Total = VoidBuildup;
+    float Total = VoidBuildup + DeferredElementBuildup(EBreakerElement::Void);
     for (const auto& Contribution : VoidProtectedContributions) Total += Contribution.Decay.Amount;
     return Total;
 }
@@ -101,7 +101,7 @@ void UBreakerStatusComponent::ApplyVoidHit(const FBreakerDamageRequest& Request,
     if (IsElementTransactionActive() || !GetOwner() || !GetOwner()->HasAuthority() || !Sink || Sink->IsDead() || Result.bKilled
         || Request.Element != EBreakerElement::Void || !Request.bCanApplyElementBuildup
         || Request.bIsDamageOverTime || Result.bDodged || Result.bParried || IsStatusImmune()
-        || HasStatus(Erased) || DeliveringTickTag == Erased
+        || DeliveringTickTag == Erased
         || !FMath::IsFinite(Result.RawDamage) || !FMath::IsFinite(Request.ProcCoefficient)
         || !FMath::IsFinite(Request.ElementalFraction) || Result.RawDamage <= 0) return;
     const float Snapshot = BreakerElementSource::RawPart(Request, Result);
@@ -111,9 +111,12 @@ void UBreakerStatusComponent::ApplyVoidHit(const FBreakerDamageRequest& Request,
     if (!FMath::IsFinite(Budget) || Budget <= 0 || !FMath::IsFinite(Threshold) || Threshold <= 0) return;
     const float Bonus = FMath::IsFinite(Request.ElementBuildupFlat) ? FMath::Max(0.0f, Request.ElementBuildupFlat) : 0;
     const float Ordinary = Result.ShieldDamage + Result.HealthDamage > 0 ? Snapshot : 0;
-    const float Buildup = (Ordinary + Bonus) * FMath::Clamp(Request.ProcCoefficient, 0.0f, 1.0f)
+    const float ComputedBuildup = (Ordinary + Bonus) * FMath::Clamp(Request.ProcCoefficient, 0.0f, 1.0f)
         * BreakerElementSource::BuildupMultiplier(Request)
         * BreakerElementSource::ResistanceFactor(Request, GetVoidResistancePercent());
+    if (DeferSympatheticElement(Request, Result, ComputedBuildup, BreakerVoid::BuildupTimeoutSeconds())) return;
+    if (HasStatus(Erased)) return; // Existing finite applications never refresh.
+    const float Buildup = ClaimedElementBuildup(Request, ComputedBuildup);
     if (!FMath::IsFinite(Buildup) || Buildup <= 0) return;
     if (FMath::IsFinite(Request.ElementBuildupFadeSeconds) && Request.ElementBuildupFadeSeconds > 0)
     {
@@ -135,7 +138,7 @@ void UBreakerStatusComponent::ApplyVoidHit(const FBreakerDamageRequest& Request,
     }
     if (!Sink->OnDeath.IsAlreadyBound(this, &UBreakerStatusComponent::HandleAfflictedOwnerDeath))
         const_cast<UBreakerCombatComponent*>(Sink)->OnDeath.AddDynamic(this, &UBreakerStatusComponent::HandleAfflictedOwnerDeath);
-    if (GetVoidBuildup() < Threshold) return;
+    if (GetVoidBuildup() - DeferredElementBuildup(EBreakerElement::Void) < Threshold) return;
     // The applying hit earns the damage. Accumulated buildup, bonuses and
     // resistance decide when it activates, never how much damage it pays.
     ResetVoidBuildup();

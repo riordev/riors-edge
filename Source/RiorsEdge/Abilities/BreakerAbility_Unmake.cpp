@@ -110,7 +110,9 @@ void UBreakerCascadeEchoListener::HandleStatusApplied(const FBreakerActiveStatus
     FRandomStream Stream(static_cast<int32>(HashCombine(
         HashCombine(GetTypeHash(CasterCharacter), static_cast<uint32>(World->GetTimeSeconds() * 1000.0)),
         BreakerUnmakeCascadeSalt)));
-    Echo.Snapshot.bRolledCritical = Stream.FRand() < Echo.Snapshot.CriticalChance;
+    Echo.Snapshot.CriticalRollSample = Stream.FRand();
+    Echo.Snapshot.bHasCriticalRollSample = true;
+    Echo.Snapshot.bRolledCritical = Echo.Snapshot.CriticalRollSample < Echo.Snapshot.CriticalChance;
 
     // Applied NEXT TICK, never inside the broadcast that triggered it: the
     // echo lands on the same component that is mid-broadcast, and mutating

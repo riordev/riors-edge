@@ -1000,6 +1000,9 @@ struct RIORSEDGE_API FBreakerDamageSnapshot
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float DamageOverTimeMultiplier = 1.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FGameplayTagContainer SourceTags;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bRolledCritical = false;
+    // The same application roll can be evaluated at the accepted impact's zone eligibility.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHasCriticalRollSample = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float CriticalRollSample = 0.0f;
 };
 
 USTRUCT(BlueprintType)
@@ -1013,6 +1016,8 @@ struct RIORSEDGE_API FBreakerStatusApplicationSpec
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float TickInterval = 1.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 InitialStacks = 1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHasAilmentRuleSnapshot = false;
+    // Caster application state is captured at accepted impact, separately from emitted Core rules.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHasCasterApplicationSnapshot = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHemorrhageSnapshot = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bLongDarkSnapshot = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bVectorFieldSnapshot = false;

@@ -18,12 +18,16 @@ struct RIORSEDGE_API FBreakerActiveStatus
     UPROPERTY(BlueprintReadOnly) EBreakerDamageFamily DamageFamily = EBreakerDamageFamily::Physical;
     UPROPERTY(BlueprintReadOnly) int32 Stacks = 1;
     UPROPERTY(BlueprintReadOnly) float RemainingDuration = 0.0f;
+    // Preserve sub-float lifetime fractions across native frame partitions.
+    // Copies (including finite Residue) retain the same unpaid clock.
+    double RemainingDurationRoundoff = 0.0;
     UPROPERTY(BlueprintReadOnly) float TimeUntilNextTick = 0.0f;
     UPROPERTY(BlueprintReadOnly) int32 TicksDelivered = 0;
     // An elemental status owns one finite snapshot. Consumption transfers this unpaid
     // amount; payout claims it before any damage callback can re-enter.
     UPROPERTY(BlueprintReadOnly) float UnpaidDamageBudget = 0.0f;
     UPROPERTY(BlueprintReadOnly) float InitialDamageBudget = 0;
+    uint64 OriginElementHitToken = 0;
     UPROPERTY(BlueprintReadOnly) float InitialReactionBudget = 0;
     UPROPERTY(BlueprintReadOnly) bool bHasReactionCreditSnapshot = false;
     // Persistence is a live ownership lease, separate from the finite funding clock.
@@ -103,9 +107,11 @@ public:
     float GetRiftThreshold() const;
     float GetRiftResistancePercent() const;
     UPROPERTY(EditAnywhere, Category="Status|Rift") float RiftResistancePercent = 0.0f;
-    uint64 PrepareElementReaction(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result);
+    uint64 BeginElementHit() { return NextElementHitToken++; }
+    uint64 PrepareElementReaction(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result, uint64 RequiredHitToken = 0);
+    uint64 PrepareElementReactionBatch(const TArray<FBreakerDamageRequest>& Requests, const FBreakerDamageResult& Result, uint64 RequiredHitToken = 0);
     void FlushElementReaction(uint64 Token);
-    bool IsElementTransactionActive() const { return PendingReactionToken != 0; }
+    bool IsElementTransactionActive() const { return PendingReactionToken != 0 || bConductorCallback; }
     float GetArmorMultiplier() const;
     float GetHealingReceivedMultiplier() const;
 
@@ -212,7 +218,7 @@ public:
     UPROPERTY(BlueprintAssignable, Category="Combat|Status") FBreakerStatusEvent OnStatusAvoided;
 
 private:
-    FBreakerActiveStatus ConsumeReactionStatus(FGameplayTag Tag, float Fraction, float ReactionBudget, bool& bFound);
+    FBreakerActiveStatus ConsumeReactionStatus(FGameplayTag Tag, float Fraction, float ReactionBudget, bool& bFound, bool bBroadcast = true);
     uint64 ApplyStatusInternal(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator, bool bDurationAlreadyScaled, float UnpaidDamageBudget = 0.0f, const FVector* SourceLocationOverride = nullptr, const FBreakerDamageRequest* ApplyingHit = nullptr);
     void AdvanceVoidBuildup(float DeltaSeconds);
     void ResetVoidBuildup();
@@ -272,12 +278,50 @@ private:
     float RiftBuildup = 0.0f;
     float RiftBuildupRemaining = 0.0f;
     TArray<FEntropyProtectedContribution> RiftProtectedContributions;
+    // Per enemy/source lockout; each element keeps an independently decaying
+    // bank and the last accepted hit's finite application-time funding.
+    struct FDeferredElementBank
+    {
+        BreakerBuildup::FDecayState Decay;
+        double AdvancedBuildupClock = 0;
+        FBreakerDamageRequest Request;
+        FBreakerDamageResult Result;
+        bool bHasSnapshot = false;
+    };
+    struct FSympatheticLockout
+    {
+        TWeakObjectPtr<AActor> Source;
+        double UnlockTime = 0;
+        FDeferredElementBank Banks[3];
+    };
+    TArray<FSympatheticLockout> SympatheticLockouts;
+    double ElementClock = 0;
+    double ElementBuildupClock = 0;
+    struct FConductorReservation { TWeakObjectPtr<AActor> Source; double ReadyTime = 0; };
+    TArray<FConductorReservation> ConductorReservations;
+    bool bConductorCallback = false;
+    const FBreakerDamageRequest* DeferredReplayRequest = nullptr;
+    float DeferredReplayAmount = 0;
+    void BeginSympatheticLockout(AActor* Source);
+    bool DeferSympatheticElement(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result,
+        float Amount, float GraceSeconds);
+    float ClaimedElementBuildup(const FBreakerDamageRequest& Request, float OrdinaryAmount);
+    void AdvanceStatusSlice(float DeltaTime);
+    void AdvanceSympatheticLockouts();
+    float DeferredElementBuildup(EBreakerElement Element) const;
+    uint64 NextElementHitToken = 1;
     uint64 NextApplicationSerial = 1;
     uint64 NextReactionToken = 1;
     uint64 PendingReactionToken = 0;
     bool bFlushingReaction = false;
-    FGameplayTag PendingReactionTag;
-    FBreakerActiveStatus PendingReactionStatus;
-    TWeakObjectPtr<AActor> PendingReactionChainTarget;
+    struct FPendingElementReaction
+    {
+        FGameplayTag Tag;
+        FBreakerActiveStatus Status;
+        TWeakObjectPtr<AActor> ChainTarget;
+        bool bSympathetic = false;
+    };
+    TArray<FPendingElementReaction> PendingElementReactions;
+    bool bReactionCanceled = false;
     uint32 ApplicationsAttempted = 0;
 };

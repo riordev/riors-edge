@@ -1478,10 +1478,10 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterVoidWhispererTree(
     // doctrine authors no multiplier, so the argument goes with the number.
     // What that leaves behind is recorded at the lane it leaves behind.
     // Historical Class-Kits VW9. O2 PLACEHOLDER: +25 critical-chance points.
-    // WAITING ON: own-zone membership at DoT application and a source critical
-    // chance snapshot override. Ordinary CriticalChance would affect all hits.
+    // Physical applications retain the original critical sample and check own-zone geometry.
+    // WAITING ON: Rot's separate critical funding rule; never double its applying hit's crit.
     Node = MakeNode(TEXT("Caster.VoidWhisperer.SnapshotDiscipline"), TEXT("Snapshot Discipline"),
-        TEXT("NOT IMPLEMENTED: DoTs applied while standing inside your own zone snapshot as if your Critical Chance were 25 percentage points higher. Purchasing this node currently grants no effect."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+        TEXT("Bleed and Poison applied while standing inside your own zone gain 25 percentage points Critical Chance using their original roll. Rot support awaits its funding rule."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Zonework"));
     Node->GrantedTags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Caster.VoidWhisperer.SnapshotDiscipline")));
     Tree->Nodes.Add(Node);
@@ -1497,10 +1497,10 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterVoidWhispererTree(
 
     // Historical Class-Kits VW11/O10. O2 PLACEHOLDER: double tick frequency,
     // 25% incoming penalty instead of the historical 15% Overcast penalty.
-    // WAITING ON: negative-Mana application-time interval snapshot for all
-    // Caster DoTs and the distinct keyed Overcast penalty replacement.
+    // Physical cadence snapshots at application; the existing incoming modifier is replaced.
+    // WAITING ON: Rot's finite funding exception for the authored extra ticks.
     Node = MakeNode(TEXT("Caster.VoidWhisperer.LongDebt"), TEXT("Long Debt"),
-        TEXT("NOT IMPLEMENTED: DoTs applied while Mana is negative snapshot double tick frequency for their lifetime. While Mana is negative, you take 25% increased damage instead of 15%. Purchasing this node currently grants no effect."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+        TEXT("Bleed and Poison applied while Mana is negative snapshot double tick frequency for their lifetime. While Mana is negative, you take 25% increased damage instead of 15%. Rot support awaits its funding rule."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Drain"));
     Node->GrantedTags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Caster.VoidWhisperer.LongDebt")));
     Tree->Nodes.Add(Node);
@@ -1651,10 +1651,10 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
     // number, honest bucket. Caster's third More SLOT stays unspent.
     // Historical Class-Kits MS11. O2 PLACEHOLDER: one reaction per target per
     // 0.5s; each refused reaction queues 10 Mana through conditional income.
-    // WAITING ON: source/target reaction throttle before status consumption and
-    // capped Mana compensation for that refusal. No flat regen substitute.
+    // The original status creditor owns the per-target throttle and capped
+    // refusal income; a refused transaction retains fuel without new buildup.
     Node = MakeNode(TEXT("Caster.Multispell.ConductorRule"), TEXT("Conductor's Rule"),
-        TEXT("NOT IMPLEMENTED: Only one reaction may trigger per target per 0.5s. Reactions that would have triggered instead grant 10 Mana through the conditional income cap. Purchasing this node currently grants no effect."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+        TEXT("Only one reaction may trigger per target per 0.5s. Reactions that would have triggered instead grant 10 Mana through the conditional income cap."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Caster.Multispell.Chain"));
     Node->GrantedTags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Caster.Multispell.ConductorRule")));
     Tree->Nodes.Add(Node);

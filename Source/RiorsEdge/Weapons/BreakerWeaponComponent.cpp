@@ -2912,7 +2912,9 @@ void UBreakerWeaponComponent::ApplyBleedOnHit(const UBreakerWeaponDefinition* De
     Spec.Snapshot.DamageOverTimeMultiplier = SourceAttributes ? SourceAttributes->GetDamageOverTimeMultiplier() : 1.0f;
     // The critical result is rolled once at application; every tick of this
     // application then crits or does not for its whole lifetime.
-    Spec.Snapshot.bRolledCritical = Stream.FRand() < Spec.Snapshot.CriticalChance;
+    Spec.Snapshot.CriticalRollSample = Stream.FRand();
+    Spec.Snapshot.bHasCriticalRollSample = true;
+    Spec.Snapshot.bRolledCritical = Spec.Snapshot.CriticalRollSample < Spec.Snapshot.CriticalChance;
     Status->ApplyStatus(Spec, EBreakerDamageFamily::Physical, GetOwner());
 }
 

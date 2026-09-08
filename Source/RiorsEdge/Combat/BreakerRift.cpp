@@ -100,7 +100,7 @@ float BreakerRift::DisplacementCm() { return BreakerRiftTuning().Displacement; }
 
 float UBreakerStatusComponent::GetRiftBuildup() const
 {
-    float Total = RiftBuildup;
+    float Total = RiftBuildup + DeferredElementBuildup(EBreakerElement::Rift);
     for (const auto& Contribution : RiftProtectedContributions) Total += Contribution.Decay.Amount;
     return Total;
 }
@@ -145,7 +145,7 @@ uint64 UBreakerStatusComponent::ApplyRiftHit(const FBreakerDamageRequest& Reques
     if (IsElementTransactionActive() || !GetOwner() || !GetOwner()->HasAuthority() || !Sink || Sink->IsDead() || Result.bKilled
         || Request.Element != EBreakerElement::Rift || !Request.bCanApplyElementBuildup
         || Request.bIsDamageOverTime || Result.bDodged || Result.bParried || IsStatusImmune()
-        || HasStatus(Unstable) || DeliveringTickTag == Unstable
+        || DeliveringTickTag == Unstable
         || !FMath::IsFinite(Result.RawDamage) || !FMath::IsFinite(Request.ProcCoefficient)
         || !FMath::IsFinite(Request.ElementalFraction) || Result.RawDamage <= 0) return 0;
     const float Snapshot = BreakerElementSource::RawPart(Request, Result);
@@ -154,9 +154,12 @@ uint64 UBreakerStatusComponent::ApplyRiftHit(const FBreakerDamageRequest& Reques
     if (!FMath::IsFinite(Budget) || Budget <= 0 || !FMath::IsFinite(Threshold) || Threshold <= 0) return 0;
     const float Bonus = FMath::IsFinite(Request.ElementBuildupFlat) ? FMath::Max(0.0f, Request.ElementBuildupFlat) : 0;
     const float Ordinary = Result.ShieldDamage + Result.HealthDamage > 0 ? Snapshot : 0;
-    const float Buildup = (Ordinary + Bonus) * FMath::Clamp(Request.ProcCoefficient, 0.0f, 1.0f)
+    const float ComputedBuildup = (Ordinary + Bonus) * FMath::Clamp(Request.ProcCoefficient, 0.0f, 1.0f)
         * BreakerElementSource::BuildupMultiplier(Request)
         * BreakerElementSource::ResistanceFactor(Request, GetRiftResistancePercent());
+    if (DeferSympatheticElement(Request, Result, ComputedBuildup, BreakerRift::BuildupTimeoutSeconds())) return 0;
+    if (HasStatus(Unstable)) return 0; // Existing finite applications never refresh.
+    const float Buildup = ClaimedElementBuildup(Request, ComputedBuildup);
     if (!FMath::IsFinite(Buildup) || Buildup <= 0) return 0;
     if (FMath::IsFinite(Request.ElementBuildupFadeSeconds) && Request.ElementBuildupFadeSeconds > 0)
     {
@@ -178,7 +181,7 @@ uint64 UBreakerStatusComponent::ApplyRiftHit(const FBreakerDamageRequest& Reques
     }
     if (!Sink->OnDeath.IsAlreadyBound(this, &UBreakerStatusComponent::HandleAfflictedOwnerDeath))
         const_cast<UBreakerCombatComponent*>(Sink)->OnDeath.AddDynamic(this, &UBreakerStatusComponent::HandleAfflictedOwnerDeath);
-    if (GetRiftBuildup() < Threshold) return 0;
+    if (GetRiftBuildup() - DeferredElementBuildup(EBreakerElement::Rift) < Threshold) return 0;
     ResetRiftBuildup();
     FBreakerStatusApplicationSpec Spec;
     Spec.StatusTag = Unstable;

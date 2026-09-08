@@ -306,7 +306,10 @@ bool UBreakerManaComponent::IsOverreachActive() const
 float UBreakerManaComponent::GetOvercastIncomingDamageTaken() const
 {
     if (!IsOvercast()) return 0.0f;
-    return FMath::Max(0.0f, IsOverreachActive() ? GetResourceTuning().OverreachIncomingDamageTaken : OvercastIncomingDamageTaken);
+    const auto* Progression = CachedProgression.Get();
+    const bool bLongDebt = Progression && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Caster.VoidWhisperer.LongDebt")));
+    const float OrdinaryPenalty = bLongDebt ? .25f : OvercastIncomingDamageTaken; // O2 PLACEHOLDER, authored replacement penalty.
+    return FMath::Max(0.0f, IsOverreachActive() ? GetResourceTuning().OverreachIncomingDamageTaken : OrdinaryPenalty);
 }
 
 bool UBreakerManaComponent::CanAffordSpend(float Cost) const

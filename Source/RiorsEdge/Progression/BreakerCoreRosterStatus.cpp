@@ -97,9 +97,8 @@ void BreakerCoreRoster::AppendStatus(UObject* Outer, TArray<FBreakerCoreWedgeDef
         const auto* Residue = Node(Outer, TEXT("Core.Reaction.Residue"), TEXT("Residue"),
             TEXT("Consumed statuses retain 10% of their remaining damage per rank."),
             {Effect(Target::ReactionResiduePercent, Bucket::Flat, 10.0f)}); // O2 PLACEHOLDER
-        // MISSING CONSUMER: No consumer yet: the elemental hit transaction still excludes statuses created by that hit. No substitute stat effect.
         const auto* SecondOrder = Node(Outer, TEXT("Core.Reaction.SecondOrder"), TEXT("Second Order"),
-            TEXT("NOT IMPLEMENTED: A reaction may consume a status it created this hit. Purchasing this node currently grants no effect."), {}, {TEXT("Progression.Node.Core.Reaction.SecondOrder")});
+            TEXT("A reaction may consume a status created earlier by this same hit."), {}, {TEXT("Progression.Node.Core.Reaction.SecondOrder")});
         const auto* Feedback = Node(Outer, TEXT("Core.Reaction.Feedback"), TEXT("Feedback"),
             TEXT("+5% elemental buildup per rank."),
             {Effect(Target::ElementalBuildup, Bucket::IncreasedPercent, 5.0f)}); // O2 PLACEHOLDER
@@ -115,9 +114,8 @@ void BreakerCoreRoster::AppendStatus(UObject* Outer, TArray<FBreakerCoreWedgeDef
         const auto* Resonance = Node(Outer, TEXT("Core.Reaction.Resonance"), TEXT("Resonance"),
             TEXT("1.20x More reaction damage."),
             {Effect(Target::ReactionDamage, Bucket::MorePercent, 20.0f)}); // O2 PLACEHOLDER
-        // MISSING CONSUMER: No consumer yet: multi-pair hit preparation and per-source/enemy deferred applications are absent. No substitute stat effect.
         const auto* Sympathetic = Node(Outer, TEXT("Core.Reaction.Sympathetic"), TEXT("Sympathetic"),
-            TEXT("NOT IMPLEMENTED: Every reaction triggers on all eligible statuses instead of the first pair. FORFEIT: each affected enemy defers your elemental applications for 3s while buildup continues. Allies and physical ailments are exempt. Purchasing this node currently grants no effect."), {}, {TEXT("Progression.Node.Core.Reaction.Sympathetic")}); // O2 PLACEHOLDER
+            TEXT("Every reaction triggers on all eligible statuses instead of the first pair. FORFEIT: each affected enemy defers your elemental applications for 3s while buildup continues. Allies and physical ailments are exempt."), {}, {TEXT("Progression.Node.Core.Reaction.Sympathetic")}); // O2 PLACEHOLDER
         Wedges.Add({TEXT("Reaction"), TEXT("Status"), true, Catalysis,
             {{Ignition, Chain}, {Residue, SecondOrder}, {Feedback, Overlap}}, {Spark, Echo}, Resonance, Sympathetic});
     }

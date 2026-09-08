@@ -1,4 +1,6 @@
 #include "Combat/BreakerStatusComponent.h"
+#include "Misc/ScopeExit.h"
+#include "Classes/BreakerCasterStatusRules.h"
 
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerEnemy.h"
@@ -155,6 +157,7 @@ uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicat
     const bool bPhysicalAilment = DamageFamily == EBreakerDamageFamily::Physical
         && Rule && Rule->bDealsPeriodicDamage && Spec.BaseDamagePerTick > 0;
     SnapshotAilmentRules(Spec, DamageFamily, Instigator);
+    BreakerCasterStatusRules::SnapshotPhysicalApplication(Spec, DamageFamily, Instigator);
     for (const auto& Active : ActiveStatuses)
         if (Active.Spec.StatusTag == Spec.StatusTag
             && (Active.Spec.bHemorrhageSnapshot || Spec.bHemorrhageSnapshot)) return 0;
@@ -253,7 +256,11 @@ uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicat
         if (Active.Spec.StatusTag == Spec.StatusTag)
         {
             Active.Stacks = bEffectOnly ? 1 : FMath::Max(Active.Stacks, FMath::Min(Active.Stacks + FMath::Max(1, Spec.InitialStacks), ApplicationStackCap));
-            Active.RemainingDuration = FMath::Max(Active.RemainingDuration, ScaledDuration);
+            if (ScaledDuration > Active.RemainingDuration + Active.RemainingDurationRoundoff)
+            {
+                Active.RemainingDuration = ScaledDuration;
+                Active.RemainingDurationRoundoff = 0;
+            }
             // Refresh credit to whoever most recently reapplied it — and the
             // facing snapshot with it, because credit and angle belong to the
             // same application.
@@ -284,6 +291,7 @@ uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicat
         if (!LeaseSource || !LeaseSource->CanMaintainLongDark()) { Spec.bLongDarkSnapshot = false; LeaseSource = nullptr; }
     }
     FBreakerActiveStatus Status;
+    Status.OriginElementHitToken = ApplyingHit ? ApplyingHit->ElementHitToken : 0;
     Status.Spec = Spec;
     Status.UnpaidDamageBudget = (bErased || bUnstable || bRot) ? UnpaidDamageBudget : 0.0f;
     Status.InitialDamageBudget = Status.UnpaidDamageBudget;
@@ -423,7 +431,16 @@ void UBreakerStatusComponent::HandleAfflictedOwnerDeath()
                 if (*It == this || Active.Instigator.Get() == GetOwner()) Active.bSympathyOnExpiry = false;
     // Keep the transaction guard until its owning outer hit flushes, even
     // if another callback revives this actor before that flush.
-    PendingReactionStatus.UnpaidDamageBudget = 0;
+    SympatheticLockouts.Reset();
+    ConductorReservations.Reset();
+    for (TObjectIterator<UBreakerStatusComponent> It; It; ++It)
+        if (It->GetWorld() == GetWorld())
+        {
+            It->SympatheticLockouts.RemoveAll([this](const auto& Lock) { return Lock.Source.Get() == GetOwner(); });
+            It->ConductorReservations.RemoveAll([this](const auto& Entry) { return Entry.Source.Get() == GetOwner(); });
+        }
+    bReactionCanceled = true;
+    for (auto& Pending : PendingElementReactions) Pending.Status.UnpaidDamageBudget = 0;
     EntropyBuildup = 0;
     EntropyBuildupRemaining = 0;
     EntropyProtectedContributions.Reset();
@@ -470,9 +487,40 @@ void UBreakerStatusComponent::AdvanceStatuses(float DeltaTime)
     // window on the OWNER, not on the list.
     if (bAdvancingStatuses || !FMath::IsFinite(DeltaTime) || DeltaTime <= 0.0f) return;
     TGuardValue<bool> AdvancingStatuses(bAdvancingStatuses, true);
+    float Remaining = DeltaTime;
+    while (Remaining > 0.f)
+    {
+        float Step = Remaining;
+        // Reach the unlock before aging the funded bank past that instant.
+        // Existing status/immunity expiry can make a waiting bank eligible;
+        // those boundaries must likewise precede the rest of a large tick.
+        for (const auto& Lock : SympatheticLockouts)
+        {
+            const double Until = Lock.UnlockTime - ElementClock;
+            if (Until > 1.e-6) Step = FMath::Min(Step, static_cast<float>(Until));
+        }
+        if (!SympatheticLockouts.IsEmpty())
+        {
+            if (StatusImmunityRemaining > 1.e-6f) Step = FMath::Min(Step, StatusImmunityRemaining);
+            for (const auto& Active : ActiveStatuses)
+                if (Active.RemainingDuration > 1.e-6f) Step = FMath::Min(Step, Active.RemainingDuration);
+        }
+        Step = FMath::Clamp(Step, FMath::Min(Remaining, 1.e-6f), Remaining);
+        AdvanceStatusSlice(Step);
+        Remaining = FMath::Max(0.f, Remaining - Step);
+    }
+}
+
+void UBreakerStatusComponent::AdvanceStatusSlice(float DeltaTime)
+{
+    ElementClock += DeltaTime;
+    TArray<uint64> AdvancingSerials;
+    for (const FBreakerActiveStatus& Status : ActiveStatuses) AdvancingSerials.Add(Status.ApplicationSerial);
     const auto* Player = Cast<ABreakerCharacter>(GetOwner());
     const auto* Progression = Player ? Player->GetProgression() : nullptr;
     const float BuildupSeconds = DeltaTime * (Progression && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Insulation"))) ? 2.0f : 1.0f);
+    ElementBuildupClock += BuildupSeconds;
+    ON_SCOPE_EXIT { AdvanceSympatheticLockouts(); };
     EntropyBuildupRemaining = FMath::Max(0.0f, EntropyBuildupRemaining - BuildupSeconds);
     if (EntropyBuildupRemaining <= 0) EntropyBuildup = 0;
     for (auto& Contribution : EntropyProtectedContributions)
@@ -488,8 +536,7 @@ void UBreakerStatusComponent::AdvanceStatuses(float DeltaTime)
     if (!Combat) Combat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>();
     if (!Combat) return;
 
-    TArray<uint64> AdvancingSerials;
-    for (const FBreakerActiveStatus& Status : ActiveStatuses) AdvancingSerials.Add(Status.ApplicationSerial);
+
     for (const uint64 ApplicationSerial : AdvancingSerials)
     {
         auto FindActive = [this, ApplicationSerial]()
@@ -508,8 +555,15 @@ void UBreakerStatusComponent::AdvanceStatuses(float DeltaTime)
             AdvanceRotStatus(ApplicationSerial, DeltaTime);
             continue;
         }
-        const float ActiveSeconds = FMath::Min(DeltaTime, FMath::Max(0.0f, Initial.RemainingDuration));
-        Initial.RemainingDuration -= ActiveSeconds;
+        const double ExactRemaining = FMath::Max(0.0, static_cast<double>(Initial.RemainingDuration) + Initial.RemainingDurationRoundoff);
+        const double ExactActiveSeconds = FMath::Min(static_cast<double>(DeltaTime), ExactRemaining);
+        double NextRemaining = ExactRemaining - ExactActiveSeconds;
+        // Match the native element boundary tolerance, without accumulating
+        // another float subtraction error every frame.
+        if (NextRemaining <= 1.e-6) NextRemaining = 0;
+        Initial.RemainingDuration = static_cast<float>(NextRemaining);
+        Initial.RemainingDurationRoundoff = NextRemaining - Initial.RemainingDuration;
+        const float ActiveSeconds = static_cast<float>(ExactActiveSeconds);
         // Status damage is owed for its whole remaining lifetime; do not discard
         // overdue damage under the zone presentation's burst guard.
         const FBreakerStatusRule* Rule = BreakerStatusRules::FindRule(Initial.Spec.StatusTag);
@@ -595,7 +649,7 @@ TArray<FBreakerActiveStatus> UBreakerStatusComponent::ConsumeAllStatuses()
     return Consumed;
 }
 
-FBreakerActiveStatus UBreakerStatusComponent::ConsumeReactionStatus(FGameplayTag Tag, float Fraction, float ReactionBudget, bool& bFound)
+FBreakerActiveStatus UBreakerStatusComponent::ConsumeReactionStatus(FGameplayTag Tag, float Fraction, float ReactionBudget, bool& bFound, bool bBroadcast)
 {
     bFound = false;
     FBreakerActiveStatus Consumed;
@@ -631,7 +685,7 @@ FBreakerActiveStatus UBreakerStatusComponent::ConsumeReactionStatus(FGameplayTag
         ActiveStatuses.Add(Retained);
     }
     ReleaseLongDarkLink(Consumed);
-    OnStatusConsumed.Broadcast(Consumed);
+    if (bBroadcast) OnStatusConsumed.Broadcast(Consumed);
     return Consumed;
 }
 FBreakerActiveStatus UBreakerStatusComponent::ConsumeStatus(FGameplayTag StatusTag, bool& bOutFound)
@@ -670,7 +724,10 @@ void UBreakerStatusComponent::ScaleRemainingDurations(float Scalar)
         const int32 Index = ActiveStatuses.IndexOfByPredicate([Serial](const FBreakerActiveStatus& Status)
         { return Status.ApplicationSerial == Serial; });
         if (Index == INDEX_NONE) continue;
-        ActiveStatuses[Index].RemainingDuration *= Clamped;
+        auto& Active = ActiveStatuses[Index];
+        const double ScaledRemaining = FMath::Max(0.0, (static_cast<double>(Active.RemainingDuration) + Active.RemainingDurationRoundoff) * Clamped);
+        Active.RemainingDuration = static_cast<float>(ScaledRemaining);
+        Active.RemainingDurationRoundoff = ScaledRemaining - Active.RemainingDuration;
         if (ActiveStatuses[Index].Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot")))
             ActiveStatuses[Index].UnpaidDamageBudget = BreakerElementReactions::RemainingRotBudget(ActiveStatuses[Index]);
         // A scalar of zero means gone, and gone is gone by exactly one route:

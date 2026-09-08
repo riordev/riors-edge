@@ -312,7 +312,9 @@ void UBreakerAbility_Cleave::ApplyCleaveBleed(AActor* Target, const UBreakerAttr
     FRandomStream Stream(static_cast<int32>(HashCombine(HashCombine(GetTypeHash(Character), static_cast<uint32>(Salt)), BreakerCleaveBleedSalt)));
     // Snapshot criticals: one roll at application decides every tick of this
     // application, exactly as the weapon path does it.
-    Spec.Snapshot.bRolledCritical = Stream.FRand() < Spec.Snapshot.CriticalChance;
+    Spec.Snapshot.CriticalRollSample = Stream.FRand();
+    Spec.Snapshot.bHasCriticalRollSample = true;
+    Spec.Snapshot.bRolledCritical = Spec.Snapshot.CriticalRollSample < Spec.Snapshot.CriticalChance;
 
     Status->ApplyStatus(Spec, EBreakerDamageFamily::Physical, const_cast<ABreakerCharacter*>(Character));
 }

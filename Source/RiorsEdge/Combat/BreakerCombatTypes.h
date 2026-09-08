@@ -86,6 +86,8 @@ struct RIORSEDGE_API FBreakerDamageRequest
 {
     GENERATED_BODY()
 
+    // Target-local identity assigned by the accepted outer hit, never inherited by callbacks.
+    uint64 ElementHitToken = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float BaseDamage = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerDamageFamily DamageFamily = EBreakerDamageFamily::Physical;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FGameplayTag DamageTypeTag;

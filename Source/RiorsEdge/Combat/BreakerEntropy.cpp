@@ -58,7 +58,7 @@ float BreakerEntropy::SympatheticFadeSeconds() { return BreakerEntropyTuning().S
 
 float UBreakerStatusComponent::GetEntropyBuildup() const
 {
-    float Total = EntropyBuildup;
+    float Total = EntropyBuildup + DeferredElementBuildup(EBreakerElement::Entropy);
     for (const auto& Contribution : EntropyProtectedContributions) Total += Contribution.Decay.Amount;
     return Total;
 }
@@ -88,7 +88,7 @@ void UBreakerStatusComponent::ApplyEntropyHit(const FBreakerDamageRequest& Reque
         || !FMath::IsFinite(Result.RawDamage) || !FMath::IsFinite(Request.ProcCoefficient)
         || !FMath::IsFinite(Request.ElementalFraction) || Result.RawDamage <= 0) return;
     const auto Rot = FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"));
-    if (HasStatus(Rot)) return; // A live damage budget is never refreshed or multiplied.
+
     const auto& Tuning = BreakerEntropyTuning();
     const float Threshold = BreakerElementSource::Threshold(Request, GetEntropyThreshold());
     const float Snapshot = BreakerElementSource::RawPart(Request, Result);
@@ -97,9 +97,12 @@ void UBreakerStatusComponent::ApplyEntropyHit(const FBreakerDamageRequest& Reque
     // the purchased flat amount. Avoidance, immunity and invalid hits do not.
     const float Ordinary = Result.ShieldDamage + Result.HealthDamage > 0 ? Snapshot : 0;
     if (Snapshot <= 0) return;
-    const float Buildup = (Ordinary + Bonus) * FMath::Clamp(Request.ProcCoefficient, 0.0f, 1.0f)
+    const float ComputedBuildup = (Ordinary + Bonus) * FMath::Clamp(Request.ProcCoefficient, 0.0f, 1.0f)
         * BreakerElementSource::BuildupMultiplier(Request)
         * BreakerElementSource::ResistanceFactor(Request, GetEntropyResistancePercent());
+    if (DeferSympatheticElement(Request, Result, ComputedBuildup, Tuning.Timeout)) return;
+    if (HasStatus(Rot)) return; // Existing finite applications never refresh.
+    const float Buildup = ClaimedElementBuildup(Request, ComputedBuildup);
     if (Threshold <= 0 || !FMath::IsFinite(Buildup) || Buildup <= 0) return;
     if (FMath::IsFinite(Request.ElementBuildupFadeSeconds) && Request.ElementBuildupFadeSeconds > 0)
     {
@@ -116,7 +119,7 @@ void UBreakerStatusComponent::ApplyEntropyHit(const FBreakerDamageRequest& Reque
     }
     if (!Sink->OnDeath.IsAlreadyBound(this, &UBreakerStatusComponent::HandleAfflictedOwnerDeath))
         const_cast<UBreakerCombatComponent*>(Sink)->OnDeath.AddDynamic(this, &UBreakerStatusComponent::HandleAfflictedOwnerDeath);
-    if (GetEntropyBuildup() < Threshold) return;
+    if (GetEntropyBuildup() - DeferredElementBuildup(EBreakerElement::Entropy) < Threshold) return;
     // Commit consumption before status/resource callbacks can re-enter combat.
     EntropyBuildup = 0;
     EntropyBuildupRemaining = 0;

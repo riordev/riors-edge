@@ -124,7 +124,9 @@ void UBreakerAbility_Fracture::ActivateAbility(const FGameplayAbilitySpecHandle 
         Entry.Spec.Snapshot.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
         Entry.Spec.Snapshot.DamageOverTimeMultiplier = SourceAttributes ? SourceAttributes->GetDamageOverTimeMultiplier() : 1.0f;
         FRandomStream Stream(static_cast<int32>(HashCombine(Damage.RandomSeed, static_cast<uint32>(Index))));
-        Entry.Spec.Snapshot.bRolledCritical = Stream.FRand() < Entry.Spec.Snapshot.CriticalChance;
+        Entry.Spec.Snapshot.CriticalRollSample = Stream.FRand();
+    Entry.Spec.Snapshot.bHasCriticalRollSample = true;
+    Entry.Spec.Snapshot.bRolledCritical = Entry.Spec.Snapshot.CriticalRollSample < Entry.Spec.Snapshot.CriticalChance;
 
         UBreakerStatusComponent::SnapshotAilmentRules(Entry.Spec, Entry.DamageFamily, Character);
         FBreakerCarriedStatus Carried;

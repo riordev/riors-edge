@@ -679,9 +679,14 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     uint64 PendingReaction = 0;
     if (UBreakerStatusComponent* Status = ElementStatus; Status && bCanDispatchElements)
     {
-        auto ShareRequest = [&ResolvedRequest](const FBreakerElementShare& Share)
+        const uint64 ElementHitToken = Status->BeginElementHit();
+        const auto* ElementAuthor = ResolvedRequest.Instigator.Get();
+        const auto* ElementProgression = ElementAuthor ? ElementAuthor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+        const bool bSecondOrder = ElementProgression && ElementProgression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Reaction.SecondOrder")));
+        auto ShareRequest = [&ResolvedRequest, ElementHitToken](const FBreakerElementShare& Share)
         {
             FBreakerDamageRequest Slice = ResolvedRequest;
+            Slice.ElementHitToken = ElementHitToken;
             Slice.ElementShares.Reset();
             Slice.Element = Share.Element;
             Slice.ElementalFraction = Share.Fraction;
@@ -692,18 +697,21 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
             }
             return Slice;
         };
-        // Inspect the old status set before any share can earn a new status.
-        // First eligible ordered pair owns the whole hit's reaction decision.
-        for (const FBreakerElementShare& Share : ElementShares)
-        {
-            PendingReaction = Status->PrepareElementReaction(ShareRequest(Share), Result);
-            if (PendingReaction != 0) break;
-        }
+        TArray<FBreakerDamageRequest> ElementRequests;
+        for (const auto& Share : ElementShares) ElementRequests.Add(ShareRequest(Share));
+        // Ordinary hits choose one pair; purchased Sympathetic preclaims all
+        // eligible originals belonging to its creditor in this same hit.
+        PendingReaction = Status->PrepareElementReactionBatch(ElementRequests, Result);
         if (PendingReaction == 0)
         {
             for (const FBreakerElementShare& Share : ElementShares)
             {
                 const FBreakerDamageRequest Slice = ShareRequest(Share);
+                if (bSecondOrder)
+                {
+                    PendingReaction = Status->PrepareElementReaction(Slice, Result, ElementHitToken);
+                    if (PendingReaction != 0) break;
+                }
                 Status->ApplyEntropyHit(Slice, Result);
                 Status->ApplyVoidHit(Slice, Result);
                 const uint64 RiftActivation = Status->ApplyRiftHit(Slice, Result);
