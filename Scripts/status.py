@@ -557,7 +557,10 @@ def build_consumer_index(sources):
     It also cannot see the library itself, deliberately: the file that DECLARES
     every tag would otherwise consume all of them.
     """
-    prod = stripped_sources(sources, exclude_substrings=("Progression/BreakerProgressionLibrary",))
+    # Roster sector files author node IDs and grant tags; neither is a runtime
+    # read. Keep both pending and activated roster authoring out of this index.
+    prod = stripped_sources(sources, exclude_substrings=(
+        "Progression/BreakerProgressionLibrary", "Progression/BreakerCoreRoster"))
     text = "\n".join(prod.values())
     # A DECLARATION IS NOT A CONSUMER, wherever it lives. Excluding the node
     # library handles the Node_* tags; the keystone tags are declared in the
