@@ -288,6 +288,7 @@ private:
     FTimerHandle WindowTimer;
     FTimerHandle MachinistPulseTimer;
     bool bAssemblyActive = false;
+    bool bNaturalAssemblyEnd = false;
     bool bMachinistActive = false;
     // The Disruptor mapping entry: a Disruptor-tagged zone riding the player.
     UPROPERTY() TObjectPtr<ABreakerZoneActor> MachinistAura;

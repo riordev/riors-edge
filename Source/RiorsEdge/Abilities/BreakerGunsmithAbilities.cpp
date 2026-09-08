@@ -769,7 +769,7 @@ void UBreakerAbility_FieldAssembly::ActivateAbility(const FGameplayAbilitySpecHa
         if (UBreakerCombatComponent* Combat = Character->FindComponentByClass<UBreakerCombatComponent>())
         {
             // Turret entry: the flat weapon-damage rider.
-            Combat->PushOutgoingModifier(MachinistModifierKey(), FlatRider, 1.0f, Duration);
+            Combat->PushWindowOutgoingModifier(MachinistModifierKey(), FlatRider, 1.0f, Duration);
             // Mine Cluster entry: kills during the window detonate radially at
             // the victim ("Mine Cluster becomes an on-kill radial detonation").
             Combat->OnKillDealt.AddDynamic(this, &UBreakerAbility_FieldAssembly::HandleMachinistKill);
@@ -918,6 +918,7 @@ void UBreakerAbility_FieldAssembly::CloseAssembly()
 {
     if (CurrentActorInfo)
     {
+        TGuardValue<bool> NaturalEnd(bNaturalAssemblyEnd, true);
         EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
     }
 }
@@ -931,7 +932,8 @@ void UBreakerAbility_FieldAssembly::EndAbility(const FGameplayAbilitySpecHandle 
         {
             if (UBreakerCombatComponent* Combat = Character->FindComponentByClass<UBreakerCombatComponent>())
             {
-                Combat->RemoveOutgoingModifier(MachinistModifierKey());
+                if (bNaturalAssemblyEnd && !bWasCancelled) Combat->FinishWindowOutgoingModifier(MachinistModifierKey());
+                else Combat->RemoveOutgoingModifier(MachinistModifierKey());
                 if (bMachinistActive)
                 {
                     Combat->OnKillDealt.RemoveDynamic(this, &UBreakerAbility_FieldAssembly::HandleMachinistKill);
