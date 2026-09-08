@@ -109,6 +109,10 @@ public:
     UFUNCTION(BlueprintPure, Category="Zone") const FBreakerZoneSpec& GetSpec() const { return Spec; }
     UFUNCTION(BlueprintPure, Category="Zone") float GetRemainingDuration() const { return static_cast<float>(RemainingDuration); }
     bool IsReleased() const { return bReleased; }
+    // Explicit opt-in for a paid window's flat armour contribution. The tail
+    // keeps existing recipients only; zone membership and visuals still end.
+    void EnableWindowArmorTail();
+    bool FinishWindowArmorTail();
     UFUNCTION(BlueprintPure, Category="Zone") AActor* GetZoneInstigator() const { return ZoneInstigator.Get(); }
     UFUNCTION(BlueprintPure, Category="Zone") int32 GetTicksDelivered() const { return TicksDelivered; }
 
@@ -202,6 +206,15 @@ protected:
 
 private:
     void DeliverTick(double ScheduledAge);
+    UFUNCTION() void RevalidateWindowArmorTail();
+    UFUNCTION() void WindowArmorActorDestroyed(AActor* Actor);
+    void ClearWindowArmorTail();
+    float TailArmorStripFor(AActor* Occupant) const;
+    TMap<TWeakObjectPtr<AActor>, float> ArmorTailRecipients;
+    double ArmorWindowDeadline = -1;
+    bool bWindowArmorEligible = false;
+    bool bWindowArmorEnabled = false;
+    bool bArmorTailActive = false;
     void SnapshotDamageRules(const FBreakerZoneSpec& NewSpec);
     void DeliverDetonation();
     UFUNCTION() void CancelDetonation();

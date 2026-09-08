@@ -798,6 +798,7 @@ void UBreakerAbility_FieldAssembly::ActivateAbility(const FGameplayAbilitySpecHa
             {
                 MachinistAura->ConfigureZone(AuraSpec, Character);
                 MachinistAura->SetFollowActor(Character);
+                MachinistAura->EnableWindowArmorTail();
             }
         }
         return;
@@ -948,7 +949,8 @@ void UBreakerAbility_FieldAssembly::EndAbility(const FGameplayAbilitySpecHandle 
         bMachinistActive = false;
         if (MachinistAura && !MachinistAura->IsActorBeingDestroyed())
         {
-            MachinistAura->Destroy();
+            if (!bNaturalAssemblyEnd || bWasCancelled || !MachinistAura->FinishWindowArmorTail())
+                MachinistAura->Destroy();
         }
         MachinistAura = nullptr;
         if (UWorld* World = GetWorld())

@@ -2,6 +2,7 @@
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbilityStateComponent.h"
 #include "Abilities/BreakerAbilityTags.h"
+#include "Abilities/BreakerWindowLaneMath.h"
 #include "Abilities/BreakerCasterAbility.h"
 #include "Characters/BreakerCharacter.h"
 #include "Progression/BreakerProgressionComponent.h"
@@ -85,6 +86,7 @@ void ABreakerZoneActor::BeginPlay()
 
 void ABreakerZoneActor::EndPlay(const EEndPlayReason::Type Reason)
 {
+    ClearWindowArmorTail();
     CancelDetonation();
     if (AActor* Caster = ZoneInstigator.Get())
     {
@@ -112,6 +114,7 @@ const TArray<TWeakObjectPtr<ABreakerZoneActor>>& ABreakerZoneActor::GetLiveZones
 void ABreakerZoneActor::ConfigureZone(const FBreakerZoneSpec& InSpec, AActor* InInstigator)
 {
     if (!HasAuthority()) return;
+    ClearWindowArmorTail();
     Spec = InSpec;
     bRadiusGrowthConsumed = false;
     ResetRimEffect();
@@ -355,6 +358,13 @@ void ABreakerZoneActor::Tick(float DeltaSeconds)
 
 void ABreakerZoneActor::AdvanceZone(float DeltaSeconds)
 {
+    if (bArmorTailActive)
+    {
+        RevalidateWindowArmorTail();
+        if (bArmorTailActive && GetWorld()->GetTimeSeconds() >= ArmorWindowDeadline + FBreakerWindowLaneMath::TailSeconds)
+        { ClearWindowArmorTail(); Destroy(); }
+        return;
+    }
     if (bExpiring) return;
     if (!HasAuthority() || bReleased) return;
     if (LongDarkOwner.IsValid() && !HasLongDarkPause()) ReleaseLongDarkPause();
@@ -392,6 +402,7 @@ void ABreakerZoneActor::AdvanceZone(float DeltaSeconds)
     SyncRimLifetime();
     if (RemainingDuration <= 0.0f && !IsExpiryPaused())
     {
+        if (FinishWindowArmorTail()) return;
         bExpiring = true;
         DeliverDetonation();
         ReleaseAllOccupants();
@@ -561,12 +572,13 @@ void ABreakerZoneActor::ReconcileArmorStrip(AActor* Occupant, bool bIncludeThis)
 {
     UBreakerCombatComponent* Combat = Occupant ? Occupant->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
     if (!Combat) return;
-    float Strongest = bIncludeThis && !bReleased && !Combat->IsDead() ? ArmorStripFor(Occupant) : 0.0f;
+    float Strongest = !Combat->IsDead() && bIncludeThis ? (bReleased ? TailArmorStripFor(Occupant) : ArmorStripFor(Occupant)) : 0.0f;
     for (const TWeakObjectPtr<ABreakerZoneActor>& Held : BreakerZoneActorLocal::BreakerLiveZones)
     {
         const ABreakerZoneActor* Other = Held.Get();
-        if (!Other || Other == this || Other->bReleased || Other->GetWorld() != GetWorld()
-            || Other->Spec.ZoneTag != Spec.ZoneTag || (!Other->IsExpiryPaused() && Other->RemainingDuration <= 0.0f)
+        if (!Other || Other == this || Other->GetWorld() != GetWorld() || Other->Spec.ZoneTag != Spec.ZoneTag || Combat->IsDead()) continue;
+        Strongest = FMath::Max(Strongest, Other->TailArmorStripFor(Occupant));
+        if (Other->bReleased || (!Other->IsExpiryPaused() && Other->RemainingDuration <= 0.0f)
             || !Other->ShouldAffectActor(Occupant)) continue;
         if (UBreakerZoneMath::IsInsideZone(Other->GetActorLocation(), Other->Spec.RadiusCm, Other->Spec.HalfHeightCm, Occupant->GetActorLocation()))
             Strongest = FMath::Max(Strongest, Other->ArmorStripFor(Occupant));
@@ -734,4 +746,105 @@ void ABreakerZoneActor::RefreshPresentation()
         Glow->SetIntensity(1800.0f);
         Glow->SetAttenuationRadius(FMath::Max(Spec.RadiusCm, 100.0f) * 1.5f);
     }
+}
+
+void ABreakerZoneActor::EnableWindowArmorTail()
+{
+    if (!HasAuthority() || bReleased || bWindowArmorEnabled || IsActorBeingDestroyed() || Spec.FlatArmorReduction <= 0 || !GetWorld()) return;
+    AActor* WindowSource = ZoneInstigator.Get();
+    auto* Progression = WindowSource ? WindowSource->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    auto* Combat = WindowSource ? WindowSource->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    if (!WindowSource || !Combat || Combat->IsDead()) return;
+    bWindowArmorEnabled = true;
+    bWindowArmorEligible = Progression && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage")));
+    ArmorWindowDeadline = GetWorld()->GetTimeSeconds() + RemainingDuration;
+    if (Progression) Progression->OnProgressionChanged.AddUniqueDynamic(this, &ThisClass::RevalidateWindowArmorTail);
+    Combat->OnDeath.AddUniqueDynamic(this, &ThisClass::RevalidateWindowArmorTail);
+    WindowSource->OnDestroyed.AddUniqueDynamic(this, &ThisClass::WindowArmorActorDestroyed);
+}
+
+float ABreakerZoneActor::TailArmorStripFor(AActor* Occupant) const
+{
+    if (!bArmorTailActive || !GetWorld() || GetWorld()->GetTimeSeconds() >= ArmorWindowDeadline + FBreakerWindowLaneMath::TailSeconds) return 0;
+    const float* Flat = ArmorTailRecipients.Find(Occupant);
+    return Flat ? *Flat * .5f : 0;
+}
+
+bool ABreakerZoneActor::FinishWindowArmorTail()
+{
+    if (bArmorTailActive) return true;
+    if (!bWindowArmorEnabled || !bWindowArmorEligible || bReleased || !GetWorld()
+        || GetWorld()->GetTimeSeconds() >= ArmorWindowDeadline + FBreakerWindowLaneMath::TailSeconds) return false;
+    // Only the flat lane is retained. No afflicted/status rule is copied.
+    for (const auto& Held : Occupants)
+        if (AActor* Target = Held.Get())
+            if (auto* Combat = Target->FindComponentByClass<UBreakerCombatComponent>(); Combat && !Combat->IsDead())
+            {
+                ArmorTailRecipients.Add(Target, Spec.FlatArmorReduction);
+                Combat->OnDeath.AddUniqueDynamic(this, &ThisClass::RevalidateWindowArmorTail);
+                Target->OnDestroyed.AddUniqueDynamic(this, &ThisClass::WindowArmorActorDestroyed);
+            }
+    if (ArmorTailRecipients.IsEmpty()) return false;
+    bArmorTailActive = true; bExpiring = true; RemainingDuration = 0;
+    ResetRimEffect(); SetActorHiddenInGame(true); SetActorEnableCollision(false);
+    ReleaseAllOccupants();
+    // Exit delegates can cancel or destroy the source; never recreate it.
+    if (!bArmorTailActive || IsActorBeingDestroyed()) return true;
+    TArray<TWeakObjectPtr<AActor>> Targets; ArmorTailRecipients.GetKeys(Targets);
+    for (const auto& Target : Targets) if (Target.IsValid()) ReconcileArmorStrip(Target.Get(), true);
+    OnZoneExpired.Broadcast();
+    // This natural expiry was handled even if an expiry delegate cancelled it.
+    return true;
+}
+
+void ABreakerZoneActor::RevalidateWindowArmorTail()
+{
+    if (!bWindowArmorEnabled) return;
+    AActor* WindowSource = ZoneInstigator.Get();
+    auto* OwnerCombat = WindowSource ? WindowSource->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    auto* Progression = WindowSource ? WindowSource->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    const bool bOwnerGone = !IsValid(WindowSource) || WindowSource->IsActorBeingDestroyed() || !OwnerCombat || OwnerCombat->IsDead();
+    if (!Progression || !Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage")))) bWindowArmorEligible = false;
+    if (bOwnerGone || (bArmorTailActive && !bWindowArmorEligible))
+    { ClearWindowArmorTail(); Destroy(); return; }
+    TArray<TWeakObjectPtr<AActor>> Targets; ArmorTailRecipients.GetKeys(Targets);
+    for (const auto& Held : Targets)
+    {
+        AActor* Target = Held.Get();
+        auto* Combat = Target ? Target->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+        if (!IsValid(Target) || Target->IsActorBeingDestroyed() || !Combat || Combat->IsDead())
+        {
+            ArmorTailRecipients.Remove(Held);
+            if (Target)
+            {
+                Target->OnDestroyed.RemoveDynamic(this, &ThisClass::WindowArmorActorDestroyed);
+                if (Combat) Combat->OnDeath.RemoveDynamic(this, &ThisClass::RevalidateWindowArmorTail);
+                ReconcileArmorStrip(Target, false);
+            }
+        }
+    }
+}
+
+void ABreakerZoneActor::WindowArmorActorDestroyed(AActor* Actor) { RevalidateWindowArmorTail(); }
+
+void ABreakerZoneActor::ClearWindowArmorTail()
+{
+    bArmorTailActive = false; bWindowArmorEnabled = false; bWindowArmorEligible = false;
+    if (AActor* WindowSource = ZoneInstigator.Get())
+    {
+        WindowSource->OnDestroyed.RemoveDynamic(this, &ThisClass::WindowArmorActorDestroyed);
+        if (auto* Progression = WindowSource->FindComponentByClass<UBreakerProgressionComponent>())
+            Progression->OnProgressionChanged.RemoveDynamic(this, &ThisClass::RevalidateWindowArmorTail);
+        if (auto* Combat = WindowSource->FindComponentByClass<UBreakerCombatComponent>())
+            Combat->OnDeath.RemoveDynamic(this, &ThisClass::RevalidateWindowArmorTail);
+    }
+    const auto Targets = ArmorTailRecipients; ArmorTailRecipients.Reset();
+    for (const auto& Pair : Targets)
+        if (AActor* Target = Pair.Key.Get())
+        {
+            Target->OnDestroyed.RemoveDynamic(this, &ThisClass::WindowArmorActorDestroyed);
+            if (auto* Combat = Target->FindComponentByClass<UBreakerCombatComponent>())
+                Combat->OnDeath.RemoveDynamic(this, &ThisClass::RevalidateWindowArmorTail);
+            ReconcileArmorStrip(Target, false);
+        }
 }

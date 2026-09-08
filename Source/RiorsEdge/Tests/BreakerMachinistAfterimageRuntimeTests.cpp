@@ -102,7 +102,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerMachinistAfterimageTest, "RiorsEdge.Abi
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FBreakerMachinistAfterimageTest::RunTest(const FString&)
 {
-    for (int32 Scenario = 0; Scenario < 4; ++Scenario)
+    for (int32 Scenario = 0; Scenario < 5; ++Scenario)
     {
         FBreakerMachinistAfterimageFixture F(EBreakerClassId::Gunsmith); if (!F.Player) return false;
         auto* Player = F.Player; auto* Progression = Player->GetProgression(); auto* Weapon = Player->GetWeapon();
@@ -135,6 +135,20 @@ bool FBreakerMachinistAfterimageTest::RunTest(const FString&)
             }
             if (!TestTrue(TEXT("Ordinary salvage funds real Core respec"), Equipment->GetForgeWallet().CanAfford(Cost))) return false;
         }
+        auto SpawnRecipient = [&](FVector Location)
+        {
+            auto* Actor = F.World->SpawnActor<AActor>(); auto* Body = NewObject<USphereComponent>(Actor);
+            Actor->AddInstanceComponent(Body); Actor->SetRootComponent(Body); Body->SetSphereRadius(40);
+            Body->SetCollisionEnabled(ECollisionEnabled::QueryOnly); Body->SetCollisionResponseToAllChannels(ECR_Ignore);
+            Body->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Block); Body->RegisterComponent(); Actor->SetActorLocation(Location);
+            auto* Combat = NewObject<UBreakerCombatComponent>(Actor); Actor->AddInstanceComponent(Combat); Combat->RegisterComponent();
+            auto* Health = NewObject<UBreakerAttributeSet>(Actor); Health->ApplyMaxHealth(1000); Health->ApplyHealth(1000); Combat->BindAttributes(Health);
+            return Actor;
+        };
+        auto* Recipient = SpawnRecipient(FVector(0,300,0)); auto* RecipientCombat = Recipient->FindComponentByClass<UBreakerCombatComponent>();
+        auto* SecondRecipient = SpawnRecipient(FVector(0,-300,0)); auto* SecondCombat = SecondRecipient->FindComponentByClass<UBreakerCombatComponent>();
+        auto* EndRecipient = SpawnRecipient(FVector(0,400,0)); auto* EndCombat = EndRecipient->FindComponentByClass<UBreakerCombatComponent>();
+        auto* LateRecipient = SpawnRecipient(FVector(0,2000,0)); auto* LateCombat = LateRecipient->FindComponentByClass<UBreakerCombatComponent>();
         // Actual shots and completed reloads earn the ultimate. Chambered's
         // first free shot is respected: hold long enough to spend real rounds.
         for (int32 Reload = 0; Reload < 30 && Scrap->GetScrap() < 100; ++Reload)
@@ -156,19 +170,39 @@ bool FBreakerMachinistAfterimageTest::RunTest(const FString&)
         auto* State = UBreakerAbilityStateComponent::FindOrAdd(Player);
         const float Duration = State->GetWindowRemaining(UBreakerAbility_FieldAssembly::WindowKey());
         TestTrue(TEXT("Machinist ordinary window exists"), Duration > 0);
+        for (TActorIterator<ABreakerZoneActor> It(F.World); It; ++It) if (!It->HasActorBegunPlay()) It->DispatchBeginPlay();
+        F.Tick(.01f); TestEqual(TEXT("Actual paid aura strips full flat armour"), RecipientCombat->GetComposedArmorReduction(), 60.0f, .001f);
         TestEqual(TEXT("Actual full rider on rifle"), F.Shot(), Baseline + Flat, .01f);
         if (Scenario == 1)
         {
             ASC->CancelAbilityHandle(Handle); F.Tick(.5f);
             TestEqual(TEXT("Explicit cancellation removes rider immediately"), F.Shot(), Baseline, .01f);
+            TestEqual(TEXT("Explicit cancel removes aura without tail"), RecipientCombat->GetComposedArmorReduction(), 0.0f, .001f);
             continue;
         }
         F.Tick(Duration + .03f);
         TestFalse(TEXT("Normal Assembly permission ends before tail"), State->IsWindowActive(UBreakerAbility_FieldAssembly::WindowKey()));
         TestFalse(TEXT("Ordinary ultimate GAS ends before tail"), ASC->FindAbilitySpecFromHandle(Handle)->IsActive());
         int32 LiveAuras = 0; for (TActorIterator<ABreakerZoneActor> It(F.World); It; ++It)
-            if (It->GetOwner() == Player && !It->IsActorBeingDestroyed()) ++LiveAuras;
-        TestEqual(TEXT("Aura retains ordinary expiry"), LiveAuras, 0);
+            if (It->GetOwner() == Player && !It->IsActorBeingDestroyed())
+            {
+                if (!It->IsReleased()) ++LiveAuras;
+                else
+                {
+                    TestTrue(TEXT("Retained numerical lease has no visual"), It->IsHidden());
+                    TestEqual(TEXT("Retained numerical lease has no zone membership"), It->GetOccupantCount(), 0);
+                }
+            }
+        TestEqual(TEXT("Aura permission retains ordinary expiry"), LiveAuras, 0);
+        TestEqual(TEXT("Existing recipient retains half armour lane"), RecipientCombat->GetComposedArmorReduction(), 30.0f, .001f);
+        LateRecipient->SetActorLocation(FVector(0,200,0)); F.Tick(.01f);
+        TestEqual(TEXT("Tail cannot acquire newly entering target"), LateCombat->GetComposedArmorReduction(), 0.0f, .001f);
+        FBreakerZoneSpec OtherSpec; OtherSpec.ZoneTag = FGameplayTag::RequestGameplayTag(TEXT("Zone.Gunsmith.Disruptor"));
+        OtherSpec.RadiusCm = 600; OtherSpec.Duration = 1; OtherSpec.FlatArmorReduction = 60;
+        auto* OtherAura = F.World->SpawnActor<ABreakerZoneActor>(); OtherAura->ConfigureZone(OtherSpec, Player); if (!OtherAura->HasActorBegunPlay()) OtherAura->DispatchBeginPlay(); F.Tick(.01f);
+        TestEqual(TEXT("Genuine overlapping Disruptor wins without adding tail"), RecipientCombat->GetComposedArmorReduction(), 60.0f, .001f);
+        OtherAura->Destroy();
+        TestEqual(TEXT("Removing genuine overlap restores half contribution"), RecipientCombat->GetComposedArmorReduction(), 30.0f, .001f);
         TestEqual(TEXT("Actual half flat rider during tail"), F.Shot(), Baseline + Flat * .5f, .01f);
         if (Scenario == 2)
         {
@@ -186,7 +220,22 @@ bool FBreakerMachinistAfterimageTest::RunTest(const FString&)
             Player->GetCombat()->RestoreVitals(); F.Tick(.5f);
             TestEqual(TEXT("Revival cannot retain dead owner's tail"), F.Shot(), Baseline, .01f);
         }
+        if (Scenario == 4)
+        {
+            Player->Destroy();
+            TestEqual(TEXT("Owner destruction immediately revokes armour tail"), EndCombat->GetComposedArmorReduction(), 0.0f, .001f);
+            continue;
+        }
+        if (Scenario == 0)
+        {
+            FBreakerDamageRequest Kill; Kill.BaseDamage = 100000; Kill.DamageFamily = EBreakerDamageFamily::TrueDamage; Kill.bCanCritical = false; Kill.SetInstigator(Player);
+            RecipientCombat->ReceiveDamage(Kill); RecipientCombat->RestoreVitals();
+            TestEqual(TEXT("Recipient revival cannot regain old armour tail"), RecipientCombat->GetComposedArmorReduction(), 0.0f, .001f);
+            SecondRecipient->Destroy(); F.Tick(.01f);
+        }
+        if (Scenario == 3) TestEqual(TEXT("Owner death revokes armour tail"), RecipientCombat->GetComposedArmorReduction(), 0.0f, .001f);
         F.Tick(2.05f); TestEqual(TEXT("Tail expires normally"), F.Shot(), Baseline, .01f);
+        TestEqual(TEXT("Armour tail expires normally"), EndCombat->GetComposedArmorReduction(), 0.0f, .001f);
     }
     return true;
 }
