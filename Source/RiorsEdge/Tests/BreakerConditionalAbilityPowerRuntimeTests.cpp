@@ -4,6 +4,9 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "Attributes/BreakerAttributeAggregation.h"
 #include "Characters/BreakerCharacter.h"
+#include "Classes/BreakerManaComponent.h"
+#include "Components/BoxComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerDamageLibrary.h"
 #include "Combat/BreakerStatusComponent.h"
@@ -14,6 +17,7 @@
 #include "Items/BreakerLootLibrary.h"
 #include "Movement/BreakerCharacterMovementComponent.h"
 #include "Progression/BreakerBuildConditions.h"
+#include "Progression/BreakerProgressionComponent.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerConditionalAbilityPowerRuntimeTest,
@@ -23,10 +27,13 @@ bool FBreakerConditionalAbilityPowerRuntimeTest::RunTest(const FString& Paramete
 {
     FBreakerItemInstance AirItem;
     float AirValue = 0;
-    for (const TCHAR* Kind : {TEXT("Airborne"), TEXT("Sliding"), TEXT("Redline"), TEXT("Dash"), TEXT("Grounded")})
+    TArray<FBreakerItemInstance> AdditionalItems;
+    TArray<float> AdditionalValues;
+    for (const TCHAR* Kind : {TEXT("Airborne"), TEXT("Sliding"), TEXT("Redline"), TEXT("Dash"), TEXT("Grounded"), TEXT("Reserve"), TEXT("Depleted"), TEXT("Ledge")})
     {
+        const bool bAdditional = FString(Kind) == TEXT("Reserve") || FString(Kind) == TEXT("Depleted") || FString(Kind) == TEXT("Ledge");
         const FName Id(*FString::Printf(TEXT("Ability.%sAddedPower"), Kind));
-        const FName TwinId(*FString::Printf(TEXT("Offense.%sAddedDamage"), Kind));
+        const FName TwinId(*(bAdditional ? FString::Printf(TEXT("Ability.%sDamage"), Kind) : FString::Printf(TEXT("Offense.%sAddedDamage"), Kind)));
         const auto& Pool = UBreakerAffixLibrary::GetSliceAffixPool();
         const auto* Definition = UBreakerAffixLibrary::FindAffix(Pool, Id);
         const auto* Twin = UBreakerAffixLibrary::FindAffix(Pool, TwinId);
@@ -39,7 +46,7 @@ bool FBreakerConditionalAbilityPowerRuntimeTest::RunTest(const FString& Paramete
         TestEqual(TEXT("authored low tier"), Definition->ValueAtT12, 1.5f);
         TestEqual(TEXT("authored normal top tier"), Definition->ValueAtT1, 16.0f);
         TestEqual(TEXT("matching conditional roll weight"), Definition->RollWeight, 45.0f);
-        for (int32 Tier : {12, 6, 1, 0, -1})
+        if (!bAdditional) for (int32 Tier : {12, 6, 1, 0, -1})
             TestEqual(TEXT("same shared tier curve including spikes"),
                 UBreakerAffixLibrary::ValueForTier(*Definition, Tier), UBreakerAffixLibrary::ValueForTier(*Twin, Tier));
         FBreakerItemInstance Item;
@@ -64,6 +71,7 @@ bool FBreakerConditionalAbilityPowerRuntimeTest::RunTest(const FString& Paramete
         TestEqual(TEXT("inactive condition refuses the row"), Refused.GetFlat(EBreakerAggregatedAttribute::AbilityDamageMultiplier), 0.0f);
         TestEqual(TEXT("ability flat cannot spill into weapon damage"), Paid.GetFlat(EBreakerAggregatedAttribute::DamageMultiplier), 0.0f);
         if (FString(Kind) == TEXT("Airborne")) { AirItem = Item; AirValue = Value; }
+        if (bAdditional) { AdditionalItems.Add(Item); AdditionalValues.Add(Value); }
     }
 
     UWorld::InitializationValues Init;
@@ -72,7 +80,8 @@ bool FBreakerConditionalAbilityPowerRuntimeTest::RunTest(const FString& Paramete
     if (!TestNotNull(TEXT("isolated equip and damage world"), World)) return false;
     GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
     World->InitializeActorsForPlay(FURL());
-    ON_SCOPE_EXIT { World->DestroyWorld(false); GEngine->DestroyWorldContext(World); };
+    const uint64 SavedFrame = GFrameCounter;
+    ON_SCOPE_EXIT { World->DestroyWorld(false); GEngine->DestroyWorldContext(World); GFrameCounter = SavedFrame; };
     auto* Player = World->SpawnActor<ABreakerCharacter>();
     auto* Victim = World->SpawnActor<AActor>();
     if (!Player || !Victim) return false;
@@ -114,6 +123,73 @@ bool FBreakerConditionalAbilityPowerRuntimeTest::RunTest(const FString& Paramete
     TestEqual(TEXT("landing immediately removes live ability power"), Hit(EBreakerDamageDelivery::Ability), GroundAbility, .0001f);
     const float BeforeTick = Health->GetHealth(); Status->AdvanceStatuses(.5f);
     TestEqual(TEXT("actual ability DoT keeps its airborne application snapshot"), BeforeTick - Health->GetHealth(), Expected, .0001f);
+
+    // Reuse this equipped native pawn for resource and completed-traversal conditions.
+    if (!TestTrue(TEXT("remove previous observation item"), Equipment->UnequipSlot(AirItem.Slot))) return false;
+    Player->SetActorTickEnabled(false);
+    Player->GetProgression()->BindAttributes(Player->GetAttributes());
+    if (!TestTrue(TEXT("actual Caster activates the resting-full Mana loop"), Player->GetProgression()->ChoosePermanentClassById(EBreakerClassId::Caster))) return false;
+    auto* Mana = Player->GetMana();
+    Mana->BindAttributes(Player->GetAttributes()); Mana->SetComponentTickEnabled(false);
+    for (int32 Index = 0; Index < 3; ++Index)
+    {
+        Mana->AdvanceLoop(30);
+        Movement->SetMovementMode(MOVE_Walking);
+        const auto& Item = AdditionalItems[Index];
+        if (!TestTrue(TEXT("equip newly rolled conditional ability item"), Equipment->EquipItem(Item))) return false;
+        auto Refresh = [&]() { Equipment->TickComponent(0.0f, LEVELTICK_All, nullptr); };
+        Refresh();
+        const float InactiveAbility = Hit(EBreakerDamageDelivery::Ability);
+        const float InactiveWeapon = Hit(EBreakerDamageDelivery::Weapon);
+        const EBreakerBuildCondition Condition = Index == 0 ? EBreakerBuildCondition::ResourceLow :
+            Index == 1 ? EBreakerBuildCondition::ResourceDepleted : EBreakerBuildCondition::RecentlyLedgeTraversed;
+        TestFalse(TEXT("real evaluator starts inactive"), Equipment->GetActiveConditions().IsActive(Condition));
+        if (Index < 2)
+        {
+            const float Cost = Player->GetAttributes()->GetClassResource() - (Index == 0 ? 10.0f : 0.0f);
+            if (!TestTrue(TEXT("normal Mana spending activates resource condition"), Mana->TrySpendMana(Cost))) return false;
+        }
+        else
+        {
+            auto Box = [&](FVector Location, FVector Extent)
+            {
+                auto* Actor = World->SpawnActor<AActor>();
+                auto* Shape = NewObject<UBoxComponent>(Actor);
+                Actor->AddInstanceComponent(Shape); Actor->SetRootComponent(Shape);
+                Shape->SetBoxExtent(Extent); Shape->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+                Shape->SetCollisionResponseToAllChannels(ECR_Block); Shape->RegisterComponent(); Actor->SetActorLocation(Location);
+                return Shape;
+            };
+            Box(FVector(0, 0, -10), FVector(3000, 3000, 10));
+            auto* Obstacle = Box(FVector(180, 0, 40), FVector(120, 200, 40));
+            Movement->bRunPhysicsWithNoController = true;
+            Movement->SetMovementMode(MOVE_Walking);
+            Movement->StopMovementImmediately();
+            const float HalfHeight = Player->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+            if (!TestTrue(TEXT("real relocation to traversal start"), Player->TeleportTo(FVector(0, 0, HalfHeight), FRotator::ZeroRotator, false, true))) return false;
+            Movement->PerformMovement(.001f);
+            const float Top = Player->GetActorLocation().Z - HalfHeight + 80.0f;
+            Obstacle->SetBoxExtent(FVector(120, 200, Top / 2));
+            Obstacle->GetOwner()->SetActorLocation(FVector(180, 0, Top / 2));
+            const double Before = Movement->GetLastLedgeTraversalTime();
+            if (!TestTrue(TEXT("real obstacle starts a swept vault"), Movement->TryBeginLedgeTraversal())) return false;
+            for (int32 Step = 0; Step < 60 && Movement->GetLastLedgeTraversalTime() <= Before; ++Step)
+            {
+                ++GFrameCounter; World->Tick(LEVELTICK_All, .01f); Movement->PerformMovement(.01f);
+            }
+            if (!TestTrue(TEXT("vault actually completes"), Movement->GetLastLedgeTraversalTime() > Before)) return false;
+        }
+        Refresh();
+        TestTrue(TEXT("live equipped evaluator observes the condition"), Equipment->GetActiveConditions().IsActive(Condition));
+        TestEqual(TEXT("new conditional flat raises real ability damage"), Hit(EBreakerDamageDelivery::Ability), InactiveAbility * (1 + AdditionalValues[Index] / 100), .0001f);
+        TestEqual(TEXT("new ability row leaves weapon lane unchanged"), Hit(EBreakerDamageDelivery::Weapon), InactiveWeapon, .0001f);
+        if (Index < 2) Mana->AdvanceLoop(30);
+        else for (int32 Step = 0; Step < 64; ++Step) { ++GFrameCounter; World->Tick(LEVELTICK_All, .05f); }
+        Refresh();
+        TestFalse(TEXT("recovery or elapsed traversal window removes condition"), Equipment->GetActiveConditions().IsActive(Condition));
+        TestEqual(TEXT("live ability power returns to baseline"), Hit(EBreakerDamageDelivery::Ability), InactiveAbility, .0001f);
+        if (!TestTrue(TEXT("remove conditional item between cases"), Equipment->UnequipSlot(Item.Slot))) return false;
+    }
     return true;
 }
 #endif

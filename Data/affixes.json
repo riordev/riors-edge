@@ -1083,6 +1083,68 @@
 			"pairedAffixId": ""
 		},
 		{
+			"id": "Ability.ReserveAddedPower",
+			"pool": "slice",
+			"displayName": "Ability Power Low Reserve",
+			"category": "Prefix",
+			"target": "AbilityDamage",
+			"bucket": "Flat",
+			"slots": [
+				"Helmet",
+				"Gloves",
+				"Necklace",
+				"Waist",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 1.5,
+			"valueAtT1": 16,
+			"rollWeight": 45,
+			"condition": "ResourceLow",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Ability.DepletedAddedPower",
+			"pool": "slice",
+			"displayName": "Ability Power in Debt",
+			"category": "Prefix",
+			"target": "AbilityDamage",
+			"bucket": "Flat",
+			"slots": [
+				"Gloves",
+				"Waist",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 1.5,
+			"valueAtT1": 16,
+			"rollWeight": 45,
+			"condition": "ResourceDepleted",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Ability.LedgeAddedPower",
+			"pool": "slice",
+			"displayName": "Ability Power after Ledge",
+			"category": "Prefix",
+			"target": "AbilityDamage",
+			"bucket": "Flat",
+			"slots": [
+				"Boots",
+				"Gloves",
+				"Waist",
+				"Secondary"
+			],
+			"valueAtT12": 1.5,
+			"valueAtT1": 16,
+			"rollWeight": 45,
+			"condition": "RecentlyLedgeTraversed",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
 			"id": "Ability.AirborneAddedPower",
 			"pool": "slice",
 			"displayName": "Ability Power in Air",
