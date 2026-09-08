@@ -308,6 +308,9 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Defense", meta=(ClampMin="0")) float DodgeResourceRefund = 5.0f;   // O2 PLACEHOLDER
 
 private:
+    // Same-target callback hits still deal damage, but cannot seed another
+    // elemental transaction before the outer impact has finished its callbacks.
+    bool bDispatchingElementHit = false;
     UPROPERTY(Replicated) bool bStaggerActive = false;
     double StaggerEndTime = 0;
     double StaggerImmunityEndTime = 0;

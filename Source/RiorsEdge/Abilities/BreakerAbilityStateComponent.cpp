@@ -3,6 +3,7 @@
 #include "GameFramework/Actor.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerEntropy.h"
+#include "Combat/BreakerElementSharesMath.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
 
@@ -152,8 +153,11 @@ void UBreakerAbilityStateComponent::SnapshotSympatheticEntropy(FBreakerDamageReq
 {
     Request.ElementBuildupFlat = 0;
     Request.ElementBuildupFadeSeconds = 0;
-    if (Request.Element != EBreakerElement::Entropy || Request.bIsDamageOverTime || !Request.bCanApplyElementBuildup
-        || !FMath::IsFinite(Request.ElementalFraction) || Request.ElementalFraction <= 0 || !HasActiveSympatheticAttunement()) return;
+    const auto Shares = BreakerElementShares::Resolve(Request);
+    const bool bHasEntropy = Shares.ContainsByPredicate([](const FBreakerElementShare& Share)
+    { return Share.Element == EBreakerElement::Entropy; });
+    if (!bHasEntropy || Request.bIsDamageOverTime || !Request.bCanApplyElementBuildup
+        || !HasActiveSympatheticAttunement()) return;
     // Overlapping qualifying buffs authorize one payload, never one per holder.
     Request.ElementBuildupFlat = BreakerEntropy::SympatheticFlatBuildup();
     Request.ElementBuildupFadeSeconds = BreakerEntropy::SympatheticFadeSeconds();

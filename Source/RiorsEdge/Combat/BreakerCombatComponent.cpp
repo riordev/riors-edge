@@ -1,4 +1,5 @@
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerElementSharesMath.h"
 
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
@@ -220,6 +221,14 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
 {
     FBreakerDamageResult Result;
     if (!Attributes || !GetOwner() || !GetOwner()->HasAuthority() || IsDead()) return Result;
+    const TArray<FBreakerElementShare> ElementShares = BreakerElementShares::Resolve(Request);
+    const bool bCanDispatchElements = !bDispatchingElementHit;
+    // Hold before attribute writes and through all callbacks/flushes. A DoT
+    // payment is not a new elemental hit and must not suppress legitimate
+    // reactions issued by its tick observers.
+    const bool bElementHit = !ElementShares.IsEmpty() && Request.bCanApplyElementBuildup
+        && !Request.bIsDamageOverTime && FMath::IsFinite(Request.ProcCoefficient) && Request.ProcCoefficient > 0;
+    TGuardValue<bool> ElementDispatchGuard(bDispatchingElementHit, bDispatchingElementHit || bElementHit);
     const FVector TowardSource = (Request.SourceLocation - GetOwner()->GetActorLocation()).GetSafeNormal2D();
     if (IsParryActive() && Request.BaseDamage > 0.0f && !Request.bIsDamageOverTime
         && Request.Instigator.Get() != GetOwner()
@@ -304,7 +313,7 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
         if (const UBreakerEquipmentComponent* Equipment = GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>())
         {
             ReductionPercent += Request.DamageFamily == EBreakerDamageFamily::Physical
-                ? Equipment->GetStats().PhysicalDamageReductionPercent * (Request.Element != EBreakerElement::None && FMath::IsFinite(Request.ElementalFraction) ? 1.0f - FMath::Clamp(Request.ElementalFraction, 0.0f, 1.0f) : 1.0f)
+                ? Equipment->GetStats().PhysicalDamageReductionPercent * (1.0f - BreakerElementShares::TotalFraction(ElementShares))
                 : 0.0f;
         }
         // The tree's lane joins gear's family bucket here — points summed,
@@ -403,14 +412,38 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     UBreakerStatusComponent* ElementStatus = GetOwner()->FindComponentByClass<UBreakerStatusComponent>();
     uint64 PendingRiftActivation = 0;
     uint64 PendingReaction = 0;
-    if (UBreakerStatusComponent* Status = ElementStatus)
+    if (UBreakerStatusComponent* Status = ElementStatus; Status && bCanDispatchElements)
     {
-        PendingReaction = Status->PrepareElementReaction(ResolvedRequest, Result);
+        auto ShareRequest = [&ResolvedRequest](const FBreakerElementShare& Share)
+        {
+            FBreakerDamageRequest Slice = ResolvedRequest;
+            Slice.ElementShares.Reset();
+            Slice.Element = Share.Element;
+            Slice.ElementalFraction = Share.Fraction;
+            if (!ResolvedRequest.ElementShares.IsEmpty() && Share.Element != EBreakerElement::Entropy)
+            {
+                Slice.ElementBuildupFlat = 0;
+                Slice.ElementBuildupFadeSeconds = 0;
+            }
+            return Slice;
+        };
+        // Inspect the old status set before any share can earn a new status.
+        // First eligible ordered pair owns the whole hit's reaction decision.
+        for (const FBreakerElementShare& Share : ElementShares)
+        {
+            PendingReaction = Status->PrepareElementReaction(ShareRequest(Share), Result);
+            if (PendingReaction != 0) break;
+        }
         if (PendingReaction == 0)
         {
-            Status->ApplyEntropyHit(ResolvedRequest, Result);
-            Status->ApplyVoidHit(ResolvedRequest, Result);
-            PendingRiftActivation = Status->ApplyRiftHit(ResolvedRequest, Result);
+            for (const FBreakerElementShare& Share : ElementShares)
+            {
+                const FBreakerDamageRequest Slice = ShareRequest(Share);
+                Status->ApplyEntropyHit(Slice, Result);
+                Status->ApplyVoidHit(Slice, Result);
+                const uint64 RiftActivation = Status->ApplyRiftHit(Slice, Result);
+                if (RiftActivation != 0) PendingRiftActivation = RiftActivation;
+            }
         }
     }
     if (bFrontBrokeThisHit) OnFrontShieldBroken.Broadcast();

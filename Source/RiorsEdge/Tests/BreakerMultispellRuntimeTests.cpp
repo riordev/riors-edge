@@ -215,6 +215,29 @@ bool FBreakerMultispellPurchasedRuntimeTest::RunTest(const FString& Parameters)
     const FGameplayTag Predicted = Cycle->PeekNext(1);
     Cycle->AdvanceCycle();
     TestEqual(TEXT("Preview predicts the next real cursor position"), Cycle->PeekNext(), Predicted);
+    // Authored two-element cycle fixture: exercise the actual purchased cast
+    // without changing the shipping cycle or granting threshold statuses.
+    Cycle->AvailableStatuses.Reset();
+    for (const auto Element : { EBreakerElement::Entropy, EBreakerElement::Void })
+    {
+        FBreakerCycleEntry Entry;
+        Entry.Element = Element;
+        Entry.Spec.StatusTag = FGameplayTag::RequestGameplayTag(Element == EBreakerElement::Entropy
+            ? TEXT("Status.Rot") : TEXT("Status.Erased"));
+        Cycle->AddStatusType(Entry);
+    }
+    Status->ConsumeAllStatuses();
+    const float EntropyBeforeSplit = Status->GetEntropyBuildup();
+    const float VoidBeforeSplit = Status->GetVoidBuildup();
+    auto* Split = CastFracture(Caster, Fracture);
+    if (!TestNotNull(TEXT("actual two-element Fracture projectile"), Split)) return false;
+    const auto& Shares = Split->GetProjectileDamage().ElementShares;
+    if (!TestEqual(TEXT("both selected elements survive the cast"), Shares.Num(), 2)) return false;
+    TestEqual(TEXT("first selected element owns half the hit"), Shares[0].Fraction, .5f);
+    TestEqual(TEXT("second selected element owns half the hit"), Shares[1].Fraction, .5f);
+    HitProjectile(Split, Target);
+    TestTrue(TEXT("actual split projectile earns Entropy"), Status->GetEntropyBuildup() > EntropyBeforeSplit);
+    TestTrue(TEXT("actual split projectile earns Void"), Status->GetVoidBuildup() > VoidBeforeSplit);
     FText RespecFailure;
     TestTrue(TEXT("Actual Forge respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, true, RespecFailure));
     TestFalse(TEXT("Respec immediately removes preview without a cast"), Cycle->CanPreviewAhead());

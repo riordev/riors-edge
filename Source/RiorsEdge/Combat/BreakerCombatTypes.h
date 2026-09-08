@@ -8,6 +8,17 @@
 UENUM(BlueprintType)
 enum class EBreakerElement : uint8 { None, Entropy, Void, Rift };
 
+// Ordered portions of one hit, never additional hits or critical rolls.
+USTRUCT(BlueprintType)
+struct RIORSEDGE_API FBreakerElementShare
+{
+    GENERATED_BODY()
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerElement Element = EBreakerElement::None;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float Fraction = 0.0f;
+    FBreakerElementShare() = default;
+    FBreakerElementShare(EBreakerElement InElement, float InFraction) : Element(InElement), Fraction(InFraction) {}
+};
+
 UENUM(BlueprintType)
 enum class EBreakerDamageFamily : uint8
 {
@@ -117,6 +128,8 @@ struct RIORSEDGE_API FBreakerDamageRequest
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerElement Element = EBreakerElement::None;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float ElementalFraction = 0.0f;
+    // Empty retains the legacy single-element request. Nonempty owns conversion.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FBreakerElementShare> ElementShares;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bCanApplyElementBuildup = true;
     // Paid at fire/cast time by an actually maintained Sympathetic buff.
     // These values change buildup only, never the hit or Rot damage snapshot.

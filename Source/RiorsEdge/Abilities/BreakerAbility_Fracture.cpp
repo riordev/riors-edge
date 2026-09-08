@@ -6,6 +6,7 @@
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerDamageLibrary.h"
+#include "Combat/BreakerElementSharesMath.h"
 #include "Combat/BreakerProjectileBase.h"
 #include "Combat/BreakerStatusCycleComponent.h"
 #include "Engine/World.h"
@@ -101,8 +102,10 @@ void UBreakerAbility_Fracture::ActivateAbility(const FGameplayAbilitySpecHandle 
         {
             // One actual impact carries conversion, even when several cycle
             // positions are selected. Never grant a threshold status directly.
-            Damage.Element = Entry.Element;
-            Damage.ElementalFraction = 1.0f;
+            FBreakerElementShare Share;
+            Share.Element = Entry.Element;
+            Share.Fraction = 1.0f;
+            Damage.ElementShares.Add(Share);
             if (Index == 0)
                 Projectile->SetOrbColor(BreakerFX::ColorForStatusTag(Entry.Spec.StatusTag, Projectile->OrbColor));
             continue;
@@ -143,6 +146,13 @@ void UBreakerAbility_Fracture::ActivateAbility(const FGameplayAbilitySpecHandle 
         }
     }
 
+    // Selected elemental positions share one conversion budget and one hit.
+    Damage.ElementShares = BreakerElementShares::Resolve(Damage);
+    if (!Damage.ElementShares.IsEmpty())
+    {
+        Damage.Element = Damage.ElementShares[0].Element;
+        Damage.ElementalFraction = BreakerElementShares::TotalFraction(Damage.ElementShares);
+    }
     if (const auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>()) State->SnapshotSympatheticEntropy(Damage);
     Projectile->InitializeProjectile(Damage, Direction, ProjectileSpeed);
     EndAbility(Handle, ActorInfo, ActivationInfo, true, false);

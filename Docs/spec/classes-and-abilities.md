@@ -103,6 +103,12 @@ Resonance deals an untyped Elemental detonation based on status count. It does
 not apply elemental buildup or reactions. Its preservation node halves status
 durations instead of consuming them; this also reduces unpaid Rot damage.
 
+Fracture's selected elemental positions share one conversion budget and one
+direct hit. Duplicate elements merge; physical carried statuses are unchanged.
+The first eligible reaction in selection order consumes an existing status
+and prevents all new buildup from that impact. A status earned by that impact
+cannot react with another of its selections. Sympathetic pays Entropy once.
+
 Hold caps each damage application after mitigation and before shield/health
 spending. Its editable starting cap is 25% of current maximum health; solo
 Wall uses 12.5% (O2 tuning). Small hits below the cap are unchanged. Active

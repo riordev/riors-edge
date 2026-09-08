@@ -8,7 +8,8 @@ Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 ## Cycle — Progression and combat (step 3)
 - [x] Repair Cascade silent echoes and cancel queued echoes when its originating ultimate ends; include targets spawned during the window.
 - [x] Implement Long Dark's zone-expiry pause during its originating Unmake window; actual purchased/paid casts retain damage and membership and release on expiry, cancel, death and respec without later rearming.
-- [ ] Finish explicit Caster elemental cycle delivery without duplicating a hit or bypassing proc safeguards; resolve Resonance delivery.
+- [x] Split Caster elemental selections across one hit and one budget; preflight one reaction, preserve proc safeguards and single Sympathetic bonus. Resonance delivery is repaired.
+- [ ] Connect actual Siphon unlock to the Void cycle entry, preserving the starter three and saved unlocks.
 - [x] Replace Hold's percentage substitute with an expiring per-hit cap: base 25% maximum health, solo Wall 12.5%, editable O2 tuning; paid base/purchased Wall prove large/small hits and cancellation/expiry. Vein remains uncapped.
 - [x] Add ordinary conditional ability-power affixes for low resource, depleted resource and completed ledge traversal; actual rolls/equips and live condition changes increase ability damage without weapon spill.
 - [x] Replace Interposition's solo shield trickle with temporary headroom behind the owned Anchor; paid cast checks rear/front/range, repeated entry and destruction without free shield.
@@ -49,7 +50,7 @@ The owner will playtest after the remaining Entropy pass is finished. Continue i
 
 ## Repair dependencies found in runtime review
 - Resonance is an untyped Elemental status-count detonation; its purchased preservation keeps earned Rot at half remaining duration/budget without triggering Wither. Tank incoming resource uses the actual hit proc coefficient, including proc-zero reactions.
-- Step3: two-position Fracture currently overwrites adjacent element selections; Cascade draws the next physical status and skips elemental buildup entries. Finish explicit split-budget delivery without duplicating direct damage or bypassing zero-proc safeguards before adding elemental cycle positions.
+- Step3: split-budget Fracture preserves adjacent elements and one direct hit; Cascade skips elemental entries. Siphon unlock still needs to append its Void entry through real progression.
 - Support Attunement and Sympathetic deliver Entropy through actual maintained buffs; Void/Rift choices wait for their element pipelines. Tank Kinetic Recovery consumes actual owned blast landings and protects against real fall harm and stagger.
 - Doctrine progression now has all four authored benchmarks across three acts and pays 8/8 through the physical finale at level50. The real mission probe verifies actions/reloads but uses an explicit XP fixture at the final gate; normal campaign leveling pace remains unvalidated.
 - New special loot now respects its final affix budget. Existing saved items remain unchanged; a migration still needs to be designed.
@@ -135,6 +136,7 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - Four Niagara systems at `/Game/Breaker/FX/NS_<Moment>` with a `Color` user parameter, or a free Fab VFX pack placed there
 
 ## Done (last three cycles; older is git)
+- Element shares: ordered normalized selections reuse one direct damage/crit result; first preexisting reaction suppresses all new buildup. Duplicate Entropy pays one flat bonus; application/consume callback recursion cannot react to sibling-created statuses. Actual purchased Fracture with an authored two-element fixture delivers both. Build/focused checks pass; full suite699started/696passed/3known/0unexpected. Shipping cycle remains three pending real Siphon unlock wiring; STATE unchanged.
 - Detonation: real Ultimate slot second press releases the active ledger without another payment or activation notification. Cleanup precedes callbacks; death and keystone removal cancel immediately. Paid legal eight-point test covers actual damage, exact mitigated payout, no recost/replay, cancellation and death. Build and focus pass; full suite698started/695passed/3known/0unexpected through quarantine auditor. STATE unchanged.
 - Interposition: solo rear field adds 10% maximum-health shield capacity within4m, grants no shield, and releases on exit, Anchor destruction, death or progression loss. Gear changes preserve their underlying capacity. Build and paid Anchor runtime pass; full suite697started/694passed/3known/0unexpected through quarantine auditor. STATE unchanged; human feel remains unvalidated.
 - Cascade/Grit: actual eight-point purchased Cascade and paid Fracture/Unmake prove physical echo across elemental cycle positions, late-spawn targets, proc0/no Chain, and cancel/death/respec before queued delivery. Tank damage callback now honors real proc0/.25/1 with proportional generation. Build/suite690started/687passed/3known/0unexpected. Fixture restores campaign entitlement and uses explicit projectile Impact; does not claim campaign traversal or natural flight. Long Dark zone pause remains next.

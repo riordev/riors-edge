@@ -19,8 +19,10 @@ public:
     bool bReactOnRotTick = false;
     bool bAdvanceOnRotTick = false;
     bool bReenterOnConsume = false;
+    bool bReenterOnApply = false;
     bool bKillOnOuterHit = false;
     int32 Consumed = 0;
     UFUNCTION() void OnHit(const FBreakerHitContext& Hit);
     UFUNCTION() void OnConsumed(const FBreakerActiveStatus& Active);
+    UFUNCTION() void OnApplied(const FBreakerActiveStatus& Active);
 };
