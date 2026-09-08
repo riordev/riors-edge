@@ -47,6 +47,7 @@ public:
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
     virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
+    virtual void OnRemoveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec) override;
     static FName WindowKey();
     static FName OutgoingModifierKey();
 
@@ -78,10 +79,13 @@ private:
     UFUNCTION() void HandleReloadChanged(bool bReloading);
     UFUNCTION() void HandleShotFired(const FBreakerShotResult& Shot);
     void CloseRig();
+    UFUNCTION() void CancelRig();
     bool OwnerHasNodeTag(const FGameplayTag& Tag) const;
 
     TWeakObjectPtr<UBreakerWeaponComponent> BoundWeapon;
     bool bRigActive = false;
+    bool bEndAfterShot = false;
+    bool bNaturalRigEnd = false;
     // AR8's shot budget and the one reload the window survives.
     int32 ShotsRemaining = 0;
     int32 ReloadsSurvived = 0;

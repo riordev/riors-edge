@@ -994,11 +994,24 @@ void UBreakerCombatComponent::PushWindowOutgoingModifier(FName Key, float FlatBo
     if (!GetOwner() || Key.IsNone() || !FMath::IsFinite(Duration) || Duration <= 0
         || !FMath::IsFinite(FlatBonus) || !FMath::IsFinite(MoreMultiplier)) return;
     PushOutgoingModifier(Key, FlatBonus, MoreMultiplier, Duration);
+    BindOutgoingWindowLease(Key, false);
+}
+
+void UBreakerCombatComponent::PushEventWindowOutgoingModifier(FName Key, float FlatBonus, float MoreMultiplier)
+{
+    if (!GetOwner() || Key.IsNone() || !FMath::IsFinite(FlatBonus) || !FMath::IsFinite(MoreMultiplier)) return;
+    PushOutgoingModifier(Key, FlatBonus, MoreMultiplier, -1.0f);
+    BindOutgoingWindowLease(Key, true);
+}
+
+void UBreakerCombatComponent::BindOutgoingWindowLease(FName Key, bool bEventEnded)
+{
     auto* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
     for (auto& Entry : OutgoingModifiers)
     {
         if (Entry.Key != Key) continue;
         Entry.bWindowContribution = true;
+        Entry.bAwaitingWindowEnd = bEventEnded;
         Entry.bAfterimage = Progression && Progression->HasNodeTag(
             FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage")));
     }
@@ -1012,7 +1025,7 @@ void UBreakerCombatComponent::UpdateWindowOutgoingModifier(FName Key, float Flat
     const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0;
     for (auto& Entry : OutgoingModifiers)
     {
-        if (Entry.Key != Key || !Entry.bWindowContribution || Entry.ExpiryTime <= Now) continue;
+        if (Entry.Key != Key || !Entry.bWindowContribution || (!Entry.bAwaitingWindowEnd && Entry.ExpiryTime <= Now)) continue;
         // A magnitude update cannot extend the lease, acquire a newly bought
         // tail, or grow an already expired Cadence Break streak.
         Entry.FlatBonus = FlatBonus;
@@ -1022,6 +1035,12 @@ void UBreakerCombatComponent::UpdateWindowOutgoingModifier(FName Key, float Flat
 
 void UBreakerCombatComponent::FinishWindowOutgoingModifier(FName Key)
 {
+    if (GetWorld()) for (auto& Entry : OutgoingModifiers)
+        if (Entry.Key == Key && Entry.bWindowContribution && Entry.bAwaitingWindowEnd)
+        {
+            Entry.bAwaitingWindowEnd = false;
+            Entry.ExpiryTime = GetWorld()->GetTimeSeconds();
+        }
     OutgoingModifiers.RemoveAll([Key](const FBreakerOutgoingModifier& Entry)
     {
         return Entry.Key == Key && (!Entry.bWindowContribution || !Entry.bAfterimage);

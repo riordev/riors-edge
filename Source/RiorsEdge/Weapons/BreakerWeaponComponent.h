@@ -479,6 +479,7 @@ public:
     // stacks; Duration <= 0 means no expiry, popped explicitly.
     UFUNCTION(BlueprintCallable, Category="Weapon|Channels") void PushShotChannelBonus(FName Key, float AdditionalProjectiles, int32 PierceBonus, int32 ChainBonus, int32 RicochetBonus, float Duration = -1.0f);
     void PushWindowShotChannelBonus(FName Key, float AdditionalProjectiles, int32 PierceBonus, int32 ChainBonus, int32 RicochetBonus, float Duration);
+    void PushEventWindowShotChannelBonus(FName Key, float AdditionalProjectiles, int32 PierceBonus, int32 ChainBonus, int32 RicochetBonus);
     void FinishWindowShotChannelBonus(FName Key);
     UFUNCTION(BlueprintCallable, Category="Weapon|Channels") void PopShotChannelBonus(FName Key);
 
@@ -777,6 +778,7 @@ private:
         float Multiplier = 1.0f;
         bool bAfterimage = false;
         bool bWindow = false;
+        bool bAwaitingWindowEnd = false;
         // Negative = no expiry; popped explicitly.
         double ExpiryTime = -1.0;
     };
@@ -800,6 +802,7 @@ private:
         FBreakerShotChannels Channels;
         bool bAfterimage = false;
         bool bWindow = false;
+        bool bAwaitingWindowEnd = false;
         // Negative = no expiry; popped explicitly.
         double ExpiryTime = -1.0;
     };
@@ -807,6 +810,7 @@ private:
     // RangeTreatmentOverrides above.
     mutable TMap<FName, FShotChannelBonusEntry> ShotChannelBonuses;
     void PruneShotChannelBonuses() const;
+    void BindShotChannelWindowLease(FName Key, bool bEventEnded);
     // One pellet's full resolution: the pierce loop, the ricochet bounce and
     // the chain arcs. Writes impacts and damage into Shot/Pellet and returns
     // how many enemies the pellet pierced BEYOND its first hit, so FireOnce

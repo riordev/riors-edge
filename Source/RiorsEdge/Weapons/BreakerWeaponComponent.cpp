@@ -2264,9 +2264,22 @@ void UBreakerWeaponComponent::PushWindowShotChannelBonus(FName Key, float Additi
 {
     if (!GetOwner() || Key.IsNone() || !FMath::IsFinite(Duration) || Duration <= 0 || !FMath::IsFinite(AdditionalProjectiles)) return;
     PushShotChannelBonus(Key,AdditionalProjectiles,PierceBonus,ChainBonus,RicochetBonus,Duration);
+    BindShotChannelWindowLease(Key, false);
+}
+
+void UBreakerWeaponComponent::PushEventWindowShotChannelBonus(FName Key, float AdditionalProjectiles, int32 PierceBonus, int32 ChainBonus, int32 RicochetBonus)
+{
+    if (!GetOwner() || Key.IsNone() || !FMath::IsFinite(AdditionalProjectiles)) return;
+    PushShotChannelBonus(Key,AdditionalProjectiles,PierceBonus,ChainBonus,RicochetBonus);
+    BindShotChannelWindowLease(Key, true);
+}
+
+void UBreakerWeaponComponent::BindShotChannelWindowLease(FName Key, bool bEventEnded)
+{
     if (auto* Entry = ShotChannelBonuses.Find(Key))
     {
         Entry->bWindow = true;
+        Entry->bAwaitingWindowEnd = bEventEnded;
         Entry->bAfterimage = OwnerHasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage")));
     }
     if (auto* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>())
@@ -2277,8 +2290,13 @@ void UBreakerWeaponComponent::PushWindowShotChannelBonus(FName Key, float Additi
 
 void UBreakerWeaponComponent::FinishWindowShotChannelBonus(FName Key)
 {
-    const auto* Entry = ShotChannelBonuses.Find(Key);
-    if (!Entry || !Entry->bAfterimage) PopShotChannelBonus(Key);
+    auto* Entry = ShotChannelBonuses.Find(Key);
+    if (!Entry || !Entry->bAfterimage) { PopShotChannelBonus(Key); return; }
+    if (Entry->bWindow && Entry->bAwaitingWindowEnd && GetWorld())
+    {
+        Entry->bAwaitingWindowEnd = false;
+        Entry->ExpiryTime = GetWorld()->GetTimeSeconds();
+    }
 }
 
 void UBreakerWeaponComponent::PopShotChannelBonus(FName Key)

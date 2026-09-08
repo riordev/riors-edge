@@ -31,6 +31,7 @@ struct RIORSEDGE_API FBreakerOutgoingModifier
     // Negative means "never expires on its own".
     UPROPERTY(BlueprintReadOnly) float ExpiryTime = -1.0f;
     bool bWindowContribution = false;
+    bool bAwaitingWindowEnd = false;
     bool bAfterimage = false;
 };
 
@@ -122,6 +123,7 @@ public:
     void PushOutgoingModifier(FName Key, float FlatBonus, float MoreMultiplier, float ExpirySeconds);
     void PushWindowOutgoingModifier(FName Key, float FlatBonus, float MoreMultiplier, float Duration);
     void UpdateWindowOutgoingModifier(FName Key, float FlatBonus, float MoreMultiplier);
+    void PushEventWindowOutgoingModifier(FName Key, float FlatBonus, float MoreMultiplier);
     void FinishWindowOutgoingModifier(FName Key);
 
     UFUNCTION(BlueprintCallable, Category="Combat|Outgoing")
@@ -352,6 +354,7 @@ private:
     UPROPERTY(Replicated) float PerfectGuardEnd = -1.0f;
     TMap<TWeakObjectPtr<AActor>, double> MeleeDefenseSuppressionExpiry;
     void PruneExpiredOutgoingModifiers();
+    void BindOutgoingWindowLease(FName Key, bool bEventEnded);
     UFUNCTION() void InvalidateAfterimageContributions();
     // STAGE 6 (Hook-And-Condition-Vocabulary §3.2-§3.3): target-conditional
     // damage, resolved on the TARGET side because ReceiveDamage is the one

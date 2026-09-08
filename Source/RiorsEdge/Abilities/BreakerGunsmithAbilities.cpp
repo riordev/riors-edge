@@ -136,7 +136,8 @@ void UBreakerAbility_SidearmRig::ActivateAbility(const FGameplayAbilitySpecHandl
     if (UBreakerCombatComponent* Combat = Character->FindComponentByClass<UBreakerCombatComponent>())
     {
         // Flat sum stage, no expiry — the shot events own the teardown.
-        Combat->PushOutgoingModifier(OutgoingModifierKey(), FlatBonusDamage, 1.0f, -1.0f);
+        Combat->PushEventWindowOutgoingModifier(OutgoingModifierKey(), FlatBonusDamage, 1.0f);
+        Combat->OnDeath.AddUniqueDynamic(this, &UBreakerAbility_SidearmRig::CancelRig);
     }
     if (UBreakerAbilityStateComponent* State = UBreakerAbilityStateComponent::FindOrAdd(Character))
     {
@@ -147,21 +148,22 @@ void UBreakerAbility_SidearmRig::ActivateAbility(const FGameplayAbilitySpecHandl
     // §G1's "+1 Pierce", live as of the Swift projectile pass (2026-08-16,
     // the one authorized cross-territory edit): a keyed channel bonus with no
     // expiry — the shot events below own the pop, like everything else here.
-    Weapon->PushShotChannelBonus(OutgoingModifierKey(), 0.0f, PierceBonus, 0, 0);
+    Weapon->PushEventWindowShotChannelBonus(OutgoingModifierKey(), 0.0f, PierceBonus, 0, 0);
 
     BoundWeapon = Weapon;
+    bEndAfterShot = false; bNaturalRigEnd = false;
+    Weapon->OnShot.AddDynamic(this, &UBreakerAbility_SidearmRig::HandleShotFired);
     Weapon->OnMagazineEmptied.AddDynamic(this, &UBreakerAbility_SidearmRig::HandleMagazineEmptied);
     Weapon->OnReloadChanged.AddDynamic(this, &UBreakerAbility_SidearmRig::HandleReloadChanged);
     // AR8 Rig Discipline: the window is measured in SHOTS — a budget of one
     // effective magazine, counted down on the weapon's own shot event, and it
-    // survives exactly one reload. Bound only when owned so a bare rig's event
-    // surface is bit-identical to before the node existed.
+    // survives exactly one reload. Every rig observes post-shot completion
+    // so the last accepted round keeps its full contribution.
     ShotsRemaining = 0;
     ReloadsSurvived = 0;
     if (OwnerHasNodeTag(BreakerNodeTags::Node_AR_RigDiscipline.GetTag()))
     {
         ShotsRemaining = Weapon->GetEffectiveMagazineSize();
-        Weapon->OnShot.AddDynamic(this, &UBreakerAbility_SidearmRig::HandleShotFired);
     }
     bRigActive = true;
 
@@ -221,7 +223,9 @@ void UBreakerAbility_SidearmRig::HandleMagazineEmptied(bool bStartedFull)
         OwnerHasNodeTag(BreakerNodeTags::Node_AR_LastRound.GetTag()),
         OwnerHasNodeTag(BreakerNodeTags::Node_AR_RigDiscipline.GetTag())))
     {
-        CloseRig();
+        // Magazine notifications precede damage/channel snapshots. End after
+        // this accepted shot, never while it is still being resolved.
+        bEndAfterShot = bRigActive;
     }
 }
 
@@ -238,12 +242,12 @@ void UBreakerAbility_SidearmRig::HandleReloadChanged(bool bReloading)
 
 void UBreakerAbility_SidearmRig::HandleShotFired(const FBreakerShotResult& Shot)
 {
-    // Only bound under Rig Discipline; a refused shot never broadcasts, so
-    // every event here is a real round leaving the rig's budget.
-    if (--ShotsRemaining <= 0)
-    {
-        CloseRig();
-    }
+    if (!bRigActive || !Shot.bFired) return;
+    // Claim the pending boundary and decrement before teardown callbacks.
+    const bool bMagazineEnded = bEndAfterShot;
+    bEndAfterShot = false;
+    const bool bBudgetEnded = ShotsRemaining > 0 && --ShotsRemaining == 0;
+    if (bMagazineEnded || bBudgetEnded) CloseRig();
 }
 
 void UBreakerAbility_SidearmRig::CloseRig()
@@ -251,12 +255,15 @@ void UBreakerAbility_SidearmRig::CloseRig()
     if (!bRigActive) return;
     if (CurrentActorInfo)
     {
+        bNaturalRigEnd = true;
         EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
     }
 }
 
 void UBreakerAbility_SidearmRig::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
+    const bool bKeepTail = bNaturalRigEnd && !bWasCancelled;
+    bNaturalRigEnd = false; bEndAfterShot = false;
     // Teardown on EVERY exit: an InstancedPerActor ability is reused, and a
     // surviving binding would end the NEXT rig on this magazine's events.
     if (bRigActive)
@@ -266,7 +273,9 @@ void UBreakerAbility_SidearmRig::EndAbility(const FGameplayAbilitySpecHandle Han
         {
             if (UBreakerCombatComponent* Combat = Character->FindComponentByClass<UBreakerCombatComponent>())
             {
-                Combat->RemoveOutgoingModifier(OutgoingModifierKey());
+                Combat->OnDeath.RemoveDynamic(this, &UBreakerAbility_SidearmRig::CancelRig);
+                if (bKeepTail) Combat->FinishWindowOutgoingModifier(OutgoingModifierKey());
+                else Combat->RemoveOutgoingModifier(OutgoingModifierKey());
             }
             if (UBreakerAbilityStateComponent* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>())
             {
@@ -275,7 +284,8 @@ void UBreakerAbility_SidearmRig::EndAbility(const FGameplayAbilitySpecHandle Han
         }
         if (UBreakerWeaponComponent* Weapon = BoundWeapon.Get())
         {
-            Weapon->PopShotChannelBonus(OutgoingModifierKey());
+            if (bKeepTail) Weapon->FinishWindowShotChannelBonus(OutgoingModifierKey());
+            else Weapon->PopShotChannelBonus(OutgoingModifierKey());
             Weapon->OnMagazineEmptied.RemoveDynamic(this, &UBreakerAbility_SidearmRig::HandleMagazineEmptied);
             Weapon->OnReloadChanged.RemoveDynamic(this, &UBreakerAbility_SidearmRig::HandleReloadChanged);
             Weapon->OnShot.RemoveDynamic(this, &UBreakerAbility_SidearmRig::HandleShotFired);
@@ -285,6 +295,23 @@ void UBreakerAbility_SidearmRig::EndAbility(const FGameplayAbilitySpecHandle Han
         ReloadsSurvived = 0;
     }
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+}
+
+void UBreakerAbility_SidearmRig::CancelRig()
+{
+    if (IsActive()) EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+}
+
+void UBreakerAbility_SidearmRig::OnRemoveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)
+{
+    // Clear the old owner before EndAbility broadcasts can start a new rig.
+    if (!IsActive()) if (auto* Character = GetBreakerCharacter())
+    {
+        if (auto* Combat = Character->GetCombat()) Combat->RemoveOutgoingModifier(OutgoingModifierKey());
+        if (auto* Weapon = Character->GetWeapon()) Weapon->PopShotChannelBonus(OutgoingModifierKey());
+    }
+    CancelRig();
+    Super::OnRemoveAbility(ActorInfo, Spec);
 }
 
 // ---------------------------------------------------------------------------
