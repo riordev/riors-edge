@@ -510,6 +510,31 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
         HubArrival = UBreakerHubBuilder::ArrivalTransform(HubFrame);
         TeleportPawnToHub(NewPlayer->GetPawn());
         bPlaytestTargetsSpawned = true;
+        if (FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureTour")))
+        {
+            // Arrival remains the first capture; subsequent frames move the
+            // real pawn through these ground-level hub views.
+            struct FHubVantage { FVector Position; FVector LookAt; };
+            const FHubVantage Vantages[] =
+            {
+                { FVector(-1480, 0, 100), FVector(1800, 0, 100) },
+                { FVector(-500, -450, 100), FVector(1800, 0, 160) },
+                { FVector(950, -900, 100), FVector(1450, -900, 160) },
+                { FVector(950, 900, 100), FVector(1450, 900, 160) },
+                { FVector(2000, 250, 100), FVector(-1480, 0, 160) },
+            };
+            for (const FHubVantage& Vantage : Vantages)
+            {
+                const FVector Position = HubFrame.TransformPosition(Vantage.Position);
+                const FRotator Facing = (HubFrame.TransformPosition(Vantage.LookAt) - Position).Rotation();
+                if (ACameraActor* Camera = GetWorld()->SpawnActor<ACameraActor>(Position, Facing))
+                {
+                    if (UCameraComponent* Component = Camera->GetCameraComponent()) Component->SetFieldOfView(90.0f);
+                    Camera->SetActorLabel(TEXT("Runtime_AnchorTourCamera"));
+                    TourCameras.Add(Camera);
+                }
+            }
+        }
         // Same reason as the front end: a screenshot run of the Anchor must
         // schedule its exit, or the harness can never photograph the hub.
         ScheduleScreenshots();

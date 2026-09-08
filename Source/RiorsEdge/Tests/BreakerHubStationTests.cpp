@@ -24,6 +24,25 @@ bool FBreakerHubStationClearanceTest::RunTest(const FString& Parameters)
         const FTransform Origin(FRotator(0, Yaw, 0), FVector(100, 200, 40));
         if (!TestNotNull(TEXT("Hub keeps its travel point"), UBreakerHubBuilder::BuildHub(World, Origin))) return false;
         const FVector ArrivalDirection = -Origin.GetRotation().GetForwardVector();
+        const FVector Arrival = UBreakerHubBuilder::ArrivalTransform(Origin).GetLocation();
+        const FCollisionShape PlayerCapsule = FCollisionShape::MakeCapsule(34.0f, 88.0f);
+        auto SweepRoute = [&](const TArray<FVector>& Points, const AActor* Service, const TCHAR* Route)
+        {
+            FCollisionQueryParams Query(SCENE_QUERY_STAT(BreakerHubRouteTest), false, Service);
+            for (int32 Index = 1; Index < Points.Num(); ++Index)
+            {
+                FHitResult Hit;
+                const bool bBlocked = World->SweepSingleByChannel(Hit, Points[Index - 1], Points[Index],
+                    FQuat::Identity, ECC_Pawn, PlayerCapsule, Query);
+                TestFalse(FString::Printf(TEXT("%s yaw %.0f segment %d clear (blocker %s)"),
+                    Route, Yaw, Index, *GetNameSafe(Hit.GetActor())), bBlocked);
+            }
+        };
+        auto At = [&](float Forward, float Lateral)
+        { return Origin.TransformPosition(FVector(Forward, Lateral, 100)); };
+        // Walk around the central obelisk before joining the vendor lanes.
+        const TArray<FVector> MainRoute = { Arrival, At(-300, -250), At(300, -250), At(450, 0) };
+        SweepRoute(MainRoute, nullptr, TEXT("Arrival to market street"));
         int32 Vendors = 0;
         for (TActorIterator<ABreakerNPC> It(World); It; ++It)
         {
@@ -41,13 +60,21 @@ bool FBreakerHubStationClearanceTest::RunTest(const FString& Parameters)
             const FCollisionShape Capsule = FCollisionShape::MakeCapsule(32.0f, 86.0f);
             TestFalse(TEXT("Vendor body is clear of station props"),
                 World->OverlapBlockingTestByChannel(Center, FQuat::Identity, ECC_Pawn, Capsule, Query));
+            const float Side = Origin.InverseTransformPosition(Center).Y < 0 ? -1.0f : 1.0f;
+            TArray<FVector> VendorRoute = { At(450, 0), At(450, Side * 500), At(1100, Side * 900),
+                Center + ArrivalDirection * 100.0f };
+            SweepRoute(VendorRoute, NPC, Side < 0 ? TEXT("Market street to Kess") : TEXT("Market street to quartermaster"));
             FHitResult Hit;
             TestFalse(TEXT("A player can approach within interaction range"),
                 World->SweepSingleByChannel(Hit, Center + ArrivalDirection * 250.0f,
                     Center + ArrivalDirection * 100.0f, FQuat::Identity, ECC_Pawn, Capsule, Query));
         }
         TestEqual(TEXT("The hub retains exactly its two existing vendors"), Vendors, 2);
-        const FVector Arrival = UBreakerHubBuilder::ArrivalTransform(Origin).GetLocation();
+        for (TActorIterator<ABreakerTravelPoint> It(World); It; ++It)
+        {
+            const FVector Approach = It->GetActorLocation() + Origin.GetRotation().GetForwardVector() * 100.0f;
+            SweepRoute({ Arrival, Approach }, *It, TEXT("Arrival to travel point"));
+        }
         TestFalse(TEXT("Arrival remains clear"), World->OverlapBlockingTestByChannel(
             Arrival, FQuat::Identity, ECC_Pawn, FCollisionShape::MakeCapsule(34.0f, 88.0f)));
     }

@@ -64,6 +64,89 @@ namespace
         if (BreakerZoneNameHasPrefix(Name, TEXT("flr_"))) return BreakerZoneEarth;
         return BreakerZoneMoss;
     }
+
+    void BreakerZoneBuildSkyline(UWorld* World, const TArray<FBreakerZonePiece>& Pieces)
+    {
+        auto FindMesh = [&](const TCHAR* Name) -> UStaticMesh*
+        {
+            const auto* Piece = Pieces.FindByPredicate([&](const auto& Entry) { return Entry.Name == Name; });
+            return Piece ? Cast<UStaticMesh>(Piece->MeshPath.TryLoad()) : nullptr;
+        };
+        UStaticMesh* EntryFloor = FindMesh(TEXT("flr_yard"));
+        UStaticMesh* SubFloor = FindMesh(TEXT("flr_yard_sub"));
+        UStaticMesh* Mound = FindMesh(TEXT("dress_mound"));
+        UStaticMesh* Building = FindMesh(TEXT("wall_n00"));
+        UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+        if (!EntryFloor || !SubFloor || !Mound || !Building || !Cube) return;
+
+        auto Place = [&](UStaticMesh* Mesh, const TCHAR* Label, FVector Centre, FVector Size, FLinearColor Color)
+        {
+            const FBoxSphereBounds Bounds = Mesh->GetBounds();
+            const FVector Full = Bounds.BoxExtent * 2;
+            if (Full.GetMin() <= UE_SMALL_NUMBER) return;
+            const FVector Scale(Size.X / Full.X, Size.Y / Full.Y, Size.Z / Full.Z);
+            // Imported Fernhall vertices already contain world placement.
+            // Subtract their scaled origin, rather than moving the old yard twice.
+            auto* Actor = World->SpawnActor<AStaticMeshActor>(Centre - Bounds.Origin * Scale, FRotator::ZeroRotator);
+            if (!Actor) return;
+            auto* Component = Actor->GetStaticMeshComponent();
+            Component->SetMobility(EComponentMobility::Movable);
+            Component->SetStaticMesh(Mesh); Component->SetWorldScale3D(Scale);
+            Component->SetCollisionProfileName(TEXT("NoCollision"));
+            Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+            Component->SetCanEverAffectNavigation(false);
+            BreakerZoneApplyColor(Component, Color);
+            Component->SetMobility(EComponentMobility::Static);
+            Actor->SetActorEnableCollision(false); Actor->SetActorTickEnabled(false);
+            Actor->Tags.Add(TEXT("FernhallSkylineDressing"));
+#if WITH_EDITOR
+            Actor->SetActorLabel(FString::Printf(TEXT("FernhallSkyline_%s"), Label));
+#endif
+        };
+        const FVector EntryCentre = EntryFloor->GetBounds().Origin;
+        const FVector SubCentre = SubFloor->GetBounds().Origin;
+        for (int32 Yard = 0; Yard < 2; ++Yard)
+        {
+            const auto Bounds = (Yard == 0 ? EntryFloor : SubFloor)->GetBounds();
+            const FVector Centre = Bounds.Origin;
+            // Use only the outward flank of each yard. The inward flanks contain
+            // the connecting seam and must remain visually and physically open.
+            const float Side = (Yard == 0 ? EntryCentre.Y - SubCentre.Y : SubCentre.Y - EntryCentre.Y) >= 0 ? 1.0f : -1.0f;
+            const float Edge = Centre.Y + Side * Bounds.BoxExtent.Y;
+            for (int32 Index = 0; Index < 5; ++Index)
+            {
+                const float X = Centre.X + (Index - 2) * 2200.0f;
+                const float Height = 550.0f + (Index % 3) * 220.0f;
+                Place(Mound, TEXT("OuterBank"), FVector(X, Edge + Side * 1700, Height * .5f - 80),
+                    FVector(3000, 2300, Height), BreakerZoneEarth);
+                Place(Mound, TEXT("DistantRidge"), FVector(X + 500, Edge + Side * 3500, Height * .65f - 120),
+                    FVector(3800, 2500, Height * 1.3f), BreakerZoneMoss * .72f);
+            }
+            for (int32 Index = 0; Index < 3; ++Index)
+            {
+                const float Height = 1100.0f + ((Index + Yard) % 3) * 320.0f;
+                const float X = Centre.X + (Index - 1) * 2800.0f;
+                Place(Building, TEXT("Roofline"), FVector(X, Edge + Side * 650, Height * .5f),
+                    FVector(1700, 850, Height), BreakerZoneConcrete * .82f);
+                Place(Cube, TEXT("RoofServiceHousing"), FVector(X + 340, Edge + Side * 680, Height + 140),
+                    FVector(450, 420, 280), BreakerZoneRust * .65f);
+            }
+        }
+        // A recognizable industrial destination beyond the far Substation wall:
+        // unequal open masts and crossbars, not another solid boundary slab.
+        const auto SubBounds = SubFloor->GetBounds();
+        const float FarX = SubCentre.X + SubBounds.BoxExtent.X + 650;
+        for (int32 Mast = 0; Mast < 2; ++Mast)
+        {
+            const float Y = SubCentre.Y + (Mast == 0 ? -650 : 650);
+            const float Height = Mast == 0 ? 2300.0f : 1950.0f;
+            for (float Offset : {-110.0f, 110.0f})
+                Place(Cube, TEXT("MastUpright"), FVector(FarX, Y + Offset, Height * .5f), FVector(90, 70, Height), BreakerZoneRust);
+            for (int32 Rung = 1; Rung <= 5; ++Rung)
+                Place(Cube, TEXT("MastCrossbar"), FVector(FarX, Y, Rung * 330), FVector(100, 330, 45), BreakerZoneConcrete);
+        }
+        Place(Cube, TEXT("BrokenGantry"), FVector(FarX, SubCentre.Y - 120, 1750), FVector(120, 1100, 100), BreakerZoneRust);
+    }
 }
 
 bool UBreakerZoneBuilder::CollectZonePieces(const FString& MeshFolder, TArray<FBreakerZonePiece>& OutPieces)
@@ -532,6 +615,8 @@ bool UBreakerZoneBuilder::BuildFernhallYard(UWorld* World, FBreakerZoneMarkers& 
 #endif
         ++Spawned;
     }
+
+    BreakerZoneBuildSkyline(World, Pieces);
 
     // The builder measures its own grammar at assembly so a playtest log shows
     // the same numbers the suite asserts — and shouts if the placed yard has
