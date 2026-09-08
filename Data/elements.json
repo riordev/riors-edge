@@ -1,4 +1,5 @@
 {
+  "overlapThresholdFraction": 0.25,
   "entropyThresholdHealthFraction": 0.1,
   "entropyDamageFraction": 0.5,
   "entropyDurationSeconds": 4.0,

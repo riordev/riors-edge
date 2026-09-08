@@ -255,6 +255,7 @@ uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicat
     {
         if (Active.Spec.StatusTag == Spec.StatusTag)
         {
+            const bool bCreditorChanged = Instigator && Active.Instigator.Get() != Instigator;
             Active.Stacks = bEffectOnly ? 1 : FMath::Max(Active.Stacks, FMath::Min(Active.Stacks + FMath::Max(1, Spec.InitialStacks), ApplicationStackCap));
             if (ScaledDuration > Active.RemainingDuration + Active.RemainingDurationRoundoff)
             {
@@ -272,6 +273,25 @@ uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicat
                 Active.SourceLocationSnapshot = Instigator->GetActorLocation();
                 Active.bHasSourceLocationSnapshot = true;
                 Active.ResourceProcCoefficient = Spec.ProcCoefficient;
+            }
+            if (bPhysicalAilment)
+            {
+                const auto* CreditProgression = Active.Instigator.IsValid() ? Active.Instigator->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+                Active.bTerminalEligible = CreditProgression && CreditProgression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Caster.VoidWhisperer.Terminal")));
+                if (bCreditorChanged || !Active.bTerminalEligible) Active.bTerminalPersistent = false;
+                if (Active.bTerminalEligible)
+                {
+                    // A newly accepted stack/refresh earns the remaining native
+                    // schedule. Preserve the original immutable damage/crit spec;
+                    // do not add the previously funded schedule a second time.
+                    const double Remaining = Active.RemainingDuration + Active.RemainingDurationRoundoff;
+                    const double Next = FMath::Max(0.0, static_cast<double>(Active.TimeUntilNextTick));
+                    const double Ticks = Next <= Remaining + 1.e-6
+                        ? 1 + FMath::FloorToDouble(FMath::Max(0.0, Remaining - Next + 1.e-6) / Active.Spec.TickInterval) : 0;
+                    const float Funded = FMath::Max(0.f, Active.Spec.BaseDamagePerTick) * Active.Stacks * static_cast<float>(Ticks);
+                    Active.TerminalPhysicalBudget = FMath::Max(Active.TerminalPhysicalBudget, Funded);
+                }
+                RefreshTerminalPersistence(Active);
             }
             const FBreakerActiveStatus Applied = Active;
             if (SourceMana) SourceMana->NotifyStatusApplication(Spec, true, GetOwner());
@@ -307,6 +327,13 @@ uint64 UBreakerStatusComponent::ApplyStatusInternal(const FBreakerStatusApplicat
     Status.ThreatSource = ApplyingHit ? ApplyingHit->ThreatSource : TWeakObjectPtr<AActor>();
     Status.bHasThreatSource = ApplyingHit && (ApplyingHit->bHasThreatSource || !ApplyingHit->ThreatSource.IsExplicitlyNull());
     Status.ResourceProcCoefficient = Spec.ProcCoefficient;
+    if (Rule && Rule->bDealsPeriodicDamage && Instigator)
+        if (const auto* SourceProgression = Instigator->FindComponentByClass<UBreakerProgressionComponent>())
+            Status.bTerminalEligible = SourceProgression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Caster.VoidWhisperer.Terminal")));
+    if (Status.bTerminalEligible && bPhysicalAilment)
+        Status.TerminalPhysicalBudget = FMath::Max(0.f, Spec.BaseDamagePerTick) * Status.Stacks
+            * FMath::FloorToFloat(ScaledDuration / Spec.TickInterval);
+    RefreshTerminalPersistence(Status);
     if (bRot && !Spec.bLongDarkSnapshot && Spec.ProcCoefficient > 0 && Instigator)
         if (const auto* SourceProgression = Instigator->FindComponentByClass<UBreakerProgressionComponent>())
         {
@@ -433,11 +460,13 @@ void UBreakerStatusComponent::HandleAfflictedOwnerDeath()
     // if another callback revives this actor before that flush.
     SympatheticLockouts.Reset();
     ConductorReservations.Reset();
+    OverlapSeeds.Reset();
     for (TObjectIterator<UBreakerStatusComponent> It; It; ++It)
         if (It->GetWorld() == GetWorld())
         {
             It->SympatheticLockouts.RemoveAll([this](const auto& Lock) { return Lock.Source.Get() == GetOwner(); });
             It->ConductorReservations.RemoveAll([this](const auto& Entry) { return Entry.Source.Get() == GetOwner(); });
+            It->OverlapSeeds.RemoveAll([this](const auto& Entry) { return Entry.Source.Get() == GetOwner(); });
         }
     bReactionCanceled = true;
     for (auto& Pending : PendingElementReactions) Pending.Status.UnpaidDamageBudget = 0;
@@ -546,6 +575,7 @@ void UBreakerStatusComponent::AdvanceStatusSlice(float DeltaTime)
         int32 Index = FindActive();
         if (Index == INDEX_NONE) continue;
         FBreakerActiveStatus& Initial = ActiveStatuses[Index];
+        RefreshTerminalPersistence(Initial);
         const FGameplayTag Tag = Initial.Spec.StatusTag;
         // A damage callback may advance the component recursively. The
         // currently dispatched application has already claimed its payment.
@@ -556,8 +586,8 @@ void UBreakerStatusComponent::AdvanceStatusSlice(float DeltaTime)
             continue;
         }
         const double ExactRemaining = FMath::Max(0.0, static_cast<double>(Initial.RemainingDuration) + Initial.RemainingDurationRoundoff);
-        const double ExactActiveSeconds = FMath::Min(static_cast<double>(DeltaTime), ExactRemaining);
-        double NextRemaining = ExactRemaining - ExactActiveSeconds;
+        const double ExactActiveSeconds = Initial.bTerminalPersistent ? static_cast<double>(DeltaTime) : FMath::Min(static_cast<double>(DeltaTime), ExactRemaining);
+        double NextRemaining = FMath::Max(0.0, ExactRemaining - ExactActiveSeconds);
         // Match the native element boundary tolerance, without accumulating
         // another float subtraction error every frame.
         if (NextRemaining <= 1.e-6) NextRemaining = 0;
@@ -582,9 +612,16 @@ void UBreakerStatusComponent::AdvanceStatusSlice(float DeltaTime)
             Index = FindActive();
             if (Index == INDEX_NONE || ActiveStatuses[Index].TicksDelivered != ExpectedDelivered) break;
             FBreakerActiveStatus& Status = ActiveStatuses[Index];
+            FBreakerStatusApplicationSpec TickSpec = Status.Spec;
+            if (Status.bTerminalEligible && Status.DamageFamily == EBreakerDamageFamily::Physical)
+            {
+                const float Claimed = FMath::Min(Status.TerminalPhysicalBudget, FMath::Max(0.f, TickSpec.BaseDamagePerTick) * Status.Stacks);
+                if (Claimed <= 0) break;
+                Status.TerminalPhysicalBudget = FMath::Max(0.f, Status.TerminalPhysicalBudget - Claimed);
+                TickSpec.BaseDamagePerTick = Claimed / FMath::Max(1, Status.Stacks);
+            }
             ++Status.TicksDelivered;
             ExpectedDelivered = Status.TicksDelivered;
-            FBreakerStatusApplicationSpec TickSpec = Status.Spec;
             TickSpec.InitialStacks = Status.Stacks;
             FBreakerDamageRequest Tick = UBreakerDamageLibrary::MakeSnapshotDotTick(TickSpec, Status.DamageFamily, Status.TicksDelivered, Status.Instigator.Get(),
                 Status.SourceLocationSnapshot, Status.bHasSourceLocationSnapshot);
@@ -594,7 +631,8 @@ void UBreakerStatusComponent::AdvanceStatusSlice(float DeltaTime)
             Combat->ReceiveDamage(Tick);
         }
         Index = FindActive();
-        if (Index != INDEX_NONE && ActiveStatuses[Index].RemainingDuration <= 0.0f)
+        if (Index != INDEX_NONE) RefreshTerminalPersistence(ActiveStatuses[Index]);
+        if (Index != INDEX_NONE && ActiveStatuses[Index].RemainingDuration <= 0.0f && !ActiveStatuses[Index].bTerminalPersistent)
         {
             const FBreakerActiveStatus Expired = ActiveStatuses[Index];
             ActiveStatuses.RemoveAt(Index);
@@ -666,6 +704,8 @@ FBreakerActiveStatus UBreakerStatusComponent::ConsumeReactionStatus(FGameplayTag
         && FMath::IsFinite(Consumed.RemainingDuration) && Consumed.RemainingDuration > 0)
     {
         FBreakerActiveStatus Retained = Consumed;
+        Retained.bTerminalEligible = false;
+        Retained.bTerminalPersistent = false;
         Retained.ApplicationSerial = NextApplicationSerial++;
         Retained.UnpaidDamageBudget = NormalBudget * Fraction;
         Retained.InitialDamageBudget = Retained.UnpaidDamageBudget;
@@ -729,7 +769,14 @@ void UBreakerStatusComponent::ScaleRemainingDurations(float Scalar)
         Active.RemainingDuration = static_cast<float>(ScaledRemaining);
         Active.RemainingDurationRoundoff = ScaledRemaining - Active.RemainingDuration;
         if (ActiveStatuses[Index].Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot")))
-            ActiveStatuses[Index].UnpaidDamageBudget = BreakerElementReactions::RemainingRotBudget(ActiveStatuses[Index]);
+        {
+            // Explicit shortening cancels the removed schedule even when a
+            // persistence rule could otherwise keep the status identity alive.
+            auto FiniteSchedule = ActiveStatuses[Index];
+            FiniteSchedule.bPersistentRot = false;
+            FiniteSchedule.bTerminalPersistent = false;
+            ActiveStatuses[Index].UnpaidDamageBudget = BreakerElementReactions::RemainingRotBudget(FiniteSchedule);
+        }
         // A scalar of zero means gone, and gone is gone by exactly one route:
         // it broadcasts as a consumption, because a caller that shortened a
         // duration to nothing did consume it.

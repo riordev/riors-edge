@@ -102,9 +102,9 @@ void BreakerCoreRoster::AppendStatus(UObject* Outer, TArray<FBreakerCoreWedgeDef
         const auto* Feedback = Node(Outer, TEXT("Core.Reaction.Feedback"), TEXT("Feedback"),
             TEXT("+5% elemental buildup per rank."),
             {Effect(Target::ElementalBuildup, Bucket::IncreasedPercent, 5.0f)}); // O2 PLACEHOLDER
-        // MISSING CONSUMER: No consumer yet: reaction preparation does not fund or queue third-element buildup. No substitute stat effect.
+        // O2 PLACEHOLDER: editable 25% threshold seed in Data/elements.json; no damage credit.
         const auto* Overlap = Node(Outer, TEXT("Core.Reaction.Overlap"), TEXT("Overlap"),
-            TEXT("NOT IMPLEMENTED: Reactions apply fresh buildup of the third element. Purchasing this node currently grants no effect."), {}, {TEXT("Progression.Node.Core.Reaction.Overlap")});
+            TEXT("Reactions seed 25% of the third element threshold as buildup only. A later direct hit funds its status."), {}, {TEXT("Progression.Node.Core.Reaction.Overlap")});
         const auto* Spark = Node(Outer, TEXT("Core.Reaction.Spark"), TEXT("Spark"),
             TEXT("+8% Increased reaction damage."),
             {Effect(Target::ReactionDamage, Bucket::IncreasedPercent, 8.0f)}); // O2 PLACEHOLDER

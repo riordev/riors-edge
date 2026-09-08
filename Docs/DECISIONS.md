@@ -448,3 +448,9 @@ Maximum wedges reached with65, including ring transit; cells show **wedges / min
 | Gateway | 22 / 22 | 22 / 44 | 21 / 65 |
 | Lane | 16 / 64 | 11 / 63 | 6 / 62 |
 | Convergence | 7 / 65 | 5 / 59 | 4 / 64 |
+
+**O236** — Overlap seeds editable25% of the third elemental chassis threshold as fresh buildup with no transferred damage credit; only a subsequent accepted direct hit can fund its resulting status.
+
+**O237** — Caster periodic applications retain their applying hit critical sample and never roll again; longer Rot windows redistribute unchanged finite damage, and Terminal or Long Dark persistence pays only remaining funded damage, never replenishing reaction credit.
+
+**O238** — Generic StatusDuration extends periodic elemental tick windows and redistributes their finite budget; Erased delayed payments and Unstable markers keep authored timers.

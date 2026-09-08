@@ -92,7 +92,7 @@ bool FBreakerCoreLongDarkRuntimeTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("owned application has persistent lease"), A.Status->GetActiveStatuses()[0].bPersistentRot);
     A.Status->AdvanceStatuses(8);
     if (!TestEqual(TEXT("lease remains after twice ordinary duration"), A.Status->GetActiveStatuses().Num(), 1)) return false;
-    TestEqual(TEXT("fixed snapshot pays sixteen ticks including point floor"), A.Health->GetHealth(), 799.5f, .001f);
+    TestEqual(TEXT("persistent snapshot stops after its eight funded ticks including point floor"), A.Health->GetHealth(), 849.625f, .001f);
     TestEqual(TEXT("funding clock reaches zero without a sentinel"), A.Status->GetActiveStatuses()[0].RemainingDuration, 0.0f);
     TestEqual(TEXT("normal budget never replenished by persistence"), A.Status->GetActiveStatuses()[0].UnpaidDamageBudget, 0.0f, .001f);
     FBreakerDamageRequest Trigger; Trigger.BaseDamage = 1; Trigger.Element = EBreakerElement::Rift; Trigger.ElementalFraction = 1;

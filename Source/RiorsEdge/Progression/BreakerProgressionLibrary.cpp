@@ -1487,10 +1487,10 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterVoidWhispererTree(
     Tree->Nodes.Add(Node);
 
     // Historical Class-Kits VW10. O2 PLACEHOLDER: target below 25% health.
-    // WAITING ON: source-owned DoT expiry policy tracking the target's health.
-    // Core Long Dark only owns one Rot and is not this all-DoT rule.
+    // Terminal latches on low target health and spends finite remaining tick funding.
+    // It does not reserve Core Long Dark's single-target lease.
     Node = MakeNode(TEXT("Caster.VoidWhisperer.Terminal"), TEXT("Terminal"),
-        TEXT("NOT IMPLEMENTED: Your DoTs do not expire on targets below 25% health; they persist until death or cleanse. Purchasing this node currently grants no effect."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+        TEXT("Your DoTs persist on targets below 25% health until death or cleanse. Ticks stop when their remaining funded damage is exhausted."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Attrition"));
     Node->GrantedTags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Caster.VoidWhisperer.Terminal")));
     Tree->Nodes.Add(Node);

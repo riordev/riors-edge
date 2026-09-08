@@ -50,6 +50,7 @@ namespace
     }
 }
 
+float BreakerEntropy::BuildupTimeoutSeconds() { return BreakerEntropyTuning().Timeout; }
 float BreakerEntropy::VestigeMeleeFraction() { return BreakerEntropyTuning().VestigeFraction; }
 float BreakerEntropy::VestigeResistancePercent() { return BreakerEntropyTuning().VestigeResistance; }
 float BreakerEntropy::AttunementTailSeconds() { return BreakerEntropyTuning().AttunementTail; }

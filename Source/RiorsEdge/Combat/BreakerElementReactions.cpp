@@ -9,13 +9,36 @@
 #include "EngineUtils.h"
 #include "UI/BreakerReactionFeedback.h"
 #include "Misc/ScopeExit.h"
+#include "Data/BreakerDataFile.h"
+#include "Combat/BreakerEntropy.h"
+#include "Combat/BreakerVoid.h"
+#include "Combat/BreakerRift.h"
+
+float BreakerElementReactions::OverlapThresholdFraction()
+{
+    static const float Fraction = []()
+    {
+        BreakerDataFile::FBreakerDataErrors Errors;
+        const auto Data = BreakerDataFile::Load(TEXT("Data/elements.json"), Errors);
+        double Value = 0;
+        if (!Data || !Data->TryGetNumberField(TEXT("overlapThresholdFraction"), Value)
+            || !FMath::IsFinite(Value) || Value < 0 || Value > 1)
+            Errors.Add(TEXT("Invalid Overlap tuning: overlapThresholdFraction"));
+        if (!ensureAlwaysMsgf(Errors.IsClean(), TEXT("%s"), *Errors.Join())) return 0.f;
+        return static_cast<float>(Value); // O2 PLACEHOLDER, editable fraction of third-element chassis threshold.
+    }();
+    return Fraction;
+}
 
 float BreakerElementReactions::RemainingRotBudget(const FBreakerActiveStatus& Status)
 {
     if (!FMath::IsFinite(Status.UnpaidDamageBudget) || Status.UnpaidDamageBudget <= 0
-        || !FMath::IsFinite(Status.RemainingDuration) || Status.RemainingDuration <= 0
+        || !FMath::IsFinite(Status.RemainingDuration)
         || !FMath::IsFinite(Status.TimeUntilNextTick) || !FMath::IsFinite(Status.Spec.TickInterval)
         || Status.Spec.TickInterval <= 0 || !FMath::IsFinite(Status.Spec.BaseDamagePerTick)) return 0;
+    // Persistence changes the schedule, never replenishes its finite credit.
+    if (Status.bPersistentRot || Status.bTerminalPersistent) return Status.UnpaidDamageBudget;
+    if (Status.RemainingDuration <= 0) return 0;
     const double Remaining = Status.RemainingDuration;
     const double Next = FMath::Max(0.0f, Status.TimeUntilNextTick);
     // Float status clocks can finish a few ulps short of an exact boundary.
@@ -134,6 +157,14 @@ uint64 UBreakerStatusComponent::PrepareElementReactionBatch(const TArray<FBreake
         Pending.bSympathetic = bExpand;
         AActor* Creditor = Candidate.Status.Instigator.Get();
         const auto* Progression = Creditor ? Creditor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+        if (Progression && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Reaction.Overlap"))))
+        {
+            Pending.OverlapElement = Candidate.Reaction == FGameplayTag::RequestGameplayTag(TEXT("Reaction.Collapse")) ? EBreakerElement::Void
+                : Candidate.Reaction == FGameplayTag::RequestGameplayTag(TEXT("Reaction.Wither")) ? EBreakerElement::Rift : EBreakerElement::Entropy;
+            const float Threshold = Pending.OverlapElement == EBreakerElement::Void ? GetVoidThreshold()
+                : Pending.OverlapElement == EBreakerElement::Rift ? GetRiftThreshold() : GetEntropyThreshold();
+            Pending.OverlapAmount = Threshold * BreakerElementReactions::OverlapThresholdFraction();
+        }
         if (Progression && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Reaction.Chain"))))
         {
             double BestDistance = FMath::Square(500.0); // O2 PLACEHOLDER, authored 5m.
@@ -211,6 +242,9 @@ void UBreakerStatusComponent::FlushElementReaction(uint64 Token)
             if (ChildSink && !ChildSink->IsDead())
                 if (auto* ChildStatus = ReservedChild->FindComponentByClass<UBreakerStatusComponent>()) ChildStatus->BeginSympatheticLockout(Source);
         }
+        // Seed once before callbacks; it carries no hit, status budget, or
+        // automatic application permission. Chain is a payment, not a new reaction.
+        SeedOverlap(Source, Pending.OverlapElement, Pending.OverlapAmount);
         FBreakerStatusApplicationSpec Spec = Consumed.Spec;
         Spec.BaseDamagePerTick = Budget; Spec.InitialStacks = 1; Spec.ProcCoefficient = 0;
         Spec.Snapshot.SourcePower = 1; Spec.Snapshot.CriticalChance = 0; Spec.Snapshot.bRolledCritical = false;
@@ -248,12 +282,44 @@ void UBreakerStatusComponent::BeginSympatheticLockout(AActor* Source)
             SourceCombat->OnDeath.AddUniqueDynamic(SourceStatus, &UBreakerStatusComponent::HandleAfflictedOwnerDeath);
 }
 
+void UBreakerStatusComponent::SeedOverlap(AActor* Source, EBreakerElement Element, float Amount)
+{
+    if (!IsValid(Source) || !FMath::IsFinite(Amount) || Amount <= 0 || Element == EBreakerElement::None) return;
+    const auto* SourceCombatState = Source->FindComponentByClass<UBreakerCombatComponent>();
+    if (SourceCombatState && SourceCombatState->IsDead()) return;
+    auto* Seed = OverlapSeeds.FindByPredicate([&](const auto& Entry) { return Entry.Source.Get() == Source && Entry.Element == Element; });
+    if (!Seed) { Seed = &OverlapSeeds.AddDefaulted_GetRef(); Seed->Source = Source; Seed->Element = Element; }
+    Seed->Decay = BreakerBuildup::Advance(Seed->Decay, static_cast<float>(ElementBuildupClock - Seed->AdvancedClock));
+    Seed->AdvancedClock = ElementBuildupClock;
+    Seed->Decay.Amount += Amount;
+    Seed->Decay.GraceRemaining = Element == EBreakerElement::Entropy ? BreakerEntropy::BuildupTimeoutSeconds()
+        : Element == EBreakerElement::Void ? BreakerVoid::BuildupTimeoutSeconds() : BreakerRift::BuildupTimeoutSeconds();
+    Seed->Decay.FadeRemaining = 0;
+    if (auto* SourceStatus = Source->FindComponentByClass<UBreakerStatusComponent>())
+        if (auto* SourceCombat = Source->FindComponentByClass<UBreakerCombatComponent>())
+            SourceCombat->OnDeath.AddUniqueDynamic(SourceStatus, &UBreakerStatusComponent::HandleAfflictedOwnerDeath);
+}
+
+float UBreakerStatusComponent::ClaimOverlap(const FBreakerDamageRequest& Request)
+{
+    // Only a subsequent accepted direct elemental hit can supply funding.
+    // Any applier may cross the seeded threshold; that hit owns all credit.
+    // Replay of an already-funded lockout bank must never claim an unfunded seed.
+    if (DeferredReplayRequest == &Request || Request.bIsDamageOverTime || !Request.bCanApplyElementBuildup) return 0;
+    float Amount = 0;
+    for (auto& Seed : OverlapSeeds)
+        if (Seed.Element == Request.Element)
+        { Amount += Seed.Decay.Amount; Seed.Decay.Amount = 0; }
+    return Amount;
+}
+
 float UBreakerStatusComponent::ClaimedElementBuildup(const FBreakerDamageRequest& Request, float OrdinaryAmount)
 {
     if (DeferredReplayRequest == &Request) return DeferredReplayAmount;
     const int32 Index = Request.Element == EBreakerElement::Entropy ? 0 : Request.Element == EBreakerElement::Void ? 1
         : Request.Element == EBreakerElement::Rift ? 2 : INDEX_NONE;
     if (Index == INDEX_NONE) return OrdinaryAmount;
+    if (FMath::IsFinite(OrdinaryAmount) && OrdinaryAmount > 0) OrdinaryAmount += ClaimOverlap(Request);
     auto* Lock = SympatheticLockouts.FindByPredicate([&](const auto& Entry)
         { return Entry.Source == Request.Instigator && Entry.UnlockTime <= ElementClock + 1.e-6; });
     if (!Lock) return OrdinaryAmount;
@@ -280,7 +346,7 @@ bool UBreakerStatusComponent::DeferSympatheticElement(const FBreakerDamageReques
     auto& Bank = Lock->Banks[Index];
     Bank.Decay = BreakerBuildup::Advance(Bank.Decay, static_cast<float>(ElementBuildupClock - Bank.AdvancedBuildupClock));
     Bank.AdvancedBuildupClock = ElementBuildupClock;
-    Bank.Decay.Amount += Amount;
+    Bank.Decay.Amount += Amount + ClaimOverlap(Request);
     Bank.Decay.GraceRemaining = GraceSeconds;
     Bank.Decay.FadeRemaining = FMath::IsFinite(Request.ElementBuildupFadeSeconds) ? FMath::Max(0.f, Request.ElementBuildupFadeSeconds) : 0.f;
     Bank.Request = Request;
@@ -296,6 +362,7 @@ float UBreakerStatusComponent::DeferredElementBuildup(EBreakerElement Element) c
     if (Index == INDEX_NONE) return 0;
     float Total = 0;
     for (const auto& Lock : SympatheticLockouts) Total += Lock.Banks[Index].Decay.Amount;
+    for (const auto& Seed : OverlapSeeds) if (Seed.Element == Element) Total += Seed.Decay.Amount;
     return Total;
 }
 
@@ -304,7 +371,13 @@ void UBreakerStatusComponent::AdvanceSympatheticLockouts()
     struct FReplay { FBreakerDamageRequest Request; FBreakerDamageResult Result; float Amount; };
     TArray<FReplay> Ready;
     const auto* Sink = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
-    if (!Sink || Sink->IsDead() || !GetOwner()->HasAuthority()) { SympatheticLockouts.Reset(); return; }
+    if (!Sink || Sink->IsDead() || !GetOwner()->HasAuthority()) { SympatheticLockouts.Reset(); OverlapSeeds.Reset(); return; }
+    for (auto& Seed : OverlapSeeds)
+    {
+        Seed.Decay = BreakerBuildup::Advance(Seed.Decay, static_cast<float>(ElementBuildupClock - Seed.AdvancedClock));
+        Seed.AdvancedClock = ElementBuildupClock;
+    }
+    OverlapSeeds.RemoveAll([](const auto& Seed) { return !Seed.Source.IsValid() || Seed.Decay.Amount <= 0; });
     for (auto& Lock : SympatheticLockouts)
     {
         auto* Source = Lock.Source.Get();
@@ -374,9 +447,11 @@ void UBreakerStatusComponent::AdvanceRotStatus(uint64 ApplicationSerial, float D
         const int32 Index = Find();
         if (Index == INDEX_NONE || !Combat || Combat->IsDead()) return;
         FBreakerActiveStatus& Active = ActiveStatuses[Index];
+        RefreshTerminalPersistence(Active);
         if (Active.bPersistentRot && !IsLongDarkLeaseValid(Active)) { RemoveLongDarkApplication(ApplicationSerial); return; }
-        if (!Active.bPersistentRot && Active.RemainingDuration <= 0) break;
-        const double ActiveFrame = Active.bPersistentRot ? RemainingFrame : FMath::Min(RemainingFrame, static_cast<double>(Active.RemainingDuration));
+        const bool bPersistent = Active.bPersistentRot || Active.bTerminalPersistent;
+        if (!bPersistent && Active.RemainingDuration <= 0) break;
+        const double ActiveFrame = bPersistent ? RemainingFrame : FMath::Min(RemainingFrame, static_cast<double>(Active.RemainingDuration));
         const double Step = FMath::Min(ActiveFrame, static_cast<double>(FMath::Max(0.0f, Active.TimeUntilNextTick)));
         Active.RemainingDuration = FMath::Max(0.0f, Active.RemainingDuration - static_cast<float>(Step));
         Active.TimeUntilNextTick = FMath::Max(0.0f, Active.TimeUntilNextTick - static_cast<float>(Step));
@@ -385,7 +460,7 @@ void UBreakerStatusComponent::AdvanceRotStatus(uint64 ApplicationSerial, float D
         {
             Active.TimeUntilNextTick = Active.Spec.TickInterval;
             const float SnapshotTick = FMath::Max(0.0f, Active.Spec.BaseDamagePerTick) * FMath::Max(1, Active.Stacks);
-            const float TickBudget = Active.bPersistentRot ? SnapshotTick : FMath::Min(Active.UnpaidDamageBudget, SnapshotTick);
+            const float TickBudget = FMath::Min(Active.UnpaidDamageBudget, SnapshotTick);
             if (TickBudget > 0)
             {
                 // Claim this one boundary before its callback. Remaining
@@ -415,7 +490,9 @@ void UBreakerStatusComponent::AdvanceRotStatus(uint64 ApplicationSerial, float D
         else if (Step <= 0) break;
     }
     const int32 Index = Find();
-    if (Index != INDEX_NONE && !ActiveStatuses[Index].bPersistentRot && ActiveStatuses[Index].RemainingDuration <= BreakerRotClockTolerance)
+    // The last paid tick can itself cross the live Terminal threshold.
+    if (Index != INDEX_NONE) RefreshTerminalPersistence(ActiveStatuses[Index]);
+    if (Index != INDEX_NONE && !ActiveStatuses[Index].bPersistentRot && !ActiveStatuses[Index].bTerminalPersistent && ActiveStatuses[Index].RemainingDuration <= BreakerRotClockTolerance)
     {
         const FBreakerActiveStatus Expired = ActiveStatuses[Index];
         ActiveStatuses.RemoveAt(Index);

@@ -32,6 +32,10 @@ struct RIORSEDGE_API FBreakerActiveStatus
     UPROPERTY(BlueprintReadOnly) bool bHasReactionCreditSnapshot = false;
     // Persistence is a live ownership lease, separate from the finite funding clock.
     UPROPERTY(BlueprintReadOnly) bool bPersistentRot = false;
+    bool bTerminalEligible = false;
+    UPROPERTY(BlueprintReadOnly) bool bTerminalPersistent = false;
+    // Physical applications retain raw tick funding; Rot uses UnpaidDamageBudget.
+    float TerminalPhysicalBudget = 0;
     UPROPERTY() TWeakObjectPtr<UBreakerStatusComponent> LongDarkSource;
     uint64 ApplicationSerial = 0;
     UPROPERTY() bool bSympathyOnExpiry = false;
@@ -74,6 +78,8 @@ public:
     // O2 PLACEHOLDER: Chain's rank buys reach, never extra generations.
     UPROPERTY(EditDefaultsOnly, Category="Status|Chain") float ChainRankOneRangeCm = 600.0f;
     UPROPERTY(EditDefaultsOnly, Category="Status|Chain") float ChainRankTwoRangeCm = 900.0f;
+    // O2 PLACEHOLDER: authored Terminal low-health threshold.
+    UPROPERTY(EditDefaultsOnly, Category="Status|Terminal", meta=(ClampMin="0", ClampMax="1")) float TerminalHealthFraction = .25f;
     UBreakerStatusComponent();
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -218,6 +224,7 @@ public:
     UPROPERTY(BlueprintAssignable, Category="Combat|Status") FBreakerStatusEvent OnStatusAvoided;
 
 private:
+    void RefreshTerminalPersistence(FBreakerActiveStatus& Status);
     FBreakerActiveStatus ConsumeReactionStatus(FGameplayTag Tag, float Fraction, float ReactionBudget, bool& bFound, bool bBroadcast = true);
     uint64 ApplyStatusInternal(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator, bool bDurationAlreadyScaled, float UnpaidDamageBudget = 0.0f, const FVector* SourceLocationOverride = nullptr, const FBreakerDamageRequest* ApplyingHit = nullptr);
     void AdvanceVoidBuildup(float DeltaSeconds);
@@ -295,6 +302,16 @@ private:
         FDeferredElementBank Banks[3];
     };
     TArray<FSympatheticLockout> SympatheticLockouts;
+    struct FOverlapSeed
+    {
+        TWeakObjectPtr<AActor> Source;
+        EBreakerElement Element = EBreakerElement::None;
+        BreakerBuildup::FDecayState Decay;
+        double AdvancedClock = 0;
+    };
+    TArray<FOverlapSeed> OverlapSeeds;
+    void SeedOverlap(AActor* Source, EBreakerElement Element, float Amount);
+    float ClaimOverlap(const FBreakerDamageRequest& Request);
     double ElementClock = 0;
     double ElementBuildupClock = 0;
     struct FConductorReservation { TWeakObjectPtr<AActor> Source; double ReadyTime = 0; };
@@ -320,6 +337,8 @@ private:
         FBreakerActiveStatus Status;
         TWeakObjectPtr<AActor> ChainTarget;
         bool bSympathetic = false;
+        EBreakerElement OverlapElement = EBreakerElement::None;
+        float OverlapAmount = 0;
     };
     TArray<FPendingElementReaction> PendingElementReactions;
     bool bReactionCanceled = false;

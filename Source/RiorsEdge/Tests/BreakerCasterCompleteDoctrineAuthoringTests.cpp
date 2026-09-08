@@ -35,8 +35,6 @@ bool FBreakerCasterCompleteDoctrineAuthoringTest::RunTest(const FString&)
         const auto* Node=Tree->FindNode(FName(Ids[Index]));
         if (!TestNotNull(TEXT("Historical final-tier declaration exists"),Node)) return false;
         TestEqual(TEXT("Literal historical name"),Node->DisplayName.ToString(),FString(Names[Index]));
-        if (Index == 1)
-            TestTrue(TEXT("Terminal remains explicitly pending its funding rule"),Node->Description.ToString().StartsWith(TEXT("NOT IMPLEMENTED")));
         TestEqual(TEXT("Final authored tier"),Node->Tier,4); TestEqual(TEXT("Single rank"),Node->MaxRank,1);
         TestEqual(TEXT("Two-point price"),Node->CostPerRank,2); TestEqual(TEXT("Six-point branch gate"),Node->RequiredTreeInvestment,6);
         TestTrue(TEXT("Caster class lock"),Node->RequiredClass==EBreakerClassId::Caster);
