@@ -88,7 +88,7 @@ float UBreakerCasterAbility::GetResourceCost() const
     // Read live, never cached (owner ruling 2026-08-14): the player re-gears
     // mid-fight and a stale efficiency would quote a price the bank is not
     // being charged. 1.0 until the affix layer supplies otherwise.
-    const float CostMultiplier = GetResourceCostMultiplier();
+    // Super already applies live resource efficiency exactly once.
     const ABreakerCharacter* Character = GetBreakerCharacter();
     const UBreakerAbilityStateComponent* State = Character ? Character->FindComponentByClass<UBreakerAbilityStateComponent>() : nullptr;
     // A window with no payload authored would silently make everything free;
@@ -96,5 +96,5 @@ float UBreakerCasterAbility::GetResourceCost() const
     const float WindowScalar = (State && State->IsWindowActive(UnmakeWindowKey()))
         ? State->GetWindowPayload(UnmakeWindowKey(), 1.0f)
         : 1.0f;
-    return ComposeResourceCost(Authored, CostMultiplier, WindowScalar);
+    return ComposeResourceCost(Authored, 1.0f, WindowScalar);
 }

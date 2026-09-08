@@ -239,7 +239,7 @@ private:
     bool IsInSafeZone() const;
     void ApplyScrapDelta(float Delta);
     void RefreshState();
-    void QueueGrant(float Amount);
+    void QueueGrant(float Amount, bool bEarnedIncome = true);
 
     struct FLoopOverrideEntry
     {

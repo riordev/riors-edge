@@ -427,8 +427,25 @@ int32 UBreakerSaveGame::LegacyCoreRankCost(FName NodeId)
         { TEXT("Core.Elements.Sequence"), 2 },
         { TEXT("Core.Elements.ReactionChain"), 3 },
     };
-    const int32* Cost = Costs.Find(NodeId);
-    return Cost ? *Cost : 0;
+    if (const int32* Cost = Costs.Find(NodeId)) return *Cost;
+    // Frozen historical roster: b566a61 introduced these 51 three-choice stops;
+    // 0e8b833 retired them. Every legal rank cost one point (MaxRank was one).
+    // Enumerate exact IDs, never accept an arbitrary Core.Travel prefix.
+    static const TSet<FName> TravelIds = []()
+    {
+        TSet<FName> Result;
+        for (const TCHAR* Suffix : { TEXT("Weapon"), TEXT("Ability"), TEXT("All") })
+        {
+            for (int32 Ring = 0; Ring < 12; ++Ring)
+                for (int32 Position = 1; Position <= 3; ++Position)
+                    Result.Add(FName(*FString::Printf(TEXT("Core.Travel.Ring%dP%d%s"), Ring, Position, Suffix)));
+            for (int32 Chord = 0; Chord < 3; ++Chord)
+                for (int32 Position = 1; Position <= 5; ++Position)
+                    Result.Add(FName(*FString::Printf(TEXT("Core.Travel.Chord%dP%d%s"), Chord, Position, Suffix)));
+        }
+        return Result;
+    }();
+    return TravelIds.Contains(NodeId) ? 1 : 0;
 }
 
 

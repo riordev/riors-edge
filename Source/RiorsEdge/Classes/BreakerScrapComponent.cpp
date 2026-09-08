@@ -1,4 +1,5 @@
 #include "Classes/BreakerScrapComponent.h"
+#include "Classes/BreakerResourceGeneration.h"
 
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
@@ -250,13 +251,13 @@ void UBreakerScrapComponent::RefreshState()
     }
 }
 
-void UBreakerScrapComponent::QueueGrant(float Amount)
+void UBreakerScrapComponent::QueueGrant(float Amount, bool bEarnedIncome)
 {
     // Every event source funnels through here so the global 15/s budget is the
     // single place generation is metered, and so the safe-zone and class gates
     // are stated once rather than at seven call sites.
     if (Amount <= 0.0f || !GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || IsInSafeZone()) return;
-    PendingGrants += Amount;
+    PendingGrants += Amount * (bEarnedIncome ? BreakerResourceGeneration::Multiplier(GetOwner()) : 1.0f);
 }
 
 void UBreakerScrapComponent::NotifyKill(float ProcCoefficient)
@@ -306,7 +307,7 @@ void UBreakerScrapComponent::NotifyMagazineEmptied(bool bStartedFull)
 
 void UBreakerScrapComponent::NotifyDeployableDestroyed(float DeployableScrapCost)
 {
-    QueueGrant(DestructionRefund(DeployableScrapCost, GetEffectiveDestructionRefundFraction()));
+    QueueGrant(DestructionRefund(DeployableScrapCost, GetEffectiveDestructionRefundFraction()), false);
 }
 
 void UBreakerScrapComponent::NotifyDeployableDamageDealt(float DamageAppliedToHealth)
@@ -471,7 +472,11 @@ void UBreakerScrapComponent::AdvanceLoop(float DeltaTime)
     // more room to pay it in. This is the same conclusion the Mana loop reaches
     // by a different route (its GrantMana metering scales the credit and leaves
     // the cap alone, because Mana's cap bounds a RATE it also generates).
-    const float EffectiveCap = FMath::Max(0.0f, GlobalGenerationCap * GetGenerationMultiplier());
+    // Core generation scales earned credits at enqueue, excluding refunds.
+    // Match positive throughput growth without delaying unscaled refunds when
+    // a generation penalty reduces the earned-credit multiplier below one.
+    const float EffectiveCap = FMath::Max(0.0f, GlobalGenerationCap * GetGenerationMultiplier()
+        * FMath::Max(1.0f, BreakerResourceGeneration::Multiplier(GetOwner())));
     const float Budget = ClampGeneration(EffectiveCap, EffectiveCap) * DeltaTime;
     // Grants QUEUE rather than being discarded when the budget is already spent,
     // matching Momentum: a kill landed during a capped frame is paid next frame,

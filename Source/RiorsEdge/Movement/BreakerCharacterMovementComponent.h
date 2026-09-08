@@ -272,9 +272,8 @@ public:
     UFUNCTION(BlueprintPure, Category="Movement|Stats") float GetComposedDashCooldownMultiplier() const;
 
     // --- Jump budget (ruling O25) ------------------------------------------
-    // Two jumps for everyone, a third for Swift. Recomputed from the PERMANENT
-    // class on OnProgressionChanged and polled as a backstop, so a dev class
-    // swap can never strand a non-Swift character with three jumps.
+    // Two base jumps, Swift's innate third, plus purchased generic air jumps.
+    // Recomputed on progression changes and polled for class/level changes.
     UFUNCTION(BlueprintPure, Category="Movement|Jump") int32 GetGrantedJumpCount() const { return GrantedJumpCount; }
     UFUNCTION(BlueprintCallable, Category="Movement|Jump") void RefreshJumpGrant();
 

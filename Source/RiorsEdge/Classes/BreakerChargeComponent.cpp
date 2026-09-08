@@ -1,4 +1,5 @@
 #include "Classes/BreakerChargeComponent.h"
+#include "Classes/BreakerResourceGeneration.h"
 
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
@@ -576,6 +577,6 @@ void UBreakerChargeComponent::AdvanceLoop(float DeltaTime)
         Generated += Drawn;
     }
 
-    if (Generated > 0.0f) ApplyChargeDelta(Generated);
+    if (Generated > 0.0f) ApplyChargeDelta(Generated * BreakerResourceGeneration::Multiplier(GetOwner()));
     RefreshBand();
 }

@@ -61,7 +61,13 @@ const UBreakerAbilityDefinition* UBreakerGameplayAbility::GetAbilityDefinition()
 float UBreakerGameplayAbility::GetResourceCost() const
 {
     const UBreakerAbilityDefinition* Definition = GetAbilityDefinition();
-    return Definition ? Definition->ResourceCost : 0.0f;
+    const float Authored = Definition ? Definition->ResourceCost : 0.0f;
+    if (Authored <= 0.0f) return 0.0f;
+    const UBreakerAttributeSet* Attributes = GetBreakerAttributes();
+    const float Multiplier = Attributes ? Attributes->GetResourceCostMultiplier() : 1.0f;
+    // Live gear/node efficiency precedes class-specific windows and price rewrites.
+    // Attributes enforce the ordinary .25 floor; retain Caster's defensive .10 floor.
+    return Authored * (FMath::IsFinite(Multiplier) ? FMath::Max(0.10f, Multiplier) : 1.0f);
 }
 
 float UBreakerGameplayAbility::GetCooldownSeconds() const

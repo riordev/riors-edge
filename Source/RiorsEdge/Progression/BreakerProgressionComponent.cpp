@@ -1485,6 +1485,13 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     Stats.AilmentAvoidancePercent = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::AilmentAvoidance));
     Stats.AbilityCastRateMultiplier = FMath::Max(1.0f, Increased(EBreakerNodeStatTarget::AbilityCastRate));
     Stats.AbilityChannelRateMultiplier = FMath::Max(1.0f, Increased(EBreakerNodeStatTarget::AbilityChannelRate));
+    Stats.ClassResourceGenerationMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::ClassResourceGeneration));
+    Stats.SprintSpeedMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::SprintSpeed));
+    Stats.AccelerationMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::Acceleration));
+    Stats.JumpHeightMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::JumpHeight));
+    Stats.LedgeSpeedMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::LedgeSpeed));
+    Stats.BonusSafeFallDistanceMeters = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::SafeFallDistance));
+    Stats.BonusAirJumpCount = FMath::Max(0.0f, Flat(EBreakerNodeStatTarget::AirJumpCount));
     Stats.bCooldownRecoveryAffectsTempo = Stats.GrantedTags.HasTagExact(
         FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Overclock")));
     Stats.BonusPierceCount = Flat(EBreakerNodeStatTarget::Pierce);

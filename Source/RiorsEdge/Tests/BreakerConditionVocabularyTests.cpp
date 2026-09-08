@@ -460,7 +460,7 @@ bool FBreakerConditionVocabularyStatTargetTest::RunTest(const FString& Parameter
     // gear-migration note.
     //
     // This number goes up in the same commit as the lane, never before it.
-    TestEqual(TEXT("stat targets with an aggregation lane today"), Wired, 39);
+    TestEqual(TEXT("stat targets with an aggregation lane today"), Wired, 46);
     TestTrue(*FString::Printf(TEXT("%d stat targets still await a lane"), TargetCount - Wired), TargetCount > Wired);
 
     // The pre-existing ten specifically, so that a future reshuffle cannot quiet

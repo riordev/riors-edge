@@ -1,4 +1,5 @@
 #include "Classes/BreakerGritComponent.h"
+#include "Classes/BreakerResourceGeneration.h"
 
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
@@ -847,7 +848,7 @@ void UBreakerGritComponent::AdvanceLoop(float DeltaTime)
 
     if (Generated > 0.0f)
     {
-        ApplyGritDelta(Generated);
+        ApplyGritDelta(Generated * BreakerResourceGeneration::Multiplier(GetOwner()));
         RefreshBand();
         return;
     }

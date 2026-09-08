@@ -196,8 +196,7 @@ Cast/channel rate scales authored clocks: deployment delay and Siphon tick spaci
 snapshot at activation; costs and channel duration remain unchanged. Instant abilities
 need an authored clock before cast rate can affect them. Overclock adds half the
 cooldown recovery bonus to each rate; it does not feed the converted bonus back into itself.
-Twenty-point constellations would buy three keystones and collapse the choice;
-thirty-two-point ones would make the third constellation meaningless.
+The complete named roster and runtime contracts live in [Core wheel](core-wheel.md).
 
 Links exist so a player can reach a second lane's notable without completing
 the first lane — the only way to build a two-notable splash with no keystone.

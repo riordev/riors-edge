@@ -190,10 +190,19 @@ bool UBreakerCharacterMovementComponent::DoJump(bool bReplayingMoves, float Delt
 
     // ACharacter::CheckJumpInput increments JumpCurrentCount AFTER DoJump
     // returns, so the jump about to be taken is index JumpCurrentCount + 1.
-    // Two spent already means this one is the third — Swift's, by construction,
-    // because nobody else is ever granted a third.
-    const bool bIsBonusJump = CharacterOwner && CharacterOwner->JumpCurrentCount >= FMath::Max(BaseJumpCount, 1);
+    // Core can grant air jumps to any class. The directional rewrite remains
+    // Swift's innate jump, rather than leaking onto generic additional jumps.
+    const auto* Progression = GetProgression();
+    const bool bIsBonusJump = CharacterOwner && Progression
+        && Progression->GetProgressionState().PermanentClass == EBreakerClassId::Swift
+        && ResolveJumpCount(EBreakerClassId::Swift, Progression->GetProgressionState().CharacterLevel,
+            BaseJumpCount, bSwiftThirdJumpEnabled, SwiftThirdJumpUnlockLevel) > FMath::Max(BaseJumpCount, 1)
+        && CharacterOwner->JumpCurrentCount == FMath::Max(BaseJumpCount, 1);
 
+    // Height is quadratic in impulse. Scale its square root so +height does
+    // not accidentally square the authored bonus. Keep the editable base stable.
+    const float HeightMultiplier = Progression ? Progression->GetNodeStats().JumpHeightMultiplier : 1.0f;
+    TGuardValue<float> JumpImpulse(JumpZVelocity, JumpZVelocity * FMath::Sqrt(FMath::Max(0.0f, HeightMultiplier)));
     const bool bJumped = Super::DoJump(bReplayingMoves, DeltaTime);
     if (bJumped)
     {
@@ -278,6 +287,7 @@ void UBreakerCharacterMovementComponent::RefreshJumpGrant()
     ObservedLevel = Progression ? Progression->GetProgressionState().CharacterLevel : 0;
     const int32 PreviousGrant = GrantedJumpCount;
     GrantedJumpCount = ResolveJumpCount(ObservedClass, ObservedLevel, BaseJumpCount, bSwiftThirdJumpEnabled, SwiftThirdJumpUnlockLevel);
+    if (Progression) GrantedJumpCount += FMath::Max(0, FMath::FloorToInt(Progression->GetNodeStats().BonusAirJumpCount));
     // Say the budget out loud whenever it changes. The third jump was
     // unreachable for its whole life and left NO trace anywhere — no warning,
     // no log line, no failing test — so the only instrument was a player
@@ -353,7 +363,10 @@ void UBreakerCharacterMovementComponent::ProcessLanded(const FHitResult& Hit, fl
         if (bProtectedLanding) Combat->GrantStaggerImmunity(KineticRecoveryImmunitySeconds);
         else if (const UBreakerAttributeSet* Attributes = GetAttributes())
         {
-            const float Fraction = FMath::Clamp((FallDistance - FMath::Max(0.0f, SafeFallDistanceCm))
+            const auto* Progression = GetProgression();
+            const float SafeDistance = SafeFallDistanceCm + (Progression
+                ? 100.0f * Progression->GetNodeStats().BonusSafeFallDistanceMeters : 0.0f);
+            const float Fraction = FMath::Clamp((FallDistance - FMath::Max(0.0f, SafeDistance))
                 / 100.0f * FMath::Max(0.0f, FallDamageHealthFractionPerMeter), 0.0f, 1.0f);
             if (Fraction > 0.0f)
             {
@@ -475,7 +488,9 @@ float UBreakerCharacterMovementComponent::GetWalkSpeedCap() const
 
 float UBreakerCharacterMovementComponent::GetSprintSpeedCap() const
 {
-    return SprintSpeed * GetComposedMoveSpeedMultiplier() * GetSpeedMultiplier() * GetAimSpeedMultiplier();
+    const auto* Progression = GetProgression();
+    const float SprintMultiplier = Progression ? Progression->GetNodeStats().SprintSpeedMultiplier : 1.0f;
+    return SprintSpeed * SprintMultiplier * GetComposedMoveSpeedMultiplier() * GetSpeedMultiplier() * GetAimSpeedMultiplier();
 }
 
 float UBreakerCharacterMovementComponent::GetGroundedSpeedCap() const
@@ -485,7 +500,9 @@ float UBreakerCharacterMovementComponent::GetGroundedSpeedCap() const
 
 float UBreakerCharacterMovementComponent::GetMaxAcceleration() const
 {
-    return IsOwnerStaggered() ? 0.0f : Super::GetMaxAcceleration();
+    const auto* Progression = GetProgression();
+    const float Multiplier = Progression ? Progression->GetNodeStats().AccelerationMultiplier : 1.0f;
+    return IsOwnerStaggered() ? 0.0f : Super::GetMaxAcceleration() * Multiplier;
 }
 
 bool UBreakerCharacterMovementComponent::IsOwnerStaggered() const
@@ -1376,7 +1393,10 @@ void UBreakerCharacterMovementComponent::BeginLedgeTraversal(const FBreakerLedge
     TraversalElapsed = 0.0f;
     const float BaseDuration = Traversal.Verb == EBreakerLedgeVerb::Vault
         ? VaultDurationSeconds : MantleDurationSeconds;
-    TraversalDuration = FMath::Max(BaseDuration * FMath::Max(DevTraversalDurationScale, 0.01f), 0.05f);
+    const auto* Progression = GetProgression();
+    const float LedgeRate = Progression ? Progression->GetNodeStats().LedgeSpeedMultiplier : 1.0f;
+    TraversalDuration = FMath::Max(BaseDuration * FMath::Max(DevTraversalDurationScale, 0.01f)
+        / FMath::Max(0.01f, LedgeRate), 0.05f);
     // Horizontal momentum is carried across the glide and paid back on a
     // completed exit; the glide itself runs on zero velocity so nothing
     // downstream reads phantom speed (the stride read above is the honest

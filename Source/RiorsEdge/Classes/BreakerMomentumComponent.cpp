@@ -1,4 +1,5 @@
 #include "Classes/BreakerMomentumComponent.h"
+#include "Classes/BreakerResourceGeneration.h"
 
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
@@ -802,7 +803,7 @@ void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
     if (Generated > 0.0f)
     {
         SettledElapsed = 0.0f;
-        ApplyMomentumDelta(Generated);
+        ApplyMomentumDelta(Generated * BreakerResourceGeneration::Multiplier(GetOwner()));
         RefreshState();
         return;
     }

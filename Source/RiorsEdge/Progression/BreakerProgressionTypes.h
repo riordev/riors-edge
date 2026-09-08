@@ -267,6 +267,13 @@ enum class EBreakerNodeStatTarget : uint8
     // Relative Increased rate percentages; composed multipliers are >= 1.
     AbilityCastRate,
     AbilityChannelRate,
+    ClassResourceGeneration,
+    SprintSpeed,
+    Acceleration,
+    JumpHeight,
+    LedgeSpeed,
+    SafeFallDistance,
+    AirJumpCount,
 
     Count UMETA(Hidden)
 };
@@ -322,6 +329,13 @@ inline bool BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget Target)
     case EBreakerNodeStatTarget::AilmentAvoidance:
     case EBreakerNodeStatTarget::AbilityCastRate:
     case EBreakerNodeStatTarget::AbilityChannelRate:
+    case EBreakerNodeStatTarget::ClassResourceGeneration:
+    case EBreakerNodeStatTarget::SprintSpeed:
+    case EBreakerNodeStatTarget::Acceleration:
+    case EBreakerNodeStatTarget::JumpHeight:
+    case EBreakerNodeStatTarget::LedgeSpeed:
+    case EBreakerNodeStatTarget::SafeFallDistance:
+    case EBreakerNodeStatTarget::AirJumpCount:
     case EBreakerNodeStatTarget::MaxClassResource:
     case EBreakerNodeStatTarget::ClassResourceRegen:
     case EBreakerNodeStatTarget::FireRate:
@@ -713,6 +727,13 @@ struct RIORSEDGE_API FBreakerNodeStats
     UPROPERTY(BlueprintReadOnly) float AbilityCastRateMultiplier = 1.0f;
     UPROPERTY(BlueprintReadOnly) float AbilityChannelRateMultiplier = 1.0f;
     UPROPERTY(BlueprintReadOnly) bool bCooldownRecoveryAffectsTempo = false;
+    UPROPERTY(BlueprintReadOnly) float ClassResourceGenerationMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float SprintSpeedMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float AccelerationMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float JumpHeightMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float LedgeSpeedMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float BonusSafeFallDistanceMeters = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float BonusAirJumpCount = 0.0f;
     // Cooldown reduction as the DIVISOR (DashCooldownReduction's convention:
     // 1.20 == 20% shorter). Floored just above zero so a malformed authored
     // row can never divide by zero or lengthen a cooldown to infinity.

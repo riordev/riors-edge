@@ -1,4 +1,5 @@
 #include "Classes/BreakerManaComponent.h"
+#include "Classes/BreakerResourceGeneration.h"
 
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
@@ -608,7 +609,8 @@ void UBreakerManaComponent::AdvanceLoop(float DeltaTime)
         const float Delay = Rank >= 2 ? Tuning.PatienceRankTwoDelay : Tuning.PatienceRankOneDelay;
         const float BonusSeconds = Rank > 0 ? FMath::Clamp(DeltaTime - FMath::Max(0.0f, Delay - PreviousFireAge), 0.0f, DeltaTime) : 0.0f;
         ApplyManaDelta((PassiveRegenPerSecond * DeltaTime + Tuning.PatienceBonusRegenPerSecond * BonusSeconds)
-            * GenerationMultiplierForMana(GetMana(), OvercastGenerationMultiplier));
+            * GenerationMultiplierForMana(GetMana(), OvercastGenerationMultiplier)
+            * BreakerResourceGeneration::Multiplier(GetOwner()));
     }
 
     if (IsInSafeZone())
@@ -638,7 +640,8 @@ void UBreakerManaComponent::AdvanceLoop(float DeltaTime)
         PendingGrants -= Drawn;
         // Overcast doubling is evaluated against the bank as it stands when the
         // credit is paid, so it stops the instant the debt is cleared.
-        ApplyManaDelta(Drawn * GenerationMultiplierForMana(GetMana(), OvercastGenerationMultiplier));
+        ApplyManaDelta(Drawn * GenerationMultiplierForMana(GetMana(), OvercastGenerationMultiplier)
+            * BreakerResourceGeneration::Multiplier(GetOwner()));
     }
 
     RefreshOvercastState();
