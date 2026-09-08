@@ -44,9 +44,15 @@ void BreakerStartEntropyCapture(ABreakerCharacter* Character)
                 if (!Zone) continue;
                 FBreakerZoneSpec Spec;
                 Spec.RadiusCm = Rot->RadiusCm;
-                Spec.Duration = 20; // O2 visual fixture lifetime, not ability tuning.
+                const bool bLifetimeProbe = FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureZoneLifetime"));
+                Spec.Duration = bLifetimeProbe ? 2 : 20; // O2 visual fixture, not ability tuning.
                 Spec.ZoneColor = BreakerFX::ColorForStatusTag(FGameplayTag::RequestGameplayTag(TEXT("Status.Rot")), FLinearColor::White);
                 Zone->ConfigureZone(Spec, Character);
+                if (bLifetimeProbe)
+                {
+                    if (Side == 0) Zone->SetExpiryPaused(true);
+                    else Zone->RefreshDuration(20);
+                }
                 if (Side == 1) Zone->GrowRadiusOnce(Rot->LingeringRefreshGrowthCm);
                 UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] Lingering side=%d radius=%.1f"), Side, Zone->GetSpec().RadiusCm);
             }

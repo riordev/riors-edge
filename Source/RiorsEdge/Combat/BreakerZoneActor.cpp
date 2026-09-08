@@ -84,6 +84,7 @@ void ABreakerZoneActor::BeginPlay()
 
 void ABreakerZoneActor::EndPlay(const EEndPlayReason::Type Reason)
 {
+    ResetRimEffect();
     ReleaseLongDarkPause();
     // Unconditional teardown, including a level transition and a destroyed
     // caster. A zone that ends without releasing its armour strip leaves the
@@ -138,6 +139,7 @@ void ABreakerZoneActor::RefreshDuration(float NewDuration)
     // Refresh, never extend: VW4's rule is that a recast resets the clock, so
     // spamming Rot cannot bank duration.
     RemainingDuration = FMath::Max(RemainingDuration, static_cast<double>(FMath::Max(0.0f, NewDuration)));
+    SyncRimLifetime();
 }
 
 bool ABreakerZoneActor::GrowRadiusOnce(float AdditionalRadiusCm)
@@ -162,7 +164,10 @@ void ABreakerZoneActor::SetFollowActor(AActor* Follow)
     FollowOffset = Follow ? GetActorLocation() - Follow->GetActorLocation() : FVector::ZeroVector;
     Spec.bMobileFootprint = Follow != nullptr;
     if (ABreakerEffectRenderer* Renderer = RimRenderer.Get())
+    {
         for (int32 Handle : RimHandles) Renderer->EndEffect(Handle, 0.0f);
+        Renderer->RemoveTickPrerequisiteActor(this);
+    }
     RimHandles.Reset();
     RefreshPresentation();
     ForceNetUpdate();
@@ -304,6 +309,7 @@ void ABreakerZoneActor::AdvanceZone(float DeltaSeconds)
     }
 
     RemainingDuration -= AgingSeconds;
+    SyncRimLifetime();
     if (RemainingDuration <= 0.0f && !IsExpiryPaused())
     {
         ReleaseAllOccupants();
@@ -545,7 +551,10 @@ void ABreakerZoneActor::OnRep_Spec()
 void ABreakerZoneActor::ResetRimEffect()
 {
     if (ABreakerEffectRenderer* Renderer = RimRenderer.Get())
+    {
         for (int32 Handle : RimHandles) Renderer->EndEffect(Handle, 0.0f);
+        Renderer->RemoveTickPrerequisiteActor(this);
+    }
     RimHandles.Reset();
     RimRenderer.Reset();
     bRimSubmitted = false;
@@ -558,18 +567,12 @@ void ABreakerZoneActor::SubmitRimEffect()
     if (!Renderer) return;
     bRimSubmitted = true;
     RimRenderer = Renderer;
+    Renderer->AddTickPrerequisiteActor(this);
 
-    // The clip is the zone's whole life with the final second as the visible
-    // expiry — the rim dims to nothing exactly as the volume stops biting.
-    // THE STATIC CLIP IS FIXED AT SUBMISSION, which leaves two recorded gaps,
-    // of them lifetime mutations this placeholder does not track:
-    // RefreshDuration (a VW4 recast resets the clock; the old rim still dies
-    // on the old clock), and SetExpiryPaused (Long Dark freezes the zone but
-    // not the rim). Mobile zones instead use attached geometry and cancel
-    // this clip, so Wellspring follows and expires with its gameplay volume.
-    // An EARLY Destroy has the mirror gap: the rim finishes its clip alone.
+    // The authoritative zone owns this clip's remaining lifetime, including
+    // refresh and paused expiry. Mobile zones use attached geometry instead.
     BreakerFX::FEffectTiming Timing;
-    Timing.DurationSeconds = Spec.Duration;
+    Timing.DurationSeconds = HasAuthority() ? FMath::Max(0.0, RemainingDuration) : Spec.Duration;
     Timing.FadeInSeconds = 0.2f;    // O2 PLACEHOLDER
     Timing.FadeOutSeconds = 1.0f;   // O2 PLACEHOLDER
 
@@ -584,6 +587,13 @@ void ABreakerZoneActor::SubmitRimEffect()
         BreakerFX::RingStroke(Center, Spec.RadiusCm, Index, BreakerFX::GroundRingStrokes, A, B);
         RimHandles.Add(Renderer->AddStroke(A, B, RimThicknessCm, Spec.ZoneColor, RimIntensity, Timing));
     }
+}
+
+void ABreakerZoneActor::SyncRimLifetime()
+{
+    if (auto* Renderer = RimRenderer.Get())
+        for (int32 Handle : RimHandles)
+            Renderer->SetEffectRemaining(Handle, FMath::Max(0.0, RemainingDuration));
 }
 
 void ABreakerZoneActor::RefreshPresentation()

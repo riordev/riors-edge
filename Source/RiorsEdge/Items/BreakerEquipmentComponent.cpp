@@ -1045,7 +1045,8 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
                 const int32 UpliftedTier = FMath::Max(Rolled.Tier - TierUplift, -1);
                 const float FromTier = UBreakerAffixLibrary::ValueForTier(*Definition, Rolled.Tier);
                 const float ToTier = UBreakerAffixLibrary::ValueForTier(*Definition, UpliftedTier);
-                if (FromTier > UE_KINDA_SMALL_NUMBER) Value *= ToTier / FromTier;
+                // Paired downside bills resolve the same signed tier step as benefits.
+                if (FMath::Abs(FromTier) > UE_KINDA_SMALL_NUMBER) Value *= ToTier / FromTier;
             }
 
             if (Definition->IsConditional())

@@ -317,6 +317,22 @@ void ABreakerEffectRenderer::EndEffect(int32 Handle, float FadeOutSeconds)
     for (FEffectLightSlot& Slot : LightState) { if (EndSlot(Slot)) return; }
 }
 
+void ABreakerEffectRenderer::SetEffectRemaining(int32 Handle, float RemainingSeconds)
+{
+    if (Handle <= 0 || !FMath::IsFinite(RemainingSeconds)) return;
+    const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0;
+    const auto Update = [&](auto& Slot)
+    {
+        if (!Slot.bActive || Slot.Serial != Handle) return false;
+        Slot.Timing.DurationSeconds = FMath::Max(0.f, static_cast<float>(Now - Slot.StartTime))
+            + FMath::Max(0.f, RemainingSeconds);
+        return true;
+    };
+    for (auto& Slot : GlowState) if (Update(Slot)) return;
+    for (auto& Slot : StrokeState) if (Update(Slot)) return;
+    for (auto& Slot : LightState) if (Update(Slot)) return;
+}
+
 void ABreakerEffectRenderer::Hide(UStaticMeshComponent* Mesh)
 {
     if (Mesh && !Mesh->bHiddenInGame) Mesh->SetHiddenInGame(true);

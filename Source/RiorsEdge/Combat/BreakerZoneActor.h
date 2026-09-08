@@ -182,11 +182,12 @@ protected:
     void RefreshPresentation();
     // The rim: a closed ring of pooled strokes at the TRUE effective radius,
     // drawn once through the shared ABreakerEffectRenderer when the zone
-    // arms, on a clip timed to the zone's whole life with the last second as
-    // the visible expiry. The disc says roughly where; the rim says exactly
-    // whether a target is inside. Once per life — see the flag.
+    // arms, then synchronized with its remaining lifetime on the authority.
+    // The disc says roughly where; the rim says exactly whether a target is
+    // inside. Refresh/pause preserves the clip instead of stacking rings.
     void SubmitRimEffect();
     void ResetRimEffect();
+    void SyncRimLifetime();
 
     UPROPERTY(VisibleAnywhere) TObjectPtr<USceneComponent> Root;
     UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Footprint;

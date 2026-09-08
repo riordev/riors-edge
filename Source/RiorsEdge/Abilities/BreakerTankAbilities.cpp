@@ -318,6 +318,7 @@ void UBreakerAbility_Rend::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 
     float TotalPostMitigation = 0.0f;
     int32 TargetIndex = 0;
+    int32 AcceptedTargetCount = 0;
     for (AActor* Target : UBreakerMeleeSweep::SweepTargets(World, Character, Params))
     {
         UBreakerCombatComponent* TargetCombat = Target ? Target->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
@@ -361,12 +362,14 @@ void UBreakerAbility_Rend::ActivateAbility(const FGameplayAbilitySpecHandle Hand
             }
         }
 
-        // L3 Open Wound: the leech stand-in pays on the FIRST target (R2: on
-        // every target), a plain heal through the one healing path.
-        if (OpenWoundLeech > 0.0f && OwnerCombat && (TargetIndex == 0 || OpenWoundRank >= 2))
+        // L3 pays on the first accepted damaging hit (R2: every such hit).
+        // Avoidance or full mitigation cannot consume R1's one payout.
+        const bool bAcceptedHit = !Result.bDodged && !Result.bParried && TargetPostMitigation > 0.0f;
+        if (bAcceptedHit && OpenWoundLeech > 0.0f && OwnerCombat && (AcceptedTargetCount == 0 || OpenWoundRank >= 2))
         {
             OwnerCombat->ApplyHealingAmount(OpenWoundLeech, Character, FGameplayTag());
         }
+        if (bAcceptedHit) ++AcceptedTargetCount;
 
         // §1.1's aggression source: a melee kill pays Grit, and Rend is the
         // Tank's melee verb — the one honest caller NotifyMeleeKill has.

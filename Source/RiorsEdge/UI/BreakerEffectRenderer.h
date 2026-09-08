@@ -120,6 +120,9 @@ public:
     // stale or recycled handle is a silent no-op, which is what a caller
     // tearing down after its target already died wants.
     void EndEffect(int32 Handle, float FadeOutSeconds);
+    // Live owning effects can refresh or pause their expiry without restarting
+    // their fade-in. Recycled/inactive handles never affect another clip.
+    void SetEffectRemaining(int32 Handle, float RemainingSeconds);
 
     // THE FOUR MOMENTS (GLASS-1). Plays the moment's Niagara system if the
     // owner has authored `/Game/Breaker/FX/NS_<Moment>` — resolved once per
