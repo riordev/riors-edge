@@ -409,3 +409,5 @@ Numbers are permanent and never reused.
 **O224** — Enemies deal elements by family. Resistance reduces buildup rate, never damage. Conversion affixes carry weapon builds into an element.
 
 **O225** — Elements are built one at a time, each end to end before the next: Entropy, Void, Rift, then reactions. Status.Void's armour and healing reduction is retired.
+
+**O226** — Large persistent destinations retain fixed regional enemy levels; tougher return Rifts supply later challenge. The campaign passes through these destinations and leaves them available for revisits, supported by an in-game map.

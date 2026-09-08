@@ -79,6 +79,32 @@ continuity rule, and nothing that spawns there constrains the campaign.
 
 ## The model
 
+### Persistent destinations
+
+Fernhall and two additional large destinations provide places the campaign
+passes through and later returns to. Each destination contains connected
+districts with recognizable landmarks, different encounter compositions,
+optional routes and discoverable Rift entrances. Scale comes from useful
+spaces and objectives along the routes, not longer empty travel.
+
+Fernhall's districts are visually distinguishable through terrain and building
+silhouettes, landmarks, materials, lighting and environmental detail. Dressing
+supports readable routes and combat sightlines. Anchor's market street and
+service spaces receive the same authored environmental treatment; a flat floor
+with isolated interactable actors does not establish a settlement.
+
+Ordinary enemies use fixed regional level ranges. Returning with a stronger
+build makes familiar patrols easier. Higher-difficulty Rift activities provide
+later challenges without raising the ordinary region to the player's level.
+Closing an instanced Rift leaves the surrounding destination accessible;
+campaign completion does not remove the reason or ability to return there.
+
+The destination map represents the actual playable geography: discovered
+districts, their connections, player location, campaign objectives and Rift
+entrances. Rift markers state their difficulty; selecting a destination or
+activity lets the player track where to go. Discovery persists with the
+character, and markers resolve to real reachable locations.
+
 ### The spatial grammar
 
 Every distance in the field is derived from the movement kit rather than

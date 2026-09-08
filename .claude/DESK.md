@@ -37,7 +37,7 @@ Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 - [x] Implement Collapse, Wither and Tear, consuming only the first status's unpaid damage; accepted-hit, callback, hitch, shortened-duration and cancellation tests pass.
 O221–O225 are recorded in DECISIONS and combat intent. Element magnitudes remain O2 tuning in Data/elements.json. Element implementation is validated; human balance and audible-mix acceptance remain part of the eventual playtest.
 ## Current owner direction
-Finish steps 1-6 before the owner playtests: Entropy, remaining elements/reactions, progression/combat, loot, interface, then Fernhall/Rift content. Erased's delayed burst is approved. Automated checks and inspected captures validate implementation; human balance acceptance remains separate.
+Finish steps 1-6 before the owner playtests: Entropy, remaining elements/reactions, progression/combat, loot, interface, then Fernhall/Rift content. Step 7's full combat visual/audio identity pass follows later; Anchor and Fernhall environment presentation belongs in step 6 and is prioritized before the additional destinations. Step 6 includes two additional larger persistent destinations alongside Fernhall, campaign traversal and return Rift activities, and an in-game destination map. Ordinary enemies retain fixed regional level ranges; tougher return Rifts supply later challenge. Automated checks and inspected captures validate implementation; human balance acceptance remains separate.
 
 ## Playtest queue (owner, 2026-09-07)
 The owner will playtest after the remaining Entropy pass is finished. Continue its remaining encounter tuning and presentation work through tested batches, then report for playtest; do not stop after each intermediate checkpoint.
@@ -56,7 +56,12 @@ The owner will playtest after the remaining Entropy pass is finished. Continue i
 - New special loot now respects its final affix budget. Existing saved items remain unchanged; a migration still needs to be designed.
 
 ## Content phase after the repair list (owner, 2026-09-07)
+- [ ] Visually flesh out Anchor first: lived-in market street, suppression-pylon landmark, distinct stash/Forge/quartermaster/command/gate spaces, functional verticality, warm interior/cold exterior lighting and environmental detail. Inspect actual arrival and service-route captures.
+- [ ] Visually flesh out Fernhall before adding destinations: recognizable districts, terrain/building silhouettes, material and lighting coherence, landmarks, environmental detail and readable encounter routes. Preserve combat sightlines and traversal; inspect actual route and combat captures.
 - [ ] Author more distinct Fernhall spaces and improve layout/content density.
+- [ ] Add two larger persistent destinations alongside Fernhall, each with connected districts, distinct landmarks, deliberate encounter compositions and a campaign route; choose final names and silhouettes against the existing setting/assets during content authoring.
+- [ ] Give each destination fixed regional level ranges and discoverable Rift sites that support later, harder return activities; preserve destination access after its campaign beats.
+- [ ] Build an in-game map of discovered destinations/districts, connecting routes, player location, campaign objectives and Rift entrances with difficulty and tracked destination; validate its markers against actual world locations and saved discovery.
 - [ ] Shape Rift runs minute by minute with finished encounters and deliberate enemy combinations.
 - [ ] Strengthen distinct class/build identities and author standout build-defining loot.
 - [ ] Unify asset packs through a coherent visual/audio identity and polished effects for existing combat.
