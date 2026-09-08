@@ -2,7 +2,7 @@
 
 Owner supplied 2026-09-08. Detailed roster overrides header: 22 wedges, 11 majors, 11 minors, 187 nodes, 429 offered points, 65 budget (6.6x). Magnitudes are placeholders; preserve named mechanics. This file condenses the owner attachment, not a completion claim.
 
-Major: gateway1; A ranked3x1 + notable2; B same; C same; links AB1/BC1; convergence3 needs two completed lanes; keystone5 needs convergence and18 prior local points. Total26, minimum keystone23. Minor: gateway1, A3+2, B3+2, convergence2 needs both lanes; total13. First gateway freely chosen, later either adjacent gateway. Three-rank nodes are one node each. All named wedges retained.
+Major: gateway1; A ranked3x1 + notable2; B same; C same; links AB1/BC1; convergence3 needs two lane notables; keystone5 needs convergence and18 prior local points. Total26, minimum keystone23. Minor: gateway1, A3+2, B3+2, convergence2 needs both notables; total13. Minor rank1 opens its notable; ranks2/3 are optional. First gateway freely chosen, later any owned node in either neighboring wedge. Three-rank nodes are one node each. All named wedges retained.
 
 Seven stages: Base / Increased / More / Site / Rate / Multiplicity / Stream. Core generic axes only; no named class resource, ability identity or ultimate. Gear and tree applicable Mores share strongest-three under existing ceiling. New convergences max1.26 each. Rule exceptions must have actual runtime consumers and bounded accounting.
 

@@ -155,8 +155,8 @@ with a silent node draws dark and unselectable until its plumbing exists
 bead is a travel node: every rank carries a magnitude. Core respec is free
 until level N and costs Riftglass after; Doctrine respec stays the Forge's (O213).
 
-The first gateway is freely chosen; later gateways require an owned neighboring
-gateway. Interior nodes cannot substitute for neighboring gateways. Major wedges have11 nodes and26
+The first gateway is freely chosen; later gateways require any owned node in
+either neighboring wedge. Major wedges have11 nodes and26
 offered points; minor wedges have6 nodes and13 offered points.
 The full roster has11 majors and11 minors:22 wedges,187 nodes and429 offered
 points against65 spendable, a6.6x ratio. All named wedges remain in the design.
@@ -176,7 +176,8 @@ Minor convergence requires both completed lanes.
 ```
 
 Each ranked lane node costs one point per rank, up to three. A notable requires
-all three ranks of its lane. Major convergence requires two completed lanes;
+rank one of its lane; ranks two and three are optional deepening. Crossing a
+lane costs three points; fully owning it costs five. Major convergence requires two notables;
 its keystone requires convergence and18 points already spent in that wedge.
 The keystone's five-point purchase cannot count toward its own gate. Its
 minimum23-point path permits two for46 and rejects three for69 against65.

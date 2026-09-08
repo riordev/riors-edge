@@ -62,7 +62,7 @@ UBreakerProgressionTree* BreakerCoreTree::Build(UObject* Outer, FName TreeId,
             auto* Minor = Copy(Lane.Minor,EBreakerCoreNodeRole::LaneMinor,Index,3,1,2);
             Minor->Prerequisites.Add(Requirement(Gateway->NodeId)); Edge(Gateway->NodeId,Minor->NodeId);
             auto* Notable = Copy(Lane.Notable,EBreakerCoreNodeRole::LaneNotable,Index,1,2,3);
-            Notable->Prerequisites.Add(Requirement(Minor->NodeId,3)); Edge(Minor->NodeId,Notable->NodeId);
+            Notable->Prerequisites.Add(Requirement(Minor->NodeId)); Edge(Minor->NodeId,Notable->NodeId);
             Notables.Add(Notable);
         }
         for (int32 Index = 0; Index < Wedge.Links.Num(); ++Index)

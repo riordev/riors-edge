@@ -73,7 +73,8 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Ring") TArray<FName> EntryNodeIds;
 
     // Core-only: choose any first gateway while Core is empty; later gateways
-    // require an owned gateway joined by a direct adjacency edge.
+    // require any owned node in either neighboring CoreWedgeOrder wedge.
+    // Without target wedge metadata, retain direct owned-gateway adjacency.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Ring") bool bRestrictEntryToOwnedNeighbor = false;
 
     // Empty preserves legacy layout. Otherwise lists every wedge clockwise.

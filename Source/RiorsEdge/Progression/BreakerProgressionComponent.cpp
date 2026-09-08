@@ -374,21 +374,41 @@ bool UBreakerProgressionComponent::CanPurchaseNode(const UBreakerProgressionTree
         && Tree->EntryNodeIds.Contains(NodeId) && GetNodeRank(NodeId, Node->Currency) == 0
         && GetProgressionState().CoreNodeRanks.ContainsByPredicate([](const FBreakerNodeRank& Rank) { return Rank.Rank > 0; }))
     {
-        bool bAdjacentGatewayOwned = false;
-        for (const FBreakerNodeEdge& Edge : Tree->AdjacencyEdges)
+        bool bNeighborOwned = false;
+        const int32 WedgeIndex = Tree->CoreWedgeOrder.IndexOfByKey(Node->Constellation);
+        if (!Node->Constellation.IsNone() && WedgeIndex != INDEX_NONE && Tree->CoreWedgeOrder.Num() > 1)
         {
-            const FName Neighbor = Edge.A == NodeId ? Edge.B : (Edge.B == NodeId ? Edge.A : NAME_None);
-            const UBreakerProgressionNode* NeighborNode = Tree->FindNode(Neighbor);
-            if (Neighbor != NodeId && NeighborNode && NeighborNode->Currency == Node->Currency
-                && Tree->EntryNodeIds.Contains(Neighbor) && GetNodeRank(Neighbor, Node->Currency) > 0)
+            // Metadata defines wedge neighbors; the graph still governs travel
+            // inside each wedge. Any paid node establishes neighboring reach.
+            const int32 Count = Tree->CoreWedgeOrder.Num();
+            const FName Before = Tree->CoreWedgeOrder[(WedgeIndex + Count - 1) % Count];
+            const FName After = Tree->CoreWedgeOrder[(WedgeIndex + 1) % Count];
+            for (const UBreakerProgressionNode* Owned : Tree->Nodes)
             {
-                bAdjacentGatewayOwned = true;
-                break;
+                if (Owned && Owned->Currency == Node->Currency && Owned->Constellation != Node->Constellation
+                    && (Owned->Constellation == Before || Owned->Constellation == After)
+                    && GetNodeRank(Owned->NodeId, Node->Currency) > 0)
+                { bNeighborOwned = true; break; }
             }
         }
-        if (!bAdjacentGatewayOwned)
+        else
         {
-            OutFailureReason = LOCTEXT("GatewayUnreached", "Reach this wedge through either neighboring gateway.");
+            // Trees without complete target metadata retain their original
+            // gateway-edge contract, including legacy authored fixtures.
+            for (const FBreakerNodeEdge& Edge : Tree->AdjacencyEdges)
+            {
+                const FName Neighbor = Edge.A == NodeId ? Edge.B : (Edge.B == NodeId ? Edge.A : NAME_None);
+                const UBreakerProgressionNode* NeighborNode = Tree->FindNode(Neighbor);
+                if (Neighbor != NodeId && NeighborNode && NeighborNode->Currency == Node->Currency
+                    && Tree->EntryNodeIds.Contains(Neighbor) && GetNodeRank(Neighbor, Node->Currency) > 0)
+                { bNeighborOwned = true; break; }
+            }
+        }
+        if (!bNeighborOwned)
+        {
+            OutFailureReason = WedgeIndex != INDEX_NONE && Tree->CoreWedgeOrder.Num() > 1
+                ? LOCTEXT("WedgeUnreached", "Reach this wedge by owning a node in either neighboring wedge.")
+                : LOCTEXT("GatewayUnreached", "Reach this wedge through either neighboring gateway.");
             return false;
         }
     }

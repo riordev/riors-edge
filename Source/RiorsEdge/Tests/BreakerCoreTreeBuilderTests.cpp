@@ -45,6 +45,11 @@ bool FBreakerCoreTreeBuilderTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Authored effect copied unchanged"),N->Effects.Num(),1);
         TestEqual(TEXT("Authored description retained"),N->Description.ToString(),FString(TEXT("Caller-authored fixture")));
         TestTrue(TEXT("Output node owned by output tree"),N->GetOuter()==Tree);
+        for (const auto& Prerequisite : N->Prerequisites)
+            TestEqual(TEXT("Builder paths require only rank one"),Prerequisite.RequiredRank,1);
+        for (const auto& Group : N->PrerequisiteGroups)
+            for (const auto& Candidate : Group.Candidates)
+                TestEqual(TEXT("Builder lane groups require only rank one"),Candidate.RequiredRank,1);
     }
     TestEqual(TEXT("Shape-derived offered cost"),Offered,65);
     TestEqual(TEXT("Builder does not mutate caller node"),Wedges[0].Gateway->RequiredTreeInvestment,99);
@@ -60,12 +65,22 @@ bool FBreakerCoreTreeBuilderTest::RunTest(const FString& Parameters)
     for (int32 Lane=0; Lane<2; ++Lane)
     {
         const FString Minor=FString::Printf(TEXT("Fixture0.Minor%d"),Lane), Notable=FString::Printf(TEXT("Fixture0.Notable%d"),Lane);
-        if (!Buy(*Minor)||!Buy(*Minor)) return false;
-        TestFalse(TEXT("Two ranks do not unlock notable"),Progression->CanPurchaseNode(Tree,FName(*Notable),Reason));
-        if (!Buy(*Minor)||!Buy(*Notable)) return false;
+        TestFalse(TEXT("Unowned minor still blocks notable"),Progression->CanPurchaseNode(Tree,FName(*Notable),Reason));
+        if (!Buy(*Minor)) return false;
+        TestTrue(TEXT("Rank one unlocks onward travel"),Progression->CanPurchaseNode(Tree,FName(*Notable),Reason));
+        if (!Buy(*Notable)) return false;
         if (Lane==0) TestFalse(TEXT("One complete lane does not unlock convergence"),Progression->CanPurchaseNode(Tree,TEXT("Fixture0.Convergence"),Reason));
     }
     if (!Buy(TEXT("Fixture0.Convergence"))) return false;
+    TestEqual(TEXT("Two rank-one lanes reach major convergence for ten points"),Progression->GetConstellationInvestment(Tree,TEXT("Fixture0")),10);
+    TestFalse(TEXT("Cheap convergence route cannot bypass eighteen-point keystone gate"),Progression->CanPurchaseNode(Tree,TEXT("Fixture0.Keystone"),Reason));
+    for (int32 Lane=0; Lane<2; ++Lane)
+    {
+        const FString Minor=FString::Printf(TEXT("Fixture0.Minor%d"),Lane);
+        if (!Buy(*Minor)||!Buy(*Minor)) return false;
+        TestEqual(TEXT("Optional investment still reaches rank three"),Progression->GetNodeRank(FName(*Minor),Tree->Currency),3);
+        TestFalse(TEXT("Fourth minor rank remains refused"),Progression->CanPurchaseNode(Tree,FName(*Minor),Reason));
+    }
     for (int32 Rank=0;Rank<3;++Rank) if (!Buy(TEXT("Fixture0.Minor2"))) return false;
     TestEqual(TEXT("Seventeen local points before link"),Progression->GetConstellationInvestment(Tree,TEXT("Fixture0")),17);
     TestFalse(TEXT("Keystone cannot count its own five-point cost toward gate"),Progression->CanPurchaseNode(Tree,TEXT("Fixture0.Keystone"),Reason));

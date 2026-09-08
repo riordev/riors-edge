@@ -425,3 +425,5 @@ Numbers are permanent and never reused.
 **O232** — Ballistics Loud adds the nearest enemy outside the original blast within one further blast radius, without imposing a target cap on ordinary splash.
 
 **O233** — Deployables have health and zones have duration; zones are not destructible, and Threat Decoy grants only deployable health.
+
+**O234** — Core lane rank one opens downstream routing while ranks two and three remain optional; later gateways require an owned node in either neighboring wedge, and keystones still require18 prior local points, so cheap travel does not bypass commitment.
