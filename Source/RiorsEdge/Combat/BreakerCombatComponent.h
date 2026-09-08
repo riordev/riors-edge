@@ -132,6 +132,9 @@ public:
     // Maintained weapon buffs own their keys and remove them on expiry/death.
     void PushWeaponFlatDamage(FName Key, float FlatBonus);
     void PopWeaponFlatDamage(FName Key);
+    void PushWindowWeaponFlatDamage(FName Key, float FlatBonus, float Duration);
+    void UpdateWindowWeaponFlatDamage(FName Key, float FlatBonus);
+    void FinishWindowWeaponFlatDamage(FName Key);
 
     // Adds the composed flat bonus to BaseDamage and folds the More product
     // into SourceDamageMultiplier. O34: the chain's product counts against the
@@ -376,6 +379,9 @@ private:
 
     UPROPERTY() TArray<FBreakerOutgoingModifier> OutgoingModifiers;
     TMap<FName, float> WeaponFlatDamage;
+    // Optional finite source-owned lifetime for an existing weapon-only flat key.
+    struct FWeaponFlatWindow { float EndTime = 0; bool bAfterimage = false; };
+    TMap<FName, FWeaponFlatWindow> WeaponFlatWindows;
     struct FLethalSaveLease
     {
         TWeakObjectPtr<AActor> Source;

@@ -1540,7 +1540,7 @@ void UBreakerAbility_Conduit::ActivateAbility(const FGameplayAbilitySpecHandle H
     }
     bConduitActive = true;
     Character->GetCombat()->OnDeath.AddUniqueDynamic(this, &ThisClass::HandleConduitDeath);
-    World->GetTimerManager().SetTimer(WindowTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { CloseConduit(); }), Duration, false);
+    World->GetTimerManager().SetTimer(WindowTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { bNaturalConduitEnd = true; CloseConduit(); }), Duration, false);
     // The ultimates' violet ignition (Overdrive's precedent), feet-anchored.
     if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World))
     {
@@ -1583,6 +1583,7 @@ void UBreakerAbility_Conduit::ActivateAbility(const FGameplayAbilitySpecHandle H
         if (UBreakerCombatComponent* Combat = Character->FindComponentByClass<UBreakerCombatComponent>())
         {
             DownbeatOwnerKey = FName(*FString::Printf(TEXT("Conduit.Downbeat.%u"), GetUniqueID()));
+            Combat->PushWindowWeaponFlatDamage(DownbeatOwnerKey, 0.0f, Duration);
             if (auto* State = UBreakerAbilityStateComponent::FindOrAdd(Character))
                 State->OnMaintainedBuffRecipientsChanged.AddUniqueDynamic(this, &ThisClass::RefreshDownbeat);
             RefreshDownbeat();
@@ -1621,7 +1622,7 @@ void UBreakerAbility_Conduit::RefreshDownbeat()
     const auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>();
     const bool bEnabled = State && State->IsWindowActive(ConduitWindowKey())
         && SupportHasNode(Character, FGameplayTag::RequestGameplayTag(TEXT("Keystone.Support.Downbeat"), false));
-    Character->GetCombat()->PushWeaponFlatDamage(DownbeatOwnerKey,
+    Character->GetCombat()->UpdateWindowWeaponFlatDamage(DownbeatOwnerKey,
         bEnabled ? DownbeatFlatDamagePerBuffedTarget * State->GetMaintainedBuffRecipientCount() : 0.0f);
 }
 
@@ -1677,6 +1678,15 @@ void UBreakerAbility_Conduit::HandleBlackoutHit(const FBreakerHitContext& Hit)
     }
 }
 
+void UBreakerAbility_Conduit::OnRemoveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)
+{
+    // Revoke before end callbacks can activate a replacement on this source.
+    if (auto* Character = GetBreakerCharacter()) Character->GetCombat()->PopWeaponFlatDamage(DownbeatOwnerKey);
+    bNaturalConduitEnd = false;
+    if (IsActive()) CloseConduit();
+    Super::OnRemoveAbility(ActorInfo, Spec);
+}
+
 void UBreakerAbility_Conduit::CloseConduit()
 {
     if (CurrentActorInfo)
@@ -1687,6 +1697,8 @@ void UBreakerAbility_Conduit::CloseConduit()
 
 void UBreakerAbility_Conduit::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
+    const bool bKeepTail = bNaturalConduitEnd && !bWasCancelled;
+    bNaturalConduitEnd = false;
     if (bConduitActive)
     {
         bConduitActive = false;
@@ -1704,7 +1716,8 @@ void UBreakerAbility_Conduit::EndAbility(const FGameplayAbilitySpecHandle Handle
             }
             if (UBreakerCombatComponent* Combat = Character->FindComponentByClass<UBreakerCombatComponent>())
             {
-                Combat->PopWeaponFlatDamage(DownbeatOwnerKey);
+                if (bKeepTail) Combat->FinishWindowWeaponFlatDamage(DownbeatOwnerKey);
+                else Combat->PopWeaponFlatDamage(DownbeatOwnerKey);
                 Combat->OnDeath.RemoveDynamic(this, &ThisClass::HandleConduitDeath);
             }
         }

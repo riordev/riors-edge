@@ -335,6 +335,8 @@ public:
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
     virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
+    virtual void OnRemoveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec) override;
+
     static FName BlackoutModifierKey();
     static FName DownbeatModifierKey();
 
@@ -371,4 +373,5 @@ private:
     TWeakObjectPtr<UBreakerCombatComponent> BoundCombat;
     TArray<TWeakObjectPtr<AActor>> BlackoutTargets;
     bool bConduitActive = false;
+    bool bNaturalConduitEnd = false;
 };

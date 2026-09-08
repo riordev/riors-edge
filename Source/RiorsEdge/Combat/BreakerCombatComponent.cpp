@@ -1055,6 +1055,12 @@ void UBreakerCombatComponent::InvalidateAfterimageContributions()
         FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage")));
     for (auto& Entry : OutgoingModifiers)
         if (!bOwned) Entry.bAfterimage = false;
+    for (auto& Entry : WeaponFlatWindows) if (!bOwned) Entry.Value.bAfterimage = false;
+    if (IsDead())
+    {
+        for (const auto& Entry : WeaponFlatWindows) WeaponFlatDamage.Remove(Entry.Key);
+        WeaponFlatWindows.Reset();
+    }
     if (IsDead()) OutgoingModifiers.RemoveAll([](const FBreakerOutgoingModifier& Entry) { return Entry.bWindowContribution; });
     PruneExpiredOutgoingModifiers();
 }
@@ -1066,7 +1072,10 @@ void UBreakerCombatComponent::RemoveOutgoingModifier(FName Key)
 
 void UBreakerCombatComponent::PruneExpiredOutgoingModifiers()
 {
-    if (OutgoingModifiers.IsEmpty() || !GetWorld()) return;
+    if (!GetWorld()) return;
+    for (auto It = WeaponFlatWindows.CreateIterator(); It; ++It)
+        if (FBreakerWindowLaneMath::Scale(GetWorld()->GetTimeSeconds(), It.Value().EndTime, It.Value().bAfterimage) == 0)
+        { WeaponFlatDamage.Remove(It.Key()); It.RemoveCurrent(); }
     const float Now = static_cast<float>(GetWorld()->GetTimeSeconds());
     OutgoingModifiers.RemoveAll([Now](const FBreakerOutgoingModifier& Modifier)
     {
@@ -1430,12 +1439,44 @@ bool UBreakerCombatComponent::ConsumeLethalSave()
 void UBreakerCombatComponent::PushWeaponFlatDamage(FName Key, float FlatBonus)
 {
     if (Key.IsNone() || !FMath::IsFinite(FlatBonus)) return;
+    WeaponFlatWindows.Remove(Key);
     WeaponFlatDamage.Add(Key, FMath::Max(0.0f, FlatBonus));
 }
 
 void UBreakerCombatComponent::PopWeaponFlatDamage(FName Key)
 {
     WeaponFlatDamage.Remove(Key);
+    WeaponFlatWindows.Remove(Key);
+}
+
+void UBreakerCombatComponent::PushWindowWeaponFlatDamage(FName Key, float FlatBonus, float Duration)
+{
+    if (!GetOwner() || !GetWorld() || Key.IsNone() || !FMath::IsFinite(FlatBonus)
+        || !FMath::IsFinite(Duration) || Duration <= 0) return;
+    PushWeaponFlatDamage(Key, FlatBonus);
+    const auto* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+    FWeaponFlatWindow Window;
+    Window.EndTime = GetWorld()->GetTimeSeconds() + Duration;
+    Window.bAfterimage = Progression && Progression->HasNodeTag(
+        FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage")));
+    WeaponFlatWindows.Add(Key, Window);
+    if (auto* MutableProgression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>())
+        MutableProgression->OnProgressionChanged.AddUniqueDynamic(this, &ThisClass::InvalidateAfterimageContributions);
+    OnDeath.AddUniqueDynamic(this, &ThisClass::InvalidateAfterimageContributions);
+}
+
+void UBreakerCombatComponent::UpdateWindowWeaponFlatDamage(FName Key, float FlatBonus)
+{
+    const auto* Window = WeaponFlatWindows.Find(Key);
+    if (!Window || !GetWorld() || Window->EndTime <= GetWorld()->GetTimeSeconds() || !FMath::IsFinite(FlatBonus)) return;
+    WeaponFlatDamage.Add(Key, FMath::Max(0.0f, FlatBonus));
+}
+
+void UBreakerCombatComponent::FinishWindowWeaponFlatDamage(FName Key)
+{
+    const auto* Window = WeaponFlatWindows.Find(Key);
+    if (!Window || !Window->bAfterimage) PopWeaponFlatDamage(Key);
+    PruneExpiredOutgoingModifiers();
 }
 
 void UBreakerCombatComponent::ApplyOutgoingModifiers(FBreakerDamageRequest& Request)
@@ -1452,7 +1493,11 @@ void UBreakerCombatComponent::ApplyOutgoingModifiers(FBreakerDamageRequest& Requ
     if (Request.Delivery == EBreakerDamageDelivery::Weapon
         && !Request.bIsDamageOverTime
         && !Request.SourceTags.HasTag(AbilitySource) && !Request.SourceTags.HasTag(MeleeSource))
-        for (const auto& Entry : WeaponFlatDamage) Flat += Entry.Value;
+        for (const auto& Entry : WeaponFlatDamage)
+        {
+            const auto* Window = WeaponFlatWindows.Find(Entry.Key);
+            Flat += Entry.Value * (Window ? FBreakerWindowLaneMath::Scale(Now, Window->EndTime, Window->bAfterimage) : 1.0f);
+        }
 
     // Flat first, then the More product — resolution order step 1. The chain's
     // product is a More, so it lands in BOTH the composed convenience value
