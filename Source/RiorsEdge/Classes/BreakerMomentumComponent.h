@@ -20,6 +20,15 @@ enum class EBreakerMomentumState : uint8
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerMomentumStateChanged, EBreakerMomentumState, NewState);
 
+USTRUCT()
+struct FBreakerMomentumFloor
+{
+    GENERATED_BODY()
+    UPROPERTY() FName Key;
+    UPROPERTY() float Fraction = 0;
+    UPROPERTY() double Expiry = 0;
+};
+
 // Swift's Momentum loop: purposeful movement fills the class resource and
 // inaction drains it. Server-authority only; inert unless the owner's
 // permanent class is Swift.
@@ -31,6 +40,8 @@ class RIORSEDGE_API UBreakerMomentumComponent : public UActorComponent
 public:
     UBreakerMomentumComponent();
     virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type Reason) override;
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
     // The whole per-frame loop, mechanically separated out of TickComponent
     // (no value or behaviour change) so it can run in an automation test with
@@ -43,10 +54,14 @@ public:
     // delegate (RiorsEdge.Classes.ClassLockNotifiesLoop covers that path).
     void AdvanceLoop(float DeltaTime);
 
-    UFUNCTION(BlueprintPure, Category="Momentum") EBreakerMomentumState GetMomentumState() const { return CachedState; }
+    UFUNCTION(BlueprintPure, Category="Momentum") EBreakerMomentumState GetMomentumState() const { return StateForFraction(GetEffectiveMomentumFraction()); }
     UFUNCTION(BlueprintPure, Category="Momentum") bool IsActiveForOwner() const;
     UFUNCTION(BlueprintPure, Category="Momentum") float GetMomentum() const;
     UFUNCTION(BlueprintPure, Category="Momentum") float GetMomentumFraction() const;
+    float GetEffectiveMomentumFraction() const;
+    void PushMomentumFloor(FName Key, float Fraction, float Duration);
+    UFUNCTION() void PopMomentumFloor(FName Key);
+    UFUNCTION() void ClearMomentumFloors();
     // ResourceDepleted eligibility (build-math finding #3): "depleted" means
     // DRAINED past empty, which only a loop that RESTS full can be. Momentum
     // is earned by moving and decays to zero at rest — an empty bar is the
@@ -299,6 +314,8 @@ private:
     // Mutable: the pure reads below are const and are the natural place to drop
     // expired entries, which is what "lazy expiry" means here.
     mutable TMap<FName, FLoopOverrideEntry> LoopOverrides;
+    UPROPERTY(ReplicatedUsing=OnRep_MomentumFloors) TArray<FBreakerMomentumFloor> MomentumFloors;
+    UFUNCTION() void OnRep_MomentumFloors() { RefreshState(); }
     void PruneLoopOverrides() const;
 
     UPROPERTY() TObjectPtr<UBreakerAttributeSet> Attributes;

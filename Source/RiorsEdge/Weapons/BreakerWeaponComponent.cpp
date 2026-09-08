@@ -986,7 +986,7 @@ float UBreakerWeaponComponent::GetNextShotSpreadDegrees() const
     // component, so the crosshair and the round agree about the bar.
     const UBreakerMomentumComponent* Momentum = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerMomentumComponent>() : nullptr;
     return TreeSpread * FBreakerWeaponMath::MomentumSpreadMultiplier(
-        Momentum ? Momentum->GetMomentumFraction() : 0.0f, Momentum && Momentum->IsActiveForOwner());
+        Momentum ? Momentum->GetEffectiveMomentumFraction() : 0.0f, Momentum && Momentum->IsActiveForOwner());
 }
 
 FVector UBreakerWeaponComponent::GetViewmodelLocationOffset() const
@@ -1774,7 +1774,7 @@ bool UBreakerWeaponComponent::FireOnce()
     const float Spread = FBreakerWeaponFeel::EffectiveSpreadDegrees(AimedProfile, BaseSpread, GetEffectiveBloomDegrees(), BurstShotIndex, MovementSpread)
         / (SpreadNodeStats ? SpreadNodeStats->WeaponSpreadReduction : 1.0f)
         * FBreakerWeaponMath::MomentumSpreadMultiplier(
-            Momentum ? Momentum->GetMomentumFraction() : 0.0f, Momentum && Momentum->IsActiveForOwner());
+            Momentum ? Momentum->GetEffectiveMomentumFraction() : 0.0f, Momentum && Momentum->IsActiveForOwner());
 
     // Recoil state for this shot, resolved before the pellets so the cosmetic
     // event can carry it to every machine and they all kick identically.

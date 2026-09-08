@@ -417,43 +417,38 @@ TSharedRef<SWidget> SBreakerMenu::BuildStashScreen()
     const FText TakeLabel = FText::FromString(BreakerStrings::Get(EBreakerStringKey::StashTakeToBackpack));
 
     TSharedRef<SWidget> MoveButton = bMoveLive
-        ? MakeButton(MoveLabel, FOnClicked::CreateLambda([this, bAtAnchor, StashCount]()
+        ? MakeButton(MoveLabel, FOnClicked::CreateLambda([this]()
         {
             UBreakerEquipmentComponent* Live = Character.IsValid() ? Character->GetEquipment() : nullptr;
             const FGuid ItemId = StashSelectedItemId;
-            if (Live && Live->DepositToStash(ItemId, bAtAnchor))
+            FText Reason = FText::FromString(GenericRefusal());
+            if (Live && Live->DepositToStashWithReason(ItemId, UBreakerGameInstance::IsAnchorMap(Character.Get()), Reason))
             {
                 StashStatus = FText::GetEmpty();
             }
             else
             {
-                // The component logged WHY; the screen re-reads the same
-                // predicates to say it. See DepositRefusal for the gap.
-                const FString Reason = DepositRefusal(bAtAnchor, StashCount);
-                StashStatus = FText::FromString(Reason.IsEmpty() ? FString(GenericRefusal()) : Reason);
+                StashStatus = Reason;
             }
             Rebuild(EBreakerMenuScreen::Stash);
             return FReply::Handled();
         }), true)
         : BreakerStashPaintedButton(MoveLabel);
 
-    const int32 SelectedItemLevel = Selected.ItemLevel;
-    const bool bSelectedClaimed = Account && Account->PendingWithdrawals.Contains(StashSelectedItemId);
-    const int32 BackpackCount = Backpack.Num();
     TSharedRef<SWidget> TakeButton = bTakeLive
         ? MakeButton(TakeLabel, FOnClicked::CreateLambda(
-            [this, bAtAnchor, bSelectedClaimed, SelectedItemLevel, CharacterLevel, BackpackCount]()
+            [this]()
         {
             UBreakerEquipmentComponent* Live = Character.IsValid() ? Character->GetEquipment() : nullptr;
             const FGuid ItemId = StashSelectedItemId;
-            if (Live && Live->WithdrawFromStash(ItemId, bAtAnchor))
+            FText Reason = FText::FromString(GenericRefusal());
+            if (Live && Live->WithdrawFromStashWithReason(ItemId, UBreakerGameInstance::IsAnchorMap(Character.Get()), Reason))
             {
                 StashStatus = FText::GetEmpty();
             }
             else
             {
-                const FString Reason = WithdrawRefusal(bAtAnchor, bSelectedClaimed, SelectedItemLevel, CharacterLevel, BackpackCount);
-                StashStatus = FText::FromString(Reason.IsEmpty() ? FString(GenericRefusal()) : Reason);
+                StashStatus = Reason;
             }
             Rebuild(EBreakerMenuScreen::Stash);
             return FReply::Handled();

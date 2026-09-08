@@ -2,6 +2,7 @@
 
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
+#include "Abilities/BreakerAbilityStateComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Game/BreakerGameMode.h"
@@ -10,6 +11,8 @@
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "TimerManager.h"
+#include "Net/UnrealNetwork.h"
+#include "GameFramework/GameStateBase.h"
 #include "Weapons/BreakerWeaponComponent.h"
 
 UBreakerMomentumComponent::UBreakerMomentumComponent()
@@ -64,6 +67,67 @@ void UBreakerMomentumComponent::BindAttributes(UBreakerAttributeSet* InAttribute
     HandleProgressionChanged();
     CachedState = StateForFraction(GetMomentumFraction());
     LastKnownResource = GetMomentum();
+}
+
+void UBreakerMomentumComponent::EndPlay(const EEndPlayReason::Type Reason)
+{
+    ClearMomentumFloors();
+    if (auto* State = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerAbilityStateComponent>() : nullptr)
+        State->OnWindowEnded.RemoveDynamic(this, &UBreakerMomentumComponent::PopMomentumFloor);
+    if (auto* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr)
+        Combat->OnDeath.RemoveDynamic(this, &UBreakerMomentumComponent::ClearMomentumFloors);
+    Super::EndPlay(Reason);
+}
+
+void UBreakerMomentumComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME(UBreakerMomentumComponent, MomentumFloors);
+}
+
+void UBreakerMomentumComponent::PushMomentumFloor(FName Key, float Fraction, float Duration)
+{
+    auto* Owner = GetOwner();
+    auto* Combat = Owner ? Owner->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    if (!Owner || !Owner->HasAuthority() || !GetWorld() || !IsActiveForOwner() || (Combat && Combat->IsDead())
+        || Key.IsNone() || !FMath::IsFinite(Fraction) || Fraction <= 0 || !FMath::IsFinite(Duration) || Duration <= 0) return;
+    MomentumFloors.RemoveAll([&](const auto& Entry) { return Entry.Key == Key; });
+    FBreakerMomentumFloor Entry;
+    Entry.Key = Key; Entry.Fraction = FMath::Clamp(Fraction, 0.0f, 1.0f);
+    Entry.Expiry = GetWorld()->GetTimeSeconds() + Duration;
+    MomentumFloors.Add(Entry);
+    Owner->ForceNetUpdate();
+    if (auto* State = UBreakerAbilityStateComponent::FindOrAdd(Owner))
+        State->OnWindowEnded.AddUniqueDynamic(this, &UBreakerMomentumComponent::PopMomentumFloor);
+    if (Combat) Combat->OnDeath.AddUniqueDynamic(this, &UBreakerMomentumComponent::ClearMomentumFloors);
+    RefreshState();
+}
+
+void UBreakerMomentumComponent::PopMomentumFloor(FName Key)
+{
+    MomentumFloors.RemoveAll([&](const auto& Entry) { return Entry.Key == Key; });
+    if (GetOwner()) GetOwner()->ForceNetUpdate();
+    RefreshState();
+}
+
+void UBreakerMomentumComponent::ClearMomentumFloors()
+{
+    if (MomentumFloors.IsEmpty()) return;
+    MomentumFloors.Reset();
+    if (GetOwner()) GetOwner()->ForceNetUpdate();
+    RefreshState();
+}
+
+float UBreakerMomentumComponent::GetEffectiveMomentumFraction() const
+{
+    float Fraction = GetMomentumFraction();
+    const auto* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    if (!IsActiveForOwner() || !GetWorld() || (Combat && Combat->IsDead())) return Fraction;
+    const AGameStateBase* GameState = GetWorld()->GetGameState();
+    const double Now = GameState ? GameState->GetServerWorldTimeSeconds() : GetWorld()->GetTimeSeconds();
+    for (const auto& Entry : MomentumFloors)
+        if (Entry.Expiry > Now) Fraction = FMath::Max(Fraction, Entry.Fraction);
+    return Fraction;
 }
 
 EBreakerMomentumState UBreakerMomentumComponent::StateForFraction(float Fraction)
@@ -251,7 +315,7 @@ void UBreakerMomentumComponent::HandleProgressionChanged()
             ContactEligibleAfterTraversal = Movement->GetLastLedgeTraversalTime();
     }
     CachedContactRank = NewContactRank;
-    if (!bIsSwift) { PendingGrants = 0.0f; ClearTraversalIncome(); }
+    if (!bIsSwift) { PendingGrants = 0.0f; ClearTraversalIncome(); ClearMomentumFloors(); }
 }
 
 void UBreakerMomentumComponent::ClearTraversalIncome()
@@ -367,7 +431,7 @@ void UBreakerMomentumComponent::UpdateMomentumShield(bool bGrounded)
         Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
     }
     const bool bNodeOwned = bIsSwift && Progression && Progression->HasNodeTag(BreakerNodeTags::Node_MomentumShield.GetTag());
-    const float Multiplier = MomentumShieldIncomingMultiplier(bNodeOwned, CachedState, bGrounded, MomentumShieldReductionFraction);
+    const float Multiplier = MomentumShieldIncomingMultiplier(bNodeOwned, GetMomentumState(), bGrounded, MomentumShieldReductionFraction);
     const bool bWantPush = Multiplier < 1.0f;
     if (bWantPush == bMomentumShieldPushed)
     {
@@ -446,7 +510,7 @@ void UBreakerMomentumComponent::NotifyLongFallLanding(float DistanceCm)
 
 void UBreakerMomentumComponent::RefreshState()
 {
-    const EBreakerMomentumState NewState = StateForFraction(GetMomentumFraction());
+    const EBreakerMomentumState NewState = GetMomentumState();
     if (NewState != CachedState)
     {
         CachedState = NewState;
@@ -585,12 +649,14 @@ void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
 {
     AActor* Owner = GetOwner();
     if (!Owner || !Owner->HasAuthority() || !Attributes || DeltaTime <= 0.0f) return;
+    MomentumFloors.RemoveAll([&](const auto& Entry) { return Entry.Expiry <= GetWorld()->GetTimeSeconds(); });
     // One deterministic spend observation per tick, so Feed's "cost most
     // recently paid" is current even on frames where this loop writes nothing.
     ObserveExternalSpend();
     const UBreakerCombatComponent* Combat = Owner->FindComponentByClass<UBreakerCombatComponent>();
     if (!IsActiveForOwner() || (Combat && Combat->IsDead()))
     {
+        ClearMomentumFloors();
         PendingGrants = 0.0f;
         ClearTraversalIncome();
         bHasLastLocation = false;

@@ -88,11 +88,9 @@ public:
 };
 
 // U2 Purge (§3 U2, Medic): strips every status from the target (self with no
-// target) and generates per status actually removed. THE IMMUNITY WINDOW IS
-// RECORDED ABSENT: §U2 calls the 3s status immunity "the whole value" and no
-// immunity primitive exists on the status component — the cleanse ships, the
-// immunity stands as the recorded gap, and the row's WindowDuration (3s)
-// keeps the number pinned for the day the primitive lands.
+// target) and generates per status actually removed. Field Kit grants the
+// existing new-status immunity window; Triage Priority R2 scales its duration
+// using Patch's target-health curve. Base immunity/buff-strip remain separate.
 UCLASS()
 class RIORSEDGE_API UBreakerAbility_Purge : public UBreakerSupportAbility
 {

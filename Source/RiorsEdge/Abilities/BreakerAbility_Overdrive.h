@@ -28,9 +28,7 @@ class UBreakerCombatComponent;
 // RiorsEdge.Abilities.KeystoneReachability fails the day that stops being true.
 //
 // REMAINING GAPS:
-//  - The Redline floor still needs UBreakerMomentumComponent::PushMomentumFloor
-//    (spec §4.7). Decay suspension and doubled generation are live through
-//    PushLoopOverride.
+// The Redline floor changes effective band treatment, never raw spendable Momentum.
 //  - Standing Wave's "projectile speed treatment" half (Class-Kits M12) is not
 //    built; the range half is. See the branch comment.
 UCLASS()

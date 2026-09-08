@@ -86,8 +86,8 @@ void UBreakerAbility_Overdrive::ActivateAbility(const FGameplayAbilitySpecHandle
     // Three simultaneous state changes, all keyed to the same window and all
     // self-expiring, so there is no teardown path that can leave the player in
     // a permanent power state: the loop stops draining and pays double, the
-    // run line speeds up, and shots land harder. GAP: the Redline floor still
-    // needs PushMomentumFloor on the Momentum component.
+    // run line speeds up, and shots land harder. The effective Redline floor
+    // does not refill the raw resource spent by this activation.
     if (UBreakerAbilityStateComponent* State = UBreakerAbilityStateComponent::FindOrAdd(Character))
     {
         State->StartWindow(WindowKey(), Duration);
@@ -95,6 +95,7 @@ void UBreakerAbility_Overdrive::ActivateAbility(const FGameplayAbilitySpecHandle
     if (UBreakerMomentumComponent* Momentum = Character->FindComponentByClass<UBreakerMomentumComponent>())
     {
         Momentum->PushLoopOverride(WindowKey(), /*bSuspendDecay=*/true, LoopGenerationMultiplier, Duration);
+        Momentum->PushMomentumFloor(WindowKey(), 2.0f / 3.0f, Duration);
     }
     if (UBreakerCombatComponent* Combat = Character->FindComponentByClass<UBreakerCombatComponent>())
     {
@@ -306,6 +307,7 @@ void UBreakerAbility_Overdrive::HandleBloodrhythmTimeout()
         if (UBreakerMomentumComponent* Momentum = Character->FindComponentByClass<UBreakerMomentumComponent>())
         {
             Momentum->PopLoopOverride(WindowKey());
+            Momentum->PopMomentumFloor(WindowKey());
         }
         if (UBreakerCombatComponent* Combat = Character->FindComponentByClass<UBreakerCombatComponent>())
         {
@@ -332,6 +334,9 @@ void UBreakerAbility_Overdrive::EndAbility(const FGameplayAbilitySpecHandle Hand
     // holds the keystone.
     if (bBloodrhythmActive)
     {
+        if (bWasCancelled)
+            if (auto* Character = GetBreakerCharacter())
+                if (auto* Momentum = Character->GetMomentum()) Momentum->PopMomentumFloor(WindowKey());
         bBloodrhythmActive = false;
         if (UBreakerCombatComponent* Combat = BoundCombat.Get())
         {

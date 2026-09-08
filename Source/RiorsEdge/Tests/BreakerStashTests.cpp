@@ -63,12 +63,15 @@ bool FBreakerStashTransferTest::RunTest(const FString& Parameters)
     Rig.Equipment->AddToBackpack(Item);
 
     // Anchor-only, the RespecAtForge pattern.
-    TestFalse(TEXT("a deposit away from the Anchor refuses"), Rig.Equipment->DepositToStash(Item.ItemId, false));
+    FText Reason;
+    TestFalse(TEXT("a deposit away from the Anchor refuses"), Rig.Equipment->DepositToStashWithReason(Item.ItemId, false, Reason));
+    TestEqual(TEXT("actual refusal explains Anchor gate"), Reason.ToString(), FString(TEXT("Return to the Anchor to use the stash.")));
     TestEqual(TEXT("the refused item stays put"), Rig.Equipment->GetBackpack().Num(), 1);
 
     // The deposit: one account write carrying item AND journal entry, then
     // the runtime copy drops.
-    TestTrue(TEXT("an Anchor deposit succeeds"), Rig.Equipment->DepositToStash(Item.ItemId, true));
+    TestTrue(TEXT("an Anchor deposit succeeds"), Rig.Equipment->DepositToStashWithReason(Item.ItemId, true, Reason));
+    TestTrue(TEXT("success clears previous refusal"), Reason.IsEmpty());
     TestEqual(TEXT("the stash holds the item"), Rig.Account->StashItems.Num(), 1);
     TestTrue(TEXT("the journal remembers the deposit"), Rig.Account->PendingRemovals.Contains(Item.ItemId));
     TestEqual(TEXT("the backpack no longer does"), Rig.Equipment->GetBackpack().Num(), 0);
@@ -80,7 +83,8 @@ bool FBreakerStashTransferTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("the claim marks it"), Rig.Account->PendingWithdrawals.Contains(Item.ItemId));
     TestEqual(TEXT("the backpack holds the working copy"), Rig.Equipment->GetBackpack().Num(), 1);
     TestFalse(TEXT("a second withdrawal of a claimed item refuses — locked, never duplicated"),
-        Rig.Equipment->WithdrawFromStash(Item.ItemId, true));
+        Rig.Equipment->WithdrawFromStashWithReason(Item.ItemId, true, Reason));
+    TestEqual(TEXT("live claim explains repeated withdrawal refusal"), Reason.ToString(), FString(TEXT("That item is locked by an unfinished withdrawal.")));
 
     // BOTH MARKS STAND (deposited, then withdrawn, no restore between), and
     // without character ids a sighting cannot say whose save it is — so the

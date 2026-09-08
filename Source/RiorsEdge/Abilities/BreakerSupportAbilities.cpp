@@ -311,8 +311,7 @@ void UBreakerAbility_Patch::ActivateAbility(const FGameplayAbilitySpecHandle Han
 
         // MD2 TRIAGE PRIORITY: harder the further below full the target is,
         // less on the healthy, at equal total throughput across the band.
-        // (R2's Purge-immunity scaling WAITS: the immunity window has no
-        // magnitude to scale — it is a duration, owned by Purge.)
+        // R2 applies the same health curve to Purge immunity duration.
         if (SupportNodeRank(Character, TEXT("Support.Medic.TriagePriority")) > 0)
         {
             const float Missing = 1.0f - BreakerSupportTargetHealthFraction(Target);
@@ -473,7 +472,10 @@ void UBreakerAbility_Purge::ActivateAbility(const FGameplayAbilitySpecHandle Han
         if (SupportHasNode(Character, BreakerNodeTags::Node_MD_FieldKit.GetTag()))
         {
             const UBreakerAbilityDefinition* Definition = GetAbilityDefinition();
-            Status->GrantStatusImmunity(Definition && Definition->WindowDuration > 0.0f ? Definition->WindowDuration : 3.0f);   // §U2: 3s
+            float Duration = Definition && Definition->WindowDuration > 0.0f ? Definition->WindowDuration : 3.0f;
+            if (SupportNodeRank(Character, TEXT("Support.Medic.TriagePriority")) >= 2)
+                Duration *= FMath::Lerp(0.6f, 1.4f, 1.0f - BreakerSupportTargetHealthFraction(Target));
+            Status->GrantStatusImmunity(Duration);
         }
 
         // THE CLEANSE, VISIBLE: a cyan wash and a rising ring of short

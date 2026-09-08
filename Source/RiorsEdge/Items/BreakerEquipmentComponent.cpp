@@ -652,24 +652,34 @@ bool UBreakerEquipmentComponent::TryEquipFromBackpack(const FGuid& ItemId, const
 
 bool UBreakerEquipmentComponent::DepositToStash(const FGuid& ItemId, bool bAtAnchor)
 {
-    if (!HasAttributeAuthority()) return false;
+    FText Reason;
+    return DepositToStashWithReason(ItemId, bAtAnchor, Reason);
+}
+
+bool UBreakerEquipmentComponent::DepositToStashWithReason(const FGuid& ItemId, bool bAtAnchor, FText& OutReason)
+{
+    OutReason = FText::GetEmpty();
+    if (!HasAttributeAuthority()) { OutReason = FText::FromString(TEXT("Transfer requires authority.")); return false; }
     if (!bAtAnchor)
     {
         UE_LOG(LogTemp, Display, TEXT("DepositToStash refused: the stash is an Anchor interaction (One-X)."));
+        OutReason = FText::FromString(TEXT("Return to the Anchor to use the stash."));
         return false;
     }
     const int32 Index = Backpack.IndexOfByPredicate([&ItemId](const FBreakerItemInstance& Existing) { return Existing.ItemId == ItemId; });
-    if (Index == INDEX_NONE) return false;
+    if (Index == INDEX_NONE) { OutReason = FText::FromString(TEXT("That item is no longer available.")); return false; }
     UBreakerAccountSave* Account = UBreakerAccountSave::LoadOrCreate();
     if (!Account)
     {
         UE_LOG(LogTemp, Warning, TEXT("DepositToStash refused: the account save is unreadable — depositing into a file this build cannot write is how an item vanishes."));
+        OutReason = FText::FromString(TEXT("Account stash is unavailable."));
         return false;
     }
     if (Account->StashItems.Num() >= UBreakerAccountSave::StashCapacity)
     {
         UE_LOG(LogTemp, Display, TEXT("DepositToStash refused: the stash is full (%d) — it is a transfer point, not a warehouse (One-X)."),
             UBreakerAccountSave::StashCapacity);
+        OutReason = FText::FromString(TEXT("The stash is full."));
         return false;
     }
     // The account file is the commit point: item and journal entry land in
@@ -686,19 +696,28 @@ bool UBreakerEquipmentComponent::DepositToStash(const FGuid& ItemId, bool bAtAnc
 
 bool UBreakerEquipmentComponent::WithdrawFromStash(const FGuid& ItemId, bool bAtAnchor)
 {
-    if (!HasAttributeAuthority()) return false;
+    FText Reason;
+    return WithdrawFromStashWithReason(ItemId, bAtAnchor, Reason);
+}
+
+bool UBreakerEquipmentComponent::WithdrawFromStashWithReason(const FGuid& ItemId, bool bAtAnchor, FText& OutReason)
+{
+    OutReason = FText::GetEmpty();
+    if (!HasAttributeAuthority()) { OutReason = FText::FromString(TEXT("Transfer requires authority.")); return false; }
     if (!bAtAnchor)
     {
         UE_LOG(LogTemp, Display, TEXT("WithdrawFromStash refused: the stash is an Anchor interaction (One-X)."));
+        OutReason = FText::FromString(TEXT("Return to the Anchor to use the stash."));
         return false;
     }
     UBreakerAccountSave* Account = UBreakerAccountSave::LoadOrCreate();
-    if (!Account) return false;
+    if (!Account) { OutReason = FText::FromString(TEXT("Account stash is unavailable.")); return false; }
     const int32 Index = Account->StashItems.IndexOfByPredicate([&ItemId](const FBreakerItemInstance& Existing) { return Existing.ItemId == ItemId; });
-    if (Index == INDEX_NONE) return false;
+    if (Index == INDEX_NONE) { OutReason = FText::FromString(TEXT("That item is no longer available.")); return false; }
     if (Account->PendingWithdrawals.Contains(ItemId))
     {
         UE_LOG(LogTemp, Display, TEXT("WithdrawFromStash refused: that item is claimed by an unfinished withdrawal — locked, never duplicated."));
+        OutReason = FText::FromString(TEXT("That item is locked by an unfinished withdrawal."));
         return false;
     }
     // The O182 gate, second entry in the player-facing roster: withdrawal is
@@ -708,6 +727,7 @@ bool UBreakerEquipmentComponent::WithdrawFromStash(const FGuid& ItemId, bool bAt
     if (!Progression)
     {
         UE_LOG(LogTemp, Warning, TEXT("WithdrawFromStash refused: no progression component to read a character level from."));
+        OutReason = FText::FromString(TEXT("Character progression is unavailable."));
         return false;
     }
     if (!BreakerItemRequirements::CanEquipAtLevel(Account->StashItems[Index].ItemLevel, Progression->GetProgressionState().CharacterLevel))
@@ -715,6 +735,7 @@ bool UBreakerEquipmentComponent::WithdrawFromStash(const FGuid& ItemId, bool bAt
         UE_LOG(LogTemp, Display, TEXT("WithdrawFromStash refused: item level %d requires character level %d (O182)."),
             Account->StashItems[Index].ItemLevel,
             BreakerItemRequirements::RequiredLevelFor(Account->StashItems[Index].ItemLevel));
+        OutReason = FText::FromString(TEXT("Your character level is too low for that item."));
         return false;
     }
     // A withdrawal is a REFUSABLE entry under One-AB's cap: the item has
@@ -724,6 +745,7 @@ bool UBreakerEquipmentComponent::WithdrawFromStash(const FGuid& ItemId, bool bAt
     {
         UE_LOG(LogTemp, Display, TEXT("WithdrawFromStash refused: the backpack holds %d of %d (One-AB). The item stays stashed."),
             Backpack.Num(), BackpackCapacity);
+        OutReason = FText::FromString(TEXT("The backpack is full."));
         return false;
     }
     // Claim-mark, one account write; the stash copy STAYS until a restore

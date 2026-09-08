@@ -60,6 +60,9 @@ public:
     // comment on UBreakerAccountSave for the whole protocol.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment|Stash") bool DepositToStash(const FGuid& ItemId, bool bAtAnchor);
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment|Stash") bool WithdrawFromStash(const FGuid& ItemId, bool bAtAnchor);
+    // Authoritative refusal from the attempted transfer; legacy bool APIs remain wrappers.
+    bool DepositToStashWithReason(const FGuid& ItemId, bool bAtAnchor, FText& OutReason);
+    bool WithdrawFromStashWithReason(const FGuid& ItemId, bool bAtAnchor, FText& OutReason);
     // Destroys a single backpack item outright. Returns false when the id is
     // not in the backpack (or on a client).
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment") bool DiscardFromBackpack(const FGuid& ItemId);
