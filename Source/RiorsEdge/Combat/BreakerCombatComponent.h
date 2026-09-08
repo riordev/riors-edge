@@ -61,6 +61,7 @@ public:
     UPROPERTY(EditDefaultsOnly, Category="Combat|Parry") float ReadParryBonusSeconds = 0.10f;
     UPROPERTY(EditDefaultsOnly, Category="Combat|Parry") float ParryCounterSeconds = 2.0f;
     virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
     // Normally resolved from the owner's ability system in BeginPlay. Exposed
@@ -171,6 +172,10 @@ public:
     void RemoveIncomingDamageModifier(FName Key);
 
     UFUNCTION(BlueprintPure, Category="Combat|Incoming") float GetComposedIncomingDamageMultiplier() const;
+    // Owned, time-bounded health-fraction caps compose by minimum, never multiplication.
+    void PushIncomingHitCap(FName Key, float HealthFraction, float Duration);
+    void RemoveIncomingHitCap(FName Key);
+    float GetIncomingHitCap() const;
 
     // Flat armour reduction, keyed (Ability-Implementation-Spec §5.3). Rot
     // strips 40 armour and VW7 strips another 40 against a target already
@@ -352,6 +357,7 @@ private:
     // responsible for removing it, and a silently expiring defence is worse
     // than one that is visibly stuck.
     TMap<FName, float> IncomingDamageModifiers;
+    TMap<FName, TPair<float, double>> IncomingHitCaps;
     TSet<FName> BeneficialIncomingModifierKeys;
     TSet<TWeakObjectPtr<class ABreakerZoneActor>> BeneficialSuppressionLeases;
     // Keyed for the same reason, and summed rather than multiplied because

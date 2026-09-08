@@ -136,6 +136,8 @@ FBreakerDamageResult UBreakerDamageLibrary::ResolveDamage(const FBreakerDamageRe
 
     Result.MitigatedDamage = Result.RawDamage * (1.0f - Mitigation) * FMath::Max(0.0f, Defense.IncomingDamageMultiplier);
     if (Result.bBlocked) Result.MitigatedDamage *= 1.0f - FMath::Clamp(Defense.BlockMitigation, 0.0f, 1.0f);
+    if (FMath::IsFinite(Defense.IncomingHitCap) && Defense.IncomingHitCap > 0)
+        Result.MitigatedDamage = FMath::Min(Result.MitigatedDamage, Defense.IncomingHitCap);
     float RemainingDamage = Result.MitigatedDamage;
     Result.RemainingShield = FMath::Max(0.0f, Defense.Shield);
     Result.RemainingHealth = FMath::Max(0.0f, Defense.Health);

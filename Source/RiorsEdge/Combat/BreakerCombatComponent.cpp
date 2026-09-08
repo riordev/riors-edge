@@ -53,6 +53,12 @@ void UBreakerCombatComponent::BindAttributes(UBreakerAttributeSet* InAttributes)
     Attributes = InAttributes;
 }
 
+void UBreakerCombatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    IncomingHitCaps.Reset();
+    Super::EndPlay(EndPlayReason);
+}
+
 void UBreakerCombatComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -315,6 +321,7 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     // Pushed incoming modifiers compose on top, in the same stage: Caster's
     // Overcast penalty, and defensive windows when they land.
     Defense.IncomingDamageMultiplier *= GetComposedIncomingDamageMultiplier();
+    Defense.IncomingHitCap = GetIncomingHitCap();
     Defense.DodgeChance = DodgeChance;
     Defense.BlockChance = BlockChance;
     Defense.BlockMitigation = BlockMitigation;
@@ -441,6 +448,7 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
         EndStagger();
         StaggerImmunityEndTime = 0;
         if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(StaggerTimer);
+        IncomingHitCaps.Reset();
         OnDeath.Broadcast();
     }
     DispatchHitDealt(Request, Result);
@@ -800,6 +808,28 @@ float UBreakerCombatComponent::ComposeDotSourcePower(const UBreakerAttributeSet*
     }
     const float TotalMore = FMath::Min(RawMore, Ceiling);
     return FlatFactor * IncreasedBucket * TotalMore;
+}
+
+void UBreakerCombatComponent::PushIncomingHitCap(FName Key, float HealthFraction, float Duration)
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !GetWorld() || IsDead() || Key.IsNone()
+        || !FMath::IsFinite(HealthFraction) || HealthFraction <= 0 || HealthFraction > 1
+        || !FMath::IsFinite(Duration) || Duration <= 0) return;
+    IncomingHitCaps.Add(Key, TPair<float, double>(HealthFraction, GetWorld()->GetTimeSeconds() + static_cast<double>(Duration)));
+}
+
+void UBreakerCombatComponent::RemoveIncomingHitCap(FName Key) { IncomingHitCaps.Remove(Key); }
+
+float UBreakerCombatComponent::GetIncomingHitCap() const
+{
+    if (!GetWorld() || IsDead()) return 0;
+    const double Now = GetWorld()->GetTimeSeconds();
+    float Fraction = 0;
+    for (const auto& Entry : IncomingHitCaps)
+        if (Entry.Value.Value > Now)
+            Fraction = Fraction > 0 ? FMath::Min(Fraction, Entry.Value.Key) : Entry.Value.Key;
+    const float Cap = Fraction * GetMaxHealth();
+    return FMath::IsFinite(Cap) && Cap > 0 ? Cap : 0;
 }
 
 void UBreakerCombatComponent::PushIncomingDamageModifier(FName Key, float Multiplier)

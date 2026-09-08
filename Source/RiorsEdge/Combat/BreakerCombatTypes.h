@@ -135,6 +135,9 @@ struct RIORSEDGE_API FBreakerDefenseState
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float Shield = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float Armor = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float IncomingDamageMultiplier = 1.0f;
+    // Absolute post-mitigation budget for one hit, across shields and health.
+    // Zero disables the cap; RawDamage is never changed by this defense.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float IncomingHitCap = 0.0f;
 
     // Passive defensive layers — not inputs. Dodge is a chance to evade a
     // hit entirely; block is a chance to reduce it. Classes and gear supply

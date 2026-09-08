@@ -1153,10 +1153,9 @@ void UBreakerAbility_Hold::ActivateAbility(const FGameplayAbilitySpecHandle Hand
         }
         else
         {
-            // The multiplicative stand-in for the per-hit cap (class comment).
-            // Wall solo: doubled effectiveness on the Tank; the ally extension
-            // is unreachable until a party exists.
-            Combat->PushIncomingDamageModifier(WindowKey(), bWall ? WallSoloIncomingMultiplier : BaseIncomingMultiplier);
+            // Every damage hit shares one post-mitigation shield/health cap.
+            // Wall's solo cap is stronger; ally sharing remains separate work.
+            Combat->PushIncomingHitCap(WindowKey(), bWall ? WallSoloHitCapHealthFraction : BaseHitCapHealthFraction, Duration);
         }
         if (bVein || bDetonation)
         {
@@ -1252,7 +1251,7 @@ void UBreakerAbility_Hold::EndAbility(const FGameplayAbilitySpecHandle Handle, c
         }
         if (UBreakerCombatComponent* Combat = BoundCombat.Get())
         {
-            Combat->RemoveIncomingDamageModifier(WindowKey());
+            Combat->RemoveIncomingHitCap(WindowKey());
             Combat->OnDamageTaken.RemoveDynamic(this, &UBreakerAbility_Hold::HandleDamageTaken);
         }
         BoundCombat.Reset();

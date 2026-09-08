@@ -464,8 +464,8 @@
 			"numbers":
 			{
 				"GenerationMultiplier": 3,
-				"BaseIncomingMultiplier": 0.5,
-				"WallSoloIncomingMultiplier": 0.25,
+				"BaseHitCapHealthFraction": 0.25,
+				"WallSoloHitCapHealthFraction": 0.125,
 				"VeinHealFraction": 0.6,
 				"DetonationReleaseFraction": 0.7,
 				"DetonationRadiusCm": 800

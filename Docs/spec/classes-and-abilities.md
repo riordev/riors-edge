@@ -103,6 +103,12 @@ Resonance deals an untyped Elemental detonation based on status count. It does
 not apply elemental buildup or reactions. Its preservation node halves status
 durations instead of consuming them; this also reduces unpaid Rot damage.
 
+Hold caps each damage application after mitigation and before shield/health
+spending. Its editable starting cap is 25% of current maximum health; solo
+Wall uses 12.5% (O2 tuning). Small hits below the cap are unchanged. Active
+caps compose by minimum, including True damage and damage-over-time ticks.
+Vein removes the cap. Expiry, cancellation and death clear its protection.
+
 ### The five loops
 
 | Class | Resource | Shape | Spends on |

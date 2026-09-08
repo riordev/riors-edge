@@ -294,3 +294,27 @@ bool FBreakerOutgoingModifierTest::RunTest(const FString& Parameters)
         Combat->GetComposedMoreMultiplier(), FBreakerAttributeAggregator::ComposedMoreCeiling(), 0.0001f);
     return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerDamageHitCapTest,
+    "RiorsEdge.Combat.DamageHitCap", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FBreakerDamageHitCapTest::RunTest(const FString& Parameters)
+{
+    FBreakerDamageRequest Hit;
+    Hit.BaseDamage = 1000; Hit.bCanCritical = false;
+    Hit.DamageFamily = EBreakerDamageFamily::TrueDamage;
+    FBreakerDefenseState Defense;
+    Defense.Health = 1000; Defense.Shield = 100; Defense.IncomingHitCap = 250;
+    const auto Capped = UBreakerDamageLibrary::ResolveDamage(Hit, Defense);
+    TestEqual(TEXT("cap preserves earned raw snapshot"), Capped.RawDamage, 1000.0f);
+    TestEqual(TEXT("cap covers combined shield and health spending"), Capped.ShieldDamage + Capped.HealthDamage, 250.0f);
+    TestEqual(TEXT("shield still pays first"), Capped.ShieldDamage, 100.0f);
+    Hit.BaseDamage = 20;
+    TestEqual(TEXT("small hits are unchanged"), UBreakerDamageLibrary::ResolveDamage(Hit, Defense).MitigatedDamage, 20.0f);
+    Hit.BaseDamage = 1000; Hit.bIsDamageOverTime = true; Hit.bBypassShield = true;
+    const auto Tick = UBreakerDamageLibrary::ResolveDamage(Hit, Defense);
+    TestEqual(TEXT("bypassing true tick still obeys cap"), Tick.HealthDamage, 250.0f);
+    TestEqual(TEXT("bypass keeps shield untouched"), Tick.ShieldDamage, 0.0f);
+    Defense.IncomingHitCap = 0;
+    TestEqual(TEXT("absent cap preserves ordinary damage"), UBreakerDamageLibrary::ResolveDamage(Hit, Defense).MitigatedDamage, 1000.0f);
+    return true;
+}

@@ -217,14 +217,8 @@ private:
 // HOLD (§2.1 ultimate): 100 Grit, no cooldown, 10s. Caps the damage any single
 // hit can do, and triples Grit generation against a raised cap.
 //
-// THE PER-HIT CAP SUBSTITUTION, per the task's explicit instruction: no
-// damage-pipeline hook can cap a single hit, so the base and Wall variants
-// push a keyed INCOMING MULTIPLIER through UBreakerCombatComponent's chain.
-// The difference is load-bearing and stands recorded: a multiplier helps
-// against streams of small hits (which the real Hold deliberately does not)
-// and caps nothing absolutely against a boss slam. When a per-hit cap hook
-// exists, these two branches move onto it and compose as `min`, never as a
-// product.
+// The cap is post-mitigation and shared by shields and health. Small hits
+// remain unchanged; overlapping caps compose by minimum. Vein removes it.
 UCLASS()
 class RIORSEDGE_API UBreakerAbility_Hold : public UBreakerGameplayAbility
 {
@@ -240,9 +234,8 @@ public:
     // §2.1: generation TRIPLES against a raised cap (20/s -> 60/s); the Grit
     // component multiplies its cap by the same override, so one push does both.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hold", meta=(ClampMin="1")) float GenerationMultiplier = 3.0f;   // §2.1
-    // The multiplicative stand-ins for the per-hit cap (see the class comment).
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hold", meta=(ClampMin="0", ClampMax="1")) float BaseIncomingMultiplier = 0.5f;    // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hold", meta=(ClampMin="0", ClampMax="1")) float WallSoloIncomingMultiplier = 0.25f;   // O2 PLACEHOLDER (§2.1 Wall: solo, doubled effectiveness)
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hold", meta=(ClampMin="0", ClampMax="1")) float BaseHitCapHealthFraction = 0.25f;    // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hold", meta=(ClampMin="0", ClampMax="1")) float WallSoloHitCapHealthFraction = 0.125f; // O2 PLACEHOLDER (§2.1 Wall: solo, doubled effectiveness)
     // §2.1 Vein: converted to healing at 60% of the post-mitigation amount.
     // Instant rather than over 1.5s — no heal-over-time primitive exists.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hold", meta=(ClampMin="0", ClampMax="1")) float VeinHealFraction = 0.6f;   // §2.1 placeholder

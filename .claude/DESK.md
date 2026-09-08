@@ -9,7 +9,8 @@ Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 - [x] Repair Cascade silent echoes and cancel queued echoes when its originating ultimate ends; include targets spawned during the window.
 - [x] Implement Long Dark's zone-expiry pause during its originating Unmake window; actual purchased/paid casts retain damage and membership and release on expiry, cancel, death and respec without later rearming.
 - [ ] Finish explicit Caster elemental cycle delivery without duplicating a hit or bypassing proc safeguards; resolve Resonance delivery.
-- [ ] Replace Hold's percentage substitute with its actual per-hit cap, then finish remaining live node gaps.
+- [x] Replace Hold's percentage substitute with an expiring per-hit cap: base 25% maximum health, solo Wall 12.5%, editable O2 tuning; paid base/purchased Wall prove large/small hits and cancellation/expiry. Vein remains uncapped.
+- [ ] Finish remaining live solo node gaps and ability-build affix breadth.
 - [ ] Finish ability-versus-weapon balance with sustained actual delivery; retain existing parity findings until their conditions are resolved.
 - [x] Repair Cleave wall-only occlusion and reject Bleed on avoided/lethal hits; actual paid casts cover aligned enemies, wall, dodge, purchased parry and lethal melee income.
 - [x] Reject hitscan Bleed and pierce Poison payloads on avoided hits; actual purchased Threshold/Pierce/Chain and paid shots preserve accepted originals/copies. Live aim checks confirm stationary first-shot accuracy, increased moving-ADS spread, movement cost and release recovery.
