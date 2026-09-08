@@ -492,7 +492,7 @@ bool FBreakerLegendaryDeadfallTest::RunTest(const FString& Parameters)
     TArray<FBreakerItemInstance> Deadfall = {BreakerRuleMakeItem(EBreakerEquipSlot::Boots, 1, Lines, EBreakerItemRule::Deadfall)};
 
     const FBreakerBuildConditionState Sliding = BreakerRuleState(EBreakerBuildCondition::Sliding);
-    const FBreakerBuildConditionState WallRiding = BreakerRuleState(EBreakerBuildCondition::WallRiding);
+    const FBreakerBuildConditionState LedgeTraversed = BreakerRuleState(EBreakerBuildCondition::RecentlyLedgeTraversed);
     const FBreakerBuildConditionState Standing;
 
     // THE REWRITE: the airborne line pays on the ground, while traversing.
@@ -500,8 +500,8 @@ bool FBreakerLegendaryDeadfallTest::RunTest(const FString& Parameters)
         BreakerRuleIncreasedDamage(Plain, Sliding), 0.0f, 0.001f);
     TestTrue(TEXT("Deadfall makes the airborne line pay while sliding"),
         BreakerRuleIncreasedDamage(Deadfall, Sliding) > 1.0f);
-    TestTrue(TEXT("Deadfall makes the airborne line pay while wall riding"),
-        BreakerRuleIncreasedDamage(Deadfall, WallRiding) > 1.0f);
+    TestTrue(TEXT("Deadfall makes the airborne line pay after completed traversal"),
+        BreakerRuleIncreasedDamage(Deadfall, LedgeTraversed) > 1.0f);
 
     // ...and it is a REDIRECTION, not the generic Unbound rewrite. Standing
     // still pays nothing, so the legendary cannot be strictly better than the

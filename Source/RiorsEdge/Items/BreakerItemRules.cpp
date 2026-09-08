@@ -57,7 +57,7 @@ namespace
         // ---- Legendary rules, never rolled --------------------------------
         Table.Add(BreakerMakeRuleDefinition(EBreakerItemRule::Deadfall,
             LOCTEXT("Rule_Deadfall", "DEADFALL"),
-            LOCTEXT("Rule_Deadfall_Desc", "Damage while Airborne also applies while Sliding and while Wall Riding. 40% less Air Control."),
+            LOCTEXT("Rule_Deadfall_Desc", "Damage while Airborne also applies while Sliding and shortly after completing a vault or mantle. 40% less Air Control."),
             false));
         Table.Add(BreakerMakeRuleDefinition(EBreakerItemRule::Cadence,
             LOCTEXT("Rule_Cadence", "CADENCE"),
@@ -65,7 +65,7 @@ namespace
             false));
         Table.Add(BreakerMakeRuleDefinition(EBreakerItemRule::Overrun,
             LOCTEXT("Rule_Overrun", "OVERRUN"),
-            LOCTEXT("Rule_Overrun_Desc", "Triple Resource Regeneration while airborne, sliding or wall riding. None otherwise."),
+            LOCTEXT("Rule_Overrun_Desc", "Triple gear Resource Regeneration while airborne, sliding or shortly after completing a vault or mantle. No gear regeneration otherwise."),
             false));
         Table.Add(BreakerMakeRuleDefinition(EBreakerItemRule::Refractor,
             LOCTEXT("Rule_Refractor", "REFRACTOR"),

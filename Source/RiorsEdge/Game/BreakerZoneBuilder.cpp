@@ -1,4 +1,5 @@
 #include "Game/BreakerZoneBuilder.h"
+#include "Game/BreakerEnvironmentDressing.h"
 
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetRegistry/AssetData.h"
@@ -122,7 +123,18 @@ namespace
                 Place(Mound, TEXT("DistantRidge"), FVector(X + 500, Edge + Side * 3500, Height * .65f - 120),
                     FVector(3800, 2500, Height * 1.3f), BreakerZoneMoss * .72f);
             }
-            for (int32 Index = 0; Index < 3; ++Index)
+            // Tall intact-material silhouettes behind the outward walls,
+            // with lower foliage breaking up their bases. No gameplay collision.
+            for (int32 Index = 0; Index < 5; ++Index)
+            {
+                const float X = Centre.X + (Index - 2) * 1900.0f;
+                BreakerPlaceEnvironmentDressing(World, Index % 3 == 1 ? TEXT("DeadTree_1") : TEXT("CommonTree_1"),
+                    FVector(X, Edge + Side * 1200, 0), 2200 + (Index % 2) * 300, Index * 67.0f);
+                BreakerPlaceEnvironmentDressing(World, TEXT("Bush_Common"),
+                    FVector(X + 430, Edge - Side * 600, 0), 180, Index * 41.0f);
+                BreakerPlaceEnvironmentDressing(World, TEXT("Fern_1"),
+                    FVector(X - 300, Edge - Side * 620, 0), 110, Index * 83.0f);
+            }            for (int32 Index = 0; Index < 3; ++Index)
             {
                 const float Height = 1100.0f + ((Index + Yard) % 3) * 320.0f;
                 const float X = Centre.X + (Index - 1) * 2800.0f;
@@ -145,6 +157,8 @@ namespace
             for (int32 Rung = 1; Rung <= 5; ++Rung)
                 Place(Cube, TEXT("MastCrossbar"), FVector(FarX, Y, Rung * 330), FVector(100, 330, 45), BreakerZoneConcrete);
         }
+        BreakerPlaceEnvironmentDressing(World, TEXT("Column_Pipes"), FVector(FarX - 80, SubCentre.Y - 750, 0), 1700, 0);
+        BreakerPlaceEnvironmentDressing(World, TEXT("Column_MetalSupport"), FVector(FarX - 80, SubCentre.Y + 750, 0), 1500, 0);
         Place(Cube, TEXT("BrokenGantry"), FVector(FarX, SubCentre.Y - 120, 1750), FVector(120, 1100, 100), BreakerZoneRust);
     }
 }
@@ -597,7 +611,20 @@ bool UBreakerZoneBuilder::BuildFernhallYard(UWorld* World, FBreakerZoneMarkers& 
             UE_LOG(LogTemp, Error, TEXT("[Zone] %s vanished between collection and spawn."), *Piece.Name);
             return false;
         }
-        // Identity transform is the entire assembly step: the composer already
+        // Replace only the noncolliding cone-tree dressing, retaining its
+        // authored position and height. Cover/floor/boundary meshes are untouched.
+        if (BreakerZoneNameHasPrefix(Piece.Name, TEXT("dress_trees")))
+        {
+            const FBox Bounds = Mesh->GetBoundingBox();
+            const FVector Center = Bounds.GetCenter();
+            const FVector Ground(Center.X, Center.Y, Bounds.Min.Z);
+            if (BreakerPlaceEnvironmentDressing(World, TEXT("CommonTree_1"), Ground, Bounds.GetSize().Z, 25))
+            {
+                BreakerPlaceEnvironmentDressing(World, TEXT("Bush_Common"), Ground + FVector(130, 0, 0), 110, 65);
+                ++Spawned;
+                continue;
+            }
+        }        // Identity transform is the entire assembly step: the composer already
         // baked world placement into the vertices.
         AStaticMeshActor* Actor = World->SpawnActor<AStaticMeshActor>(FVector::ZeroVector, FRotator::ZeroRotator);
         if (!Actor) continue;

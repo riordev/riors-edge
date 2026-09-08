@@ -1,5 +1,6 @@
 #include "Characters/BreakerCharacter.h"
 #include "Audio/BreakerFootstepComponent.h"
+#include "Game/BreakerLocalMapComponent.h"
 #include "Characters/BreakerFirstPersonArms.h"
 #include "Combat/BreakerStatusCycleComponent.h"
 #include "Combat/BreakerStatusComponent.h"
@@ -106,6 +107,7 @@ ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer
     Combat = CreateDefaultSubobject<UBreakerCombatComponent>(TEXT("Combat"));
     Weapon = CreateDefaultSubobject<UBreakerWeaponComponent>(TEXT("Weapon"));
     Footsteps = CreateDefaultSubobject<UBreakerFootstepComponent>(TEXT("Footsteps"));
+    LocalMap = CreateDefaultSubobject<UBreakerLocalMapComponent>(TEXT("LocalMap"));
     Playtest = CreateDefaultSubobject<UBreakerPlaytestComponent>(TEXT("Playtest"));
     Equipment = CreateDefaultSubobject<UBreakerEquipmentComponent>(TEXT("Equipment"));
     Momentum = CreateDefaultSubobject<UBreakerMomentumComponent>(TEXT("Momentum"));
@@ -526,6 +528,8 @@ void ABreakerCharacter::SaveGameState()
         Save->QuestCounters = Quests->GetState().Counters;
     }
     Save->SaveVersion = UBreakerSaveGame::CurrentSaveVersion;
+    Save->DiscoveredMapSites = LocalMap->GetDiscovered();
+    Save->TrackedMapSite = LocalMap->GetTracked();
     UGameplayStatics::SaveGameToSlot(Save, ActiveSaveSlotName(), 0);
 }
 
@@ -644,6 +648,7 @@ void ABreakerCharacter::LoadGameState()
         Weapon->SetSlotArchetype(1, Save->SlotOneArchetype);
         Weapon->SetSlotArchetype(2, Save->SlotTwoArchetype);
         if (Quests) Quests->RestoreFrom(Save->QuestFlags, Save->QuestCounters);
+        LocalMap->Restore(Save->DiscoveredMapSites, Save->TrackedMapSite);
     }
 
     // RIFTGLASS IS THE ACCOUNT'S (O51) — LEDGER's crossing into this file.
@@ -2409,6 +2414,7 @@ void ABreakerCharacter::OpenMenuScreenForCapture(const FString& ScreenName)
     const FString Wanted = ScreenName.ToUpper();
     EBreakerMenuScreen Screen = EBreakerMenuScreen::Main;
     if (Wanted == TEXT("INVENTORY")) Screen = EBreakerMenuScreen::Inventory;
+    else if (Wanted == TEXT("MAP")) Screen = EBreakerMenuScreen::LocalMap;
     else if (Wanted == TEXT("CHARACTER") || Wanted == TEXT("SHEET")) Screen = EBreakerMenuScreen::CharacterSheet;
     else if (Wanted == TEXT("SKILLTREES") || Wanted == TEXT("SKILLS")) Screen = EBreakerMenuScreen::SkillTrees;
     // LOADOUT retired 2026-08-17 (equipment IS the loadout); the capture

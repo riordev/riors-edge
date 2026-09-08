@@ -1312,6 +1312,7 @@ void SBreakerMenu::ApplyScreen(EBreakerMenuScreen NewScreen)
         case EBreakerMenuScreen::Abilities: ContentHost->SetContent(BuildAbilitiesScreen()); break;
         case EBreakerMenuScreen::Dialogue: ContentHost->SetContent(BuildDialogueScreen()); break;
         case EBreakerMenuScreen::Travel: ContentHost->SetContent(BuildTravelScreen()); break;
+        case EBreakerMenuScreen::LocalMap: ContentHost->SetContent(BuildLocalMapScreen()); break;
         case EBreakerMenuScreen::DevSandbox: ContentHost->SetContent(BuildDevSandboxScreen()); break;
         case EBreakerMenuScreen::CharacterSheet: ContentHost->SetContent(BuildCharacterSheetScreen()); break;
         case EBreakerMenuScreen::Stash: ContentHost->SetContent(BuildStashScreen()); break;
@@ -2096,6 +2097,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildPauseScreen()
     }), false);
     // SKILL TREES intentionally absent: the INVENTORY screen's tab strip owns
     // that route now.
+    AddButton(TEXT("MAP"), FOnClicked::CreateLambda([this]()
+    {
+        Rebuild(EBreakerMenuScreen::LocalMap);
+        return FReply::Handled();
+    }), false);
     AddButton(TEXT("SETTINGS"), FOnClicked::CreateLambda([this]()
     {
         Rebuild(EBreakerMenuScreen::Settings);

@@ -3,6 +3,7 @@
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbilityStateComponent.h"
+#include "Abilities/BreakerGameplayAbility.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Game/BreakerGameMode.h"
@@ -569,12 +570,22 @@ void UBreakerMomentumComponent::HandleMagazineEmptied(bool bStartedFull)
     // magazine of ammunition — the node cannot be farmed faster than the
     // player can shoot. bStartedFull is Scrap's dump clause, not this one:
     // F5 rewards emptying rather than tapping, wherever the magazine started.
-    // R2's second half — "also refunds 1s of ability cooldown" — has no seam
-    // here (cooldowns live on the ability system); it stays WAITING, recorded
-    // on the node in BreakerProgressionLibrary.cpp.
     if (!GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || IsInSafeZone()) return;
-    if (GetFrenzyNodeRank(TEXT("Swift.Frenzy.DryFire")) <= 0) return;
-    GrantMomentum(12.0f);   // §1.3 F5: +12
+    const int32 Rank = GetFrenzyNodeRank(TEXT("Swift.Frenzy.DryFire"));
+    if (Rank <= 0) return;
+    GrantMomentum(12.0f); // Class kit F5: +12 on the actual last round.
+    if (Rank >= 2)
+    {
+        const IAbilitySystemInterface* AbilityOwner = Cast<IAbilitySystemInterface>(GetOwner());
+        UAbilitySystemComponent* ASC = AbilityOwner ? AbilityOwner->GetAbilitySystemComponent() : nullptr;
+        if (!ASC) return;
+        FGameplayEffectQuery Query;
+        Query.EffectDefinition = UBreakerAbilityCooldownEffect::StaticClass();
+        for (const FActiveGameplayEffectHandle& Handle : ASC->GetActiveEffects(Query))
+        {
+            ASC->ModifyActiveEffectStartTime(Handle, -1.0f); // Authored R2: refund one second.
+        }
+    }
 }
 
 void UBreakerMomentumComponent::HandleKillDealt(const FBreakerHitContext& Hit)

@@ -14,6 +14,7 @@
 class UAbilitySystemComponent;
 class UBreakerAttributeSet;
 class UBreakerFootstepComponent;
+class UBreakerLocalMapComponent;
 class UBreakerInputConfig;
 class UInputMappingContext;
 class UCameraComponent;
@@ -113,6 +114,7 @@ public:
     // conditions, quest state derivation and the kill tracker all read through
     // this rather than through a bare array on the pawn.
     UFUNCTION(BlueprintPure, Category="Interaction") UBreakerQuestJournal* GetQuestJournal() const { return Quests; }
+    UBreakerLocalMapComponent* GetLocalMap() const { return LocalMap; }
     UFUNCTION(BlueprintPure, Category="Playtest") UBreakerPlaytestComponent* GetPlaytest() const { return Playtest; }
     UFUNCTION(BlueprintPure, Category="Playtest") float GetLookSensitivity() const { return LookSensitivity; }
     UFUNCTION(BlueprintPure, Category="Playtest") float GetCurrentFOV() const;
@@ -152,6 +154,7 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat") TObjectPtr<UBreakerCombatComponent> Combat;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TObjectPtr<UBreakerWeaponComponent> Weapon;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Audio") TObjectPtr<UBreakerFootstepComponent> Footsteps;
+    UPROPERTY() TObjectPtr<UBreakerLocalMapComponent> LocalMap;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Equipment") TObjectPtr<UBreakerEquipmentComponent> Equipment;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Momentum") TObjectPtr<UBreakerMomentumComponent> Momentum;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Mana") TObjectPtr<UBreakerManaComponent> Mana;

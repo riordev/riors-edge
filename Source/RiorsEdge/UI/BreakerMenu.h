@@ -101,7 +101,8 @@ enum class EBreakerMenuScreen : uint8
     // the screen has no back and HandleEscape never names it. Builds in its
     // own TU (UI/BreakerDeathScreen.cpp). Appended last, same rule as
     // Travel.
-    Death
+    Death,
+    LocalMap
 };
 
 // ---------------------------------------------------------------------------
@@ -575,6 +576,7 @@ private:
     FReply HandleDialogueChoiceKey(const FKeyEvent& KeyEvent);
     // The Anchor's navigation screen: one card per available destination.
     TSharedRef<SWidget> BuildTravelScreen();
+    TSharedRef<SWidget> BuildLocalMapScreen();
     // The breakpoint sandbox (see the enum note on DevSandbox). Reached from
     // the pause menu behind an explicit DEV label; also the reachable home of
     // the DEV MODE class-swap checkbox that used to live only on the

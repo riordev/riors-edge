@@ -1,4 +1,5 @@
 #include "Game/BreakerHubBuilder.h"
+#include "Game/BreakerEnvironmentDressing.h"
 
 #include "Interaction/BreakerNPC.h"
 #include "Interaction/BreakerStashPoint.h"
@@ -116,6 +117,8 @@ namespace
         Mesh->SetMobility(EComponentMobility::Static);
         Actor->SetActorEnableCollision(bCollides);
         Actor->SetActorTickEnabled(false);
+        if (FString(Label).Contains(TEXT("Walkway")) || FString(Label).Contains(TEXT("Apron")))
+            Actor->Tags.Add(TEXT("BreakerMapGround"));
         Actor->SetActorLabel(Label);
         return Actor;
     }
@@ -216,6 +219,20 @@ namespace
                 Box(X,Side*1080,355,FVector(42,42,55),HubPaletteOffWhite,false,TEXT("Runtime_HubLampGlass"));
                 HubAttachPropLight(Lamp,FVector(0,0,155),FLinearColor(1,.72f,.40f),8500,1250);
             }
+        }
+        // Material-preserving planted pockets and workshop hardware. All stay
+        // outside the arrival/vendor routes; sizes are O2 environment tuning.
+        for (const float Side : {-1.0f, 1.0f})
+        {
+            for (const float X : {-1100.0f, 200.0f})
+            {
+                BreakerPlaceEnvironmentDressing(World, TEXT("Bush_Common"), Frame.At(X, Side * 850, 75), 130, Yaw.Yaw + Side * 35);
+                BreakerPlaceEnvironmentDressing(World, TEXT("Fern_1"), Frame.At(X - 90, Side * 850, 75), 85, Yaw.Yaw + 70);
+            }
+            BreakerPlaceEnvironmentDressing(World, TEXT("CommonTree_1"), Frame.At(-1800, Side * 1190, 0), 700, Yaw.Yaw + Side * 20);
+            BreakerPlaceEnvironmentDressing(World, TEXT("Column_Pipes"), Frame.At(2260, Side * 1520, 0), 660, Yaw.Yaw);
+            BreakerPlaceEnvironmentDressing(World, TEXT("Column_MetalSupport"), Frame.At(2250, Side * 400, 0), 560, Yaw.Yaw);
+            BreakerPlaceEnvironmentDressing(World, TEXT("Door_Metal"), Frame.At(2300, Side * 970, 0), 330, Yaw.Yaw + 90);
         }
         // Actual paving joints and gutters break up the uniform slab at eye level.
         for (int32 Row = 0; Row < 25; ++Row)

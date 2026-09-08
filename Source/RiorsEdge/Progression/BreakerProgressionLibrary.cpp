@@ -2085,11 +2085,9 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftFrenzyTree()
     // firing the last round in a magazine generates +12 Momentum. Consumed by
     // UBreakerMomentumComponent::HandleMagazineEmptied off the weapon's
     // OnMagazineEmptied event (which fires on the last round LEAVING, never
-    // on the reload). R2's second clause — "also refunds 1s of ability
-    // cooldown" — stays WAITING ON: a cooldown-reduction seam into the
-    // ability system's active cooldown effects, which no component owns yet.
+    // on the reload). Rank two also refunds one second of active ability cooldown.
     Node = MakeNode(TEXT("Swift.Frenzy.DryFire"), TEXT("Dry Fire"),
-        TEXT("Firing the last round of a magazine pays Momentum. Emptying rather than tapping is rewarded at Redline."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 2, 2, 1);
+        TEXT("Firing the last round of a magazine pays Momentum. Emptying rather than tapping is rewarded at Redline. R2: also refunds 1s of active ability cooldown."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Swift.Frenzy.Loaded"));
     AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 5.0f, EBreakerBuildCondition::Redline); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_DryFire.GetTag());

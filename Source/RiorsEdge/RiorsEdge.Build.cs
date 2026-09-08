@@ -31,6 +31,8 @@ public class RiorsEdge : ModuleRules
             PrivateDependencyModuleNames.Add("AssetRegistry");
             // Supported C++ font-face import factory; excluded from game builds.
             PrivateDependencyModuleNames.Add("UnrealEd");
+            // Original glTF environment kit import through editor AssetImportTask.
+            PrivateDependencyModuleNames.Add("AssetTools");
             // Arms-only skeletal asset authoring; never linked into the game target.
             PrivateDependencyModuleNames.AddRange(new[] { "MeshDescription", "StaticMeshDescription",
                 "SkeletalMeshDescription", "SkeletalMeshUtilitiesCommon", "MeshUtilities" });

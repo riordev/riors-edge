@@ -52,6 +52,9 @@ public:
     // such property, so deserialization leaves it empty, which is exactly the
     // correct value for a save written before any objective could be counted.
     UPROPERTY() TMap<FName, int32> QuestCounters;
+    // Additive exploration state: older saves begin with no discovered sites.
+    UPROPERTY() TArray<FName> DiscoveredMapSites;
+    UPROPERTY() FName TrackedMapSite;
     // The Forge's crafting wallet (Items/BreakerForgeLibrary.h). Additive
     // since version 2, the same discipline QuestCounters used going into
     // version 2: a v2 file has no such property, so it deserializes to the

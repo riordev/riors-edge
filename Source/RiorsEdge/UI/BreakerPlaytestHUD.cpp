@@ -1,4 +1,5 @@
 #include "UI/BreakerPlaytestHUD.h"
+#include "Game/BreakerLocalMapComponent.h"
 #include "Combat/BreakerStatusCycleComponent.h"
 
 #include "UI/BreakerDamageFeed.h"
@@ -1137,6 +1138,14 @@ void ABreakerPlaytestHUD::DrawQuestLine(const ABreakerCharacter* Character)
     // Fitted into the 320 rather than trusted to be short; never wrapped.
     const float Right = S(BreakerUI::HudWeaponRight);
     const float Limit = S(BreakerUI::HudQuestTrackerWidth);
+    FBreakerLocalMapMarker MapTarget;
+    if (Character->GetLocalMap()->GetTrackedMarker(MapTarget))
+    {
+        const FString Direction = FString::Printf(TEXT("%s · %dm"), *MapTarget.Label.ToString(),
+            FMath::RoundToInt(FVector::Dist2D(Character->GetActorLocation(), MapTarget.Location) / 100));
+        DrawSpecTextRight(Direction, Right, S(BreakerUI::HudQuestLineTop + 46), BreakerUI::Gold,
+            FitSpecPixels(Direction, BreakerUI::HudQuestLinePixels, Limit, 11.0f));
+    }
 
     for (const FBreakerMissionDefinition& Mission : UBreakerMissionLibrary::GetMissions())
     {

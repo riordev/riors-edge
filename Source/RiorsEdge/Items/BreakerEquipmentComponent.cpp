@@ -998,7 +998,7 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         if (Rules.bAirborneAlsoGroundTraversal && Condition == EBreakerBuildCondition::Airborne)
         {
             return Conditions.IsActive(EBreakerBuildCondition::Sliding)
-                || Conditions.IsActive(EBreakerBuildCondition::WallRiding);
+                || Conditions.IsActive(EBreakerBuildCondition::RecentlyLedgeTraversed);
         }
         return false;
     };
@@ -1236,7 +1236,7 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
     {
         const bool bTraversing = Conditions.IsActive(EBreakerBuildCondition::Airborne)
             || Conditions.IsActive(EBreakerBuildCondition::Sliding)
-            || Conditions.IsActive(EBreakerBuildCondition::WallRiding);
+            || Conditions.IsActive(EBreakerBuildCondition::RecentlyLedgeTraversed);
         Stats.ResourceRegenPerSecond *= bTraversing ? Rules.TraversalRegenMultiplier : 0.0f;
     }
 
