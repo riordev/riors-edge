@@ -384,6 +384,8 @@ private:
     // is the producer's edit, not this lane's. Changing its shape, its meaning
     // or its fill order remains a declared crossing.
     TArray<FBreakerHUDMapBlip> EnemyBlips;
+    // Current-frame canvas pixels, populated before damage-number placement.
+    TArray<FBox2D> EnemyPlateBounds;
     // Screen-space rectangles (CentreX, TopY, Width, Height) already claimed by
     // an enemy label this frame, so a second enemy projecting to nearly the
     // same point does not print through the first. Rebuilt every frame.

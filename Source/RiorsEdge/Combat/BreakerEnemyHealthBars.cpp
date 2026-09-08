@@ -390,6 +390,14 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
     // frame — DrawHUD runs every frame and a container built inside it is a
     // per-frame allocation.
     EnemyBlips.Reset();
+    EnemyPlateBounds.Reset();
+    auto ReservePlate = [this](float X, float Y, float W, float H)
+    {
+        if (!Canvas || W <= 0 || H <= 0) return;
+        const FVector2D Min(FMath::Max(0.0f, X), FMath::Max(0.0f, Y));
+        const FVector2D Max(FMath::Min(Canvas->ClipX, X + W), FMath::Min(Canvas->ClipY, Y + H));
+        if (Max.X > Min.X && Max.Y > Min.Y) EnemyPlateBounds.Emplace(Min, Max);
+    };
 
     UWorld* World = GetWorld();
     if (!World || !Character) return;
@@ -800,6 +808,7 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
             DrawnLabelBounds.Emplace(Projected.X, ColumnTop, ColumnW, ColumnH);
         }
 
+        ReservePlate(Bar.X, Bar.Y, Bar.W, Bar.H);
         BreakerEnemyBarDrawBody(*this, Bar, Fraction, ChipFraction, ShieldFraction, bShowChipAndShield,
             ScaleUnit, BarAlpha);
 
@@ -839,6 +848,7 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
                 const float PipRowW = Pip.X * PipCount + PipGap * (PipCount - 1);
                 const float PipRowX = Projected.X - PipRowW * 0.5f;
                 const float PipRowY = Bar.Y + Bar.H + Gap;
+                ReservePlate(PipRowX, PipRowY, PipRowW, Pip.Y);
                 for (int32 i = 0; i < PipCount; ++i)
                 {
                     FLinearColor PipColour = BreakerUI::BorderRest;
@@ -863,9 +873,11 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
                 && EntropyY + EntropyH <= Canvas->ClipY
                 && Projected.X - EntropyTextSize.X * .5f >= 0 && Projected.X + EntropyTextSize.X * .5f <= Canvas->ClipX)
             {
+                ReservePlate(Projected.X - EntropyTextSize.X * .5f, EntropyY, EntropyTextSize.X, EntropyTextSize.Y);
                 DrawSpecTextCentered(EntropyText, Projected.X, EntropyY, Rot ? BreakerUI::Orange : BreakerUI::Gold, EntropyPixels, BarAlpha, ESpecFontRole::Mono);
                 const float RailY = EntropyY + EntropyTextSize.Y + Gap;
                 const float Fill = Rot ? FMath::Clamp(Rot->RemainingDuration / FMath::Max(Rot->Spec.Duration, UE_SMALL_NUMBER), 0.0f, 1.0f) : Buildup;
+                ReservePlate(Bar.X, RailY, Bar.W, EntropyRailH);
                 DrawRect(BreakerUI::Alpha(BreakerUI::BorderRest, BarAlpha), Bar.X, RailY, Bar.W, EntropyRailH);
                 DrawRect(BreakerUI::Alpha(Rot ? BreakerUI::Orange : BreakerUI::Gold, BarAlpha), Bar.X, RailY, Bar.W * Fill, EntropyRailH);
             }
@@ -873,9 +885,11 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
                 && VoidY + VoidH <= Canvas->ClipY
                 && Projected.X - VoidTextSize.X * .5f >= 0 && Projected.X + VoidTextSize.X * .5f <= Canvas->ClipX)
             {
+                ReservePlate(Projected.X - VoidTextSize.X * .5f, VoidY, VoidTextSize.X, VoidTextSize.Y);
                 DrawSpecTextCentered(VoidText, Projected.X, VoidY, BreakerUI::Violet, EntropyPixels, BarAlpha, ESpecFontRole::Mono);
                 const float RailY = VoidY + VoidTextSize.Y + Gap;
                 const float Fill = Erased ? FMath::Clamp(Erased->RemainingDuration / FMath::Max(Erased->Spec.Duration, UE_SMALL_NUMBER), 0.0f, 1.0f) : VoidBuildup;
+                ReservePlate(Bar.X, RailY, Bar.W, EntropyRailH);
                 DrawRect(BreakerUI::Alpha(BreakerUI::BorderRest, BarAlpha), Bar.X, RailY, Bar.W, EntropyRailH);
                 DrawRect(BreakerUI::Alpha(BreakerUI::Violet, BarAlpha), Bar.X, RailY, Bar.W * Fill, EntropyRailH);
             }
@@ -883,14 +897,18 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
                 && RiftY + RiftH <= Canvas->ClipY
                 && Projected.X - RiftTextSize.X * .5f >= 0 && Projected.X + RiftTextSize.X * .5f <= Canvas->ClipX)
             {
+                ReservePlate(Projected.X - RiftTextSize.X * .5f, RiftY, RiftTextSize.X, RiftTextSize.Y);
                 DrawSpecTextCentered(RiftText, Projected.X, RiftY, BreakerRiftFeedback::Color, EntropyPixels, BarAlpha, ESpecFontRole::Mono);
                 const float RailY = RiftY + RiftTextSize.Y + Gap;
                 const float Fill = Unstable ? FMath::Clamp(Unstable->RemainingDuration / FMath::Max(Unstable->Spec.Duration, UE_SMALL_NUMBER), 0.0f, 1.0f) : RiftBuildup;
+                ReservePlate(Bar.X, RailY, Bar.W, EntropyRailH);
                 DrawRect(BreakerUI::Alpha(BreakerUI::BorderRest, BarAlpha), Bar.X, RailY, Bar.W, EntropyRailH);
                 DrawRect(BreakerUI::Alpha(BreakerRiftFeedback::Color, BarAlpha), Bar.X, RailY, Bar.W * Fill, EntropyRailH);
             }
             if (bShowName)
             {
+                const FVector2D NameSize = MeasureSpecText(Name, NamePixels, ESpecFontRole::Display);
+                ReservePlate(Projected.X - NameSize.X * .5f, NameY, NameSize.X, NameSize.Y);
                 DrawSpecTextCentered(Name, Projected.X, NameY,
                     bBossRank ? BreakerUI::TealName : BreakerUI::TextSecondary, NamePixels, BarAlpha, ESpecFontRole::Display);
             }
@@ -900,6 +918,7 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
                 const float RowX = Projected.X - MarksW * 0.5f;
                 const float UnderlineY = MarksY + Cell + BreakerEnemyBarMath::MarkActiveUnderlineGapPx * ScaleUnit;
                 const float UnderlineH = BreakerEnemyBarMath::MarkActiveUnderlinePx * ScaleUnit;
+                ReservePlate(RowX, MarksY, MarksW, UnderlineY + UnderlineH - MarksY);
                 for (int32 i = 0; i < Marks.Num(); ++i)
                 {
                     const float CellX = RowX + Pitch * i;
@@ -955,10 +974,13 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         const float ShieldMax = DummyAttributes->GetMaxShield();
         const float ShieldFraction = ShieldMax > UE_SMALL_NUMBER ? DummyAttributes->GetShield() / ShieldMax : 0.0f;
         // Full opacity: a dummy never fades, and Alpha(C, 1.0f) is exactly C.
+        ReservePlate(Bar.X, Bar.Y, Bar.W, Bar.H);
         BreakerEnemyBarDrawBody(*this, Bar, Fraction, Fraction, ShieldFraction,
             Distance < BreakerEnemyBarMath::ChipAndShieldHideCm, ScaleUnit, 1.0f);
         const float NameY = Bar.Y - BreakerEnemyBarMath::ColumnGapPx * Scale * ScaleUnit
             - BreakerEnemyBar::NameLinePixels * Scale * ScaleUnit;
+        const FVector2D LabelSize = MeasureSpecText(Dummy->GetProfileLabel(), BreakerEnemyBar::NamePixels * Scale, ESpecFontRole::Display);
+        ReservePlate(Projected.X - LabelSize.X * .5f, NameY, LabelSize.X, LabelSize.Y);
         DrawSpecTextCentered(Dummy->GetProfileLabel(), Projected.X, NameY,
             BreakerUI::TextSecondary, BreakerEnemyBar::NamePixels * Scale, 1.0f, ESpecFontRole::Display);
     }

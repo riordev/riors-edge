@@ -13,6 +13,7 @@
 
 class UAbilitySystemComponent;
 class UBreakerAttributeSet;
+class UBreakerFootstepComponent;
 class UBreakerInputConfig;
 class UInputMappingContext;
 class UCameraComponent;
@@ -150,6 +151,7 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Progression") TObjectPtr<UBreakerProgressionComponent> Progression;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat") TObjectPtr<UBreakerCombatComponent> Combat;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TObjectPtr<UBreakerWeaponComponent> Weapon;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Audio") TObjectPtr<UBreakerFootstepComponent> Footsteps;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Equipment") TObjectPtr<UBreakerEquipmentComponent> Equipment;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Momentum") TObjectPtr<UBreakerMomentumComponent> Momentum;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Mana") TObjectPtr<UBreakerManaComponent> Mana;

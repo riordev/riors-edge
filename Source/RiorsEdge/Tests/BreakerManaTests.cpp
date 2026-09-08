@@ -88,7 +88,7 @@ bool FBreakerManaInertTest::RunTest(const FString& Parameters)
     // The two numbers the 2026-08-14 inversion moved. Pinned so a silent revert
     // to the accumulating-bank weighting shows up as a failing test rather than
     // as a Caster who quietly stops needing to regenerate.
-    TestEqual(TEXT("Passive regeneration is the primary recovery path"), Mana->PassiveRegenPerSecond, 6.0f);
+    TestEqual(TEXT("Passive regeneration is the primary recovery path"), Mana->PassiveRegenPerSecond, 11.0f);
     TestEqual(TEXT("The conditional-income cap is at par with regeneration"), Mana->GlobalGenerationCap, 6.0f);
     TestEqual(TEXT("Defaults match the Class-Kits Overcast floor"), Mana->GetOvercastFloor(), -20.0f);
     TestEqual(TEXT("Defaults match the Class-Kits Overcast damage penalty"), Mana->OvercastIncomingDamageTaken, 0.15f);

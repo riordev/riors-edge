@@ -27,7 +27,8 @@ bool FBreakerAudioVolumeRoutingTest::RunTest(const FString& Parameters)
     if (!TestNotNull(TEXT("Sound director"), Director)) return false;
     TArray<UAudioComponent*> Voices;
     Director->GetComponents(Voices);
-    if (!TestEqual(TEXT("All eleven player cues have voices"), Voices.Num(), 11)) return false;
+    if (!TestEqual(TEXT("All twelve player cues have voices"), Voices.Num(), 12)) return false;
+    TestTrue(TEXT("Footsteps share the real settings-routed voice pool"), Voices.ContainsByPredicate([](const UAudioComponent* Voice) { return Voice->GetFName() == TEXT("FootstepVoice"); }));
     TestTrue(TEXT("Void activation has its own voice"), Voices.ContainsByPredicate([](const UAudioComponent* Voice) { return Voice->GetFName() == TEXT("VoidMarkVoice"); }));
     TestTrue(TEXT("Void payout has its own voice"), Voices.ContainsByPredicate([](const UAudioComponent* Voice) { return Voice->GetFName() == TEXT("VoidBurstVoice"); }));
     TestTrue(TEXT("Rift activation has its own voice"), Voices.ContainsByPredicate([](const UAudioComponent* Voice) { return Voice->GetFName() == TEXT("RiftVoice"); }));

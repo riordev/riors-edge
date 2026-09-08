@@ -71,6 +71,7 @@ public:
     ABreakerSoundDirector();
     void ApplyVolumeSettings(float Master, float Effects);
     static void PlaySettingsTest(UWorld* World);
+    static void PlayFootstep(UWorld* World);
 
     // The trigger was pulled and a round left. Per cosmetic shot, not per
     // pellet: a shotgun blast is one report.
@@ -124,6 +125,11 @@ protected:
 private:
     // One persistent voice per verb; PCM cached at BeginPlay and queued
     // verbatim per trigger.
+    UPROPERTY() TObjectPtr<UAudioComponent> FootstepVoice;
+    UPROPERTY() TArray<TObjectPtr<USoundWaveProcedural>> FootstepWaves;
+    TArray<TArray<int16>> FootstepPcm;
+    int32 NextFootstep = 0;
+    double LastFootstepTime = -1000;
     UPROPERTY() TObjectPtr<UAudioComponent> FireVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> HitVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> KillVoice;

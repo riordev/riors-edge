@@ -12,6 +12,7 @@
     "BloodpriceRankTwoFraction": 0.2,
     "PatienceRankOneDelay": 4,
     "PatienceRankTwoDelay": 2,
+    "PatienceBonusRegenPerSecond": 1,
     "VarianceRankOneMultiplier": 2,
     "VarianceRankTwoMultiplier": 3,
     "SequenceWindowSeconds": 6,

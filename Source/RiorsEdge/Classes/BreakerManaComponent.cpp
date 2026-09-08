@@ -42,6 +42,7 @@ bool UBreakerManaComponent::ParseResourceTuning(const FJsonObject& Object, FBrea
         { TEXT("BloodpriceRankTwoFraction"), &Candidate.BloodpriceRankTwoFraction, 0 },
         { TEXT("PatienceRankOneDelay"), &Candidate.PatienceRankOneDelay, 0 },
         { TEXT("PatienceRankTwoDelay"), &Candidate.PatienceRankTwoDelay, 0 },
+        { TEXT("PatienceBonusRegenPerSecond"), &Candidate.PatienceBonusRegenPerSecond, 0 },
         { TEXT("VarianceRankOneMultiplier"), &Candidate.VarianceRankOneMultiplier, 1 },
         { TEXT("VarianceRankTwoMultiplier"), &Candidate.VarianceRankTwoMultiplier, 1 },
         { TEXT("SequenceWindowSeconds"), &Candidate.SequenceWindowSeconds, UE_KINDA_SMALL_NUMBER },
@@ -606,7 +607,8 @@ void UBreakerManaComponent::AdvanceLoop(float DeltaTime)
         const FBreakerCasterResourceTuning& Tuning = GetResourceTuning();
         const float Delay = Rank >= 2 ? Tuning.PatienceRankTwoDelay : Tuning.PatienceRankOneDelay;
         const float BonusSeconds = Rank > 0 ? FMath::Clamp(DeltaTime - FMath::Max(0.0f, Delay - PreviousFireAge), 0.0f, DeltaTime) : 0.0f;
-        ApplyManaDelta(PassiveRegenPerSecond * (DeltaTime + BonusSeconds) * GenerationMultiplierForMana(GetMana(), OvercastGenerationMultiplier));
+        ApplyManaDelta((PassiveRegenPerSecond * DeltaTime + Tuning.PatienceBonusRegenPerSecond * BonusSeconds)
+            * GenerationMultiplierForMana(GetMana(), OvercastGenerationMultiplier));
     }
 
     if (IsInSafeZone())

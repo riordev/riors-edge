@@ -1,4 +1,5 @@
 #include "Characters/BreakerCharacter.h"
+#include "Audio/BreakerFootstepComponent.h"
 #include "Characters/BreakerFirstPersonArms.h"
 #include "Combat/BreakerStatusCycleComponent.h"
 #include "Combat/BreakerStatusComponent.h"
@@ -104,6 +105,7 @@ ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer
     Progression = CreateDefaultSubobject<UBreakerProgressionComponent>(TEXT("Progression"));
     Combat = CreateDefaultSubobject<UBreakerCombatComponent>(TEXT("Combat"));
     Weapon = CreateDefaultSubobject<UBreakerWeaponComponent>(TEXT("Weapon"));
+    Footsteps = CreateDefaultSubobject<UBreakerFootstepComponent>(TEXT("Footsteps"));
     Playtest = CreateDefaultSubobject<UBreakerPlaytestComponent>(TEXT("Playtest"));
     Equipment = CreateDefaultSubobject<UBreakerEquipmentComponent>(TEXT("Equipment"));
     Momentum = CreateDefaultSubobject<UBreakerMomentumComponent>(TEXT("Momentum"));

@@ -1239,7 +1239,8 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
     TArray<FVector2D> Placed;
     Placed.Reserve(Visible.Num());
     TArray<FBox2D> PlacedLabels;
-    PlacedLabels.Reserve(Visible.Num());
+    PlacedLabels.Reserve(Visible.Num() + EnemyPlateBounds.Num());
+    PlacedLabels.Append(EnemyPlateBounds);
     const float ClusterRadius = S(BreakerHUD::DamageClusterRadius);
 
     for (const FBreakerHUDDamageNumber* Number : Visible)
@@ -2130,9 +2131,16 @@ ABreakerTracerRenderer* ABreakerPlaytestHUD::GetTracerRenderer()
 
 ABreakerSoundDirector* ABreakerPlaytestHUD::GetSoundDirector()
 {
-    if (SoundDirector) return SoundDirector;
+    if (IsValid(SoundDirector)) return SoundDirector;
     UWorld* World = GetWorld();
     if (!World) return nullptr;
+    for (TActorIterator<ABreakerSoundDirector> It(World); It; ++It)
+    {
+        if (!IsValid(*It)) continue;
+        SoundDirector = *It;
+        SoundDirector->SetLifeSpan(0.0f);
+        return SoundDirector;
+    }
     FActorSpawnParameters Params;
     Params.Owner = this;
     Params.ObjectFlags |= RF_Transient;

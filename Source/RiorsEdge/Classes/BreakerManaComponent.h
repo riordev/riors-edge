@@ -25,6 +25,7 @@ struct FBreakerCasterResourceTuning
     float BloodpriceRankTwoFraction = 0.2f; // O2 PLACEHOLDER
     float PatienceRankOneDelay = 4.0f; // O2 PLACEHOLDER
     float PatienceRankTwoDelay = 2.0f; // O2 PLACEHOLDER
+    float PatienceBonusRegenPerSecond = 1.0f; // O2: additive improvement over competitive starter recovery.
     float VarianceRankOneMultiplier = 2.0f; // O2 PLACEHOLDER
     float VarianceRankTwoMultiplier = 3.0f; // O2 PLACEHOLDER
     float SequenceWindowSeconds = 6.0f; // O2 PLACEHOLDER
@@ -172,16 +173,10 @@ public:
     // THE primary recovery path under the 2026-08-14 owner ruling, and the one
     // number to turn when a Caster feels resource-starved or resource-free.
     //
-    // O2 PLACEHOLDER 6.0/s. Derived, not guessed: Class-Kits §2.1 authored
-    // +2.0/s as a FLOOR under an accumulating loop (a full 100 bar in 50s,
-    // "usable but never sufficient"), and §2.7's first acceptance criterion
-    // reads one 25-cost cast every ~13s from regeneration alone. As the primary
-    // path that is far too slow — it is a floor being asked to be a ceiling.
-    // 6.0/s refills the bar in ~17s and sustains one mid-cost (30 Mana) cast
-    // every 5s with no target present, which is a cadence a player can actually
-    // fight at while still making a three-cast burst something they have to
-    // stop and recover from. §2.7 criterion 1 needs restating against this.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Mana|Generation", meta=(ClampMin="0")) float PassiveRegenPerSecond = 6.0f; // O2 PLACEHOLDER
+    // O227 requires competitive starter casting before Patience investment.
+    // O2 initial tuning: 11/s baseline; Patience adds 1/s after its delay.
+    // Invested recovery remains 12/s. Validate through paid sustained casts.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Mana|Generation", meta=(ClampMin="0")) float PassiveRegenPerSecond = 11.0f; // O2 PLACEHOLDER
     // Unchanged from Class-Kits §2.1 on purpose. The per-source magnitudes are
     // what SB1/SB3/VW1/MS1 and §2.7's shotgun-vs-rifle criterion are authored
     // against, and the anti-Multishot 1/n ratio lives between them — moving

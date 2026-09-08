@@ -169,6 +169,6 @@ void BreakerStartEntropyCapture(ABreakerCharacter* Character)
                 Character->GetCombat()->ReceiveDamage(Hit);
             }
         }
-    }), (FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureRift")) || FCString::Strstr(FCommandLine::Get(), TEXT("BreakerCaptureReaction="))) ? 5.8f : FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureVoid")) ? 5.5f : 1.0f, false);
+    }), (FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureRift")) || FCString::Strstr(FCommandLine::Get(), TEXT("BreakerCaptureReaction="))) ? 5.8f : (FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureVoid")) || FParse::Param(FCommandLine::Get(), TEXT("BreakerCapturePlateStress"))) ? 5.5f : 1.0f, false);
 #endif
 }

@@ -122,10 +122,10 @@ bool FBreakerCasterContinuationRuntimeTest::RunTest(const FString& Parameters)
     FBreakerShotResult Miss; Miss.bFired = true;
     Player->GetWeapon()->OnShot.Broadcast(Miss);
     Mana->AdvanceLoop(3.5f); Mana->AdvanceLoop(1);
-    TestEqual(TEXT("Miss resets Patience and crossing frame grants only eligible half-second bonus"), Mana->GetMana(), 30.0f);
+    TestEqual(TEXT("Miss resets Patience and crossing frame grants only eligible half-second additive bonus"), Mana->GetMana(), 4.5f * 6.0f + .5f * 1.0f);
     if (!Buy(Void, TEXT("Caster.VoidWhisperer.Patience"))) return false;
     Player->GetAttributes()->ApplyClassResource(0); Player->GetWeapon()->OnShot.Broadcast(Miss); Mana->AdvanceLoop(3);
-    TestEqual(TEXT("Rank two idle threshold is two seconds"), Mana->GetMana(), 24.0f);
+    TestEqual(TEXT("Rank two idle threshold is two seconds"), Mana->GetMana(), 3.0f * 6.0f + 1.0f);
     Mana->PassiveRegenPerSecond = 0;
     UAbilitySystemComponent* ASC = Player->GetAbilitySystemComponent();
     const FGameplayAbilitySpecHandle Siphon = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Siphon::StaticClass(), 1));

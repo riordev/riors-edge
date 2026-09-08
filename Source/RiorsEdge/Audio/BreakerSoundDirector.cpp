@@ -31,6 +31,7 @@ ABreakerSoundDirector::ABreakerSoundDirector()
         Voice->bIsUISound = true;
         return Voice;
     };
+    FootstepVoice = MakeVoice(TEXT("FootstepVoice"));
     FireVoice = MakeVoice(TEXT("FireVoice"));
     HitVoice = MakeVoice(TEXT("HitVoice"));
     KillVoice = MakeVoice(TEXT("KillVoice"));
@@ -88,6 +89,17 @@ void ABreakerSoundDirector::BeginPlay()
     UBreakerGameSettings* Settings = NewObject<UBreakerGameSettings>(this);
     Settings->LoadOrDefaults();
     ApplyVolumeSettings(Settings->MasterVolume, Settings->EffectsVolume);
+    for (int32 Index = 0; Index < 5; ++Index)
+    {
+        const FString Path = FPaths::ProjectContentDir() / FString::Printf(TEXT("Breaker/Audio/kenney/impact-sounds/footstep_concrete_%03d.wav"), Index);
+        TArray<uint8> Bytes;
+        if (!FFileHelper::LoadFileToArray(Bytes, *Path)) continue;
+        BreakerWave::FParsedWave Sample = BreakerWave::ParseWav(Bytes);
+        if (!Sample.IsValid()) continue;
+        FootstepWaves.Add(MakeWave(Sample.SampleRate));
+        FootstepPcm.Add(MoveTemp(Sample.Samples));
+    }
+    UE_LOG(LogTemp, Log, TEXT("[BreakerSound] concrete footsteps: %d shipped PCM samples loaded."), FootstepPcm.Num());
 
     const int32 FireRate = LoadOrSynth(TEXT("weapon_fire.wav"), &BreakerSound::RenderWeaponFire, FirePcm);
     const int32 HitRate = LoadOrSynth(TEXT("hit_confirm.wav"), &BreakerSound::RenderHitConfirm, HitPcm);
@@ -133,11 +145,31 @@ void ABreakerSoundDirector::BeginPlay()
 void ABreakerSoundDirector::ApplyVolumeSettings(float Master, float Effects)
 {
     const float Gain = BreakerSound::EffectsGain(Master, Effects);
-    for (UAudioComponent* Voice : { FireVoice.Get(), HitVoice.Get(), KillVoice.Get(),
+    for (UAudioComponent* Voice : { FootstepVoice.Get(), FireVoice.Get(), HitVoice.Get(), KillVoice.Get(),
         TakeHitVoice.Get(), AbilityVoice.Get(), PlayerDeathVoice.Get(), EntropyVoice.Get(), VoidMarkVoice.Get(), VoidBurstVoice.Get(), RiftVoice.Get(), ReactionVoice.Get() })
     {
         if (Voice) Voice->SetVolumeMultiplier(Gain);
     }
+}
+
+void ABreakerSoundDirector::PlayFootstep(UWorld* World)
+{
+    if (!World || World->GetNetMode() == NM_DedicatedServer) return;
+    ABreakerSoundDirector* Director = nullptr;
+    for (TActorIterator<ABreakerSoundDirector> It(World); It; ++It)
+        if (IsValid(*It) && !It->IsActorBeingDestroyed()) { Director = *It; break; }
+    if (!Director)
+    {
+        FActorSpawnParameters Params;
+        Params.ObjectFlags |= RF_Transient;
+        Director = World->SpawnActor<ABreakerSoundDirector>(ABreakerSoundDirector::StaticClass(), FTransform::Identity, Params);
+    }
+    if (Director) Director->SetLifeSpan(0); // Adopt a settings-preview director for ongoing gameplay.
+    if (!Director || Director->FootstepPcm.IsEmpty() || World->GetTimeSeconds() - Director->LastFootstepTime < .28) return;
+    Director->LastFootstepTime = World->GetTimeSeconds();
+    const int32 Index = Director->NextFootstep++ % Director->FootstepPcm.Num();
+    Director->FootstepVoice->SetSound(Director->FootstepWaves[Index]);
+    Director->Trigger(Director->FootstepVoice, Director->FootstepWaves[Index], Director->FootstepPcm[Index]);
 }
 
 void ABreakerSoundDirector::PlaySettingsTest(UWorld* World)

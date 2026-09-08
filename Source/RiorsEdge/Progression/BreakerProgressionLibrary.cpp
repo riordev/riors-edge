@@ -2429,12 +2429,9 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterVoidWhispererTree(
     Tree->Nodes.Add(Node);
 
     // The not-shooting income — the branch's argument for putting the gun down.
-    // Flagged NEEDS-RE-SITING in its own description: the Mana inversion turned
-    // this from a trickle bonus into a doubling of the PRIMARY income, which is
-    // a different node than the one that was priced. O2 holds the magnitude.
-    // WAITING ON: a recently-fired recorder, and the regen path reading it.
+    // Adds recovery to the competitive starter rate after the live no-fire delay.
     Node = MakeNode(TEXT("Caster.VoidWhisperer.Patience"), TEXT("Patience"),
-        TEXT("Passive Mana regeneration doubles while the caster has not fired a weapon recently."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 2, 1);
+        TEXT("Adds Mana regeneration while you have not fired a weapon for 4s (R2: 2s)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 2, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Patience.GetTag());
     Tree->Nodes.Add(Node);
 
