@@ -1,3 +1,4 @@
+#include "Tests/BreakerFractureTestHelpers.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
@@ -127,6 +128,7 @@ bool FBreakerVoidAbilityRuntimeTest::RunTest(const FString& Parameters)
         for (TActorIterator<ABreakerProjectileBase> It(World); It; ++It) Existing.Add(*It);
         Caster->GetAttributes()->ApplyClassResource(100);
         if (!TestTrue(TEXT("actual Fracture activates"), ASC->TryActivateAbility(Fracture))) return false;
+        if (!BreakerWaitForFractureCast(World, ASC, Fracture)) return false;
         ABreakerProjectileBase* Projectile = nullptr;
         for (TActorIterator<ABreakerProjectileBase> It(World); It; ++It) if (!Existing.Contains(*It) && !It->HasImpacted()) { Projectile = *It; break; }
         if (!TestNotNull(TEXT("actual Fracture projectile"), Projectile)) return false;
@@ -148,6 +150,7 @@ bool FBreakerVoidAbilityRuntimeTest::RunTest(const FString& Parameters)
         for (TActorIterator<ABreakerProjectileBase> It(World); It; ++It) Existing.Add(*It);
         Caster->GetAttributes()->ApplyClassResource(100); // Cast funding, no offensive stats.
         if (!TestTrue(TEXT("actual follow-up Fracture cast"), ASC->TryActivateAbility(Fracture))) return false;
+        if (!BreakerWaitForFractureCast(World, ASC, Fracture)) return false;
         ABreakerProjectileBase* Projectile = nullptr;
         for (TActorIterator<ABreakerProjectileBase> It(World); It; ++It)
             if (!Existing.Contains(*It) && !It->HasImpacted()) { Projectile = *It; break; }

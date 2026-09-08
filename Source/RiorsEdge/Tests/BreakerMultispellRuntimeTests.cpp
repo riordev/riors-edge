@@ -1,3 +1,4 @@
+#include "Tests/BreakerFractureTestHelpers.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
@@ -13,6 +14,8 @@
 #include "UObject/UnrealType.h"
 #include "Components/SphereComponent.h"
 #include "Engine/World.h"
+#include "Engine/Engine.h"
+#include "Movement/BreakerCharacterMovementComponent.h"
 #include "EngineUtils.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
@@ -33,6 +36,7 @@ namespace BreakerMultispellRuntime
         for (TActorIterator<ABreakerProjectileBase> It(Caster->GetWorld()); It; ++It) Existing.Add(*It);
         Caster->GetAttributes()->ApplyClassResource(100.0f);
         if (!Caster->GetAbilitySystemComponent()->TryActivateAbility(Handle)) return nullptr;
+        if (!BreakerWaitForFractureCast(Caster->GetWorld(), Caster->GetAbilitySystemComponent(), Handle)) return nullptr;
         for (TActorIterator<ABreakerProjectileBase> It(Caster->GetWorld()); It; ++It)
         {
             if (!Existing.Contains(*It) && !It->HasImpacted())
@@ -55,12 +59,17 @@ bool FBreakerMultispellPurchasedRuntimeTest::RunTest(const FString& Parameters)
     UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true,
         ERHIFeatureLevel::Num, &Initialization);
     if (!TestNotNull(TEXT("isolated runtime world"), World)) return false;
-    ON_SCOPE_EXIT { World->DestroyWorld(false); };
+    GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+    World->InitializeActorsForPlay(FURL());
+    const uint64 SavedFrame = GFrameCounter;
+    ON_SCOPE_EXIT { World->DestroyWorld(false); GEngine->DestroyWorldContext(World); GFrameCounter = SavedFrame; };
     FActorSpawnParameters Spawn;
     Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     ABreakerCharacter* Caster = World->SpawnActor<ABreakerCharacter>(ABreakerCharacter::StaticClass(),
         FVector::ZeroVector, FRotator::ZeroRotator, Spawn);
     if (!TestNotNull(TEXT("real caster"), Caster)) return false;
+    Caster->SetActorTickEnabled(false);
+    Caster->GetBreakerMovement()->SetComponentTickEnabled(false);
     UAbilitySystemComponent* ASC = Caster->GetAbilitySystemComponent();
     ASC->InitAbilityActorInfo(Caster, Caster);
     ASC->AddAttributeSetSubobject(Caster->GetAttributes());

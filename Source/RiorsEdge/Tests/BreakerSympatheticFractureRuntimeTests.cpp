@@ -1,3 +1,4 @@
+#include "Tests/BreakerFractureTestHelpers.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
@@ -185,6 +186,7 @@ bool FBreakerSympatheticFractureRuntimeTest::RunTest(const FString& Parameters)
     const auto Fracture = AllyASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Fracture::StaticClass(), 1));
     if (!TestTrue(TEXT("real Fracture cast commits"), AllyASC->TryActivateAbility(Fracture))) return false;
     TestTrue(TEXT("real Fracture spends Mana"), Ally->GetMana()->GetMana() < ManaBefore);
+    if (!BreakerWaitForFractureCast(World, AllyASC, Fracture)) return false;
     ABreakerProjectileBase* Projectile = nullptr;
     for (TActorIterator<ABreakerProjectileBase> It(World); It; ++It)
         if (It->GetOwner() == Ally) { Projectile = *It; break; }

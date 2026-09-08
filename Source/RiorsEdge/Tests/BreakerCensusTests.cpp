@@ -523,7 +523,7 @@ bool FBreakerAbilitiesNumbersTest::RunTest(const FString& Parameters)
         TestEqual(FString::Printf(TEXT("%s: a key the file does not name answers with the default"), *Id),
             Definition->Number(FName(TEXT("Breaker.NoSuchNumber")), 7.0f), 7.0f);
     }
-    TestEqual(TEXT("One hundred and forty-one numbers including Lingering refresh growth"), KeyCount, 141);
+    TestEqual(TEXT("One hundred and forty-two numbers including Fracture cast duration"), KeyCount, 142);
     TestEqual(TEXT("Twenty-eight rows carry numbers; seven classes keep theirs as constexpr or in the body"), RowsWithNumbers, 28);
 
     // Order is the class's declaration order, super first: the Gunsmith
@@ -532,6 +532,9 @@ bool FBreakerAbilitiesNumbersTest::RunTest(const FString& Parameters)
     const UBreakerAbilityDefinition* Turret = UBreakerAbilityDefinition::FindFallback(FName(TEXT("Gunsmith.Turret")));
     const UBreakerAbilityDefinition* Cleave = UBreakerAbilityDefinition::FindFallback(FName(TEXT("Caster.Cleave")));
     const UBreakerAbilityDefinition* Siphon = UBreakerAbilityDefinition::FindFallback(FName(TEXT("Caster.Siphon")));
+    const UBreakerAbilityDefinition* Fracture = UBreakerAbilityDefinition::FindFallback(FName(TEXT("Caster.Fracture")));
+    if (TestNotNull(TEXT("Fracture cast timing row is reachable"), Fracture))
+        TestEqual(TEXT("Fracture cast duration is authored"), Fracture->Number(TEXT("BaseCastSeconds"), -1), 0.35f);
     if (TestNotNull(TEXT("Siphon Drain tuning row is reachable"), Siphon))
     {
         TestEqual(TEXT("Drain rank-one threshold is authored"), Siphon->Number(TEXT("DrainRankOneThreshold"), -1), 0.10f);

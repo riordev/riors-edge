@@ -1,3 +1,4 @@
+#include "Tests/BreakerFractureTestHelpers.h"
 #include "Tests/BreakerReactionRuntimeObserver.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/ScopeExit.h"
@@ -144,6 +145,7 @@ bool FBreakerCoreDeadeyeRuntimeTest::RunTest(const FString& Parameters)
     const float FractureMana = Attr->GetClassResource();
     if (!TestTrue(TEXT("Paid Fracture emits projectile"), ASC->TryActivateAbility(Fracture))) return false;
     TestTrue(TEXT("Projectile cast debits resource"), Attr->GetClassResource() < FractureMana);
+    if (!BreakerWaitForFractureCast(World, ASC, Fracture)) return false;
     ABreakerProjectileBase* Projectile = nullptr;
     for (TActorIterator<ABreakerProjectileBase> It(World); It; ++It)
         if (It->GetOwner() == Player && !It->HasImpacted()) { Projectile = *It; break; }

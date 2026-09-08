@@ -1,3 +1,4 @@
+#include "Tests/BreakerFractureTestHelpers.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
@@ -101,6 +102,7 @@ bool FBreakerSiphonCycleRuntimeTest::RunTest(const FString& Parameters)
         const float Before = Mana->GetMana();
         if (!TestTrue(TEXT("actual paid Fracture cast"), Player->GetAbilitySystemComponent()->TryActivateAbility(Handle))) return false;
         TestTrue(TEXT("each projectile consumes normal Mana"), Mana->GetMana() < Before);
+        if (!BreakerWaitForFractureCast(World, Player->GetAbilitySystemComponent(), Handle)) return false;
         ABreakerProjectileBase* Projectile = nullptr;
         for (TActorIterator<ABreakerProjectileBase> It(World); It; ++It) if (!Existing.Contains(*It)) { Projectile = *It; break; }
         if (!TestNotNull(TEXT("paid cast spawned projectile"), Projectile)) return false;

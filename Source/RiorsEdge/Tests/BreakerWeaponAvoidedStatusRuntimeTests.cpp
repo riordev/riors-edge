@@ -1,3 +1,4 @@
+#include "Tests/BreakerFractureTestHelpers.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
@@ -194,6 +195,7 @@ bool FBreakerWeaponAvoidedStatusRuntimeTest::RunTest(const FString& Parameters)
         const float BeforeCast = Mana->GetMana();
         if (!TestTrue(TEXT("real paid Fracture prepares spreading Poison"), Source->GetAbilitySystemComponent()->TryActivateAbility(Fracture))) return false;
         TestTrue(TEXT("Fracture spends existing Mana"), Mana->GetMana() < BeforeCast);
+        if (!BreakerWaitForFractureCast(World, Source->GetAbilitySystemComponent(), Fracture)) return false;
         ABreakerProjectileBase* Projectile = nullptr;
         for (TActorIterator<ABreakerProjectileBase> It(World); It; ++It)
             if (!Existing.Contains(*It)) { Projectile = *It; break; }

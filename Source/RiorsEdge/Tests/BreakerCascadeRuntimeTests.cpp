@@ -1,3 +1,4 @@
+#include "Tests/BreakerFractureTestHelpers.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
@@ -110,6 +111,7 @@ bool FBreakerCascadeRuntimeTest::RunTest(const FString& Parameters)
             const float Before = Mana->GetMana();
             if (!TestTrue(TEXT("real Fracture activation"), ASC->TryActivateAbility(Fracture))) return nullptr;
             TestTrue(TEXT("Fracture pays before the ultimate"), Mana->GetMana() < Before);
+            if (!BreakerWaitForFractureCast(World, ASC, Fracture)) return nullptr;
             for (TActorIterator<ABreakerProjectileBase> It(World); It; ++It)
                 if (!Existing.Contains(*It)) return *It;
             return nullptr;

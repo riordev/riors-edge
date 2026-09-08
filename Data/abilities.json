@@ -188,6 +188,7 @@
 			"windowDuration": 0,
 			"numbers":
 			{
+				"BaseCastSeconds": 0.35,
 				"CyclePositionsPerCast": 1,
 				"ImpactDamage": 300,
 				"ProjectileSpeed": 4000,

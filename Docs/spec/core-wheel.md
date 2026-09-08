@@ -74,7 +74,7 @@ Each line below: gateway; lane A; lane B; lane C if major; links if major; conve
 - Threat allies need actual party relation. Deployables have health; zones have duration and are not destructible.
 - Literal weapon/ability bases apply after item-level scaling and before source pools; never re-add to stored status/reaction payouts.
 - Utility has two minors despite prose saying every sector has a major: preserve explicit roster.
-- Fracture currently instant; cast-rate promises require actual cadence, not a fake cooldown display.
+- Fracture pays and snapshots at cast start, then emits after its authored cast duration divided by composed cast rate. GAS remains active during that phase; repeated input and Conduction cannot bypass it. Cancellation, death and removal discard pending emission without advancing the cycle or refunding the committed cost.
 
 ## Primitive contracts
 

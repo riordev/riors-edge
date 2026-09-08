@@ -1,3 +1,4 @@
+#include "Tests/BreakerFractureTestHelpers.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
@@ -109,6 +110,7 @@ bool FBreakerCoreVelocityRuntimeTest::RunTest(const FString& Parameters)
     const float Resource = Attr->GetClassResource();
     if (!ASC->TryActivateAbility(Handle)) return false;
     TestTrue(TEXT("Native ability actually pays"), Attr->GetClassResource() < Resource);
+    if (!BreakerWaitForFractureCast(World, ASC, Handle)) return false;
     ABreakerProjectileBase* Projectile = nullptr;
     for (TActorIterator<ABreakerProjectileBase> It(World); It; ++It) if (It->GetOwner() == Player && !It->HasImpacted()) { Projectile = *It; break; }
     if (!TestNotNull(TEXT("Paid Fracture emitted"), Projectile)) return false;
