@@ -77,11 +77,6 @@ bool FBreakerCastTimeShippedTest::RunTest(const FString& Parameters)
         FName(TEXT("Caster.Fracture")),
         FName(TEXT("Caster.Siphon")),
         FName(TEXT("Tank.BreachCharge")),
-        // Unmake opens the window that rewrites every Caster cost. A wind-up
-        // before that window opens moves the whole class's cost model, which
-        // is a design change rather than a delay, so it is parked with a
-        // ruling owed rather than authored in passing.
-        FName(TEXT("Caster.Unmake")),
         // Rot alone is still parked, and the reason narrowed once its fixture
         // got a real play world: the world now ticks, so its ZONES tick too,
         // while RotPurchasedZones drives zone life by hand with AdvanceZone
@@ -89,6 +84,15 @@ bool FBreakerCastTimeShippedTest::RunTest(const FString& Parameters)
         // occupancy and follow offsets underneath those manual advances. That
         // is the test's timing model, not the play world, and it is the one
         // thing left between the Caster and a full kit of wind-ups.
+        // Unmake stays instant on a MEASURED interaction, not a hunch. Its
+        // window suspends Mana generation, and a wind-up means the bank
+        // regenerates for the length of the cast BEFORE the suspension
+        // starts — deep enough that OverreachRuntime's debt clears and a
+        // second free Unmake is no longer available. That fixture says in
+        // its own comment that the interaction is authored and "recorded
+        // rather than silently nerfed", so a wind-up here is a balance
+        // change the owner rules on, not a delay.
+        FName(TEXT("Caster.Unmake")),
         FName(TEXT("Caster.Rot")),
         // Resonance is parked on a MEASURED consequence rather than a fixture.
         // It detonates the statuses on a target and is paid out of their
