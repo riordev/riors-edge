@@ -143,7 +143,8 @@ TArray<FBreakerLocalMapMarker> UBreakerLocalMapComponent::GetMarkers() const
         auto& Marker=Out.AddDefaulted_GetRef(); Marker.Id=Site;
         Marker.Label=It->GetDisplayName(); Marker.Detail=It->GetCachePrompt(); Marker.Location=It->GetActorLocation();
         const auto* Destination=BreakerPrototypeDestinations::ForWorld(this);
-        Marker.bObjective=!Destination; // Both prototype supply routes are now optional.
+        // Shatterpoint still requires district supplies; the other regions have separate mission objectives.
+        Marker.bObjective=!Destination || Destination->Id==TEXT("Shatterpoint");
     }
     for(TActorIterator<ABreakerMeridianGroundCrew> It(World);It;++It)
     {

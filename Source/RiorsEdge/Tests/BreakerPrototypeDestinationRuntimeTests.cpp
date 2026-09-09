@@ -147,6 +147,41 @@ bool FBreakerPrototypeDestinationRuntimeTest::RunTest(const FString& Parameters)
         auto* Map=Player->FindComponentByClass<UBreakerLocalMapComponent>(); if (!Map) return false;
         TestTrue(TEXT("Local map shows actual floor footprints"),Map->GetGround().Num()>=5);
         TestEqual(TEXT("Local map names its real region"),Map->GetRegionName().ToString(),D.DisplayName);
+        // Fresh arrival must expose the actual mission before proximity discovery.
+        // These assertions exercise the same visibility and tracking API as the map UI.
+        const auto ArrivalMarkers=Map->GetMarkers();
+        for(int32 Pocket=0;Pocket<3;++Pocket)
+        {
+            const FName Site(*FString::Printf(TEXT("Destination.Site.%s.%d"),*D.Id.ToString(),Pocket));
+            const auto* Marker=ArrivalMarkers.FindByPredicate([&](const auto& M){return M.Id==Site;});
+            if(!TestNotNull(TEXT("Each real district cache has its stable map site"),Marker))return false;
+            TestFalse(TEXT("Fresh arrival has not discovered distant district supplies"),Map->IsDiscovered(Site));
+            if(D.Id==TEXT("Shatterpoint"))
+            {
+                TestTrue(TEXT("Required city supplies are visible before discovery"),Map->IsVisible(*Marker));
+                TestTrue(TEXT("A player can track each required supply pocket from arrival"),Map->Track(Site));
+                FBreakerLocalMapMarker Tracked;
+                TestTrue(TEXT("Tracked supply resolves to its actual undiscovered site"),Map->GetTrackedMarker(Tracked)&&Tracked.Id==Site&&Tracked.Location.Equals(Marker->Location));
+            }
+            else
+            {
+                TestFalse(TEXT("Optional supplies do not compete with the regional mission"),Marker->bObjective);
+                TestFalse(TEXT("Undiscovered optional supplies retain exploration visibility"),Map->IsVisible(*Marker));
+                TestFalse(TEXT("Undiscovered optional supplies cannot be tracked prematurely"),Map->Track(Site));
+            }
+        }
+        Map->Track(NAME_None);
+        if(D.Id!=TEXT("Shatterpoint"))
+        {
+            const FName MissionSite=D.Id==TEXT("RedBasin")?FName(TEXT("RedBasin.Recovery"))
+                :D.Id==TEXT("StationZero")?UBreakerContainmentHunt::TargetTag()
+                :D.Id==TEXT("BrokenCoast")?FName(TEXT("BrokenCoast.Uplink")):FName(TEXT("PortMeridian.GroundCrew"));
+            const auto* Mission=ArrivalMarkers.FindByPredicate([&](const auto& M){return M.Id==MissionSite;});
+            if(!TestNotNull(TEXT("Regional mission retains its actual consumer marker"),Mission))return false;
+            TestTrue(TEXT("Regional mission remains visible at arrival"),Mission->bObjective&&Map->IsVisible(*Mission));
+            TestTrue(TEXT("Regional mission is trackable before optional supply discovery"),Map->Track(MissionSite));
+            Map->Track(NAME_None);
+        }
         // Sweep the native standing capsule down the route through each district.
         // Enemy bodies are ignored; this proves geometry, not combat skill.
         FCollisionQueryParams Query(SCENE_QUERY_STAT(PrototypeWalkingRoute),false,Player);
