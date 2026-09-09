@@ -20,6 +20,7 @@
 #include "Characters/BreakerCharacter.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Items/BreakerAffixLibrary.h"
+#include "Items/BreakerItemNaming.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Items/BreakerItemRequirements.h"
 #include "Movement/BreakerCharacterMovementComponent.h"
@@ -4704,9 +4705,28 @@ namespace
     // which for a weapon is its ARCHETYPE (the one fact not already implied by
     // where the card sits) and for armour is its slot.
     //
-    // This is a CONTENT GAP, not a layout choice: line two still prints rarity
-    // and slot as the reference asks, so an unnamed piece of armour repeats its
-    // slot on both lines until item names exist.
+    // THE GAP ABOVE IS NOW FILLED (O267, owner-ruled: PoE grammar). A rolled
+    // item names itself after its two strongest lines — prefix, base, "of"
+    // suffix — so the card leads with what the item IS instead of repeating
+    // its slot on both lines. The grammar and the ranking are pure and live
+    // in Items/BreakerItemNaming.h, proved there on a bare array; only the
+    // lookup that turns a rolled id into its word is here, because words are
+    // data and the grammar is a rule.
+    //
+    // A LEGENDARY IS NOT RENAMED. It already carries authored copy, and a
+    // legendary that called itself "Havoc Riftplate of Cast Speed" would bury
+    // the one name in the game somebody actually wrote.
+    FString BreakerMenuAffixWord(const FBreakerRolledAffix& Rolled)
+    {
+        const FBreakerAffixLibraryData& Library = UBreakerAffixLibrary::GetData();
+        for (const TArray<FBreakerAffixDefinition>* Pool : { &Library.Slice, &Library.Aberrant,
+            &Library.Unwritten, &Library.Downsides })
+            for (const FBreakerAffixDefinition& Affix : *Pool)
+                if (Affix.AffixId == Rolled.AffixId) return Affix.DisplayName.ToString();
+        if (Library.Elemental.AffixId == Rolled.AffixId) return Library.Elemental.DisplayName.ToString();
+        return FString();
+    }
+
     FString ItemDisplayName(const FBreakerItemInstance& Item)
     {
         if (Item.IsLegendary())
@@ -4725,11 +4745,17 @@ namespace
         {
             return TEXT("ISSUE RIFLE");
         }
-        if (Item.IsWeapon())
-        {
-            return BreakerWeaponArchetypeNames::Short(Item.WeaponArchetype);
-        }
-        return SlotName(Item.Slot);
+        // The BASE the grammar wraps: a weapon is its archetype, armour its
+        // slot. Unchanged — this was always the right base, it simply had
+        // nothing wrapped around it.
+        const FString Base = Item.IsWeapon()
+            ? BreakerWeaponArchetypeNames::Short(Item.WeaponArchetype)
+            : SlotName(Item.Slot);
+        using namespace BreakerItemNaming;
+        const FBreakerRolledAffix* Prefix = StrongestOfCategory(Item.Affixes, EBreakerAffixCategory::Prefix);
+        const FBreakerRolledAffix* Suffix = StrongestOfCategory(Item.Affixes, EBreakerAffixCategory::Suffix);
+        return Compose(Prefix ? BreakerMenuAffixWord(*Prefix) : FString(), Base,
+            Suffix ? BreakerMenuAffixWord(*Suffix) : FString());
     }
 
     // Line two: rarity and slot. Aberrant and Unwritten say so in their own
@@ -9311,7 +9337,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
                                 SNew(SVerticalBox)
                                 + SVerticalBox::Slot().AutoHeight()
                                 [
-                                    MenuText(FText::FromString(ItemSlotLabel(Item).ToUpper()), BreakerUI::TypeBody,
+                                    MenuText(FText::FromString(ItemDisplayName(Item).ToUpper()), BreakerUI::TypeBody,
                                         bRowSelected ? Primary : SoftText, true)
                                 ]
                                 + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
@@ -9422,7 +9448,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
                 SNew(SVerticalBox)
                 + SVerticalBox::Slot().AutoHeight()
                 [
-                    MenuText(FText::FromString(ItemSlotLabel(SelectedItem).ToUpper()), BreakerUI::TypeH1, Primary, true)
+                    MenuText(FText::FromString(ItemDisplayName(SelectedItem).ToUpper()), BreakerUI::TypeH1, Primary, true)
                 ]
                 + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
                 [
