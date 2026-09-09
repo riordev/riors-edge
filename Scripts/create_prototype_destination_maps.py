@@ -4,7 +4,7 @@ Geometry, services, fixed encounters and rewards are authored in the native buil
 """
 import unreal
 
-maps = ("Lvl_RedBasin", "Lvl_StationZero", "Lvl_PortMeridian")
+maps = ("Lvl_RedBasin", "Lvl_StationZero", "Lvl_PortMeridian", "Lvl_BrokenCoast")
 levels = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 mode = unreal.load_class(None, "/Script/RiorsEdge.BreakerGameMode")
@@ -34,4 +34,4 @@ for name in maps:
 for name in maps:
     if not unreal.EditorAssetLibrary.does_asset_exist("/Game/Breaker/Maps/" + name):
         raise RuntimeError("Incomplete destination creation; native catalogue must remain package-gated")
-unreal.log("Prototype destination map packages verified: Red Basin, Station Zero and Port Meridian")
+unreal.log("Prototype destination map packages verified: Red Basin, Station Zero, Port Meridian and Broken Coast")

@@ -1,0 +1,9 @@
+# Broken Coast prototype acceptance
+
+Strand Landing42, Broken Jetty44 and Signal Point46 are fixed regional districts in a real Unreal map package. Eighteen existing guards gate three normal physical supply items; two travel points offer Anchor13. The coast has continuous flat land, a visible concrete seawall and a decorative sea below/outside the shore. Offshore pier geometry is decorative; no swimming, water hazards or offshore objectives are implemented.
+
+Native coverage includes all four prototype packages, actual spawned guards, authored level handling, unchanged regional levels for a level50 visitor, floor/capsule paths through districts and to caches/gates, actual death-gated cache payout/pickup, map objective retirement and normal respawn. Ocean bounds include noncolliding geometry and are checked valid/below shore; it cannot appear as walkable ground or answer physics queries. Seawall blocks a standing capsule; jumping over it and full human traversal remain untested. Native character fall recovery already exists; this change does not add one.
+
+Build/full suite858 passing,3 expected failures,0 unexpected; status regenerated. Exact general travel registry9→10 reflects the fourth actual package, with one door-only route unchanged. Unreal Python created the missing map and left prior maps untouched. Independent review corrected a potentially vacuous noncolliding bounds assertion before integration.
+
+All four1920x1080 frames in seat/captures/broken-coast-1113 were inspected: arrival, boat/shoreline, damaged pier and beacon. They visibly establish the flat coastal setting and clear central route, but the sea is a flat placeholder with exposed distant edges and structures remain primitive. Capture profile was fresh/isolated, cameras elevated for landmarks. No combat difficulty, mouse interaction or complete map-to-map transport claim follows from those views. Dedicated mission beats, campaign leveling and harder return Rifts remain open.

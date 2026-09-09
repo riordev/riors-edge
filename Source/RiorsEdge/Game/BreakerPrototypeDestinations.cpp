@@ -38,7 +38,11 @@ const TArray<BreakerPrototypeDestinations::FDefinition>& BreakerPrototypeDestina
         {TEXT("PortMeridian"), TEXT("Lvl_PortMeridian"), TEXT("Port Meridian"),
             TEXT("Prototype destination / fixed areas 34-38. Cross a destroyed airport through the departures terminal, wreck-strewn apron and damaged maintenance hangar. Clear the three marked pockets and recover their supplies. Either gate returns to Anchor 13."),
             {FVector(2200,0,0), FVector(8800,0,0), FVector(15400,0,0)},
-            {TEXT("Departures Terminal"), TEXT("Broken Apron"), TEXT("Maintenance Hangar")}, {34,36,38}}
+            {TEXT("Departures Terminal"), TEXT("Broken Apron"), TEXT("Maintenance Hangar")}, {34,36,38}},
+        {TEXT("BrokenCoast"), TEXT("Lvl_BrokenCoast"), TEXT("Broken Coast"),
+            TEXT("Prototype destination / fixed areas 42-46. Follow the flat shoreline from a stranded landing through a broken jetty to the signal beacon. Clear the three marked pockets and recover their supplies. Either gate returns to Anchor 13."),
+            {FVector(2200,0,0), FVector(8800,0,0), FVector(15400,0,0)},
+            {TEXT("Strand Landing"), TEXT("Broken Jetty"), TEXT("Signal Point")}, {42,44,46}}
     };
     return Definitions;
 }
@@ -73,11 +77,12 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
     const bool bBasin = Id == TEXT("RedBasin");
     const bool bStation = Id == TEXT("StationZero");
     const bool bAirport = Id == TEXT("PortMeridian");
+    const bool bCoast = Id == TEXT("BrokenCoast");
     // O2 PLACEHOLDER palette/placement: scorched soil versus cool lab panels,
     // with amber route lamps. Rift teal remains reserved for travel objects.
-    const FLinearColor Ground = bBasin ? FLinearColor(.16f,.085f,.05f) : bAirport ? FLinearColor(.13f,.14f,.15f) : FLinearColor(.09f,.13f,.19f);
-    const FLinearColor Wall = bBasin ? FLinearColor(.27f,.14f,.08f) : bAirport ? FLinearColor(.29f,.30f,.28f) : FLinearColor(.18f,.25f,.34f);
-    const FLinearColor Trim = bBasin ? FLinearColor(.15f,.12f,.10f) : bAirport ? FLinearColor(.52f,.40f,.16f) : FLinearColor(.42f,.49f,.55f);
+    const FLinearColor Ground = bBasin ? FLinearColor(.16f,.085f,.05f) : bAirport ? FLinearColor(.13f,.14f,.15f) : bCoast ? FLinearColor(.31f,.29f,.23f) : FLinearColor(.09f,.13f,.19f);
+    const FLinearColor Wall = bBasin ? FLinearColor(.27f,.14f,.08f) : bAirport ? FLinearColor(.29f,.30f,.28f) : bCoast ? FLinearColor(.28f,.31f,.30f) : FLinearColor(.18f,.25f,.34f);
+    const FLinearColor Trim = bBasin ? FLinearColor(.15f,.12f,.10f) : bAirport ? FLinearColor(.52f,.40f,.16f) : bCoast ? FLinearColor(.34f,.26f,.17f) : FLinearColor(.42f,.49f,.55f);
     bool bGeometryValid = true;
     int32 RecorderCount=0;
     auto Shape = [&](const TCHAR* Name,UStaticMesh* Mesh,FVector At,FVector Size,FLinearColor Color,
@@ -103,6 +108,28 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
         if (auto* Actor=BreakerPlaceEnvironmentDressing(World,Asset,At,Height,Yaw))
         { Actor->Tags.Add(TEXT("PrototypeDestination.Dressing")); ++Result.DressingCount; }
     };
+    if(bCoast)
+    {
+        // O2 PLACEHOLDER: continuous flat coastal ground backs every district
+        // and connector. The visual sea lies outside it, below walking height.
+        // It is not a swimming surface, a new hazard or a playable map ground.
+        const float MinX=ArrivalLocation().X-800.f;
+        const float MaxX=Definition->Districts.Last().X+3400.f;
+        const float MidX=(MinX+MaxX)*.5f;
+        const float Length=MaxX-MinX;
+        if(auto* Land=Shape(TEXT("CoastalPlain"),Cube,FVector(MidX,0,-101),FVector(Length,5600,200),Ground,true))
+            Land->Tags.Add(TEXT("Destination.Landmark.CoastalPlain"));
+        if(auto* Sea=Shape(TEXT("OceanSurface"),Cube,FVector(MidX,-33000,-250),FVector(90000,60400,20),FLinearColor(.07f,.12f,.18f)))
+        {
+            Sea->SetActorEnableCollision(false);
+            Sea->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+            Sea->GetStaticMeshComponent()->SetCanEverAffectNavigation(false);
+            Sea->Tags.Add(TEXT("Destination.Landmark.Ocean"));
+        }
+        // The sea-facing edge is a visible low concrete seawall, outside
+        // guard/cache/return routes. No invisible blocking volume is authored.
+        Shape(TEXT("CoastalSeaWall"),Cube,FVector(MidX,-2710,95),FVector(Length,150,190),Wall);
+    }
     Result.Arrival=ArrivalLocation();
     // O2 PLACEHOLDER: continuous approach floor reaches the first court;
     // safety comes from distance, not invulnerability or disabled encounters.
@@ -215,6 +242,21 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
                 }
                 Dress(TEXT("Column_Pipes"),C+FVector(2600,Side*2450,0),420,Side*90);
             }
+            else if(bCoast)
+            {
+                // O2 PLACEHOLDER: a flat, open shoreline with low weathered
+                // piles rather than tall enclosing terrain or city walls.
+                for(int32 Pile=0;Pile<5;++Pile)
+                {
+                    const FVector At=C+FVector(-2200+Pile*1100,Side*2350,0);
+                    Shape(TEXT("MooringBollard"),Cylinder,At+FVector(0,0,80),FVector(100,100,160),Trim);
+                    if(Side>0 && Pile%2==0)
+                        Dress(TEXT("Bush_Common"),At+FVector(0,150,0),220,Pile*35);
+                }
+                Dress(TEXT("Column_Pipes"),C+FVector(-2100,Side*2100,0),300,Side*90);
+                if(Pocket==0)
+                    Shape(TEXT("LandingSupplyStack"),Cube,C+FVector(-1600,Side*1900,85),FVector(650,400,170),Trim);
+            }
             // Real low cover and a full-height line break, with side approaches.
             // O2 PLACEHOLDER: keep the laboratory southwest arrival diagonal
             // outside the full standing-capsule footprint of this cover.
@@ -294,6 +336,42 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
                     Shape(TEXT("HangarRoofTruss"),Cube,C+FVector(-2100+Bay*2100,0,1400),FVector(110,5100,130),Trim);
                 Shape(TEXT("CollapsedHangarDoor"),Cube,C+FVector(2450,-2050,370),FVector(110,900,800),Wall,false,FRotator(0,10,15));
                 Dress(TEXT("Column_Pipes"),C+FVector(-2200,-2000,0),750,90);
+            }
+        }
+        if(bCoast)
+        {
+            // O2 PLACEHOLDER: noninteractive coastal landmarks keep all real
+            // objectives on the continuous shore, not the broken offshore pier.
+            if(Pocket==0)
+            {
+                const FVector At=C+FVector(1800,-1900,0);
+                if(auto* Hull=Shape(TEXT("StrandedBoatHull"),Cube,At+FVector(0,0,140),FVector(1500,470,240),Trim,false,FRotator(0,8,-10)))
+                    Hull->Tags.Add(TEXT("Destination.Landmark.StrandLanding"));
+                Shape(TEXT("BoatCabin"),Cube,At+FVector(200,0,330),FVector(430,350,300),Wall,false,FRotator(0,8,-10));
+                Shape(TEXT("BoatMast"),Cylinder,At+FVector(-300,0,640),FVector(35,35,1000),Trim,false,FRotator(0,0,-10));
+            }
+            if(Pocket==1)
+            {
+                for(int32 Segment=0;Segment<5;++Segment)
+                {
+                    const FVector At=C+FVector(1900,-2100-Segment*600,0);
+                    // A separated pier silhouette beyond the seawall is
+                    // decorative: there is no missing objective to jump to.
+                    if(auto* Deck=Shape(TEXT("BrokenPierDeck"),Cube,At+FVector(0,0,-30-Segment*25),FVector(650,450,80),Trim,false,FRotator(Segment*3,0,0)))
+                    {Deck->SetActorEnableCollision(false);Deck->Tags.Add(TEXT("Destination.Landmark.BrokenJetty"));}
+                    for(int32 Side:{-1,1})
+                        if(auto* Pile=Shape(TEXT("PierTimberPile"),Cylinder,At+FVector(Side*290,0,-160),FVector(95,95,620),Trim))
+                            Pile->SetActorEnableCollision(false);
+                }
+            }
+            if(Pocket==2)
+            {
+                const FVector At=C+FVector(1900,-1900,0);
+                if(auto* Tower=Shape(TEXT("SignalBeaconTower"),Cylinder,At+FVector(0,0,750),FVector(560,560,1500),Wall))
+                    Tower->Tags.Add(TEXT("Destination.Landmark.SignalPoint"));
+                Shape(TEXT("BeaconLanternRoom"),Cylinder,At+FVector(0,0,1580),FVector(800,800,220),Trim);
+                Shape(TEXT("BeaconLens"),Cylinder,At+FVector(0,0,1740),FVector(480,480,130),FLinearColor(.75f,.62f,.35f));
+                Shape(TEXT("BeaconCap"),Cylinder,At+FVector(0,0,1850),FVector(850,850,90),Wall);
             }
         }
         TArray<ABreakerEnemy*> Guards;

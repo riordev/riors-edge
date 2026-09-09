@@ -6,6 +6,8 @@
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerEnemy.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMeshActor.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -32,7 +34,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerPrototypeDestinationPackagesTest,
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FBreakerPrototypeDestinationPackagesTest::RunTest(const FString& Parameters)
 {
-    TestEqual(TEXT("Exactly three playable prototype definitions"),BreakerPrototypeDestinations::All().Num(),3);
+    TestEqual(TEXT("Exactly four playable prototype definitions"),BreakerPrototypeDestinations::All().Num(),4);
     for (const auto& D : BreakerPrototypeDestinations::All())
     {
         if (!TestTrue(TEXT("Run create_prototype_destination_maps.py: actual destination World package exists"),BreakerPrototypeDestinations::HasMapPackage(D))) return false;
@@ -111,18 +113,20 @@ bool FBreakerPrototypeDestinationRuntimeTest::RunTest(const FString& Parameters)
             ? TArray<FName>{TEXT("Destination.Landmark.ScorchedFields"),TEXT("Destination.Landmark.BurnedHomestead"),TEXT("Destination.Landmark.ImpactCrater")}
             : D.Id==TEXT("StationZero")
                 ? TArray<FName>{TEXT("Destination.Landmark.ResearchBench"),TEXT("Destination.Landmark.SpecimenGarden"),TEXT("Destination.Landmark.ContainmentLaboratory")}
-                : TArray<FName>{TEXT("Destination.Landmark.DeparturesTerminal"),TEXT("Destination.Landmark.AircraftWreck"),TEXT("Destination.Landmark.MaintenanceHangar")};
+                : D.Id==TEXT("PortMeridian")
+                    ? TArray<FName>{TEXT("Destination.Landmark.DeparturesTerminal"),TEXT("Destination.Landmark.AircraftWreck"),TEXT("Destination.Landmark.MaintenanceHangar")}
+                    : TArray<FName>{TEXT("Destination.Landmark.StrandLanding"),TEXT("Destination.Landmark.BrokenJetty"),TEXT("Destination.Landmark.SignalPoint"),TEXT("Destination.Landmark.Ocean"),TEXT("Destination.Landmark.CoastalPlain")};
         for (FName Landmark : RequiredLandmarks)
         {
             AActor* Found=nullptr;
             for (TActorIterator<AActor> It(World);It;++It) if(It->ActorHasTag(Landmark)){Found=*It;break;}
             TestNotNull(*FString::Printf(TEXT("Authored setting landmark exists: %s"),*Landmark.ToString()),Found);
         }
-        if(D.Id==TEXT("PortMeridian"))
+        if(D.Id==TEXT("PortMeridian") || D.Id==TEXT("BrokenCoast"))
         {
             for(auto* Enemy:Enemies)
-                TestFalse(TEXT("Airport guards never inherit Station Zero's priority hunt"),Enemy->ActorHasTag(UBreakerContainmentHunt::TargetTag()));
-            TestFalse(TEXT("Airport objective is real supply recovery, not a research mission"),Player->FindComponentByClass<UBreakerLocalMapComponent>()->GetCampaignObjective().ToString().Contains(TEXT("Custodian")));
+                TestFalse(TEXT("Supply-region guards never inherit Station Zero's priority hunt"),Enemy->ActorHasTag(UBreakerContainmentHunt::TargetTag()));
+            TestFalse(TEXT("Supply-region objective is recovery, not a research mission"),Player->FindComponentByClass<UBreakerLocalMapComponent>()->GetCampaignObjective().ToString().Contains(TEXT("Custodian")));
         }
         for (auto* Gate : Gates)
         {
@@ -164,15 +168,15 @@ bool FBreakerPrototypeDestinationRuntimeTest::RunTest(const FString& Parameters)
             }
             Previous=End;
         }
-        if(D.Id==TEXT("PortMeridian"))
+        if(D.Id==TEXT("PortMeridian") || D.Id==TEXT("BrokenCoast"))
         {
-            // Airport side access is tested with the same standing capsule;
+            // Flat destination side access is tested with the same standing capsule;
             // the main route alone does not prove caches or gates are usable.
             TArray<TPair<FVector,FVector>> Spurs;
             for(int32 Pocket=0;Pocket<Caches.Num();++Pocket)
             {
                 const FVector Centre=D.Districts[Pocket];
-                const FName Site(*FString::Printf(TEXT("Destination.Site.PortMeridian.%d"),Pocket));
+                const FName Site(*FString::Printf(TEXT("Destination.Site.%s.%d"),*D.Id.ToString(),Pocket));
                 auto* const* Cache=Caches.FindByPredicate([&](const auto* C){return C->ActorHasTag(Site);});
                 if(!Cache)return false;
                 Spurs.Add({Centre,(*Cache)->GetActorLocation()});
@@ -183,15 +187,34 @@ bool FBreakerPrototypeDestinationRuntimeTest::RunTest(const FString& Parameters)
             {
                 FVector From=Spur.Key,To=Spur.Value;From.Z=To.Z=Half+3;
                 FHitResult Block;
-                TestFalse(TEXT("Airport cache/return approach fits the real standing capsule"),World->SweepSingleByObjectType(Block,From,To,FQuat::Identity,
+                TestFalse(TEXT("Destination cache/return approach fits the real standing capsule"),World->SweepSingleByObjectType(Block,From,To,FQuat::Identity,
                     FCollisionObjectQueryParams(ECC_WorldStatic),FCollisionShape::MakeCapsule(Radius,Half),Query));
                 for(int32 Sample=0;Sample<=10;++Sample)
                 {
                     const FVector At=FMath::Lerp(From,To,Sample/10.f);FHitResult Floor;
-                    TestTrue(TEXT("Airport cache/return approach has continuous floor"),World->LineTraceSingleByObjectType(Floor,At,At-FVector(0,0,Half+20),
+                    TestTrue(TEXT("Destination cache/return approach has continuous floor"),World->LineTraceSingleByObjectType(Floor,At,At-FVector(0,0,Half+20),
                         FCollisionObjectQueryParams(ECC_WorldStatic),Query));
                 }
             }
+        }
+        if(D.Id==TEXT("BrokenCoast"))
+        {
+            AStaticMeshActor* Sea=nullptr;
+            for(TActorIterator<AStaticMeshActor> It(World);It;++It)
+                if(It->ActorHasTag(TEXT("Destination.Landmark.Ocean")))Sea=*It;
+            if(!TestNotNull(TEXT("Coast has an actual ocean presentation mesh"),Sea))return false;
+            TestFalse(TEXT("Visual sea is not a fake walkable floor"),Sea->GetActorEnableCollision());
+            TestEqual(TEXT("Ocean mesh disables physics queries"),Sea->GetStaticMeshComponent()->GetCollisionEnabled(),ECollisionEnabled::NoCollision);
+            TestFalse(TEXT("Ocean never contributes a surveyed walking footprint"),Sea->ActorHasTag(TEXT("BreakerMapGround")));
+            const FBox SeaBounds=Sea->GetComponentsBoundingBox(true);
+            TestTrue(TEXT("Noncolliding ocean has real nonempty presentation bounds"),SeaBounds.IsValid && !SeaBounds.GetExtent().IsNearlyZero());
+            TestTrue(TEXT("Ocean surface lies below the authored flat shore"),SeaBounds.IsValid && SeaBounds.Max.Z<0.f);
+            // Inspect the actual visible seawall as a physical boundary; no
+            // swimming permission, invisible wall or objective offshore.
+            FHitResult Wall;
+            TestTrue(TEXT("Visible seawall bounds the playable shore"),World->SweepSingleByObjectType(Wall,
+                D.Districts[1]+FVector(0,-2400,Half+3),D.Districts[1]+FVector(0,-2900,Half+3),FQuat::Identity,
+                FCollisionObjectQueryParams(ECC_WorldStatic),FCollisionShape::MakeCapsule(Radius,Half),Query));
         }
         TArray<int32> FixedLevels;
         for (auto* Enemy : Enemies) FixedLevels.Add(Enemy->GetAreaLevel());

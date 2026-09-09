@@ -623,8 +623,12 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
                 // and hangar frame; these views do not alter live gameplay.
                 const FVector AirportViews[]={FVector(-1800,-800,700),FVector(-300,-600,650),FVector(-2100,-800,650)};
                 const FVector AirportLooks[]={FVector(0,1700,420),FVector(1700,-1950,250),FVector(1000,0,900)};
-                const FVector At=Centre+(bAirport?AirportViews[District]:bBasin?BasinViews[District]:ResearchViews[District]);
-                const FRotator Facing=(Centre+(bAirport?AirportLooks[District]:bBasin?BasinLooks[District]:ResearchLooks[District])-At).Rotation();
+                const bool bCoast=Prototype->Id==TEXT("BrokenCoast");
+                // O2 PLACEHOLDER: seaward views frame the boat, pier and beacon.
+                const FVector CoastViews[]={FVector(-500,-300,650),FVector(-400,-300,800),FVector(-500,-300,800)};
+                const FVector CoastLooks[]={FVector(1800,-1900,250),FVector(1900,-3000,-50),FVector(1900,-1900,1050)};
+                const FVector At=Centre+(bCoast?CoastViews[District]:bAirport?AirportViews[District]:bBasin?BasinViews[District]:ResearchViews[District]);
+                const FRotator Facing=(Centre+(bCoast?CoastLooks[District]:bAirport?AirportLooks[District]:bBasin?BasinLooks[District]:ResearchLooks[District])-At).Rotation();
                 if (auto* Camera=GetWorld()->SpawnActor<ACameraActor>(At,Facing))
                 {
                     Camera->GetCameraComponent()->SetFieldOfView(90.f);

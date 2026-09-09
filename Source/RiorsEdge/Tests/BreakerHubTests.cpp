@@ -51,7 +51,7 @@ bool FBreakerHubTravelRegistryTest::RunTest(const FString& Parameters)
         if (!Destination.bEnabled) continue;
         if (Destination.bDoorOnly) ++DoorOnlyCount; else ++GeneralCount;
     }
-    TestEqual(TEXT("Nine general destinations include three packaged regional prototypes"), GeneralCount, 9);
+    TestEqual(TEXT("Ten general destinations include four packaged regional prototypes"), GeneralCount, 10);
     TestEqual(TEXT("Exactly one door-only destination: the Local Rift"), DoorOnlyCount, 1);
 
     // A travel point excludes its current destination; other reachable entries
