@@ -184,6 +184,10 @@ enum class EBreakerStatTarget : uint8
     WeaponEntropyConversion,
     WeaponVoidConversion,
     WeaponRiftConversion,
+    // O253: whole skill levels granted by a rolled line on Waist or Necklace.
+    // Appended at the tail like everything above — this enum is serialized by
+    // value into every saved item.
+    SkillLevel,
     Count UMETA(Hidden)
 };
 
@@ -513,6 +517,12 @@ struct RIORSEDGE_API FBreakerEquipmentStats
     UPROPERTY(BlueprintReadOnly) float PrimaryEffectiveRangeMultiplier = 1.0f;
     UPROPERTY(BlueprintReadOnly) float PrimarySustainedAccuracyMultiplier = 1.0f;
     UPROPERTY(BlueprintReadOnly) int32 PrimaryPierceCount = 0;
+    // O253: whole skill levels the equipped set grants, summed across the two
+    // slots that can carry the line. An INTEGER on the stats struct rather
+    // than a float in the aggregated-attribute fold, for the same reason
+    // Pierce is: that fold composes (Base+Flat)x(1+Increased)xMore in floats,
+    // and a level is a countable thing the player is shown.
+    UPROPERTY(BlueprintReadOnly) int32 BonusSkillLevels = 0;
     UPROPERTY(BlueprintReadOnly) float PrimaryEntropyConversionPercent = 0.0f;
     UPROPERTY(BlueprintReadOnly) float PrimaryVoidConversionPercent = 0.0f;
     UPROPERTY(BlueprintReadOnly) float PrimaryRiftConversionPercent = 0.0f;

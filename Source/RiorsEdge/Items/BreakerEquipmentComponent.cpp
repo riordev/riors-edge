@@ -1027,6 +1027,14 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
                 if (!UBreakerAffixLibrary::IsEligibleForItem(*Definition, Item, Rolled.Tier)) continue;
                 Value = UBreakerAffixLibrary::ValueForTier(*Definition, FMath::Max(Rolled.Tier - TierUplift, UBreakerAffixLibrary::TopTier));
             }
+            else if (Definition->StatTarget == EBreakerStatTarget::SkillLevel)
+            {
+                // O253 re-derives at the uplifted tier rather than taking the
+                // ratio branch below, for the reason Pierce does: the ratio
+                // path multiplies, and 3 x 1.636 is 4.9 skill levels. A step
+                // table has to be re-read at the new step, never scaled.
+                Value = UBreakerAffixLibrary::ValueForTier(*Definition, FMath::Max(Rolled.Tier - TierUplift, UBreakerAffixLibrary::TopTier));
+            }
             else if (TierUplift > 0)
             {
                 // Scaled by the RATIO between the two tiers rather than
@@ -1201,6 +1209,9 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
     Stats.PrimaryEffectiveRangeMultiplier = Increased(EBreakerStatTarget::WeaponEffectiveRange);
     Stats.PrimarySustainedAccuracyMultiplier = Increased(EBreakerStatTarget::WeaponSustainedAccuracy);
     Stats.PrimaryPierceCount = FMath::Max(0, FMath::FloorToInt(FlatByTarget[static_cast<int32>(EBreakerStatTarget::WeaponPierce)]));
+    // O253, the same shape one line up: floored to a whole number so nothing
+    // downstream ever has to decide what 2.37 skill levels means.
+    Stats.BonusSkillLevels = FMath::Max(0, FMath::FloorToInt(FlatByTarget[static_cast<int32>(EBreakerStatTarget::SkillLevel)]));
     Stats.PrimaryEntropyConversionPercent = FMath::Clamp(FlatByTarget[static_cast<int32>(EBreakerStatTarget::WeaponEntropyConversion)], 0.0f, 100.0f);
     Stats.PrimaryVoidConversionPercent = FMath::Clamp(FlatByTarget[static_cast<int32>(EBreakerStatTarget::WeaponVoidConversion)], 0.0f, 100.0f);
     Stats.PrimaryRiftConversionPercent = FMath::Clamp(FlatByTarget[static_cast<int32>(EBreakerStatTarget::WeaponRiftConversion)], 0.0f, 100.0f);

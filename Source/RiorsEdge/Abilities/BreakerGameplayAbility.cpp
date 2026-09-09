@@ -8,6 +8,7 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Items/BreakerEquipmentComponent.h"
 #include "Progression/BreakerExperience.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Weapons/BreakerWeaponComponent.h"
@@ -188,8 +189,16 @@ int32 UBreakerGameplayAbility::SkillLevelFor(const AActor* OwnerActor)
 {
     const auto* Progression = OwnerActor ? OwnerActor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
     if (!Progression) return BreakerSkillLevel::MinLevel;
-    return BreakerSkillLevel::ForCharacterLevel(
+    const int32 Earned = BreakerSkillLevel::ForCharacterLevel(
         Progression->GetCharacterLevel(), UBreakerExperienceLibrary::MaxCharacterLevel);
+    // O253: gear adds ABOVE the earned ceiling. Summed as a whole number the
+    // equipment layer already floored, and clamped to the composed ceiling
+    // rather than the earned one — clamping to 15 here is exactly what would
+    // make the affix's endgame tiers, where every character is already at 15,
+    // pay nothing at all.
+    const auto* Equipment = OwnerActor->FindComponentByClass<UBreakerEquipmentComponent>();
+    const int32 FromGear = Equipment ? FMath::Max(0, Equipment->GetStats().BonusSkillLevels) : 0;
+    return FMath::Clamp(Earned + FromGear, BreakerSkillLevel::MinLevel, BreakerSkillLevel::MaxComposedLevel);
 }
 
 float UBreakerGameplayAbility::AbilityBaseDamageFor(const AActor* OwnerActor, float ScaledAuthoredBase)

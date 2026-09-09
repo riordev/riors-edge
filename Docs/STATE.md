@@ -26,7 +26,7 @@ measurement without judging it.
 | Scaffolding nodes | ceiling | 0 of 371 authored | ceiling 50 | ok |
 | Conditions that can never be true | ceiling | 5.0 | ceiling 5, target 1 | ok |
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
-| Build variance band, at cap | band | 4.17 | band 8.0–10.0 | **OUT** |
+| Build variance band, at cap | band | 4.07 | band 8.0–10.0 | **OUT** |
 | Build variance band, endgame | band | 13.02 | band 12.0–20.0 | ok |
 | Ability lane throughput against weapon lane, at cap | band | 0.53 | band 0.85–1.15 | **OUT** |
 | Ability lane throughput against weapon lane, endgame | band | 0.29 | no pin — measurement only | — |
@@ -36,7 +36,7 @@ measurement without judging it.
 
 ## Tests
 
-- passing: 830
+- passing: 831
 - expected red: 4
 - **unexpected red: 0**
 - asserted invariants with no test: 35

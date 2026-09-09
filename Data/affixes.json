@@ -513,6 +513,24 @@
 			"pairedAffixId": ""
 		},
 		{
+			"id": "Ability.SkillLevel",
+			"pool": "slice",
+			"displayName": "Skill Levels",
+			"category": "Prefix",
+			"target": "SkillLevel",
+			"bucket": "Flat",
+			"slots": [
+				"Necklace",
+				"Waist"
+			],
+			"valueAtT12": 1,
+			"valueAtT1": 3,
+			"rollWeight": 25,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
 			"id": "Offense.AddedDamage",
 			"pool": "slice",
 			"displayName": "Added Damage",

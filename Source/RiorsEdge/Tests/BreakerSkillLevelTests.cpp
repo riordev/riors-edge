@@ -56,7 +56,29 @@ bool FBreakerSkillLevelTest::RunTest(const FString&)
     // Clamped at both ends rather than extrapolated: a caller that hands this
     // a level off the ladder gets the ladder's edge, not a made-up number.
     TestEqual(TEXT("a sub-floor skill level clamps"), DamageMultiplier(-3), DamageMultiplier(MinLevel));
-    TestEqual(TEXT("a super-ceiling skill level clamps"), DamageMultiplier(MaxLevel + 9), DamageMultiplier(MaxLevel));
+    TestEqual(TEXT("a super-ceiling skill level clamps to the COMPOSED ceiling"),
+        DamageMultiplier(MaxComposedLevel + 9), DamageMultiplier(MaxComposedLevel));
+    // O253: gear carries a character PAST the earned ceiling, and the
+    // multiplier has to keep paying up there or the affix's endgame tiers —
+    // which only exist at the character cap — would grant nothing at all.
+    TestTrue(TEXT("gear levels above the earned ceiling still pay"),
+        DamageMultiplier(MaxLevel + 1) > DamageMultiplier(MaxLevel));
+    TestEqual(TEXT("the composed ceiling is the earned one plus both slots"),
+        MaxComposedLevel, MaxLevel + MaxAffixLevels * AffixSlotCount);
+
+    // ---- O253's tier bands, exactly as ruled ------------------------------
+    for (int32 Tier = 7; Tier <= 12; ++Tier)
+        TestEqual(*FString::Printf(TEXT("T%d grants one level"), Tier), AffixLevelsForTier(Tier), 1);
+    for (int32 Tier = 4; Tier <= 6; ++Tier)
+        TestEqual(*FString::Printf(TEXT("T%d grants two levels"), Tier), AffixLevelsForTier(Tier), 2);
+    for (int32 Tier = 1; Tier <= 3; ++Tier)
+        TestEqual(*FString::Printf(TEXT("T%d grants three levels"), Tier), AffixLevelsForTier(Tier), 3);
+    TestEqual(TEXT("T0 sits in the three band with T1 (O253 does not name it)"), AffixLevelsForTier(0), 3);
+    TestEqual(TEXT("T-1 alone grants four"), AffixLevelsForTier(-1), 4);
+    TestEqual(TEXT("four is the authored per-affix ceiling"), MaxAffixLevels, 4);
+    for (int32 Tier = -1; Tier <= 12; ++Tier)
+        TestTrue(*FString::Printf(TEXT("T%d stays inside [1, MaxAffixLevels]"), Tier),
+            AffixLevelsForTier(Tier) >= 1 && AffixLevelsForTier(Tier) <= MaxAffixLevels);
 
     // Every step is the same size, which is what makes the ladder readable.
     for (int32 Level = MinLevel; Level < MaxLevel; ++Level)

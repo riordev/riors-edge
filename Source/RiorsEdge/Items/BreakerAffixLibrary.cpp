@@ -1,5 +1,7 @@
 #include "Items/BreakerAffixLibrary.h"
 
+#include "Abilities/BreakerSkillLevelMath.h"
+
 #include "Data/BreakerDataFile.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
@@ -7,6 +9,15 @@
 float UBreakerAffixLibrary::ValueForTier(const FBreakerAffixDefinition& Affix, int32 Tier)
 {
     if (Affix.StatTarget == EBreakerStatTarget::WeaponPierce) return Tier < TopTier || Tier > 4 ? 0.0f : Tier == TopTier ? 2.0f : 1.0f;
+    // O253: skill levels are a STEP FUNCTION of tier, not a curve. The
+    // geometric path below cannot express the authored bands under any pair of
+    // anchors — the required ranges are arithmetically empty under both floor
+    // and round — and a skill level is a whole number by nature, so the table
+    // in BreakerSkillLevel owns the value the way Pierce's line above owns its
+    // own. The data row's anchors are placeholders that only have to be
+    // monotonic for row validation.
+    if (Affix.StatTarget == EBreakerStatTarget::SkillLevel)
+        return static_cast<float>(BreakerSkillLevel::AffixLevelsForTier(FMath::Clamp(Tier, TopTier, WorstTier)));
     const int32 ClampedTier = FMath::Clamp(Tier, TopTier, WorstTier);
     const auto BoundConversion = [&](float Value)
     {
@@ -52,7 +63,10 @@ bool UBreakerAffixLibrary::IsEligibleForItem(const FBreakerAffixDefinition& Affi
 float UBreakerAffixLibrary::RollValueForTier(const FBreakerAffixDefinition& Affix, int32 Tier, float UnitRoll)
 {
     const float Value = ValueForTier(Affix, Tier);
-    if (Affix.StatTarget == EBreakerStatTarget::WeaponPierce) return Value;
+    // Both discrete lines skip the in-band variance below: it lerps toward the
+    // next tier's value, which is exactly how a whole number becomes 2.37.
+    if (Affix.StatTarget == EBreakerStatTarget::WeaponPierce
+        || Affix.StatTarget == EBreakerStatTarget::SkillLevel) return Value;
     return FMath::Lerp(Value, ValueForTier(Affix, FMath::Max(Tier - 1, TopTier)), UnitRoll * 0.5f);
 }
 
