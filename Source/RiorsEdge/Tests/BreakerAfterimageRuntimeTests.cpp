@@ -3,7 +3,6 @@
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Slipcut.h"
 #include "Abilities/BreakerAbility_Overdrive.h"
-#include "Abilities/BreakerAbility_Skim.h"
 #include "Abilities/BreakerAbility_Sightline.h"
 #include "Abilities/BreakerAbilityStateComponent.h"
 #include "Abilities/BreakerWindowLaneMath.h"
@@ -133,21 +132,6 @@ bool FBreakerAfterimageRuntimeTest::RunTest(const FString&)
                     for (int32 I=0; I<40; ++I) { Player->SetActorLocation(Player->GetActorLocation()+Move->Velocity); Momentum->AdvanceLoop(1); }
                     Move->StopMovementImmediately();
                 };
-                Fund();
-                const auto Skim = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Skim::StaticClass(),1));
-                // Skim's paid speed window requires a successful moving
-                // redirect; casting while stationary legitimately grants none.
-                const float RedirectSpeed = Move->GetWalkSpeedCap();
-                Move->Velocity = FVector(0, RedirectSpeed, 0);
-                if (!TestTrue(TEXT("Paid Skim opens real speed lane"),ASC->TryActivateAbility(Skim))) return false;
-                TestTrue(TEXT("Paid Skim actually redirects existing momentum"), Move->Velocity.X > 0
-                    && FMath::IsNearlyEqual(Move->Velocity.Size2D(), RedirectSpeed, .01f));
-                Move->StopMovementImmediately();
-                TestEqual(TEXT("Skim full speed contribution"),Move->GetSpeedMultiplier(),1.25f,.001f);
-                Tick(UBreakerAbility_Skim::BurstSeconds+.03f);
-                TestEqual(TEXT("Skim half speed contribution"),Move->GetSpeedMultiplier(),1.125f,.001f);
-                Tick(2.05f);
-                TestEqual(TEXT("Skim speed tail ends"),Move->GetSpeedMultiplier(),1.0f,.001f);
                 Fund();
                 auto* Target=World->SpawnActor<AActor>(); auto* Body=NewObject<USphereComponent>(Target);
                 Target->AddInstanceComponent(Body); Target->SetRootComponent(Body); Body->SetSphereRadius(60);

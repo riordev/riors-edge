@@ -52,9 +52,9 @@ bool FBreakerAbilityClassFilterResolveTest::RunTest(const FString& Parameters)
     // Same shape, a class-ability slot rather than the ultimate: a Swift
     // starter in a Caster's ClassAbilityOne slot.
     const UBreakerAbilityDefinition* CrossClassAbility =
-        UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Caster, One, TEXT("Swift.Skim"));
+        UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Caster, One, TEXT("Swift.Slipcut"));
     TestTrue(TEXT("A foreign-class ability id does not resolve to itself"),
-        !CrossClassAbility || CrossClassAbility->AbilityId != TEXT("Swift.Skim"));
+        !CrossClassAbility || CrossClassAbility->AbilityId != TEXT("Swift.Slipcut"));
     TestTrue(TEXT("The fallback for a rejected foreign ability is still this class's default"),
         CrossClassAbility && CrossClassAbility->ClassId == EBreakerClassId::Caster);
 
@@ -65,9 +65,9 @@ bool FBreakerAbilityClassFilterResolveTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Swift.Overdrive still resolves for a Swift character"),
         OwnClassUltimate && OwnClassUltimate->AbilityId == TEXT("Swift.Overdrive"));
     const UBreakerAbilityDefinition* OwnClassAbility =
-        UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Swift, One, TEXT("Swift.Skim"));
-    TestTrue(TEXT("Swift.Skim still resolves for a Swift character"),
-        OwnClassAbility && OwnClassAbility->AbilityId == TEXT("Swift.Skim"));
+        UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Swift, One, TEXT("Swift.Slipcut"));
+    TestTrue(TEXT("Swift.Slipcut still resolves for a Swift character"),
+        OwnClassAbility && OwnClassAbility->AbilityId == TEXT("Swift.Slipcut"));
 
     // Untouched behaviour: nothing equipped still falls back to the class
     // default (the case BreakerAbilityTests.cpp's Selection test already
@@ -76,7 +76,7 @@ bool FBreakerAbilityClassFilterResolveTest::RunTest(const FString& Parameters)
     const UBreakerAbilityDefinition* Defaulted =
         UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Swift, One, NAME_None);
     TestTrue(TEXT("Nothing equipped still resolves to the class default"),
-        Defaulted && Defaulted->AbilityId == TEXT("Swift.Skim"));
+        Defaulted && Defaulted->AbilityId == TEXT("Swift.Slipcut"));
 
     return true;
 }

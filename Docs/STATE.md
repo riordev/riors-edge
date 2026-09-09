@@ -13,7 +13,7 @@ measurement without judging it.
 
 | Section | Direction | Value | Pin | State |
 |---|---|---|---|---|
-| Silent nodes | ceiling | 0 of 371 authored | ceiling 54 | ok |
+| Silent nodes | ceiling | 0 of 370 authored | ceiling 54 | ok |
 | Stat targets with no aggregation lane | ceiling | 1 of 88 | ceiling 6 | ok |
 | Aggregation lanes carrying nothing | ceiling | 1 of 86 lanes | ceiling 9 | ok |
 | Node tags with no consumer | ceiling | 129 of 209 declared | ceiling 143 | ok |
@@ -21,9 +21,9 @@ measurement without judging it.
 | Resource generation entry points with no caller | ceiling | 3 of 21 | ceiling 0 | **OUT** |
 | Asserted invariants with no test | ceiling | 35 of 136 asserted across 8 specs | ceiling 42, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 3.0 worst tree | floor 3.0 | ok |
-| Trees sitting exactly on the offered-to-spendable floor | ceiling | 12 of 16 | no pin — measurement only | — |
+| Trees sitting exactly on the offered-to-spendable floor | ceiling | 13 of 16 | no pin — measurement only | — |
 | Node-shape composition, per tree | band | 39 % ranked minors, all trees | no pin — measurement only | — |
-| Scaffolding nodes | ceiling | 0 of 371 authored | ceiling 50 | ok |
+| Scaffolding nodes | ceiling | 0 of 370 authored | ceiling 50 | ok |
 | Conditions that can never be true | ceiling | 5.0 | ceiling 5, target 1 | ok |
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
 | Build variance band, at cap | band | 4.05 | band 8.0–10.0 | **OUT** |
@@ -36,7 +36,7 @@ measurement without judging it.
 
 ## Tests
 
-- passing: 840
+- passing: 841
 - expected red: 3
 - **unexpected red: 0**
 - asserted invariants with no test: 35
@@ -52,7 +52,7 @@ A test that was never written is the worst of the three: it looks asserted.
 
 ## Silent nodes
 
-**ceiling** · 0 of 371 authored · ceiling 54
+**ceiling** · 0 of 370 authored · ceiling 54
 
 Authored, purchasable, costs a point, and produces no observable change. Counted against BOTH consumption axes — tag and node id.
 
@@ -208,7 +208,7 @@ Most of a build should be refusal. A CEILING here would lock the trees at their 
 - Doctrine.Support.Medic: 12 nodes, 24 points offered, 3.0x budget
 - Doctrine.Support.Warden: 12 nodes, 24 points offered, 3.0x budget
 - Doctrine.Swift.Frenzy: 13 nodes, 26 points offered, 3.25x budget
-- Doctrine.Swift.Kinetic: 14 nodes, 26 points offered, 3.25x budget
+- Doctrine.Swift.Kinetic: 13 nodes, 24 points offered, 3.0x budget
 - Doctrine.Swift.Marksman: 13 nodes, 26 points offered, 3.25x budget
 - Doctrine.Tank.Bastion: 12 nodes, 24 points offered, 3.0x budget
 - Doctrine.Tank.Demolitionist: 12 nodes, 24 points offered, 3.0x budget
@@ -216,7 +216,7 @@ Most of a build should be refusal. A CEILING here would lock the trees at their 
 
 ## Trees sitting exactly on the offered-to-spendable floor
 
-**ceiling** · 12 of 16 · no pin — measurement only
+**ceiling** · 13 of 16 · no pin — measurement only
 
 A tree here is one node-price change away from red, and the floor section reports ok until the run it fails on. This falls when a tree is authored above its shape's arithmetic, never by moving a pin.
 
@@ -229,6 +229,7 @@ A tree here is one node-price change away from red, and the floor section report
 - Doctrine.Support.Conductor: 3.0x, exactly the floor
 - Doctrine.Support.Medic: 3.0x, exactly the floor
 - Doctrine.Support.Warden: 3.0x, exactly the floor
+- Doctrine.Swift.Kinetic: 3.0x, exactly the floor
 - Doctrine.Tank.Bastion: 3.0x, exactly the floor
 - Doctrine.Tank.Demolitionist: 3.0x, exactly the floor
 - Doctrine.Tank.Leech: 3.0x, exactly the floor
@@ -250,7 +251,7 @@ A tree that is almost entirely notable-shaped has nothing to fill a constellatio
 - Doctrine.Support.Medic: 0% ranked minor, 92% notable, 8% convergence/keystone
 - Doctrine.Support.Warden: 0% ranked minor, 92% notable, 8% convergence/keystone
 - Doctrine.Swift.Frenzy: 46% ranked minor, 46% notable, 8% convergence/keystone
-- Doctrine.Swift.Kinetic: 21% ranked minor, 71% notable, 7% convergence/keystone
+- Doctrine.Swift.Kinetic: 23% ranked minor, 69% notable, 8% convergence/keystone
 - Doctrine.Swift.Marksman: 15% ranked minor, 77% notable, 8% convergence/keystone
 - Doctrine.Tank.Bastion: 0% ranked minor, 92% notable, 8% convergence/keystone
 - Doctrine.Tank.Demolitionist: 0% ranked minor, 92% notable, 8% convergence/keystone
@@ -258,7 +259,7 @@ A tree that is almost entirely notable-shaped has nothing to fill a constellatio
 
 ## Scaffolding nodes
 
-**ceiling** · 0 of 371 authored · ceiling 50
+**ceiling** · 0 of 370 authored · ceiling 50
 
 No stat line, no condition, and no rule anything reads. A STRICT SUBSET of the silent nodes: the difference is the silent nodes that ARE shaped and merely point at an unpaid target, which is a wiring problem where this is an authoring one.
 

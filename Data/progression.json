@@ -12,7 +12,7 @@
 		"Source/RiorsEdge/Progression/BreakerCoreRosterWeapon.cpp": "668dc0b08541588e995afe28301d8ae2bacb2106",
 		"Source/RiorsEdge/Progression/BreakerCoreTree.cpp": "0d1c3252ee7f95d02fea3445e83f7e71b05e15c2",
 		"Source/RiorsEdge/Progression/BreakerCoreTree.h": "d5cbc90580dd4568eeb1ee21d00f5159dc56bbae",
-		"Source/RiorsEdge/Progression/BreakerProgressionLibrary.cpp": "baf5838c3a5d4884e1b309e95537aa66f7f26bdd",
+		"Source/RiorsEdge/Progression/BreakerProgressionLibrary.cpp": "9e751f48bbbd8d9aad4afeb74e8d185f32a0b18c",
 		"Source/RiorsEdge/Progression/BreakerProgressionNode.h": "092c6560be0df6e02143690452adec272475a950",
 		"Source/RiorsEdge/Progression/BreakerProgressionTree.h": "aaf54881b733ca884baff936284824ef3d55a931",
 		"Source/RiorsEdge/Progression/BreakerProgressionTypes.h": "4aab232f357d06d46007bc4f916a256a7a94adde"
@@ -7531,26 +7531,6 @@
 					"requiredTreeInvestment": 2
 				},
 				{
-					"id": "Swift.Kinetic.SkimDiscipline",
-					"tier": 3,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Swift.Kinetic.SkimDiscipline"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Swift.Kinetic.Redirect",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
-				},
-				{
 					"id": "Swift.Kinetic.AirWork",
 					"tier": 3,
 					"ranks": 1,
@@ -7647,7 +7627,7 @@
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Swift.Kinetic.SkimDiscipline",
+							"id": "Swift.Kinetic.Redirect",
 							"rank": 1
 						}
 					],

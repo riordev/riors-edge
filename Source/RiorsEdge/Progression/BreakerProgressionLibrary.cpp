@@ -547,13 +547,13 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
     // LIVE 2026-08-16 (partially): the AbilityCooldown lane exists, so the
     // node's cooldown half pays — cooldowns started while airborne run 20%
     // shorter per rank (O2 PLACEHOLDER; the divisor convention, evaluated at
-    // cast, and Skim is the ability a Swift casts airborne). The designed
+    // cast, including a Slipcut cast airborne). The designed
     // once-per-airtime EVENT ("sharp direction changes refund") is a rule the
     // lane cannot say; the tag stays for that consumer, and the text below
     // describes what the purchase actually does today rather than what it
     // will do then.
     Node = MakeNode(TEXT("Swift.Kinetic.Redirect"), TEXT("Redirect"),
-        TEXT("Skim comes back faster while you stay off the ground — abilities cast airborne start a shorter cooldown."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 2, 2, 1);
+        TEXT("Abilities cast airborne start a shorter cooldown."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Swift.Kinetic.ReadTheRoom"));
     AddEffect(Node, EBreakerNodeStatTarget::AbilityCooldown, EBreakerNodeStatBucket::IncreasedPercent, 20.0f, EBreakerBuildCondition::Airborne); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Redirect.GetTag());
@@ -579,19 +579,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Landing.GetTag());
     Tree->Nodes.Add(Node);
 
-    Node = MakeNode(TEXT("Swift.Kinetic.SkimDiscipline"), TEXT("Skim Discipline"),
-        TEXT("Grants Hard Stop. Skim may be used twice per airtime."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 3, 1, 2);
-    AddPrerequisite(Node, TEXT("Swift.Kinetic.Redirect"));
-    // PHANTOM GRANT FIXED (audit item 3): "HardStop" was never a real ability
-    // id — there is no Abilities/BreakerAbility_HardStop and no "HardStop" row
-    // in the fallback registry. Hard Stop is not a second activatable ability
-    // at all: it is a rewrite of Skim itself, already CONSUMED by
-    // Abilities/BreakerAbility_Skim.cpp via UBreakerAbility_Skim::ShouldHardStop
-    // (gated on owning this node's tag, not on an ability id in the loadout).
-    // The grant is removed rather than pointed at something that does not
-    // exist; the tag below is the real, live mechanism.
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SkimDiscipline.GetTag());
-    Tree->Nodes.Add(Node);
+    // O258 retires Skim and its airtime-only node; v9 -> v10 refunds paid ranks.
 
     // Air Work also carries the airborne-multishot buy-up (owner ruling
     // 2026-08-16): the base momentum coupling's airborne bonus halved
@@ -649,19 +637,11 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MomentumShield.GetTag());
     Tree->Nodes.Add(Node);
 
-    // K10. A cost-for-power rewrite of Hard Stop, which is itself not an
-    // ability but a rewrite of Skim consumed by UBreakerAbility_Skim::
-    // ShouldHardStop off the Skim Discipline tag — so this node is a rewrite
-    // OF a rewrite and the prerequisite below is load-bearing, not flavour.
-    // Both halves (immunity instead of reduction; 60 Momentum instead of 30)
-    // are ability-internal and have no node-stat expression. The
-    // invulnerability-loop risk the design flags is bounded by Hard Stop's own
-    // cooldown and raised cost, neither of which this node can state either.
-    // WAITING ON: UBreakerAbility_Skim reading this tag alongside the
-    // Skim Discipline one it already reads.
+    // Hard Stop remains a standalone token unlock. O258 keeps the six-point
+    // tier gate and redirects this rewrite through the live Redirect node.
     Node = MakeNode(TEXT("Swift.Kinetic.SpendToLive"), TEXT("Spend to Live"),
         TEXT("Hard Stop's window becomes true immunity, and it costs twice the Momentum."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Swift.Kinetic.SkimDiscipline"));
+    AddPrerequisite(Node, TEXT("Swift.Kinetic.Redirect"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_SpendToLive.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -3285,20 +3265,8 @@ UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(
     // Ids must match the ability fallback registry exactly, or a loadout
     // seeded from them resolves to nothing.
     //
-    // ONE starter, by ruling (ORDERS ruling 1, overturning O176 as written):
-    // Swift starts with Skim alone, its second free verb is the enhanced-dash
-    // tree node granted at level one — a node, never a slot occupant — and
-    // ClassAbilityTwo ships EMPTY until the first quartermaster unlock. The
-    // visibly empty slot is the feature: it is the first thing a token fills.
-    //
-    // The five remaining class abilities are unlockables — Slipcut first in
-    // the row because the quartermaster offers in this order and Slipcut is
-    // Frenzy's ignition, the fantasy the ruling moved off the starter row;
-    // Lead joins them (it was only ever a starter because the old single
-    // list held two). Five purchases against the DERIVED token schedule
-    // (AbilityTokenLevelForIndex, O138) — the count reads this list, so all
-    // five are reachable and the last lands at the shared completion level.
-    // The row is in Data/class-kits.json.
+    // O258: Slipcut is the sole free starter. Slot two stays empty until an
+    // unlock is equipped; the data row drives the remaining token entitlement.
     BreakerClassKitApply(*Swift);
     // Class-Kits §1.3-1.5 order: Frenzy, Kinetic, Marksman. The branch strip
     // reads this list, so it now shows the three chips the design names.

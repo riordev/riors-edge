@@ -64,7 +64,7 @@ bool FBreakerHardStopAffordabilityRuntimeTest::RunTest(const FString& Parameters
     const auto* Tree = UBreakerProgressionLibrary::GetSwiftKineticTree();
     for (const TCHAR* Node : {TEXT("Swift.Kinetic.ReadTheRoom"), TEXT("Swift.Kinetic.ReadTheRoom"),
         TEXT("Swift.Kinetic.Redirect"), TEXT("Swift.Kinetic.Redirect"),
-        TEXT("Swift.Kinetic.SkimDiscipline"), TEXT("Swift.Kinetic.SpendToLive")})
+        TEXT("Swift.Kinetic.Landing"), TEXT("Swift.Kinetic.Landing"), TEXT("Swift.Kinetic.SpendToLive")})
     {
         const bool Bought = Progression->PurchaseNode(Tree, Node, Reason);
         if (!TestTrue(FString::Printf(TEXT("Legal purchase %s: %s"), Node, *Reason.ToString()), Bought)) return false;

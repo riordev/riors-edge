@@ -107,8 +107,9 @@ public:
     // receipt and the character id, both additive; the Riftglass fold itself
     // is NOT a migration step, because it writes two files and a pure
     // in-memory step cannot — see Save/BreakerRiftglassFold.h. Version 9
-    // added Model, Voice and FaceIndex, additive.
-    static constexpr int32 CurrentSaveVersion = 9;
+    // added Model, Voice and FaceIndex, additive. Version 10 retires Skim,
+    // makes Slipcut the Swift starter, and refunds the retired purchases.
+    static constexpr int32 CurrentSaveVersion = 10;
 
     UPROPERTY() int32 SaveVersion = 1;
     // Missing fields must deserialize as legacy even after activation. Writers
@@ -129,12 +130,13 @@ public:
 
     // Brings a deserialized payload up to CurrentSaveVersion IN MEMORY, in
     // version order, one step at a time (Save-Architecture 5.2 — never a switch
-    // on "old vs new"). Returns false only for a file from a NEWER build, which
-    // is refused rather than repaired or overwritten. Pure on the struct: no
+    // on "old vs new"). Refuses a newer format or a migration that cannot
+    // preserve its refund safely. Pure on the struct: no
     // world, no slot, no engine state, so the automation suite can prove every
     // step. The migrated payload is written back on the next normal save, not
     // eagerly.
     static bool MigrateToCurrent(UBreakerSaveGame& Save, FString& OutNote);
+    static bool MigrateSwiftStarterV9ToV10(FBreakerProgressionState& Progression, FString& OutNote);
 
     // The rename step, exposed so it can be tested and reused: applies the
     // v1 -> v2 flag remap in place. Unknown flags are PRESERVED VERBATIM, never

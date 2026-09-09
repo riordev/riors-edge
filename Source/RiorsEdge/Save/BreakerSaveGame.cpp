@@ -122,6 +122,49 @@ void UBreakerSaveGame::MigrateAbilityUnlocksV4ToV5(FBreakerProgressionState& Pro
     }
 }
 
+bool UBreakerSaveGame::MigrateSwiftStarterV9ToV10(FBreakerProgressionState& Progression, FString& OutNote)
+{
+    OutNote.Reset();
+    if (Progression.PermanentClass != EBreakerClassId::Swift) return true;
+    const FName RetiredAbility(TEXT("Swift.Skim"));
+    const FName Starter(TEXT("Swift.Slipcut"));
+    const FName RetiredNode(TEXT("Swift.Kinetic.SkimDiscipline"));
+    // Frozen v9 purchase costs. The historical v4 -> v5 grant did NOT include
+    // Slipcut: presence in this paid-unlock list is the refund receipt.
+    const int32 TokenRefund = Progression.UnlockedAbilityIds.Contains(Starter) ? 1 : 0;
+    int64 DoctrineRefund = 0;
+    for (const auto& Rank : Progression.DoctrineNodeRanks)
+    {
+        if (Rank.NodeId != RetiredNode) continue;
+        if (Rank.Rank < 0 || Rank.Rank > 1)
+        {
+            OutNote = TEXT("invalid retired Skim Discipline rank; migration left progression unchanged");
+            return false;
+        }
+        DoctrineRefund += int64(Rank.Rank) * 2;
+    }
+    if (int64(Progression.UnspentAbilityTokens) + TokenRefund > MAX_int32
+        || int64(Progression.UnspentDoctrinePoints) + DoctrineRefund > MAX_int32)
+    {
+        OutNote = TEXT("retired Swift purchase refund exceeds wallet capacity; migration left progression unchanged");
+        return false;
+    }
+    auto& Loadout = Progression.AbilityLoadout;
+    // Preserve an already-equipped Slipcut's position; never duplicate it.
+    if (Loadout.ClassAbilityOne == RetiredAbility)
+        Loadout.ClassAbilityOne = Loadout.ClassAbilityTwo == Starter ? NAME_None : Starter;
+    if (Loadout.ClassAbilityTwo == RetiredAbility)
+        Loadout.ClassAbilityTwo = Loadout.ClassAbilityOne == Starter ? NAME_None : Starter;
+    Progression.UnlockedAbilityIds.Remove(RetiredAbility);
+    Progression.UnlockedAbilityIds.Remove(Starter);
+    Progression.UnspentAbilityTokens += TokenRefund;
+    // AbilityTokensGranted records previous entitlement, not current stock.
+    // Keeping it prevents a later catalogue expansion from paying it twice.
+    Progression.DoctrineNodeRanks.RemoveAll([&](const FBreakerNodeRank& Rank) { return Rank.NodeId == RetiredNode; });
+    Progression.UnspentDoctrinePoints += static_cast<int32>(DoctrineRefund);
+    return true;
+}
+
 bool UBreakerSaveGame::MigrateToCurrent(UBreakerSaveGame& Save, FString& OutNote)
 {
     OutNote.Reset();
@@ -200,6 +243,9 @@ bool UBreakerSaveGame::MigrateToCurrent(UBreakerSaveGame& Save, FString& OutNote
             // Additive (O14): Model, Voice and FaceIndex deserialize to
             // Human / Mid / 0 on a v8 file, and that is the body every
             // pre-v9 character was drawn with. Nothing to transform.
+            break;
+        case 9:
+            if (!MigrateSwiftStarterV9ToV10(Save.Progression, OutNote)) return false;
             break;
         default:
             // Unreachable while every version below CurrentSaveVersion has a

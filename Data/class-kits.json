@@ -59,10 +59,9 @@
 		{
 			"classId": "Swift",
 			"starterAbilityIds": [
-				"Swift.Skim"
+				"Swift.Slipcut"
 			],
 			"unlockableAbilityIds": [
-				"Swift.Slipcut",
 				"Swift.Lead",
 				"Swift.CadenceBreak",
 				"Swift.HardStop",

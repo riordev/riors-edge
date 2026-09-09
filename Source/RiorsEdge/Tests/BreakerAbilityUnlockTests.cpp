@@ -111,7 +111,7 @@ bool FBreakerAbilityCataloguePartitionTest::RunTest(const FString& Parameters)
 
 // (a2) The shipped stock file. The catalogue is a row in Data/class-kits.json;
 // this reads the file the way the library does and pins the one fact the
-// quartermaster screen makes player-visible: Swift's first offer is Slipcut.
+// quartermaster screen makes player-visible: Swift's first offer is Lead.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerClassKitsShippedTest,
     "RiorsEdge.Data.ClassKits.Shipped",
@@ -155,12 +155,11 @@ bool FBreakerClassKitsShippedTest::RunTest(const FString& Parameters)
             BreakerDataFile::ParseEnum(ClassName, ClassId) && ClassId != EBreakerClassId::None);
     }
 
-    // The offer order is the row order: Slipcut is Frenzy's ignition and the
-    // first thing Swift's first token can buy.
+    // O258 makes Slipcut free; Lead is the first remaining token purchase.
     const UBreakerClassDefinition* Swift = UBreakerProgressionLibrary::GetFallbackClassDefinition(EBreakerClassId::Swift);
     if (!TestNotNull(TEXT("Swift has a definition"), Swift)) return false;
     if (!TestTrue(TEXT("Swift sells something"), Swift->UnlockableAbilityIds.Num() > 0)) return false;
-    TestEqual(TEXT("Swift's first offer is Slipcut"), Swift->UnlockableAbilityIds[0], FName(TEXT("Swift.Slipcut")));
+    TestEqual(TEXT("Swift's first offer is Lead"), Swift->UnlockableAbilityIds[0], FName(TEXT("Swift.Lead")));
     return true;
 }
 
@@ -193,7 +192,7 @@ bool FBreakerAbilityNoPermanentlyRefusableTest::RunTest(const FString& Parameter
 
 // (c) The authored starter shape per class, and it is what a fresh character
 // holds. This was "exactly two starters" universally until ORDERS ruling 1:
-// Swift is a ONE-starter class — Skim plus the enhanced-dash tree node, with
+// Swift is a ONE-starter class — Slipcut under O258, with
 // ClassAbilityTwo shipping EMPTY until the first quartermaster unlock. The
 // empty slot is the feature, so it is asserted as EMPTY rather than skipped:
 // a default leaking back into slot two would silently retire the ruling.
@@ -289,16 +288,16 @@ bool FBreakerDevForceEquipTest::RunTest(const FString& Parameters)
     // point — while the real path still refuses it.
     FText Failure;
     TestFalse(TEXT("the real path still refuses an un-unlocked id"),
-        Progression->EquipAbility(EBreakerAbilitySlot::ClassAbilityTwo, TEXT("Swift.Slipcut"), Failure));
-    Progression->DevForceEquipAbility(EBreakerAbilitySlot::ClassAbilityTwo, TEXT("Swift.Slipcut"));
+        Progression->EquipAbility(EBreakerAbilitySlot::ClassAbilityTwo, TEXT("Swift.Lead"), Failure));
+    Progression->DevForceEquipAbility(EBreakerAbilitySlot::ClassAbilityTwo, TEXT("Swift.Lead"));
     TestEqual(TEXT("the dev surface equips it"),
-        Progression->GetProgressionState().AbilityLoadout.ClassAbilityTwo, FName(TEXT("Swift.Slipcut")));
+        Progression->GetProgressionState().AbilityLoadout.ClassAbilityTwo, FName(TEXT("Swift.Lead")));
 
     // Impossibilities still refuse: a foreign-class id, and a non-ultimate in
     // the ultimate slot.
     Progression->DevForceEquipAbility(EBreakerAbilitySlot::ClassAbilityOne, TEXT("Caster.Rot"));
     TestEqual(TEXT("a foreign-class id is refused even by the dev surface"),
-        Progression->GetProgressionState().AbilityLoadout.ClassAbilityOne, FName(TEXT("Swift.Skim")));
+        Progression->GetProgressionState().AbilityLoadout.ClassAbilityOne, FName(TEXT("Swift.Slipcut")));
     Progression->DevForceEquipAbility(EBreakerAbilitySlot::Ultimate, TEXT("Swift.Lead"));
     TestEqual(TEXT("a non-ultimate is refused from the ultimate slot"),
         Progression->GetProgressionState().AbilityLoadout.Ultimate, FName(TEXT("Swift.Overdrive")));
@@ -624,26 +623,26 @@ bool FBreakerStarterAbilityMoveTest::RunTest(const FString& Parameters)
     Owner->AddInstanceComponent(Abilities);
     if (!TestTrue(TEXT("fresh Swift chosen"), Progression->ChoosePermanentClassById(EBreakerClassId::Swift))) return false;
     const FBreakerAbilityLoadout Original = Progression->GetProgressionState().AbilityLoadout;
-    TestEqual(TEXT("Swift starts with Skim"), Original.ClassAbilityOne, FName(TEXT("Swift.Skim")));
+    TestEqual(TEXT("Swift starts with Slipcut"), Original.ClassAbilityOne, FName(TEXT("Swift.Slipcut")));
     TestTrue(TEXT("second slot starts empty"), Original.ClassAbilityTwo.IsNone());
     TestEqual(TEXT("move preview allows"), Abilities->PreviewSelection(EBreakerAbilitySlot::ClassAbilityTwo, Original.ClassAbilityOne), EBreakerAbilitySelectionResult::Allowed);
     FText Failure;
-    TestTrue(TEXT("Skim moves to second"), Abilities->TryEquipAbility(EBreakerAbilitySlot::ClassAbilityTwo, Original.ClassAbilityOne, Failure));
+    TestTrue(TEXT("Slipcut moves to second"), Abilities->TryEquipAbility(EBreakerAbilitySlot::ClassAbilityTwo, Original.ClassAbilityOne, Failure));
     TestTrue(TEXT("source clears"), Progression->GetProgressionState().AbilityLoadout.ClassAbilityOne.IsNone());
     const FBreakerAbilityLoadout Moved = Progression->GetProgressionState().AbilityLoadout;
-    TestNull(TEXT("runtime source does not refill Skim"), UBreakerAbilityComponent::ResolveLoadoutDefinition(EBreakerClassId::Swift, EBreakerAbilitySlot::ClassAbilityOne, Moved));
+    TestNull(TEXT("runtime source does not refill Slipcut"), UBreakerAbilityComponent::ResolveLoadoutDefinition(EBreakerClassId::Swift, EBreakerAbilitySlot::ClassAbilityOne, Moved));
     const UBreakerAbilityDefinition* ResolvedMoved = UBreakerAbilityComponent::ResolveLoadoutDefinition(EBreakerClassId::Swift, EBreakerAbilitySlot::ClassAbilityTwo, Moved);
     if (!TestNotNull(TEXT("runtime destination resolves"), ResolvedMoved)) return false;
-    TestEqual(TEXT("runtime destination is Skim"), ResolvedMoved->AbilityId, Original.ClassAbilityOne);
-    TestEqual(TEXT("second holds Skim"), Progression->GetProgressionState().AbilityLoadout.ClassAbilityTwo, Original.ClassAbilityOne);
-    TestTrue(TEXT("Skim remains unlocked"), Progression->IsAbilityUnlocked(Original.ClassAbilityOne));
-    TestTrue(TEXT("Skim moves back"), Abilities->TryEquipAbility(EBreakerAbilitySlot::ClassAbilityOne, Original.ClassAbilityOne, Failure));
+    TestEqual(TEXT("runtime destination is Slipcut"), ResolvedMoved->AbilityId, Original.ClassAbilityOne);
+    TestEqual(TEXT("second holds Slipcut"), Progression->GetProgressionState().AbilityLoadout.ClassAbilityTwo, Original.ClassAbilityOne);
+    TestTrue(TEXT("Slipcut remains unlocked"), Progression->IsAbilityUnlocked(Original.ClassAbilityOne));
+    TestTrue(TEXT("Slipcut moves back"), Abilities->TryEquipAbility(EBreakerAbilitySlot::ClassAbilityOne, Original.ClassAbilityOne, Failure));
     TestEqual(TEXT("first restored"), Progression->GetProgressionState().AbilityLoadout.ClassAbilityOne, Original.ClassAbilityOne);
     TestTrue(TEXT("second clears"), Progression->GetProgressionState().AbilityLoadout.ClassAbilityTwo.IsNone());
     const FBreakerAbilityLoadout Restored = Progression->GetProgressionState().AbilityLoadout;
     const UBreakerAbilityDefinition* ResolvedBack = UBreakerAbilityComponent::ResolveLoadoutDefinition(EBreakerClassId::Swift, EBreakerAbilitySlot::ClassAbilityOne, Restored);
     if (!TestNotNull(TEXT("runtime original slot resolves"), ResolvedBack)) return false;
-    TestEqual(TEXT("runtime original slot is Skim"), ResolvedBack->AbilityId, Original.ClassAbilityOne);
+    TestEqual(TEXT("runtime original slot is Slipcut"), ResolvedBack->AbilityId, Original.ClassAbilityOne);
     TestNull(TEXT("runtime second stays empty"), UBreakerAbilityComponent::ResolveLoadoutDefinition(EBreakerClassId::Swift, EBreakerAbilitySlot::ClassAbilityTwo, Restored));
     TestEqual(TEXT("ultimate unchanged"), Progression->GetProgressionState().AbilityLoadout.Ultimate, Original.Ultimate);
     return true;

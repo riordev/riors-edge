@@ -167,7 +167,7 @@ bool FBreakerSaveAppearanceRoundTripTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("The version survives"), Read->SaveVersion, UBreakerSaveGame::CurrentSaveVersion);
 
     // A v8 payload — the last shape written before the three fields existed
-    // — migrates to 9 wearing Human / Mid / 0, with everything it did carry
+    // — passes through v9 wearing Human / Mid / 0, with everything it did carry
     // untouched.
     UBreakerSaveGame* Old = Cast<UBreakerSaveGame>(UGameplayStatics::CreateSaveGameObject(UBreakerSaveGame::StaticClass()));
     if (!Old) { AddError(TEXT("Could not create a save object")); return false; }
@@ -177,7 +177,6 @@ bool FBreakerSaveAppearanceRoundTripTest::RunTest(const FString& Parameters)
     const FGuid OldId = Old->CharacterId;
     FString Note;
     TestTrue(TEXT("A v8 save loads"), UBreakerSaveGame::MigrateToCurrent(*Old, Note));
-    TestEqual(TEXT("It is now version 9"), Old->SaveVersion, 9);
     TestEqual(TEXT("It arrives at the head version"), Old->SaveVersion, UBreakerSaveGame::CurrentSaveVersion);
     TestFalse(TEXT("The migration reports itself"), Note.IsEmpty());
     TestEqual(TEXT("A migrated v8 character is Human"), static_cast<int32>(Old->Model), static_cast<int32>(EBreakerPlayerModel::Human));

@@ -407,7 +407,7 @@ bool FBreakerAbilitiesFreshTest::RunTest(const FString& Parameters)
     }
 
     const TArray<UBreakerAbilityDefinition*>& Abilities = UBreakerAbilityDefinition::GetFallbackRegistry();
-    TestEqual(TEXT("Thirty-five rows, seven per class"), Abilities.Num(), 35);
+    TestEqual(TEXT("Thirty-four registered abilities after O258 retires Skim"), Abilities.Num(), 34);
 
     int32 UltimateCount = 0;
     int32 VariantCount = 0;

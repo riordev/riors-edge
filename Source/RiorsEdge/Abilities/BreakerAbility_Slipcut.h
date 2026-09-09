@@ -8,7 +8,7 @@
 // S1 Slipcut (Class-Kits §1.2, landed under O175). "0.4s window in which
 // every weapon hit has its cadence cost halved (fires at 2x rate, consumes
 // ammo normally). Ends early on reload. Rewards holding a full magazine into
-// the window." The design's Swift starter alongside Skim (O176) and Frenzy's
+// the window." The sole Swift starter (O258) and Frenzy's
 // ignition — F7 Slipcut Mastery and the branch's cadence nodes rewrite it.
 //
 // The cadence rewrite reaches the weapon through ONE seam:

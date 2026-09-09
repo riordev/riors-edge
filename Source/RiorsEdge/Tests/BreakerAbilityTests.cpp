@@ -10,7 +10,6 @@
 #include "Abilities/BreakerAbility_Closequarter.h"
 #include "Abilities/BreakerAbility_Lead.h"
 #include "Abilities/BreakerAbility_Overdrive.h"
-#include "Abilities/BreakerAbility_Skim.h"
 #include "Abilities/BreakerAbility_Unmake.h"
 #include "Abilities/BreakerCasterAbility.h"
 #include "Abilities/BreakerGameplayAbility.h"
@@ -64,16 +63,16 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FBreakerAbilityDefinitionValuesTest::RunTest(const FString& Parameters)
 {
     // Values quoted from Docs/Design/Class-Kits.md §1.2.
-    const UBreakerAbilityDefinition* Skim = UBreakerAbilityDefinition::FindFallback(TEXT("Swift.Skim"));
-    if (!Skim)
+    const UBreakerAbilityDefinition* Slipcut = UBreakerAbilityDefinition::FindFallback(TEXT("Swift.Slipcut"));
+    if (!Slipcut)
     {
-        AddError(TEXT("Skim is missing from the fallback registry"));
+        AddError(TEXT("Slipcut is missing from the fallback registry"));
         return false;
     }
-    TestEqual(TEXT("Skim costs 15 Momentum"), Skim->GetResourceCost(), 15.0f);
-    TestEqual(TEXT("Skim has a 3s cooldown"), Skim->GetCooldownSeconds(), 3.0f);
-    TestTrue(TEXT("Skim is the one implemented proof ability"), Skim->IsImplemented());
-    TestTrue(TEXT("Skim's ability class derives from the Breaker base"), Skim->AbilityClass->IsChildOf(UBreakerGameplayAbility::StaticClass()));
+    TestEqual(TEXT("Slipcut costs 20 Momentum"), Slipcut->GetResourceCost(), 20.0f);
+    TestEqual(TEXT("Slipcut has a 4s cooldown"), Slipcut->GetCooldownSeconds(), 4.0f);
+    TestTrue(TEXT("Slipcut is an implemented starter ability"), Slipcut->IsImplemented());
+    TestTrue(TEXT("Slipcut's ability class derives from the Breaker base"), Slipcut->AbilityClass->IsChildOf(UBreakerGameplayAbility::StaticClass()));
 
     const UBreakerAbilityDefinition* Lead = UBreakerAbilityDefinition::FindFallback(TEXT("Swift.Lead"));
     if (!Lead)
@@ -165,7 +164,7 @@ bool FBreakerAbilityKeystoneVariantTest::RunTest(const FString& Parameters)
 
     // An unrelated tag must not select a keystone row.
     FGameplayTagContainer Unrelated;
-    Unrelated.AddTag(BreakerAbilityTags::State_Ability_Skim);
+    Unrelated.AddTag(BreakerAbilityTags::State_Ability_Slipcut);
     TestFalse(TEXT("An unrelated tag falls back to the base row"), Overdrive->ResolveVariant(Unrelated).KeystoneTag.IsValid());
 
     // A definition with no rows authored still answers with the definition's
@@ -315,10 +314,10 @@ bool FBreakerAbilityResolutionTest::RunTest(const FString& Parameters)
     // An empty loadout falls back to the class default so the slice is
     // playable before the loadout UI writes anything.
     const UBreakerAbilityDefinition* SlotOne = UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Swift, EBreakerAbilitySlot::ClassAbilityOne, NAME_None);
-    TestNotNull(TEXT("An empty Swift slot one defaults to Skim"), SlotOne);
+    TestNotNull(TEXT("An empty Swift slot one defaults to Slipcut"), SlotOne);
     if (SlotOne)
     {
-        TestEqual(TEXT("The default is Skim"), SlotOne->AbilityId, FName(TEXT("Swift.Skim")));
+        TestEqual(TEXT("The default is Slipcut"), SlotOne->AbilityId, FName(TEXT("Swift.Slipcut")));
     }
 
     const UBreakerAbilityDefinition* Ultimate = UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Swift, EBreakerAbilitySlot::Ultimate, NAME_None);
@@ -355,7 +354,7 @@ bool FBreakerAbilityResolutionTest::RunTest(const FString& Parameters)
     // silently granting nothing.
     const UBreakerAbilityDefinition* UnknownFallback = UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Swift, EBreakerAbilitySlot::ClassAbilityOne, TEXT("Swift.Nonsense"));
     TestNotNull(TEXT("An unknown equipped id falls back to the class default"), UnknownFallback);
-    if (UnknownFallback) TestEqual(TEXT("Fallback is the slot default"), UnknownFallback->AbilityId, FName(TEXT("Swift.Skim")));
+    if (UnknownFallback) TestEqual(TEXT("Fallback is the slot default"), UnknownFallback->AbilityId, FName(TEXT("Swift.Slipcut")));
     return true;
 }
 
@@ -369,24 +368,6 @@ bool FBreakerAbilityCostRuleTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Exactly enough resource affords the ability"), UBreakerGameplayAbility::IsAffordable(15.0f, 15.0f));
     TestFalse(TEXT("One short does not afford it"), UBreakerGameplayAbility::IsAffordable(14.99f, 15.0f));
     TestTrue(TEXT("A free ability is always affordable"), UBreakerGameplayAbility::IsAffordable(0.0f, 0.0f));
-    return true;
-}
-
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-    FBreakerAbilitySkimDirectionTest,
-    "RiorsEdge.Abilities.SkimDirection",
-    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
-
-bool FBreakerAbilitySkimDirectionTest::RunTest(const FString& Parameters)
-{
-    // Skim is a horizontal verb: looking straight down must not aim it downward.
-    const FVector LookingDown = UBreakerAbility_Skim::HorizontalDirectionForView(FRotator(-89.0, 0.0, 0.0));
-    TestTrue(TEXT("The impulse is strictly horizontal"), FMath::IsNearlyZero(LookingDown.Z));
-    TestTrue(TEXT("The impulse is normalized"), FMath::IsNearlyEqual(LookingDown.Size(), 1.0f, KINDA_SMALL_NUMBER));
-    TestTrue(TEXT("Pitch does not change the heading"), LookingDown.Equals(FVector::ForwardVector, KINDA_SMALL_NUMBER));
-
-    const FVector Yawed = UBreakerAbility_Skim::HorizontalDirectionForView(FRotator(0.0, 90.0, 0.0));
-    TestTrue(TEXT("Yaw drives the heading"), Yawed.Equals(FVector::RightVector, KINDA_SMALL_NUMBER));
     return true;
 }
 
@@ -429,10 +410,6 @@ bool FBreakerAbilityImpactRulesTest::RunTest(const FString& Parameters)
     // The pitch-gated Hard Stop modal that used to be asserted here is
     // retired (O177): Hard Stop is its own ability, and its rules are pinned
     // in BreakerSwiftRewriteConsumerTests against UBreakerAbility_HardStop.
-
-    // Skim's burst must remain a burst, not a state.
-    TestTrue(TEXT("Skim's burst adds speed"), UBreakerAbility_Skim::BurstSpeedMultiplier > 1.0f);
-    TestTrue(TEXT("Skim's burst is shorter than its cooldown"), UBreakerAbility_Skim::BurstSeconds < 3.0f);
 
     // Overdrive is a power state: doubled generation and a real More.
     TestEqual(TEXT("Overdrive doubles Momentum generation"), UBreakerAbility_Overdrive::LoopGenerationMultiplier, 2.0f);
@@ -917,7 +894,7 @@ bool FBreakerAbilitySelectionTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("An unknown id is refused"), static_cast<int32>(UBreakerAbilityComponent::ValidateSelection(
         EBreakerClassId::Caster, One, TEXT("Caster.NoSuchThing"), NAME_None, NAME_None, NAME_None)), static_cast<int32>(EResult::UnknownAbility));
     TestEqual(TEXT("Another class's ability is refused"), static_cast<int32>(UBreakerAbilityComponent::ValidateSelection(
-        EBreakerClassId::Caster, One, TEXT("Swift.Skim"), NAME_None, NAME_None, NAME_None)), static_cast<int32>(EResult::WrongClass));
+        EBreakerClassId::Caster, One, TEXT("Swift.Slipcut"), NAME_None, NAME_None, NAME_None)), static_cast<int32>(EResult::WrongClass));
     // Slot discipline both ways: the ultimate is a locked third choice, not a
     // third class-ability slot.
     TestEqual(TEXT("An ultimate may not take a class slot"), static_cast<int32>(UBreakerAbilityComponent::ValidateSelection(

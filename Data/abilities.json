@@ -11,16 +11,6 @@
 			"variants": []
 		},
 		{
-			"id": "Swift.Skim",
-			"resourceCost": 15,
-			"cooldownSeconds": 3,
-			"windowDuration": 0.25,
-			"numbers":
-			{
-			},
-			"variants": []
-		},
-		{
 			"id": "Swift.Lead",
 			"resourceCost": 40,
 			"cooldownSeconds": 10,

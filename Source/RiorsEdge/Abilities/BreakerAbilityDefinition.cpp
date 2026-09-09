@@ -16,7 +16,6 @@
 #include "Abilities/BreakerAbility_Siphon.h"
 #include "Abilities/BreakerAbility_Unmake.h"
 #include "Abilities/BreakerAbility_Overdrive.h"
-#include "Abilities/BreakerAbility_Skim.h"
 #include "Abilities/BreakerGunsmithAbilities.h"
 #include "Abilities/BreakerSupportAbilities.h"
 #include "Abilities/BreakerTankAbilities.h"
@@ -547,8 +546,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     // ------------------------------------------------------------------
 
     // S1 Slipcut — §1.2 row S1: 20 Momentum, 4s cooldown, 0.4s window.
-    // The design's STARTER beside Skim (O176; the class-definition buckets
-    // in Progression/ execute that half).
+    // O258: the free Swift starter; Skim is retired.
     UBreakerAbilityDefinition* Slipcut = MakeFallback(TEXT("FallbackAbility_Swift_Slipcut"));
     Slipcut->AbilityId = TEXT("Swift.Slipcut");
     Slipcut->ClassId = EBreakerClassId::Swift;
@@ -560,22 +558,6 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Slipcut->CooldownTag = BreakerAbilityTags::Cooldown_Class_Swift_Slipcut;
     Slipcut->AbilityClass = UBreakerAbility_Slipcut::StaticClass();
     Registry.Add(Slipcut);
-
-    // S3 Skim — Class-Kits §1.2 row S3: 15 Momentum, 3s cooldown.
-    UBreakerAbilityDefinition* Skim = MakeFallback(TEXT("FallbackAbility_Swift_Skim"));
-    Skim->AbilityId = TEXT("Swift.Skim");
-    Skim->ClassId = EBreakerClassId::Swift;
-    Skim->DisplayName = FText::FromString(TEXT("Skim"));
-    Skim->Description = FText::FromString(TEXT("Directional impulse that redirects existing horizontal speed."));
-    Skim->SlotAffinity = EBreakerAbilitySlot::ClassAbilityOne;
-    Skim->Verb = EBreakerAbilityVerb::Movement;
-    Skim->AbilityTag = BreakerAbilityTags::Ability_Class_Swift_Skim;
-    Skim->CooldownTag = BreakerAbilityTags::Cooldown_Class_Swift_Skim;
-    Skim->AbilityClass = UBreakerAbility_Skim::StaticClass();
-    // O2 PLACEHOLDER: the redirect/boost window length is not specified by any
-    // design doc. Structure is complete; the number is a guess and must be
-    // replaced (Ability-Implementation-Spec §11 GAP list).
-    Registry.Add(Skim);
 
     // S6 Lead — Class-Kits §1.2 row S6: 40 Momentum, 10s cooldown, the mark
     // lasts 6s.
@@ -1349,7 +1331,7 @@ FName UBreakerAbilityDefinition::DefaultAbilityIdForSlot(EBreakerClassId ClassId
     case EBreakerClassId::Swift:
         switch (Slot)
         {
-        case EBreakerAbilitySlot::ClassAbilityOne: return TEXT("Swift.Skim");
+        case EBreakerAbilitySlot::ClassAbilityOne: return TEXT("Swift.Slipcut");
         case EBreakerAbilitySlot::ClassAbilityTwo: return NAME_None;
         case EBreakerAbilitySlot::Ultimate:        return TEXT("Swift.Overdrive");
         default: return NAME_None;

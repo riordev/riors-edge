@@ -5,7 +5,6 @@
 #include "Abilities/BreakerAbility_CadenceBreak.h"
 #include "Abilities/BreakerAbility_HardStop.h"
 #include "Abilities/BreakerAbility_Sightline.h"
-#include "Abilities/BreakerAbility_Skim.h"
 #include "Abilities/BreakerAbility_Slipcut.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Classes/BreakerMomentumComponent.h"
@@ -17,24 +16,20 @@
 // ---------------------------------------------------------------------------
 // SWIFT'S WAITING KINETIC/FRENZY REWRITES PAY (2026-08-16). One contract
 // throughout, the same as BreakerBranchNodeConsumerTests: buy the node -> an
-// observable rule change; without it, bit-identical behaviour. Skim Discipline
-// (both halves), Spend to Live, Momentum Shield, and Second Wind's Cadence
+// observable rule change; without it, bit-identical behaviour.
+// Spend to Live, Momentum Shield, and Second Wind's Cadence
 // Break host are the nodes under test.
 // ---------------------------------------------------------------------------
 
-// Skim's airtime ceiling and Spend to Live's two halves, as the pure rules the
+// Spend to Live's two halves, as the pure rules the
 // ability activates through.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-    FBreakerSkimAirtimeAndSpendToLiveTest,
-    "RiorsEdge.Abilities.SkimAirtimeAndSpendToLive",
+    FBreakerSpendToLiveRulesTest,
+    "RiorsEdge.Abilities.SpendToLiveRules",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-bool FBreakerSkimAirtimeAndSpendToLiveTest::RunTest(const FString& Parameters)
+bool FBreakerSpendToLiveRulesTest::RunTest(const FString& Parameters)
 {
-    // Class-Kits §1.2 S3: once per airtime. §1.4 K7: twice with the node.
-    TestEqual(TEXT("Base kit skims once per airtime"), UBreakerAbility_Skim::MaxAirborneUses(false), 1);
-    TestEqual(TEXT("Skim Discipline raises the ceiling to two"), UBreakerAbility_Skim::MaxAirborneUses(true), 2);
-
     // Spend to Live's cost half: "it costs twice the Momentum" (node text).
     // Since O177 the payer is the standalone Hard Stop, at S4's authored 30 —
     // the doubling is the doc's own 30 -> 60.
@@ -236,11 +231,10 @@ bool FBreakerSwiftRosterCompleteTest::RunTest(const FString& Parameters)
             Sightline->AbilityClass == UBreakerAbility_Sightline::StaticClass());
     }
 
-    // The catalogue, derived: Swift now offers six class abilities and one
-    // ultimate, which is the design's 6+1 (Docs/spec/classes-and-abilities.md:
-    // "Two abilities plus one ultimate are equipped, from six per class").
-    TestEqual(TEXT("Swift's class-slot catalogue is six"),
-        UBreakerAbilityDefinition::GetClassAbilityIds(EBreakerClassId::Swift, EBreakerAbilitySlot::ClassAbilityOne).Num(), 6);
+    // O258 retires Skim; the remaining catalogue has five class abilities
+    // and one ultimate until the separately authored kit expansion lands.
+    TestEqual(TEXT("Swift's class-slot catalogue is five after O258 retires Skim"),
+        UBreakerAbilityDefinition::GetClassAbilityIds(EBreakerClassId::Swift, EBreakerAbilitySlot::ClassAbilityOne).Num(), 5);
     TestEqual(TEXT("Swift's ultimate catalogue is one"),
         UBreakerAbilityDefinition::GetClassAbilityIds(EBreakerClassId::Swift, EBreakerAbilitySlot::Ultimate).Num(), 1);
     return true;

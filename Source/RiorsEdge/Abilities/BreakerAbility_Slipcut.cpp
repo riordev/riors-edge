@@ -59,7 +59,6 @@ int32 UBreakerAbility_Slipcut::CountActiveAbilityCooldowns() const
     // is its cooldown) so it is absent by construction, not by omission.
     const FGameplayTag CooldownTags[] = {
         BreakerAbilityTags::Cooldown_Class_Swift_Slipcut.GetTag(),
-        BreakerAbilityTags::Cooldown_Class_Swift_Skim.GetTag(),
         BreakerAbilityTags::Cooldown_Class_Swift_Lead.GetTag(),
         BreakerAbilityTags::Cooldown_Class_Swift_CadenceBreak.GetTag(),
         BreakerAbilityTags::Cooldown_Class_Swift_HardStop.GetTag(),

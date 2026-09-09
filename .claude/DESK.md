@@ -7,7 +7,7 @@ Continue validated blocks until the owner returns. Prioritize playable changes f
 ## Immediate queue
 
 1. Fernhall cache gameplay landed; inspect dedicated capture placement before closing presentation.
-2. O258: retire Skim, make Slipcut the Swift starter, and migrate/remove SkimDiscipline with its consumer and existing loadouts.
+2. O258 landed: Slipcut is Swift's starter; v10 migrates Skim slots and refunds retired purchases without duplication.
 3. O247 landed: Provoke forces its target for four seconds and grants lasting scaled threat; paid Standing Order cancellation verified.
 4. O250 landed: a broken Warden front stays broken through revival.
 5. O251: occlusion hides the entire enemy plate; inspect rendered frames.
@@ -22,7 +22,7 @@ Continue validated blocks until the owner returns. Prioritize playable changes f
 |---|---|---|
 | 1 Entropy | Finite funding, original critical samples, paid duration and persistence tests landed | Actual encounter clarity, audible feedback and sustained ability/converted-weapon play |
 | 2 Elements/reactions | Entropy, Void, Rift and bounded reactions have native delivery tests | Regression check current builds, readable combined feedback and complete encounter loop |
-| 3 Progression/combat | 187 Core nodes; 371 total nodes; no measured silent nodes; Caster doctrines12/24; allocation parity0.93 | Audit actual consumers/acquisition, remaining kit programme, solo-node gaps and gameplay balance |
+| 3 Progression/combat | 187 Core nodes; 370 total nodes; no measured silent nodes; Caster doctrines12/24; allocation parity0.93 | Audit actual consumers/acquisition, remaining kit programme, solo-node gaps and gameplay balance |
 | 4 Loot | New special budgets, overflow conversion, Unwritten rename and skill-level affixes landed | Legacy-item protection, authored perks/legendaries, real legal-loadout comparison and UI clarity |
 | 5 Interface | Core wheel and paid purchase/assignment paths exist | Occlusion, clipping across menus/resolutions, NPC/equipment/death focus flows and dev sandbox |
 | 6 Fernhall/Rifts | Five outdoor pockets/17 enemies, Watchkeeper contract, campaign flags and local map exist | Cache, authored spaces, varied mission objectives, distinct Rift interiors, reward/return and natural leveling |
@@ -63,7 +63,7 @@ Owner authorizes adding multiplayer when feasible. Audit current listen-server j
 
 ## Latest validated baseline
 
-Pulled main1e369b4. Remote report:837 passing,3 expected failures,0 unexpected. Local build and fresh census/suite validated:837 passing,3 expected failures,0 unexpected. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
+Current local build/census/full suite:841 passing,3 expected failures,0 unexpected. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
 
 ## Landed this pass
 
@@ -74,3 +74,5 @@ Pulled main1e369b4. Remote report:837 passing,3 expected failures,0 unexpected. 
 - Fernhall cache: real pocket clearance, authoritative range/LOS, one physical ordinary loot roll, one-shot/reentrant claims and pickup validated. No empty prompt or map marker. Build/full suite839 passing,3 expected,0 unexpected; rendered placement pending.
 
 - Provoke: real forced target and editable threat grant, range/death/safe-zone eligibility, stronger later competitor and paid Standing Order route pass. Test competitor moved outside native melee reach while retaining real Grit proximity. Build/census/full suite840 passing,3 expected,0 unexpected. Two new numeric keys counted explicitly; no balance pin changed.
+
+- Swift starter: Slipcut replaces Skim; v10 preserves equipped order, refunds paid Slipcut/SkimDiscipline once and leaves frozen historical migrations intact. Paid starter, HardStop and save coverage pass. Four stale inventory/version assertions updated;841 passing,3 expected,0 unexpected. Registered abilities35→34 and total nodes371→370 reflect the explicit retirement; kit expansion remains open.

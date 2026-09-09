@@ -29,7 +29,7 @@ present is a class that does not work alone.
 participate.
 
 **Two abilities plus one ultimate are equipped**, from the class's registered kit. Starters are per-class authored — one or two free at level one. Swift is
-the one-starter class: Skim plus an enhanced-dash tree node granted at level one, and its second slot stands visibly empty until the first unlock — the
+the one-starter class: Slipcut plus its innate dash at level one, and its second slot stands visibly empty until the first unlock — the
 empty slot is the first thing the quartermaster fills. Many against two slots is a loadout decision rather than a rotation.
 
 **The remaining class abilities unlock one at a time, per character.** The ultimate and the starters are free and never unlock; every remaining class
