@@ -4,6 +4,8 @@
 #include "UI/BreakerDoctrineBoardLayout.h"
 #include "UI/BreakerSandboxModel.h"
 #include "EngineUtils.h"
+#include "HAL/FileManager.h"
+#include "Misc/Paths.h"
 #include "Audio/BreakerSoundDirector.h"
 #include "Data/BreakerStrings.h"
 
@@ -1014,6 +1016,57 @@ void SBreakerMenu::ShowScreenForCapture(EBreakerMenuScreen Screen)
     if (FParse::Value(FCommandLine::Get(), TEXT("BreakerCaptureBoard="), Board))
     {
         Board = Board.ToUpper();
+#if !UE_BUILD_SHIPPING
+        if (Board == TEXT("DISCARDCONFIRM") || Board == TEXT("TRAVEL"))
+        {
+            FString UserDirectory;
+            if (!Character.IsValid() || !Character->GetWorld()
+                || !FParse::Value(FCommandLine::Get(), TEXT("UserDir="), UserDirectory)
+                || UserDirectory.IsEmpty() || FPaths::IsRelative(UserDirectory)
+                || FPaths::IsSamePath(FPaths::ConvertRelativePathToFull(UserDirectory), FPaths::ProjectDir())
+                || IFileManager::Get().DirectoryExists(*(FPaths::ProjectSavedDir() / TEXT("SaveGames"))))
+            {
+                UE_LOG(LogTemp, Warning, TEXT("[BreakerCapture] %s refused: fresh isolated absolute UserDir required."), *Board);
+                return;
+            }
+            Character->bRefuseSavesForPendingCharacter = true;
+            if (Board == TEXT("DISCARDCONFIRM"))
+            {
+                // Existing exceptional-threshold arm; BuildInventoryScreen reads
+                // the actual backpack count. No item grant, removal or receipt.
+                DiscardModalIndex = 1;
+                SwapPickerItemId.Invalidate();
+                SwapPickerFocusId.Invalidate();
+                ShowInventory();
+                const auto* Equipment = Character->GetEquipment();
+                UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] actual discard confirmation below Exceptional count=%d; no inventory mutation."),
+                    Equipment ? Equipment->CountBackpackBelowRarity(EBreakerItemRarity::Exceptional) : 0);
+                return;
+            }
+            // Inspect the existing point offering the largest real list. This
+            // selects its UI only; no destination request or quest flag is sent.
+            ABreakerTravelPoint* BestPoint = nullptr;
+            int32 BestCount = 0;
+            for (TActorIterator<ABreakerTravelPoint> It(Character->GetWorld()); It; ++It)
+            {
+                if (!IsValid(*It) || It->IsActorBeingDestroyed()) continue;
+                const int32 Count = It->GetAvailableDestinations().Num();
+                if (Count > BestCount)
+                {
+                    BestPoint = *It;
+                    BestCount = Count;
+                }
+            }
+            if (!BestPoint)
+            {
+                UE_LOG(LogTemp, Warning, TEXT("[BreakerCapture] TRAVEL refused: no existing live travel point offers destinations."));
+                return;
+            }
+            ShowTravel(BestPoint);
+            UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] actual travel list point=%s destinations=%d; no travel requested."), *BestPoint->GetName(), BestCount);
+            return;
+        }
+#endif
         if (Board == TEXT("CORE")) { SkillBoardTab = 1; }
         else if (Board == TEXT("QUESTREWARD") && Character.IsValid())
         {
@@ -5084,8 +5137,10 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
 
         const FOnClicked DiscardOne = FOnClicked::CreateLambda([this, ItemId]()
         {
-            if (Character.IsValid() && Character->GetEquipment()) Character->GetEquipment()->DiscardFromBackpack(ItemId);
-            InventoryStatus = FText::FromString(TEXT("Discarded 1 item."));
+            const bool bDiscarded = Character.IsValid() && Character->GetEquipment()
+                && Character->GetEquipment()->DiscardFromBackpack(ItemId);
+            InventoryStatus = FText::FromString(bDiscarded
+                ? TEXT("Discarded 1 item.") : TEXT("Item could not be discarded."));
             Rebuild(EBreakerMenuScreen::Inventory);
             return FReply::Handled();
         });
@@ -5583,6 +5638,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
 TSharedRef<SWidget> SBreakerMenu::BuildDiscardModal(int32 ArmIndex, EBreakerItemRarity MinimumKept, int32 Count)
 {
     const FString Threshold = RarityName(MinimumKept);
+    const float ModalWidth = 560.0f;
+    const float ContentWidth = ModalWidth - 2.0f * BreakerUI::Space24
+        - 2.0f * BreakerUI::BorderThin - BreakerUI::RailThickness;
     // The count is the equipment component's own answer, produced by the same
     // predicate the discard uses — the modal cannot promise a different number
     // from the one it destroys.
@@ -5593,8 +5651,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildDiscardModal(int32 ArmIndex, EBreakerItem
     ];
     Plate->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
     [
-        MenuText(FText::FromString(FString::Printf(TEXT("%d backpack item%s below %s will be destroyed. This cannot be undone."),
-            Count, Count == 1 ? TEXT("") : TEXT("s"), *Threshold)), BreakerUI::TypeBody, SoftText)
+        MenuWrappedText(FText::FromString(FString::Printf(TEXT("%d backpack item%s below %s will be destroyed. This cannot be undone."),
+            Count, Count == 1 ? TEXT("") : TEXT("s"), *Threshold)), BreakerUI::TypeBody, SoftText, ContentWidth)
     ];
     // The exclusions, stated rather than assumed. Both are properties of the
     // component: equipped gear is a separate container, and Aberrant and
@@ -5666,7 +5724,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildDiscardModal(int32 ArmIndex, EBreakerItem
         ]
         + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
         [
-            SNew(SBox).WidthOverride(560.0f)
+            SNew(SBox).WidthOverride(ModalWidth)
             [
                 // The destructive face on a harm-red rail: the only plate in
                 // the system that is not part of the panel ramp.
