@@ -895,6 +895,12 @@ void SBreakerMenu::ShowCharacterSheet()
     Rebuild(EBreakerMenuScreen::CharacterSheet);
 }
 
+void SBreakerMenu::ShowLocalMap()
+{
+    RootScreen = EBreakerMenuScreen::Pause;
+    Rebuild(EBreakerMenuScreen::LocalMap);
+}
+
 void SBreakerMenu::ShowDialogue(ABreakerNPC* NPC)
 {
     DialogueNPC = NPC;

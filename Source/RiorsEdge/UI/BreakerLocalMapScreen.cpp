@@ -4,6 +4,10 @@
 #include "UI/BreakerTypeRoles.h"
 #include "Widgets/SLeafWidget.h"
 #include "Widgets/Input/SButton.h"
+#include "UI/BreakerMapTravelRules.h"
+#include "Interaction/BreakerTravelPoint.h"
+#include "Game/BreakerGameInstance.h"
+#include "Game/BreakerGameMode.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/SBoxPanel.h"
@@ -97,8 +101,70 @@ TSharedRef<SWidget> SBreakerMenu::BuildLocalMapScreen()
     if (!Map->GetCampaignObjective().IsEmpty())
         Body->AddSlot().AutoHeight().Padding(0,0,0,12)
         [SNew(STextBlock).Text(Map->GetCampaignObjective()).Font(BreakerBodyFont(14)).AutoWrapText(true).ColorAndOpacity(BreakerUI::Gold)];
+    // ---- Fast travel (O265) ------------------------------------------------
+    // The map IS the travel screen now. From any instance it offers exactly
+    // one way out — home — and from the Anchor it offers the ordinary
+    // registry. The rule itself is pure and lives in BreakerMapTravelRules.h;
+    // everything here is presentation and the two live reads it needs.
+    const bool bInHub = UBreakerGameInstance::IsAnchorMap(Player->GetWorld());
+    const bool bInCombat = Player->IsInResourceCombat();
+    TArray<FName> RegistryIds;
+    for (const FBreakerTravelDestination& Destination : ABreakerTravelPoint::GetFallbackRegistry())
+    {
+        if (!Destination.bEnabled || Destination.bDoorOnly) continue;
+        if (Destination.Id == ABreakerTravelPoint::ErasedEarthDestinationId
+            && !ABreakerTravelPoint::CanEnterErasedEarth(Player)) continue;
+        if ((Destination.Id == ABreakerTravelPoint::StrippedEarthDestinationId
+            || Destination.Id == ABreakerTravelPoint::WinningEarthDestinationId)
+            && !ABreakerTravelPoint::CanEnterFinaleEarth(Destination.Id, Player)) continue;
+        RegistryIds.Add(Destination.Id);
+    }
+    const TArray<FName> Offered = BreakerMapTravel::OfferedDestinations(
+        bInHub, RegistryIds, ABreakerTravelPoint::HubDestinationId);
+    if (!Offered.IsEmpty())
+    {
+        Body->AddSlot().AutoHeight().Padding(0, 0, 0, 8)
+        [SNew(STextBlock).Text(FText::FromString(bInHub ? TEXT("TRAVEL") : TEXT("TRAVEL  ·  ONE WAY OUT OF AN INSTANCE, AND IT LEADS HOME")))
+            .Font(BreakerBodyFont(12, true)).ColorAndOpacity(BreakerUI::TextSecondary)];
+        for (const FName DestinationId : Offered)
+        {
+            FBreakerTravelDestination Destination;
+            if (!ABreakerTravelPoint::FindDestination(DestinationId, Destination)) continue;
+            // ui.md: a disabled control is PAINTED, never faded. In combat the
+            // row says what it is waiting for rather than going grey.
+            const bool bRefused = BreakerMapTravel::TravelRefusedInCombat(bInCombat);
+            const FString Label = bRefused
+                ? Destination.DisplayName.ToString().ToUpper() + FString(TEXT("   —   NOT WHILE IN COMBAT"))
+                : Destination.DisplayName.ToString().ToUpper();
+            Body->AddSlot().AutoHeight().Padding(0, 0, 0, 6)
+            [
+                SNew(SButton)
+                .ButtonColorAndOpacity(bRefused ? BreakerUI::BgRaised : BreakerUI::Panel20)
+                .ContentPadding(FMargin(16, 10))
+                .HAlign(HAlign_Fill)
+                .OnClicked(FOnClicked::CreateLambda([this, DestinationId, bRefused]()
+                {
+                    if (bRefused || !Character.IsValid()) return FReply::Handled();
+                    UWorld* World = Character->GetWorld();
+                    ABreakerGameMode* Mode = World ? World->GetAuthGameMode<ABreakerGameMode>() : nullptr;
+                    if (!Mode) return FReply::Handled();
+                    // The SAME verb the death screen already uses, and the
+                    // same one a travel point calls: no second travel path.
+                    // Travel FIRST, resume second — the travel screen's own
+                    // order. Travel is legal while the menu holds the pause,
+                    // and resuming first would unpause a world that is about
+                    // to be torn down by the level change.
+                    Mode->HandleHubTravelSelected(DestinationId, Character.Get());
+                    if (Character.IsValid()) Character->ResumeFromMenu();
+                    return FReply::Handled();
+                }))
+                [SNew(STextBlock).Text(FText::FromString(Label)).Font(BreakerBodyFont(14, true))
+                    .ColorAndOpacity(bRefused ? BreakerUI::TextMuted : BreakerUI::TextPrimary)]
+            ];
+        }
+    }
     Body->AddSlot().AutoHeight()
-    [SNew(SBox).HeightOverride(620)
+    [SNew(SBox).HeightOverride(520)
         [SNew(SHorizontalBox)
             + SHorizontalBox::Slot().FillWidth(1).Padding(0,0,20,0)[SNew(SBreakerLocalMapCanvas).Player(Player)]
             + SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(260)[SNew(SScrollBox) + SScrollBox::Slot()[List]]]]];

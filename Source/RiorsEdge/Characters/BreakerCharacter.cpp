@@ -758,6 +758,10 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
     // C for the character sheet, the same shape as I for the loadout: a
     // full-screen modal, toggled, and legal while paused.
     PlayerInputComponent->BindKey(EKeys::C, IE_Pressed, this, &ThisClass::ToggleCharacterSheet).bExecuteWhenPaused = true;
+    // M for the map, the same shape again. It is the FAST TRAVEL front door
+    // (O265), not only a survey: the owner was getting stranded in instances
+    // with no way home short of finding a door.
+    PlayerInputComponent->BindKey(EKeys::M, IE_Pressed, this, &ThisClass::ToggleLocalMap).bExecuteWhenPaused = true;
     // Interact rides Enhanced Input now (ruled: a raw BindKey appears in no
     // keybind list). The raw F is only the asset-not-cooked fallback, gated
     // so the two paths can never both fire one press.
@@ -2607,6 +2611,17 @@ void ABreakerCharacter::ToggleInventoryMenu()
     }
     OpenMenu(false);
     if (MenuWidget.IsValid()) MenuWidget->ShowInventory();
+}
+
+void ABreakerCharacter::ToggleLocalMap()
+{
+    if (MenuWidget.IsValid())
+    {
+        ResumeFromMenu();
+        return;
+    }
+    OpenMenu(false);
+    if (MenuWidget.IsValid()) MenuWidget->ShowLocalMap();
 }
 
 void ABreakerCharacter::StartWave()

@@ -504,3 +504,5 @@ Maximum wedges reached with65, including ring transit; cells show **wedges / min
 **O263** — Item levels 1 to 10 carry no equip requirement. The gate exists to pace levelling, and it has nothing to pace in the opening hour: an ilvl 7 drop that cannot be worn until character level 7 makes the first drops of the game into inventory clutter. RequiredLevelFor stays derived and clamped; only its floor moves.
 
 **O264** — A landing latches the boosted speed ceiling into its bleed. The boost still survives a landing rather than vanishing (O-D1(a) stands), but it stops ratcheting: jump, slide, jump held nothing back, so a sprint chain kept its speed indefinitely and the whole kit read as slippery.
+
+**O265** — The map is fast travel. From anywhere that is not the Anchor it offers exactly one destination, the hub; from the Anchor it offers the ordinary registry. Travel is refused in combat, in both directions, so it can never be an escape. A player is never stranded in an instance and never routes between instances without passing through the place that holds their stash and their Forge.

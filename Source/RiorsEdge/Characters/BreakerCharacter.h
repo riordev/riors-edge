@@ -409,6 +409,7 @@ private:
     void MenuRebindKey(FKey Key);
     void ToggleInventoryMenu();
     void ToggleCharacterSheet();
+    void ToggleLocalMap();
     void InteractWithNearbyNPC();
     UFUNCTION(Server, Reliable) void ServerOpenFernhallCache(ABreakerFernhallCache* Cache);
     UFUNCTION(Server, Reliable) void ServerInteractBasinRecorder(ABreakerBasinRecorder* Recorder);

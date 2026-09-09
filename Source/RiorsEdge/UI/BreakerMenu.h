@@ -493,6 +493,7 @@ public:
     void ShowPauseMenu();
     void ShowInventory();
     void ShowCharacterSheet();
+    void ShowLocalMap();
     void ShowDialogue(class ABreakerNPC* NPC);
     // The travel picker's front door, in the same shape as ShowDialogue: the
     // caller has already opened the menu (OpenMenu(false)) and hands us the

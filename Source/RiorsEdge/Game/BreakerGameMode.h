@@ -543,9 +543,17 @@ private:
     FFieldFrame Frame;
     bool bFieldFrameSet = false;
     void BuildFieldFrame(const APawn* Pawn);
+public:
     // Bound to the hub travel point. Teleports only — see the implementation
     // for why travel must never re-run the gym build.
+    //
+    // DECLARED CROSSING (GLASS -> GROUND, O265): the local map is the fast
+    // travel front door and calls this directly, the way the death screen
+    // already reaches ReturnToAnchor. It is public rather than duplicated so
+    // there is exactly ONE travel path in the project; the map narrows WHICH
+    // destinations it offers and never how travelling happens.
     void HandleHubTravelSelected(FName DestinationId, APawn* RequestingPawn);
+private:
     // The rift door's own handler. Separate from the travel one because a
     // rift entry carries DATA — which rift — and the travel delegate carries
     // only an id. Writes PendingRift and travels to the interior.
