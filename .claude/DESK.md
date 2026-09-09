@@ -194,7 +194,28 @@ yet honour; each is one slice, sized so no two share a build.
 - [ ] O246 Delete the compiled ability defaults. 36 `MakeFallback` rows restate `Data/abilities.json`. The deletion commit MUST also replace `RiorsEdge.Data.Abilities.Fresh` (which proves JSON matches C++, and loses its referent) with a schema/completeness test: every registered id has a row, every field in range. Do not delete without the swap — that trades drift for an unvalidated data file.
 - [ ] O247 Provoke grants threat. Keep the 4s forced-target window; add a one-time threat grant scaled by `ThreatGeneratedMultiplier` so the Tank still holds the pack when the window closes. `BreakerEnemyThreatMath` already scores and prefers; `ThreatGenerated` is a live stat target with no content behind it. KIT writes the ability, FIELD owns the threat seam — declare the crossing.
 - [ ] O248 Grandfather over-budget special items. Flag legacy items, keep them legal, bind the budget to new rolls only. Never strip an owner's affixes at load.
-- [ ] O249 Drop Chance above the cap converts to rarity weight. Closes the `DropChanceReachesEveryRank` expected-red; delete its pin in the same commit.
+- [x] O249 LANDED. Overflow above the cap drains a share of what remains of
+  Standard up the same rarity ladder the below-cap shift already uses.
+  `Items/BreakerDropOverflowMath.h` is world-free; the drain is HYPERBOLIC so
+  it is strictly monotone for unbounded input and can never take a weight
+  negative — a linear drain would need its own clamp, which is the second
+  saturation point the ruling exists to remove. Below the cap the overflow is
+  exactly zero and the branch does not execute, so the pre-ruling table is not
+  merely equal, it is the same additions.
+- [ ] THE PIN DOES NOT GO GREEN, AND THAT IS CORRECT. `DropChanceReachesEveryRank`
+  measures `GetEffectiveDropChance` alone, and under O249 that function's
+  answer at a boss is LEGITIMATELY still 1.000 — the ruling keeps the cap and
+  changes what happens to the excess. So the test now measures the wrong
+  thing: its finding is resolved by the pipeline while being unmeasurable by
+  that assertion. It wants a rewrite to measure VALUE rather than step-one
+  probability. Left untouched rather than edited, because widening or
+  deleting an assertion to match an implementation is the one move this
+  project forbids outright. Owner's ruling.
+- NOTE FOR THE NEXT READER: `UBreakerLootLibrary::RollRarity(Seed, Bonus)`
+  passes Rank=Boss as its "no rank supplied" fiction, and a boss saturates at
+  zero — so ALL of its bonus is now overflow. Dev grants, fixtures and the
+  crafting preview therefore show the fully converted distribution. The
+  existing weights assertion passes harder rather than softer.
 - [ ] O250 The Warden's front stops re-arming on `OnVitalsRestored`.
 - [ ] O251 An occluded enemy yields its bar with its marks. Visual — run `/photograph` and read the frames.
 

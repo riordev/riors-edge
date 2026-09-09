@@ -95,6 +95,13 @@ struct RIORSEDGE_API FBreakerDropTableParams
     // only which rarity came out of a drop you were getting anyway is the kind
     // of quiet lie this project has shipped before (see the DamageMultiplier
     // that nothing wrote).
+    //
+    // O249 closes the other end of the same lie. Step 1 is a probability, so it
+    // ceilings at 1.0 whatever this scale is; the bonus past that ceiling
+    // converts into rarity weight rather than being discarded, so the stat
+    // still reads at the rank it is most bought for. Setting this to 0 leaves
+    // the affix a pure quality stat through the shift below and routes nothing
+    // through the conversion — see BreakerDropOverflowMath.h.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Chance", meta=(ClampMin="0"))
     float DropChanceQuantityScale = 1.0f;   // O2 PLACEHOLDER
 
@@ -329,8 +336,26 @@ public:
     // Step 1, with the Drop Chance affix folded in. Clamped to [0,1]: a
     // guaranteed drop cannot become two drops, because the drop COUNT per kill
     // is a separate design nobody has ruled on.
+    //
+    // The clamp is REAL and O249 keeps it. What O249 changes is what happens to
+    // the bonus this function cannot spend — see GetDropChanceOverflowPercent.
     UFUNCTION(BlueprintPure, Category="Items|Drops")
     static float GetEffectiveDropChance(EBreakerMonsterRank Rank, float DropChanceBonusPercent, const FBreakerDropTableParams& Params);
+
+    // O249. The bonus percent at which step 1 first reaches 1.0 for this rank —
+    // the point past which quantity cannot move. TNumericLimits<float>::Max()
+    // when this rank can never saturate; see BreakerDropOverflowMath.h.
+    //
+    // The shipped BossDropChance is 1.0, so a boss saturates at ZERO bonus:
+    // every point of Drop Chance a player has ever rolled is overflow there.
+    UFUNCTION(BlueprintPure, Category="Items|Drops")
+    static float GetDropChanceSaturationPercent(EBreakerMonsterRank Rank, const FBreakerDropTableParams& Params);
+
+    // O249. The part of the bonus step 1 cannot spend, which step 3 CONVERTS
+    // into rarity weight instead of discarding. Exactly zero below the cap, so
+    // a player under it sees the pre-ruling table bit for bit.
+    UFUNCTION(BlueprintPure, Category="Items|Drops")
+    static float GetDropChanceOverflowPercent(EBreakerMonsterRank Rank, float DropChanceBonusPercent, const FBreakerDropTableParams& Params);
 
     UFUNCTION(BlueprintPure, Category="Items|Drops")
     static bool RollsDrop(int32 RandomSeed, EBreakerMonsterRank Rank, float DropChanceBonusPercent, const FBreakerDropTableParams& Params);

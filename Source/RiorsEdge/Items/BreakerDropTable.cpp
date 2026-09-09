@@ -1,6 +1,7 @@
 #include "Items/BreakerDropTable.h"
 
 #include "Items/BreakerAffixLibrary.h"
+#include "Items/BreakerDropOverflowMath.h"
 
 namespace
 {
@@ -27,7 +28,15 @@ namespace
     // weight OUT of Standard and pours it into the higher tiers in fixed
     // proportions. Kept as a drain rather than a flat add so a huge Drop Chance
     // roll cannot make Standard negative.
-    void BreakerDropBuildWeights(float DropChanceBonusPercent, const FBreakerDropTableParams& Params, float(&OutWeights)[BreakerDropRarityCount])
+    //
+    // TWO LANES since O249, and the second is inert unless step 1 has already
+    // ceilinged. The below-cap shift is unchanged — same clamp, same order of
+    // operations, same figures, now named in BreakerDropOverflowMath.h so the
+    // conversion cannot drift away from the ladder it copies. The conversion
+    // then drains a share of WHAT IS LEFT of Standard, which is why an
+    // arbitrarily large bonus still cannot make any weight negative.
+    void BreakerDropBuildWeights(float DropChanceBonusPercent, float DropChanceOverflowPercent,
+        const FBreakerDropTableParams& Params, float(&OutWeights)[BreakerDropRarityCount])
     {
         float StandardWeight = Params.StandardWeight;
         float UncommonWeight = Params.UncommonWeight;
@@ -36,12 +45,26 @@ namespace
         float UnwrittenWeight = Params.UnwrittenWeight;
 
         const float Bonus = FMath::Clamp(DropChanceBonusPercent, 0.0f, 100.0f) / 100.0f;
-        const float Shifted = StandardWeight * Bonus * 0.5f;
+        const float Shifted = StandardWeight * Bonus * BreakerDropOverflow::BaseShiftFraction;
         StandardWeight -= Shifted;
-        UncommonWeight += Shifted * 0.55f;
-        ExceptionalWeight += Shifted * 0.30f;
-        AberrantWeight += Shifted * 0.12f;
-        UnwrittenWeight += Shifted * 0.03f;
+        UncommonWeight += Shifted * BreakerDropOverflow::UncommonShare;
+        ExceptionalWeight += Shifted * BreakerDropOverflow::ExceptionalShare;
+        AberrantWeight += Shifted * BreakerDropOverflow::AberrantShare;
+        UnwrittenWeight += Shifted * BreakerDropOverflow::UnwrittenShare;
+
+        // O249. Guarded on the drain rather than run unconditionally so that a
+        // player below the cap touches none of this arithmetic at all: the
+        // pre-ruling table is not merely equal here, it is the same additions.
+        const float Drain = BreakerDropOverflow::DrainFraction(DropChanceOverflowPercent);
+        if (Drain > 0.0f)
+        {
+            const float Converted = StandardWeight * Drain;
+            StandardWeight -= Converted;
+            UncommonWeight += Converted * BreakerDropOverflow::UncommonShare;
+            ExceptionalWeight += Converted * BreakerDropOverflow::ExceptionalShare;
+            AberrantWeight += Converted * BreakerDropOverflow::AberrantShare;
+            UnwrittenWeight += Converted * BreakerDropOverflow::UnwrittenShare;
+        }
 
         OutWeights[static_cast<int32>(EBreakerItemRarity::Standard)] = StandardWeight;
         OutWeights[static_cast<int32>(EBreakerItemRarity::Uncommon)] = UncommonWeight;
@@ -129,6 +152,17 @@ float UBreakerDropTableLibrary::GetEffectiveDropChance(EBreakerMonsterRank Rank,
     return FMath::Clamp(Base * (1.0f + Bonus), 0.0f, 1.0f);
 }
 
+float UBreakerDropTableLibrary::GetDropChanceSaturationPercent(EBreakerMonsterRank Rank, const FBreakerDropTableParams& Params)
+{
+    return BreakerDropOverflow::SaturationPercent(GetRankDropChance(Rank, Params), Params.DropChanceQuantityScale);
+}
+
+float UBreakerDropTableLibrary::GetDropChanceOverflowPercent(EBreakerMonsterRank Rank, float DropChanceBonusPercent, const FBreakerDropTableParams& Params)
+{
+    return BreakerDropOverflow::OverflowPercent(DropChanceBonusPercent,
+        GetRankDropChance(Rank, Params), Params.DropChanceQuantityScale);
+}
+
 bool UBreakerDropTableLibrary::RollsDrop(int32 RandomSeed, EBreakerMonsterRank Rank, float DropChanceBonusPercent, const FBreakerDropTableParams& Params)
 {
     const float Chance = GetEffectiveDropChance(Rank, DropChanceBonusPercent, Params);
@@ -166,7 +200,8 @@ void UBreakerDropTableLibrary::GetGatedRarityProbabilities(int32 ItemLevel, EBre
     const FBreakerDropTableParams& Params, TArray<float>& OutProbabilities)
 {
     float Weights[BreakerDropRarityCount];
-    BreakerDropBuildWeights(DropChanceBonusPercent, Params, Weights);
+    BreakerDropBuildWeights(DropChanceBonusPercent,
+        GetDropChanceOverflowPercent(Rank, DropChanceBonusPercent, Params), Params, Weights);
     BreakerDropApplyGates(ItemLevel, Rank, Params, Weights);
 
     float Total = 0.0f;
@@ -190,7 +225,8 @@ EBreakerItemRarity UBreakerDropTableLibrary::RollGatedRarity(int32 RandomSeed, i
     float DropChanceBonusPercent, const FBreakerDropTableParams& Params)
 {
     float Weights[BreakerDropRarityCount];
-    BreakerDropBuildWeights(DropChanceBonusPercent, Params, Weights);
+    BreakerDropBuildWeights(DropChanceBonusPercent,
+        GetDropChanceOverflowPercent(Rank, DropChanceBonusPercent, Params), Params, Weights);
     BreakerDropApplyGates(ItemLevel, Rank, Params, Weights);
 
     float Total = 0.0f;
