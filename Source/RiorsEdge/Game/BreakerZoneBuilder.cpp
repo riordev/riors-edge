@@ -1,4 +1,6 @@
 #include "Game/BreakerZoneBuilder.h"
+#include "Game/BreakerZonePalette.h"
+#include "Game/BreakerGameInstance.h"
 #include "Game/BreakerEnvironmentDressing.h"
 #include "Game/BreakerFernhallPerimeter.h"
 #include "Game/BreakerFernhallCourtyardBuilder.h"
@@ -45,11 +47,33 @@ namespace
         UMaterialInterface* BaseMaterial = LoadObject<UMaterialInterface>(
             nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
         if (!BaseMaterial) return;
+        // SAME MAP, DIFFERENT RULES, SO IT MUST NOT LOOK THE SAME. A rift
+        // interior is this yard's own geometry with PendingRift set, and under
+        // O268 it is the only one of the two that is finite and concludes. The
+        // palette is what tells a player which of them they are standing in
+        // before they act on it.
+        //
+        // The ruin is applied HERE, at the single point every painted surface in
+        // the zone passes through, rather than inside BreakerZoneColorFor. The
+        // first attempt did it at the lookup and the capture frames caught it:
+        // the prefix table paints the composed pieces, but the walk strips,
+        // joints, drains and skyline all carry their own literal colours
+        // straight to this function — so the buildings went to ruin while the
+        // ground the player actually looks at stayed pristine. One choke point
+        // cannot be missed by a path that is added later either.
+        //
+        // PendingRift is transient travel state and IS unset on the way out
+        // (ABreakerGameMode, "walking out of a place is not entering it again"),
+        // so an ordinary yard cannot inherit a ruin from the rift before it.
+        const UWorld* World = Mesh->GetWorld();
+        const UBreakerGameInstance* Session = World ? World->GetGameInstance<UBreakerGameInstance>() : nullptr;
+        const FLinearColor Painted = Session && Session->PendingRift.IsSet()
+            ? BreakerZonePalette::Dilapidate(Color) : Color;
         for (int32 Slot = 0; Slot < Mesh->GetNumMaterials(); ++Slot)
         {
             if (UMaterialInstanceDynamic* Dynamic = UMaterialInstanceDynamic::Create(BaseMaterial, Mesh))
             {
-                Dynamic->SetVectorParameterValue(TEXT("Color"), Color);
+                Dynamic->SetVectorParameterValue(TEXT("Color"), Painted);
                 Mesh->SetMaterial(Slot, Dynamic);
             }
         }
