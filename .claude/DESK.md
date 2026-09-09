@@ -55,13 +55,14 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 - DropChanceReachesEveryRank measures probability while O249 converts capped excess into rarity value. Keep the enumerated finding until its replacement measurement is explicitly settled; do not change pins for green results.
 - Prolific1.51 remains enumerated with its deletion condition; the eight-Unwritten fixture is not a legal loadout.
 - At-cap variance4.05 is below8–10. Ability allocation parity is now0.93 after mirrored fixture allocations and Arc critical access; it is not a native sustained-throughput measurement.
+- Native starter diagnostic: Cleave/rifle DPS0.535 at level1 and0.550 at level20 during seconds10–20. Earned Fracture at level20 sustains1267 vs rifle1051 in that interval. Rifles run out of initial ammunition during20–30s; late totals cannot establish parity. Diagnose Cleave's rate/resource lane before tuning; see Docs/reports/caster-sustain-2026-09-09.md.
 - Core offers429/65=6.6x; closed22-wedge ring is active. Do not reopen retired hub-entry or2.63x questions.
 - Potential future ultimate redesign (Unmake as a decisive event) and skill-level stacking cap need explicit design treatment; retain current rules meanwhile.
 - Anchor13's name alone does not establish twelve other settlements.
 
 ## Latest validated baseline
 
-Current local build/census/full suite:851 passing,3 expected failures,0 unexpected. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
+Current local build/census/full suite:852 passing,3 expected failures,0 unexpected. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
 
 ## Landed this pass
 
@@ -96,3 +97,5 @@ Current local build/census/full suite:851 passing,3 expected failures,0 unexpect
 - Sightline removal: actual purchased grant and nine-point Afterimage route verify full/half pierce and immediate permanent cleanup when the inactive grant is removed. Fixture baseline now includes native traversal-earned Momentum pierce. Build/full suite850/3/0; independently reviewed.
 
 - Rift retry: actual game-mode entry now rejects exhausted endgame allowance without resetting/spending it; campaign retry stays free. Native direct calls verify zero/negative/positive budgets and unchanged instance identity. Test name is a sibling of existing DeathBudget so Unreal runs both. Build/full suite851/3/0. Consumable keys, device and cross-map run remain unfinished.
+
+- Caster sustain/Rot clock: ten native minute-long scenarios preserve legal affixes, earned grants, resource recovery, projectile delivery and reloads. All Rot zones pay12 boundary ticks. HUD test now advances actual world time and rejects indefinite zero-time aggregation. Build/full suite852/3/0; measurements and limits in Docs/reports/caster-sustain-2026-09-09.md. Starter Cleave balance remains open.

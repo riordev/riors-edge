@@ -19,7 +19,8 @@ bool FBreakerRotDamageFeedRuntimeTest::RunTest(const FString& Parameters)
     if (!TestNotNull(TEXT("isolated damage feed world"), World)) return false;
     GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
     World->InitializeActorsForPlay(FURL());
-    ON_SCOPE_EXIT { World->DestroyWorld(false); GEngine->DestroyWorldContext(World); };
+    const uint64 InitialFrame = GFrameCounter;
+    ON_SCOPE_EXIT { World->DestroyWorld(false); GEngine->DestroyWorldContext(World); GFrameCounter = InitialFrame; };
     AActor* Dealer = World->SpawnActor<AActor>();
     AActor* Victim = World->SpawnActor<AActor>();
     auto* HUD = World->SpawnActor<ABreakerPlaytestHUD>();
@@ -45,8 +46,24 @@ bool FBreakerRotDamageFeedRuntimeTest::RunTest(const FString& Parameters)
     FScriptDelegate Feed;
     Feed.BindUFunction(HUD, TEXT("HandlePlayerHitDealt"));
     DealerCombat->OnHitDealt.Add(Feed);
-    Status->AdvanceStatuses(TickInterval);
-    Status->AdvanceStatuses(TickInterval);
+    // The HUD stamps arrivals from world time, independently of status time.
+    // Advance both clocks: back-to-back manual ticks would falsely prove any
+    // number of half-second ticks merge into a single zero-time arrival.
+    auto TickStatus = [&](float Seconds)
+    {
+        for (float Elapsed = 0; Elapsed < Seconds;)
+        {
+            const float Step = FMath::Min(.01f, Seconds - Elapsed);
+            ++GFrameCounter; World->Tick(LEVELTICK_All, Step); Elapsed += Step;
+        }
+        Status->AdvanceStatuses(Seconds);
+    };
+    const float StartTime = World->GetTimeSeconds();
+    TickStatus(TickInterval);
+    if (!TestEqual(TEXT("First real tick produces one number"), HUD->GetDamageNumbers().Num(), 1)) return false;
+    const double FirstBirth = HUD->GetDamageNumbers()[0].Time;
+    TestEqual(TEXT("First arrival follows one authored tick interval"), float(FirstBirth - StartTime), TickInterval, .001f);
+    TickStatus(TickInterval);
     if (!TestEqual(TEXT("real Rot ticks reach one aggregated HUD number"), HUD->GetDamageNumbers().Num(), 1)) return false;
     const auto& Number = HUD->GetDamageNumbers()[0];
     TestTrue(TEXT("actual tick preserves DoT delivery"), Number.bFromDoT);
@@ -54,15 +71,25 @@ bool FBreakerRotDamageFeedRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("actual tick preserves exact Rot provenance"), Number.DamageTypeTag, Rot);
     TestEqual(TEXT("aggregation sums actual tick damage"), Number.Value, TickDamage * 2, .001f);
     TestEqual(TEXT("Rot keeps subdued existing DoT lifetime"), Number.Lifetime, BreakerDamageFeed::MinimumDoTLifetime);
+    TestEqual(TEXT("Second tick does not slide number birth"), Number.Time, FirstBirth);
+    TestEqual(TEXT("Two ticks advance actual world time"), World->GetTimeSeconds() - StartTime, double(TickInterval) * 2.0, .001);
     FBreakerStatusApplicationSpec Physical;
     Physical.StatusTag = Bleed; Physical.Duration = 3; Physical.TickInterval = .5f; Physical.BaseDamagePerTick = 1;
     Physical.Snapshot.SourcePower = 1; Physical.Snapshot.CriticalChance = 0;
     Status->ApplyStatus(Physical, EBreakerDamageFamily::Physical, Dealer);
-    Status->AdvanceStatuses(.5f);
-    TestEqual(TEXT("simultaneous physical and Rot ticks stay separate in the actual HUD"), HUD->GetDamageNumbers().Num(), 2);
+    TickStatus(.5f);
+    TestEqual(TEXT("Next cadence group and physical tick stay separate"), HUD->GetDamageNumbers().Num(), 3);
     const auto* RotNumber = HUD->GetDamageNumbers().FindByPredicate([&](const FBreakerHUDDamageNumber& Entry) { return Entry.DamageTypeTag == Rot; });
     const auto* BleedNumber = HUD->GetDamageNumbers().FindByPredicate([&](const FBreakerHUDDamageNumber& Entry) { return Entry.DamageTypeTag == Bleed; });
-    if (TestNotNull(TEXT("Rot number remains independently identifiable"), RotNumber)) TestEqual(TEXT("Rot sum excludes physical tick"), RotNumber->Value, TickDamage * 3, .001f);
+    if (TestNotNull(TEXT("First Rot group remains independently identifiable"), RotNumber))
+        TestEqual(TEXT("Expired merge group remains its original two ticks"), RotNumber->Value, TickDamage * 2, .001f);
+    const auto* NextRot = HUD->GetDamageNumbers().FindByPredicate([&](const FBreakerHUDDamageNumber& Entry)
+        { return Entry.DamageTypeTag == Rot && Entry.Time > FirstBirth; });
+    if (TestNotNull(TEXT("A tick beyond the merge window starts a new Rot group"), NextRot))
+    {
+        TestEqual(TEXT("New Rot group contains only its accepted tick"), NextRot->Value, TickDamage, .001f);
+        TestTrue(TEXT("New group begins outside first group's merge interval"), NextRot->Time - FirstBirth > BreakerDamageFeed::DoTMergeWindow);
+    }
     if (TestNotNull(TEXT("physical tick has its own number"), BleedNumber)) TestEqual(TEXT("physical sum excludes Rot tick"), BleedNumber->Value, 1.0f, .001f);
     DealerCombat->OnHitDealt.Remove(Feed);
     return true;
