@@ -28,21 +28,25 @@ const TArray<BreakerPrototypeDestinations::FDefinition>& BreakerPrototypeDestina
     // player level. Return visits retain these levels and normal loot gates.
     static const TArray<FDefinition> Definitions = {
         {TEXT("RedBasin"), TEXT("Lvl_RedBasin"), TEXT("Red Basin"),
-            TEXT("Prototype destination / fixed areas 12-16. Cross scorched farmland and a shattered homestead to the impact crater. Recover the survey recorder at Burned Homestead and extract it at the Impact Basin relay. Supply caches are optional; either gate returns to Anchor 13."),
+            TEXT("Areas 12-16 / Scorched farmland. Recover the survey recorder, then extract it at the crater relay."),
             {FVector(2200,0,0), FVector(8500,2000,0), FVector(15000,-500,0)},
             {TEXT("Scorched Fields"), TEXT("Burned Homestead"), TEXT("Impact Basin")}, {12,14,16}},
         {TEXT("StationZero"), TEXT("Lvl_StationZero"), TEXT("Station Zero"),
-            TEXT("Prototype destination / fixed areas 24-28. Enter an overrun research hub through reception, specimen gardens and the containment laboratory. Hunt the Containment Custodian in the laboratory; supply lockers are optional. Either gate returns to Anchor 13."),
+            TEXT("Areas 24-28 / Overrun research hub. Hunt the Containment Custodian; supply lockers are optional."),
             {FVector(2000,0,0), FVector(8000,-1200,0), FVector(12500,3600,0)},
             {TEXT("Research Reception"), TEXT("Specimen Gardens"), TEXT("Containment Laboratory")}, {24,26,28}},
         {TEXT("PortMeridian"), TEXT("Lvl_PortMeridian"), TEXT("Port Meridian"),
-            TEXT("Prototype destination / fixed areas 34-38. Cross a destroyed airport through the departures terminal, wreck-strewn apron and damaged maintenance hangar. Clear the three marked pockets and recover their supplies. Either gate returns to Anchor 13."),
+            TEXT("Areas 34-38 / Destroyed airport. Clear terminal, apron and hangar defenders; recover their supplies."),
             {FVector(2200,0,0), FVector(8800,0,0), FVector(15400,0,0)},
             {TEXT("Departures Terminal"), TEXT("Broken Apron"), TEXT("Maintenance Hangar")}, {34,36,38}},
         {TEXT("BrokenCoast"), TEXT("Lvl_BrokenCoast"), TEXT("Broken Coast"),
-            TEXT("Prototype destination / fixed areas 42-46. Follow the flat shoreline from a stranded landing through a broken jetty to the signal beacon. Clear the three marked pockets and recover their supplies. Either gate returns to Anchor 13."),
+            TEXT("Areas 42-46 / Flat shoreline. Recover supplies from Strand Landing, Broken Jetty and Signal Point."),
             {FVector(2200,0,0), FVector(8800,0,0), FVector(15400,0,0)},
-            {TEXT("Strand Landing"), TEXT("Broken Jetty"), TEXT("Signal Point")}, {42,44,46}}
+            {TEXT("Strand Landing"), TEXT("Broken Jetty"), TEXT("Signal Point")}, {42,44,46}},
+        {TEXT("Shatterpoint"), TEXT("Lvl_Shatterpoint"), TEXT("Shatterpoint"),
+            TEXT("Areas 48-52 / Ruined streets. Recover supplies from Broken Avenue, Civic Square and Overpass Market."),
+            {FVector(2200,0,0), FVector(8800,900,0), FVector(15400,-200,0)},
+            {TEXT("Broken Avenue"), TEXT("Civic Square"), TEXT("Overpass Market")}, {48,50,52}}
     };
     return Definitions;
 }
@@ -78,11 +82,12 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
     const bool bStation = Id == TEXT("StationZero");
     const bool bAirport = Id == TEXT("PortMeridian");
     const bool bCoast = Id == TEXT("BrokenCoast");
+    const bool bCity = Id == TEXT("Shatterpoint");
     // O2 PLACEHOLDER palette/placement: scorched soil versus cool lab panels,
     // with amber route lamps. Rift teal remains reserved for travel objects.
-    const FLinearColor Ground = bBasin ? FLinearColor(.16f,.085f,.05f) : bAirport ? FLinearColor(.13f,.14f,.15f) : bCoast ? FLinearColor(.31f,.29f,.23f) : FLinearColor(.09f,.13f,.19f);
-    const FLinearColor Wall = bBasin ? FLinearColor(.27f,.14f,.08f) : bAirport ? FLinearColor(.29f,.30f,.28f) : bCoast ? FLinearColor(.28f,.31f,.30f) : FLinearColor(.18f,.25f,.34f);
-    const FLinearColor Trim = bBasin ? FLinearColor(.15f,.12f,.10f) : bAirport ? FLinearColor(.52f,.40f,.16f) : bCoast ? FLinearColor(.34f,.26f,.17f) : FLinearColor(.42f,.49f,.55f);
+    const FLinearColor Ground = bBasin ? FLinearColor(.16f,.085f,.05f) : bAirport ? FLinearColor(.13f,.14f,.15f) : bCoast ? FLinearColor(.31f,.29f,.23f) : bCity ? FLinearColor(.12f,.12f,.13f) : FLinearColor(.09f,.13f,.19f);
+    const FLinearColor Wall = bBasin ? FLinearColor(.27f,.14f,.08f) : bAirport ? FLinearColor(.29f,.30f,.28f) : bCoast ? FLinearColor(.28f,.31f,.30f) : bCity ? FLinearColor(.25f,.23f,.24f) : FLinearColor(.18f,.25f,.34f);
+    const FLinearColor Trim = bBasin ? FLinearColor(.15f,.12f,.10f) : bAirport ? FLinearColor(.52f,.40f,.16f) : bCoast ? FLinearColor(.34f,.26f,.17f) : bCity ? FLinearColor(.38f,.34f,.27f) : FLinearColor(.42f,.49f,.55f);
     bool bGeometryValid = true;
     int32 RecorderCount=0;
     auto Shape = [&](const TCHAR* Name,UStaticMesh* Mesh,FVector At,FVector Size,FLinearColor Color,
@@ -257,6 +262,32 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
                 if(Pocket==0)
                     Shape(TEXT("LandingSupplyStack"),Cube,C+FVector(-1600,Side*1900,85),FVector(650,400,170),Trim);
             }
+            else if(bCity)
+            {
+                // O2 PLACEHOLDER: irregular city frontages face the open road.
+                // Building collision remains outside all guard/cache approaches.
+                for(int32 Block=0;Block<4;++Block)
+                {
+                    const FVector At=C+FVector(-2400+Block*1600,Side*2850,0);
+                    const float Height=1500.f+((Block+Pocket)%3)*650.f;
+                    if(auto* Building=Shape(TEXT("RuinedCityBlock"),Cube,At+FVector(0,0,Height*.5f),FVector(1150,950,Height),Wall))
+                        Building->Tags.Add(TEXT("Destination.Landmark.CityBlocks"));
+                    for(int32 Storey=0;Storey<3;++Storey)
+                        if(auto* Windows=Shape(TEXT("DarkWindowBand"),Cube,At+FVector(0,-Side*479,450+Storey*550),
+                            FVector(920,8,180),FLinearColor(.045f,.055f,.07f)))Windows->SetActorEnableCollision(false);
+                    Shape(TEXT("FracturedRoofParapet"),Cube,At+FVector(160,0,Height+90),FVector(500,1000,180),Trim,false,FRotator(0,0,Side*6));
+                    Dress(TEXT("Column_Pipes"),At+FVector(-430,-Side*500,0),800,Side*90);
+                }
+                // Sidewalk slabs are flush with the existing walkable district.
+                Shape(TEXT("CitySidewalk"),Cube,C+FVector(0,Side*2150,-10),FVector(6000,650,20),Trim,true);
+                if(Pocket==2)
+                    for(int32 Stall=0;Stall<3;++Stall)
+                    {
+                        const FVector At=C+FVector(-2000+Stall*700,Side*1900,0);
+                        Shape(TEXT("AbandonedMarketCounter"),Cube,At+FVector(0,0,65),FVector(450,260,130),Trim);
+                        Shape(TEXT("TornMarketCanopy"),Cube,At+FVector(0,0,320),FVector(580,420,35),Wall,false,FRotator(0,0,Side*8));
+                    }
+            }
             // Real low cover and a full-height line break, with side approaches.
             // O2 PLACEHOLDER: keep the laboratory southwest arrival diagonal
             // outside the full standing-capsule footprint of this cover.
@@ -374,6 +405,32 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
                 Shape(TEXT("BeaconCap"),Cylinder,At+FVector(0,0,1850),FVector(850,850,90),Wall);
             }
         }
+        if(bCity)
+        {
+            // O2 PLACEHOLDER: each street block has a distinct landmark, all
+            // beyond the existing standing route and guarded supply locations.
+            if(Pocket==0)
+                if(auto* Sign=Shape(TEXT("BrokenAvenueGantry"),Cube,C+FVector(-2200,0,650),FVector(140,3200,220),Trim,false,FRotator(0,0,6)))
+                    Sign->Tags.Add(TEXT("Destination.Landmark.BrokenAvenue"));
+            if(Pocket==1)
+            {
+                const FVector At=C+FVector(1900,-1900,0);
+                if(auto* Monument=Shape(TEXT("ShatteredCivicMonument"),Cube,At+FVector(0,0,680),FVector(520,520,1360),Wall))
+                    Monument->Tags.Add(TEXT("Destination.Landmark.CivicSquare"));
+                Shape(TEXT("CivicClockFace"),Cylinder,At+FVector(-285,0,1050),FVector(340,340,40),Trim,false,FRotator(90,0,0));
+                Shape(TEXT("FallenMonumentCrown"),Cube,At+FVector(-650,0,130),FVector(470,470,260),Trim,false,FRotator(0,25,15));
+            }
+            if(Pocket==2)
+            {
+                if(auto* Deck=Shape(TEXT("FracturedOverpassDeck"),Cube,C+FVector(200,0,1020),FVector(1500,6500,180),Wall))
+                    Deck->Tags.Add(TEXT("Destination.Landmark.OverpassMarket"));
+                for(int32 Side:{-1,1})
+                {
+                    Shape(TEXT("OverpassPier"),Cube,C+FVector(200,Side*2230,450),FVector(220,280,900),Trim);
+                    Shape(TEXT("OverpassBrokenRail"),Cube,C+FVector(-450,Side*1700,1210),FVector(100,1800,230),Trim,false,FRotator(0,0,Side*8));
+                }
+            }
+        }
         TArray<ABreakerEnemy*> Guards;
         const FVector Offsets[]={FVector(-900,-350,100),FVector(50,450,100),FVector(1250,-500,100),
             FVector(-1200,900,100),FVector(1400,700,100),FVector(450,-1450,100)};
@@ -383,6 +440,11 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
             if (Index==2 || (Pocket==0 && Index==4)) Class=ABreakerRangedEnemy::StaticClass();
             if (Index==3 && (Pocket>0 || !bBasin)) Class=ABreakerWardenEnemy::StaticClass();
             if (Index==5 || (Pocket==2 && Index==4)) Class=ABreakerSkirmisherEnemy::StaticClass();
+            // O2 PLACEHOLDER: street firing line, armoured civic pair, then
+            // fast underpass flankers, using existing chassis and rewards.
+            if(bCity && Pocket==0 && Index==3)Class=ABreakerRangedEnemy::StaticClass();
+            if(bCity && Pocket==1 && Index==4)Class=ABreakerWardenEnemy::StaticClass();
+            if(bCity && Pocket==2 && Index==0)Class=ABreakerSkirmisherEnemy::StaticClass();
             FActorSpawnParameters Params; Params.SpawnCollisionHandlingOverride=ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
             const FVector At=C+Offsets[Index];
             auto* Enemy=World->SpawnActor<ABreakerEnemy>(Class,At,FRotator(0,180,0),Params);

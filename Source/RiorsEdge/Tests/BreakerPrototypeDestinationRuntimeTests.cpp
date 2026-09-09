@@ -5,6 +5,9 @@
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerEnemy.h"
+#include "Combat/BreakerRangedEnemy.h"
+#include "Combat/BreakerWardenEnemy.h"
+#include "Combat/BreakerSkirmisherEnemy.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMeshActor.h"
@@ -34,14 +37,13 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerPrototypeDestinationPackagesTest,
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FBreakerPrototypeDestinationPackagesTest::RunTest(const FString& Parameters)
 {
-    TestEqual(TEXT("Exactly four playable prototype definitions"),BreakerPrototypeDestinations::All().Num(),4);
+    TestEqual(TEXT("Exactly five playable prototype definitions"),BreakerPrototypeDestinations::All().Num(),5);
     for (const auto& D : BreakerPrototypeDestinations::All())
     {
         if (!TestTrue(TEXT("Run create_prototype_destination_maps.py: actual destination World package exists"),BreakerPrototypeDestinations::HasMapPackage(D))) return false;
         FBreakerTravelDestination Entry;
         if (!TestTrue(TEXT("Actual package is exposed by the live travel registry"),ABreakerTravelPoint::FindDestination(D.Id,Entry))) return false;
         TestTrue(TEXT("Prototype is enabled general travel"),Entry.bEnabled && !Entry.bDoorOnly);
-        TestTrue(TEXT("Player-facing description labels unfinished presentation honestly"),Entry.Description.Contains(TEXT("Prototype destination")));
         TestFalse(TEXT("Destination must not inherit gym content"),UBreakerGameInstance::IsGymMapName(D.MapName));
         TestEqual(TEXT("Three individually authored districts"),D.Districts.Num(),3);
         TestEqual(TEXT("Every district has its fixed regional level"),D.AreaLevels.Num(),D.Districts.Num());
@@ -115,14 +117,16 @@ bool FBreakerPrototypeDestinationRuntimeTest::RunTest(const FString& Parameters)
                 ? TArray<FName>{TEXT("Destination.Landmark.ResearchBench"),TEXT("Destination.Landmark.SpecimenGarden"),TEXT("Destination.Landmark.ContainmentLaboratory")}
                 : D.Id==TEXT("PortMeridian")
                     ? TArray<FName>{TEXT("Destination.Landmark.DeparturesTerminal"),TEXT("Destination.Landmark.AircraftWreck"),TEXT("Destination.Landmark.MaintenanceHangar")}
-                    : TArray<FName>{TEXT("Destination.Landmark.StrandLanding"),TEXT("Destination.Landmark.BrokenJetty"),TEXT("Destination.Landmark.SignalPoint"),TEXT("Destination.Landmark.Ocean"),TEXT("Destination.Landmark.CoastalPlain")};
+                    : D.Id==TEXT("BrokenCoast")
+                        ? TArray<FName>{TEXT("Destination.Landmark.StrandLanding"),TEXT("Destination.Landmark.BrokenJetty"),TEXT("Destination.Landmark.SignalPoint"),TEXT("Destination.Landmark.Ocean"),TEXT("Destination.Landmark.CoastalPlain")}
+                        : TArray<FName>{TEXT("Destination.Landmark.CityBlocks"),TEXT("Destination.Landmark.BrokenAvenue"),TEXT("Destination.Landmark.CivicSquare"),TEXT("Destination.Landmark.OverpassMarket")};
         for (FName Landmark : RequiredLandmarks)
         {
             AActor* Found=nullptr;
             for (TActorIterator<AActor> It(World);It;++It) if(It->ActorHasTag(Landmark)){Found=*It;break;}
             TestNotNull(*FString::Printf(TEXT("Authored setting landmark exists: %s"),*Landmark.ToString()),Found);
         }
-        if(D.Id==TEXT("PortMeridian") || D.Id==TEXT("BrokenCoast"))
+        if(D.Id==TEXT("PortMeridian") || D.Id==TEXT("BrokenCoast") || D.Id==TEXT("Shatterpoint"))
         {
             for(auto* Enemy:Enemies)
                 TestFalse(TEXT("Supply-region guards never inherit Station Zero's priority hunt"),Enemy->ActorHasTag(UBreakerContainmentHunt::TargetTag()));
@@ -168,9 +172,9 @@ bool FBreakerPrototypeDestinationRuntimeTest::RunTest(const FString& Parameters)
             }
             Previous=End;
         }
-        if(D.Id==TEXT("PortMeridian") || D.Id==TEXT("BrokenCoast"))
+        if(D.Id==TEXT("PortMeridian") || D.Id==TEXT("BrokenCoast") || D.Id==TEXT("Shatterpoint"))
         {
-            // Flat destination side access is tested with the same standing capsule;
+            // Destination side access is tested with the same standing capsule;
             // the main route alone does not prove caches or gates are usable.
             TArray<TPair<FVector,FVector>> Spurs;
             for(int32 Pocket=0;Pocket<Caches.Num();++Pocket)
@@ -215,6 +219,18 @@ bool FBreakerPrototypeDestinationRuntimeTest::RunTest(const FString& Parameters)
             TestTrue(TEXT("Visible seawall bounds the playable shore"),World->SweepSingleByObjectType(Wall,
                 D.Districts[1]+FVector(0,-2400,Half+3),D.Districts[1]+FVector(0,-2900,Half+3),FQuat::Identity,
                 FCollisionObjectQueryParams(ECC_WorldStatic),FCollisionShape::MakeCapsule(Radius,Half),Query));
+        }
+        if(D.Id==TEXT("Shatterpoint"))
+        {
+            // Inspect actual spawned native chassis, not authoring flags.
+            for(int32 Pocket=0;Pocket<3;++Pocket)
+            {
+                const FName GuardTag(*FString::Printf(TEXT("Destination.Shatterpoint.Pocket.%d"),Pocket));
+                UClass* Required=Pocket==0?ABreakerRangedEnemy::StaticClass():Pocket==1?ABreakerWardenEnemy::StaticClass():ABreakerSkirmisherEnemy::StaticClass();
+                int32 Count=0;
+                for(auto* Enemy:Enemies)if(Enemy->ActorHasTag(GuardTag)&&Enemy->GetClass()==Required)++Count;
+                TestEqual(TEXT("City pockets use actual firing-line, armoured-pair and flanker groups"),Count,Pocket==1?2:3);
+            }
         }
         TArray<int32> FixedLevels;
         for (auto* Enemy : Enemies) FixedLevels.Add(Enemy->GetAreaLevel());

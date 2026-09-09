@@ -627,8 +627,12 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
                 // O2 PLACEHOLDER: seaward views frame the boat, pier and beacon.
                 const FVector CoastViews[]={FVector(-500,-300,650),FVector(-400,-300,800),FVector(-500,-300,800)};
                 const FVector CoastLooks[]={FVector(1800,-1900,250),FVector(1900,-3000,-50),FVector(1900,-1900,1050)};
-                const FVector At=Centre+(bCoast?CoastViews[District]:bAirport?AirportViews[District]:bBasin?BasinViews[District]:ResearchViews[District]);
-                const FRotator Facing=(Centre+(bCoast?CoastLooks[District]:bAirport?AirportLooks[District]:bBasin?BasinLooks[District]:ResearchLooks[District])-At).Rotation();
+                const bool bCity=Prototype->Id==TEXT("Shatterpoint");
+                // O2 PLACEHOLDER: actual street, civic and underpass silhouettes.
+                const FVector CityViews[]={FVector(-1800,-600,550),FVector(-300,-300,700),FVector(-2300,-500,650)};
+                const FVector CityLooks[]={FVector(1400,700,1200),FVector(1900,-1900,700),FVector(600,0,650)};
+                const FVector At=Centre+(bCity?CityViews[District]:bCoast?CoastViews[District]:bAirport?AirportViews[District]:bBasin?BasinViews[District]:ResearchViews[District]);
+                const FRotator Facing=(Centre+(bCity?CityLooks[District]:bCoast?CoastLooks[District]:bAirport?AirportLooks[District]:bBasin?BasinLooks[District]:ResearchLooks[District])-At).Rotation();
                 if (auto* Camera=GetWorld()->SpawnActor<ACameraActor>(At,Facing))
                 {
                     Camera->GetCameraComponent()->SetFieldOfView(90.f);
