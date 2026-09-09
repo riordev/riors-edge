@@ -191,6 +191,7 @@ public:
     static ABreakerNPC* SpawnQuartermaster(UWorld* World, const FVector& Location, const FRotator& Rotation);
 
 protected:
+    void ConfigureConsoleBody();
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UCapsuleComponent> Body;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UStaticMeshComponent> Visual;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UStaticMeshComponent> Head;

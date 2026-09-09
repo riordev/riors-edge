@@ -193,7 +193,8 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
         // in a fixture is content the player cannot reach.
         {
             TArray<ABreakerNPC*> Npcs;
-            for (TActorIterator<ABreakerNPC> It(World); It; ++It) Npcs.Add(*It);
+            for (TActorIterator<ABreakerNPC> It(World); It; ++It)
+                if (!It->DialogueId.IsNone()) Npcs.Add(*It);
             if (TestEqual(TEXT("Fernhall stands exactly one contract giver"), Npcs.Num(), 1))
             {
                 const ABreakerNPC* Keeper = Npcs[0];

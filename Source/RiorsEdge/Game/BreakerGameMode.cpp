@@ -5,6 +5,7 @@
 #include "Game/BreakerErasedEarthBuilder.h"
 #include "Interaction/BreakerSurvivor.h"
 #include "Interaction/BreakerFinaleActor.h"
+#include "Interaction/BreakerFernhallCache.h"
 #include "Game/BreakerFinaleEarthBuilder.h"
 #include "Game/BreakerZoneBuilder.h"
 #include "Game/BreakerFernhallCourtyardBuilder.h"
@@ -3985,6 +3986,7 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
             + Forward * FMath::Lerp(Field.BandNearCm, Field.BandFarCm, Fractions[Pocket])
             + Right * Laterals[Pocket];
         const int32 AreaLevel = UBreakerZoneBuilder::FernhallRiftFor(Yards[Pocket]).EffectiveAreaLevel();
+        TArray<ABreakerEnemy*> PocketMembers;
         int32 Placement = 0;
         auto Spawn = [&](TSubclassOf<ABreakerEnemy> Class, bool bElite)
         {
@@ -4051,6 +4053,7 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
             Enemy->SetActorLocation(At);
             Enemy->ConfigureEncounter(At, Index * 1.3f);
             Enemy->Tags.Add(FName(*FString::Printf(TEXT("Fernhall.Outdoor.%d"), Pocket)));
+            PocketMembers.Add(Enemy);
             UBreakerKillTelemetryComponent::AttachTo(Enemy);
             ++Spawned;
         };
@@ -4084,6 +4087,28 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
         if (Pocket == 3 || Pocket == 4)
             for (int32 Index = 0; Index < PerQuietPocket; ++Index)
                 Spawn(ABreakerEnemy::StaticClass(), false);
+        if (Pocket == 3)
+        {
+            // Existing yard-frame fraction; no marker or existing site moves.
+            const FVector Desired = Center - Forward * 550.f; // O2 PLACEHOLDER, approach offset.
+            FHitResult Floor;
+            FCollisionQueryParams Query(SCENE_QUERY_STAT(FernhallCacheFloor), false);
+            if (World->LineTraceSingleByObjectType(Floor, Desired + FVector(0,0,3000), Desired - FVector(0,0,3000),
+                FCollisionObjectQueryParams(ECC_WorldStatic), Query) && Floor.ImpactNormal.Z >= .7f)
+            {
+                const auto* Body = GetDefault<ABreakerFernhallCache>()->FindComponentByClass<UCapsuleComponent>();
+                const float Height = Body->GetScaledCapsuleHalfHeight();
+                const FVector At = Floor.ImpactPoint + FVector(0,0,Height + 2.f);
+                if (!World->OverlapBlockingTestByChannel(At, FQuat::Identity, ECC_Pawn,
+                    FCollisionShape::MakeCapsule(Body->GetScaledCapsuleRadius(),Height), Query))
+                {
+                    auto* Cache = World->SpawnActor<ABreakerFernhallCache>(At, (-Forward).Rotation());
+                    if (Cache) Cache->Configure(AreaLevel, PocketMembers, PerQuietPocket);
+                }
+                else UE_LOG(LogTemp, Error, TEXT("[Fernhall] cache approach is obstructed."));
+            }
+            else UE_LOG(LogTemp, Error, TEXT("[Fernhall] cache has no walkable floor."));
+        }
     }
     UE_LOG(LogTemp, Display, TEXT("[Fernhall] %d finite outdoor enemies placed across %d pockets; no wave controller."), Spawned, PocketCount);
     BreakerFernhallCourtyard::FPlan Courtyard;

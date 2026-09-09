@@ -12,12 +12,7 @@ ABreakerFinaleActor::ABreakerFinaleActor()
 {
     bReplicates = true;
     // This is an unattended console, not a disguised person or damage target.
-    Head->SetVisibility(false);
-    Visual->SetRelativeScale3D(FVector(.80f,.60f,.70f));
-    Visual->SetRelativeLocation(FVector(0,0,-50));
-    Trim->SetRelativeRotation(FRotator::ZeroRotator);
-    Trim->SetRelativeScale3D(FVector(.70f,.45f,.06f));
-    Trim->SetRelativeLocation(FVector(0,0,-10));
+    ConfigureConsoleBody();
 }
 void ABreakerFinaleActor::BeginPlay()
 {

@@ -79,7 +79,7 @@ TArray<FBreakerLocalMapMarker> UBreakerLocalMapComponent::GetMarkers() const
     }
     for (TActorIterator<ABreakerNPC> It(World); It; ++It)
     {
-        if (!IsValid(*It)) continue;
+        if (!IsValid(*It) || It->ActorHasTag(TEXT("Fernhall.Cache"))) continue;
         auto& Marker = Out.AddDefaulted_GetRef();
         Marker.Location = It->GetActorLocation(); Marker.Label = It->GetDisplayName();
         // NPC appearances can change with the player's body; discovery belongs

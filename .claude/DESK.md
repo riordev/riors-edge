@@ -6,7 +6,7 @@ Continue validated blocks until the owner returns. Prioritize playable changes f
 
 ## Immediate queue
 
-1. Fernhall cache: a console-shaped interactable, unlocked by clearing its nearby pocket, pays loot once. Use yard-relative placement without moving existing sites.
+1. Fernhall cache gameplay landed; inspect dedicated capture placement before closing presentation.
 2. O258: retire Skim, make Slipcut the Swift starter, and migrate/remove SkimDiscipline with its consumer and existing loadouts.
 3. O247: Provoke keeps its four-second forced target and grants threat scaled by the existing threat lane.
 4. O250 landed: a broken Warden front stays broken through revival.
@@ -14,7 +14,7 @@ Continue validated blocks until the owner returns. Prioritize playable changes f
 6. O248: grandfather existing over-budget special items; constrain new rolls without removing owned affixes.
 7. Kit expansion under O252–O260: verify the registered roster, author reachable abilities/passives with real consumers, and reconcile counts before claiming the 55-entry target. Carom, Coup, Backstep, Pyre, Riftlance, Recall, Bulwark and Overwatch are named candidates. Rover, Barrel and Wildcard require additional mechanics. Check proposed names against Core/doctrine IDs.
 8. O246: remove duplicated compiled ability defaults only with a replacement schema/completeness test for Data/abilities.json.
-9. Derive world Core Point trigger coverage from actual mission references instead of bTriggerBuilt declarations.
+9. World Core Point coverage is already derived from mission Unlock.CorePoint references; verify remaining uncovered sources against actual flag delivery before changing content.
 
 ## Seven-step acceptance checklist
 
@@ -70,3 +70,5 @@ Pulled main1e369b4. Remote report:837 passing,3 expected failures,0 unexpected. 
 - Desk reduced from640 to104 lines: removed stale completed work and contradictory questions, retained active gaps and seven-step acceptance criteria. Rebuilt pulled code and regenerated its source witness;837 passing,3 expected failures,0 unexpected.
 
 - Warden front revival: build and full suite838 passing/3 expected/0 unexpected; actual Wakeful revival and follow-up frontal damage tested. Broken front stays depleted; fresh Wardens still arm.
+
+- Fernhall cache: real pocket clearance, authoritative range/LOS, one physical ordinary loot roll, one-shot/reentrant claims and pickup validated. No empty prompt or map marker. Build/full suite839 passing,3 expected,0 unexpected; rendered placement pending.

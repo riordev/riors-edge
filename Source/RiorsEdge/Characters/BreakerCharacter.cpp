@@ -64,6 +64,7 @@
 #include "Combat/BreakerEnemy.h"
 #include "Items/BreakerLootLibrary.h"
 #include "Interaction/BreakerNPC.h"
+#include "Interaction/BreakerFernhallCache.h"
 #include "Interaction/BreakerTravelPoint.h"
 #include "Interaction/BreakerRiftDoor.h"
 #include "Game/BreakerZoneBuilder.h"
@@ -2563,6 +2564,7 @@ ABreakerNPC* ABreakerCharacter::FindNearbyNPC() const
     float NearestDistanceSq = TNumericLimits<float>::Max();
     for (TActorIterator<ABreakerNPC> It(GetWorld()); It; ++It)
     {
+        if (const auto* Cache = Cast<ABreakerFernhallCache>(*It); Cache && Cache->IsOpened()) continue;
         const float DistanceSq = FVector::DistSquared(GetActorLocation(), It->GetActorLocation());
         if (DistanceSq <= FMath::Square(It->GetInteractionRange()) && DistanceSq < NearestDistanceSq)
         {
@@ -2673,6 +2675,12 @@ void ABreakerCharacter::InteractWithNearbyNPC()
 
     ABreakerNPC* NPC = FindNearbyNPC();
     if (!NPC) return;
+    if (auto* Cache = Cast<ABreakerFernhallCache>(NPC))
+    {
+        if (HasAuthority()) Cache->TryOpen(this);
+        else ServerOpenFernhallCache(Cache);
+        return;
+    }
     OpenMenu(false);
     if (MenuWidget.IsValid()) MenuWidget->ShowDialogue(NPC);
 }
@@ -2887,4 +2895,9 @@ void ABreakerCharacter::Landed(const FHitResult& Hit)
         }
     }
     LastFallingSpeed = 0.0f;
+}
+
+void ABreakerCharacter::ServerOpenFernhallCache_Implementation(ABreakerFernhallCache* Cache)
+{
+    if (IsValid(Cache)) Cache->TryOpen(this);
 }
