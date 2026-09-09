@@ -4,6 +4,7 @@
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerWorldPoints.h"
 #include "Save/BreakerQuestJournal.h"
+#include "Save/BreakerMissionContent.h"
 #include "Tests/BreakerStatusEmit.h"
 
 // ---------------------------------------------------------------------------
@@ -134,6 +135,76 @@ bool FBreakerWorldPointGrantTest::RunTest(const FString& Parameters)
     // The claim survives as a flag, which is what makes it survive a reload.
     TestTrue(TEXT("The claim is recorded in the flag set"),
         Journal->HasFlag(UBreakerWorldPointLibrary::FlagForSource(Source)));
+    return true;
+}
+
+
+// ---------------------------------------------------------------------------
+// THE WIRING, not the rule. RiorsEdge.Progression.WorldPoints.SoloReachable
+// above asserts the REGISTRY, and passed for the entire time the fifteen
+// points were unreachable: GrantWorldPoint had no caller outside these tests,
+// so every Unlock beat naming a Core Point was validated by the loader, read
+// by the census, and paid nothing. This asserts the seam instead.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerWorldPointBeatGrantTest,
+    "RiorsEdge.Progression.WorldPoints.MissionBeatGrants",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerWorldPointBeatGrantTest::RunTest(const FString&)
+{
+    AActor* Owner = NewObject<AActor>();
+    auto* Progression = NewObject<UBreakerProgressionComponent>(Owner);
+    auto* Journal = NewObject<UBreakerQuestJournal>();
+    if (!Progression || !Journal) return false;
+
+    // Nothing reached: nothing owed. A settle on an empty journal must not
+    // mint anything, or the budget inflates for a character who has played
+    // nothing at all.
+    const int32 Before = Progression->GetProgressionState().UnspentCorePoints;
+    Progression->SettleWorldCorePoints(Journal);
+    TestEqual(TEXT("an untouched journal is owed no Core Points"),
+        Progression->GetProgressionState().UnspentCorePoints, Before);
+
+    // THE SHIPPED CONTENT authorises at least one, or this whole seam is
+    // decoration. Walk the missions for the first Unlock beat that names a
+    // Core Point and set every flag the beats before it require.
+    const TArray<FBreakerMissionDefinition>& Missions = UBreakerMissionLibrary::GetMissions();
+    bool bFoundAuthoredCorePoint = false;
+    for (const FBreakerMissionDefinition& Mission : Missions)
+    {
+        for (const FBreakerMissionBeat& Beat : Mission.Beats)
+        {
+            if (Beat.Kind == EBreakerMissionBeatKind::Unlock && !Beat.CorePoint.IsNone())
+            {
+                bFoundAuthoredCorePoint = true;
+                TestTrue(*FString::Printf(TEXT("beat Core Point '%s' is a known world source"),
+                    *Beat.CorePoint.ToString()),
+                    UBreakerWorldPointLibrary::IsKnownSource(Beat.CorePoint));
+            }
+        }
+    }
+    TestTrue(TEXT("the shipped missions author at least one Core Point beat"), bFoundAuthoredCorePoint);
+
+    // And the settle pays a reached one exactly once. Driven through the
+    // library's own walk so the test cannot disagree with the runtime about
+    // what "reached" means.
+    for (const FBreakerMissionDefinition& Mission : Missions)
+    {
+        for (const FBreakerMissionBeat& Beat : Mission.Beats)
+        {
+            if (Beat.Kind != EBreakerMissionBeatKind::Unlock || Beat.CorePoint.IsNone()) continue;
+            const int32 PointsBefore = Progression->GetProgressionState().UnspentCorePoints;
+            TestTrue(TEXT("a reached source grants once"), Progression->GrantWorldPoint(Beat.CorePoint, Journal));
+            TestEqual(TEXT("and it granted exactly one"),
+                Progression->GetProgressionState().UnspentCorePoints, PointsBefore + 1);
+            // The settle must be safe to run repeatedly at the flag seam.
+            Progression->SettleWorldCorePoints(Journal);
+            Progression->SettleWorldCorePoints(Journal);
+            TestEqual(TEXT("settling again pays nothing more"),
+                Progression->GetProgressionState().UnspentCorePoints, PointsBefore + 1);
+            return true;
+        }
+    }
     return true;
 }
 

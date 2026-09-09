@@ -17,7 +17,7 @@ measurement without judging it.
 | Stat targets with no aggregation lane | ceiling | 1 of 88 | ceiling 6 | ok |
 | Aggregation lanes carrying nothing | ceiling | 1 of 86 lanes | ceiling 9 | ok |
 | Node tags with no consumer | ceiling | 129 of 209 declared | ceiling 143 | ok |
-| Conditions no content authors | ceiling | 19 of 27 | ceiling 12 | **OUT** |
+| Conditions no content authors | ceiling | 12 of 27 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 3 of 21 | ceiling 0 | **OUT** |
 | Asserted invariants with no test | ceiling | 35 of 136 asserted across 8 specs | ceiling 42, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 3.0 worst tree | floor 3.0 | ok |
@@ -36,7 +36,7 @@ measurement without judging it.
 
 ## Tests
 
-- passing: 831
+- passing: 832
 - expected red: 4
 - **unexpected red: 0**
 - asserted invariants with no test: 35
@@ -123,17 +123,11 @@ A tag nothing reads. Some are legitimately reserved; most are a promise the game
 
 ## Conditions no content authors
 
-**ceiling** · 19 of 27 · ceiling 12  ·  **OUT**
+**ceiling** · 12 of 27 · ceiling 12
 
 Vocabulary that exists and pays for nothing. Widening the vocabulary ahead of its consumers is what produced most of this list.
 
 - WallRiding
-- RecentlyDashed
-- Stationary
-- HealthHigh
-- HealthLow
-- ResourceLow
-- ResourceDepleted
 - RecentlyKilled
 - RecentlyTookDamage
 - RecentlyCastAbility
@@ -144,7 +138,6 @@ Vocabulary that exists and pays for nothing. Widening the vocabulary ahead of it
 - TargetElite
 - TargetAtCloseRange
 - TargetBandBroken
-- RecentlyLedgeTraversed
 - ParryCounter
 
 ## Resource generation entry points with no caller

@@ -190,6 +190,11 @@ public:
     // mission; the component settles it against LevelDoctrinePointsGranted.
     static int32 DoctrinePointEntitlement(const FBreakerQuestFlagSet& Flags);
 
+    // The world Core Point sources every REACHED Unlock beat authorises, in
+    // mission order. The same walk DoctrinePointEntitlement does, for the
+    // other of the three things an Unlock beat can pay.
+    static TArray<FName> EarnedCorePointSources(const FBreakerQuestFlagSet& Flags);
+
     // THE TWO SEAMS. Both gate on the beat being CURRENT -- the same rule
     // UBreakerQuestLibrary::NotifyEnemyKilled applies to an objective: work
     // done before the story asks for it does not pre-complete the ask.

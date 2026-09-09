@@ -481,6 +481,16 @@ void UBreakerEnemyModifierComponent::DetonateVolatile()
         Request.bHasSourceLocation = true;
         Request.SetInstigator(GetOwner());
         Request.CreditTo = VolatileCreditTo;
+        // THE BLAST IS NOT A BULLET, and once CreditTo made it reach the
+        // player's HUD it had to stop claiming it was one. Delivery defaults to
+        // Weapon and bHasImpactLocation to false, so a credited blast hit was
+        // drawing its damage numbers on the WEAPON arrival clock — delayed by
+        // tracer flight time from the player's muzzle to each victim's pivot,
+        // for damage he did not fire. Naming the delivery and the real impact
+        // point puts the number at the blast, when the blast happens.
+        Request.Delivery = EBreakerDamageDelivery::Ability;
+        Request.ImpactLocation = Candidate->GetActorLocation();
+        Request.bHasImpactLocation = true;
         if (Request.BaseDamage > 0.0f) Combat->ReceiveDamage(Request);
     }
 }

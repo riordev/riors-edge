@@ -363,6 +363,31 @@ def load_affix_targets():
     return targets
 
 
+def load_affix_conditions():
+    """Every EBreakerBuildCondition an affix row is gated on.
+
+    THE DEAD-CONDITION COUNT USED TO READ CORE NODES ALONE, and reported
+    seven live conditions as authored by nothing: RecentlyDashed, Stationary,
+    HealthHigh, HealthLow, ResourceLow, ResourceDepleted and
+    RecentlyLedgeTraversed are all carried by shipped affix rows. The section
+    directly above it (empty lanes) already counts both authoring layers, so
+    one report was contradicting the other and a landed pass looked undone.
+    A condition is authored if ANYTHING authors it.
+    """
+    try:
+        with open(AFFIXES, "rb") as f:
+            library = json.loads(f.read().decode("utf-8"))
+    except OSError:
+        raise ParseError(f"{os.path.relpath(AFFIXES, ROOT)} is missing; it is the affix library.")
+    except ValueError as e:
+        raise ParseError(f"{os.path.relpath(AFFIXES, ROOT)} is not JSON: {e}")
+    rows = library.get("affixes")
+    if not isinstance(rows, list) or not rows:
+        raise ParseError(f"{os.path.relpath(AFFIXES, ROOT)}: no 'affixes' rows. The file shape changed.")
+    return {row.get("condition") for row in rows
+            if isinstance(row.get("condition"), str) and row.get("condition") not in ("", "Always")}
+
+
 def census_nodes(census, tag_map):
     """parse_nodes' dict shape, from the census.
 
@@ -953,7 +978,7 @@ def build_sections(sources, census=None):
         targets, paid, rider_delivered, affix_owned = parse_lane_register(types)
         conditions = parse_conditions(conds_text)
         core_budget, doctrine_budget = parse_point_budgets()
-        authored_conds = {c for n in nodes for c in n["conditions"]}
+        authored_conds = {c for n in nodes for c in n["conditions"]} | load_affix_conditions()
         currency_of = {t["id"]: t["currency"] for t in native_census["trees"]}
     elif census is None:
         nodes = parse_nodes(lib)
@@ -962,7 +987,7 @@ def build_sections(sources, census=None):
         core_budget, doctrine_budget = parse_point_budgets()
         # Source mode reads the raw library text, comments and helpers
         # included; data mode reads the union of what the nodes carry.
-        authored_conds = {m.group(1) for m in re.finditer(r'EBreakerBuildCondition::(\w+)', lib)}
+        authored_conds = {m.group(1) for m in re.finditer(r'EBreakerBuildCondition::(\w+)', lib)} | load_affix_conditions()
         currency_of = {}
     else:
         nodes = census_nodes(census, tag_map)
@@ -970,7 +995,7 @@ def build_sections(sources, census=None):
         conditions = [c for c in census["conditions"] if c != "Count"]
         core_budget = int(census["budgets"]["core"])
         doctrine_budget = int(census["budgets"]["doctrine"])
-        authored_conds = {c for n in nodes for c in n["conditions"]}
+        authored_conds = {c for n in nodes for c in n["conditions"]} | load_affix_conditions()
         currency_of = {t["id"]: t["currency"] for t in census["trees"]}
     index = build_consumer_index(sources)
 

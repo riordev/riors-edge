@@ -301,6 +301,11 @@ public:
     // Unlock beat pays the moment it is reached and a save from before the
     // seams existed is brought current the first time it opens.
     void SettleDoctrineEntitlement(const FBreakerQuestFlagSet& Flags);
+
+    // The story's Core Points, settled the same way and at the same seam.
+    // GrantWorldPoint is idempotent through the journal, so this is safe to
+    // run on every flag set.
+    void SettleWorldCorePoints(class UBreakerQuestJournal* Journal);
     // Seeds the slice budget whenever the point economy is empty (no ranks in
     // either currency and nothing unspent), and locks Swift only if no class
     // is chosen — so both a new gym pawn and an existing save written before

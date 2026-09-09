@@ -2720,7 +2720,14 @@ void ABreakerCharacter::BindQuestRewardEvents()
     QuestRewardEventsHandle = Quests->OnFlagSet.AddWeakLambda(this, [this](FName Flag)
     {
         GrantQuestRewardForFlag(Flag);
-        if (Progression && Quests) Progression->SettleDoctrineEntitlement(Quests->GetState());
+        if (Progression && Quests)
+        {
+            Progression->SettleDoctrineEntitlement(Quests->GetState());
+            // The other half of what an Unlock beat can pay. Doctrine points
+            // have always settled here; the fifteen world Core Points were
+            // authored and never granted, so eight missions paid nothing.
+            Progression->SettleWorldCorePoints(Quests);
+        }
     });
 }
 

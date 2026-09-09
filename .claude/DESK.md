@@ -5,6 +5,18 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
+## Still owed on the world Core Points
+
+The fifteen now GRANT (they reach the player through the flag seam), but
+`Docs/STATE.md`'s "World Core Point sources with no trigger" row is still
+self-declared: `bTriggerBuilt` is a hand-authored bool on each row in
+`Progression/BreakerWorldPoints.cpp`, counted by `CountWithBuiltTrigger`.
+It read `14 of 15 ok` while the true figure was 15 of 15, and it reads
+`14 ok` now while the true figure is lower. A number that a human types
+about the code is not a measurement — it should be DERIVED from whether a
+mission beat names the source, the way every other row on that table is
+measured. Not done here; the wiring was the urgent half.
+
 ## Owner ruling needed — do enemies damage each other on death?
 
 An ordinary enemy chain-detonates when it dies: `ABreakerEnemy::HandleDeath`

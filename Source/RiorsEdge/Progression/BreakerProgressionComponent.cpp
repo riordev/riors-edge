@@ -946,6 +946,27 @@ int32 UBreakerProgressionComponent::GetXpToNextLevel() const
     return UBreakerExperienceLibrary::XpToNextLevel(State.CharacterLevel, ExperienceCurve);
 }
 
+void UBreakerProgressionComponent::SettleWorldCorePoints(UBreakerQuestJournal* Journal)
+{
+    if (GetOwner() && !GetOwner()->HasAuthority()) return;
+    if (!Journal) return;
+    // THE FIFTEEN WERE AUTHORED, VALIDATED AND NEVER PAID. Every Unlock beat
+    // that names a Core Point had it read by the census and by the mission
+    // validator and by nothing else: GrantWorldPoint had no caller outside the
+    // tests, so eight missions whose entire reward is a Core Point paid the
+    // player nothing at all, while CorePointBudget (cap + 15) priced the whole
+    // Core tree as though they had. Settled here, at the same flag-set seam
+    // that settles doctrine, and for the same reason: the story is what pays.
+    //
+    // Safe to run on every flag because GrantWorldPoint claims its own journal
+    // flag and refuses a second grant — the one-time rule lives with the
+    // grant, not with the caller.
+    for (const FName Source : UBreakerMissionLibrary::EarnedCorePointSources(Journal->GetState()))
+    {
+        GrantWorldPoint(Source, Journal);
+    }
+}
+
 bool UBreakerProgressionComponent::GrantWorldPoint(FName SourceId, UBreakerQuestJournal* Journal)
 {
     if (GetOwner() && !GetOwner()->HasAuthority()) return false;

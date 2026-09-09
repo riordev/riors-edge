@@ -983,6 +983,24 @@ int32 UBreakerMissionLibrary::DoctrinePointEntitlement(const FBreakerQuestFlagSe
     return Entitled;
 }
 
+TArray<FName> UBreakerMissionLibrary::EarnedCorePointSources(const FBreakerQuestFlagSet& Flags)
+{
+    TArray<FName> Sources;
+    for (const FBreakerMissionDefinition& Mission : GetMissions())
+    {
+        const int32 Completed = BeatsCompleted(Mission, Flags);
+        for (int32 Index = 0; Index < Completed; ++Index)
+        {
+            const FBreakerMissionBeat& Beat = Mission.Beats[Index];
+            if (Beat.Kind == EBreakerMissionBeatKind::Unlock && !Beat.CorePoint.IsNone())
+            {
+                Sources.AddUnique(Beat.CorePoint);
+            }
+        }
+    }
+    return Sources;
+}
+
 TArray<FName> UBreakerMissionLibrary::ArrivalFlagsFor(FName DestinationId, const FBreakerQuestFlagSet& Flags)
 {
     TArray<FName> Out;
