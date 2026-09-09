@@ -1,606 +1,70 @@
-# Desk — what the owner will feel next time he plays
+# Desk — next playtest
 
-## HANDOFF — read this first (2026-09-09, machine switch)
+## Working scope
 
-Base `cf0ce5d`, suite 837 passing / 3 expected red / 0 unexpected, tree
-clean and pushed. The owner is about to PLAY, then a different agent picks
-up on another machine.
+Continue validated blocks until the owner returns. Prioritize playable changes for the next large playtest. Investigate an individual bug for at most five minutes, then record its evidence and park the affected change if unresolved. Independent agents stage on disjoint files; one engine build/suite runs at a time. Every landed block follows BUILD → SUITE → Scripts/status.py → COMMIT → PUSH. Larger changes receive independent review. Never count placeholders or pure-maths tests as complete gameplay.
 
-STARTING ON THE OTHER BOX: close the editor, `git pull --ff-only`, and if
-meshes come back as pointer files run `git lfs pull`. Do not build with the
-editor open. Read `Docs/STATE.md`'s summary table before planning anything.
+## Immediate queue
 
-### What the playtest is actually judging
+1. Fernhall cache: a console-shaped interactable, unlocked by clearing its nearby pocket, pays loot once. Use yard-relative placement without moving existing sites.
+2. O258: retire Skim, make Slipcut the Swift starter, and migrate/remove SkimDiscipline with its consumer and existing loadouts.
+3. O247: Provoke keeps its four-second forced target and grants threat scaled by the existing threat lane.
+4. O250: a broken Warden front stays broken through revival.
+5. O251: occlusion hides the entire enemy plate; inspect rendered frames.
+6. O248: grandfather existing over-budget special items; constrain new rolls without removing owned affixes.
+7. Kit expansion under O252–O260: verify the registered roster, author reachable abilities/passives with real consumers, and reconcile counts before claiming the 55-entry target. Carom, Coup, Backstep, Pyre, Riftlance, Recall, Bulwark and Overwatch are named candidates. Rover, Barrel and Wildcard require additional mechanics. Check proposed names against Core/doctrine IDs.
+8. O246: remove duplicated compiled ability defaults only with a replacement schema/completeness test for Data/abilities.json.
+9. Derive world Core Point trigger coverage from actual mission references instead of bTriggerBuilt declarations.
 
-THE BIG ONE: enemies no longer chain-detonate on death (O261). It shipped
-true by class default, so every dying body dealt 35% of max health inside
-420 cm and a pack of four cascaded itself from one kill — and those kills
-paid the player nothing. Every pack fight is different now. If the owner
-says packs feel slow or spongy, that is this, and the answer is tuning
-enemy counts or damage, NOT putting the cascade back.
+## Seven-step acceptance checklist
 
-Also new and unjudged: Fernhall's two off-lane pockets (17 outdoor across
-five, first time anything sits off the centreline); the Watchkeeper and his
-contract; the `SKILL n` readout; Momentum's cone at 0.75 (was 0.6);
-Volatile kills now paying Feed/Scrap and drawing numbers at the blast; and
-eight missions that paid literally nothing now paying a Core Point.
+| Step | Present evidence | Remaining acceptance work |
+|---|---|---|
+| 1 Entropy | Finite funding, original critical samples, paid duration and persistence tests landed | Actual encounter clarity, audible feedback and sustained ability/converted-weapon play |
+| 2 Elements/reactions | Entropy, Void, Rift and bounded reactions have native delivery tests | Regression check current builds, readable combined feedback and complete encounter loop |
+| 3 Progression/combat | 187 Core nodes; 371 total nodes; no measured silent nodes; Caster doctrines12/24; allocation parity0.93 | Audit actual consumers/acquisition, remaining kit programme, solo-node gaps and gameplay balance |
+| 4 Loot | New special budgets, overflow conversion, Unwritten rename and skill-level affixes landed | Legacy-item protection, authored perks/legendaries, real legal-loadout comparison and UI clarity |
+| 5 Interface | Core wheel and paid purchase/assignment paths exist | Occlusion, clipping across menus/resolutions, NPC/equipment/death focus flows and dev sandbox |
+| 6 Fernhall/Rifts | Five outdoor pockets/17 enemies, Watchkeeper contract, campaign flags and local map exist | Cache, authored spaces, varied mission objectives, distinct Rift interiors, reward/return and natural leveling |
+| 7 Visual/audio | Placeholder presentation and combat feedback exist | Anchor/Fernhall identity, weapons/arms/weakpoints, coherent sound/VFX and signature encounters; inspect captures, do not claim final art |
 
-### Known broken — do NOT spend the owner's notes on these
+## Destinations and missions
 
-- The Warden overrides the base engaged tick wholesale: no arrival ring, no
-  arrival angle, two stack on one line, it walks through the player between
-  sweeps (`Combat/BreakerWardenEnemy.cpp` TickEngagedBehaviour).
-- Ranged enemies have no walk sequence and move in ref pose; STEER frames
-  call StopMovement and rebuild velocity from zero — the stutter at range.
-- A Volatile corpse has NO visual tell. The disc and light were retired by
-  O203 and the Niagara pass has not happened, so the player dies to an
-  invisible fuse and it reads as unfair. Recorded at the site.
-- The rift interior is still the entry yard with the doors suppressed.
+- Anchor 13: main hub; Fernhall Approach: overgrown industrial with a cityscape.
+- Red Basin: scorched farmland/crater. Station Zero: overrun research hub. Port Meridian: destroyed airport/terminal. Broken Coast: ocean/flat landscape. Shatterpoint: city sprawl.
+- Improve Anchor/Fernhall routes and landmarks; author playable placeholder destinations/tilesets and varied objectives using available assets. Ordinary regional difficulty stays fixed; return Rifts provide harder encounters.
+- Existing local-map site IDs contain coordinates: replace with stable identity and preserve discovery before relocating existing sites.
+- Rift interior currently reuses the yard. BuildCoverField generates gym-specific sections; FernhallFieldParams validates authored layouts and is not a compatible generation recipe. Use a genuinely band-aware generator or independently composed interiors; retain RiftGeneratedField as a measured probe.
+- O262: command post consumes a key carrying area level/modifiers and determines layout. Consumable entry and death budget land together. A key, device and tileset are not complete until enter → fight → reward → return works.
+- Add mission variety only with a real objective consumer. Current ordinary quest progress supports kills and the specific residue collection path; generic collection needs implementation.
 
-### Rulings the owner still owes
+## Multiplayer
 
-- `DropChanceReachesEveryRank` stays expected-red on purpose. O249 landed
-  and the pin now measures the wrong thing — it reads
-  `GetEffectiveDropChance` alone, which at a boss is LEGITIMATELY still
-  1.000 because the ruling keeps the cap and converts the excess. It wants
-  a rewrite to measure VALUE, not step-one probability. Do not edit or
-  delete the assertion to make it green.
-- Every ultimate in the game is a window ("for the duration, X"). None is a
-  moment. At least one wants to be a single decisive event; Unmake is the
-  candidate.
-- O253's two slots STACK (+8 on a fifteen-rung ladder). Summed rather than
-  capped, and capping it is one constant.
-- The local map's site ids embed world COORDINATES
-  (`BreakerLocalMapComponent.cpp:76-78`), so moving any authored site
-  silently resets a player's discovery. A NEW site is safe; a MOVED one is
-  not. Fix the id scheme in the same commit as the first geometry change.
+Owner authorizes adding multiplayer when feasible. Audit current listen-server join, ownership, replication, interactions, combat and save isolation first. Implement bounded cooperative slices with two-client evidence; record unsupported paths. Do not advertise a working multiplayer mode from RPC declarations alone. Trading, account services and MMO infrastructure are outside the immediate playtest priority.
 
-### Lessons from this session that will save the next agent a cycle
+## Known issues to time-box
 
-MEASURE BEFORE TUNING. Three separate times a number was tuned and moved
-nothing, because the guess about where the value came from was wrong:
-- The rift cover field: lattice pitch swept 3400-5400 cm, no change. Pocket
-  ring swept 12-0, no change. The census finally showed the pieces were the
-  GYM's field spread to 20476 cm across a band ending at 8900 — cover from
-  another field counted against this one. `BuildCoverField` is a gym
-  builder; `FernhallFieldParams` is a VALIDATOR set that has only ever
-  judged an authored layout. `RiorsEdge.Zone.RiftGeneratedField` is the
-  instrument that says when that changes.
-- The ability parity gap was a BROKEN FIXTURE, not missing content. It
-  bought 11 increased lines against the weapon side's 17 and bought a flat
-  line that is dead in the ability lane. Corrected, 0.526 -> 0.926.
-- O254 was authored wrong from a stale branch: the flat ability lane
-  already shipped. Read the TREE, not a branch, before believing a claim
-  about it.
+- Warden engaged movement bypasses arrival spacing and can walk through the player.
+- Ranged STEER transitions reset movement and appear to stutter; walk animation is missing.
+- Volatile corpse has no visible fuse after O203 retired disc/light. Add readable placeholder feedback before final Niagara art.
+- Damage numbers can overlap enemy plates. Hover, focus recovery and comfort require real interaction checks beyond static captures.
+- Remaining Afterimage window/ability consumers, Open Wound's authored lane substitute, rocket continuation and ally-threat semantics need source review; old desk claims are not evidence of current absence.
+- Three generation entries remain uncalled; one aggregation lane and one target remain empty/unrouted. Consult current STATE for exact identities.
+- Other low-priority cleanup only after verifying use: empty modifier test helper; unused HUD dimensions; stale movement comments; duplicated boss timings; slot-invalid fixtures; inert affix leans; menu string-table migration.
 
-Probes are cheap and pay. Each of the above cost one build and closed a
-route that would otherwise have burned a cycle.
+## Decisions and measurements requiring explicit care
 
-### Next work, in order, and all of it is scoped
+- DropChanceReachesEveryRank measures probability while O249 converts capped excess into rarity value. Keep the enumerated finding until its replacement measurement is explicitly settled; do not change pins for green results.
+- Prolific1.51 remains enumerated with its deletion condition; the eight-Unwritten fixture is not a legal loadout.
+- At-cap variance4.05 is below8–10. Ability allocation parity is now0.93 after mirrored fixture allocations and Arc critical access; it is not a native sustained-throughput measurement.
+- Core offers429/65=6.6x; closed22-wedge ring is active. Do not reopen retired hub-entry or2.63x questions.
+- Potential future ultimate redesign (Unmake as a decisive event) and skill-level stacking cap need explicit design treatment; retain current rules meanwhile.
+- Anchor13's name alone does not establish twelve other settlements.
 
-1. The Fernhall cache — `ABreakerFinaleActor`'s console shape plus the
-   two-line loot roll (`BreakerEnemy.cpp:1745-1748`), placed at a
-   yard-frame fraction like the Breach door so it needs NO marker and moves
-   no pinned count. Gate it on a nearby pocket being cleared.
-2. O258 Skim retires, Slipcut becomes the starter. `Swift.Kinetic.SkimDiscipline`
-   is a live Core node with no other referent — it moves or goes in the same
-   commit or Silent nodes leaves its ceiling of 0.
-3. O247 Provoke grants threat; O250 the Warden's front stops re-arming;
-   O251 an occluded enemy yields its bar.
-4. The eleven authorable new abilities (see the roster block below).
-5. O246 delete the compiled ability defaults — and the deletion commit MUST
-   swap `Data.Abilities.Fresh` for a schema test, or it trades drift for an
-   unvalidated data file.
+## Latest validated baseline
 
-PARALLEL LANES WORK, with a fence. A subagent given an explicit directory
-list, no build and no git authored O249 cleanly while the main session built
-and committed. Only one build may run at a time.
+Pulled main1e369b4. Remote report:837 passing,3 expected failures,0 unexpected. Local build and fresh census/suite validated:837 passing,3 expected failures,0 unexpected. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
 
+## Landed this pass
 
-
-One file, one queue. Ordered by what changes the next play session, not by
-system. A cycle takes the top block, lands it in ONE build and ONE suite,
-pushes, and stops so the owner can play. His notes go straight in here.
-Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
-
-## Still owed on the world Core Points
-
-The fifteen now GRANT (they reach the player through the flag seam), but
-`Docs/STATE.md`'s "World Core Point sources with no trigger" row is still
-self-declared: `bTriggerBuilt` is a hand-authored bool on each row in
-`Progression/BreakerWorldPoints.cpp`, counted by `CountWithBuiltTrigger`.
-It read `14 of 15 ok` while the true figure was 15 of 15, and it reads
-`14 ok` now while the true figure is lower. A number that a human types
-about the code is not a measurement — it should be DERIVED from whether a
-mission beat names the source, the way every other row on that table is
-measured. Not done here; the wiring was the urgent half.
-
-## Landed: the chain is a player effect now (O261)
-
-The on-death chain ships OFF. `bExplodesOnDeath` defaults false; an enemy
-death damages other enemies only where a player source says it does. Nothing
-authors such an effect yet, so the property survives as the mechanism one
-will set rather than as a default nobody asked for. Both magnitudes stay O2.
-
-## Fernhall has a person in it (landed)
-
-- [x] THE WATCHKEEPER stands on `marker_npc_contract` — a marker the composer
-  authored, the loader validated, the piece contract counted, and no
-  production code had ever read. Fernhall held zero NPCs and every quest in
-  the game was given in the hub, so the yard was somewhere you crossed and
-  never somewhere you were sent from. Ten lines in the Fernhall branch, one
-  dialogue row, one quest. No geometry, no new marker role, no asset
-  re-import, no new class.
-- His contract is a KILL objective on purpose: quest progress only counts
-  kills and one feedstock helper hard-wired to Quest.KessSalvage, so a
-  find-or-collect contract is plumbing this game does not have. Recorded so
-  the next contract does not try.
-- NOT PHOTOGRAPHED, said plainly. He faces the player start from the entry
-  plaza and the default camera looks the other way, down the lane at the
-  substation door; the harness cannot turn it. Verified by test instead —
-  exactly one NPC in the world, within a centimetre of the marker, with his
-  row resolving in the shipped Data/dialogue.json and his contract in the
-  shipped Data/quests.json. A capture tour vantage would photograph him.
-- [x] FIVE POCKETS, 4/3/4/3/3 = 17 outdoor (was 11), one elite still. The two
-  added sit OFF THE LANE at 1400 cm lateral — all three originals were on the
-  centreline, so every fight in Fernhall happened in a strip down the middle
-  and the flanks were scenery. Lateral offset also buys separation depth
-  alone could not: the entry band is 7500 cm with fights at 0.25 and 0.70, so
-  a third between them can never be more than ~1690 cm from both.
-- THE XP ECONOMY NOTICED, and the owner ruled the trim. Wave one solves to
-  twelve Skitters; placing all of them took a cleared entry yard from 159 XP
-  to 375, past the 279 that reaches level two — the first contract would have
-  become a reward for something the player had already outgrown. Half the
-  wave reads 267 and the test now asserts the RELATIONSHIP (cleared yard
-  < 279) rather than only the figure, so a future population change that
-  crosses the line fails and says why.
-- [ ] Next, same file so a different cycle: a cache built from
-  ABreakerFinaleActor's console shape plus the two-line loot roll, placed at
-  a yard-frame fraction like the Breach door so it needs no marker and moves
-  no pinned count.
-
-## The destinations, named (owner, 2026-09-09)
-
-Seven, each with a silhouette that is not another grey yard. This is the item
-the content phase was blocked on — nothing could be authored under a name
-nobody had chosen.
-
-| Destination | Read |
-|---|---|
-| Anchor 13 | the main hub |
-| Fernhall Approach | overgrown industrial, subtle cityscape |
-| Red Basin | red scorched dilapidated farmland, a crater |
-| Station Zero | a research hub, overrun |
-| Port Meridian | destroyed CQB airport / terminal |
-| Broken Coast | ocean, flat landscape |
-| Shatterpoint | alternative city sprawl |
-
-ANCHOR 13 ANSWERS A STANDING SPEC QUESTION. `Docs/spec/content-and-modes.md`
-asks "whether one Anchor is the whole settlement layer, or a network of
-them"; a hub with a NUMBER is a network with twelve others, and the question
-can be closed the day the owner confirms that reading.
-
-Two of these are already partly built and should be renamed rather than
-re-authored: the hub is Anchor 13, and Fernhall Approach is the yard that
-ships. The other five are new ground.
-
-WHAT THIS UNBLOCKS AND WHAT IT DOES NOT: naming was the only owner-gated
-half. Each destination still needs geometry, and the composer's vocabulary is
-the real constraint — Fernhall's walls are `city_building-small-a` stretched
-into slabs, and 587 kit models sit unimported (90 of them genuinely solid).
-Red Basin and Broken Coast in particular are FLAT-GROUND reads, which is the
-cheapest thing this pipeline makes: a floor, a perimeter and a cover lattice
-is most of a basin.
-
-## The endgame shape (O262) — a device, a key, a tileset
-
-The PoE reading, mapped onto what already exists. Campaign = the three acts
-through authored destinations, which ship. Past it:
-
-- THE DEVICE is the command post `Docs/spec/content-and-modes.md:169` already
-  names in the Anchor loop and which was never built. It consumes a key and
-  opens a rift.
-- THE KEY is an item. The item system already carries rarity, tiered affixes,
-  item level, drop tables and a stash — a key is a new item KIND, not a new
-  system. Its area level is its tier; its rolled affixes are the run's
-  modifiers.
-- THE TIER is `AreaLevel`, already 1-100 with derived monster scaling.
-- CONSUMABLE ENTRY is O122, which FIVE separate code sites already say they
-  are waiting for. The death budget ships in the same commit, as O122 rules.
-- THE TILESET is the only genuinely missing piece, and the cheap version is
-  not new art: `UBreakerCoverLayoutLibrary::BuildCoverField` is a seeded,
-  validated generator that already exists (lane width, gaps, line break,
-  cover fraction), and 113 kit meshes are already imported. A varied interior
-  is a seeded ARRANGEMENT of pieces the game already has.
-
-- [x] The seed is the rift's, not the session's. `ModifierSeedBase` was one
-  authored constant, so every field the generator built in every rift in
-  every session came out identical — two different rifts were the same room
-  twice, and re-entering one could never surprise you. `LayoutSeed` mixes the
-  encounter id and the area level, so a rift reproduces exactly while two
-  rifts differ and the same place at depth rearranges. The gym keeps the
-  authored base untouched: an instrument that shifted under measurement
-  would make every density reading incomparable with the last.
-- REPLACE WAS TRIED AND THE CHEAP ROUTE IS CLOSED, measured not guessed.
-  `RiorsEdge.Zone.RiftGeneratedField` runs the shipped generator over the
-  yard's own band for 27 rift seeds: every one refuses, laying 47 pieces for
-  7.62% cover against a 0.50-5.00% ceiling. The obvious knob does nothing —
-  a pitch sweep from 3400 to 5400 cm moves neither the count nor the fraction
-  by a hundredth, because in a band this small the LATTICE contributes
-  nothing and all 47 pieces come from the combat pockets and their rings.
-  Widening a lattice cannot thin a field the lattice is not filling. Fitting
-  the generator to a yard is therefore pocket composition authored for a new
-  purpose, not a number to tune.
-- THE SMALL-BAND PROFILE WAS TRIED TOO, AND IT IS NOT A PROFILE. Three
-  guesses were wrong before the pieces were asked directly. Lattice pitch
-  3400-5400: no change. Pocket outer ring 12-0: no change. The census says
-  why — with the yard's params there are NO pockets, the lattice contributes
-  nothing, and the 47 pieces spread forward to 20476 cm across a band ending
-  at 8900. The generator is building the GYM's field (elite arena, jump-run
-  edges, sniper lane) and the fraction divides that cover by the yard's much
-  smaller band. 7.62% is cover from another field counted against this one.
-- AND THE GYM-ONLY SECTIONS CANNOT BE SWITCHED OFF: the shipped idiom parks
-  them at 1e7 rather than skipping them, so the pieces stay in the returned
-  array and keep counting. Parking the elite arena leaves 45 pieces reaching
-  forward 10,003,476 cm. Sections would have to become SKIPPABLE first.
-- SO: `BuildCoverField` is a gym field builder and `FernhallFieldParams` is a
-  VALIDATOR parameter set — it has only ever judged the authored layout,
-  which is why nobody noticed it cannot build one. Pairing them was the plan
-  and the plan is wrong.
-- [ ] Varied rift interiors therefore need EITHER a generator written for a
-  band this size (sections skippable, pockets scaled to the band) OR O167's
-  other branch: interiors composed as their own geometry. The second is the
-  honest one and is what the owner's destination ask points at anyway.
-  `RiorsEdge.Zone.RiftGeneratedField` stays as the instrument that says when
-  the first route opens.
-- THE DIRECTION THE OWNER WANTS, recorded so neither route forgets it: a
-  DESTINATION in the Destiny sense — a persistent place with things inside it
-  to interact with — not just a fight box. Interactable vocabulary already
-  exists (travel points, NPCs, stash, loot and feedstock pickups, rift
-  doors); what is missing is a reason to walk anywhere in a space.
-- [ ] Then: the key item, the command post, consumable entry + the death
-  budget together per O122.
-- [ ] The local map's site ids embed world coordinates
-  (`BreakerLocalMapComponent.cpp:76-78`), so moving any authored site
-  silently resets a player's discovery. Fix that id scheme in the same commit
-  as the first geometry change.
-
-## Cycle — the kit programme (O252-O260)
-
-The roster target is 55: eight actives, one ultimate and two passives per
-class. 34 ship today, 21 are to be authored, and the order below is by what
-unblocks the most rather than by class.
-
-- [x] O260 LANDED. Anomalous -> Unwritten across 54 files, 335 insertions against 335 deletions — a pure rename with no net change. The enumerator keeps its value (4), so no saved item moves. Data/affixes.json moved with it because `BreakerAffixReadEnum` parses the rarity BY ENUMERATOR NAME, and the pool word "anomalous" with it. Two uppercase display literals were missed by the first word-boundary pass and caught by `Items.LootPickup.DisplayLabel` going red — the label derives from the enum, so the code was right and the test's expectation was stale.
-- OWNER, EDITOR ONLY: `Content/Breaker/UI/Marks/T_RarityUnwritten` does not exist — the asset is still `T_RarityAnomalous.uasset`, and `Scripts/import_marks.py:31` still maps that name to `rarity-anomalous_256.png`. Both are left deliberately: renaming the key without renaming the binary asset and its source PNG breaks the import, and a .uasset cannot be hand-edited. Nothing in C++ resolves that texture by name today, so it is cosmetic drift in content, not a broken reference.
-- [x] O254 CLOSED, 0.526x -> 0.926x, inside O99's 0.85-1.15 band. The gap was a BROKEN INSTRUMENT, not a content shortfall. `AbilityOptimizedLoadout` bought 11 increased lines against the weapon fixture's 17, bought no conditional line at all while byte-identical Ability.Airborne/Redline/Dash twins shipped unbought, and bought `Offense.AddedDamage` on two slots — a line that routes only to DamageMultiplier and is dead in the ability lane, which is exactly why the flat layer emitted x1.000. Its own comment claimed "same number of offensive lines": it was 36 against 29. Mirrored line for line; nothing granted that the shipped data does not already grant on that slot.
-- The crit half was real content, not instrument: `Core.Precision` was the ONLY wedge in the roster authoring crit and it is tagged Weapon. Prime, Channel and Reach now carry Precision's own three magnitudes, so an ability build can buy crit at all. Crit 0.812 -> 0.910. The Arc lane count moved 30 -> 33 and its pin moved with it, which is that pin working.
-- `PowerBand.AbilityLane` retired from the expected-red roster under its own deletion condition. Out-of-band sections: 5 -> 3.
-- [ ] O258 Skim retires, Slipcut becomes the starter. `Swift.Kinetic.SkimDiscipline` is a live Core node with no other referent — it moves or goes in the same commit or Silent nodes leaves its `ceiling 0 of 371`.
-- [ ] The eleven authorable new abilities: Carom, Coup, Backstep (Swift) · Pyre, Riftlance (Caster) · Recall (Gunsmith) · Bulwark (Tank) · Overwatch (Support), and the ten passives. Every one bids into a lane that exists today.
-- [ ] The three that need vocabulary first: Rover (a friendly AI pawn on NAV-1's controller and mover), Barrel (charge locomotion), Wildcard (a sanctioned exception to the foreign-class guard at `BreakerAbilityComponent.cpp:440`).
-- QUESTION FOR THE OWNER, not blocking: every ultimate in the game is a window — Overdrive, Unmake, Field Assembly, Hold and Conduit are all "for the duration, X". None is a moment. At least one wants to be a single decisive event instead; Unmake is the candidate.
-- NAME SWEEP OWED before authoring: `Afterimage`, `Attunement`, `Machinist`, `Interposition` and `Reprisal` are Core node ids already. The new names above were steered around those by hand, not by a tool.
-
-## Cycle — the ruled-but-unbuilt slice (O245-O251)
-
-The ruling pass landed O239-O251. Five of them rule intent the code does not
-yet honour; each is one slice, sized so no two share a build.
-
-- [x] O245 Volatile credit LANDED. The request now separates the actor whose stats AUTHOR a hit from the actor CREDITED with it: `FBreakerDamageRequest::CreditTo`, unset on every ordinary path and therefore bit-identical there. The blast keeps the corpse as instigator (naming the player there would have handed it his Execute/Interrupt/conditional-More lookups and rescaled it, breaking O217) and names the killer in CreditTo, so `DispatchHitDealt` broadcasts on the player's component. The killer is recorded on the combat component before the death broadcast, because OnDeath carries no parameters and fires BEFORE the attacker-side context exists. `RiorsEdge.Combat.VolatileCreditRuntime` pins both halves plus the unattributed control.
-- FOUND WHILE PINNING O245, NOT EXPLAINED, NOT FIXED: in the fixture, two enemies spawned 60 cm apart exchange a real 77-damage Physical hit (enemy A instigating on enemy B) at setup, before anything in the test fires — visible as a dispatch with author == dealer == the neighbouring enemy, reproduced in both spawned pairs. Enemy actor ticks are disabled in that fixture, so it is not an attack tick. Either enemies can damage each other on contact, or something at spawn/BeginPlay deals a hit; both are worth a look. It does not touch the O245 assertions, which measure the blast alone.
-- [ ] O246 Delete the compiled ability defaults. 36 `MakeFallback` rows restate `Data/abilities.json`. The deletion commit MUST also replace `RiorsEdge.Data.Abilities.Fresh` (which proves JSON matches C++, and loses its referent) with a schema/completeness test: every registered id has a row, every field in range. Do not delete without the swap — that trades drift for an unvalidated data file.
-- [ ] O247 Provoke grants threat. Keep the 4s forced-target window; add a one-time threat grant scaled by `ThreatGeneratedMultiplier` so the Tank still holds the pack when the window closes. `BreakerEnemyThreatMath` already scores and prefers; `ThreatGenerated` is a live stat target with no content behind it. KIT writes the ability, FIELD owns the threat seam — declare the crossing.
-- [ ] O248 Grandfather over-budget special items. Flag legacy items, keep them legal, bind the budget to new rolls only. Never strip an owner's affixes at load.
-- [x] O249 LANDED. Overflow above the cap drains a share of what remains of
-  Standard up the same rarity ladder the below-cap shift already uses.
-  `Items/BreakerDropOverflowMath.h` is world-free; the drain is HYPERBOLIC so
-  it is strictly monotone for unbounded input and can never take a weight
-  negative — a linear drain would need its own clamp, which is the second
-  saturation point the ruling exists to remove. Below the cap the overflow is
-  exactly zero and the branch does not execute, so the pre-ruling table is not
-  merely equal, it is the same additions.
-- [ ] THE PIN DOES NOT GO GREEN, AND THAT IS CORRECT. `DropChanceReachesEveryRank`
-  measures `GetEffectiveDropChance` alone, and under O249 that function's
-  answer at a boss is LEGITIMATELY still 1.000 — the ruling keeps the cap and
-  changes what happens to the excess. So the test now measures the wrong
-  thing: its finding is resolved by the pipeline while being unmeasurable by
-  that assertion. It wants a rewrite to measure VALUE rather than step-one
-  probability. Left untouched rather than edited, because widening or
-  deleting an assertion to match an implementation is the one move this
-  project forbids outright. Owner's ruling.
-- NOTE FOR THE NEXT READER: `UBreakerLootLibrary::RollRarity(Seed, Bonus)`
-  passes Rank=Boss as its "no rank supplied" fiction, and a boss saturates at
-  zero — so ALL of its bonus is now overflow. Dev grants, fixtures and the
-  crafting preview therefore show the fully converted distribution. The
-  existing weights assertion passes harder rather than softer.
-- [ ] O250 The Warden's front stops re-arming on `OnVitalsRestored`.
-- [ ] O251 An occluded enemy yields its bar with its marks. Visual — run `/photograph` and read the frames.
-
-## Cycle — New Core wheel primitives
-- [x] Full Core activated with frozen legacy-cost refund and layout version2:117→187 nodes,171→429 offered,2.63→6.6x. Exactly22 wedges in the requested closed ring, neighbour restriction enabled. All-start reach,23/46/69 keystone costs, migrations and purchase/projection tests pass. Native census refreshed;820 tests,816 passing,4 enumerated findings,0 unexpected. Python status emits;12 Python instrument/route tests pass. Empty lanes54→1; native authored count295→365;3 Reaction consumer gaps explicitly visible in node descriptions. Live1080 overview/720 Precision captures inspected; hover/pan remain playtest checks.
-- Density is measured in O235:65 points reaches22 gateways,7 convergences, or4 convergences with two keystones. Replacement density band needs play data. Normalized at-cap4.80→4.17, endgame14.47→13.02, ability ratio.542→.526; these exclude literal added hit bases, tempo and multiplicity. Preserved controlled Prolific step1.47→1.512 exceeds unchanged1.5; reviewed finding enumerated with deletion condition, no assertion or numerical pin widened. Its eight-Anomalous fixture is not a legal equipment loadout, so it does not establish a legal full-DPS breach.
-- [x] Caster schema integrated: Spellblade11/22, Multispell10/20, VoidWhisperer9/18 → each12/24 with four final-tier choices; worst offered ratio2.25→3.0. Overreach free debt casting/30% penalty and Prepared-35 floor pass native paid-cast tests. Found and fixed base Unmake death cleanup so its window and Mana suspension end before respawn. Build/census pass;823 tests,819 passing,4 enumerated findings,0 unexpected; status regenerated. Four new Caster consumers remain explicitly marked, giving7 silent of371 total pending the requested runtime batch.
-- [x] Second Order consumes same-hit statuses; Sympathetic settles bounded same-creditor pairs and defers elemental applications per enemy/source. Conductor preserves refused fuel and queues capped10 Mana at a0.5s per-target gate. Snapshot Discipline retains the original physical-ailment critical sample and checks the caster's own zone; Long Debt snapshots doubled physical-ailment cadence and replaces the negative-Mana penalty with25%. Native paid purchase/cast, respec, callback and clock tests pass. Fixed small-frame finite expiry drift and two deferred-bank loss paths. Editor build and fresh-census check pass;828 tests,824 passing,4 existing expected failures,0 unexpected. Python status emits: silent7→2 of371, invariant gaps35 of131; existing balance/condition/generation findings remain. At that checkpoint Snapshot Discipline and Long Debt still lacked Rot support; the lower silent count does not mean complete coverage.
-- [x] Owner-ruled slices: Overlap/Terminal, then Caster Rot support, then periodic elemental StatusDuration. Each lands separately after build/full suite/status. Fresh25% buildup transfers no credit; longer or persistent Rot spends the same finite funding. Erased and Unstable retain authored timers.
-- [x] Overlap/Terminal: editable25% unfunded seed, any later qualifying applier supplies its own damage; no automatic seed application or transfer. Terminal and Long Dark stop paying at finite exhaustion. Final-tick latch, physical refresh, original critical snapshot, respec/cleanse, seeded lockout and allied credit pass. Build/census pass;830 tests,826 passing,4 existing expected failures,0 unexpected. Status emits silent2→0 of371; Caster Rot extensions and duration routing remain separate coverage, not implied by zero silent.
-- [x] Caster Rot support: Snapshot Discipline reuses the accepted critical sample, Long Debt doubles the tick window without adding funding, and deferred applications retain both through zone exit and respec. Build/census pass;831 tests,827 passing,4 existing expected failures,0 unexpected. Status regenerated; periodic StatusDuration is the next separate slice.
-- [x] Periodic elemental duration: paid Sequence adds12%, Echo combines to18%; native ticks distribute unchanged damage/reaction funding across the full extended Rot window. Deferred accepted-hit duration survives actual Core respec; fresh applications use current lanes. Erased delay and Unstable marker are unchanged. Build/census pass;832 tests,828 passing,4 existing expected failures,0 unexpected. Status regenerated; all three owner-ruled slices now complete.
-- [x] Cheap playfeel recovery: flat2HP/s replaced with editable2% physical maximum health/s after4 seconds without combat (O2 PLACEHOLDER). Native purchased-health scaling, incoming/outgoing clock, death, Knit, Second Life and respec pass. Build/full suite832 tests,828 passing,4 existing expected failures,0 unexpected; status regenerated. Sprint/fire exclusion and720cm sprint stride with speed-clamped bob were already shipped and their regression tests still pass; live comfort remains a playtest observation.
-- Measurement recommendation: (b). O99 and power-and-scaling assert ability/weapon throughput, with no tempo exclusion; the current AbilityLane test explicitly excludes cadence, resources, reload and literal base damage and compares composed per-hit multipliers. Its0.53 is a correct narrower multiplier result, not composed throughput. Recommend retaining that diagnostic and proposing a separate native damage/time comparison at equal gear depth with fixed encounter/time windows, authored cast/fire tempo, costs/recovery and reload. Owner must rule any replacement; existing pin, denominator and enumerated finding stay unchanged. References: Docs/DECISIONS.md O99; Docs/spec/power-and-scaling.md asserted throughput row; BreakerPowerBandTests.cpp AbilityTotal and AbilityLane.
-- [x] Utility completes full candidate: Control, Threat;12 nodes/26 points, total22 wedges/187 nodes/429 points/242 edges. Purchased stagger/threat consumers pass. Every start reaches all22; exactly two ring neighbours, rank-one routes and65-point/69-point three-key refusal pass using50 level+15 world-source entitlement APIs (not encounter-trigger coverage). Build820 tests/817 passing/3 expected/0 unexpected; status.py regenerated, missing invariants37→35. Corrected stale fixture ring order/cap entitlement and isolated candidate definitions from copied fallback trees. Ally threat relation remains recorded gap; live activation next.
-- [x] Movement candidate authored: Velocity, Kinesis;17 nodes/39 points, cumulative175/403. Actual23-point No Ground route validates doubled speed, both damage conversions, nonlethal30% incoming forfeit, paid respec;9-point Kinesis validates metre/count lanes. Build816 tests/813 passing/3 expected/0 unexpected; status.py regenerated. Corrected test initialization and lethal-health clipping in the damage probe.
-- [x] Status candidate authored: Affliction, Entropy, Reaction, Rift, Void;45 nodes/104 points, cumulative158/364. Real10-point convergence/23-point Long Dark, ranked Residue, adjacency and refund pass. Build814 tests/811 passing/3 expected/0 unexpected; status.py regenerated. SecondOrder, Overlap, Sympathetic lack consumers and are explicitly marked at their declarations; no substitute effects. Fixed candidate class registration in the paid-route fixture.
-- [x] Ability candidate authored: Arc, Tempo, Reservoir, Duration;34 nodes/78 points, cumulative113/260. Real earned ranks, token unlock, equipped Mana-paid Fracture emission and respec verify cast tempo. Build812 tests/809 passing/3 expected/0 unexpected; status.py regenerated. Existing Afterimage consumer gaps recorded at site; candidate not live until complete activation.
-- [x] Defence candidate authored: Aegis, Bulwark, Constitution, Ward, Recovery;40 nodes/91 points, cumulative79/182. Actual earned Parry/Counterweight/Riposte/Wall purchases validate block, timing, healing, front shield and paid respec. Build810 tests/807 passing/3 expected/0 unexpected; status.py regenerated. Fixed fixture funding for the real level30 respec price. Candidate only; activation waits for all22 wedges.
-- [x] Weapon candidate authored: Precision, Vector, Ballistics, Loadout;39 nodes/91 offered points. Real candidate Precision purchases pay18 local+5 keystone, and native rifle damage proves Deadeye/Fixate. Build808 tests/805 passing/3 expected/0 unexpected; status.py emits with existing measurement violations. Roster helpers are excluded from runtime-consumer indexing. Live117-node roster and migration remain unchanged until complete assembly; rocket Pierce/Chain continuation gap is recorded at authoring site.
-- [x] Instrument restored: real invariant table added and status.py emitted STATE from full807-test suite:804 passing,3 expected,0 unexpected. Baseline live Core117 nodes/171 offered/65 budget; Caster11/22,10/20,9/18;0 silent of295,54 empty of86 lanes,3 uncalled of21 generation entries,37 missing of128 asserted invariants. Generator exits1 for measured out-of-band sections, not a parse/environment failure; pins unchanged.
-- Instrument correction: Python is operational. status.py refused emission because core-wheel.md lacked its required Asserted invariants table. Earlier environment-fault attribution was incorrect; use the real generator for every following cycle. The incomplete Cadence/Downbeat enhancement slice is saved outside the checkout while the owner-prioritized roster pass proceeds.
-- [x] Cadence base reload/swap contributions retain half for two seconds after each owned window actually ends. Separate source ownership, strongest-source overlap, exit/reentry, extension, real reload/swap timing, death and ability removal pass. Build/full audit807 started,804 passed,3 pins,0 unexpected. Nested Downbeat enhancement remains a separate pending slice; live Core acquisition and STATE unchanged.
-- [x] Hitscan ricochets preserve half proc and cannot produce further chains/forks; generated pellets retain zero proc including native weapon Bleed. Real earned Fan/Ricochet/Chain purchases, wall seek, ordinary chain control, authored SMG Bleed and ammunition pass. Fixed preexisting wall-surface self-obstruction by starting seek/continuation outside the impact. Build/full audit806 started,803 passed,3 pins,0 unexpected; corrected isolated wallet level. Rocket Fan proc, rocket continuation semantics and live replacement acquisition remain pending; STATE not regenerated.
-- [x] Reprisal restores Spellblade's tier4/cost2 choice after Bloodprice and six invested. A surviving native passive block grants one two-second free Cleave; shared quote/commit snapshots consume it once and refusals preserve it. Actual earned block chance, eight-point purchase, floor-cost casting, expiry, respec/rebuy, lethal block and nested lethal health callbacks pass. Build/native census/full audit805 started,802 passed,3 pins,0 unexpected; census295 nodes,144 ability keys. Fixed compile shadowing, editor tuning-field order and nested-death arming. Six Caster additions and live Core replacement remain pending; STATE not regenerated.
-- [x] Metronome retains independent per-holder half flat contributions using the casting Support's Afterimage ownership. Stack generation, listeners and maintained membership end normally; actual paid/equipped token unlock, Discipline self extension, rifle hits, foreign ownership, cancellation, death/destruction, respec/rebuy, removal and recast pass. Build/full audit804 started,801 passed,3 pins,0 unexpected. Cadence base tempo and nested Downbeat enhancement remain pending; STATE not regenerated.
-- [x] Generic, zone/window and buff/window duration contributions compose additively once and share projection math. Rot zone and Overhaul gameplay/HUD timers snapshot their matching scope through respec and actual expiry; earned-price temporary schema and normal unlock/equip pass. Serialized targets86/87 append safely, census294 nodes; build/full audit803 started,800 passed,3 pins,0 unexpected. Fixed stale wired-count assertion and isolated fixture grant/Scrap binding. Buff-only helper has numerical coverage but no new buff-only consumer; other window adoption and live replacement purchase remain pending. STATE not regenerated.
-- [x] Downbeat freezes its weapon-only flat contribution at natural Conduit expiry and retains half for Afterimage; free casts and recipient counting end normally. Real Support kit, token-paid Cadence equipment, campaign-funded Downbeat and healing-earned Charge validate full/half rifle damage, cancellation, membership changes, death, respec/rebuy and inactive ability removal. Build/full audit802 started,799 passed,3 pins,0 unexpected. Cadence/Metronome base tails and nested Downbeat enhancement remain pending; STATE not regenerated.
-- [x] Rockets use one purchased seeking ricochet on a world impact, retaining the same projectile, source, trigger and aged lifetime until terminal explosion. Real launch/ammunition, wall collision, emitted respec, nearest seek, second-wall termination, fallback, damage attenuation and half proc pass. Build/full audit801 started,798 passed,3 pins,0 unexpected. Fixed projectile self-occlusion and registered the isolated flight clock; Bulk fixture now uses native StopSimulating rather than the retired hit callback. Rocket Pierce/Chain, Fan proc correction and hitscan proc-law repair remain pending; no rendered flight claim. STATE not regenerated.
-- [x] Interference restores a Multispell tier4/cost2 choice after Resonance and six invested, selecting its existing fixed-per-status/three-status threshold curve. Actual campaign-funded purchase, token unlock/equip, paid two/three-status detonation, Payment refund, preservation and Forge respec/re-equip pass; six-status coverage is numerical only. Build/native census/full audit800 started,797 passed,3 pins,0 unexpected; census294 nodes,143 ability keys. Seven Caster additions and replacement Core activation remain pending; STATE not regenerated.
-- [x] Sidearm Rig keeps full flat damage/Pierce through the final magazine or Rig Discipline budget shot, then starts event-ended Afterimage contributions. Real starter equip, zero-cost quote, cooldown, reload exception, idle beyond nominal HUD time, recast/refusal, cancel, respec/rebuy, death and removal pass. Build/full audit799 started,796 passed,3 pins,0 unexpected. Event-ended APIs preserve finite-window semantics and prevent repeated finish from extending tails. Remaining Support lanes and live replacement Core remain pending; STATE not regenerated.
-- [x] No Distance is a real Spellblade tier4/cost2 option after Momentum Transfer and six invested. Its editable50-Mana base feeds the existing quote/commit/debit path and enables the existing full-health arrival refund. Normal XP/token unlock, equipment slot, campaign-funded eight-point purchase, baseline/purchased/refusal and Forge respec/re-equip pass. Build/native census/full audit798 started,795 passed,3 pins,0 unexpected; census293 total nodes, Spellblade10/20, other Caster doctrines9/18, numeric keys143. Corrected staged-header timestamp/UHT cache and fixture re-equip; remaining eight Caster additions and replacement Core remain pending. STATE unchanged without regeneration.
-- [x] Machinist's armour-reduction lane retains half on existing recipients for two seconds, reconciles strongest same-tag overlap, and refuses new entrants. Actual paid ultimate tests cover full/half, normal permission end, cancellation, overlap removal, source/recipient death/destruction, respec and expiry. Build/full audit797 started,794 passed,3 pins,0 unexpected; repaired an Unreal member-shadowing compile error. Direct reserve-ammo pulses are non-lane payouts under O228 and correctly stop with the window; no pulse-tail work is owed. No rendered or multiplayer tail claim; STATE was not regenerated.
-- [x] Overpressure funds bounded40% splash from each accepted ordinary weapon hit, preserving typed raw damage and secondary defenses without recursive procs; radius snapshots Concussion area and range forfeit halves composed range. Actual rifle/front-only hits, secondary armour/front/ward, native rocket blast parents, callback respec/death and earned Concussion ranks pass. Build/full audit797 started,794 passed,3 pins,0 unexpected. Mixed conversion is an explicit source-allocation fixture, not a rolled-item claim; autonomous projectile continuation and live replacement purchase path remain pending. STATE unchanged without regeneration.
-- [x] Machinist's outgoing flat-damage window retains its half contribution for Afterimage after natural expiry; primary GAS permission and kill hook end normally. Actual Armory commitment, eight paid Doctrine points and rifle/reload-earned Scrap cover full/half damage, cancellation, respec/rebuy and death/revival. Build/full audit796 started,793 passed,3 pins,0 unexpected. Fixture corrections preserve real commitment and source-pool/point-floor math. Live Core roster/layout and unregenerated STATE unchanged.
-- [x] Reaction Residue retains a purchased fraction of normal unpaid damage and funded reaction credit, reduces immediate payout accordingly and preserves finite timing. Replacement precedes consume callbacks; no new debt/persistence/expiry spread/proc funding. Separate earned Chain/Residue purchases, repeated consumption, respec, callback reentry, cleansing and native Erased expiry pass; Chain receives half the reduced primary. Ordinal85 appends safely and projection exposes retained percentage. Build/native census/full audit795 started,792 passed,3 pins,0 unexpected. Live Long Dark lease interaction and visual acceptance remain further checks; roster/layout and unregenerated STATE unchanged.
-- [x] Fracture has an authored0.35s O2 cast phase divided by cast rate, with active GAS blocking overlapping casts even under Conduction. Cost, payload, aim, cycle positions and rate snapshot at payment; cancellation/death/removal discard pending emission and preserve cursor. Actual paid starter, separate Metronome/Prime purchases, respec snapshots and existing elemental/ailment encounter tests pass. Build/native census/full audit794 started,791 passed,3 pins,0 unexpected. Repaired Multispell's untickable fixture and updated the tuning-key census141→142. Balance targets unchanged; live Core replacement and STATE regeneration remain pending.
-- [x] Ballistics Loud snapshots on direct weapon delivery and adds the nearest living enemy outside a rocket blast within one further radius. Existing edge damage pays the extra hit; ordinary targets remain uncapped. Native paid-schema rocket tests cover nearest/tie selection, normal victims, outer refusal and emitted/new-shot respec behavior. Build/full audit793 started,790 passed,3 pins,0 unexpected. Overpressure and autonomous rocket continuation remain unbuilt; live roster/layout unchanged and STATE not regenerated.
-- [x] O234 pathing: builder notables open at minor rank1; ranks2/3 remain optional. Metadata-bearing gateway access accepts an owned same-currency node in either neighboring wedge, including wraparound, while legacy gateway-only trees retain their contract. Earned purchases cover cheap10-point major convergence, optional deepening,17-point refusal/18-point gate and23-point keystone, foreign/currency exclusions and exact respec. Build/full audit792 started,789 passed,3 pins,0 unexpected. Live roster remains117/layout1; no roster/count change or visual activation claimed.
-- [x] Source census parser accepts literal descriptions and dereferenced description identifiers without changing node/tier/rank/cost captures. The omitted node was Caster.Multispell.Sequence: source291→292, native292, ID differences0. Exact regex checked independently in PowerShell against source/native IDs and escaped-literal/dynamic fixtures. Python execution and STATE regeneration were not run; no claim of a Python runtime check. Editor build and full suite audit791/788/3 pins/0 unexpected pass.
-- [x] Splinter selects a later-target weapon More in the shared three slots. One trigger retains its first enemy across pellets, pierce, chain, forks and sibling rocket impacts; emitted source pools survive respec. Native paid weapon delivery and competing gear sources pass; autonomous rocket geometry remains separate.
-- [x] Reaction Chain pays one nearest enemy within5m half the funded primary payout, with original source attribution and no new buildup/proc chain. Callback reentry and invalid recipient checks pass.
-- [x] Provoke flat damage and Answering Fire proximity income retain half lane contributions for Afterimage; natural expiry, absence, respec/rebuy and actual death cleanup pass. Cadence Break's acquired stacks retain their measured half tail. Remaining Gunsmith/Support windows are pending.
-- Trigger/reaction/window validation: build and native census pass;791 declared/started,788 passed,3 existing pins,0 unexpected through PowerShell suite auditor. Corrected a post-respec baseline and test enemy AI reactivation; actual critical hits are normalized for lane comparison without forcing critical chance. Live Core remains117/layout1; STATE unchanged without regeneration.
-- The owner confirms all22 wedges/187 nodes/429 points. Author Weapon, Defence, Ability, Status, Movement, Utility in separate commits; ring follows that order and wraps Threat to Precision. Activate full roster and frozen-cost migration together, then validate neighbour-only entry and finish all Caster doctrines to12 nodes/24 points. Density must be measured from rank-one routes; multiplayer, hideout, trading and account authority are excluded.
-- Sympathetic banks each source/element independently with normal buildup decay and the latest accepted applying-hit snapshot. Unlock applies eligible funding; an occupied status slot preserves the waiting bank. Replays never manufacture funding from reaction payout.
-- [x] Fixate is a selected critical-weapon More in the shared three slots; actual rifle, respec snapshots, derived-payment exclusion and gear competition pass. Overheal supplies15%-physical-health capacity floor and central excess conversion without double amplification or free fill; projection includes its floor.
-- [x] Afterimage preserves half numerical contributions for Slipcut, Skim, Sightline, Overdrive and Cadence Break; explicit cancellation/death/respec revoke leases, discrete channels combine before rounding. Paid speed, outgoing rifle damage, fire rate and Sightline consumption pass. Cadence Break stack-tail runtime and remaining Tank/Gunsmith/Support/resource windows are still pending.
-- [x] Break snapshots weapon-only armour shred, applies after the enabling hit, caps three independently expiring stacks and survives emitted-request respec. Actual rifle, nested callback, avoidance/zero/derived refusals and expiry pass. Sympathy copies finite original Rot once at natural expiry to the nearest eligible enemy; native buildup/ticks, respec snapshot and consume/cleanse refusal pass.
-- [x] Ignore Me suppresses personal threat and doubles owned-deployable earned threat with existing zero-threat fallback; prior ledger suppression, respec, attribution and destruction pass. Ally doubling remains unbuilt without an authoritative party relation.
-- [x] Reusable Core construction stamps ranked lanes, adjacent gateways, local convergence/keystone gates and explicit roles from supplied authored nodes. Earned purchases/refusals, minimum23-point keystone and exact refund pass. It does not author or activate the replacement roster.
-- Window/shred/spread validation: editor build and native census pass;787 declared/started,784 passed,3 pinned failures,0 unexpected through PowerShell suite auditor. Corrected fixture clocks, moving Skim input and native-health buildup thresholds without weakening assertions. Live Core remains117/layout1; replacement roster and migration remain pending; STATE unchanged without regeneration.
-- [x] Accepted-damage threat selects player/deployable targets with stable ties, live-target feedback and unchanged reward attribution. Native target switching, actual melee damage to a turret, destroyed/dead target pruning and the real starting-player safe-zone path pass. Projectile request copies preserve direct source; derived status attribution remains below.
-- [x] Direct deployable threat attribution survives physical/elemental status and reaction snapshots, refresh and spread; expired producers do not become owner threat. Reward owner stays unchanged. Native delayed/periodic/reaction/refresh/destruction checks pass; Pierce retains its existing copier-attribution policy.
-- [x] Counted lane prerequisites and local wedge investment support ranked lanes, two-of-three convergence and an18-point gate independent of other wedges. Real level-earned purchases/refusals and exact respec refund pass; replacement roster remains separate.
-- [x] Frozen117 legacy Core purchase costs and atomic once-only refund migration are tested through an archive missing the new version field. Migration stays inactive until replacement roster/save writers activate together. Unknown allocations refuse rather than guessing cost; older retired layouts need historical-cost coverage before activation.
-- [x] Composed projection pins the existing0.25-per-point baseline against gear and refuses phantom fourth-rank/unknown-node gains. This is the existing additive floor, not a new relative-power target.
-- Validation: editor build passes;733 declared/started,730 passed,3 existing pinned failures,0 unexpected via the seat's PowerShell suite auditor. STATE remains unchanged without regeneration. No new wheel layout or visual completion claimed.
-- [ ] Build the supplied generic stat/rule vocabulary before authoring its nodes; validate actual delivery, resources, defensive routing and forfeits.
-- [x] Literal AddedWeaponDamage/AddedAbilityPower lanes compose after item-level base scaling and before delivery power/source pools. Rifle, rocket snapshots, paid Siphon and paid turret prove actual delivery; raw weapon-base accessors keep Ability-delivered deployments/blasts separate from weapon bonuses. Temporary schema purchases validate primitives; replacement Core acquisition remains unbuilt.
-- [x] Save writers stamp active Core layout; legacy adoption copies its source version. The active version remains1 until the new roster is ready.
-- Literal/status batch validation: build passes;737 declared/started,734 passed,3 pinned failures,0 unexpected via PowerShell suite audit. Native census regenerated for the two appended stat targets. Turret fixture now uses real initialized callbacks, authored starting ammo, paid reload income and the native enemy attribute set. No ability-balance or new-wheel completion claim.
-- [x] New-schema gateways require either owned neighbor after the first purchase. Census now exports gateway/adjacency, grouped prerequisites and investment gates; legal ranked purchases, cross-tree refusal and respec reset pass.
-- [x] Generic health/armour Increased, physical reduction, elemental resistance and ailment avoidance have live consumers and shared caps. Paid temporary schema plus actual rolled equipment validates damage, buildup and removal. Defence percentages are flat percentage points, not Increased damage buckets.
-- [x] Deployment cast delay and Siphon channel spacing snapshot their respective rates without changing costs/window length. Overclock converts half cooldown-recovery bonus into both rates without recursion. Actual paid clocks and purchased rule aggregation pass; instant Fracture still needs an authored cadence.
-- Gateway/defence/tempo validation: build passes;743 declared/started,740 passed,3 pinned failures,0 unexpected. Census regenerated. An obsolete enum-tail assertion was corrected while preserving serialized ordinals. Core roster and migration remain inactive; generic non-Caster costs, resource generation and remaining rule rewrites are next.
-- [x] Live efficiency applies once to every class before class price/window rewrites. Actual rolled gear, legal Swift Spend to Live and paid Caster Siphon/Unmake validate HUD, refusal and debit; no squared Caster cost reduction.
-- [x] Generic generation reaches all five native income loops. Earned temporary-schema purchase, source notifications, respec, direct grants, Mana suspension and Scrap destruction-refund checks pass. Source notifications isolate generation; they are not encounter acquisition evidence.
-- [x] Sprint/acceleration, jump height, additional air jumps, traversal speed and safe-fall distance have live movement consumers. Actual repeated input, swept falls/vaults/mantles and respec pass; faster traversal snapshots at actual movement entry, not queued input. Generic jumps do not acquire Swift's innate redirect.
-- [x] Exact153 historical Travel IDs supplement the frozen117 cost table, using verified one-point historical costs. Mixed old/current allocations refund once; malformed boundary IDs refuse atomically. Active layout version remains1.
-- Resource/movement/migration validation: build passes;747 declared/started,744 passed,3 pinned failures,0 unexpected. Census regenerated. Fixtures now advance small real world frames through source ICDs and begin traversal before testing mid-traversal respec. Full accepted roster is preserved in Docs/spec/core-wheel.md; remaining rewrites and new wheel activation are still open.
-- [x] Conduction bypasses cooldowns and snapshots final cast costs with an owner-wide five-second fading surcharge. Actual paid Swift casts validate reentry, failed casts, expiry, respec and death; class-specific Conduction combinations remain further integration work.
-- [x] Generic flat resource regeneration and Second Shift reach all five native loops. Core/gear supplemental regeneration still needs a single composed payout before activation; the separate paths are not final.
-- [x] Nine weapon numeric lanes have native consumers for range/falloff, rocket speed/area, reload/swap, magazine/reserve and pierce loss. Paid schema tests cover real shots, reloads, ammo conservation and rocket launch/explosion snapshots; autonomous rocket flight is not claimed.
-- [x] Optional Core role/lane/sector metadata exports through census and produces a nonoverlapping187-node structural layout. Actual menu adoption and visual inspection remain next.
-- Weapon/resource/Conduction/layout validation: build passes;751 declared/started,748 passed,3 pinned failures,0 unexpected. Census regenerated. Corrected fixtures use a legitimately free low-level respec and Support resource above its native OOC ceiling. New roster and migration remain inactive.
-- [x] Supplemental Core and gear regeneration now share one composed Flat/Increased attribute and one active-class payout. Actual rolled gear, bought Core stats, Overrun and suspension validate single payment; existing Mana tuning is unchanged. Other four resource loops keep safe-zone exclusion.
-- [x] Six elemental source lanes snapshot generic/specific buildup, penetration and threshold reduction at emission. Actual paid Siphon, respec and stored requests prove earlier buildup without extra earned damage. Post-crit raw element allocations are explicit; per-element damage multipliers and source-specific HUD threshold presentation remain separate work.
-- [x] Quickdraw gives one additive first-shot bonus after a completed swap; Two Guns transfers reserve into the holstered magazine over six seconds without reload-trigger payouts. Native paid-schema shots/timers validate refusal, miss consumption, respec, death-event cleanup and ammo conservation. Death fixture dispatches the real delegate rather than a lethal hit.
-- [x] Role-aware UI and inert187-node preview render a circular overview plus clear focused lanes, rank pips and hover details. Six720p/1080p overview/major/minor captures inspected. Fixed tiny scaled labels, DPI sizing, invented hub spokes and edges crossing unrelated nodes. Overview has a readable wedge rail; preview cannot purchase or respec. This is structural presentation, not live roster activation or authored icons.
-- Source/regen/Loadout/UI validation: build passes;754 declared/started,751 passed,3 pinned failures,0 unexpected. Native census regenerated. Corrected source-stat fixture buckets and routed Quickdraw through the shared damage API without relaxing conformance. Final captures live under Saved/CoreCapture; STATE remains unchanged without regeneration.
-- [ ] Replace the wheel, save version and UI together; inspect ranked nodes, adjacent wedge routes, purchase/refusal and refund flows.
-- [x] Elemental/Rot/Void/Rift/reaction Increased have distinct live consumers that join the original additive bucket. Converted portions share one crit result; physical DR weights actual unconverted raw damage. Paid Siphon, mixed shares, elemental status payouts and respec snapshots pass. Fixed pre-binding source splits advertising zero flat damage beside valid native defaults.
-- [x] Elemental, Void, Reaction and Effective Health Mores join the same three-source gear/tree selection. Matching scopes, temporary windows, target riders and late element assignment respect remaining headroom. Effective Health changes existing-pool durability without healing/capacity. Joint selection/projection and actual defensive-pool tests pass; identity rows remain hidden by existing UI filtering.
-- [x] Reaction credit is funded when its original status is applied, then reduced with claimable unpaid damage. Native partial ticks, shortened lifetime, foreign trigger, respec, callback reentry and purchased Chain propagation pass; neither payout nor copies reapply the source bonuses.
-- Scoped damage/defence validation: build passes;763 declared/started,760 passed,3 pinned failures,0 unexpected. Native census regenerated. Test expectations include the existing0.25% spent-point floor; invalid direct Rot-copy fixture replaced by real Chain acquisition. Roster/migration remain inactive and STATE unchanged without regeneration.
-- [x] Density redistributes the same finite Rot budget; Hemorrhage snapshots faster physical ailment clocks and refuses refresh; Deepen supplies an offensive extra stack. Earned purchases, paid Fracture and partial reaction settlement pass. Long Dark remains separate.
-- [x] Recovery stats reach central healing and existing passive recovery/recharge. Overflow conversion cannot amplify or heal twice; Second Life pays half the composed regeneration in combat. Native player fixture covers earned purchases and respec; Overheal capacity remains separate.
-- [x] Threat generation, deployment health snapshots and targeted Provocation accuracy have actual consumers. Native target switching/ranged windup and deployment checks pass; party-wide threat remains unbuilt; zones use duration, not health.
-- [x] Immovable blocks forced displacement and faster locomotion while retaining ordinary jumps; Phantom Step sweeps instant traversal. Real obstacle tests pass, including the walking forfeit when both are owned. Fixed a pre-existing fractional endpoint bug that sent completed ascending traversal toward its starting height. Newly inserted blockers and mid-traversal acquisition remain additional coverage.
-- [x] Ward Insulation doubles buildup grace/fade only. Null refuses one valid ailment per six-second combat boundary, including an elemental threshold; callback reentry and no-tick gaps cannot grant extra refusals. Earned native physical/Void and fade checks pass.
-- Ailment/recovery/threat/movement/Ward validation: build passes;759 declared/started,756 passed,3 pinned failures,0 unexpected. Census regenerated. Corrected missing player-state fixture and exact traversal endpoint; assertions retained. New Core roster/migration still inactive; STATE remains unchanged without regeneration.
-- [x] Deadeye guarantees direct critical hits while halving positive critical-damage bonuses; native baseline and negative penalties stay intact. Actual rifle, paid Siphon and emitted Fracture/physical-ailment snapshots survive respec correctly.
-- [x] Fan adds two projectiles to hitscan and rockets while forfeiting spread reductions. Predicted/fired cones agree, including idle burst reset. Rocket siblings debit one round and settle Damage Ramp once; purchased Emplacement cannot bypass the forfeit.
-- [x] Long Dark owns one persistent Rot lease with death/respec/consume cleanup and guarded replacement callbacks. Persistent ticks continue after finite reaction credit runs out without replenishing it. Persistent indicators replace misleading expiry timers; no new rendered capture claimed.
-- [x] Parry timing lanes, Riposte and Perfect Guard have native RPC-handler coverage. One successful parry pays healing and arms protection before callbacks; passive avoidance and its projections become zero. Follow-up guarded hits cannot repeatedly pay rewards.
-- Keystone batch validation: editor build passes;768 declared/started,765 passed,3 pinned failures,0 unexpected via PowerShell suite audit. Census refreshed. Fixed stale enum-tail checks, controllerless ability targeting, real rocket cadence and an old eight-pellet fixture whose multiplicity now reaches rockets. Replacement roster/migration remain inactive; STATE unchanged without regeneration.
-- [x] Pool/element/zone/Control consumers: named shield capacity + Core pools/Wall/Third Layer, No Ground/converters, Patience/Debt, Rift path rules, Standing/Detonation and attributed stagger rules pass native runtime checks. Replacement Core acquisition remains inactive.
-- Pool/element/zone/Control validation: editor build passes;776 declared/started,773 passed,3 pinned failures,0 unexpected via PowerShell suite audit. Census refreshed. Fixed intermediate equipment-swap capacity clamping and absent Interposition cleanup hiding real shield breaks; corrected Velocity's overkill-limited fixture. STATE remains unchanged without regeneration.
-- [x] Cold Barrel reduces the literal hip/aim base before bloom and movement, with Fan refusal and actual fired/predicted cone checks. Endurance supplies combined owner health values while raw damage/healing, Hold and target thresholds retain physical pools. Bait reads actual live owned deployable targeting and adds Increased once before status funding; foreign/destroyed lures and funded payouts cannot acquire it.
-- Base-spread/Endurance/Bait validation: editor build and census pass;779 declared/started,776 passed,3 pinned failures,0 unexpected via PowerShell suite audit. Earned temporary-schema purchases/respec cover runtime consumers; replacement roster stays inactive. Endurance measured at80% physical health plus full layers enables HealthHigh, while full physical health plus empty layers fails it;33% physical plus full layers refuses HealthLow. STATE unchanged without regeneration.
-- Remaining consumer groups: rocket Pierce/Chain and proc-law repair; remaining ability area/duration and Afterimage lane consumers; Second Order/Overlap/Sympathetic reaction exceptions; party-aware ally threat. Replacement roster authoring, activation, purchase layouts and save migration remain pending. Do not count generic helpers or spec entries as completed runtime consumers.
-- Status-duration gap: native Entropy/Void/Rift applications call ApplyStatusInternal with already-scaled duration, bypassing the source StatusDuration lane. Sequence/Echo therefore do not extend elemental statuses. Before changing it, resolve whether generic duration also lengthens Erased's delayed payout and Unstable's marker; finite earned damage must not be silently enlarged.
-- Implementation decisions O228–O233: Afterimage halves lane contributions with existing quantization; Endurance supplies combined owner health values except Hold/enemy-facing reads; Ignore Me retains existing zero-threat fallback; Sympathetic defers source-specific elemental applications per enemy while buildup continues; Loud reaches one additional radius; Decoy is deployable-only. These rules remain implementation work. Measure Endurance's high/low-health condition uptime. Projectile fractional carry is already shared by hitscan/rockets and is documented in the Core contract.
-- [ ] Measure composed purchase steps and offered density from the actual new roster; regenerate the census and status with a trusted runtime.
-- Roster: preserve all22 named wedges (11 major/11 minor,187 nodes,429 points offered,6.6x). The detailed roster governs the conflicting header arithmetic under the owner's instruction to use implementation judgment.
-
-## Progression and combat (step 3)
-- [x] Attune reserves all locked signature IDs and category seats before drawing, including signatures stored after ordinary lines. Existing over-eight-line items retain their shape and reserve later original IDs against duplicate fallback. Native archive roundtrips,1024 paid seed draws, actual salvage-funded held-item crafting and exact debit/refusal checks pass; broader old-item normalization remains unruled.
-- [x] Hard Stop protection now expires after its real window: cleanup is Combat-owned so GAS ability teardown cannot delete it. Both base/Spend to Live paid runtime damage checks pass; repeated paid cast replaces the deadline. Explicit cooldown-reset diagnostic is separate from ordinary player reachability.
-- [x] Gear regeneration and Resource on Kill respect paid Unmake Mana suspension; actual Overrun/ordinary sustain rolls prove normal income, suspension, healing continuity and resume after cancellation.
-- [x] Loot pickup validates live nearby same-world collectors and static LOS; claim precedes acquisition callbacks to prevent duplicate transfers. Full backpack preserves the drop and releases claim. Shared Character finder/RPC and actual rolled transfer/reentry/death/range/wall/capacity checks pass.
-- [x] Pressure generates its count-independent Charge after Suppress casting ends; GAS no longer cancels its timer immediately. Death/respec permanently invalidate the old lease; rebuy/revive cannot rearm it. Real healing funds both paid casts and occupied zones prove ranks1/2.
-- [x] HUD affordability reads the granted ability instance live, including Spend to Live doubled cost. Active cooldown radial duration uses the applied effect snapshot, so airborne reduction starts empty and landing cannot change its denominator. Actual legal unlock/slot/purchase paths and paid casts pass; Core unchanged.
-- [x] Open Wound pays only on accepted damaging Rend hits; avoided first targets preserve rank-one entitlement. Legal purchased/paid runtime covers avoidance, immunity, first-successful hit, both ranks, shield-only and lethal hits. Its existing LifeOnKill-as-LifeOnHit substitute remains a separate authored gap.
-- [x] Prolific applies its signed tier step to downside affixes as well as benefits. Actual rolled/equipped Riftplate and paid Temper preserve printed values, ordinary-item isolation and the printed-tier ceiling.
-- [x] Static zone outlines follow refreshed and paused lifetimes, radius growth and early destruction; world runtime covers long frames and recycled renderer handles. Isolated paused/refreshed captures inspected at720p/1080p; raised-paving fill clipping and network lifetime replication remain open.
-- [x] Tell now exposes actual marked melee/Lattice/Warden windups beside the enemy health bar. Paid legal Support runtime covers ownership, idle/windup and respec; actual Lattice windup captured at720p. Cadence copy now specifies half of gear Increased Fire Rate as Increased Weapon Damage; actual rolled equipment proves secondary displacement and excludes purchased tree rate from conversion while preserving ordinary point-spend damage. Combined suite:717 started /714 passed /3 known failures /0 unexpected.
-- [x] Dry Fire R2 refunds one second from actual active ability cooldowns on the last round. Legal purchased/paid Swift runtime covers R1/R2 and reload non-repayment.
-- [x] Deadfall and Overrun use completed vault/mantle windows instead of retired wall riding. Real rolled/equipped tests land through physics before checking the bonus, then cover expiry, abort and teleport. Overrun explicitly describes gear regeneration; item IDs and magnitudes unchanged.
-- [x] Repair Cascade silent echoes and cancel queued echoes when its originating ultimate ends; include targets spawned during the window.
-- [x] Implement Long Dark's zone-expiry pause during its originating Unmake window; actual purchased/paid casts retain damage and membership and release on expiry, cancel, death and respec without later rearming.
-- [x] Split Caster elemental selections across one hit and one budget; preflight one reaction, preserve proc safeguards and single Sympathetic bonus. Resonance delivery is repaired.
-- [x] Actual Siphon unlock appends Void once; starter three remain, existing unlocks reconstruct, and a legal eight-point paid Fracture path delivers Entropy/Void together.
-- [x] Replace Hold's percentage substitute with an expiring per-hit cap: base 25% maximum health, solo Wall 12.5%, editable O2 tuning; paid base/purchased Wall prove large/small hits and cancellation/expiry. Vein remains uncapped.
-- [x] Add ordinary conditional ability-power affixes for low resource, depleted resource and completed ledge traversal; actual rolls/equips and live condition changes increase ability damage without weapon spill.
-- [x] Replace Interposition's solo shield trickle with temporary headroom behind the owned Anchor; paid cast checks rear/front/range, repeated entry and destruction without free shield.
-- [x] Detonation second ultimate press releases its paid stored damage once; expiry remains a fallback, cancellation/death/keystone loss discard it.
-- [ ] Finish remaining live solo node gaps.
-- [x] Overdrive holds effective Redline while its paid window is active without refilling raw Momentum or allowing a free recast. Actual weapon channels, raw-resource conditions, early close, death/revival and expiry are covered by paid runtime checks.
-- [x] Medic Triage Priority rank two scales Field Kit's Purge immunity using the existing target-health curve. Actual healing earns the cost; legal eight-point purchases verify full/half/low-health immunity and elemental buildup after expiry.
-- [x] Stash transfers return their actual refusal reason to the UI and read Anchor location at click time; successful operations clear stale messages. Transfer journal ordering stays intact. Combined batch: build passed, 704 started / 701 passed / 3 known failures / 0 unexpected.
-- [x] Lingering rank two grows an overlapping refreshed Rot by one metre once per zone, including its membership and replicated footprint. Paid four-point path proves rank-one refusal, growth, new enemy damage, repeat prevention and fresh-zone reset. Suite: 702 started, 699 passed, 3 known failures, no unexpected failures. Overhead base/grown captures inspected; flat fill clipping into raised paving remains visual work.
-- [x] Emplacement's moving weapon spread requires the rear of a live owned Anchor within its existing radius. Actual six-point purchase and paid Anchor prove moving versus stationary cones, front/side/rear/range, rotation and destruction. Suite: 701 started, 698 passed, 3 known failures, no unexpected failures.
-- [ ] Finish ability-versus-weapon balance with sustained actual delivery; retain existing parity findings until their conditions are resolved.
-- [x] O227 starter recovery pass: 11 Mana/s baseline, Patience adds 1/s after its existing 4/2s delay. Paid starter Fracture reaches 204 DPS versus rifle 195 during seconds 10–20; Patience increases full-minute casts (41 versus 38 standalone). Costs, damage, conditional caps and fixed parity fixtures unchanged. Build and suite: 706 started / 703 passed / 3 known failures / 0 unexpected. This establishes starter sustain, not full item-level or encounter balance.
-- [x] Damage numbers reserve actual enemy names, health/status bars, modifier rows and boss pips. All four 1080p/720p combat frames inspected; sampled hit/Rot labels clear the visible plate. Crowded boss encounters and final VFX remain unvalidated.
-- [x] Grounded local movement plays five existing recorded concrete footsteps through one shared, settings-controlled director. Distance cadence rejects airborne/menu/dead/traversal/teleport movement. Native component-to-PCM and all 12 voice volume checks pass. Surface-specific selection and audible mix acceptance remain outstanding; STATE unchanged without regeneration.
-- [x] Repair Cleave wall-only occlusion and reject Bleed on avoided/lethal hits; actual paid casts cover aligned enemies, wall, dodge, purchased parry and lethal melee income.
-- [x] Reject hitscan Bleed and pierce Poison payloads on avoided hits; actual purchased Threshold/Pierce/Chain and paid shots preserve accepted originals/copies. Live aim checks confirm stationary first-shot accuracy, increased moving-ADS spread, movement cost and release recovery.
-
-## Completed element implementation (steps 1–2, O221–O225)
-- [x] Add explicit element identity, accepted-hit buildup and chassis-scaled thresholds; Entropy applies Rot with damage snapshotted from the applying hit.
-- [x] Route an actual weapon conversion affix and Caster Rot through the same damage/buildup path. Resistance changes buildup only; Bleed and Poison remain physical.
-- [x] Retire legacy Status.Void armour/healing reduction. Siphon keeps damage/healing and Sequence earns its third status through actual Entropy.
-- [x] Show enemy/player Entropy buildup and active Rot timers; inspect actual combat captures at 1920x1080 and 1280x720.
-- [x] Give Vestige melee an authored Entropy share and family buildup resistance; restore Fracture's third position as real Entropy hits. Add the missing native player status receiver.
-- [x] Support Attunement converts real Cadence/Metronome recipients' weapons to Entropy, with rank-two linger, independent ownership and fire-time projectile snapshots.
-- [x] Support Sympathetic adds damage-independent buildup through actual maintained buffs and gives each attacker's protected buildup its own gradual fade. Weapons and Entropy ability casts snapshot the effect.
-- [x] Keep Rot damage numbers separate from physical ticks and add bounded activation VFX/audio; inspect 1080p and 720p combat captures.
-- [x] Repair real projectile collision and aimed Rot placement; tune Caster burst damage and verify every zone lifetime tick against shipped trash/veteran chassis.
-- [x] Validate Entropy implementation in sustained paid casting and authored encounters. Fracture continues paying and dealing damage during seconds50-60; purchased Patience increases post-opening casts against matched controls. Live ability/converted-weapon delivery and reward-loop checks pass. This is implementation coverage, not human balance acceptance; fixed progression parity remains in step3.
-  - Entry now opens with4melee/1Lattice rather than12melee. Actual first-wave AI delivery runs use normal starting resources: converted and guaranteed starter rifles kill4/5 before death at11.95s; paid Fracture/Rot kills4/5 before death at24.60s and activates Rot. This basic driver approaches and aims but does not evade; results prove delivery and threat, not player skill, successful clears or balance. Negative Mana(-10.30) is legal Overcast above the authored-20floor. Entry is free despite area5; naturally earned Fernhall progression and full-run balance remain unmeasured. Buffed traveling Fracture now proves Sympathetic snapshot and timed fade; audible mix still needs playtest evidence.
-- [x] Finish Void implementation: delayed Erased, paid Siphon, ordinary weapon conversion and family attack delivery validated. Altered applies Void; Vestige authored attacks consistently apply Entropy. Human balance acceptance remains separate.
-- [x] Build Rift kernel and Breach delivery: accepted-hit Unstable pays once and sweeps actual enemy/player capsules against walls and ledges; status, damage and audio feedback are wired.
-- [x] Finish Rift weapon conversion through actual rolled/equipped Primary hitscan and rocket fire-time snapshots.
-- [x] Implement Collapse, Wither and Tear, consuming only the first status's unpaid damage; accepted-hit, callback, hitch, shortened-duration and cancellation tests pass.
-O221–O225 are recorded in DECISIONS and combat intent. Element magnitudes remain O2 tuning in Data/elements.json. Element implementation is validated; human balance and audible-mix acceptance remain part of the eventual playtest.
-## Current owner direction
-Implement the owner's supplied Core wheel through independent, validated primitive batches, then activate the authored layout and save migration together. Continue the seven-step pass after this work. Report progress during execution without stopping after each intermediate commit. Step7 is a larger polish effort and must not be rushed to claim completion.
-Finish steps 1-7: Entropy, remaining elements/reactions, progression/combat, loot, interface, Fernhall/Rift content, then the full visual/audio identity pass. Anchor and Fernhall environment presentation belongs in step 6 and is prioritized before the additional destinations. Step 6 includes two additional larger persistent destinations alongside Fernhall, campaign traversal and return Rift activities, and an in-game destination map. Ordinary enemies retain fixed regional level ranges; tougher return Rifts supply later challenge. Automated checks and inspected captures validate implementation; human balance acceptance remains separate.
-
-## Playtest queue (owner, 2026-09-07)
-The owner will playtest after the remaining Entropy pass is finished. Continue its remaining encounter tuning and presentation work through tested batches, then report for playtest; do not stop after each intermediate checkpoint.
-- (ui, npcs, systems) Reduce menu density and clipping; repair NPC interaction flow, ability assignment and point spending; present Core as the authored tree rather than a node cloud; update the dev sandbox. Finish silent nodes and Caster progression.
-- (maps, story, endgame loop) Finish Fernhall → Rift → reward → return, expand Fernhall into meaningful combat areas, make Anchor a hub, and author one memorable mission. Validate the complete Rift loop before expanding multiplayer/MMO scope.
-- (abilities, build diversity) Improve ability builds versus weapons; investigate intermittent Rot damage, ticks and numbers and Caster Cleave range. Provide an easy ability/ultimate/base-stat tuning surface.
-- (movement, weapons) Reduce sprint bob/sway; disallow sprinting while shooting; remove dash except innate Swift; give scoped/unscoped fire a tradeoff. Add base health regeneration after four seconds out of combat (owner suggests 1–2; magnitude to tune).
-- (loot & economy) Fix gear behavior and show base weapon damage. Evaluate Standard 3–4, Uncommon 4–5, Exceptional 4–6 affixes with existing tier caps. Aberrants should have quirky unique rules; Unwrittens should have strong build-defining exotic perks; the no-More restriction does not apply to these two categories. A well-rolled and treated Exceptional should outperform them on some axes.
-- (visuals, sound, enemies) Improve arms and weapon models, integrate weakpoints, add subtle enemy names, and make one weapon/ability/enemy/boss visually polished. Add audible combat feedback. Replace colored ability borders with placeholder icons, radial cooldown recovery and numeric timers; hide irrelevant Riftglass. Smooth the death screen and mouse handoff.
-
-## Repair dependencies found in runtime review
-- [x] Piercing copies retain the source's already-scaled remaining duration. Actual ordinary Rifle/earned Swift pierce with purchased Linger verifies physical Poison copy payload, proc0 and expiry; Poison seed is explicit, not a Swift ability claim.
-- [x] Bulk's owned live Anchor rejects incidental radial damage, preserving direct-impact vulnerability and health scaling. Real rocket impact dispatch and paid ranks0/1/2 verify this plus respec and unrelated deployables; projectile flight is not claimed.
-- [x] First-contract seven outdoor kills earn159 XP; authored120 XP turn-in now reaches279/level2 with an ordinary Core point. Duplicate/restored/unearned turns cannot repay. Level5 ability-token gate and global curve unchanged. Actual dialogue offer shows data-derived item/XP reward at720p without clipping.
-- [x] Feed the Forge now requires physical residue from six actual Vestige deaths. Owned drops use F collection with a count-bearing prompt, distant labels, range/LOS/death/quest guards and no backpack cost. Kills alone cannot complete it. Partial counters survive, duplicates cannot repay, revival resets source claims, leftovers clear on completion. Actual Fernhall six-collection and restored3/6 fixtures pass;720p/1080p pickup frames inspected. Residue mesh remains a placeholder; network and human interaction acceptance remain unclaimed.
-- Next implementation slices: separate damage numbers from enemy plate bounds and finish legal sustained build comparisons. Keep existing parity failures until the actual shortfall is resolved. Attunement currently specifies Entropy; future element selection needs selection timing, persistence and overlapping-buff rules before adding a control.
-- Environment/audio slices after the repair queue: Fernhall facade/material separation, grounded distance-driven footsteps using verified shipped samples, and region-owned ambience with suitable sound assets. Extra destinations and their map remain separate playable-content work.
-- Resonance is an untyped Elemental status-count detonation; its purchased preservation keeps earned Rot at half remaining duration/budget without triggering Wither. Tank incoming resource uses the actual hit proc coefficient, including proc-zero reactions.
-- Step3: split-budget Fracture preserves adjacent elements and one direct hit; Cascade skips elemental entries. Actual Siphon unlock appends Void through progression, including existing unlocks.
-- Support Attunement and Sympathetic deliver Entropy through actual maintained buffs; Void/Rift choices wait for their element pipelines. Tank Kinetic Recovery consumes actual owned blast landings and protects against real fall harm and stagger.
-- Doctrine progression now has all four authored benchmarks across three acts and pays 8/8 through the physical finale at level50. The real mission probe verifies actions/reloads but uses an explicit XP fixture at the final gate; normal campaign leveling pace remains unvalidated.
-- New special loot now respects its final affix budget. Existing saved items remain unchanged; a migration still needs to be designed.
-
-## Content phase after the repair list (owner, 2026-09-07)
-- [x] Act II rail-trench investigation now marks and tracks its actual living level16 contact with stable encounter identity and live position. Acceptance/arrival gating, unrelated deaths, completion and restored journals prove marker lifecycle without granting discovery. Actual campaign-path720p/1080p MAP captures inspected with objective, level, distance and controls visible; destination/district map and content expansion remain open.
-- [x] Campaign probe collects actual Forge feedstock through normal ownership/range/visibility/journal checks after its accelerated kills. Contact-map capture preserves the open menu until the screenshot completes; Scripts/ue-loop-probe.ps1 exposes ContactMap and resolution options. Both fresh isolated runs reach the contact after real dialogue/travel/collection and Act I completion; this is not ordinary combat/leveling balance.
-- Forge/contact-map validation: editor build passes;780 declared/started,777 passed,3 existing pins,0 unexpected via PowerShell suite audit. First capture found obsolete missing feedstock collection; repaired probe then passed twice. Final frames under Saved/ContactMapCapture/1280-db7d9ba052d940a3892778cda81c0cf7 and1920-af3b29d2f4f041faae57ceca74f38ffd. STATE remains unchanged without regeneration.
-- [x] Breach entry uses one live eligibility check across door, menu and GameMode; missing prior turn-in/assignment is shown before selection and checked again on click. Refusal keeps the menu open, dead/null actors emit no entry, ordinary campaign entry remains free. Actual journal-state/native-door tests and720p/1080p prerequisite captures pass; large empty travel panel remains density work.
-- [x] Fernhall maintenance courtyard:36x42m optional combat space connected through an8m bent passage, full-height/low cover, textured service gantry and warm lamp. Three ordinary Vestiges and one Lattice use fixed entry level5 and existing rewards; original11 outdoor enemies and159 entry-kill XP remain. Actual world checks cover supported capsule routes both ways, closed outer corner, blocked inner/outer sightlines, native quartet/attack and map footprints. Invisible collision joins seal exact-edge cracks without overlapping visible floor slabs. Four final1080p arrival/entrance/combat/reverse frames and720p map inspected; foliage blocking the doorway and orphaned roof housings repaired. Walls/materials remain blockout; no full encounter-clear or human-balance claim.
-- [x] Capture tour advances the actual pawn only after the viewport processes its screenshot, then waits a full interval. Pending requests cannot overwrite each other; EndPlay removes callback/ticker. Final four-frame tour confirms arrival then each authored vantage. This repairs the shifted-frame finding below.
-- [x] Campaign objectives appear on the local map through actual dialogue identity, travel destinations and Rift encounter IDs. Current target can be tracked without granting exploration discovery; quest advancement retires the old target.720p/1080p map frames inspected with objective/header/legend/back visible. World encounters without a concrete site retain tracker text only; destination map and district discovery remain open.
-- [x] Fernhall entry stone, pale connecting surfaces and industrial Substation now have distinct ground treatment, service paving and drains. Anchor residential facades gain pale awnings/shutters/doorstep planting; workshops use rust awnings/vents/pipes. Overlay bounds, collision and navigation checks pass. Actual map-background arrival, service, overhead boundary and Substation frames inspected; materials remain rough and broad empty floor areas remain. Capture tour moves the pawn in the screenshot-request frame, shifting the saved view forward; fix that instrument before using frame indexes as location evidence.
-- [x] Material-preserving environment batch: seven original glTF models imported as 47 mesh/material/texture assets. Anchor gains planted pockets and workshop hardware; Fernhall replaces cone-tree dressing and adds visible skyline/wall-base foliage and Substation hardware. Corrected a horizontal support mesh before sizing; all seven actual meshes at two rotations have bounds, ground alignment, material and collision/navigation coverage. Import audit passes; final Anchor/Fernhall frames inspected. Broad flat floors, repeated facades and mission density remain unfinished.
-- [x] Local map opened from Pause → MAP: actual Anchor walkways/Fernhall floor survey, player heading, nearby discovered service/Rift sites, real Rift difficulty, persistent discovery/tracked site, selection/clear/back controls and HUD distance. Actual 720p/1080p frames inspected; memory save round-trip and distinct same-class gate discovery covered. This is not the full destination map: district discovery, campaign objective markers and the two additional destinations remain open. Generic stationary sites use class/location keys, so moving an authored site creates a new discovery.
-- [x] First environment architecture batch: Anchor street buildings/awnings, service wings, paving, furniture, warm task lights and a distant suppression pylon; move the small memorial off the arrival sightline. Fernhall gains outward rooflines/banks and a substation mast silhouette, with dressing collision/navigation disabled. Build and rotated hub capsule-route checks pass; full suite 700 started / 697 passed / 3 known failures / 0 unexpected. Actual Anchor arrival/service and Fernhall route captures inspected. This remains blockout architecture, not completion of the two visual tasks below: broad empty floors, rough materials, thin-surface artifacts and missing environmental content still need work. Fernhall's first boundary capture caught death fade; isolated boundary recapture inspected successfully. Captures do not establish playtest balance.
-- [ ] Visually flesh out Anchor first: lived-in market street, suppression-pylon landmark, distinct stash/Forge/quartermaster/command/gate spaces, functional verticality, warm interior/cold exterior lighting and environmental detail. Inspect actual arrival and service-route captures.
-- [ ] Visually flesh out Fernhall before adding destinations: recognizable districts, terrain/building silhouettes, material and lighting coherence, landmarks, environmental detail and readable encounter routes. Preserve combat sightlines and traversal; inspect actual route and combat captures.
-- [ ] Author more distinct Fernhall spaces and improve layout/content density.
-- [ ] Add two larger persistent destinations alongside Fernhall, each with connected districts, distinct landmarks, deliberate encounter compositions and a campaign route; choose final names and silhouettes against the existing setting/assets during content authoring.
-- [ ] Give each destination fixed regional level ranges and discoverable Rift sites that support later, harder return activities; preserve destination access after its campaign beats.
-- [ ] Build an in-game map of discovered destinations/districts, connecting routes, player location, campaign objectives and Rift entrances with difficulty and tracked destination; validate its markers against actual world locations and saved discovery.
-- [ ] Shape Rift runs minute by minute with finished encounters and deliberate enemy combinations.
-- [ ] Strengthen distinct class/build identities and author standout build-defining loot.
-- [ ] Unify asset packs through a coherent visual/audio identity and polished effects for existing combat.
-- [ ] Add mission/quest beats and one or two signature bosses or activities that define the game.
-Prioritize content and encounter composition over additional enemy framework.
-## Direction (owner, 2026-09-06)
-Push hard on today's build; the owner is out and reads the report. Cycles run in parallel on disjoint files, one build, one suite, one commit per cycle. The affix system is updated as Cycle 13 lands. A story-mission schema is drafted now so the campaign can be fleshed out. The owner's frame to check every system against: characters pick a doctrine (sub-class) a couple of levels in and unlock doctrine points through the main story quest; a Core tree every class shares scales on its own; the doctrine tree is class-specific. A current inventory of abilities, ultimates, doctrines, affixes and their scaling is owed, with each marked live, stub or unreachable.
-
-## Direction (owner, 2026-09-05)
-No playtest until the core loop has more oomph. The next blocks are the ones that change what a trigger pull, a shield and a kill feel like: flat damage that is really the weapon's, a boss that fights back with a shield you break, and a Niagara pass with a sound for every verb. Content plumbing waits behind them.
-
-## Open questions for the owner
-- None open. O239-O249 answered the eight that stood here; each ruling is in Docs/DECISIONS.md and its site carries the reason.
-
-## Plumbing the design asks for, in the order that unblocks the most
-- Not to build without a system and a ruling: subtitles, text scale, reduce-flash, Forge Attune-to-rift, a MATERIALS tab, pad glyphs, the gamepad toggle, the class-select yard with 3D figures (waits on O14 models).
-
-## Then, in this order, each sized when it reaches the top
-1. Implement Entropy, Void, Rift, then Collapse/Wither/Tear under O222–O225. Provoke-as-a-status waits on the threat question.
-2. Rift interiors (GROUND-1): three to five room shapes measured against the gap rules, feeding the wave solver.
-3. Ten authored legendaries with printed forfeits (LEDGER-4, O66/O67).
-4. Anomalies as the first real endgame (GROUND-3): key → run → payout as a functional test.
-5. Two-seat listen-server smoke every cycle (O185), then Dungeons, then Raids.
-
-## The voice (O195) — slots in whenever a cycle has room
-- [ ] O195 string table, the menu series: `BreakerMenu.cpp` by screen (title/pause/settings, inventory, trees, …), one build each, through `BreakerStrings::Get`; the HUD, loading, stash and bar slice is live in `Data/strings.json`. `BANKED FROM THE FIGHT · SPENT IN LUMPS` on the class cards is the first menu row to move.
-- [ ] Menu checklist: every screen photographed; hover/press states, transitions, type hierarchy, density, faded-disabled — a list the owner marks.
-- [ ] Per-archetype weapon fire: `weapon_fire_<archetype>.wav` → `weapon_fire.wav` → synth.
-
-## Later (infrastructure only when it unblocks a felt item this week)
-- Inventory equipped titles, affix names, rarity sublines and base damage fit the inspected1920x1080GEARDAMAGE capture after button padding/alignment repair. Other menus/resolutions remain in the clipping queue.
-- `KeystoneAtShippedBudget` and `NodePurchaseFlow` now pass through completed campaign journal fixtures at level50; their expected-red entries were retired after the physical mission probe reached eight and survived reload. All original numeric purchase/refund/Core assertions remain unchanged.
-- RULED AS BUILT: arrival and rift-completion flags stay current-beat only (the kill-counter rule). Unconditional arrival would let a player pre-complete beats by wandering, which the patrol-kill rule already forbids. No change.
-- The enemy chip re-arm inside a hold reads `GetSecondsSinceDamage() <= DeltaSeconds`; settled chips are not pruned (they hold the last fraction) and the map is bounded by live enemies in range.
-- O251: an occluded enemy yields its bar with its marks. Today only the marks and the BOSS word yield; the bar follows them in the O251 slice.
-- The Chevron mark as specified is a corner bracket; BarsVertical sits one unit off centre. Both drawn as the sheet says.
-- `BreakerUI::HudEnemyBarWidth/Height` are unread; delete on the next token pass.
-- `PrepareEnemyForModifierGrant` in the game-mode tests is an empty stub with live callers.
-- `DoctrinePointsPerBenchmark` and the doctrine grant are constexprs the census writes; a JSON getter for `budgets.doctrine` would let the mission validator read one source.
-- With the modifier disc and light retired (O203), the Volatile corpse's fuse has no visual tell until the Niagara pass; recorded at the site.
-- O250: the front is gone for the fight. It re-arms on every `OnVitalsRestored` today, so a Wakeful revive still grants a second front; the O250 slice drops that re-arm.
-- RULED AS BUILT: the break exposes the weak point and does NOT raise the apparatus. The break is the player's outcome; the raise is the boss's own beat, and coupling them removes its agency.
-- Equipment conditional-damage diagnostic totals include conditional Increased Fire Rate because they lack a target filter. Flat armour/crit and More are already excluded. No current C++ HUD/combat consumer reads these fields; defer behind visible repairs.
-- Deposit/withdraw return a bool and log the reason; the stash screen re-derives the refusal line. A result enum on the component (LEDGER) is the fix.
-- The HUD paints every travel point's overhead prompt in rift teal; the stash point's prompt inherits it (GLASS, the HUD pass).
-- `GatherDialogueFlags` / `GatherEntryFlags` in `BreakerQuestContent.cpp` carry no Breaker prefix (pre-existing).
-- `player_death.wav` is not in the shipped-samples list until a sample is authored; the synth is the floor.
-- `Offense.WallRideDamage` is a dead row (its condition is never true); delete it when the leans are next touched.
-- After the Boots-only MoveSpeed row: the Gloves `Core.MoveSpeed` roll in `Items.Equipment.AttributeContribution` (~BreakerItemTests.cpp:425) grants a slot a line it cannot roll; move it to Boots in the next build. The Sidearm lean on `Core.MoveSpeed` in `affixes.json` is inert (leans apply on weapon slots); delete the row when the leans are next touched.
-- The death beat's black is a camera fade and its teleport lands at the end of black; `HoldBlack`/`ReleaseBlack` on the game instance are the seam to move the teleport to the start of black and reveal through the arrival gate. Felt only if the respawn frame reads cold.
-- The boot's first front-end frame is still uncovered; only travels get the cover.
-- The split copy's 0.7 scale has no pin: `ConfigureAsSplitCopy` writes health through GAS, which no test outside a world can call. It waits on the map-loading functional tests (GROUND-4).
-- The Warden overrides the base engaged tick wholesale: no arrival ring, no arrival angle, so two Wardens stack on one line and it walks through the player between sweeps (`BreakerWardenEnemy.cpp` TickEngagedBehaviour).
-- Nav.Probe Squad's LATTICE FAIL reads the band without `BandHysteresis` (150 cm); a moving pawn can print an honest fail at the band edge.
-- Ranged enemies have no walk sequence and move in ref pose; STEER frames call StopMovement and rebuild velocity from zero each flip (the stutter at range). Both recorded at the site in `BreakerEnemy.cpp` Tick.
-- `BossBand`'s 20/45 s constants are function-local; `PromotedBossSecondsFloor/Ceiling` duplicate them. One line in BossBand to share the pair.
-- NAV-2 cover on the nav · DATA-2 affixes to data · FIELD-3 boss grammar · GROUND-4 functional tests · GLASS-3 the 11K-line split · NAV cover/squad · Anomalies
-- `SlideEntrySpeed = 550` is still absolute (0.92 of the 595 walk; was reachable in the top 45 cm/s of a walk only) — a fraction of `WalkSpeed` like the Momentum gates.
-- `BreakerGameMode.h` field grammar comments derive `DashRefreshDistance 4400` and `OneJumpGap 700` from a 1100 sprint; the sprint is 990.
-
-## Filing notes
-Every note the owner writes carries one of these tags so the queue reads by category: AI (behaviour, not roster) · bosses · animation · VFX/hit feedback · networking/party/social · loot & economy · encounter/level tooling · content authoring pipeline · onboarding/first hour · endgame loop · performance budget · telemetry · accessibility/input · persistence · systems · core gameplay · weapons · abilities · classes · maps · enemies · story · build diversity · fun interactions · visuals · sound · movement · ui · npcs.
-
-## Owner only
-- Fab mannequin/GASP, Ultimate Modular Women, Sonniss extract (arms, anims, real audio all wait on these)
-- Four Niagara systems at `/Game/Breaker/FX/NS_<Moment>` with a `Color` user parameter, or a free Fab VFX pack placed there
-
-## Done (last three cycles; older is git)
-- Breach entry batch: build passed;729 declared/started,726 passed,3 pinned failures,0 unexpected through PowerShell suite auditor. Old null-only broadcast test upgraded to an actual live pawn while retaining carried-definition assertions; separate null/dead refusals covered. Both native-door menu fixture frames inspected; no actual mouse click or full travel playthrough claimed. Core and STATE untouched; large destinations, content density, balance and migration remain open.
-- Hard Stop/gear Mana/pickup batch: build passed;728 declared/started,725 passed,3 pinned failures,0 unexpected through PowerShell suite auditor. Bounded element/reaction source review found no new confirmed defect; existing paid integration tests remain green. Core and STATE untouched. Full balance, special-item migration and larger destinations remain unfinished; Breach selection refusal is next.
-- Pressure/live HUD batch: build passed;725 declared/started,722 passed,3 known failures,0 unexpected through PowerShell suite auditor. Initial paid runtime exposed GAS clearing Pressure timer on normal EndAbility; timer now begins after teardown. Actual funding for both casts asserted. Live720p sequence inspected (2.6 then0.5 countdown/recovery), initial720p/1080p frames also inspected; initial capture precedes cast, and reduced-duration proof is paid runtime rather than the visual fixture. Core and STATE unchanged. Overlapping Suppress fields, multiplayer presentation and full balance remain open.
-- Open Wound/Prolific/zone-outline batch: build passed;722 declared/started,719 passed,3 known failures,0 unexpected through PowerShell suite auditor. First run caught a lethal fixture expecting a separate equipment kill listener it had not started; corrected test accounting without production or tolerance changes.720p/1080p lifetime captures inspected. Core untouched; STATE unchanged. Full balance, loot migration, fill clipping and multiplayer lifetime presentation remain open.
-- Courtyard content batch: build passed;719 declared/started,716 passed,3 known failures,0 unexpected through PowerShell suite auditor. Actual court connected/map-visible and normal quartet live. Intermediate checks found exact-edge collision cracks, a perimeter opening, a diagnostic route crossing retained cover and a too-narrow sight-blocker assertion; repaired geometry and explicit inner/outer route checks retain original requirements. Final rendered route/map frames inspected. STATE unchanged; larger destinations, mission pacing, loot/parity and final visual/audio work remain open.
-- Campaign map/Tell/Cadence/district batch: build passed;717 started,714 passed,3 known failures,0 unexpected. Current campaign targets track without exploration grants; real paid marked attack warning, actual Cadence equipment/conversion checks, differentiated Anchor facades/Fernhall surfaces.720p/1080p map and world captures inspected. STATE unchanged.
-- Feed Forge mission batch: build passes;714 declared/started,711 passed,3 known failures,0 unexpected through PowerShell suite auditor. Both rendered pickup/prompt captures inspected using an isolated native-death fixture frozen after impact, not a human playthrough. STATE unchanged. Larger authored districts, mission pacing and final art remain open.
-- Bulk/pierce/first-contract batch: editor build passes;713 declared/started,710 passed,3 known failures,0 unexpected through PowerShell suite auditor. First suite caught canonical quest-field order, corrected without changing assertions. Reward dialogue capture inspected at720p. STATE unchanged; natural player combat balance and projectile flight remain unclaimed.
-- Local map/environment/traversal batch: build passes; full suite 710 declared/started, 707 passed, 3 known failures, no unexpected failures through PowerShell suite auditor. Material import/audit and actual rendered map/environment frames inspected. One intermediate Fernhall tour frame caught death fade; final Substation frames and map-backed arrival were inspected separately. STATE unchanged; no claim of human balance, final art quality or seven-step completion.
-- Siphon cycle: real ability-token unlock appends Void/Erased once, including unlock-before-component creation; unchanged sync does not broadcast. Starter three and authored entries remain intact. Legal eight-point MS7 and two paid casts deliver Entropy/Void through the real Impact seam without cursor overrides. Build/focus pass; full suite700started/697passed/3known/0unexpected. Natural flight and campaign acquisition are not claimed; STATE unchanged.
-- Element shares: ordered normalized selections reuse one direct damage/crit result; first preexisting reaction suppresses all new buildup. Duplicate Entropy pays one flat bonus; application/consume callback recursion cannot react to sibling-created statuses. Actual purchased Fracture with an authored two-element fixture delivers both. Build/focused checks pass; full suite699started/696passed/3known/0unexpected. Shipping cycle remains three pending real Siphon unlock wiring; STATE unchanged.
-- Detonation: real Ultimate slot second press releases the active ledger without another payment or activation notification. Cleanup precedes callbacks; death and keystone removal cancel immediately. Paid legal eight-point test covers actual damage, exact mitigated payout, no recost/replay, cancellation and death. Build and focus pass; full suite698started/695passed/3known/0unexpected through PowerShell suite auditor. STATE unchanged.
-- Interposition: solo rear field adds 10% maximum-health shield capacity within4m, grants no shield, and releases on exit, Anchor destruction, death or progression loss. Gear changes preserve their underlying capacity. Build and paid Anchor runtime pass; full suite697started/694passed/3known/0unexpected through PowerShell suite auditor. STATE unchanged; human feel remains unvalidated.
-- Cascade/Grit: actual eight-point purchased Cascade and paid Fracture/Unmake prove physical echo across elemental cycle positions, late-spawn targets, proc0/no Chain, and cancel/death/respec before queued delivery. Tank damage callback now honors real proc0/.25/1 with proportional generation. Build/suite690started/687passed/3known/0unexpected. Fixture restores campaign entitlement and uses explicit projectile Impact; does not claim campaign traversal or natural flight. Long Dark zone pause remains next.
-- Reactions: Collapse/Wither/Tear spend one consumed unpaid budget; original-applier credit, proc0, no new buildup or chains. Rot ticks claim payment before callbacks; shortening cancels future budget permanently. Build/suite688started/685passed/3known/0unexpected. Inspected all7frames across three reaction types at1080p/720p: labels separate from each other; original hit still overlaps enemy nameplate, retained for step5. Overlapping activation effects and audible mix need later polish/playtest.
-- Rift conversion: ordinary Primary prefix, real rifle threshold activation and marker suppression, wrong-slot isolation and launched rocket snapshot after gear replacement. Build/suite687started/684passed/3known/0unexpected. Entropy/Void/Rift each have real ability and weapon delivery; reactions remain unbuilt. Existing enemy families cover Entropy/Void; no new Rift family authored.
-- Rift kernel/Breach: full suite686started/683passed/3known/0unexpected; actual paid Breach, callback cancellation/order, lethal single payout, native floor-backed activation and capsule wall/ledge tests pass. Opened both1080p and720p frames: UNSTABLE timer/damage and player RIFT60% meter readable; transient enemy-plate overlap remains step5. Screenshots do not validate movement feel or audible mix. Rift weapon conversion and reactions remain next.
-- **Void weapons and family attacks:** Ordinary Primary conversion rolls route hitscan/rockets through one explicit strongest-share selection; actual ammunition earns Erased and world ticks pay once, rockets retain launch identity after gear swaps. Altered attacks carry Void and Vestige attacks Entropy across authored melee/projectile/Warden paths; modifier hazards remain separate. Skirmisher rounds now configure before BeginPlay. Runtime review exposed player capsules being counted as cover: Lattice/Skirmisher now query actual WorldStatic objects, with open/wall regressions. Build passed;683declared/started,680passed,3known,0unexpected via PowerShell suite auditor. No new art-quality claim; projectile geometry checked through actual begun components. STATE unchanged.
-- **Erased kernel and Siphon delivery:** Void earns a finite applying-hit snapshot and pays it once after its delay. Reapplication cannot enlarge/refresh it; consume, cleanse and death cancel unpaid damage. Siphon builds Void through actual paid channel hits; Zonework recognizes unpaid Erased. Separate meters/countdowns and activation/burst cues; capture-discovered Rot/Erased number overlap repaired with measured animated bounds. Final1080p/720p frames inspected: independent numbers and meters, transient numbers can still cross enemy status plates. Sustained Fracture/Patience checks pass without tuning/parity pin changes. Build passed;681declared/started,678passed,3known,0unexpected via PowerShell suite auditor after extending volume coverage to all9voices. STATE unchanged. Void weapons/family delivery, Rift and reactions remain next.
-- **Siphon damage-family repair:** Restored Elemental classification accidentally removed alongside the retired Void debuff. Actual paid channel ticks now verify equal damage before/after legitimately rolled Physical DR gear, matching leech, and a reduced physical control hit. No Erased effect or retired armour/healing debuff added. Build passed;678declared/started,675passed,3known,0unexpected via PowerShell suite auditor. STATE unchanged without regeneration.
+- Desk reduced from640 to104 lines: removed stale completed work and contradictory questions, retained active gaps and seven-step acceptance criteria. Rebuilt pulled code and regenerated its source witness;837 passing,3 expected failures,0 unexpected.
