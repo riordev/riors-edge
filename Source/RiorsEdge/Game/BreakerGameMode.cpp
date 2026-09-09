@@ -3338,7 +3338,11 @@ FBreakerCoverFieldParams ABreakerGameMode::MakeCoverFieldParams() const
     Params.LaneCoverForwardCm = RangeFiringLineDistance - 1500.0f + RangedSightlineDepth;
     Params.LaneCoverRightCm = Params.SniperLaneRightCm + 500.0f;
 
-    Params.Seed = ModifierSeedBase;
+    // The layout is the rift's, not the session's. Unset (the gym, the
+    // ordinary field) keeps the authored base so an instrument never shifts
+    // under measurement; a rift mixes its own identity and level in.
+    const UBreakerGameInstance* SeedSession = GetGameInstance<UBreakerGameInstance>();
+    Params.Seed = SeedSession ? SeedSession->PendingRift.LayoutSeed(ModifierSeedBase) : ModifierSeedBase;
     return Params;
 }
 

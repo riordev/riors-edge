@@ -24,6 +24,49 @@ death damages other enemies only where a player source says it does. Nothing
 authors such an effect yet, so the property survives as the mechanism one
 will set rather than as a default nobody asked for. Both magnitudes stay O2.
 
+## The endgame shape (O262) — a device, a key, a tileset
+
+The PoE reading, mapped onto what already exists. Campaign = the three acts
+through authored destinations, which ship. Past it:
+
+- THE DEVICE is the command post `Docs/spec/content-and-modes.md:169` already
+  names in the Anchor loop and which was never built. It consumes a key and
+  opens a rift.
+- THE KEY is an item. The item system already carries rarity, tiered affixes,
+  item level, drop tables and a stash — a key is a new item KIND, not a new
+  system. Its area level is its tier; its rolled affixes are the run's
+  modifiers.
+- THE TIER is `AreaLevel`, already 1-100 with derived monster scaling.
+- CONSUMABLE ENTRY is O122, which FIVE separate code sites already say they
+  are waiting for. The death budget ships in the same commit, as O122 rules.
+- THE TILESET is the only genuinely missing piece, and the cheap version is
+  not new art: `UBreakerCoverLayoutLibrary::BuildCoverField` is a seeded,
+  validated generator that already exists (lane width, gaps, line break,
+  cover fraction), and 113 kit meshes are already imported. A varied interior
+  is a seeded ARRANGEMENT of pieces the game already has.
+
+- [x] The seed is the rift's, not the session's. `ModifierSeedBase` was one
+  authored constant, so every field the generator built in every rift in
+  every session came out identical — two different rifts were the same room
+  twice, and re-entering one could never surprise you. `LayoutSeed` mixes the
+  encounter id and the area level, so a rift reproduces exactly while two
+  rifts differ and the same place at depth rearranges. The gym keeps the
+  authored base untouched: an instrument that shifted under measurement
+  would make every density reading incomparable with the last.
+- [ ] THE ONE DECISION BEFORE MORE CODE: does a rift interior REPLACE the
+  authored yard's cover with a generated field, or is it a separately
+  composed space? O167 already names interiors-get-shapes as the
+  precondition. Replacing is nearly free and reuses every validator; a
+  separate space is two cycles and needs its own GLB. The generated field
+  cannot simply be ADDED to the authored lattice — cover fraction is a
+  measured band and doubling the pieces breaks it.
+- [ ] Then: the key item, the command post, consumable entry + the death
+  budget together per O122.
+- [ ] The local map's site ids embed world coordinates
+  (`BreakerLocalMapComponent.cpp:76-78`), so moving any authored site
+  silently resets a player's discovery. Fix that id scheme in the same commit
+  as the first geometry change.
+
 ## Cycle — the kit programme (O252-O260)
 
 The roster target is 55: eight actives, one ultimate and two passives per

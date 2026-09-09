@@ -67,6 +67,33 @@ struct RIORSEDGE_API FBreakerRiftDefinition
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Rift") FName EncounterId = NAME_None;
 
     bool IsSet() const { return AreaLevel > 0; }
+
+    /**
+     * The seed every generated layout in this rift draws from.
+     *
+     * A MAP'S SHAPE IS A FUNCTION OF THE MAP, NOT OF THE SESSION. The cover
+     * generator has always been seeded — FRandomStream(Params.Seed) — but the
+     * seed was one authored constant, so every field it built in every rift in
+     * every session came out identical. Two different rifts were the same
+     * room, twice, and re-entering one could never surprise you either.
+     *
+     * Mixed from the encounter identity and the area level, so a rift
+     * reproduces exactly (a bug report about a layout can be re-opened) while
+     * two rifts differ, and the same place at a higher level is a new
+     * arrangement rather than the same one with bigger numbers.
+     *
+     * An unset rift returns the caller's base untouched: the gym is an
+     * instrument, and a field that shifted under measurement would be useless.
+     */
+    int32 LayoutSeed(int32 Base) const
+    {
+        if (!IsSet()) return Base;
+        const uint32 Mixed = HashCombine(HashCombine(GetTypeHash(EncounterId),
+            GetTypeHash(EffectiveAreaLevel())), static_cast<uint32>(Base));
+        // Folded into a non-negative int32: FRandomStream takes a signed seed
+        // and a negative one is legal but reads as a mistake in a log.
+        return static_cast<int32>(Mixed & 0x7FFFFFFFu);
+    }
     int32 EffectiveAreaLevel() const { return UBreakerMonsterChassisLibrary::ClampAreaLevel(AreaLevel); }
 };
 

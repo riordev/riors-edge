@@ -499,3 +499,5 @@ Maximum wedges reached with65, including ring transit; cells show **wedges / min
 
 **O261** — An enemy's death damages other enemies only where a player source says it does: an item, a tree node, an ability. A pack does not thin itself, and the on-death chain ships off by default until such an effect exists.
 
+**O262** — The endgame is a device, a key and a tileset. The campaign runs through authored destinations; past it, a command post in the Anchor consumes a rift key — an item carrying its own area level and rolled modifiers — and opens an instance whose layout is generated from the key rather than authored. A rift's shape is a function of the rift, never of the session.
+
