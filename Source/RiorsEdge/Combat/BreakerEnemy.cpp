@@ -1206,6 +1206,14 @@ void ABreakerEnemy::ApplyAuthoredAttackElement(FBreakerDamageRequest& Request) c
 void ABreakerEnemy::PerformAttack(AActor* TargetPawn)
 {
     if (!TargetPawn || !GetWorld() || GetWorld()->GetTimeSeconds() - LastAttackTime < AttackCooldown) return;
+    // AN ENEMY NEVER STRIKES ANOTHER ENEMY (O261). The guard used to live only
+    // in the target SELECTOR — IsEligibleThreatTarget accepts a character or a
+    // deployable and nothing else — which is correct until something hands
+    // this function a target by another route, and then a full AttackDamage
+    // hit lands on a packmate with nothing to stop it. The rule belongs at the
+    // strike as well as at the choice, which is where Combat/ states it for
+    // zones and projectiles already.
+    if (TargetPawn->IsA<ABreakerEnemy>()) return;
     // The AI's broad-phase distance is planar. A real strike must also reach
     // the target vertically and cannot cross intervening blocking geometry.
     const FVector StrikeOrigin = GetActorLocation();
