@@ -81,6 +81,7 @@ public:
 
 private:
     UFUNCTION() void HandleHitDealt(const FBreakerHitContext& Hit);
+    UFUNCTION() void HandleBloodlineOwnerDeath();
     void CloseBloodline();
 
     FTimerHandle WindowTimer;

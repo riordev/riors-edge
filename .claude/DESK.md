@@ -71,7 +71,7 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 
 ## Latest validated baseline
 
-Current local build/full suite:862 passing,3 expected failures,0 unexpected; native census refreshed for54 quest flags and current ability declarations. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
+Current local build/full suite:863 passing,3 expected failures,0 unexpected; native census refreshed for54 quest flags and current ability declarations. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
 
 ## Playtest handoff
 

@@ -473,13 +473,15 @@ void UBreakerAbility_Bloodline::ActivateAbility(const FGameplayAbilitySpecHandle
     bExsanguinate = BreakerTankAbilityLocal::BreakerTankHasNode(Character, BreakerNodeTags::Node_L_Exsanguinate.GetTag());
     const float AuthoredDuration = Definition ? Definition->WindowDuration : 8.0f;
     const float Duration = bExsanguinate ? 2.0f : AuthoredDuration;   // node text
+    BoundCombat = Combat;
+    bBloodlineActive = true;
+    Combat->OnHitDealt.AddUniqueDynamic(this, &ThisClass::HandleHitDealt);
+    Combat->OnDeath.AddUniqueDynamic(this, &ThisClass::HandleBloodlineOwnerDeath);
     if (UBreakerAbilityStateComponent* State = UBreakerAbilityStateComponent::FindOrAdd(Character))
     {
         State->StartWindow(WindowKey(), Duration);
     }
-    BoundCombat = Combat;
-    Combat->OnHitDealt.AddDynamic(this, &UBreakerAbility_Bloodline::HandleHitDealt);
-    bBloodlineActive = true;
+    if (!bBloodlineActive || !IsActive() || Combat->IsDead()) return;
     World->GetTimerManager().SetTimer(WindowTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { CloseBloodline(); }), Duration, false);
 
     // The cast moment, feet-anchored per the camera law: gold, the payment
@@ -501,7 +503,7 @@ void UBreakerAbility_Bloodline::HandleHitDealt(const FBreakerHitContext& Hit)
     if (Hit.bFundedWeaponSplash) return;
     if (!bBloodlineActive) return;
     ABreakerCharacter* Character = GetBreakerCharacter();
-    if (!Character) return;
+    if (!Character || !Character->GetCombat() || Character->GetCombat()->IsDead()) return;
     // L11 Exsanguinate: a landing hit re-opens the 2s grace. Non-DoT hits only
     // (the recorded nearest-honest melee filter — see the header); a bleed
     // ticking on its own must not sustain the window forever.
@@ -529,6 +531,11 @@ void UBreakerAbility_Bloodline::HandleHitDealt(const FBreakerHitContext& Hit)
     }
 }
 
+void UBreakerAbility_Bloodline::HandleBloodlineOwnerDeath()
+{
+    if (IsActive()) EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+}
+
 void UBreakerAbility_Bloodline::CloseBloodline()
 {
     if (CurrentActorInfo)
@@ -545,6 +552,7 @@ void UBreakerAbility_Bloodline::EndAbility(const FGameplayAbilitySpecHandle Hand
         if (UBreakerCombatComponent* Combat = BoundCombat.Get())
         {
             Combat->OnHitDealt.RemoveDynamic(this, &UBreakerAbility_Bloodline::HandleHitDealt);
+            Combat->OnDeath.RemoveDynamic(this, &ThisClass::HandleBloodlineOwnerDeath);
         }
         BoundCombat.Reset();
         if (ABreakerCharacter* Character = GetBreakerCharacter())
