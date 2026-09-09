@@ -37,9 +37,15 @@ bool FBreakerSoundSynthShapeTest::RunTest(const FString& Parameters)
         {TEXT("AbilityCast"), BreakerSound::AbilityCastDurationSeconds, &BreakerSound::RenderAbilityCast},
         {TEXT("PlayerDeath"), BreakerSound::PlayerDeathDurationSeconds, &BreakerSound::RenderPlayerDeath},
         {TEXT("EntropyActivation"), BreakerSound::EntropyActivationDurationSeconds, &BreakerSound::RenderEntropyActivation},
+        {TEXT("VoidActivation"), .24f, &BreakerSound::RenderVoidActivation},
+        {TEXT("VoidBurst"), .18f, &BreakerSound::RenderVoidBurst},
+        {TEXT("RiftActivation"), .22f, &BreakerSound::RenderRiftActivation},
+        {TEXT("ReactionCollapse"), .28f, &BreakerSound::RenderReactionCollapse},
+        {TEXT("ReactionWither"), .30f, &BreakerSound::RenderReactionWither},
+        {TEXT("ReactionTear"), .20f, &BreakerSound::RenderReactionTear},
     };
     // Every shipped fallback renderer participates in the waveform checks.
-    TestEqual(TEXT("seven cues are rendered"), static_cast<int32>(UE_ARRAY_COUNT(Cases)), 7);
+    TestEqual(TEXT("all thirteen authored fallback cues are rendered"), static_cast<int32>(UE_ARRAY_COUNT(Cases)), 13);
 
     for (const FCase& Case : Cases)
     {

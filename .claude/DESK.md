@@ -78,4 +78,6 @@ Current local build/full suite:856 passing,3 expected failures,0 unexpected; nat
 
 - Fernhall perimeter pipeworks/foliage and selective material-compatible Nanite fallback landed. Nine rendered frames inspected across Fernhall, service prompts and Station map; still blockout art. Retired Skim HUD/stale guidance cleaned. See Docs/reports/fernhall-service-polish-2026-09-09.md.
 
+- Audio raw-file packaging now includes existing samples/footsteps; optional missing overrides use the unchanged synth without spurious read warnings. All13 fallback waveforms covered. Device routing/listening remains unverified; see Docs/reports/audio-readiness-2026-09-09.md.
+
 Detailed historical receipts: Docs/reports/playtest-pass-ledger-2026-09-09.md. Individual capture/measurement reports remain under Docs/reports.

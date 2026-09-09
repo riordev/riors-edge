@@ -63,7 +63,8 @@ int32 ABreakerSoundDirector::LoadOrSynth(const TCHAR* FileName, void (*Synth)(TA
 {
     const FString Path = FPaths::ProjectContentDir() / TEXT("Breaker/Audio") / FileName;
     TArray<uint8> Bytes;
-    if (FFileHelper::LoadFileToArray(Bytes, *Path))
+    const bool bOverrideExists = FPaths::FileExists(Path);
+    if (bOverrideExists && FFileHelper::LoadFileToArray(Bytes, *Path))
     {
         BreakerWave::FParsedWave Parsed = BreakerWave::ParseWav(Bytes);
         if (Parsed.IsValid())
@@ -75,9 +76,13 @@ int32 ABreakerSoundDirector::LoadOrSynth(const TCHAR* FileName, void (*Synth)(TA
         }
         UE_LOG(LogTemp, Warning, TEXT("[BreakerSound] %s exists but is not 16-bit PCM WAV — synth fallback."), FileName);
     }
+    else if (bOverrideExists)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[BreakerSound] %s exists but could not be read — synth fallback."), FileName);
+    }
     else
     {
-        UE_LOG(LogTemp, Log, TEXT("[BreakerSound] %s missing — synth fallback."), FileName);
+        UE_LOG(LogTemp, Log, TEXT("[BreakerSound] %s optional override absent — authored synth fallback."), FileName);
     }
     Synth(OutPcm);
     return BreakerSound::SampleRate;
