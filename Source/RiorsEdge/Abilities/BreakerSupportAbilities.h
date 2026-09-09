@@ -81,10 +81,10 @@ public:
     // MD11 NO TRIAGE: far cheaper. The cooldown half is shaved after commit.
     virtual float GetUnmodifiedResourceCost() const override;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Patch", meta=(ClampMin="0")) float TargetRangeCm = 2000.0f;   // §U1: 20 m
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Patch", meta=(ClampMin="0")) float TargetRangeCm {}; // O246: authored in Data/abilities.json.   // §U1: 20 m
     // O2 PLACEHOLDER: §U1 authors "a percentage of the target's maximum
     // health" and never the percentage.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Patch", meta=(ClampMin="0", ClampMax="1")) float HealFractionOfTargetMax = 0.25f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Patch", meta=(ClampMin="0", ClampMax="1")) float HealFractionOfTargetMax {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
 };
 
 // U2 Purge (§3 U2, Medic): strips every status from the target (self with no
@@ -102,7 +102,7 @@ public:
     // MD11 NO TRIAGE: far cheaper, self-only (both halves in the cpp).
     virtual float GetUnmodifiedResourceCost() const override;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Purge", meta=(ClampMin="0")) float TargetRangeCm = 2000.0f;   // O2 PLACEHOLDER (mirrors Patch)
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Purge", meta=(ClampMin="0")) float TargetRangeCm {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER (mirrors Patch)
 };
 
 // U3 Cadence: living cooperative players receive keyed reload/swap tempo.
@@ -125,13 +125,13 @@ public:
     UFUNCTION() void HandleBatonZoneExpired();
 
     // O2 presentation and tempo tuning, exported to abilities.json.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cadence", meta=(ClampMin="0")) float DetachedBatonRadiusCm = 800.0f;
-    UPROPERTY(EditDefaultsOnly, Category="Cadence") float AuraRadiusCm = 500.0f;
-    UPROPERTY(EditDefaultsOnly, Category="Cadence") float SectionRankOneRadiusBonusCm = 200.0f;
-    UPROPERTY(EditDefaultsOnly, Category="Cadence") float SectionRankTwoRadiusBonusCm = 400.0f;
-    UPROPERTY(EditDefaultsOnly, Category="Cadence") float ReloadTempoMultiplier = 1.25f;
-    UPROPERTY(EditDefaultsOnly, Category="Cadence") float SwapTempoMultiplier = 1.25f;
-    UPROPERTY(EditDefaultsOnly, Category="Cadence") float ConductingTailSeconds = 2.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cadence", meta=(ClampMin="0")) float DetachedBatonRadiusCm {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, Category="Cadence") float AuraRadiusCm {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, Category="Cadence") float SectionRankOneRadiusBonusCm {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, Category="Cadence") float SectionRankTwoRadiusBonusCm {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, Category="Cadence") float ReloadTempoMultiplier {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, Category="Cadence") float SwapTempoMultiplier {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, Category="Cadence") float ConductingTailSeconds {}; // O246: authored in Data/abilities.json.
 
 private:
     void ShaveTick();
@@ -183,10 +183,10 @@ public:
     static FName WindowKey();
     static FName OutgoingModifierKey();
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Metronome", meta=(ClampMin="0")) float FlatDamagePerStack = 2.0f;   // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Metronome", meta=(ClampMin="1")) int32 MaximumStacks = 5;   // O2 PLACEHOLDER ("to a cap", §U4)
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Metronome", meta=(ClampMin="0.1")) float StreakGapSeconds = 1.0f;   // §U4: resets on a full second without a hit
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Metronome", meta=(ClampMin="0")) float RecipientRadiusCm = 500.0f; // O2 PLACEHOLDER, cast-time snapshot
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Metronome", meta=(ClampMin="0")) float FlatDamagePerStack {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Metronome", meta=(ClampMin="1")) int32 MaximumStacks {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER ("to a cap", §U4)
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Metronome", meta=(ClampMin="0.1")) float StreakGapSeconds {}; // O246: authored in Data/abilities.json.   // §U4: resets on a full second without a hit
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Metronome", meta=(ClampMin="0")) float RecipientRadiusCm {}; // O246: authored in Data/abilities.json. // O2 PLACEHOLDER, cast-time snapshot
 
 private:
     UFUNCTION() void HandleHitDealt(const FBreakerHitContext& Hit);
@@ -234,20 +234,20 @@ public:
     // Owner-local Tell presentation, only during an actual marked attack windup.
     static bool ShouldShowTell(const ABreakerCharacter* Viewer, const class ABreakerEnemy* Enemy);
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="0")) float TargetRangeCm = 3000.0f;   // O2 PLACEHOLDER (§U5 authors no range)
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="0")) float TargetRangeCm {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER (§U5 authors no range)
     // O2 PLACEHOLDER: "takes increased damage" with no magnitude authored.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="1")) float MarkedDamageMultiplier = 1.15f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="1")) float MarkedDamageMultiplier {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
     // WA8 DEEP MARK: per-depth damage-taken increase and Charge-yield bonus.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="0")) float DeepMarkDamagePerDepth = 0.05f;   // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="0")) float DeepMarkYieldPerDepth = 0.25f;    // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="1")) int32 DeepMarkMaxDepth = 3;             // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="0")) float DeepMarkDamagePerDepth {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="0")) float DeepMarkYieldPerDepth {}; // O246: authored in Data/abilities.json.    // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="1")) int32 DeepMarkMaxDepth {}; // O246: authored in Data/abilities.json.             // O2 PLACEHOLDER
     // WA11's shortened leash. O2 PLACEHOLDER ("much shorter").
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="0.5")) float HuntersEconomyDuration = 4.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="0.5")) float HuntersEconomyDuration {}; // O246: authored in Data/abilities.json.
     // WA6 TELL, the softening half: while the mark lives the marked enemy hits
     // you softer — a keyed multiplier on the enemy's outgoing-damage seam.
     // Below 1 by definition, above 0 by law: softer, never disarmed.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="0.05", ClampMax="1")) float TellOutgoingMultiplier = 0.75f;   // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="0", ClampMax="1")) float PaintedAllyYieldMultiplier = 0.5f; // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="0.05", ClampMax="1")) float TellOutgoingMultiplier {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="0", ClampMax="1")) float PaintedAllyYieldMultiplier {}; // O246: authored in Data/abilities.json. // O2 PLACEHOLDER
 
 private:
     UFUNCTION() void HandleHitDealt(const FBreakerHitContext& Hit);
@@ -286,25 +286,25 @@ public:
     UFUNCTION() void HandleOccupantExited(AActor* Occupant);
     UFUNCTION() void HandleZoneExpired();
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0")) float AimRangeCm = 3000.0f;   // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0")) float RadiusCm = 600.0f;   // §U6: 6 m
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0")) float AimRangeCm {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0")) float RadiusCm {}; // O246: authored in Data/abilities.json.   // §U6: 6 m
     // Same enemy movement-profile mutator (and the same recorded Fleetfoot
     // restore limitation) as the Disruptor's slow.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0", ClampMax="1")) float SlowMultiplier = 0.55f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0", ClampMax="1")) float SlowMultiplier {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
     // WA7 SUPPRESSION: FLAT armour cut on enemies inside — flat, never a
     // percentage, the boss-cap protection. O2 PLACEHOLDER magnitude.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0")) float SuppressionArmorCut = 30.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0")) float SuppressionArmorCut {}; // O246: authored in Data/abilities.json.
     // WA5 PRESSURE: the slow, count-independent occupancy trickle (per second).
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0")) float PressureChargePerSecond = 1.0f;   // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0")) float PressureChargePerSecondRank2 = 2.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0")) float PressureChargePerSecond {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0")) float PressureChargePerSecondRank2 {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
     // The accuracy cut, through the enemy's keyed aim-error seam. Above 1 by
     // clamp: the seam reads excess-over-one as degradation, so 1.0 would be a
     // cut that cuts nothing.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="1")) float SuppressAccuracyMultiplier = 1.75f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="1")) float SuppressAccuracyMultiplier {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
     // §U6's application delay on the cut. WA3 R2 removes it ("the accuracy cut
     // lands instantly too"); at base the enemy shoots straight for this long
     // after entering, so there is something for R2 to buy.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0")) float AccuracyApplyDelaySeconds = 1.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0")) float AccuracyApplyDelaySeconds {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
 
     static FName AccuracyModifierKey();
 
@@ -349,17 +349,17 @@ public:
     static FName BlackoutModifierKey();
     static FName DownbeatModifierKey();
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Conduit", meta=(ClampMin="0")) float RadiusCm = 1500.0f;   // §3.1: 15 m
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Conduit", meta=(ClampMin="0")) float RadiusCm {}; // O246: authored in Data/abilities.json.   // §3.1: 15 m
     // Triage (§3.1): a continuous healing field — every valid target (solo:
     // self) healed each second, with one lethal save per target per cast.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Conduit", meta=(ClampMin="0", ClampMax="1")) float TriageHealFractionPerSecond = 0.04f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Conduit", meta=(ClampMin="0", ClampMax="1")) float TriageHealFractionPerSecond {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
     // Downbeat (§3.1): flat weapon damage for every buffed target (solo: one).
     // FLAT is load-bearing — flat-sum stage, cannot double-dip with gear.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Conduit", meta=(ClampMin="0")) float DownbeatFlatDamagePerBuffedTarget = 4.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Conduit", meta=(ClampMin="0")) float DownbeatFlatDamagePerBuffedTarget {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
     // Blackout (§3.1): marks and suppresses every enemy in radius INSTEAD of
     // casting abilities; the marks are yours for generation purposes.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Conduit", meta=(ClampMin="1")) float BlackoutMarkedDamageMultiplier = 1.15f;   // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Conduit", meta=(ClampMin="0", ClampMax="1")) float BlackoutSlowMultiplier = 0.55f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Conduit", meta=(ClampMin="1")) float BlackoutMarkedDamageMultiplier {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Conduit", meta=(ClampMin="0", ClampMax="1")) float BlackoutSlowMultiplier {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
 
 private:
     UFUNCTION() void HandleBlackoutHit(const FBreakerHitContext& Hit);

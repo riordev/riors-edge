@@ -70,9 +70,9 @@ public:
 
     // O2 PLACEHOLDER: §G1 authors "bonus flat damage" with no magnitude. Flat
     // bucket, before the additive Increased bucket, so it cannot double-dip.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="SidearmRig", meta=(ClampMin="0")) float FlatBonusDamage = 8.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="SidearmRig", meta=(ClampMin="0")) float FlatBonusDamage {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
     // §G1's other half, verbatim: "+1 Pierce". Doc-seeded, not a placeholder.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="SidearmRig", meta=(ClampMin="0")) int32 PierceBonus = 1;   // Class-Kits-Gunsmith §3 G1
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="SidearmRig", meta=(ClampMin="0")) int32 PierceBonus {}; // O246: authored in Data/abilities.json.   // Class-Kits-Gunsmith §3 G1
 
 private:
     UFUNCTION() void HandleMagazineEmptied(bool bStartedFull);
@@ -115,22 +115,22 @@ public:
     static int32 BenchWorkTailRounds(int32 DrawnRounds);
 
     // §G2: seed 3 reserve : 1 magazine round.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Overhaul", meta=(ClampMin="1")) int32 ReservePerRound = 3;   // O2 PLACEHOLDER (§G2 seed)
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Overhaul", meta=(ClampMin="1")) int32 ReservePerRound {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER (§G2 seed)
     // §G2: drawn up to a cap of +100% of base magazine size.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Overhaul", meta=(ClampMin="0")) float MaximumCapacityFraction = 1.0f;   // O2 PLACEHOLDER (§G2 seed)
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Overhaul", meta=(ClampMin="0")) float MaximumCapacityFraction {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER (§G2 seed)
     // AR10 Overpressure: what activation credits reserve with (the "capacity
     // converts into reserve" half at its honest size), and what each shot in
     // the window restores. Fractions of starting reserve, the same currency
     // AddReserveAmmoFraction speaks.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Overhaul", meta=(ClampMin="0")) float OverpressureReserveGrantFraction = 0.25f;   // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Overhaul", meta=(ClampMin="0")) float OverpressurePerShotReserveFraction = 0.02f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Overhaul", meta=(ClampMin="0")) float OverpressureReserveGrantFraction {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Overhaul", meta=(ClampMin="0")) float OverpressurePerShotReserveFraction {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
     // AR10's literal capacity SHRINK, live now that the weapon's capacity
     // hook accepts a negative delta (2026-08-16, the weapon-half pay pass):
     // the window shrinks the magazine by this fraction of its effective size
     // at activation — the mirror of the base bet's +100% growth cap — and
     // the pop restores it, rounds displaced by the shrink settling to
     // reserve 1:1 on the weapon.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Overhaul", meta=(ClampMin="0", ClampMax="1")) float OverpressureCapacityShrinkFraction = 0.5f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Overhaul", meta=(ClampMin="0", ClampMax="1")) float OverpressureCapacityShrinkFraction {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
 
 private:
     UFUNCTION() void HandleOverpressureShot(const FBreakerShotResult& Shot);
@@ -182,8 +182,8 @@ public:
     UFUNCTION() void CancelPendingPlacement();
 
     // §2.3: seed 8 m along the aim ray.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Deploy", meta=(ClampMin="0")) float PlacementRangeCm = 800.0f;   // §2.3 seed
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Deploy", meta=(ClampMin="0")) float BaseDeployCastSeconds = 1.0f; // O2 placeholder; Data/abilities.json
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Deploy", meta=(ClampMin="0")) float PlacementRangeCm {}; // O246: authored in Data/abilities.json.   // §2.3 seed
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Deploy", meta=(ClampMin="0")) float BaseDeployCastSeconds {}; // O246: authored in Data/abilities.json. // O2 placeholder; Data/abilities.json
 
 protected:
     EBreakerDeployableType DeployableType = EBreakerDeployableType::Turret;
@@ -269,20 +269,20 @@ public:
     static FName MachinistModifierKey();
 
     // §3: the window raises the TOTAL cap to 8; per-type stays 2, invariantly.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="FieldAssembly", meta=(ClampMin="4")) int32 RaisedDensityCap = 8;   // §3
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="FieldAssembly", meta=(ClampMin="4")) int32 RaisedDensityCap {}; // O246: authored in Data/abilities.json.   // §3
     // Machinist's per-type mapping table is authored as a SHAPE by the doc and
     // explicitly not its magnitudes. ALL FOUR entries are now implemented
     // (2026-08-16, the branch-tree pay pass): Turret -> a flat weapon-damage
     // rider; Ammo Crate -> periodic reserve regeneration; Mine Cluster -> an
     // on-kill radial detonation; Disruptor -> a follow aura on the player.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="FieldAssembly", meta=(ClampMin="0")) float MachinistFlatDamageFraction = 0.3f;   // O2 PLACEHOLDER (fraction of scaled weapon base)
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="FieldAssembly", meta=(ClampMin="0.5")) float MachinistReservePulseSeconds = 5.0f;   // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="FieldAssembly", meta=(ClampMin="0", ClampMax="1")) float MachinistReservePulseFraction = 0.1f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="FieldAssembly", meta=(ClampMin="0")) float MachinistFlatDamageFraction {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER (fraction of scaled weapon base)
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="FieldAssembly", meta=(ClampMin="0.5")) float MachinistReservePulseSeconds {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="FieldAssembly", meta=(ClampMin="0", ClampMax="1")) float MachinistReservePulseFraction {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
     // The Mine Cluster mapping entry: kills during the window detonate at the
     // victim, as a fraction of the owner's scaled weapon base, at the turret's
     // 0.5 proc coefficient so the window is not a proc engine.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="FieldAssembly", meta=(ClampMin="0")) float MachinistDetonationCoefficient = 0.6f;   // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="FieldAssembly", meta=(ClampMin="0")) float MachinistDetonationRadiusCm = 300.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="FieldAssembly", meta=(ClampMin="0")) float MachinistDetonationCoefficient {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="FieldAssembly", meta=(ClampMin="0")) float MachinistDetonationRadiusCm {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
 
 private:
     UFUNCTION() void HandleMachinistKill(const FBreakerHitContext& Hit);

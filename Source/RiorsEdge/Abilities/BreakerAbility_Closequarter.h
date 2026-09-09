@@ -85,19 +85,19 @@ public:
     static float EffectiveRangeCm(bool bEdgeworkDuringUnmake, float AuthoredRangeCm, float UnrestrictedRangeCm);
 
     // O2 PLACEHOLDER: No Distance's authored price before ordinary modifiers.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Closequarter", meta=(ClampMin="0")) float NoDistanceManaCost = 50.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Closequarter", meta=(ClampMin="0")) float NoDistanceManaCost {}; // O246: authored in Data/abilities.json.
 
     // Class-Kits §2.2 C2: 12 m reach, arriving 2 m short.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Closequarter", meta=(ClampMin="0")) float MaximumRangeCm = 1200.0f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Closequarter", meta=(ClampMin="0")) float StandoffCm = 200.0f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Closequarter", meta=(ClampMin="0", ClampMax="1")) float RefundHealthFraction = 0.4f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Closequarter", meta=(ClampMin="0")) float RefundMana = 15.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Closequarter", meta=(ClampMin="0")) float MaximumRangeCm {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Closequarter", meta=(ClampMin="0")) float StandoffCm {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Closequarter", meta=(ClampMin="0", ClampMax="1")) float RefundHealthFraction {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Closequarter", meta=(ClampMin="0")) float RefundMana {}; // O246: authored in Data/abilities.json.
     // O2 PLACEHOLDER: time to spend Momentum Transfer after actual arrival.
-    UPROPERTY(EditDefaultsOnly, Category="Closequarter") float MomentumTransferRankOneSeconds = 2.0f;
-    UPROPERTY(EditDefaultsOnly, Category="Closequarter") float MomentumTransferRankTwoSeconds = 3.0f;
+    UPROPERTY(EditDefaultsOnly, Category="Closequarter") float MomentumTransferRankOneSeconds {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, Category="Closequarter") float MomentumTransferRankTwoSeconds {}; // O246: authored in Data/abilities.json.
 
     // Edgework's "no range limit within line of sight". 1 km stands in for
     // unlimited: far past any playable sightline, so it reads as no limit at
     // all, while still bounding the trace. O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Closequarter", meta=(ClampMin="0")) float UnrestrictedRangeCm = 100000.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Closequarter", meta=(ClampMin="0")) float UnrestrictedRangeCm {}; // O246: authored in Data/abilities.json.
 };

@@ -41,10 +41,10 @@ public:
     UFUNCTION(BlueprintPure, Category="Abilities") AActor* GetMarkedTarget() const { return MarkedTarget.Get(); }
 
     // Class-Kits §1.2 S6: 25 m.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Lead", meta=(ClampMin="0")) float MarkMinimumRangeCm = 2500.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Lead", meta=(ClampMin="0")) float MarkMinimumRangeCm {}; // O246: authored in Data/abilities.json.
     // O2 PLACEHOLDER: no design doc states the targeting trace length. 120 m is
     // "as far as the player can see" for the gym, not a balance number.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Lead", meta=(ClampMin="0")) float MarkTraceDistanceCm = 12000.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Lead", meta=(ClampMin="0")) float MarkTraceDistanceCm {}; // O246: authored in Data/abilities.json.
 
 private:
     TWeakObjectPtr<AActor> MarkedTarget;

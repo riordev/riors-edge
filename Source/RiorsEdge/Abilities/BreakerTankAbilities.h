@@ -32,18 +32,18 @@ public:
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
     // §T1: 3 m arc.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rend", meta=(ClampMin="0")) float RangeCm = 300.0f;   // §T1
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rend", meta=(ClampMin="0", ClampMax="360")) float ArcDegrees = 120.0f;   // O2 PLACEHOLDER (L7 widens to 180, so base is narrower)
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rend", meta=(ClampMin="0")) float RangeCm {}; // O246: authored in Data/abilities.json.   // §T1
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rend", meta=(ClampMin="0", ClampMax="360")) float ArcDegrees {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER (L7 widens to 180, so base is narrower)
     // O2 PLACEHOLDER: "scaled by weapon damage" shape, the Cleave precedent.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rend", meta=(ClampMin="0")) float WeaponDamageCoefficient = 1.3f;   // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rend", meta=(ClampMin="0")) float UnarmedDamage = 25.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rend", meta=(ClampMin="0")) float WeaponDamageCoefficient {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rend", meta=(ClampMin="0")) float UnarmedDamage {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
     // §T1: heals for 35% of post-mitigation damage dealt.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rend", meta=(ClampMin="0", ClampMax="1")) float HealFraction = 0.35f;   // §T1
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rend", meta=(ClampMin="0", ClampMax="1")) float HealFraction {}; // O246: authored in Data/abilities.json.   // §T1
     // §T1's overheal-to-shield cap is 25% OF MAXIMUM HEALTH; the healing
     // path's cap is a fraction OF MAX SHIELD, and the 4%/s-after-3s shield
     // decay has no primitive at all. Both differences are recorded on the
     // activation site rather than papered over.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rend", meta=(ClampMin="0", ClampMax="1")) float OverhealShieldFraction = 1.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rend", meta=(ClampMin="0", ClampMax="1")) float OverhealShieldFraction {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
     // TANK OWNS ITS OWN CEILING (O106). MaxShield initialises to 0 for every
     // character, and the only thing that used to raise it was a SUPPORT node —
     // UBreakerChargeComponent's conversion nodes, which set it to 25% of max
@@ -57,7 +57,7 @@ public:
     // Tank's: raise-only, never lowering a ceiling another system set.
     // O2 PLACEHOLDER: 25% of maximum health, the same fraction the Support path
     // borrowed from Tank §T1 in the first place.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rend", meta=(ClampMin="0", ClampMax="1")) float ShieldCeilingHealthFraction = 0.25f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rend", meta=(ClampMin="0", ClampMax="1")) float ShieldCeilingHealthFraction {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
 };
 
 // T2 Bloodline (§2 T2, Leech): 8s window doubling Life on Hit and extending it
@@ -106,7 +106,7 @@ public:
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
     // O2 PLACEHOLDER: placed a body-length ahead of the Tank, facing away.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="AnchorPoint", meta=(ClampMin="0")) float PlacementRangeCm = 250.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="AnchorPoint", meta=(ClampMin="0")) float PlacementRangeCm {}; // O246: authored in Data/abilities.json.
 };
 
 // T4 Provoke (§2 T4, Bastion): forces nearby enemies to target you, and each
@@ -125,17 +125,17 @@ class RIORSEDGE_API UBreakerAbility_Provoke : public UBreakerGameplayAbility
 
 public:
     UBreakerAbility_Provoke();
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Provoke", meta=(ClampMin="0")) float ThreatGranted = 100.f; // O2 PLACEHOLDER, tunable one-time threat credit.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Provoke", meta=(ClampMin="0")) float ForcedTargetSeconds = 4.f; // O2 PLACEHOLDER, authored window.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Provoke", meta=(ClampMin="0")) float ThreatGranted {}; // O246: authored in Data/abilities.json. // O2 PLACEHOLDER, tunable one-time threat credit.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Provoke", meta=(ClampMin="0")) float ForcedTargetSeconds {}; // O246: authored in Data/abilities.json. // O2 PLACEHOLDER, authored window.
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
     static FName OutgoingModifierKey();
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Provoke", meta=(ClampMin="0")) float RadiusCm = 1000.0f;   // §T4: 10 m
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Provoke", meta=(ClampMin="0")) float RadiusCm {}; // O246: authored in Data/abilities.json.   // §T4: 10 m
     // §T4: +4% of weapon base damage per enemy provoked, 6 stacks max, 6s.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Provoke", meta=(ClampMin="0", ClampMax="1")) float FlatDamagePerEnemyFraction = 0.04f;   // §T4 placeholder
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Provoke", meta=(ClampMin="1")) int32 MaximumStacks = 6;   // §T4
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Provoke", meta=(ClampMin="0")) float BonusDurationSeconds = 6.0f;   // §T4
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Provoke", meta=(ClampMin="0", ClampMax="1")) float FlatDamagePerEnemyFraction {}; // O246: authored in Data/abilities.json.   // §T4 placeholder
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Provoke", meta=(ClampMin="1")) int32 MaximumStacks {}; // O246: authored in Data/abilities.json.   // §T4
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Provoke", meta=(ClampMin="0")) float BonusDurationSeconds {}; // O246: authored in Data/abilities.json.   // §T4
 };
 
 // T5 Breach Charge (§2 T5, Demolitionist): thrown explosive, 1.2s fuse, 5 m
@@ -152,16 +152,16 @@ public:
     UBreakerAbility_BreachCharge();
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BreachCharge", meta=(ClampMin="0")) float ThrowRangeCm = 700.0f;   // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BreachCharge", meta=(ClampMin="0")) float FuseSeconds = 1.2f;   // §T5
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BreachCharge", meta=(ClampMin="0")) float BlastRadiusCm = 500.0f;   // §T5: 5 m
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BreachCharge", meta=(ClampMin="0")) float WeaponDamageCoefficient = 1.5f;   // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BreachCharge", meta=(ClampMin="0")) float UnarmedDamage = 40.0f;   // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BreachCharge", meta=(ClampMin="0", ClampMax="1")) float EdgeDamageFraction = 0.35f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BreachCharge", meta=(ClampMin="0")) float ThrowRangeCm {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BreachCharge", meta=(ClampMin="0")) float FuseSeconds {}; // O246: authored in Data/abilities.json.   // §T5
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BreachCharge", meta=(ClampMin="0")) float BlastRadiusCm {}; // O246: authored in Data/abilities.json.   // §T5: 5 m
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BreachCharge", meta=(ClampMin="0")) float WeaponDamageCoefficient {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BreachCharge", meta=(ClampMin="0")) float UnarmedDamage {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BreachCharge", meta=(ClampMin="0", ClampMax="1")) float EdgeDamageFraction {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
     // §T5: base self-damage reduction placeholder 50%, floor never below 20%
     // of the damage an enemy at the same distance would take.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BreachCharge", meta=(ClampMin="0", ClampMax="1")) float SelfDamageFraction = 0.5f;   // §T5 placeholder
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BreachCharge", meta=(ClampMin="0")) float KnockbackImpulse = 1400.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BreachCharge", meta=(ClampMin="0", ClampMax="1")) float SelfDamageFraction {}; // O246: authored in Data/abilities.json.   // §T5 placeholder
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BreachCharge", meta=(ClampMin="0")) float KnockbackImpulse {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
 
     virtual bool CheckCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
     virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
@@ -201,17 +201,17 @@ public:
         const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="0")) float BlastRadiusCm = 600.0f;   // §T6: 6 m
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="0")) float WeaponDamageCoefficient = 1.8f;   // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="0")) float UnarmedDamage = 50.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="0")) float BlastRadiusCm {}; // O246: authored in Data/abilities.json.   // §T6: 6 m
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="0")) float WeaponDamageCoefficient {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="0")) float UnarmedDamage {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
     // Measured descent that maps to full damage; short jumps retain the
     // authored minimum while longer drops reward the actual height gained
     // rather than mandatory (§T6).
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="1")) float FullPowerFallDistanceCm = 1200.0f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="0", ClampMax="1")) float MinimumPowerFraction = 0.4f;   // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="0")) float StaggerSeconds = 1.5f;   // §T6
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="0")) float SlamDownSpeed = 2200.0f;   // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="1")) float TerminalDescentFallDistanceCm = 2500.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="1")) float FullPowerFallDistanceCm {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="0", ClampMax="1")) float MinimumPowerFraction {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="0")) float StaggerSeconds {}; // O246: authored in Data/abilities.json.   // §T6
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="0")) float SlamDownSpeed {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="1")) float TerminalDescentFallDistanceCm {}; // O246: authored in Data/abilities.json.
 private:
     UFUNCTION() void HandlePlungeLanded(const FHitResult& Hit);
 };
@@ -237,16 +237,16 @@ public:
 
     // §2.1: generation TRIPLES against a raised cap (20/s -> 60/s); the Grit
     // component multiplies its cap by the same override, so one push does both.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hold", meta=(ClampMin="1")) float GenerationMultiplier = 3.0f;   // §2.1
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hold", meta=(ClampMin="0", ClampMax="1")) float BaseHitCapHealthFraction = 0.25f;    // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hold", meta=(ClampMin="0", ClampMax="1")) float WallSoloHitCapHealthFraction = 0.125f; // O2 PLACEHOLDER (§2.1 Wall: solo, doubled effectiveness)
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hold", meta=(ClampMin="1")) float GenerationMultiplier {}; // O246: authored in Data/abilities.json.   // §2.1
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hold", meta=(ClampMin="0", ClampMax="1")) float BaseHitCapHealthFraction {}; // O246: authored in Data/abilities.json.    // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hold", meta=(ClampMin="0", ClampMax="1")) float WallSoloHitCapHealthFraction {}; // O246: authored in Data/abilities.json. // O2 PLACEHOLDER (§2.1 Wall: solo, doubled effectiveness)
     // §2.1 Vein: converted to healing at 60% of the post-mitigation amount.
     // Instant rather than over 1.5s — no heal-over-time primitive exists.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hold", meta=(ClampMin="0", ClampMax="1")) float VeinHealFraction = 0.6f;   // §2.1 placeholder
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hold", meta=(ClampMin="0", ClampMax="1")) float VeinHealFraction {}; // O246: authored in Data/abilities.json.   // §2.1 placeholder
     // §2.1 Detonation: releases 70% of absorbed damage, 8 m, no falloff.
     // Second input releases early; natural expiry remains the fallback.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hold", meta=(ClampMin="0", ClampMax="1")) float DetonationReleaseFraction = 0.7f;   // §2.1 placeholder
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hold", meta=(ClampMin="0")) float DetonationRadiusCm = 800.0f;   // §2.1: 8 m
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hold", meta=(ClampMin="0", ClampMax="1")) float DetonationReleaseFraction {}; // O246: authored in Data/abilities.json.   // §2.1 placeholder
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hold", meta=(ClampMin="0")) float DetonationRadiusCm {}; // O246: authored in Data/abilities.json.   // §2.1: 8 m
 
 private:
     UFUNCTION() void HandleDamageTaken(const FBreakerHitContext& Hit);

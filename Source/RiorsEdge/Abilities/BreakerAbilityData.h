@@ -18,8 +18,8 @@ class UClass;
 //
 // A file that fails validation applies NOTHING: every row keeps its
 // default-constructed numerics (zero cost, zero cooldown, zero window) and
-// every ability class keeps its compiled member initialisers, behind an
-// ensure, never a nearest fit. RiorsEdge.Data.Abilities.Fresh reads the
+// every Data-backed class property stays unconfigured, behind an
+// ensure, never a nearest fit. RiorsEdge.Data.Abilities.Schema reads the
 // errors first so a broken file names its breaks.
 //
 // Kept apart from the definition header, which is included widely, so a

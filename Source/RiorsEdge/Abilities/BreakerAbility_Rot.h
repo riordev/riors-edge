@@ -46,25 +46,25 @@ public:
     bool ShouldFollowCaster(const AActor* OwnerActor, bool bGroundHit, const FVector& HitPoint, const FVector& HitNormal) const;
 
     // Class-Kits §2.2 C3: 4 m radius, 6 s.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float RadiusCm = 400.0f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float DurationSeconds = 6.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float RadiusCm {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float DurationSeconds {}; // O246: authored in Data/abilities.json.
     // O2 PLACEHOLDER: the doc gives radius and duration and nothing else. The
     // cadence is a shape, not balance.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0.05")) float TickIntervalSeconds = 0.5f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0.05")) float TickIntervalSeconds {}; // O246: authored in Data/abilities.json.
     // O2 PLACEHOLDER: direct Entropy hits build the earned Rot status.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float ZoneDamagePerTick = 10.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float ZoneDamagePerTick {}; // O246: authored in Data/abilities.json.
     // Class-Kits §2.2 C3: a FLAT 40. Flat and never percentage is the ruling —
     // it is what protects the boss armour cap (Master 7.10.5).
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float FlatArmorReduction = 40.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float FlatArmorReduction {}; // O246: authored in Data/abilities.json.
     // How far out the puddle can be placed. O2 PLACEHOLDER.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float MaximumRangeCm = 2500.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float MaximumRangeCm {}; // O246: authored in Data/abilities.json.
     // Vertical reach of the volume; see FBreakerZoneSpec::HalfHeightCm.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float HalfHeightCm = 250.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float HalfHeightCm {}; // O246: authored in Data/abilities.json.
     // O2 PLACEHOLDER: conditional income shares the Caster generation cap.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot|Nodes", meta=(ClampMin="0")) float StandingWaterRankOneManaPerSecond = 2.0f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot|Nodes", meta=(ClampMin="0")) float StandingWaterRankTwoManaPerSecond = 4.0f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot|Nodes", meta=(ClampMin="0")) float ZoneworkAdditionalArmorReduction = 20.0f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot|Nodes", meta=(ClampMin="0")) float LingeringRefreshGrowthCm = 100.0f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot|Nodes", meta=(ClampMin="0")) float WellspringSelfPlacementRadiusCm = 150.0f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot|Nodes", meta=(ClampMin="0", ClampMax="1")) float WellspringMinimumGroundNormalZ = 0.7f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot|Nodes", meta=(ClampMin="0")) float StandingWaterRankOneManaPerSecond {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot|Nodes", meta=(ClampMin="0")) float StandingWaterRankTwoManaPerSecond {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot|Nodes", meta=(ClampMin="0")) float ZoneworkAdditionalArmorReduction {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot|Nodes", meta=(ClampMin="0")) float LingeringRefreshGrowthCm {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot|Nodes", meta=(ClampMin="0")) float WellspringSelfPlacementRadiusCm {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot|Nodes", meta=(ClampMin="0", ClampMax="1")) float WellspringMinimumGroundNormalZ {}; // O246: authored in Data/abilities.json.
 };

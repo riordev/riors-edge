@@ -162,8 +162,8 @@ namespace
 // exactly — the same row count, every id known, every variant row present,
 // every numeric property keyed and no key without a property — before a
 // single number is applied. Anything short of that leaves every row at its
-// default-constructed numerics and every ability class at its compiled
-// initialisers behind an ensure, because a table that half-loaded would play
+// default-constructed numerics and every Data-backed class property
+// unconfigured behind an ensure, because a table that half-loaded would play
 // as a table that loaded.
 namespace
 {
@@ -362,7 +362,7 @@ namespace
 
             // Numbers: every property on the class has a key and every key
             // names a property. A class that declares a number the file
-            // does not carry would keep its compiled value while the rest of
+            // does not carry would remain unconfigured while the rest of
             // the file applied, and a key the class does not declare is a
             // typo or a renamed member; both are the same all-or-nothing
             // failure as a missing row.
@@ -420,7 +420,7 @@ namespace
         if (!Errors.IsClean())
         {
             BreakerAbilityDataErrorsStore = Errors.Messages;
-            ensureMsgf(false, TEXT("%s failed to load; every ability keeps zero cost, zero cooldown, zero window and its compiled class numbers.\n%s"), *File, *Errors.Join());
+            ensureMsgf(false, TEXT("%s failed to load; every ability keeps zero cost, zero cooldown, zero window and unconfigured class numbers.\n%s"), *File, *Errors.Join());
             return;
         }
 
@@ -435,21 +435,16 @@ namespace
 
             // The class numbers go onto the class default object, which every
             // instance copies at grant (InstancedPerActor), so the ability
-            // body reads its own member and finds the file's value. The
-            // value the compiler put there is recorded first. Ints round from
+            // body reads its own member and finds the file's value.
+            // Data is the only magnitude authority (O246). Ints round from
             // the file's float.
-            Definition.CompiledNumbers.Reset();
             Definition.Numbers.Reset();
             if (UObject* Defaults = Definition.AbilityClass.Get() ? Definition.AbilityClass.Get()->GetDefaultObject() : nullptr)
             {
                 for (FNumericProperty* Property : BreakerAbilityData::NumberProperties(Definition.AbilityClass.Get()))
                 {
                     void* Value = Property->ContainerPtrToValuePtr<void>(Defaults);
-                    const float Compiled = Property->IsFloatingPoint()
-                        ? static_cast<float>(Property->GetFloatingPointPropertyValue(Value))
-                        : static_cast<float>(Property->GetSignedIntPropertyValue(Value));
                     const float Authored = Row.Numbers[Property->GetFName()];
-                    Definition.CompiledNumbers.Add(Property->GetFName(), Compiled);
                     Definition.Numbers.Add(Property->GetFName(), Authored);
                     if (Property->IsFloatingPoint())
                     {
@@ -673,7 +668,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     // Caster. Costs quoted from Class-Kits §2.2. NO COOLDOWNS ANYWHERE in
     // this class: Mana *is* the cooldown (Class-Kits §2.1), so no entry below
     // authors a CooldownTag, every Caster cooldownSeconds in the file is 0
-    // (RiorsEdge.Data.Abilities.Fresh pins it), and the HUD can therefore
+    // (RiorsEdge.Data.Abilities.Schema pins it), and the HUD can therefore
     // tell "cost-gated" from "cooldown of zero" (spec D3).
     // ------------------------------------------------------------------
 

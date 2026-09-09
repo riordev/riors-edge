@@ -48,23 +48,23 @@ public:
     static FName ChannelWindowKey();
 
     // Class-Kits §2.2 C4: a 5 s channel.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0")) float ChannelSeconds = 5.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0")) float ChannelSeconds {}; // O246: authored in Data/abilities.json.
     // Everything below is O2 PLACEHOLDER: GAP [O2] in spec §5.4 says the damage
     // per tick, the tick interval, the heal portion and the break threshold are
     // all unspecified.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0.05")) float TickIntervalSeconds = 0.5f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0.05")) float TickIntervalSeconds {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
     // The item-level-1 number; each tick rides the equipped weapon's
     // item-level scalar (O35).
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0")) float DamagePerTick = 14.0f;   // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0", ClampMax="2")) float LeechFraction = 0.4f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0")) float DamagePerTick {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0", ClampMax="2")) float LeechFraction {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
     // Baseline tolerance remains; purchased Drain uses the editable rank thresholds.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0", ClampMax="1")) float BreakThresholdFraction = 0.05f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0")) float MaximumRangeCm = 3000.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0", ClampMax="1")) float BreakThresholdFraction {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0")) float MaximumRangeCm {}; // O246: authored in Data/abilities.json.
     // The channel also breaks if the target walks out of this. A channel that
     // follows a target across the map is not what "on one target" means.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0")) float BreakDistanceCm = 3600.0f;
-    UPROPERTY(EditDefaultsOnly, Category="Siphon") float DrainRankOneThreshold = 0.10f; // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, Category="Siphon") float DrainRankTwoThreshold = 0.15f; // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0")) float BreakDistanceCm {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, Category="Siphon") float DrainRankOneThreshold {}; // O246: authored in Data/abilities.json. // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, Category="Siphon") float DrainRankTwoThreshold {}; // O246: authored in Data/abilities.json. // O2 PLACEHOLDER
 
 protected:
     // One channel tick: damage the target through the contract, heal the caster

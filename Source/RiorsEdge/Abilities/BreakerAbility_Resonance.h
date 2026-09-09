@@ -30,10 +30,10 @@ public:
     // MS8's rewrite: do not consume, halve the remaining durations instead.
     // A data field rather than a branch, so the node flips one value.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Resonance") bool bConsumeStatuses = true;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Resonance", meta=(ClampMin="0", ClampMax="1")) float DurationScalarWhenNotConsuming = 0.5f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Resonance", meta=(ClampMin="0", ClampMax="1")) float DurationScalarWhenNotConsuming {}; // O246: authored in Data/abilities.json.
     // MS5 Payment: Mana per distinct status consumed. Zero at base.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Resonance", meta=(ClampMin="0")) float RefundManaPerStatus = 0.0f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Resonance", meta=(ClampMin="0")) float MaximumRangeCm = 4000.0f;
-    UPROPERTY(EditDefaultsOnly, Category="Resonance|Mana") float PaymentRankOneManaPerStatus = 2.0f; // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, Category="Resonance|Mana") float PaymentRankTwoManaPerStatus = 4.0f; // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Resonance", meta=(ClampMin="0")) float RefundManaPerStatus {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Resonance", meta=(ClampMin="0")) float MaximumRangeCm {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, Category="Resonance|Mana") float PaymentRankOneManaPerStatus {}; // O246: authored in Data/abilities.json. // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, Category="Resonance|Mana") float PaymentRankTwoManaPerStatus {}; // O246: authored in Data/abilities.json. // O2 PLACEHOLDER
 };

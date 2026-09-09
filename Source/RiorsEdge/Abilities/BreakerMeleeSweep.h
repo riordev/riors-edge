@@ -15,9 +15,9 @@ struct RIORSEDGE_API FBreakerMeleeSweepParams
     // Expected normalized and horizontal. Cleave is a forward arc, not a cone
     // that can be aimed at the floor.
     UPROPERTY(BlueprintReadWrite) FVector Forward = FVector::ForwardVector;
-    UPROPERTY(BlueprintReadWrite, meta=(ClampMin="0")) float RangeCm = 300.0f;
+    UPROPERTY(BlueprintReadWrite, meta=(ClampMin="0")) float RangeCm {}; // O246: authored in Data/abilities.json.
     // Full included angle, so 90 means 45 degrees either side of Forward.
-    UPROPERTY(BlueprintReadWrite, meta=(ClampMin="0", ClampMax="360")) float ArcDegrees = 90.0f;
+    UPROPERTY(BlueprintReadWrite, meta=(ClampMin="0", ClampMax="360")) float ArcDegrees {}; // O246: authored in Data/abilities.json.
     // 0 means no limit.
     UPROPERTY(BlueprintReadWrite, meta=(ClampMin="0")) int32 MaxTargets = 0;
 };

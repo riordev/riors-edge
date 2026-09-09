@@ -71,29 +71,29 @@ public:
     static FName SwingWindowKey();
 
     // Class-Kits §2.2 C1: 3 m.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float RangeCm = 450.0f; // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float RangeCm {}; // O246: authored in Data/abilities.json. // O2 PLACEHOLDER
     // O2 PLACEHOLDER: no design doc gives the base arc. SB8 Edge widens it to
     // 180, so the base must be narrower than that; 120 is a shape, not balance.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0", ClampMax="360")) float ArcDegrees = 120.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0", ClampMax="360")) float ArcDegrees {}; // O246: authored in Data/abilities.json.
     // O2 PLACEHOLDER: "scaled by weapon damage" with no coefficient authored.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float WeaponDamageCoefficient = 1.5f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float WeaponDamageCoefficient {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
     // O2 PLACEHOLDER: a Caster with no weapon component still has a melee verb.
     // The authored number is the ITEM LEVEL 1 value; it rides the equipped
     // weapon's item-level scalar (O35).
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float UnarmedDamage = 20.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float UnarmedDamage {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
     // O2 PLACEHOLDER: the lock is the melee risk. Class-Kits names it (Edgework
     // removes it) but never times it.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float AnimationLockSeconds = 0.45f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float AnimationLockSeconds {}; // O246: authored in Data/abilities.json.
     // Class-Kits §2.2 C1: Bleed at a 100% base chance. The magnitude and
     // duration are O2 PLACEHOLDER — no doc supplies them for this application.
     // Per-tick damage is an item-level-1 number and rides the weapon scalar at
     // application (O35), the weapon-bleed precedent generalised.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float BleedDamagePerTick = 6.0f;   // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float BleedDuration = 4.0f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0.05")) float BleedTickInterval = 1.0f;
-    UPROPERTY(EditDefaultsOnly, Category="Cleave|Mana") float FollowThroughRankOneKillRefund = 3.0f; // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, Category="Cleave|Mana") float FollowThroughRankTwoKillRefund = 6.0f; // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float ReprisalWindowSeconds = 2.0f; // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float BleedDamagePerTick {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float BleedDuration {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0.05")) float BleedTickInterval {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, Category="Cleave|Mana") float FollowThroughRankOneKillRefund {}; // O246: authored in Data/abilities.json. // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, Category="Cleave|Mana") float FollowThroughRankTwoKillRefund {}; // O246: authored in Data/abilities.json. // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float ReprisalWindowSeconds {}; // O246: authored in Data/abilities.json. // O2 PLACEHOLDER
 
 private:
     // LevelScalar and OwnerCombat are read once by the activation and passed

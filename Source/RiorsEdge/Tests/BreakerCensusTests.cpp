@@ -380,21 +380,14 @@ bool FBreakerMissionsFreshTest::RunTest(const FString& Parameters)
     return true;
 }
 
-// THE COMMITTED ABILITY FILE IS THE LOADED REGISTRY, OR THIS IS RED.
-//
-// Data/abilities.json is what the fallback registry overlays its numerics
-// from. Same pin as the other data files, plus the shipped configuration:
-// the thirty-five rows, five ultimates each carrying a base row and three
-// keystones, and no Caster cooldown anywhere (Mana is the cooldown,
-// Class-Kits §2.1). The literal value pins live in BreakerAbilityTests and
-// BreakerUnbuiltClassTests; this test proves the file is the table those
-// read.
+// O246: validate the authored ability schema and completeness, independent of
+// formatting or a duplicate compiled magnitude table. Loader failures are atomic.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-    FBreakerAbilitiesFreshTest,
-    "RiorsEdge.Data.Abilities.Fresh",
+    FBreakerAbilitiesSchemaTest,
+    "RiorsEdge.Data.Abilities.Schema",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-bool FBreakerAbilitiesFreshTest::RunTest(const FString& Parameters)
+bool FBreakerAbilitiesSchemaTest::RunTest(const FString& Parameters)
 {
     const TArray<FString>& LoadErrors = BreakerAbilityData::GetDataErrors();
     for (const FString& Error : LoadErrors)
@@ -407,7 +400,8 @@ bool FBreakerAbilitiesFreshTest::RunTest(const FString& Parameters)
     }
 
     const TArray<UBreakerAbilityDefinition*>& Abilities = UBreakerAbilityDefinition::GetFallbackRegistry();
-    TestEqual(TEXT("Thirty-four registered abilities after O258 retires Skim"), Abilities.Num(), 34);
+    TestEqual(TEXT("O258 roster: six Swift rows and seven for each other class"), Abilities.Num(), 34);
+    TSet<FName> AbilityIds;
 
     int32 UltimateCount = 0;
     int32 VariantCount = 0;
@@ -419,6 +413,13 @@ bool FBreakerAbilitiesFreshTest::RunTest(const FString& Parameters)
             AddError(TEXT("A registry row is null"));
             continue;
         }
+        TestFalse(TEXT("Every ability has an identity"), Definition->AbilityId.IsNone());
+        TestFalse(FString::Printf(TEXT("%s identity occurs once"), *Definition->AbilityId.ToString()), AbilityIds.Contains(Definition->AbilityId));
+        AbilityIds.Add(Definition->AbilityId);
+        TestNotNull(FString::Printf(TEXT("%s retains a native class"), *Definition->AbilityId.ToString()), Definition->AbilityClass.Get());
+        TestTrue(TEXT("Resource cost is finite and nonnegative"), FMath::IsFinite(Definition->ResourceCost) && Definition->ResourceCost >= 0.f);
+        TestTrue(TEXT("Cooldown is finite and nonnegative"), FMath::IsFinite(Definition->CooldownSeconds) && Definition->CooldownSeconds >= 0.f);
+        TestTrue(TEXT("Window is finite and nonnegative"), FMath::IsFinite(Definition->WindowDuration) && Definition->WindowDuration >= 0.f);
         if (Definition->IsUltimate())
         {
             ++UltimateCount;
@@ -441,25 +442,6 @@ bool FBreakerAbilitiesFreshTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("No Caster row has a cooldown: Mana is the cooldown"), CasterCooldowns, 0);
     AddInfo(FString::Printf(TEXT("Ability registry: %d abilities, %d ultimates, %d variants"), Abilities.Num(), UltimateCount, VariantCount));
 
-    const FString Fresh = BreakerCensus::ExportAbilities(Abilities);
-
-    const FString Path = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / BreakerCensus::AbilitiesRelativePath());
-    FString Committed;
-    if (!FFileHelper::LoadFileToString(Committed, *Path))
-    {
-        AddError(FString::Printf(TEXT("%s is missing. Run `bash Scripts/ue-census.sh` and commit the file."), *Path));
-        return false;
-    }
-    Committed.ReplaceInline(TEXT("\r\n"), TEXT("\n"));
-
-    if (Committed != Fresh)
-    {
-        AddError(FString::Printf(
-            TEXT("%s is not in canonical form against what the registry loaded. ")
-            TEXT("Run `bash Scripts/ue-census.sh` and commit Data/abilities.json in the same change."),
-            *Path));
-        return false;
-    }
     return true;
 }
 
@@ -468,12 +450,12 @@ bool FBreakerAbilitiesFreshTest::RunTest(const FString& Parameters)
 // Every EditDefaultsOnly float and int32 an ability class declares below
 // UBreakerGameplayAbility is a key on its row's "numbers" object, applied
 // onto the class default object at load. The shipped configuration: one
-// key per property on every row, one hundred and twenty-two keys across the
-// registry (one hundred and nineteen declarations; the Gunsmith deploy
+// key per property on every row, 146 keys across the
+// registry (143 declarations; the Gunsmith deploy
 // base's PlacementRangeCm is carried once by each of its four subclasses),
 // and a missing key answers with the caller's default.
 //
-// The file is the tuning authority; compiled initializers are failed-load fallbacks.
+// O246: the file is the sole tuning authority; unconfigured properties are zero.
 // Verify the loaded class defaults, so editing a magnitude needs no C++ edit.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerAbilitiesNumbersTest,
@@ -503,9 +485,9 @@ bool FBreakerAbilitiesNumbersTest::RunTest(const FString& Parameters)
             continue;
         }
         const FString Id = Definition->AbilityId.ToString();
+        UObject* Instance = NewObject<UObject>(GetTransientPackage(), Definition->AbilityClass.Get());
         const TArray<FNumericProperty*> Properties = BreakerAbilityData::NumberProperties(Definition->AbilityClass.Get());
         TestEqual(FString::Printf(TEXT("%s carries one key per numeric property"), *Id), Definition->Numbers.Num(), Properties.Num());
-        TestEqual(FString::Printf(TEXT("%s recorded one compiled value per numeric property"), *Id), Definition->CompiledNumbers.Num(), Properties.Num());
         KeyCount += Definition->Numbers.Num();
         if (Properties.Num() > 0)
         {
@@ -515,8 +497,7 @@ bool FBreakerAbilitiesNumbersTest::RunTest(const FString& Parameters)
         {
             const FName Key = Property->GetFName();
             const float* Authored = Definition->Numbers.Find(Key);
-            const float* Compiled = Definition->CompiledNumbers.Find(Key);
-            if (!Authored || !Compiled)
+            if (!Authored)
             {
                 AddError(FString::Printf(TEXT("%s: %s is declared on %s but not carried"), *Id, *Key.ToString(), *Property->GetOwnerClass()->GetName()));
                 continue;
@@ -526,13 +507,18 @@ bool FBreakerAbilitiesNumbersTest::RunTest(const FString& Parameters)
                 ? static_cast<float>(Property->GetFloatingPointPropertyValue(RuntimeValue))
                 : static_cast<float>(Property->GetSignedIntPropertyValue(RuntimeValue));
             TestEqual(FString::Printf(TEXT("%s.%s: runtime applies the authored value"), *Id, *Key.ToString()), Applied, *Authored);
+            const void* InstanceValue = Property->ContainerPtrToValuePtr<void>(Instance);
+            const float Instanced = Property->IsFloatingPoint()
+                ? static_cast<float>(Property->GetFloatingPointPropertyValue(InstanceValue))
+                : static_cast<float>(Property->GetSignedIntPropertyValue(InstanceValue));
+            TestEqual(FString::Printf(TEXT("%s.%s: constructed instance receives Data"), *Id, *Key.ToString()), Instanced, *Authored);
             TestEqual(FString::Printf(TEXT("%s.%s: Number reads the authored value"), *Id, *Key.ToString()), Definition->Number(Key, -1.0f), *Authored);
         }
         TestEqual(FString::Printf(TEXT("%s: a key the file does not name answers with the default"), *Id),
             Definition->Number(FName(TEXT("Breaker.NoSuchNumber")), 7.0f), 7.0f);
     }
     TestEqual(TEXT("One hundred and forty-six numbers including Provoke threat and forced duration"), KeyCount, 146);
-    TestEqual(TEXT("Twenty-eight rows carry numbers; seven classes keep theirs as constexpr or in the body"), RowsWithNumbers, 28);
+    TestEqual(TEXT("Twenty-eight rows carry numbers; six remaining rows keep rules as constexpr or in the body"), RowsWithNumbers, 28);
 
     // Order is the class's declaration order, super first: the Gunsmith
     // deploy base's range precedes anything a deployable declares itself,

@@ -3,6 +3,8 @@
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbilityComponent.h"
 #include "Abilities/BreakerAbilityDefinition.h"
+#include "Abilities/BreakerAbilityData.h"
+#include "UObject/UnrealType.h"
 #include "Abilities/BreakerAbilityTags.h"
 #include "Abilities/BreakerSkillLevelMath.h"
 #include "Attributes/BreakerAttributeSet.h"
@@ -42,6 +44,25 @@ UBreakerGameplayAbility::UBreakerGameplayAbility()
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
     CostGameplayEffectClass = UBreakerAbilityCostEffect::StaticClass();
     CooldownGameplayEffectClass = UBreakerAbilityCooldownEffect::StaticClass();
+}
+
+void UBreakerGameplayAbility::PostInitProperties()
+{
+    Super::PostInitProperties();
+    if (HasAnyFlags(RF_ClassDefaultObject)) return;
+    // O246: native instance construction can retain zero-initialized storage
+    // despite a patched CDO. Apply the same authoritative Data row to the
+    // completed instance; no second table of authored magnitudes exists.
+    const UBreakerAbilityDefinition* Definition = GetAbilityDefinition();
+    if (!Definition) return;
+    for (FNumericProperty* Property : BreakerAbilityData::NumberProperties(GetClass()))
+    {
+        const float* Authored = Definition->Numbers.Find(Property->GetFName());
+        if (!Authored) continue;
+        void* Value = Property->ContainerPtrToValuePtr<void>(this);
+        if (Property->IsFloatingPoint()) Property->SetFloatingPointPropertyValue(Value, *Authored);
+        else Property->SetIntPropertyValue(Value, static_cast<int64>(FMath::RoundToInt(*Authored)));
+    }
 }
 
 bool UBreakerGameplayAbility::CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,

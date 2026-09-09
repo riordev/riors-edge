@@ -30,16 +30,16 @@ public:
 
     virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
     virtual void OnRemoveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec) override;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fracture", meta=(ClampMin="0")) float BaseCastSeconds = 0.35f; // O2 PLACEHOLDER; authored in Data/abilities.json
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fracture", meta=(ClampMin="0")) float BaseCastSeconds {}; // O246: authored in Data/abilities.json. // O2 PLACEHOLDER; authored in Data/abilities.json
 
     // MS7's upgrade applies TWO cycle positions per cast. Data, not a branch.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fracture", meta=(ClampMin="1", ClampMax="4")) int32 CyclePositionsPerCast = 1;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fracture", meta=(ClampMin="1", ClampMax="4")) int32 CyclePositionsPerCast {}; // O246: authored in Data/abilities.json.
     // Every value below is O2 PLACEHOLDER: Class-Kits gives Fracture a cost and
     // a behaviour and no numbers at all. ImpactDamage is the item-level-1
     // number and rides the equipped weapon's item-level scalar (O35).
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fracture", meta=(ClampMin="0")) float ImpactDamage = 300.0f;   // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fracture", meta=(ClampMin="0")) float ProjectileSpeed = 4000.0f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fracture", meta=(ClampMin="0")) float MuzzleForwardCm = 80.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fracture", meta=(ClampMin="0")) float ImpactDamage {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fracture", meta=(ClampMin="0")) float ProjectileSpeed {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fracture", meta=(ClampMin="0")) float MuzzleForwardCm {}; // O246: authored in Data/abilities.json.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fracture") TSubclassOf<ABreakerProjectileBase> ProjectileClass;
 private:
     void CompleteCast();

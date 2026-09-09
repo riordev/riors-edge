@@ -13,7 +13,7 @@ Continue validated blocks until the owner returns. Prioritize playable changes f
 5. O251 landed: static cover hides the entire enemy plate including bosses; open/blocked frames inspected.
 6. O248 verified: native archive, v9→v10/repeated migration, equipped/backpack restore and paid Attune retain historical over-budget affixes. No destructive normalization needed.
 7. Kit expansion under O252–O260: verify the registered roster, author reachable abilities/passives with real consumers, and reconcile counts before claiming the 55-entry target. Carom, Coup, Backstep, Pyre, Riftlance, Recall, Bulwark and Overwatch are named candidates. Rover, Barrel and Wildcard require additional mechanics. Check proposed names against Core/doctrine IDs.
-8. O246: remove duplicated compiled ability defaults only with a replacement schema/completeness test for Data/abilities.json.
+8. O246 landed: Data alone authors146 numeric keys; native instance initialization applies them explicitly, schema and instance/CDO agreement verified.
 9. World Core Point coverage is already derived from mission Unlock.CorePoint references; verify remaining uncovered sources against actual flag delivery before changing content.
 
 ## Seven-step acceptance checklist
@@ -80,3 +80,5 @@ Current local build/census/full suite:842 passing,3 expected failures,0 unexpect
 - Enemy plates: bosses now obey the same static-cover rule. Native occlusion and full suite pass842/3/0; rendered1920×1080 open/blocked frames confirm full plate visibility/removal. Cache placement also inspected. Capture boot-map race avoided with explicit map launch; weak core ticker fixes paused setup. See Docs/reports/plate-cache-capture-2026-09-09.md; rough art/poses and live interaction remain open.
 
 - Legacy special items: strengthened existing native Forge test checks exact stored line order/identity/tier/value/category after serialization, repeated current migration, equipment restore, then paid Attune. Nine-line historical items survive. Build/full suite842/3/0; production preservation already existed, so no item rewrite or tuning change.
+
+- Ability numeric authority: removed143 duplicated initializers; Data schema replaces compiled-default freshness. First suite exposed native instances retaining zeros despite patched CDOs; fixed at PostInitProperties and added all-row instance checks, independently reviewed. Rebuilt full suite842/3/0. No status.py binding existed to rename; measurement pins unchanged. Custom serialized Blueprint overrides are outside the registered native roster guarantee.

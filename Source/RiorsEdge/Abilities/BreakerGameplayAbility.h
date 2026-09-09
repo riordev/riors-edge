@@ -43,6 +43,7 @@ class RIORSEDGE_API UBreakerGameplayAbility : public UGameplayAbility
 
 public:
     UBreakerGameplayAbility();
+    virtual void PostInitProperties() override;
     // Timed buffs are not interrupted merely because their caster staggers.
     // Channels and pending casts opt in explicitly.
     virtual bool IsStaggerInterruptible() const { return false; }

@@ -122,7 +122,7 @@ public:
 
     // Class-Kits S2/F9 use 1.0s; 3.0s is this component's default gap, quoted
     // from the task brief rather than from a design doc. O2 PLACEHOLDER.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Abilities|State", meta=(ClampMin="0")) float StreakGapSeconds = 3.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Abilities|State", meta=(ClampMin="0")) float StreakGapSeconds {}; // O246: authored in Data/abilities.json.
 
     // Pure rule, exposed for tests: a streak survives only a same-target hit
     // inside the gap.

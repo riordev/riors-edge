@@ -75,7 +75,7 @@ public:
     static constexpr float SecondWindResetSeconds = 1.0f;
     // O2 PLACEHOLDER — spec §4.2 GAP: "the flat bonus per stack is not
     // specified. Structure is complete; the magnitude is a placeholder."
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="CadenceBreak", meta=(ClampMin="0")) float FlatDamagePerStack = 4.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="CadenceBreak", meta=(ClampMin="0")) float FlatDamagePerStack {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
 
 private:
     // Streak driver, bound once per instance to the weapon's OnShot.
