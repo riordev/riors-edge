@@ -29,9 +29,17 @@ bool FBreakerRotNodesRuntimeTest::RunTest(const FString& Parameters)
     UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
     if (!TestNotNull(TEXT("isolated zone world"), World)) return false;
     GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
-    ON_SCOPE_EXIT { GEngine->DestroyWorldContext(World); World->DestroyWorld(false); };
+    // O266: Rot winds up, and a wind-up resolves on the world timer, so this
+    // fixture has to be tickable. It stays a HAND-DRIVEN zone test either way:
+    // zone age is the DeltaSeconds argument to AdvanceZone and nothing else,
+    // so every actor the assertions measure is frozen below and the test keeps
+    // sole ownership of the clock it reads.
+    World->InitializeActorsForPlay(FURL());
+    const uint64 EntryFrame = GFrameCounter;
+    ON_SCOPE_EXIT { GEngine->DestroyWorldContext(World); World->DestroyWorld(false); GFrameCounter = EntryFrame; };
     ABreakerCharacter* Player = World->SpawnActor<ABreakerCharacter>();
     if (!TestNotNull(TEXT("real caster"), Player)) return false;
+    Player->SetActorTickEnabled(false);
     UAbilitySystemComponent* ASC = Player->GetAbilitySystemComponent();
     ASC->InitAbilityActorInfo(Player, Player); ASC->AddAttributeSetSubobject(Player->GetAttributes());
     Player->GetCombat()->BindAttributes(Player->GetAttributes());
@@ -42,6 +50,7 @@ bool FBreakerRotNodesRuntimeTest::RunTest(const FString& Parameters)
     Progression->GrantPlaytestPoints(8, 0);
     UBreakerManaComponent* Mana = Player->GetMana();
     Mana->BindAttributes(Player->GetAttributes()); Mana->PassiveRegenPerSecond = 0;
+    Mana->SetComponentTickEnabled(false);
     Player->GetAttributes()->ApplyClassResource(0);
     const UBreakerProgressionTree* Tree = UBreakerProgressionLibrary::GetCasterVoidWhispererTree();
     auto Buy = [&](const TCHAR* Id)
@@ -115,6 +124,12 @@ bool FBreakerRotNodesRuntimeTest::RunTest(const FString& Parameters)
     Ground->SetCollisionResponseToAllChannels(ECR_Block); Ground->RegisterComponent();
     Floor->SetActorLocation(FVector(0, 0, -110));
     APlayerController* Controller = World->SpawnActor<APlayerController>();
+    // Before Possess: a play world gives the controller a camera manager, and
+    // possessing then aims it at the pawn. Rot reads GetPlayerViewPoint, so the
+    // -90 control rotation below would be silently overruled by the pawn's own
+    // rotation and the straight-down self-placement trace would fire sideways
+    // into the victim instead. This is what actually blocked the wind-up.
+    Controller->bAutoManageActiveCameraTarget = false;
     Controller->Possess(Player); Controller->SetControlRotation(FRotator(-90, 0, 0));
     Player->GetBreakerMovement()->SetMovementMode(MOVE_Walking);
     Player->GetBreakerMovement()->SetComponentTickEnabled(false);
@@ -124,6 +139,12 @@ bool FBreakerRotNodesRuntimeTest::RunTest(const FString& Parameters)
         Player->GetAttributes()->ApplyClassResource(100);
         TestTrue(TEXT("real Rot activation"), ASC->TryActivateAbility(RotHandle));
         BreakerResolvePendingCast(World, Player);
+        // The world ticked for the wind-up; the zones must not have aged for it.
+        // Follow is performed INSIDE AdvanceZone, not by Tick, so freezing the
+        // actor costs the fixture nothing: its own explicit AdvanceZone calls
+        // still move a following zone exactly as before.
+        for (const TWeakObjectPtr<ABreakerZoneActor>& Spawned : ABreakerZoneActor::GetLiveZones())
+            if (ABreakerZoneActor* Zone = Spawned.Get()) Zone->SetActorTickEnabled(false);
         ABreakerZoneActor* Found = nullptr;
         for (const TWeakObjectPtr<ABreakerZoneActor>& Held : ABreakerZoneActor::GetLiveZones())
             if (ABreakerZoneActor* Candidate = Held.Get())

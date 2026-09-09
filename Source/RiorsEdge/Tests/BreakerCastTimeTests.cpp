@@ -85,15 +85,6 @@ bool FBreakerCastTimeShippedTest::RunTest(const FString& Parameters)
         // its own comment that the interaction is authored and "recorded
         // rather than silently nerfed", so a wind-up here is a balance
         // change the owner rules on, not a delay.
-        // Rot stays instant, and the reason is now exact. Its fixture drives
-        // zone life by hand with AdvanceZone, so the world ticks a wind-up
-        // needs would age every zone underneath its measurements. Freezing
-        // the zone actors was tried and does not work either: a Rot zone
-        // FOLLOWS its caster on tick, so a frozen zone stops following and
-        // the fixture's own follow assertions fail instead. The test needs a
-        // timing model that separates zone age from world time; there is no
-        // trick that avoids writing it.
-        FName(TEXT("Caster.Rot")),
         FName(TEXT("Caster.Unmake")),
         // Resonance is parked on a MEASURED consequence rather than a fixture.
         // It detonates the statuses on a target and is paid out of their

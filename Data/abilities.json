@@ -152,7 +152,7 @@
 			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, castTimeSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 25,
 			"cooldownSeconds": 0,
-			"castTimeSeconds": 0,
+			"castTimeSeconds": 0.6,
 			"windowDuration": 6,
 			"numbers":
 			{
