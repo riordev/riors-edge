@@ -6970,13 +6970,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildClassSelectScreen()
         const bool bImplemented = ClassHasImplementedKit(Entry.ClassId);
         // O39: a class with no kit is LOCKED — choosing it would permanently
         // strand a character on nothing, since class selection is one-way.
-        // There is no longer a dev bypass: the swap tool that used to open both
-        // this gate and the already-chosen lock is gone, so this screen now
-        // states one rule and obeys it. Testing another class is a new
-        // character, which is the route the create carousel already offers.
-        // UBreakerProgressionComponent::DevForceClass survives as an API --
-        // several components document their broadcast behaviour against it --
-        // it simply has no button any more.
+        // This normal selection screen stays locked; Force Class is isolated in the developer sandbox.
         const bool bDesignLocked = !bImplemented;
         const bool bIsCurrent = Entry.ClassId == CurrentClass;
         const bool bSelectable = !bDesignLocked && CurrentClass == EBreakerClassId::None;
@@ -11042,7 +11036,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildDevSandboxScreen()
 
     // ---- 2. Gym area level ----------------------------------------------
     Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)[SettingsSectionHeader(TEXT("GYM AREA LEVEL"))];
-    if (GameMode)
+    const bool bGymMap = Character.IsValid() && UBreakerGameInstance::IsGymMap(Character.Get());
+    if (GameMode && bGymMap)
     {
         TSharedRef<SHorizontalBox> AreaRow = SNew(SHorizontalBox);
         AreaRow->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space16, 0.0f)
@@ -11089,8 +11084,10 @@ TSharedRef<SWidget> SBreakerMenu::BuildDevSandboxScreen()
     {
         Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
         [
-            MenuText(FText::FromString(TEXT("NO BREAKER GAME MODE IN THIS WORLD — AREA LEVEL LIVES ON THE GYM.")),
-                BreakerUI::TypeCaption, Muted, true)
+            MenuWrappedText(FText::FromString(bGymMap
+                ? TEXT("Gym controls require an authoritative game mode.")
+                : TEXT("Gym level controls are available in the gym. Regional enemy levels remain authored; use Gear to choose the next grant's item level.")),
+                BreakerUI::TypeCaption, Muted, FMath::Min(1040.0f, MeasureWideScreen().PanelWidth) - 2 * BreakerUI::Space24)
         ];
     }
 
@@ -11119,7 +11116,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildDevSandboxScreen()
                             // save makes it stick.
                             Prog->DevForceClass(Captured);
                             if (Character.IsValid()) Character->SaveGameState();
-                            DevSandboxStatus = FText::FromString(TEXT("CLASS FORCED. KITLESS CLASSES RUN WITH NO KIT — THAT IS THE POINT OF LOOKING."));
+                            DevSandboxStatus = FText::FromString(FString::Printf(
+                                TEXT("Class changed to %s. %s"),
+                                *ClassDisplayName(Prog->GetProgressionState().PermanentClass),
+                                ClassHasImplementedKit(Prog->GetProgressionState().PermanentClass)
+                                    ? TEXT("Implemented kit available.") : TEXT("No implemented kit is available for this class.")));
                         }
                         Rebuild(EBreakerMenuScreen::DevSandbox);
                         return FReply::Handled();
@@ -11128,12 +11129,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildDevSandboxScreen()
         }
         Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)[ClassRow];
     }
-    // The class-swap toggle used to live here. It is gone: class selection is
-    // permanent per character, the class screen now states that rule without an
-    // exception, and testing another class is a new character. The GConfig key
-    // survives because two OTHER dev affordances still read it -- the gear
-    // grants below and the skill screen's point-recovery row -- so its name is
-    // now historical rather than descriptive.
+    // Force Class above is the explicit developer override; normal class selection remains permanent.
 
     }
     if (DevSandboxTab == 1)
