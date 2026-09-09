@@ -43,7 +43,7 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 
 - Warden engaged movement bypasses arrival spacing and can walk through the player.
 - Ranged STEER transitions reset movement and appear to stutter; walk animation is missing.
-- Volatile corpse has no visible fuse after O203 retired disc/light. Add readable placeholder feedback before final Niagara art.
+- Volatile now has a tested outlined countdown; final Niagara presentation and real client cadence/human timing remain.
 - Damage numbers can overlap enemy plates. Hover, focus recovery and comfort require real interaction checks beyond static captures.
 - Remaining Afterimage window/ability consumers, Open Wound's authored lane substitute, rocket continuation and ally-threat semantics need source review; old desk claims are not evidence of current absence.
 - Three generation entries remain uncalled; one aggregation lane and one target remain empty/unrouted. Consult current STATE for exact identities.
@@ -60,7 +60,7 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 
 ## Latest validated baseline
 
-Current local build/census/full suite:848 passing,3 expected failures,0 unexpected. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
+Current local build/census/full suite:849 passing,3 expected failures,0 unexpected. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
 
 ## Landed this pass
 
@@ -87,3 +87,5 @@ Current local build/census/full suite:848 passing,3 expected failures,0 unexpect
 - Prototype destinations: real Red Basin/Station Zero packages, six fixed-level districts/36 guards/six supply rewards, stable maps and return gates. Safe arrival and native death/respawn, route sweeps, actual cache kill gates/pickups pass;847/3/0. Both four-frame1080 scenery tours inspected; prototype objective verified in two720 frames. Still blockout art and recovery-only objectives; see Docs/reports/prototype-destinations-2026-09-09.md.
 
 - Survivor Core entitlement: canonical one-point Unlock pays actual supported arrival flag; silent restored saves settle at native startup. Wallet updates before synchronous receipt persistence. Independent review and memory archive/reentry/reload tests pass;848/3/0. Uncovered World Core sources12→11; remaining events need real authored delivery, not guessed bindings.
+
+- Volatile warning: real lethal/corpse tick/detonation/reset checks and full suite849/3/0. All six1080 capture frames inspected: open countdown readable, covered and clipped-edge cues fully absent. Static freezes prove geometry only; native tests prove clock, replication transport remains separate. See Docs/reports/volatile-countdown-2026-09-09.md.

@@ -530,6 +530,40 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         const FVector HeadWorld = Enemy->GetActorLocation() + FVector(0.0f, 0.0f, HalfHeight);
         const FVector FeetWorld = Enemy->GetActorLocation() - FVector(0.0f, 0.0f, HalfHeight);
 
+        // O203: no colored body disc, light or filled modifier shape. Keep
+        // the death hazard readable after its health bar has disappeared.
+        const auto* Fuse = Enemy->GetModifierComponent();
+        if (Fuse && Fuse->IsFuseLit())
+        {
+            if (Distance > BreakerEnemyBarMath::DrawCm) continue;
+            const FVector Cue = Project(HeadWorld, false);
+            if (Cue.Z <= 0.0f) continue;
+            FCollisionQueryParams Sight(FName(TEXT("BreakerVolatileFuseSight")),false);
+            Sight.AddIgnoredActor(Enemy); Sight.AddIgnoredActor(Character);
+            if (World->LineTraceTestByObjectType(CameraLocation,HeadWorld,
+                FCollisionObjectQueryParams(ECC_WorldStatic),Sight)) continue;
+            const float Half = 9.0f * ScaleUnit; // O2 PLACEHOLDER: outlined warning mark half-size.
+            const float Stroke = 2.0f * ScaleUnit; // O2 PLACEHOLDER: system geometry stroke.
+            const FString Label=FString::Printf(TEXT("DETONATES %.1fs"),Fuse->GetFuseRemainingSeconds());
+            const float Pixels=14.0f * ScaleUnit; // O2 PLACEHOLDER: readable fuse countdown type.
+            const FVector2D Size=MeasureSpecText(Label,Pixels,ESpecFontRole::Mono);
+            const float TextY=Cue.Y+Half+Stroke;
+            // Match the plate policy: cull the whole cue if any outlined
+            // geometry or text would clip. Do not turn it into an edge arrow.
+            const float CueHalfWidth=FMath::Max(Half+Stroke*.5f,static_cast<float>(Size.X)*.5f);
+            const float CueTop=Cue.Y-Half-Stroke*.5f;
+            const float CueBottom=FMath::Max(Cue.Y+Half+Stroke*.5f,TextY+static_cast<float>(Size.Y));
+            if (Cue.X-CueHalfWidth < 0 || Cue.X+CueHalfWidth > Canvas->ClipX
+                || CueTop < 0 || CueBottom > Canvas->ClipY) continue;
+            DrawLine(Cue.X,Cue.Y-Half,Cue.X+Half,Cue.Y,BreakerUI::System,Stroke);
+            DrawLine(Cue.X+Half,Cue.Y,Cue.X,Cue.Y+Half,BreakerUI::System,Stroke);
+            DrawLine(Cue.X,Cue.Y+Half,Cue.X-Half,Cue.Y,BreakerUI::System,Stroke);
+            DrawLine(Cue.X-Half,Cue.Y,Cue.X,Cue.Y-Half,BreakerUI::System,Stroke);
+            DrawSpecTextCentered(Label,Cue.X,TextY,BreakerUI::System,Pixels,1.0f,ESpecFontRole::Mono);
+            ReservePlate(Cue.X-CueHalfWidth,CueTop,CueHalfWidth*2.f,CueBottom-CueTop);
+            continue;
+        }
+
         // ---- Beyond DrawCm ----------------------------------------------------
         // The plate is gone, with the sheet's two exceptions. The champion
         // keeps a contact dot at the head: a ChampionContactDotPx square in the

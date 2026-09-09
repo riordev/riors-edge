@@ -113,6 +113,7 @@ public:
     // Same sign as TickFuse: the fuse is -1 when unlit and counts down from
     // FuseTotal while lit.
     UFUNCTION(BlueprintPure, Category="Enemy|Modifiers") bool IsFuseLit() const { return FuseRemaining > 0.0f; }
+    UFUNCTION(BlueprintPure, Category="Enemy|Modifiers") float GetFuseRemainingSeconds() const { return FMath::Max(0.0f, FuseRemaining); }
     // Up only inside one reflect call — bReflecting is the re-entrancy guard,
     // not a window — so a reader outside that call sees false.
     UFUNCTION(BlueprintPure, Category="Enemy|Modifiers") bool IsReflecting() const { return bReflecting; }
@@ -160,7 +161,7 @@ private:
     float PhaseTelegraphRemaining = 0.0f;
     float BlinkRemaining = 0.0f;
     bool bPhaseTelegraphing = false;
-    float FuseRemaining = -1.0f;
+    UPROPERTY(Replicated) float FuseRemaining = -1.0f;
     float FuseTotal = 0.0f;
     // Who popped this Volatile, snapshotted on the death frame rather than
     // read at detonation: the fuse outlives the death by design, and the

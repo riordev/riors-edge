@@ -26,6 +26,7 @@ void UBreakerEnemyModifierComponent::GetLifetimeReplicatedProps(TArray<FLifetime
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(UBreakerEnemyModifierComponent, Modifiers);
+    DOREPLIFETIME(UBreakerEnemyModifierComponent, FuseRemaining);
 }
 
 void UBreakerEnemyModifierComponent::BeginPlay()
@@ -82,6 +83,8 @@ bool UBreakerEnemyModifierComponent::SetModifiers(const TArray<EBreakerEnemyModi
     // A pooled body is re-dressed through here (ReviveFromPool's checklist),
     // so the previous life's killer must not survive into the next one.
     VolatileCreditTo = nullptr;
+    FuseRemaining = -1.0f;
+    FuseTotal = 0.0f;
     ApplyPersistentModifiers();
     OnModifiersChanged.Broadcast();
     return true;
@@ -412,14 +415,11 @@ void UBreakerEnemyModifierComponent::NotifyOwnerDied()
         }
         FuseTotal = FMath::Max(0.0f, Params.VolatileFuseSeconds);
         FuseRemaining = FuseTotal;
-        // BEHAVIOURAL GAP, RECORDED, NOT FAKED. The fuse has no visual tell:
-        // the enemy hides its body on death, the nameplate goes with the live
-        // health it reads, and the coloured disc and light that strobed
-        // through the fuse are retired (O203: marks are system-colour
-        // geometry on the plate; O129: no colour on the body). Until the
-        // Niagara pass gives the corpse a fuse emitter, a Volatile detonation
-        // is announced only by the mark the enemy carried while alive. The
-        // countdown itself is untouched.
+        // O203/O129: the colored modifier disc and its light remain retired.
+        // The living health plate disappears at death. Until the
+        // Niagara pass gives the corpse a fuse emitter, the existing HUD
+        // projects an unfilled system-color marker and this replicated
+        // countdown over the corpse. The retired disc/light stay absent.
         // A zero fuse is a legal authoring choice and must detonate now rather
         // than wait a frame for a clock that will never tick again.
         if (FuseTotal <= 0.0f)

@@ -3,6 +3,8 @@
 #include "Camera/PlayerCameraManager.h"
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerBossEnemy.h"
+#include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerModifierComponent.h"
 #include "Combat/BreakerEnemyPlateVisibility.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -32,11 +34,20 @@ namespace
 }
 void BreakerSchedulePlateCapture(UWorld* World)
 {
- FString Mode,UserDirectory;
+ FString Mode,UserDirectory,VolatileMode;
+ const bool bVolatile=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureVolatileFreeze="),VolatileMode);
  const bool bPlate=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureEnemyPlate="),Mode);
  const bool bCache=FParse::Param(FCommandLine::Get(),TEXT("BreakerCaptureCache"));
  const bool bScenery=FParse::Param(FCommandLine::Get(),TEXT("BreakerCaptureScenery"));
- if(!World||(!bPlate&&!bCache&&!bScenery))return;
+ if(!World||(!bPlate&&!bCache&&!bScenery&&!bVolatile))return;
+ if(bVolatile)
+ {
+    if(bPlate||bCache||bScenery || (!VolatileMode.Equals(TEXT("open"),ESearchCase::IgnoreCase)
+        && !VolatileMode.Equals(TEXT("blocked"),ESearchCase::IgnoreCase)
+        && !VolatileMode.Equals(TEXT("edge"),ESearchCase::IgnoreCase)))
+    { UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] VolatileFreeze requires one mode: open, blocked, edge; no other capture setup flag.")); return; }
+    Mode=VolatileMode;
+ }
  if(!FParse::Value(FCommandLine::Get(),TEXT("UserDir="),UserDirectory)||UserDirectory.IsEmpty()
     ||FPaths::IsRelative(UserDirectory)||FPaths::IsSamePath(FPaths::ConvertRelativePathToFull(UserDirectory),FPaths::ProjectDir())
     ||IFileManager::Get().DirectoryExists(*(FPaths::ProjectSavedDir()/TEXT("SaveGames"))))
@@ -45,7 +56,7 @@ void BreakerSchedulePlateCapture(UWorld* World)
  {UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Mode must be open or blocked."));return;}
  // Core time advances while the arrival menu has paused world timers.
  // Weak UObject binding prevents setup after this world is destroyed.
- FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(World,[World,Mode,bCache,bPlate,bScenery](float)
+ FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(World,[World,Mode,bCache,bPlate,bScenery,bVolatile](float)
  {
     auto* PC=World->GetFirstPlayerController();auto* Player=PC?Cast<ABreakerCharacter>(PC->GetPawn()):nullptr;
     if(!Player||!Player->HasAuthority())return false;
@@ -83,7 +94,8 @@ void BreakerSchedulePlateCapture(UWorld* World)
         BreakerPlateCaptureBox(World,Origin+FVector(900,0,-25),FVector(2200,1600,25));
         Player->SetActorLocation(Origin+FVector(0,0,100));
         FActorSpawnParameters Spawn;Spawn.SpawnCollisionHandlingOverride=ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-        auto* Boss=World->SpawnActor<ABreakerBossEnemy>(Origin+FVector(1600,0,200),FRotator(0,180,0),Spawn);if(!Boss)return false;
+        const TSubclassOf<ABreakerEnemy> BodyClass=bVolatile ? ABreakerEnemy::StaticClass() : ABreakerBossEnemy::StaticClass();
+        auto* Boss=World->SpawnActor<ABreakerEnemy>(BodyClass,Origin+FVector(1600,0,200),FRotator(0,180,0),Spawn);if(!Boss)return false;
         Boss->ConfigureCrowdProbe();Boss->SetActorTickEnabled(false);
         if(auto* Move=Boss->FindComponentByClass<UBreakerEnemyMovementComponent>()){Move->StopMovementImmediately();Move->SetComponentTickEnabled(false);}
         const auto* Capsule=Boss->FindComponentByClass<UCapsuleComponent>();
@@ -95,6 +107,29 @@ void BreakerSchedulePlateCapture(UWorld* World)
     FVector Eye;FRotator Facing;PC->GetPlayerViewPoint(Eye,Facing);PC->SetControlRotation((Aim-Eye).Rotation());
     if(PC->PlayerCameraManager)PC->PlayerCameraManager->UpdateCamera(.05f);
     PC->GetPlayerViewPoint(Eye,Facing);
+    if(bVolatile && PlateEnemy)
+    {
+        auto* Modifiers=PlateEnemy->GetModifierComponent();
+        auto* Combat=PlateEnemy->FindComponentByClass<UBreakerCombatComponent>();
+        if(!Modifiers||!Combat||!Modifiers->SetModifiers({EBreakerEnemyModifier::Volatile})) return false;
+        // Structural capture: normal accepted lethal request starts the real
+        // corpse fuse. Its authored duration and damage are never replaced.
+        FBreakerDamageRequest Hit; Hit.BaseDamage=Combat->GetMaxHealth()*2.f;
+        Hit.DamageFamily=EBreakerDamageFamily::TrueDamage; Hit.bCanCritical=false;
+        Hit.bCanBeAvoided=false; Hit.bBypassShield=true; Hit.SetInstigator(Player);
+        const auto Result=Combat->ReceiveDamage(Hit);
+        if(!Result.bKilled||!Modifiers->IsFuseLit())
+        { UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Volatile freeze refused: native death did not start a positive fuse.")); return false; }
+        if(Mode.Equals(TEXT("edge"),ESearchCase::IgnoreCase) && PC->PlayerCameraManager)
+        {
+            // O2 PLACEHOLDER capture framing: head remains just inside the
+            // right edge; the wider warning must be wholly culled, not clipped.
+            Facing.Yaw-=PC->PlayerCameraManager->GetFOVAngle()*.49f;
+            PC->SetControlRotation(Facing);PC->PlayerCameraManager->UpdateCamera(.05f);
+        }
+        UE_LOG(LogTemp,Display,TEXT("[PlateCapture] Volatile STATIC FREEZE mode=%s actual-death=%d remaining=%.3f authored=%.3f; validates geometry only, not countdown animation."),
+            *Mode,PlateEnemy->IsDeadEnemy(),Modifiers->GetFuseRemainingSeconds(),Modifiers->Params.VolatileFuseSeconds);
+    }
     if(PlateEnemy)UE_LOG(LogTemp,Display,TEXT("[PlateCapture] mode=%s nativeVisibility=%d eye=%s head=%s"),*Mode,
         BreakerEnemyPlateVisibility::IsVisible(World,Eye,Aim,PlateEnemy,Player),*Eye.ToString(),*Aim.ToString());
     PC->SetPause(true);
