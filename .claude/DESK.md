@@ -53,13 +53,26 @@ through authored destinations, which ship. Past it:
   rifts differ and the same place at depth rearranges. The gym keeps the
   authored base untouched: an instrument that shifted under measurement
   would make every density reading incomparable with the last.
-- [ ] THE ONE DECISION BEFORE MORE CODE: does a rift interior REPLACE the
-  authored yard's cover with a generated field, or is it a separately
-  composed space? O167 already names interiors-get-shapes as the
-  precondition. Replacing is nearly free and reuses every validator; a
-  separate space is two cycles and needs its own GLB. The generated field
-  cannot simply be ADDED to the authored lattice — cover fraction is a
-  measured band and doubling the pieces breaks it.
+- REPLACE WAS TRIED AND THE CHEAP ROUTE IS CLOSED, measured not guessed.
+  `RiorsEdge.Zone.RiftGeneratedField` runs the shipped generator over the
+  yard's own band for 27 rift seeds: every one refuses, laying 47 pieces for
+  7.62% cover against a 0.50-5.00% ceiling. The obvious knob does nothing —
+  a pitch sweep from 3400 to 5400 cm moves neither the count nor the fraction
+  by a hundredth, because in a band this small the LATTICE contributes
+  nothing and all 47 pieces come from the combat pockets and their rings.
+  Widening a lattice cannot thin a field the lattice is not filling. Fitting
+  the generator to a yard is therefore pocket composition authored for a new
+  purpose, not a number to tune.
+- [ ] SO THE CHOICE IS NARROWER THAN IT LOOKED: either give the generator a
+  SMALL-BAND PROFILE (fewer pockets, or pockets scaled to the band rather
+  than authored for a 220 m apron), or take O167's other branch and compose
+  rift interiors as their own geometry. The probe stays as the instrument
+  that says when the first route opens.
+- THE DIRECTION THE OWNER WANTS, recorded so neither route forgets it: a
+  DESTINATION in the Destiny sense — a persistent place with things inside it
+  to interact with — not just a fight box. Interactable vocabulary already
+  exists (travel points, NPCs, stash, loot and feedstock pickups, rift
+  doors); what is missing is a reason to walk anywhere in a space.
 - [ ] Then: the key item, the command post, consumable entry + the death
   budget together per O122.
 - [ ] The local map's site ids embed world coordinates
