@@ -215,6 +215,7 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="1")) float TerminalDescentFallDistanceCm {}; // O246: authored in Data/abilities.json.
 private:
     UFUNCTION() void HandlePlungeLanded(const FHitResult& Hit);
+    UFUNCTION() void HandlePlungeOwnerDeath();
 };
 
 // HOLD (§2.1 ultimate): 100 Grit, no cooldown, 10s. Caps the damage any single

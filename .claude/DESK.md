@@ -51,6 +51,8 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 - Remaining Afterimage window/ability consumers, Open Wound's authored lane substitute, rocket continuation and ally-threat semantics need source review; old desk claims are not evidence of current absence.
 - Overhaul Bench Work revoke cleanup is parked after bounded correction: nested death/removal during main ammo settlement skips the old window/delegate teardown even when capacity refunds correctly. Candidate and callback fixtures remain outside checkout; no production change landed.
 - Blackout Afterimage is parked: its unkeyed enemy movement overwrite can erase Fleetfoot/other slows, and its shared incoming-damage key lets one caster remove another's effect. Requires source-owned contributions before extending the numerical tail; ordinary marked-hit Charge permission still ends on time.
+- Guest Hold/deployable cast audio and HUD pulses lack an owner acceptance receipt. The narrow RPC candidate is parked: GAS activation success can still represent immediately rejected placement, while active-state filtering rejects valid instant casts. No optimistic success cue was added.
+- Desktop input probe launched an isolated profile but exposed no targetable game window to the computer-use tool; mouse-focus acceptance remains unverified.
 - Three generation entries remain uncalled; one aggregation lane and one target remain empty/unrouted. Consult current STATE for exact identities.
 - Other low-priority cleanup only after verifying use: empty modifier test helper; unused HUD dimensions; stale movement comments; duplicated boss timings; slot-invalid fixtures; inert affix leans; menu string-table migration.
 
@@ -71,7 +73,7 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 
 ## Latest validated baseline
 
-Current local build/full suite:863 passing,3 expected failures,0 unexpected; native census refreshed for54 quest flags and current ability declarations. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
+Current local build/full suite:864 passing,3 expected failures,0 unexpected; native census refreshed for54 quest flags and current ability declarations. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
 
 ## Playtest handoff
 

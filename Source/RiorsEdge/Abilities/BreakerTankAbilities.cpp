@@ -1025,7 +1025,13 @@ void UBreakerAbility_GroundZero::ActivateAbility(const FGameplayAbilitySpecHandl
 
     // The slam itself: drive the Tank hard into the ground.
     Character->LandedDelegate.AddUniqueDynamic(this, &ThisClass::HandlePlungeLanded);
+    Character->GetCombat()->OnDeath.AddUniqueDynamic(this, &ThisClass::HandlePlungeOwnerDeath);
     Character->LaunchCharacter(FVector(0.0f, 0.0f, -SlamDownSpeed), false, true);
+}
+
+void UBreakerAbility_GroundZero::HandlePlungeOwnerDeath()
+{
+    if (IsActive()) EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
 
 void UBreakerAbility_GroundZero::HandlePlungeLanded(const FHitResult& Hit)
@@ -1095,7 +1101,11 @@ void UBreakerAbility_GroundZero::EndAbility(const FGameplayAbilitySpecHandle Han
     const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
     if (ABreakerCharacter* Character = GetBreakerCharacter())
+    {
         Character->LandedDelegate.RemoveDynamic(this, &ThisClass::HandlePlungeLanded);
+        if (auto* Combat = Character->GetCombat())
+            Combat->OnDeath.RemoveDynamic(this, &ThisClass::HandlePlungeOwnerDeath);
+    }
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
