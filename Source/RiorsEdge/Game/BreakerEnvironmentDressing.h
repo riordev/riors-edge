@@ -5,6 +5,9 @@
 #include "Engine/World.h"
 #include "Components/StaticMeshComponent.h"
 
+// Configure only this decorative component, before assigning its imported mesh.
+RIORSEDGE_API void BreakerConfigureDressingNanite(UStaticMeshComponent* Component, UStaticMesh* Mesh);
+
 // Original materials and uniform proportions; only decorative placement.
 // Desired height is O2 blockout tuning. Ground is the bottom of the mesh bounds.
 inline AStaticMeshActor* BreakerPlaceEnvironmentDressing(UWorld* World, const TCHAR* Name,
@@ -29,6 +32,7 @@ inline AStaticMeshActor* BreakerPlaceEnvironmentDressing(UWorld* World, const TC
     if (!Actor) return nullptr;
     UStaticMeshComponent* Component = Actor->GetStaticMeshComponent();
     Component->SetMobility(EComponentMobility::Movable);
+    BreakerConfigureDressingNanite(Component, Mesh);
     Component->SetStaticMesh(Mesh);
     Component->SetWorldScale3D(FVector(Scale));
     Component->SetCollisionProfileName(TEXT("NoCollision"));

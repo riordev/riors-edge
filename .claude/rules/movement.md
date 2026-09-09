@@ -6,9 +6,12 @@ paths:
 
 # Movement (KIT)
 
-- Verbs: walk, sprint, two jumps (Swift three), crouch, dash on cooldown
-  (O40), slide, vault, mantle. **No wall ride (O144), no grapple, no tether,
-  no stamina (O1).** Parry is the only tree-granted verb (O25).
+- Verbs include walk, sprint, jump, dash, slide, vault and mantle. Slide is
+  the crouch; there is no separate static crouch verb (O242,
+  `Docs/DECISIONS.md`). **No wall ride (O144), no grapple, no tether,
+  no stamina (O1).** The accepted Core Kinesis Air Jump grants an additional
+  air jump; Parry is not the only tree-granted verb (`Docs/spec/core-wheel.md`,
+  O235). Preserve each class's existing innate traversal rules.
 - Traversal runs in `MOVE_Custom / CustomModeLedgeTraversal` with the
   saved-move pass. The pawn holds no traversal state; ask `IsTraversingLedge()`.
 - `MaxStepHeight` is authored at 45. `LedgeMinimumHeightCm > MaxStepHeight`

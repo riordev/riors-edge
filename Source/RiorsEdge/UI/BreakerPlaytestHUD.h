@@ -144,8 +144,7 @@ private:
     UFUNCTION() void HandlePlayerHitDealt(const struct FBreakerHitContext& Hit);
     void EnsureWeaponBinding(const ABreakerCharacter* Character);
 
-    // Activations are instantaneous and leave no polled state (Skim in
-    // particular finishes inside its own frame), so every ability readout below
+    // Instant activations can finish inside their own frame, so each readout below
     // is driven by this latch rather than by a per-frame query.
     UFUNCTION() void HandleAbilityActivated(EBreakerAbilitySlot Slot);
     void EnsureAbilityBinding(const ABreakerCharacter* Character);
@@ -237,7 +236,6 @@ private:
     // The teaching callout: first few casts of each ability only.
     // FIELDPLATE HUD §5: violet frame, edge bands, title plate, step-down.
     void DrawUltimateTreatment(const ABreakerCharacter* Character);
-    void DrawSkimBurst(const FVector2D& Center);
     void DrawMarkedTarget(const ABreakerCharacter* Character);
 
     UPROPERTY() TObjectPtr<UBreakerCombatComponent> BoundCombat;
@@ -268,9 +266,6 @@ private:
     // name buys exactly one more callout on the cast after the rewrite first
     // resolves, and none thereafter.
     FString SlotLastVariantName[AbilitySlotCount];
-    // Latched separately from the callout: the crosshair burst fires on every
-    // Skim, not only the first three.
-    double SkimBurstTime = -1000.0;
 
     // The trash-bar focus linger (selective bars, ruled): when the aim last
     // left each enemy, so its bar fades instead of blinking.

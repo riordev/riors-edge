@@ -69,7 +69,7 @@ UBreakerLocalMapComponent::UBreakerLocalMapComponent()
 
 FText UBreakerLocalMapComponent::GetRegionName() const
 {
-    if (const auto* Prototype=BreakerPrototypeDestinations::ForWorld(this)) return FText::FromString(Prototype->DisplayName+TEXT(" / PROTOTYPE"));
+    if (const auto* Prototype=BreakerPrototypeDestinations::ForWorld(this)) return FText::FromString(Prototype->DisplayName);
     if (UBreakerGameInstance::IsAnchorMap(this)) return FText::FromString(TEXT("ANCHOR 13"));
     if (UBreakerGameInstance::IsFernhallMap(this)) return FText::FromString(TEXT("FERNHALL APPROACH"));
     if (UBreakerGameInstance::IsErasedEarthMap(this)) return FText::FromString(TEXT("ERASED EARTH"));

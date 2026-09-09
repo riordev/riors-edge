@@ -1,5 +1,6 @@
 #include "Game/BreakerZoneBuilder.h"
 #include "Game/BreakerEnvironmentDressing.h"
+#include "Game/BreakerFernhallPerimeter.h"
 #include "Game/BreakerFernhallCourtyardBuilder.h"
 #include "EngineUtils.h"
 
@@ -709,6 +710,7 @@ bool UBreakerZoneBuilder::BuildFernhallYard(UWorld* World, FBreakerZoneMarkers& 
 
     BreakerZoneBuildSurfaceDetail(World, Pieces);
     BreakerZoneBuildSkyline(World, Pieces);
+    BreakerBuildFernhallPerimeter(World, Pieces);
     // Existing outward scenery must not visually bury the new playable route.
     TArray<FBox> ClearAreas = Courtyard.GroundFootprints;
     FBox Approach(ForceInit);

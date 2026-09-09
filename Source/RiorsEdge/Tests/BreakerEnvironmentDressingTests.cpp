@@ -4,6 +4,9 @@
 #include "Engine/Engine.h"
 #include "EngineUtils.h"
 #include "Game/BreakerZoneBuilder.h"
+#include "Materials/MaterialInterface.h"
+#include "NaniteSceneProxy.h"
+#include "StaticMeshResources.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerEnvironmentDressingTest,
@@ -33,6 +36,21 @@ bool FBreakerEnvironmentDressingTest::RunTest(const FString& Parameters)
             TestEqual(TEXT("decorative component has no query collision"), Component->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
             TestFalse(TEXT("decorative component cannot alter navigation"), Component->CanEverAffectNavigation());
             UStaticMesh* Mesh = Component->GetStaticMesh();
+            bool bUnsupportedBlend = false;
+            for (const FStaticMaterial& Slot : Mesh->GetStaticMaterials())
+            {
+                const UMaterialInterface* Material = Slot.MaterialInterface;
+                if (Material && Material->GetNaniteOverride()) Material = Material->GetNaniteOverride();
+                if (Material && !Nanite::IsSupportedBlendMode(*Material)) bUnsupportedBlend = true;
+            }
+            const bool bNeedsFallback = Mesh->IsNaniteEnabled() && bUnsupportedBlend;
+            TestEqual(FString::Printf(TEXT("%s uses fallback only for unsupported imported blend modes"), Name),
+                Component->IsForceDisableNanite(), bNeedsFallback);
+            if (bNeedsFallback)
+                TestTrue(FString::Printf(TEXT("%s has real fallback LOD geometry"), Name), Mesh->GetRenderData() && Mesh->GetRenderData()->LODResources.Num() > 0
+                    && Mesh->GetRenderData()->LODResources[0].GetNumVertices() > 0);
+            AddInfo(FString::Printf(TEXT("Dressing %s Nanite=%d unsupportedBlend=%d componentFallback=%d"),
+                Name, Mesh->IsNaniteEnabled(), bUnsupportedBlend, Component->IsForceDisableNanite()));
             for (int32 Slot = 0; Slot < Mesh->GetStaticMaterials().Num(); ++Slot)
                 TestTrue(FString::Printf(TEXT("%s retains imported material slot %d"), Name, Slot),
                     Component->GetMaterial(Slot) == Mesh->GetStaticMaterials()[Slot].MaterialInterface);
@@ -71,6 +89,21 @@ bool FBreakerEnvironmentDressingTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Surface dressing stays a shallow overlay"), Box.GetSize().Z <= 2.1);
         TestNotNull(TEXT("Surface dressing has an assigned material"), Component->GetMaterial(0));
     }
+    TSet<FName> Landmarks;
+    for(TActorIterator<AStaticMeshActor> It(World);It;++It)
+    {
+        if(!IsValid(*It)||!It->ActorHasTag(TEXT("FernhallPerimeterPass")))continue;
+        const auto* Component=It->GetStaticMeshComponent();
+        TestFalse(TEXT("New perimeter cannot block authored routes"),It->GetActorEnableCollision());
+        TestEqual(TEXT("New perimeter cannot change combat trace outcomes"),Component->GetCollisionEnabled(),ECollisionEnabled::NoCollision);
+        TestFalse(TEXT("New perimeter cannot change navigation"),Component->CanEverAffectNavigation());
+        TestFalse(TEXT("New perimeter has no per-frame work"),It->IsActorTickEnabled());
+        for(const FName Tag:{FName(TEXT("Fernhall.Landmark.ReclaimedGrove")),FName(TEXT("Fernhall.Landmark.PipeWorks"))})
+            if(It->ActorHasTag(Tag))Landmarks.Add(Tag);
+        const UStaticMesh* Mesh=Component->GetStaticMesh();
+        TestTrue(TEXT("Landmarks use actual installed meshes"),Mesh&&Mesh->GetPathName().StartsWith(TEXT("/Game/Breaker/EnvironmentKit/")));
+    }
+    TestEqual(TEXT("Both distinct pocket silhouettes survive courtyard clearance"),Landmarks.Num(),2);
     TestTrue(TEXT("First authored yard has surface treatment"), YardCounts[0] > 0);
     TestTrue(TEXT("Second authored yard has surface treatment"), YardCounts[1] > 0);
     return true;

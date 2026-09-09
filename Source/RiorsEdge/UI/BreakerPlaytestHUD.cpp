@@ -181,7 +181,6 @@ namespace BreakerHUD
 
     // Ability feedback timings. All cosmetic: nothing here gates a rule.
     static constexpr float AbilityFlashSeconds = 0.3f;
-    static constexpr float SkimBurstSeconds = 0.25f;
     static constexpr float MarkHeadroomCm = 160.0f;
 
     // Every ability state window shares this prefix; the HUD shows the whole
@@ -454,7 +453,6 @@ void ABreakerPlaytestHUD::DrawHUD()
     DrawQuestLine(Character);
 
     // --- Centre: feedback only, nothing persistent ------------------------
-    DrawSkimBurst(Center);
     // The event banners, one pass: rift complete, level up, wave clear, in
     // priority order at staggered arrivals, each in its own rectangle.
     DrawBanners(Center);
@@ -1644,13 +1642,8 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
         const float NameScale = DistanceScaleFor(Distance);
         DrawSpecTextCentered(NPC->GetDisplayName().ToString().ToUpper(),
             Projected.X, Projected.Y, PersonWarm, 12.0f * NameScale, 1.0f, ESpecFontRole::Display);
-        // THE VERB UNDER THE NAME (ruled: close the 30:1 gap between "I can
-        // read its name at 9,000" and "I'm told what to press at 300").
-        // Always drawn: muted while out of reach — a standing answer to
-        // "what does this thing answer to" — and bone once F would land.
-        const bool bInReach = Distance <= NPC->GetInteractionRange();
-        DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudPromptTalk), Projected.X, Projected.Y + S(14.0f) * NameScale,
-            bInReach ? BreakerUI::System : BreakerUI::TextMuted, 10.0f * NameScale, 1.0f, ESpecFontRole::Mono);
+        // Service names remain useful at a distance. Action keys belong only
+        // to the single eligible actor selected by the real interaction path.
     }
 
     for (TActorIterator<ABreakerTravelPoint> It(World); It; ++It)
@@ -1667,26 +1660,12 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
         // Rift-teal, because travel is the rift verb — the one text colour the
         // reserve permits, on the one label describing a rift object.
         //
-        // THE NPC IDIOM AT LAST: a NOUN over a VERB. This line printed a
-        // hardcoded TRAVEL while the prompt beneath called GetPromptLabel(), so
-        // the rift door said TRAVEL over F ENTER RIFT — two verbs, one wrong.
-        // Calling the prompt getter for both fixed the wrong word and left the
-        // word doubled. GROUND has now published GetDisplayName(), virtual and
-        // overridden on the door to return the rift's own area name, which is
-        // the noun this line always wanted.
+        // Passive travel/service labels identify the place without promising
+        // that F can act at this distance. The focused plate owns that hint.
         const float GateScale = DistanceScaleFor(Distance);
-        const FString PromptWord = TravelPoint->GetPromptLabel().ToString().ToUpper();
         const FString NounWord = TravelPoint->GetDisplayName().ToString().ToUpper();
-        // NEVER PRINT THE SAME WORD TWICE. The base GetDisplayName returns the
-        // PROMPT because "a general gate IS travel; there is no better name for
-        // it than what it does" — correct for the getter, and it means a plain
-        // gate would print TRAVEL over F TRAVEL exactly as before. So the noun
-        // line draws only when it is genuinely a different word: the door gets
-        // its name, the gate gets one honest line, and no site prints a
-        // stutter. GROUND read the Anchor gate's single line as a missing noun;
-        // it is a gate with no noun to give, which is this rule working.
         float LabelY = Projected.Y;
-        if (!NounWord.IsEmpty() && NounWord != PromptWord)
+        if (!NounWord.IsEmpty())
         {
             DrawSpecTextCentered(NounWord, Projected.X, LabelY, BreakerUI::TealUnwritten, 13.0f * GateScale, 1.0f, ESpecFontRole::Display);
             LabelY += S(15.0f) * GateScale;
@@ -1702,12 +1681,7 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
             DrawSpecTextCentered(DetailWord, Projected.X, LabelY, BreakerUI::TextMuted, 10.0f * GateScale);
             LabelY += S(13.0f) * GateScale;
         }
-        // Same always-drawn verb rule as the NPCs: muted out of reach, bone
-        // once F would land.
-        const bool bInReach = Distance <= TravelPoint->GetInteractionRange();
-        DrawSpecTextCentered(BreakerStrings::Format(EBreakerStringKey::HudPromptKeyed, *PromptWord),
-            Projected.X, LabelY,
-            bInReach ? BreakerUI::System : BreakerUI::TextMuted, 10.0f * GateScale, 1.0f, ESpecFontRole::Mono);
+
     }
 }
 
@@ -1979,13 +1953,6 @@ void ABreakerPlaytestHUD::HandleAbilityActivated(EBreakerAbilitySlot Slot)
     const UBreakerAbilityComponent* Abilities = BoundAbilities;
     const UBreakerAbilityDefinition* Definition = Abilities ? Abilities->GetDefinitionForSlot(Slot) : nullptr;
 
-    // Skim's crosshair burst is keyed off the ability's identity, not its slot:
-    // the loadout is free to move it between the two class slots.
-    if (Definition && Definition->AbilityId == FName(TEXT("Swift.Skim")))
-    {
-        SkimBurstTime = Now;
-    }
-
     // THE FIFTH VERB (ORDERS ruling 2). Played before the null-definition
     // return below, and with NAME_None when there is no definition: the
     // activation HAPPENED either way, and an ability that fires silently
@@ -2138,35 +2105,6 @@ void ABreakerPlaytestHUD::DrawUltimateTreatment(const ABreakerCharacter* Charact
         const float PlateY = S(BreakerUI::UltimateTitleTop);
         DrawPlate(PlateX, PlateY, PlateW, PlateH, BreakerUI::Violet, EBreakerRail::Top);
         DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudCalloutOverdriveActive), W * 0.5f, PlateY + S(14.0f), BreakerUI::Violet, 20.0f, 1.0f, ESpecFontRole::Display);
-    }
-}
-
-// --------------------------------------------------------------------------
-// Skim's confirmation: a radial speed-line burst at the crosshair. Short and
-// centre-screen because the redirect is felt, not seen.
-// --------------------------------------------------------------------------
-void ABreakerPlaytestHUD::DrawSkimBurst(const FVector2D& Center)
-{
-    const double Age = (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0) - SkimBurstTime;
-    if (Age < 0.0 || Age >= BreakerHUD::SkimBurstSeconds) return;
-
-    const float Alpha01 = static_cast<float>(Age) / BreakerHUD::SkimBurstSeconds;
-    const float Fade = 1.0f - Alpha01;
-    // Lines travel outward as they fade, which reads as speed rather than as a
-    // flashing ring.
-    const float Inner = FMath::Lerp(S(16.0f), S(40.0f), Alpha01);
-    const float Outer = Inner + FMath::Lerp(S(14.0f), S(6.0f), Alpha01);
-    // Skim is a movement verb: the one place cyan belongs at the crosshair.
-    const FLinearColor Color = BreakerUI::Alpha(BreakerUI::VerbMove, Fade);
-
-    constexpr int32 LineCount = 8;
-    for (int32 Index = 0; Index < LineCount; ++Index)
-    {
-        const float Angle = (2.0f * UE_PI) * static_cast<float>(Index) / static_cast<float>(LineCount);
-        const float Cos = FMath::Cos(Angle);
-        const float Sin = FMath::Sin(Angle);
-        DrawLine(Center.X + Cos * Inner, Center.Y + Sin * Inner,
-                 Center.X + Cos * Outer, Center.Y + Sin * Outer, Color, S(1.75f));
     }
 }
 

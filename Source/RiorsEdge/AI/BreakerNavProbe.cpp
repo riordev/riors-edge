@@ -359,7 +359,7 @@ namespace
                 // is in reach.
                 ABreakerRangedEnemy* Ranged = State->Ranged.Get();
                 const bool bLos = Ranged && Ranged->HasLineOfSightToTarget();
-                FVector Goal;
+                FVector Goal = FVector::ZeroVector;
                 const bool bHasGoal = Ranged && Ranged->GetCoverGoal(Goal);
                 const FString CoverText = bHasGoal
                     ? FString::Printf(TEXT("(%.0f,%.0f)"), Goal.X, Goal.Y) : FString(TEXT("none"));

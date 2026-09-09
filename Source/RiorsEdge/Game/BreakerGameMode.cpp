@@ -72,6 +72,7 @@
 #include "Engine/GameViewportClient.h"
 #include "HAL/PlatformTime.h"
 #include "Misc/Paths.h"
+#include "HAL/FileManager.h"
 
 ABreakerGameMode::ABreakerGameMode()
 {
@@ -1824,6 +1825,71 @@ void ABreakerGameMode::BuildZoneCaptureTour(const FBreakerZoneMarkers& Markers)
                 const FVector Target = Eye.Equals(Plan.At(-650,0,100)) ? Plan.At(1600,0,100) : Plan.At(3000,3900,150);
                 Vantages.Add({Eye, (Target - Eye).Rotation()});
             }
+        }
+    }
+    if (FParse::Param(FCommandLine::Get(), TEXT("BreakerCapturePerimeter")))
+    {
+        FString UserDirectory;
+        if (!FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureScenery"))
+            || !FParse::Value(FCommandLine::Get(), TEXT("UserDir="), UserDirectory)
+            || UserDirectory.IsEmpty() || FPaths::IsRelative(UserDirectory)
+            || FPaths::IsSamePath(FPaths::ConvertRelativePathToFull(UserDirectory), FPaths::ProjectDir())
+            || IFileManager::Get().DirectoryExists(*(FPaths::ProjectSavedDir() / TEXT("SaveGames"))))
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[BreakerCapture] Perimeter refused: Scenery and fresh isolated absolute UserDir required."));
+            return;
+        }
+        TArray<FBreakerZonePiece> Pieces;
+        BreakerFernhallCourtyard::FPlan Plan;
+        FString Error;
+        if (!UBreakerZoneBuilder::CollectZonePieces(UBreakerZoneBuilder::FernhallMeshFolder(), Pieces)
+            || !BreakerFernhallCourtyard::MakePlan(Pieces, Plan, Error)) return;
+        auto Bounds = [&](const TCHAR* Name, FBox& Out)
+        {
+            const auto* Piece = Pieces.FindByPredicate([&](const FBreakerZonePiece& P) { return P.Name == Name; });
+            auto* Mesh = Piece ? Cast<UStaticMesh>(Piece->MeshPath.TryLoad()) : nullptr;
+            if (!Mesh) return false;
+            Out = Mesh->GetBoundingBox(); return true;
+        };
+        FBox Entry, Sub;
+        if (!Bounds(TEXT("flr_yard"), Entry) || !Bounds(TEXT("flr_yard_sub"), Sub)) return;
+        const float Side = Entry.GetCenter().Y >= Sub.GetCenter().Y ? 1.f : -1.f;
+        const auto* Defaults = GetDefault<ABreakerCharacter>();
+        const auto* Capsule = Defaults->GetCapsuleComponent();
+        const auto* Camera = Defaults->FindComponentByClass<UCameraComponent>();
+        if (!Capsule || !Camera) return;
+        Vantages.Reset();
+        auto StandingView = [&](const TCHAR* Label, FVector Ground, const FVector& Target)
+        {
+            // O2 PLACEHOLDER capture offsets. Existing floor and capsule clearance
+            // determine standing height; no geometry is moved to serve the shot.
+            FCollisionQueryParams Query(SCENE_QUERY_STAT(PerimeterCaptureFloor), false);
+            if (auto* PC = GetWorld()->GetFirstPlayerController()) Query.AddIgnoredActor(PC->GetPawn());
+            FHitResult Floor;
+            if (!GetWorld()->LineTraceSingleByObjectType(Floor, Ground+FVector(0,0,200), Ground-FVector(0,0,200),
+                FCollisionObjectQueryParams(ECC_WorldStatic), Query)) return false;
+            const FVector At = Floor.ImpactPoint+FVector(0,0,Capsule->GetScaledCapsuleHalfHeight()+2.f);
+            if (GetWorld()->OverlapBlockingTestByChannel(At,FQuat::Identity,ECC_Pawn,
+                FCollisionShape::MakeCapsule(Capsule->GetScaledCapsuleRadius(),Capsule->GetScaledCapsuleHalfHeight()),Query)) return false;
+            FRotator Aim=(Target-At).Rotation();
+            for (int32 Pass=0;Pass<2;++Pass)
+                Aim=(Target-(At+Aim.RotateVector(Camera->GetRelativeLocation()))).Rotation();
+            Vantages.Add({At,Aim});
+            UE_LOG(LogTemp,Display,TEXT("[BreakerCapture] perimeter %s standing=%s target=%s"),Label,*At.ToString(),*Target.ToString());
+            return true;
+        };
+        FVector EntryGround=Start->Location; EntryGround.Z=Entry.Max.Z;
+        FVector GroveGround=Entry.GetCenter()+FVector(-Entry.GetExtent().X*.5f,0,0); GroveGround.Z=Entry.Max.Z;
+        FVector PipesGround=Sub.GetCenter()+FVector(-Sub.GetExtent().X*.4f,0,0); PipesGround.Z=Sub.Max.Z;
+        const bool bEntry=StandingView(TEXT("entry-grove"),EntryGround,Entry.GetCenter()+FVector(0,Side*Entry.GetExtent().Y,700));
+        const bool bGrove=StandingView(TEXT("grove-medium"),GroveGround,Entry.GetCenter()+FVector(0,Side*(Entry.GetExtent().Y+1700),1000));
+        const bool bPipes=StandingView(TEXT("pipeworks-medium"),PipesGround,Sub.GetCenter()+FVector(0,-Side*(Sub.GetExtent().Y+2400),1600));
+        // Aim at the real first turn, not through the wall across the dogleg.
+        const bool bCourt=Plan.RoutePoints.Num()>=2 && StandingView(TEXT("courtyard-entrance"),Plan.RoutePoints[0],Plan.RoutePoints[1]+FVector(0,0,100));
+        if (!bEntry || !bGrove || !bPipes || !bCourt)
+        {
+            UE_LOG(LogTemp,Warning,TEXT("[BreakerCapture] Perimeter refused incomplete standing route: entry=%d grove=%d pipes=%d courtyard=%d."),bEntry,bGrove,bPipes,bCourt);
+            return;
         }
     }
     for (const FVantage& Vantage : Vantages)

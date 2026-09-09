@@ -129,7 +129,7 @@ bool FBreakerPrototypeDestinationRuntimeTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Repeated arrival does not duplicate encounters"),AfterCount,BeforeCount);
         auto* Map=Player->FindComponentByClass<UBreakerLocalMapComponent>(); if (!Map) return false;
         TestTrue(TEXT("Local map shows actual floor footprints"),Map->GetGround().Num()>=5);
-        TestEqual(TEXT("Local map names its real region"),Map->GetRegionName().ToString(),D.DisplayName+TEXT(" / PROTOTYPE"));
+        TestEqual(TEXT("Local map names its real region"),Map->GetRegionName().ToString(),D.DisplayName);
         // Sweep the native standing capsule down the route through each district.
         // Enemy bodies are ignored; this proves geometry, not combat skill.
         FCollisionQueryParams Query(SCENE_QUERY_STAT(PrototypeWalkingRoute),false,Player);
