@@ -60,7 +60,7 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 
 ## Latest validated baseline
 
-Current local build/census/full suite:847 passing,3 expected failures,0 unexpected. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
+Current local build/census/full suite:848 passing,3 expected failures,0 unexpected. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
 
 ## Landed this pass
 
@@ -85,3 +85,5 @@ Current local build/census/full suite:847 passing,3 expected failures,0 unexpect
 - Cooperative combat sandbox: native isolation/environment tests and full suite845/3/0. Real two-process verification passed: two profiles, client floor/lighting, remote displacement, guest normal fire RPC, nine server weapon hits and client220→148→0 health/death. Disposable UserDirs and unchanged save hashes verified. Compile API/macro issues and live-log sharing fixed within the per-bug time box. This is combat-only; progression/travel and remaining multiplayer interactions are not claimed complete.
 
 - Prototype destinations: real Red Basin/Station Zero packages, six fixed-level districts/36 guards/six supply rewards, stable maps and return gates. Safe arrival and native death/respawn, route sweeps, actual cache kill gates/pickups pass;847/3/0. Both four-frame1080 scenery tours inspected; prototype objective verified in two720 frames. Still blockout art and recovery-only objectives; see Docs/reports/prototype-destinations-2026-09-09.md.
+
+- Survivor Core entitlement: canonical one-point Unlock pays actual supported arrival flag; silent restored saves settle at native startup. Wallet updates before synchronous receipt persistence. Independent review and memory archive/reentry/reload tests pass;848/3/0. Uncovered World Core sources12→11; remaining events need real authored delivery, not guessed bindings.

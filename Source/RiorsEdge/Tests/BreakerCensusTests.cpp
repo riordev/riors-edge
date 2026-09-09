@@ -319,7 +319,7 @@ bool FBreakerMissionsFreshTest::RunTest(const FString& Parameters)
     if (!TestNotNull(TEXT("Authored Survivor rescue exists"), Rescue)) return false;
     TestEqual(TEXT("Rescue begins Act III"), Rescue->Act, 3);
     TestEqual(TEXT("Rescue has one earned quest"), Rescue->Quests.Num(), 1);
-    TestEqual(TEXT("Rescue has eight ordered beats"), Rescue->Beats.Num(), 8);
+    TestEqual(TEXT("Rescue has nine ordered beats including its canonical world point"), Rescue->Beats.Num(), 9);
     const FBreakerMissionDefinition* Finale = Missions.FindByPredicate([](const FBreakerMissionDefinition& Mission) { return Mission.MissionId == TEXT("Act3.Finale"); });
     if (!TestNotNull(TEXT("Finale is authored separately from rescue"), Finale)) return false;
     TestEqual(TEXT("Finale remains in the third act"), Finale->Act, 3);

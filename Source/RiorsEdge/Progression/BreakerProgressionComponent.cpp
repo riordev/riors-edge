@@ -981,8 +981,10 @@ bool UBreakerProgressionComponent::GrantWorldPoint(FName SourceId, UBreakerQuest
     const FName Flag = UBreakerWorldPointLibrary::FlagForSource(SourceId);
     if (Journal->HasFlag(Flag)) return false;   // already claimed; one-time and permanent
 
-    Journal->SetFlag(Flag);
+    // SetFlag synchronously notifies persistence and reentrant settlers.
+    // Publish the wallet before its receipt so a startup save contains both.
     State.UnspentCorePoints = FMath::Max(0, State.UnspentCorePoints + 1);
+    Journal->SetFlag(Flag);
     OnProgressionChanged.Broadcast();
     return true;
 }

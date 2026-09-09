@@ -74,7 +74,7 @@ bool FBreakerSurvivorMissionLawTest::RunTest(const FString& Parameters)
     const FBreakerMissionDefinition* Mission = Missions.FindByPredicate([](const FBreakerMissionDefinition& M) { return M.MissionId == TEXT("Act3.Survivor"); });
     if (!TestNotNull(TEXT("authored Survivor mission"), Mission)) return false;
     TestEqual(TEXT("early Act III, no fake finale"), Mission->Act, 3);
-    if (!TestEqual(TEXT("eight explicit ordered beats"), Mission->Beats.Num(), 8)) return false;
+    if (!TestEqual(TEXT("nine explicit ordered beats including canonical world point"), Mission->Beats.Num(), 9)) return false;
     TestFalse(TEXT("rescue is not a fabricated boss completion"), Mission->Beats.ContainsByPredicate([](const FBreakerMissionBeat& B) { return B.Kind == EBreakerMissionBeatKind::Boss; }));
     FBreakerQuestDefinition Quest;
     if (!TestTrue(TEXT("actual rescue quest"), UBreakerQuestLibrary::FindQuest(TEXT("Quest.Survivor"), Quest))) return false;
@@ -116,7 +116,8 @@ bool FBreakerSurvivorMissionLawTest::RunTest(const FString& Parameters)
     Flags.Add(Arrived[0]);
     TestEqual(TEXT("arrival alone does not pay doctrine"), UBreakerMissionLibrary::DoctrinePointEntitlement(Flags), 4);
     TestEqual(TEXT("all physical objectives ready for Survivor turn-in"), UBreakerQuestLibrary::ComputeQuestState(Quest, Flags), EBreakerQuestState::ReadyToTurnIn);
-    TestEqual(TEXT("return tracker names actual Survivor"), UBreakerMissionLibrary::TrackerLine(Mission->Beats[5], Flags), FString::Printf(UBreakerMissionLibrary::ReturnToVerb, TEXT("THE SURVIVOR")));
+    TestEqual(TEXT("arrival unlock names the canonical one-point source"), Mission->Beats[5].CorePoint, FName(TEXT("SurvivorToAnchor")));
+    TestEqual(TEXT("return tracker names actual Survivor"), UBreakerMissionLibrary::TrackerLine(Mission->Beats[6], Flags), FString::Printf(UBreakerMissionLibrary::ReturnToVerb, TEXT("THE SURVIVOR")));
     Flags.Add(BreakerQuestFlags::SurvivorTurnedIn);
     TestEqual(TEXT("completed rescue raises cumulative entitlement to six"), UBreakerMissionLibrary::DoctrinePointEntitlement(Flags), 6);
     TestNull(TEXT("all rescue beats completed"), UBreakerMissionLibrary::CurrentBeat(*Mission, Flags));

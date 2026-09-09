@@ -32,11 +32,11 @@ measurement without judging it.
 | Ability lane throughput against weapon lane, endgame | band | 0.86 | no pin — measurement only | — |
 | Monster damage growth against gear defence growth | ceiling | 0.63 | ceiling 1.0 | ok |
 | Worst single rewrite step on an optimized build | ceiling | 1.51 | ceiling 1.5 | **OUT** |
-| World Core Point sources with no trigger | ceiling | 12.0 | ceiling 14, target 0 | ok |
+| World Core Point sources with no trigger | ceiling | 11.0 | ceiling 14, target 0 | ok |
 
 ## Tests
 
-- passing: 847
+- passing: 848
 - expected red: 3
 - **unexpected red: 0**
 - asserted invariants with no test: 35

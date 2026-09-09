@@ -412,6 +412,9 @@ void ABreakerCharacter::BeginPlay()
             Quests->SetFlag(Flag);
         }
         Progression->SettleDoctrineEntitlement(Quests->GetState());
+        // RestoreFrom is silent. Newly authored canonical world rewards must
+        // settle on startup even when this arrival sets no additional flag.
+        Progression->SettleWorldCorePoints(Quests);
     }
     if (Weapon && Equipment && HasAuthority()) Weapon->SyncArchetypesToEquipment();
     // Build the blockout for whatever the save restored. Before this the proxy

@@ -287,6 +287,11 @@
 					"completesOn": "Quest.Survivor.ReachedAnchor"
 				},
 				{
+					"id": "SurvivorToAnchor",
+					"kind": "Unlock",
+					"corePoint": "SurvivorToAnchor"
+				},
+				{
 					"id": "SurvivorReturn",
 					"kind": "Return",
 					"npc": "Survivor",
