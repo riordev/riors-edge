@@ -61,7 +61,7 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 
 ## Latest validated baseline
 
-Current local build/census/full suite:850 passing,3 expected failures,0 unexpected. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
+Current local build/census/full suite:851 passing,3 expected failures,0 unexpected. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
 
 ## Landed this pass
 
@@ -94,3 +94,5 @@ Current local build/census/full suite:850 passing,3 expected failures,0 unexpect
 - Ability menu/cache usability: full suite849/3/0. Swift1080 and Caster720 rows fit; vacant slots no longer print NONE. Cache focus shares range/cover eligibility, redundant distant labels are removed and its focused prompt anchors at the console. Six successful frames inspected; see Docs/reports/ability-menu-cache-2026-09-09.md. Mouse interaction and other screens still require play.
 
 - Sightline removal: actual purchased grant and nine-point Afterimage route verify full/half pierce and immediate permanent cleanup when the inactive grant is removed. Fixture baseline now includes native traversal-earned Momentum pierce. Build/full suite850/3/0; independently reviewed.
+
+- Rift retry: actual game-mode entry now rejects exhausted endgame allowance without resetting/spending it; campaign retry stays free. Native direct calls verify zero/negative/positive budgets and unchanged instance identity. Test name is a sibling of existing DeathBudget so Unreal runs both. Build/full suite851/3/0. Consumable keys, device and cross-map run remain unfinished.

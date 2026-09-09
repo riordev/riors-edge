@@ -382,6 +382,11 @@ void ABreakerGameMode::RetryRift(APawn* RequestingPawn)
         UE_LOG(LogTemp, Error, TEXT("[Rift] retry requested with no rift set. Refusing travel."));
         return;
     }
+    if (!BreakerDeathBudget::CanRetryRift(Session->PendingRift.Tier, Session->EndgameDeathsRemaining))
+    {
+        UE_LOG(LogTemp, Display, TEXT("[Rift] retry refused: endgame death allowance exhausted."));
+        return;
+    }
     Session->PendingDestinationId = ABreakerTravelPoint::RiftDestinationId;
     UE_LOG(LogTemp, Display, TEXT("[Rift] retry: %s (area level %d, %d of %d deaths remain)"),
         *Session->PendingRift.AreaName.ToString(), Session->PendingRift.EffectiveAreaLevel(),
