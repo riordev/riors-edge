@@ -483,7 +483,7 @@ Maximum wedges reached with65, including ring transit; cells show **wedges / min
 
 **O253** — Skill levels roll on Waist and Necklace, gated by affix tier: +1 at T12-T7, +2 at T6-T4, +3 at T3-T1, +4 at T-1 alone. Campaign play crosses only T12-T6, so the top of the ladder is endgame by construction rather than by rule.
 
-**O254** — Added Ability Damage is the flat half O54 left unnamed, bidding into the ability lane exactly as Added Damage bids into the weapon lane. Skill levels are free power and this is allocated power; only this half answers the ability-lane parity band.
+**O254** — The ability lane's flat half already ships as Ability.AddedPower and no second flat line is authored. The lane closes through breadth in its Increased pool and an ability counterpart to the weapon-only critical line: the measured shortfall is increased 0.735 and crit 0.812 against a flat that is already 0.867. Skill levels are free power and cannot discharge this band, which compares allocations.
 
 **O255** — A passive ability occupies a class slot and competes with the actives for it. A player who fills both class slots with passives has built a loadout, not opted out of one.
 
