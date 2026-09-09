@@ -2,6 +2,7 @@
 	"abilities": [
 		{
 			"id": "Swift.Slipcut",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 20,
 			"cooldownSeconds": 4,
 			"windowDuration": 0.4,
@@ -12,6 +13,7 @@
 		},
 		{
 			"id": "Swift.Lead",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 40,
 			"cooldownSeconds": 10,
 			"windowDuration": 6,
@@ -24,6 +26,7 @@
 		},
 		{
 			"id": "Swift.CadenceBreak",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 35,
 			"cooldownSeconds": 8,
 			"windowDuration": 3,
@@ -35,6 +38,7 @@
 		},
 		{
 			"id": "Swift.HardStop",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 30,
 			"cooldownSeconds": 6,
 			"windowDuration": 0.6,
@@ -45,6 +49,7 @@
 		},
 		{
 			"id": "Swift.Sightline",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 25,
 			"cooldownSeconds": 6,
 			"windowDuration": 2,
@@ -55,6 +60,7 @@
 		},
 		{
 			"id": "Swift.Overdrive",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 100,
 			"cooldownSeconds": 0,
 			"windowDuration": 8,
@@ -94,6 +100,7 @@
 		},
 		{
 			"id": "Caster.Cleave",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 12,
 			"cooldownSeconds": 0,
 			"windowDuration": 0.3,
@@ -101,7 +108,7 @@
 			{
 				"RangeCm": 450,
 				"ArcDegrees": 120,
-				"WeaponDamageCoefficient": 1.5,
+				"WeaponDamageCoefficient": 2.4,
 				"UnarmedDamage": 20,
 				"AnimationLockSeconds": 0.3,
 				"BleedDamagePerTick": 6,
@@ -115,6 +122,7 @@
 		},
 		{
 			"id": "Caster.Closequarter",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 35,
 			"cooldownSeconds": 0,
 			"windowDuration": 0,
@@ -133,6 +141,7 @@
 		},
 		{
 			"id": "Caster.Rot",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 25,
 			"cooldownSeconds": 0,
 			"windowDuration": 6,
@@ -156,6 +165,7 @@
 		},
 		{
 			"id": "Caster.Siphon",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 30,
 			"cooldownSeconds": 0,
 			"windowDuration": 5,
@@ -175,6 +185,7 @@
 		},
 		{
 			"id": "Caster.Fracture",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 30,
 			"cooldownSeconds": 0,
 			"windowDuration": 0,
@@ -190,6 +201,7 @@
 		},
 		{
 			"id": "Caster.Resonance",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 40,
 			"cooldownSeconds": 0,
 			"windowDuration": 0,
@@ -205,6 +217,7 @@
 		},
 		{
 			"id": "Caster.Unmake",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 80,
 			"cooldownSeconds": 0,
 			"windowDuration": 6,
@@ -244,6 +257,7 @@
 		},
 		{
 			"id": "Gunsmith.SidearmRig",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 0,
 			"cooldownSeconds": 10,
 			"windowDuration": 0,
@@ -256,6 +270,7 @@
 		},
 		{
 			"id": "Gunsmith.Overhaul",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 0,
 			"cooldownSeconds": 18,
 			"windowDuration": 10,
@@ -271,6 +286,7 @@
 		},
 		{
 			"id": "Gunsmith.Turret",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 40,
 			"cooldownSeconds": 0,
 			"windowDuration": 30,
@@ -283,6 +299,7 @@
 		},
 		{
 			"id": "Gunsmith.AmmoCrate",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 30,
 			"cooldownSeconds": 0,
 			"windowDuration": 45,
@@ -295,6 +312,7 @@
 		},
 		{
 			"id": "Gunsmith.MineCluster",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 35,
 			"cooldownSeconds": 0,
 			"windowDuration": 60,
@@ -307,6 +325,7 @@
 		},
 		{
 			"id": "Gunsmith.Disruptor",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 45,
 			"cooldownSeconds": 0,
 			"windowDuration": 20,
@@ -319,6 +338,7 @@
 		},
 		{
 			"id": "Gunsmith.FieldAssembly",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 100,
 			"cooldownSeconds": 0,
 			"windowDuration": 20,
@@ -364,6 +384,7 @@
 		},
 		{
 			"id": "Tank.Rend",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 25,
 			"cooldownSeconds": 6,
 			"windowDuration": 0,
@@ -381,6 +402,7 @@
 		},
 		{
 			"id": "Tank.Bloodline",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 40,
 			"cooldownSeconds": 12,
 			"windowDuration": 8,
@@ -391,6 +413,7 @@
 		},
 		{
 			"id": "Tank.AnchorPoint",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 30,
 			"cooldownSeconds": 10,
 			"windowDuration": 12,
@@ -402,6 +425,7 @@
 		},
 		{
 			"id": "Tank.Provoke",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 35,
 			"cooldownSeconds": 12,
 			"windowDuration": 4,
@@ -418,6 +442,7 @@
 		},
 		{
 			"id": "Tank.BreachCharge",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 30,
 			"cooldownSeconds": 8,
 			"windowDuration": 0,
@@ -436,6 +461,7 @@
 		},
 		{
 			"id": "Tank.GroundZero",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 45,
 			"cooldownSeconds": 10,
 			"windowDuration": 0,
@@ -454,6 +480,7 @@
 		},
 		{
 			"id": "Tank.Hold",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 100,
 			"cooldownSeconds": 0,
 			"windowDuration": 10,
@@ -499,6 +526,7 @@
 		},
 		{
 			"id": "Support.Patch",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 25,
 			"cooldownSeconds": 6,
 			"windowDuration": 0,
@@ -511,6 +539,7 @@
 		},
 		{
 			"id": "Support.Purge",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 30,
 			"cooldownSeconds": 10,
 			"windowDuration": 3,
@@ -522,6 +551,7 @@
 		},
 		{
 			"id": "Support.Cadence",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 30,
 			"cooldownSeconds": 8,
 			"windowDuration": 8,
@@ -539,6 +569,7 @@
 		},
 		{
 			"id": "Support.Metronome",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 35,
 			"cooldownSeconds": 9,
 			"windowDuration": 8,
@@ -553,6 +584,7 @@
 		},
 		{
 			"id": "Support.Mark",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 20,
 			"cooldownSeconds": 5,
 			"windowDuration": 10,
@@ -571,6 +603,7 @@
 		},
 		{
 			"id": "Support.Suppress",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 40,
 			"cooldownSeconds": 10,
 			"windowDuration": 6,
@@ -589,6 +622,7 @@
 		},
 		{
 			"id": "Support.Conduit",
+			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 100,
 			"cooldownSeconds": 0,
 			"windowDuration": 12,

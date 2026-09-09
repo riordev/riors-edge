@@ -501,6 +501,10 @@ namespace
     {
         Writer.WriteObjectStart();
         Writer.WriteValue(TEXT("id"), Definition.AbilityId.ToString());
+        // O2 declarations must survive canonical export. Keep annotation beside
+        // magnitudes, outside the numeric-only numbers object; never copy a
+        // second numeric table or pretend arbitrary source comments round-trip.
+        Writer.WriteValue(TEXT("_comment"), TEXT("O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here."));
         Writer.WriteValue(TEXT("resourceCost"), Definition.ResourceCost);
         Writer.WriteValue(TEXT("cooldownSeconds"), Definition.CooldownSeconds);
         Writer.WriteValue(TEXT("windowDuration"), Definition.WindowDuration);

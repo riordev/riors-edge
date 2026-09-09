@@ -62,7 +62,7 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 
 ## Latest validated baseline
 
-Current local build/full suite:855 passing,3 expected failures,0 unexpected; native census refreshed for the Station hunt flag. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
+Current local build/full suite:855 passing,3 expected failures,0 unexpected; native census refreshed for current ability data and export declarations. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
 
 ## Recent delivered changes
 
@@ -70,7 +70,7 @@ Current local build/full suite:855 passing,3 expected failures,0 unexpected; nat
 - Warden revival, Provoke/Standing Order, Swift starter migration, numeric ability authority and existing-item migration protection landed.
 - Fernhall guarded physical cache; Red Basin/Station Zero fixed-region prototype districts, local maps and real return gates landed. Station Zero now has a persistent priority hunt with optional lockers.
 - Anchor gatehouses/service-yard dressing, boss/Volatile occlusion cues, ability-menu wrapping, empty-label removal and cache prompt clarity were inspected in rendered captures.
-- Cleave cost/tempo improved native sustained output; direct/periodic split is next before coefficient tuning.
+- Cleave cost/tempo and measured direct coefficient now reach roughly94–96% of rifle starter throughput at close range. Ability rows retain their O2 declaration through census export.
 - Cooperative sandbox now verifies owner metadata, actual weapon damage, guest lethal/server respawn and client input restoration with isolated saves. Optional early screenshot capture is parked; no rendered death acceptance claim.
 
 Detailed historical receipts: Docs/reports/playtest-pass-ledger-2026-09-09.md. Individual capture/measurement reports remain under Docs/reports.

@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCasterDamageSplitObserver.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Cleave.h"
@@ -121,6 +122,13 @@ bool FBreakerCasterStarterSustainRuntimeTest::RunTest(const FString& Parameters)
             if (Controller->PlayerCameraManager) Controller->PlayerCameraManager->UpdateCamera(.05f);
         };
         Aim();
+        auto* DamageSplit=NewObject<UBreakerCasterDamageSplitObserver>(Enemy);
+        TStrongObjectPtr<UBreakerCasterDamageSplitObserver> HeldDamageSplit(DamageSplit);
+        auto* TargetCombat=Enemy->FindComponentByClass<UBreakerCombatComponent>();
+        if(!TargetCombat)return false;
+        TargetCombat->OnDamageTaken.AddDynamic(DamageSplit,&UBreakerCasterDamageSplitObserver::Observe);
+        double SliceDirect=0,SlicePeriodic=0,SliceBleed=0,SliceEntropy=0,SliceVoid=0,SliceRift=0;
+        int32 SliceDirectHits=0,SlicePeriodicHits=0,SliceCriticalHits=0;
         const float StartingHealth = EnemyAttributes->GetHealth();
         const float StartingMana = Mana->GetMana();
         const int32 StartingAmmo = Weapon->GetMagazineAmmo() + Weapon->GetReserveAmmo();
@@ -222,6 +230,13 @@ bool FBreakerCasterStarterSustainRuntimeTest::RunTest(const FString& Parameters)
                     *Label, (Step + 1) / 20 - 10, (Step + 1) / 20, Damage, Damage / 10,
                     PaidCasts - SliceCasts, UsedRounds - SliceRounds, Mana->GetMana(),
                     Weapon->GetMagazineAmmo() + Weapon->GetReserveAmmo(), EnemyAttributes->GetHealth() <= 0));
+                AddInfo(FString::Printf(TEXT("STARTER ACCEPTED SPLIT %s seconds%d-%d directHealth%.3f periodicHealth%.3f bleedHealth%.3f entropyHealth%.3f voidHealth%.3f riftHealth%.3f directHits%d periodicHits%d directCrits%d; element/status subtotals overlap direct/periodic, no requested or overkill damage"),
+                    *Label,(Step+1)/20-10,(Step+1)/20,DamageSplit->Direct-SliceDirect,DamageSplit->Periodic-SlicePeriodic,
+                    DamageSplit->Bleed-SliceBleed,DamageSplit->Entropy-SliceEntropy,DamageSplit->Void-SliceVoid,DamageSplit->Rift-SliceRift,
+                    DamageSplit->DirectHits-SliceDirectHits,DamageSplit->PeriodicHits-SlicePeriodicHits,DamageSplit->DirectCriticalHits-SliceCriticalHits));
+                SliceDirect=DamageSplit->Direct;SlicePeriodic=DamageSplit->Periodic;SliceBleed=DamageSplit->Bleed;
+                SliceEntropy=DamageSplit->Entropy;SliceVoid=DamageSplit->Void;SliceRift=DamageSplit->Rift;
+                SliceDirectHits=DamageSplit->DirectHits;SlicePeriodicHits=DamageSplit->PeriodicHits;SliceCriticalHits=DamageSplit->DirectCriticalHits;
                 if (Step == 199) { OpeningDamage = Damage; OpeningCasts = PaidCasts; bOpeningObserved = true; }
                 if (Step == 1199) { FinalSliceDamage = Damage; FinalSliceCasts = PaidCasts - SliceCasts; }
                 SliceHealth = EnemyAttributes->GetHealth(); SliceCasts = PaidCasts; SliceRounds = UsedRounds;
@@ -229,6 +244,10 @@ bool FBreakerCasterStarterSustainRuntimeTest::RunTest(const FString& Parameters)
         }
         Weapon->StopFire();
         const float WindowDamage = StartingHealth - EnemyAttributes->GetHealth();
+        const double WindowDirect=DamageSplit->Direct,WindowPeriodic=DamageSplit->Periodic;
+        AddInfo(FString::Printf(TEXT("STARTER ACCEPTED WINDOW %s observedSeconds%.2f directHealth%.3f periodicHealth%.3f sum%.3f netHealthLoss%.3f bleedHealth%.3f directHits%d periodicHits%d directCrits%d"),
+            *Label,FirstDeath<0?60.f:FirstDeath,WindowDirect,WindowPeriodic,WindowDirect+WindowPeriodic,WindowDamage,
+            DamageSplit->Bleed,DamageSplit->DirectHits,DamageSplit->PeriodicHits,DamageSplit->DirectCriticalHits));
         const float EndingMana = Mana->GetMana();
         const int32 Rounds = StartingAmmo - Weapon->GetMagazineAmmo() - Weapon->GetReserveAmmo();
         BeginSpawnedDelivery(); // Include actors accepted during the final measurement tick.
@@ -238,6 +257,8 @@ bool FBreakerCasterStarterSustainRuntimeTest::RunTest(const FString& Parameters)
             BeginSpawnedDelivery(); // Drain native delayed deliveries; never issue another input.
         }
         const float TailDamage = StartingHealth - EnemyAttributes->GetHealth() - WindowDamage;
+        AddInfo(FString::Printf(TEXT("STARTER ACCEPTED TAIL %s directHealth%.3f periodicHealth%.3f netHealthLoss%.3f"),
+            *Label,DamageSplit->Direct-WindowDirect,DamageSplit->Periodic-WindowPeriodic,TailDamage));
         TestTrue(*(Label + TEXT(" actual attacks damage the real collider")), WindowDamage > 0);
         if (bCasting)
         {
