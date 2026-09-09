@@ -94,16 +94,16 @@
 		},
 		{
 			"id": "Caster.Cleave",
-			"resourceCost": 20,
+			"resourceCost": 12,
 			"cooldownSeconds": 0,
-			"windowDuration": 0.45,
+			"windowDuration": 0.3,
 			"numbers":
 			{
 				"RangeCm": 450,
 				"ArcDegrees": 120,
 				"WeaponDamageCoefficient": 1.5,
 				"UnarmedDamage": 20,
-				"AnimationLockSeconds": 0.45,
+				"AnimationLockSeconds": 0.3,
 				"BleedDamagePerTick": 6,
 				"BleedDuration": 4,
 				"BleedTickInterval": 1,

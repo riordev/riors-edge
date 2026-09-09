@@ -60,11 +60,15 @@ bool FBreakerPreparedRuntimeTest::RunTest(const FString& Parameters)
         if(!Abilities->TryEquipAbility(Melee,TEXT("Caster.Cleave"),Reason)||!Abilities->TryEquipAbility(Spell,TEXT("Caster.Fracture"),Reason))return false;Abilities->RefreshGrants();
         Mana->AdvanceLoop(20);
         // Use the authoritative spend seam to establish a boundary bank; the
-        // actual equipped Cleave performs the tested crossing into debt.
-        if(!Mana->TrySpendMana(Mana->GetMana()-1))return false;
-        TestEqual(TEXT("Cleave quotes ordinary price"),Abilities->GetResourceCostForSlot(Melee),20.f,.001f);
-        if(!Abilities->TryActivateSlot(Melee))return false;
-        TestEqual(TEXT("Native paid cast crosses into debt"),Mana->GetMana(),-19.f,.001f);ASC->CancelAllAbilities();
+        // purchased Fracture crosses from a positive bank to -19. A cheaper
+        // Cleave would need a negative starting bank, where casting is refused.
+        // Keep the status-income boundary without bypassing that real refusal.
+        const float SpellPrice=Abilities->GetResourceCostForSlot(Spell);
+        if(!TestTrue(TEXT("Paid boundary setup remains above zero"),SpellPrice>19.f))return false;
+        if(!Mana->TrySpendMana(Mana->GetMana()-(SpellPrice-19.f)))return false;
+        TestEqual(TEXT("Cleave quotes ordinary price"),Abilities->GetResourceCostForSlot(Melee),12.f,.001f);
+        if(!TestTrue(TEXT("Purchased spell enters the actual debt boundary"),Abilities->TryActivateSlot(Spell)))return false;
+        TestEqual(TEXT("Native paid cast reaches status-income debt boundary"),Mana->GetMana(),-19.f,.001f);ASC->CancelAllAbilities();
         auto* Target=World->SpawnActor<AActor>();if(!Target)return false;
         auto* Sink=NewObject<UBreakerCombatComponent>(Target);Target->AddInstanceComponent(Sink);Sink->RegisterComponent();
         auto* Health=NewObject<UBreakerAttributeSet>(Target);Health->ApplyMaxHealth(1000);Health->ApplyHealth(1000);Sink->BindAttributes(Health);

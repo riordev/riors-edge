@@ -672,7 +672,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     // tell "cost-gated" from "cooldown of zero" (spec D3).
     // ------------------------------------------------------------------
 
-    // C1 Cleave — Class-Kits §2.2 row C1: 20 Mana, no cooldown.
+    // C1 Cleave — Class-Kits §2.2 row C1: O2 PLACEHOLDER cost/lock live in Data/abilities.json; no cooldown.
     UBreakerAbilityDefinition* Cleave = MakeFallback(TEXT("FallbackAbility_Caster_Cleave"));
     Cleave->AbilityId = TEXT("Caster.Cleave");
     Cleave->ClassId = EBreakerClassId::Caster;

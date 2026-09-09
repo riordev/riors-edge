@@ -51,7 +51,9 @@ bool FBreakerLongDebtRuntimeTest::RunTest(const FString& Parameters)
     for(int32 Cast=0;Cast<20 && !Mana->IsOvercast();++Cast)
     {
         if(!TestTrue(TEXT("Paid Cleave casts"),Abilities->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityOne)))return false;
-        Clock(.55f);
+        // The next normal input follows the authored lock; lingering .55s
+        // would now recover the smaller cost before the debt observation.
+        Clock(GetDefault<UBreakerAbility_Cleave>()->AnimationLockSeconds+.05f);
     }
     if(!TestTrue(TEXT("Paid casting reaches negative Mana"),Mana->IsOvercast()))return false;
     FBreakerQuestFlagSet Flags;for(const auto& Mission:UBreakerMissionLibrary::GetMissions())for(const auto& Beat:Mission.Beats)

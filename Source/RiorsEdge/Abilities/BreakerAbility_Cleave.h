@@ -7,9 +7,9 @@
 class UBreakerAttributeSet;
 class UBreakerCombatComponent;
 
-// C1 Cleave (Class-Kits §2.2, Ability-Implementation-Spec §5.1): 20 Mana, no
-// cooldown. "Short forward melee arc, 3 m, physical damage scaled by weapon
-// damage. Applies Bleed at a 100% base chance."
+// C1 Cleave (Class-Kits §2.2, Ability-Implementation-Spec §5.1): Data-authored cost,
+// lock and range, no cooldown. Short forward melee arc with physical damage
+// scaled by weapon damage. Applies Bleed at a 100% base chance.
 //
 // The Caster's only melee verb, and the only melee damage submission in the
 // project. Everything it needs beyond the shared ability base is the arc sweep

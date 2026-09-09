@@ -437,7 +437,9 @@ bool FBreakerCasterKitRegistryTest::RunTest(const FString& Parameters)
         AddError(TEXT("Cleave is missing from the fallback registry"));
         return false;
     }
-    TestEqual(TEXT("Cleave costs 20 Mana"), Cleave->GetResourceCost(), 20.0f);
+    TestEqual(TEXT("Cleave starter tempo trial costs 12 Mana"), Cleave->GetResourceCost(), 12.0f);
+    TestEqual(TEXT("Cleave HUD window matches authored lock"), Cleave->WindowDuration, GetDefault<UBreakerAbility_Cleave>()->AnimationLockSeconds);
+    TestEqual(TEXT("Cleave starter tempo trial lock"), GetDefault<UBreakerAbility_Cleave>()->AnimationLockSeconds, .30f);
     TestTrue(TEXT("Cleave is implemented"), Cleave->IsImplemented());
     TestTrue(TEXT("Cleave derives from the Caster base"), Cleave->AbilityClass->IsChildOf(UBreakerCasterAbility::StaticClass()));
 

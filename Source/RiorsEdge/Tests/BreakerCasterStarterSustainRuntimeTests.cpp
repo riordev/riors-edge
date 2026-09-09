@@ -172,6 +172,7 @@ bool FBreakerCasterStarterSustainRuntimeTest::RunTest(const FString& Parameters)
         float SliceHealth = StartingHealth;
         int32 SliceCasts = 0, SliceRounds = 0;
         float OpeningDamage = 0;
+        bool bOpeningObserved = false;
         int32 OpeningCasts = 0;
         int32 FinalSliceCasts = 0;
         float FinalSliceDamage = 0;
@@ -221,7 +222,7 @@ bool FBreakerCasterStarterSustainRuntimeTest::RunTest(const FString& Parameters)
                     *Label, (Step + 1) / 20 - 10, (Step + 1) / 20, Damage, Damage / 10,
                     PaidCasts - SliceCasts, UsedRounds - SliceRounds, Mana->GetMana(),
                     Weapon->GetMagazineAmmo() + Weapon->GetReserveAmmo(), EnemyAttributes->GetHealth() <= 0));
-                if (Step == 199) { OpeningDamage = Damage; OpeningCasts = PaidCasts; }
+                if (Step == 199) { OpeningDamage = Damage; OpeningCasts = PaidCasts; bOpeningObserved = true; }
                 if (Step == 1199) { FinalSliceDamage = Damage; FinalSliceCasts = PaidCasts - SliceCasts; }
                 SliceHealth = EnemyAttributes->GetHealth(); SliceCasts = PaidCasts; SliceRounds = UsedRounds;
             }
@@ -241,16 +242,16 @@ bool FBreakerCasterStarterSustainRuntimeTest::RunTest(const FString& Parameters)
         if (bCasting)
         {
             TestTrue(*(Label + TEXT(" real resource gates permit paid casts")), PaidCasts > 0);
-            TestTrue(*(Label + TEXT(" natural Mana recovery supports casts after the opening bank")), PaidCasts > OpeningCasts);
             if (FirstDeath < 0)
             {
+                TestTrue(*(Label + TEXT(" natural Mana recovery supports casts after the opening bank")), bOpeningObserved && PaidCasts > OpeningCasts);
                 TestTrue(*(Label + TEXT(" normal Mana recovery still pays casts during seconds 50-60")), FinalSliceCasts > 0);
                 TestTrue(*(Label + TEXT(" late paid delivery still reduces actual target health during seconds 50-60")), FinalSliceDamage > 0);
                 TestEqual(*(Label + TEXT(" surviving-target casting row does not spend rifle ammo")), Rounds, 0);
             }
             if (bFracture) TestTrue(*(Label + TEXT(" actual Ability-pool Fracture produces traveling projectiles")), ProjectileSpawns > 0);
         }
-        else TestTrue(*(Label + TEXT(" real trigger consumes ammunition")), Rounds > 0);
+        else if (FirstDeath < 0) TestTrue(*(Label + TEXT(" real trigger consumes ammunition")), Rounds > 0);
         // This is an unpinned measurement, not a requirement that ordinary crits
         // cannot kill the target. A kill ends observation; never invent health
         // or treat native kill rewards as negative ammunition consumption.
@@ -263,8 +264,8 @@ bool FBreakerCasterStarterSustainRuntimeTest::RunTest(const FString& Parameters)
             TestTrue(*(Label + TEXT(" actual zone releases its leases")), CastZone->IsReleased());
             TestTrue(*(Label + TEXT(" actual zone is destroyed after its final tick")), CastZone->IsActorBeingDestroyed());
         }
-        AddInfo(FString::Printf(TEXT("STARTER KIT DELIVERY %s hp%.3f opening10s%.3f observedSeconds%.2f windowDamage%.3f tail5s%.3f casts%d projectiles%d netRounds%d reloads%d rotTicks%d mana%.2f->%.2f firstDeath%.2f; one initial bank/ammo supply, native kill rewards retained, stationary shipped probe target, unchanged legal rolled affixes, no allocations or build-parity claim"),
-            *Label, StartingHealth, OpeningDamage, FirstDeath < 0 ? 60.0f : FirstDeath, WindowDamage, TailDamage, PaidCasts, ProjectileSpawns, Rounds, Reloads, RotTicks, StartingMana, EndingMana, FirstDeath));
+        AddInfo(FString::Printf(TEXT("STARTER KIT DELIVERY %s hp%.3f openingAvailable%d opening10s%.3f observedSeconds%.2f windowDamage%.3f tail5s%.3f casts%d projectiles%d netRounds%d reloads%d rotTicks%d mana%.2f->%.2f firstDeath%.2f; one initial bank/ammo supply, native kill rewards retained, stationary shipped probe target, unchanged legal rolled affixes, no allocations or build-parity claim"),
+            *Label, StartingHealth, bOpeningObserved, OpeningDamage, FirstDeath < 0 ? 60.0f : FirstDeath, WindowDamage, TailDamage, PaidCasts, ProjectileSpawns, Rounds, Reloads, RotTicks, StartingMana, EndingMana, FirstDeath));
         ASC->CancelAllAbilities();
         for (const auto& Held : Projectiles) if (auto* Projectile = Held.Get()) Projectile->Destroy();
         Enemy->Destroy(); Controller->UnPossess(); Controller->Destroy(); Player->Destroy();

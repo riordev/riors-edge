@@ -85,7 +85,7 @@ bool FBreakerOverreachRuntimeTest::RunTest(const FString& Parameters)
         for(int32 Cast=0;Cast<20;++Cast)
         {
             if(Mana->GetMana()<0)return true;
-            if(!CastSlot(Melee,20))return false;
+            if(!CastSlot(Melee,12))return false;
             if(Mana->GetMana()<0)return true;
             Clock(.55f);
         }
@@ -138,7 +138,7 @@ bool FBreakerOverreachRuntimeTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Respec removes Overreach immediately in debt"),Mana->IsOverreachActive());
     TestEqual(TEXT("Respec in debt restores base incoming penalty"),Combat->GetComposedIncomingDamageMultiplier(),1.15f,.001f);
     if(!Abilities->TryEquipAbility(Melee,TEXT("Caster.Cleave"),Reason))return false;Abilities->RefreshGrants();
-    TestEqual(TEXT("Respec restores ordinary quote"),Abilities->GetResourceCostForSlot(Melee),20.f,.001f);
+    TestEqual(TEXT("Respec restores ordinary quote"),Abilities->GetResourceCostForSlot(Melee),12.f,.001f);
     TestFalse(TEXT("Positive-cost casting is again refused in debt"),Abilities->TryActivateSlot(Melee));
     if(!BuySix()||!Progression->PurchaseNode(Tree,Overreach,Reason))return false;
     if(!Abilities->TryEquipAbility(Ultimate,TEXT("Caster.Unmake"),Reason))return false;Abilities->RefreshGrants();
