@@ -5,7 +5,7 @@
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 
-bool UBreakerMeleeSweep::IsInsideArc(const FVector& Origin, const FVector& Forward, const FVector& TargetLocation, float RangeCm, float ArcDegrees)
+bool UBreakerMeleeSweep::IsInsideArc(const FVector& Origin, const FVector& Forward, const FVector& TargetLocation, float RangeCm, float ArcDegrees, float TargetRadiusCm)
 {
     if (RangeCm <= 0.0f || ArcDegrees <= 0.0f)
     {
@@ -15,7 +15,10 @@ bool UBreakerMeleeSweep::IsInsideArc(const FVector& Origin, const FVector& Forwa
     FVector ToTarget = TargetLocation - Origin;
     ToTarget.Z = 0.0;
     const double DistanceSquared = ToTarget.SizeSquared();
-    if (DistanceSquared > static_cast<double>(RangeCm) * RangeCm)
+    // Reach is to the body's SURFACE, not its origin. A negative radius cannot
+    // shorten the authored range: forgiveness only ever adds.
+    const double Reach = static_cast<double>(RangeCm) + FMath::Max(0.0f, TargetRadiusCm);
+    if (DistanceSquared > Reach * Reach)
     {
         return false;
     }
@@ -92,7 +95,16 @@ TArray<AActor*> UBreakerMeleeSweep::SweepTargets(const UWorld* World, AActor* In
         {
             continue;
         }
-        if (!IsInsideArc(Params.Origin, Params.Forward, Candidate->GetActorLocation(), Params.RangeCm, Params.ArcDegrees))
+        // The forgiveness comes from the very component this overlap admitted
+        // the candidate by, so the arc can never disagree with the query that
+        // fed it. Overlap.Component is that component by construction.
+        float TargetRadius = 0.0f;
+        if (const UPrimitiveComponent* Touched = Overlap.GetComponent())
+        {
+            const FVector Extent = Touched->Bounds.BoxExtent;
+            TargetRadius = HorizontalReach(Extent);
+        }
+        if (!IsInsideArc(Params.Origin, Params.Forward, Candidate->GetActorLocation(), Params.RangeCm, Params.ArcDegrees, TargetRadius))
         {
             continue;
         }

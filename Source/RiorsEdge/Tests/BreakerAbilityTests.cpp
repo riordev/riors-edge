@@ -653,6 +653,39 @@ bool FBreakerCleaveRulesTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Straight ahead and out of range is a miss"), UBreakerMeleeSweep::IsInsideArc(Origin, Forward, FVector(400.0, 0.0, 0.0), Range, Arc));
     TestTrue(TEXT("Exactly at the range boundary connects"), UBreakerMeleeSweep::IsInsideArc(Origin, Forward, FVector(300.0, 0.0, 0.0), Range, Arc));
     TestFalse(TEXT("Directly behind is never a hit"), UBreakerMeleeSweep::IsInsideArc(Origin, Forward, FVector(-100.0, 0.0, 0.0), Range, Arc));
+
+    // REACH IS TO THE BODY'S SURFACE, NOT ITS ORIGIN. The overlap that feeds
+    // this arc is a sphere against the target's collision, so a body already
+    // touching the sphere used to be thrown away whenever its actor origin sat
+    // past the range — the swing landed short of what the player could see.
+    TestFalse(TEXT("A body whose origin sits past the range is still a miss with no body"),
+        UBreakerMeleeSweep::IsInsideArc(Origin, Forward, FVector(340.0, 0.0, 0.0), Range, Arc));
+    TestTrue(TEXT("...and connects once its own half-extent is forgiven"),
+        UBreakerMeleeSweep::IsInsideArc(Origin, Forward, FVector(340.0, 0.0, 0.0), Range, Arc, 42.0f));
+    TestTrue(TEXT("The forgiven boundary itself connects"),
+        UBreakerMeleeSweep::IsInsideArc(Origin, Forward, FVector(342.0, 0.0, 0.0), Range, Arc, 42.0f));
+    TestFalse(TEXT("but forgiveness is finite"),
+        UBreakerMeleeSweep::IsInsideArc(Origin, Forward, FVector(343.0, 0.0, 0.0), Range, Arc, 42.0f));
+    // Forgiveness only ever ADDS: a negative radius must not shorten a swing.
+    TestTrue(TEXT("A negative radius cannot shorten the authored range"),
+        UBreakerMeleeSweep::IsInsideArc(Origin, Forward, FVector(300.0, 0.0, 0.0), Range, Arc, -50.0f));
+
+    // THE YAW-DEPENDENCE, which is the half the desk never recorded. A box
+    // reaches its half-extent face-on and its longer diagonal corner-on, so a
+    // circumscribed forgiveness would make the SAME body at the SAME distance
+    // hittable or not according to how it happened to be standing. The
+    // inscribed radius is the largest forgiveness true from every yaw.
+    TestEqual(TEXT("Reach is the inscribed half-extent, so it does not depend on facing"),
+        UBreakerMeleeSweep::HorizontalReach(FVector(42.0, 42.0, 58.0)), 42.0f, 0.0001f);
+    TestEqual(TEXT("An oblong body reaches by its NARROW side, never its wide one"),
+        UBreakerMeleeSweep::HorizontalReach(FVector(90.0, 30.0, 58.0)), 30.0f, 0.0001f);
+    TestTrue(TEXT("and the inscribed reach never exceeds the circumscribed one it replaces"),
+        UBreakerMeleeSweep::HorizontalReach(FVector(90.0, 30.0, 58.0))
+            <= FMath::Sqrt(90.0f * 90.0f + 30.0f * 30.0f));
+    TestEqual(TEXT("A bodiless point earns no forgiveness"),
+        UBreakerMeleeSweep::HorizontalReach(FVector::ZeroVector), 0.0f, 0.0001f);
+    TestEqual(TEXT("and a nonsense extent cannot pay a negative one"),
+        UBreakerMeleeSweep::HorizontalReach(FVector(-10.0, -10.0, 5.0)), 0.0f, 0.0001f);
     // 45 degrees off centre is inside a 120-degree arc; 70 is not.
     TestTrue(TEXT("45 degrees off centre is inside a 120 degree arc"),
         UBreakerMeleeSweep::IsInsideArc(Origin, Forward, FVector(100.0, 100.0, 0.0), Range, Arc));
