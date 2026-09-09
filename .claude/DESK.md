@@ -7,7 +7,7 @@ Continue validated blocks until the owner returns. Prioritize playable changes f
 ## Immediate queue
 
 1. Cooperative sandbox landed with real host/guest fire and replicated health/death evidence. Remaining multiplayer acceptance: abilities, drop contention, respawn/rejoin, human movement feel and eventual campaign support.
-2. Red Basin/Station Zero prototypes landed; next content acceptance is varied mission beats and real return Rifts. Refine exposed boundaries, repeated cover and crowded distant supply prompts.
+2. Red Basin/Station Zero prototypes landed; next content acceptance is varied mission beats and real return Rifts. Refine exposed boundaries and repeated cover. Anchor surroundings/work-area dressing landed but remains blockout art.
 3. Volatile countdown and ability-menu wrapping/empty-label fixes landed with rendered checks. Continue interactive focus/death flow and other menu screens.
 4. Finish remaining Afterimage consumers and real-clock Rot feedback checks. Cache prompt now shares opening eligibility and stays visible at the console; final prop art remains.
 5. Kit expansion under O252–O260: current34 registered entries are11 actives and10 passives short of55. Carom, Coup, Backstep, Pyre, Riftlance, Recall, Bulwark and Overwatch are named candidates without sufficient authored mechanics in the current docs. Rover/Barrel need new mechanics; Wildcard has O257 but needs Forge/foreign-grant/resource infrastructure. Do not fill the count with clones or call existing innate nodes slot passives.
@@ -99,3 +99,5 @@ Current local build/census/full suite:852 passing,3 expected failures,0 unexpect
 - Rift retry: actual game-mode entry now rejects exhausted endgame allowance without resetting/spending it; campaign retry stays free. Native direct calls verify zero/negative/positive budgets and unchanged instance identity. Test name is a sibling of existing DeathBudget so Unreal runs both. Build/full suite851/3/0. Consumable keys, device and cross-map run remain unfinished.
 
 - Caster sustain/Rot clock: ten native minute-long scenarios preserve legal affixes, earned grants, resource recovery, projectile delivery and reloads. All Rot zones pay12 boundary ticks. HUD test now advances actual world time and rejects indefinite zero-time aggregation. Build/full suite852/3/0; measurements and limits in Docs/reports/caster-sustain-2026-09-09.md. Starter Cleave balance remains open.
+
+- Anchor surroundings: gatehouses, outer terraces, service yard and distinct forge/quartermaster details. All six1080 views inspected; native arrival/vendor/gate/stash routes pass at yaw0/90. Build/full suite852/3/0. Repeat combat diagnostic exposed a59.2s target kill; it now stops and labels censored observations instead of inflating health or misreading kill-awarded ammo. Early-kill opening/rifle-net-ammo edge cases will be handled with the next diagnostic update. See Docs/reports/anchor-grounding-2026-09-09.md.

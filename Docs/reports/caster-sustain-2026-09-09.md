@@ -1,6 +1,6 @@
 # Native Caster sustain diagnostic
 
-Actual level/area/item 1 and 20 characters use ordinary class choice, registered equipment grants, the same deterministic legal Standard rifle at each depth, native Mana recovery, weapon reloads, traveling projectiles and accepted target health loss. Fracture is purchased with an earned level token. No Core/Doctrine allocations or affix edits are added. Each row runs 60 seconds plus five seconds for pending delivery; an opening Rot is optional.
+Actual level/area/item 1 and 20 characters use ordinary class choice, registered equipment grants, the same deterministic legal Standard rifle at each depth, native Mana recovery, weapon reloads, traveling projectiles and accepted target health loss. Fracture is purchased with an earned level token. No Core/Doctrine allocations or affix edits are added. Each row observes up to60 seconds plus five seconds for pending delivery; an opening Rot is optional. The table is the first complete sample, not a deterministic damage guarantee.
 
 | Level | Delivery | DPS 0–10s | DPS 10–20s | DPS 50–60s | Casts in 60s |
 |---|---|---:|---:|---:|---:|
@@ -22,3 +22,5 @@ Every rifle row spends its normal150 rounds and exhausts ammunition during secon
 All opening Rot zones deliver their12 boundary ticks, affect actual occupancy and release/destroy normally. A separate real-clock HUD test confirms successive half-second Rot ticks merge only inside the existing merge interval, preserve number birth time, start a new group afterward, and remain separate from Bleed. This fixes a test that previously advanced status time while leaving HUD world time at zero; production feedback tuning is unchanged.
 
 Build/full suite:852 passing,3 expected failures,0 unexpected. The real-clock assertion uses double-precision world time to match the engine API. No production numbers or measurement pins changed.
+
+A repeated run killed the Fracture target at59.2s through ordinary critical samples and awarded60 ammunition. The diagnostic now stops input at target death, labels the row CENSORED and reports actual observed seconds. It does not assert later fixed-window sustain or zero net ammunition for that row. Surviving targets retain those assertions. No target health is inflated and native rewards are preserved; whole-minute comparisons require uncensored observations.

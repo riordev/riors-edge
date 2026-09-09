@@ -277,6 +277,81 @@ namespace
     }
 }
 
+namespace
+{
+    void BreakerHubBuildGrounding(UWorld* World, const FBreakerHubFrame& Frame)
+    {
+        // O2 PLACEHOLDER — architectural placement/scale, not new playable space.
+        // All service transforms remain in their existing builders. The outer
+        // settlement steps down from the market and leaves the pylon exposed.
+        const FRotator Yaw = Frame.Forward.Rotation();
+        const FLinearColor Slate(.16f, .20f, .21f), Plaster(.46f, .43f, .35f);
+        auto Box = [&](FVector Position, FVector Size, const FLinearColor& Color,
+            bool bCollision, const TCHAR* Label, const TCHAR* Tag)
+        {
+            AStaticMeshActor* Actor = HubSpawnShape(World, HubShapeCube,
+                Frame.At(Position.X, Position.Y, Position.Z), Size / 100.0f,
+                Yaw, Color, bCollision, Label);
+            if (Actor) Actor->Tags.Add(FName(Tag));
+            return Actor;
+        };
+        // O2 PLACEHOLDER — beyond the unchanged 35 m plaza edge, with the
+        // entry axis left open. Roof steps and inset shutters make gate houses
+        // read as occupied buildings, not a new wall across the travel point.
+        for (const float Side : {-1.0f, 1.0f})
+        {
+            Box(FVector(-3970, Side * 1700, 480), FVector(1050, 1900, 960), Plaster,
+                true, TEXT("Runtime_HubGateHouse"), TEXT("HubGroundingPerimeter"));
+            Box(FVector(-3970, Side * 1700, 990), FVector(1150, 2050, 60), Slate,
+                true, TEXT("Runtime_HubGateRoof"), TEXT("HubGroundingPerimeter"));
+            for (const float Across : {-540.0f, 0.0f, 540.0f})
+            {
+                Box(FVector(-3430, Side * 1700 + Across, 580), FVector(20, 210, 230), HubPaletteStone,
+                    false, TEXT("Runtime_HubGateShutter"), TEXT("HubGroundingDetail"));
+                Box(FVector(-3400, Side * 1700 + Across, 450), FVector(90, 250, 24), HubPaletteOffWhite,
+                    false, TEXT("Runtime_HubGateSill"), TEXT("HubGroundingDetail"));
+            }
+            // O2 PLACEHOLDER — low earth terraces hide the exposed slab edge;
+            // the upper terraces have fewer trees than the inhabited street.
+            Box(FVector(0, Side * 4000, 120), FVector(7500, 1100, 240), HubPaletteEarth,
+                true, TEXT("Runtime_HubOuterTerrace"), TEXT("HubGroundingPerimeter"));
+            Box(FVector(800, Side * 4650, 250), FVector(6000, 700, 500), HubPaletteStone,
+                true, TEXT("Runtime_HubOuterRetainingBank"), TEXT("HubGroundingPerimeter"));
+            for (const float X : {-2700.0f, 1100.0f, 2700.0f})
+                BreakerPlaceEnvironmentDressing(World, TEXT("CommonTree_1"),
+                    Frame.At(X, Side * 4170, 240), 1100, Yaw.Yaw + Side * X / 100);
+        }
+        // O2 PLACEHOLDER — a low service shed bridges the distant pylon's
+        // foundation visually to the market without hiding its vertical scale.
+        Box(FVector(4450, -1700, 370), FVector(1800, 1900, 740), HubPaletteConcrete,
+            true, TEXT("Runtime_HubServiceYard"), TEXT("HubGroundingPerimeter"));
+        Box(FVector(4450, -1700, 755), FVector(1880, 1980, 30), Slate,
+            true, TEXT("Runtime_HubServiceYardRoof"), TEXT("HubGroundingPerimeter"));
+        // O2 PLACEHOLDER — forge exhaust and pipe manifold stay behind Kess's
+        // existing counter; the actual kit keeps its original worn materials.
+        BreakerPlaceEnvironmentDressing(World, TEXT("Column_Pipes"), Frame.At(2140, -1220, 0), 500, Yaw.Yaw);
+        Box(FVector(2120, -1220, 560), FVector(170, 170, 370), HubPaletteRust,
+            false, TEXT("Runtime_HubForgeExtraction"), TEXT("HubForgeWorkArea"));
+        Box(FVector(2120, -1220, 770), FVector(240, 230, 50), Slate,
+            false, TEXT("Runtime_HubForgeExtractionCap"), TEXT("HubForgeWorkArea"));
+        for (const float Height : {150.0f, 220.0f, 290.0f})
+            Box(FVector(2170, -600, Height), FVector(100, 170, 30), HubPaletteRust,
+                false, TEXT("Runtime_HubForgeStock"), TEXT("HubForgeWorkArea"));
+        // O2 PLACEHOLDER — pale sorted supply bins and a task board give the
+        // quartermaster a different work silhouette without fake interaction.
+        Box(FVector(2160, 1200, 220), FVector(35, 250, 190), HubPaletteOffWhite,
+            false, TEXT("Runtime_HubQuartermasterBoard"), TEXT("HubQuartermasterWorkArea"));
+        for (const float Lateral : {620.0f, 760.0f, 900.0f})
+        {
+            Box(FVector(2130, Lateral, 80), FVector(170, 110, 160), HubPaletteConcrete,
+                false, TEXT("Runtime_HubSupplyBin"), TEXT("HubQuartermasterWorkArea"));
+            Box(FVector(2110, Lateral, 165), FVector(190, 120, 10), HubPaletteOffWhite,
+                false, TEXT("Runtime_HubSupplyLid"), TEXT("HubQuartermasterWorkArea"));
+        }
+    }
+}
+
+
 void UBreakerHubBuilder::BuildPlazaAndBoundary(UWorld* World, const FBreakerHubFrame& Frame)
 {
     using namespace BreakerHubLayout;
@@ -474,5 +549,6 @@ ABreakerTravelPoint* UBreakerHubBuilder::BuildHub(UWorld* World, const FTransfor
     BuildPlazaAndBoundary(World, Frame);
     BuildVendors(World, Frame);
     BreakerHubBuildStreet(World, Frame);
+    BreakerHubBuildGrounding(World, Frame);
     return BuildTravelPoint(World, Frame);
 }

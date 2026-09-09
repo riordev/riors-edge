@@ -2,6 +2,7 @@
 #include "Misc/ScopeExit.h"
 #include "Game/BreakerHubBuilder.h"
 #include "Interaction/BreakerNPC.h"
+#include "Interaction/BreakerStashPoint.h"
 #include "Interaction/BreakerTravelPoint.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
@@ -70,6 +71,24 @@ bool FBreakerHubStationClearanceTest::RunTest(const FString& Parameters)
                     Center + ArrivalDirection * 100.0f, FQuat::Identity, ECC_Pawn, Capsule, Query));
         }
         TestEqual(TEXT("The hub retains exactly its two existing vendors"), Vendors, 2);
+        int32 Stashes = 0, Perimeter = 0, ForgeArea = 0, QuartermasterArea = 0;
+        for (TActorIterator<AActor> It(World); It; ++It)
+        {
+            Perimeter += It->ActorHasTag(TEXT("HubGroundingPerimeter")) ? 1 : 0;
+            ForgeArea += It->ActorHasTag(TEXT("HubForgeWorkArea")) ? 1 : 0;
+            QuartermasterArea += It->ActorHasTag(TEXT("HubQuartermasterWorkArea")) ? 1 : 0;
+        }
+        TestTrue(TEXT("Built hub carries its outer settlement landmarks"), Perimeter > 0);
+        TestTrue(TEXT("Built forge has a distinct work area"), ForgeArea > 0);
+        TestTrue(TEXT("Built quartermaster has a distinct stock area"), QuartermasterArea > 0);
+        for (TActorIterator<ABreakerStashPoint> It(World); It; ++It)
+        {
+            ++Stashes;
+            const FVector Local = Origin.InverseTransformPosition(It->GetActorLocation());
+            TestTrue(TEXT("Stash retains its original service position"), Local.Equals(FVector(1200, 0, 100), 0.5f));
+            SweepRoute({At(450, 0), At(1000, 0)}, *It, TEXT("Market street to stash"));
+        }
+        TestEqual(TEXT("Grounding adds no extra stash interaction"), Stashes, 1);
         for (TActorIterator<ABreakerTravelPoint> It(World); It; ++It)
         {
             const FVector Approach = It->GetActorLocation() + Origin.GetRotation().GetForwardVector() * 100.0f;

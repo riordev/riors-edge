@@ -566,11 +566,13 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
             struct FHubVantage { FVector Position; FVector LookAt; };
             const FHubVantage Vantages[] =
             {
-                { FVector(-1480, 0, 100), FVector(1800, 0, 100) },
+                // O2 PLACEHOLDER: ground-level framing of street, work areas,
+                // pylon and outer settlement; no gameplay spawn changes.
+                { FVector(-1460, -140, 175), FVector(1800, 0, 950) },
+                { FVector(700, -560, 170), FVector(2500, -930, 560) },
+                { FVector(760, 480, 170), FVector(2600, 900, 500) },
+                { FVector(0, 250, 170), FVector(-3970, 500, 600) },
                 { FVector(-500, -450, 100), FVector(1800, 0, 160) },
-                { FVector(950, -900, 100), FVector(1450, -900, 160) },
-                { FVector(950, 900, 100), FVector(1450, 900, 160) },
-                { FVector(2000, 250, 100), FVector(-1480, 0, 160) },
             };
             for (const FHubVantage& Vantage : Vantages)
             {
