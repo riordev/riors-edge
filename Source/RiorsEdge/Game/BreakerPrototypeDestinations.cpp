@@ -18,6 +18,7 @@
 #include "Interaction/BreakerFernhallCache.h"
 #include "Interaction/BreakerBasinRecorder.h"
 #include "Interaction/BreakerCoastalUplink.h"
+#include "Interaction/BreakerMeridianGroundCrew.h"
 #include "Interaction/BreakerTravelPoint.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Misc/PackageName.h"
@@ -37,7 +38,7 @@ const TArray<BreakerPrototypeDestinations::FDefinition>& BreakerPrototypeDestina
             {FVector(2000,0,0), FVector(8000,-1200,0), FVector(12500,3600,0)},
             {TEXT("Research Reception"), TEXT("Specimen Gardens"), TEXT("Containment Laboratory")}, {24,26,28}},
         {TEXT("PortMeridian"), TEXT("Lvl_PortMeridian"), TEXT("Port Meridian"),
-            TEXT("Areas 34-38 / Destroyed airport. Clear terminal, apron and hangar defenders; recover their supplies."),
+            TEXT("Areas 34-38 / Destroyed airport. Guide the ground crew from Departures to Maintenance Hangar; supply caches are optional."),
             {FVector(2200,0,0), FVector(8800,0,0), FVector(15400,0,0)},
             {TEXT("Departures Terminal"), TEXT("Broken Apron"), TEXT("Maintenance Hangar")}, {34,36,38}},
         {TEXT("BrokenCoast"), TEXT("Lvl_BrokenCoast"), TEXT("Broken Coast"),
@@ -145,6 +146,7 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
     Shape(TEXT("ArrivalApproach"),Cube,(ApproachStart+ApproachEnd)*.5f-FVector(0,0,70),
         FVector(ApproachDelta.Size2D()+600,2200,140),Ground,true,ApproachDelta.Rotation());
     Result.WalkingRoute={Result.Arrival};
+    TArray<TArray<ABreakerEnemy*>> MeridianPockets;
     // O2 PLACEHOLDER: centimetre-authored wide walking route; ledges and cover
     // are optional. No destination requires dash, wall-run or a class.
     for (int32 Pocket=0;Pocket<3;++Pocket)
@@ -475,6 +477,7 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
         if(bBasin&&Pocket>0)
             if(auto* Recorder=World->SpawnActor<ABreakerBasinRecorder>(C+FVector(1700,Pocket==2?-650:-900,100),FRotator(0,180,0)))
             { ++RecorderCount;if(Pocket==2)Recorder->ConfigureExtraction(); }
+        if(bAirport)MeridianPockets.Add(Guards);
         const FVector CacheAt=C+FVector(1000,1700,90);
         if (auto* Cache=World->SpawnActor<ABreakerFernhallCache>(CacheAt,FRotator(0,180,0)))
         {
@@ -492,6 +495,13 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
     if(bCoast)
         if(auto* Uplink=World->SpawnActor<ABreakerCoastalUplink>(Definition->Districts.Last()+FVector(1900,-1100,100),FRotator(0,180,0)))
             bUplinkPresent=true;
+    bool bCrewPresent=!bAirport;
+    if(bAirport)
+        if(auto* Crew=World->SpawnActor<ABreakerMeridianGroundCrew>(Definition->Districts[0]+GetDefault<ABreakerMeridianGroundCrew>()->ShelterOffset,FRotator::ZeroRotator))
+        {
+            bCrewPresent=Crew->ConfigureMeridian(Definition->Districts,MeridianPockets);
+            if(!bCrewPresent)Crew->Destroy();
+        }
     // Wide connectors overlap both districts. The laboratory turns north;
     // the farm track bends toward the impact basin.
     for (int32 Link=0;Link<2;++Link)
@@ -513,7 +523,7 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
             Gate->Tags.Add(TEXT("PrototypeDestination.ReturnGate"));
             Result.Gates.Add(Gate);
         }
-    Result.bComplete=bGeometryValid && bUplinkPresent && (!bBasin || RecorderCount==2) && Result.Enemies.Num()==18 && Result.Caches.Num()==3 && Result.Gates.Num()==2 && Result.DressingCount>=6;
+    Result.bComplete=bGeometryValid && bUplinkPresent && bCrewPresent && (!bBasin || RecorderCount==2) && Result.Enemies.Num()==18 && Result.Caches.Num()==3 && Result.Gates.Num()==2 && Result.DressingCount>=6;
     UE_LOG(LogTemp,Display,TEXT("[PrototypeDestination] %s complete=%d fixed=%d-%d enemies=%d caches=%d dressing=%d"),
         *Definition->DisplayName,Result.bComplete,Definition->AreaLevels[0],Definition->AreaLevels.Last(),Result.Enemies.Num(),Result.Caches.Num(),Result.DressingCount);
     return Result;

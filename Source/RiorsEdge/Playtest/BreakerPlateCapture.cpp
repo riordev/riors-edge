@@ -20,6 +20,7 @@
 #include "Interaction/BreakerFernhallCache.h"
 #include "Interaction/BreakerBasinRecorder.h"
 #include "Interaction/BreakerCoastalUplink.h"
+#include "Interaction/BreakerMeridianGroundCrew.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
@@ -39,7 +40,8 @@ namespace
 }
 void BreakerSchedulePlateCapture(UWorld* World)
 {
- FString Mode,UserDirectory,VolatileMode,AbilityClass,RecorderMode,UplinkMode;
+ FString Mode,UserDirectory,VolatileMode,AbilityClass,RecorderMode,UplinkMode,MeridianMode;
+ const bool bMeridian=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureMeridian="),MeridianMode);
  const bool bUplink=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureUplink="),UplinkMode);
  const bool bRecorder=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureRecorder="),RecorderMode);
  const bool bAbilityMenu=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureAbilityClass="),AbilityClass);
@@ -47,7 +49,16 @@ void BreakerSchedulePlateCapture(UWorld* World)
  const bool bPlate=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureEnemyPlate="),Mode);
  const bool bCache=FParse::Param(FCommandLine::Get(),TEXT("BreakerCaptureCache"));
  const bool bScenery=FParse::Param(FCommandLine::Get(),TEXT("BreakerCaptureScenery"));
- if(!World||(!bPlate&&!bCache&&!bScenery&&!bVolatile&&!bAbilityMenu&&!bRecorder&&!bUplink))return;
+ if(!World||(!bPlate&&!bCache&&!bScenery&&!bVolatile&&!bAbilityMenu&&!bRecorder&&!bUplink&&!bMeridian))return;
+ if(bMeridian)
+ {
+    FString Board;const bool bHasBoard=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureBoard="),Board);
+    const bool bDialogue=MeridianMode.Equals(TEXT("Dialogue"),ESearchCase::IgnoreCase);
+    if(bPlate||bCache||bScenery||bVolatile||bAbilityMenu||bRecorder||bUplink
+        ||(!bDialogue&&!MeridianMode.Equals(TEXT("Prompt"),ESearchCase::IgnoreCase))
+        ||(bDialogue&&(!bHasBoard||!Board.Equals(TEXT("DIALOGUE"),ESearchCase::IgnoreCase)))||(!bDialogue&&bHasBoard))
+    {UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Meridian requires Prompt without board or Dialogue with -BreakerCaptureBoard=DIALOGUE; no other setup mode."));return;}
+ }
  if(bUplink && (bPlate||bCache||bScenery||bVolatile||bAbilityMenu||bRecorder
     ||(!UplinkMode.Equals(TEXT("Ready"),ESearchCase::IgnoreCase)&&!UplinkMode.Equals(TEXT("Active"),ESearchCase::IgnoreCase))))
  { UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Uplink requires Ready or Active and no other setup mode."));return; }
@@ -79,9 +90,9 @@ void BreakerSchedulePlateCapture(UWorld* World)
  {UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Mode must be open or blocked."));return;}
  // Core time advances while the arrival menu has paused world timers.
  // Weak UObject binding prevents setup after this world is destroyed.
- FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(World,[World,Mode,bCache,bPlate,bScenery,bVolatile,bAbilityMenu,AbilityClass,bRecorder,RecorderMode,bUplink,UplinkMode](float)
+ FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(World,[World,Mode,bCache,bPlate,bScenery,bVolatile,bAbilityMenu,AbilityClass,bRecorder,RecorderMode,bUplink,UplinkMode,bMeridian,MeridianMode](float)
  {
-    if(bAbilityMenu||bRecorder||bUplink)
+    if(bAbilityMenu||bRecorder||bUplink||bMeridian)
         if(const auto* Session=World->GetGameInstance<UBreakerGameInstance>(); Session && Session->IsArrivalCoverUp()) return true;
     auto* PC=World->GetFirstPlayerController();auto* Player=PC?Cast<ABreakerCharacter>(PC->GetPawn()):nullptr;
     if(!Player||!Player->HasAuthority())return false;
@@ -156,6 +167,41 @@ void BreakerSchedulePlateCapture(UWorld* World)
         UE_LOG(LogTemp,Display,TEXT("[PlateCapture] Recorder=%s actualCurrentStep=%d reachable=%d nearby=%d standing=%s console=%s; native recovery used for extraction, no flag injection; combat frozen for static QA."),
             *RecorderMode,Selected->IsCurrentStep(Player),Selected->IsInteractionReachable(Player),Player->FindNearbyNPC()==Selected,
             *Player->GetActorLocation().ToString(),*Selected->GetActorLocation().ToString());
+    }
+    else if(bMeridian)
+    {
+        ABreakerMeridianGroundCrew* Crew=nullptr;
+        for(TActorIterator<ABreakerMeridianGroundCrew> It(World);It;++It){Crew=*It;break;}
+        if(!Crew){UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Meridian requires actual Port Meridian ground crew."));return false;}
+        // O2 PLACEHOLDER framing only: real standing floor/capsule, no crew or
+        // geometry relocation. Keep the player within ordinary talk range.
+        FVector At=Crew->GetActorLocation()+Crew->GetActorForwardVector()*220.f;
+        FCollisionQueryParams Query(SCENE_QUERY_STAT(MeridianCaptureFloor),false,Player);Query.AddIgnoredActor(Crew);
+        FHitResult Floor;
+        if(!World->LineTraceSingleByObjectType(Floor,At+FVector(0,0,200),At-FVector(0,0,500),FCollisionObjectQueryParams(ECC_WorldStatic),Query))
+        {UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Meridian standing floor missing."));return false;}
+        const auto* Body=Player->GetCapsuleComponent();At.Z=Floor.ImpactPoint.Z+Body->GetScaledCapsuleHalfHeight()+2.f;
+        if(World->OverlapAnyTestByObjectType(At,FQuat::Identity,FCollisionObjectQueryParams(ECC_WorldStatic),
+            FCollisionShape::MakeCapsule(Body->GetScaledCapsuleRadius(),Body->GetScaledCapsuleHalfHeight()),Query))
+        {UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Meridian standing approach is obstructed."));return false;}
+        Player->SetActorLocation(At);FHitResult Obstruction;
+        if(Player->FindNearbyNPC()!=Crew||World->LineTraceSingleByObjectType(Obstruction,At,Crew->GetActorLocation(),FCollisionObjectQueryParams(ECC_WorldStatic),Query))
+        {UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Meridian ordinary NPC selection or LOS failed."));return false;}
+        if(MeridianMode.Equals(TEXT("Dialogue"),ESearchCase::IgnoreCase))
+        {
+            // Existing DIALOGUE capture selects the longest real authored row.
+            // Verify that row is this nearby crew's ordinary starting node;
+            // refuse rather than silently photographing unrelated dialogue.
+            ABreakerNPC* Selected=nullptr;FName SelectedNode;int32 Longest=-1;
+            for(TActorIterator<ABreakerNPC> It(World);It;++It)
+                for(const auto& Node:It->DialogueNodes)
+                    if(Node.SpeakerLine.Len()>Longest){Longest=Node.SpeakerLine.Len();Selected=*It;SelectedNode=Node.NodeId;}
+            if(Selected!=Crew||!Player->GetQuestJournal()||SelectedNode!=Crew->ResolveStartNodeId(Player->GetQuestJournal()->GetState()))
+            {UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Meridian dialogue capture is not the actual reachable start row."));return false;}
+        }
+        Aim=Crew->GetActorLocation()+FVector(0,0,65); // O2 PLACEHOLDER capture aim only.
+        UE_LOG(LogTemp,Display,TEXT("[PlateCapture] Meridian STATIC QA mode=%s nearby=%d dialogue=%s actor=%s standing=%s; actual reachable crew, no escort start, flags, guard kills or time injection."),
+            *MeridianMode,Player->FindNearbyNPC()==Crew,*Crew->DialogueId.ToString(),*Crew->GetActorLocation().ToString(),*Player->GetActorLocation().ToString());
     }
     else if(bUplink)
     {
@@ -250,6 +296,11 @@ void BreakerSchedulePlateCapture(UWorld* World)
     }
     if(PlateEnemy)UE_LOG(LogTemp,Display,TEXT("[PlateCapture] mode=%s nativeVisibility=%d eye=%s head=%s"),*Mode,
         BreakerEnemyPlateVisibility::IsVisible(World,Eye,Aim,PlateEnemy,Player),*Eye.ToString(),*Aim.ToString());
+    if(bMeridian&&MeridianMode.Equals(TEXT("Dialogue"),ESearchCase::IgnoreCase))
+    {
+        Player->OpenMenuScreenForCapture(TEXT("INVENTORY")); // Existing verified DIALOGUE board route.
+        UE_LOG(LogTemp,Display,TEXT("[PlateCapture] Meridian existing dialogue menu open=%d; no choice selected."),Player->IsMenuOpen());
+    }
     PC->SetPause(true);
     return false; // One setup only; screenshots use the existing core ticker.
  }),1.f);

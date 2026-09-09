@@ -52,7 +52,8 @@
 		"Quest.StationZero.CustodianDown",
 		"Quest.RedBasin.RecorderRecovered",
 		"Quest.RedBasin.RecorderExtracted",
-		"Quest.BrokenCoast.UplinkRestored"
+		"Quest.BrokenCoast.UplinkRestored",
+		"Quest.PortMeridian.GroundCrewEvacuated"
 	],
 	"quests": [
 		{

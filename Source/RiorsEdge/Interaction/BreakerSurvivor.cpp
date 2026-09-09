@@ -16,8 +16,9 @@ ABreakerSurvivor::ABreakerSurvivor()
 void ABreakerSurvivor::BeginPlay()
 {
     Super::BeginPlay();
+    const FName AuthoredDialogue=GetEscortDialogueId();
     const FBreakerDialogueRow* Row = GetDialogueData().Npcs.FindByPredicate(
-        [](const FBreakerDialogueRow& Entry) { return Entry.Id == TEXT("Survivor"); });
+        [AuthoredDialogue](const FBreakerDialogueRow& Entry) { return Entry.Id == AuthoredDialogue; });
     if (Row)
     {
         DialogueId = Row->Id;
@@ -26,14 +27,18 @@ void ABreakerSurvivor::BeginPlay()
         DialogueNodes = Row->Nodes;
         EntryOverrides = Row->Entries;
     }
-    else UE_LOG(LogTemp, Error, TEXT("Survivor has no authored dialogue row"));
+    else UE_LOG(LogTemp, Error, TEXT("Escort has no authored dialogue row: %s"),*AuthoredDialogue.ToString());
 }
 
 void ABreakerSurvivor::ConfigureEscort(const FBreakerErasedEarthLayout& Layout)
 {
+    ConfigureEscortRoute(Layout.SurvivorShelter, Layout.Extraction, Layout.Route, Layout.PocketCount);
+}
+void ABreakerSurvivor::ConfigureEscortRoute(FVector InShelter,FVector InExtraction,const TArray<FBreakerSurvivorRoutePoint>& Points,int32 PocketCount)
+{
     if (!HasAuthority()) return;
-    Shelter = Layout.SurvivorShelter; Extraction = Layout.Extraction;
-    Route = Layout.Route; ClearedPockets.Init(false, FMath::Max(0, Layout.PocketCount));
+    Shelter = InShelter; Extraction = InExtraction;
+    Route = Points; ClearedPockets.Init(false, FMath::Max(0, PocketCount));
     ResetToShelter();
 }
 
@@ -54,10 +59,7 @@ bool ABreakerSurvivor::TryBeginEscort(ABreakerCharacter* Player)
         || !FMath::IsFinite(LuciditySeconds) || LuciditySeconds <= 0
         || EscortState == EBreakerSurvivorEscortState::AtExtraction || IsEscortActive()
         || FVector::Dist(Player->GetActorLocation(), GetActorLocation()) > InteractionRange) return false;
-    const auto& Flags = Player->GetQuestJournal()->GetState().Flags;
-    if (!UBreakerGameInstance::IsErasedEarthMap(this) || !Flags.Contains(TEXT("Quest.Breach.TurnedIn"))
-        || !Flags.Contains(TEXT("Quest.Survivor.Accepted"))
-        || Flags.Contains(TEXT("Quest.Survivor.Extracted"))) return false;
+    if (!IsEscortAdmitted(Player)) return false;
     for (const FBreakerSurvivorRoutePoint& Point : Route)
         if (Point.RequiredPocket != INDEX_NONE && !ClearedPockets.IsValidIndex(Point.RequiredPocket)) return false;
     EscortPlayer = Player; RouteIndex = 0;
@@ -67,6 +69,12 @@ bool ABreakerSurvivor::TryBeginEscort(ABreakerCharacter* Player)
     return LucidityRemaining > 0.0f;
 }
 
+bool ABreakerSurvivor::IsEscortAdmitted(const ABreakerCharacter* Player) const
+{
+    const auto& Flags = Player->GetQuestJournal()->GetState().Flags;
+    return UBreakerGameInstance::IsErasedEarthMap(this) && Flags.Contains(TEXT("Quest.Breach.TurnedIn"))
+        && Flags.Contains(TEXT("Quest.Survivor.Accepted")) && !Flags.Contains(TEXT("Quest.Survivor.Extracted"));
+}
 void ABreakerSurvivor::SetPocketCleared(int32 PocketIndex, bool bCleared)
 {
     if (HasAuthority() && ClearedPockets.IsValidIndex(PocketIndex)) ClearedPockets[PocketIndex] = bCleared;

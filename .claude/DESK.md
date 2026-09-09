@@ -7,7 +7,7 @@ Continue validated blocks until the owner returns. Prioritize playable changes f
 ## Immediate queue
 
 1. Cooperative sandbox landed with real host/guest fire and replicated health/death evidence. Owner slot metadata and guest health/input respawn transport now verified; real Slipcut prediction/payment/server cadence and same-key cleanup now verified; remaining acceptance: other abilities/classes, latency/rejection bank convergence, drop contention, rejoin, human presentation/movement feel and eventual campaign support.
-2. Red Basin/Station Zero/Port Meridian/Broken Coast/Shatterpoint prototypes and Station priority hunt landed; Red Basin recovery/extraction and Broken Coast uplink transmission also landed; next content acceptance is real return Rifts, route pacing and region scenery. Refine exposed boundaries and repeated cover. Anchor surroundings/work-area dressing landed but remains blockout art.
+2. Red Basin/Station Zero/Port Meridian/Broken Coast/Shatterpoint prototypes and Station priority hunt landed; Red Basin recovery/extraction, Broken Coast uplink transmission and Port Meridian ground-crew escort also landed; next content acceptance is real return Rifts, route pacing and region scenery. Refine exposed boundaries and repeated cover. Anchor surroundings/work-area dressing landed but remains blockout art.
 3. Volatile countdown and ability-menu wrapping/empty-label fixes landed with rendered checks. Inventory destruction prose now wraps within its plate and failed single-item removal reports failure. Continue interactive focus/death flow and other menu screens.
 4. Finish remaining Afterimage consumers and real-clock Rot feedback checks. Cache prompt now shares opening eligibility and stays visible at the console; final prop art remains.
 5. Kit expansion under O252–O260: current34 registered entries are11 actives and10 passives short of55. Carom, Coup, Backstep, Pyre, Riftlance, Recall, Bulwark and Overwatch are named candidates without sufficient authored mechanics in the current docs. Rover/Barrel need new mechanics; Wildcard has O257 but needs Forge/foreign-grant/resource infrastructure. Do not fill the count with clones or call existing innate nodes slot passives.
@@ -49,6 +49,7 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 - Volatile now has a tested outlined countdown; final Niagara presentation and real client cadence/human timing remain.
 - Damage numbers can overlap enemy plates. Hover, focus recovery and comfort require real interaction checks beyond static captures.
 - Remaining Afterimage window/ability consumers, Open Wound's authored lane substitute, rocket continuation and ally-threat semantics need source review; old desk claims are not evidence of current absence.
+- Overhaul Bench Work revoke cleanup is parked after bounded correction: nested death/removal during main ammo settlement skips the old window/delegate teardown even when capacity refunds correctly. Candidate and callback fixtures remain outside checkout; no production change landed.
 - Blackout Afterimage is parked: its unkeyed enemy movement overwrite can erase Fleetfoot/other slows, and its shared incoming-damage key lets one caster remove another's effect. Requires source-owned contributions before extending the numerical tail; ordinary marked-hit Charge permission still ends on time.
 - Three generation entries remain uncalled; one aggregation lane and one target remain empty/unrouted. Consult current STATE for exact identities.
 - Other low-priority cleanup only after verifying use: empty modifier test helper; unused HUD dimensions; stale movement comments; duplicated boss timings; slot-invalid fixtures; inert affix leans; menu string-table migration.
@@ -70,7 +71,7 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 
 ## Latest validated baseline
 
-Current local build/full suite:861 passing,3 expected failures,0 unexpected; native census refreshed for53 quest flags and current ability declarations. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
+Current local build/full suite:862 passing,3 expected failures,0 unexpected; native census refreshed for54 quest flags and current ability declarations. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
 
 ## Playtest handoff
 

@@ -2244,6 +2244,68 @@
 				}
 			],
 			"entries": []
+		},
+		{
+			"id": "MeridianGroundCrew",
+			"displayName": "MERIDIAN GROUND CREW",
+			"startNodeId": "Start",
+			"nodes": [
+				{
+					"nodeId": "Start",
+					"speakerLine": "The terminal is lost. Get me across the apron to Maintenance Hangar. Stay close and clear the route. If this attempt fails, regroup here.",
+					"requiredFlags": [],
+					"blockedByFlags": [
+						"Quest.PortMeridian.GroundCrewEvacuated"
+					],
+					"choices": [
+						{
+							"text": "I will guide you. Follow me.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [
+								"Quest.PortMeridian.GroundCrewEvacuated"
+							],
+							"action": "StartSurvivorEscort"
+						},
+						{
+							"text": "Wait here.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Safe",
+					"speakerLine": "Maintenance Hangar is secure. I can take it from here.",
+					"requiredFlags": [
+						"Quest.PortMeridian.GroundCrewEvacuated"
+					],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "Stay safe.",
+							"nextNodeId": "",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				}
+			],
+			"entries": [
+				{
+					"startNodeId": "Safe",
+					"requiredFlags": [
+						"Quest.PortMeridian.GroundCrewEvacuated"
+					],
+					"blockedByFlags": []
+				}
+			]
 		}
 	]
 }

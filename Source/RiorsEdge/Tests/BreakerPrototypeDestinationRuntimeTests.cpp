@@ -289,6 +289,11 @@ bool FBreakerPrototypeDestinationRuntimeTest::RunTest(const FString& Parameters)
             TestFalse(TEXT("Recovering supplies does not complete the coastal uplink"),Map->GetCampaignObjective().ToString().Contains(TEXT("Return to Anchor 13")));
             TestTrue(TEXT("Unfinished uplink remains an actual map objective"),Map->GetMarkers().ContainsByPredicate([](const auto& M) { return M.Id==TEXT("BrokenCoast.Uplink") && M.bObjective; }));
         }
+        else if(D.Id==TEXT("PortMeridian"))
+        {
+            TestFalse(TEXT("Supplies do not fabricate a completed physical escort"),Map->GetCampaignObjective().ToString().Contains(TEXT("Return to Anchor 13")));
+            TestTrue(TEXT("Unfinished ground crew remains an actual map objective"),Map->GetMarkers().ContainsByPredicate([](const auto& M){return M.Id==TEXT("PortMeridian.GroundCrew")&&M.bObjective;}));
+        }
         else
             TestTrue(TEXT("Completed local objective directs the player home"),Map->GetCampaignObjective().ToString().Contains(TEXT("Return to Anchor 13")));
         // Real campaign death must return to the same pre-BeginPlay start,

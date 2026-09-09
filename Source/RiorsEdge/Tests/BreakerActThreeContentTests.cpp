@@ -61,7 +61,8 @@ bool FBreakerSurvivorDialogueTest::RunTest(const FString& Parameters)
                 TestFalse(TEXT("no dialogue fabricates extraction proof"), Choice.SetsQuestFlag == BreakerQuestFlags::SurvivorExtracted);
                 TestFalse(TEXT("no dialogue fabricates actual Anchor arrival"), Choice.SetsQuestFlag == BreakerQuestFlags::SurvivorReachedAnchor);
                 if (Choice.Action == EBreakerDialogueAction::StartSurvivorEscort)
-                    TestEqual(TEXT("escort action belongs to the dedicated friendly NPC"), Row.Id, FName(TEXT("Survivor")));
+                    TestTrue(TEXT("escort action belongs only to the two dedicated physical escort actors"),
+                        Row.Id==FName(TEXT("Survivor")) || Row.Id==FName(TEXT("MeridianGroundCrew")));
             }
     return true;
 }

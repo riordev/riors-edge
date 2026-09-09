@@ -170,7 +170,7 @@ bool FBreakerQuestsFreshTest::RunTest(const FString& Parameters)
     int32 ObjectiveCount = 0;
     for (const FBreakerQuestDefinition& Quest : Quests) { ObjectiveCount += Quest.Objectives.Num(); }
     TestEqual(TEXT("Fifteen objectives including rescue and finale"), ObjectiveCount, 15);
-    TestEqual(TEXT("Fifty-three registered flags including destination hunt, survey and uplink receipts"), Flags.Num(), 53);
+    TestEqual(TEXT("Fifty-four registered flags including regional objective receipts"), Flags.Num(), 54);
     TestTrue(TEXT("A quest flag is registered"), UBreakerQuestLibrary::IsRegisteredFlag(BreakerQuestFlags::FirstContractTurnedIn));
     TestFalse(TEXT("A progress counter is not a registered flag"), UBreakerQuestLibrary::IsRegisteredFlag(BreakerQuestFlags::FirstContractKillCounter));
     AddInfo(FString::Printf(TEXT("Quest registry: %d quests, %d objectives, %d flags"), Quests.Num(), ObjectiveCount, Flags.Num()));
@@ -225,7 +225,7 @@ bool FBreakerDialogueFreshTest::RunTest(const FString& Parameters)
     // Fernhall's first NPC. Every quest giver in the game stood in the hub
     // until him, and the yard was somewhere you crossed rather than somewhere
     // you were sent from.
-    TestEqual(TEXT("Eight authored dialogue rows including physical mission actors"), Data.Npcs.Num(), 8);
+    TestEqual(TEXT("Nine authored dialogue rows including physical mission actors"), Data.Npcs.Num(), 9);
     const FBreakerDialogueRow* Kess = Data.Npcs.FindByPredicate([](const FBreakerDialogueRow& Row) { return Row.Id == FName(TEXT("ForgeKeeper")); });
     const FBreakerDialogueRow* Quartermaster = Data.Npcs.FindByPredicate([](const FBreakerDialogueRow& Row) { return Row.Id == FName(TEXT("Quartermaster")); });
     const FBreakerDialogueRow* Survivor = Data.Npcs.FindByPredicate([](const FBreakerDialogueRow& Row) { return Row.Id == FName(TEXT("Survivor")); });
@@ -252,9 +252,9 @@ bool FBreakerDialogueFreshTest::RunTest(const FString& Parameters)
         EntryCount += Row.Entries.Num();
         for (const FBreakerDialogueNode& Node : Row.Nodes) { ChoiceCount += Node.Choices.Num(); }
     }
-    TestEqual(TEXT("Sixty-six nodes"), NodeCount, 66);
-    TestEqual(TEXT("One hundred twenty-four choices"), ChoiceCount, 124);
-    TestEqual(TEXT("Thirty-seven entries"), EntryCount, 37);
+    TestEqual(TEXT("Sixty-eight nodes"), NodeCount, 68);
+    TestEqual(TEXT("One hundred twenty-seven choices"), ChoiceCount, 127);
+    TestEqual(TEXT("Thirty-eight entries"), EntryCount, 38);
     AddInfo(FString::Printf(TEXT("Dialogue: %d npcs, %d nodes, %d choices, %d entries"), Data.Npcs.Num(), NodeCount, ChoiceCount, EntryCount));
 
     const FString Fresh = BreakerCensus::ExportDialogue(Data);

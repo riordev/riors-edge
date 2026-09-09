@@ -23,6 +23,7 @@ public:
     virtual void BeginPlay() override;
     virtual void Tick(float DeltaSeconds) override;
     void ConfigureEscort(const FBreakerErasedEarthLayout& Layout);
+    void ConfigureEscortRoute(FVector InShelter, FVector InExtraction, const TArray<FBreakerSurvivorRoutePoint>& Points, int32 PocketCount);
     bool TryBeginEscort(ABreakerCharacter* Player);
     void SetPocketCleared(int32 PocketIndex, bool bCleared = true);
     void SetDialoguePaused(bool bPaused);
@@ -44,6 +45,9 @@ public:
     UPROPERTY(EditAnywhere, Category="Survivor|Escort") float ExtractionRadius = 180.0f;
     UPROPERTY(EditAnywhere, Category="Survivor|Escort") float CheckpointRadius = 45.0f;
 
+protected:
+    virtual FName GetEscortDialogueId() const { return TEXT("Survivor"); }
+    virtual bool IsEscortAdmitted(const ABreakerCharacter* Player) const;
 private:
     void FailEscort();
     bool MoveAlongRoute(float DeltaSeconds);
