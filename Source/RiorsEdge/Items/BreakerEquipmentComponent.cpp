@@ -1290,6 +1290,11 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         // rather than the item multiplying the tree's result down.
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::AirControlMultiplier, AirControlPercent);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DashCooldownReduction, IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::DashCooldownReduction)]);
+        // O266: the first gear line that reaches an ABILITY lane. Every other
+        // ability stat is still tree-only; this is the bridge the rest follow.
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::AbilityCastRateMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::AbilityCastRate)]);
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::AbilityAreaMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::AbilityArea)]);
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::AbilityCooldownReduction, IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::AbilityCooldownReduction)]);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::FireRateMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::FireRate)]);
         // Efficiency is authored as a percentage of cost REMOVED, and the
         // attribute is the cost SCALE, so the sign flips exactly once, here.

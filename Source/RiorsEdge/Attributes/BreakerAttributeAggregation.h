@@ -135,6 +135,18 @@ enum class EBreakerAggregatedAttribute : uint8
     // are additive from day one instead of after the fourth instance of the
     // bug.
     ClassResourceRegen,
+    // O266. Cast rate as a MULTIPLIER on wind-up speed (x1.20 == a 20%
+    // shorter cast), the DashCooldownReduction shape and for the same
+    // reason: a stat held as a duration cannot share an additive bucket,
+    // because two layers each folding a percentage into seconds do not
+    // add. Gear and the Core Tempo nodes both bid here so +20% of each
+    // reads x1.40 and never x1.44.
+    AbilityCastRateMultiplier,
+    // The same bridge for the other two ability lanes gear can now reach.
+    // Area scales radius, arc and range; AbilityCooldownReduction is a
+    // DIVISOR like DashCooldownReduction above it.
+    AbilityAreaMultiplier,
+    AbilityCooldownReduction,
     Count
 };
 

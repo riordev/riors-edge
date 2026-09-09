@@ -68,6 +68,9 @@ UBreakerAttributeSet::UBreakerAttributeSet()
     InitSlideSpeedMultiplier(1.0f);
     InitAirControlMultiplier(1.0f);
     InitDashCooldownReduction(1.0f);
+    InitAbilityCastRate(1.0f);
+    InitAbilityArea(1.0f);
+    InitAbilityCooldownReduction(1.0f);
     InitFireRateMultiplier(1.0f);
     InitResourceCostMultiplier(1.0f);
     // Flat-shaped, not multiplier-shaped: 0 is "nothing contributed".
@@ -95,6 +98,9 @@ void UBreakerAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
     BREAKER_REPLICATE(SlideSpeedMultiplier);
     BREAKER_REPLICATE(AirControlMultiplier);
     BREAKER_REPLICATE(DashCooldownReduction);
+    BREAKER_REPLICATE(AbilityCastRate);
+    BREAKER_REPLICATE(AbilityArea);
+    BREAKER_REPLICATE(AbilityCooldownReduction);
     BREAKER_REPLICATE(FireRateMultiplier);
     BREAKER_REPLICATE(ResourceCostMultiplier);
     BREAKER_REPLICATE(ClassResourceRegen);
@@ -138,6 +144,13 @@ void UBreakerAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribut
     // than a clamp at zero, because a hostile or badly-rolled -100% would
     // otherwise be a divide by zero rather than a very long cooldown.
     else if (Attribute == GetDashCooldownReductionAttribute()) NewValue = FMath::Max(0.05f, NewValue);
+    // Floored at 1.0: a cast rate below one would LENGTHEN a wind-up, and no
+    // authored line is allowed to make an ability slower than the file says.
+    else if (Attribute == GetAbilityCastRateAttribute()) NewValue = FMath::Max(1.0f, NewValue);
+    // Floored just above zero so geometry can never invert and a divisor can
+    // never quietly become a multiplier.
+    else if (Attribute == GetAbilityAreaAttribute()) NewValue = FMath::Max(0.05f, NewValue);
+    else if (Attribute == GetAbilityCooldownReductionAttribute()) NewValue = FMath::Max(0.05f, NewValue);
     // Floored well above zero: a fire rate multiplier at or near 0 would turn
     // the fire interval into an infinity and hang the weapon rather than slow it.
     else if (Attribute == GetFireRateMultiplierAttribute()) NewValue = FMath::Max(0.05f, NewValue);
@@ -167,6 +180,9 @@ void UBreakerAttributeSet::CaptureAttributeBases()
     Values[static_cast<int32>(EBreakerAggregatedAttribute::SlideSpeedMultiplier)] = GetSlideSpeedMultiplier();
     Values[static_cast<int32>(EBreakerAggregatedAttribute::AirControlMultiplier)] = GetAirControlMultiplier();
     Values[static_cast<int32>(EBreakerAggregatedAttribute::DashCooldownReduction)] = GetDashCooldownReduction();
+    Values[static_cast<int32>(EBreakerAggregatedAttribute::AbilityCastRateMultiplier)] = GetAbilityCastRate();
+    Values[static_cast<int32>(EBreakerAggregatedAttribute::AbilityAreaMultiplier)] = GetAbilityArea();
+    Values[static_cast<int32>(EBreakerAggregatedAttribute::AbilityCooldownReduction)] = GetAbilityCooldownReduction();
     Values[static_cast<int32>(EBreakerAggregatedAttribute::FireRateMultiplier)] = GetFireRateMultiplier();
     Values[static_cast<int32>(EBreakerAggregatedAttribute::ResourceCostMultiplier)] = GetResourceCostMultiplier();
     Values[static_cast<int32>(EBreakerAggregatedAttribute::Armor)] = GetArmor();
@@ -331,6 +347,9 @@ void UBreakerAttributeSet::RecomputeAggregatedAttributes()
     WriteAttributeValue(GetSlideSpeedMultiplierAttribute(), SlideSpeedMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::SlideSpeedMultiplier));
     WriteAttributeValue(GetAirControlMultiplierAttribute(), AirControlMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::AirControlMultiplier));
     WriteAttributeValue(GetDashCooldownReductionAttribute(), DashCooldownReduction, Aggregator.Compose(EBreakerAggregatedAttribute::DashCooldownReduction));
+    WriteAttributeValue(GetAbilityCastRateAttribute(), AbilityCastRate, Aggregator.Compose(EBreakerAggregatedAttribute::AbilityCastRateMultiplier));
+    WriteAttributeValue(GetAbilityAreaAttribute(), AbilityArea, Aggregator.Compose(EBreakerAggregatedAttribute::AbilityAreaMultiplier));
+    WriteAttributeValue(GetAbilityCooldownReductionAttribute(), AbilityCooldownReduction, Aggregator.Compose(EBreakerAggregatedAttribute::AbilityCooldownReduction));
 
     // Flat mitigation from gear. Reaches gameplay through
     // UBreakerCombatComponent::GetEffectiveArmor() -> FBreakerDefenseState
@@ -404,6 +423,9 @@ BREAKER_ON_REP(MoveSpeed)
 BREAKER_ON_REP(SlideSpeedMultiplier)
 BREAKER_ON_REP(AirControlMultiplier)
 BREAKER_ON_REP(DashCooldownReduction)
+BREAKER_ON_REP(AbilityCastRate)
+BREAKER_ON_REP(AbilityArea)
+BREAKER_ON_REP(AbilityCooldownReduction)
 BREAKER_ON_REP(FireRateMultiplier)
 BREAKER_ON_REP(ResourceCostMultiplier)
 BREAKER_ON_REP(ClassResourceRegen)

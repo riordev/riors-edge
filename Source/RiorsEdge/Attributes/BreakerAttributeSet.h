@@ -99,6 +99,16 @@ public:
     BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, AirControlMultiplier)
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_DashCooldownReduction, Category="Movement") FGameplayAttributeData DashCooldownReduction;
     BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, DashCooldownReduction)
+    // O266: cast rate as a DIVISOR on the authored wind-up, x1.20 == a 20%
+    // shorter cast. Same shape as DashCooldownReduction directly above and for
+    // the same reason — gear and the Core Tempo nodes must share one additive
+    // bucket, which a stat held in seconds could never do.
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_AbilityCastRate, Category="Abilities") FGameplayAttributeData AbilityCastRate;
+    BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, AbilityCastRate)
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_AbilityArea, Category="Abilities") FGameplayAttributeData AbilityArea;
+    BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, AbilityArea)
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_AbilityCooldownReduction, Category="Abilities") FGameplayAttributeData AbilityCooldownReduction;
+    BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, AbilityCooldownReduction)
 
     // Rounds per minute multiplier. Base 1.0. Consumed by the weapon
     // component's fire timing, so a Fire Rate affix changes cadence rather
@@ -236,6 +246,9 @@ protected:
     UFUNCTION() void OnRep_SlideSpeedMultiplier(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_AirControlMultiplier(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_DashCooldownReduction(const FGameplayAttributeData& OldValue) const;
+    UFUNCTION() void OnRep_AbilityCastRate(const FGameplayAttributeData& OldValue) const;
+    UFUNCTION() void OnRep_AbilityArea(const FGameplayAttributeData& OldValue) const;
+    UFUNCTION() void OnRep_AbilityCooldownReduction(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_FireRateMultiplier(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_ResourceCostMultiplier(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_ClassResourceRegen(const FGameplayAttributeData& OldValue) const;

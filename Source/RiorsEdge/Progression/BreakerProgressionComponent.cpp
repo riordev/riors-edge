@@ -1712,6 +1712,13 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
         // Stored as the divisor (x1.20 == a 20% shorter cooldown), which is the
         // only shape two layers can share one bucket in.
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DashCooldownReduction, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::DashCooldown)]);
+        // O266: Core Tempo's cast-rate nodes join gear in ONE additive bucket.
+        // Read through the attribute from here on, never through node stats
+        // alone — that was the gear-times-tree multiplication bug every other
+        // line in this block exists to prevent.
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::AbilityCastRateMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::AbilityCastRate)]);
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::AbilityAreaMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::AbilityArea)]);
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::AbilityCooldownReduction, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::AbilityCooldown)]);
         OutContribution->AddFlat(EBreakerAggregatedAttribute::Armor, FlatByTarget[static_cast<int32>(EBreakerNodeStatTarget::Armor)]);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::Armor, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::Armor)]);
         // Individual damage More effects were submitted at collection time.

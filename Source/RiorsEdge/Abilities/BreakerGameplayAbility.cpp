@@ -171,7 +171,13 @@ float UBreakerGameplayAbility::ScaledCooldownSeconds(float AuthoredSeconds, floa
 float UBreakerGameplayAbility::AbilityCastRateMultiplierFor(const AActor* OwnerActor)
 {
     const auto* Progression = OwnerActor ? OwnerActor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
-    float Rate = Progression ? Progression->GetNodeStats().AbilityCastRateMultiplier : 1.0f;
+    // O266: the COMPOSED attribute when one exists, so gear and tree share one
+    // additive bucket; node stats remain the fallback for a rig with no
+    // attribute set, which is most of the pure-maths fixtures.
+    const auto* Attributes = OwnerActor ? OwnerActor->FindComponentByClass<UAbilitySystemComponent>() : nullptr;
+    const UBreakerAttributeSet* Set = Attributes ? Attributes->GetSet<UBreakerAttributeSet>() : nullptr;
+    float Rate = Set ? Set->GetAbilityCastRate()
+        : (Progression ? Progression->GetNodeStats().AbilityCastRateMultiplier : 1.0f);
     if (Progression && Progression->GetNodeStats().bCooldownRecoveryAffectsTempo)
     {
         const float Recovery = Progression->GetNodeStats().AbilityCooldownReduction;
@@ -194,6 +200,9 @@ float UBreakerGameplayAbility::AbilityChannelRateMultiplierFor(const AActor* Own
 float UBreakerGameplayAbility::AbilityAreaMultiplierFor(const AActor* OwnerActor)
 {
     const UBreakerProgressionComponent* Progression = OwnerActor ? OwnerActor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    // Composed attribute first: gear and tree in one additive bucket.
+    const auto* AreaASC = OwnerActor ? OwnerActor->FindComponentByClass<UAbilitySystemComponent>() : nullptr;
+    if (const UBreakerAttributeSet* Set = AreaASC ? AreaASC->GetSet<UBreakerAttributeSet>() : nullptr) return Set->GetAbilityArea();
     return Progression ? Progression->GetNodeStats().AbilityAreaMultiplier : 1.0f;
 }
 
@@ -252,6 +261,9 @@ float UBreakerGameplayAbility::AbilityBaseDamageFor(const AActor* OwnerActor, fl
 float UBreakerGameplayAbility::AbilityCooldownReductionFor(const AActor* OwnerActor)
 {
     const UBreakerProgressionComponent* Progression = OwnerActor ? OwnerActor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    const auto* CdASC = OwnerActor ? OwnerActor->FindComponentByClass<UAbilitySystemComponent>() : nullptr;
+    if (const UBreakerAttributeSet* Set = CdASC ? CdASC->GetSet<UBreakerAttributeSet>() : nullptr)
+        return FMath::Max(0.01f, Set->GetAbilityCooldownReduction());
     return Progression ? FMath::Max(0.01f, Progression->GetNodeStats().AbilityCooldownReduction) : 1.0f;
 }
 

@@ -188,6 +188,11 @@ enum class EBreakerStatTarget : uint8
     // Appended at the tail like everything above — this enum is serialized by
     // value into every saved item.
     SkillLevel,
+    // O266: cast rate on gear. APPENDED at the tail like everything above
+    // — this enum is serialized by value into every saved item.
+    AbilityCastRate,
+    AbilityArea,
+    AbilityCooldownReduction,
     Count UMETA(Hidden)
 };
 

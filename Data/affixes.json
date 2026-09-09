@@ -209,6 +209,67 @@
 			"pairedAffixId": ""
 		},
 		{
+			"id": "Ability.Cooldown",
+			"pool": "slice",
+			"displayName": "Ability Cooldown",
+			"category": "Suffix",
+			"target": "AbilityCooldownReduction",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Helmet",
+				"Gloves",
+				"Boots",
+				"Necklace"
+			],
+			"valueAtT12": 4,
+			"valueAtT1": 32,
+			"rollWeight": 55,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Ability.Area",
+			"pool": "slice",
+			"displayName": "Area of Effect",
+			"category": "Prefix",
+			"target": "AbilityArea",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Helmet",
+				"Gloves",
+				"Necklace",
+				"Waist"
+			],
+			"valueAtT12": 3,
+			"valueAtT1": 26,
+			"rollWeight": 50,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Ability.CastSpeed",
+			"pool": "slice",
+			"displayName": "Cast Speed",
+			"category": "Suffix",
+			"target": "AbilityCastRate",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Gloves",
+				"Necklace",
+				"Waist",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 3,
+			"valueAtT1": 24,
+			"rollWeight": 55,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
 			"id": "Core.MaxResource",
 			"pool": "slice",
 			"displayName": "Maximum Resource",
