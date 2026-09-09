@@ -43,11 +43,23 @@ will set rather than as a default nobody asked for. Both magnitudes stay O2.
   exactly one NPC in the world, within a centimetre of the marker, with his
   row resolving in the shipped Data/dialogue.json and his contract in the
   shipped Data/quests.json. A capture tour vantage would photograph him.
-- [ ] Next, same file so a different cycle: two or three more fight pockets
-  (`SpawnFernhallEncounters` is an array bound and two literal blocks), then
-  a cache built from ABreakerFinaleActor's console shape plus the two-line
-  loot roll, placed at a yard-frame fraction like the Breach door so it needs
-  no marker and moves no pinned count.
+- [x] FIVE POCKETS, 4/3/4/3/3 = 17 outdoor (was 11), one elite still. The two
+  added sit OFF THE LANE at 1400 cm lateral — all three originals were on the
+  centreline, so every fight in Fernhall happened in a strip down the middle
+  and the flanks were scenery. Lateral offset also buys separation depth
+  alone could not: the entry band is 7500 cm with fights at 0.25 and 0.70, so
+  a third between them can never be more than ~1690 cm from both.
+- THE XP ECONOMY NOTICED, and the owner ruled the trim. Wave one solves to
+  twelve Skitters; placing all of them took a cleared entry yard from 159 XP
+  to 375, past the 279 that reaches level two — the first contract would have
+  become a reward for something the player had already outgrown. Half the
+  wave reads 267 and the test now asserts the RELATIONSHIP (cleared yard
+  < 279) rather than only the figure, so a future population change that
+  crosses the line fails and says why.
+- [ ] Next, same file so a different cycle: a cache built from
+  ABreakerFinaleActor's console shape plus the two-line loot roll, placed at
+  a yard-frame fraction like the Breach door so it needs no marker and moves
+  no pinned count.
 
 ## The destinations, named (owner, 2026-09-09)
 

@@ -87,8 +87,8 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
         TArray<ABreakerEnemy*> Enemies;
         int32 CourtyardCount = 0, CourtyardMelee = 0, CourtyardLattices = 0;
         TArray<FVector> PocketCenters;
-        PocketCenters.Init(FVector::ZeroVector, 3);
-        int32 PocketCounts[] = { 0, 0, 0 };
+        PocketCenters.Init(FVector::ZeroVector, 5);
+        int32 PocketCounts[] = { 0, 0, 0, 0, 0 };
         int32 Elites = 0;
         int32 SubstationMelee = 0, SubstationWardens = 0, SubstationSkirmishers = 0, EntryLattices = 0;
         ABreakerEnemy* SubstationSkirmisher = nullptr;
@@ -102,7 +102,7 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
             TestFalse(TEXT("Outdoor enemy cannot complete a rift"), Enemy->IsRiftTerminator());
             Elites += Enemy->GetMonsterRank() != EBreakerMonsterRank::Trash ? 1 : 0;
             int32 Pocket = INDEX_NONE;
-            for (int32 Index = 0; Index < 3; ++Index)
+            for (int32 Index = 0; Index < 5; ++Index)
                 if (Enemy->Tags.Contains(FName(*FString::Printf(TEXT("Fernhall.Outdoor.%d"), Index)))) Pocket = Index;
             if (!TestTrue(TEXT("Every body belongs to an authored pocket or courtyard"), Pocket != INDEX_NONE || bCourtyard)) return false;
             if (bCourtyard)
@@ -141,19 +141,48 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
             TestTrue(TEXT("Arrival is outside every patrol's detection range"),
                 FVector::Dist2D(Player->GetActorLocation(), Enemy->GetActorLocation()) > Enemy->GetDetectionRange());
         }
-        if (!TestEqual(TEXT("Eleven existing enemies populate each fresh visit"), Enemies.Num(), 11)) return false;
+        AddInfo(FString::Printf(TEXT("FERNHALL POCKETS  total %d, per pocket %d/%d/%d/%d/%d, elites %d"),
+            Enemies.Num(), PocketCounts[0], PocketCounts[1], PocketCounts[2], PocketCounts[3], PocketCounts[4], Elites));
+        // 11 -> 17. Before this the persistent world held fifteen bodies and a
+        // player crossed two 106 m yards meeting three fights; the far half of
+        // each yard was walked and never contested. The added six are HALF of
+        // wave one of the same solved budget — plain Skitters, no Lattice, no
+        // Skirmisher, no Warden, no elite — so the two fights that carry a rank
+        // are still pockets 1 and 2 and the new ground is the space between.
+        //
+        // Half rather than all twelve because the XP economy noticed: placing
+        // the whole wave took a cleared entry yard from 159 XP to 375, past
+        // the 279 that reaches level two, which would have made the first
+        // contract a reward for something the player had already outgrown.
+        if (!TestEqual(TEXT("Seventeen outdoor enemies populate each fresh visit"), Enemies.Num(), 17)) return false;
         TestEqual(TEXT("Four additional courtyard enemies"), CourtyardCount, 4);
         TestEqual(TEXT("Three ordinary courtyard melee"), CourtyardMelee, 3);
         TestEqual(TEXT("One courtyard Lattice"), CourtyardLattices, 1);
         TestEqual(TEXT("Roster retains one elite for the initial contract"), Elites, 1);
-        const int32 ExpectedCounts[] = { 4, 3, 4 };
-        for (int32 Index = 0; Index < 3; ++Index)
+        const int32 ExpectedCounts[] = { 4, 3, 4, 3, 3 };
+        for (int32 Index = 0; Index < 5; ++Index)
         {
             if (!TestEqual(TEXT("Distinct pocket roster"), PocketCounts[Index], ExpectedCounts[Index])) return false;
             PocketCenters[Index] /= PocketCounts[Index];
         }
         TestTrue(TEXT("Entry fights occupy separate combat spaces"), FVector::Dist2D(PocketCenters[0], PocketCenters[1]) > 2500);
         TestTrue(TEXT("Substation encounter occupies its own yard"), FVector::Dist2D(PocketCenters[1], PocketCenters[2]) > 4000);
+        // The two added pockets are their own ground, not a second body of an
+        // existing fight. 1800 cm is a formation's own width rather than a
+        // round number: the grid is three wide on the pocket's spacing, so
+        // closer than that and two pockets interleave into one fight.
+        //
+        // NOT a detection-range test, and it was written as one first. 2200 cm
+        // detection is player-to-enemy; two pockets inside it do not merge,
+        // they mean a fight can SPILL into its neighbour — which in a
+        // destination is a feature and is the owner's to judge, not a rule to
+        // assert here.
+        TestTrue(TEXT("The entry yard's off-lane pocket is its own ground"),
+            FMath::Min(FVector::Dist2D(PocketCenters[3], PocketCenters[0]),
+                       FVector::Dist2D(PocketCenters[3], PocketCenters[1])) > 1800);
+        TestTrue(TEXT("The substation's off-lane pocket is its own ground"),
+            FVector::Dist2D(PocketCenters[4], PocketCenters[2]) > 1800);
+        TestTrue(TEXT("Rank still sits in exactly one outdoor fight"), Elites == 1);
 
         // THE CONTRACT GIVER, ON THE MARKER THE COMPOSER SHIPPED. The yard
         // authored marker_npc_contract, the loader validated it, and nothing
@@ -240,7 +269,18 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
             TestTrue(TEXT("Actual outdoor enemy dies to combat damage"),
                 Enemy->FindComponentByClass<UBreakerCombatComponent>()->ReceiveDamage(Kill).bKilled);
         }
-        TestEqual(TEXT("Original entry kills retain exact natural XP"), Player->GetProgression()->GetProgressionState().TotalExperience - XpBefore, 159);
+        // 159 -> 267 as the yard gained six bodies. THE NUMBER IS NOT THE
+        // POINT; the threshold under it is. 279 XP reaches level two, so a
+        // cleared yard must stay BELOW that or the first contract's turn-in
+        // stops being what levels the player and becomes a reward for
+        // something they had already outgrown. Placing all twelve of wave
+        // one read 375 and broke exactly that, which is why the pockets carry
+        // three each. Assert the relationship, not just the figure — a future
+        // population change that crosses the line should fail here and say so.
+        const int32 ClearedYardXp = Player->GetProgression()->GetProgressionState().TotalExperience - XpBefore;
+        TestEqual(TEXT("Entry kills retain their natural XP"), ClearedYardXp, 267);
+        TestTrue(TEXT("A cleared yard still leaves level two to the contract's turn-in"),
+            ClearedYardXp < 279);
         if (Visit == 0)
         {
             TestTrue(TEXT("Entry encounters complete the accepted spill objective"), Journal->HasFlag(TEXT("Quest.FirstContract.SpillThinned")));
@@ -266,8 +306,8 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
             CourtyardAfterRepeat += It->Tags.Contains(TEXT("Fernhall.Outdoor.Courtyard")) ? 1 : 0;
         }
         TestEqual(TEXT("Repeated startup preserves courtyard quartet"), CourtyardAfterRepeat, 4);
-        TestEqual(TEXT("Repeated startup preserves original population"), AfterRepeat - CourtyardAfterRepeat, 11);
-        TestEqual(TEXT("Repeated startup preserves original eleven plus courtyard four"), AfterRepeat, 15);
+        TestEqual(TEXT("Repeated startup preserves the outdoor population"), AfterRepeat - CourtyardAfterRepeat, 17);
+        TestEqual(TEXT("Repeated startup preserves seventeen outdoor plus courtyard four"), AfterRepeat, 21);
         TestFalse(TEXT("Clearing outdoor encounters never starts waves"), Mode->IsWaveActive());
     }
     return true;

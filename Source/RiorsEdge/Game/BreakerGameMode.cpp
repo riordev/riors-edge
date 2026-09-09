@@ -3932,12 +3932,45 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
     // the visible patrols exist before the player rounds the corner.
     const FBreakerWaveComposition Roster = UBreakerWaveBudgetLibrary::SolveWave(
         2, 1, UBreakerWaveBudgetLibrary::MakeRiftWaveBudget(3));
-    const FName Yards[] = { NAME_None, NAME_None, FName(TEXT("substation")) };
-    const float Fractions[] = { 0.25f, 0.70f, 0.50f }; // O2 placeholder placement within validated bands.
+    // A SECOND SOLVED WAVE, for the two pockets the yards did not have. The
+    // roster stays SOLVED rather than authored — hand-placing bodies to make a
+    // place feel busy is how a destination stops agreeing with the budget the
+    // rest of the game is measured against.
+    //
+    // WAVE ONE, not three. Three is the boss wave of this budget and solves to
+    // no trash at all, which is exactly what the first attempt placed: two
+    // empty pockets and a yard that looked identical. Wave one is twelve plain
+    // Skitters with no Lattice, Skirmisher, Warden or elite in it — the right
+    // shape for the ground between the set pieces, and the reason the two
+    // fights that carry a rank stay pockets 1 and 2.
+    const FBreakerWaveComposition Second = UBreakerWaveBudgetLibrary::SolveWave(
+        1, 1, UBreakerWaveBudgetLibrary::MakeRiftWaveBudget(3));
+    // FIVE POCKETS, THREE IN THE ENTRY YARD AND TWO IN THE SUBSTATION. Before
+    // this the whole persistent world held fifteen bodies and a player crossed
+    // two 106 m yards meeting three fights; the far half of each yard was
+    // walked and never contested. Fractions are spread across the validated
+    // band rather than clustered, so the ground between them is the reason to
+    // keep moving. All O2 PLACEHOLDER.
+    const FName Yards[] = { NAME_None, NAME_None, FName(TEXT("substation")),
+                            NAME_None, FName(TEXT("substation")) };
+    const float Fractions[] = { 0.25f, 0.70f, 0.50f, 0.45f, 0.80f };
+    // OFF THE LANE, and that is the point of the two new ones. The original
+    // three sit on the yard's centreline, so the whole fight of Fernhall
+    // happened in a strip down the middle and the flanks were scenery you ran
+    // past. A yard band is 4000 cm wide against a 1800 cm dash corridor, so
+    // 1400 puts a pocket clear of the corridor and still well inside the band
+    // — genuinely different ground, reached by leaving the lane.
+    //
+    // It also buys the separation that depth alone could not: the entry band
+    // is 7500 cm with fights already at 0.25 and 0.70, so a third between
+    // them can never be more than ~1690 cm from both. Lateral offset makes
+    // that distance two-dimensional. All O2 PLACEHOLDER.
+    const float Laterals[] = { 0.0f, 0.0f, 0.0f, 1400.0f, -1400.0f };
+    constexpr int32 PocketCount = 5;
     TArray<FBreakerZonePiece> YardPieces;
     UBreakerZoneBuilder::CollectZonePieces(UBreakerZoneBuilder::FernhallMeshFolder(), YardPieces);
     int32 Spawned = 0;
-    for (int32 Pocket = 0; Pocket < 3; ++Pocket)
+    for (int32 Pocket = 0; Pocket < PocketCount; ++Pocket)
     {
         FVector2D Origin2D, Forward2D;
         if (!UBreakerZoneBuilder::YardFrame(Markers, Yards[Pocket], Origin2D, Forward2D))
@@ -3949,7 +3982,8 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
         const FVector Right = FVector::CrossProduct(FVector::UpVector, Forward);
         const FBreakerCoverFieldParams Field = UBreakerZoneBuilder::FernhallFieldParams(Yards[Pocket]);
         const FVector Center = FVector(Origin2D.X, Origin2D.Y, 0)
-            + Forward * FMath::Lerp(Field.BandNearCm, Field.BandFarCm, Fractions[Pocket]);
+            + Forward * FMath::Lerp(Field.BandNearCm, Field.BandFarCm, Fractions[Pocket])
+            + Right * Laterals[Pocket];
         const int32 AreaLevel = UBreakerZoneBuilder::FernhallRiftFor(Yards[Pocket]).EffectiveAreaLevel();
         int32 Placement = 0;
         auto Spawn = [&](TSubclassOf<ABreakerEnemy> Class, bool bElite)
@@ -4035,8 +4069,23 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
             for (int32 Index = 0; Index < 2; ++Index) Spawn(ABreakerEnemy::StaticClass(), false);
             for (int32 Index = 0; Index < Roster.Skirmishers; ++Index) Spawn(ABreakerSkirmisherEnemy::StaticClass(), false);
         }
+        // The second wave's melee, split between the two yards' quiet halves.
+        // Deliberately no Warden and no elite out here: the two fights that
+        // carry a rank already stand at pockets 1 and 2, and a destination
+        // whose every pocket is a set piece has no shape to it.
+        // THREE EACH, NOT SIX, AND THE REASON IS THE XP ECONOMY. Wave one
+        // solves to twelve Skitters and placing all of them took a cleared
+        // entry yard from 159 XP to 375 — past the 279 that reaches level two,
+        // so the first contract stopped being the thing that levels you and
+        // became a reward for something you had already outgrown. Half the
+        // wave keeps the pacing the campaign was tuned against while still
+        // nearly doubling what stands in the world. Owner-ruled. O2.
+        const int32 PerQuietPocket = Second.Skitters / 4;
+        if (Pocket == 3 || Pocket == 4)
+            for (int32 Index = 0; Index < PerQuietPocket; ++Index)
+                Spawn(ABreakerEnemy::StaticClass(), false);
     }
-    UE_LOG(LogTemp, Display, TEXT("[Fernhall] %d finite outdoor enemies placed across three pockets; no wave controller."), Spawned);
+    UE_LOG(LogTemp, Display, TEXT("[Fernhall] %d finite outdoor enemies placed across %d pockets; no wave controller."), Spawned, PocketCount);
     BreakerFernhallCourtyard::FPlan Courtyard;
     FString CourtyardError;
     if (BreakerFernhallCourtyard::MakePlan(YardPieces, Courtyard, CourtyardError))
