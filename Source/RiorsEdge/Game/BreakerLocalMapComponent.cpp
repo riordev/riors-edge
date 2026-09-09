@@ -1,5 +1,7 @@
 #include "Game/BreakerLocalMapComponent.h"
 #include "Game/BreakerPrototypeDestinations.h"
+#include "Game/BreakerContainmentHunt.h"
+#include "Combat/BreakerEnemy.h"
 #include "Interaction/BreakerFernhallCache.h"
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
@@ -30,6 +32,14 @@ FText UBreakerLocalMapComponent::GetCampaignObjective() const
 {
     if (const auto* Prototype=BreakerPrototypeDestinations::ForWorld(this))
     {
+        if (Prototype->Id==TEXT("StationZero"))
+        {
+            const auto* Player=Cast<ABreakerCharacter>(GetOwner());
+            const bool bComplete=Player && Player->GetQuestJournal() && Player->GetQuestJournal()->HasFlag(UBreakerContainmentHunt::CompletionFlag());
+            return FText::FromString(bComplete
+                ? TEXT("Containment Custodian eliminated. Return to Anchor 13 from either travel gate; supply lockers are optional.")
+                : TEXT("Hunt the Containment Custodian in the Containment Laboratory (fixed area 28). Supply lockers are optional."));
+        }
         int32 Recovered=0;
         for (TActorIterator<ABreakerFernhallCache> It(GetWorld());It;++It)
             if (It->ActorHasTag(TEXT("PrototypeDestination.Cache")) && It->IsOpened()) ++Recovered;
@@ -88,6 +98,18 @@ TArray<FBreakerLocalMapMarker> UBreakerLocalMapComponent::GetMarkers() const
             : FString::Printf(TEXT("%s.%d.%d.%d"), *It->GetClass()->GetName(), FMath::RoundToInt(Position.X), FMath::RoundToInt(Position.Y), FMath::RoundToInt(Position.Z));
         Marker.Id = FName(*(Region + TEXT(".site.") + Site));
     }
+    const auto* HuntPlayer=Cast<ABreakerCharacter>(GetOwner());
+    const bool bHuntDone=HuntPlayer && HuntPlayer->GetQuestJournal() && HuntPlayer->GetQuestJournal()->HasFlag(UBreakerContainmentHunt::CompletionFlag());
+    if (!bHuntDone)
+        for (TActorIterator<ABreakerEnemy> It(World);It;++It)
+        {
+            if (!IsValid(*It) || !It->ActorHasTag(UBreakerContainmentHunt::TargetTag())) continue;
+            const auto* Combat=It->FindComponentByClass<UBreakerCombatComponent>();
+            if (!Combat || Combat->IsDead()) continue;
+            auto& Marker=Out.AddDefaulted_GetRef();Marker.Id=UBreakerContainmentHunt::TargetTag();
+            Marker.Label=FText::FromString(TEXT("Containment Custodian"));Marker.Detail=FText::FromString(TEXT("Priority target / fixed area 28"));
+            Marker.Location=It->GetActorLocation();Marker.bObjective=true;
+        }
     for (TActorIterator<ABreakerFernhallCache> It(World);It;++It)
     {
         if (!IsValid(*It) || !It->ActorHasTag(TEXT("PrototypeDestination.Cache")) || It->IsOpened()) continue;
@@ -96,7 +118,8 @@ TArray<FBreakerLocalMapMarker> UBreakerLocalMapComponent::GetMarkers() const
         if (Site.IsNone()) continue;
         auto& Marker=Out.AddDefaulted_GetRef(); Marker.Id=Site;
         Marker.Label=It->GetDisplayName(); Marker.Detail=It->GetCachePrompt(); Marker.Location=It->GetActorLocation();
-        Marker.bObjective=true;
+        const auto* Destination=BreakerPrototypeDestinations::ForWorld(this);
+        Marker.bObjective=!Destination || Destination->Id!=TEXT("StationZero");
     }
     for (TActorIterator<ABreakerNPC> It(World); It; ++It)
     {

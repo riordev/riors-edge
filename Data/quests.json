@@ -48,7 +48,8 @@
 		"Quest.Watch.Offered",
 		"Quest.Watch.Accepted",
 		"Quest.Watch.FlankCleared",
-		"Quest.Watch.TurnedIn"
+		"Quest.Watch.TurnedIn",
+		"Quest.StationZero.CustodianDown"
 	],
 	"quests": [
 		{

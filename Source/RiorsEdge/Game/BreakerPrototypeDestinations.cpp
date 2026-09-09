@@ -1,4 +1,5 @@
 #include "Game/BreakerPrototypeDestinations.h"
+#include "Game/BreakerContainmentHunt.h"
 #include "Game/BreakerEnvironmentDressing.h"
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerRangedEnemy.h"
@@ -30,7 +31,7 @@ const TArray<BreakerPrototypeDestinations::FDefinition>& BreakerPrototypeDestina
             {FVector(2200,0,0), FVector(8500,2000,0), FVector(15000,-500,0)},
             {TEXT("Scorched Fields"), TEXT("Burned Homestead"), TEXT("Impact Basin")}, {12,14,16}},
         {TEXT("StationZero"), TEXT("Lvl_StationZero"), TEXT("Station Zero"),
-            TEXT("Prototype destination / fixed areas 24-28. Enter an overrun research hub through reception, specimen gardens and the containment laboratory. Recover district supply lockers; either gate returns to Anchor 13."),
+            TEXT("Prototype destination / fixed areas 24-28. Enter an overrun research hub through reception, specimen gardens and the containment laboratory. Hunt the Containment Custodian in the laboratory; supply lockers are optional. Either gate returns to Anchor 13."),
             {FVector(2000,0,0), FVector(8000,-1200,0), FVector(12500,3600,0)},
             {TEXT("Research Reception"), TEXT("Specimen Gardens"), TEXT("Containment Laboratory")}, {24,26,28}}
     };
@@ -260,6 +261,9 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
             Enemy->SetActorLocation(Stand);
             Enemy->ConfigureEncounter(Stand,Index*1.3f);
             Enemy->Tags.Add(FName(*FString::Printf(TEXT("Destination.%s.Pocket.%d"),*Id.ToString(),Pocket)));
+            // O2 PLACEHOLDER authored target assignment: the laboratory Warden
+            // is the Containment Custodian; five surrounding guards are optional.
+            if (!bBasin && Pocket==2 && Index==3) UBreakerContainmentHunt::AttachTo(Enemy);
             UBreakerKillTelemetryComponent::AttachTo(Enemy);
             Guards.Add(Enemy); Result.Enemies.Add(Enemy);
         }

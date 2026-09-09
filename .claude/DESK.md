@@ -7,7 +7,7 @@ Continue validated blocks until the owner returns. Prioritize playable changes f
 ## Immediate queue
 
 1. Cooperative sandbox landed with real host/guest fire and replicated health/death evidence. Owner slot metadata and guest health/input respawn transport now verified; remaining acceptance: predicted ability effects/costs, drop contention, rejoin, human presentation/movement feel and eventual campaign support.
-2. Red Basin/Station Zero prototypes landed; next content acceptance is varied mission beats and real return Rifts. Refine exposed boundaries and repeated cover. Anchor surroundings/work-area dressing landed but remains blockout art.
+2. Red Basin/Station Zero prototypes and Station priority hunt landed; next content acceptance is Red Basin recovery/extraction and real return Rifts. Refine exposed boundaries and repeated cover. Anchor surroundings/work-area dressing landed but remains blockout art.
 3. Volatile countdown and ability-menu wrapping/empty-label fixes landed with rendered checks. Continue interactive focus/death flow and other menu screens.
 4. Finish remaining Afterimage consumers and real-clock Rot feedback checks. Cache prompt now shares opening eligibility and stays visible at the console; final prop art remains.
 5. Kit expansion under O252â€“O260: current34 registered entries are11 actives and10 passives short of55. Carom, Coup, Backstep, Pyre, Riftlance, Recall, Bulwark and Overwatch are named candidates without sufficient authored mechanics in the current docs. Rover/Barrel need new mechanics; Wildcard has O257 but needs Forge/foreign-grant/resource infrastructure. Do not fill the count with clones or call existing innate nodes slot passives.
@@ -62,13 +62,13 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 
 ## Latest validated baseline
 
-Current local build/full suite:854 passing,3 expected failures,0 unexpected; native census remains current for unchanged authoring. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
+Current local build/full suite:855 passing,3 expected failures,0 unexpected; native census refreshed for the Station hunt flag. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
 
 ## Recent delivered changes
 
 - Full22-wedge Core remains active. Paid Afterimage Hold/Sightline and Survivor Core-point delivery have runtime coverage.
 - Warden revival, Provoke/Standing Order, Swift starter migration, numeric ability authority and existing-item migration protection landed.
-- Fernhall guarded physical cache; Red Basin/Station Zero fixed-region prototype districts, local maps and real return gates landed.
+- Fernhall guarded physical cache; Red Basin/Station Zero fixed-region prototype districts, local maps and real return gates landed. Station Zero now has a persistent priority hunt with optional lockers.
 - Anchor gatehouses/service-yard dressing, boss/Volatile occlusion cues, ability-menu wrapping, empty-label removal and cache prompt clarity were inspected in rendered captures.
 - Cleave cost/tempo improved native sustained output; direct/periodic split is next before coefficient tuning.
 - Cooperative sandbox now verifies owner metadata, actual weapon damage, guest lethal/server respawn and client input restoration with isolated saves. Optional early screenshot capture is parked; no rendered death acceptance claim.

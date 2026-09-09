@@ -170,7 +170,7 @@ bool FBreakerQuestsFreshTest::RunTest(const FString& Parameters)
     int32 ObjectiveCount = 0;
     for (const FBreakerQuestDefinition& Quest : Quests) { ObjectiveCount += Quest.Objectives.Num(); }
     TestEqual(TEXT("Fifteen objectives including rescue and finale"), ObjectiveCount, 15);
-    TestEqual(TEXT("Forty-nine registered flags"), Flags.Num(), 49);
+    TestEqual(TEXT("Fifty registered flags including Station Zero hunt completion"), Flags.Num(), 50);
     TestTrue(TEXT("A quest flag is registered"), UBreakerQuestLibrary::IsRegisteredFlag(BreakerQuestFlags::FirstContractTurnedIn));
     TestFalse(TEXT("A progress counter is not a registered flag"), UBreakerQuestLibrary::IsRegisteredFlag(BreakerQuestFlags::FirstContractKillCounter));
     AddInfo(FString::Printf(TEXT("Quest registry: %d quests, %d objectives, %d flags"), Quests.Num(), ObjectiveCount, Flags.Num()));
