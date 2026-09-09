@@ -463,7 +463,33 @@ void ABreakerPlaytestHUD::DrawHUD()
     {
         // Harm is instant: full-bleed edge lines, no inset, no fade in.
         const FLinearColor DamageColor = BreakerUI::Alpha(BreakerUI::Harm, 0.85f);
-        DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudCalloutDamage), Center.X, Center.Y - S(80.0f), DamageColor, 16.0f, 1.0f, ESpecFontRole::Display);
+        const FString DamageLabel = BreakerStrings::Get(EBreakerStringKey::HudCalloutDamage);
+        const FVector2D DamageLabelSize = MeasureSpecText(DamageLabel, 16.0f, ESpecFontRole::Display);
+        const float LabelLeft = Center.X - DamageLabelSize.X * .5f;
+        const float LabelRight = Center.X + DamageLabelSize.X * .5f;
+        float DamageLabelY = Center.Y - S(80.0f);
+        // The player-damage callout shares screen space with enemy status rows.
+        // Move above their actual measured bounds, including any newly crossed
+        // row; never overwrite the Rot timer with this independent HUD pass.
+        for (int32 Pass = 0; Pass < EnemyPlateBounds.Num(); ++Pass)
+        {
+            bool bMoved = false;
+            for (const FBox2D& Taken : EnemyPlateBounds)
+            {
+                if (LabelLeft < Taken.Max.X && LabelRight > Taken.Min.X
+                    && DamageLabelY < Taken.Max.Y && DamageLabelY + DamageLabelSize.Y > Taken.Min.Y)
+                {
+                    DamageLabelY = Taken.Min.Y - S(BreakerUI::Space8) - DamageLabelSize.Y;
+                    bMoved = true;
+                }
+            }
+            if (!bMoved) break;
+        }
+        // If no on-screen slot remains, the unchanged full-screen harm frame
+        // still announces the hit; do not clip the text at the viewport edge.
+        if (LabelLeft >= 0 && LabelRight <= Canvas->ClipX && DamageLabelY >= 0
+            && DamageLabelY + DamageLabelSize.Y <= Canvas->ClipY)
+            DrawSpecTextCentered(DamageLabel, Center.X, DamageLabelY, DamageColor, 16.0f, 1.0f, ESpecFontRole::Display);
         const float T = S(4.0f);
         DrawRect(DamageColor, 0.0f, 0.0f, Canvas->ClipX, T);
         DrawRect(DamageColor, 0.0f, Canvas->ClipY - T, Canvas->ClipX, T);
