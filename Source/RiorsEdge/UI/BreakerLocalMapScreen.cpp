@@ -164,7 +164,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildLocalMapScreen()
         }
     }
     Body->AddSlot().AutoHeight()
-    [SNew(SBox).HeightOverride(520)
+    // The canvas yields to the travel list. In an instance there is ONE row and
+    // the map keeps its full height; in the Anchor there are seven, and a fixed
+    // canvas pushed the map's own footer and BACK off the plate — which nobody
+    // saw until the capture harness could finally photograph the hub. The floor
+    // keeps the map legible rather than letting it collapse to a strip.
+    [SNew(SBox).HeightOverride(FMath::Clamp(520.0f - Offered.Num() * 62.0f, 240.0f, 520.0f))
         [SNew(SHorizontalBox)
             + SHorizontalBox::Slot().FillWidth(1).Padding(0,0,20,0)[SNew(SBreakerLocalMapCanvas).Player(Player)]
             + SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(260)[SNew(SScrollBox) + SScrollBox::Slot()[List]]]]];

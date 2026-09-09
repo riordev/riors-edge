@@ -502,6 +502,17 @@ void ABreakerCharacter::SaveGameState()
     {
         return;
     }
+    // A MENU CAPTURE REFUSES THE SAME WAY, and it has to now. The front-end
+    // guard below covered every capture run for free while captures were
+    // stranded in the front end; once they travel to a real map that guard
+    // stops applying, and ue-capture.sh passes no -UserDir, so the write
+    // would land in the OWNER'S save directory. A photograph must never
+    // persist anything.
+    FString CaptureScreenScratch;
+    if (FParse::Value(FCommandLine::Get(), TEXT("BreakerCaptureMenu="), CaptureScreenScratch))
+    {
+        return;
+    }
     // A FRONT-END pawn with no character has nothing worth persisting: its
     // state is BeginPlay's fresh seeding, and writing it to the legacy slot
     // is what AdoptLegacySaveIfPresent later adopts into an empty roster as a
@@ -2410,19 +2421,35 @@ void ABreakerCharacter::ShowInitialMenu()
         {
             DestinationMap = FName(*Prototype->MapName);
         }
+        else if (bAutoPlayValue && AutoPlayDestination.Equals(TEXT("FrontEnd"), ESearchCase::IgnoreCase))
+        {
+            // The title screens are photographed WHERE THE PLAYER MEETS THEM.
+            // Before the reorder below this needed no row, because naming a
+            // capture screen cancelled the travel and every run stayed here by
+            // accident. Now that travel wins, staying has to be asked for.
+            DestinationMap = FName(UBreakerGameInstance::FrontEndMapName());
+        }
         else if (bAutoPlayValue && !AutoPlayDestination.Equals(TEXT("Anchor"), ESearchCase::IgnoreCase))
         {
             UE_LOG(LogTemp, Warning, TEXT("[BreakerAutoPlay] Unknown destination '%s'; landing in the Anchor."), *AutoPlayDestination);
         }
-        UE_LOG(LogTemp, Display, TEXT("[BreakerAutoPlay] Skipping the title menu; travelling to %s."), *DestinationMap.ToString());
-        // ...unless a capture run asked for a specific screen, in which case
-        // the whole point is to be sitting on it.
-        FString CaptureScreen;
-        if (FParse::Value(FCommandLine::Get(), TEXT("BreakerCaptureMenu="), CaptureScreen) && !CaptureScreen.IsEmpty())
-        {
-            OpenMenuScreenForCapture(CaptureScreen);
-        }
-        else if (UBreakerGameInstance::IsFrontEndMap(this))
+        // TRAVEL WINS, AND THE CAPTURE SCREEN OPENS ON THE FAR SIDE.
+        //
+        // These two were the arms of one if / else-if, with the capture arm
+        // FIRST — so naming a screen CANCELLED the travel and every menu frame
+        // ever taken was photographed in the empty front end. The desk read the
+        // log line below as a travel losing a race; it is neither. It printed
+        // unconditionally above the branch, so it announced a journey that the
+        // very next line refused to make.
+        //
+        // Nothing here waits, and adding a wait would be a no-op: arrival cover
+        // is only ever raised by a travel, so on the old path IsArrivalCoverUp()
+        // was false for the entire run. The destination pawn re-enters this
+        // function on its own — ShouldShowInitialMenu is "front end OR no active
+        // character", and an autoplay run never adopts one — and the arriving
+        // map re-arms its own frame schedule well after the cover clears.
+        if (UBreakerGameInstance::IsFrontEndMap(this)
+            && DestinationMap != FName(UBreakerGameInstance::FrontEndMapName()))
         {
             // "Entering the gym" has to be a TRAVEL now. This branch predates
             // the map split: in the one-map world, suppressing the menu left
@@ -2433,7 +2460,15 @@ void ABreakerCharacter::ShowInitialMenu()
             // green. The menu's own play path is one TravelTo, so autoplay
             // takes exactly that step itself, to the destination resolved
             // above.
+            UE_LOG(LogTemp, Display, TEXT("[BreakerAutoPlay] Skipping the title menu; travelling to %s."), *DestinationMap.ToString());
             UBreakerGameInstance::TravelTo(this, DestinationMap);
+            return;
+        }
+        // Arrived, or asked to stay: now the run can sit on its screen.
+        FString CaptureScreen;
+        if (FParse::Value(FCommandLine::Get(), TEXT("BreakerCaptureMenu="), CaptureScreen) && !CaptureScreen.IsEmpty())
+        {
+            OpenMenuScreenForCapture(CaptureScreen);
         }
         return;
     }
