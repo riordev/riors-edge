@@ -37,9 +37,8 @@ enum class EBreakerWorldPointDelivery : uint8
     // Reconstructing a Rior fragment. One-time, and the capability is the
     // point; the Core Point rides along.
     Fragment,
-    // First-clear of a rift archetype, grouped. NOT one grant per archetype —
-    // see the note on the two grouped entries below, which is a live owner
-    // question rather than a settled shape.
+    // O117: two grouped first-clear grants across eight Rift archetypes,
+    // not one Core Point per archetype.
     Archetype,
     // Completing an Act III erased Earth.
     Zone
@@ -77,12 +76,6 @@ struct RIORSEDGE_API FBreakerWorldPointSource
     // character with a permanent class is unrecoverable.
     UPROPERTY(BlueprintReadOnly) bool bMissable = false;
 
-    // AUTHORING INTENT ONLY, AND NO LONGER COUNTED. CountWithBuiltTrigger
-    // derives the real figure from whether a mission beat names this source,
-    // because a bool a human sets by hand is a claim about the code rather
-    // than a measurement of it — this one said fourteen were missing while
-    // all fifteen were, for as long as the grant had no caller.
-    UPROPERTY(BlueprintReadOnly) bool bTriggerBuilt = false;
 };
 
 UCLASS()
@@ -105,8 +98,8 @@ public:
     UFUNCTION(BlueprintPure, Category="Progression|WorldPoints")
     static bool IsKnownSource(FName SourceId);
 
-    // How many of the fifteen a build can actually reach today. The difference
-    // between this and fifteen is the campaign's payout gap, as a number.
+    // Number of canon sources referenced by mission Unlock.CorePoint beats.
+    // Actual trigger delivery and player reachability require runtime checks.
     UFUNCTION(BlueprintPure, Category="Progression|WorldPoints")
     static int32 CountWithBuiltTrigger();
 };

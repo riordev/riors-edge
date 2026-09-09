@@ -11,7 +11,7 @@ Continue validated blocks until the owner returns. Prioritize playable changes f
 3. Volatile countdown and ability-menu wrapping/empty-label fixes landed with rendered checks. Inventory destruction prose now wraps within its plate and failed single-item removal reports failure. Continue interactive focus/death flow and other menu screens.
 4. Finish remaining Afterimage consumers and real-clock Rot feedback checks. Cache prompt now shares opening eligibility and stays visible at the console; final prop art remains.
 5. Kit expansion under O252–O260: current34 registered entries are11 actives and10 passives short of55. Carom, Coup, Backstep, Pyre, Riftlance, Recall, Bulwark and Overwatch are named candidates without sufficient authored mechanics in the current docs. Rover/Barrel need new mechanics; Wildcard has O257 but needs Forge/foreign-grant/resource infrastructure. Do not fill the count with clones or call existing innate nodes slot passives.
-6. World Core Point coverage is already derived from mission Unlock.CorePoint references; verify remaining uncovered sources against actual flag delivery before changing content.
+6. World Core Point coverage counts mission Unlock.CorePoint references. Four of15 sources are authored; the remaining11 are unmapped content, not eleven broken wallet writes. Startup and flag delivery already settle grants. Assign real source/objective identities before adding any grant; do not award a named source from a merely similar mission.
 
 ## Seven-step acceptance checklist
 
@@ -65,25 +65,13 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 - Native starter diagnostic: after separating accepted direct and periodic damage, Cleave coefficient1.5→2.4 brings seconds10–20 rifle ratios to0.935/0.962 at levels1/20. This is stationary close-range weapon-derived Cleave, not general Ability-pool parity. Earned Fracture has independent Ability-pool evidence. Rifles exhaust initial ammunition during20–30s, so late totals cannot establish parity; see Docs/reports/cleave-tempo-2026-09-09.md.
 - Core offers429/65=6.6x; closed22-wedge ring is active. Do not reopen retired hub-entry or2.63x questions.
 - Potential future ultimate redesign (Unmake as a decisive event) and skill-level stacking cap need explicit design treatment; retain current rules meanwhile.
+- Gear ResourceOnKill currently pays immediately through the attribute bank outside Mana::GrantMana conditional metering; its suspension runtime test explicitly expects this payment. Should gear kill income remain immediate or join the capped queue? Keep current behavior until ruled; this is not a confirmed defect.
 - Anchor13's name alone does not establish twelve other settlements.
 
 ## Latest validated baseline
 
 Current local build/full suite:860 passing,3 expected failures,0 unexpected; native census refreshed for52 quest flags and current ability declarations. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
 
-## Recent delivered changes
+## Playtest handoff
 
-- Full22-wedge Core remains active. Paid Afterimage Hold/Sightline/Slipcut/Overdrive/Cadence Break/Hard Stop and Survivor Core-point delivery have runtime coverage; removing inactive Slipcut, Overdrive, Cadence Break or Hard Stop now immediately revokes its remaining window/tail contributions. Hard Stop numerical protection halves in its tail; Spend to Live immunity ends normally.
-- Warden revival, Provoke/Standing Order, Swift starter migration, numeric ability authority and existing-item migration protection landed.
-- Fernhall guarded physical cache; Red Basin/Station Zero/Port Meridian/Broken Coast/Shatterpoint fixed-region prototype districts, local maps and real return gates landed. Station Zero now has a persistent priority hunt; Red Basin has recorder recovery/extraction, both with optional supply lockers.
-- Anchor gatehouses/service-yard dressing, boss/Volatile occlusion cues, ability-menu wrapping, empty-label removal and cache prompt clarity were inspected in rendered captures.
-- Cleave cost/tempo and measured direct coefficient now reach roughly94–96% of rifle starter throughput at close range. Ability rows retain their O2 declaration through census export.
-- Cooperative sandbox now verifies owner metadata, actual weapon damage, guest lethal/server respawn and client input restoration with isolated saves. Optional early screenshot capture is parked; no rendered death acceptance claim.
-
-- Fernhall perimeter pipeworks/foliage and selective material-compatible Nanite fallback landed. Nine rendered frames inspected across Fernhall, service prompts and Station map; still blockout art. Retired Skim HUD/stale guidance cleaned. See Docs/reports/fernhall-service-polish-2026-09-09.md.
-
-- Audio raw-file packaging now includes existing samples/footsteps; optional missing overrides use the unchanged synth without spurious read warnings. All13 fallback waveforms covered. Device routing/listening remains unverified; see Docs/reports/audio-readiness-2026-09-09.md.
-
-Detailed historical receipts: Docs/reports/playtest-pass-ledger-2026-09-09.md. Individual capture/measurement reports remain under Docs/reports.
-
-- Escape now returns from Character Sheet and Local Map to the existing root menu, matching BACK. Build/full suite857 passing,3 expected failures,0 unexpected. This closes two navigation dead ends; OS mouse-focus acceptance remains pending.
+Current delivered features and suggested route: Docs/reports/next-playtest-2026-09-09.md. Detailed evidence stays in the linked reports and git; this desk carries remaining work.

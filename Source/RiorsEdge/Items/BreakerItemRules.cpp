@@ -175,13 +175,11 @@ FBreakerItemRuleDefinition UBreakerItemRuleLibrary::FindRule(EBreakerItemRule Ru
     {
         if (Definition.Rule == Rule) return Definition;
     }
-    // GAP, recorded rather than faked: a saved item carrying
-    // EBreakerItemRule::Overflow reaches this line. The value is still in the
-    // enum, the table has no row for it, so the item resolves to an empty
-    // definition — the card prints no rule name and no description, and
-    // ResolveRules leaves the set at identity. Nothing tells the player the
-    // line went dark. A refund or a re-roll on load is the honest treatment
-    // and is not built here.
+    // The retired EBreakerItemRule::Overflow keeps its serialized enum value,
+    // but O196 removed its flat-into-Increased effect and authored row. This
+    // lookup returns empty metadata; ResolveRules adds no rewrite for it.
+    // This is separate from drop-chance overflow conversion. No replacement
+    // rule, refund, or item reroll is implied by this metadata fallback.
     return FBreakerItemRuleDefinition();
 }
 
@@ -268,8 +266,8 @@ FBreakerItemRuleSet UBreakerItemRuleLibrary::ResolveRules(const TArray<FBreakerI
             // rewrites the tier of the affixes on the item carrying it, and
             // folding it into a wearer-wide set would leak it onto every other
             // piece. Overflow lands here too and contributes nothing: O196
-            // rules the flat-into-Increased sum a defect, so a saved Overflow
-            // item is inert (see FindRule).
+            // rules the flat-into-Increased sum a defect. Its retired rule is
+            // inert; the saved item's ordinary affixes still resolve normally.
             break;
         }
     }

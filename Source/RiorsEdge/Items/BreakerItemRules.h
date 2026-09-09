@@ -15,12 +15,10 @@
 // and Docs/Vertical-Slice.md scoped "three build-defining legendary items" of
 // which zero existed.
 //
-// THE RULE THAT SHAPED EVERY DESIGN HERE: an Unwritten rewrite is not allowed
-// to be a fourth More multiplier. O3 caps a build at three composed Mores and
-// the trees already offer six options against that cap, so a fourth would
-// either be eaten by the global clamp in FBreakerAttributeAggregator or
-// silently displace one the player chose. Every rewrite below therefore changes
-// a RULE the aggregation obeys, in the precedent of a tree keystone.
+// O221: an Aberrant or Unwritten rewrite may author a More. Gear and tree
+// Mores share three slots under one ceiling; ordinary affixes never author
+// More. The named rules below use other rewrites, but that is their authored
+// behavior, not a prohibition on future special-item Mores.
 //
 // THE SECOND RULE: every effect must have a live consumer, verified before it
 // was authored. This project has already shipped a node structurally incapable
@@ -83,9 +81,9 @@ struct RIORSEDGE_API FBreakerItemRuleSet
     float PhysicalDamageReductionCap = FBreakerEquipmentStats::DefaultPhysicalDamageReductionCap;
     // Cadence: Fire Rate crosses into the damage bucket at this fraction.
     float FireRateToIncreasedDamage = 0.0f;
-    // Deadfall's bill, as an ordinary negative Increased percentage rather than
-    // a sub-1.0 More. Affixes and items must never author a More (there is a
-    // test), and a downside is not an exemption from the locked rule.
+    // Deadfall's authored bill is negative Increased Air Control. O221 permits
+    // special-item Mores within the shared budget; it does not change this
+    // existing downside into a More.
     float AirControlPercentDelta = 0.0f;
     // Overrun: regen multiplier while a fast-traversal condition holds, and
     // while none does. Two numbers rather than one flag because the rule is a

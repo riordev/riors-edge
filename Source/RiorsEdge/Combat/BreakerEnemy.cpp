@@ -1045,10 +1045,10 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
     // O2 PLACEHOLDER: the reference speed is MoveSpeed until each sequence's
     // stride is measured; a sequence whose authored stride does not cover
     // MoveSpeed per cycle still slides by the ratio.
-    // Recorded gaps, not fixed here: the Ranged archetype ships no sequence
-    // and moves in its reference pose, so it has no gait to drive; and STEER
-    // frames call StopMovement and rebuild the velocity from the direction,
-    // so on those frames the velocity read here is the rebuilt one.
+    // The Ranged archetype ships no sequence, so it has no gait to drive.
+    // STEER adds input to the integrating mover. StopChase aborts only an
+    // active path; repeated steering frames retain velocity. A path-to-steer
+    // transition may stop the path follower once before steering resumes.
     if (Mover && NamedBody && MoveSpeed > 0.0f && NamedBody->IsPlaying())
     {
         constexpr float MaxRate = 2.0f;   // O2 PLACEHOLDER
