@@ -9,7 +9,7 @@ Continue validated blocks until the owner returns. Prioritize playable changes f
 1. Fernhall cache: a console-shaped interactable, unlocked by clearing its nearby pocket, pays loot once. Use yard-relative placement without moving existing sites.
 2. O258: retire Skim, make Slipcut the Swift starter, and migrate/remove SkimDiscipline with its consumer and existing loadouts.
 3. O247: Provoke keeps its four-second forced target and grants threat scaled by the existing threat lane.
-4. O250: a broken Warden front stays broken through revival.
+4. O250 landed: a broken Warden front stays broken through revival.
 5. O251: occlusion hides the entire enemy plate; inspect rendered frames.
 6. O248: grandfather existing over-budget special items; constrain new rolls without removing owned affixes.
 7. Kit expansion under O252–O260: verify the registered roster, author reachable abilities/passives with real consumers, and reconcile counts before claiming the 55-entry target. Carom, Coup, Backstep, Pyre, Riftlance, Recall, Bulwark and Overwatch are named candidates. Rover, Barrel and Wildcard require additional mechanics. Check proposed names against Core/doctrine IDs.
@@ -68,3 +68,5 @@ Pulled main1e369b4. Remote report:837 passing,3 expected failures,0 unexpected. 
 ## Landed this pass
 
 - Desk reduced from640 to104 lines: removed stale completed work and contradictory questions, retained active gaps and seven-step acceptance criteria. Rebuilt pulled code and regenerated its source witness;837 passing,3 expected failures,0 unexpected.
+
+- Warden front revival: build and full suite838 passing/3 expected/0 unexpected; actual Wakeful revival and follow-up frontal damage tested. Broken front stays depleted; fresh Wardens still arm.

@@ -156,6 +156,8 @@ bool ABreakerWardenEnemy::IsFrontBroken() const
 void ABreakerWardenEnemy::ArmFront()
 {
     if (!Combat || !Attributes) return;
+    // O250: reviving the body never restores a front already paid to break.
+    if (Combat->IsFrontShieldBroken()) { SetSlabVisible(false); return; }
     Combat->ArmFrontShield(BreakerShield::FrontPool(Attributes->GetMaxHealth(), FrontShieldFractionOfMaxHealth));
     SetSlabVisible(true);
 }
@@ -224,8 +226,7 @@ void ABreakerWardenEnemy::SetBodyVisible(bool bVisible)
     // Every path that hides the body (death, Wakeful downed, a Phase
     // modifier's untargetable window) hides the slab and stops it blocking.
     // Showing the body shows the slab only while the front is unbroken: a
-    // broken front is gone for the fight, and only a vitals restore (ArmFront)
-    // brings it back.
+    // broken front stays gone through a vitals restore or Wakeful revive (O250).
     SetSlabVisible(bVisible && !IsFrontBroken());
     // The ring is driven by the slam and must never be left on by a death or a
     // respawn, so it goes away regardless of which way bVisible points.
