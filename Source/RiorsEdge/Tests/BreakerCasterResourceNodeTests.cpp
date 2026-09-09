@@ -13,6 +13,7 @@
 #include "Combat/BreakerStatusComponent.h"
 #include "Components/SphereComponent.h"
 #include "Data/BreakerDataFile.h"
+#include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
@@ -80,7 +81,13 @@ bool FBreakerCasterStatusResourceRuntimeTest::RunTest(const FString& Parameters)
     Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
     UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
     if (!TestNotNull(TEXT("isolated world"), World)) return false;
-    ON_SCOPE_EXIT { World->DestroyWorld(false); };
+    // O266: a wind-up resolves on the world timer, so these fixtures need
+    // worlds that can actually be TICKED. The context is not optional —
+    // InitializeActorsForPlay without one crashes in tick group setup.
+    GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+    World->InitializeActorsForPlay(FURL());
+    const uint64 EntryFrame = GFrameCounter;
+    ON_SCOPE_EXIT { GEngine->DestroyWorldContext(World); World->DestroyWorld(false); GFrameCounter = EntryFrame; };
     // This fixture's subject is purchased-node wiring across several trees.
     // Eight is the authored eventual pool, not today's two-point campaign
     // entitlement. The separate Seep fixture below uses that live entitlement.
@@ -205,7 +212,13 @@ bool FBreakerCasterSeepCurrentBudgetTest::RunTest(const FString& Parameters)
     Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
     UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
     if (!TestNotNull(TEXT("isolated current-budget world"), World)) return false;
-    ON_SCOPE_EXIT { World->DestroyWorld(false); };
+    // O266: a wind-up resolves on the world timer, so these fixtures need
+    // worlds that can actually be TICKED. The context is not optional —
+    // InitializeActorsForPlay without one crashes in tick group setup.
+    GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+    World->InitializeActorsForPlay(FURL());
+    const uint64 EntryFrame = GFrameCounter;
+    ON_SCOPE_EXIT { GEngine->DestroyWorldContext(World); World->DestroyWorld(false); GFrameCounter = EntryFrame; };
     ABreakerCharacter* Caster = MakeCaster(World);
     FVictim Victim = MakeVictim(World);
     FBreakerStatusApplicationSpec Poison;
@@ -238,7 +251,13 @@ bool FBreakerCasterPaymentRuntimeTest::RunTest(const FString& Parameters)
     Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
     UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
     if (!TestNotNull(TEXT("isolated payment world"), World)) return false;
-    ON_SCOPE_EXIT { World->DestroyWorld(false); };
+    // O266: a wind-up resolves on the world timer, so these fixtures need
+    // worlds that can actually be TICKED. The context is not optional —
+    // InitializeActorsForPlay without one crashes in tick group setup.
+    GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+    World->InitializeActorsForPlay(FURL());
+    const uint64 EntryFrame = GFrameCounter;
+    ON_SCOPE_EXIT { GEngine->DestroyWorldContext(World); World->DestroyWorld(false); GFrameCounter = EntryFrame; };
     // Payment rank two requires four doctrine points including prerequisites.
     // This tests its authored purchase/cast wiring, not campaign reachability;
     // the current campaign still grants only two and that gap remains pinned.

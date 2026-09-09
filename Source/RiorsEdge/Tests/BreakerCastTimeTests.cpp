@@ -77,19 +77,27 @@ bool FBreakerCastTimeShippedTest::RunTest(const FString& Parameters)
         FName(TEXT("Caster.Fracture")),
         FName(TEXT("Caster.Siphon")),
         FName(TEXT("Tank.BreachCharge")),
-        // PARKED, not designed: Rot and Resonance want a wind-up and cannot
-        // have one yet. Their runtime fixtures build worlds that never call
-        // InitializeActorsForPlay, so a timer-driven cast can never resolve
-        // there, and adding the call crashes them outright — they were not
-        // written for a play world. That is fixture architecture, not a data
-        // edit, and it is on the desk as its own item.
-        FName(TEXT("Caster.Rot")),
-        FName(TEXT("Caster.Resonance")),
         // Unmake opens the window that rewrites every Caster cost. A wind-up
         // before that window opens moves the whole class's cost model, which
         // is a design change rather than a delay, so it is parked with a
         // ruling owed rather than authored in passing.
         FName(TEXT("Caster.Unmake")),
+        // Rot alone is still parked, and the reason narrowed once its fixture
+        // got a real play world: the world now ticks, so its ZONES tick too,
+        // while RotPurchasedZones drives zone life by hand with AdvanceZone
+        // and assumes no time passes between its steps. A wind-up moves
+        // occupancy and follow offsets underneath those manual advances. That
+        // is the test's timing model, not the play world, and it is the one
+        // thing left between the Caster and a full kit of wind-ups.
+        FName(TEXT("Caster.Rot")),
+        // Resonance is parked on a MEASURED consequence rather than a fixture.
+        // It detonates the statuses on a target and is paid out of their
+        // remaining damage budget — and a wind-up burns budget before the
+        // detonation collects it, so the same cast deals measurably less
+        // (405 -> 270 in MultispellPurchasedRuntime). Whether Resonance should
+        // SNAPSHOT its statuses when the cast begins, the way DoT sources
+        // already snapshot, is a ruling and not a number.
+        FName(TEXT("Caster.Resonance")),
     };
     for (const FName Id : Instant)
     {
