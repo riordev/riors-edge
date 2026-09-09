@@ -181,6 +181,7 @@ protected:
 
 private:
     UAbilitySystemComponent* GetAbilitySystem() const;
+    FGameplayAbilitySpec* FindGrantedSpecForSlot(EBreakerAbilitySlot Slot) const;
     UBreakerProgressionComponent* GetProgression() const;
     bool BuildLoadoutSignature(FString& OutSignature) const;
 

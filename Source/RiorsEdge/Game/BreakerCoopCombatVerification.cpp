@@ -9,6 +9,10 @@
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbilityComponent.h"
 #include "Abilities/BreakerAbilityDefinition.h"
+#include "Abilities/BreakerAbility_Slipcut.h"
+#include "Abilities/BreakerAbilityStateComponent.h"
+#include "GameplayPrediction.h"
+#include "GameplayEffect.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -36,6 +40,7 @@ void ABreakerCoopCombatVerification::GetLifetimeReplicatedProps(TArray<FLifetime
  DOREPLIFETIME(ABreakerCoopCombatVerification,Target);
  DOREPLIFETIME(ABreakerCoopCombatVerification,GuestStart);
  DOREPLIFETIME(ABreakerCoopCombatVerification,InitialHealth);
+ DOREPLIFETIME(ABreakerCoopCombatVerification,bServerSlipcutVerified);
 }
 void ABreakerCoopCombatVerification::StopGuestFire()
 {
@@ -50,7 +55,62 @@ void ABreakerCoopCombatVerification::EndPlay(const EEndPlayReason::Type Reason)
   Guest->GetCombat()->OnDeath.RemoveDynamic(this,&ThisClass::ObserveGuestDeath);
   Guest->GetCombat()->OnVitalsRestored.RemoveDynamic(this,&ThisClass::ObserveGuestRestore);
  }
+ if(IsValid(Guest)) if(auto* ASC=Guest->GetAbilitySystemComponent())
+ { ASC->AbilityActivatedCallbacks.RemoveAll(this); ASC->AbilityEndedCallbacks.RemoveAll(this); }
  StopGuestFire(); Super::EndPlay(Reason);
+}
+void ABreakerCoopCombatVerification::BindAbilityObservers()
+{
+ if(bAbilityObserversBound || !IsValid(Guest))return;
+ auto* ASC=Guest->GetAbilitySystemComponent(); if(!ASC)return;
+ ASC->AbilityActivatedCallbacks.AddUObject(this,&ThisClass::ObserveAbilityStart);
+ ASC->AbilityEndedCallbacks.AddUObject(this,&ThisClass::ObserveAbilityEnd);
+ bAbilityObserversBound=true;
+}
+void ABreakerCoopCombatVerification::ObserveAbilityStart(UGameplayAbility* Ability)
+{
+ if(!IsValid(Guest) || !Ability || !Ability->IsA<UBreakerAbility_Slipcut>())return;
+ ++SlipcutStarts;
+ AbilityResourceBefore=Guest->GetAttributes()->GetClassResource();
+ AbilityRateBefore=Guest->GetWeapon()->GetFireRateMultiplier();
+ auto Key=Ability->GetCurrentActivationInfo().GetActivationPredictionKey();
+ ObservedPredictionKey=Key.Current;
+ if(!HasAuthority() && Guest->IsLocallyControlled() && Key.IsValidKey())
+ {
+  // Observe GAS's real key retirement, never manufacture an acknowledgement.
+  Key.NewCaughtUpDelegate().BindUObject(this,&ThisClass::PredictionCaughtUp);
+  Key.NewRejectedDelegate().BindUObject(this,&ThisClass::PredictionRejected);
+ }
+}
+void ABreakerCoopCombatVerification::ObserveAbilityEnd(UGameplayAbility* Ability)
+{
+ auto* Slipcut=Cast<UBreakerAbility_Slipcut>(Ability);
+ if(!IsValid(Guest) || !Slipcut)return;
+ ++SlipcutEnds;
+ if(!HasAuthority())return;
+ auto* Abilities=Guest->GetAbilities();
+ const auto Slot=EBreakerAbilitySlot::ClassAbilityOne;
+ const float Quoted=Abilities->GetCost(Slot);
+ const float Debit=AbilityResourceBefore-Guest->GetAttributes()->GetClassResource();
+ const auto* State=Guest->FindComponentByClass<UBreakerAbilityStateComponent>();
+ const float Rate=Guest->GetWeapon()->GetFireRateMultiplier();
+ if(SlipcutStarts!=1 || SlipcutEnds!=1 || ObservedPredictionKey<=0
+  || !FMath::IsNearlyEqual(Debit,Quoted,.01f) || !FMath::IsNearlyEqual(Slipcut->GetLastPaidResourceCost(),Quoted,.01f)
+  || Abilities->GetCooldownRemaining(Slot)<=0 || !State || !State->IsWindowActive(UBreakerAbility_Slipcut::WindowKey())
+  || Rate<=AbilityRateBefore)return;
+ bServerSlipcutVerified=true;ForceNetUpdate();
+ UE_LOG(LogTemp,Display,TEXT("[CoopVerify] server guest-slipcut profile=%s key=%d starts=%d ends=%d quoted=%.2f debit=%.2f rate-before=%.3f rate-after=%.3f cooldown=%.3f window=1"),
+  *Guest->GetCoopCombatProfileId().ToString(),ObservedPredictionKey,SlipcutStarts,SlipcutEnds,Quoted,Debit,AbilityRateBefore,Rate,Abilities->GetCooldownRemaining(Slot));
+}
+void ABreakerCoopCombatVerification::PredictionCaughtUp()
+{
+ bPredictionCaughtUp=true;
+ UE_LOG(LogTemp,Display,TEXT("[CoopVerify] client slipcut-key-caught-up profile=%s key=%d"),*Guest->GetCoopCombatProfileId().ToString(),ObservedPredictionKey);
+}
+void ABreakerCoopCombatVerification::PredictionRejected()
+{
+ bPredictionRejected=true;
+ UE_LOG(LogTemp,Warning,TEXT("[CoopVerify] client slipcut-key-rejected profile=%s key=%d"),*Guest->GetCoopCombatProfileId().ToString(),ObservedPredictionKey);
 }
 bool ABreakerCoopCombatVerification::SpawnTarget()
 {
@@ -113,6 +173,11 @@ void ABreakerCoopCombatVerification::ServerBeginGuestDeathCheck_Implementation()
  // owner RPC follows the guest's actual target-death receipt, never a timer.
  if(!HasAuthority() || bExpired || !bTargetDefeated || bGuestDeathIssued || !IsValid(Guest)
   || GetOwner()!=Guest->GetController() || !Guest->GetCombat() || Guest->GetCombat()->IsDead())return;
+ // Earlier ordinary combat can kill the guest while movement funds Slipcut.
+ // Keep those observations; measure this explicitly requested lifecycle from
+ // its own living start instead of requiring an immortal prelude.
+ DeathsBeforeRequestedCheck=GuestDeaths;RestoresBeforeRequestedCheck=GuestRestores;
+ UE_LOG(LogTemp,Display,TEXT("[CoopVerify] server guest-check-baseline deaths=%d restores=%d"),GuestDeaths,GuestRestores);
  bGuestDeathIssued=true;
  GuestDeathPosition=Guest->GetActorLocation();
  FBreakerDamageRequest Hit;
@@ -120,7 +185,7 @@ void ABreakerCoopCombatVerification::ServerBeginGuestDeathCheck_Implementation()
  Hit.bCanCritical=false;Hit.bCanBeAvoided=false;Hit.bBypassShield=true;Hit.SetInstigator(this);
  Guest->GetCombat()->ReceiveDamage(Hit);
  UE_LOG(LogTemp,Display,TEXT("[CoopVerify] server guest-lethal profile=%s health=%.2f death-events=%d awaiting=%d"),
-  *Guest->GetCoopCombatProfileId().ToString(),Guest->GetAttributes()->GetHealth(),GuestDeaths,Guest->IsAwaitingRespawn());
+  *Guest->GetCoopCombatProfileId().ToString(),Guest->GetAttributes()->GetHealth(),GuestDeaths-DeathsBeforeRequestedCheck,Guest->IsAwaitingRespawn());
 }
 void ABreakerCoopCombatVerification::Tick(float DeltaSeconds)
 {
@@ -143,6 +208,7 @@ void ABreakerCoopCombatVerification::Tick(float DeltaSeconds)
    if(Profiles.Num()<2 || !Guest){Guest=nullptr;return;}
    GuestStart=Guest->GetActorLocation();SetOwner(Guest->GetController());ForceNetUpdate();
   }
+  BindAbilityObservers();
   if(!bGuestObserversBound && Guest->GetCombat())
   {
    Guest->GetCombat()->OnDeath.AddDynamic(this,&ThisClass::ObserveGuestDeath);
@@ -151,10 +217,10 @@ void ABreakerCoopCombatVerification::Tick(float DeltaSeconds)
   }
   if(bGuestDeathIssued)
   {
-   if(GuestDeaths==1 && GuestRestores==1 && Guest->GetAttributes()->GetHealth()>0 && !Guest->IsAwaitingRespawn())
+   if(GuestDeaths-DeathsBeforeRequestedCheck==1 && GuestRestores-RestoresBeforeRequestedCheck==1 && Guest->GetAttributes()->GetHealth()>0 && !Guest->IsAwaitingRespawn())
    {
     UE_LOG(LogTemp,Display,TEXT("[CoopVerify] server guest-respawn profile=%s health=%.2f death-events=%d restore-events=%d distance=%.2f"),
-     *Guest->GetCoopCombatProfileId().ToString(),Guest->GetAttributes()->GetHealth(),GuestDeaths,GuestRestores,
+     *Guest->GetCoopCombatProfileId().ToString(),Guest->GetAttributes()->GetHealth(),GuestDeaths-DeathsBeforeRequestedCheck,GuestRestores-RestoresBeforeRequestedCheck,
      FVector::Dist(GuestDeathPosition,Guest->GetActorLocation()));
     bExpired=true;
    }
@@ -165,7 +231,7 @@ void ABreakerCoopCombatVerification::Tick(float DeltaSeconds)
    bMoved=true;
    UE_LOG(LogTemp,Display,TEXT("[CoopVerify] server guest-movement profile=%s distance=%.2f"),*Guest->GetCoopCombatProfileId().ToString(),FVector::Dist2D(Guest->GetActorLocation(),GuestStart));
   }
-  if(bMoved && !Target && InitialHealth==0)
+  if(bMoved && bServerSlipcutVerified && !Target && InitialHealth==0)
   {
    if(!SpawnTarget()){bExpired=true;UE_LOG(LogTemp,Warning,TEXT("[CoopVerify] no legal target placement"));}
   }
@@ -175,6 +241,7 @@ void ABreakerCoopCombatVerification::Tick(float DeltaSeconds)
  auto* PC=Cast<APlayerController>(Guest->GetController());
  auto* Weapon=Guest->FindComponentByClass<UBreakerWeaponComponent>();
  if(!PC || !Weapon)return;
+ BindAbilityObservers();
  if(!bGuestObserversBound && Guest->GetCombat())
  {
   Guest->GetCombat()->OnDeath.AddDynamic(this,&ThisClass::ObserveGuestDeath);
@@ -244,6 +311,60 @@ void ABreakerCoopCombatVerification::Tick(float DeltaSeconds)
   return; // The preceding frame elapsed before input began; do not charge it.
  }
  if(MoveAge<.5f){Guest->AddMovementInput(FVector::ForwardVector,1);MoveAge+=DeltaSeconds;return;}
+ // Fund the actual starter through ordinary movement and replicated Momentum.
+ // O2 PLACEHOLDER smoke route only: reverse along a short line instead of
+ // running off the yard. Collision/anti-farm rules stay enabled; no credit grant.
+ if(!bAbilityReconciled)
+ {
+  auto* Abilities=Guest->GetAbilities();auto* ASC=Guest->GetAbilitySystemComponent();
+  const auto Slot=EBreakerAbilitySlot::ClassAbilityOne;
+  if(!Abilities || !ASC)return;
+  if(!bAbilityRequested)
+  {
+   const float Quoted=Abilities->GetCost(Slot);
+   if(AbilitySettleSeconds<=0 && Guest->GetAttributes()->GetClassResource()<Quoted+5.f)
+   {
+    AbilityMoveSeconds+=DeltaSeconds;
+    const float Direction=(static_cast<int32>(AbilityMoveSeconds/1.5f)%2)==0?1.f:-1.f;
+    Guest->AddMovementInput(FVector::ForwardVector,Direction);
+    AbilitySettleSeconds=0;return;
+   }
+   AbilitySettleSeconds+=DeltaSeconds;
+   if(AbilitySettleSeconds<.15f)return;
+   bAbilityRequested=true;
+   const float Before=Guest->GetAttributes()->GetClassResource();
+   const float Rate=Weapon->GetFireRateMultiplier();
+   const bool Activated=Abilities->TryActivateSlot(Slot);
+   const float After=Guest->GetAttributes()->GetClassResource();
+   const bool RefusedSecond=!Abilities->TryActivateSlot(Slot);
+   if(!Activated || SlipcutStarts!=1 || SlipcutEnds!=1 || ObservedPredictionKey<=0
+    || !FMath::IsNearlyEqual(Before-After,Quoted,.01f) || !RefusedSecond
+    || !FMath::IsNearlyEqual(Guest->GetAttributes()->GetClassResource(),After,.01f)
+    || !FMath::IsNearlyEqual(Weapon->GetFireRateMultiplier(),Rate,.001f)
+    || Abilities->GetCooldownRemaining(Slot)<=0)
+   {bExpired=true;UE_LOG(LogTemp,Warning,TEXT("[CoopVerify] client slipcut-local-failed activated=%d starts=%d ends=%d key=%d debit=%.3f quoted=%.3f second-refused=%d"),Activated,SlipcutStarts,SlipcutEnds,ObservedPredictionKey,Before-After,Quoted,RefusedSecond);return;}
+   UE_LOG(LogTemp,Display,TEXT("[CoopVerify] client guest-slipcut-local profile=%s key=%d starts=1 ends=1 quoted=%.2f debit=%.2f second-refused=1 authority-cadence-unchanged=1"),
+    *Guest->GetCoopCombatProfileId().ToString(),ObservedPredictionKey,Quoted,Before-After);
+   return;
+  }
+  if(bPredictionRejected){bExpired=true;return;}
+  if(!bPredictionCaughtUp || !bServerSlipcutVerified)return;
+  // Prediction catch-up must retire the temporary predicted cost modifier.
+  // Compare actual replicated attribute base/current, not a smoke RPC snapshot
+  // that would race the still-running native Momentum decay loop.
+  for(const auto Handle:ASC->GetActiveEffects(FGameplayEffectQuery()))
+  {
+   const auto* Effect=ASC->GetActiveGameplayEffect(Handle);
+   if(Effect && Effect->Spec.Def && Effect->Spec.Def->IsA<UBreakerAbilityCostEffect>()
+    && Effect->PredictionKey.Current==ObservedPredictionKey)return;
+  }
+  const float Current=ASC->GetNumericAttribute(UBreakerAttributeSet::GetClassResourceAttribute());
+  const float Base=ASC->GetNumericAttributeBase(UBreakerAttributeSet::GetClassResourceAttribute());
+  if(!FMath::IsNearlyEqual(Current,Base,.01f) || Abilities->GetCooldownRemaining(Slot)<=0)return;
+  bAbilityReconciled=true;
+  UE_LOG(LogTemp,Display,TEXT("[CoopVerify] client guest-slipcut-reconciled profile=%s key=%d starts=%d ends=%d resource=%.3f base=%.3f cooldown=%.3f pending-predicted-cost=0"),
+   *Guest->GetCoopCombatProfileId().ToString(),ObservedPredictionKey,SlipcutStarts,SlipcutEnds,Current,Base,Abilities->GetCooldownRemaining(Slot));
+ }
  if(!IsValid(Target)){StopGuestFire();return;}
  const auto* ASC=Target->GetAbilitySystemComponent();
  const auto* Attr=ASC?ASC->GetSet<UBreakerAttributeSet>():nullptr;

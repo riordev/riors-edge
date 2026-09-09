@@ -698,13 +698,13 @@ bool UBreakerAbilityComponent::TryActivateSlot(EBreakerAbilitySlot Slot)
     if (bAbilityCommitInProgress) return false;
     const UBreakerCombatComponent* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
     if (Combat && (Combat->IsDead() || Combat->IsStaggered())) return false;
-    const FBreakerGrantedAbility* Granted = GrantedBySlot.Find(Slot);
     UAbilitySystemComponent* ASC = GetAbilitySystem();
     if (!ASC)
     {
         return false;
     }
-    if (!Granted || !Granted->bImplemented || !Granted->Handle.IsValid())
+    FGameplayAbilitySpec* Spec = FindGrantedSpecForSlot(Slot);
+    if (!Spec)
     {
         // Designed but unimplemented, or nothing equipped. Ask the server to
         // reconcile in case this client's grant bookkeeping is stale.
@@ -715,7 +715,7 @@ bool UBreakerAbilityComponent::TryActivateSlot(EBreakerAbilitySlot Slot)
         }
         return false;
     }
-    FGameplayAbilitySpec* Spec = ASC->FindAbilitySpecFromHandle(Granted->Handle);
+    const FGameplayAbilitySpecHandle Handle = Spec->Handle;
     if (Spec && Spec->Ability && Spec->Ability->IsA<UBreakerAbility_Hold>())
     {
         if (GetOwner() && !GetOwner()->HasAuthority())
@@ -741,11 +741,11 @@ bool UBreakerAbilityComponent::TryActivateSlot(EBreakerAbilitySlot Slot)
         }
         if (Spec->IsActive())
         {
-            ASC->CancelAbilityHandle(Granted->Handle);
+            ASC->CancelAbilityHandle(Handle);
             return true;
         }
     }
-    const bool bActivated = ASC->TryActivateAbility(Granted->Handle);
+    const bool bActivated = ASC->TryActivateAbility(Handle);
     if (bActivated)
     {
         // Broadcast here rather than inside each ability: this is the one
@@ -788,16 +788,23 @@ bool UBreakerAbilityComponent::IsSlotImplemented(EBreakerAbilitySlot Slot) const
 
 bool UBreakerAbilityComponent::IsSlotGranted(EBreakerAbilitySlot Slot) const
 {
-    const FBreakerGrantedAbility* Granted = GrantedBySlot.Find(Slot);
-    if (Granted) return Granted->Handle.IsValid();
-    // Metadata and GAS specs may arrive in either order. Until both agree,
-    // the HUD cannot advertise a usable grant. Never manufacture a handle.
-    const auto* Definition = GetDefinitionForSlot(Slot);
+    return FindGrantedSpecForSlot(Slot) != nullptr;
+}
+
+FGameplayAbilitySpec* UBreakerAbilityComponent::FindGrantedSpecForSlot(EBreakerAbilitySlot Slot) const
+{
     auto* ASC = GetAbilitySystem();
-    if (!GetOwner() || GetOwner()->HasAuthority() || !Definition || !ASC) return false;
-    for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
-        if (Spec.InputID == static_cast<int32>(Slot) && Spec.Ability && Spec.Ability->GetClass() == Definition->AbilityClass.Get()) return true;
-    return false;
+    if (!ASC) return nullptr;
+    if (const FBreakerGrantedAbility* Granted = GrantedBySlot.Find(Slot))
+        return Granted->bImplemented && Granted->Handle.IsValid() ? ASC->FindAbilitySpecFromHandle(Granted->Handle) : nullptr;
+    // Owner metadata and GAS specs can arrive in either order. Use only a real
+    // matching spec so LocalPredicted abilities begin on the pressing client;
+    // never manufacture a handle or grant an ability from replicated metadata.
+    const auto* Definition = GetDefinitionForSlot(Slot);
+    if (!GetOwner() || GetOwner()->HasAuthority() || !Definition || !Definition->IsImplemented()) return nullptr;
+    for (FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+        if (Spec.InputID == static_cast<int32>(Slot) && Spec.Ability && Spec.Ability->GetClass() == Definition->AbilityClass.Get()) return &Spec;
+    return nullptr;
 }
 
 void UBreakerAbilityComponent::OnRep_SlotAbilityIds()

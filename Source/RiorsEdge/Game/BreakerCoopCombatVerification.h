@@ -5,6 +5,7 @@
 #include "BreakerCoopCombatVerification.generated.h"
 class ABreakerCharacter;
 class ABreakerEnemy;
+class UGameplayAbility;
 // Explicit nonsaving, two-process smoke driver. No ammo/resource/progression
 // grants. After the real weapon kill, a verification-only environmental damage
 // request exercises guest death and the existing authority respawn timer.
@@ -28,6 +29,16 @@ private:
  UFUNCTION(Server, Reliable) void ServerBeginGuestDeathCheck();
  UFUNCTION() void ObserveGuestDeath();
  UFUNCTION() void ObserveGuestRestore();
+ void ObserveAbilityStart(UGameplayAbility* Ability);
+ void ObserveAbilityEnd(UGameplayAbility* Ability);
+ void BindAbilityObservers();
+ void PredictionCaughtUp();
+ void PredictionRejected();
+ UPROPERTY(Replicated) bool bServerSlipcutVerified=false;
+ bool bAbilityObserversBound=false,bAbilityRequested=false,bPredictionCaughtUp=false,bPredictionRejected=false,bAbilityReconciled=false;
+ int32 SlipcutStarts=0,SlipcutEnds=0;
+ int32 ObservedPredictionKey=0;
+ float AbilityResourceBefore=0,AbilityRateBefore=1,AbilitySettleSeconds=0,AbilityMoveSeconds=0;
  bool SpawnTarget();
  void StopGuestFire();
  float Age=0,MoveAge=0,AimAge=0;
@@ -36,6 +47,7 @@ private:
  bool bHealthReceiptLogged=false,bDeathReceiptLogged=false,bExpired=false;
  int32 GuestWeaponHits=0;
  int32 GuestDeaths=0,GuestRestores=0;
+ int32 DeathsBeforeRequestedCheck=0,RestoresBeforeRequestedCheck=0;
  bool bTargetDefeated=false,bGuestDeathIssued=false,bGuestDeathRequested=false;
  bool bGuestObserversBound=false,bGuestDeadSeen=false;
  FVector GuestDeathPosition=FVector::ZeroVector;

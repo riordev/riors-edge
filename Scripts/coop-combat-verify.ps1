@@ -57,7 +57,7 @@ try {
   $hostText=(ReadSharedLog $hostLog)
   $ids=@([regex]::Matches($hostText,'\[CoopTest\] isolated profile=([A-Fa-f0-9-]+) authority=1')|ForEach-Object{$_.Groups[1].Value}|Select-Object -Unique)
   $guestText=if(Test-Path -LiteralPath $guestLog){(ReadSharedLog $guestLog)}else{''}
- } until(($ids.Count -ge 2 -and $guestText -match '\[CoopTest\].*(authority=0|received server profile)' -and $guestText -match '\[CoopTest\] local environment ready:' -and $hostText -match '\[CoopVerify\] server target-death' -and $guestText -match '\[CoopVerify\] client replicated-death' -and $hostText -match '\[CoopVerify\] server guest-respawn' -and $guestText -match '\[CoopVerify\] client guest-revived-presentation') -or [DateTime]::UtcNow -ge $deadline)
+ } until(($ids.Count -ge 2 -and $guestText -match '\[CoopTest\].*(authority=0|received server profile)' -and $guestText -match '\[CoopTest\] local environment ready:' -and $hostText -match '\[CoopVerify\] server guest-slipcut' -and $guestText -match '\[CoopVerify\] client guest-slipcut-reconciled' -and $hostText -match '\[CoopVerify\] server target-death' -and $guestText -match '\[CoopVerify\] client replicated-death' -and $hostText -match '\[CoopVerify\] server guest-respawn' -and $guestText -match '\[CoopVerify\] client guest-revived-presentation') -or [DateTime]::UtcNow -ge $deadline)
  if($ids.Count -lt 2){throw 'Server never initialized two distinct test profiles'}
  if($guestText -notmatch '\[CoopTest\].*(authority=0|received server profile)'){throw 'Guest has no initialized test profile'}
  if($guestText -notmatch '\[CoopTest\] local environment ready:'){throw 'Guest never built its Fernhall geometry and lighting'}
@@ -83,9 +83,29 @@ try {
   $profile=[regex]::Match($text,($observation+' profile=([A-Fa-f0-9-]+)')).Groups[1].Value
   if($profile -ne $requestProfile){throw ('Death/respawn identity mismatch: '+$observation)}
  }
+ # Same actual guest, prediction key and authored cost across processes. A
+ # caught-up GAS key and retired predicted modifier prove reconciliation; an
+ # arbitrary replicated smoke flag alone is insufficient.
+ if($guestText -match 'slipcut-(local-failed|key-rejected)'){throw 'Guest Slipcut prediction failed or was rejected'}
+ $local=[regex]::Match($guestText,'client guest-slipcut-local profile=([A-Fa-f0-9-]+) key=(\d+) starts=1 ends=1 quoted=([0-9.]+) debit=([0-9.]+) second-refused=1 authority-cadence-unchanged=1')
+ $server=[regex]::Match($hostText,'server guest-slipcut profile=([A-Fa-f0-9-]+) key=(\d+) starts=1 ends=1 quoted=([0-9.]+) debit=([0-9.]+) rate-before=([0-9.]+) rate-after=([0-9.]+) cooldown=([0-9.]+) window=1')
+ $caught=[regex]::Match($guestText,'client slipcut-key-caught-up profile=([A-Fa-f0-9-]+) key=(\d+)')
+ $settled=[regex]::Match($guestText,'client guest-slipcut-reconciled profile=([A-Fa-f0-9-]+) key=(\d+) starts=1 ends=1 resource=([0-9.]+) base=([0-9.]+) cooldown=([0-9.]+) pending-predicted-cost=0')
+ foreach($observation in @($local,$server,$caught,$settled)){
+  if(!$observation.Success -or $observation.Groups[1].Value -ne $requestProfile){throw 'Missing or mismatched guest Slipcut evidence'}
+  if($observation.Groups[2].Value -ne $local.Groups[2].Value -or [int]$observation.Groups[2].Value -le 0){throw 'Slipcut evidence uses different or invalid prediction keys'}
+ }
+ $culture=[Globalization.CultureInfo]::InvariantCulture
+ $cost=[double]::Parse($local.Groups[3].Value,$culture)
+ if($cost -le 0){throw 'Slipcut cost must be genuinely paid'}
+ foreach($value in @($local.Groups[4].Value,$server.Groups[3].Value,$server.Groups[4].Value)){
+  if([Math]::Abs([double]::Parse($value,$culture)-$cost) -gt .01){throw 'Slipcut predicted/authoritative cost mismatch'}
+ }
+ if([double]::Parse($server.Groups[6].Value,$culture) -le [double]::Parse($server.Groups[5].Value,$culture) -or [double]::Parse($server.Groups[7].Value,$culture) -le 0){throw 'No authoritative Slipcut cadence/cooldown effect'}
+ if([Math]::Abs([double]::Parse($settled.Groups[3].Value,$culture)-[double]::Parse($settled.Groups[4].Value,$culture)) -gt .01 -or [double]::Parse($settled.Groups[5].Value,$culture) -le 0){throw 'Predicted cost failed to reconcile while native cooldown was active'}
  # Displacement is observed during guest movement input; this does not prove
  # every centimetre came from input rather than knockback or another force.
- [pscustomobject]@{ServerProfiles=$ids;HostProcessId=$hostProcess.Id;GuestProcessId=$guestProcess.Id;Logs=$logDirectory;HostUserDir=$hostUserDirectory;GuestUserDir=$guestUserDirectory;Scope='Observed remote displacement during input, guest fire RPC, server weapon damage/death and client replicated health/death; actual guest death/server timer respawn/client presentation revival with no client gameplay delegates; displacement cause is not isolated'}|ConvertTo-Json
+ [pscustomobject]@{ServerProfiles=$ids;HostProcessId=$hostProcess.Id;GuestProcessId=$guestProcess.Id;Logs=$logDirectory;HostUserDir=$hostUserDirectory;GuestUserDir=$guestUserDirectory;Scope='Actual guest Swift Slipcut local prediction, exact client/server cost, authoritative cadence window, same-key GAS catch-up and retired predicted cost modifier; observed remote displacement during input, guest fire RPC, server weapon damage/death and client replicated health/death; actual guest death/server timer respawn/client presentation revival with no client gameplay delegates; displacement cause is not isolated'}|ConvertTo-Json
 }
 finally {
  if(!$KeepRunning){foreach($ownedProcess in @($guestProcess,$hostProcess)){if($ownedProcess -and !$ownedProcess.HasExited){Stop-Process -Id $ownedProcess.Id -Force}}}

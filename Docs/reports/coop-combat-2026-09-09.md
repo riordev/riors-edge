@@ -80,3 +80,22 @@ support, and human input/presentation checks. This remains a transient Swift
 combat sandbox, not a multiplayer campaign release.
 
 Final build/full suite:854 passing,3 expected reds,0 unexpected; status regenerated.
+
+## Real predicted guest activation
+
+Owner input now resolves the actual matching replicated GAS spec and starts normal LocalPredicted activation locally. Hold/deployables retain their explicit server-only press handling. Metadata never creates a grant or handle.
+
+Actual two-process verification passed at10:19 UTC in `Saved/CoopSmoke/8938cb98e5ee4ccd9cd579a83ca12ca4`:
+
+- Ordinary movement earned starter Slipcut's20 Momentum. Guest and server each observed one activation, one end and an exact20 debit, under the same native prediction key1.
+- The guest immediately saw cooldown and refused a second press without further cost. The server cadence multiplier moved1→2 with the actual window and4-second cooldown.
+- Native key catch-up retired the guest's temporary predicted cost effect. Guest current/base resource both read5.078 at that observation. This establishes predicted modifier cleanup; it does not prove exact ongoing server/client bank equality while native decay and replication continue.
+- The existing weapon target/death and guest server-respawn/client-input lifecycle also passed. The requested cycle had exactly one server death and one restore, with zero guest gameplay death/restore delegates. Save hashes remained unchanged.
+
+The longer movement-funding phase exposed ordinary ambient deaths before the requested lifecycle. The verifier now preserves and logs those totals (six deaths/restores in this run), then measures the explicitly requested check from its guarded living start. Duplicate events during that measured interval still fail. No immunity, enemy suppression or resource grants were added. The bare Swift smoke profile is not evidence of comfortable or balanced cooperative encounters.
+
+An artificial standalone role-flip prediction fixture was parked after the five-minute investigation cap: it advertised activation but did not reproduce payment, even after refreshing Unreal's cached network role. Its checks were not weakened into a pass. This change's prediction acceptance is the actual two-process run above. Full-suite regression/status is recorded with the landing commit.
+
+Independent reviews covered the production grant lookup, actual GAS callback/prediction-key observations and lifecycle counter baselines. Remaining work: exact bank convergence under latency/rejection, other classes/abilities, loot contention (Refractor can select a protected ally and waste a fork seat), reconnect, campaign support and human presentation/feel.
+
+Landing regression:856 passing,3 expected failures,0 unexpected; status regenerated.

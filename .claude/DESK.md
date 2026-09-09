@@ -6,7 +6,7 @@ Continue validated blocks until the owner returns. Prioritize playable changes f
 
 ## Immediate queue
 
-1. Cooperative sandbox landed with real host/guest fire and replicated health/death evidence. Owner slot metadata and guest health/input respawn transport now verified; remaining acceptance: predicted ability effects/costs, drop contention, rejoin, human presentation/movement feel and eventual campaign support.
+1. Cooperative sandbox landed with real host/guest fire and replicated health/death evidence. Owner slot metadata and guest health/input respawn transport now verified; real Slipcut prediction/payment/server cadence and same-key cleanup now verified; remaining acceptance: other abilities/classes, latency/rejection bank convergence, drop contention, rejoin, human presentation/movement feel and eventual campaign support.
 2. Red Basin/Station Zero prototypes and Station priority hunt landed; Red Basin recovery/extraction also landed; next content acceptance is real return Rifts, route pacing and region scenery. Refine exposed boundaries and repeated cover. Anchor surroundings/work-area dressing landed but remains blockout art.
 3. Volatile countdown and ability-menu wrapping/empty-label fixes landed with rendered checks. Continue interactive focus/death flow and other menu screens.
 4. Finish remaining Afterimage consumers and real-clock Rot feedback checks. Cache prompt now shares opening eligibility and stays visible at the console; final prop art remains.
@@ -37,11 +37,11 @@ Continue validated blocks until the owner returns. Prioritize playable changes f
 
 ## Multiplayer
 
-Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profiles, client geometry, authored late-guest start, no persistent writes, scoped friendly-fire prevention. Real two-process guest fire/server damage/death/client health transport passed; see Docs/reports/coop-combat-2026-09-09.md and Scripts/coop-combat-verify.ps1. Owner slot IDs/real GAS specs and actual guest death/server-timer respawn/input restoration are verified. Full campaign/progression, predicted ability effects/costs, loot contention, rejoin and human presentation/feel remain unvalidated. Trading, account services and MMO infrastructure stay outside this playtest slice.
+Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profiles, client geometry, authored late-guest start, no persistent writes, scoped friendly-fire prevention. Real two-process guest fire/server damage/death/client health transport passed; see Docs/reports/coop-combat-2026-09-09.md and Scripts/coop-combat-verify.ps1. Owner slot IDs/real GAS specs and actual guest death/server-timer respawn/input restoration are verified. Real Slipcut local/server payment and prediction-key cleanup are verified. Full campaign/progression, other abilities/classes, exact bank convergence under latency/rejection, loot contention, rejoin and human presentation/feel remain unvalidated. Trading, account services and MMO infrastructure stay outside this playtest slice.
 
 ## Known issues to time-box
 
-- Warden engaged movement bypasses arrival spacing and can walk through the player.
+- Warden engaged movement bypasses arrival spacing and can walk through the player. Arrival-ring candidate is parked after five-minute native fixture limit: naked100HP target dies to native level-one124.51 slam before later spacing checks; needs a legal equipped target and post-BeginPlay range sampling, not health/damage overrides. No production change landed.
 - Ranged STEER transitions reset movement and appear to stutter; walk animation is missing.
 - Volatile now has a tested outlined countdown; final Niagara presentation and real client cadence/human timing remain.
 - Damage numbers can overlap enemy plates. Hover, focus recovery and comfort require real interaction checks beyond static captures.
@@ -49,6 +49,9 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 - Blackout Afterimage is parked: its unkeyed enemy movement overwrite can erase Fleetfoot/other slows, and its shared incoming-damage key lets one caster remove another's effect. Requires source-owned contributions before extending the numerical tail; ordinary marked-hit Charge permission still ends on time.
 - Three generation entries remain uncalled; one aggregation lane and one target remain empty/unrouted. Consult current STATE for exact identities.
 - Other low-priority cleanup only after verifying use: empty modifier test helper; unused HUD dimensions; stale movement comments; duplicated boss timings; slot-invalid fixtures; inert affix leans; menu string-table migration.
+
+- Refractor can waste a fork seat on a protected coop player before damage rejection. Legal real-shot fixture and candidate eligibility repair remain parked after bounded audit.
+- Bare Swift coop smoke profile suffered ambient deaths during ordinary movement funding. Network receipts are not a balanced encounter acceptance.
 
 ## Decisions and measurements requiring explicit care
 
