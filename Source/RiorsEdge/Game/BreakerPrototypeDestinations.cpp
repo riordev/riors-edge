@@ -16,6 +16,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Interaction/BreakerFernhallCache.h"
+#include "Interaction/BreakerBasinRecorder.h"
 #include "Interaction/BreakerTravelPoint.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Misc/PackageName.h"
@@ -27,7 +28,7 @@ const TArray<BreakerPrototypeDestinations::FDefinition>& BreakerPrototypeDestina
     // player level. Return visits retain these levels and normal loot gates.
     static const TArray<FDefinition> Definitions = {
         {TEXT("RedBasin"), TEXT("Lvl_RedBasin"), TEXT("Red Basin"),
-            TEXT("Prototype destination / fixed areas 12-16. Cross scorched farmland and a shattered homestead to the impact crater. Recover each district's supply cache; either gate returns to Anchor 13."),
+            TEXT("Prototype destination / fixed areas 12-16. Cross scorched farmland and a shattered homestead to the impact crater. Recover the survey recorder at Burned Homestead and extract it at the Impact Basin relay. Supply caches are optional; either gate returns to Anchor 13."),
             {FVector(2200,0,0), FVector(8500,2000,0), FVector(15000,-500,0)},
             {TEXT("Scorched Fields"), TEXT("Burned Homestead"), TEXT("Impact Basin")}, {12,14,16}},
         {TEXT("StationZero"), TEXT("Lvl_StationZero"), TEXT("Station Zero"),
@@ -72,6 +73,7 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
     const FLinearColor Wall = bBasin ? FLinearColor(.27f,.14f,.08f) : FLinearColor(.18f,.25f,.34f);
     const FLinearColor Trim = bBasin ? FLinearColor(.15f,.12f,.10f) : FLinearColor(.42f,.49f,.55f);
     bool bGeometryValid = true;
+    int32 RecorderCount=0;
     auto Shape = [&](const TCHAR* Name,UStaticMesh* Mesh,FVector At,FVector Size,FLinearColor Color,
         bool bGround=false,FRotator Rotation=FRotator::ZeroRotator)
     {
@@ -267,6 +269,11 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
             UBreakerKillTelemetryComponent::AttachTo(Enemy);
             Guards.Add(Enemy); Result.Enemies.Add(Enemy);
         }
+        // O2 PLACEHOLDER placement: recovery in district two, extraction in
+        // district three. Existing central walking route remains unchanged.
+        if(bBasin&&Pocket>0)
+            if(auto* Recorder=World->SpawnActor<ABreakerBasinRecorder>(C+FVector(1700,Pocket==2?-650:-900,100),FRotator(0,180,0)))
+            { ++RecorderCount;if(Pocket==2)Recorder->ConfigureExtraction(); }
         const FVector CacheAt=C+FVector(1000,1700,90);
         if (auto* Cache=World->SpawnActor<ABreakerFernhallCache>(CacheAt,FRotator(0,180,0)))
         {
@@ -299,7 +306,7 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
             Gate->Tags.Add(TEXT("PrototypeDestination.ReturnGate"));
             Result.Gates.Add(Gate);
         }
-    Result.bComplete=bGeometryValid && Result.Enemies.Num()==18 && Result.Caches.Num()==3 && Result.Gates.Num()==2 && Result.DressingCount>=6;
+    Result.bComplete=bGeometryValid && (!bBasin || RecorderCount==2) && Result.Enemies.Num()==18 && Result.Caches.Num()==3 && Result.Gates.Num()==2 && Result.DressingCount>=6;
     UE_LOG(LogTemp,Display,TEXT("[PrototypeDestination] %s complete=%d fixed=%d-%d enemies=%d caches=%d dressing=%d"),
         *Definition->DisplayName,Result.bComplete,Definition->AreaLevels[0],Definition->AreaLevels.Last(),Result.Enemies.Num(),Result.Caches.Num(),Result.DressingCount);
     return Result;

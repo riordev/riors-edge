@@ -16,6 +16,7 @@
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/WorldSettings.h"
 #include "Interaction/BreakerFernhallCache.h"
+#include "Interaction/BreakerBasinRecorder.h"
 #include "Interaction/BreakerTravelPoint.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Items/BreakerLootPickup.h"
@@ -196,6 +197,14 @@ bool FBreakerPrototypeDestinationRuntimeTest::RunTest(const FString& Parameters)
             TestEqual(TEXT("Reward is retained in the player's backpack"),Player->GetEquipment()->GetBackpack().Num(),Items+1);
             TestFalse(TEXT("Completed cache marker retires"),Map->GetMarkers().ContainsByPredicate([&](const auto& M) { return M.Id==Site; }));
         }
+        if(D.Id==TEXT("RedBasin"))
+            for(bool bExtraction:{false,true})
+                for(TActorIterator<ABreakerBasinRecorder> It(World);It;++It)
+                    if(It->IsExtraction()==bExtraction)
+                    {
+                        Player->SetActorLocation(It->GetActorLocation()+FVector(-150,0,0));
+                        if(!TestTrue(TEXT("Native recovery/extraction advances destination objective"),It->TryInteract(Player)))return false;
+                    }
         TestTrue(TEXT("Completed local objective directs the player home"),Map->GetCampaignObjective().ToString().Contains(TEXT("Return to Anchor 13")));
         // Real campaign death must return to the same pre-BeginPlay start,
         // not the stale origin stored in older map shells.

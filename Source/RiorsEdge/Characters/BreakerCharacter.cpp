@@ -69,6 +69,7 @@
 #include "Items/BreakerLootLibrary.h"
 #include "Interaction/BreakerNPC.h"
 #include "Interaction/BreakerFernhallCache.h"
+#include "Interaction/BreakerBasinRecorder.h"
 #include "Interaction/BreakerTravelPoint.h"
 #include "Interaction/BreakerRiftDoor.h"
 #include "Game/BreakerZoneBuilder.h"
@@ -2623,6 +2624,7 @@ ABreakerNPC* ABreakerCharacter::FindNearbyNPC() const
     for (TActorIterator<ABreakerNPC> It(GetWorld()); It; ++It)
     {
         if (const auto* Cache = Cast<ABreakerFernhallCache>(*It); Cache && !Cache->IsInteractionReachable(this)) continue;
+        if (const auto* Recorder=Cast<ABreakerBasinRecorder>(*It);Recorder&&!Recorder->IsInteractionReachable(this))continue;
         const float DistanceSq = FVector::DistSquared(GetActorLocation(), It->GetActorLocation());
         if (DistanceSq <= FMath::Square(It->GetInteractionRange()) && DistanceSq < NearestDistanceSq)
         {
@@ -2733,6 +2735,11 @@ void ABreakerCharacter::InteractWithNearbyNPC()
 
     ABreakerNPC* NPC = FindNearbyNPC();
     if (!NPC) return;
+    if(auto* Recorder=Cast<ABreakerBasinRecorder>(NPC))
+    {
+        if(HasAuthority())Recorder->TryInteract(this);else ServerInteractBasinRecorder(Recorder);
+        return;
+    }
     if (auto* Cache = Cast<ABreakerFernhallCache>(NPC))
     {
         if (HasAuthority()) Cache->TryOpen(this);
@@ -2954,6 +2961,9 @@ void ABreakerCharacter::Landed(const FHitResult& Hit)
     }
     LastFallingSpeed = 0.0f;
 }
+
+void ABreakerCharacter::ServerInteractBasinRecorder_Implementation(ABreakerBasinRecorder* Recorder)
+{ if(IsValid(Recorder))Recorder->TryInteract(this); }
 
 void ABreakerCharacter::ServerOpenFernhallCache_Implementation(ABreakerFernhallCache* Cache)
 {

@@ -18,6 +18,7 @@
 #include "GameFramework/PlayerController.h"
 #include "HAL/FileManager.h"
 #include "Interaction/BreakerFernhallCache.h"
+#include "Interaction/BreakerBasinRecorder.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
@@ -37,13 +38,17 @@ namespace
 }
 void BreakerSchedulePlateCapture(UWorld* World)
 {
- FString Mode,UserDirectory,VolatileMode,AbilityClass;
+ FString Mode,UserDirectory,VolatileMode,AbilityClass,RecorderMode;
+ const bool bRecorder=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureRecorder="),RecorderMode);
  const bool bAbilityMenu=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureAbilityClass="),AbilityClass);
  const bool bVolatile=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureVolatileFreeze="),VolatileMode);
  const bool bPlate=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureEnemyPlate="),Mode);
  const bool bCache=FParse::Param(FCommandLine::Get(),TEXT("BreakerCaptureCache"));
  const bool bScenery=FParse::Param(FCommandLine::Get(),TEXT("BreakerCaptureScenery"));
- if(!World||(!bPlate&&!bCache&&!bScenery&&!bVolatile&&!bAbilityMenu))return;
+ if(!World||(!bPlate&&!bCache&&!bScenery&&!bVolatile&&!bAbilityMenu&&!bRecorder))return;
+ if(bRecorder && (bPlate||bCache||bScenery||bVolatile||bAbilityMenu
+    ||(!RecorderMode.Equals(TEXT("Recovery"),ESearchCase::IgnoreCase)&&!RecorderMode.Equals(TEXT("Extraction"),ESearchCase::IgnoreCase))))
+ { UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Recorder requires Recovery or Extraction and no other setup mode."));return; }
  if(bAbilityMenu)
  {
     FString Board;
@@ -69,9 +74,9 @@ void BreakerSchedulePlateCapture(UWorld* World)
  {UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Mode must be open or blocked."));return;}
  // Core time advances while the arrival menu has paused world timers.
  // Weak UObject binding prevents setup after this world is destroyed.
- FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(World,[World,Mode,bCache,bPlate,bScenery,bVolatile,bAbilityMenu,AbilityClass](float)
+ FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(World,[World,Mode,bCache,bPlate,bScenery,bVolatile,bAbilityMenu,AbilityClass,bRecorder,RecorderMode](float)
  {
-    if(bAbilityMenu)
+    if(bAbilityMenu||bRecorder)
         if(const auto* Session=World->GetGameInstance<UBreakerGameInstance>(); Session && Session->IsArrivalCoverUp()) return true;
     auto* PC=World->GetFirstPlayerController();auto* Player=PC?Cast<ABreakerCharacter>(PC->GetPawn()):nullptr;
     if(!Player||!Player->HasAuthority())return false;
@@ -112,7 +117,42 @@ void BreakerSchedulePlateCapture(UWorld* World)
     Player->GetBreakerMovement()->StopMovementImmediately();Player->GetBreakerMovement()->SetMovementMode(MOVE_None);
     FVector Aim;
     ABreakerEnemy* PlateEnemy=nullptr;
-    if(bCache)
+    if(bRecorder)
+    {
+        ABreakerBasinRecorder* Recovery=nullptr;ABreakerBasinRecorder* Extraction=nullptr;
+        for(TActorIterator<ABreakerBasinRecorder> It(World);It;++It)
+            if(It->IsExtraction())Extraction=*It;else Recovery=*It;
+        if(!Recovery||!Extraction){UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Recorder setup requires actual Red Basin consoles."));return false;}
+        auto StandAt=[&](ABreakerBasinRecorder* Console)
+        {
+            // O2 PLACEHOLDER capture distance only. Real standing capsule rests on the
+            // existing floor; neither console nor its scenery is relocated.
+            FVector At=Console->GetActorLocation()+Console->GetActorForwardVector()*180.f;
+            FCollisionQueryParams Query(SCENE_QUERY_STAT(RecorderCaptureFloor),false,Player);Query.AddIgnoredActor(Console);
+            FHitResult Floor;
+            if(!World->LineTraceSingleByObjectType(Floor,At+FVector(0,0,200),At-FVector(0,0,500),FCollisionObjectQueryParams(ECC_WorldStatic),Query))return false;
+            const auto* Body=Player->GetCapsuleComponent();
+            At.Z=Floor.ImpactPoint.Z+Body->GetScaledCapsuleHalfHeight()+2.f;
+            if(World->OverlapAnyTestByObjectType(At,FQuat::Identity,FCollisionObjectQueryParams(ECC_WorldStatic),
+                FCollisionShape::MakeCapsule(Body->GetScaledCapsuleRadius(),Body->GetScaledCapsuleHalfHeight()),Query))return false;
+            Player->SetActorLocation(At);
+            return Console->IsInteractionReachable(Player);
+        };
+        ABreakerBasinRecorder* Selected=Recovery;
+        if(RecorderMode.Equals(TEXT("Extraction"),ESearchCase::IgnoreCase))
+        {
+            if(!StandAt(Recovery)||!Recovery->TryInteract(Player))
+            {UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Recorder extraction refused: real recovery interaction did not succeed."));return false;}
+            Selected=Extraction;
+        }
+        if(!StandAt(Selected))
+        {UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Recorder standing approach/visibility is obstructed."));return false;}
+        Aim=Selected->GetActorLocation();
+        UE_LOG(LogTemp,Display,TEXT("[PlateCapture] Recorder=%s actualCurrentStep=%d reachable=%d nearby=%d standing=%s console=%s; native recovery used for extraction, no flag injection; combat frozen for static QA."),
+            *RecorderMode,Selected->IsCurrentStep(Player),Selected->IsInteractionReachable(Player),Player->FindNearbyNPC()==Selected,
+            *Player->GetActorLocation().ToString(),*Selected->GetActorLocation().ToString());
+    }
+    else if(bCache)
     {
         ABreakerFernhallCache* Cache=nullptr;for(TActorIterator<ABreakerFernhallCache> It(World);It;++It){Cache=*It;break;}
         if(!Cache){UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] No authored Fernhall cache found."));return false;}

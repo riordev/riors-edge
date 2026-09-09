@@ -3,6 +3,7 @@
 #include "Game/BreakerContainmentHunt.h"
 #include "Combat/BreakerEnemy.h"
 #include "Interaction/BreakerFernhallCache.h"
+#include "Interaction/BreakerBasinRecorder.h"
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerAlteredEnemy.h"
@@ -39,6 +40,15 @@ FText UBreakerLocalMapComponent::GetCampaignObjective() const
             return FText::FromString(bComplete
                 ? TEXT("Containment Custodian eliminated. Return to Anchor 13 from either travel gate; supply lockers are optional.")
                 : TEXT("Hunt the Containment Custodian in the Containment Laboratory (fixed area 28). Supply lockers are optional."));
+        }
+        if(Prototype->Id==TEXT("RedBasin"))
+        {
+            const auto* Player=Cast<ABreakerCharacter>(GetOwner());const auto* Journal=Player?Player->GetQuestJournal():nullptr;
+            return FText::FromString(Journal&&Journal->HasFlag(ABreakerBasinRecorder::ExtractedFlag())
+                ?TEXT("Survey recorder extracted. Return to Anchor 13 from either travel gate; supply caches are optional.")
+                :Journal&&Journal->HasFlag(ABreakerBasinRecorder::RecoveredFlag())
+                    ?TEXT("Carry the survey recorder to the Impact Basin extraction relay.")
+                    :TEXT("Recover the survey recorder from Burned Homestead."));
         }
         int32 Recovered=0;
         for (TActorIterator<ABreakerFernhallCache> It(GetWorld());It;++It)
@@ -119,11 +129,17 @@ TArray<FBreakerLocalMapMarker> UBreakerLocalMapComponent::GetMarkers() const
         auto& Marker=Out.AddDefaulted_GetRef(); Marker.Id=Site;
         Marker.Label=It->GetDisplayName(); Marker.Detail=It->GetCachePrompt(); Marker.Location=It->GetActorLocation();
         const auto* Destination=BreakerPrototypeDestinations::ForWorld(this);
-        Marker.bObjective=!Destination || Destination->Id!=TEXT("StationZero");
+        Marker.bObjective=!Destination; // Both prototype supply routes are now optional.
+    }
+    for(TActorIterator<ABreakerBasinRecorder> It(World);It;++It)
+    {
+        if(!IsValid(*It)||!It->IsCurrentStep(Cast<ABreakerCharacter>(GetOwner())))continue;
+        auto& Marker=Out.AddDefaulted_GetRef();Marker.Id=It->IsExtraction()?FName(TEXT("RedBasin.Extraction")):FName(TEXT("RedBasin.Recovery"));
+        Marker.Label=It->GetDisplayName();Marker.Detail=It->GetRecorderPrompt();Marker.Location=It->GetActorLocation();Marker.bObjective=true;
     }
     for (TActorIterator<ABreakerNPC> It(World); It; ++It)
     {
-        if (!IsValid(*It) || It->IsA<ABreakerFernhallCache>()) continue;
+        if (!IsValid(*It) || It->IsA<ABreakerFernhallCache>() || It->IsA<ABreakerBasinRecorder>()) continue;
         auto& Marker = Out.AddDefaulted_GetRef();
         Marker.Location = It->GetActorLocation(); Marker.Label = It->GetDisplayName();
         // NPC appearances can change with the player's body; discovery belongs

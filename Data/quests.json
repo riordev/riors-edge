@@ -49,7 +49,9 @@
 		"Quest.Watch.Accepted",
 		"Quest.Watch.FlankCleared",
 		"Quest.Watch.TurnedIn",
-		"Quest.StationZero.CustodianDown"
+		"Quest.StationZero.CustodianDown",
+		"Quest.RedBasin.RecorderRecovered",
+		"Quest.RedBasin.RecorderExtracted"
 	],
 	"quests": [
 		{

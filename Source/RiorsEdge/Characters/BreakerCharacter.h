@@ -35,6 +35,7 @@ class UBreakerAbilityComponent;
 class UBreakerQuestJournal;
 class ABreakerNPC;
 class ABreakerFernhallCache;
+class ABreakerBasinRecorder;
 class ABreakerLootPickup;
 class SBreakerMenu;
 struct FInputActionValue;
@@ -409,6 +410,7 @@ private:
     void ToggleCharacterSheet();
     void InteractWithNearbyNPC();
     UFUNCTION(Server, Reliable) void ServerOpenFernhallCache(ABreakerFernhallCache* Cache);
+    UFUNCTION(Server, Reliable) void ServerInteractBasinRecorder(ABreakerBasinRecorder* Recorder);
     UFUNCTION(Server, Reliable) void ServerPickupLoot(ABreakerLootPickup* Pickup);
     UFUNCTION(Server, Reliable) void ServerCollectFeedstock(ABreakerFeedstockPickup* Pickup);
     void StartWave();

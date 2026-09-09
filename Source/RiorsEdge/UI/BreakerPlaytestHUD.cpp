@@ -38,6 +38,7 @@
 #include "Combat/BreakerStatusComponent.h"
 #include "Interaction/BreakerNPC.h"
 #include "Interaction/BreakerFernhallCache.h"
+#include "Interaction/BreakerBasinRecorder.h"
 #include "Interaction/BreakerTravelPoint.h"
 #include "Game/BreakerGameInstance.h"
 #include "Game/BreakerGameMode.h"
@@ -1545,13 +1546,14 @@ void ABreakerPlaytestHUD::DrawInteractPrompt(const ABreakerCharacter* Character,
     }
     if (const ABreakerNPC* NearbyNPC = Character->FindNearbyNPC())
     {
-        // A cache is a low console; the person-head anchor goes offscreen at normal use range.
-        const FVector PromptAnchor = Cast<ABreakerFernhallCache>(NearbyNPC) ? NearbyNPC->GetActorLocation()
+        // Low cache/recorder consoles need a body anchor; the person-head offset leaves the viewport at normal use range.
+        const FVector PromptAnchor = (Cast<ABreakerFernhallCache>(NearbyNPC) || Cast<ABreakerBasinRecorder>(NearbyNPC)) ? NearbyNPC->GetActorLocation()
             : NearbyNPC->GetActorLocation() + FVector(0.0f, 0.0f, 150.0f);
         const FVector Projected = Project(PromptAnchor, false);
         if (Projected.Z <= 0.0f) return;
         DrawInteractPlate(Projected.X, Projected.Y, BreakerUI::TextSecondary, 1,
-            Cast<ABreakerFernhallCache>(NearbyNPC) ? Cast<ABreakerFernhallCache>(NearbyNPC)->GetCachePrompt().ToString()
+            Cast<ABreakerBasinRecorder>(NearbyNPC) ? Cast<ABreakerBasinRecorder>(NearbyNPC)->GetRecorderPrompt().ToString()
+                : Cast<ABreakerFernhallCache>(NearbyNPC) ? Cast<ABreakerFernhallCache>(NearbyNPC)->GetCachePrompt().ToString()
                 : BreakerStrings::Format(EBreakerStringKey::HudPromptTalkNamed, *NearbyNPC->GetDisplayName().ToString().ToUpper()), true);
     }
 }

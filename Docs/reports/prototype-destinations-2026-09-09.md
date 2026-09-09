@@ -41,3 +41,36 @@ its authored map identity. This is a solo destination beat, not a new main
 campaign chapter or shared multiplayer quest system.
 
 Station follow-up final build/census/full suite:855 passing,3 expected reds,0 unexpected.
+
+## Red Basin recorder recovery and extraction
+
+A specialized console in Burned Homestead now starts a carried survey-recorder
+objective. Bring it to the Impact Basin extraction relay, then use either real
+Anchor return gate. Two journal receipts persist both stages; this is not a
+backpack item and does not mint additional XP, loot or currency. Fixed regional
+guards and recoverable supply caches remain optional.
+
+The authoritative action checks same world/destination, live player, range,
+static visibility and current sequence stage. Normal nearby-NPC selection and
+the focused prompt share eligibility. Duplicate and out-of-order claims refuse;
+the two destination flags are separate from existing campaign rewards.
+
+Independent review caught the original extraction console inside a solid rim.
+Its district-relative Y moved-900→-650; native console/body and player approach
+clearance plus visibility assertions verify the actual geometry. Quest census
+now expects52 registered flags. Lifecycle coverage uses actual interactions,
+native in-memory archive/reload at both steps, no duplicate economy delivery,
+marker retirement and unchanged native return bindings. Cross-map travel and
+human campaign pacing are not simulated by that test.
+
+Four1280x720 screenshots inspected, all in the task workspace:
+- seat/captures/basin-recovery-0935: two standing views; focused recovery prompt and objective fit.
+- seat/captures/basin-extraction-0936: two standing views; actual prior recovery enabled the extraction prompt and changed objective.
+
+Capture mode uses a fresh disposable UserDir, native nearby recovery action
+for extraction readiness, actual floor/capsule placement and existing combat
+freeze. No journal flag injection or artificial HUD. These are static UI/
+placement checks. Simple console bodies, exposed horizons/empty extraction
+backdrop and distant redundant TALK labels remain visible polish gaps.
+
+Red Basin final build/census/full suite:856 passing,3 expected reds,0 unexpected.
