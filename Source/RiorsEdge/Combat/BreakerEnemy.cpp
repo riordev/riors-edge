@@ -868,11 +868,14 @@ bool ABreakerEnemy::IsEligibleThreatTarget(const AActor* Candidate) const
 void ABreakerEnemy::ClearThreat()
 {
     ThreatLedger.Reset(); CurrentThreatTarget.Reset(); CommittedAttackTarget.Reset();
+    ProvokedTarget.Reset(); ProvokeEndsAt = 0; bProvokeEndsOnForeignDamage = false;
 }
 
 void ABreakerEnemy::HandleThreatDamage(const FBreakerHitContext& Hit)
 {
     if (!HasAuthority() || bDead || (Combat && Combat->IsDead()) || Hit.Target != this) return;
+    if (bProvokeEndsOnForeignDamage && ProvokedTarget.IsValid() && Hit.Instigator != ProvokedTarget.Get()
+        && Hit.Result.HealthDamage + Hit.Result.ShieldDamage > 0) ProvokedTarget.Reset();
     AActor* Source = Hit.ThreatSource.Get();
     if (!IsEligibleThreatTarget(Source)) return;
     AActor* StatOwner = Source;
@@ -891,8 +894,27 @@ void ABreakerEnemy::HandleThreatDamage(const FBreakerHitContext& Hit)
     Score = FMath::Min(static_cast<double>(Score) + Earned, static_cast<double>(MAX_flt));
 }
 
+void ABreakerEnemy::ApplyProvokeThreat(AActor* Source, float Amount, float Duration, bool bCancelOnForeignDamage)
+{
+    if (!HasAuthority() || bDead || !Combat || Combat->IsDead() || !IsEligibleThreatTarget(Source)
+        || !FMath::IsFinite(Amount) || Amount < 0 || !FMath::IsFinite(Duration) || Duration <= 0) return;
+    const auto* Progression = Source->FindComponentByClass<UBreakerProgressionComponent>();
+    const float Multiplier = Progression ? Progression->GetNodeStats().ThreatGeneratedMultiplier : 1.f;
+    if (!BreakerEnemyOwnsIgnoreMe(Source))
+    {
+        float& Score = ThreatLedger.FindOrAdd(Source);
+        Score = FMath::Min(static_cast<double>(MAX_flt), static_cast<double>(Score)
+            + Amount * (FMath::IsFinite(Multiplier) ? FMath::Max(0.f,Multiplier) : 1.f));
+    }
+    ProvokedTarget = Source; ProvokeEndsAt = GetWorld()->GetTimeSeconds() + Duration;
+    bProvokeEndsOnForeignDamage = bCancelOnForeignDamage;
+}
 AActor* ABreakerEnemy::SelectThreatTarget()
 {
+    if (IsEligibleThreatTarget(ProvokedTarget.Get()) && GetWorld()->GetTimeSeconds() < ProvokeEndsAt
+        && FVector::DistSquared2D(GetActorLocation(),ProvokedTarget->GetActorLocation()) <= FMath::Square(DetectionRange))
+    { CurrentThreatTarget = ProvokedTarget; return ProvokedTarget.Get(); }
+    ProvokedTarget.Reset();
     AActor* Best = nullptr;
     float BestScore = 0, BestDistance = TNumericLimits<float>::Max();
     for (auto It = ThreatLedger.CreateIterator(); It; ++It)

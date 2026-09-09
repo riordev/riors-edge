@@ -417,6 +417,8 @@
 			"windowDuration": 4,
 			"numbers":
 			{
+				"ThreatGranted": 100,
+				"ForcedTargetSeconds": 4,
 				"RadiusCm": 1000,
 				"FlatDamagePerEnemyFraction": 0.04,
 				"MaximumStacks": 6,

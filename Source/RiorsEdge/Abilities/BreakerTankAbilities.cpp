@@ -723,24 +723,21 @@ void UBreakerAbility_Provoke::ActivateAbility(const FGameplayAbilitySpecHandle H
     // B3 LOUD: Provoke reaches 13 m (R2: 16 m) instead of 10.
     const int32 LoudRank = BreakerTankNodeRank(Character, TEXT("Tank.Bastion.Loud"));
     const float EffectiveRadius = LoudRank >= 2 ? 1600.0f : (LoudRank == 1 ? 1300.0f : RadiusCm);   // node text
-    // B10 STANDING ORDER: the window holds 10s — "until the enemy is damaged by
-    // someone who is not you" is vacuous solo (there is no one else), so the
-    // 10s clock is the whole reachable rewrite and stands recorded as such.
+    // B10 STANDING ORDER: forced focus lasts ten seconds unless a foreign source damages the enemy.
     const bool bStandingOrder = BreakerTankHasNode(Character, BreakerNodeTags::Node_B_StandingOrder.GetTag());
     const float EffectiveDuration = bStandingOrder ? 10.0f : BonusDurationSeconds;   // node text
 
-    // Count the provoked. The FORCED-TARGETING half is honestly absent (no
-    // threat concept on enemy AI — Class-Kits-Unbuilt §5.3); solo it is
-    // vacuous anyway. The SOLO CONVERSION below is §T4's implemented half.
+    // O247: forced focus opens the window; real threat remains afterward.
     int32 Provoked = 0;
     for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
     {
-        const ABreakerEnemy* Enemy = *It;
+        ABreakerEnemy* Enemy = *It;
         if (!Enemy) continue;
         const UBreakerCombatComponent* EnemyCombat = Enemy->FindComponentByClass<UBreakerCombatComponent>();
         if (!EnemyCombat || EnemyCombat->IsDead()) continue;
         if (FVector::DistSquared(Character->GetActorLocation(), Enemy->GetActorLocation()) <= EffectiveRadius * EffectiveRadius)
         {
+            Enemy->ApplyProvokeThreat(Character, ThreatGranted, bStandingOrder ? 10.f : ForcedTargetSeconds, bStandingOrder);
             ++Provoked;
         }
     }

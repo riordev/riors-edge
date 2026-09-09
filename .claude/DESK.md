@@ -8,7 +8,7 @@ Continue validated blocks until the owner returns. Prioritize playable changes f
 
 1. Fernhall cache gameplay landed; inspect dedicated capture placement before closing presentation.
 2. O258: retire Skim, make Slipcut the Swift starter, and migrate/remove SkimDiscipline with its consumer and existing loadouts.
-3. O247: Provoke keeps its four-second forced target and grants threat scaled by the existing threat lane.
+3. O247 landed: Provoke forces its target for four seconds and grants lasting scaled threat; paid Standing Order cancellation verified.
 4. O250 landed: a broken Warden front stays broken through revival.
 5. O251: occlusion hides the entire enemy plate; inspect rendered frames.
 6. O248: grandfather existing over-budget special items; constrain new rolls without removing owned affixes.
@@ -72,3 +72,5 @@ Pulled main1e369b4. Remote report:837 passing,3 expected failures,0 unexpected. 
 - Warden front revival: build and full suite838 passing/3 expected/0 unexpected; actual Wakeful revival and follow-up frontal damage tested. Broken front stays depleted; fresh Wardens still arm.
 
 - Fernhall cache: real pocket clearance, authoritative range/LOS, one physical ordinary loot roll, one-shot/reentrant claims and pickup validated. No empty prompt or map marker. Build/full suite839 passing,3 expected,0 unexpected; rendered placement pending.
+
+- Provoke: real forced target and editable threat grant, range/death/safe-zone eligibility, stronger later competitor and paid Standing Order route pass. Test competitor moved outside native melee reach while retaining real Grit proximity. Build/census/full suite840 passing,3 expected,0 unexpected. Two new numeric keys counted explicitly; no balance pin changed.

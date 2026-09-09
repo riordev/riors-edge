@@ -125,6 +125,8 @@ class RIORSEDGE_API UBreakerAbility_Provoke : public UBreakerGameplayAbility
 
 public:
     UBreakerAbility_Provoke();
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Provoke", meta=(ClampMin="0")) float ThreatGranted = 100.f; // O2 PLACEHOLDER, tunable one-time threat credit.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Provoke", meta=(ClampMin="0")) float ForcedTargetSeconds = 4.f; // O2 PLACEHOLDER, authored window.
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
     static FName OutgoingModifierKey();

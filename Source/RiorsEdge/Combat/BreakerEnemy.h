@@ -201,6 +201,7 @@ public:
     AActor* GetCommittedAttackTarget() const { return CommittedAttackTarget.Get(); }
     bool IsEligibleThreatTarget(const AActor* Candidate) const;
     void ClearThreat();
+    void ApplyProvokeThreat(AActor* Source, float Amount, float Duration, bool bCancelOnForeignDamage);
     // Read-only views of the authored tuning. Public so tools, the playtest
     // report and the automation suite can assert against what an archetype
     // SHIPS with, without opening the tuning itself for writing.
@@ -710,6 +711,9 @@ protected:
     TWeakObjectPtr<AActor> CurrentThreatTarget;
     TWeakObjectPtr<AActor> CommittedAttackTarget;
     TMap<TWeakObjectPtr<AActor>, float> ThreatLedger;
+    TWeakObjectPtr<AActor> ProvokedTarget;
+    double ProvokeEndsAt = 0;
+    bool bProvokeEndsOnForeignDamage = false;
     UFUNCTION() void HandleThreatDamage(const FBreakerHitContext& Hit);
     AActor* SelectThreatTarget();
     // Wakeful needs to know how the killing blow landed.
