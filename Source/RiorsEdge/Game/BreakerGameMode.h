@@ -505,7 +505,53 @@ public:
         }
     };
 
+    // REPOPULATION, THE ORDINARY WORLD ONLY. A rift is an instance with a
+    // completion condition and its population stays finite; the world outside
+    // one has patrols, and a patrol that never comes back leaves a destination
+    // that is cleared once and then permanently empty. Owner-ruled.
+    //
+    // O2 PLACEHOLDER. Long enough that clearing a pocket is an accomplishment
+    // that lasts, short enough that a player crossing back finds the world
+    // alive rather than swept.
+    UPROPERTY(EditDefaultsOnly, Category="World|Repopulation", meta=(ClampMin="0"))
+    float OutdoorRepopulationDelaySeconds = 45.0f;
+    // NOT A TASTE NUMBER: it must exceed ABreakerEnemy::DetectionRange (2200),
+    // or a patrol returns already able to see the player and the arrival reads
+    // as the pop-in this block exists to remove. 3000 keeps margin over it and
+    // still sits inside a yard band. O2 PLACEHOLDER.
+    UPROPERTY(EditDefaultsOnly, Category="World|Repopulation", meta=(ClampMin="0"))
+    float OutdoorRepopulationClearanceCm = 3000.0f;
+
 private:
+    // ONE AUTHORED STANDING PLACE. Recorded when the area is built, so a
+    // returning patrol takes the slot it was placed in rather than having its
+    // position re-derived — the formation maths in SpawnFernhallEncounters is
+    // authored layout, and a second evaluation of it is a second source of
+    // truth that can drift.
+    struct FBreakerOutdoorSlot
+    {
+        TSubclassOf<class ABreakerEnemy> Class;
+        FVector Home = FVector::ZeroVector;
+        FRotator Facing = FRotator::ZeroRotator;
+        float PatrolPhase = 0.0f;
+        int32 AreaLevel = 1;
+        int32 Pocket = INDEX_NONE;
+        bool bElite = false;
+        // The body standing in it, or nothing. A slot is empty when its
+        // occupant is gone OR dead: a corpse still lying in the pocket has
+        // already stopped being a fight.
+        TWeakObjectPtr<class ABreakerEnemy> Occupant;
+        float EmptySeconds = 0.0f;
+    };
+    TArray<FBreakerOutdoorSlot> OutdoorSlots;
+    // THE PACE, SHARED RATHER THAN PER-SLOT. Every empty slot accrues in
+    // parallel while a pocket stands cleared, so without one clock they all
+    // come due in the same frame and the pocket refills as a WAVE — which is
+    // the rift's verb, not the world's. One body returns, then the world
+    // waits again.
+    float OutdoorRepopulationCountdown = 0.0f;
+    void TickOutdoorRepopulation(float DeltaSeconds);
+    class ABreakerEnemy* RefillOutdoorSlot(FBreakerOutdoorSlot& Slot);
     void SpawnFernhallEncounters(const FBreakerZoneMarkers& Markers);
     void BuildSurvivorMission(APawn* Player);
     void TickSurvivorMission();

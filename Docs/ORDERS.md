@@ -2503,27 +2503,43 @@ because the next authored ledge is the one nobody will check.
 rather than three numbers copied out of a header. That is the same
 publish-once-read-many shape that gave 145 one author.
 
-## THE ROAM SPACE: SPARSE AND NON-RESPAWNING, AND THE VERB IS DIFFERENT
+## THE ROAM SPACE: PATROLLED, AND THE VERB IS DIFFERENT
 
 GROUND's report names a tension nobody had: **the roam and the rift interior are
 the same ground.** A player who fights trash walking to a door, then steps
 through it to fight trash in the room they were just standing in, has been given
 one space twice — and tuning either population does not fix that.
 
-**Their recommendation is accepted, and one thing is added that resolves the
-tension rather than softening it.** Sparse and non-respawning, yes. And:
+**The tension is real and the answer is not population count.** The roam was
+once made non-respawning to carry this distinction on its own, and it could not:
+a player cannot feel the difference between "finite" and "slow" while standing
+in a cleared yard, and the price was a destination that is swept once and then
+permanently dead — which is also why a quest whose kills are elite-gated could
+not be finished without leaving and rebuilding the instance.
 
-**The roam's fight is a DIFFERENT KIND, not a smaller amount.** The rift is
-waves that escalate and end. The roam is **placed, static, finite** — you clear
-it and it stays clear while you are in the area. Nothing spawns behind you,
-nothing escalates, nothing is a run. That makes the roam about **traversal and
-what is found**, which is what One-AA parked the exploration reward on, and the
-rift about escalation and a payout. Same ground, two verbs, and a player can
-tell which one they are in without being told.
+**What separates the two verbs is the rift's OBJECTIVE and its DRESSING.** The
+rift is a run: clear the area, survive the waves, deliver the payload — it
+escalates, it ends, and it pays. The roam is **patrolled and continuous** —
+nothing escalates, nothing concludes, and a cleared pocket returns to its
+authored composition one body at a time on the world's clock, never within
+sight of the player. That makes the roam about **traversal and what is found**,
+which is what One-AA parked the exploration reward on, and the rift about
+escalation and a payout.
 
-**The roam pays the LADDER, not loot-per-kill** (One-AA): what a roam fight
-gives is access, discovery, and the first-clear purse. Density is `O2
-PLACEHOLDER` and it is the owner's, through `Breaker.Rift.Population`.
+**What a roam fight PAYS is the ladder and the first-clear purse** (One-AA):
+access and discovery, not a per-kill economy — the rift is where killing pays
+per body. A returning patrol is an ordinary enemy and pays what one pays; what
+the roam does not do is make grinding it the efficient route, and the world
+clock is what holds that, since one body returns per interval no matter how
+fast the ground is cleared. Density is `O2 PLACEHOLDER` and it is the owner's,
+through `Breaker.Rift.Population`.
+
+**This is why the rift interior must read as a DILAPIDATED version of the area
+it copies.** With the two verbs no longer separated by population, the visual is
+what tells a player which rules they are standing under before they act on
+them — whether clearing this ground progresses an objective or merely thins a
+patrol that will reform. It is legibility, not decoration, and it is the load-
+bearing half of the distinction.
 
 ## KIT'S TRAVERSAL RECON — ROUTED
 

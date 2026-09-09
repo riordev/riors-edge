@@ -1,4 +1,5 @@
 #include "Game/BreakerGameMode.h"
+#include "Game/BreakerRepopulationMath.h"
 #include "Game/BreakerPrototypeDestinations.h"
 #include "Game/BreakerCoopCombatTest.h"
 #include "GameFramework/PawnMovementComponent.h"
@@ -95,6 +96,7 @@ void ABreakerGameMode::Tick(float DeltaSeconds)
     Super::Tick(DeltaSeconds);
     TickSupplyCrate(DeltaSeconds);
     TickWaveAdvance(DeltaSeconds);
+    TickOutdoorRepopulation(DeltaSeconds);
     TickCrowdSampler(DeltaSeconds);
     if (bFernhallMissionReady && GetWorld() && GetWorld()->GetFirstPlayerController())
         BindFernhallMissionJournal(GetWorld()->GetFirstPlayerController()->GetPawn());
@@ -4092,6 +4094,99 @@ void ABreakerGameMode::HandleSurvivorExtraction(ABreakerSurvivor* Survivor, ABre
     UE_LOG(LogTemp, Display, TEXT("[Survivor] Physical extraction verified; return to Anchor remains required."));
 }
 
+// ---------------------------------------------------------------------------
+// REPOPULATION. The ordinary world has patrols and they come back; a rift is an
+// instance with a completion condition and stays finite. Owner-ruled, and it
+// REPLACES the reasoning of the older roam ruling rather than merely reversing
+// it: finiteness used to be what made the roam and the rift feel like different
+// verbs, because they are the same ground. That work now falls to the rift's
+// objective and its dilapidated dressing, which separate the two far harder
+// than a population count did.
+//
+// Deliberately NOT the per-body self-respawn that already ships
+// (ABreakerEnemy::bRespawns, live today on the gym's standing encounter): that
+// path returns a body three seconds after death wherever it fell, with no
+// distance gate and no pace. The mode owns this clock because the gate and the
+// cadence ARE the feature.
+// ---------------------------------------------------------------------------
+void ABreakerGameMode::TickOutdoorRepopulation(float DeltaSeconds)
+{
+    if (bRiftInstance || OutdoorSlots.IsEmpty()) return;
+    UWorld* World = GetWorld();
+    if (!World || !HasAuthority()) return;
+
+    OutdoorRepopulationCountdown = FMath::Max(0.0f, OutdoorRepopulationCountdown - DeltaSeconds);
+
+    const APlayerController* Viewer = World->GetFirstPlayerController();
+    const APawn* Player = Viewer ? Viewer->GetPawn() : nullptr;
+    if (!Player) return;
+    const FVector PlayerAt = Player->GetActorLocation();
+
+    // A slot is empty when its occupant is gone OR dead: a corpse lying in the
+    // pocket has already stopped being a fight.
+    TArray<float, TInlineAllocator<32>> Candidates;
+    Candidates.Reserve(OutdoorSlots.Num());
+    for (FBreakerOutdoorSlot& Slot : OutdoorSlots)
+    {
+        const ABreakerEnemy* Standing = Slot.Occupant.Get();
+        const bool bHeld = Standing && !Standing->IsDeadEnemy();
+        Slot.EmptySeconds = bHeld ? 0.0f : Slot.EmptySeconds + DeltaSeconds;
+        // A slot the player is standing near is no candidate this frame, but it
+        // KEEPS the wait it has accrued — walking away must not restart a clock
+        // that has already run, or a patrolled route could never recover.
+        const bool bClear = BreakerRepopulation::IsClearOfPlayer(
+            FVector::DistSquared(Slot.Home, PlayerAt), OutdoorRepopulationClearanceCm);
+        Candidates.Add(bHeld || !bClear ? 0.0f : Slot.EmptySeconds);
+    }
+
+    if (OutdoorRepopulationCountdown > 0.0f) return;
+    const int32 Due = BreakerRepopulation::NextDueSlot(Candidates, OutdoorRepopulationDelaySeconds);
+    if (Due == INDEX_NONE) return;
+    if (RefillOutdoorSlot(OutdoorSlots[Due]))
+    {
+        OutdoorRepopulationCountdown = OutdoorRepopulationDelaySeconds;
+    }
+}
+
+ABreakerEnemy* ABreakerGameMode::RefillOutdoorSlot(FBreakerOutdoorSlot& Slot)
+{
+    UWorld* World = GetWorld();
+    if (!World || !Slot.Class) return nullptr;
+    // The floor under this slot was traced when the area was built and has not
+    // moved, but the world has had a fight in it since: a corpse, a deployable
+    // or another body can be standing here now. Refuse and try again rather
+    // than pushing a patrol into something.
+    FCollisionQueryParams Query(SCENE_QUERY_STAT(FernhallRepopulation), false);
+    if (ABreakerEnemy* Fallen = Slot.Occupant.Get()) Query.AddIgnoredActor(Fallen);
+    const ABreakerEnemy* Template = GetDefault<ABreakerEnemy>(Slot.Class);
+    const UCapsuleComponent* Body = Template ? Template->FindComponentByClass<UCapsuleComponent>() : nullptr;
+    if (Body && World->OverlapBlockingTestByChannel(Slot.Home, FQuat::Identity, ECC_Pawn,
+        FCollisionShape::MakeCapsule(Body->GetScaledCapsuleRadius(), Body->GetScaledCapsuleHalfHeight()), Query))
+    {
+        return nullptr;
+    }
+    FActorSpawnParameters Parameters;
+    Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    ABreakerEnemy* Patrol = World->SpawnActor<ABreakerEnemy>(Slot.Class, Slot.Home, Slot.Facing, Parameters);
+    if (!Patrol) return nullptr;
+    // Exactly what the authored placement gave this slot, including the elite
+    // that a quest's elite-gated objective counts. ConfigureWave keeps the
+    // per-body self-respawn off: this clock owns the return, not the corpse.
+    Patrol->ConfigureWave(Slot.AreaLevel);
+    if (Slot.bElite) Patrol->ConfigureElite();
+    Patrol->ConfigureEncounter(Slot.Home, Slot.PatrolPhase);
+    if (Slot.Pocket != INDEX_NONE)
+    {
+        Patrol->Tags.Add(FName(*FString::Printf(TEXT("Fernhall.Outdoor.%d"), Slot.Pocket)));
+    }
+    UBreakerKillTelemetryComponent::AttachTo(Patrol);
+    // The same protection every other arrival gets.
+    Patrol->GrantEmergenceWindow();
+    Slot.Occupant = Patrol;
+    Slot.EmptySeconds = 0.0f;
+    return Patrol;
+}
+
 void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Markers)
 {
     UWorld* World = GetWorld();
@@ -4222,6 +4317,20 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
             Enemy->SetActorLocation(At);
             Enemy->ConfigureEncounter(At, Index * 1.3f);
             Enemy->Tags.Add(FName(*FString::Printf(TEXT("Fernhall.Outdoor.%d"), Pocket)));
+            // THE SLOT, recorded at the moment the placement is known good:
+            // floor traced, capsule clear, formation resolved. A patrol that
+            // returns takes this back rather than having its position derived a
+            // second time from the formation maths above — one authored layout,
+            // one source of truth for where a body stands.
+            FBreakerOutdoorSlot& Slot = OutdoorSlots.AddDefaulted_GetRef();
+            Slot.Class = Class;
+            Slot.Home = At;
+            Slot.Facing = (-Forward).Rotation();
+            Slot.PatrolPhase = Index * 1.3f;
+            Slot.AreaLevel = AreaLevel;
+            Slot.Pocket = Pocket;
+            Slot.bElite = bElite;
+            Slot.Occupant = Enemy;
             PocketMembers.Add(Enemy);
             UBreakerKillTelemetryComponent::AttachTo(Enemy);
             ++Spawned;
