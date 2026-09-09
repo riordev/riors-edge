@@ -429,6 +429,15 @@ protected:
     virtual void TickEngagedBehaviour(AActor* Player, float Distance, float DeltaSeconds,
         FVector& OutDirection, float& OutSpeedScale);
 
+    // THE ARRIVAL RING, extracted so it can be called rather than inherited.
+    // Every archetype that CLOSES must call this: an override that replaces
+    // the base chase replaces the ring along with it, which is exactly how
+    // the Warden ended up walking full speed into the player and through
+    // them. Reused, not re-derived — the same rule this ring already
+    // carries for the ranged band it came from.
+    void ApplyArrivalRing(AActor* Player, float Distance, const FVector& ToPlayer,
+        FVector& OutDirection, float& OutSpeedScale, FVector& OutApproach);
+
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UCapsuleComponent> BodyCollision;
     // The mover (NAV-1, NAV's, in AI/). Tick hands it the behaviour's direction
     // and speed scale once per authoritative frame; it steers or paths, and it

@@ -1056,6 +1056,44 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
     }
 }
 
+
+void ABreakerEnemy::ApplyArrivalRing(AActor* Player, float Distance, const FVector& ToPlayer,
+    FVector& OutDirection, float& OutSpeedScale, FVector& OutApproach)
+{
+    if (!Player) return;
+    ArrivalBand = UBreakerRangedBehaviorLibrary::ClassifyBand(Distance,
+        AttackRange * ArrivalInnerRatio, AttackRange, ArrivalHysteresisCm, ArrivalBand);
+    // THE ARRIVAL ANGLE. Advance walks to a point ON the ring, not to the
+    // player: the target-to-body bearing rotated by this body's signed
+    // ArrivalOffsetDeg, handed to the mover through the goal channel so a
+    // blocked line still paths to it. Two closers seeded apart split left and
+    // right and arrive from two angles instead of stacking on one point. The
+    // weave below folds onto this approach vector. A subclass with no contact
+    // range has no ring and closes straight on the player.
+    OutApproach = ToPlayer;
+    if (ArrivalBand == EBreakerRangedBand::Advance && AttackRange > 0.0f)
+    {
+        const FVector Goal = BreakerLocomotionMath::ArrivalGoal(Player->GetActorLocation(), GetActorLocation(),
+            AttackRange, BreakerLocomotionMath::ArrivalSign(PatrolPhase), BreakerLocomotionMath::ArrivalOffsetDeg);
+        PathGoal = Goal;
+        bHasPathGoal = true;
+        const FVector ToGoal = (Goal - GetActorLocation()).GetSafeNormal2D();
+        if (!ToGoal.IsNearlyZero()) OutApproach = ToGoal;
+        OutDirection = OutApproach;
+    }
+    if (ArrivalBand != EBreakerRangedBand::Advance)
+    {
+        const float RadialSign = UBreakerRangedBehaviorLibrary::GetBandRadialSign(ArrivalBand);
+        OutDirection = ToPlayer * RadialSign;
+        OutSpeedScale = UBreakerRangedBehaviorLibrary::GetBandSpeedScale(
+            ArrivalBand, 1.0f, ArrivalRetreatSpeedScale, 0.0f);
+        // Facing is set explicitly because a held body has no movement
+        // direction to derive one from, and an enemy attacking the player
+        // while facing where it last walked is worse than the stack was.
+        DesiredFacing = ToPlayer;
+        StateLabel = ArrivalBand == EBreakerRangedBand::Hold ? TEXT("ATTACK") : TEXT("BACK OFF");
+    }
+}
 void ABreakerEnemy::TickEngagedBehaviour(AActor* Player, float Distance, float DeltaSeconds,
     FVector& OutDirection, float& OutSpeedScale)
 {
@@ -1080,38 +1118,10 @@ void ABreakerEnemy::TickEngagedBehaviour(AActor* Player, float Distance, float D
     // mid-wind-up must be allowed to finish rather than freeze holding a
     // telegraph it never pays off. The ring governs the chase; it does not
     // govern a leap that has already been announced to the player.
-    ArrivalBand = UBreakerRangedBehaviorLibrary::ClassifyBand(Distance,
-        AttackRange * ArrivalInnerRatio, AttackRange, ArrivalHysteresisCm, ArrivalBand);
-    // THE ARRIVAL ANGLE. Advance walks to a point ON the ring, not to the
-    // player: the target-to-body bearing rotated by this body's signed
-    // ArrivalOffsetDeg, handed to the mover through the goal channel so a
-    // blocked line still paths to it. Two closers seeded apart split left and
-    // right and arrive from two angles instead of stacking on one point. The
-    // weave below folds onto this approach vector. A subclass with no contact
-    // range has no ring and closes straight on the player.
+    // The ring is a CALL now, not inherited code, so an archetype that
+    // overrides the chase cannot silently drop it.
     FVector Approach = ToPlayer;
-    if (ArrivalBand == EBreakerRangedBand::Advance && AttackRange > 0.0f)
-    {
-        const FVector Goal = BreakerLocomotionMath::ArrivalGoal(Player->GetActorLocation(), GetActorLocation(),
-            AttackRange, BreakerLocomotionMath::ArrivalSign(PatrolPhase), BreakerLocomotionMath::ArrivalOffsetDeg);
-        PathGoal = Goal;
-        bHasPathGoal = true;
-        const FVector ToGoal = (Goal - GetActorLocation()).GetSafeNormal2D();
-        if (!ToGoal.IsNearlyZero()) Approach = ToGoal;
-        OutDirection = Approach;
-    }
-    if (ArrivalBand != EBreakerRangedBand::Advance)
-    {
-        const float RadialSign = UBreakerRangedBehaviorLibrary::GetBandRadialSign(ArrivalBand);
-        OutDirection = ToPlayer * RadialSign;
-        OutSpeedScale = UBreakerRangedBehaviorLibrary::GetBandSpeedScale(
-            ArrivalBand, 1.0f, ArrivalRetreatSpeedScale, 0.0f);
-        // Facing is set explicitly because a held body has no movement
-        // direction to derive one from, and an enemy attacking the player
-        // while facing where it last walked is worse than the stack was.
-        DesiredFacing = ToPlayer;
-        StateLabel = ArrivalBand == EBreakerRangedBand::Hold ? TEXT("ATTACK") : TEXT("BACK OFF");
-    }
+    ApplyArrivalRing(Player, Distance, ToPlayer, OutDirection, OutSpeedScale, Approach);
 
     // (a) Closing sprint: far away, they commit to closing the gap
     // instead of ambling. Inside SprintRange they drop to normal so the

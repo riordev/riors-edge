@@ -247,8 +247,15 @@ void ABreakerWardenEnemy::TickEngagedBehaviour(AActor* Player, float Distance, f
     // toward it at MaxTurnRateDegreesPerSecond, once, which is what makes
     // circling it a real contest rather than a free win.
     DesiredFacing = ToPlayer;
-    OutDirection = ToPlayer;
-    OutSpeedScale = 1.0f;
+    // THE WARDEN CLOSES THROUGH THE RING. It used to write a full-speed
+    // vector straight at the player and fall off the end of this function
+    // with it intact whenever neither attack was armed — and because this
+    // override never calls Super, nothing downstream re-added the spacing:
+    // the mover has no stop distance while steering, by design, because the
+    // ring "is always the behaviour's to govern, never the path's". So the
+    // body walked into the player and, the player being a Pawn, through them.
+    FVector Approach = ToPlayer;
+    ApplyArrivalRing(Player, Distance, ToPlayer, OutDirection, OutSpeedScale, Approach);
     StateLabel = TEXT("ADVANCE");
 
     // --- Slam: resolves first, because it is the attack that ignores facing
