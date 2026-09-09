@@ -41,3 +41,5 @@ Historical validation receipts; current pending work is in .claude/DESK.md.
 - Cleave tempo: editable O2 cost20→12, lock/window0.45→0.30; unchanged coefficient/range/Bleed. Native casts13→23 per ten seconds; first ratio0.73/0.74, still below goal. Prepared boundary now uses purchased Fracture from positive Mana; real negative-cast refusal preserved. Censored opening/ammo edges corrected. Build/census/full suite852/3/0; independent review, no pins changed. See Docs/reports/cleave-tempo-2026-09-09.md.
 
 - Fernhall/service polish: 21 noncolliding perimeter props, selective supported-material Nanite fallback, distant action-label cleanup, retired Skim HUD removal and current-rule cleanup. Nine rendered frames inspected. Build/full suite856/3/0; see Docs/reports/fernhall-service-polish-2026-09-09.md.
+
+- Rift layout reproducibility: canonical lowercase text FNV replaces process-local FName hash. Unset/empty identity and area/base participation preserved; golden70439488 independently reproduced and native checked. Existing nonempty arrangements change once; no persisted run seeds require migration. Build/full suite856/3/0, no pins changed.

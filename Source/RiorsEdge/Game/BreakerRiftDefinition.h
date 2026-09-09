@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Hash/Fnv.h"
 #include "Combat/BreakerMonsterChassis.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
@@ -88,7 +89,14 @@ struct RIORSEDGE_API FBreakerRiftDefinition
     int32 LayoutSeed(int32 Base) const
     {
         if (!IsSet()) return Base;
-        const uint32 Mixed = HashCombine(HashCombine(GetTypeHash(EncounterId),
+        // O262: FName's comparison index belongs to the running process.
+        // Hash canonical text instead; preserve NAME_None's original zero hash.
+        // FNV string hashing is stable across character widths, and lower-case
+        // normalization preserves FName's case-insensitive identity.
+        const FString CanonicalId = EncounterId.ToString().ToLower();
+        const uint32 IdentityHash = EncounterId.IsNone() ? 0u
+            : UE::HashStringFNV1a32(FStringView(CanonicalId));
+        const uint32 Mixed = HashCombine(HashCombine(IdentityHash,
             GetTypeHash(EffectiveAreaLevel())), static_cast<uint32>(Base));
         // Folded into a non-negative int32: FRandomStream takes a signed seed
         // and a negative one is legal but reads as a mistake in a log.

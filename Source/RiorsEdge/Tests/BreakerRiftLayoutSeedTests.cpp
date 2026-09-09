@@ -42,6 +42,16 @@ bool FBreakerRiftLayoutSeedTest::RunTest(const FString&)
     TestEqual(TEXT("and identically from an equal copy"),
         A.LayoutSeed(Base), Rift(TEXT("breach.marshalling"), 12).LayoutSeed(Base));
 
+    // Fixed algorithm witness, independent of this process's FName allocation
+    // order. This is a reproducibility contract, not an O2 gameplay magnitude.
+    TestEqual(TEXT("canonical encounter text has a process-independent golden seed"),
+        A.LayoutSeed(Base), 70439488);
+    TestEqual(TEXT("FName identity remains case insensitive"),
+        A.LayoutSeed(Base), Rift(TEXT("BREACH.MARSHALLING"), 12).LayoutSeed(Base));
+    TestEqual(TEXT("set rift with empty identity preserves original zero-identity hash"),
+        Rift(TEXT(""), 12).LayoutSeed(Base),
+        static_cast<int32>(HashCombine(HashCombine(0u, GetTypeHash(12)), static_cast<uint32>(Base)) & 0x7fffffffu));
+
     // DISTINCT: two rifts are two places.
     const FBreakerRiftDefinition B = Rift(TEXT("fernhall.approach"), 12);
     TestNotEqual(TEXT("a different encounter is a different layout"), A.LayoutSeed(Base), B.LayoutSeed(Base));
