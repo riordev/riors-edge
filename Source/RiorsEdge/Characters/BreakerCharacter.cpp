@@ -70,6 +70,7 @@
 #include "Interaction/BreakerNPC.h"
 #include "Interaction/BreakerFernhallCache.h"
 #include "Interaction/BreakerBasinRecorder.h"
+#include "Interaction/BreakerCoastalUplink.h"
 #include "Interaction/BreakerTravelPoint.h"
 #include "Interaction/BreakerRiftDoor.h"
 #include "Game/BreakerZoneBuilder.h"
@@ -2625,6 +2626,7 @@ ABreakerNPC* ABreakerCharacter::FindNearbyNPC() const
     {
         if (const auto* Cache = Cast<ABreakerFernhallCache>(*It); Cache && !Cache->IsInteractionReachable(this)) continue;
         if (const auto* Recorder=Cast<ABreakerBasinRecorder>(*It);Recorder&&!Recorder->IsInteractionReachable(this))continue;
+        if (const auto* Uplink=Cast<ABreakerCoastalUplink>(*It);Uplink&&!Uplink->IsInteractionReachable(this))continue;
         const float DistanceSq = FVector::DistSquared(GetActorLocation(), It->GetActorLocation());
         if (DistanceSq <= FMath::Square(It->GetInteractionRange()) && DistanceSq < NearestDistanceSq)
         {
@@ -2735,6 +2737,11 @@ void ABreakerCharacter::InteractWithNearbyNPC()
 
     ABreakerNPC* NPC = FindNearbyNPC();
     if (!NPC) return;
+    if(auto* Uplink=Cast<ABreakerCoastalUplink>(NPC))
+    {
+        if(HasAuthority())Uplink->TryInteract(this);else ServerInteractCoastalUplink(Uplink);
+        return;
+    }
     if(auto* Recorder=Cast<ABreakerBasinRecorder>(NPC))
     {
         if(HasAuthority())Recorder->TryInteract(this);else ServerInteractBasinRecorder(Recorder);
@@ -2962,6 +2969,8 @@ void ABreakerCharacter::Landed(const FHitResult& Hit)
     LastFallingSpeed = 0.0f;
 }
 
+void ABreakerCharacter::ServerInteractCoastalUplink_Implementation(ABreakerCoastalUplink* Uplink)
+{ if(IsValid(Uplink))Uplink->TryInteract(this); }
 void ABreakerCharacter::ServerInteractBasinRecorder_Implementation(ABreakerBasinRecorder* Recorder)
 { if(IsValid(Recorder))Recorder->TryInteract(this); }
 

@@ -51,7 +51,8 @@
 		"Quest.Watch.TurnedIn",
 		"Quest.StationZero.CustodianDown",
 		"Quest.RedBasin.RecorderRecovered",
-		"Quest.RedBasin.RecorderExtracted"
+		"Quest.RedBasin.RecorderExtracted",
+		"Quest.BrokenCoast.UplinkRestored"
 	],
 	"quests": [
 		{

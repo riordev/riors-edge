@@ -19,6 +19,7 @@
 #include "HAL/FileManager.h"
 #include "Interaction/BreakerFernhallCache.h"
 #include "Interaction/BreakerBasinRecorder.h"
+#include "Interaction/BreakerCoastalUplink.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
@@ -38,14 +39,18 @@ namespace
 }
 void BreakerSchedulePlateCapture(UWorld* World)
 {
- FString Mode,UserDirectory,VolatileMode,AbilityClass,RecorderMode;
+ FString Mode,UserDirectory,VolatileMode,AbilityClass,RecorderMode,UplinkMode;
+ const bool bUplink=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureUplink="),UplinkMode);
  const bool bRecorder=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureRecorder="),RecorderMode);
  const bool bAbilityMenu=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureAbilityClass="),AbilityClass);
  const bool bVolatile=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureVolatileFreeze="),VolatileMode);
  const bool bPlate=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureEnemyPlate="),Mode);
  const bool bCache=FParse::Param(FCommandLine::Get(),TEXT("BreakerCaptureCache"));
  const bool bScenery=FParse::Param(FCommandLine::Get(),TEXT("BreakerCaptureScenery"));
- if(!World||(!bPlate&&!bCache&&!bScenery&&!bVolatile&&!bAbilityMenu&&!bRecorder))return;
+ if(!World||(!bPlate&&!bCache&&!bScenery&&!bVolatile&&!bAbilityMenu&&!bRecorder&&!bUplink))return;
+ if(bUplink && (bPlate||bCache||bScenery||bVolatile||bAbilityMenu||bRecorder
+    ||(!UplinkMode.Equals(TEXT("Ready"),ESearchCase::IgnoreCase)&&!UplinkMode.Equals(TEXT("Active"),ESearchCase::IgnoreCase))))
+ { UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Uplink requires Ready or Active and no other setup mode."));return; }
  if(bRecorder && (bPlate||bCache||bScenery||bVolatile||bAbilityMenu
     ||(!RecorderMode.Equals(TEXT("Recovery"),ESearchCase::IgnoreCase)&&!RecorderMode.Equals(TEXT("Extraction"),ESearchCase::IgnoreCase))))
  { UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Recorder requires Recovery or Extraction and no other setup mode."));return; }
@@ -74,9 +79,9 @@ void BreakerSchedulePlateCapture(UWorld* World)
  {UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Mode must be open or blocked."));return;}
  // Core time advances while the arrival menu has paused world timers.
  // Weak UObject binding prevents setup after this world is destroyed.
- FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(World,[World,Mode,bCache,bPlate,bScenery,bVolatile,bAbilityMenu,AbilityClass,bRecorder,RecorderMode](float)
+ FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(World,[World,Mode,bCache,bPlate,bScenery,bVolatile,bAbilityMenu,AbilityClass,bRecorder,RecorderMode,bUplink,UplinkMode](float)
  {
-    if(bAbilityMenu||bRecorder)
+    if(bAbilityMenu||bRecorder||bUplink)
         if(const auto* Session=World->GetGameInstance<UBreakerGameInstance>(); Session && Session->IsArrivalCoverUp()) return true;
     auto* PC=World->GetFirstPlayerController();auto* Player=PC?Cast<ABreakerCharacter>(PC->GetPawn()):nullptr;
     if(!Player||!Player->HasAuthority())return false;
@@ -151,6 +156,33 @@ void BreakerSchedulePlateCapture(UWorld* World)
         UE_LOG(LogTemp,Display,TEXT("[PlateCapture] Recorder=%s actualCurrentStep=%d reachable=%d nearby=%d standing=%s console=%s; native recovery used for extraction, no flag injection; combat frozen for static QA."),
             *RecorderMode,Selected->IsCurrentStep(Player),Selected->IsInteractionReachable(Player),Player->FindNearbyNPC()==Selected,
             *Player->GetActorLocation().ToString(),*Selected->GetActorLocation().ToString());
+    }
+    else if(bUplink)
+    {
+        ABreakerCoastalUplink* Uplink=nullptr;
+        for(TActorIterator<ABreakerCoastalUplink> It(World);It;++It){Uplink=*It;break;}
+        if(!Uplink){UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Uplink setup requires actual Broken Coast console."));return false;}
+        // O2 PLACEHOLDER capture distance only. Keep actual floor, capsule,
+        // interaction LOS, console and surrounding geometry unchanged.
+        FVector At=Uplink->GetActorLocation()+Uplink->GetActorForwardVector()*180.f;
+        FCollisionQueryParams Query(SCENE_QUERY_STAT(UplinkCaptureFloor),false,Player);Query.AddIgnoredActor(Uplink);
+        FHitResult Floor;
+        if(!World->LineTraceSingleByObjectType(Floor,At+FVector(0,0,200),At-FVector(0,0,500),FCollisionObjectQueryParams(ECC_WorldStatic),Query))
+        {UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Uplink approach has no actual standing floor."));return false;}
+        const auto* Body=Player->GetCapsuleComponent();
+        At.Z=Floor.ImpactPoint.Z+Body->GetScaledCapsuleHalfHeight()+2.f;
+        if(World->OverlapAnyTestByObjectType(At,FQuat::Identity,FCollisionObjectQueryParams(ECC_WorldStatic),
+            FCollisionShape::MakeCapsule(Body->GetScaledCapsuleRadius(),Body->GetScaledCapsuleHalfHeight()),Query))
+        {UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Uplink standing capsule is obstructed."));return false;}
+        Player->SetActorLocation(At);
+        if(!Uplink->IsInteractionReachable(Player)||Player->FindNearbyNPC()!=Uplink)
+        {UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Uplink real interaction/visibility did not select console."));return false;}
+        if(UplinkMode.Equals(TEXT("Active"),ESearchCase::IgnoreCase)&&!Uplink->TryInteract(Player))
+        {UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Uplink Active refused: real interaction failed."));return false;}
+        Aim=Uplink->GetActorLocation();
+        UE_LOG(LogTemp,Display,TEXT("[PlateCapture] Uplink STATIC QA mode=%s active=%d remaining=%.3f authored=%.3f reachable=%d nearby=%d standing=%s console=%s; real interaction only, no flags/time injection; simulation frozen, not countdown acceptance."),
+            *UplinkMode,Uplink->IsTransmitting(),Uplink->GetRemainingSeconds(),Uplink->TransmissionSeconds,Uplink->IsInteractionReachable(Player),Player->FindNearbyNPC()==Uplink,
+            *Player->GetActorLocation().ToString(),*Uplink->GetActorLocation().ToString());
     }
     else if(bCache)
     {

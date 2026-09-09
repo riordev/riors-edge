@@ -17,6 +17,7 @@
 #include "EngineUtils.h"
 #include "Interaction/BreakerFernhallCache.h"
 #include "Interaction/BreakerBasinRecorder.h"
+#include "Interaction/BreakerCoastalUplink.h"
 #include "Interaction/BreakerTravelPoint.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Misc/PackageName.h"
@@ -40,7 +41,7 @@ const TArray<BreakerPrototypeDestinations::FDefinition>& BreakerPrototypeDestina
             {FVector(2200,0,0), FVector(8800,0,0), FVector(15400,0,0)},
             {TEXT("Departures Terminal"), TEXT("Broken Apron"), TEXT("Maintenance Hangar")}, {34,36,38}},
         {TEXT("BrokenCoast"), TEXT("Lvl_BrokenCoast"), TEXT("Broken Coast"),
-            TEXT("Areas 42-46 / Flat shoreline. Recover supplies from Strand Landing, Broken Jetty and Signal Point."),
+            TEXT("Areas 42-46 / Flat shoreline. Restore the Signal Point coastal uplink; supply caches are optional."),
             {FVector(2200,0,0), FVector(8800,0,0), FVector(15400,0,0)},
             {TEXT("Strand Landing"), TEXT("Broken Jetty"), TEXT("Signal Point")}, {42,44,46}},
         {TEXT("Shatterpoint"), TEXT("Lvl_Shatterpoint"), TEXT("Shatterpoint"),
@@ -485,6 +486,12 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
             Result.Caches.Add(Cache);
         }
     }
+    // O2 PLACEHOLDER: inland approach to the existing Signal Point tower;
+    // finite level-46 defenders stay unchanged and may already be defeated.
+    bool bUplinkPresent=!bCoast;
+    if(bCoast)
+        if(auto* Uplink=World->SpawnActor<ABreakerCoastalUplink>(Definition->Districts.Last()+FVector(1900,-1100,100),FRotator(0,180,0)))
+            bUplinkPresent=true;
     // Wide connectors overlap both districts. The laboratory turns north;
     // the farm track bends toward the impact basin.
     for (int32 Link=0;Link<2;++Link)
@@ -506,7 +513,7 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
             Gate->Tags.Add(TEXT("PrototypeDestination.ReturnGate"));
             Result.Gates.Add(Gate);
         }
-    Result.bComplete=bGeometryValid && (!bBasin || RecorderCount==2) && Result.Enemies.Num()==18 && Result.Caches.Num()==3 && Result.Gates.Num()==2 && Result.DressingCount>=6;
+    Result.bComplete=bGeometryValid && bUplinkPresent && (!bBasin || RecorderCount==2) && Result.Enemies.Num()==18 && Result.Caches.Num()==3 && Result.Gates.Num()==2 && Result.DressingCount>=6;
     UE_LOG(LogTemp,Display,TEXT("[PrototypeDestination] %s complete=%d fixed=%d-%d enemies=%d caches=%d dressing=%d"),
         *Definition->DisplayName,Result.bComplete,Definition->AreaLevels[0],Definition->AreaLevels.Last(),Result.Enemies.Num(),Result.Caches.Num(),Result.DressingCount);
     return Result;

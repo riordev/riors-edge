@@ -282,7 +282,15 @@ bool FBreakerPrototypeDestinationRuntimeTest::RunTest(const FString& Parameters)
                         Player->SetActorLocation(It->GetActorLocation()+FVector(-150,0,0));
                         if(!TestTrue(TEXT("Native recovery/extraction advances destination objective"),It->TryInteract(Player)))return false;
                     }
-        TestTrue(TEXT("Completed local objective directs the player home"),Map->GetCampaignObjective().ToString().Contains(TEXT("Return to Anchor 13")));
+        if(D.Id==TEXT("BrokenCoast"))
+        {
+            // Supply caches remain optional; the paid clock/completion/save route
+            // is exercised by CoastalUplinkRuntime against the actual console.
+            TestFalse(TEXT("Recovering supplies does not complete the coastal uplink"),Map->GetCampaignObjective().ToString().Contains(TEXT("Return to Anchor 13")));
+            TestTrue(TEXT("Unfinished uplink remains an actual map objective"),Map->GetMarkers().ContainsByPredicate([](const auto& M) { return M.Id==TEXT("BrokenCoast.Uplink") && M.bObjective; }));
+        }
+        else
+            TestTrue(TEXT("Completed local objective directs the player home"),Map->GetCampaignObjective().ToString().Contains(TEXT("Return to Anchor 13")));
         // Real campaign death must return to the same pre-BeginPlay start,
         // not the stale origin stored in older map shells.
         FBreakerDamageRequest Death; Death.BaseDamage=Player->GetCombat()->GetMaxHealth()*2;

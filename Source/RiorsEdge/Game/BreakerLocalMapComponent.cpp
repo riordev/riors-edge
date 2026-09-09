@@ -4,6 +4,7 @@
 #include "Combat/BreakerEnemy.h"
 #include "Interaction/BreakerFernhallCache.h"
 #include "Interaction/BreakerBasinRecorder.h"
+#include "Interaction/BreakerCoastalUplink.h"
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerAlteredEnemy.h"
@@ -49,6 +50,12 @@ FText UBreakerLocalMapComponent::GetCampaignObjective() const
                 :Journal&&Journal->HasFlag(ABreakerBasinRecorder::RecoveredFlag())
                     ?TEXT("Carry the survey recorder to the Impact Basin extraction relay.")
                     :TEXT("Recover the survey recorder from Burned Homestead."));
+        }
+        if(Prototype->Id==TEXT("BrokenCoast"))
+        {
+            for(TActorIterator<ABreakerCoastalUplink> It(GetWorld());It;++It)
+                if(IsValid(*It))return It->GetObjectiveText(Cast<ABreakerCharacter>(GetOwner()));
+            return FText::FromString(TEXT("Coastal uplink unavailable. Return from either travel gate."));
         }
         int32 Recovered=0;
         for (TActorIterator<ABreakerFernhallCache> It(GetWorld());It;++It)
@@ -131,6 +138,13 @@ TArray<FBreakerLocalMapMarker> UBreakerLocalMapComponent::GetMarkers() const
         const auto* Destination=BreakerPrototypeDestinations::ForWorld(this);
         Marker.bObjective=!Destination; // Both prototype supply routes are now optional.
     }
+    for(TActorIterator<ABreakerCoastalUplink> It(World);It;++It)
+    {
+        const auto* Player=Cast<ABreakerCharacter>(GetOwner());
+        if(!IsValid(*It)||It->IsCompleteFor(Player))continue;
+        auto& Marker=Out.AddDefaulted_GetRef();Marker.Id=TEXT("BrokenCoast.Uplink");Marker.Label=It->GetDisplayName();
+        Marker.Detail=It->GetUplinkPrompt(Player);Marker.Location=It->GetActorLocation();Marker.bObjective=true;
+    }
     for(TActorIterator<ABreakerBasinRecorder> It(World);It;++It)
     {
         if(!IsValid(*It)||!It->IsCurrentStep(Cast<ABreakerCharacter>(GetOwner())))continue;
@@ -139,7 +153,7 @@ TArray<FBreakerLocalMapMarker> UBreakerLocalMapComponent::GetMarkers() const
     }
     for (TActorIterator<ABreakerNPC> It(World); It; ++It)
     {
-        if (!IsValid(*It) || It->IsA<ABreakerFernhallCache>() || It->IsA<ABreakerBasinRecorder>()) continue;
+        if (!IsValid(*It) || It->IsA<ABreakerFernhallCache>() || It->IsA<ABreakerBasinRecorder>() || It->IsA<ABreakerCoastalUplink>()) continue;
         auto& Marker = Out.AddDefaulted_GetRef();
         Marker.Location = It->GetActorLocation(); Marker.Label = It->GetDisplayName();
         // NPC appearances can change with the player's body; discovery belongs
