@@ -504,9 +504,15 @@ namespace
         // O2 declarations must survive canonical export. Keep annotation beside
         // magnitudes, outside the numeric-only numbers object; never copy a
         // second numeric table or pretend arbitrary source comments round-trip.
-        Writer.WriteValue(TEXT("_comment"), TEXT("O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, windowDuration, numbers and variants are authored here."));
+        Writer.WriteValue(TEXT("_comment"), TEXT("O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, castTimeSeconds, windowDuration, numbers and variants are authored here."));
         Writer.WriteValue(TEXT("resourceCost"), Definition.ResourceCost);
         Writer.WriteValue(TEXT("cooldownSeconds"), Definition.CooldownSeconds);
+        // O266. A row field the writer does not know about is DELETED by the
+        // next census export, silently and repo-wide — which is exactly what
+        // happened to every authored wind-up the first time the census ran
+        // after they landed. Any new row-level key belongs here in the same
+        // commit that adds it to the loader.
+        Writer.WriteValue(TEXT("castTimeSeconds"), Definition.CastTimeSeconds);
         Writer.WriteValue(TEXT("windowDuration"), Definition.WindowDuration);
         Writer.WriteObjectStart(TEXT("numbers"));
         for (const FNumericProperty* Property : BreakerAbilityData::NumberProperties(Definition.AbilityClass.Get()))
