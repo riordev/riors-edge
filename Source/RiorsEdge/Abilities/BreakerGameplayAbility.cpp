@@ -426,8 +426,13 @@ bool UBreakerGameplayAbility::BeginCastIfNeeded(const FGameplayAbilitySpecHandle
     // than inventing a lane: O266's second half needs a canon row in
     // power-and-scaling.md and a conformance test before any node or affix may
     // bid into it. The seam is here so that lands as one number, not a rewrite.
+    // O266's second half: the wind-up is divided by the owner's composed cast
+    // rate. THE LANE ALREADY EXISTED — AbilityCastRate, authored by Core
+    // Tempo's Metronome, Quicken and Cascade and already dividing Fracture's
+    // own cast phase — so a generic wind-up plugs into it rather than
+    // inventing a second cast-speed concept beside it.
     const float Seconds = Definition
-        ? EffectiveCastSeconds(Definition->GetCastTimeSeconds(), 1.0f) : 0.0f;
+        ? EffectiveCastSeconds(Definition->GetCastTimeSeconds(), AbilityCastRateMultiplierFor(Character)) : 0.0f;
     if (Seconds <= 0.0f || !World) return true;
 
     // O266: the price goes on the KEYPRESS. A refused commit is a refused
