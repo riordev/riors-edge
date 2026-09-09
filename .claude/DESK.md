@@ -68,11 +68,11 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 
 ## Latest validated baseline
 
-Current local build/full suite:858 passing,3 expected failures,0 unexpected; native census refreshed for52 quest flags and current ability declarations. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
+Current local build/full suite:859 passing,3 expected failures,0 unexpected; native census refreshed for52 quest flags and current ability declarations. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
 
 ## Recent delivered changes
 
-- Full22-wedge Core remains active. Paid Afterimage Hold/Sightline/Slipcut/Overdrive and Survivor Core-point delivery have runtime coverage; removing inactive Slipcut or Overdrive now immediately revokes its remaining window/tail contributions.
+- Full22-wedge Core remains active. Paid Afterimage Hold/Sightline/Slipcut/Overdrive/Cadence Break and Survivor Core-point delivery have runtime coverage; removing inactive Slipcut, Overdrive or Cadence Break now immediately revokes its remaining window/tail contributions.
 - Warden revival, Provoke/Standing Order, Swift starter migration, numeric ability authority and existing-item migration protection landed.
 - Fernhall guarded physical cache; Red Basin/Station Zero/Port Meridian/Broken Coast/Shatterpoint fixed-region prototype districts, local maps and real return gates landed. Station Zero now has a persistent priority hunt; Red Basin has recorder recovery/extraction, both with optional supply lockers.
 - Anchor gatehouses/service-yard dressing, boss/Volatile occlusion cues, ability-menu wrapping, empty-label removal and cache prompt clarity were inspected in rendered captures.

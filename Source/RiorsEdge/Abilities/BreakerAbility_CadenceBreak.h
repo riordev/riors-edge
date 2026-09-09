@@ -52,6 +52,8 @@ public:
 
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
+    virtual void OnRemoveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec) override;
+
     // The window key on the SI-9 state component (spec §4.2 names it).
     static FName WindowKey();
     // This ability's entry on the attacker's outgoing-modifier chain.

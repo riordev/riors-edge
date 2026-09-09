@@ -219,3 +219,23 @@ void UBreakerAbility_CadenceBreak::ActivateAbility(const FGameplayAbilitySpecHan
 
     EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 }
+
+void UBreakerAbility_CadenceBreak::OnRemoveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)
+{
+    // The instant activation can be inactive while its earned flat lane lives
+    // on. Withdraw that lease and its shot producer before publishing closure.
+    ClearStacks();
+    if (ABreakerCharacter* Character = GetBreakerCharacter())
+    {
+        if (auto* Combat = Character->GetCombat()) Combat->RemoveOutgoingModifier(ModifierKey());
+        if (auto* Weapon = Character->GetWeapon())
+            Weapon->OnShot.RemoveDynamic(this, &ThisClass::HandleShot);
+        if (auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>())
+        {
+            State->OnWindowEnded.RemoveDynamic(this, &ThisClass::HandleWindowEnded);
+            State->CloseWindow(WindowKey());
+        }
+    }
+    bDelegatesBound = false;
+    Super::OnRemoveAbility(ActorInfo, Spec);
+}
