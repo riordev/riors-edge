@@ -87,6 +87,13 @@ public:
     // load, because the pawn that knew it was destroyed by the load.
     void AdoptSessionCharacter();
     FGuid ActiveCharacterId;
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    void InitializeCoopCombatProfile();
+    bool IsCoopCombatProfile() const;
+    FGuid GetCoopCombatProfileId() const { return CoopCombatProfileId; }
+    UPROPERTY(ReplicatedUsing=OnRep_CoopCombatProfile) FGuid CoopCombatProfileId;
+    UFUNCTION() void OnRep_CoopCombatProfile();
+    bool bCoopKitInitialized = false;
     // Armed by EnterWorldAsCharacter the moment this pawn's identity is
     // re-pointed at a character whose state it does NOT hold. From then until
     // the level load destroys it, every SaveGameState on this pawn is refused:

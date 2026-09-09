@@ -1,4 +1,5 @@
 #include "Game/BreakerGameMode.h"
+#include "Game/BreakerCoopCombatTest.h"
 #include "GameFramework/PawnMovementComponent.h"
 
 #include "Game/BreakerHubBuilder.h"
@@ -387,6 +388,24 @@ void ABreakerGameMode::ReturnToAnchor(APawn* RequestingPawn)
 
 AActor* ABreakerGameMode::ChoosePlayerStart_Implementation(AController* Player)
 {
+    // Late guests must use the same authored arrival as the initial host,
+    // without re-running HandleStartingNewPlayer's encounter construction.
+    if (BreakerCoopCombatTest::IsEnabled(GetWorld()) && UBreakerGameInstance::IsFernhallMap(this))
+    {
+        const FName StartTag(TEXT("BreakerCoopArrival"));
+        for (TActorIterator<APlayerStart> It(GetWorld()); It; ++It)
+            if (It->Tags.Contains(StartTag)) return *It;
+        TArray<FBreakerZonePiece> Pieces;
+        FBreakerZoneMarkers Markers;
+        if (UBreakerZoneBuilder::CollectZonePieces(UBreakerZoneBuilder::FernhallMeshFolder(),Pieces)
+            && UBreakerZoneBuilder::ExtractMarkers(Pieces,Markers))
+            if (const auto* Start=Markers.Find(EBreakerZoneMarkerRole::PlayerStart))
+            {
+                // Same capsule placement as the existing Fernhall arrival.
+                APlayerStart* Arrival=GetWorld()->SpawnActor<APlayerStart>(Start->Location+FVector(0,0,112),FRotator::ZeroRotator);
+                if (Arrival) { Arrival->Tags.Add(StartTag); return Arrival; }
+            }
+    }
     if (AActor* Authored = Super::ChoosePlayerStart_Implementation(Player))
     {
         return Authored;

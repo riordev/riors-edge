@@ -6,7 +6,7 @@ Continue validated blocks until the owner returns. Prioritize playable changes f
 
 ## Immediate queue
 
-1. Validate and land the isolated cooperative combat slice with actual host/guest evidence; preserve ordinary saves.
+1. Cooperative sandbox landed with real host/guest fire and replicated health/death evidence. Remaining multiplayer acceptance: abilities, drop contention, respawn/rejoin, human movement feel and eventual campaign support.
 2. Land Red Basin and Station Zero prototypes, matching farmland/crater and research-hub settings. Create real map packages, test routes/rewards/return, and inspect rendered frames.
 3. Land Volatile countdown visibility and ability-menu wrapping/empty-label fixes with rendered checks.
 4. Finish remaining Afterimage consumers and real-clock Rot feedback checks. Cache live prompt/focus and final prop art remain.
@@ -37,7 +37,7 @@ Continue validated blocks until the owner returns. Prioritize playable changes f
 
 ## Multiplayer
 
-Owner authorizes adding multiplayer when feasible. Audit current listen-server join, ownership, replication, interactions, combat and save isolation first. Implement bounded cooperative slices with two-client evidence; record unsupported paths. Do not advertise a working multiplayer mode from RPC declarations alone. Trading, account services and MMO infrastructure are outside the immediate playtest priority.
+Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profiles, client geometry, authored late-guest start, no persistent writes, scoped friendly-fire prevention. Real two-process guest fire/server damage/death/client health transport passed; see Docs/reports/coop-combat-2026-09-09.md and Scripts/coop-combat-verify.ps1. Full multiplayer campaign/progression, ability replication, loot contention, respawn/rejoin and feel remain unvalidated. Trading, account services and MMO infrastructure stay outside this playtest slice.
 
 ## Known issues to time-box
 
@@ -60,7 +60,7 @@ Owner authorizes adding multiplayer when feasible. Audit current listen-server j
 
 ## Latest validated baseline
 
-Current local build/census/full suite:843 passing,3 expected failures,0 unexpected. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
+Current local build/census/full suite:845 passing,3 expected failures,0 unexpected. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
 
 ## Landed this pass
 
@@ -81,3 +81,5 @@ Current local build/census/full suite:843 passing,3 expected failures,0 unexpect
 - Ability numeric authority: removed143 duplicated initializers; Data schema replaces compiled-default freshness. First suite exposed native instances retaining zeros despite patched CDOs; fixed at PostInitProperties and added all-row instance checks, independently reviewed. Rebuilt full suite842/3/0. No status.py binding existed to rename; measurement pins unchanged. Custom serialized Blueprint overrides are outside the registered native roster guarantee.
 
 - Hold Afterimage: paid native Core route and equipped resource-funded Hold verify generation's two-second half-contribution tail. Ordinary hit cap ends on time; cancellation, death, paid respec and removing the inactive granted ability revoke the contribution. Independent review caught the removal gap before landing. Build/full suite843/3/0.
+
+- Cooperative combat sandbox: native isolation/environment tests and full suite845/3/0. Real two-process verification passed: two profiles, client floor/lighting, remote displacement, guest normal fire RPC, nine server weapon hits and client220→148→0 health/death. Disposable UserDirs and unchanged save hashes verified. Compile API/macro issues and live-log sharing fixed within the per-bug time box. This is combat-only; progression/travel and remaining multiplayer interactions are not claimed complete.

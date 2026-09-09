@@ -1,4 +1,5 @@
 #include "Combat/BreakerCombatComponent.h"
+#include "Game/BreakerCoopCombatTest.h"
 #include "Combat/BreakerDeployable.h"
 #include "Combat/BreakerElementSharesMath.h"
 
@@ -362,6 +363,9 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
 {
     FBreakerDamageResult Result;
     if (!Attributes || !GetOwner() || !GetOwner()->HasAuthority() || IsDead()) return Result;
+    if (BreakerCoopCombatTest::IsEnabled(GetWorld()) && GetOwner()->IsA<ABreakerCharacter>()
+        && Request.Instigator.IsValid() && Request.Instigator.Get() != GetOwner()
+        && Request.Instigator->IsA<ABreakerCharacter>()) return Result;
     RefreshCoreFrontShieldCapacity();
     if (const auto* Deployable = Cast<ABreakerDeployable>(GetOwner()); Deployable && Deployable->RejectsIncidentalAreaDamage(Request)) return Result;
     const TArray<FBreakerElementShare> ElementShares = BreakerElementShares::Resolve(Request);

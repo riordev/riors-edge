@@ -1,4 +1,5 @@
 #include "Game/BreakerGameInstance.h"
+#include "Game/BreakerCoopCombatTest.h"
 
 #include "Combat/BreakerEnemy.h"
 #include "Interaction/BreakerTravelPoint.h"
@@ -160,6 +161,7 @@ void UBreakerGameInstance::TravelTo(const UObject* WorldContext, FName MapName)
 {
     if (MapName.IsNone()) return;
     UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContext, EGetWorldErrorMode::ReturnNull) : nullptr;
+    if (BreakerCoopCombatTest::IsEnabled(World)) return; // Test mode never travels through campaign doors.
     UBreakerGameInstance* Session = World ? World->GetGameInstance<UBreakerGameInstance>() : nullptr;
     if (Session)
     {
@@ -173,6 +175,7 @@ void UBreakerGameInstance::TravelTo(const UObject* WorldContext, FName MapName)
 
 void UBreakerGameInstance::BeginTravel(FName MapName)
 {
+    if (BreakerCoopCombatTest::IsEnabled(GetWorld())) return; // Fixed-map test only.
     if (bTravelPending) return;
 
     // The capture harness cannot author a rift and the beat is exactly the

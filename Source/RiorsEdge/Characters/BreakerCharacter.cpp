@@ -1,4 +1,7 @@
 #include "Characters/BreakerCharacter.h"
+#include "Game/BreakerCoopCombatTest.h"
+#include "Game/BreakerCoopCombatVerification.h"
+#include "Net/UnrealNetwork.h"
 #include "Interaction/BreakerFeedstockPickup.h"
 #include "Audio/BreakerFootstepComponent.h"
 #include "Game/BreakerLocalMapComponent.h"
@@ -316,6 +319,7 @@ void ABreakerCharacter::BeginPlay()
     // BEFORE anything reads a save. A level load destroyed the pawn that knew
     // which character was being played, so this one asks the session first —
     // otherwise every load after the first would read the legacy single slot.
+    if (IsCoopCombatProfile()) InitializeCoopCombatProfile();
     AdoptSessionCharacter();
     // Holstered for the whole life of an Anchor pawn (see IsWeaponsHolstered).
     bWeaponsHolstered = UBreakerGameInstance::IsAnchorMap(this);
@@ -472,6 +476,7 @@ void ABreakerCharacter::BeginPlay()
 
 void ABreakerCharacter::SaveGameState()
 {
+    if (IsCoopCombatProfile()) return;
     if (!HasAuthority() || !Progression || !Equipment || !Weapon) return;
     // The pawn's identity has been re-pointed at a character whose state this
     // pawn does not hold (EnterWorldAsCharacter, mid-travel). Writing now
@@ -536,6 +541,7 @@ void ABreakerCharacter::SaveGameState()
 
 void ABreakerCharacter::AdoptSessionCharacter()
 {
+    if (IsCoopCombatProfile()) return;
     // Runs on arrival in a new map. The pawn was destroyed by the level load
     // and this is a fresh one, so it has no idea who it is until it asks the
     // session — without this, travelling to the gym would silently load the
@@ -562,6 +568,7 @@ FString ABreakerCharacter::ActiveSaveSlotName() const
 
 void ABreakerCharacter::EnterWorldAsCharacter(const FGuid& CharacterId)
 {
+    if (IsCoopCombatProfile()) return;
     // THE PATH FROM THE CHARACTER SCREEN INTO THE GAME. Order matters twice
     // here, and both orderings shipped broken once:
     //   1. The OUTGOING character is saved under its OWN slot BEFORE the id
@@ -626,6 +633,7 @@ void ABreakerCharacter::EnterWorldAsCharacter(const FGuid& CharacterId)
 
 void ABreakerCharacter::LoadGameState()
 {
+    if (IsCoopCombatProfile()) return;
     if (!HasAuthority() || !Progression || !Equipment || !Weapon) return;
     const FString SlotName = ActiveSaveSlotName();
     UBreakerSaveGame* Save = Cast<UBreakerSaveGame>(UGameplayStatics::LoadGameFromSlot(SlotName, 0));
@@ -2321,6 +2329,7 @@ void ABreakerCharacter::ApplyMenuSettings(float NewSensitivity, float NewFOV, bo
 
 void ABreakerCharacter::ShowInitialMenu()
 {
+    if (IsCoopCombatProfile()) return;
     // -BreakerAutoPlay skips the title menu so the game can be SMOKE-TESTED
     // without a human at the keyboard: a run that stops on the title screen
     // proves only that startup works. Dev-only by construction — a
@@ -2380,6 +2389,7 @@ void ABreakerCharacter::ShowInitialMenu()
 
 void ABreakerCharacter::OpenMenu(bool bInitialMenu)
 {
+    if (IsCoopCombatProfile()) return;
     APlayerController* PC = Cast<APlayerController>(GetController());
     if (!PC || !GEngine || !GEngine->GameViewport) return;
     ClearHeldGameplayInput();
@@ -2515,6 +2525,7 @@ void ABreakerCharacter::ResumeFromMenu()
 
 void ABreakerCharacter::ReturnToTitleMenu()
 {
+    if (IsCoopCombatProfile()) return;
     bShowingInitialMenu = true;
     if (MenuWidget.IsValid()) MenuWidget->ShowMainMenu();
 }
@@ -2900,4 +2911,38 @@ void ABreakerCharacter::Landed(const FHitResult& Hit)
 void ABreakerCharacter::ServerOpenFernhallCache_Implementation(ABreakerFernhallCache* Cache)
 {
     if (IsValid(Cache)) Cache->TryOpen(this);
+}
+
+bool ABreakerCharacter::IsCoopCombatProfile() const
+{
+    return CoopCombatProfileId.IsValid() || BreakerCoopCombatTest::IsEnabled(GetWorld());
+}
+void ABreakerCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME(ABreakerCharacter, CoopCombatProfileId);
+}
+void ABreakerCharacter::InitializeCoopCombatProfile()
+{
+    if (!IsCoopCombatProfile() || bCoopKitInitialized) return;
+    if (GetNetMode()==NM_Client) BreakerCoopCombatTest::EnsureLocalEnvironment(GetWorld());
+    bRefuseSavesForPendingCharacter = true; ActiveCharacterId.Invalidate(); bRiftglassBoundToAccount = false;
+    if (HasAuthority() && !CoopCombatProfileId.IsValid()) CoopCombatProfileId = FGuid::NewGuid();
+    if (Progression)
+    {
+        FBreakerProgressionState Fresh; Fresh.PermanentClass=EBreakerClassId::Swift;
+        Progression->LoadProgressionState(Fresh);
+    }
+    if (Abilities) Abilities->RefreshGrants();
+    bCoopKitInitialized = true;
+    if (HasAuthority()) ABreakerCoopCombatVerification::StartForWorld(GetWorld());
+    UE_LOG(LogTemp,Display,TEXT("[CoopTest] isolated profile=%s authority=%d class=Swift persistence=disabled"),
+        *CoopCombatProfileId.ToString(),HasAuthority());
+}
+void ABreakerCharacter::OnRep_CoopCombatProfile()
+{
+    if (!HasActorBegunPlay()) return;
+    InitializeCoopCombatProfile();
+    UE_LOG(LogTemp,Display,TEXT("[CoopTest] received server profile=%s local=%d"),*CoopCombatProfileId.ToString(),IsLocallyControlled());
+    if (IsLocallyControlled()) ResumeFromMenu();
 }
