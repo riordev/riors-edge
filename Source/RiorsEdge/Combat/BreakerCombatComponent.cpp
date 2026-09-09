@@ -1130,6 +1130,14 @@ void UBreakerCombatComponent::InvalidateAfterimageContributions()
         for (const auto& Entry : WeaponFlatWindows) WeaponFlatDamage.Remove(Entry.Key);
         WeaponFlatWindows.Reset();
     }
+    for (auto& Entry : IncomingWindows)
+        if (!bOwned) Entry.Value.bAfterimage = false;
+    if (IsDead())
+    {
+        for (const auto& Entry : IncomingWindows)
+        { IncomingDamageModifiers.Remove(Entry.Key); BeneficialIncomingModifierKeys.Remove(Entry.Key); }
+        IncomingWindows.Reset();
+    }
     if (IsDead()) OutgoingModifiers.RemoveAll([](const FBreakerOutgoingModifier& Entry) { return Entry.bWindowContribution; });
     PruneExpiredOutgoingModifiers();
 }
@@ -1294,10 +1302,27 @@ float UBreakerCombatComponent::GetIncomingHitCap() const
 void UBreakerCombatComponent::PushIncomingDamageModifier(FName Key, float Multiplier)
 {
     if (Key.IsNone()) return;
+    IncomingWindows.Remove(Key);
     BeneficialIncomingModifierKeys.Remove(Key);
     // Re-pushing the same key replaces rather than stacks, matching the
     // outgoing chain's rule.
     IncomingDamageModifiers.Add(Key, FMath::Max(0.0f, Multiplier));
+}
+
+void UBreakerCombatComponent::PushWindowIncomingDamageModifier(FName Key, float Multiplier, float Duration)
+{
+    if (!GetOwner() || !GetWorld() || IsDead() || Key.IsNone()
+        || !FMath::IsFinite(Multiplier) || Multiplier <= 0
+        || !FMath::IsFinite(Duration) || Duration <= 0) return;
+    PushIncomingDamageModifier(Key, Multiplier);
+    auto* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+    FIncomingWindow Lease;
+    Lease.EndTime = GetWorld()->GetTimeSeconds() + Duration;
+    Lease.bAfterimage = Progression && Progression->HasNodeTag(
+        FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage")));
+    IncomingWindows.Add(Key, Lease);
+    if (Progression) Progression->OnProgressionChanged.AddUniqueDynamic(this, &ThisClass::InvalidateAfterimageContributions);
+    OnDeath.AddUniqueDynamic(this, &ThisClass::InvalidateAfterimageContributions);
 }
 
 void UBreakerCombatComponent::PushBeneficialIncomingDamageModifier(FName Key, float Multiplier)
@@ -1338,6 +1363,7 @@ bool UBreakerCombatComponent::IsBeneficialEffectSuppressed() const
 
 void UBreakerCombatComponent::RemoveIncomingDamageModifier(FName Key)
 {
+    IncomingWindows.Remove(Key);
     IncomingDamageModifiers.Remove(Key);
     BeneficialIncomingModifierKeys.Remove(Key);
 }
@@ -1347,7 +1373,13 @@ float UBreakerCombatComponent::GetComposedIncomingDamageMultiplier() const
     float Product = 1.0f;
     const bool bSuppressBuffs = !BeneficialIncomingModifierKeys.IsEmpty() && IsBeneficialEffectSuppressed();
     for (const TPair<FName, float>& Entry : IncomingDamageModifiers)
-        if (!bSuppressBuffs || !BeneficialIncomingModifierKeys.Contains(Entry.Key)) Product *= Entry.Value;
+    {
+        if (bSuppressBuffs && BeneficialIncomingModifierKeys.Contains(Entry.Key)) continue;
+        const FIncomingWindow* Lease = IncomingWindows.Find(Entry.Key);
+        const float Scale = Lease ? (IsDead() ? 0.0f : FBreakerWindowLaneMath::Scale(
+            GetWorld() ? GetWorld()->GetTimeSeconds() : 0, Lease->EndTime, Lease->bAfterimage)) : 1.0f;
+        Product *= FBreakerWindowLaneMath::Multiplier(Entry.Value, Scale);
+    }
     return Product;
 }
 

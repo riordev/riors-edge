@@ -93,17 +93,27 @@ void UBreakerAbility_HardStop::ActivateAbility(const FGameplayAbilitySpecHandle 
     {
         if (UBreakerCombatComponent* Combat = Character->FindComponentByClass<UBreakerCombatComponent>())
         {
-            Combat->PushIncomingDamageModifier(IncomingModifierKey(), IncomingMultiplier(OwnerHasSpendToLive(), DamageReductionFraction));
-            TWeakObjectPtr<UBreakerCombatComponent> WeakCombat(Combat);
-            // The protection outlives this instant ability. Binding to Combat
-            // keeps GAS EndAbility from clearing its cleanup timer.
-            World->GetTimerManager().SetTimer(ProtectionTimer, FTimerDelegate::CreateWeakLambda(Combat, [WeakCombat]()
+            World->GetTimerManager().ClearTimer(ProtectionTimer);
+            Combat->OnDeath.AddUniqueDynamic(this, &ThisClass::RevokeProtection);
+            const bool bImmunity = OwnerHasSpendToLive();
+            if (!bImmunity)
             {
-                if (UBreakerCombatComponent* Restored = WeakCombat.Get())
+                Combat->PushWindowIncomingDamageModifier(IncomingModifierKey(), IncomingMultiplier(false, DamageReductionFraction), WindowSeconds);
+            }
+            else
+            {
+                Combat->PushIncomingDamageModifier(IncomingModifierKey(), 0.0f);
+                TWeakObjectPtr<UBreakerCombatComponent> WeakCombat(Combat);
+                // The protection outlives this instant ability. Binding to Combat
+                // keeps GAS EndAbility from clearing its cleanup timer.
+                World->GetTimerManager().SetTimer(ProtectionTimer, FTimerDelegate::CreateWeakLambda(Combat, [WeakCombat]()
                 {
-                    Restored->RemoveIncomingDamageModifier(IncomingModifierKey());
-                }
-            }), WindowSeconds, false);
+                    if (UBreakerCombatComponent* Restored = WeakCombat.Get())
+                    {
+                        Restored->RemoveIncomingDamageModifier(IncomingModifierKey());
+                    }
+                }), WindowSeconds, false);
+            }
         }
         if (UBreakerAbilityStateComponent* State = UBreakerAbilityStateComponent::FindOrAdd(Character))
         {
@@ -139,4 +149,22 @@ void UBreakerAbility_HardStop::ActivateAbility(const FGameplayAbilitySpecHandle 
     }
 
     EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+}
+
+void UBreakerAbility_HardStop::RevokeProtection()
+{
+    if (auto* World = GetWorld()) World->GetTimerManager().ClearTimer(ProtectionTimer);
+    if (auto* Character = GetBreakerCharacter())
+    {
+        if (auto* Combat = Character->GetCombat()) Combat->RemoveIncomingDamageModifier(IncomingModifierKey());
+        if (auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>()) State->CloseWindow(WindowKey());
+    }
+}
+
+void UBreakerAbility_HardStop::OnRemoveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)
+{
+    RevokeProtection();
+    if (auto* Character = GetBreakerCharacter())
+        if (auto* Combat = Character->GetCombat()) Combat->OnDeath.RemoveDynamic(this, &ThisClass::RevokeProtection);
+    Super::OnRemoveAbility(ActorInfo, Spec);
 }

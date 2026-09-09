@@ -55,6 +55,7 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 
 - Refractor can waste a fork seat on a protected coop player before damage rejection. Legal real-shot fixture and candidate eligibility repair remain parked after bounded audit.
 - Bare Swift coop smoke profile suffered ambient deaths during ordinary movement funding. Network receipts are not a balanced encounter acceptance.
+- Caster cooperative expansion is parked after bounded network acceptance failure: metadata/real grants/native isolation passed, but two actual guest Cleave requests were rejected by authority; first run logged player death25ms before request. Swift unchanged rerun passed after an initial rejection. Whole expansion restored; no Caster combat claim. Logs and candidate are retained outside checkout in coop-caster-verification-stage/parked-runtime.
 
 ## Decisions and measurements requiring explicit care
 
@@ -68,11 +69,11 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 
 ## Latest validated baseline
 
-Current local build/full suite:859 passing,3 expected failures,0 unexpected; native census refreshed for52 quest flags and current ability declarations. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
+Current local build/full suite:860 passing,3 expected failures,0 unexpected; native census refreshed for52 quest flags and current ability declarations. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
 
 ## Recent delivered changes
 
-- Full22-wedge Core remains active. Paid Afterimage Hold/Sightline/Slipcut/Overdrive/Cadence Break and Survivor Core-point delivery have runtime coverage; removing inactive Slipcut, Overdrive or Cadence Break now immediately revokes its remaining window/tail contributions.
+- Full22-wedge Core remains active. Paid Afterimage Hold/Sightline/Slipcut/Overdrive/Cadence Break/Hard Stop and Survivor Core-point delivery have runtime coverage; removing inactive Slipcut, Overdrive, Cadence Break or Hard Stop now immediately revokes its remaining window/tail contributions. Hard Stop numerical protection halves in its tail; Spend to Live immunity ends normally.
 - Warden revival, Provoke/Standing Order, Swift starter migration, numeric ability authority and existing-item migration protection landed.
 - Fernhall guarded physical cache; Red Basin/Station Zero/Port Meridian/Broken Coast/Shatterpoint fixed-region prototype districts, local maps and real return gates landed. Station Zero now has a persistent priority hunt; Red Basin has recorder recovery/extraction, both with optional supply lockers.
 - Anchor gatehouses/service-yard dressing, boss/Volatile occlusion cues, ability-menu wrapping, empty-label removal and cache prompt clarity were inspected in rendered captures.

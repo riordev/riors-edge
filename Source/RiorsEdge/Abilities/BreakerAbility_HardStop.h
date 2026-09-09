@@ -22,6 +22,7 @@ class RIORSEDGE_API UBreakerAbility_HardStop : public UBreakerGameplayAbility
 
 public:
     UBreakerAbility_HardStop();
+    virtual void OnRemoveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec) override;
 
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
@@ -62,5 +63,6 @@ public:
 
 private:
     FTimerHandle ProtectionTimer;
+    UFUNCTION() void RevokeProtection();
     bool OwnerHasSpendToLive() const;
 };

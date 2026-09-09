@@ -192,6 +192,8 @@ public:
     // First consumer: Caster's Overcast penalty (Class-Kits §2.1).
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat|Incoming")
     void PushIncomingDamageModifier(FName Key, float Multiplier);
+    // O228: numerical defence only; binary immunity must use ordinary ownership.
+    void PushWindowIncomingDamageModifier(FName Key, float Multiplier, float Duration);
     // Explicit external buffs, separate from boss gates and other mechanics.
     void PushBeneficialIncomingDamageModifier(FName Key, float Multiplier);
     void AddBeneficialSuppressionLease(class ABreakerZoneActor* Zone);
@@ -415,6 +417,12 @@ private:
     // responsible for removing it, and a silently expiring defence is worse
     // than one that is visibly stuck.
     TMap<FName, float> IncomingDamageModifiers;
+    struct FIncomingWindow
+    {
+        double EndTime = 0;
+        bool bAfterimage = false;
+    };
+    TMap<FName, FIncomingWindow> IncomingWindows;
     TMap<FName, TPair<float, double>> IncomingHitCaps;
     TSet<FName> BeneficialIncomingModifierKeys;
     TSet<TWeakObjectPtr<class ABreakerZoneActor>> BeneficialSuppressionLeases;
