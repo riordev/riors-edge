@@ -44,7 +44,11 @@
 		"Quest.Finale.ReturnedFromWon",
 		"Quest.Finale.Seal",
 		"Quest.Finale.Hold",
-		"Quest.Finale.TurnedIn"
+		"Quest.Finale.TurnedIn",
+		"Quest.Watch.Offered",
+		"Quest.Watch.Accepted",
+		"Quest.Watch.FlankCleared",
+		"Quest.Watch.TurnedIn"
 	],
 	"quests": [
 		{
@@ -287,6 +291,31 @@
 				"itemCount": 2,
 				"minimumRarity": "Exceptional",
 				"itemLevel": 50
+			}
+		},
+		{
+			"id": "Quest.Watch",
+			"title": "HOLD THE APPROACH",
+			"giver": "WATCHKEEPER",
+			"offeredFlag": "Quest.Watch.Offered",
+			"acceptedFlag": "Quest.Watch.Accepted",
+			"turnedInFlag": "Quest.Watch.TurnedIn",
+			"objectives": [
+				{
+					"id": "Flank",
+					"text": "Clear the substation flank",
+					"completionFlag": "Quest.Watch.FlankCleared",
+					"progressCounter": "Quest.Watch.Kills",
+					"requiredCount": 6,
+					"requiresEliteKill": false
+				}
+			],
+			"reward":
+			{
+				"itemCount": 1,
+				"minimumRarity": "Uncommon",
+				"itemLevel": 5,
+				"experience": 90
 			}
 		}
 	]

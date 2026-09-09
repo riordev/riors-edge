@@ -17,6 +17,8 @@
 #include "Game/BreakerGameInstance.h"
 #include "Game/BreakerGameMode.h"
 #include "Game/BreakerZoneBuilder.h"
+#include "Save/BreakerQuestContent.h"
+#include "Interaction/BreakerNPC.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/WorldSettings.h"
 #include "Interaction/BreakerFeedstockPickup.h"
@@ -152,6 +154,46 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
         }
         TestTrue(TEXT("Entry fights occupy separate combat spaces"), FVector::Dist2D(PocketCenters[0], PocketCenters[1]) > 2500);
         TestTrue(TEXT("Substation encounter occupies its own yard"), FVector::Dist2D(PocketCenters[1], PocketCenters[2]) > 4000);
+
+        // THE CONTRACT GIVER, ON THE MARKER THE COMPOSER SHIPPED. The yard
+        // authored marker_npc_contract, the loader validated it, and nothing
+        // read it — so Fernhall held no NPC at all and every quest in the game
+        // was given in the hub. This asserts the seam AND the content: the
+        // shipped Data/dialogue.json must actually carry his row, and the
+        // shipped Data/quests.json his contract. A giver whose rows exist only
+        // in a fixture is content the player cannot reach.
+        {
+            TArray<ABreakerNPC*> Npcs;
+            for (TActorIterator<ABreakerNPC> It(World); It; ++It) Npcs.Add(*It);
+            if (TestEqual(TEXT("Fernhall stands exactly one contract giver"), Npcs.Num(), 1))
+            {
+                const ABreakerNPC* Keeper = Npcs[0];
+                TestEqual(TEXT("and he is the Watchkeeper"), Keeper->DialogueId, FName(TEXT("Watchkeeper")));
+                TestTrue(TEXT("with dialogue loaded from the shipped file"), Keeper->DialogueNodes.Num() > 0);
+
+                TArray<FBreakerZonePiece> KeeperPieces;
+                FBreakerZoneMarkers Markers;
+                if (UBreakerZoneBuilder::CollectZonePieces(UBreakerZoneBuilder::FernhallMeshFolder(), KeeperPieces)
+                    && UBreakerZoneBuilder::ExtractMarkers(KeeperPieces, Markers))
+                {
+                    const FBreakerZoneMarker* Contract = Markers.Find(EBreakerZoneMarkerRole::NPCContract);
+                    if (TestNotNull(TEXT("the contract marker is authored"), Contract))
+                    {
+                        TestTrue(TEXT("he stands on it"),
+                            FVector::Dist2D(Keeper->GetActorLocation(), Contract->Location) < 1.0f);
+                    }
+                }
+
+                // SHIPPED CONFIGURATION: both rows resolve in the committed
+                // data, not in anything this test built.
+                const FBreakerDialogueRow* Row = ABreakerNPC::GetDialogueData().Npcs.FindByPredicate(
+                    [](const FBreakerDialogueRow& E) { return E.Id == FName(TEXT("Watchkeeper")); });
+                TestNotNull(TEXT("his dialogue row ships in Data/dialogue.json"), Row);
+                const bool bQuestShips = UBreakerQuestLibrary::GetFallbackQuests().ContainsByPredicate(
+                    [](const FBreakerQuestDefinition& Q) { return Q.QuestId == FName(TEXT("Quest.Watch")); });
+                TestTrue(TEXT("his contract ships in Data/quests.json"), bQuestShips);
+            }
+        }
         TestEqual(TEXT("Entry retains its ranged pressure"), EntryLattices, 1);
         TestEqual(TEXT("Substation gains two melee flankers"), SubstationMelee, 2);
         TestEqual(TEXT("Substation has one Warden anchor"), SubstationWardens, 1);

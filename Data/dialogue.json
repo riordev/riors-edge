@@ -2091,6 +2091,159 @@
 					"blockedByFlags": []
 				}
 			]
+		},
+		{
+			"id": "Watchkeeper",
+			"displayName": "WATCHKEEPER",
+			"startNodeId": "Start",
+			"nodes": [
+				{
+					"nodeId": "Start",
+					"speakerLine": "I don't go back and I don't go forward. I just count what comes through.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "What's coming through?",
+							"nextNodeId": "Job",
+							"setsQuestFlag": "Quest.Watch.Offered",
+							"requiredFlags": [],
+							"blockedByFlags": [
+								"Quest.Watch.Accepted"
+							],
+							"action": "None"
+						},
+						{
+							"text": "Still working the flank.",
+							"nextNodeId": "Progress",
+							"setsQuestFlag": "",
+							"requiredFlags": [
+								"Quest.Watch.Accepted"
+							],
+							"blockedByFlags": [
+								"Quest.Watch.FlankCleared"
+							],
+							"action": "None"
+						},
+						{
+							"text": "Flank's clear.",
+							"nextNodeId": "Done",
+							"setsQuestFlag": "",
+							"requiredFlags": [
+								"Quest.Watch.FlankCleared"
+							],
+							"blockedByFlags": [
+								"Quest.Watch.TurnedIn"
+							],
+							"action": "None"
+						},
+						{
+							"text": "Nothing. Keep counting.",
+							"nextNodeId": "End",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Job",
+					"speakerLine": "The substation side. They come up through it and I can't watch both ends. Six of them and the count goes back to something I can live with.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "I'll thin them.",
+							"nextNodeId": "Accept",
+							"setsQuestFlag": "Quest.Watch.Accepted",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						},
+						{
+							"text": "Not today.",
+							"nextNodeId": "End",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Accept",
+					"speakerLine": "Substation flank. Six. I'll be here — I'm always here.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "Understood.",
+							"nextNodeId": "End",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Progress",
+					"speakerLine": "Still hearing them. Whatever you're doing, it isn't finished.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "It will be.",
+							"nextNodeId": "End",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Done",
+					"speakerLine": "Quiet on that side. First time this week.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "Take the count.",
+							"nextNodeId": "Reward",
+							"setsQuestFlag": "Quest.Watch.TurnedIn",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "Reward",
+					"speakerLine": "Here. It came through the tear and I've no use for it. You will.",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": [
+						{
+							"text": "Watch yourself.",
+							"nextNodeId": "End",
+							"setsQuestFlag": "",
+							"requiredFlags": [],
+							"blockedByFlags": [],
+							"action": "None"
+						}
+					]
+				},
+				{
+					"nodeId": "End",
+					"speakerLine": "",
+					"requiredFlags": [],
+					"blockedByFlags": [],
+					"choices": []
+				}
+			],
+			"entries": []
 		}
 	]
 }

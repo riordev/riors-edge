@@ -24,6 +24,64 @@ death damages other enemies only where a player source says it does. Nothing
 authors such an effect yet, so the property survives as the mechanism one
 will set rather than as a default nobody asked for. Both magnitudes stay O2.
 
+## Fernhall has a person in it (landed)
+
+- [x] THE WATCHKEEPER stands on `marker_npc_contract` — a marker the composer
+  authored, the loader validated, the piece contract counted, and no
+  production code had ever read. Fernhall held zero NPCs and every quest in
+  the game was given in the hub, so the yard was somewhere you crossed and
+  never somewhere you were sent from. Ten lines in the Fernhall branch, one
+  dialogue row, one quest. No geometry, no new marker role, no asset
+  re-import, no new class.
+- His contract is a KILL objective on purpose: quest progress only counts
+  kills and one feedstock helper hard-wired to Quest.KessSalvage, so a
+  find-or-collect contract is plumbing this game does not have. Recorded so
+  the next contract does not try.
+- NOT PHOTOGRAPHED, said plainly. He faces the player start from the entry
+  plaza and the default camera looks the other way, down the lane at the
+  substation door; the harness cannot turn it. Verified by test instead —
+  exactly one NPC in the world, within a centimetre of the marker, with his
+  row resolving in the shipped Data/dialogue.json and his contract in the
+  shipped Data/quests.json. A capture tour vantage would photograph him.
+- [ ] Next, same file so a different cycle: two or three more fight pockets
+  (`SpawnFernhallEncounters` is an array bound and two literal blocks), then
+  a cache built from ABreakerFinaleActor's console shape plus the two-line
+  loot roll, placed at a yard-frame fraction like the Breach door so it needs
+  no marker and moves no pinned count.
+
+## The destinations, named (owner, 2026-09-09)
+
+Seven, each with a silhouette that is not another grey yard. This is the item
+the content phase was blocked on — nothing could be authored under a name
+nobody had chosen.
+
+| Destination | Read |
+|---|---|
+| Anchor 13 | the main hub |
+| Fernhall Approach | overgrown industrial, subtle cityscape |
+| Red Basin | red scorched dilapidated farmland, a crater |
+| Station Zero | a research hub, overrun |
+| Port Meridian | destroyed CQB airport / terminal |
+| Broken Coast | ocean, flat landscape |
+| Shatterpoint | alternative city sprawl |
+
+ANCHOR 13 ANSWERS A STANDING SPEC QUESTION. `Docs/spec/content-and-modes.md`
+asks "whether one Anchor is the whole settlement layer, or a network of
+them"; a hub with a NUMBER is a network with twelve others, and the question
+can be closed the day the owner confirms that reading.
+
+Two of these are already partly built and should be renamed rather than
+re-authored: the hub is Anchor 13, and Fernhall Approach is the yard that
+ships. The other five are new ground.
+
+WHAT THIS UNBLOCKS AND WHAT IT DOES NOT: naming was the only owner-gated
+half. Each destination still needs geometry, and the composer's vocabulary is
+the real constraint — Fernhall's walls are `city_building-small-a` stretched
+into slabs, and 587 kit models sit unimported (90 of them genuinely solid).
+Red Basin and Broken Coast in particular are FLAT-GROUND reads, which is the
+cheapest thing this pipeline makes: a floor, a perimeter and a cover lattice
+is most of a basin.
+
 ## The endgame shape (O262) — a device, a key, a tileset
 
 The PoE reading, mapped onto what already exists. Campaign = the three acts

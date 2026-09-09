@@ -696,6 +696,27 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
                 Door->Rift = UBreakerZoneBuilder::FernhallRiftFor(RiftMarker.Yard);
                 Door->OnRiftEntryRequested.AddUObject(this, &ABreakerGameMode::HandleRiftEntryRequested);
             }
+
+            // THE WATCHKEEPER, ON A MARKER THE COMPOSER SHIPPED AND NOTHING
+            // READ. marker_npc_contract has been authored, parsed, validated
+            // by the piece contract and consumed by no production code — the
+            // yard set aside a place to stop and left it empty, while every
+            // quest giver in the game stood in the hub. So Fernhall was
+            // somewhere you crossed and never somewhere you were sent from.
+            //
+            // Not in a rift: an instance is the yard emptied of its people,
+            // and a contract giver standing in one would offer work inside
+            // the place the work is. He faces the player start for the same
+            // reason the doors do — arrive looking at a face, not a back.
+            if (!bRiftInstance)
+            {
+                if (const FBreakerZoneMarker* Contract = Markers.Find(EBreakerZoneMarkerRole::NPCContract))
+                {
+                    const FVector Facing = (StartAt - Contract->Location).GetSafeNormal2D();
+                    SpawnFinaleResident(TEXT("Watchkeeper"), Contract->Location,
+                        Facing.IsNearlyZero() ? FRotator::ZeroRotator : Facing.Rotation());
+                }
+            }
         }
         if (!bRiftInstance)
         {

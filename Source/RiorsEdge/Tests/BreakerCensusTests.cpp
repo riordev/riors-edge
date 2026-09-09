@@ -157,7 +157,11 @@ bool FBreakerQuestsFreshTest::RunTest(const FString& Parameters)
     const TArray<FBreakerQuestDefinition>& Quests = UBreakerQuestLibrary::GetFallbackQuests();
     const TArray<FName>& Flags = UBreakerQuestLibrary::GetRegisteredFlags();
 
-    TestEqual(TEXT("Three acts author eight quests"), Quests.Num(), 8);
+    // 8 -> 9 quests, 14 -> 15 objectives, 45 -> 49 flags: Quest.Watch,
+    // taken in the field. A Kill objective on purpose — quest progress only
+    // counts kills and one hard-wired feedstock helper, so a find-or-collect
+    // contract is plumbing this game does not have.
+    TestEqual(TEXT("Three acts author nine quests"), Quests.Num(), 9);
     const TArray<FName> ChainOrder = { TEXT("Quest.FirstContract"), TEXT("Quest.KessSalvage"), TEXT("Quest.Pattern"), TEXT("Quest.Deeper") };
     for (int32 Index = 0; Index < ChainOrder.Num() && Index < Quests.Num(); ++Index)
     {
@@ -165,8 +169,8 @@ bool FBreakerQuestsFreshTest::RunTest(const FString& Parameters)
     }
     int32 ObjectiveCount = 0;
     for (const FBreakerQuestDefinition& Quest : Quests) { ObjectiveCount += Quest.Objectives.Num(); }
-    TestEqual(TEXT("Fourteen objectives including rescue and finale"), ObjectiveCount, 14);
-    TestEqual(TEXT("Forty-five registered flags"), Flags.Num(), 45);
+    TestEqual(TEXT("Fifteen objectives including rescue and finale"), ObjectiveCount, 15);
+    TestEqual(TEXT("Forty-nine registered flags"), Flags.Num(), 49);
     TestTrue(TEXT("A quest flag is registered"), UBreakerQuestLibrary::IsRegisteredFlag(BreakerQuestFlags::FirstContractTurnedIn));
     TestFalse(TEXT("A progress counter is not a registered flag"), UBreakerQuestLibrary::IsRegisteredFlag(BreakerQuestFlags::FirstContractKillCounter));
     AddInfo(FString::Printf(TEXT("Quest registry: %d quests, %d objectives, %d flags"), Quests.Num(), ObjectiveCount, Flags.Num()));
@@ -217,7 +221,11 @@ bool FBreakerDialogueFreshTest::RunTest(const FString& Parameters)
     }
 
     const FBreakerDialogueData& Data = ABreakerNPC::GetDialogueData();
-    TestEqual(TEXT("Seven authored dialogue rows including physical mission actors"), Data.Npcs.Num(), 7);
+    // 7 -> 8 rows, 59 -> 66 nodes, 114 -> 124 choices: the Watchkeeper,
+    // Fernhall's first NPC. Every quest giver in the game stood in the hub
+    // until him, and the yard was somewhere you crossed rather than somewhere
+    // you were sent from.
+    TestEqual(TEXT("Eight authored dialogue rows including physical mission actors"), Data.Npcs.Num(), 8);
     const FBreakerDialogueRow* Kess = Data.Npcs.FindByPredicate([](const FBreakerDialogueRow& Row) { return Row.Id == FName(TEXT("ForgeKeeper")); });
     const FBreakerDialogueRow* Quartermaster = Data.Npcs.FindByPredicate([](const FBreakerDialogueRow& Row) { return Row.Id == FName(TEXT("Quartermaster")); });
     const FBreakerDialogueRow* Survivor = Data.Npcs.FindByPredicate([](const FBreakerDialogueRow& Row) { return Row.Id == FName(TEXT("Survivor")); });
@@ -244,8 +252,8 @@ bool FBreakerDialogueFreshTest::RunTest(const FString& Parameters)
         EntryCount += Row.Entries.Num();
         for (const FBreakerDialogueNode& Node : Row.Nodes) { ChoiceCount += Node.Choices.Num(); }
     }
-    TestEqual(TEXT("Fifty-nine nodes"), NodeCount, 59);
-    TestEqual(TEXT("One hundred fourteen choices"), ChoiceCount, 114);
+    TestEqual(TEXT("Sixty-six nodes"), NodeCount, 66);
+    TestEqual(TEXT("One hundred twenty-four choices"), ChoiceCount, 124);
     TestEqual(TEXT("Thirty-seven entries"), EntryCount, 37);
     AddInfo(FString::Printf(TEXT("Dialogue: %d npcs, %d nodes, %d choices, %d entries"), Data.Npcs.Num(), NodeCount, ChoiceCount, EntryCount));
 
