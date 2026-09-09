@@ -35,7 +35,8 @@ void BreakerSchedulePlateCapture(UWorld* World)
  FString Mode,UserDirectory;
  const bool bPlate=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureEnemyPlate="),Mode);
  const bool bCache=FParse::Param(FCommandLine::Get(),TEXT("BreakerCaptureCache"));
- if(!World||(!bPlate&&!bCache))return;
+ const bool bScenery=FParse::Param(FCommandLine::Get(),TEXT("BreakerCaptureScenery"));
+ if(!World||(!bPlate&&!bCache&&!bScenery))return;
  if(!FParse::Value(FCommandLine::Get(),TEXT("UserDir="),UserDirectory)||UserDirectory.IsEmpty()
     ||FPaths::IsRelative(UserDirectory)||FPaths::IsSamePath(FPaths::ConvertRelativePathToFull(UserDirectory),FPaths::ProjectDir())
     ||IFileManager::Get().DirectoryExists(*(FPaths::ProjectSavedDir()/TEXT("SaveGames"))))
@@ -44,11 +45,24 @@ void BreakerSchedulePlateCapture(UWorld* World)
  {UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Mode must be open or blocked."));return;}
  // Core time advances while the arrival menu has paused world timers.
  // Weak UObject binding prevents setup after this world is destroyed.
- FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(World,[World,Mode,bCache](float)
+ FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(World,[World,Mode,bCache,bPlate,bScenery](float)
  {
     auto* PC=World->GetFirstPlayerController();auto* Player=PC?Cast<ABreakerCharacter>(PC->GetPawn()):nullptr;
     if(!Player||!Player->HasAuthority())return false;
     Player->bRefuseSavesForPendingCharacter=true;Player->ResumeFromMenu();
+    if (bScenery && !bPlate && !bCache)
+    {
+        // The authored tour owns location and aim on its existing core ticker.
+        // Freeze simulation only: no enemies, geometry, materials, or camera
+        // are replaced or repositioned by this option.
+        auto* Movement = Player->GetBreakerMovement();
+        Movement->StopMovementImmediately();
+        Movement->SetMovementMode(MOVE_None);
+        Movement->SetComponentTickEnabled(false);
+        PC->SetPause(true);
+        UE_LOG(LogTemp, Display, TEXT("[PlateCapture] Scenery simulation paused; authored tour retains view control."));
+        return false;
+    }
     for(TActorIterator<ABreakerEnemy> It(World);It;++It)
     {It->SetActorTickEnabled(false);if(auto* Move=It->FindComponentByClass<UBreakerEnemyMovementComponent>()){Move->StopMovementImmediately();Move->SetComponentTickEnabled(false);}}
     Player->GetBreakerMovement()->StopMovementImmediately();Player->GetBreakerMovement()->SetMovementMode(MOVE_None);

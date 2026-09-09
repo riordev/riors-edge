@@ -51,7 +51,7 @@ bool FBreakerHubTravelRegistryTest::RunTest(const FString& Parameters)
         if (!Destination.bEnabled) continue;
         if (Destination.bDoorOnly) ++DoorOnlyCount; else ++GeneralCount;
     }
-    TestEqual(TEXT("Exactly six general destinations: gym, Anchor, Fernhall, and three earned Earths"), GeneralCount, 6);
+    TestEqual(TEXT("Eight general destinations include both packaged regional prototypes"), GeneralCount, 8);
     TestEqual(TEXT("Exactly one door-only destination: the Local Rift"), DoorOnlyCount, 1);
 
     // A travel point never offers the place it stands in, which is what keeps

@@ -1,4 +1,5 @@
 #include "Interaction/BreakerTravelPoint.h"
+#include "Game/BreakerPrototypeDestinations.h"
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Save/BreakerQuestJournal.h"
@@ -182,7 +183,7 @@ const TArray<FBreakerTravelDestination>& ABreakerTravelPoint::GetFallbackRegistr
     // "what places exist" question answered in exactly one place.
     FBreakerTravelDestination Hub;
     Hub.Id = ABreakerTravelPoint::HubDestinationId;
-    Hub.DisplayName = FText::FromString(TEXT("The Anchor"));
+    Hub.DisplayName = FText::FromString(TEXT("Anchor 13"));
     Hub.Description = TEXT("The hub — vendors, the Forge Keeper, and the way into the story.");
     Hub.bEnabled = true;
     // THE FIRST AUTHORED ZONE. The vertical slice's place: a kit-bashed
@@ -191,7 +192,7 @@ const TArray<FBreakerTravelDestination>& ABreakerTravelPoint::GetFallbackRegistr
     // list and the deployment briefing speak the same name.
     FBreakerTravelDestination Fernhall;
     Fernhall.Id = ABreakerTravelPoint::FernhallDestinationId;
-    Fernhall.DisplayName = FText::FromString(TEXT("The Fernhall Approach"));
+    Fernhall.DisplayName = FText::FromString(TEXT("Fernhall Approach"));
     Fernhall.Description = TEXT("The overgrown yard outside Fernhall — the First Contract, and the rift.");
     Fernhall.bEnabled = true;
 
@@ -230,6 +231,15 @@ const TArray<FBreakerTravelDestination>& ABreakerTravelPoint::GetFallbackRegistr
     Won.DisplayName = FText::FromString(TEXT("The Winning Earth"));
     Won.Description = TEXT("An intact world beyond Rior's reach. Follow the reconstructed signal.");
     Registry.Add(Won);
+    // Prototype entries exist only after their actual map packages have been
+    // authored. An absent map never produces a dead travel card.
+    for (const auto& Definition : BreakerPrototypeDestinations::All())
+    {
+        if (!BreakerPrototypeDestinations::HasMapPackage(Definition)) continue;
+        FBreakerTravelDestination Place;
+        Place.Id=Definition.Id; Place.DisplayName=FText::FromString(Definition.DisplayName);
+        Place.Description=Definition.Description; Registry.Add(Place);
+    }
 
     return Registry;
 }

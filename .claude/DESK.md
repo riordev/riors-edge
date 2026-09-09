@@ -7,7 +7,7 @@ Continue validated blocks until the owner returns. Prioritize playable changes f
 ## Immediate queue
 
 1. Cooperative sandbox landed with real host/guest fire and replicated health/death evidence. Remaining multiplayer acceptance: abilities, drop contention, respawn/rejoin, human movement feel and eventual campaign support.
-2. Land Red Basin and Station Zero prototypes, matching farmland/crater and research-hub settings. Create real map packages, test routes/rewards/return, and inspect rendered frames.
+2. Red Basin/Station Zero prototypes landed; next content acceptance is varied mission beats and real return Rifts. Refine exposed boundaries, repeated cover and crowded distant supply prompts.
 3. Land Volatile countdown visibility and ability-menu wrapping/empty-label fixes with rendered checks.
 4. Finish remaining Afterimage consumers and real-clock Rot feedback checks. Cache live prompt/focus and final prop art remain.
 5. Kit expansion under O252–O260: current34 registered entries are11 actives and10 passives short of55. Carom, Coup, Backstep, Pyre, Riftlance, Recall, Bulwark and Overwatch are named candidates without sufficient authored mechanics in the current docs. Rover/Barrel need new mechanics; Wildcard has O257 but needs Forge/foreign-grant/resource infrastructure. Do not fill the count with clones or call existing innate nodes slot passives.
@@ -60,7 +60,7 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 
 ## Latest validated baseline
 
-Current local build/census/full suite:845 passing,3 expected failures,0 unexpected. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
+Current local build/census/full suite:847 passing,3 expected failures,0 unexpected. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
 
 ## Landed this pass
 
@@ -83,3 +83,5 @@ Current local build/census/full suite:845 passing,3 expected failures,0 unexpect
 - Hold Afterimage: paid native Core route and equipped resource-funded Hold verify generation's two-second half-contribution tail. Ordinary hit cap ends on time; cancellation, death, paid respec and removing the inactive granted ability revoke the contribution. Independent review caught the removal gap before landing. Build/full suite843/3/0.
 
 - Cooperative combat sandbox: native isolation/environment tests and full suite845/3/0. Real two-process verification passed: two profiles, client floor/lighting, remote displacement, guest normal fire RPC, nine server weapon hits and client220→148→0 health/death. Disposable UserDirs and unchanged save hashes verified. Compile API/macro issues and live-log sharing fixed within the per-bug time box. This is combat-only; progression/travel and remaining multiplayer interactions are not claimed complete.
+
+- Prototype destinations: real Red Basin/Station Zero packages, six fixed-level districts/36 guards/six supply rewards, stable maps and return gates. Safe arrival and native death/respawn, route sweeps, actual cache kill gates/pickups pass;847/3/0. Both four-frame1080 scenery tours inspected; prototype objective verified in two720 frames. Still blockout art and recovery-only objectives; see Docs/reports/prototype-destinations-2026-09-09.md.

@@ -1,4 +1,6 @@
 #include "Game/BreakerLocalMapComponent.h"
+#include "Game/BreakerPrototypeDestinations.h"
+#include "Interaction/BreakerFernhallCache.h"
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerAlteredEnemy.h"
@@ -26,6 +28,14 @@ namespace
 
 FText UBreakerLocalMapComponent::GetCampaignObjective() const
 {
+    if (const auto* Prototype=BreakerPrototypeDestinations::ForWorld(this))
+    {
+        int32 Recovered=0;
+        for (TActorIterator<ABreakerFernhallCache> It(GetWorld());It;++It)
+            if (It->ActorHasTag(TEXT("PrototypeDestination.Cache")) && It->IsOpened()) ++Recovered;
+        return FText::FromString(Recovered==3 ? TEXT("All supplies recovered. Return to Anchor 13 from either travel gate.")
+            : FString::Printf(TEXT("%s: recover district supplies (%d/3). Clear each marked pocket, then open its cache."),*Prototype->DisplayName,Recovered));
+    }
     const auto* Player = Cast<ABreakerCharacter>(GetOwner());
     const auto* Beat = BreakerMapCurrentBeat(GetOwner());
     return Player && Beat ? FText::FromString(UBreakerMissionLibrary::TrackerLine(*Beat, Player->GetQuestJournal()->GetState())) : FText::GetEmpty();
@@ -39,8 +49,9 @@ UBreakerLocalMapComponent::UBreakerLocalMapComponent()
 
 FText UBreakerLocalMapComponent::GetRegionName() const
 {
-    if (UBreakerGameInstance::IsAnchorMap(this)) return FText::FromString(TEXT("THE ANCHOR"));
-    if (UBreakerGameInstance::IsFernhallMap(this)) return FText::FromString(TEXT("FERNHALL"));
+    if (const auto* Prototype=BreakerPrototypeDestinations::ForWorld(this)) return FText::FromString(Prototype->DisplayName+TEXT(" / PROTOTYPE"));
+    if (UBreakerGameInstance::IsAnchorMap(this)) return FText::FromString(TEXT("ANCHOR 13"));
+    if (UBreakerGameInstance::IsFernhallMap(this)) return FText::FromString(TEXT("FERNHALL APPROACH"));
     if (UBreakerGameInstance::IsErasedEarthMap(this)) return FText::FromString(TEXT("ERASED EARTH"));
     if (UBreakerGameInstance::IsStrippedEarthMap(this)) return FText::FromString(TEXT("STRIPPED EARTH"));
     if (UBreakerGameInstance::IsWinningEarthMap(this)) return FText::FromString(TEXT("WINNING EARTH"));
@@ -77,9 +88,19 @@ TArray<FBreakerLocalMapMarker> UBreakerLocalMapComponent::GetMarkers() const
             : FString::Printf(TEXT("%s.%d.%d.%d"), *It->GetClass()->GetName(), FMath::RoundToInt(Position.X), FMath::RoundToInt(Position.Y), FMath::RoundToInt(Position.Z));
         Marker.Id = FName(*(Region + TEXT(".site.") + Site));
     }
+    for (TActorIterator<ABreakerFernhallCache> It(World);It;++It)
+    {
+        if (!IsValid(*It) || !It->ActorHasTag(TEXT("PrototypeDestination.Cache")) || It->IsOpened()) continue;
+        FName Site;
+        for (FName Tag : It->Tags) if (Tag.ToString().StartsWith(TEXT("Destination.Site."))) { Site=Tag; break; }
+        if (Site.IsNone()) continue;
+        auto& Marker=Out.AddDefaulted_GetRef(); Marker.Id=Site;
+        Marker.Label=It->GetDisplayName(); Marker.Detail=It->GetCachePrompt(); Marker.Location=It->GetActorLocation();
+        Marker.bObjective=true;
+    }
     for (TActorIterator<ABreakerNPC> It(World); It; ++It)
     {
-        if (!IsValid(*It) || It->ActorHasTag(TEXT("Fernhall.Cache"))) continue;
+        if (!IsValid(*It) || It->IsA<ABreakerFernhallCache>()) continue;
         auto& Marker = Out.AddDefaulted_GetRef();
         Marker.Location = It->GetActorLocation(); Marker.Label = It->GetDisplayName();
         // NPC appearances can change with the player's body; discovery belongs

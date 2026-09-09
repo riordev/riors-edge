@@ -1,5 +1,6 @@
 #include "Characters/BreakerCharacter.h"
 #include "Game/BreakerCoopCombatTest.h"
+#include "Game/BreakerPrototypeDestinations.h"
 #include "Game/BreakerCoopCombatVerification.h"
 #include "Net/UnrealNetwork.h"
 #include "Interaction/BreakerFeedstockPickup.h"
@@ -2356,6 +2357,10 @@ void ABreakerCharacter::ShowInitialMenu()
         else if (bAutoPlayValue && AutoPlayDestination.Equals(TEXT("Fernhall"), ESearchCase::IgnoreCase))
         {
             DestinationMap = FName(UBreakerGameInstance::FernhallMapName());
+        }
+        else if (const auto* Prototype = BreakerPrototypeDestinations::Find(FName(*AutoPlayDestination)))
+        {
+            DestinationMap = FName(*Prototype->MapName);
         }
         else if (bAutoPlayValue && !AutoPlayDestination.Equals(TEXT("Anchor"), ESearchCase::IgnoreCase))
         {

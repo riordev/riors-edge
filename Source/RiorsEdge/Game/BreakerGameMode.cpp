@@ -1,4 +1,5 @@
 #include "Game/BreakerGameMode.h"
+#include "Game/BreakerPrototypeDestinations.h"
 #include "Game/BreakerCoopCombatTest.h"
 #include "GameFramework/PawnMovementComponent.h"
 
@@ -49,6 +50,7 @@
 #include "Engine/StaticMeshActor.h"
 #include "GameFramework/PlayerController.h"
 #include "Camera/CameraActor.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Camera/CameraComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Combat/BreakerZoneActor.h"
@@ -182,6 +184,12 @@ void ABreakerGameMode::HandleHubTravelSelected(FName DestinationId, APawn* Reque
         Session->PendingRift = FBreakerRiftDefinition();
         // The counter goes with the rift it counted for (O82).
         Session->EndgameDeathsRemaining = UBreakerRiftLibrary::SoloEndgameDeathBudget;
+    }
+    if (const auto* Prototype=BreakerPrototypeDestinations::Find(DestinationId))
+    {
+        if (BreakerPrototypeDestinations::HasMapPackage(*Prototype))
+            UBreakerGameInstance::TravelTo(this,FName(*Prototype->MapName));
+        return;
     }
     if (DestinationId == ABreakerTravelPoint::HubDestinationId)
     {
@@ -388,6 +396,17 @@ void ABreakerGameMode::ReturnToAnchor(APawn* RequestingPawn)
 
 AActor* ABreakerGameMode::ChoosePlayerStart_Implementation(AController* Player)
 {
+    // Select before pawn BeginPlay records its campaign respawn transform.
+    // Existing authored shells may retain their former start at the origin.
+    if (BreakerPrototypeDestinations::ForWorld(this))
+    {
+        const FName StartTag(TEXT("PrototypeDestination.Arrival"));
+        for (TActorIterator<APlayerStart> It(GetWorld());It;++It)
+            if (It->ActorHasTag(StartTag)) return *It;
+        auto* Arrival=GetWorld()->SpawnActor<APlayerStart>(BreakerPrototypeDestinations::ArrivalLocation(),FRotator::ZeroRotator);
+        if (Arrival) { Arrival->Tags.Add(StartTag); return Arrival; }
+        return nullptr;
+    }
     // Late guests must use the same authored arrival as the initial host,
     // without re-running HandleStartingNewPlayer's encounter construction.
     if (BreakerCoopCombatTest::IsEnabled(GetWorld()) && UBreakerGameInstance::IsFernhallMap(this))
@@ -564,6 +583,46 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
         // schedule its exit, or the harness can never photograph the hub.
         ScheduleScreenshots();
         UE_LOG(LogTemp, Log, TEXT("[BreakerMap] anchor — hub built, no gym."));
+        return;
+    }
+
+    if (const auto* Prototype=BreakerPrototypeDestinations::ForWorld(this))
+    {
+        const auto Layout=BreakerPrototypeDestinations::Build(GetWorld(),Prototype->Id);
+        for (auto* Gate : Layout.Gates)
+            Gate->OnDestinationSelected.AddUObject(this,&ABreakerGameMode::HandleHubTravelSelected);
+        if (APawn* Pawn=NewPlayer->GetPawn())
+        {
+            Pawn->TeleportTo(Layout.Arrival,Layout.Facing);
+            if (AController* Controller=Pawn->GetController()) Controller->SetControlRotation(Layout.Facing);
+            BuildFieldFrame(Pawn);
+        }
+        GymAreaLevel=Prototype->AreaLevels[0];
+        bPlaytestTargetsSpawned=true;
+        if (FParse::Param(FCommandLine::Get(),TEXT("BreakerCaptureTour")))
+            for (int32 District=0;District<Prototype->Districts.Num();++District)
+            {
+                // O2 PLACEHOLDER: setting review views explicitly frame the
+                // scorched farm/crater and research landmarks, not freight.
+                const FVector Centre=Prototype->Districts[District];
+                const bool bBasin=Prototype->Id==TEXT("RedBasin");
+                const FVector BasinViews[]={FVector(-1800,-1300,850),FVector(-500,-800,650),FVector(-500,-800,950)};
+                const FVector BasinLooks[]={FVector(300,0,100),FVector(1800,-1750,350),FVector(1800,-1650,100)};
+                const FVector ResearchViews[]={FVector(-500,0,500),FVector(500,-500,850),FVector(-500,-500,900)};
+                const FVector ResearchLooks[]={FVector(-1500,1750,100),FVector(-2400,1600,450),FVector(1900,-1500,950)};
+                const FVector At=Centre+(bBasin?BasinViews[District]:ResearchViews[District]);
+                const FRotator Facing=(Centre+(bBasin?BasinLooks[District]:ResearchLooks[District])-At).Rotation();
+                if (auto* Camera=GetWorld()->SpawnActor<ACameraActor>(At,Facing))
+                {
+                    Camera->GetCameraComponent()->SetFieldOfView(90.f);
+#if WITH_EDITOR
+                    Camera->SetActorLabel(Prototype->DisplayName+TEXT(" - ")+Prototype->DistrictNames[District]);
+#endif
+                    UE_LOG(LogTemp,Display,TEXT("[DestinationCapture] %s / %s"),*Prototype->DisplayName,*Prototype->DistrictNames[District]);
+                    TourCameras.Add(Camera);
+                }
+            }
+        ScheduleScreenshots();
         return;
     }
 
@@ -1896,6 +1955,9 @@ void ABreakerGameMode::FinishScreenshot()
                     if (UPawnMovementComponent* Movement = Pawn->GetMovementComponent()) Movement->StopMovementImmediately();
                     PC->SetControlRotation(Vantage->GetActorRotation());
                     PC->SetViewTarget(Pawn);
+                    // Frozen scenery tours still need a fresh camera cache after moving the pawn.
+                    if (FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureScenery")) && PC->PlayerCameraManager)
+                        PC->PlayerCameraManager->UpdateCamera(0.0f);
                 }
                 else
                 {

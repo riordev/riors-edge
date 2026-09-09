@@ -1,6 +1,7 @@
 #include "UI/BreakerPlaytestHUD.h"
 #include "Interaction/BreakerFeedstockPickup.h"
 #include "Game/BreakerLocalMapComponent.h"
+#include "Game/BreakerPrototypeDestinations.h"
 #include "Combat/BreakerStatusCycleComponent.h"
 
 #include "UI/BreakerDamageFeed.h"
@@ -1165,6 +1166,29 @@ void ABreakerPlaytestHUD::DrawQuestLine(const ABreakerCharacter* Character)
             FMath::RoundToInt(FVector::Dist2D(Character->GetActorLocation(), MapTarget.Location) / 100));
         DrawSpecTextRight(Direction, Right, S(BreakerUI::HudQuestLineTop + 46), BreakerUI::Gold,
             FitSpecPixels(Direction, BreakerUI::HudQuestLinePixels, Limit, 11.0f));
+    }
+
+    // These side destinations have a live cache objective, not a campaign
+    // dialogue beat. Share the map's actual state without writing quest flags.
+    if (BreakerPrototypeDestinations::ForWorld(Character))
+    {
+        FString Objective=Character->GetLocalMap()->GetCampaignObjective().ToString();
+        FString Detail;
+        // Reuse the map's two authored sentences in the existing two-line
+        // tracker space; retain the tracked-site direction below them.
+        const int32 Sentence=Objective.Find(TEXT(". "));
+        if (Sentence!=INDEX_NONE)
+        {
+            Detail=Objective.Mid(Sentence+2);
+            Objective=Objective.Left(Sentence+1);
+        }
+        if (!Objective.IsEmpty())
+            DrawSpecTextRight(Objective,Right,S(BreakerUI::HudQuestLineTop),BreakerUI::TextSecondary,
+                FitSpecPixels(Objective,BreakerUI::HudQuestLinePixels,Limit,11.0f));
+        if (!Detail.IsEmpty())
+            DrawSpecTextRight(Detail,Right,S(BreakerUI::HudQuestLineTop+22),BreakerUI::TextSecondary,
+                FitSpecPixels(Detail,BreakerUI::HudQuestLinePixels,Limit,11.0f));
+        return;
     }
 
     for (const FBreakerMissionDefinition& Mission : UBreakerMissionLibrary::GetMissions())

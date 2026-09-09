@@ -1,4 +1,5 @@
 #include "Game/BreakerGameInstance.h"
+#include "Game/BreakerPrototypeDestinations.h"
 #include "Game/BreakerCoopCombatTest.h"
 
 #include "Combat/BreakerEnemy.h"
@@ -61,6 +62,7 @@ bool UBreakerGameInstance::IsErasedEarthMap(const UObject* WorldContext)
 bool UBreakerGameInstance::IsDestinationMap(const UObject* WorldContext, FName DestinationId)
 {
     const FString Map = BreakerCurrentMapName(WorldContext);
+    if (const auto* Prototype=BreakerPrototypeDestinations::Find(DestinationId)) return Map==Prototype->MapName;
     if (DestinationId == ABreakerTravelPoint::HubDestinationId) return Map == AnchorMapName();
     if (DestinationId == ABreakerTravelPoint::FernhallDestinationId) return Map == FernhallMapName();
     if (DestinationId == ABreakerTravelPoint::ErasedEarthDestinationId) return Map == ErasedEarthMapName();
@@ -91,7 +93,8 @@ bool UBreakerGameInstance::IsGymMapName(const FString& Name)
     // of the fallback is that every NEW named map must be excluded here by
     // hand, or it silently fills with targets and a boss key — which is why
     // this is a name-in, bool-out function the suite can hold.
-    return Name != FrontEndMapName() && Name != AnchorMapName() && Name != FernhallMapName()
+    return !BreakerPrototypeDestinations::All().ContainsByPredicate([&](const auto& D) { return D.MapName==Name; })
+        && Name != FrontEndMapName() && Name != AnchorMapName() && Name != FernhallMapName()
         && Name != ErasedEarthMapName() && Name != StrippedEarthMapName() && Name != WinningEarthMapName();
 }
 
