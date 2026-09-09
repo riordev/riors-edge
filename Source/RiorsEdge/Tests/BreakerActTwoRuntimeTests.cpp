@@ -90,6 +90,13 @@ bool FBreakerActTwoRuntimeTest::RunTest(const FString& Parameters)
         auto Kill = [&](ABreakerEnemy* Enemy)
         {
             if (!Enemy->HasActorBegunPlay()) Enemy->DispatchBeginPlay();
+            // An arrival is protected for its emergence window, and this fixture
+            // kills a wave in the frame it spawns — so without ending the window
+            // first every hit below would be absorbed and no wave would clear.
+            // The window is a fight-pacing rule; what is under test here is the
+            // Breach wave and objective structure. Its own behaviour is pinned
+            // by RiorsEdge.Combat.Emergence.Window.
+            Enemy->EndEmergenceWindow();
             FBreakerDamageRequest Hit;
             Hit.BaseDamage = 100000000.0f;
             Hit.bCanCritical = false;

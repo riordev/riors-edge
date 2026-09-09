@@ -202,6 +202,29 @@ public:
     bool IsEligibleThreatTarget(const AActor* Candidate) const;
     void ClearThreat();
     void ApplyProvokeThreat(AActor* Source, float Amount, float Duration, bool bCancelOnForeignDamage);
+
+    // THE EMERGENCE WINDOW. A body that has just arrived cannot be deleted
+    // in the frame it appears. Owner report: enemies "just appear on top of
+    // you out of thin air" — the distance half of that is already engineered
+    // and logs when it fails, but nothing ever protected an arriving body,
+    // so a player already firing at the spawn point erases it before it is
+    // a fight.
+    //
+    // It is the SHIPPED immunity shape, not a new one: a keyed 0.0 incoming
+    // modifier plus an owned timer that removes it, exactly as Swift's Hard
+    // Stop does under Spend to Live. O228 forbids binary immunity through
+    // PushWindowIncomingDamageModifier — "numerical defence only; binary
+    // immunity must use ordinary ownership" — and ordinary ownership is
+    // precisely this: the emerging body owns the timer that ends it.
+    void GrantEmergenceWindow();
+    // Ends the window early. Bound to death so a body killed after the window
+    // opens cannot leave a modifier on a pooled corpse that revives later.
+    UFUNCTION() void EndEmergenceWindow();
+    static FName EmergenceModifierKey() { return TEXT("Emergence.Arrival"); }
+    // O2 PLACEHOLDER. Long enough that an arrival cannot be deleted on its
+    // first frame, short enough that it is never a shield to fight behind.
+    UPROPERTY(EditDefaultsOnly, Category="Combat|Emergence", meta=(ClampMin="0"))
+    float EmergenceProtectedSeconds = 0.8f;
     // Read-only views of the authored tuning. Public so tools, the playtest
     // report and the automation suite can assert against what an archetype
     // SHIPS with, without opening the tuning itself for writing.
@@ -764,6 +787,7 @@ private:
     bool bPooledByGameMode = false;
     FVector PooledBaseScale = FVector::OneVector;
     FTimerHandle PoolParkTimer;
+    FTimerHandle EmergenceTimer;
 
     // The three seam lanes. Plain maps, not UPROPERTYs: entries are pushed and
     // popped by live effects that also own the teardown (the armour lane's

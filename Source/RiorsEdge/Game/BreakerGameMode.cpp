@@ -4623,6 +4623,10 @@ ABreakerEnemy* ABreakerGameMode::AcquirePooledEnemy(UClass* EnemyClass, const FV
             ABreakerEnemy* Parked = Reserve->Pop().Get();
             if (!Parked) continue;
             Parked->ReviveFromPool(SpawnLocation);
+            // Every wave arrival passes through this one function — first
+            // wave and later, gym, rift and breach — so the emergence window
+            // is granted here rather than at each caller.
+            Parked->GrantEmergenceWindow();
             return Parked;
         }
     }
@@ -4633,6 +4637,7 @@ ABreakerEnemy* ABreakerGameMode::AcquirePooledEnemy(UClass* EnemyClass, const FV
     {
         Enemy->SetPooledByGameMode(true);
         Enemy->OnParkedForPool.BindUObject(this, &ABreakerGameMode::HandleEnemyParkedForPool);
+        Enemy->GrantEmergenceWindow();
     }
     return Enemy;
 }

@@ -1518,6 +1518,33 @@ void ABreakerEnemy::ParkPooledBody()
     else Destroy();
 }
 
+
+void ABreakerEnemy::GrantEmergenceWindow()
+{
+    UWorld* World = GetWorld();
+    UBreakerCombatComponent* Emerging = FindComponentByClass<UBreakerCombatComponent>();
+    if (!World || !Emerging || !HasAuthority() || EmergenceProtectedSeconds <= 0.0f) return;
+    // Re-arming replaces the previous cleanup rather than stacking one, the
+    // same way Hard Stop reuses its timer when a cooldown reset allows a
+    // second cast inside the first window. A pooled body arrives many times.
+    World->GetTimerManager().ClearTimer(EmergenceTimer);
+    Emerging->PushIncomingDamageModifier(EmergenceModifierKey(), 0.0f);
+    Emerging->OnDeath.AddUniqueDynamic(this, &ABreakerEnemy::EndEmergenceWindow);
+    World->GetTimerManager().SetTimer(EmergenceTimer, FTimerDelegate::CreateWeakLambda(this, [this]()
+    {
+        EndEmergenceWindow();
+    }), EmergenceProtectedSeconds, false);
+}
+
+void ABreakerEnemy::EndEmergenceWindow()
+{
+    if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(EmergenceTimer);
+    if (UBreakerCombatComponent* Emerged = FindComponentByClass<UBreakerCombatComponent>())
+    {
+        Emerged->RemoveIncomingDamageModifier(EmergenceModifierKey());
+    }
+}
+
 void ABreakerEnemy::ReviveFromPool(const FVector& SpawnLocation)
 {
     // RespawnEnemy's checklist, plus everything a PROMOTED body has to give

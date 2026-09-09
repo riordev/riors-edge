@@ -115,6 +115,12 @@ bool FBreakerRiftRuntimeLoopTest::RunTest(const FString& Parameters)
         for (ABreakerEnemy* Enemy : Enemies)
         {
             if (!Enemy->HasActorBegunPlay()) Enemy->DispatchBeginPlay();
+            // Structural clears happen in the spawn frame, inside the emergence
+            // window, so the window is ended before the hit. This fixture owns
+            // the wave cadence; RiorsEdge.Combat.Emergence.Window owns the
+            // window, and ticking it out here would spend the breather clock
+            // this test measures.
+            Enemy->EndEmergenceWindow();
             FBreakerDamageRequest Hit;
             Hit.BaseDamage = 100000000.0f;
             Hit.bCanCritical = false;
