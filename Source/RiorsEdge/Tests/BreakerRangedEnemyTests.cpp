@@ -21,6 +21,59 @@ bool FBreakerRangedBandTest::RunTest(const FString& Parameters)
     const float Min = 900.0f;
     const float Max = 1900.0f;
 
+    // LINE OF SIGHT SETTLES BEFORE IT IS BELIEVED, and this is the predicate
+    // that actually oscillated. The band's own hysteresis is proved below and
+    // was never the problem; a raw line trace WRAPPING it flipped every frame,
+    // and one blocked frame swung the movement vector about ninety degrees.
+    constexpr float Hold = 0.25f;
+    // Agreement is not a change and never waits.
+    TestTrue(TEXT("A visible body that stays visible stays believed"),
+        ELib::SettleLineOfSight(true, true, 0.0f, Hold));
+    TestFalse(TEXT("A blocked body that stays blocked stays believed"),
+        ELib::SettleLineOfSight(false, false, 10.0f, Hold));
+    // A single flickering frame costs nothing at all.
+    TestTrue(TEXT("One blocked frame does not blind a body that can see"),
+        ELib::SettleLineOfSight(false, true, 0.016f, Hold));
+    TestFalse(TEXT("and one clear frame does not un-blind a body behind cover"),
+        ELib::SettleLineOfSight(true, false, 0.016f, Hold));
+    // A real change still arrives, and exactly on time.
+    TestFalse(TEXT("A block held past the dwell is finally believed"),
+        ELib::SettleLineOfSight(false, true, Hold, Hold));
+    TestTrue(TEXT("and so is a line that has genuinely cleared"),
+        ELib::SettleLineOfSight(true, false, Hold + 0.01f, Hold));
+    // A zero dwell keeps the old frame-accurate rule reachable rather than
+    // making it impossible to ask for.
+    TestFalse(TEXT("A zero dwell filters nothing"),
+        ELib::SettleLineOfSight(false, true, 0.0f, 0.0f));
+
+    // THE FIRST LOOK IS BELIEVED AT ONCE, and the suite is what found this. A
+    // body that spawns already seeing the player, or that rounds a corner onto
+    // it, has no belief yet to protect — making it wait out the dwell before it
+    // would commit to a target broke a shipped runtime fixture and would have
+    // read in play as a quarter second of blank staring on every arrival. The
+    // dwell filters CHANGES of mind; it must not delay having one.
+    //
+    // Expressed against the rule: with no accrued disagreement, whatever the
+    // caller passes as the settled value is what survives, so a caller that
+    // seeds the belief from the raw reading gets the raw reading.
+    TestTrue(TEXT("A body seeded from a clear first look believes it immediately"),
+        ELib::SettleLineOfSight(true, true, 0.0f, Hold));
+    TestFalse(TEXT("and one seeded from a blocked first look believes that"),
+        ELib::SettleLineOfSight(false, false, 0.0f, Hold));
+
+    // THE SHIPPED CONFIGURATION. A dwell of zero would ship the stutter back
+    // and no assertion above would notice which dial did it.
+    const ABreakerRangedEnemy* ShippedRanged = GetDefault<ABreakerRangedEnemy>();
+    if (TestNotNull(TEXT("the ranged class default exists"), ShippedRanged))
+    {
+        TestTrue(TEXT("the shipped line-of-sight dwell is a real filter"),
+            ShippedRanged->LineOfSightHoldSeconds > 0.0f);
+        // Long enough to swallow a body walking across the line at a run, and
+        // that is the case it exists for.
+        TestTrue(TEXT("and long enough to outlast a single frame by a wide margin"),
+            ShippedRanged->LineOfSightHoldSeconds >= 0.1f);
+    }
+
     // With no hysteresis the band is the plain three-way split.
     TestTrue(TEXT("Beyond the band it advances"),
         ELib::ClassifyBand(3000.0f, Min, Max, 0.0f, EBreakerRangedBand::Hold) == EBreakerRangedBand::Advance);

@@ -69,6 +69,11 @@ public:
     // Boundary deadband. Without it the enemy sitting on an edge flips band
     // every frame and reads as a twitching bug.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Ranged|Band", meta=(ClampMin="0")) float BandHysteresis = 150.0f;
+    // The band's hysteresis in seconds rather than centimetres, for the
+    // predicate that wraps it. Long enough to swallow a body walking across
+    // the line or a corner clipped in passing; short enough that genuinely
+    // taking cover still reads as taking cover. O2 PLACEHOLDER.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Ranged|Band", meta=(ClampMin="0")) float LineOfSightHoldSeconds = 0.25f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Ranged|Band", meta=(ClampMin="0")) float AdvanceSpeedMultiplier = 1.25f;
     // Backing off is its fastest gear: being crowded is the failure state.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Ranged|Band", meta=(ClampMin="0")) float RetreatSpeedMultiplier = 1.35f;
@@ -154,6 +159,14 @@ private:
     float StrafeTimer = 0.0f;
     float StrafeSign = 1.0f;
     bool bLastLineOfSight = false;
+    // How long the raw trace has disagreed with bLastLineOfSight.
+    float LineOfSightDisagreeSeconds = 0.0f;
+    // Whether bLastLineOfSight is a BELIEF yet or still its default. The dwell
+    // filters CHANGES of mind, and a body that has not looked yet has no mind
+    // to change: without this a body that spawns already seeing the player
+    // stands blind for the whole dwell before it will commit to a target, and
+    // a body rounding a corner meets the same delay on first sight.
+    bool bLineOfSightEstablished = false;
     // The flank it is walking to, held across ticks until the line to the
     // player is open again or the body arrives without one.
     FVector CoverGoal = FVector::ZeroVector;

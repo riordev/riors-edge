@@ -36,6 +36,22 @@ public:
     static EBreakerRangedBand ClassifyBand(float Distance, float MinDistance, float MaxDistance,
         float Hysteresis, EBreakerRangedBand PreviousBand);
 
+    // LINE OF SIGHT HAS TO SETTLE BEFORE IT IS BELIEVED.
+    //
+    // The band below has real two-sided hysteresis, and a pure test already
+    // pins that a settled body never leaves Hold on its own. The oscillation
+    // was never in the band: it was in the UN-hysteresised predicate wrapping
+    // it. A raw line trace taken fresh every frame flips on a passing body, a
+    // clipped corner, a muzzle crossing a post — and one blocked frame used to
+    // swing the movement vector from a lateral strafe to a radial close, about
+    // ninety degrees, and then hold the body there.
+    //
+    // So the reading gets the same treatment the band already has: a change
+    // must PERSIST before it is acted on. DisagreeSeconds is how long the raw
+    // trace has disagreed with what the body currently believes.
+    UFUNCTION(BlueprintPure, Category="Enemy|Ranged")
+    static bool SettleLineOfSight(bool bRawVisible, bool bSettledVisible, float DisagreeSeconds, float HoldSeconds);
+
     // +1 = close the gap, -1 = back off, 0 = hold station and strafe.
     UFUNCTION(BlueprintPure, Category="Enemy|Ranged")
     static float GetBandRadialSign(EBreakerRangedBand Band);

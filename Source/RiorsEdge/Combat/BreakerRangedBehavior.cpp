@@ -40,6 +40,16 @@ EBreakerRangedBand UBreakerRangedBehaviorLibrary::ClassifyBand(float Distance, f
     return EBreakerRangedBand::Hold;
 }
 
+bool UBreakerRangedBehaviorLibrary::SettleLineOfSight(bool bRawVisible, bool bSettledVisible, float DisagreeSeconds, float HoldSeconds)
+{
+    // Agreement is not a change and never needs to wait.
+    if (bRawVisible == bSettledVisible) return bSettledVisible;
+    // A zero or negative hold is no filter at all, which keeps the old
+    // frame-accurate behaviour available rather than making it unreachable.
+    if (HoldSeconds <= 0.0f) return bRawVisible;
+    return DisagreeSeconds >= HoldSeconds ? bRawVisible : bSettledVisible;
+}
+
 float UBreakerRangedBehaviorLibrary::GetBandRadialSign(EBreakerRangedBand Band)
 {
     switch (Band)

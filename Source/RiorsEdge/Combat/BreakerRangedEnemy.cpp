@@ -136,7 +136,24 @@ void ABreakerRangedEnemy::TickEngagedBehaviour(AActor* Player, float Distance, f
     // class honours this instead of facing the movement vector.
     DesiredFacing = ToPlayer;
 
-    const bool bLineOfSight = HasLineOfSightTo(Player);
+    // The raw trace, then the settled belief. Accumulate only while the two
+    // disagree; agreement resets the clock, so a single flickering frame costs
+    // nothing and a real block still arrives on time.
+    const bool bRawLineOfSight = HasLineOfSightTo(Player);
+    if (!bLineOfSightEstablished)
+    {
+        // First look: believe the eyes at once. The dwell exists to stop a
+        // settled body changing its mind on one frame, not to make a body that
+        // has just arrived — or just rounded a corner — wait to have one.
+        bLineOfSightEstablished = true;
+        bLastLineOfSight = bRawLineOfSight;
+        LineOfSightDisagreeSeconds = 0.0f;
+    }
+    LineOfSightDisagreeSeconds = bRawLineOfSight == bLastLineOfSight
+        ? 0.0f : LineOfSightDisagreeSeconds + DeltaSeconds;
+    const bool bLineOfSight = UBreakerRangedBehaviorLibrary::SettleLineOfSight(
+        bRawLineOfSight, bLastLineOfSight, LineOfSightDisagreeSeconds, LineOfSightHoldSeconds);
+    if (bLineOfSight != bLastLineOfSight) LineOfSightDisagreeSeconds = 0.0f;
     bLastLineOfSight = bLineOfSight;
 
     // --- Band: advance / hold / retreat ------------------------------------
@@ -146,7 +163,15 @@ void ABreakerRangedEnemy::TickEngagedBehaviour(AActor* Player, float Distance, f
         // beside a registered cover piece from which the line to the player
         // is open, walked to through the mover's goal channel so the path
         // follower can take it round the wall. Held until the line clears.
-        Band = EBreakerRangedBand::Advance;
+        // BAND IS DELIBERATELY NOT WRITTEN HERE, and that is the second half
+        // of the stutter. This used to force Band to Advance, which is the
+        // exact value ClassifyBand reads back as PreviousBand — so a moment of
+        // repositioning erased the band's memory and, on the next clear frame,
+        // narrowed the outer edge to High - Hysteresis. The body then owed 300
+        // cm of closing before it could hold again, for one blocked frame.
+        // Repositioning is a different verb from the band, not a value of it:
+        // the label says REPOSITION, the speed comes straight from the advance
+        // multiplier, and the band keeps what it last honestly classified.
         OutSpeedScale = AdvanceSpeedMultiplier;
         StateLabel = TEXT("REPOSITION");
 
