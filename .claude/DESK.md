@@ -6,11 +6,11 @@ Continue validated blocks until the owner returns. Prioritize playable changes f
 
 ## Immediate queue
 
-1. Fernhall cache gameplay landed; inspect dedicated capture placement before closing presentation.
+1. Fernhall cache gameplay and rendered placement landed; live prompt/focus and final prop art remain.
 2. O258 landed: Slipcut is Swift's starter; v10 migrates Skim slots and refunds retired purchases without duplication.
 3. O247 landed: Provoke forces its target for four seconds and grants lasting scaled threat; paid Standing Order cancellation verified.
 4. O250 landed: a broken Warden front stays broken through revival.
-5. O251: occlusion hides the entire enemy plate; inspect rendered frames.
+5. O251 landed: static cover hides the entire enemy plate including bosses; open/blocked frames inspected.
 6. O248: grandfather existing over-budget special items; constrain new rolls without removing owned affixes.
 7. Kit expansion under O252–O260: verify the registered roster, author reachable abilities/passives with real consumers, and reconcile counts before claiming the 55-entry target. Carom, Coup, Backstep, Pyre, Riftlance, Recall, Bulwark and Overwatch are named candidates. Rover, Barrel and Wildcard require additional mechanics. Check proposed names against Core/doctrine IDs.
 8. O246: remove duplicated compiled ability defaults only with a replacement schema/completeness test for Data/abilities.json.
@@ -63,7 +63,7 @@ Owner authorizes adding multiplayer when feasible. Audit current listen-server j
 
 ## Latest validated baseline
 
-Current local build/census/full suite:841 passing,3 expected failures,0 unexpected. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
+Current local build/census/full suite:842 passing,3 expected failures,0 unexpected. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
 
 ## Landed this pass
 
@@ -76,3 +76,5 @@ Current local build/census/full suite:841 passing,3 expected failures,0 unexpect
 - Provoke: real forced target and editable threat grant, range/death/safe-zone eligibility, stronger later competitor and paid Standing Order route pass. Test competitor moved outside native melee reach while retaining real Grit proximity. Build/census/full suite840 passing,3 expected,0 unexpected. Two new numeric keys counted explicitly; no balance pin changed.
 
 - Swift starter: Slipcut replaces Skim; v10 preserves equipped order, refunds paid Slipcut/SkimDiscipline once and leaves frozen historical migrations intact. Paid starter, HardStop and save coverage pass. Four stale inventory/version assertions updated;841 passing,3 expected,0 unexpected. Registered abilities35→34 and total nodes371→370 reflect the explicit retirement; kit expansion remains open.
+
+- Enemy plates: bosses now obey the same static-cover rule. Native occlusion and full suite pass842/3/0; rendered1920×1080 open/blocked frames confirm full plate visibility/removal. Cache placement also inspected. Capture boot-map race avoided with explicit map launch; weak core ticker fixes paused setup. See Docs/reports/plate-cache-capture-2026-09-09.md; rough art/poses and live interaction remain open.

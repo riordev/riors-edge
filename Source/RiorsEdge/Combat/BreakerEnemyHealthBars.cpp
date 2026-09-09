@@ -40,6 +40,7 @@
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerStatusComponent.h"
 #include "Combat/BreakerEnemyBarMath.h"
+#include "Combat/BreakerEnemyPlateVisibility.h"
 #include "Combat/BreakerEnemyModifiers.h"
 #include "Combat/BreakerModifierComponent.h"
 #include "Combat/BreakerEnemy.h"
@@ -610,20 +611,9 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         if (Projected.Z <= 0.0f) continue;
 
         // ---- Line of sight ------------------------------------------------------
-        // One trace per barred enemy per frame, camera to head, against world
-        // statics only: the enemy and the player are ignored, and other bodies
-        // do not count as cover — a plate over a pack is the crowd read, not a
-        // leak. A wall between the camera and the head hides the WHOLE plate
-        // for every rank but the boss, because a bar floating over a wall is a
-        // position leak rather than a health read. The boss's bar draws
-        // through — the fight is read from anywhere in the arena — and only its
-        // marks and its name yield.
-        FCollisionQueryParams SightParams(FName(TEXT("BreakerEnemyBarSight")), false);
-        SightParams.AddIgnoredActor(Enemy);
-        SightParams.AddIgnoredActor(Character);
-        const bool bSightBlocked = World->LineTraceTestByObjectType(CameraLocation, HeadWorld,
-            FCollisionObjectQueryParams(ECC_WorldStatic), SightParams);
-        if (bSightBlocked && !bBossRank) continue;
+        // O251: cover hides the entire plate at every rank, including bosses.
+        // Other moving bodies remain transparent to the crowd read.
+        if (!BreakerEnemyPlateVisibility::IsVisible(World, CameraLocation, HeadWorld, Enemy, Character)) continue;
 
         const float Scale = bBeyondDraw ? BreakerEnemyBarMath::BeyondDrawBossScale
                                         : BreakerEnemyBarMath::ScaleFor(Distance);
@@ -750,7 +740,7 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
             { return Entry.Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot")) && (Entry.bPersistentRot || Entry.RemainingDuration > 0); }) : nullptr;
         const float Threshold = Status ? Status->GetEntropyThreshold() : 0;
         const float Buildup = Status && Threshold > UE_SMALL_NUMBER ? FMath::Clamp(Status->GetEntropyBuildup() / Threshold, 0.0f, 1.0f) : 0;
-        const bool bShowEntropy = bShowName && !bSightBlocked && (Rot || Buildup > 0);
+        const bool bShowEntropy = bShowName && (Rot || Buildup > 0);
         const float EntropyPixels = BreakerEnemyBar::NamePixels * Scale;
         const FString EntropyText = Rot && Rot->bPersistentRot ? BreakerStrings::Get(EBreakerStringKey::HudRotPersistent)
             : Rot ? BreakerStrings::Format(EBreakerStringKey::HudRotTimer, Rot->RemainingDuration)
@@ -763,7 +753,7 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
             { return Entry.Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Erased")) && Entry.RemainingDuration > 0; }) : nullptr;
         const float VoidThreshold = Status ? Status->GetVoidThreshold() : 0;
         const float VoidBuildup = Status && VoidThreshold > UE_SMALL_NUMBER ? FMath::Clamp(Status->GetVoidBuildup() / VoidThreshold, 0.0f, 1.0f) : 0;
-        const bool bShowVoid = bShowName && !bSightBlocked && (Erased || VoidBuildup > 0);
+        const bool bShowVoid = bShowName && (Erased || VoidBuildup > 0);
         const FString VoidText = Erased ? BreakerStrings::Format(EBreakerStringKey::HudErasedTimer, Erased->RemainingDuration)
             : FString::Printf(TEXT("%s %d%%"), *BreakerStrings::Get(EBreakerStringKey::HudVoid), FMath::Clamp(FMath::RoundToInt(VoidBuildup * 100), 1, 100));
         const FVector2D VoidTextSize = bShowVoid ? MeasureSpecText(VoidText, EntropyPixels, ESpecFontRole::Mono) : FVector2D::ZeroVector;
@@ -773,7 +763,7 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
             { return Entry.Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Unstable")) && Entry.RemainingDuration > 0; }) : nullptr;
         const float RiftThreshold = Status ? Status->GetRiftThreshold() : 0;
         const float RiftBuildup = Status && RiftThreshold > UE_SMALL_NUMBER ? FMath::Clamp(Status->GetRiftBuildup() / RiftThreshold, 0.0f, 1.0f) : 0;
-        const bool bShowRift = bShowName && !bSightBlocked && (Unstable || RiftBuildup > 0);
+        const bool bShowRift = bShowName && (Unstable || RiftBuildup > 0);
         const FString RiftText = Unstable ? BreakerStrings::Format(EBreakerStringKey::HudUnstableTimer, Unstable->RemainingDuration)
             : FString::Printf(TEXT("%s %d%%"), *BreakerStrings::Get(EBreakerStringKey::HudRift), FMath::Clamp(FMath::RoundToInt(RiftBuildup * 100), 1, 100));
         const FVector2D RiftTextSize = bShowRift ? MeasureSpecText(RiftText, EntropyPixels, ESpecFontRole::Mono) : FVector2D::ZeroVector;
@@ -871,7 +861,7 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
             // Recorded, not faked with a health-fraction stand-in.
         }
 
-        if (!bOverlapped && !bSightBlocked)
+        if (!bOverlapped)
         {
             if (bShowEntropy && Bar.X >= 0 && Bar.X + Bar.W <= Canvas->ClipX
                 && EntropyY + EntropyH <= Canvas->ClipY

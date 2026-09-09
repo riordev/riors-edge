@@ -36,6 +36,7 @@
 #include "Playtest/BreakerKillTelemetryComponent.h"
 #include "Playtest/BreakerFeedstockCapture.h"
 #include "Playtest/BreakerTellCapture.h"
+#include "Playtest/BreakerPlateCapture.h"
 #include "Playtest/BreakerPlaytestComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -1586,6 +1587,7 @@ void ABreakerGameMode::ScheduleScreenshots()
     bCaptureAwaitsArrival = FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureArrival"));
     if (!FParse::Value(FCommandLine::Get(), TEXT("BreakerScreenshots="), Count) && bCaptureAwaitsArrival) Count = 2; // O2 PLACEHOLDER
     if (Count <= 0) return;
+    BreakerSchedulePlateCapture(GetWorld());
     ScreenshotsRemaining = FMath::Clamp(Count, 1, 60);
     ScreenshotIndex = 0;
     if (bCaptureAwaitsArrival)
