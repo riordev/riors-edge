@@ -1086,24 +1086,49 @@ void ABreakerPlaytestHUD::DrawResourceTrack(const BreakerHUD::FResourceRow& Row,
 // border. The mm:ss countdown to the next wave sits right of the cells —
 // empty out of combat, empty when nothing is counting.
 //
-// The name is the session's PendingRift.AreaName, latched each frame it is
-// set so the line survives the frame the rift is torn down. A gym with no
-// rift set has no zone to name and prints nothing, which is the truthful
-// state. The boss's phase left this corner with the encounter row: it lives
-// on the boss (02-hud), drawn by the nameplate TU.
+// The current Rift name takes precedence; ordinary prototype regions name
+// the nearest authored district and its fixed level. Other maps leave this
+// line vacant. Boss phase remains on the enemy nameplate.
 // --------------------------------------------------------------------------
 void ABreakerPlaytestHUD::DrawZoneLine(const ABreakerCharacter* Character)
 {
     if (!Character || !Canvas) return;
     bool bRiftSet = false;
+    ZoneName.Reset();
     if (const UBreakerGameInstance* Session = GetWorld() ? GetWorld()->GetGameInstance<UBreakerGameInstance>() : nullptr)
     {
         bRiftSet = Session->PendingRift.IsSet();
         if (bRiftSet) ZoneName = Session->PendingRift.AreaName.ToString().ToUpper();
     }
+    if (!bRiftSet)
+    {
+        if (const auto* Region = BreakerPrototypeDestinations::ForWorld(Character))
+        {
+            // District labels follow the closest authored centre in the ground plane.
+            // This is presentation only: patrol and loot levels remain authored at spawn.
+            int32 Closest = INDEX_NONE;
+            double ClosestDistance = TNumericLimits<double>::Max();
+            for (int32 Index = 0; Index < Region->Districts.Num(); ++Index)
+            {
+                if (!Region->DistrictNames.IsValidIndex(Index) || !Region->AreaLevels.IsValidIndex(Index)) continue;
+                const double Distance = FVector::DistSquared2D(Character->GetActorLocation(), Region->Districts[Index]);
+                if (Distance < ClosestDistance)
+                {
+                    Closest = Index;
+                    ClosestDistance = Distance;
+                }
+            }
+            if (Closest != INDEX_NONE)
+                ZoneName = FString::Printf(TEXT("%s · LEVEL %d"),
+                    *Region->DistrictNames[Closest].ToUpper(), Region->AreaLevels[Closest]);
+        }
+    }
     if (!ZoneName.IsEmpty())
     {
-        DrawSpecText(ZoneName, S(BreakerUI::HudZoneLeft), S(BreakerUI::HudZoneTop), BreakerUI::System, BreakerUI::HudZonePixels, 1.0f, ESpecFontRole::Display);
+        const float Pixels = bRiftSet ? BreakerUI::HudZonePixels : FitSpecPixels(ZoneName,
+            BreakerUI::HudZonePixels, S(BreakerUI::HudQuestTrackerWidth),
+            BreakerUI::HudQuestLinePixels, ESpecFontRole::Display);
+        DrawSpecText(ZoneName, S(BreakerUI::HudZoneLeft), S(BreakerUI::HudZoneTop), BreakerUI::System, Pixels, 1.0f, ESpecFontRole::Display);
     }
 
     const ABreakerGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<ABreakerGameMode>() : nullptr;

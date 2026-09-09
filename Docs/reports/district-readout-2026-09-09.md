@@ -1,0 +1,7 @@
+# Fixed district names in the HUD
+
+Ordinary prototype destinations now populate the existing upper-left location line with the nearest authored district name and its fixed level. Selection uses horizontal distance, with a stable first-index tie. The Rift name retains precedence. Enemy levels, loot, progression and objective state are not changed; this is orientation information, not a guarantee that a roaming enemy shares the nearest district's level.
+
+Independent review checked current definition indices, font measurement and bounded width, Rift precedence and absence of gameplay writes. Four 1280x720 frames were inspected across seat/captures/district-arrival-1345 and district-signal-1347. The ordinary arrival reads STRAND LANDING · LEVEL 42; after the existing isolated uplink capture positions the player at the reachable console, the same HUD reads SIGNAL POINT · LEVEL 46. Both leave the right-hand objective tracker clear. The earlier frame of the console run still shows arrival while shaders settle; it was inspected and is not treated as the console view. Other district names use the same measured-width path; the longest Containment Laboratory label and Rift presentation were not separately captured in this slice.
+
+Build and full suite completed; current measured totals are in STATE. The source comment was updated to describe the derived location label rather than the removed stale-name latch.
