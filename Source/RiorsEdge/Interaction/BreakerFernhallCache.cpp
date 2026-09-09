@@ -52,16 +52,21 @@ FText ABreakerFernhallCache::GetCachePrompt() const
     if (bOpened) return FText::GetEmpty();
     return FText::FromString(bCleared ? TEXT("OPEN CACHE") : TEXT("CLEAR NEARBY HOSTILES"));
 }
-bool ABreakerFernhallCache::TryOpen(ABreakerCharacter* Player)
+bool ABreakerFernhallCache::IsInteractionReachable(const ABreakerCharacter* Player) const
 {
-    if (!HasAuthority() || IsActorBeingDestroyed() || bOpened || !IsValid(Player) || !Player->HasAuthority()
-        || Player->GetWorld() != GetWorld() || !Player->GetCombat() || Player->GetCombat()->IsDead()
-        || !Player->GetEquipment() || FVector::DistSquared(Player->GetActorLocation(), GetActorLocation()) > FMath::Square(InteractionRange)) return false;
+    if (IsActorBeingDestroyed() || bOpened || !IsValid(Player) || !GetWorld()
+        || Player->GetWorld()!=GetWorld() || !Player->GetCombat() || Player->GetCombat()->IsDead()
+        || FVector::DistSquared(Player->GetActorLocation(),GetActorLocation())>FMath::Square(InteractionRange)) return false;
     FCollisionQueryParams Visibility(SCENE_QUERY_STAT(FernhallCacheVisibility), false, Player);
     Visibility.AddIgnoredActor(this);
     FHitResult Obstruction;
     if (GetWorld()->LineTraceSingleByObjectType(Obstruction, Player->GetActorLocation(), GetActorLocation(),
         FCollisionObjectQueryParams(ECC_WorldStatic), Visibility)) return false;
+    return true;
+}
+bool ABreakerFernhallCache::TryOpen(ABreakerCharacter* Player)
+{
+    if (!HasAuthority() || !IsInteractionReachable(Player) || !Player->HasAuthority() || !Player->GetEquipment()) return false;
     ObserveGuardDeaths(); if (!bCleared) return false;
     // Claim before spawn callbacks; only a failed physical spawn releases it.
     bOpened = true;

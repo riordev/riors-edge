@@ -13,6 +13,8 @@ public:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
     void Configure(int32 AreaLevel, const TArray<ABreakerEnemy*>& Pocket, int32 ExpectedMembers);
     bool TryOpen(ABreakerCharacter* Player);
+    // Shared non-mutating range/visibility check for input and its focused HUD prompt.
+    bool IsInteractionReachable(const ABreakerCharacter* Player) const;
     bool IsOpened() const { return bOpened; }
     bool IsPocketCleared() const { return bCleared; }
     FText GetCachePrompt() const;

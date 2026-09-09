@@ -1545,7 +1545,10 @@ void ABreakerPlaytestHUD::DrawInteractPrompt(const ABreakerCharacter* Character,
     }
     if (const ABreakerNPC* NearbyNPC = Character->FindNearbyNPC())
     {
-        const FVector Projected = Project(NearbyNPC->GetActorLocation() + FVector(0.0f, 0.0f, 150.0f), false);
+        // A cache is a low console; the person-head anchor goes offscreen at normal use range.
+        const FVector PromptAnchor = Cast<ABreakerFernhallCache>(NearbyNPC) ? NearbyNPC->GetActorLocation()
+            : NearbyNPC->GetActorLocation() + FVector(0.0f, 0.0f, 150.0f);
+        const FVector Projected = Project(PromptAnchor, false);
         if (Projected.Z <= 0.0f) return;
         DrawInteractPlate(Projected.X, Projected.Y, BreakerUI::TextSecondary, 1,
             Cast<ABreakerFernhallCache>(NearbyNPC) ? Cast<ABreakerFernhallCache>(NearbyNPC)->GetCachePrompt().ToString()
@@ -1627,7 +1630,9 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
         const ABreakerNPC* NPC = *It;
         if (!NPC || NPC == Plated) continue;
         const auto* Cache = Cast<ABreakerFernhallCache>(NPC);
-        if (Cache && Cache->IsOpened()) continue;
+        // Cache objectives already have map markers. Only the single focused
+        // interaction plate names them in-world, using actual range and LOS.
+        if (Cache) continue;
         const float Distance = FVector::Distance(ViewerLocation, NPC->GetActorLocation());
         if (Distance > LabelMaxDistance) continue;
         // Above the head sphere (rel Z 92 + radius), same idiom as the enemy
@@ -1642,7 +1647,7 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
         // Always drawn: muted while out of reach — a standing answer to
         // "what does this thing answer to" — and bone once F would land.
         const bool bInReach = Distance <= NPC->GetInteractionRange();
-        DrawSpecTextCentered(Cache ? FString(TEXT("F  ")) + Cache->GetCachePrompt().ToString() : BreakerStrings::Get(EBreakerStringKey::HudPromptTalk), Projected.X, Projected.Y + S(14.0f) * NameScale,
+        DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudPromptTalk), Projected.X, Projected.Y + S(14.0f) * NameScale,
             bInReach ? BreakerUI::System : BreakerUI::TextMuted, 10.0f * NameScale, 1.0f, ESpecFontRole::Mono);
     }
 

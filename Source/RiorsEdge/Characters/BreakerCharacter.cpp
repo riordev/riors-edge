@@ -2583,7 +2583,7 @@ ABreakerNPC* ABreakerCharacter::FindNearbyNPC() const
     float NearestDistanceSq = TNumericLimits<float>::Max();
     for (TActorIterator<ABreakerNPC> It(GetWorld()); It; ++It)
     {
-        if (const auto* Cache = Cast<ABreakerFernhallCache>(*It); Cache && Cache->IsOpened()) continue;
+        if (const auto* Cache = Cast<ABreakerFernhallCache>(*It); Cache && !Cache->IsInteractionReachable(this)) continue;
         const float DistanceSq = FVector::DistSquared(GetActorLocation(), It->GetActorLocation());
         if (DistanceSq <= FMath::Square(It->GetInteractionRange()) && DistanceSq < NearestDistanceSq)
         {

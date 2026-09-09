@@ -10345,6 +10345,14 @@ TSharedRef<SWidget> SBreakerMenu::BuildAbilitiesScreen()
     UBreakerProgressionComponent* Progression = Character.IsValid() ? Character->GetProgression() : nullptr;
     const EBreakerClassId PermanentClass = Progression ? Progression->GetProgressionState().PermanentClass : EBreakerClassId::None;
     const FWideScreenMetrics Metrics = MeasureWideScreen();
+    // Compute the text's actual content width before Slate layout. The scroll
+    // bar, plate rail/edges, and both padding layers all spend horizontal room.
+    const float AbilityScrollbarWidth = 12.0f; // O2 PLACEHOLDER: reserved scrollbar width.
+    const float AbilityScrollbarPad = BreakerUI::Space4;
+    const float AbilityRowTextWidth = Metrics.PanelWidth
+        - AbilityScrollbarWidth - 2.0f * AbilityScrollbarPad
+        - BreakerUI::RailThickness - 2.0f * BreakerUI::BorderThin
+        - 4.0f * BreakerUI::Space16 - 2.0f * BreakerUI::BorderSelected;
 
     TSharedRef<SHorizontalBox> HeaderRight = SNew(SHorizontalBox);
     HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center)[BuildScreenTabs(EBreakerMenuScreen::Abilities)];
@@ -10384,11 +10392,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildAbilitiesScreen()
             [BorderWrap(SNew(SButton)
                 .ButtonColorAndOpacity(AbilityPickerSlot == Slot ? PanelHover : PanelRaised)
                 .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space12))
+                .HAlign(HAlign_Fill)
                 .OnClicked(FOnClicked::CreateLambda([this, Slot]() { AbilityPickerSlot = Slot; Rebuild(EBreakerMenuScreen::Abilities); return FReply::Handled(); }))
                 [SNew(SVerticalBox)
                     + SVerticalBox::Slot().AutoHeight()[MenuWrappedText(FText::FromString(Entry.Label), BreakerUI::TypeCaption, Muted, Metrics.PanelWidth / 3 - 2 * BreakerUI::Space24, true)]
                     + SVerticalBox::Slot().AutoHeight().Padding(0, BreakerUI::Space4, 0, 0)
-                    [MenuWrappedText(Active ? Active->DisplayName : FText::FromString(TEXT("NONE")), BreakerUI::TypeBody, Primary, Metrics.PanelWidth / 3 - 2 * BreakerUI::Space24, true)]],
+                    [MenuWrappedText(Active ? Active->DisplayName : FText::GetEmpty(), BreakerUI::TypeBody, Primary, Metrics.PanelWidth / 3 - 2 * BreakerUI::Space24, true)]],
                 AbilityPickerSlot == Slot ? Cyan : BorderRest, AbilityPickerSlot == Slot ? BreakerUI::BorderSelected : BreakerUI::BorderThin)];
         }
         for (const FSlotEntry& SlotEntry : SlotEntries)
@@ -10412,7 +10421,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildAbilitiesScreen()
                 + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(SlotEntry.Label), BreakerUI::TypeH2, Primary, true)]
                 + SHorizontalBox::Slot().AutoWidth()
                 [
-                    MenuText(FText::FromString(FString::Printf(TEXT("ACTIVE: %s"), GrantedDefinition ? *GrantedDefinition->DisplayName.ToString() : TEXT("NONE"))),
+                    MenuText(GrantedDefinition ? FText::FromString(FString::Printf(TEXT("ACTIVE: %s"), *GrantedDefinition->DisplayName.ToString())) : FText::GetEmpty(),
                         BreakerUI::TypeCaption, GrantedDefinition ? Cyan : Muted, true)
                 ]
             ];
@@ -10443,6 +10452,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildAbilitiesScreen()
                         SNew(SButton)
                         .ButtonColorAndOpacity(bIsEquippedChoice ? PanelHover : PanelRaised)
                         .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
+                        .HAlign(HAlign_Fill)
                         .OnClicked(FOnClicked::CreateLambda([this, Slot, CapturedId]()
                         {
                             if (Character.IsValid() && Character->GetAbilities())
@@ -10494,12 +10504,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildAbilitiesScreen()
                             ]
                             + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
                             [
-                                MenuWrappedText(Definition ? Definition->Description : FText::GetEmpty(), BreakerUI::TypeCaption, Muted, Metrics.PanelWidth - 4 * BreakerUI::Space16 - 2 * BreakerUI::BorderSelected)
+                                MenuWrappedText(Definition ? Definition->Description : FText::GetEmpty(), BreakerUI::TypeCaption, Muted, AbilityRowTextWidth)
                             ]
                             + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
                             [
                                 bPreviewBlocked
-                                    ? StaticCastSharedRef<SWidget>(MenuWrappedText(UBreakerAbilityComponent::DescribeSelectionResult(Preview), BreakerUI::TypeCaption, Harm, Metrics.PanelWidth - 4 * BreakerUI::Space16 - 2 * BreakerUI::BorderSelected, true))
+                                    ? StaticCastSharedRef<SWidget>(MenuWrappedText(UBreakerAbilityComponent::DescribeSelectionResult(Preview), BreakerUI::TypeCaption, Harm, AbilityRowTextWidth, true))
                                     : SNullWidget::NullWidget
                             ]
                         ],
@@ -10525,7 +10535,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildAbilitiesScreen()
         HeaderRight,
         SNew(SVerticalBox)
             + SVerticalBox::Slot().AutoHeight()[Selectors]
-            + SVerticalBox::Slot().FillHeight(1.0f)[SNew(SScrollBox) + SScrollBox::Slot()[Body]],
+            + SVerticalBox::Slot().FillHeight(1.0f)
+            [SNew(SScrollBox)
+                .ScrollBarThickness(FVector2D(AbilityScrollbarWidth, AbilityScrollbarWidth))
+                .ScrollBarPadding(FMargin(AbilityScrollbarPad, 0.0f))
+                + SScrollBox::Slot()[Body]],
         SNew(SBox).Padding(BreakerUI::Space24, BreakerUI::Space12)[MenuWrappedText(AbilityStatus, BreakerUI::TypeCaption, Amber, Metrics.PanelWidth - 2 * BreakerUI::Space24, true)],
         Metrics.PanelWidth,
         Metrics.PanelHeight,

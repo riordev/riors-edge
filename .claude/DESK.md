@@ -8,8 +8,8 @@ Continue validated blocks until the owner returns. Prioritize playable changes f
 
 1. Cooperative sandbox landed with real host/guest fire and replicated health/death evidence. Remaining multiplayer acceptance: abilities, drop contention, respawn/rejoin, human movement feel and eventual campaign support.
 2. Red Basin/Station Zero prototypes landed; next content acceptance is varied mission beats and real return Rifts. Refine exposed boundaries, repeated cover and crowded distant supply prompts.
-3. Land Volatile countdown visibility and ability-menu wrapping/empty-label fixes with rendered checks.
-4. Finish remaining Afterimage consumers and real-clock Rot feedback checks. Cache live prompt/focus and final prop art remain.
+3. Volatile countdown and ability-menu wrapping/empty-label fixes landed with rendered checks. Continue interactive focus/death flow and other menu screens.
+4. Finish remaining Afterimage consumers and real-clock Rot feedback checks. Cache prompt now shares opening eligibility and stays visible at the console; final prop art remains.
 5. Kit expansion under O252–O260: current34 registered entries are11 actives and10 passives short of55. Carom, Coup, Backstep, Pyre, Riftlance, Recall, Bulwark and Overwatch are named candidates without sufficient authored mechanics in the current docs. Rover/Barrel need new mechanics; Wildcard has O257 but needs Forge/foreign-grant/resource infrastructure. Do not fill the count with clones or call existing innate nodes slot passives.
 6. World Core Point coverage is already derived from mission Unlock.CorePoint references; verify remaining uncovered sources against actual flag delivery before changing content.
 
@@ -89,3 +89,5 @@ Current local build/census/full suite:849 passing,3 expected failures,0 unexpect
 - Survivor Core entitlement: canonical one-point Unlock pays actual supported arrival flag; silent restored saves settle at native startup. Wallet updates before synchronous receipt persistence. Independent review and memory archive/reentry/reload tests pass;848/3/0. Uncovered World Core sources12→11; remaining events need real authored delivery, not guessed bindings.
 
 - Volatile warning: real lethal/corpse tick/detonation/reset checks and full suite849/3/0. All six1080 capture frames inspected: open countdown readable, covered and clipped-edge cues fully absent. Static freezes prove geometry only; native tests prove clock, replication transport remains separate. See Docs/reports/volatile-countdown-2026-09-09.md.
+
+- Ability menu/cache usability: full suite849/3/0. Swift1080 and Caster720 rows fit; vacant slots no longer print NONE. Cache focus shares range/cover eligibility, redundant distant labels are removed and its focused prompt anchors at the console. Six successful frames inspected; see Docs/reports/ability-menu-cache-2026-09-09.md. Mouse interaction and other screens still require play.

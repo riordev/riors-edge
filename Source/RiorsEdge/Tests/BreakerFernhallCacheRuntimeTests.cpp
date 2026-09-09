@@ -120,6 +120,7 @@ bool FBreakerFernhallCacheRuntimeTest::RunTest(const FString& Parameters)
         Pocket[0]->Destroy();
         Player->SetActorLocation(Cache->GetActorLocation()+FVector(1000,0,0));
         TestFalse(TEXT("Distant interactor cannot claim reward"),Cache->TryOpen(Player));
+        TestFalse(TEXT("Distant cache cannot become the focused prompt"),Player->FindNearbyNPC()==Cache);
         Player->SetActorLocation(Cache->GetActorLocation()+Cache->GetActorForwardVector()*180.f);
         auto* Wall=World->SpawnActor<AActor>();if(!Wall)return false;
         auto* WallBody=NewObject<UBoxComponent>(Wall);Wall->SetRootComponent(WallBody);Wall->AddInstanceComponent(WallBody);
@@ -127,8 +128,11 @@ bool FBreakerFernhallCacheRuntimeTest::RunTest(const FString& Parameters)
         WallBody->SetCollisionEnabled(ECollisionEnabled::QueryOnly);WallBody->SetCollisionResponseToAllChannels(ECR_Block);WallBody->RegisterComponent();
         Wall->SetActorLocation((Player->GetActorLocation()+Cache->GetActorLocation())*.5f);
         TestFalse(TEXT("Authoritative pointer interaction cannot open through static cover"),Cache->TryOpen(Player));
+        TestFalse(TEXT("Static cover also hides the focused cache prompt"),Player->FindNearbyNPC()==Cache);
         TestFalse(TEXT("Blocked attempt does not consume the reward"),Cache->IsOpened());
         Wall->Destroy();
+        TestTrue(TEXT("Cleared nearby cache regains its focused prompt after cover removal"),Player->FindNearbyNPC()==Cache);
+        TestEqual(TEXT("Cleared prompt remains the actual open verb"),Cache->GetCachePrompt().ToString(),FString(TEXT("OPEN CACHE")));
         TSet<ABreakerLootPickup*> Before;
         for(TActorIterator<ABreakerLootPickup> It(World);It;++It)Before.Add(*It);
         bool bReentryCalled=false;bool bReentryPaid=false;

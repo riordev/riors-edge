@@ -2,6 +2,9 @@
 #include "AI/BreakerEnemyMovementComponent.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Characters/BreakerCharacter.h"
+#include "Abilities/BreakerAbilityComponent.h"
+#include "Progression/BreakerProgressionComponent.h"
+#include "Game/BreakerGameInstance.h"
 #include "Combat/BreakerBossEnemy.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerModifierComponent.h"
@@ -34,12 +37,22 @@ namespace
 }
 void BreakerSchedulePlateCapture(UWorld* World)
 {
- FString Mode,UserDirectory,VolatileMode;
+ FString Mode,UserDirectory,VolatileMode,AbilityClass;
+ const bool bAbilityMenu=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureAbilityClass="),AbilityClass);
  const bool bVolatile=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureVolatileFreeze="),VolatileMode);
  const bool bPlate=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureEnemyPlate="),Mode);
  const bool bCache=FParse::Param(FCommandLine::Get(),TEXT("BreakerCaptureCache"));
  const bool bScenery=FParse::Param(FCommandLine::Get(),TEXT("BreakerCaptureScenery"));
- if(!World||(!bPlate&&!bCache&&!bScenery&&!bVolatile))return;
+ if(!World||(!bPlate&&!bCache&&!bScenery&&!bVolatile&&!bAbilityMenu))return;
+ if(bAbilityMenu)
+ {
+    FString Board;
+    if(bPlate||bCache||bScenery||bVolatile
+        || (!AbilityClass.Equals(TEXT("Swift"),ESearchCase::IgnoreCase) && !AbilityClass.Equals(TEXT("Caster"),ESearchCase::IgnoreCase))
+        || !FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureBoard="),Board)
+        || !Board.Equals(TEXT("ABILITIES"),ESearchCase::IgnoreCase))
+    { UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] AbilityClass requires Swift or Caster, -BreakerCaptureBoard=ABILITIES, and no other setup flag.")); return; }
+ }
  if(bVolatile)
  {
     if(bPlate||bCache||bScenery || (!VolatileMode.Equals(TEXT("open"),ESearchCase::IgnoreCase)
@@ -56,11 +69,31 @@ void BreakerSchedulePlateCapture(UWorld* World)
  {UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Mode must be open or blocked."));return;}
  // Core time advances while the arrival menu has paused world timers.
  // Weak UObject binding prevents setup after this world is destroyed.
- FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(World,[World,Mode,bCache,bPlate,bScenery,bVolatile](float)
+ FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(World,[World,Mode,bCache,bPlate,bScenery,bVolatile,bAbilityMenu,AbilityClass](float)
  {
+    if(bAbilityMenu)
+        if(const auto* Session=World->GetGameInstance<UBreakerGameInstance>(); Session && Session->IsArrivalCoverUp()) return true;
     auto* PC=World->GetFirstPlayerController();auto* Player=PC?Cast<ABreakerCharacter>(PC->GetPawn()):nullptr;
     if(!Player||!Player->HasAuthority())return false;
-    Player->bRefuseSavesForPendingCharacter=true;Player->ResumeFromMenu();
+    Player->bRefuseSavesForPendingCharacter=true;
+    if(bAbilityMenu)
+    {
+        auto* Progression=Player->GetProgression();
+        const auto Class=AbilityClass.Equals(TEXT("Swift"),ESearchCase::IgnoreCase) ? EBreakerClassId::Swift : EBreakerClassId::Caster;
+        if(!Progression) return false;
+        // Disposable capture pawns auto-lock Swift before setup. Reset only this
+        // isolated nonsaving fixture, then use ordinary class choice/grant rules.
+        Progression->bAutoLockSwiftIfFresh=false;
+        Progression->LoadProgressionState(FBreakerProgressionState{});
+        if(!Progression->ChoosePermanentClassById(Class))
+        { UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Ability menu refused: requires a fresh unchosen character and normal class selection.")); return false; }
+        Player->GetAbilities()->RefreshGrants();
+        Player->OpenMenuScreenForCapture(TEXT("INVENTORY")); // Existing ABILITIES board routing.
+        UE_LOG(LogTemp,Display,TEXT("[PlateCapture] Ability menu class=%s level=%d through normal choice/registered grants; no XP or extra unlocks."),
+            *AbilityClass,Progression->GetCharacterLevel());
+        return false;
+    }
+    Player->ResumeFromMenu();
     if (bScenery && !bPlate && !bCache)
     {
         // The authored tour owns location and aim on its existing core ticker.
@@ -129,6 +162,19 @@ void BreakerSchedulePlateCapture(UWorld* World)
         }
         UE_LOG(LogTemp,Display,TEXT("[PlateCapture] Volatile STATIC FREEZE mode=%s actual-death=%d remaining=%.3f authored=%.3f; validates geometry only, not countdown animation."),
             *Mode,PlateEnemy->IsDeadEnemy(),Modifiers->GetFuseRemainingSeconds(),Modifiers->Params.VolatileFuseSeconds);
+    }
+    if(bCache)
+    {
+        ABreakerFernhallCache* Cache=nullptr;
+        for(TActorIterator<ABreakerFernhallCache> It(World);It;++It){Cache=*It;break;}
+        if(Cache)
+        {
+            FVector2D Anchor; const bool bProjected=PC->ProjectWorldLocationToScreen(Cache->GetActorLocation()+FVector(0,0,150),Anchor);
+            int32 Width=0,Height=0;PC->GetViewportSize(Width,Height);
+            UE_LOG(LogTemp,Display,TEXT("[PlateCapture] cache focus=%d reachable=%d distance=%.2f range=%.2f projected=%d anchor=(%.1f,%.1f) viewport=%dx%d eye=%s"),
+                Player->FindNearbyNPC()==Cache,Cache->IsInteractionReachable(Player),FVector::Distance(Player->GetActorLocation(),Cache->GetActorLocation()),Cache->GetInteractionRange(),
+                bProjected,Anchor.X,Anchor.Y,Width,Height,*Eye.ToString());
+        }
     }
     if(PlateEnemy)UE_LOG(LogTemp,Display,TEXT("[PlateCapture] mode=%s nativeVisibility=%d eye=%s head=%s"),*Mode,
         BreakerEnemyPlateVisibility::IsVisible(World,Eye,Aim,PlateEnemy,Player),*Eye.ToString(),*Aim.ToString());
