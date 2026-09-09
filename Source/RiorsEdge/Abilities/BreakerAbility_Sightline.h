@@ -38,6 +38,8 @@ public:
 
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
+    virtual void OnRemoveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec) override;
+
     // Window.Swift. prefix: the HUD's family scan draws the 2s bar for free.
     static FName WindowKey();
     // Key for the weapon's shot-channel stack.

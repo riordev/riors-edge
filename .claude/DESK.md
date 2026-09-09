@@ -46,6 +46,7 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 - Volatile now has a tested outlined countdown; final Niagara presentation and real client cadence/human timing remain.
 - Damage numbers can overlap enemy plates. Hover, focus recovery and comfort require real interaction checks beyond static captures.
 - Remaining Afterimage window/ability consumers, Open Wound's authored lane substitute, rocket continuation and ally-threat semantics need source review; old desk claims are not evidence of current absence.
+- Blackout Afterimage is parked: its unkeyed enemy movement overwrite can erase Fleetfoot/other slows, and its shared incoming-damage key lets one caster remove another's effect. Requires source-owned contributions before extending the numerical tail; ordinary marked-hit Charge permission still ends on time.
 - Three generation entries remain uncalled; one aggregation lane and one target remain empty/unrouted. Consult current STATE for exact identities.
 - Other low-priority cleanup only after verifying use: empty modifier test helper; unused HUD dimensions; stale movement comments; duplicated boss timings; slot-invalid fixtures; inert affix leans; menu string-table migration.
 
@@ -60,7 +61,7 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 
 ## Latest validated baseline
 
-Current local build/census/full suite:849 passing,3 expected failures,0 unexpected. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
+Current local build/census/full suite:850 passing,3 expected failures,0 unexpected. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
 
 ## Landed this pass
 
@@ -91,3 +92,5 @@ Current local build/census/full suite:849 passing,3 expected failures,0 unexpect
 - Volatile warning: real lethal/corpse tick/detonation/reset checks and full suite849/3/0. All six1080 capture frames inspected: open countdown readable, covered and clipped-edge cues fully absent. Static freezes prove geometry only; native tests prove clock, replication transport remains separate. See Docs/reports/volatile-countdown-2026-09-09.md.
 
 - Ability menu/cache usability: full suite849/3/0. Swift1080 and Caster720 rows fit; vacant slots no longer print NONE. Cache focus shares range/cover eligibility, redundant distant labels are removed and its focused prompt anchors at the console. Six successful frames inspected; see Docs/reports/ability-menu-cache-2026-09-09.md. Mouse interaction and other screens still require play.
+
+- Sightline removal: actual purchased grant and nine-point Afterimage route verify full/half pierce and immediate permanent cleanup when the inactive grant is removed. Fixture baseline now includes native traversal-earned Momentum pierce. Build/full suite850/3/0; independently reviewed.

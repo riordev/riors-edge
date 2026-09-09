@@ -141,3 +141,24 @@ void UBreakerAbility_Sightline::ActivateAbility(const FGameplayAbilitySpecHandle
 
     EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 }
+
+void UBreakerAbility_Sightline::OnRemoveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)
+{
+    // The GAS activation ends immediately, but its keyed numerical lease can
+    // outlive the ordinary window. Revoke before any window-end callbacks.
+    if (ABreakerCharacter* Character = GetBreakerCharacter())
+    {
+        if (UBreakerWeaponComponent* Weapon = Character->GetWeapon())
+        {
+            Weapon->PopShotChannelBonus(ChannelKey());
+            Weapon->OnShot.RemoveDynamic(this, &UBreakerAbility_Sightline::HandleShot);
+        }
+        if (auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>())
+        {
+            State->OnWindowEnded.RemoveDynamic(this, &UBreakerAbility_Sightline::HandleWindowEnded);
+            State->CloseWindow(WindowKey());
+        }
+    }
+    bDelegatesBound = false;
+    Super::OnRemoveAbility(ActorInfo, Spec);
+}
