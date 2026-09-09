@@ -26,5 +26,6 @@ This is a running handoff, not a claim that the seven-step programme is complete
 - The seven-step pass remains open: complete kits, legal build balance, generated return Rifts, natural campaign leveling, interactive UI acceptance and polished audio/art are not complete.
 - Warden arrival fix is parked under the five-minute bug limit. Its initial native fixture dies to a level-one slam before proving spacing; no candidate production change was shipped.
 - Blackout Afterimage needs source-owned slow/damage contributions before extending its tail safely.
+- The new enclosed Substation candidate is parked after its arrival-floor runtime check failed. Current campaign Rifts still use the existing environment.
 - Audio has installed main samples and authored reaction synth fallbacks. Native sample/queue checks do not establish actual speaker/headphone output.
 - Existing expected-red balance findings remain visible; pins were not moved to manufacture a green result.

@@ -203,3 +203,25 @@ void UBreakerAbility_Slipcut::ActivateAbility(const FGameplayAbilitySpecHandle H
 
     EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 }
+
+void UBreakerAbility_Slipcut::OnRemoveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)
+{
+    // The activation ends immediately, but the owned cadence lease may still
+    // be full strength or in its natural Afterimage tail. Claim cleanup before
+    // window-end callbacks so grant removal never masquerades as natural expiry.
+    if (ABreakerCharacter* Character = GetBreakerCharacter())
+    {
+        if (UBreakerWeaponComponent* Weapon = FindWeapon())
+        {
+            Weapon->PopFireRateMultiplier(CadenceKey());
+            Weapon->OnReloadChanged.RemoveDynamic(this, &UBreakerAbility_Slipcut::HandleReloadChanged);
+        }
+        if (auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>())
+        {
+            State->OnWindowEnded.RemoveDynamic(this, &UBreakerAbility_Slipcut::HandleWindowEnded);
+            State->CloseWindow(WindowKey());
+        }
+    }
+    bDelegatesBound = false;
+    Super::OnRemoveAbility(ActorInfo, Spec);
+}

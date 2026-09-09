@@ -43,3 +43,5 @@ Historical validation receipts; current pending work is in .claude/DESK.md.
 - Fernhall/service polish: 21 noncolliding perimeter props, selective supported-material Nanite fallback, distant action-label cleanup, retired Skim HUD removal and current-rule cleanup. Nine rendered frames inspected. Build/full suite856/3/0; see Docs/reports/fernhall-service-polish-2026-09-09.md.
 
 - Rift layout reproducibility: canonical lowercase text FNV replaces process-local FName hash. Unset/empty identity and area/base participation preserved; golden70439488 independently reproduced and native checked. Existing nonempty arrangements change once; no persisted run seeds require migration. Build/full suite856/3/0, no pins changed.
+
+- Slipcut Afterimage cleanup: removing the actual inactive granted ability immediately pops its own cadence lease and unbinds its callbacks before closing the window. Focused native test passes with actual starter equip, a paid nine-point Duration route, movement-funded cast, natural half-contribution tail and no later resurrection. Build/full regression857 passing,3 expected failures,0 unexpected; status regenerated, independent source review.
