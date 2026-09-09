@@ -760,6 +760,15 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
                     }
                 }
     }
+    // Record the attacker BEFORE the death broadcast below, because that is
+    // the only ordering in which a death listener can ask who did it. A hit
+    // that dealt nothing (a full dodge) names nobody, and self-damage never
+    // overwrites a real attacker with the victim.
+    if (const AActor* Author = Request.Instigator.Get();
+        Author && Author != GetOwner() && (Result.HealthDamage > 0.0f || Result.ShieldDamage > 0.0f))
+    {
+        LastDamageInstigator = Request.Instigator;
+    }
     OnDamageReceived.Broadcast(Result);
     if (Result.bKilled && !bDeathBroadcast)
     {
@@ -911,12 +920,19 @@ void UBreakerCombatComponent::ApplyTargetConditionRiders(FBreakerDamageRequest& 
 
 void UBreakerCombatComponent::DispatchHitDealt(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result)
 {
-    AActor* Dealer = Request.Instigator.Get();
+    AActor* Author = Request.Instigator.Get();
+    // The AUTHOR made the numbers; the DEALER earns them. They are the same
+    // actor on every ordinary hit — CreditTo unset falls straight back to the
+    // instigator — and differ only where an effect is caused by one actor and
+    // authored by another (O245's Volatile blast). An expired CreditTo falls
+    // back too: a credit target that left the world credits nobody new.
+    AActor* Dealer = Request.CreditTo.IsValid() ? Request.CreditTo.Get() : Author;
 
     FBreakerHitContext Context;
-    Context.Instigator = Dealer;
+    Context.Instigator = Author;
+    Context.CreditedTo = Dealer;
     Context.ThreatSource = (Request.bHasThreatSource || !Request.ThreatSource.IsExplicitlyNull())
-        ? Request.ThreatSource : TWeakObjectPtr<AActor>(Dealer);
+        ? Request.ThreatSource : TWeakObjectPtr<AActor>(Author);
     Context.Target = GetOwner();
     Context.Result = Result;
     Context.bFromDoT = Request.bIsDamageOverTime;

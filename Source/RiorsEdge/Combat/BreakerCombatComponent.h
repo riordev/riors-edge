@@ -339,7 +339,16 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Defense", meta=(ClampMin="0", ClampMax="1")) float DodgeChance = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Defense", meta=(ClampMin="0")) float DodgeResourceRefund = 5.0f;   // O2 PLACEHOLDER
 
+    // The last actor to land real damage on this owner. Recorded because the
+    // death path CANNOT reach it any other way: OnDeath carries no parameters
+    // and fires BEFORE the attacker-side OnDamageTaken, so a listener that
+    // wants to know who landed the killing blow has already run by the time
+    // the context exists. Weak, and null on an unattributed death (a hazard,
+    // a test). Corpse-window effects read it — see O245's Volatile.
+    AActor* GetLastDamageInstigator() const { return LastDamageInstigator.Get(); }
+
 private:
+    TWeakObjectPtr<AActor> LastDamageInstigator = nullptr;
     // Same-target callback hits still deal damage, but cannot seed another
     // elemental transaction before the outer impact has finished its callbacks.
     bool bDispatchingElementHit = false;

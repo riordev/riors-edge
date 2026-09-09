@@ -162,6 +162,11 @@ private:
     bool bPhaseTelegraphing = false;
     float FuseRemaining = -1.0f;
     float FuseTotal = 0.0f;
+    // Who popped this Volatile, snapshotted on the death frame rather than
+    // read at detonation: the fuse outlives the death by design, and the
+    // answer must be the killing blow's, not whatever touched the corpse
+    // last. Weak — an attacker who dies inside the fuse credits nobody (O245).
+    TWeakObjectPtr<AActor> VolatileCreditTo = nullptr;
     bool bWakefulSpent = false;
     // Re-entrancy guard for the reflect. Belt and braces: the reflect is dealt
     // as TrueDamage and this component only ever reflects Physical/Elemental,

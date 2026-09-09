@@ -183,6 +183,15 @@ struct RIORSEDGE_API FBreakerDamageRequest
     UPROPERTY(BlueprintReadWrite) TWeakObjectPtr<AActor> ThreatSource = nullptr;
     // Preserve an explicitly attributed producer after its weak pointer expires.
     UPROPERTY(BlueprintReadWrite) bool bHasThreatSource = false;
+    // WHO THE HIT AND KILL HOOKS PAY, when that is not the actor whose stats
+    // authored the hit. Instigator drives the damage MATHS — Execute, Interrupt
+    // and every conditional More read the instigator's progression — so an
+    // effect the player caused but did not author cannot simply name him
+    // there without silently scaling with his build. A Volatile blast is
+    // exactly that shape (O245): monster-scaled by its corpse, earned by
+    // whoever popped it. Unset, or expired, means the Instigator, which is
+    // every ordinary path and is bit-identical to having no field at all.
+    UPROPERTY(BlueprintReadWrite) TWeakObjectPtr<AActor> CreditTo = nullptr;
     // Environmental falls cannot be dodged/blocked; all existing hits opt in.
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bCanBeAvoided = true;
 
@@ -376,6 +385,11 @@ struct RIORSEDGE_API FBreakerHitContext
 
     UPROPERTY(BlueprintReadOnly) TObjectPtr<AActor> Instigator = nullptr;
     UPROPERTY(BlueprintReadOnly) TWeakObjectPtr<AActor> ThreatSource = nullptr;
+    // Whose component this was broadcast on. Equal to Instigator on every
+    // ordinary hit; they differ only where the author of a hit and the earner
+    // of it are different actors (O245). A listener that wants "did I do this"
+    // reads this; one that wants "whose stats made this" reads Instigator.
+    UPROPERTY(BlueprintReadOnly) TObjectPtr<AActor> CreditedTo = nullptr;
     UPROPERTY(BlueprintReadOnly) TObjectPtr<AActor> Target = nullptr;
     UPROPERTY(BlueprintReadOnly) FBreakerDamageResult Result;
     UPROPERTY(BlueprintReadOnly) bool bFromDoT = false;

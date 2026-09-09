@@ -79,6 +79,9 @@ bool UBreakerEnemyModifierComponent::SetModifiers(const TArray<EBreakerEnemyModi
     bExternalEffectsReleased = false;
     Modifiers = NewModifiers;
     bWakefulSpent = false;
+    // A pooled body is re-dressed through here (ReviveFromPool's checklist),
+    // so the previous life's killer must not survive into the next one.
+    VolatileCreditTo = nullptr;
     ApplyPersistentModifiers();
     OnModifiersChanged.Broadcast();
     return true;
@@ -397,6 +400,16 @@ void UBreakerEnemyModifierComponent::NotifyOwnerDied()
 
     if (HasModifier(EBreakerEnemyModifier::Volatile))
     {
+        // O245: snapshot the killer on the death frame. The blast is still
+        // authored by the corpse — see DetonateVolatile — but the player who
+        // chose where this body died earns what it kills.
+        if (const AActor* Owner = GetOwner())
+        {
+            if (const UBreakerCombatComponent* Combat = Owner->FindComponentByClass<UBreakerCombatComponent>())
+            {
+                VolatileCreditTo = Combat->GetLastDamageInstigator();
+            }
+        }
         FuseTotal = FMath::Max(0.0f, Params.VolatileFuseSeconds);
         FuseRemaining = FuseTotal;
         // BEHAVIOURAL GAP, RECORDED, NOT FAKED. The fuse has no visual tell:
@@ -440,11 +453,15 @@ void UBreakerEnemyModifierComponent::DetonateVolatile()
     // trash body inside the inner radius outright. A separate enemy fraction
     // is authoring and waits on a playtest.
     //
-    // BEHAVIOURAL GAP, RECORDED, NOT FAKED. The dealer is the corpse: the
-    // request's instigator is the detonating enemy, so an enemy killed by the
-    // blast broadcasts OnKillDealt on the corpse's combat component, and the
-    // Feed / Scrap / deployable kill hooks that credit the player's kills do
-    // not credit a blast kill. The enemy killed records no killer.
+    // THE AUTHOR IS THE CORPSE, THE EARNER IS ITS KILLER (O245). The
+    // instigator stays the detonating enemy, because the instigator is what
+    // the damage MATHS reads — Execute, Interrupt and every conditional More
+    // look up the instigator's progression, so naming the player there would
+    // quietly scale the blast with his build and break O217's one number.
+    // CreditTo moves the hit and kill hooks alone, so the Feed / Scrap /
+    // deployable listeners pay the player who popped the Volatile while the
+    // number stays exactly the monster's. An unattributed death (a hazard, a
+    // test) leaves CreditTo null and falls back to the corpse as before.
     for (TActorIterator<APawn> It(GetWorld()); It; ++It)
     {
         APawn* Candidate = *It;
@@ -463,6 +480,7 @@ void UBreakerEnemyModifierComponent::DetonateVolatile()
         Request.SourceLocation = Center;
         Request.bHasSourceLocation = true;
         Request.SetInstigator(GetOwner());
+        Request.CreditTo = VolatileCreditTo;
         if (Request.BaseDamage > 0.0f) Combat->ReceiveDamage(Request);
     }
 }
