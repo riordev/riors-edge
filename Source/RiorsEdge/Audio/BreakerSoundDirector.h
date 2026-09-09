@@ -107,6 +107,10 @@ public:
     // LowerAndDropSeconds, so the cue lands with the black rather than with
     // the fatal hit — the fatal hit is silent on purpose (take-hit skips it).
     void PlayPlayerDeath();
+    // The player gained a level. One cue per level-up event, never per level
+    // when several land at once: the banner states the count, and a stacked
+    // arpeggio would read as a bug. Overridable with level_up.wav.
+    void PlayLevelUp();
     // An ability was cast. AbilityId selects a per-ability override if one has
     // been authored; NAME_None, or an id with no file, plays the shared
     // default. Resolved on first use per id and cached, so the miss costs one
@@ -138,6 +142,7 @@ private:
     // the other four verbs cut themselves.
     UPROPERTY() TObjectPtr<UAudioComponent> AbilityVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> PlayerDeathVoice;
+    UPROPERTY() TObjectPtr<UAudioComponent> LevelUpVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> EntropyVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> VoidMarkVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> RiftVoice;
@@ -161,6 +166,7 @@ private:
     UPROPERTY() TObjectPtr<USoundWaveProcedural> TakeHitWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> AbilityDefaultWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> PlayerDeathWave;
+    UPROPERTY() TObjectPtr<USoundWaveProcedural> LevelUpWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> EntropyWave;
     // Per-ability overrides, resolved lazily. A key present with a NULL value
     // means "probed, no override authored" — the sentinel is what stops a
@@ -178,6 +184,7 @@ private:
     TArray<int16> TakeHitPcm;
     TArray<int16> AbilityDefaultPcm;
     TArray<int16> PlayerDeathPcm;
+    TArray<int16> LevelUpPcm;
     TArray<int16> EntropyPcm;
     double LastEntropyCueTime = -1000;
     int32 EntropyCueCount = 0;

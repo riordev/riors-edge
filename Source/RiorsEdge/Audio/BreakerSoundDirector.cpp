@@ -38,6 +38,7 @@ ABreakerSoundDirector::ABreakerSoundDirector()
     TakeHitVoice = MakeVoice(TEXT("TakeHitVoice"));
     AbilityVoice = MakeVoice(TEXT("AbilityVoice"));
     PlayerDeathVoice = MakeVoice(TEXT("PlayerDeathVoice"));
+    LevelUpVoice = MakeVoice(TEXT("LevelUpVoice"));
     EntropyVoice = MakeVoice(TEXT("EntropyVoice"));
     VoidMarkVoice = MakeVoice(TEXT("VoidMarkVoice"));
     RiftVoice = MakeVoice(TEXT("RiftVoice"));
@@ -120,6 +121,7 @@ void ABreakerSoundDirector::BeginPlay()
     const int32 AbilityRate = LoadOrSynth(TEXT("ability_cast.wav"), &BreakerSound::RenderAbilityCast, AbilityDefaultPcm);
     // The sixth verb (O193): one low cue at the death beat's cut to black.
     const int32 PlayerDeathRate = LoadOrSynth(TEXT("player_death.wav"), &BreakerSound::RenderPlayerDeath, PlayerDeathPcm);
+    const int32 LevelUpRate = LoadOrSynth(TEXT("level_up.wav"), &BreakerSound::RenderLevelUp, LevelUpPcm);
     const int32 EntropyRate = LoadOrSynth(TEXT("entropy_activate.wav"), &BreakerSound::RenderEntropyActivation, EntropyPcm);
 
     FireWave = MakeWave(FireRate);
@@ -134,6 +136,8 @@ void ABreakerSoundDirector::BeginPlay()
     AbilityVoice->SetSound(AbilityDefaultWave);
     PlayerDeathWave = MakeWave(PlayerDeathRate);
     PlayerDeathVoice->SetSound(PlayerDeathWave);
+    LevelUpWave = MakeWave(LevelUpRate);
+    LevelUpVoice->SetSound(LevelUpWave);
     EntropyWave = MakeWave(EntropyRate);
     EntropyVoice->SetSound(EntropyWave);
     VoidMarkWave = MakeWave(LoadOrSynth(TEXT("void_activate.wav"), &BreakerSound::RenderVoidActivation, VoidMarkPcm));
@@ -150,8 +154,15 @@ void ABreakerSoundDirector::BeginPlay()
 void ABreakerSoundDirector::ApplyVolumeSettings(float Master, float Effects)
 {
     const float Gain = BreakerSound::EffectsGain(Master, Effects);
-    for (UAudioComponent* Voice : { FootstepVoice.Get(), FireVoice.Get(), HitVoice.Get(), KillVoice.Get(),
-        TakeHitVoice.Get(), AbilityVoice.Get(), PlayerDeathVoice.Get(), EntropyVoice.Get(), VoidMarkVoice.Get(), VoidBurstVoice.Get(), RiftVoice.Get(), ReactionVoice.Get() })
+    // EVERY voice this actor owns, not a hand-kept list of twelve. The list
+    // was the drift: adding the level-up cue left it silent-but-full-volume
+    // — routed nowhere, ignoring the settings the player set — and only the
+    // volume assertion in the routing test caught it. A thirteenth verb is
+    // now correct by construction, and the test still pins the roster by name
+    // and by count so a MISSING voice is still a red.
+    TArray<UAudioComponent*> Voices;
+    GetComponents(Voices);
+    for (UAudioComponent* Voice : Voices)
     {
         if (Voice) Voice->SetVolumeMultiplier(Gain);
     }
@@ -369,3 +380,4 @@ void ABreakerSoundDirector::PlayHitConfirm() { Trigger(HitVoice, HitWave, HitPcm
 void ABreakerSoundDirector::PlayKill()       { Trigger(KillVoice, KillWave, KillPcm); }
 void ABreakerSoundDirector::PlayTakeHit()    { Trigger(TakeHitVoice, TakeHitWave, TakeHitPcm); }
 void ABreakerSoundDirector::PlayPlayerDeath() { Trigger(PlayerDeathVoice, PlayerDeathWave, PlayerDeathPcm); }
+void ABreakerSoundDirector::PlayLevelUp() { Trigger(LevelUpVoice, LevelUpWave, LevelUpPcm); }

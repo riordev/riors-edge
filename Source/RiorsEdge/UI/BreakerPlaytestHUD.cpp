@@ -27,6 +27,7 @@
 #include "UI/BreakerTracerMath.h"
 #include "UI/BreakerTracerRenderer.h"
 #include "UI/BreakerEffectRenderer.h"
+#include "Components/CapsuleComponent.h"
 #include "Audio/BreakerSoundDirector.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Weapons/BreakerWeaponDefinition.h"
@@ -1983,6 +1984,46 @@ void ABreakerPlaytestHUD::HandleLevelGained(int32 NewLevel, int32 LevelsGained)
     }
     if (Grant.IsEmpty()) Grant = BreakerStrings::Get(EBreakerStringKey::HudBannerPointCapReached);
     EnqueueBanner(EBreakerBannerKind::LevelUp, Title, Grant);
+
+    // OWNER REPORT: "could we add a sound and a visual for leveling up". The
+    // banner above already existed and was not felt — one 400x88 plate in the
+    // top-right corner, on a screen that also puts the objective line there —
+    // and nothing in the game made a noise when the player grew.
+    //
+    // Both halves land here rather than at the progression site: WHEN a cue
+    // fires is the owning lane's call, and this is the seam that already
+    // knows a level was gained. One cue and one ring per EVENT, never per
+    // level: two levels from one kill is one banner, and it is one sound.
+    if (ABreakerSoundDirector* Sound = GetSoundDirector()) Sound->PlayLevelUp();
+    const AActor* Levelled = BoundProgression ? BoundProgression->GetOwner() : nullptr;
+    UWorld* World = GetWorld();
+    ABreakerEffectRenderer* Effects = Levelled && World ? ABreakerEffectRenderer::FindOrSpawn(World) : nullptr;
+    if (Effects)
+    {
+        // O179's camera law: a self-anchored draw sits at the FEET, because
+        // the one camera guaranteed to stand inside a player-centred primitive
+        // is the player's own. Gold, because O179 files gold as reward and a
+        // level is a payment received.
+        const ABreakerCharacter* Grown = Cast<ABreakerCharacter>(Levelled);
+        const float HalfHeight = Grown && Grown->GetCapsuleComponent()
+            ? Grown->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 88.0f;
+        const FVector Feet = Levelled->GetActorLocation() - FVector(0.0f, 0.0f, HalfHeight);
+        BreakerFX::FEffectTiming RingTiming;
+        RingTiming.DurationSeconds = 0.55f;   // O2 PLACEHOLDER: the cue's own length.
+        RingTiming.FadeInSeconds = 0.04f;     // O2 PLACEHOLDER
+        RingTiming.FadeOutSeconds = 0.30f;    // O2 PLACEHOLDER
+        // Strokes arrive around the ring rather than all at once, which is
+        // what makes it read as an expanding mark instead of a decal.
+        constexpr float SweepSeconds = 0.14f;   // O2 PLACEHOLDER
+        constexpr float RingRadiusCm = 200.0f;  // O2 PLACEHOLDER
+        for (int32 Index = 0; Index < BreakerFX::GroundRingStrokes; ++Index)
+        {
+            FVector A, B;
+            BreakerFX::RingStroke(Feet, RingRadiusCm, Index, BreakerFX::GroundRingStrokes, A, B);
+            Effects->AddStroke(A, B, 7.0f, BreakerUI::Gold, 3.0f, RingTiming,
+                SweepSeconds * Index / BreakerFX::GroundRingStrokes);
+        }
+    }
 }
 
 void ABreakerPlaytestHUD::EnsureAbilityBinding(const ABreakerCharacter* Character)

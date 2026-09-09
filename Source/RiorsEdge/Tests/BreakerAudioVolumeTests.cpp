@@ -27,12 +27,15 @@ bool FBreakerAudioVolumeRoutingTest::RunTest(const FString& Parameters)
     if (!TestNotNull(TEXT("Sound director"), Director)) return false;
     TArray<UAudioComponent*> Voices;
     Director->GetComponents(Voices);
-    if (!TestEqual(TEXT("All twelve player cues have voices"), Voices.Num(), 12)) return false;
+    if (!TestEqual(TEXT("All thirteen player cues have voices"), Voices.Num(), 13)) return false;
     TestTrue(TEXT("Footsteps share the real settings-routed voice pool"), Voices.ContainsByPredicate([](const UAudioComponent* Voice) { return Voice->GetFName() == TEXT("FootstepVoice"); }));
     TestTrue(TEXT("Void activation has its own voice"), Voices.ContainsByPredicate([](const UAudioComponent* Voice) { return Voice->GetFName() == TEXT("VoidMarkVoice"); }));
     TestTrue(TEXT("Void payout has its own voice"), Voices.ContainsByPredicate([](const UAudioComponent* Voice) { return Voice->GetFName() == TEXT("VoidBurstVoice"); }));
     TestTrue(TEXT("Rift activation has its own voice"), Voices.ContainsByPredicate([](const UAudioComponent* Voice) { return Voice->GetFName() == TEXT("RiftVoice"); }));
     TestTrue(TEXT("Reactions have a bounded shared voice"), Voices.ContainsByPredicate([](const UAudioComponent* Voice) { return Voice->GetFName() == TEXT("ReactionVoice"); }));
+    // The thirteenth: a level was gained. It routes through the same settings
+    // pool as every other cue, which is the whole point of counting them here.
+    TestTrue(TEXT("Level-up has its own voice"), Voices.ContainsByPredicate([](const UAudioComponent* Voice) { return Voice->GetFName() == TEXT("LevelUpVoice"); }));
     UBreakerGameSettings* Settings = NewObject<UBreakerGameSettings>();
     Settings->MasterVolume = 0.5f;
     Settings->EffectsVolume = 0.4f;

@@ -223,4 +223,34 @@ namespace BreakerSound
     inline void RenderTakeHit(TArray<int16>& Out)    { RenderPcm16(Out, TakeHitDurationSeconds, &TakeHitSample); }
     inline void RenderAbilityCast(TArray<int16>& Out) { RenderPcm16(Out, AbilityCastDurationSeconds, &AbilityCastSample); }
     inline void RenderPlayerDeath(TArray<int16>& Out) { RenderPcm16(Out, PlayerDeathDurationSeconds, &PlayerDeathSample); }
+
+    // THE SEVENTH VERB: a level was gained (owner report: "could we add a
+    // sound and a visual for leveling up"). The banner already existed and
+    // was not felt; nothing in the game made a noise when the player grew.
+    //
+    // It is the only cue in this bank that RISES and the only one with no
+    // noise term at all, which is the whole of how it is told apart: every
+    // other verb here either falls (player death 110->55, entropy, the
+    // reactions), carries grit, or sits under 200 Hz. Two STEPPED pure tones a
+    // fourth apart rather than a glide, so it reads as a musical event instead
+    // of a swoop — no other cue is stepped either. O179 files gold as reward,
+    // and a level is a payment received.
+    inline constexpr float LevelUpDurationSeconds = 0.55f;   // O2 PLACEHOLDER
+    inline constexpr float LevelUpStepSeconds = 0.16f;       // O2 PLACEHOLDER
+    inline float LevelUpSample(int32 Index)
+    {
+        const float T = static_cast<float>(Index) / SampleRate;
+        const bool bSecond = T >= LevelUpStepSeconds;
+        const float NoteT = bSecond ? T - LevelUpStepSeconds : T;
+        const float NoteLength = bSecond ? LevelUpDurationSeconds - LevelUpStepSeconds : LevelUpStepSeconds;
+        const float Hz = bSecond ? 880.0f : 587.33f;   // O2 PLACEHOLDER: A5 over D5.
+        // The upper note carries a quiet octave so the top of the figure is
+        // brighter than its start; the lower one is a plain tone.
+        const float Body = FMath::Sin(2 * PI * Hz * NoteT)
+            + (bSecond ? .25f * FMath::Sin(4 * PI * Hz * NoteT) : 0.0f);
+        // The first note is clipped short by the step, so it decays fast; the
+        // second rings out under the banner.
+        return .34f * Body * Envelope(NoteT, NoteLength, bSecond ? 3.0f : 6.0f);   // O2 PLACEHOLDER
+    }
+    inline void RenderLevelUp(TArray<int16>& Out) { RenderPcm16(Out, LevelUpDurationSeconds, &LevelUpSample); }
 }

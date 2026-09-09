@@ -27,10 +27,20 @@
 // ---------------------------------------------------------------------------
 namespace BreakerItemRequirements
 {
+    // O263: the opening window. Item levels at or under this need no level at
+    // all. Owner report: twenty minutes of play produced items the character
+    // could not wear, because an ilvl 7 drop wanted character level 7 — the
+    // gate exists to PACE levelling and has nothing to pace in the first hour,
+    // where it only turns the game's first drops into inventory clutter.
+    constexpr int32 FreeEquipItemLevel = 10;   // O2 PLACEHOLDER (O263)
+
     inline int32 RequiredLevelFor(int32 ItemLevel)
     {
         // RULED (One-AA): min(ItemLevel, MaxCharacterLevel), floored at 1 so
         // a degenerate item level cannot author a level-0 requirement.
+        // O263 moves that floor up to cover the whole opening window; the rule
+        // stays derived, so this remains a one-line retune with no migration.
+        if (ItemLevel <= FreeEquipItemLevel) return 1;
         return FMath::Clamp(ItemLevel, 1, UBreakerExperienceLibrary::MaxCharacterLevel);
     }
 

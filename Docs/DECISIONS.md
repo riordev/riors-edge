@@ -501,3 +501,6 @@ Maximum wedges reached with65, including ring transit; cells show **wedges / min
 
 **O262** — The endgame is a device, a key and a tileset. The campaign runs through authored destinations; past it, a command post in the Anchor consumes a rift key — an item carrying its own area level and rolled modifiers — and opens an instance whose layout is generated from the key rather than authored. A rift's shape is a function of the rift, never of the session.
 
+**O263** — Item levels 1 to 10 carry no equip requirement. The gate exists to pace levelling, and it has nothing to pace in the opening hour: an ilvl 7 drop that cannot be worn until character level 7 makes the first drops of the game into inventory clutter. RequiredLevelFor stays derived and clamped; only its floor moves.
+
+**O264** — A landing latches the boosted speed ceiling into its bleed. The boost still survives a landing rather than vanishing (O-D1(a) stands), but it stops ratcheting: jump, slide, jump held nothing back, so a sprint chain kept its speed indefinitely and the whole kit read as slippery.

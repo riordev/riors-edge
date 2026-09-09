@@ -47,6 +47,17 @@ bool FBreakerItemRequiredLevelTest::RunTest(const FString& Parameters)
     // The boundary in both directions.
     TestTrue(TEXT("at-level equips"), CanEquipAtLevel(23, 23));
     TestFalse(TEXT("one level short refuses"), CanEquipAtLevel(23, 22));
+
+    // O263, the opening window: nothing in item levels 1-10 asks for a level,
+    // so a fresh character wears every drop of its first hour. The window is
+    // exactly closed at its own edge — the first item ABOVE it asks in full.
+    for (int32 ItemLevel = 1; ItemLevel <= FreeEquipItemLevel; ++ItemLevel)
+    {
+        TestEqual(FString::Printf(TEXT("item level %d asks for level 1"), ItemLevel), RequiredLevelFor(ItemLevel), 1);
+        TestTrue(FString::Printf(TEXT("a level-1 character wears item level %d"), ItemLevel), CanEquipAtLevel(ItemLevel, 1));
+    }
+    TestEqual(TEXT("the first item past the window asks in full"), RequiredLevelFor(FreeEquipItemLevel + 1), FreeEquipItemLevel + 1);
+    TestFalse(TEXT("and refuses the character the window carried"), CanEquipAtLevel(FreeEquipItemLevel + 1, 1));
     return true;
 }
 

@@ -687,6 +687,11 @@ private:
     // state machine — from being cut by a stray key release.
     bool bJumpCutArmed = false;
     void ApplyAirSteering(float DeltaTime);
+    // O264: fold the boosted ceiling into its bleed. A nonzero rate IS the
+    // latch (D1(a)), so this is idempotent — a second call cannot re-arm a
+    // faster decay, and only a fresh grant (TryDash, PrepareSlideJump) clears
+    // the rate. Called on every break condition and on every landing.
+    void LatchBoostedCeilingBleed();
 };
 
 // ---------------------------------------------------------------------------

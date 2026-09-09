@@ -352,10 +352,28 @@ void UBreakerCharacterMovementComponent::ProcessLanded(const FHitResult& Hit, fl
     {
         Velocity.X *= Scale;
         Velocity.Y *= Scale;
-        // BoostedSpeedCeiling is left alone: it is a ceiling, not a floor, so
-        // the player does not snap back to it, and clearing it here would
-        // quietly change how dash momentum survives a landing.
+        // BoostedSpeedCeiling is not CLEARED here: it is a ceiling, not a
+        // floor, so the player does not snap back to it, and clearing it
+        // outright would quietly change how dash momentum survives a landing.
     }
+    // O264, owner report: "if you jump then slide you'll heavily keep your
+    // momentum when sprinting and it makes everything feel off". The ceiling
+    // survived a landing untouched and the tick's ratchet
+    // (max(ceiling, current speed)) only ever raised it while a direction was
+    // held, so sprint -> jump -> slide -> jump held nothing back and the speed
+    // compounded. A landing now LATCHES the bleed instead: D1(a) still holds —
+    // the boost glides down over AboveCapDecaySeconds rather than vanishing,
+    // an air dash still lands with its momentum — but the chain now converges
+    // instead of ratcheting, because only a fresh grant re-arms it.
+    //
+    // TWO ADJACENT FINDINGS, recorded not repaired, because one report moves
+    // one dial: (1) bSlideOwnsLanding exempts a merely REQUESTED slide from
+    // the landing cost entirely, so crouch held in the air pays no toll at any
+    // fall speed — the stated intent is only that the scrub must not drop the
+    // player under SlideEntrySpeed, which is a floor, not an exemption; and
+    // (2) GetMaxSpeed while sliding returns max(SprintSpeed * mult,
+    // Velocity.Size2D()), a cap that reads its own current speed.
+    LatchBoostedCeilingBleed();
     bJumpCutArmed = false;
 
     Super::ProcessLanded(Hit, remainingTime, Iterations);
@@ -877,6 +895,19 @@ void UBreakerCharacterMovementComponent::OnTeleported()
     }
 }
 
+void UBreakerCharacterMovementComponent::LatchBoostedCeilingBleed()
+{
+    if (BoostedSpeedCeiling <= 0.0f || BoostedCeilingBleedRatePerSecond > 0.0f) return;
+    const float RestingCap = GetGroundedSpeedCap();
+    if (BoostedSpeedCeiling <= RestingCap)
+    {
+        // Nothing above the cap to bleed: the old sentinel, no felt difference.
+        BoostedSpeedCeiling = 0.0f;
+        return;
+    }
+    BoostedCeilingBleedRatePerSecond = BoostedCeilingBleedRate(BoostedSpeedCeiling, RestingCap, AboveCapDecaySeconds);
+}
+
 void UBreakerCharacterMovementComponent::PerformMovement(float DeltaTime)
 {
     if (IsOwnerStaggered())
@@ -1086,19 +1117,7 @@ void UBreakerCharacterMovementComponent::TickComponent(float DeltaTime, ELevelTi
         // Only a fresh grant — TryDash, PrepareSlideJump — re-arms the boost.
         const bool bBoostBroken = bMovementReleased || bCollisionSlowed || bCollisionRedirected;
         const float RestingCap = GetGroundedSpeedCap();
-        if (bBoostBroken && BoostedCeilingBleedRatePerSecond <= 0.0f)
-        {
-            if (BoostedSpeedCeiling <= RestingCap)
-            {
-                // Nothing above the cap to bleed: the old sentinel, no felt
-                // difference, and the block stops running for free.
-                BoostedSpeedCeiling = 0.0f;
-            }
-            else
-            {
-                BoostedCeilingBleedRatePerSecond = BoostedCeilingBleedRate(BoostedSpeedCeiling, RestingCap, AboveCapDecaySeconds);
-            }
-        }
+        if (bBoostBroken) LatchBoostedCeilingBleed();
         if (BoostedCeilingBleedRatePerSecond > 0.0f)
         {
             BoostedSpeedCeiling = StepBoostedCeilingBleed(BoostedSpeedCeiling, RestingCap, BoostedCeilingBleedRatePerSecond, DeltaTime);
