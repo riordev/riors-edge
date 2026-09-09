@@ -182,6 +182,7 @@ namespace
         float ResourceCost = 0.0f;
         float CooldownSeconds = 0.0f;
         float WindowDuration = 0.0f;
+        float CastTimeSeconds = 0.0f;
         TMap<FName, float> Numbers;
         TArray<FBreakerAbilityVariantData> Variants;
     };
@@ -236,6 +237,7 @@ namespace
         bool bOk = BreakerAbilityDataReadNumber(Row, TEXT("resourceCost"), Id, Out.ResourceCost, Errors);
         bOk = BreakerAbilityDataReadNumber(Row, TEXT("cooldownSeconds"), Id, Out.CooldownSeconds, Errors) && bOk;
         bOk = BreakerAbilityDataReadNumber(Row, TEXT("windowDuration"), Id, Out.WindowDuration, Errors) && bOk;
+        bOk = BreakerAbilityDataReadNumber(Row, TEXT("castTimeSeconds"), Id, Out.CastTimeSeconds, Errors) && bOk;
 
         // The ability class's own numbers, keyed by property name. Required
         // on every row, empty on a row whose class declares none, so a row
@@ -432,6 +434,7 @@ namespace
             Definition.ResourceCost = Row.ResourceCost;
             Definition.CooldownSeconds = Row.CooldownSeconds;
             Definition.WindowDuration = Row.WindowDuration;
+            Definition.CastTimeSeconds = Row.CastTimeSeconds;
 
             // The class numbers go onto the class default object, which every
             // instance copies at grant (InstancedPerActor), so the ability

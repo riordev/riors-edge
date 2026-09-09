@@ -5,6 +5,7 @@
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Abilities/BreakerAbilityStateComponent.h"
 #include "Abilities/BreakerAbility_Cleave.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Abilities/BreakerAbility_Unmake.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
@@ -82,12 +83,21 @@ bool FBreakerOverreachRuntimeTest::RunTest(const FString& Parameters)
     };
     auto EnterDebt=[&]()
     {
-        for(int32 Cast=0;Cast<20;++Cast)
+        // O266 slowed the spam this loop depends on: a wind-up plus a lock is
+        // longer than the old 0.55s spacing, so Mana regenerates more per cast
+        // and the bank takes more repetitions to go negative. That is the
+        // point of the wind-up, not a defect — the loop's job is only to REACH
+        // debt so the overcast rules below can be tested.
+        for(int32 Cast=0;Cast<60;++Cast)
         {
             if(Mana->GetMana()<0)return true;
             if(!CastSlot(Melee,12))return false;
             if(Mana->GetMana()<0)return true;
-            Clock(.55f);
+            // O266: one Cleave now occupies its WIND-UP and then its animation
+            // lock, so the spacing between repeat casts is both, read from the
+            // file rather than restated as a literal.
+            Clock(BreakerAuthoredCastSeconds(TEXT("Caster.Cleave"))
+                +GetDefault<UBreakerAbility_Cleave>()->AnimationLockSeconds+.05f);
         }
         AddError(TEXT("Normal repeated paid Cleave never reached debt"));return false;
     };

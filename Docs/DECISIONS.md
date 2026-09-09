@@ -506,3 +506,5 @@ Maximum wedges reached with65, including ring transit; cells show **wedges / min
 **O264** — A landing latches the boosted speed ceiling into its bleed. The boost still survives a landing rather than vanishing (O-D1(a) stands), but it stops ratcheting: jump, slide, jump held nothing back, so a sprint chain kept its speed indefinitely and the whole kit read as slippery.
 
 **O265** — The map is fast travel. From anywhere that is not the Anchor it offers exactly one destination, the hub; from the Anchor it offers the ordinary registry. Travel is refused in combat, in both directions, so it can never be an escape. A player is never stranded in an instance and never routes between instances without passing through the place that holds their stash and their Forge.
+
+**O266** — Abilities wind up. An authored cast time delays the RESOLUTION, not the press: the Mana goes on the keypress and is never returned, damage taken interrupts the cast, and an interrupted cast is a loss. Movement and defensive verbs author no cast time — a dodge with a wind-up is not a dodge. Cast Speed is a divisor lane over the authored seconds, on the DashCooldownReduction convention.

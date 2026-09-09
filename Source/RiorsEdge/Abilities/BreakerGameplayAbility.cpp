@@ -6,6 +6,9 @@
 #include "Abilities/BreakerAbilityData.h"
 #include "UObject/UnrealType.h"
 #include "Abilities/BreakerAbilityTags.h"
+#include "Abilities/BreakerAbilityStateComponent.h"
+#include "TimerManager.h"
+#include "Engine/World.h"
 #include "Abilities/BreakerSkillLevelMath.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
@@ -96,6 +99,11 @@ float UBreakerGameplayAbility::GetResourceCost() const
 bool UBreakerGameplayAbility::CommitAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
     const FGameplayAbilityActivationInfo ActivationInfo, FGameplayTagContainer* OptionalRelevantTags)
 {
+    // O266: a cast paid on the keypress. The re-entry after the wind-up runs
+    // the ability's own CommitAbility, and charging there would take the price
+    // twice. One claim per cast, released when the cast resolves or is
+    // interrupted.
+    if (bCastCommitted) return true;
     auto* Character = GetBreakerCharacter();
     auto* Abilities = Character ? Character->GetAbilities() : nullptr;
     if (Abilities && !Abilities->BeginAbilityCommit()) return false;
@@ -381,4 +389,117 @@ const FGameplayTagContainer* UBreakerGameplayAbility::GetCooldownTags() const
         }
     }
     return CachedCooldownTags.IsEmpty() ? nullptr : &CachedCooldownTags;
+}
+
+// ---------------------------------------------------------------------------
+// THE CAST (O266). Spells no longer appear on the keypress.
+// ---------------------------------------------------------------------------
+
+float UBreakerGameplayAbility::EffectiveCastSeconds(float AuthoredSeconds, float CastSpeedMultiplier)
+{
+    // The DIVISOR convention every rate lane in this project already uses
+    // (DashCooldownReduction's): a multiplier of 1.25 is a 20% shorter cast,
+    // never a 25% longer one. A malformed multiplier is floored rather than
+    // dividing by zero, and a negative authored time is not a negative cast.
+    const float Authored = FMath::Max(0.0f, AuthoredSeconds);
+    if (Authored <= 0.0f) return 0.0f;
+    return Authored / FMath::Max(0.01f, CastSpeedMultiplier);
+}
+
+FName UBreakerGameplayAbility::CastWindowKey(FName AbilityId)
+{
+    // "Window." is the prefix the HUD's ability-window bar already filters on,
+    // so a pending cast draws itself with no HUD change.
+    return FName(*FString::Printf(TEXT("Window.Cast.%s"), *AbilityId.ToString()));
+}
+
+bool UBreakerGameplayAbility::BeginCastIfNeeded(const FGameplayAbilitySpecHandle Handle,
+    const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo)
+{
+    // The re-entry after a finished wind-up: let the body run.
+    if (bCastPending) { bCastPending = false; return true; }
+
+    const UBreakerAbilityDefinition* Definition = GetAbilityDefinition();
+    ABreakerCharacter* Character = GetBreakerCharacter();
+    UWorld* World = Character ? Character->GetWorld() : nullptr;
+    // CAST SPEED IS NOT AUTHORED YET, and this reads 1.0 deliberately rather
+    // than inventing a lane: O266's second half needs a canon row in
+    // power-and-scaling.md and a conformance test before any node or affix may
+    // bid into it. The seam is here so that lands as one number, not a rewrite.
+    const float Seconds = Definition
+        ? EffectiveCastSeconds(Definition->GetCastTimeSeconds(), 1.0f) : 0.0f;
+    if (Seconds <= 0.0f || !World) return true;
+
+    // O266: the price goes on the KEYPRESS. A refused commit is a refused
+    // cast — no window, no timer, and the ability ends the way it always did.
+    if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+    {
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+        return false;
+    }
+    bCastCommitted = true;
+    bCastPending = true;
+    CastHandle = Handle;
+    CastActivationInfo = ActivationInfo;
+
+    if (UBreakerAbilityStateComponent* State = UBreakerAbilityStateComponent::FindOrAdd(Character))
+    {
+        State->StartWindow(CastWindowKey(Definition->AbilityId), Seconds);
+    }
+    // Damage interrupts (O266). Bound per cast and released with it, so an
+    // ability that is not casting pays nothing for the rule.
+    if (UBreakerCombatComponent* Combat = Character->FindComponentByClass<UBreakerCombatComponent>())
+    {
+        Combat->OnDamageReceived.AddDynamic(this, &UBreakerGameplayAbility::HandleCastInterrupt);
+    }
+
+    FTimerDelegate Resolve;
+    Resolve.BindWeakLambda(this, [this, Handle, ActorInfo, ActivationInfo]()
+    {
+        EndCastBinding();
+        // bCastPending is still true, so this re-entry passes the gate above
+        // and the ability's own body finally runs.
+        ActivateAbility(Handle, ActorInfo, ActivationInfo, nullptr);
+        bCastCommitted = false;
+    });
+    World->GetTimerManager().SetTimer(CastTimer, Resolve, Seconds, false);
+    return false;
+}
+
+void UBreakerGameplayAbility::HandleCastInterrupt(const FBreakerDamageResult& Result)
+{
+    if (!bCastPending) return;
+    // A dodged or fully-parried hit is not damage taken, so it is not an
+    // interrupt: the rule is "taking damage", and reading the result rather
+    // than the attempt is what keeps a whiff from cancelling a cast.
+    if (Result.bDodged || Result.bParried) return;
+    if (Result.HealthDamage + Result.ShieldDamage <= 0.0f) return;
+
+    ABreakerCharacter* Character = GetBreakerCharacter();
+    UWorld* World = Character ? Character->GetWorld() : nullptr;
+    if (World) World->GetTimerManager().ClearTimer(CastTimer);
+    const UBreakerAbilityDefinition* Definition = GetAbilityDefinition();
+    if (Definition)
+    {
+        if (UBreakerAbilityStateComponent* State = UBreakerAbilityStateComponent::FindOrAdd(Character))
+        {
+            State->CloseWindow(CastWindowKey(Definition->AbilityId));
+        }
+    }
+    EndCastBinding();
+    bCastPending = false;
+    // NO REFUND, owner-ruled. The Mana went on the keypress and the wind-up is
+    // the risk that buys it back; handing it over on an interrupt would make
+    // casting free to attempt.
+    bCastCommitted = false;
+    EndAbility(CastHandle, CurrentActorInfo, CastActivationInfo, true, true);
+}
+
+void UBreakerGameplayAbility::EndCastBinding()
+{
+    ABreakerCharacter* Character = GetBreakerCharacter();
+    if (UBreakerCombatComponent* Combat = Character ? Character->FindComponentByClass<UBreakerCombatComponent>() : nullptr)
+    {
+        Combat->OnDamageReceived.RemoveDynamic(this, &UBreakerGameplayAbility::HandleCastInterrupt);
+    }
 }

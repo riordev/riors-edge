@@ -4,6 +4,7 @@
 #include "Abilities/BreakerAbilityComponent.h"
 #include "Abilities/BreakerAbilityStateComponent.h"
 #include "Abilities/BreakerAbility_Cleave.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
 #include "Classes/BreakerManaComponent.h"
@@ -56,6 +57,8 @@ bool FBreakerReprisalRuntimeTest::RunTest(const FString& Parameters)
         const float Before=Mana->GetMana(); const float VictimBefore=Target->GetAttributes()->GetHealth();
         TestEqual(TEXT("HUD quote is live"),Abilities->GetResourceCostForSlot(Slot),Price,.001f);
         if(!TestTrue(TEXT("Native Cleave activates"),Abilities->TryActivateSlot(Slot))) return false;
+        // O266: the swing lands at the END of its wind-up, not on the press.
+        Clock(BreakerAuthoredCastSeconds(TEXT("Caster.Cleave"))+.05f);
         const auto* Spec=ASC->FindAbilitySpecFromClass(UBreakerAbility_Cleave::StaticClass());
         const auto* Ability=Spec?Cast<UBreakerAbility_Cleave>(Spec->GetPrimaryInstance()):nullptr;
         if(!Ability) return false;

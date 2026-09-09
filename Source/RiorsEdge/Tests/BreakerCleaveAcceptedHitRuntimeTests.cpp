@@ -2,6 +2,7 @@
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Cleave.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
 #include "Classes/BreakerManaComponent.h"
@@ -79,7 +80,11 @@ bool FBreakerCleaveAcceptedHitRuntimeTest::RunTest(const FString& Parameters)
             FText Reason;
             for (const TCHAR* Node : { TEXT("Core.Bulwark.Read"), TEXT("Core.Bulwark.Guard"), TEXT("Core.Bulwark.Parry") })
                 if (!TestTrue(TEXT("actual earned Core parry purchase"), Progression->PurchaseNode(UBreakerProgressionLibrary::GetCoreSliceTree(), Node, Reason))) return false;
-            if (!TestTrue(TEXT("real frontal parry starts"), Front->GetCombat()->TryParry())) return false;
+            // The parry is STARTED BELOW, after the swing is under way. O266
+            // made that necessary and more honest at once: a parry window is
+            // short, a wind-up is 0.35s, and a parry pressed before the caster
+            // even starts swinging has lapsed by the time the arc lands. The
+            // player reacts to the wind-up, so the fixture does too.
         }
         if (Scenario == 4) Front->GetAttributes()->ApplyHealth(1);
         auto* ASC = Caster->GetAbilitySystemComponent();
@@ -88,6 +93,19 @@ bool FBreakerCleaveAcceptedHitRuntimeTest::RunTest(const FString& Parameters)
         const float FrontHealth = Front->GetAttributes()->GetHealth();
         const float RearHealth = Rear->GetAttributes()->GetHealth();
         if (!TestTrue(TEXT("real paid Cleave activates"), ASC->TryActivateAbility(Handle))) return false;
+        // O266: activation opens the wind-up and the arc lands when it CLOSES,
+        // which changes what a parry means. The window is 0.25s and the wind-up
+        // is 0.35s, so a parry pressed on the caster's keypress has already
+        // lapsed by impact — the defender must now react to the swing rather
+        // than pre-empt it. The fixture parries LATE, inside the window that
+        // actually covers the landing, and that is the rule, not a workaround.
+        const float WindUp = BreakerAuthoredCastSeconds(TEXT("Caster.Cleave"));
+        float Elapsed = 0.0f;
+        for (; Elapsed < FMath::Max(0.0f, WindUp - .10f); Elapsed += .02f)
+        { ++GFrameCounter; World->Tick(LEVELTICK_All, .02f); }
+        if (Scenario == 3 && !TestTrue(TEXT("real frontal parry starts"), Front->GetCombat()->TryParry())) return false;
+        for (; Elapsed < WindUp + .05f; Elapsed += .02f)
+        { ++GFrameCounter; World->Tick(LEVELTICK_All, .02f); }
         const float PaidMana = Mana->GetMana();
         TestTrue(TEXT("Cleave spends ordinary Mana"), PaidMana < BeforeMana);
         Mana->AdvanceLoop(1);

@@ -7,6 +7,7 @@
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Abilities/BreakerAbilityStateComponent.h"
 #include "Abilities/BreakerAbility_Cleave.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Abilities/BreakerAbility_Unmake.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
@@ -99,6 +100,8 @@ bool FBreakerSnapshotDisciplineRuntimeTest::RunTest(const FString& Parameters)
     const float BeforeMana=Player->GetMana()->GetMana();
     const float QuotedCost=Abilities->GetResourceCostForSlot(EBreakerAbilitySlot::ClassAbilityOne);
     if(!TestTrue(TEXT("Normal equipped starter Cleave activates"),Abilities->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityOne)))return false;
+        // O266: the swing lands at the END of its wind-up, not on the press.
+        Clock(BreakerAuthoredCastSeconds(TEXT("Caster.Cleave"))+.05f);
     TestEqual(TEXT("Cleave pays its actual quoted Mana"),BeforeMana-Player->GetMana()->GetMana(),QuotedCost,.001f);
     const auto* NativeBleed=VictimStatus->GetActiveStatuses().FindByPredicate([](const FBreakerActiveStatus& Entry)
         {return Entry.Spec.StatusTag==FGameplayTag::RequestGameplayTag(TEXT("Status.Bleed"));});

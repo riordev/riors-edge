@@ -15,6 +15,7 @@
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Abilities/BreakerAbilityStateComponent.h"
 #include "Abilities/BreakerAbility_Cleave.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Abilities/BreakerAbility_Unmake.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
@@ -60,6 +61,8 @@ bool FBreakerCasterRotFundingRuntimeTest::RunTest(const FString& Parameters)
     for(int32 Cast=0;Cast<20 && !Mana->IsOvercast();++Cast)
     {
         if(!TestTrue(TEXT("Paid Cleave casts"),Abilities->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityOne)))return false;
+        // O266: the swing lands at the END of its wind-up, not on the press.
+        Clock(BreakerAuthoredCastSeconds(TEXT("Caster.Cleave"))+.05f);
         // The next normal input follows the authored lock; lingering .55s
         // would now recover the smaller cost before the debt observation.
         Clock(GetDefault<UBreakerAbility_Cleave>()->AnimationLockSeconds+.05f);

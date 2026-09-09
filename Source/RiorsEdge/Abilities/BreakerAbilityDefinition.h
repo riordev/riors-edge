@@ -91,6 +91,11 @@ public:
     // cooldown that happens to be ready.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cost", meta=(ClampMin="0")) float CooldownSeconds = 0.0f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cost", meta=(ClampMin="0")) float WindowDuration = 0.0f;
+    // O266: the wind-up before the ability RESOLVES. Zero means it lands on
+    // the keypress, which is what every ability in the project used to do.
+    // Movement and defensive verbs keep their zero by ruling — a dodge with a
+    // wind-up is not a dodge — so this is authored, never inferred from class.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cost", meta=(ClampMin="0")) float CastTimeSeconds = 0.0f;   // O2 PLACEHOLDER
 
     // Index 0 is the base row when authored. Empty on non-ultimates.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Variants") TArray<FBreakerAbilityVariant> Variants;
@@ -114,6 +119,8 @@ public:
     UFUNCTION(BlueprintPure, Category="Abilities") float GetResourceCost() const { return ResourceCost; }
     UFUNCTION(BlueprintPure, Category="Abilities") float GetCooldownSeconds() const { return CooldownSeconds; }
     UFUNCTION(BlueprintPure, Category="Abilities") bool HasCooldown() const { return CooldownSeconds > 0.0f; }
+    UFUNCTION(BlueprintPure, Category="Abilities") float GetCastTimeSeconds() const { return CastTimeSeconds; }
+    UFUNCTION(BlueprintPure, Category="Abilities") bool HasCastTime() const { return CastTimeSeconds > 0.0f; }
     UFUNCTION(BlueprintPure, Category="Abilities") bool IsImplemented() const { return AbilityClass != nullptr; }
     UFUNCTION(BlueprintPure, Category="Abilities") bool IsUltimate() const { return SlotAffinity == EBreakerAbilitySlot::Ultimate; }
     UFUNCTION(BlueprintPure, Category="Abilities") bool CanOccupySlot(EBreakerAbilitySlot Slot) const;

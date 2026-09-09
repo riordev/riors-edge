@@ -60,6 +60,10 @@ bool UBreakerAbility_Rot::ShouldFollowCaster(const AActor* OwnerActor, bool bGro
 
 void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
+    // O266: the wind-up. Returns false when it has started a cast — the cost
+    // is already paid, the window is open, and this function is called again
+    // when the wind-up completes. Zero authored cast time is a no-op.
+    if (!BeginCastIfNeeded(Handle, ActorInfo, ActivationInfo)) return;
     ABreakerCharacter* Character = GetBreakerCharacter();
     UWorld* World = Character ? Character->GetWorld() : nullptr;
     if (!World || !CommitAbility(Handle, ActorInfo, ActivationInfo))

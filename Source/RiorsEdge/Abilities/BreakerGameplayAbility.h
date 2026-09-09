@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Abilities/GameplayAbility.h"
 #include "GameplayEffect.h"
+#include "Combat/BreakerCombatTypes.h"
 #include "BreakerGameplayAbility.generated.h"
 
 enum class EBreakerAbilityDurationKind : uint8 { Generic, Zone, Window, Buff };
@@ -63,6 +64,42 @@ public:
     virtual float GetAuthoredResourceCost() const;
     float GetLastPaidResourceCost() const { return LastPaidResourceCost; }
     virtual bool CommitAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, FGameplayTagContainer* OptionalRelevantTags = nullptr) override;
+
+    // --- The cast (O266) ----------------------------------------------------
+    // Pure rule: the wind-up an ability actually serves. The multiplier is the
+    // Cast Speed lane's divisor and is 1.0 until that lane exists, so this is
+    // the seam the lane plugs into rather than a second place to author time.
+    UFUNCTION(BlueprintPure, Category="Abilities|Cast")
+    static float EffectiveCastSeconds(float AuthoredSeconds, float CastSpeedMultiplier);
+
+    // The HUD window key a pending cast holds. Prefixed so the existing
+    // ability-window bar draws it with no HUD change at all (O179: a window is
+    // a HUD bar), and per-ability so two casts can never share a countdown.
+    static FName CastWindowKey(FName AbilityId);
+
+    // THE GATE, called as the first line of an ability's ActivateAbility.
+    //
+    // Returns TRUE when the ability should resolve NOW — either it authors no
+    // cast time, or its cast has just finished and this is the re-entry.
+    // Returns FALSE when it has started a cast: cost is already paid (O266
+    // spends on the keypress), the window is open, and the timer will call
+    // ActivateAbility again when the wind-up completes.
+    //
+    // Deliberately a one-line gate rather than a ResolveCast refactor: every
+    // ability's body stays exactly where it is and keeps its own commit,
+    // which is what makes this safe to apply across a whole class in one pass.
+    bool BeginCastIfNeeded(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+        const FGameplayAbilityActivationInfo ActivationInfo);
+
+    // Damage interrupts a cast (O266). No refund — the Mana went on the
+    // keypress and an interrupted cast is a loss, which is the whole point of
+    // a wind-up being a risk.
+    UFUNCTION() void HandleCastInterrupt(const FBreakerDamageResult& Result);
+    bool IsCasting() const { return bCastPending; }
+
+private:
+    void EndCastBinding();
+public:
     virtual void CommitExecute(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) override;
     virtual bool CheckCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
     // The LIVE cooldown: the definition's authored seconds divided by the
@@ -156,4 +193,12 @@ private:
     bool bCostSnapshotActive = false;
     float CommitCostSnapshot = 0.0f;
     float LastPaidResourceCost = 0.0f;
+    // Cast state. bCastPending says a wind-up is running; bCastCommitted says
+    // its price is already paid, so the re-entry's own CommitAbility must not
+    // charge a second time.
+    bool bCastPending = false;
+    bool bCastCommitted = false;
+    FGameplayAbilitySpecHandle CastHandle;
+    FGameplayAbilityActivationInfo CastActivationInfo;
+    FTimerHandle CastTimer;
 };
