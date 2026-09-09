@@ -479,3 +479,21 @@ Maximum wedges reached with65, including ring transit; cells show **wedges / min
 
 **O251** — An occluded enemy yields its bar with its marks. A bar drawn through a wall is the readability problem the focus rule exists to solve, and half a nameplate yielding is worse than none.
 
+**O252** — Abilities carry a skill level of 1-15 earned on a shared pool, so every ability a character owns sits at the same level and unlocking a new one never costs the player the level they had. Character levels 1-50 run alongside it; unlocks finish at 30 and skill level keeps climbing.
+
+**O253** — Skill levels roll on Waist and Necklace, gated by affix tier: +1 at T12-T7, +2 at T6-T4, +3 at T3-T1, +4 at T-1 alone. Campaign play crosses only T12-T6, so the top of the ladder is endgame by construction rather than by rule.
+
+**O254** — Added Ability Damage is the flat half O54 left unnamed, bidding into the ability lane exactly as Added Damage bids into the weapon lane. Skill levels are free power and this is allocated power; only this half answers the ability-lane parity band.
+
+**O255** — A passive ability occupies a class slot and competes with the actives for it. A player who fills both class slots with passives has built a loadout, not opted out of one.
+
+**O256** — Every class carries eight actives, one ultimate and two passives. The ultimate sits beside the eight rather than inside them.
+
+**O257** — Wildcard holds one non-ultimate active from another class in a Support class slot, chosen at the Forge, spending Charge at the borrowed cost plus half again in cost and cooldown. Support never carries a second resource bar, and the tax is what makes it access rather than efficiency.
+
+**O258** — Skim retires and Slipcut is Swift's starter. A directional impulse that redirects horizontal speed is a second, costed copy of the dash Swift already has innately, and SkimDiscipline moves or goes in the same commit.
+
+**O259** — Passives bid into lanes the game does not already crowd — area, duration, deployable stats, resource generation, ammunition. A passive granting a weak damage More is worth exactly zero, because only the strongest three damage More sources apply.
+
+**O260** — The top rarity is Unwritten in code, data and screen alike. The enumerator's value never moves, so the rename is safe everywhere the name is not a stored string.
+

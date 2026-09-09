@@ -5,6 +5,22 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
+## Cycle — the kit programme (O252-O260)
+
+The roster target is 55: eight actives, one ultimate and two passives per
+class. 34 ship today, 21 are to be authored, and the order below is by what
+unblocks the most rather than by class.
+
+- [ ] O260 The rarity rename, Anomalous -> Unwritten. 312 references across 49 source files plus `Data/affixes.json`, `Scripts/status-pins.json` and `Scripts/import_marks.py`. Mechanical, its own commit. `Content/Breaker/UI/Marks/T_RarityAnomalous.uasset` is BINARY and can only be renamed in the editor — the owner's, recorded rather than faked, and the code keeps the old asset path until he does it.
+- [ ] O254 Added Ability Damage, the flat ability lane. One appended stat target, one pool entry mirroring Added Damage on the same slots, one aggregation site. This is the half that answers `PowerBand.AbilityLane`; re-measure the band after and do NOT delete the expected red just because skill levels later move the number.
+- [ ] O252 Skill level 1-15 on a shared pool. `FGameplayAbilitySpec(Definition->AbilityClass, 1, ...)` at `BreakerAbilityComponent.cpp:653` is the one grant site and that literal `1` is the level; GAS already threads it through `GetAbilityLevel()`, which the cost and cooldown specs already read. CHECK FIRST whether those magnitudes are level-scaled curves — if they are, raising the level silently raises costs.
+- [ ] O253 The skill-level affix on Waist and Necklace, tier-gated +1/+2/+3/+4.
+- [ ] O258 Skim retires, Slipcut becomes the starter. `Swift.Kinetic.SkimDiscipline` is a live Core node with no other referent — it moves or goes in the same commit or Silent nodes leaves its `ceiling 0 of 371`.
+- [ ] The eleven authorable new abilities: Carom, Coup, Backstep (Swift) · Pyre, Riftlance (Caster) · Recall (Gunsmith) · Bulwark (Tank) · Overwatch (Support), and the ten passives. Every one bids into a lane that exists today.
+- [ ] The three that need vocabulary first: Rover (a friendly AI pawn on NAV-1's controller and mover), Barrel (charge locomotion), Wildcard (a sanctioned exception to the foreign-class guard at `BreakerAbilityComponent.cpp:440`).
+- QUESTION FOR THE OWNER, not blocking: every ultimate in the game is a window — Overdrive, Unmake, Field Assembly, Hold and Conduit are all "for the duration, X". None is a moment. At least one wants to be a single decisive event instead; Unmake is the candidate.
+- NAME SWEEP OWED before authoring: `Afterimage`, `Attunement`, `Machinist`, `Interposition` and `Reprisal` are Core node ids already. The new names above were steered around those by hand, not by a tool.
+
 ## Cycle — the ruled-but-unbuilt slice (O245-O251)
 
 The ruling pass landed O239-O251. Five of them rule intent the code does not
