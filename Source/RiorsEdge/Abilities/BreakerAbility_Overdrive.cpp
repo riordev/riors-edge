@@ -376,3 +376,39 @@ void UBreakerAbility_Overdrive::EndAbility(const FGameplayAbilitySpecHandle Hand
     }
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
+
+void UBreakerAbility_Overdrive::OnRemoveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)
+{
+    // Ordinary activation is already inactive while its full window or tail
+    // still owns contributions. Revoke leases before publishing window closure.
+    bBloodrhythmActive = false;
+    if (auto* Combat = BoundCombat.Get())
+        Combat->OnHitDealt.RemoveDynamic(this, &ThisClass::HandleBloodrhythmHit);
+    BoundCombat.Reset();
+    if (auto* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(BloodrhythmTimeoutHandle);
+        World->GetTimerManager().ClearTimer(BloodrhythmWindowEndHandle);
+    }
+    if (auto* Character = GetBreakerCharacter())
+    {
+        if (auto* Combat = Character->GetCombat()) Combat->RemoveOutgoingModifier(OutgoingModifierKey());
+        if (auto* Movement = Character->GetBreakerMovement())
+        {
+            Movement->PopSpeedMultiplier(WindowKey());
+            Movement->PopDashCooldownSuspension(WindowKey());
+        }
+        if (auto* Weapon = Character->GetWeapon()) Weapon->PopRangeTreatmentOverride(WindowKey());
+        if (auto* Momentum = Character->GetMomentum())
+        {
+            Momentum->PopLoopOverride(WindowKey());
+            Momentum->PopMomentumFloor(WindowKey());
+        }
+        if (auto* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>())
+        {
+            State->OnWindowEnded.RemoveDynamic(this, &ThisClass::HandleWindowEnded);
+            State->CloseWindow(WindowKey());
+        }
+    }
+    Super::OnRemoveAbility(ActorInfo, Spec);
+}

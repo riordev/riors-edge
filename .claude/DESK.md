@@ -34,6 +34,7 @@ Continue validated blocks until the owner returns. Prioritize playable changes f
 - Campaign Substation enclosure candidate is parked after five-minute native arrival-floor failure: marker600,0,0 lies inside imported floor bounds, but simple WorldStatic floor query returns no hit. Roof, light positions and structural identity pass. No new interior landed; candidate/diagnostics retained outside checkout.
 - Rift interior currently reuses the yard. BuildCoverField generates gym-specific sections; FernhallFieldParams validates authored layouts and is not a compatible generation recipe. Use a genuinely band-aware generator or independently composed interiors; retain RiftGeneratedField as a measured probe.
 - Rift seed arithmetic now hashes canonical encounter text rather than process-local FName indices; golden70439488 verified for breach.marshalling/area12/base20260814. Nonempty-ID generated arrangements change once; no persisted run-seed schema exists. This is deterministic input arithmetic, not full topology/transport acceptance.
+- O262 acquisition/modifier/failure rulings remain needed: where keys drop, allowed modifier pool/count, and refund versus retained admission after failed travel. Current equipment-shaped item storage cannot safely impersonate a key.
 - O262: command post consumes a key carrying area level/modifiers and determines layout. Consumable entry and death budget land together. A key, device and tileset are not complete until enter → fight → reward → return works.
 - Add mission variety only with a real objective consumer. Current ordinary quest progress supports kills and the specific residue collection path; generic collection needs implementation.
 
@@ -44,7 +45,7 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 ## Known issues to time-box
 
 - Warden engaged movement bypasses arrival spacing and can walk through the player. Arrival-ring candidate is parked after five-minute native fixture limit: naked100HP target dies to native level-one124.51 slam before later spacing checks; needs a legal equipped target and post-BeginPlay range sampling, not health/damage overrides. No production change landed.
-- Ranged STEER transitions reset movement and appear to stutter; walk animation is missing.
+- Ranged stutter remains reported, cause unverified. StopChase already avoids repeated STEER velocity resets; inspect actual mode/velocity transitions before changing navigation ownership. Walk animation remains missing.
 - Volatile now has a tested outlined countdown; final Niagara presentation and real client cadence/human timing remain.
 - Damage numbers can overlap enemy plates. Hover, focus recovery and comfort require real interaction checks beyond static captures.
 - Remaining Afterimage window/ability consumers, Open Wound's authored lane substitute, rocket continuation and ally-threat semantics need source review; old desk claims are not evidence of current absence.
@@ -67,11 +68,11 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 
 ## Latest validated baseline
 
-Current local build/full suite:857 passing,3 expected failures,0 unexpected; native census refreshed for52 quest flags and current ability declarations. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
+Current local build/full suite:858 passing,3 expected failures,0 unexpected; native census refreshed for52 quest flags and current ability declarations. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
 
 ## Recent delivered changes
 
-- Full22-wedge Core remains active. Paid Afterimage Hold/Sightline/Slipcut and Survivor Core-point delivery have runtime coverage; removing inactive Slipcut now immediately revokes its cadence tail.
+- Full22-wedge Core remains active. Paid Afterimage Hold/Sightline/Slipcut/Overdrive and Survivor Core-point delivery have runtime coverage; removing inactive Slipcut or Overdrive now immediately revokes its remaining window/tail contributions.
 - Warden revival, Provoke/Standing Order, Swift starter migration, numeric ability authority and existing-item migration protection landed.
 - Fernhall guarded physical cache; Red Basin/Station Zero/Port Meridian fixed-region prototype districts, local maps and real return gates landed. Station Zero now has a persistent priority hunt; Red Basin has recorder recovery/extraction, both with optional supply lockers.
 - Anchor gatehouses/service-yard dressing, boss/Volatile occlusion cues, ability-menu wrapping, empty-label removal and cache prompt clarity were inspected in rendered captures.
