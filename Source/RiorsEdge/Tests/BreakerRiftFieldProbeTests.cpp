@@ -18,21 +18,33 @@
 // So this asks the question directly, for many rift seeds, before any of it
 // is wired into the builder.
 //
-// THE ANSWER TODAY IS NO, AND THE REASON IS NOT THE ONE EXPECTED. Every seed
-// refuses: the generator lays 47 pieces into the yard's band for 7.62% cover
-// against a 0.50-5.00% ceiling. The obvious knob does nothing — the pitch
-// sweep below runs 3400 cm to 5400 cm and the piece count and cover fraction
-// do not move by a hundredth, because in a band this small the LATTICE
-// contributes nothing and all 47 pieces come from the combat pockets and
-// their outer rings. Widening the lattice cannot thin a field the lattice is
-// not filling.
+// THE ANSWER IS NO, AND THE REASON IS STRUCTURAL RATHER THAN A NUMBER.
 //
-// What that means for the plan: making the generator fit a yard is not a
-// number to tune, it is pocket composition authored for a new purpose — so
-// the cheap route to varied rift interiors is closed until the generator
-// grows a small-band profile, and O167's other branch (interiors get their
-// own composed geometry) is the honest alternative. This test stays as the
-// instrument that says when the route opens.
+// Three guesses were wrong before the pieces were asked directly, which is
+// the whole argument for asking. Sweeping the lattice pitch 3400-5400 cm
+// moved nothing. Sweeping the pocket outer ring 12-0 moved nothing. The
+// census says why: with the yard's params there are NO pockets and the
+// lattice contributes nothing, and the 47 pieces are spread forward to
+// 20476 cm across a band that ends at 8900 — the generator is building the
+// GYM's field (elite arena, jump-run edges, sniper lane) and
+// CoverAreaFraction is then dividing that cover by the yard's much smaller
+// band. 7.62% is not a dense yard; it is cover from another field counted
+// against this one.
+//
+// And the gym-only sections cannot simply be switched off, because the
+// idiom for disabling them RELOCATES rather than suppresses: parking the
+// elite arena at 1e7 leaves 45 pieces, now reaching forward 10,003,476 cm,
+// still in the returned array and still counted. Sections would have to
+// become skippable for any of this to work.
+//
+// SO: UBreakerCoverLayoutLibrary::BuildCoverField is a gym field builder,
+// and UBreakerZoneBuilder::FernhallFieldParams is a VALIDATOR parameter set
+// — it has only ever been used to judge the authored layout, which is why
+// nobody noticed it cannot build one. Pairing them was the plan and the
+// plan is wrong. Varied rift interiors need either a generator written for
+// a band this size, or O167's other branch: interiors composed as their own
+// geometry. This test stays as the instrument that says when that changes.
+//
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerRiftFieldProbeTest,
     "RiorsEdge.Zone.RiftGeneratedField",
@@ -46,7 +58,53 @@ bool FBreakerRiftFieldProbeTest::RunTest(const FString&)
     // WHAT PITCH FITS THIS YARD? The lattice spacing shipped for the gym's
     // 220 m apron; the yard is 106 x 56 m and the same pitch over-fills it.
     // Cover density falls with the square of the pitch, so the sweep is short.
-    for (const float Pitch : {3400.f, 3800.f, 4200.f, 4600.f, 5000.f, 5400.f})
+    // WHERE DO THE 47 COME FROM? Twice now I have guessed a source and been
+    // wrong — the lattice pitch moved nothing, the pocket ring moved nothing.
+    // So this asks the pieces themselves: cluster ids are assigned per
+    // generator section, so a histogram of them names the section without
+    // reading another line of it.
+    {
+        FBreakerCoverFieldParams P = Yard;
+        P.Seed = 1;
+        const TArray<FBreakerCoverPiece> Built = UBreakerCoverLayoutLibrary::BuildCoverField(P);
+        int32 Chest = 0, Full = 0;
+        float MinF = 1e9f, MaxF = -1e9f, MinR = 1e9f, MaxR = -1e9f, Area = 0.0f;
+        for (const FBreakerCoverPiece& Piece : Built)
+        {
+            (Piece.Class == EBreakerCoverClass::FullHeight ? Full : Chest) += 1;
+            MinF = FMath::Min(MinF, Piece.Forward); MaxF = FMath::Max(MaxF, Piece.Forward);
+            MinR = FMath::Min(MinR, Piece.Right);   MaxR = FMath::Max(MaxR, Piece.Right);
+            Area += Piece.HalfLengthCm * 2.0f * Piece.HalfDepthCm * 2.0f;
+        }
+        AddInfo(FString::Printf(
+            TEXT("RIFT PIECE CENSUS  %d pieces (%d chest, %d full), spread fwd %.0f..%.0f right %.0f..%.0f, area %.0f cm2"),
+            Built.Num(), Chest, Full, MinF, MaxF, MinR, MaxR, Area));
+        AddInfo(FString::Printf(TEXT("RIFT PIECE CENSUS  pockets %d, corridor pockets %d, band %.0fx%.0f cm"),
+            Yard.PocketCentres.Num(), Yard.CorridorPocketCentres.Num(),
+            Yard.BandFarCm - Yard.BandNearCm, Yard.BandHalfWidthCm * 2.0f));
+    }
+
+    // THE ARENA WAS NEVER PARKED. FernhallFieldParams pushes the gym-only
+    // jump run, sniper lane and wall lane out of range, but not the elite
+    // arena at 17000 cm — which is why the census finds pieces 204 m down a
+    // 106 m yard. Park it the same way and see what the band actually holds.
+    {
+        FBreakerCoverFieldParams P = Yard;
+        P.ArenaDistanceCm = 1.0e7f;
+        P.Seed = 1;
+        const TArray<FBreakerCoverPiece> Built = UBreakerCoverLayoutLibrary::BuildCoverField(P);
+        float MinF = 1e9f, MaxF = -1e9f;
+        for (const FBreakerCoverPiece& Piece : Built)
+        { MinF = FMath::Min(MinF, Piece.Forward); MaxF = FMath::Max(MaxF, Piece.Forward); }
+        FString Why;
+        const bool bLegal = UBreakerCoverLayoutLibrary::IsLayoutLegal(Built, P, Why);
+        AddInfo(FString::Printf(TEXT("RIFT ARENA PARKED  %d pieces, fwd %.0f..%.0f, cover %.2f%%, legal=%d %s"),
+            Built.Num(), MinF, MaxF,
+            UBreakerCoverLayoutLibrary::CoverAreaFraction(Built, P) * 100.0f,
+            bLegal ? 1 : 0, *Why));
+    }
+
+    for (const int32 OuterRing : {12, 8, 4, 0})
     {
         int32 PitchLegal = 0, PitchTotal = 0, Pieces = 0;
         float WorstFraction = 0.0f;
@@ -58,7 +116,7 @@ bool FBreakerRiftFieldProbeTest::RunTest(const FString&)
                 R.EncounterId = FName(Id);
                 R.AreaLevel = Level;
                 FBreakerCoverFieldParams P = Yard;
-                P.ClusterPitchCm = Pitch;
+                P.PocketOuterRingCount = OuterRing;
                 P.Seed = R.LayoutSeed(Base);
                 const TArray<FBreakerCoverPiece> Built = UBreakerCoverLayoutLibrary::BuildCoverField(P);
                 Pieces = Built.Num();
@@ -69,8 +127,8 @@ bool FBreakerRiftFieldProbeTest::RunTest(const FString&)
                 if (UBreakerCoverLayoutLibrary::IsLayoutLegal(Built, P, Why)) ++PitchLegal;
             }
         }
-        AddInfo(FString::Printf(TEXT("RIFT PITCH SWEEP  pitch %.0f cm -> %d pieces, worst cover %.2f%%, %d/%d legal"),
-            Pitch, Pieces, WorstFraction, PitchLegal, PitchTotal));
+        AddInfo(FString::Printf(TEXT("RIFT RING SWEEP  outer ring %2d -> %d pieces, worst cover %.2f%%, %d/%d legal"),
+            OuterRing, Pieces, WorstFraction, PitchLegal, PitchTotal));
     }
 
     int32 Legal = 0;

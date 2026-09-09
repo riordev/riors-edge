@@ -227,6 +227,19 @@ struct RIORSEDGE_API FBreakerCoverFieldParams
     // inside one telegraph-plus-flight window, and so does the enemy.
     UPROPERTY(BlueprintReadOnly, Category="Cover|Pocket") float PocketInnerRingRadiusCm = 850.0f;   // O2 PLACEHOLDER
     UPROPERTY(BlueprintReadOnly, Category="Cover|Pocket") float PocketOuterRingRadiusCm = 2600.0f;   // O2 PLACEHOLDER
+    // How many chest pieces stand on that outer ring. TWELVE IS THE GYM'S
+    // NUMBER and stays the default, so every field built before this parameter
+    // existed comes out bit-identical.
+    //
+    // It is a parameter because the ring's REASON does not survive a small
+    // band. The outer ring exists to bridge the annulus between a pocket's own
+    // cover and the first lattice cluster — ground that would otherwise sit
+    // more than a cover pitch from anything. In a yard-sized band the lattice
+    // contributes no pieces at all (measured: sweeping the cluster pitch from
+    // 3400 to 5400 cm moves neither the count nor the cover fraction), so the
+    // ring is bridging to something that is not there while its twelve pieces
+    // push the field past the cover-fraction ceiling on their own.
+    UPROPERTY(BlueprintReadOnly, Category="Cover|Pocket") int32 PocketOuterRingCount = 12;   // O2 PLACEHOLDER
     // The pillar sits on the -Forward bearing, mid-way between two ring blocks.
     // It used to sit at bearing 200, which put it 82 cm from one of them -- a
     // gap the SEVERED DRUDGE's 120 cm body cannot pass through. At 180 the same

@@ -63,11 +63,28 @@ through authored destinations, which ship. Past it:
   Widening a lattice cannot thin a field the lattice is not filling. Fitting
   the generator to a yard is therefore pocket composition authored for a new
   purpose, not a number to tune.
-- [ ] SO THE CHOICE IS NARROWER THAN IT LOOKED: either give the generator a
-  SMALL-BAND PROFILE (fewer pockets, or pockets scaled to the band rather
-  than authored for a 220 m apron), or take O167's other branch and compose
-  rift interiors as their own geometry. The probe stays as the instrument
-  that says when the first route opens.
+- THE SMALL-BAND PROFILE WAS TRIED TOO, AND IT IS NOT A PROFILE. Three
+  guesses were wrong before the pieces were asked directly. Lattice pitch
+  3400-5400: no change. Pocket outer ring 12-0: no change. The census says
+  why — with the yard's params there are NO pockets, the lattice contributes
+  nothing, and the 47 pieces spread forward to 20476 cm across a band ending
+  at 8900. The generator is building the GYM's field (elite arena, jump-run
+  edges, sniper lane) and the fraction divides that cover by the yard's much
+  smaller band. 7.62% is cover from another field counted against this one.
+- AND THE GYM-ONLY SECTIONS CANNOT BE SWITCHED OFF: the shipped idiom parks
+  them at 1e7 rather than skipping them, so the pieces stay in the returned
+  array and keep counting. Parking the elite arena leaves 45 pieces reaching
+  forward 10,003,476 cm. Sections would have to become SKIPPABLE first.
+- SO: `BuildCoverField` is a gym field builder and `FernhallFieldParams` is a
+  VALIDATOR parameter set — it has only ever judged the authored layout,
+  which is why nobody noticed it cannot build one. Pairing them was the plan
+  and the plan is wrong.
+- [ ] Varied rift interiors therefore need EITHER a generator written for a
+  band this size (sections skippable, pockets scaled to the band) OR O167's
+  other branch: interiors composed as their own geometry. The second is the
+  honest one and is what the owner's destination ask points at anyway.
+  `RiorsEdge.Zone.RiftGeneratedField` stays as the instrument that says when
+  the first route opens.
 - THE DIRECTION THE OWNER WANTS, recorded so neither route forgets it: a
   DESTINATION in the Destiny sense — a persistent place with things inside it
   to interact with — not just a fight box. Interactable vocabulary already

@@ -283,9 +283,11 @@ TArray<FBreakerCoverPiece> UBreakerCoverLayoutLibrary::BuildCoverField(const FBr
         }
 
         const int32 OuterCluster = ClusterIndex++;
-        for (int32 Index = 0; Index < 12; ++Index)
+        const int32 OuterCount = FMath::Max(0, Params.PocketOuterRingCount);
+        const float OuterStep = OuterCount > 0 ? 360.0f / static_cast<float>(OuterCount) : 0.0f;
+        for (int32 Index = 0; Index < OuterCount; ++Index)
         {
-            const float Bearing = 30.0f * Index;
+            const float Bearing = OuterStep * Index;
             const float Radians = FMath::DegreesToRadians(Bearing);
             const float Fwd = Pocket.X + FMath::Cos(Radians) * Params.PocketOuterRingRadiusCm;
             const float Rgt = Pocket.Y + FMath::Sin(Radians) * Params.PocketOuterRingRadiusCm;
