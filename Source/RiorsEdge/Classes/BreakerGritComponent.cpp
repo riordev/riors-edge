@@ -293,6 +293,33 @@ void UBreakerGritComponent::PushLoopOverride(FName Key, bool bSuspendDecay, floa
     LoopOverrides.Add(Key, Entry);
 }
 
+void UBreakerGritComponent::PushWindowGenerationOverride(FName Key, float Multiplier, float Duration)
+{
+    if (!GetOwner() || !GetWorld() || Key.IsNone() || !FMath::IsFinite(Duration) || Duration <= 0
+        || !FMath::IsFinite(Multiplier) || Multiplier < 0) return;
+    PushLoopOverride(Key, false, Multiplier, Duration);
+    auto* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+    if (auto* Entry = LoopOverrides.Find(Key))
+    {
+        Entry->bWindowGeneration = true;
+        Entry->bAfterimage = Progression && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage")));
+    }
+    if (Progression) Progression->OnProgressionChanged.AddUniqueDynamic(this, &ThisClass::InvalidateAfterimageProximity);
+    if (auto* Combat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>())
+        Combat->OnDeath.AddUniqueDynamic(this, &ThisClass::InvalidateAfterimageProximity);
+}
+
+void UBreakerGritComponent::FinishWindowGenerationOverride(FName Key)
+{
+    auto* Entry = LoopOverrides.Find(Key);
+    const auto* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    // Premature closure never manufactures a tail. Death/respec callbacks can
+    // run before the ability's close callback; consult the already-claimed entry.
+    if (!Entry || !Entry->bWindowGeneration || !Entry->bAfterimage || !GetWorld()
+        || (Combat && Combat->IsDead()) || GetWorld()->GetTimeSeconds() + 1.e-6 < Entry->ExpiryTime)
+        PopLoopOverride(Key);
+}
+
 void UBreakerGritComponent::PopLoopOverride(FName Key)
 {
     LoopOverrides.Remove(Key);
@@ -305,7 +332,11 @@ void UBreakerGritComponent::PruneLoopOverrides() const
     const double Now = World->GetTimeSeconds();
     for (auto It = LoopOverrides.CreateIterator(); It; ++It)
     {
-        if (IsLoopOverrideExpired(It.Value().ExpiryTime, Now)) It.RemoveCurrent();
+        const auto& Entry = It.Value();
+        const bool bExpired = Entry.bWindowGeneration
+            ? FBreakerWindowLaneMath::Scale(Now, Entry.ExpiryTime, Entry.bAfterimage) == 0
+            : IsLoopOverrideExpired(Entry.ExpiryTime, Now);
+        if (bExpired) It.RemoveCurrent();
     }
 }
 
@@ -326,7 +357,10 @@ float UBreakerGritComponent::GetGenerationMultiplier() const
     Active.Reserve(LoopOverrides.Num());
     for (const TPair<FName, FLoopOverrideEntry>& Pair : LoopOverrides)
     {
-        Active.Add(Pair.Value.GenerationMultiplier);
+        const auto& Entry = Pair.Value;
+        const float Scale = Entry.bWindowGeneration && GetWorld()
+            ? FBreakerWindowLaneMath::Scale(GetWorld()->GetTimeSeconds(), Entry.ExpiryTime, Entry.bAfterimage) : 1.f;
+        Active.Add(1.f + (Entry.GenerationMultiplier - 1.f) * Scale);
     }
     return ComposeGenerationMultipliers(Active);
 }
@@ -611,6 +645,12 @@ void UBreakerGritComponent::InvalidateAfterimageProximity()
     const auto* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
     const auto* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
     const bool bOwned = Progression && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage")));
+    for (auto It = LoopOverrides.CreateIterator(); It; ++It)
+    {
+        if (!It.Value().bWindowGeneration) continue;
+        if (Combat && Combat->IsDead()) It.RemoveCurrent();
+        else if (!bOwned) It.Value().bAfterimage = false;
+    }
     for (auto It = ProximityBoosts.CreateIterator(); It; ++It)
     {
         if (!It.Value().bWindow) continue;

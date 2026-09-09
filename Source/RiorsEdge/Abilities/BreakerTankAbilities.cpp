@@ -1136,7 +1136,7 @@ void UBreakerAbility_Hold::ActivateAbility(const FGameplayAbilitySpecHandle Hand
     // because the Grit loop multiplies its cap by the composed override.
     if (UBreakerGritComponent* Grit = Character->FindComponentByClass<UBreakerGritComponent>())
     {
-        Grit->PushLoopOverride(WindowKey(), /*bSuspendDecay=*/false, GenerationMultiplier, Duration);
+        Grit->PushWindowGenerationOverride(WindowKey(), GenerationMultiplier, Duration);
     }
 
     UBreakerCombatComponent* Combat = Character->FindComponentByClass<UBreakerCombatComponent>();
@@ -1254,6 +1254,16 @@ void UBreakerAbility_Hold::CloseHold()
     }
 }
 
+void UBreakerAbility_Hold::OnRemoveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)
+{
+    // Natural expiry ends the active spec before its owned lane tail. Claim
+    // cleanup even when bHoldActive is already false, before any end callbacks.
+    if (auto* Character = ActorInfo ? Cast<ABreakerCharacter>(ActorInfo->AvatarActor.Get()) : nullptr)
+        if (auto* Grit = Character->GetGrit()) Grit->PopLoopOverride(WindowKey());
+    if (IsActive()) EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+    Super::OnRemoveAbility(ActorInfo, Spec);
+}
+
 void UBreakerAbility_Hold::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
     if (bHoldActive)
@@ -1277,7 +1287,10 @@ void UBreakerAbility_Hold::EndAbility(const FGameplayAbilitySpecHandle Handle, c
         if (Character)
         {
             if (UBreakerGritComponent* Grit = Character->FindComponentByClass<UBreakerGritComponent>())
-                Grit->PopLoopOverride(WindowKey());
+            {
+                if (bWasCancelled) Grit->PopLoopOverride(WindowKey());
+                else Grit->FinishWindowGenerationOverride(WindowKey());
+            }
             if (UBreakerAbilityStateComponent* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>())
                 State->CloseWindow(WindowKey());
         }

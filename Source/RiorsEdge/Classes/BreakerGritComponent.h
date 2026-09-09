@@ -196,6 +196,9 @@ public:
     // yet; the seam exists so the day one does, it pays without a Classes/ edit.
     UFUNCTION(BlueprintCallable, Category="Grit|Loop") void PushLoopOverride(FName Key, bool bSuspendDecay, float GenerationMultiplier, float Duration, float DecayRateMultiplier = 1.0f);
     UFUNCTION(BlueprintCallable, Category="Grit|Loop") void PopLoopOverride(FName Key);
+    // O228: only the numeric generation contribution receives a natural tail.
+    void PushWindowGenerationOverride(FName Key, float Multiplier, float Duration);
+    void FinishWindowGenerationOverride(FName Key);
     UFUNCTION(BlueprintPure, Category="Grit|Loop") bool IsDecaySuspended() const;
     UFUNCTION(BlueprintPure, Category="Grit|Loop") float GetGenerationMultiplier() const;
     // Product of every active override's decay-rate multiplier; scales the
@@ -288,6 +291,8 @@ private:
 
     struct FLoopOverrideEntry
     {
+        bool bWindowGeneration = false;
+        bool bAfterimage = false;
         bool bSuspendDecay = false;
         float GenerationMultiplier = 1.0f;
         // Scales the decay rate; 0 is a legal suspension, see PushLoopOverride.

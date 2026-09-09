@@ -6,15 +6,12 @@ Continue validated blocks until the owner returns. Prioritize playable changes f
 
 ## Immediate queue
 
-1. Fernhall cache gameplay and rendered placement landed; live prompt/focus and final prop art remain.
-2. O258 landed: Slipcut is Swift's starter; v10 migrates Skim slots and refunds retired purchases without duplication.
-3. O247 landed: Provoke forces its target for four seconds and grants lasting scaled threat; paid Standing Order cancellation verified.
-4. O250 landed: a broken Warden front stays broken through revival.
-5. O251 landed: static cover hides the entire enemy plate including bosses; open/blocked frames inspected.
-6. O248 verified: native archive, v9→v10/repeated migration, equipped/backpack restore and paid Attune retain historical over-budget affixes. No destructive normalization needed.
-7. Kit expansion under O252–O260: verify the registered roster, author reachable abilities/passives with real consumers, and reconcile counts before claiming the 55-entry target. Carom, Coup, Backstep, Pyre, Riftlance, Recall, Bulwark and Overwatch are named candidates. Rover, Barrel and Wildcard require additional mechanics. Check proposed names against Core/doctrine IDs.
-8. O246 landed: Data alone authors146 numeric keys; native instance initialization applies them explicitly, schema and instance/CDO agreement verified.
-9. World Core Point coverage is already derived from mission Unlock.CorePoint references; verify remaining uncovered sources against actual flag delivery before changing content.
+1. Validate and land the isolated cooperative combat slice with actual host/guest evidence; preserve ordinary saves.
+2. Land Red Basin and Station Zero prototypes, matching farmland/crater and research-hub settings. Create real map packages, test routes/rewards/return, and inspect rendered frames.
+3. Land Volatile countdown visibility and ability-menu wrapping/empty-label fixes with rendered checks.
+4. Finish remaining Afterimage consumers and real-clock Rot feedback checks. Cache live prompt/focus and final prop art remain.
+5. Kit expansion under O252–O260: current34 registered entries are11 actives and10 passives short of55. Carom, Coup, Backstep, Pyre, Riftlance, Recall, Bulwark and Overwatch are named candidates without sufficient authored mechanics in the current docs. Rover/Barrel need new mechanics; Wildcard has O257 but needs Forge/foreign-grant/resource infrastructure. Do not fill the count with clones or call existing innate nodes slot passives.
+6. World Core Point coverage is already derived from mission Unlock.CorePoint references; verify remaining uncovered sources against actual flag delivery before changing content.
 
 ## Seven-step acceptance checklist
 
@@ -63,7 +60,7 @@ Owner authorizes adding multiplayer when feasible. Audit current listen-server j
 
 ## Latest validated baseline
 
-Current local build/census/full suite:842 passing,3 expected failures,0 unexpected. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
+Current local build/census/full suite:843 passing,3 expected failures,0 unexpected. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
 
 ## Landed this pass
 
@@ -82,3 +79,5 @@ Current local build/census/full suite:842 passing,3 expected failures,0 unexpect
 - Legacy special items: strengthened existing native Forge test checks exact stored line order/identity/tier/value/category after serialization, repeated current migration, equipment restore, then paid Attune. Nine-line historical items survive. Build/full suite842/3/0; production preservation already existed, so no item rewrite or tuning change.
 
 - Ability numeric authority: removed143 duplicated initializers; Data schema replaces compiled-default freshness. First suite exposed native instances retaining zeros despite patched CDOs; fixed at PostInitProperties and added all-row instance checks, independently reviewed. Rebuilt full suite842/3/0. No status.py binding existed to rename; measurement pins unchanged. Custom serialized Blueprint overrides are outside the registered native roster guarantee.
+
+- Hold Afterimage: paid native Core route and equipped resource-funded Hold verify generation's two-second half-contribution tail. Ordinary hit cap ends on time; cancellation, death, paid respec and removing the inactive granted ability revoke the contribution. Independent review caught the removal gap before landing. Build/full suite843/3/0.
