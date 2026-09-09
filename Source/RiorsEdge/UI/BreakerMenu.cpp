@@ -8369,7 +8369,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         {
             const FVector2D Direction = (B - A).GetSafeNormal();
             const float EndInset = bRoleLayout ? RoleMarkerSize * .5f : 23.0f;
-            const float DrawWidth = bRoleLayout && bFocused ? Width / FitScale : Width;
+            const float DrawWidth = !bRoleLayout ? Width : bFocused ? Width / FitScale : FMath::Max(Width, 1.0f / FitScale);
             AddCanvasSegment(Canvas, A + Direction * EndInset, B - Direction * EndInset, Color, DrawWidth);
         };
         // The overview is an atlas, not a field of undersized purchase targets.
@@ -8419,10 +8419,15 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             const FSkillNodeView View = MakeSkillNodeView(Node, Rank, bPurchasable, LockReason, TreeSpent, Snapshot);
             const FBreakerMenuSkillRung Rung = BreakerMenuSkillLadderRung(Kind, bOwned, bPurchasable,
                 BreakerMenuSkillKeystoneRefused(Progression, CoreTree, Node));
-            const float RingWidth = bRoleLayout ? (bFocused ? 1.5f / FitScale : 3.0f) : MarkerRingThickness(Kind, bOwned || bPurchasable);
-            const FLinearColor MarkerFill = bRoleLayout && !bOwned ? PanelRaised : Rung.Fill;
-            const FLinearColor MarkerRing = bRoleLayout && !bOwned ? Muted : Rung.Ring;
-            const TSharedRef<SWidget> Core = MakeMarkerCore(Kind, bRoleLayout ? Primary : Rung.Core, MarkerFill, bRoleLayout ? RoleMarkerSize : 44.0f);
+            // Keep the overview's existing footprint: adjacent diagonal lane
+            // markers are already close. Readability comes from pixel-wide
+            // strokes and the same owned/purchasable/locked state palette.
+            const float RingWidth = bRoleLayout ? (bFocused ? 1.5f / FitScale : FMath::Max(3.0f, 1.0f / FitScale)) : MarkerRingThickness(Kind, bOwned || bPurchasable);
+            const FLinearColor MarkerFill = Rung.Fill;
+            // Gateway/minor squares have no glyph, so their ring must also
+            // communicate the Rung's purchasable Primary versus locked state.
+            const FLinearColor MarkerRing = bRoleLayout && !bOwned && bPurchasable ? Rung.Core : Rung.Ring;
+            const TSharedRef<SWidget> Core = MakeMarkerCore(Kind, Rung.Core, MarkerFill, bRoleLayout ? RoleMarkerSize : 44.0f);
             TSharedRef<SWidget> Marker = bFocused && !bSealed
                 ? WireMarker(CoreTree, Node, View, bPurchasable, LockReason, MarkerFill, MarkerRing, RingWidth, Core)
                 : BorderWrap(SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
