@@ -1,5 +1,103 @@
 # Desk — what the owner will feel next time he plays
 
+## HANDOFF — read this first (2026-09-09, machine switch)
+
+Base `cf0ce5d`, suite 837 passing / 3 expected red / 0 unexpected, tree
+clean and pushed. The owner is about to PLAY, then a different agent picks
+up on another machine.
+
+STARTING ON THE OTHER BOX: close the editor, `git pull --ff-only`, and if
+meshes come back as pointer files run `git lfs pull`. Do not build with the
+editor open. Read `Docs/STATE.md`'s summary table before planning anything.
+
+### What the playtest is actually judging
+
+THE BIG ONE: enemies no longer chain-detonate on death (O261). It shipped
+true by class default, so every dying body dealt 35% of max health inside
+420 cm and a pack of four cascaded itself from one kill — and those kills
+paid the player nothing. Every pack fight is different now. If the owner
+says packs feel slow or spongy, that is this, and the answer is tuning
+enemy counts or damage, NOT putting the cascade back.
+
+Also new and unjudged: Fernhall's two off-lane pockets (17 outdoor across
+five, first time anything sits off the centreline); the Watchkeeper and his
+contract; the `SKILL n` readout; Momentum's cone at 0.75 (was 0.6);
+Volatile kills now paying Feed/Scrap and drawing numbers at the blast; and
+eight missions that paid literally nothing now paying a Core Point.
+
+### Known broken — do NOT spend the owner's notes on these
+
+- The Warden overrides the base engaged tick wholesale: no arrival ring, no
+  arrival angle, two stack on one line, it walks through the player between
+  sweeps (`Combat/BreakerWardenEnemy.cpp` TickEngagedBehaviour).
+- Ranged enemies have no walk sequence and move in ref pose; STEER frames
+  call StopMovement and rebuild velocity from zero — the stutter at range.
+- A Volatile corpse has NO visual tell. The disc and light were retired by
+  O203 and the Niagara pass has not happened, so the player dies to an
+  invisible fuse and it reads as unfair. Recorded at the site.
+- The rift interior is still the entry yard with the doors suppressed.
+
+### Rulings the owner still owes
+
+- `DropChanceReachesEveryRank` stays expected-red on purpose. O249 landed
+  and the pin now measures the wrong thing — it reads
+  `GetEffectiveDropChance` alone, which at a boss is LEGITIMATELY still
+  1.000 because the ruling keeps the cap and converts the excess. It wants
+  a rewrite to measure VALUE, not step-one probability. Do not edit or
+  delete the assertion to make it green.
+- Every ultimate in the game is a window ("for the duration, X"). None is a
+  moment. At least one wants to be a single decisive event; Unmake is the
+  candidate.
+- O253's two slots STACK (+8 on a fifteen-rung ladder). Summed rather than
+  capped, and capping it is one constant.
+- The local map's site ids embed world COORDINATES
+  (`BreakerLocalMapComponent.cpp:76-78`), so moving any authored site
+  silently resets a player's discovery. A NEW site is safe; a MOVED one is
+  not. Fix the id scheme in the same commit as the first geometry change.
+
+### Lessons from this session that will save the next agent a cycle
+
+MEASURE BEFORE TUNING. Three separate times a number was tuned and moved
+nothing, because the guess about where the value came from was wrong:
+- The rift cover field: lattice pitch swept 3400-5400 cm, no change. Pocket
+  ring swept 12-0, no change. The census finally showed the pieces were the
+  GYM's field spread to 20476 cm across a band ending at 8900 — cover from
+  another field counted against this one. `BuildCoverField` is a gym
+  builder; `FernhallFieldParams` is a VALIDATOR set that has only ever
+  judged an authored layout. `RiorsEdge.Zone.RiftGeneratedField` is the
+  instrument that says when that changes.
+- The ability parity gap was a BROKEN FIXTURE, not missing content. It
+  bought 11 increased lines against the weapon side's 17 and bought a flat
+  line that is dead in the ability lane. Corrected, 0.526 -> 0.926.
+- O254 was authored wrong from a stale branch: the flat ability lane
+  already shipped. Read the TREE, not a branch, before believing a claim
+  about it.
+
+Probes are cheap and pay. Each of the above cost one build and closed a
+route that would otherwise have burned a cycle.
+
+### Next work, in order, and all of it is scoped
+
+1. The Fernhall cache — `ABreakerFinaleActor`'s console shape plus the
+   two-line loot roll (`BreakerEnemy.cpp:1745-1748`), placed at a
+   yard-frame fraction like the Breach door so it needs NO marker and moves
+   no pinned count. Gate it on a nearby pocket being cleared.
+2. O258 Skim retires, Slipcut becomes the starter. `Swift.Kinetic.SkimDiscipline`
+   is a live Core node with no other referent — it moves or goes in the same
+   commit or Silent nodes leaves its ceiling of 0.
+3. O247 Provoke grants threat; O250 the Warden's front stops re-arming;
+   O251 an occluded enemy yields its bar.
+4. The eleven authorable new abilities (see the roster block below).
+5. O246 delete the compiled ability defaults — and the deletion commit MUST
+   swap `Data.Abilities.Fresh` for a schema test, or it trades drift for an
+   unvalidated data file.
+
+PARALLEL LANES WORK, with a fence. A subagent given an explicit directory
+list, no build and no git authored O249 cleanly while the main session built
+and committed. Only one build may run at a time.
+
+
+
 One file, one queue. Ordered by what changes the next play session, not by
 system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
