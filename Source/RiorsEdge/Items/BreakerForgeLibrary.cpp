@@ -70,7 +70,7 @@ namespace
         case EBreakerItemRarity::Uncommon:    return {4, 6};      // was 1 Flux
         case EBreakerItemRarity::Exceptional: return {8, 18};     // was 3 Flux
         case EBreakerItemRarity::Aberrant:    return {14, 102};   // was 7 Flux + 1 Sigil
-        case EBreakerItemRarity::Anomalous:   return {20, 252};   // was 12 Flux + 3 Sigil
+        case EBreakerItemRarity::Unwritten:   return {20, 252};   // was 12 Flux + 3 Sigil
         default:                              return {1, 0};
         }
     }
@@ -183,7 +183,7 @@ FBreakerForgeCost UBreakerForgeLibrary::ReforgeCost(const FBreakerItemInstance& 
 {
     FBreakerForgeCost Cost;
     // Scales on how much item there is to reroll, so rerolling a six-affix
-    // Anomalous is not the same price as rerolling a one-line Standard. See
+    // Unwritten is not the same price as rerolling a one-line Standard. See
     // the ladder table above BreakerForgeTemperCostForTargetTier.
     Cost.Amount = FMath::RoundToInt((6 + 4 * Item.Affixes.Num()) * BreakerForgeLevelScalar(Item.ItemLevel));  // O2 PLACEHOLDER
     return Cost;

@@ -1176,7 +1176,7 @@ float UBreakerCombatComponent::GetComposedMoreMultiplier() const
     }
 
     // O34: ONE More ceiling. The chain spends whatever headroom the attribute
-    // side (tree keystones, Anomalous rewrites) left under the aggregator's
+    // side (tree keystones, Unwritten rewrites) left under the aggregator's
     // budget — total effective More is (attribute-side product x chain product)
     // and may never exceed FBreakerAttributeAggregator::ComposedMoreCeiling().
     // On a build already holding three Mores near the ceiling a window buys

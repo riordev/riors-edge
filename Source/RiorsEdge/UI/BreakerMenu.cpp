@@ -4321,7 +4321,7 @@ namespace
         return BreakerUI::RarityColor(Rarity);
     }
 
-    // A card whose rarity reads from its 3px left rail. Anomalous also takes
+    // A card whose rarity reads from its 3px left rail. Unwritten also takes
     // a full 1px border, because it is the only tier that is simultaneously a
     // world object class.
     TSharedRef<SWidget> MakeRarityCard(const TSharedRef<SWidget>& Inner, EBreakerItemRarity Rarity, bool bHasItem)
@@ -4345,10 +4345,10 @@ namespace
             case EBreakerItemRarity::Aberrant: return TEXT("ABERRANT");
             // O50: the DISPLAY name is Unwritten. O49 gave "Anomalies" to the
             // endgame content type, so the rarity gave up the word. The
-            // ENUMERATOR stays Anomalous and must never move -- it is
+            // ENUMERATOR stays Unwritten and must never move -- it is
             // serialized, and CLAUDE.md's append-only rule protects it
             // independently of this rename.
-            case EBreakerItemRarity::Anomalous: return TEXT("UNWRITTEN");
+            case EBreakerItemRarity::Unwritten: return TEXT("UNWRITTEN");
             default: return TEXT("STANDARD");
         }
     }
@@ -4640,7 +4640,7 @@ namespace
         return SlotName(Item.Slot);
     }
 
-    // Line two: rarity and slot. Aberrant and Anomalous say so in their own
+    // Line two: rarity and slot. Aberrant and Unwritten say so in their own
     // colour, because those two are the tiers with a cap behind them; the rest
     // stay muted so a wall of loot does not become a wall of colour.
     FString ItemRarityAndSlot(const FBreakerItemInstance& Item)
@@ -4650,13 +4650,13 @@ namespace
 
     FLinearColor RarityTagColor(EBreakerItemRarity Rarity)
     {
-        return Rarity == EBreakerItemRarity::Aberrant || Rarity == EBreakerItemRarity::Anomalous
+        return Rarity == EBreakerItemRarity::Aberrant || Rarity == EBreakerItemRarity::Unwritten
             ? BreakerUI::RarityColor(Rarity) : Muted;
     }
 
     // The rarity tally: five 8x8 boxes at a 2px gap, the first rank+1 filled
     // in the rarity's colour and the rest in the rest ring. The rank is the
-    // enum's own order (Standard 0 .. Anomalous 4), which is append-only.
+    // enum's own order (Standard 0 .. Unwritten 4), which is append-only.
     TSharedRef<SWidget> BreakerMenuMakeRarityTally(EBreakerItemRarity Rarity)
     {
         const int32 Filled = static_cast<int32>(Rarity) + 1;
@@ -4685,7 +4685,7 @@ namespace
             EBreakerItemRarity::Uncommon,
             EBreakerItemRarity::Exceptional,
             EBreakerItemRarity::Aberrant,
-            EBreakerItemRarity::Anomalous,
+            EBreakerItemRarity::Unwritten,
         };
         TSharedRef<SHorizontalBox> Beams = SNew(SHorizontalBox);
         for (const EBreakerItemRarity Rarity : Ramp)
@@ -4996,8 +4996,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                     TEXT("ABERRANT %d/%d · UNWRITTEN %d/%d\nAt the limit, choose an item to replace."),
                     Equipment ? Equipment->CountEquippedOfRarity(EBreakerItemRarity::Aberrant) : 0,
                     UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Aberrant),
-                    Equipment ? Equipment->CountEquippedOfRarity(EBreakerItemRarity::Anomalous) : 0,
-                    UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Anomalous))),
+                    Equipment ? Equipment->CountEquippedOfRarity(EBreakerItemRarity::Unwritten) : 0,
+                    UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Unwritten))),
                     BreakerUI::TypeCaption, SoftText,
                     BreakerInventoryLayout::EquipmentFooterTextWidth(EquipmentColumnWidth))
             ],
@@ -5389,7 +5389,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         // hook the three authored legendaries (O32) are unreachable outside
         // Blueprint/console/automation. Same dev gate as GRANT TEST GEAR,
         // dropped into the backpack rather than equipped, same reason: only
-        // one Anomalous piece can be worn at a time.
+        // one Unwritten piece can be worn at a time.
         DevRow->AddSlot().AutoWidth().Padding(0.0f, 0.0f, 4.0f, 0.0f)
         [
             SNew(SButton)
@@ -5598,10 +5598,10 @@ TSharedRef<SWidget> SBreakerMenu::BuildDiscardModal(int32 ArmIndex, EBreakerItem
     ];
     // The exclusions, stated rather than assumed. Both are properties of the
     // component: equipped gear is a separate container, and Aberrant and
-    // Anomalous sit above every threshold this screen offers.
+    // Unwritten sit above every threshold this screen offers.
     Plate->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
     [
-        MenuText(FText::FromString(TEXT("NEVER INCLUDED\n· EQUIPPED GEAR\n· ABERRANT\n· ANOMALOUS")), BreakerUI::TypeCaption, Muted, true)
+        MenuText(FText::FromString(TEXT("NEVER INCLUDED\n· EQUIPPED GEAR\n· ABERRANT\n· UNWRITTEN")), BreakerUI::TypeCaption, Muted, true)
     ];
 
     TSharedRef<SHorizontalBox> Actions = SNew(SHorizontalBox);
@@ -11088,7 +11088,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildDevSandboxScreen()
     ];
     {
         TSharedRef<SHorizontalBox> RarityRow = SNew(SHorizontalBox);
-        for (int32 RarityIndex = 0; RarityIndex <= static_cast<int32>(EBreakerItemRarity::Anomalous); ++RarityIndex)
+        for (int32 RarityIndex = 0; RarityIndex <= static_cast<int32>(EBreakerItemRarity::Unwritten); ++RarityIndex)
         {
             const EBreakerItemRarity Rarity = static_cast<EBreakerItemRarity>(RarityIndex);
             RarityRow->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)

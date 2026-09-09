@@ -1636,7 +1636,7 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
         float LabelY = Projected.Y;
         if (!NounWord.IsEmpty() && NounWord != PromptWord)
         {
-            DrawSpecTextCentered(NounWord, Projected.X, LabelY, BreakerUI::TealAnomalous, 13.0f * GateScale, 1.0f, ESpecFontRole::Display);
+            DrawSpecTextCentered(NounWord, Projected.X, LabelY, BreakerUI::TealUnwritten, 13.0f * GateScale, 1.0f, ESpecFontRole::Display);
             LabelY += S(15.0f) * GateScale;
         }
         // The difficulty gauge, empty on a general gate. GROUND owns the number

@@ -23,7 +23,7 @@ bool FBreakerProlificSignedRuntimeTest::RunTest(const FString& Parameters)
     for (int32 Seed = 1; Seed <= 60000; ++Seed)
     {
         auto Candidate = UBreakerLootLibrary::RollItem(TEXT("Prolific.Discovery"),
-            EBreakerEquipSlot::Gloves, EBreakerItemRarity::Anomalous, 120, Seed);
+            EBreakerEquipSlot::Gloves, EBreakerItemRarity::Unwritten, 120, Seed);
         const int32 Index = Candidate.Affixes.IndexOfByPredicate([](const FBreakerRolledAffix& Affix)
         { return Affix.AffixId == TEXT("Downside.Riftplate") && Affix.Tier == 1; });
         if (Candidate.Rule == EBreakerItemRule::Prolific && Index != INDEX_NONE

@@ -30,7 +30,7 @@
 //
 // The fixture is the LimitDisplacement test's own shape: a bare instance with
 // an id, a slot, a rarity and an item level. Nothing here grants a piece the
-// game would not — the cap fixtures are three Aberrant and one Anomalous, and
+// game would not — the cap fixtures are three Aberrant and one Unwritten, and
 // the one legendary is rolled through the library the drop path uses.
 // ---------------------------------------------------------------------------
 
@@ -97,7 +97,7 @@ bool FBreakerSwapPickerTest::RunTest(const FString& Parameters)
     // the fixture carries exactly what a drop carries.
     const FBreakerItemInstance Cadence = UBreakerLootLibrary::RollLegendary(TEXT("Legendary.Cadence"), 50, 77);
     TestTrue(TEXT("Cadence rolls as a legendary"), Cadence.IsLegendary() && Cadence.IsValid());
-    FBreakerItemInstance WornLegendarySecondary = BreakerSwapTestItem(EBreakerEquipSlot::Secondary, EBreakerItemRarity::Anomalous, 30);
+    FBreakerItemInstance WornLegendarySecondary = BreakerSwapTestItem(EBreakerEquipSlot::Secondary, EBreakerItemRarity::Unwritten, 30);
     WornLegendarySecondary.LegendaryId = TEXT("Legendary.Test");
     const FBreakerEquipPreview CadencePreview = UBreakerEquipmentComponent::PreviewEquipAgainst({WornLegendarySecondary}, Cadence);
     TestTrue(TEXT("The slot rule names the Secondary"), CadencePreview.bRuleDisplaces);
@@ -141,21 +141,21 @@ bool FBreakerSwapPickerTest::RunTest(const FString& Parameters)
     {
         UBreakerEquipmentComponent* Equipment = NewObject<UBreakerEquipmentComponent>(NewObject<AActor>());
         for (const FBreakerItemInstance& Item : Loadout) Equipment->EquipItem(Item);
-        const FBreakerItemInstance Necklace = BreakerSwapTestItem(EBreakerEquipSlot::Necklace, EBreakerItemRarity::Anomalous, 10);
+        const FBreakerItemInstance Necklace = BreakerSwapTestItem(EBreakerEquipSlot::Necklace, EBreakerItemRarity::Unwritten, 10);
         Equipment->EquipItem(Necklace);
 
         const int32 AberrantLimit = UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Aberrant);
-        const int32 AnomalousLimit = UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Anomalous);
+        const int32 UnwrittenLimit = UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Unwritten);
         TestEqual(TEXT("Aberrant caps at three"), AberrantLimit, 3);
-        TestEqual(TEXT("Anomalous caps at one"), AnomalousLimit, 1);
+        TestEqual(TEXT("Unwritten caps at one"), UnwrittenLimit, 1);
         TestEqual(TEXT("At the shipped Aberrant cap the picker has exactly the cap's rows"),
             Equipment->SwapCandidates(Waist).Num(), AberrantLimit);
-        const FBreakerItemInstance AnomalousHelmet = BreakerSwapTestItem(EBreakerEquipSlot::Helmet, EBreakerItemRarity::Anomalous, 50);
-        TestEqual(TEXT("At the shipped Anomalous cap the picker has exactly the cap's rows"),
-            Equipment->SwapCandidates(AnomalousHelmet).Num(), AnomalousLimit);
+        const FBreakerItemInstance UnwrittenHelmet = BreakerSwapTestItem(EBreakerEquipSlot::Helmet, EBreakerItemRarity::Unwritten, 50);
+        TestEqual(TEXT("At the shipped Unwritten cap the picker has exactly the cap's rows"),
+            Equipment->SwapCandidates(UnwrittenHelmet).Num(), UnwrittenLimit);
 
         // The picker opens on exactly the card's limit tell.
-        for (const FBreakerItemInstance& Incoming : {Waist, AnomalousHelmet, BetterGloves, ExceptionalWaist})
+        for (const FBreakerItemInstance& Incoming : {Waist, UnwrittenHelmet, BetterGloves, ExceptionalWaist})
         {
             const FBreakerEquipPreview Preview = Equipment->PreviewEquip(Incoming);
             TestEqual(TEXT("ShouldOpenSwapPicker is the limit tell"),
@@ -166,7 +166,7 @@ bool FBreakerSwapPickerTest::RunTest(const FString& Parameters)
 
         // Every row the rule can produce reads TAKE OFF: the in-slot piece
         // is never a cap victim, so no row shares the incoming slot.
-        for (const FBreakerItemInstance& Incoming : {Waist, AnomalousHelmet})
+        for (const FBreakerItemInstance& Incoming : {Waist, UnwrittenHelmet})
         {
             for (const FBreakerItemInstance& Row : Equipment->SwapCandidates(Incoming))
             {
@@ -179,7 +179,7 @@ bool FBreakerSwapPickerTest::RunTest(const FString& Parameters)
 
     // ---- The text and the numbers ----------------------------------------
     TestEqual(TEXT("The title"), Title(EBreakerItemRarity::Aberrant, 3, 3), FString(TEXT("ABERRANT · 3 OF 3 WORN")));
-    TestEqual(TEXT("The title prints the O50 display name"), Title(EBreakerItemRarity::Anomalous, 1, 1), FString(TEXT("UNWRITTEN · 1 OF 1 WORN")));
+    TestEqual(TEXT("The title prints the O50 display name"), Title(EBreakerItemRarity::Unwritten, 1, 1), FString(TEXT("UNWRITTEN · 1 OF 1 WORN")));
     TestEqual(TEXT("The incoming line"), IncomingLine(EBreakerEquipSlot::Waist), FString(TEXT("INCOMING · WAIST")));
     TestEqual(TEXT("KEEP CURRENT"), FString(KeepCurrentLabel()), FString(TEXT("KEEP CURRENT")));
     TestEqual(TEXT("A row in the incoming slot would read SWAP"), FString(RowButtonLabel(Gloves, BetterGloves)), FString(TEXT("SWAP")));

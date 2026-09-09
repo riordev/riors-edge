@@ -107,7 +107,7 @@ bool FBreakerAttributeAggregatorMathTest::RunTest(const FString& Parameters)
         Aggregator.Compose(EBreakerAggregatedAttribute::MaxHealth), 390.0f, 0.001f);
 
     // More multipliers compose multiplicatively, on top of the additive bucket
-    // and against each other. Reserved for trees and Anomalous items (O3).
+    // and against each other. Reserved for trees and Unwritten items (O3).
     Gear.ComposeMore(EBreakerAggregatedAttribute::MaxHealth, 1.5f);
     Tree.ComposeMore(EBreakerAggregatedAttribute::MaxHealth, 1.2f);
     Aggregator.SetContribution(EBreakerAttributeContributor::Equipment, Gear);

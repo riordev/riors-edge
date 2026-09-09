@@ -63,7 +63,7 @@ namespace
         { 2.2f, 0.05f,  0.8f,    0.0f,    0.0f, false, 0.40f,  60.0f },  // Uncommon
         { 4.0f, 0.07f,  1.6f, 1800.0f,  750.0f, false, 0.44f,  80.0f },  // Exceptional
         { 7.0f, 0.09f,  2.6f, 4500.0f, 1400.0f, true,  0.48f, 110.0f },  // Aberrant
-        { 9.5f, 0.11f,  3.4f, 7000.0f, 1800.0f, true,  0.52f, 140.0f },  // Anomalous
+        { 9.5f, 0.11f,  3.4f, 7000.0f, 1800.0f, true,  0.52f, 140.0f },  // Unwritten
     };
 }
 
@@ -140,7 +140,7 @@ void ABreakerLootPickup::OnRep_Item() { ApplyRarityVisuals(); }
 // beam rendered as a paler wash of the rarity it names and no drop matched its
 // own inventory frame: Uncommon (0.25,0.55,1.00) against the token's linear
 // (0.051,0.262,1.000), Aberrant (1.00,0.25,0.25) against (1.000,0.051,0.051),
-// Anomalous (0.15,0.95,0.85) against (0.019,0.888,0.694). The Anomalous line
+// Unwritten (0.15,0.95,0.85) against (0.019,0.888,0.694). The Unwritten line
 // even claimed in a comment to be "the reserved teal" while being a colour the
 // reserved-teal predicate does not recognise.
 //
@@ -159,7 +159,7 @@ int32 ABreakerLootPickup::TierForRarity(EBreakerItemRarity Rarity)
     case EBreakerItemRarity::Uncommon:    return 1;
     case EBreakerItemRarity::Exceptional: return 2;
     case EBreakerItemRarity::Aberrant:    return 3;
-    case EBreakerItemRarity::Anomalous:   return 4;
+    case EBreakerItemRarity::Unwritten:   return 4;
     case EBreakerItemRarity::Standard:
     default:                              return 0;
     }
@@ -177,7 +177,7 @@ void ABreakerLootPickup::ApplyRarityVisuals()
     if (ItemVisual) ItemVisual->SetRelativeScale3D(FVector(Drama.BoxScale));
 
     // The beam is LIGHT now, not paint: the unlit-additive glow material (the
-    // tracer's), so an Anomalous column reads across the arena and does not go
+    // tracer's), so an Unwritten column reads across the arena and does not go
     // grey in shadow. Standard has no beam at all — silence is what makes the
     // tiers above it loud.
     if (RarityBeam)

@@ -9,13 +9,13 @@
 // WHAT RARITY MEANS, and the three build-defining legendaries.
 // ---------------------------------------------------------------------------
 // The problem this file exists to fix, stated plainly: rarity gated affix COUNT
-// and a tier ceiling and nothing else, so an Anomalous item was a Standard item
+// and a tier ceiling and nothing else, so an Unwritten item was a Standard item
 // with more lines. Finding one was arithmetic. Item-Foundation had always
-// reserved Anomalous as the home of rule rewrites and nothing implemented it,
+// reserved Unwritten as the home of rule rewrites and nothing implemented it,
 // and Docs/Vertical-Slice.md scoped "three build-defining legendary items" of
 // which zero existed.
 //
-// THE RULE THAT SHAPED EVERY DESIGN HERE: an Anomalous rewrite is not allowed
+// THE RULE THAT SHAPED EVERY DESIGN HERE: an Unwritten rewrite is not allowed
 // to be a fourth More multiplier. O3 caps a build at three composed Mores and
 // the trees already offer six options against that cap, so a fourth would
 // either be eaten by the global clamp in FBreakerAttributeAggregator or
@@ -41,7 +41,7 @@ struct RIORSEDGE_API FBreakerItemRuleDefinition
     // stat: "conditional lines are always active", never "+X% damage".
     UPROPERTY(BlueprintReadOnly) FText Description;
     // False for a legendary rule, which is carried by exactly one named item
-    // and must never appear on an ordinary Anomalous drop.
+    // and must never appear on an ordinary Unwritten drop.
     UPROPERTY(BlueprintReadOnly) bool bRollable = false;
 };
 
@@ -113,7 +113,7 @@ public:
     static const TArray<FBreakerItemRuleDefinition>& GetRuleDefinitions();
     UFUNCTION(BlueprintPure, Category="Items|Rules")
     static FBreakerItemRuleDefinition FindRule(EBreakerItemRule Rule);
-    // The rules an ordinary Anomalous drop may roll, in a stable order so a
+    // The rules an ordinary Unwritten drop may roll, in a stable order so a
     // seed reproduces the same rewrite forever.
     static const TArray<EBreakerItemRule>& GetRollableRules();
     // Deterministic pick for a drop.
@@ -126,7 +126,7 @@ public:
     static FBreakerLegendaryDefinition FindLegendary(FName LegendaryId);
     // The legendary that occupies this slot, or an invalid definition. One per
     // slot at most, which is what keeps "you will hold exactly one legendary"
-    // (the Anomalous equip cap) from being a coin flip about which.
+    // (the Unwritten equip cap) from being a coin flip about which.
     UFUNCTION(BlueprintPure, Category="Items|Legendary")
     static FBreakerLegendaryDefinition FindLegendaryForSlot(EBreakerEquipSlot Slot);
 

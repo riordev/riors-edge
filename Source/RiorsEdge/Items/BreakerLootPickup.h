@@ -19,7 +19,7 @@ class UStaticMeshComponent;
 // paycheck must be readable from across the arena BEFORE the player walks
 // over: Standard is just the tinted box; Uncommon adds a modest column;
 // Exceptional+ get a genuine vertical light beam (emissive, taller and
-// brighter by tier) plus a rarity-coloured point light; Aberrant and Anomalous
+// brighter by tier) plus a rarity-coloured point light; Aberrant and Unwritten
 // pulse. Every magnitude O2 PLACEHOLDER.
 UCLASS(Blueprintable)
 class RIORSEDGE_API ABreakerLootPickup : public AActor
@@ -43,10 +43,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="Loot") bool TryPickup(ABreakerCharacter* Character);
     UFUNCTION(BlueprintPure, Category="Loot") bool CanPickup(const ABreakerCharacter* Character) const;
 
-    // Rarity chroma shared with the HUD. Anomalous keeps its rift teal — it is
+    // Rarity chroma shared with the HUD. Unwritten keeps its rift teal — it is
     // a rift-class object, so the object-chroma law permits it.
     static FLinearColor ColorForRarity(EBreakerItemRarity Rarity);
-    // 0 (Standard) .. 4 (Anomalous): the one ladder every drama knob below
+    // 0 (Standard) .. 4 (Unwritten): the one ladder every drama knob below
     // scales from, so a new rarity cannot get a beam without getting a light.
     static int32 TierForRarity(EBreakerItemRarity Rarity);
 

@@ -1445,7 +1445,7 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     // source multiplies one — so a x1.20 Shared can be worth more to a build
     // than a x1.22 Weapon-only and still lose its slot to it here. Every More
     // in the content today is same-lane (AddDamageMore -> Shared), so the two
-    // orderings agree; the first time a doctrine or an Anomalous item authors
+    // orderings agree; the first time a doctrine or an Unwritten item authors
     // a lane-specific More alongside Shared ones, this line is where the
     // selection stops meaning "most valuable three" and a decision is due.
     MoreSources.StableSort([](const FBreakerMoreSource& A, const FBreakerMoreSource& B) { return A.Multiplier > B.Multiplier; });

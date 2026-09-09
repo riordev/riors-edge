@@ -170,7 +170,7 @@ void UBreakerEquipmentComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProp
 namespace
 {
     // One predicate for the bulk discard and for the count the confirmation
-    // modal prints. Aberrant and Anomalous sit above every threshold the UI
+    // modal prints. Aberrant and Unwritten sit above every threshold the UI
     // offers, so "never bulk-discards your best gear" is a property of the
     // rarity order rather than a special case bolted on here.
     bool IsBelowRarity(const FBreakerItemInstance& Item, EBreakerItemRarity MinimumKept)
@@ -178,9 +178,9 @@ namespace
         return static_cast<uint8>(Item.Rarity) < static_cast<uint8>(MinimumKept);
     }
 
-    // O37: legendary and (non-legendary) Anomalous are separate equip-cap
-    // axes even though every legendary rolls Anomalous rarity (O32) — a worn
-    // legendary must not spend the Anomalous cap, and a second Anomalous
+    // O37: legendary and (non-legendary) Unwritten are separate equip-cap
+    // axes even though every legendary rolls Unwritten rarity (O32) — a worn
+    // legendary must not spend the Unwritten cap, and a second Unwritten
     // piece must not evict a legendary, or be evicted for one, as if they
     // shared a single pool. Every OTHER rarity still shares its axis with
     // itself exactly as before. This is the one predicate PreviewEquipAgainst
@@ -290,7 +290,7 @@ int32 UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity Rarity)
     switch (Rarity)
     {
         case EBreakerItemRarity::Aberrant:  return 3;
-        case EBreakerItemRarity::Anomalous: return 1;
+        case EBreakerItemRarity::Unwritten: return 1;
         default:                            return INDEX_NONE;
     }
 }
@@ -302,9 +302,9 @@ int32 UBreakerEquipmentComponent::CountEquippedOfRarity(EBreakerItemRarity Rarit
     {
         if (!Item.IsValid() || Item.Rarity != Rarity) continue;
         // O37: a legendary occupies its own equip-cap axis and must not be
-        // counted against the (non-legendary) Anomalous cap it happens to
+        // counted against the (non-legendary) Unwritten cap it happens to
         // share a rarity with — CountEquippedLegendaries answers for it.
-        if (Rarity == EBreakerItemRarity::Anomalous && Item.IsLegendary()) continue;
+        if (Rarity == EBreakerItemRarity::Unwritten && Item.IsLegendary()) continue;
         ++Count;
     }
     return Count;
@@ -323,19 +323,19 @@ int32 UBreakerEquipmentComponent::CountEquippedLegendaries() const
 bool UBreakerEquipmentComponent::ValidateEquipCaps(const TArray<FBreakerItemInstance>& Items, FText& OutFailureReason)
 {
     int32 LegendaryCount = 0;
-    int32 AnomalousCount = 0;
+    int32 UnwrittenCount = 0;
     int32 AberrantCount = 0;
     for (const FBreakerItemInstance& Item : Items)
     {
         if (!Item.IsValid()) continue;
         // Same axis split as SharesEquipCapAxis / CountEquippedOfRarity: a
-        // legendary is never ALSO counted as a non-legendary Anomalous.
+        // legendary is never ALSO counted as a non-legendary Unwritten.
         if (Item.IsLegendary()) ++LegendaryCount;
-        else if (Item.Rarity == EBreakerItemRarity::Anomalous) ++AnomalousCount;
+        else if (Item.Rarity == EBreakerItemRarity::Unwritten) ++UnwrittenCount;
         else if (Item.Rarity == EBreakerItemRarity::Aberrant) ++AberrantCount;
     }
 
-    // O37: "exactly 1 equipped legendary, 1 non-legendary Anomalous, 3
+    // O37: "exactly 1 equipped legendary, 1 non-legendary Unwritten, 3
     // Aberrant" (O11 reaffirmed). Equip-time displacement enforces this live,
     // so finding MORE than the cap here means a save predating O37, a
     // hand-edited fixture, or a content bug — never a normal equip.
@@ -346,11 +346,11 @@ bool UBreakerEquipmentComponent::ValidateEquipCaps(const TArray<FBreakerItemInst
             FText::AsNumber(LegendaryCount));
         return false;
     }
-    if (AnomalousCount > 1)
+    if (UnwrittenCount > 1)
     {
         OutFailureReason = FText::Format(
-            NSLOCTEXT("BreakerEquipment", "TooManyAnomalous", "{0} non-legendary Anomalous items are equipped; the cap is 1 (O37)."),
-            FText::AsNumber(AnomalousCount));
+            NSLOCTEXT("BreakerEquipment", "TooManyUnwritten", "{0} non-legendary Unwritten items are equipped; the cap is 1 (O37)."),
+            FText::AsNumber(UnwrittenCount));
         return false;
     }
     if (AberrantCount > 3)
@@ -407,7 +407,7 @@ FBreakerEquipPreview UBreakerEquipmentComponent::PreviewEquipAgainst(const TArra
     }
 
     // O37: the cap axis is SharesEquipCapAxis, not bare Rarity equality — a
-    // legendary and a non-legendary Anomalous share a rarity (O32) but sit on
+    // legendary and a non-legendary Unwritten share a rarity (O32) but sit on
     // separate axes, so neither counts against, evicts, or is evicted for the
     // other. Every other rarity is unaffected: SharesEquipCapAxis falls back
     // to plain Rarity equality whenever neither side is a legendary.
@@ -426,7 +426,7 @@ FBreakerEquipPreview UBreakerEquipmentComponent::PreviewEquipAgainst(const TArra
     if (InSlot && SharesEquipCapAxis(*InSlot, Candidate)) --Surviving;
     // A piece the SLOT RULE already ejects is leaving too, so it cannot also be
     // the cap's victim and its departure counts against the tally the same way.
-    // Without this, equipping Cadence over an Anomalous Secondary at a cap of
+    // Without this, equipping Cadence over an Unwritten Secondary at a cap of
     // one would eject the Secondary AND name a second piece to die for a cap
     // the first ejection had already satisfied.
     if (Preview.bRuleDisplaces && SharesEquipCapAxis(Preview.RuleDisplaced, Candidate)) --Surviving;
@@ -937,7 +937,7 @@ void UBreakerEquipmentComponent::DevGrantLegendaries(int32 ItemLevel)
     const int32 SafeLevel = FMath::Max(1, ItemLevel);
     static int32 LegendaryGrantCounter = 0;
     ++LegendaryGrantCounter;
-    // Into the BACKPACK, not equipped: only one Anomalous piece may be worn, so
+    // Into the BACKPACK, not equipped: only one Unwritten piece may be worn, so
     // equipping all three would silently eject two and the grant would look
     // broken. Handing over three and making the player choose is the mechanic.
     for (const FBreakerLegendaryDefinition& Definition : UBreakerItemRuleLibrary::GetLegendaries())
@@ -990,7 +990,7 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         // DEADFALL is narrower on purpose: it REDIRECTS the airborne family
         // onto the two grounded traversal states rather than freeing every
         // conditional line. A legendary that was strictly better than the
-        // generic Anomalous rewrite would make the generic one dead content.
+        // generic Unwritten rewrite would make the generic one dead content.
         if (Rules.bAirborneAlsoGroundTraversal && Condition == EBreakerBuildCondition::Airborne)
         {
             return Conditions.IsActive(EBreakerBuildCondition::Sliding)
@@ -1072,7 +1072,7 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
                 const auto Exact = [Definition](const FBreakerAffixDefinition& Row) { return Row.AffixId == Definition->AffixId; };
                 const bool bPermitted = Item.Rarity >= Definition->MinimumRarity && Item.Rarity >= EBreakerItemRarity::Aberrant
                     && ((Definition->MinimumRarity == EBreakerItemRarity::Aberrant && UBreakerAffixLibrary::GetAberrantAffixPool().ContainsByPredicate(Exact))
-                        || (Definition->MinimumRarity == EBreakerItemRarity::Anomalous && UBreakerAffixLibrary::GetAnomalousAffixPool().ContainsByPredicate(Exact)));
+                        || (Definition->MinimumRarity == EBreakerItemRarity::Unwritten && UBreakerAffixLibrary::GetUnwrittenAffixPool().ContainsByPredicate(Exact)));
                 EBreakerDamageMoreLane Lane = EBreakerDamageMoreLane::Weapon;
                 bool bDamageLane = true;
                 switch (Definition->StatTarget)
@@ -1256,7 +1256,7 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         // the Increased percentages have to reach the attribute set unmerged so
         // they can join the tree's percentages in ONE additive bucket per stat.
         // Gear authors no More multipliers — those are reserved for trees and
-        // Anomalous items (O3).
+        // Unwritten items (O3).
         // Base health rides the same lane as the Health affix: one flat
         // bucket, folded with the tree's, so a Life piece and a Health line
         // compose instead of stacking through different doors.

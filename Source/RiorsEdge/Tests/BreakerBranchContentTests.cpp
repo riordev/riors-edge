@@ -412,7 +412,7 @@ bool FBreakerMoreCeilingWithNewContentTest::RunTest(const FString& Parameters)
     // WHAT THIS DOES NOT COVER: the aggregator is exercised with every
     // condition forced true at once, which no real character can hold — it is
     // an upper bound, not a reachable state. It also says nothing about
-    // Anomalous items, the other More source outside the class layer, which
+    // Unwritten items, the other More source outside the class layer, which
     // this pass did not touch.
     return true;
 }

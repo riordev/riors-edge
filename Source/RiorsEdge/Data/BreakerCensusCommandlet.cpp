@@ -250,8 +250,8 @@ int32 UBreakerCensusCommandlet::Main(const FString& Params)
     }
     int32 LeanRows = 0;
     for (const FBreakerArchetypeLeans& Table : Affixes.Leans) { LeanRows += Table.Rows.Num(); }
-    UE_LOG(LogBreakerCensus, Display, TEXT("wrote %s: %d slice, %d aberrant, %d anomalous, %d downside, %d elemental, %d leans across %d archetypes, %d caps"),
-        *AffixPath, Affixes.Slice.Num(), Affixes.Aberrant.Num(), Affixes.Anomalous.Num(), Affixes.Downsides.Num(),
+    UE_LOG(LogBreakerCensus, Display, TEXT("wrote %s: %d slice, %d aberrant, %d unwritten, %d downside, %d elemental, %d leans across %d archetypes, %d caps"),
+        *AffixPath, Affixes.Slice.Num(), Affixes.Aberrant.Num(), Affixes.Unwritten.Num(), Affixes.Downsides.Num(),
         Affixes.Elemental.AffixId.IsNone() ? 0 : 1, LeanRows, Affixes.Leans.Num(), Affixes.Caps.Num());
 
     // The quest registry, by the same rule: a dirty load is an EMPTY registry

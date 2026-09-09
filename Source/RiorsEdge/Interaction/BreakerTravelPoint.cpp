@@ -74,7 +74,7 @@ void ABreakerTravelPoint::BeginPlay()
     Super::BeginPlay();
 
     // The marker body wears hardware teal as PAINT (lit, shaded), the column
-    // wears Anomalous teal as LIGHT (unlit additive, MakeGlowMaterial): the
+    // wears Unwritten teal as LIGHT (unlit additive, MakeGlowMaterial): the
     // object is teal because it is a rift object, and the beacon glows because
     // it must survive distance, fog and shadow. Teal here is canon-legal —
     // the reserve exists exactly so that rift objects, and only rift objects,
@@ -92,7 +92,7 @@ void ABreakerTravelPoint::BeginPlay()
     {
         // Intensity past 1.0 is what pushes the column into bloom; 4.0 reads
         // as a light column without whiting out the sky behind it.
-        BreakerUI::SetGlowColor(GlowMaterial, BreakerUI::TealAnomalous, 4.0f);
+        BreakerUI::SetGlowColor(GlowMaterial, BreakerUI::TealUnwritten, 4.0f);
     }
 }
 

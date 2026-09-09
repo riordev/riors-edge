@@ -26,7 +26,7 @@ bool FBreakerPierceAffixTest::RunTest(const FString& Parameters)
     FBreakerItemInstance Example;
     bool Found = false, SawRocket = false, SawAccuracy = false;
     for (const auto Rarity : {EBreakerItemRarity::Standard, EBreakerItemRarity::Uncommon, EBreakerItemRarity::Exceptional,
-        EBreakerItemRarity::Aberrant, EBreakerItemRarity::Anomalous})
+        EBreakerItemRarity::Aberrant, EBreakerItemRarity::Unwritten})
     {
         for (int32 Seed = 1; Seed <= 400; ++Seed)
         {

@@ -82,10 +82,10 @@ namespace BreakerUI
     inline const FLinearColor RiftDamage = Hex(0x35E8FF); // damage numbers only (rift-hot)
 
     // --- Teal object law ---------------------------------------------------
-    // Legal on rift geometry, suppression hardware, and Anomalous items.
+    // Legal on rift geometry, suppression hardware, and Unwritten items.
     // Never on chrome: buttons, rails, focus rings, tracks, tooltips.
     inline const FLinearColor TealHardware = Hex(0x1E8F7C);
-    inline const FLinearColor TealAnomalous = Hex(0x2FBFA6);
+    inline const FLinearColor TealUnwritten = Hex(0x2FBFA6);
     inline const FLinearColor TealName = Hex(0x6ADFC9);   // top-rarity name text
 
     // TEAL IS A NOUN, NEVER AN ADJECTIVE, and this is the predicate a teal
@@ -106,7 +106,7 @@ namespace BreakerUI
     inline bool IsReservedTeal(const FLinearColor& Colour)
     {
         return Colour.Equals(TealHardware, 0.001f)
-            || Colour.Equals(TealAnomalous, 0.001f)
+            || Colour.Equals(TealUnwritten, 0.001f)
             || Colour.Equals(TealName, 0.001f);
     }
 
@@ -115,9 +115,9 @@ namespace BreakerUI
     inline const FLinearColor RarityUncommon = Hex(0x8FB865);
     inline const FLinearColor RarityExceptional = Hex(0x8B8FEC);
     inline const FLinearColor RarityAberrant = Hex(0xE07AAE);
-    // Identical to TealAnomalous by construction: the top rarity IS the teal
+    // Identical to TealUnwritten by construction: the top rarity IS the teal
     // noun, and tests assert the two agree.
-    inline const FLinearColor RarityAnomalous = Hex(0x2FBFA6);
+    inline const FLinearColor RarityUnwritten = Hex(0x2FBFA6);
 
     inline FLinearColor RarityColor(EBreakerItemRarity Rarity)
     {
@@ -126,16 +126,16 @@ namespace BreakerUI
             case EBreakerItemRarity::Uncommon:    return RarityUncommon;
             case EBreakerItemRarity::Exceptional: return RarityExceptional;
             case EBreakerItemRarity::Aberrant:    return RarityAberrant;
-            case EBreakerItemRarity::Anomalous:   return RarityAnomalous;
+            case EBreakerItemRarity::Unwritten:   return RarityUnwritten;
             default:                              return RarityStandard;
         }
     }
 
-    // Anomalous is the one tier that also gets a full 1px border, because it
+    // Unwritten is the one tier that also gets a full 1px border, because it
     // is the only rarity that is also a world object class.
     inline bool RarityGetsFullBorder(EBreakerItemRarity Rarity)
     {
-        return Rarity == EBreakerItemRarity::Anomalous;
+        return Rarity == EBreakerItemRarity::Unwritten;
     }
 
     // --- Destructive surfaces ---------------------------------------------

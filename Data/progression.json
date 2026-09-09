@@ -1,7 +1,7 @@
 {
 	"coreAuthoringSources":
 	{
-		"Source/RiorsEdge/Data/BreakerCensus.cpp": "1c7069b9aefa9e7b144da8245e77d1e13e2b8a59",
+		"Source/RiorsEdge/Data/BreakerCensus.cpp": "2748c2d6ae69134043a80d5ad6084d1e9a9cdd0d",
 		"Source/RiorsEdge/Progression/BreakerCoreRoster.cpp": "ca4b1707553c9da18d7b8af4ac7754112028a581",
 		"Source/RiorsEdge/Progression/BreakerCoreRoster.h": "79f375b9ff6fb7edcb722657408b7cb6e22371df",
 		"Source/RiorsEdge/Progression/BreakerCoreRosterAbility.cpp": "2f06f12df660b38367d7342872436f9a294ad673",

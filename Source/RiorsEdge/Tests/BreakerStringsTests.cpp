@@ -130,7 +130,7 @@ bool FBreakerStringsLexiconTest::RunTest(const FString& Parameters)
     // carries, the graybox grid, stubs and dev prefixes.
     const TCHAR* Scaffolding[] = { TEXT("TILESET"), TEXT("BANKED"), TEXT("SETTLED"), TEXT("GRID"), TEXT("STUB"), TEXT("DEV:") };
     // The Act I lexicon, case-insensitive for the same reason that test is.
-    const TCHAR* ActOne[] = { TEXT("altered"), TEXT("bastion"), TEXT("aberrant"), TEXT("anomalous") };
+    const TCHAR* ActOne[] = { TEXT("altered"), TEXT("bastion"), TEXT("aberrant"), TEXT("unwritten") };
 
     for (int32 Index = 0; Index < BreakerStringKeyCount; ++Index)
     {

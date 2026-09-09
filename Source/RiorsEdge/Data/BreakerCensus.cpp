@@ -551,7 +551,7 @@ FString BreakerCensus::ExportAffixes(const FBreakerAffixLibraryData& Data)
     Writer->WriteArrayStart(TEXT("affixes"));
     for (const FBreakerAffixDefinition& Affix : Data.Slice) { BreakerCensusAffixRow(*Writer, Affix, TEXT("slice")); }
     for (const FBreakerAffixDefinition& Affix : Data.Aberrant) { BreakerCensusAffixRow(*Writer, Affix, TEXT("aberrant")); }
-    for (const FBreakerAffixDefinition& Affix : Data.Anomalous) { BreakerCensusAffixRow(*Writer, Affix, TEXT("anomalous")); }
+    for (const FBreakerAffixDefinition& Affix : Data.Unwritten) { BreakerCensusAffixRow(*Writer, Affix, TEXT("unwritten")); }
     for (const FBreakerAffixDefinition& Affix : Data.Downsides) { BreakerCensusAffixRow(*Writer, Affix, TEXT("downside")); }
     if (!Data.Elemental.AffixId.IsNone()) { BreakerCensusAffixRow(*Writer, Data.Elemental, TEXT("elemental")); }
     Writer->WriteArrayEnd();

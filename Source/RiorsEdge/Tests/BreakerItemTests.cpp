@@ -181,7 +181,7 @@ bool FBreakerItemLevelGatingTest::RunTest(const FString& Parameters)
         ALib::TierCapForRarity(EBreakerItemRarity::Standard) - ALib::TierCapForRarity(EBreakerItemRarity::Uncommon), 2);
     TestEqual(TEXT("Exceptional rarity ceiling is T-1"), ALib::TierCapForRarity(EBreakerItemRarity::Exceptional), -1);
     TestEqual(TEXT("Aberrant rarity ceiling is T-1"), ALib::TierCapForRarity(EBreakerItemRarity::Aberrant), -1);
-    TestEqual(TEXT("Anomalous rarity ceiling is T-1"), ALib::TierCapForRarity(EBreakerItemRarity::Anomalous), -1);
+    TestEqual(TEXT("Unwritten rarity ceiling is T-1"), ALib::TierCapForRarity(EBreakerItemRarity::Unwritten), -1);
 
     // The caps must remain ORDERED, and no cap may sit outside the ladder — a
     // cap worse than the worst tier would make a rarity unrollable.
@@ -190,7 +190,7 @@ bool FBreakerItemLevelGatingTest::RunTest(const FString& Parameters)
         && ALib::TierCapForRarity(EBreakerItemRarity::Uncommon) > ALib::TierCapForRarity(EBreakerItemRarity::Exceptional));
     TestTrue(TEXT("No rarity cap sits outside the ladder"),
         ALib::TierCapForRarity(EBreakerItemRarity::Standard) <= ALib::WorstTier
-        && ALib::TierCapForRarity(EBreakerItemRarity::Anomalous) >= ALib::TopTier);
+        && ALib::TierCapForRarity(EBreakerItemRarity::Unwritten) >= ALib::TopTier);
 
     // A Standard drop at the item-level ceiling is capped by its RARITY, not by
     // its item level — which is the only thing that makes a rarity cap mean
@@ -616,7 +616,7 @@ bool FBreakerEquipLimitCountTest::RunTest(const FString& Parameters)
 
     // O11 / master sheet 4.1. Everything below Aberrant is uncapped.
     TestEqual(TEXT("Aberrant caps at three"), UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Aberrant), 3);
-    TestEqual(TEXT("Anomalous caps at one"), UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Anomalous), 1);
+    TestEqual(TEXT("Unwritten caps at one"), UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Unwritten), 1);
     TestEqual(TEXT("Exceptional is uncapped"), UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Exceptional), INDEX_NONE);
     TestEqual(TEXT("Standard is uncapped"), UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Standard), INDEX_NONE);
 
@@ -627,7 +627,7 @@ bool FBreakerEquipLimitCountTest::RunTest(const FString& Parameters)
 
     TestEqual(TEXT("Aberrant count reads the equipped list"), Equipment->CountEquippedOfRarity(EBreakerItemRarity::Aberrant), 2);
     TestEqual(TEXT("Exceptional count reads the equipped list"), Equipment->CountEquippedOfRarity(EBreakerItemRarity::Exceptional), 1);
-    TestEqual(TEXT("Anomalous count is zero"), Equipment->CountEquippedOfRarity(EBreakerItemRarity::Anomalous), 0);
+    TestEqual(TEXT("Unwritten count is zero"), Equipment->CountEquippedOfRarity(EBreakerItemRarity::Unwritten), 0);
     return true;
 }
 
@@ -675,11 +675,11 @@ bool FBreakerEquipDisplacementTest::RunTest(const FString& Parameters)
     Preview = UBreakerEquipmentComponent::PreviewEquipAgainst(Tied, Waist);
     TestEqual(TEXT("Equal item levels break on wear order"), static_cast<int32>(Preview.LimitDisplaced.Slot), static_cast<int32>(EBreakerEquipSlot::Helmet));
 
-    // Anomalous is capped at one, and a lower rarity is never capped.
-    const TArray<FBreakerItemInstance> OneAnomalous = {MakeItem(EBreakerEquipSlot::Necklace, EBreakerItemRarity::Anomalous, 10)};
-    Preview = UBreakerEquipmentComponent::PreviewEquipAgainst(OneAnomalous, MakeItem(EBreakerEquipSlot::Helmet, EBreakerItemRarity::Anomalous, 50));
-    TestTrue(TEXT("A second Anomalous exceeds its cap of one"), Preview.bExceedsRarityLimit);
-    Preview = UBreakerEquipmentComponent::PreviewEquipAgainst(OneAnomalous, MakeItem(EBreakerEquipSlot::Helmet, EBreakerItemRarity::Exceptional, 50));
+    // Unwritten is capped at one, and a lower rarity is never capped.
+    const TArray<FBreakerItemInstance> OneUnwritten = {MakeItem(EBreakerEquipSlot::Necklace, EBreakerItemRarity::Unwritten, 10)};
+    Preview = UBreakerEquipmentComponent::PreviewEquipAgainst(OneUnwritten, MakeItem(EBreakerEquipSlot::Helmet, EBreakerItemRarity::Unwritten, 50));
+    TestTrue(TEXT("A second Unwritten exceeds its cap of one"), Preview.bExceedsRarityLimit);
+    Preview = UBreakerEquipmentComponent::PreviewEquipAgainst(OneUnwritten, MakeItem(EBreakerEquipSlot::Helmet, EBreakerItemRarity::Exceptional, 50));
     TestFalse(TEXT("Exceptional is never capped"), Preview.bExceedsRarityLimit);
     TestEqual(TEXT("Uncapped rarities report no limit"), Preview.RarityLimit, INDEX_NONE);
 
@@ -707,11 +707,11 @@ bool FBreakerEquipDisplacementTest::RunTest(const FString& Parameters)
 // O37 — per-axis equip caps (audit item 8)
 // ---------------------------------------------------------------------------
 // Before this, EquipLimitForRarity/PreviewEquipAgainst/CountEquippedOfRarity
-// all keyed purely off Item.Rarity, so a legendary (which rolls Anomalous per
-// O32) shared the "1 Anomalous" cap with ordinary Anomalous drops: equipping
+// all keyed purely off Item.Rarity, so a legendary (which rolls Unwritten per
+// O32) shared the "1 Unwritten" cap with ordinary Unwritten drops: equipping
 // one could silently evict the other, and the two axes O37 separates were
 // really one. This section pins the split, and that Aberrant (which no
-// legendary ever carries) and a solo non-legendary Anomalous are unaffected.
+// legendary ever carries) and a solo non-legendary Unwritten are unaffected.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerEquipCapAxesTest,
     "RiorsEdge.Items.Equipment.PerAxisCaps",
@@ -723,22 +723,22 @@ bool FBreakerEquipCapAxesTest::RunTest(const FString& Parameters)
 
     auto MakeLegendary = [](EBreakerEquipSlot Slot, int32 ItemLevel)
     {
-        FBreakerItemInstance Item = MakeItem(Slot, EBreakerItemRarity::Anomalous, ItemLevel);
+        FBreakerItemInstance Item = MakeItem(Slot, EBreakerItemRarity::Unwritten, ItemLevel);
         Item.LegendaryId = TEXT("Legendary.Test");
         return Item;
     };
 
-    // --- A legendary and a non-legendary Anomalous coexist, in both directions
+    // --- A legendary and a non-legendary Unwritten coexist, in both directions
     const FBreakerItemInstance Legendary = MakeLegendary(EBreakerEquipSlot::Boots, 50);
-    const FBreakerItemInstance OrdinaryAnomalous = MakeItem(EBreakerEquipSlot::Necklace, EBreakerItemRarity::Anomalous, 50);
+    const FBreakerItemInstance OrdinaryUnwritten = MakeItem(EBreakerEquipSlot::Necklace, EBreakerItemRarity::Unwritten, 50);
 
-    FBreakerEquipPreview Preview = UBreakerEquipmentComponent::PreviewEquipAgainst({Legendary}, OrdinaryAnomalous);
-    TestFalse(TEXT("A non-legendary Anomalous does not exceed its cap while a legendary is worn"), Preview.bExceedsRarityLimit);
+    FBreakerEquipPreview Preview = UBreakerEquipmentComponent::PreviewEquipAgainst({Legendary}, OrdinaryUnwritten);
+    TestFalse(TEXT("A non-legendary Unwritten does not exceed its cap while a legendary is worn"), Preview.bExceedsRarityLimit);
     TestFalse(TEXT("...and does not name the legendary as a victim"), Preview.LimitDisplaced.IsValid());
 
-    Preview = UBreakerEquipmentComponent::PreviewEquipAgainst({OrdinaryAnomalous}, Legendary);
-    TestFalse(TEXT("A legendary does not exceed its cap while an ordinary Anomalous is worn"), Preview.bExceedsRarityLimit);
-    TestFalse(TEXT("...and does not name the Anomalous piece as a victim"), Preview.LimitDisplaced.IsValid());
+    Preview = UBreakerEquipmentComponent::PreviewEquipAgainst({OrdinaryUnwritten}, Legendary);
+    TestFalse(TEXT("A legendary does not exceed its cap while an ordinary Unwritten is worn"), Preview.bExceedsRarityLimit);
+    TestFalse(TEXT("...and does not name the Unwritten piece as a victim"), Preview.LimitDisplaced.IsValid());
 
     // --- The legendary axis still caps at exactly one -----------------------
     const TArray<FBreakerItemInstance> OneLegendary = {MakeLegendary(EBreakerEquipSlot::Primary, 50)};
@@ -746,10 +746,10 @@ bool FBreakerEquipCapAxesTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("A second legendary exceeds the legendary cap of one"), Preview.bExceedsRarityLimit);
     TestTrue(TEXT("...and the first legendary is the one displaced"), Preview.LimitDisplaced.IsLegendary());
 
-    // --- The non-legendary Anomalous axis still caps at exactly one --------
-    const TArray<FBreakerItemInstance> OneOrdinaryAnomalous = {OrdinaryAnomalous};
-    Preview = UBreakerEquipmentComponent::PreviewEquipAgainst(OneOrdinaryAnomalous, MakeItem(EBreakerEquipSlot::Helmet, EBreakerItemRarity::Anomalous, 50));
-    TestTrue(TEXT("A second non-legendary Anomalous still exceeds its own cap of one"), Preview.bExceedsRarityLimit);
+    // --- The non-legendary Unwritten axis still caps at exactly one --------
+    const TArray<FBreakerItemInstance> OneOrdinaryUnwritten = {OrdinaryUnwritten};
+    Preview = UBreakerEquipmentComponent::PreviewEquipAgainst(OneOrdinaryUnwritten, MakeItem(EBreakerEquipSlot::Helmet, EBreakerItemRarity::Unwritten, 50));
+    TestTrue(TEXT("A second non-legendary Unwritten still exceeds its own cap of one"), Preview.bExceedsRarityLimit);
     TestFalse(TEXT("...and the displaced piece is not a legendary (there is none here)"), Preview.LimitDisplaced.IsLegendary());
 
     // --- Aberrant is untouched: still three, still its own axis ------------
@@ -763,18 +763,18 @@ bool FBreakerEquipCapAxesTest::RunTest(const FString& Parameters)
     // --- End to end through the real component, and the validator ----------
     UBreakerEquipmentComponent* Equipment = NewObject<UBreakerEquipmentComponent>(NewObject<AActor>());
     TestTrue(TEXT("The legendary equips"), Equipment->EquipItem(Legendary));
-    TestTrue(TEXT("An ordinary Anomalous equips alongside it"), Equipment->EquipItem(OrdinaryAnomalous));
+    TestTrue(TEXT("An ordinary Unwritten equips alongside it"), Equipment->EquipItem(OrdinaryUnwritten));
     TestEqual(TEXT("One legendary is equipped"), Equipment->CountEquippedLegendaries(), 1);
-    TestEqual(TEXT("...and the Anomalous count excludes it"), Equipment->CountEquippedOfRarity(EBreakerItemRarity::Anomalous), 1);
+    TestEqual(TEXT("...and the Unwritten count excludes it"), Equipment->CountEquippedOfRarity(EBreakerItemRarity::Unwritten), 1);
 
     FBreakerItemInstance Found;
-    TestTrue(TEXT("The legendary is still equipped, not evicted by the Anomalous piece"),
+    TestTrue(TEXT("The legendary is still equipped, not evicted by the Unwritten piece"),
         Equipment->GetEquippedItem(Legendary.Slot, Found) && Found.IsLegendary());
-    TestTrue(TEXT("The Anomalous piece is still equipped, not evicted by the legendary"),
-        Equipment->GetEquippedItem(OrdinaryAnomalous.Slot, Found) && !Found.IsLegendary());
+    TestTrue(TEXT("The Unwritten piece is still equipped, not evicted by the legendary"),
+        Equipment->GetEquippedItem(OrdinaryUnwritten.Slot, Found) && !Found.IsLegendary());
 
     FText Failure;
-    TestTrue(TEXT("One legendary plus one non-legendary Anomalous validates clean"),
+    TestTrue(TEXT("One legendary plus one non-legendary Unwritten validates clean"),
         UBreakerEquipmentComponent::ValidateEquipCaps(Equipment->GetEquipped(), Failure));
     TestTrue(TEXT("...and an empty set validates clean"), UBreakerEquipmentComponent::ValidateEquipCaps({}, Failure));
 
@@ -787,9 +787,9 @@ bool FBreakerEquipCapAxesTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("A second legendary fails validation"), UBreakerEquipmentComponent::ValidateEquipCaps(OverfullLegendary, Failure));
     TestFalse(TEXT("The failure carries a reason"), Failure.IsEmpty());
 
-    TArray<FBreakerItemInstance> OverfullAnomalous = Equipment->GetEquipped();
-    OverfullAnomalous.Add(MakeItem(EBreakerEquipSlot::Gloves, EBreakerItemRarity::Anomalous, 30));
-    TestFalse(TEXT("A second non-legendary Anomalous fails validation"), UBreakerEquipmentComponent::ValidateEquipCaps(OverfullAnomalous, Failure));
+    TArray<FBreakerItemInstance> OverfullUnwritten = Equipment->GetEquipped();
+    OverfullUnwritten.Add(MakeItem(EBreakerEquipSlot::Gloves, EBreakerItemRarity::Unwritten, 30));
+    TestFalse(TEXT("A second non-legendary Unwritten fails validation"), UBreakerEquipmentComponent::ValidateEquipCaps(OverfullUnwritten, Failure));
 
     TArray<FBreakerItemInstance> OverfullAberrant = ThreeAberrant;
     OverfullAberrant.Add(MakeItem(EBreakerEquipSlot::Waist, EBreakerItemRarity::Aberrant, 30));
@@ -862,7 +862,7 @@ bool FBreakerBulkDiscardCountTest::RunTest(const FString& Parameters)
     Equipment->AddToBackpack(MakeItem(EBreakerEquipSlot::Gloves, EBreakerItemRarity::Uncommon, 14));
     Equipment->AddToBackpack(MakeItem(EBreakerEquipSlot::Waist, EBreakerItemRarity::Exceptional, 20));
     Equipment->AddToBackpack(MakeItem(EBreakerEquipSlot::Necklace, EBreakerItemRarity::Aberrant, 22));
-    Equipment->AddToBackpack(MakeItem(EBreakerEquipSlot::Primary, EBreakerItemRarity::Anomalous, 24));
+    Equipment->AddToBackpack(MakeItem(EBreakerEquipSlot::Primary, EBreakerItemRarity::Unwritten, 24));
     // Equipped gear is a separate container and is never a discard candidate.
     Equipment->EquipItem(MakeItem(EBreakerEquipSlot::Secondary, EBreakerItemRarity::Standard, 5));
 
@@ -875,12 +875,12 @@ bool FBreakerBulkDiscardCountTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("The stated count is the destroyed count"), Removed, Predicted);
     TestEqual(TEXT("Nothing left to discard"), Equipment->CountBackpackBelowRarity(EBreakerItemRarity::Exceptional), 0);
 
-    // Aberrant and Anomalous are above every threshold the screen offers, so
+    // Aberrant and Unwritten are above every threshold the screen offers, so
     // a bulk discard can never take them.
     TestTrue(TEXT("Aberrant survives"), Equipment->GetBackpack().ContainsByPredicate(
         [](const FBreakerItemInstance& Item) { return Item.Rarity == EBreakerItemRarity::Aberrant; }));
-    TestTrue(TEXT("Anomalous survives"), Equipment->GetBackpack().ContainsByPredicate(
-        [](const FBreakerItemInstance& Item) { return Item.Rarity == EBreakerItemRarity::Anomalous; }));
+    TestTrue(TEXT("Unwritten survives"), Equipment->GetBackpack().ContainsByPredicate(
+        [](const FBreakerItemInstance& Item) { return Item.Rarity == EBreakerItemRarity::Unwritten; }));
     TestTrue(TEXT("Equipped gear is untouched"), Equipment->GetEquipped().ContainsByPredicate(
         [](const FBreakerItemInstance& Item) { return Item.Slot == EBreakerEquipSlot::Secondary; }));
     return true;

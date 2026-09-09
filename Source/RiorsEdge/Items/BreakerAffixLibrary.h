@@ -35,7 +35,7 @@ struct FBreakerAffixLibraryData
 {
     TArray<FBreakerAffixDefinition> Slice;
     TArray<FBreakerAffixDefinition> Aberrant;
-    TArray<FBreakerAffixDefinition> Anomalous;
+    TArray<FBreakerAffixDefinition> Unwritten;
     TArray<FBreakerAffixDefinition> Downsides;
     FBreakerAffixDefinition Elemental;
     TArray<FBreakerArchetypeLeans> Leans;
@@ -68,7 +68,7 @@ public:
 
     static constexpr int32 WorstTier = 12;                  // the floor of the ladder
     static constexpr int32 BestNormalTier = 1;              // best tier item level alone can reach
-    static constexpr int32 TopTier = -1;                    // the crafted/Anomalous ceiling
+    static constexpr int32 TopTier = -1;                    // the crafted/Unwritten ceiling
 
     // The character level cap, expressed as an item level, and the tier a
     // player is standing on when they reach it. Owner ruling: the levelling
@@ -230,16 +230,16 @@ public:
     // so they pay the player the ordinary pool ignores. They are drawn by a
     // dedicated step in UBreakerLootLibrary::RollItemInternal, never by the
     // generic affix loop — which is why they live in their own array instead of
-    // the slice pool. Exclusive to Aberrant: Anomalous has its own, stronger
+    // the slice pool. Exclusive to Aberrant: Unwritten has its own, stronger
     // pool below, so each high rarity keeps its own identity rather than the
     // higher one being "the lower one plus more".
     static const TArray<FBreakerAffixDefinition>& GetAberrantAffixPool();
 
-    // Anomalous' signature lines: rarer, stronger, exactly one per drop, and
+    // Unwritten' signature lines: rarer, stronger, exactly one per drop, and
     // they sit BESIDE the rule rewrite (the rule roll is untouched — every
-    // Anomalous still carries a rule, and the legendary chance is drawn before
+    // Unwritten still carries a rule, and the legendary chance is drawn before
     // this line exists in the stream).
-    static const TArray<FBreakerAffixDefinition>& GetAnomalousAffixPool();
+    static const TArray<FBreakerAffixDefinition>& GetUnwrittenAffixPool();
 
     // The elemental leg of the defense triad (owner ruling 2026-08-16/17):
     // AUTHORED-BUT-UNGATED. A real definition with a real consumer
@@ -300,7 +300,7 @@ public:
     static bool IsOffensiveTarget(EBreakerStatTarget Target);
 
     // Resolves an affix id against the given pool FIRST, then falls back to the
-    // special pools (Aberrant, Anomalous, downsides). The fallback is what lets
+    // special pools (Aberrant, Unwritten, downsides). The fallback is what lets
     // every existing definition lookup — aggregation, the comparison rows, the
     // Forge's temper/reforge, the tooltip — resolve a special line without any
     // of those call sites changing, while the special definitions stay OUT of

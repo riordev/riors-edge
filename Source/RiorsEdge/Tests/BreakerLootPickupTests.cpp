@@ -55,8 +55,8 @@ bool FBreakerLootPickupLabelTest::RunTest(const FString& Parameters)
     Pickup->SetItem(MakeTestItem(EBreakerItemRarity::Exceptional, EBreakerEquipSlot::BodyArmour));
     TestEqual(TEXT("Label is RARITY SLOTNAME"), Pickup->GetDisplayLabel().ToString(), FString(TEXT("EXCEPTIONAL BODYARMOUR")));
 
-    Pickup->SetItem(MakeTestItem(EBreakerItemRarity::Anomalous, EBreakerEquipSlot::Primary));
-    TestEqual(TEXT("Label tracks the current item"), Pickup->GetDisplayLabel().ToString(), FString(TEXT("ANOMALOUS PRIMARY")));
+    Pickup->SetItem(MakeTestItem(EBreakerItemRarity::Unwritten, EBreakerEquipSlot::Primary));
+    TestEqual(TEXT("Label tracks the current item"), Pickup->GetDisplayLabel().ToString(), FString(TEXT("UNWRITTEN PRIMARY")));
     return true;
 }
 
@@ -85,7 +85,7 @@ bool FBreakerLootPickupRarityColorTest::RunTest(const FString& Parameters)
     // than typed, so it cannot drift out of agreement with it either.
     for (const EBreakerItemRarity Rarity : { EBreakerItemRarity::Standard, EBreakerItemRarity::Uncommon,
                                              EBreakerItemRarity::Exceptional, EBreakerItemRarity::Aberrant,
-                                             EBreakerItemRarity::Anomalous })
+                                             EBreakerItemRarity::Unwritten })
     {
         const FLinearColor Token = BreakerUI::RarityColor(Rarity);
         const FLinearColor Beam = ABreakerLootPickup::ColorForRarity(Rarity);

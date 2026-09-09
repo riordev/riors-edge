@@ -224,7 +224,7 @@ namespace BreakerStashLayout
         }
     }
 
-    // How many of the five tally cells a rarity fills: Standard one, Anomalous
+    // How many of the five tally cells a rarity fills: Standard one, Unwritten
     // five. The enum's declared order is the ladder (append-only, so this
     // holds).
     inline int32 RarityTallyFilled(EBreakerItemRarity Rarity)

@@ -60,8 +60,8 @@ bool FBreakerHUDShippedTokensTest::RunTest(const FString& Parameters)
 
     // The teal law: the top rarity IS the teal noun, and the name step is
     // reserved with it.
-    TestTrue(TEXT("Anomalous rarity is teal-1"), RarityAnomalous.Equals(TealAnomalous, BreakerHUDMathTolerance));
-    TestTrue(TEXT("Teal-1 is 0x2FBFA6"), TealAnomalous.Equals(Hex(0x2FBFA6), BreakerHUDMathTolerance));
+    TestTrue(TEXT("Unwritten rarity is teal-1"), RarityUnwritten.Equals(TealUnwritten, BreakerHUDMathTolerance));
+    TestTrue(TEXT("Teal-1 is 0x2FBFA6"), TealUnwritten.Equals(Hex(0x2FBFA6), BreakerHUDMathTolerance));
     TestTrue(TEXT("The name teal is reserved"), IsReservedTeal(TealName));
     TestFalse(TEXT("System bone is not reserved teal"), IsReservedTeal(System));
     TestFalse(TEXT("The movement verb is not reserved teal"), IsReservedTeal(VerbMove));
@@ -328,12 +328,12 @@ bool FBreakerHUDRarityTallyTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Uncommon two"), RarityTallyCells(EBreakerItemRarity::Uncommon), 2);
     TestEqual(TEXT("Exceptional three"), RarityTallyCells(EBreakerItemRarity::Exceptional), 3);
     TestEqual(TEXT("Aberrant four"), RarityTallyCells(EBreakerItemRarity::Aberrant), 4);
-    TestEqual(TEXT("Anomalous five"), RarityTallyCells(EBreakerItemRarity::Anomalous), 5);
+    TestEqual(TEXT("Unwritten five"), RarityTallyCells(EBreakerItemRarity::Unwritten), 5);
     TestTrue(TEXT("The tally ascends with rarity"),
         RarityTallyCells(EBreakerItemRarity::Standard) < RarityTallyCells(EBreakerItemRarity::Uncommon)
         && RarityTallyCells(EBreakerItemRarity::Uncommon) < RarityTallyCells(EBreakerItemRarity::Exceptional)
         && RarityTallyCells(EBreakerItemRarity::Exceptional) < RarityTallyCells(EBreakerItemRarity::Aberrant)
-        && RarityTallyCells(EBreakerItemRarity::Aberrant) < RarityTallyCells(EBreakerItemRarity::Anomalous));
+        && RarityTallyCells(EBreakerItemRarity::Aberrant) < RarityTallyCells(EBreakerItemRarity::Unwritten));
     return true;
 }
 

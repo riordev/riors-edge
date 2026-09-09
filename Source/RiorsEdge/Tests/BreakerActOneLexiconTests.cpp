@@ -12,8 +12,8 @@
 // lore, props — because the Act II turn (A2-1) IS the first time the player
 // meets the word's referent, and a single stray mention spends the campaign's
 // most carefully guarded beat for nothing. "Bastion" is not this game's word
-// for a settlement (it is "Anchor"), and "Aberrant"/"Anomalous" are ITEM
-// RARITIES, never enemy words — an enemy called Anomalous would also violate
+// for a settlement (it is "Anchor"), and "Aberrant"/"Unwritten" are ITEM
+// RARITIES, never enemy words — an enemy called Unwritten would also violate
 // the teal object law by attaching the reserved band's vocabulary to a
 // combatant.
 //
@@ -30,7 +30,7 @@ bool FBreakerActOneLexiconTest::RunTest(const FString& Parameters)
 {
     // Case-insensitive on purpose: "altered" as a common verb is still the
     // word, and the register is clipped enough that no Act I line needs it.
-    const TCHAR* Banned[] = { TEXT("altered"), TEXT("bastion"), TEXT("aberrant"), TEXT("anomalous") };
+    const TCHAR* Banned[] = { TEXT("altered"), TEXT("bastion"), TEXT("aberrant"), TEXT("unwritten") };
 
     // (source description, text) pairs so a failure names the exact string.
     TArray<TPair<FString, FString>> Strings;

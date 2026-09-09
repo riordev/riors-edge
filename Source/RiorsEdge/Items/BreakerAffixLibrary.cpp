@@ -112,7 +112,7 @@ void UBreakerAffixLibrary::AffixCountRangeForRarity(EBreakerItemRarity Rarity, i
     case EBreakerItemRarity::Uncommon:    OutMinimum = 4; OutMaximum = 5; break;
     case EBreakerItemRarity::Exceptional: OutMinimum = 4; OutMaximum = 6; break;
     case EBreakerItemRarity::Aberrant:    OutMinimum = 4; OutMaximum = 6; break;
-    case EBreakerItemRarity::Anomalous:   OutMinimum = 5; OutMaximum = 6; break;
+    case EBreakerItemRarity::Unwritten:   OutMinimum = 5; OutMaximum = 6; break;
     default:                              OutMinimum = 1; OutMaximum = 1; break;
     }
 }
@@ -122,7 +122,7 @@ void UBreakerAffixLibrary::AffixCountRangeForRarity(EBreakerItemRarity Rarity, i
 // ---------------------------------------------------------------------------
 // The file is the library. Every row carries a "pool" word that decides which
 // array it lands in; the exclusivity the special pools rely on (the generic
-// loop and the Forge never iterate Aberrant, Anomalous, downside or elemental
+// loop and the Forge never iterate Aberrant, Unwritten, downside or elemental
 // rows) is therefore a property of that one word, and the validator is what
 // keeps the word honest. A row that fails any check below fails the WHOLE
 // load: the pools come back empty behind an ensure, because a library that
@@ -134,7 +134,7 @@ namespace
 
     const TCHAR* const BreakerAffixPoolSlice = TEXT("slice");
     const TCHAR* const BreakerAffixPoolAberrant = TEXT("aberrant");
-    const TCHAR* const BreakerAffixPoolAnomalous = TEXT("anomalous");
+    const TCHAR* const BreakerAffixPoolUnwritten = TEXT("unwritten");
     const TCHAR* const BreakerAffixPoolDownside = TEXT("downside");
     const TCHAR* const BreakerAffixPoolElemental = TEXT("elemental");
 
@@ -262,7 +262,7 @@ namespace
         if (Affix.StatBucket == EBreakerStatBucket::MorePercent)
         {
             const bool bSpecialPool = (Pool == BreakerAffixPoolAberrant && Affix.MinimumRarity == EBreakerItemRarity::Aberrant)
-                || (Pool == BreakerAffixPoolAnomalous && Affix.MinimumRarity == EBreakerItemRarity::Anomalous);
+                || (Pool == BreakerAffixPoolUnwritten && Affix.MinimumRarity == EBreakerItemRarity::Unwritten);
             const bool bDamageLane = Affix.StatTarget == EBreakerStatTarget::WeaponDamage || Affix.StatTarget == EBreakerStatTarget::AbilityDamage
                 || Affix.StatTarget == EBreakerStatTarget::SharedDamage || Affix.StatTarget == EBreakerStatTarget::DamageOverTime;
             if (!bSpecialPool || !bDamageLane || Affix.ValueAtT12 <= 0 || Affix.ValueAtT1 <= 0)
@@ -344,12 +344,12 @@ namespace
 
                 if (Pool == BreakerAffixPoolSlice) { Data.Slice.Add(Affix); }
                 else if (Pool == BreakerAffixPoolAberrant) { Data.Aberrant.Add(Affix); }
-                else if (Pool == BreakerAffixPoolAnomalous) { Data.Anomalous.Add(Affix); }
+                else if (Pool == BreakerAffixPoolUnwritten) { Data.Unwritten.Add(Affix); }
                 else if (Pool == BreakerAffixPoolDownside) { Data.Downsides.Add(Affix); }
                 else if (Pool == BreakerAffixPoolElemental) { Data.Elemental = Affix; ++ElementalRows; }
                 else
                 {
-                    Errors.Add(FString::Printf(TEXT("%s: pool \"%s\" is not slice, aberrant, anomalous, downside or elemental"),
+                    Errors.Add(FString::Printf(TEXT("%s: pool \"%s\" is not slice, aberrant, unwritten, downside or elemental"),
                         *Affix.AffixId.ToString(), *Pool));
                 }
             }
@@ -500,9 +500,9 @@ const TArray<FBreakerAffixDefinition>& UBreakerAffixLibrary::GetAberrantAffixPoo
     return GetData().Aberrant;
 }
 
-const TArray<FBreakerAffixDefinition>& UBreakerAffixLibrary::GetAnomalousAffixPool()
+const TArray<FBreakerAffixDefinition>& UBreakerAffixLibrary::GetUnwrittenAffixPool()
 {
-    return GetData().Anomalous;
+    return GetData().Unwritten;
 }
 
 const TArray<FBreakerAffixDefinition>& UBreakerAffixLibrary::GetSpecialDownsidePool()
@@ -573,13 +573,13 @@ const FBreakerAffixDefinition* UBreakerAffixLibrary::FindAffix(const TArray<FBre
     if (const FBreakerAffixDefinition* Found = Pool.FindByPredicate(ById)) return Found;
     // The special-pool fallback. Aggregation, comparison rows, tooltips and the
     // Forge all resolve rolled ids through this function with the SLICE pool as
-    // the argument; a special line on an Aberrant/Anomalous item must resolve
+    // the argument; a special line on an Aberrant/Unwritten item must resolve
     // there or it would aggregate to nothing — a line that lies. Falling back
     // here (instead of merging the pools) is what keeps the special entries out
     // of every generic candidate walk, so they can never be OFFERED below their
     // rarity while still always being READ.
     if (const FBreakerAffixDefinition* Found = GetAberrantAffixPool().FindByPredicate(ById)) return Found;
-    if (const FBreakerAffixDefinition* Found = GetAnomalousAffixPool().FindByPredicate(ById)) return Found;
+    if (const FBreakerAffixDefinition* Found = GetUnwrittenAffixPool().FindByPredicate(ById)) return Found;
     // The authored-but-ungated elemental leg resolves here for the same
     // reason the special pools do: an item that CARRIES the line (granted,
     // test fixture, future content) must aggregate and print it truthfully,

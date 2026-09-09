@@ -126,7 +126,7 @@ struct RIORSEDGE_API FBreakerDropTableParams
     float AberrantWeight = 1.2f;   // O2 PLACEHOLDER (was 2.5 flat, ungated)
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Rarity", meta=(ClampMin="0"))
-    float AnomalousWeight = 0.25f;   // O2 PLACEHOLDER (was 0.5 flat, ungated)
+    float UnwrittenWeight = 0.25f;   // O2 PLACEHOLDER (was 0.5 flat, ungated)
 
     // --- Step 2: THE GATES -------------------------------------------------
     // THE RULE, in one sentence, so the owner can overrule it:
@@ -154,7 +154,7 @@ struct RIORSEDGE_API FBreakerDropTableParams
     int32 AberrantMinimumItemLevel = 25;   // O2 PLACEHOLDER
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Gates", meta=(ClampMin="1"))
-    int32 AnomalousMinimumItemLevel = 40;   // O2 PLACEHOLDER
+    int32 UnwrittenMinimumItemLevel = 40;   // O2 PLACEHOLDER
 
     // NOTE ON O29, recorded rather than acted on. These three unlocks were
     // derived against the old 1-50 item level range, and O29 took item level to
@@ -163,7 +163,7 @@ struct RIORSEDGE_API FBreakerDropTableParams
     //
     // Item level tracks AREA level, and the campaign is area levels 1-50; the
     // endgame is 50-100. Scaling proportionally would put Aberrant at ilvl 60
-    // and Anomalous at 96, so a player would finish the entire campaign having
+    // and Unwritten at 96, so a player would finish the entire campaign having
     // never seen either rarity - the ladder would be introduced only after the
     // content that teaches it. These gates pace the player's INTRODUCTION to
     // rarity, and that introduction still happens across 1-50 regardless of how
@@ -187,7 +187,7 @@ struct RIORSEDGE_API FBreakerDropTableParams
     EBreakerMonsterRank AberrantMinimumRank = EBreakerMonsterRank::Elite;   // O2 PLACEHOLDER
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Gates")
-    EBreakerMonsterRank AnomalousMinimumRank = EBreakerMonsterRank::Elite;   // O2 PLACEHOLDER
+    EBreakerMonsterRank UnwrittenMinimumRank = EBreakerMonsterRank::Elite;   // O2 PLACEHOLDER
 };
 
 // An hour of play, described as kills. This is an INPUT to the projection, not
@@ -223,13 +223,13 @@ struct RIORSEDGE_API FBreakerLootRateProjection
     UPROPERTY(BlueprintReadOnly, Category="Drops|Projection") float ItemsPerHour = 0.0f;
     UPROPERTY(BlueprintReadOnly, Category="Drops|Projection") float ExceptionalOrBetterPerHour = 0.0f;
     UPROPERTY(BlueprintReadOnly, Category="Drops|Projection") float AberrantPerHour = 0.0f;
-    UPROPERTY(BlueprintReadOnly, Category="Drops|Projection") float AnomalousPerHour = 0.0f;
+    UPROPERTY(BlueprintReadOnly, Category="Drops|Projection") float UnwrittenPerHour = 0.0f;
 
     // Infinity when the rarity is gated out entirely at this item level, which
     // is the honest answer to "how long before an Aberrant" in a level-10 area:
     // never. A large finite number would read as "eventually".
     UPROPERTY(BlueprintReadOnly, Category="Drops|Projection") float HoursPerAberrant = 0.0f;
-    UPROPERTY(BlueprintReadOnly, Category="Drops|Projection") float HoursPerAnomalous = 0.0f;
+    UPROPERTY(BlueprintReadOnly, Category="Drops|Projection") float HoursPerUnwritten = 0.0f;
 };
 
 // ---------------------------------------------------------------------------

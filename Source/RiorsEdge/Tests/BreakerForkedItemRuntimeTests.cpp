@@ -60,7 +60,7 @@ bool FBreakerRefractorRollTest::RunTest(const FString& Parameters)
     for (int32 Seed = 0; Seed < 512; ++Seed)
     {
         const FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(TEXT("Test.Necklace"), EBreakerEquipSlot::Necklace,
-            EBreakerItemRarity::Anomalous, 40, Seed);
+            EBreakerItemRarity::Unwritten, 40, Seed);
         if (Item.LegendaryId == TEXT("Legendary.Refractor"))
         {
             bReachedFromOrdinaryLoot = true;

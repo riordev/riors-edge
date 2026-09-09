@@ -17,7 +17,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerItemAcquired, const FBreaker
 // Owns the eight equipment slots plus a simple backpack, and folds equipped
 // affixes into the attribute set. Aggregation rule: flat values sum, then
 // the single additive Increased bucket applies once per stat. More
-// multipliers are reserved for tree and Anomalous rule rewrites.
+// multipliers are reserved for tree and Unwritten rule rewrites.
 UCLASS(ClassGroup=Items, BlueprintType, meta=(BlueprintSpawnableComponent))
 class RIORSEDGE_API UBreakerEquipmentComponent : public UActorComponent
 {
@@ -74,7 +74,7 @@ public:
     // Whatever was equipped goes back to the backpack the usual way.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment") void DevGrantTestGear(int32 ItemLevel);
     // Playtest helper: rolls every legendary at the given item level into the
-    // backpack. Anomalous is ~0.5% of drops and only three slots have one, so
+    // backpack. Unwritten is ~0.5% of drops and only three slots have one, so
     // without this the three build-defining items are unreachable in a session
     // — which is the same "exists but cannot be found" failure as an affix with
     // no consumer, one step removed.
@@ -113,15 +113,15 @@ public:
     // screen without touching the loadout widget.
 
     // Equipped cap for a rarity. INDEX_NONE means uncapped. O11 / master sheet
-    // 4.1: Aberrant 3, Anomalous 1; everything below them is unlimited. O37
-    // reaffirms O11's numbers and separates the Anomalous axis from the
+    // 4.1: Aberrant 3, Unwritten 1; everything below them is unlimited. O37
+    // reaffirms O11's numbers and separates the Unwritten axis from the
     // legendary one — see CountEquippedOfRarity's comment and
     // CountEquippedLegendaries below.
     static int32 EquipLimitForRarity(EBreakerItemRarity Rarity);
 
     // How many equipped pieces are of this rarity. O37: a legendary rolls
-    // Anomalous (O32) but sits on its own equip-cap axis, so it is EXCLUDED
-    // here when Rarity is Anomalous — CountEquippedLegendaries answers that
+    // Unwritten (O32) but sits on its own equip-cap axis, so it is EXCLUDED
+    // here when Rarity is Unwritten — CountEquippedLegendaries answers that
     // question instead, and the two never double-count the same piece.
     UFUNCTION(BlueprintPure, Category="Equipment") int32 CountEquippedOfRarity(EBreakerItemRarity Rarity) const;
     // Companion to CountEquippedOfRarity for the legendary axis O37 splits
@@ -130,7 +130,7 @@ public:
     // and displace the weakest piece on the axis).
     UFUNCTION(BlueprintPure, Category="Equipment") int32 CountEquippedLegendaries() const;
 
-    // O37: exactly 1 equipped legendary, 1 non-legendary Anomalous, 3
+    // O37: exactly 1 equipped legendary, 1 non-legendary Unwritten, 3
     // Aberrant. Equip-time displacement (PreviewEquipAgainst/EquipItem) never
     // lets a live component exceed these, so this validator's job is a save
     // load, a hand-edited fixture, or a content-authoring check finding MORE
@@ -197,7 +197,7 @@ public:
     // predates the conditional family keeps its exact previous behaviour.
     // Rule rewrites carried by the equipped set are resolved and applied HERE,
     // inside the same function, rather than by a second pass somewhere else.
-    // That is the whole reason an Anomalous rewrite reaches gameplay at all:
+    // That is the whole reason an Unwritten rewrite reaches gameplay at all:
     // this function's output is what the attribute set folds and what
     // UBreakerCombatComponent reads, so a rewrite expressed here cannot be a
     // line of text on a card.

@@ -239,7 +239,7 @@ namespace BreakerHUDMath
             case EBreakerItemRarity::Uncommon:    return 2;
             case EBreakerItemRarity::Exceptional: return 3;
             case EBreakerItemRarity::Aberrant:    return 4;
-            case EBreakerItemRarity::Anomalous:   return 5;
+            case EBreakerItemRarity::Unwritten:   return 5;
             default:                              return 1;
         }
     }

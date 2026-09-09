@@ -11,10 +11,10 @@ bool FBreakerFinalAffixBudgetTest::RunTest(const FString& Parameters)
     TSet<FName> ReachableLegendaries;
     const auto& Generic = UBreakerAffixLibrary::GetSliceAffixPool();
     const auto& Bills = UBreakerAffixLibrary::GetSpecialDownsidePool();
-    for (EBreakerItemRarity Rarity : {EBreakerItemRarity::Aberrant, EBreakerItemRarity::Anomalous})
+    for (EBreakerItemRarity Rarity : {EBreakerItemRarity::Aberrant, EBreakerItemRarity::Unwritten})
     {
         const auto& Specials = Rarity == EBreakerItemRarity::Aberrant
-            ? UBreakerAffixLibrary::GetAberrantAffixPool() : UBreakerAffixLibrary::GetAnomalousAffixPool();
+            ? UBreakerAffixLibrary::GetAberrantAffixPool() : UBreakerAffixLibrary::GetUnwrittenAffixPool();
         int32 Minimum = 0, Maximum = 0;
         UBreakerAffixLibrary::AffixCountRangeForRarity(Rarity, Minimum, Maximum);
         for (int32 SlotIndex = 0; SlotIndex < static_cast<int32>(EBreakerEquipSlot::Count); ++SlotIndex)

@@ -113,8 +113,8 @@ bool FBreakerDropRarityGateTest::RunTest(const FString& Parameters)
     {
         TestFalse(FString::Printf(TEXT("Trash can never unlock Aberrant (ilvl %d)"), ItemLevel),
             UBreakerDropTableLibrary::IsRarityUnlocked(EBreakerItemRarity::Aberrant, ItemLevel, EBreakerMonsterRank::Trash, Params));
-        TestFalse(FString::Printf(TEXT("Trash can never unlock Anomalous (ilvl %d)"), ItemLevel),
-            UBreakerDropTableLibrary::IsRarityUnlocked(EBreakerItemRarity::Anomalous, ItemLevel, EBreakerMonsterRank::Trash, Params));
+        TestFalse(FString::Printf(TEXT("Trash can never unlock Unwritten (ilvl %d)"), ItemLevel),
+            UBreakerDropTableLibrary::IsRarityUnlocked(EBreakerItemRarity::Unwritten, ItemLevel, EBreakerMonsterRank::Trash, Params));
     }
 
     // And through the ROLL, not only the predicate, because the predicate could
@@ -256,16 +256,16 @@ bool FBreakerDropLootPerHourTest::RunTest(const FString& Parameters)
         { EBreakerMonsterRank::Boss,            Kills.BossKillsPerHour } };
 
     // Documented stops. Area level 5 is below every high gate, 10 opens
-    // Exceptional, 25 opens Aberrant, 50 opens Anomalous.
+    // Exceptional, 25 opens Aberrant, 50 opens Unwritten.
     const int32 ItemLevels[] = { 5, 10, 25, 50 };
     for (const int32 ItemLevel : ItemLevels)
     {
         const FBreakerLootRateProjection Projection = UBreakerDropTableLibrary::ProjectLootRate(Kills, ItemLevel, 0.0f, Params);
 
-        // Simulate 200 hours so even the Anomalous rate (fractions of one an
+        // Simulate 200 hours so even the Unwritten rate (fractions of one an
         // hour) has enough events to compare against.
         constexpr int32 SimulatedHours = 200;
-        double Items = 0.0, ExceptionalOrBetter = 0.0, Aberrant = 0.0, Anomalous = 0.0;
+        double Items = 0.0, ExceptionalOrBetter = 0.0, Aberrant = 0.0, Unwritten = 0.0;
         for (const FSweepRow& Row : Rows)
         {
             const int32 KillCount = FMath::RoundToInt(Row.KillsPerHour) * SimulatedHours;
@@ -277,18 +277,18 @@ bool FBreakerDropLootPerHourTest::RunTest(const FString& Parameters)
                 Items += 1.0;
                 if (Rarity >= EBreakerItemRarity::Exceptional) ExceptionalOrBetter += 1.0;
                 if (Rarity == EBreakerItemRarity::Aberrant) Aberrant += 1.0;
-                if (Rarity == EBreakerItemRarity::Anomalous) Anomalous += 1.0;
+                if (Rarity == EBreakerItemRarity::Unwritten) Unwritten += 1.0;
             }
         }
         const float MeasuredItems = static_cast<float>(Items / SimulatedHours);
         const float MeasuredExceptional = static_cast<float>(ExceptionalOrBetter / SimulatedHours);
         const float MeasuredAberrant = static_cast<float>(Aberrant / SimulatedHours);
-        const float MeasuredAnomalous = static_cast<float>(Anomalous / SimulatedHours);
+        const float MeasuredUnwritten = static_cast<float>(Unwritten / SimulatedHours);
 
         AddInfo(FString::Printf(
-            TEXT("ilvl %d | items/h %.1f (proj %.1f) | Exc+/h %.2f (proj %.2f) | Aberrant/h %.3f (proj %.3f) | Anomalous/h %.4f (proj %.4f)"),
+            TEXT("ilvl %d | items/h %.1f (proj %.1f) | Exc+/h %.2f (proj %.2f) | Aberrant/h %.3f (proj %.3f) | Unwritten/h %.4f (proj %.4f)"),
             ItemLevel, MeasuredItems, Projection.ItemsPerHour, MeasuredExceptional, Projection.ExceptionalOrBetterPerHour,
-            MeasuredAberrant, Projection.AberrantPerHour, MeasuredAnomalous, Projection.AnomalousPerHour));
+            MeasuredAberrant, Projection.AberrantPerHour, MeasuredUnwritten, Projection.UnwrittenPerHour));
 
         TestTrue(FString::Printf(TEXT("Items per hour matches the projection (ilvl %d)"), ItemLevel),
             FMath::Abs(MeasuredItems - Projection.ItemsPerHour) < 2.0f);
@@ -296,8 +296,8 @@ bool FBreakerDropLootPerHourTest::RunTest(const FString& Parameters)
             FMath::Abs(MeasuredExceptional - Projection.ExceptionalOrBetterPerHour) < 1.0f);
         TestTrue(FString::Printf(TEXT("Aberrant per hour matches the projection (ilvl %d)"), ItemLevel),
             FMath::Abs(MeasuredAberrant - Projection.AberrantPerHour) < 0.15f);
-        TestTrue(FString::Printf(TEXT("Anomalous per hour matches the projection (ilvl %d)"), ItemLevel),
-            FMath::Abs(MeasuredAnomalous - Projection.AnomalousPerHour) < 0.08f);
+        TestTrue(FString::Printf(TEXT("Unwritten per hour matches the projection (ilvl %d)"), ItemLevel),
+            FMath::Abs(MeasuredUnwritten - Projection.UnwrittenPerHour) < 0.08f);
     }
 
     // The DOCUMENTED figures. These are the lines in Docs/Item-Foundation.md;

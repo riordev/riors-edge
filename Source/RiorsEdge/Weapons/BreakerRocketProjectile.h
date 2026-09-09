@@ -57,7 +57,7 @@ public:
     // So: a DARK body carrying a bright tail. The casing and nose are panel
     // greys, the exhaust is the only orange, and the motion in it is a flicker
     // of the flame rather than a rotation of the object. Nothing here is teal;
-    // teal belongs to rift geometry, suppression hardware and Anomalous items.
+    // teal belongs to rift geometry, suppression hardware and Unwritten items.
 
     // How long the detonation flash stays on screen after the damage lands.
     // The actor survives for this long with collision and movement off, which

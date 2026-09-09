@@ -28,7 +28,7 @@ namespace
         const auto& Generic = UBreakerAffixLibrary::GetSliceAffixPool();
         const auto& Downsides = UBreakerAffixLibrary::GetSpecialDownsidePool();
         const bool bAberrant = Item.Rarity == EBreakerItemRarity::Aberrant;
-        const auto& Specials = bAberrant ? UBreakerAffixLibrary::GetAberrantAffixPool() : UBreakerAffixLibrary::GetAnomalousAffixPool();
+        const auto& Specials = bAberrant ? UBreakerAffixLibrary::GetAberrantAffixPool() : UBreakerAffixLibrary::GetUnwrittenAffixPool();
         auto Has = [&](FName Id) { return Item.Affixes.ContainsByPredicate([Id](const FBreakerRolledAffix& A) { return A.AffixId == Id; }); };
         auto Count = [&](EBreakerAffixCategory Category) { return UBreakerLootLibrary::CountAffixesOfCategory(Item, Category); };
         auto Add = [&](const FBreakerAffixDefinition& Definition, int32 Tier, bool bVariance)
@@ -199,13 +199,13 @@ FBreakerItemInstance UBreakerLootLibrary::RollItemInternal(FName DefinitionId, E
     // unlock tiers item level has not reached — those come from crafting.
     const int32 BestTier = FMath::Max(BestLevelTier, UBreakerAffixLibrary::TierCapForRarity(Rarity));
 
-    if (Rarity == EBreakerItemRarity::Aberrant || Rarity == EBreakerItemRarity::Anomalous)
+    if (Rarity == EBreakerItemRarity::Aberrant || Rarity == EBreakerItemRarity::Unwritten)
     {
         const FBreakerLegendaryDefinition Legendary = UBreakerItemRuleLibrary::FindLegendary(ForcedLegendaryId);
-        if (bAllowLegendary && Rarity == EBreakerItemRarity::Anomalous)
+        if (bAllowLegendary && Rarity == EBreakerItemRarity::Unwritten)
         {
             const FBreakerLegendaryDefinition Candidate = UBreakerItemRuleLibrary::FindLegendaryForSlot(Slot);
-            if (Candidate.IsValid() && Random.FRand() < LegendaryChanceWithinAnomalous)
+            if (Candidate.IsValid() && Random.FRand() < LegendaryChanceWithinUnwritten)
                 return RollLegendary(Candidate.LegendaryId, Item.ItemLevel, RandomSeed ^ 0x1EDA5EED);
         }
         if (Legendary.IsValid())
@@ -214,7 +214,7 @@ FBreakerItemInstance UBreakerLootLibrary::RollItemInternal(FName DefinitionId, E
             Item.DefinitionId = Legendary.LegendaryId;
             Item.Rule = Legendary.Rule;
         }
-        else if (Rarity == EBreakerItemRarity::Anomalous)
+        else if (Rarity == EBreakerItemRarity::Unwritten)
             Item.Rule = UBreakerItemRuleLibrary::RollRule(Random.RandRange(0, MAX_int32 - 1));
         if (!BreakerLootAllocateSpecial(Item, Random, AffixCount, BestTier, Legendary))
         {
@@ -333,7 +333,7 @@ FBreakerItemInstance UBreakerLootLibrary::RollLegendary(FName LegendaryId, int32
 
     // Signatures enter the allocation before generic variance, inside the
     // same final budget and category caps as their special line and its bill.
-    return RollItemInternal(LegendaryId, Definition.Slot, EBreakerItemRarity::Anomalous,
+    return RollItemInternal(LegendaryId, Definition.Slot, EBreakerItemRarity::Unwritten,
         ItemLevel, RandomSeed, false, LegendaryId);
 }
 

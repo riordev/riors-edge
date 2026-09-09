@@ -278,7 +278,7 @@ bool FBreakerTriadPoolMembershipTest::RunTest(const FString& Parameters)
 
     // The two live legs roll from the ordinary pool at every rarity (slice
     // membership IS rarity-universality: the generic loop draws Standard
-    // through Anomalous from this one array, and both lines default to
+    // through Unwritten from this one array, and both lines default to
     // MinimumRarity Standard).
     TestTrue(TEXT("Physical DR is droppable"), SliceHas(TEXT("Core.PhysicalDR")));
     TestTrue(TEXT("Ailment Avoidance is droppable"), SliceHas(TEXT("Core.AilmentAvoidance")));
@@ -294,7 +294,7 @@ bool FBreakerTriadPoolMembershipTest::RunTest(const FString& Parameters)
     }
 
     // The ungated leg: absent from EVERY droppable pool — slice, Aberrant,
-    // Anomalous — yet resolvable through FindAffix so an item carrying it
+    // Unwritten — yet resolvable through FindAffix so an item carrying it
     // aggregates truthfully. That combination is the stated choice: the
     // line is honest, and the pool refuses to sell it before it can pay.
     const FName ElementalId(TEXT("Core.ElementalResist"));
@@ -304,7 +304,7 @@ bool FBreakerTriadPoolMembershipTest::RunTest(const FString& Parameters)
     };
     TestFalse(TEXT("Elemental Resistance is not in the slice pool"), PoolHas(Slice));
     TestFalse(TEXT("Elemental Resistance is not in the Aberrant pool"), PoolHas(UBreakerAffixLibrary::GetAberrantAffixPool()));
-    TestFalse(TEXT("Elemental Resistance is not in the Anomalous pool"), PoolHas(UBreakerAffixLibrary::GetAnomalousAffixPool()));
+    TestFalse(TEXT("Elemental Resistance is not in the Unwritten pool"), PoolHas(UBreakerAffixLibrary::GetUnwrittenAffixPool()));
 
     const FBreakerAffixDefinition* Resist = UBreakerAffixLibrary::FindAffix(Slice, ElementalId);
     if (TestNotNull(TEXT("Elemental Resistance still resolves through the fallback"), Resist))

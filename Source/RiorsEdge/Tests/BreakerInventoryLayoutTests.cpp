@@ -250,14 +250,14 @@ bool FBreakerInventoryLayoutLimitTellTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("the cap is quoted verbatim"), MakeFooterLead(Preview), TEXT("LIMIT FULL 3/3"));
     }
 
-    // The Anomalous cap reads the same way at 1/1.
+    // The Unwritten cap reads the same way at 1/1.
     {
         FBreakerEquipPreview Preview;
         Preview.bExceedsRarityLimit = true;
         Preview.RarityCount = 1;
         Preview.RarityLimit = 1;
-        Preview.LimitDisplaced = BreakerInventoryMakeItem(EBreakerEquipSlot::Boots, EBreakerItemRarity::Anomalous, 66);
-        TestEqual(TEXT("the anomalous cap"), MakeFooterLead(Preview), TEXT("LIMIT FULL 1/1"));
+        Preview.LimitDisplaced = BreakerInventoryMakeItem(EBreakerEquipSlot::Boots, EBreakerItemRarity::Unwritten, 66);
+        TestEqual(TEXT("the unwritten cap"), MakeFooterLead(Preview), TEXT("LIMIT FULL 1/1"));
     }
 
     // A CAP WITH NO NAMED VICTIM IS NOT A TELL. The reference's tell is "LIMIT
@@ -541,7 +541,7 @@ bool FBreakerTealSealedClusterTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Suppression teal is recognised as reserved"),
         BreakerUI::IsReservedTeal(BreakerUI::TealHardware));
     TestTrue(TEXT("Top-rarity teal is recognised as reserved"),
-        BreakerUI::IsReservedTeal(BreakerUI::TealAnomalous));
+        BreakerUI::IsReservedTeal(BreakerUI::TealUnwritten));
     TestFalse(TEXT("The system accent is not reserved teal"),
         BreakerUI::IsReservedTeal(BreakerUI::Cyan));
     return true;

@@ -39,7 +39,7 @@ namespace BreakerItemRuleTest
         Item.ItemId = FGuid::NewGuid();
         Item.DefinitionId = TEXT("RuleTest");
         Item.Slot = Slot;
-        Item.Rarity = EBreakerItemRarity::Anomalous;
+        Item.Rarity = EBreakerItemRarity::Unwritten;
         Item.ItemLevel = 50;
         Item.Rule = Rule;
         for (const FName AffixId : AffixIds)
@@ -332,37 +332,37 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerItemRarityMeaningTest::RunTest(const FString& Parameters)
 {
-    int32 AnomalousWithRule = 0;
-    int32 AnomalousTotal = 0;
+    int32 UnwrittenWithRule = 0;
+    int32 UnwrittenTotal = 0;
     TSet<EBreakerItemRule> Seen;
 
     for (int32 Seed = 1; Seed <= 400; ++Seed)
     {
-        // Every rarity below Anomalous, on every slot: none may carry a rule.
-        for (int32 RarityIndex = 0; RarityIndex < static_cast<int32>(EBreakerItemRarity::Anomalous); ++RarityIndex)
+        // Every rarity below Unwritten, on every slot: none may carry a rule.
+        for (int32 RarityIndex = 0; RarityIndex < static_cast<int32>(EBreakerItemRarity::Unwritten); ++RarityIndex)
         {
             const FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(TEXT("RarityTest"),
                 static_cast<EBreakerEquipSlot>(Seed % static_cast<int32>(EBreakerEquipSlot::Count)),
                 static_cast<EBreakerItemRarity>(RarityIndex), 50, Seed * 31 + RarityIndex);
-            TestFalse(TEXT("Only Anomalous carries a rule"), Item.HasRule());
+            TestFalse(TEXT("Only Unwritten carries a rule"), Item.HasRule());
         }
 
         // Gloves have no legendary, so this exercises the generic branch.
-        const FBreakerItemInstance Anomalous = UBreakerLootLibrary::RollItem(TEXT("RarityTest"),
-            EBreakerEquipSlot::Gloves, EBreakerItemRarity::Anomalous, 50, Seed);
-        ++AnomalousTotal;
-        if (Anomalous.HasRule()) { ++AnomalousWithRule; Seen.Add(Anomalous.Rule); }
+        const FBreakerItemInstance Unwritten = UBreakerLootLibrary::RollItem(TEXT("RarityTest"),
+            EBreakerEquipSlot::Gloves, EBreakerItemRarity::Unwritten, 50, Seed);
+        ++UnwrittenTotal;
+        if (Unwritten.HasRule()) { ++UnwrittenWithRule; Seen.Add(Unwritten.Rule); }
         // O196: the enum value with no definition never reaches a drop.
-        TestFalse(TEXT("Overflow never rolls"), Anomalous.Rule == EBreakerItemRule::Overflow);
+        TestFalse(TEXT("Overflow never rolls"), Unwritten.Rule == EBreakerItemRule::Overflow);
     }
 
-    TestEqual(TEXT("Every Anomalous drop carries a rewrite"), AnomalousWithRule, AnomalousTotal);
+    TestEqual(TEXT("Every Unwritten drop carries a rewrite"), UnwrittenWithRule, UnwrittenTotal);
     TestEqual(TEXT("Every rollable rewrite is reachable"), Seen.Num(), UBreakerItemRuleLibrary::GetRollableRules().Num());
     for (const EBreakerItemRule Rule : Seen)
     {
         // A legendary's rewrite must never appear on an ordinary drop, or the
         // legendary stops being the reason to hunt for it.
-        TestTrue(TEXT("A legendary rule never rolls on an ordinary Anomalous"),
+        TestTrue(TEXT("A legendary rule never rolls on an ordinary Unwritten"),
             UBreakerItemRuleLibrary::FindRule(Rule).bRollable);
     }
 
@@ -441,11 +441,11 @@ bool FBreakerLegendarySignatureTest::RunTest(const FString& Parameters)
         const FBreakerItemInstance Rolled = UBreakerLootLibrary::RollLegendary(Definition.LegendaryId, 50, 4242);
         TestTrue(*(Context + TEXT(" rolls a valid item")), Rolled.IsValid());
         TestTrue(*(Context + TEXT(" is legendary")), Rolled.IsLegendary());
-        // O37: a legendary rolls Anomalous (O32) but sits on its OWN equip-cap
-        // axis, separate from the non-legendary Anomalous cap of one —
+        // O37: a legendary rolls Unwritten (O32) but sits on its OWN equip-cap
+        // axis, separate from the non-legendary Unwritten cap of one —
         // RiorsEdge.Items.Equipment.PerAxisCaps covers the separation itself.
-        TestEqual(*(Context + TEXT(" is Anomalous, per O32")),
-            static_cast<int32>(Rolled.Rarity), static_cast<int32>(EBreakerItemRarity::Anomalous));
+        TestEqual(*(Context + TEXT(" is Unwritten, per O32")),
+            static_cast<int32>(Rolled.Rarity), static_cast<int32>(EBreakerItemRarity::Unwritten));
         TestEqual(*(Context + TEXT(" carries its own rule, not a rolled one")),
             static_cast<int32>(Rolled.Rule), static_cast<int32>(Definition.Rule));
         TestEqual(*(Context + TEXT(" lands in its slot")), static_cast<int32>(Rolled.Slot), static_cast<int32>(Definition.Slot));
@@ -471,10 +471,10 @@ bool FBreakerLegendarySignatureTest::RunTest(const FString& Parameters)
     for (int32 Seed = 1; Seed <= 600 && !bDroppedNaturally; ++Seed)
     {
         const FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(TEXT("Drop"),
-            EBreakerEquipSlot::Boots, EBreakerItemRarity::Anomalous, 50, Seed);
+            EBreakerEquipSlot::Boots, EBreakerItemRarity::Unwritten, 50, Seed);
         bDroppedNaturally = Item.IsLegendary();
     }
-    TestTrue(TEXT("A legendary can drop from the ordinary Anomalous pipeline"), bDroppedNaturally);
+    TestTrue(TEXT("A legendary can drop from the ordinary Unwritten pipeline"), bDroppedNaturally);
     return true;
 }
 
@@ -505,7 +505,7 @@ bool FBreakerLegendaryDeadfallTest::RunTest(const FString& Parameters)
 
     // ...and it is a REDIRECTION, not the generic Unbound rewrite. Standing
     // still pays nothing, so the legendary cannot be strictly better than the
-    // Anomalous rule that frees every condition.
+    // Unwritten rule that frees every condition.
     TestEqual(TEXT("Deadfall pays nothing while standing still: it is not Unbound"),
         BreakerRuleIncreasedDamage(Deadfall, Standing), 0.0f, 0.001f);
     TestEqual(TEXT("Deadfall does not free unrelated conditional lines"),

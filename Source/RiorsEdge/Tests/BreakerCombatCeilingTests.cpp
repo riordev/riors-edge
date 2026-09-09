@@ -434,7 +434,7 @@ bool FBreakerCeilingDotWindowSnapshotTest::RunTest(const FString& Parameters)
 // DoT More lane multiplies on top inside the one O34 ceiling. That lane has
 // no author in the progression content since O95 took Long Dark's multiplier
 // away, so this test is now the only thing exercising it -- which is a reason
-// to keep it, not to delete it: an Anomalous rewrite is still permitted one.
+// to keep it, not to delete it: an Unwritten rewrite is still permitted one.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerCeilingDotAdditiveBucketTest,
     "RiorsEdge.Combat.Ceiling.DotAdditiveBucket",

@@ -17,7 +17,7 @@
 //   value = (Base + sum(Flat)) * (1 + sum(IncreasedPercent) / 100) * prod(More)
 // Flat sums first, all Increased percentages form ONE additive bucket per
 // stat across every contributor, and More multipliers compose multiplicatively
-// (reserved for trees and Anomalous items, capped by ruling O3).
+// (reserved for trees and Unwritten items, capped by ruling O3).
 
 // The attributes the unified pass owns. An attribute a single system owns
 // outright (Shield, Armor, ...) deliberately stays out.
@@ -186,7 +186,7 @@ struct RIORSEDGE_API FBreakerAttributeContribution
     // Each damage call contributes one source; Shared spends one slot for both lanes.
     void ComposeSharedMoreDamage(float Multiplier);
     // Composes into this contributor's More product. Reserved for tree
-    // keystones and Anomalous rule rewrites (O3 caps the composed budget).
+    // keystones and Unwritten rule rewrites (O3 caps the composed budget).
     void ComposeMore(EBreakerAggregatedAttribute Attribute, float Multiplier);
     void AddDamageMoreSource(FName Key, EBreakerDamageMoreLane Lane, float Multiplier);
     void SetDeadeye(bool bEnabled) { bDeadeye = bEnabled; }

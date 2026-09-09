@@ -139,7 +139,7 @@ enum class EBreakerModifierFamilyScope : uint8
 };
 
 // §1.4's selection weights. Internal names only — never surfaced in UI using
-// the words Aberrant or Anomalous, which are item rarities (§1.4 naming note).
+// the words Aberrant or Unwritten, which are item rarities (§1.4 naming note).
 UENUM(BlueprintType)
 enum class EBreakerModifierWeightClass : uint8
 {

@@ -7,7 +7,7 @@ namespace
     // Named with the file's subject: this project has twice shipped a unity-
     // build collision between identically named helpers in two anonymous
     // namespaces (see the note in BreakerLootLibrary.cpp).
-    constexpr int32 BreakerDropRarityCount = static_cast<int32>(EBreakerItemRarity::Anomalous) + 1;
+    constexpr int32 BreakerDropRarityCount = static_cast<int32>(EBreakerItemRarity::Unwritten) + 1;
 
     // Sub-seed salts. Arbitrary constants, but FIXED constants: changing one
     // re-rolls every drop in the game from the same kill seeds, which would
@@ -33,7 +33,7 @@ namespace
         float UncommonWeight = Params.UncommonWeight;
         float ExceptionalWeight = Params.ExceptionalWeight;
         float AberrantWeight = Params.AberrantWeight;
-        float AnomalousWeight = Params.AnomalousWeight;
+        float UnwrittenWeight = Params.UnwrittenWeight;
 
         const float Bonus = FMath::Clamp(DropChanceBonusPercent, 0.0f, 100.0f) / 100.0f;
         const float Shifted = StandardWeight * Bonus * 0.5f;
@@ -41,13 +41,13 @@ namespace
         UncommonWeight += Shifted * 0.55f;
         ExceptionalWeight += Shifted * 0.30f;
         AberrantWeight += Shifted * 0.12f;
-        AnomalousWeight += Shifted * 0.03f;
+        UnwrittenWeight += Shifted * 0.03f;
 
         OutWeights[static_cast<int32>(EBreakerItemRarity::Standard)] = StandardWeight;
         OutWeights[static_cast<int32>(EBreakerItemRarity::Uncommon)] = UncommonWeight;
         OutWeights[static_cast<int32>(EBreakerItemRarity::Exceptional)] = ExceptionalWeight;
         OutWeights[static_cast<int32>(EBreakerItemRarity::Aberrant)] = AberrantWeight;
-        OutWeights[static_cast<int32>(EBreakerItemRarity::Anomalous)] = AnomalousWeight;
+        OutWeights[static_cast<int32>(EBreakerItemRarity::Unwritten)] = UnwrittenWeight;
     }
 
     // Step 2. A gated rarity's weight becomes zero; nothing is redistributed
@@ -155,9 +155,9 @@ bool UBreakerDropTableLibrary::IsRarityUnlocked(EBreakerItemRarity Rarity, int32
     case EBreakerItemRarity::Aberrant:
         return ItemLevel >= Params.AberrantMinimumItemLevel
             && Order >= GetRankLootOrder(Params.AberrantMinimumRank);
-    case EBreakerItemRarity::Anomalous:
-        return ItemLevel >= Params.AnomalousMinimumItemLevel
-            && Order >= GetRankLootOrder(Params.AnomalousMinimumRank);
+    case EBreakerItemRarity::Unwritten:
+        return ItemLevel >= Params.UnwrittenMinimumItemLevel
+            && Order >= GetRankLootOrder(Params.UnwrittenMinimumRank);
     }
     return false;
 }
@@ -211,8 +211,8 @@ EBreakerItemRarity UBreakerDropTableLibrary::RollGatedRarity(int32 RandomSeed, i
         if ((Roll -= Weight) < 0.0f) return Last;
     }
     // Float slop only. Falls to the highest UNLOCKED rarity rather than to
-    // Anomalous unconditionally, which is the bug the original's bare
-    // `return Anomalous` tail would have had the moment a weight hit zero.
+    // Unwritten unconditionally, which is the bug the original's bare
+    // `return Unwritten` tail would have had the moment a weight hit zero.
     return Last;
 }
 
@@ -245,18 +245,18 @@ FBreakerLootRateProjection UBreakerDropTableLibrary::ProjectLootRate(const FBrea
         TArray<float> Probabilities;
         GetGatedRarityProbabilities(ItemLevel, Ranks[Index], DropChanceBonusPercent, Params, Probabilities);
         const float Aberrant = Probabilities[static_cast<int32>(EBreakerItemRarity::Aberrant)];
-        const float Anomalous = Probabilities[static_cast<int32>(EBreakerItemRarity::Anomalous)];
-        Projection.ExceptionalOrBetterPerHour += Drops * (Probabilities[static_cast<int32>(EBreakerItemRarity::Exceptional)] + Aberrant + Anomalous);
+        const float Unwritten = Probabilities[static_cast<int32>(EBreakerItemRarity::Unwritten)];
+        Projection.ExceptionalOrBetterPerHour += Drops * (Probabilities[static_cast<int32>(EBreakerItemRarity::Exceptional)] + Aberrant + Unwritten);
         Projection.AberrantPerHour += Drops * Aberrant;
-        Projection.AnomalousPerHour += Drops * Anomalous;
+        Projection.UnwrittenPerHour += Drops * Unwritten;
     }
 
     // Infinity is the honest answer when the rarity is gated out of this
     // content entirely: not "eventually", never.
     Projection.HoursPerAberrant = Projection.AberrantPerHour > 0.0f
         ? 1.0f / Projection.AberrantPerHour : TNumericLimits<float>::Max();
-    Projection.HoursPerAnomalous = Projection.AnomalousPerHour > 0.0f
-        ? 1.0f / Projection.AnomalousPerHour : TNumericLimits<float>::Max();
+    Projection.HoursPerUnwritten = Projection.UnwrittenPerHour > 0.0f
+        ? 1.0f / Projection.UnwrittenPerHour : TNumericLimits<float>::Max();
     return Projection;
 }
 

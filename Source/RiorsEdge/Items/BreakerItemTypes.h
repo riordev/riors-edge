@@ -11,7 +11,7 @@
 // rarity and affix category all ride in FBreakerItemInstance — so inserting an
 // entry re-points every stored item after the insertion point. A new slot
 // silently moves every saved Necklace into the Waist; a new rarity between
-// Aberrant and Anomalous turns every stored Anomalous into something else.
+// Aberrant and Unwritten turns every stored Unwritten into something else.
 // There is no version check that catches this, because the file is not
 // corrupt: it is valid data meaning something different. Renaming an
 // enumerator is safe (the value does not move); moving one is not.
@@ -36,7 +36,7 @@ enum class EBreakerItemRarity : uint8
     Uncommon,
     Exceptional,
     Aberrant,
-    Anomalous
+    Unwritten
 };
 
 UENUM(BlueprintType)
@@ -191,15 +191,15 @@ enum class EBreakerStatTarget : uint8
 // RULE REWRITES — what rarity MEANS above Exceptional.
 // ---------------------------------------------------------------------------
 // Before this, rarity gated affix COUNT and a tier ceiling and nothing else, so
-// an Anomalous item was a Standard item with more lines and finding one was an
+// an Unwritten item was a Standard item with more lines and finding one was an
 // arithmetic event rather than a build event. Item-Foundation always said
-// Anomalous was meant to be the home of rule rewrites (the locked aggregation
-// rule reserves More multipliers "for tree nodes and Anomalous rule rewrites")
+// Unwritten was meant to be the home of rule rewrites (the locked aggregation
+// rule reserves More multipliers "for tree nodes and Unwritten rule rewrites")
 // and nothing implemented it.
 //
 // THE CONSTRAINT THAT SHAPED EVERY ENTRY BELOW. O3 caps a build at THREE
 // composed More multipliers and the trees already author six options against
-// it, so an Anomalous rewrite that is simply a fourth More is either dead
+// it, so an Unwritten rewrite that is simply a fourth More is either dead
 // weight (the global clamp in FBreakerAttributeAggregator eats it) or a quiet
 // nerf to the three the player chose. So none of these is a More. Each one
 // changes a RULE the aggregation obeys — the precedent is a tree keystone,
@@ -215,7 +215,7 @@ enum class EBreakerItemRule : uint8
 {
     None,
 
-    // ---- Rolled on ordinary Anomalous drops ------------------------------
+    // ---- Rolled on ordinary Unwritten drops ------------------------------
     // UNBOUND. Every conditional affix line the wearer has pays out regardless
     // of whether its condition holds. Rewrites the predicate, not the number:
     // the lines still land in the same single additive bucket, they simply stop
@@ -286,9 +286,9 @@ struct RIORSEDGE_API FBreakerAffixDefinition
     // ---- The high-rarity identity pass (O11's reserved seat) --------------
     // The rarity FLOOR for this line. Standard means "the ordinary pool", which
     // is every affix that existed before this field did — the default keeps all
-    // of them exactly as authored. Aberrant/Anomalous mark the SPECIAL pools:
+    // of them exactly as authored. Aberrant/Unwritten mark the SPECIAL pools:
     // those definitions live in UBreakerAffixLibrary::GetAberrantAffixPool /
-    // GetAnomalousAffixPool rather than in the slice pool, so the generic affix
+    // GetUnwrittenAffixPool rather than in the slice pool, so the generic affix
     // loop and the Forge's Attune candidate walk (which both iterate the slice
     // pool) structurally cannot offer them below their rarity. The field is the
     // stated intent; the pool separation is the enforcement.
@@ -376,13 +376,13 @@ struct RIORSEDGE_API FBreakerItemInstance
     // field, so a retune never needs a save migration.
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerArmourArchetype ArmourArchetype = EBreakerArmourArchetype::None;
 
-    // THE RULE THIS ITEM REWRITES, or None. Rolled onto Anomalous drops and
+    // THE RULE THIS ITEM REWRITES, or None. Rolled onto Unwritten drops and
     // fixed on legendaries; every other item in the game leaves it None.
     //
     // It is a FIELD, not something derived from Rarity, and that distinction is
     // load-bearing. Deriving it from rarity would silently hand a rewrite to
-    // every Anomalous item that already exists in a save, in a test fixture, or
-    // in the power-band loadouts — which build every piece at Anomalous purely
+    // every Unwritten item that already exists in a save, in a test fixture, or
+    // in the power-band loadouts — which build every piece at Unwritten purely
     // to lift the tier cap. An item earns a rewrite when it is ROLLED one.
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerItemRule Rule = EBreakerItemRule::None;
 
@@ -440,7 +440,7 @@ struct RIORSEDGE_API FBreakerAffixComparison
 // Two displacements can happen at once and they are deliberately separate:
 // the ORDINARY one is the piece in the same slot, which every equip swaps out;
 // the LIMIT one is a second piece ejected because the rarity cap (O11 /
-// master sheet 4.1: Aberrant 3, Anomalous 1) is already met. The cap is never
+// master sheet 4.1: Aberrant 3, Unwritten 1) is already met. The cap is never
 // a refusal — it is disclosed, and the named piece is the piece that actually
 // leaves.
 USTRUCT(BlueprintType)
@@ -541,9 +541,9 @@ struct RIORSEDGE_API FBreakerEquipmentStats
     // ---- Rule rewrites ----------------------------------------------------
     // Every rule currently in force from equipped items, in the order the slots
     // were walked. Duplicates are impossible in practice — a rollable rule
-    // never doubles up because the non-legendary Anomalous axis caps at one
+    // never doubles up because the non-legendary Unwritten axis caps at one
     // (O37), a legendary's rule never doubles up because the legendary axis
-    // ALSO caps at one (O37, its own axis, separate from the Anomalous one
+    // ALSO caps at one (O37, its own axis, separate from the Unwritten one
     // per O32), and the two pools never share a value — but the array does
     // not assume it.
     UPROPERTY(BlueprintReadOnly) TArray<EBreakerItemRule> ActiveRules = {};

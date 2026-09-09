@@ -106,7 +106,7 @@ bool FBreakerForgeSalvageTest::RunTest(const FString& Parameters)
     // Salvage's rarity ordering is what makes a drop worth picking up rather
     // than walking past.
     float Previous = -1.0f;
-    for (int32 RarityIndex = 0; RarityIndex <= static_cast<int32>(EBreakerItemRarity::Anomalous); ++RarityIndex)
+    for (int32 RarityIndex = 0; RarityIndex <= static_cast<int32>(EBreakerItemRarity::Unwritten); ++RarityIndex)
     {
         const FBreakerItemInstance Item = BreakerForgeMakeItem(static_cast<EBreakerItemRarity>(RarityIndex), 5, {TEXT("Core.Health")});
         const float Riftglass = static_cast<float>(UBreakerForgeLibrary::SalvageValue(Item).Get());
@@ -221,11 +221,11 @@ bool FBreakerForgeTemperTest::RunTest(const FString& Parameters)
     // THE SPIKE IS PRICED, NOT GATED. With one currency the old "Sigil-only"
     // rule became a flat boss-scale price: a wallet one short of the T0 rung
     // is refused, and the refused craft spends nothing.
-    FBreakerItemInstance Nearly = BreakerForgeMakeItem(EBreakerItemRarity::Anomalous, 1, {TEXT("Offense.WeaponDamage")});
+    FBreakerItemInstance Nearly = BreakerForgeMakeItem(EBreakerItemRarity::Unwritten, 1, {TEXT("Offense.WeaponDamage")});
     const FBreakerForgeCost SpikeCost = UBreakerForgeLibrary::TemperCost(Nearly, 0);
     TestTrue(TEXT("The spike outprices the whole normal ladder"),
         SpikeCost.Amount > UBreakerForgeLibrary::TemperCost(
-            BreakerForgeMakeItem(EBreakerItemRarity::Anomalous, 2, {TEXT("Offense.WeaponDamage")}), 0).Amount);
+            BreakerForgeMakeItem(EBreakerItemRarity::Unwritten, 2, {TEXT("Offense.WeaponDamage")}), 0).Amount);
     FBreakerForgeWallet OneShort;
     OneShort.Add(SpikeCost.Amount - 1);
     TestEqual(TEXT("One Riftglass short of the spike is refused"),
@@ -236,7 +236,7 @@ bool FBreakerForgeTemperTest::RunTest(const FString& Parameters)
     // Prolific already grants a tier at aggregation time, so its printed
     // ceiling tightens by the same step. Two rules that each grant a tier must
     // compose to one T-1 ceiling, not to a T-2 the value curve has no entry for.
-    FBreakerItemInstance ProlificItem = BreakerForgeMakeItem(EBreakerItemRarity::Anomalous, 1, {TEXT("Offense.WeaponDamage")});
+    FBreakerItemInstance ProlificItem = BreakerForgeMakeItem(EBreakerItemRarity::Unwritten, 1, {TEXT("Offense.WeaponDamage")});
     ProlificItem.Rule = EBreakerItemRule::Prolific;
     TestEqual(TEXT("Prolific tightens the printed temper ceiling by its uplift"),
         UBreakerForgeLibrary::TemperCeilingForItem(ProlificItem), 0);
@@ -288,7 +288,7 @@ bool FBreakerForgeReforgeAttuneTest::RunTest(const FString& Parameters)
 
     // ATTUNE moves ids, never tiers, and the result has to be an item the drop
     // pipeline could have produced: slot-legal, no duplicates.
-    FBreakerItemInstance Attuned = BreakerForgeMakeItem(EBreakerItemRarity::Anomalous, 2,
+    FBreakerItemInstance Attuned = BreakerForgeMakeItem(EBreakerItemRarity::Unwritten, 2,
         {TEXT("Offense.WeaponDamage"), TEXT("Core.Health"), TEXT("Crit.Chance"), TEXT("Crit.Damage")});
     const TArray<FBreakerRolledAffix> AttuneBefore = Attuned.Affixes;
     FBreakerForgeWallet AttuneWallet = BreakerForgeRichWallet();
@@ -357,7 +357,7 @@ bool FBreakerForgeLoopTest::RunTest(const FString& Parameters)
     {
         Equipment->AddToBackpack(BreakerForgeMakeItem(EBreakerItemRarity::Standard, 7, {TEXT("Core.Health")}));
     }
-    Equipment->AddToBackpack(BreakerForgeMakeItem(EBreakerItemRarity::Anomalous, 2, {TEXT("Core.Health")}));
+    Equipment->AddToBackpack(BreakerForgeMakeItem(EBreakerItemRarity::Unwritten, 2, {TEXT("Core.Health")}));
     const int32 Expected = Equipment->CountBackpackBelowRarity(EBreakerItemRarity::Exceptional);
     TestEqual(TEXT("Bulk salvage melts exactly what the count promised"),
         Equipment->SalvageBackpackBelowRarity(EBreakerItemRarity::Exceptional), Expected);
@@ -366,7 +366,7 @@ bool FBreakerForgeLoopTest::RunTest(const FString& Parameters)
     // Temper an EQUIPPED item and watch the composed attribute move. This is
     // the assertion that the Forge is a gameplay system rather than a data
     // editor: a craft has to re-fold the contribution, not just repaint a card.
-    FBreakerItemInstance Worn = BreakerForgeMakeItem(EBreakerItemRarity::Anomalous, 5, {TEXT("Core.Health")});
+    FBreakerItemInstance Worn = BreakerForgeMakeItem(EBreakerItemRarity::Unwritten, 5, {TEXT("Core.Health")});
     TestTrue(TEXT("The item equips"), Equipment->EquipItem(Worn));
     const float BeforeHealth = Attributes->GetMaxHealth();
 

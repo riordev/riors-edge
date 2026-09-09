@@ -40,7 +40,7 @@ namespace BreakerCensus
     RIORSEDGE_API FString AffixesRelativePath();
 
     // The affix library as its data file: rows in pool order (slice, aberrant,
-    // anomalous, downside, elemental), enums by name, the display name as the
+    // unwritten, downside, elemental), enums by name, the display name as the
     // FText's source string, then the "leans" and "caps" objects. Returns the
     // text directly rather than an FJsonObject because FJsonObject holds
     // every number as a double and prints seventeen significant digits, which

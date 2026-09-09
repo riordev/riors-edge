@@ -10,10 +10,10 @@
 #include "Progression/BreakerBuildConditions.h"
 
 // ---------------------------------------------------------------------------
-// THE HIGH-RARITY IDENTITY PASS — special affixes for Aberrant and Anomalous.
+// THE HIGH-RARITY IDENTITY PASS — special affixes for Aberrant and Unwritten.
 // ---------------------------------------------------------------------------
 // O11 reserved Aberrant's "1-2 unique modifier affixes" and the seat is now
-// occupied; Anomalous gained one signature line BESIDE its rule. These tests
+// occupied; Unwritten gained one signature line BESIDE its rule. These tests
 // pin the four properties the pass promised: the pools' content is honest
 // (every line reaches gameplay, every condition is evaluable, every bill is a
 // real bill), the rarity gate is absolute in the downward direction, the roll
@@ -28,7 +28,7 @@ namespace BreakerSpecialAffixTest
     {
         TSet<FName> Ids;
         for (const FBreakerAffixDefinition& Affix : UBreakerAffixLibrary::GetAberrantAffixPool()) Ids.Add(Affix.AffixId);
-        for (const FBreakerAffixDefinition& Affix : UBreakerAffixLibrary::GetAnomalousAffixPool()) Ids.Add(Affix.AffixId);
+        for (const FBreakerAffixDefinition& Affix : UBreakerAffixLibrary::GetUnwrittenAffixPool()) Ids.Add(Affix.AffixId);
         for (const FBreakerAffixDefinition& Affix : UBreakerAffixLibrary::GetSpecialDownsidePool()) Ids.Add(Affix.AffixId);
         return Ids;
     }
@@ -87,13 +87,13 @@ bool FBreakerSpecialAffixPoolContentTest::RunTest(const FString& Parameters)
     using ALib = UBreakerAffixLibrary;
     const TArray<FBreakerAffixDefinition>& Slice = ALib::GetSliceAffixPool();
     const TArray<FBreakerAffixDefinition>& Aberrant = ALib::GetAberrantAffixPool();
-    const TArray<FBreakerAffixDefinition>& Anomalous = ALib::GetAnomalousAffixPool();
+    const TArray<FBreakerAffixDefinition>& Unwritten = ALib::GetUnwrittenAffixPool();
     const TArray<FBreakerAffixDefinition>& Downsides = ALib::GetSpecialDownsidePool();
 
     // The owner's brief and O11's number: a small pool of 6-10 for Aberrant,
-    // 4-6 rarer ones for Anomalous.
+    // 4-6 rarer ones for Unwritten.
     TestTrue(TEXT("Aberrant pool holds 6-10 special affixes"), Aberrant.Num() >= 6 && Aberrant.Num() <= 10);
-    TestTrue(TEXT("Anomalous pool holds 4-6 signature affixes"), Anomalous.Num() >= 4 && Anomalous.Num() <= 6);
+    TestTrue(TEXT("Unwritten pool holds 4-6 signature affixes"), Unwritten.Num() >= 4 && Unwritten.Num() <= 6);
 
     TSet<FName> SeenIds;
     auto CheckSpecialEntry = [this, &Slice, &Downsides, &SeenIds](const FBreakerAffixDefinition& Affix, EBreakerItemRarity ExpectedRarity)
@@ -156,7 +156,7 @@ bool FBreakerSpecialAffixPoolContentTest::RunTest(const FString& Parameters)
     };
 
     for (const FBreakerAffixDefinition& Affix : Aberrant) CheckSpecialEntry(Affix, EBreakerItemRarity::Aberrant);
-    for (const FBreakerAffixDefinition& Affix : Anomalous) CheckSpecialEntry(Affix, EBreakerItemRarity::Anomalous);
+    for (const FBreakerAffixDefinition& Affix : Unwritten) CheckSpecialEntry(Affix, EBreakerItemRarity::Unwritten);
 
     // The bills: constant NEGATIVE lines in ordinary buckets. Constant so the
     // deal reads as "this much, always"; negative or they are not bills.
@@ -207,7 +207,7 @@ bool FBreakerSpecialAffixPoolContentTest::RunTest(const FString& Parameters)
         }
     };
     CheckCoverage(Aberrant, TEXT("Aberrant"));
-    CheckCoverage(Anomalous, TEXT("Anomalous"));
+    CheckCoverage(Unwritten, TEXT("Unwritten"));
     return true;
 }
 
@@ -223,7 +223,7 @@ bool FBreakerSpecialAffixRarityGatingTest::RunTest(const FString& Parameters)
 {
     using namespace BreakerSpecialAffixTest;
     const TArray<FBreakerAffixDefinition>& AberrantPool = UBreakerAffixLibrary::GetAberrantAffixPool();
-    const TArray<FBreakerAffixDefinition>& AnomalousPool = UBreakerAffixLibrary::GetAnomalousAffixPool();
+    const TArray<FBreakerAffixDefinition>& UnwrittenPool = UBreakerAffixLibrary::GetUnwrittenAffixPool();
     const TSet<FName> AllSpecialIds = BreakerSpecialAllIds();
 
     // BELOW: no special or downside id may ever appear on Standard, Uncommon
@@ -249,7 +249,7 @@ bool FBreakerSpecialAffixRarityGatingTest::RunTest(const FString& Parameters)
     }
 
     // ACROSS: the pools are exclusive per rarity — an Aberrant never carries an
-    // Anomalous signature and an Anomalous never carries an Aberrant special,
+    // Unwritten signature and an Unwritten never carries an Aberrant special,
     // so each high rarity keeps its own identity. And WITHIN: an Aberrant
     // carries 1-2 special lines (O11's number) whenever the category caps left
     // it any room at all, which the per-slot category coverage makes the
@@ -264,8 +264,8 @@ bool FBreakerSpecialAffixRarityGatingTest::RunTest(const FString& Parameters)
                 static_cast<EBreakerEquipSlot>(SlotIndex), EBreakerItemRarity::Aberrant, 60, Seed * 977 + SlotIndex);
             ++AberrantDrops;
             if (BreakerSpecialItemHasAnyOf(Item, AberrantPool)) ++AberrantWithSpecial;
-            TestFalse(TEXT("An Aberrant never carries an Anomalous signature line"),
-                BreakerSpecialItemHasAnyOf(Item, AnomalousPool));
+            TestFalse(TEXT("An Aberrant never carries an Unwritten signature line"),
+                BreakerSpecialItemHasAnyOf(Item, UnwrittenPool));
 
             int32 SpecialLines = 0;
             for (const FBreakerRolledAffix& Rolled : Item.Affixes)
@@ -280,25 +280,25 @@ bool FBreakerSpecialAffixRarityGatingTest::RunTest(const FString& Parameters)
     TestEqual(*FString::Printf(TEXT("Every Aberrant carries a special line (%d of %d)"),
         AberrantWithSpecial, AberrantDrops), AberrantWithSpecial, AberrantDrops);
 
-    int32 AnomalousDrops = 0;
-    int32 AnomalousWithSignature = 0;
+    int32 UnwrittenDrops = 0;
+    int32 UnwrittenWithSignature = 0;
     for (int32 SlotIndex = 0; SlotIndex < static_cast<int32>(EBreakerEquipSlot::Count); ++SlotIndex)
     {
         for (int32 Seed = 1; Seed <= 80; ++Seed)
         {
             const FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(TEXT("Gate"),
-                static_cast<EBreakerEquipSlot>(SlotIndex), EBreakerItemRarity::Anomalous, 60, Seed * 613 + SlotIndex);
-            ++AnomalousDrops;
-            if (BreakerSpecialItemHasAnyOf(Item, AnomalousPool)) ++AnomalousWithSignature;
-            TestFalse(TEXT("An Anomalous never carries an Aberrant special line"),
+                static_cast<EBreakerEquipSlot>(SlotIndex), EBreakerItemRarity::Unwritten, 60, Seed * 613 + SlotIndex);
+            ++UnwrittenDrops;
+            if (BreakerSpecialItemHasAnyOf(Item, UnwrittenPool)) ++UnwrittenWithSignature;
+            TestFalse(TEXT("An Unwritten never carries an Aberrant special line"),
                 BreakerSpecialItemHasAnyOf(Item, AberrantPool));
             // The signature sits BESIDE the rule — the rule roll must not have
             // regressed. (Legendaries carry their fixed rule instead.)
-            TestTrue(TEXT("Every Anomalous still carries a rule"), Item.HasRule());
+            TestTrue(TEXT("Every Unwritten still carries a rule"), Item.HasRule());
         }
     }
-    TestEqual(*FString::Printf(TEXT("Every Anomalous carries its signature line (%d of %d)"),
-        AnomalousWithSignature, AnomalousDrops), AnomalousWithSignature, AnomalousDrops);
+    TestEqual(*FString::Printf(TEXT("Every Unwritten carries its signature line (%d of %d)"),
+        UnwrittenWithSignature, UnwrittenDrops), UnwrittenWithSignature, UnwrittenDrops);
 
     // EVERY pool entry is actually reachable at its rarity: for each special,
     // roll on one of its allowed slots until it shows. An authored line nobody
@@ -316,7 +316,7 @@ bool FBreakerSpecialAffixRarityGatingTest::RunTest(const FString& Parameters)
         TestTrue(*(Affix.AffixId.ToString() + TEXT(" is reachable at its rarity")), bSeen);
     };
     for (const FBreakerAffixDefinition& Affix : AberrantPool) AssertReachable(Affix, EBreakerItemRarity::Aberrant);
-    for (const FBreakerAffixDefinition& Affix : AnomalousPool) AssertReachable(Affix, EBreakerItemRarity::Anomalous);
+    for (const FBreakerAffixDefinition& Affix : UnwrittenPool) AssertReachable(Affix, EBreakerItemRarity::Unwritten);
 
     // A bill never appears without its carrier: the downside is part of the
     // deal, not an independent roll.
@@ -356,7 +356,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerSpecialAffixDeterminismTest::RunTest(const FString& Parameters)
 {
-    for (const EBreakerItemRarity Rarity : {EBreakerItemRarity::Aberrant, EBreakerItemRarity::Anomalous})
+    for (const EBreakerItemRarity Rarity : {EBreakerItemRarity::Aberrant, EBreakerItemRarity::Unwritten})
     {
         for (int32 SlotIndex = 0; SlotIndex < static_cast<int32>(EBreakerEquipSlot::Count); ++SlotIndex)
         {
@@ -451,7 +451,7 @@ bool FBreakerSpecialAffixReachGameplayTest::RunTest(const FString& Parameters)
             IncreasedDamage(Items, StateWith(EBreakerBuildCondition::Airborne)), 0.0f, 0.001f);
     }
 
-    // ENTROPY DEBT: the Anomalous flip — live only at empty resource.
+    // ENTROPY DEBT: the Unwritten flip — live only at empty resource.
     {
         const TArray<FBreakerItemInstance> Items = {BreakerSpecialMakeItem(EBreakerEquipSlot::Helmet, {TEXT("Anomaly.EntropyDebt")})};
         TestTrue(TEXT("Entropy Debt pays while the resource is empty"),
@@ -518,7 +518,7 @@ bool FBreakerSpecialAffixReachGameplayTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Failsafe pays nothing at full health"),
             IncreasedDamage({Flipped}, FBreakerBuildConditionState()), 0.0f, 0.001f);
         Flipped.Rule = EBreakerItemRule::Unbound;
-        Flipped.Rarity = EBreakerItemRarity::Anomalous;
+        Flipped.Rarity = EBreakerItemRarity::Unwritten;
         TestTrue(TEXT("Unbound frees a special conditional like any other"),
             IncreasedDamage({Flipped}, FBreakerBuildConditionState()) > 80.0f);
     }
@@ -537,17 +537,17 @@ bool FBreakerSpecialAffixNoRegressionTest::RunTest(const FString& Parameters)
 {
     using namespace BreakerSpecialAffixTest;
 
-    // A legendary still drops from the ordinary Anomalous pipeline, and now
-    // carries a signature line like every other Anomalous — the peak of the
+    // A legendary still drops from the ordinary Unwritten pipeline, and now
+    // carries a signature line like every other Unwritten — the peak of the
     // ladder is not exempt from the ladder's identity.
     bool bLegendaryDropped = false;
     for (int32 Seed = 1; Seed <= 600 && !bLegendaryDropped; ++Seed)
     {
         const FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(TEXT("Drop"),
-            EBreakerEquipSlot::Boots, EBreakerItemRarity::Anomalous, 50, Seed);
+            EBreakerEquipSlot::Boots, EBreakerItemRarity::Unwritten, 50, Seed);
         bLegendaryDropped = Item.IsLegendary();
     }
-    TestTrue(TEXT("A legendary still drops from the ordinary Anomalous pipeline"), bLegendaryDropped);
+    TestTrue(TEXT("A legendary still drops from the ordinary Unwritten pipeline"), bLegendaryDropped);
 
     const FBreakerItemInstance Deadfall = UBreakerLootLibrary::RollLegendary(TEXT("Legendary.Deadfall"), 50, 4242);
     TestTrue(TEXT("A legendary keeps its fixed rule beside the signature line"),
@@ -556,23 +556,23 @@ bool FBreakerSpecialAffixNoRegressionTest::RunTest(const FString& Parameters)
         UBreakerLootLibrary::RollLegendary(TEXT("Legendary.Deadfall"), 50, 4242).Affixes.Num() == Deadfall.Affixes.Num());
 
     // The O37 equip caps are untouched by the special lines: one legendary,
-    // one non-legendary Anomalous, three Aberrant — asserted through the same
+    // one non-legendary Unwritten, three Aberrant — asserted through the same
     // validator the save path uses, with REAL rolled items carrying real
     // special lines.
     TArray<FBreakerItemInstance> Loadout;
     Loadout.Add(UBreakerLootLibrary::RollLegendary(TEXT("Legendary.Overrun"), 50, 99));
-    FBreakerItemInstance Anomalous = UBreakerLootLibrary::RollItem(TEXT("Cap"), EBreakerEquipSlot::Necklace, EBreakerItemRarity::Anomalous, 50, 7);
-    Loadout.Add(Anomalous);
+    FBreakerItemInstance Unwritten = UBreakerLootLibrary::RollItem(TEXT("Cap"), EBreakerEquipSlot::Necklace, EBreakerItemRarity::Unwritten, 50, 7);
+    Loadout.Add(Unwritten);
     Loadout.Add(UBreakerLootLibrary::RollItem(TEXT("Cap"), EBreakerEquipSlot::Helmet, EBreakerItemRarity::Aberrant, 50, 11));
     Loadout.Add(UBreakerLootLibrary::RollItem(TEXT("Cap"), EBreakerEquipSlot::Gloves, EBreakerItemRarity::Aberrant, 50, 13));
     Loadout.Add(UBreakerLootLibrary::RollItem(TEXT("Cap"), EBreakerEquipSlot::Boots, EBreakerItemRarity::Aberrant, 50, 17));
     FText Failure;
-    TestTrue(TEXT("The O37 loadout (1 legendary, 1 Anomalous, 3 Aberrant) still validates"),
+    TestTrue(TEXT("The O37 loadout (1 legendary, 1 Unwritten, 3 Aberrant) still validates"),
         UBreakerEquipmentComponent::ValidateEquipCaps(Loadout, Failure));
 
-    FBreakerItemInstance SecondAnomalous = UBreakerLootLibrary::RollItem(TEXT("Cap"), EBreakerEquipSlot::Waist, EBreakerItemRarity::Anomalous, 50, 19);
-    Loadout.Add(SecondAnomalous);
-    TestFalse(TEXT("A second non-legendary Anomalous still fails validation"),
+    FBreakerItemInstance SecondUnwritten = UBreakerLootLibrary::RollItem(TEXT("Cap"), EBreakerEquipSlot::Waist, EBreakerItemRarity::Unwritten, 50, 19);
+    Loadout.Add(SecondUnwritten);
+    TestFalse(TEXT("A second non-legendary Unwritten still fails validation"),
         UBreakerEquipmentComponent::ValidateEquipCaps(Loadout, Failure));
     return true;
 }

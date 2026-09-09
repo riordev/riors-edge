@@ -60,7 +60,7 @@ namespace BreakerSwapPickerLayout
     }
 
     // ---- Text ------------------------------------------------------------
-    // The rarity word as the loadout prints it. O50: the Anomalous ENUMERATOR
+    // The rarity word as the loadout prints it. O50: the Unwritten ENUMERATOR
     // displays as UNWRITTEN; the enumerator itself never moves.
     inline const TCHAR* RarityWord(EBreakerItemRarity Rarity)
     {
@@ -69,7 +69,7 @@ namespace BreakerSwapPickerLayout
             case EBreakerItemRarity::Uncommon:    return TEXT("UNCOMMON");
             case EBreakerItemRarity::Exceptional: return TEXT("EXCEPTIONAL");
             case EBreakerItemRarity::Aberrant:    return TEXT("ABERRANT");
-            case EBreakerItemRarity::Anomalous:   return TEXT("UNWRITTEN");
+            case EBreakerItemRarity::Unwritten:   return TEXT("UNWRITTEN");
             default:                              return TEXT("STANDARD");
         }
     }

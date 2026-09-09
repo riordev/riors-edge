@@ -147,7 +147,7 @@ namespace BreakerPowerBandTest
         Item.ItemId = FGuid::NewGuid();
         Item.DefinitionId = TEXT("PowerBand");
         Item.Slot = Piece.Slot;
-        Item.Rarity = EBreakerItemRarity::Anomalous;
+        Item.Rarity = EBreakerItemRarity::Unwritten;
         // Which band this piece belongs to (O36): AtCapItemLevel or
         // EndgameItemLevel, passed by the caller rather than assumed here.
         Item.ItemLevel = ItemLevel;
@@ -663,14 +663,14 @@ namespace BreakerPowerBandTest
     // a value; a legendary or a rolled rule that comes out of the pipeline is
     // let through because the game grants it at that rarity.
     //
-    // THE EQUIP CAPS ARE HONOURED, not approximated: at most one Anomalous and
+    // THE EQUIP CAPS ARE HONOURED, not approximated: at most one Unwritten and
     // three Aberrant pieces are worn at once (EquipLimitForRarity), the rest
     // are Exceptional. Every slot is rolled at all three rarities, and the
     // capped rarities are handed to the slots where they buy the most over
     // that slot's best Exceptional â€” greedy, one slot at a time, per-slot
     // totals rather than a joint optimum, which is stated so nobody reads
-    // "best in slot" as "best loadout". Only ONE slot rolls Anomalous at all,
-    // so a legendary (its own equip axis, O37) cannot stack a second Anomalous
+    // "best in slot" as "best loadout". Only ONE slot rolls Unwritten at all,
+    // so a legendary (its own equip axis, O37) cannot stack a second Unwritten
     // beside it here. Cadence occupies both hands (the slot rule EquipItem
     // enforces), so a Cadence Primary ejects the Secondary from this loadout
     // exactly as it would from a worn one.
@@ -700,7 +700,7 @@ namespace BreakerPowerBandTest
         // rarities follow in the order they are handed out (rarest first).
         const EBreakerItemRarity Rarities[] = {
             EBreakerItemRarity::Exceptional,
-            EBreakerItemRarity::Anomalous,
+            EBreakerItemRarity::Unwritten,
             EBreakerItemRarity::Aberrant,
         };
         constexpr int32 RarityCount = UE_ARRAY_COUNT(Rarities);
@@ -799,7 +799,7 @@ namespace BreakerPowerBandTest
         };
         float BestScore = Score(Loadout);
         const EBreakerItemRarity Rarities[] = { EBreakerItemRarity::Exceptional,
-            EBreakerItemRarity::Anomalous, EBreakerItemRarity::Aberrant };
+            EBreakerItemRarity::Unwritten, EBreakerItemRarity::Aberrant };
         for (int32 Pass = 0; Pass < 3; ++Pass) // O2 PLACEHOLDER: bounded diagnostic search.
         {
             bool bImproved = false;
@@ -866,8 +866,8 @@ namespace BreakerPowerBandTest
     // RuleBandImpact tests below.
     // -----------------------------------------------------------------------
     // O2 PLACEHOLDER, and the reason it is stated here rather than felt later:
-    // one Anomalous rewrite is the top of the rarity ladder, so it has to be a
-    // real step. It must NOT be so large that finding the right Anomalous is
+    // one Unwritten rewrite is the top of the rarity ladder, so it has to be a
+    // real step. It must NOT be so large that finding the right Unwritten is
     // worth more than the whole optimized loadout, which is what "choices beat
     // accumulation" (O27) would look like inverted.
     constexpr float MaximumRuleStep = 1.35f;
@@ -976,7 +976,7 @@ namespace BreakerPowerBandTest
     //
     // WRONG BASIS. The endgame band is measured on a loadout carrying NO
     // rewrite -- the endgame test asserts exactly that, piece by piece ("A
-    // power-band piece carries no rewrite despite being Anomalous"), and then
+    // power-band piece carries no rewrite despite being Unwritten"), and then
     // asserts the measured band is untouched by the rarity pass. So 16x is what
     // the OTHER avenues produce with the rewrite layer absent, and taking a
     // quarter-share of it for rewrites shares a band that does not contain the
@@ -1278,19 +1278,19 @@ bool FBreakerPowerBandRolledBestInSlotTest::RunTest(const FString& Parameters)
     }
 
     // The shipped equip caps, read from the component rather than restated.
-    // Legendaries are counted INTO the Anomalous tally here on purpose: the
-    // helper rolls exactly one slot Anomalous, so the stricter reading holds
-    // and a legendary can never ride in as a second Anomalous piece.
-    int32 AnomalousCount = 0;
+    // Legendaries are counted INTO the Unwritten tally here on purpose: the
+    // helper rolls exactly one slot Unwritten, so the stricter reading holds
+    // and a legendary can never ride in as a second Unwritten piece.
+    int32 UnwrittenCount = 0;
     int32 AberrantCount = 0;
     for (const FBreakerItemInstance& Item : Loadout)
     {
-        if (Item.Rarity == EBreakerItemRarity::Anomalous) ++AnomalousCount;
+        if (Item.Rarity == EBreakerItemRarity::Unwritten) ++UnwrittenCount;
         if (Item.Rarity == EBreakerItemRarity::Aberrant) ++AberrantCount;
     }
-    TestTrue(*FString::Printf(TEXT("At most %d Anomalous piece(s) worn (found %d)"),
-        UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Anomalous), AnomalousCount),
-        AnomalousCount <= UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Anomalous));
+    TestTrue(*FString::Printf(TEXT("At most %d Unwritten piece(s) worn (found %d)"),
+        UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Unwritten), UnwrittenCount),
+        UnwrittenCount <= UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Unwritten));
     TestTrue(*FString::Printf(TEXT("At most %d Aberrant pieces worn (found %d)"),
         UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Aberrant), AberrantCount),
         AberrantCount <= UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Aberrant));
@@ -1459,12 +1459,12 @@ bool FBreakerPowerBandEndgameTest::RunTest(const FString& Parameters)
 // The band above is unchanged by the rarity pass, and that is by construction:
 // FBreakerItemInstance::Rule defaults to None and the two loadouts are authored
 // affix by affix, so the power-band characters carry no rewrite even though
-// every piece is built at Anomalous to lift the tier cap. Which means the band
+// every piece is built at Unwritten to lift the tier cap. Which means the band
 // test on its own would say NOTHING about whether the rewrites are balanced.
 //
 // This is that measurement, run at the ENDGAME fixture (ilvl 120): a rewrite
 // is available to a baseline and an optimized character alike, so the number
-// that matters is not the 12-20x band but the STEP: what one Anomalous piece
+// that matters is not the 12-20x band but the STEP: what one Unwritten piece
 // is worth on top of a build that has already done everything else right.
 // Logged in full, because the value of the rewrites is the deliverable and a
 // future tuning pass needs to see which one moved.
@@ -1547,7 +1547,7 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
         if (!Definition.bRollable) continue;   // legendaries have their own tests
 
         // The rewrite lands on ONE piece, because the equip cap is one
-        // Anomalous. Helmet: it carries damage, crit and a conditional line, so
+        // Unwritten. Helmet: it carries damage, crit and a conditional line, so
         // every rollable rewrite has something on it to bite on.
         TArray<FBreakerItemInstance> WithRule = OptimizedLoadout(BandItemLevel, OptimizedTierFor(BandItemLevel));
         WithRule[0].Rule = Definition.Rule;
@@ -1601,7 +1601,7 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
     TArray<FBreakerItemInstance> Untouched = OptimizedLoadout(EndgameItemLevel, OptimizedTierFor(EndgameItemLevel));
     for (const FBreakerItemInstance& Item : Untouched)
     {
-        TestEqual(TEXT("A power-band piece carries no rewrite despite being Anomalous"),
+        TestEqual(TEXT("A power-band piece carries no rewrite despite being Unwritten"),
             static_cast<int32>(Item.Rule), static_cast<int32>(EBreakerItemRule::None));
     }
     TestEqual(TEXT("The measured band is untouched by the rarity pass"),
@@ -1854,7 +1854,7 @@ bool FBreakerAffixBreadthTest::RunTest(const FString& Parameters)
         if (Affix.IsConditional()) ++ConditionalCount;
         TestTrue(*(Affix.AffixId.ToString() + TEXT(" rolls on at least one slot")), Affix.AllowedSlots.Num() > 0);
         // No affix may author a More multiplier; those are reserved for trees
-        // and Anomalous rule rewrites (O3, Item-Foundation's locked rule).
+        // and Unwritten rule rewrites (O3, Item-Foundation's locked rule).
         TestTrue(*(Affix.AffixId.ToString() + TEXT(" does not author a More multiplier")),
             Affix.StatBucket != EBreakerStatBucket::MorePercent);
     }

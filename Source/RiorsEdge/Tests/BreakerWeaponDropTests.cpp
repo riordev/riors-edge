@@ -49,7 +49,7 @@ namespace BreakerWeaponDropTest
         for (int32 Seed = 1; Accepted < Samples && Seed < Samples * 200; ++Seed)
         {
             const FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(
-                TEXT("Drop"), EBreakerEquipSlot::Primary, EBreakerItemRarity::Anomalous, 50, Seed);
+                TEXT("Drop"), EBreakerEquipSlot::Primary, EBreakerItemRarity::Unwritten, 50, Seed);
             if (Item.WeaponArchetype != Archetype) continue;
             ++Accepted;
             Total += BreakerDropCountAffix(Item, AffixId);

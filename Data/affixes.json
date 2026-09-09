@@ -1698,7 +1698,7 @@
 		},
 		{
 			"id": "Anomaly.EventHorizon",
-			"pool": "anomalous",
+			"pool": "unwritten",
 			"displayName": "Event Horizon",
 			"category": "Prefix",
 			"target": "AirborneDamage",
@@ -1714,12 +1714,12 @@
 			"valueAtT1": 170,
 			"rollWeight": 100,
 			"condition": "Airborne",
-			"minimumRarity": "Anomalous",
+			"minimumRarity": "Unwritten",
 			"pairedAffixId": ""
 		},
 		{
 			"id": "Anomaly.PhaseShear",
-			"pool": "anomalous",
+			"pool": "unwritten",
 			"displayName": "Phase Shear",
 			"category": "Suffix",
 			"target": "RecentlyDashedDamage",
@@ -1734,12 +1734,12 @@
 			"valueAtT1": 150,
 			"rollWeight": 100,
 			"condition": "RecentlyDashed",
-			"minimumRarity": "Anomalous",
+			"minimumRarity": "Unwritten",
 			"pairedAffixId": ""
 		},
 		{
 			"id": "Anomaly.EntropyDebt",
-			"pool": "anomalous",
+			"pool": "unwritten",
 			"displayName": "Entropy Debt",
 			"category": "Prefix",
 			"target": "WeaponDamage",
@@ -1756,12 +1756,12 @@
 			"valueAtT1": 200,
 			"rollWeight": 80,
 			"condition": "ResourceDepleted",
-			"minimumRarity": "Anomalous",
+			"minimumRarity": "Unwritten",
 			"pairedAffixId": ""
 		},
 		{
 			"id": "Anomaly.SingularityFeed",
-			"pool": "anomalous",
+			"pool": "unwritten",
 			"displayName": "Singularity Feed",
 			"category": "Suffix",
 			"target": "ResourceOnKill",
@@ -1780,12 +1780,12 @@
 			"valueAtT1": 70,
 			"rollWeight": 100,
 			"condition": "Always",
-			"minimumRarity": "Anomalous",
+			"minimumRarity": "Unwritten",
 			"pairedAffixId": ""
 		},
 		{
 			"id": "Anomaly.Riftplate",
-			"pool": "anomalous",
+			"pool": "unwritten",
 			"displayName": "Riftplate",
 			"category": "Suffix",
 			"target": "Armour",
@@ -1801,7 +1801,7 @@
 			"valueAtT1": 400,
 			"rollWeight": 100,
 			"condition": "Always",
-			"minimumRarity": "Anomalous",
+			"minimumRarity": "Unwritten",
 			"pairedAffixId": "Downside.Riftplate"
 		},
 		{
@@ -1873,7 +1873,7 @@
 			"valueAtT1": -10,
 			"rollWeight": 1,
 			"condition": "Always",
-			"minimumRarity": "Anomalous",
+			"minimumRarity": "Unwritten",
 			"pairedAffixId": ""
 		},
 		{

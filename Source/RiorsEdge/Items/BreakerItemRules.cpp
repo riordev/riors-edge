@@ -32,7 +32,7 @@ namespace
     {
         TArray<FBreakerItemRuleDefinition> Table;
 
-        // ---- Rollable Anomalous rewrites ----------------------------------
+        // ---- Rollable Unwritten rewrites ----------------------------------
         // Consumer for all three: UBreakerEquipmentComponent::AggregateStats,
         // whose output is submitted to UBreakerAttributeSet and read by
         // UBreakerCombatComponent. Nothing here stops at a card.
@@ -95,7 +95,7 @@ namespace
         // movement conformance pass.
         //
         // It is NOT bUnbound. Making every conditional line free would be
-        // strictly better than the Anomalous rewrite that does exactly that,
+        // strictly better than the Unwritten rewrite that does exactly that,
         // and a legendary that outclasses the generic rewrite makes the
         // generic rewrite dead content.
         FBreakerLegendaryDefinition Deadfall;

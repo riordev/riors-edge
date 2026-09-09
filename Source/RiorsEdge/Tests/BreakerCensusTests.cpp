@@ -98,15 +98,15 @@ bool FBreakerAffixesFreshTest::RunTest(const FString& Parameters)
     // The shipped configuration: an export of nothing cannot be fresh.
     TestTrue(TEXT("The slice pool carries the authored library, not a stub"), Data.Slice.Num() >= 20);
     TestTrue(TEXT("The Aberrant pool is populated"), Data.Aberrant.Num() > 0);
-    TestTrue(TEXT("The Anomalous pool is populated"), Data.Anomalous.Num() > 0);
+    TestTrue(TEXT("The Unwritten pool is populated"), Data.Unwritten.Num() > 0);
     TestTrue(TEXT("The downside pool is populated"), Data.Downsides.Num() > 0);
     TestTrue(TEXT("The elemental row is Core.ElementalResist"),
         Data.Elemental.AffixId == FName(TEXT("Core.ElementalResist")));
     TestEqual(TEXT("Every archetype has a lean table"),
         Data.Leans.Num(), static_cast<int32>(EBreakerWeaponArchetype::Count));
     TestTrue(TEXT("The lean tables carry rows"), LeanRows > 0);
-    AddInfo(FString::Printf(TEXT("Affix library: %d slice, %d aberrant, %d anomalous, %d downside, 1 elemental, %d leans across %d archetypes, %d caps"),
-        Data.Slice.Num(), Data.Aberrant.Num(), Data.Anomalous.Num(), Data.Downsides.Num(), LeanRows, Data.Leans.Num(), Data.Caps.Num()));
+    AddInfo(FString::Printf(TEXT("Affix library: %d slice, %d aberrant, %d unwritten, %d downside, 1 elemental, %d leans across %d archetypes, %d caps"),
+        Data.Slice.Num(), Data.Aberrant.Num(), Data.Unwritten.Num(), Data.Downsides.Num(), LeanRows, Data.Leans.Num(), Data.Caps.Num()));
 
     const FString Fresh = BreakerCensus::ExportAffixes(Data);
 
