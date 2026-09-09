@@ -7,6 +7,8 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "AbilitySystemComponent.h"
+#include "Abilities/BreakerAbilityComponent.h"
+#include "Abilities/BreakerAbilityDefinition.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -43,6 +45,11 @@ void ABreakerCoopCombatVerification::StopGuestFire()
 }
 void ABreakerCoopCombatVerification::EndPlay(const EEndPlayReason::Type Reason)
 {
+ if(IsValid(Guest) && Guest->GetCombat())
+ {
+  Guest->GetCombat()->OnDeath.RemoveDynamic(this,&ThisClass::ObserveGuestDeath);
+  Guest->GetCombat()->OnVitalsRestored.RemoveDynamic(this,&ThisClass::ObserveGuestRestore);
+ }
  StopGuestFire(); Super::EndPlay(Reason);
 }
 bool ABreakerCoopCombatVerification::SpawnTarget()
@@ -95,8 +102,25 @@ void ABreakerCoopCombatVerification::ObserveDeath()
  {
   UE_LOG(LogTemp,Display,TEXT("[CoopVerify] server target-death profile=%s target=%s guest-weapon-hits=%d"),
    *Guest->GetCoopCombatProfileId().ToString(),*Target->GetName(),GuestWeaponHits);
-  bExpired=true;
+  bTargetDefeated=true;
  }
+}
+void ABreakerCoopCombatVerification::ObserveGuestDeath(){++GuestDeaths;}
+void ABreakerCoopCombatVerification::ObserveGuestRestore(){++GuestRestores;}
+void ABreakerCoopCombatVerification::ServerBeginGuestDeathCheck_Implementation()
+{
+ // This actor exists only under the explicit isolated verification flag. The
+ // owner RPC follows the guest's actual target-death receipt, never a timer.
+ if(!HasAuthority() || bExpired || !bTargetDefeated || bGuestDeathIssued || !IsValid(Guest)
+  || GetOwner()!=Guest->GetController() || !Guest->GetCombat() || Guest->GetCombat()->IsDead())return;
+ bGuestDeathIssued=true;
+ GuestDeathPosition=Guest->GetActorLocation();
+ FBreakerDamageRequest Hit;
+ Hit.BaseDamage=1000000.0f; // O2 PLACEHOLDER verification-only environmental lethal hit.
+ Hit.bCanCritical=false;Hit.bCanBeAvoided=false;Hit.bBypassShield=true;Hit.SetInstigator(this);
+ Guest->GetCombat()->ReceiveDamage(Hit);
+ UE_LOG(LogTemp,Display,TEXT("[CoopVerify] server guest-lethal profile=%s health=%.2f death-events=%d awaiting=%d"),
+  *Guest->GetCoopCombatProfileId().ToString(),Guest->GetAttributes()->GetHealth(),GuestDeaths,Guest->IsAwaitingRespawn());
 }
 void ABreakerCoopCombatVerification::Tick(float DeltaSeconds)
 {
@@ -117,7 +141,24 @@ void ABreakerCoopCombatVerification::Tick(float DeltaSeconds)
     if(!It->GetController()->IsLocalController())Guest=*It;
    }
    if(Profiles.Num()<2 || !Guest){Guest=nullptr;return;}
-   GuestStart=Guest->GetActorLocation();ForceNetUpdate();
+   GuestStart=Guest->GetActorLocation();SetOwner(Guest->GetController());ForceNetUpdate();
+  }
+  if(!bGuestObserversBound && Guest->GetCombat())
+  {
+   Guest->GetCombat()->OnDeath.AddDynamic(this,&ThisClass::ObserveGuestDeath);
+   Guest->GetCombat()->OnVitalsRestored.AddDynamic(this,&ThisClass::ObserveGuestRestore);
+   bGuestObserversBound=true;
+  }
+  if(bGuestDeathIssued)
+  {
+   if(GuestDeaths==1 && GuestRestores==1 && Guest->GetAttributes()->GetHealth()>0 && !Guest->IsAwaitingRespawn())
+   {
+    UE_LOG(LogTemp,Display,TEXT("[CoopVerify] server guest-respawn profile=%s health=%.2f death-events=%d restore-events=%d distance=%.2f"),
+     *Guest->GetCoopCombatProfileId().ToString(),Guest->GetAttributes()->GetHealth(),GuestDeaths,GuestRestores,
+     FVector::Dist(GuestDeathPosition,Guest->GetActorLocation()));
+    bExpired=true;
+   }
+   return;
   }
   if(!bMoved && FVector::Dist2D(Guest->GetActorLocation(),GuestStart)>50)
   {
@@ -134,6 +175,30 @@ void ABreakerCoopCombatVerification::Tick(float DeltaSeconds)
  auto* PC=Cast<APlayerController>(Guest->GetController());
  auto* Weapon=Guest->FindComponentByClass<UBreakerWeaponComponent>();
  if(!PC || !Weapon)return;
+ if(!bGuestObserversBound && Guest->GetCombat())
+ {
+  Guest->GetCombat()->OnDeath.AddDynamic(this,&ThisClass::ObserveGuestDeath);
+  Guest->GetCombat()->OnVitalsRestored.AddDynamic(this,&ThisClass::ObserveGuestRestore);
+  bGuestObserversBound=true;
+ }
+ if(bGuestDeathRequested)
+ {
+  StopGuestFire();
+  const float GuestHealth=Guest->GetAttributes()->GetHealth();
+  if(!bGuestDeadSeen && GuestHealth<=0 && Guest->IsAwaitingRespawn() && !Guest->InputEnabled())
+  {
+   bGuestDeadSeen=true;
+   UE_LOG(LogTemp,Display,TEXT("[CoopVerify] client guest-dead-presentation profile=%s health=%.2f awaiting=1 input=0 death-events=%d restore-events=%d"),
+    *Guest->GetCoopCombatProfileId().ToString(),GuestHealth,GuestDeaths,GuestRestores);
+  }
+  if(bGuestDeadSeen && GuestHealth>0 && !Guest->IsAwaitingRespawn() && Guest->InputEnabled())
+  {
+   UE_LOG(LogTemp,Display,TEXT("[CoopVerify] client guest-revived-presentation profile=%s health=%.2f awaiting=0 input=1 death-events=%d restore-events=%d"),
+    *Guest->GetCoopCombatProfileId().ToString(),GuestHealth,GuestDeaths,GuestRestores);
+   bExpired=true;
+  }
+  return;
+ }
  if(Guest->IsWeaponsHolstered() || Guest->GetCombat()->IsDead()){StopGuestFire();return;}
  if(!bPresenceLogged)
  {
@@ -144,8 +209,40 @@ void ABreakerCoopCombatVerification::Tick(float DeltaSeconds)
   bPresenceLogged=true;
   UE_LOG(LogTemp,Display,TEXT("[CoopVerify] client distinct-player-presence count=%d profile=%s"),Profiles.Num(),*Guest->GetCoopCombatProfileId().ToString());
  }
+ // Observe the owner-facing getters only after replicated metadata AND real
+ // GAS specs agree. This gates ordinary smoke input, so missing metadata fails
+ // by timeout instead of a reflection-only success or a manufactured grant.
+ if(!bSlotMetadataLogged)
+ {
+  auto* Abilities=Guest->FindComponentByClass<UBreakerAbilityComponent>();
+  if(!Abilities)return;
+  const auto One=EBreakerAbilitySlot::ClassAbilityOne;
+  const auto Two=EBreakerAbilitySlot::ClassAbilityTwo;
+  const auto Ultimate=EBreakerAbilitySlot::Ultimate;
+  const auto* First=Abilities->GetDefinitionForSlot(One);
+  const auto* Ult=Abilities->GetDefinitionForSlot(Ultimate);
+  if(Abilities->GetAbilityIdForSlot(One)!=FName(TEXT("Swift.Slipcut"))
+   || Abilities->GetAbilityIdForSlot(Ultimate)!=FName(TEXT("Swift.Overdrive"))
+   || !First || First->AbilityId!=Abilities->GetAbilityIdForSlot(One)
+   || !Ult || Ult->AbilityId!=Abilities->GetAbilityIdForSlot(Ultimate)
+   || !Abilities->IsSlotImplemented(One) || !Abilities->IsSlotImplemented(Ultimate)
+   || !Abilities->IsSlotGranted(One) || !Abilities->IsSlotGranted(Ultimate)
+   || !Abilities->GetAbilityIdForSlot(Two).IsNone() || Abilities->GetDefinitionForSlot(Two)
+   || Abilities->IsSlotGranted(Two)
+   || !Abilities->GetAbilityIdForSlot(static_cast<EBreakerAbilitySlot>(255)).IsNone())return;
+  bSlotMetadataLogged=true;
+  UE_LOG(LogTemp,Display,TEXT("[CoopVerify] client owner-slot-definitions profile=%s first=%s second=none ultimate=%s real-specs=matched"),
+   *Guest->GetCoopCombatProfileId().ToString(),*First->AbilityId.ToString(),*Ult->AbilityId.ToString());
+ }
  // Ordinary movement consumer; replicated movement is independently observed
  // by authority above. No teleport, movement multicast or synthetic result.
+ if(PC->GetPawn()!=Guest || PC->GetViewTarget()!=Guest)return;
+ if(!bMovementInputStarted)
+ {
+  bMovementInputStarted=true;
+  Guest->AddMovementInput(FVector::ForwardVector,1);
+  return; // The preceding frame elapsed before input began; do not charge it.
+ }
  if(MoveAge<.5f){Guest->AddMovementInput(FVector::ForwardVector,1);MoveAge+=DeltaSeconds;return;}
  if(!IsValid(Target)){StopGuestFire();return;}
  const auto* ASC=Target->GetAbilitySystemComponent();
@@ -167,7 +264,12 @@ void ABreakerCoopCombatVerification::Tick(float DeltaSeconds)
  {
   StopGuestFire();
   if(!bDeathReceiptLogged){bDeathReceiptLogged=true;UE_LOG(LogTemp,Display,TEXT("[CoopVerify] client replicated-death target=%s health=%.2f"),*Target->GetName(),Health);}
-  bExpired=true;return;
+  if(GetOwner()==PC)
+  {
+   bGuestDeathRequested=true;
+   ServerBeginGuestDeathCheck();
+  }
+  return;
  }
  FVector Eye;FRotator View;PC->GetPlayerViewPoint(Eye,View);
  PC->SetControlRotation((Target->GetActorLocation()-Eye).Rotation());

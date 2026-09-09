@@ -5,8 +5,9 @@
 #include "BreakerCoopCombatVerification.generated.h"
 class ABreakerCharacter;
 class ABreakerEnemy;
-// Explicit nonsaving, two-process smoke driver. Never grants damage, ammo,
-// resources or progression. Completion is observed from real combat/replication.
+// Explicit nonsaving, two-process smoke driver. No ammo/resource/progression
+// grants. After the real weapon kill, a verification-only environmental damage
+// request exercises guest death and the existing authority respawn timer.
 UCLASS()
 class RIORSEDGE_API ABreakerCoopCombatVerification : public AActor
 {
@@ -24,10 +25,18 @@ private:
  UPROPERTY(Replicated) float InitialHealth=0;
  UFUNCTION() void ObserveDamage(const FBreakerHitContext& Hit);
  UFUNCTION() void ObserveDeath();
+ UFUNCTION(Server, Reliable) void ServerBeginGuestDeathCheck();
+ UFUNCTION() void ObserveGuestDeath();
+ UFUNCTION() void ObserveGuestRestore();
  bool SpawnTarget();
  void StopGuestFire();
  float Age=0,MoveAge=0,AimAge=0;
+ bool bSlotMetadataLogged=false,bMovementInputStarted=false;
  bool bMoved=false,bPresenceLogged=false,bInitialHealthSeen=false,bFiring=false;
  bool bHealthReceiptLogged=false,bDeathReceiptLogged=false,bExpired=false;
  int32 GuestWeaponHits=0;
+ int32 GuestDeaths=0,GuestRestores=0;
+ bool bTargetDefeated=false,bGuestDeathIssued=false,bGuestDeathRequested=false;
+ bool bGuestObserversBound=false,bGuestDeadSeen=false;
+ FVector GuestDeathPosition=FVector::ZeroVector;
 };

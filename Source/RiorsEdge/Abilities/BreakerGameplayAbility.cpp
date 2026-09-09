@@ -70,7 +70,7 @@ bool UBreakerGameplayAbility::CanActivateAbility(const FGameplayAbilitySpecHandl
 {
     const AActor* Avatar = ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
     const UBreakerCombatComponent* Combat = Avatar ? Avatar->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
-    if (Combat && Combat->IsStaggered()) return false;
+    if (Combat && (Combat->IsDead() || Combat->IsStaggered())) return false;
     const auto* Character = ActorInfo ? Cast<ABreakerCharacter>(ActorInfo->AvatarActor.Get()) : nullptr;
     if (Character && Character->GetAbilities()->IsAbilityCommitInProgress()) return false;
     return Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags);

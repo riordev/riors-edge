@@ -185,6 +185,9 @@ private:
     bool BuildLoadoutSignature(FString& OutSignature) const;
 
     UPROPERTY() TMap<EBreakerAbilitySlot, FBreakerGrantedAbility> GrantedBySlot;
+    // Owner HUD identity only. Actual authority grants remain in GAS.
+    UPROPERTY(ReplicatedUsing=OnRep_SlotAbilityIds) TArray<FName> SlotAbilityIds;
+    UFUNCTION() void OnRep_SlotAbilityIds();
 
     mutable TWeakObjectPtr<UAbilitySystemComponent> CachedAbilitySystem;
     mutable TWeakObjectPtr<UBreakerProgressionComponent> CachedProgression;

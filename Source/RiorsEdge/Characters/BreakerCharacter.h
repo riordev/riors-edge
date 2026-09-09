@@ -508,6 +508,8 @@ private:
     // onto the camera, the rig, the fade and the HUD flag. The respawn
     // teleport fires at BreakerDeathBeat::TeleportAtSeconds, under the black.
     void UpdateDeathBeat(float DeltaSeconds);
+    void ReconcileClientDeathPresentation();
+    bool bClientAwaitingHealthRevival = false;
     // Negative = no beat in flight.
     float DeathBeatElapsed = -1.0f;
     // The camera's authored relative location, captured in the constructor
@@ -522,7 +524,7 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Death Beat")
     FBreakerDeathBeatTimeline DeathBeat;
     // The HUD's read for the death beat's own line.
-    bool IsAwaitingRespawn() const { return bRespawnPending; }
+    bool IsAwaitingRespawn() const { return bRespawnPending || bClientAwaitingHealthRevival; }
     // 0 at the ready pose, 1 at the holster pose: how far the beat has
     // lowered the rig this frame. The viewmodel rest pose and pitch blend on
     // it; an Anchor pawn's permanent holster is the 1 case.

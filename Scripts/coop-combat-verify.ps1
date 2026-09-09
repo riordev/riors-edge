@@ -57,22 +57,35 @@ try {
   $hostText=(ReadSharedLog $hostLog)
   $ids=@([regex]::Matches($hostText,'\[CoopTest\] isolated profile=([A-Fa-f0-9-]+) authority=1')|ForEach-Object{$_.Groups[1].Value}|Select-Object -Unique)
   $guestText=if(Test-Path -LiteralPath $guestLog){(ReadSharedLog $guestLog)}else{''}
- } until(($ids.Count -ge 2 -and $guestText -match '\[CoopTest\].*(authority=0|received server profile)' -and $guestText -match '\[CoopTest\] local environment ready:' -and $hostText -match '\[CoopVerify\] server target-death' -and $guestText -match '\[CoopVerify\] client replicated-death') -or [DateTime]::UtcNow -ge $deadline)
+ } until(($ids.Count -ge 2 -and $guestText -match '\[CoopTest\].*(authority=0|received server profile)' -and $guestText -match '\[CoopTest\] local environment ready:' -and $hostText -match '\[CoopVerify\] server target-death' -and $guestText -match '\[CoopVerify\] client replicated-death' -and $hostText -match '\[CoopVerify\] server guest-respawn' -and $guestText -match '\[CoopVerify\] client guest-revived-presentation') -or [DateTime]::UtcNow -ge $deadline)
  if($ids.Count -lt 2){throw 'Server never initialized two distinct test profiles'}
  if($guestText -notmatch '\[CoopTest\].*(authority=0|received server profile)'){throw 'Guest has no initialized test profile'}
  if($guestText -notmatch '\[CoopTest\] local environment ready:'){throw 'Guest never built its Fernhall geometry and lighting'}
  foreach($pattern in @('server guest-movement','server guest-weapon-hit','server target-death')){
   if($hostText -notmatch ('\[CoopVerify\] '+$pattern)){throw ('Missing authoritative observation: '+$pattern)}
  }
- foreach($pattern in @('client distinct-player-presence','client initial-health','client fire-request','client replicated-health','client replicated-death')){
+ foreach($pattern in @('client owner-slot-definitions','client distinct-player-presence','client initial-health','client fire-request','client replicated-health','client replicated-death')){
   if($guestText -notmatch ('\[CoopVerify\] '+$pattern)){throw ('Missing guest observation: '+$pattern)}
  }
+ foreach($pattern in @('server guest-lethal profile=[A-Fa-f0-9-]+ health=0\.00 death-events=1 awaiting=1','server guest-respawn profile=[A-Fa-f0-9-]+ health=[1-9][0-9]*\.\d+ death-events=1 restore-events=1')){
+  if($hostText -notmatch ('\[CoopVerify\] '+$pattern)){throw ('Missing authoritative guest death/respawn: '+$pattern)}
+ }
+ foreach($pattern in @('client guest-dead-presentation profile=[A-Fa-f0-9-]+ health=0\.00 awaiting=1 input=0 death-events=0 restore-events=0','client guest-revived-presentation profile=[A-Fa-f0-9-]+ health=[1-9][0-9]*\.\d+ awaiting=0 input=1 death-events=0 restore-events=0')){
+  if($guestText -notmatch ('\[CoopVerify\] '+$pattern)){throw ('Missing guest replicated death/revival presentation: '+$pattern)}
+ }
  $requestProfile=[regex]::Match($guestText,'client fire-request profile=([A-Fa-f0-9-]+)').Groups[1].Value
+ $slotProfile=[regex]::Match($guestText,'client owner-slot-definitions profile=([A-Fa-f0-9-]+)').Groups[1].Value
+ if(!$slotProfile -or $slotProfile -ne $requestProfile){throw 'Owner slot metadata was not observed for the guest that actually fired'}
  $hitProfiles=@([regex]::Matches($hostText,'server guest-weapon-hit profile=([A-Fa-f0-9-]+)')|ForEach-Object{$_.Groups[1].Value}|Select-Object -Unique)
  if(!$requestProfile -or $hitProfiles -notcontains $requestProfile){throw 'Client request identity does not match server-attributed weapon damage'}
+ foreach($observation in @('server guest-lethal','server guest-respawn','client guest-dead-presentation','client guest-revived-presentation')){
+  $text=if($observation.StartsWith('server')){$hostText}else{$guestText}
+  $profile=[regex]::Match($text,($observation+' profile=([A-Fa-f0-9-]+)')).Groups[1].Value
+  if($profile -ne $requestProfile){throw ('Death/respawn identity mismatch: '+$observation)}
+ }
  # Displacement is observed during guest movement input; this does not prove
  # every centimetre came from input rather than knockback or another force.
- [pscustomobject]@{ServerProfiles=$ids;HostProcessId=$hostProcess.Id;GuestProcessId=$guestProcess.Id;Logs=$logDirectory;HostUserDir=$hostUserDirectory;GuestUserDir=$guestUserDirectory;Scope='Observed remote displacement during input, guest fire RPC, server weapon damage/death and client replicated health/death; displacement cause is not isolated'}|ConvertTo-Json
+ [pscustomobject]@{ServerProfiles=$ids;HostProcessId=$hostProcess.Id;GuestProcessId=$guestProcess.Id;Logs=$logDirectory;HostUserDir=$hostUserDirectory;GuestUserDir=$guestUserDirectory;Scope='Observed remote displacement during input, guest fire RPC, server weapon damage/death and client replicated health/death; actual guest death/server timer respawn/client presentation revival with no client gameplay delegates; displacement cause is not isolated'}|ConvertTo-Json
 }
 finally {
  if(!$KeepRunning){foreach($ownedProcess in @($guestProcess,$hostProcess)){if($ownedProcess -and !$ownedProcess.HasExited){Stop-Process -Id $ownedProcess.Id -Force}}}

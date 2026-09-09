@@ -280,6 +280,7 @@ void ABreakerCharacter::Tick(float DeltaSeconds)
     UpdateDashCameraFeedback(DeltaSeconds);
     UpdateCameraFieldOfView();
     UpdateCameraShake(DeltaSeconds);
+    ReconcileClientDeathPresentation();
     UpdateDeathBeat(DeltaSeconds);
     if (bTraversalDemoArmed)
     {
@@ -1786,10 +1787,48 @@ void ABreakerCharacter::RespawnAtTilesetStart()
     if (Combat) Combat->RestoreVitals();
 }
 
+void ABreakerCharacter::ReconcileClientDeathPresentation()
+{
+    // Health arrives through GAS replication. Reconcile here as possession may
+    // arrive after Health's OnRep; only the owning client's presentation changes.
+    // Never broadcast death, reset the encounter or schedule a client respawn.
+    if (HasAuthority() || !IsLocallyControlled() || !Attributes) return;
+    APlayerController* PC = Cast<APlayerController>(Controller);
+    if (!PC) return;
+    const bool bDead = Attributes->GetHealth() <= 0.0f;
+    if (bDead == bClientAwaitingHealthRevival) return;
+    bClientAwaitingHealthRevival = bDead;
+    if (bDead)
+    {
+        ClearHeldGameplayInput();
+        ConsumeMovementInputVector();
+        DisableInput(PC);
+        if (bDashRollApplied)
+        {
+            FRotator Rotation = PC->GetControlRotation();
+            Rotation.Roll = 0.0f;
+            PC->SetControlRotation(Rotation);
+        }
+        DashFeedbackElapsed = -1.0f;
+        bDashRollApplied = false;
+        if (FirstPersonCamera) CameraRestLocation = FirstPersonCamera->GetRelativeLocation();
+        DeathBeatElapsed = 0.0f;
+    }
+    else
+    {
+        // Replicated health, not a local elapsed-time guess, owns revival.
+        // The server owns teleport, ammunition, vitals and encounter reset.
+        EnableInput(PC);
+        DeathBeatElapsed = BreakerDeathBeat::TeleportAtSeconds(DeathBeat);
+    }
+}
+
 void ABreakerCharacter::UpdateDeathBeat(float DeltaSeconds)
 {
     if (DeathBeatElapsed < 0.0f) return;
     DeathBeatElapsed += DeltaSeconds;
+    if (bClientAwaitingHealthRevival)
+        DeathBeatElapsed = FMath::Min(DeathBeatElapsed, DeathBeat.LowerAndDropSeconds);
     const FBreakerDeathBeatSample Beat = BreakerDeathBeat::Sample(DeathBeat, DeathBeatElapsed);
     const bool bDone = Beat.Phase == EBreakerDeathBeatPhase::Done;
 

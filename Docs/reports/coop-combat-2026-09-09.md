@@ -36,6 +36,47 @@ Logs: `Saved/CoopSmoke/3e4e52a5b3c84f88bb4e24f06c448d3c`.
 This is actual fire-RPC and health/death transport evidence. It does not test
 latency compensation, matchmaking, NAT, persistent campaign progression,
 cross-map travel, full ability replication, drop contention, guest reconnect,
-or death/respawn handoff. Those remain explicit multiplayer acceptance work.
+or human death/respawn presentation quality. Those remain explicit multiplayer acceptance work.
 The verification target is no-loot/no-respawn and the harness aims automatically;
 it does not stand in for human combat feel or visual review.
+
+## Owner slots and guest respawn follow-up
+
+The owner now receives slot ability IDs, resolves their registry definitions,
+and reports a granted slot only when a real replicated GAS spec matches its
+class and input ID. Empty/invalid slots remain empty; no client grants are
+manufactured. Dead characters refuse both slot and direct GAS activation.
+
+The owning guest observes replicated physical health for presentation only:
+zero clears held input and starts the existing death beat; positive health
+restores input/fade. The server alone owns death events, respawn timing,
+teleport, ammunition and vitals restoration. Native tests cover actual paid
+activation before/after death and replicated-health presentation boundaries.
+
+Two-process verification passed at09:08 UTC, logs
+`Saved/CoopSmoke/475ca9d4220e4e4dbf6caf3f3b9ed012`:
+
+- Guest received Slipcut, empty second slot and Overdrive matched to real specs.
+- Nine actual guest weapon hits killed the ordinary220-health target.
+- Verification then issued one server environmental lethal hit. Server observed
+  one death and one normal timer restoration to100 health about2 seconds later.
+- Guest observed health0/input off and health100/input on, with zero local
+  gameplay death/restoration delegates. Identity matched the same firing guest.
+- Both disposable profiles and real save hashes remained protected.
+
+The input verifier now waits for possession and the guest view target, and
+starts its movement clock after issuing the first input. Counting the loading
+frame beforehand had consumed the entire short input window.
+
+Optional screenshot extension is parked outside the checkout: an early capture
+still disrupts that short movement phase. Three initial frames were inspected;
+two preceded camera readiness and one showed the actual rough first-person
+world without a complete combat HUD. No successful rendered death/revival
+sequence is claimed. Do not treat script receipts as visual acceptance.
+
+Remaining multiplayer work includes local predicted ability activation/HUD
+feedback, actual cost/effect transport, loot contention, reconnect, campaign
+support, and human input/presentation checks. This remains a transient Swift
+combat sandbox, not a multiplayer campaign release.
+
+Final build/full suite:854 passing,3 expected reds,0 unexpected; status regenerated.

@@ -39,6 +39,7 @@ void UBreakerAbilityComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProper
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME_CONDITION(UBreakerAbilityComponent, ConductionCastTimes, COND_OwnerOnly);
+    DOREPLIFETIME_CONDITION(UBreakerAbilityComponent, SlotAbilityIds, COND_OwnerOnly);
 }
 
 double UBreakerAbilityComponent::ConductionClock() const
@@ -665,6 +666,12 @@ void UBreakerAbilityComponent::RefreshGrants()
         OnSlotChanged.Broadcast(Slot, Granted.AbilityId);
     }
 
+    SlotAbilityIds.Reset(UE_ARRAY_COUNT(Slots));
+    for (const EBreakerAbilitySlot Slot : Slots)
+    {
+        const FBreakerGrantedAbility* Granted = GrantedBySlot.Find(Slot);
+        SlotAbilityIds.Add(Granted ? Granted->AbilityId : NAME_None);
+    }
     BuildLoadoutSignature(CachedLoadoutSignature);
 }
 
@@ -690,7 +697,7 @@ bool UBreakerAbilityComponent::TryActivateSlot(EBreakerAbilitySlot Slot)
 {
     if (bAbilityCommitInProgress) return false;
     const UBreakerCombatComponent* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
-    if (Combat && Combat->IsStaggered()) return false;
+    if (Combat && (Combat->IsDead() || Combat->IsStaggered())) return false;
     const FBreakerGrantedAbility* Granted = GrantedBySlot.Find(Slot);
     UAbilitySystemComponent* ASC = GetAbilitySystem();
     if (!ASC)
@@ -757,25 +764,46 @@ void UBreakerAbilityComponent::ServerActivateSlot_Implementation(EBreakerAbility
 FName UBreakerAbilityComponent::GetAbilityIdForSlot(EBreakerAbilitySlot Slot) const
 {
     const FBreakerGrantedAbility* Granted = GrantedBySlot.Find(Slot);
-    return Granted ? Granted->AbilityId : NAME_None;
+    if (Granted) return Granted->AbilityId;
+    const int32 Index = Slot == EBreakerAbilitySlot::ClassAbilityOne ? 0
+        : Slot == EBreakerAbilitySlot::ClassAbilityTwo ? 1 : Slot == EBreakerAbilitySlot::Ultimate ? 2 : INDEX_NONE;
+    return GetOwner() && !GetOwner()->HasAuthority() && SlotAbilityIds.IsValidIndex(Index) ? SlotAbilityIds[Index] : NAME_None;
 }
 
 UBreakerAbilityDefinition* UBreakerAbilityComponent::GetDefinitionForSlot(EBreakerAbilitySlot Slot) const
 {
     const FBreakerGrantedAbility* Granted = GrantedBySlot.Find(Slot);
-    return Granted ? Granted->Definition.Get() : nullptr;
+    if (Granted) return Granted->Definition.Get();
+    const FName Id = GetAbilityIdForSlot(Slot);
+    return Id.IsNone() ? nullptr : UBreakerAbilityDefinition::FindFallback(Id);
 }
 
 bool UBreakerAbilityComponent::IsSlotImplemented(EBreakerAbilitySlot Slot) const
 {
     const FBreakerGrantedAbility* Granted = GrantedBySlot.Find(Slot);
-    return Granted && Granted->bImplemented;
+    if (Granted) return Granted->bImplemented;
+    const auto* Definition = GetDefinitionForSlot(Slot);
+    return Definition && Definition->IsImplemented();
 }
 
 bool UBreakerAbilityComponent::IsSlotGranted(EBreakerAbilitySlot Slot) const
 {
     const FBreakerGrantedAbility* Granted = GrantedBySlot.Find(Slot);
-    return Granted && Granted->Handle.IsValid();
+    if (Granted) return Granted->Handle.IsValid();
+    // Metadata and GAS specs may arrive in either order. Until both agree,
+    // the HUD cannot advertise a usable grant. Never manufacture a handle.
+    const auto* Definition = GetDefinitionForSlot(Slot);
+    auto* ASC = GetAbilitySystem();
+    if (!GetOwner() || GetOwner()->HasAuthority() || !Definition || !ASC) return false;
+    for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+        if (Spec.InputID == static_cast<int32>(Slot) && Spec.Ability && Spec.Ability->GetClass() == Definition->AbilityClass.Get()) return true;
+    return false;
+}
+
+void UBreakerAbilityComponent::OnRep_SlotAbilityIds()
+{
+    const EBreakerAbilitySlot Slots[] = { EBreakerAbilitySlot::ClassAbilityOne, EBreakerAbilitySlot::ClassAbilityTwo, EBreakerAbilitySlot::Ultimate };
+    for (const EBreakerAbilitySlot Slot : Slots) OnSlotChanged.Broadcast(Slot, GetAbilityIdForSlot(Slot));
 }
 
 bool UBreakerAbilityComponent::SlotHasCooldown(EBreakerAbilitySlot Slot) const
