@@ -106,6 +106,9 @@ public:
     static float AbilityChannelRateMultiplierFor(const AActor* OwnerActor);
     static float ComposeAbilityDurationMultiplier(const FBreakerNodeStats& Stats, EBreakerAbilityDurationKind Kind);
     static float AbilityDurationMultiplierFor(const AActor* OwnerActor, EBreakerAbilityDurationKind Kind = EBreakerAbilityDurationKind::Generic);
+    // O252: the shared ability skill level this owner carries, 1-15. Public
+    // so the HUD can print it — a chase the player cannot see is dead content.
+    UFUNCTION(BlueprintPure, Category="Abilities") static int32 SkillLevelFor(const AActor* OwnerActor);
     static float AbilityBaseDamageFor(const AActor* OwnerActor, float ScaledAuthoredBase);
     // The cooldown DIVISOR (DashCooldownReduction's convention: 1.20 == 20%
     // shorter). Never at or below zero — the aggregator floors it.

@@ -4,9 +4,11 @@
 #include "Abilities/BreakerAbilityComponent.h"
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Abilities/BreakerAbilityTags.h"
+#include "Abilities/BreakerSkillLevelMath.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Progression/BreakerExperience.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Weapons/BreakerWeaponComponent.h"
 
@@ -182,12 +184,31 @@ float UBreakerGameplayAbility::ComposeAbilityDurationMultiplier(const FBreakerNo
     return FMath::Max(0.0f, 1.0f + Percent * .01f);
 }
 
+int32 UBreakerGameplayAbility::SkillLevelFor(const AActor* OwnerActor)
+{
+    const auto* Progression = OwnerActor ? OwnerActor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    if (!Progression) return BreakerSkillLevel::MinLevel;
+    return BreakerSkillLevel::ForCharacterLevel(
+        Progression->GetCharacterLevel(), UBreakerExperienceLibrary::MaxCharacterLevel);
+}
+
 float UBreakerGameplayAbility::AbilityBaseDamageFor(const AActor* OwnerActor, float ScaledAuthoredBase)
 {
     if (!FMath::IsFinite(ScaledAuthoredBase) || ScaledAuthoredBase <= 0.0f) return 0.0f;
     const auto* Progression = OwnerActor ? OwnerActor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
     const float Added = Progression ? Progression->GetNodeStats().AddedAbilityPower : 0.0f;
-    return FMath::Max(0.0f, ScaledAuthoredBase + (FMath::IsFinite(Added) ? Added : 0.0f));
+    // O252: the skill level scales the ABILITY'S OWN base and nothing else.
+    // Gear's Added Ability Power lands after it, so a skill level never
+    // multiplies what the player bolted on — the same partition the weapon
+    // lane keeps between a gun's base and Added Damage.
+    //
+    // READ LIVE, not from the granted spec's level. GAS carries an ability
+    // level and the grant site now sets it honestly, but re-granting on every
+    // level-up to keep a spec current would reset ability state for a number
+    // that is a pure function of character level anyway. This is the source of
+    // truth; the spec's level is for inspection.
+    const float Scaled = ScaledAuthoredBase * BreakerSkillLevel::DamageMultiplier(SkillLevelFor(OwnerActor));
+    return FMath::Max(0.0f, Scaled + (FMath::IsFinite(Added) ? Added : 0.0f));
 }
 
 float UBreakerGameplayAbility::AbilityCooldownReductionFor(const AActor* OwnerActor)

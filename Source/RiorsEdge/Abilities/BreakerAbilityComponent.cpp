@@ -650,7 +650,15 @@ void UBreakerAbilityComponent::RefreshGrants()
         Granted.bImplemented = Definition->IsImplemented();
         if (Granted.bImplemented)
         {
-            FGameplayAbilitySpec Spec(Definition->AbilityClass, 1, static_cast<int32>(Slot), Owner);
+            // O252: granted AT the character's shared skill level rather than
+            // the flat 1 that stood here, so GetAbilityLevel() reports
+            // something true to anyone who inspects it. It is NOT the source of
+            // truth for damage — UBreakerGameplayAbility::AbilityBaseDamageFor
+            // reads the level live, because keeping a spec current would mean
+            // re-granting on every level-up and that resets ability state for a
+            // number which is a pure function of character level anyway.
+            FGameplayAbilitySpec Spec(Definition->AbilityClass,
+                UBreakerGameplayAbility::SkillLevelFor(Owner), static_cast<int32>(Slot), Owner);
             Granted.Handle = ASC->GiveAbility(Spec);
         }
         GrantedBySlot.Add(Slot, Granted);
