@@ -49,7 +49,12 @@ bool FBreakerCoreRosterAbilityAuthoringTest::RunTest(const FString& Parameters)
         if (N->CoreRole == EBreakerCoreNodeRole::Keystone) TestEqual(TEXT("Local keystone gate"), N->RequiredConstellationInvestment, 18);
     }
     TestEqual(TEXT("Ability offered points"), Offered, 78);
-    TestEqual(TEXT("Exact authored lane count"), EffectCount, 30);
+    // 30 -> 33 under O254: Prime, Channel and Reach each gained a crit effect
+    // beside the ability line they already carried. The three magnitudes are
+    // Core.Precision's own, mirrored rather than invented, so the ability lane
+    // stops being unable to buy crit at all. This count exists to make exactly
+    // this kind of change announce itself, and it did.
+    TestEqual(TEXT("Exact authored lane count"), EffectCount, 33);
     auto Find = [&](const TCHAR* Id) -> const UBreakerProgressionNode*
     { for (const UBreakerProgressionNode* N : Tree->Nodes) if (N->NodeId == FName(Id)) return N; AddError(FString(TEXT("Missing ")) + Id); return nullptr; };
     using T = EBreakerNodeStatTarget; using B = EBreakerNodeStatBucket;

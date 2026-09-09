@@ -613,9 +613,20 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy") bool bDropsLoot = true;
     // Wave-mode enemies die for good instead of recycling.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy") bool bRespawns = true;
-    // Death chain: dying enemies detonate for a fraction of their max
-    // health, damaging nearby enemies (never the player). Dense packs pop.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy") bool bExplodesOnDeath = true;
+    // Death chain: a dying enemy detonates for a fraction of its max health
+    // against nearby enemies (never the player).
+    //
+    // OFF BY DEFAULT, AND THAT IS THE RULING (O261). A pack is not supposed to
+    // thin itself: an enemy death damages other enemies only where a PLAYER
+    // source says it does — an item, a tree node, an ability. Shipped true, it
+    // cascaded a four-body trash pack from one kill, contradicted the
+    // friendly-fire convention Combat/BreakerZoneActor.cpp states outright,
+    // and paid the player nothing for the kills it made because the dealer was
+    // the corpse. Nothing authors a player on-kill detonation today, so this
+    // stays false everywhere until something does; the property survives as
+    // the mechanism that effect will set, rather than as a default nobody
+    // asked for. Both magnitudes below stay O2 until such an effect is felt.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy") bool bExplodesOnDeath = false;   // O261
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy", meta=(ClampMin="0", ClampMax="1")) float DeathExplosionHealthFraction = 0.35f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy", meta=(ClampMin="0")) float DeathExplosionRadius = 420.0f;
 

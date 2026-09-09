@@ -3,17 +3,25 @@
 
 namespace BreakerCoreRoster
 {
+// O254: THE ABILITY WEDGE AUTHORS CRIT TOO. Core.Precision was the only wedge
+// in the whole roster carrying a CriticalChance or CriticalDamage effect, and
+// it is tagged Weapon — which is the entire reason ability crit measured 0.812
+// of weapon crit. The three magnitudes added below are Precision's own
+// (Sightline's 6, Angle's 2 per rank, TriggerDiscipline's 25), mirrored onto
+// three Arc nodes rather than invented, so no new number enters the game and
+// no new lane, attribute or enum is required. Crit stays the build-gated site
+// multiplier O34 already permits; this only stops it being weapon-only.
 void AppendAbility(UObject* Outer, TArray<FBreakerCoreWedgeDefinition>& Wedges)
 {
     using T = EBreakerNodeStatTarget;
     using B = EBreakerNodeStatBucket;
     Wedges.Add({TEXT("Arc"), TEXT("Ability"), true,
-        Node(Outer, TEXT("Core.Arc.Prime"), TEXT("Prime"), TEXT("8% increased Ability Damage."), {Effect(T::AbilityDamage, B::IncreasedPercent, 8.f)}), // O2 PLACEHOLDER
+        Node(Outer, TEXT("Core.Arc.Prime"), TEXT("Prime"), TEXT("8% increased Ability Damage and 6 Critical Damage."), {Effect(T::AbilityDamage, B::IncreasedPercent, 8.f), Effect(T::CriticalDamage, B::Flat, 6.f)}), // O2 PLACEHOLDER
         {
-            {Node(Outer, TEXT("Core.Arc.Channel"), TEXT("Channel"), TEXT("6% increased Ability Damage per rank."), {Effect(T::AbilityDamage, B::IncreasedPercent, 6.f)}), // O2 PLACEHOLDER
+            {Node(Outer, TEXT("Core.Arc.Channel"), TEXT("Channel"), TEXT("6% increased Ability Damage and 2% Critical Chance per rank."), {Effect(T::AbilityDamage, B::IncreasedPercent, 6.f), Effect(T::CriticalChance, B::Flat, 2.f)}), // O2 PLACEHOLDER
              Node(Outer, TEXT("Core.Arc.Widen"), TEXT("Widen"), TEXT("15% increased Ability Area."), {Effect(T::AbilityArea, B::IncreasedPercent, 15.f)})}, // O2 PLACEHOLDER
             {Node(Outer, TEXT("Core.Arc.Vent"), TEXT("Vent"), TEXT("4 Added Ability Power per rank."), {Effect(T::AddedAbilityPower, B::Flat, 4.f)}), // O2 PLACEHOLDER
-             Node(Outer, TEXT("Core.Arc.Reach"), TEXT("Reach"), TEXT("25% increased Ability Damage."), {Effect(T::AbilityDamage, B::IncreasedPercent, 25.f)})}, // O2 PLACEHOLDER
+             Node(Outer, TEXT("Core.Arc.Reach"), TEXT("Reach"), TEXT("25% increased Ability Damage and 25 Critical Damage."), {Effect(T::AbilityDamage, B::IncreasedPercent, 25.f), Effect(T::CriticalDamage, B::Flat, 25.f)})}, // O2 PLACEHOLDER
             {Node(Outer, TEXT("Core.Arc.Anchor"), TEXT("Anchor"), TEXT("6% increased Ability Area per rank."), {Effect(T::AbilityArea, B::IncreasedPercent, 6.f)}), // O2 PLACEHOLDER
              Node(Outer, TEXT("Core.Arc.Persistence"), TEXT("Persistence"), TEXT("20% increased zone and window duration."), {Effect(T::ZoneAndWindowDuration, B::IncreasedPercent, 20.f)})} // O2 PLACEHOLDER
         },

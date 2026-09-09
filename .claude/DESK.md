@@ -17,34 +17,12 @@ about the code is not a measurement — it should be DERIVED from whether a
 mission beat names the source, the way every other row on that table is
 measured. Not done here; the wiring was the urgent half.
 
-## Owner ruling needed — do enemies damage each other on death?
+## Landed: the chain is a player effect now (O261)
 
-An ordinary enemy chain-detonates when it dies: `ABreakerEnemy::HandleDeath`
-(`Combat/BreakerEnemy.cpp:1393-1411`) deals `MaxHealth * 0.35` Physical to
-every live enemy within 420 cm. `bExplodesOnDeath = true` is the CLASS
-DEFAULT (`Combat/BreakerEnemy.h:618`); only split copies and the boss opt
-out. It ships on and fires in ordinary play — a pack of four trash at area
-level 1 cascades itself: first kill leaves the survivors at 143, the second
-at 66, the third finishes them.
-
-- It was authorised once (commit `7766649`) but NO LIVE RULING covers it —
-  nothing in DECISIONS.md, nothing in Docs/spec/.
-- It contradicts the friendly-fire convention the rest of `Combat/` states
-  outright at `Combat/BreakerZoneActor.cpp:477-482`: "a zone cast by an enemy
-  never touches another enemy ... a pack melting itself in its own hazard
-  reads as a bug." Enemy projectiles keep the same rule.
-- The cascade's kills PAY THE PLAYER NOTHING — the dealer is the corpse, so
-  Feed, Scrap, on-kill nodes and deployable listeners never see them. Exactly
-  the defect O245 just fixed for the Volatile blast, in a second place.
-- Both magnitudes (0.35, 420 cm) carry no O2 PLACEHOLDER marker.
-
-THREE ANSWERS, all one commit: (a) it goes — flip the default to false, which
-authors nothing and matches the stated convention; (b) it stays and is ruled,
-in which case it needs CreditTo so a cascade kill pays the player, the two
-numbers get O2 markers, and the trash TTK bands are re-measured against O18;
-(c) it stays only for a named archetype rather than every trash body.
-NOT TAKEN UNILATERALLY: this changes how every fight feels, and it is the
-owner's mechanic to keep or cut.
+The on-death chain ships OFF. `bExplodesOnDeath` defaults false; an enemy
+death damages other enemies only where a player source says it does. Nothing
+authors such an effect yet, so the property survives as the mechanism one
+will set rather than as a default nobody asked for. Both magnitudes stay O2.
 
 ## Cycle — the kit programme (O252-O260)
 
@@ -54,15 +32,9 @@ unblocks the most rather than by class.
 
 - [x] O260 LANDED. Anomalous -> Unwritten across 54 files, 335 insertions against 335 deletions — a pure rename with no net change. The enumerator keeps its value (4), so no saved item moves. Data/affixes.json moved with it because `BreakerAffixReadEnum` parses the rarity BY ENUMERATOR NAME, and the pool word "anomalous" with it. Two uppercase display literals were missed by the first word-boundary pass and caught by `Items.LootPickup.DisplayLabel` going red — the label derives from the enum, so the code was right and the test's expectation was stale.
 - OWNER, EDITOR ONLY: `Content/Breaker/UI/Marks/T_RarityUnwritten` does not exist — the asset is still `T_RarityAnomalous.uasset`, and `Scripts/import_marks.py:31` still maps that name to `rarity-anomalous_256.png`. Both are left deliberately: renaming the key without renaming the binary asset and its source PNG breaks the import, and a .uasset cannot be hand-edited. Nothing in C++ resolves that texture by name today, so it is cosmetic drift in content, not a broken reference.
-- [ ] O254 The ability lane's real shortfall. CORRECTED: the flat half ALREADY SHIPS — `Ability.AddedPower` targets `AbilityDamage` in the Flat bucket on the same six slots and anchors as `Offense.AddedDamage`, and aggregates at `BreakerEquipmentComponent.cpp:1317`. A second flat line would have been a duplicate lane. The suite's own decomposition names the actual gap: parity 0.526x = flat 0.867 x increased 0.735 x more 1.016 x crit 0.812. Two levers, in order — (a) INCREASED BREADTH, the largest single factor, where the weapon pool simply carries more lines than the ability pool; (b) CRIT, where `WeaponCriticalDamage` has no ability counterpart. `more` is already at parity (1.016) and needs nothing.
-- Worth knowing before tuning: on ROLLED gear the same measure reads 0.795x at ilvl 50 and 0.702x at ilvl 120. The 0.526 is an optimized-allocation comparison, so the felt gap is materially smaller than the pinned number. The endgame figure (0.287) diverges mostly through flat (0.645), which is a scaling divergence and its own question.
-- [x] O252 LANDED. Skill level 1-15, shared, in `Abilities/BreakerSkillLevelMath.h` — DERIVED from character level rather than accumulated separately, because a shared pool fed by the same combat is a different-shaped function of the same input, and this way there is no second save field and no migration. `ForCharacterLevel` is the one function to replace if pacing ever needs to diverge. It multiplies the ability's AUTHORED base only, at the single shared site `AbilityBaseDamageFor`, so gear's Added Ability Power lands after it and a skill level never multiplies what the player bolted on. x1.00 at level 1 by assertion — the existing kit was tuned at the bottom of the ladder and a floor above one would have rescaled all 35 abilities silently. The grant site stops passing a literal 1; damage still reads the level LIVE, because keeping a spec current would mean re-granting on every level-up and that resets ability state.
-- The cost/cooldown risk flagged before building did NOT exist: `ApplyCost` and `ApplyCooldown` pass the level to `MakeOutgoingGameplayEffectSpec`, but both magnitudes arrive by `SetSetByCallerMagnitude` from `GetResourceCost()`/`GetCooldownSeconds()`, so no level-scaled curve is ever read. Raising skill level cannot raise costs.
-- AND THE PARITY BAND DID NOT MOVE: 0.526x at cap and 0.287x endgame, bit-identical before and after. The fixture compares gear ATTRIBUTE ratios and this scales an ability's authored base, so the free power stayed out of the measurement it would have been dishonest to improve. The expected red stands untouched.
-- OWED: the HUD does not print the skill level yet. `UBreakerGameplayAbility::SkillLevelFor` is public and BlueprintPure for exactly that. A chase the player cannot see is dead content, so this is not finished until it is on screen.
-- [x] O253 LANDED. `Ability.SkillLevel` on Necklace and Waist, +1 at T12-T7, +2 at T6-T4, +3 at T3-T1, +4 at T-1. A STEP TABLE, not a curve — the ordinary magnitude path interpolates geometrically between two anchors and no anchor pair reproduces these bands under either rounding rule (the required ranges are arithmetically empty), and a skill level is a countable thing the player is shown. Follows the Pierce precedent exactly: discrete value, variance suppressed, and re-derived at the uplifted tier under Prolific rather than ratio-scaled, because 3 x 1.636 is 4.9 levels.
-- AMENDS O252, AND IT HAD TO: gear OVERCAPS the earned ceiling. `ForCharacterLevel(50,50)` is already 15, and O253 puts +3/+4 at endgame tiers — which only exist at the character cap. Clamping the composed level to 15 would have made three quarters of the affix's own ladder grant literally nothing, the reachability rule failing at the design's top end. Earned stays 1-15; composed ceiling is 23.
-- OPEN, NOT BLOCKING: the two slots STACK, so best-in-slot is +8 on a 15 ladder. Summed rather than capped because O253 authors a per-affix ladder and says nothing about a total, and because capping the sum makes a second good roll worth nothing. Capping it later is one constant (`AffixSlotCount`).
+- [x] O254 CLOSED, 0.526x -> 0.926x, inside O99's 0.85-1.15 band. The gap was a BROKEN INSTRUMENT, not a content shortfall. `AbilityOptimizedLoadout` bought 11 increased lines against the weapon fixture's 17, bought no conditional line at all while byte-identical Ability.Airborne/Redline/Dash twins shipped unbought, and bought `Offense.AddedDamage` on two slots — a line that routes only to DamageMultiplier and is dead in the ability lane, which is exactly why the flat layer emitted x1.000. Its own comment claimed "same number of offensive lines": it was 36 against 29. Mirrored line for line; nothing granted that the shipped data does not already grant on that slot.
+- The crit half was real content, not instrument: `Core.Precision` was the ONLY wedge in the roster authoring crit and it is tagged Weapon. Prime, Channel and Reach now carry Precision's own three magnitudes, so an ability build can buy crit at all. Crit 0.812 -> 0.910. The Arc lane count moved 30 -> 33 and its pin moved with it, which is that pin working.
+- `PowerBand.AbilityLane` retired from the expected-red roster under its own deletion condition. Out-of-band sections: 5 -> 3.
 - [ ] O258 Skim retires, Slipcut becomes the starter. `Swift.Kinetic.SkimDiscipline` is a live Core node with no other referent — it moves or goes in the same commit or Silent nodes leaves its `ceiling 0 of 371`.
 - [ ] The eleven authorable new abilities: Carom, Coup, Backstep (Swift) · Pyre, Riftlance (Caster) · Recall (Gunsmith) · Bulwark (Tank) · Overwatch (Support), and the ten passives. Every one bids into a lane that exists today.
 - [ ] The three that need vocabulary first: Rover (a friendly AI pawn on NAV-1's controller and mover), Barrel (charge locomotion), Wildcard (a sanctioned exception to the foreign-class guard at `BreakerAbilityComponent.cpp:440`).

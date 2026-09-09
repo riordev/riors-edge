@@ -26,18 +26,18 @@ measurement without judging it.
 | Scaffolding nodes | ceiling | 0 of 371 authored | ceiling 50 | ok |
 | Conditions that can never be true | ceiling | 5.0 | ceiling 5, target 1 | ok |
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
-| Build variance band, at cap | band | 4.07 | band 8.0–10.0 | **OUT** |
-| Build variance band, endgame | band | 13.02 | band 12.0–20.0 | ok |
-| Ability lane throughput against weapon lane, at cap | band | 0.53 | band 0.85–1.15 | **OUT** |
-| Ability lane throughput against weapon lane, endgame | band | 0.29 | no pin — measurement only | — |
+| Build variance band, at cap | band | 4.05 | band 8.0–10.0 | **OUT** |
+| Build variance band, endgame | band | 12.89 | band 12.0–20.0 | ok |
+| Ability lane throughput against weapon lane, at cap | band | 0.93 | band 0.85–1.15 | ok |
+| Ability lane throughput against weapon lane, endgame | band | 0.86 | no pin — measurement only | — |
 | Monster damage growth against gear defence growth | ceiling | 0.63 | ceiling 1.0 | ok |
 | Worst single rewrite step on an optimized build | ceiling | 1.51 | ceiling 1.5 | **OUT** |
 | World Core Point sources with no trigger | ceiling | 14.0 | ceiling 14, target 0 | ok |
 
 ## Tests
 
-- passing: 832
-- expected red: 4
+- passing: 833
+- expected red: 3
 - **unexpected red: 0**
 - asserted invariants with no test: 35
 
@@ -47,7 +47,6 @@ A test that was never written is the worst of the three: it looks asserted.
 **Expected red**
 
 - `RiorsEdge.Items.Drops.DropChanceReachesEveryRank`
-- `RiorsEdge.Progression.PowerBand.AbilityLane`
 - `RiorsEdge.Progression.PowerBand.AtCap`
 - `RiorsEdge.Progression.RuleBandImpact.Step`
 

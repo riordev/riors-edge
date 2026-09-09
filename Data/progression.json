@@ -4,7 +4,7 @@
 		"Source/RiorsEdge/Data/BreakerCensus.cpp": "2748c2d6ae69134043a80d5ad6084d1e9a9cdd0d",
 		"Source/RiorsEdge/Progression/BreakerCoreRoster.cpp": "ca4b1707553c9da18d7b8af4ac7754112028a581",
 		"Source/RiorsEdge/Progression/BreakerCoreRoster.h": "79f375b9ff6fb7edcb722657408b7cb6e22371df",
-		"Source/RiorsEdge/Progression/BreakerCoreRosterAbility.cpp": "2f06f12df660b38367d7342872436f9a294ad673",
+		"Source/RiorsEdge/Progression/BreakerCoreRosterAbility.cpp": "836b905cce0f3c20e6ff503cf8e459b8912e33c4",
 		"Source/RiorsEdge/Progression/BreakerCoreRosterDefence.cpp": "10ca13c3c4e35d6c6d4140b142cbd7afdbccb59c",
 		"Source/RiorsEdge/Progression/BreakerCoreRosterMovement.cpp": "c4e3d19c0d78b915eb217a8ffdb95577204d9f9f",
 		"Source/RiorsEdge/Progression/BreakerCoreRosterStatus.cpp": "592d8f26222814cc89c9218ab95d1df1e293297a",
@@ -3896,6 +3896,13 @@
 							"valuePerRank": 8,
 							"condition": "Always",
 							"alsoRequires": []
+						},
+						{
+							"target": "CriticalDamage",
+							"bucket": "Flat",
+							"valuePerRank": 6,
+							"condition": "Always",
+							"alsoRequires": []
 						}
 					],
 					"tags": [],
@@ -3916,6 +3923,13 @@
 							"target": "AbilityDamage",
 							"bucket": "IncreasedPercent",
 							"valuePerRank": 6,
+							"condition": "Always",
+							"alsoRequires": []
+						},
+						{
+							"target": "CriticalChance",
+							"bucket": "Flat",
+							"valuePerRank": 2,
 							"condition": "Always",
 							"alsoRequires": []
 						}
@@ -3996,6 +4010,13 @@
 						{
 							"target": "AbilityDamage",
 							"bucket": "IncreasedPercent",
+							"valuePerRank": 25,
+							"condition": "Always",
+							"alsoRequires": []
+						},
+						{
+							"target": "CriticalDamage",
+							"bucket": "Flat",
 							"valuePerRank": 25,
 							"condition": "Always",
 							"alsoRequires": []

@@ -1931,21 +1931,33 @@ bool FBreakerAffixBreadthTest::RunTest(const FString& Parameters)
 
 namespace BreakerPowerBandTest
 {
-    // The optimized loadout's shape with the offensive line swapped for the
-    // ability pool, plus the shared line on the three slots that carry it. Same
-    // slots, same tier, same number of offensive lines - so this compares two
-    // POOLS and not a rich build against a poor one.
+    // THE OPTIMIZED LOADOUT, MIRRORED LINE FOR LINE INTO THE ABILITY POOL.
+    // Every offensive line below is the exact twin of the one OptimizedLoadout
+    // holds in the same slot: same condition, same tier anchors, same roll
+    // weight, differing only in which pool it feeds. Nothing here is granted
+    // that the shipped data does not already grant on that slot.
+    //
+    // IT DID NOT USED TO BE A MIRROR, and the comment that stood here said it
+    // was. The weapon build bought 17 increased lines; this bought 11, with no
+    // conditional line at all, while byte-identical Ability.Airborne/Redline/
+    // Dash twins shipped unbought. It also bought Offense.AddedDamage on two
+    // slots — a line that routes ONLY to DamageMultiplier and is therefore
+    // dead in the ability lane, which is why the flat layer emitted exactly
+    // x1.000. So the pinned parity figure was measuring a fixture's selections
+    // and not the two pools, and the code five hundred lines up says as much:
+    // this measure "can only ever hold the lines somebody thought of".
+    // Corrected rather than pinned around — a wrong instrument gets fixed.
     TArray<FBreakerItemInstance> AbilityOptimizedLoadout(int32 ItemLevel, int32 Tier)
     {
         return MakeLoadout({
-            {EBreakerEquipSlot::Helmet,     Tier, {TEXT("Offense.AbilityDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage")}},
-            {EBreakerEquipSlot::BodyArmour, Tier, {TEXT("Offense.AbilityDamage"), TEXT("Offense.SharedDamage"), TEXT("Core.Health")}},
-            {EBreakerEquipSlot::Gloves,     Tier, {TEXT("Offense.AbilityDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage")}},
-            {EBreakerEquipSlot::Boots,      Tier, {TEXT("Offense.AbilityDamage"), TEXT("Move.AirControl"), TEXT("Move.DashCooldown")}},
-            {EBreakerEquipSlot::Necklace,   Tier, {TEXT("Offense.AbilityDamage"), TEXT("Offense.SharedDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage")}},
-            {EBreakerEquipSlot::Waist,      Tier, {TEXT("Offense.AbilityDamage"), TEXT("Offense.SharedDamage"), TEXT("Core.Health")}},
-            {EBreakerEquipSlot::Primary,    Tier, {TEXT("Offense.AbilityDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Core.MaxResource")}},
-            {EBreakerEquipSlot::Secondary,  Tier, {TEXT("Offense.AbilityDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Core.ResourceRegen")}},
+            {EBreakerEquipSlot::Helmet,     Tier, {TEXT("Offense.AbilityDamage"), TEXT("Ability.AirborneDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Ability.AddedPower")}},
+            {EBreakerEquipSlot::BodyArmour, Tier, {TEXT("Offense.AbilityDamage"), TEXT("Ability.RedlineDamage"), TEXT("Core.Health")}},
+            {EBreakerEquipSlot::Gloves,     Tier, {TEXT("Offense.AbilityDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Ability.AddedPower"), TEXT("Ability.DashDamage")}},
+            {EBreakerEquipSlot::Boots,      Tier, {TEXT("Offense.AbilityDamage"), TEXT("Ability.AirborneDamage"), TEXT("Move.AirControl"), TEXT("Move.DashCooldown")}},
+            {EBreakerEquipSlot::Necklace,   Tier, {TEXT("Offense.AbilityDamage"), TEXT("Ability.AirborneDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Ability.AddedPower")}},
+            {EBreakerEquipSlot::Waist,      Tier, {TEXT("Offense.AbilityDamage"), TEXT("Ability.DashDamage"), TEXT("Ability.AddedPower"), TEXT("Core.Health")}},
+            {EBreakerEquipSlot::Primary,    Tier, {TEXT("Offense.AbilityDamage"), TEXT("Ability.AirborneDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Ability.RedlineDamage")}},
+            {EBreakerEquipSlot::Secondary,  Tier, {TEXT("Offense.AbilityDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Ability.AddedPower"), TEXT("Ability.DashDamage")}},
         }, ItemLevel);
     }
 }

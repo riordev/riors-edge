@@ -497,3 +497,5 @@ Maximum wedges reached with65, including ring transit; cells show **wedges / min
 
 **O260** — The top rarity is Unwritten in code, data and screen alike. The enumerator's value never moves, so the rename is safe everywhere the name is not a stored string.
 
+**O261** — An enemy's death damages other enemies only where a player source says it does: an item, a tree node, an ability. A pack does not thin itself, and the on-death chain ships off by default until such an effect exists.
+
