@@ -10,6 +10,7 @@
 #include "Game/BreakerGameInstance.h"
 #include "Game/BreakerGameMode.h"
 #include "Game/BreakerZoneBuilder.h"
+#include "Game/BreakerWaveBudget.h"
 #include "Combat/BreakerBossEnemy.h"
 #include "Combat/BreakerHoldfastEnemy.h"
 #include "Combat/BreakerCombatComponent.h"
@@ -58,6 +59,10 @@ bool FBreakerRiftRuntimeLoopTest::RunTest(const FString& Parameters)
     ABreakerGameMode* Mode = World->GetAuthGameMode<ABreakerGameMode>();
     if (!TestNotNull(TEXT("Rift game mode"), Mode)) return false;
     Mode->DispatchBeginPlay();
+    const uint64 SavedFrame = GFrameCounter;
+    ON_SCOPE_EXIT { GFrameCounter = SavedFrame; };
+    if (!TestTrue(TEXT("Production wave pacing actor is registered and enabled"),
+        Mode->PrimaryActorTick.IsTickFunctionRegistered() && Mode->PrimaryActorTick.IsTickFunctionEnabled())) return false;
     // A plain pawn carries the real components without Character's save-slot
     // load/EndPlay persistence. No owner character or account file is touched.
     ADefaultPawn* Pawn = World->SpawnActor<ADefaultPawn>();
@@ -117,7 +122,31 @@ bool FBreakerRiftRuntimeLoopTest::RunTest(const FString& Parameters)
             Hit.SetInstigator(Pawn);
             Enemy->FindComponentByClass<UBreakerCombatComponent>()->ReceiveDamage(Hit);
         }
-        Mode->StartNextWave();
+        // Structural lethal hits above test the clear gate, not player DPS.
+        // From here the actual registered mode tick must own the breather and
+        // next spawn: no manual StartNextWave, private countdown or timer calls.
+        const int32 ClearedWave = Mode->GetCurrentWave();
+        float Breather = 0.0f;
+        if (!TestTrue(TEXT("Shipped wave cadence defines this non-boss clear"),
+            UBreakerWaveBudgetLibrary::GetAutoAdvanceDelay(ClearedWave, Mode->WaveBudget, Breather))) return false;
+        if (!TestTrue(TEXT("Clearing all native guards ends the current wave"), !Mode->IsWaveActive())) return false;
+        constexpr float ClockStep = .05f;
+        const int32 BeforeBoundarySteps = FMath::Max(0, FMath::FloorToInt(Breather / ClockStep) - 1);
+        for (int32 Step = 0; Step < BeforeBoundarySteps; ++Step)
+        {
+            ++GFrameCounter;
+            World->Tick(LEVELTICK_All, ClockStep);
+        }
+        TestEqual(TEXT("Actual world clock preserves the shipped breather before its boundary"), Mode->GetCurrentWave(), ClearedWave);
+        // Up to three final ticks accommodate float partitioning at the
+        // authored boundary; the fixture does not alter the pacing budget.
+        for (int32 Step = 0; Step < 3 && Mode->GetCurrentWave() == ClearedWave; ++Step)
+        {
+            ++GFrameCounter;
+            World->Tick(LEVELTICK_All, ClockStep);
+        }
+        if (!TestEqual(TEXT("Waiting naturally starts exactly the next production wave"), Mode->GetCurrentWave(), ClearedWave + 1)) return false;
+        if (!TestTrue(TEXT("Natural advance spawns a real live encounter"), Mode->IsWaveActive())) return false;
     }
     if (!TestNotNull(TEXT("Cleared waves culminate in a real boss"), Boss)) return false;
     TestTrue(TEXT("Undercroft spawned Holdfast, not the gym Marshal"), Boss->IsA<ABreakerHoldfastEnemy>());
@@ -155,7 +184,7 @@ bool FBreakerRiftRuntimeLoopTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Repeated completion cannot pay twice"), Completions, 1);
     TestEqual(TEXT("Repeated completion preserves paid XP"), Progression->GetProgressionState().TotalExperience, PaidXp);
     TestFalse(TEXT("Completed rift cannot restart waves through the manual wave command"), Mode->IsWaveActive());
-    AddInfo(TEXT("Validated actual Fernhall build, waves, boss damage, completion subscription, purse and exit offers; cross-map loading is not simulated."));
+    AddInfo(TEXT("Validated actual Fernhall build, naturally clock-advanced waves, boss damage, completion subscription, purse and exit offers; cross-map loading is not simulated."));
     return true;
 }
 

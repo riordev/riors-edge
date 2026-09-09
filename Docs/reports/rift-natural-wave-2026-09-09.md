@@ -1,0 +1,7 @@
+# Rift waves advance through the ordinary clock
+
+The existing RuntimeBossRewardReturn fixture now waits through the shipped wave breathers using real world ticks and the registered GameMode actor. It asserts that the next wave cannot appear before the authored boundary, then requires exactly one natural advance and a live encounter. The explicit StartNextWave calls during the run are removed. No production timing or reward tuning changed.
+
+Native execution observed both eight-second breathers and reached the actual Holdfast encounter. Existing physical boss placement/reset, accepted death, completion purse, account update, exit offers and duplicate-completion protection checks remain. Independent review verified tick registration, boundary partitioning and preservation of those assertions. Build and targeted runtime passed; full-suite totals remain in STATE.
+
+This is structural encounter progression. Guard deaths use structural damage, not an earned player's DPS. The fixture uses a plain pawn and installs PendingRift directly; it does not prove door interaction or cross-map loading. A combined real Character journal/reward/return proof needs the actual prior Act1 acceptance, arrival, enemy death, feedstock pickup and turn-in path. Current separate quest fixtures restore prior flags or counters and cannot serve as earned acquisition evidence. FirstForge is an automatic unlock beat after Salvage turn-in; it does not require an extra invented forge interaction.

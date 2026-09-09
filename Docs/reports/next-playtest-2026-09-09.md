@@ -16,7 +16,7 @@ This is a running handoff, not a claim that the seven-step programme is complete
 
 1. Start in Anchor and check service readability, equipment/ability assignment and menu focus.
 2. Compare starter Caster Cleave, Rot and an earned Fracture against ordinary packs and a tougher target; report range, resource downtime and damage-number readability separately.
-3. Play Fernhall's pockets, Watchkeeper and guarded lockers. Check the existing campaign Rift through reward and return without developer shortcuts.
+3. Play Fernhall's pockets, Watchkeeper and guarded lockers. Check the existing campaign Rift through reward and return without developer shortcuts. Native acceptance now waits through its real wave breathers; a complete player-driven door-to-return loop remains to be played.
 4. Travel to Red Basin, recover the recorder, extract it and return; revisit after a normal save/load. Then hunt Station Zero's Custodian, optionally clear lockers and return. At Port Meridian, meet the ground crew, guide them through the three defended checkpoints and reach Maintenance Hangar; try separation and death/retry. At Broken Coast, restore the Signal Point uplink and test leaving its working radius, retrying and returning after completion.
 5. Spend and refund Core/Doctrine points across contrasting builds. Report a specific node and trigger when something seems inactive.
 6. If testing coop, use the documented isolated sandbox. Campaign progression, shared loot, rejoin and broad class support remain outside its verified scope.
