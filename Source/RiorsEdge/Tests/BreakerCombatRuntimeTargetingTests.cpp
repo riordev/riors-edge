@@ -72,7 +72,7 @@ bool FBreakerCleaveWorldOcclusionTest::RunTest(const FString& Parameters)
     Sweep.RangeCm = Cleave->ComputeEffectiveRangeCm(nullptr);
     Sweep.ArcDegrees = Cleave->ComputeEffectiveArcDegrees(nullptr);
     Sweep.Forward = FVector::ForwardVector;
-    TestEqual(TEXT("shipped Cleave reach is 4.5 metres"), Sweep.RangeCm, 450.0f);
+    TestEqual(TEXT("shipped Cleave reach is 6.5 metres"), Sweep.RangeCm, 650.0f);
     TestTrue(TEXT("open enemy does not occlude itself"), UBreakerMeleeSweep::SweepTargets(World, nullptr, Sweep).Contains(Enemy));
     AActor* Wall = World->SpawnActor<AActor>();
     UBoxComponent* WallBody = NewObject<UBoxComponent>(Wall);
@@ -86,7 +86,11 @@ bool FBreakerCleaveWorldOcclusionTest::RunTest(const FString& Parameters)
     Wall->SetActorLocation(FVector(200, 0, 0));
     TestFalse(TEXT("wall still blocks the swing"), UBreakerMeleeSweep::SweepTargets(World, nullptr, Sweep).Contains(Enemy));
     Wall->Destroy();
-    Enemy->SetActorLocation(FVector(500, 0, 0));
+    // Derived from the authored reach, not a literal beside it: the fixture
+    // shipped at 500 against a 450 reach and went green-to-red the moment the
+    // authored number moved. The rule under test is "past the reach", so the
+    // fixture states exactly that.
+    Enemy->SetActorLocation(FVector(Sweep.RangeCm + 50.0f, 0, 0));
     TestFalse(TEXT("enemy beyond authored reach is refused"), UBreakerMeleeSweep::SweepTargets(World, nullptr, Sweep).Contains(Enemy));
     return true;
 }

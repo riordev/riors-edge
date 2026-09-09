@@ -9,6 +9,14 @@ namespace BreakerCoreBoard
 {
     constexpr float FocusHitSize = 44.0f;
     constexpr float OverviewLabelRadius = 720.0f; // O2 presentation.
+    // Role-overview name ring. Twenty-two names on ONE radius leave 414 canvas
+    // units of arc each, and the board draws at roughly a fifth of its canvas,
+    // so that is an 87-pixel budget for CONSTITUTION — the reason the wheel
+    // shipped anonymous. Alternating two radii doubles each name's arc.
+    constexpr float RoleLabelNearRadius = 1400.0f; // O2 presentation.
+    constexpr float RoleLabelFarRadius = 1530.0f;  // O2 presentation. Its box stays inside the 1600 half-canvas.
+    // Inside the gateway ring (620) and outside the sector spokes' 100.
+    constexpr float RoleSectorLabelRadius = 380.0f; // O2 presentation.
     inline FVector2D OverviewHitSize() { return FVector2D(190.0f, 74.0f); }
     struct FWedge
     {

@@ -679,7 +679,7 @@ bool FBreakerMovementShippedSpeedsTest::RunTest(const FString& Parameters)
     if (!TestNotNull(TEXT("Movement constructs"), Movement)) return false;
     if (!TestNotNull(TEXT("Momentum constructs"), Momentum)) return false;
 
-    TestEqual(TEXT("Walk speed ships at 595"), Movement->WalkSpeed, 595.0f, 0.0001f);
+    TestEqual(TEXT("Walk speed ships at 640"), Movement->WalkSpeed, 640.0f, 0.0001f);
     TestEqual(TEXT("Sprint speed ships at 990"), Movement->SprintSpeed, 990.0f, 0.0001f);
     TestEqual(TEXT("Air control ships at 0.35"), Movement->AirControl, 0.35f, 0.0001f);
     TestEqual(TEXT("Air control boost ships at 1.15"), Movement->AirControlBoostMultiplier, 1.15f, 0.0001f);

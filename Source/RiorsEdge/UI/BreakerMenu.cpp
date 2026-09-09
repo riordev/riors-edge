@@ -1012,6 +1012,39 @@ void SBreakerMenu::ShowScreenForCapture(EBreakerMenuScreen Screen)
     // shipped build cannot reach it. It exists because "capture SKILLTREES"
     // photographed exactly one of that screen's three boards, and the two it
     // skipped are the two nobody has ever looked at.
+#if !UE_BUILD_SHIPPING
+    FString DoctrineId;
+    if (FParse::Value(FCommandLine::Get(), TEXT("BreakerCaptureDoctrine="), DoctrineId))
+    {
+        FString UserDirectory;
+        if (!Character.IsValid() || !Character->bRefuseSavesForPendingCharacter
+            || !FParse::Value(FCommandLine::Get(), TEXT("UserDir="), UserDirectory) || UserDirectory.IsEmpty()
+            || FPaths::IsRelative(UserDirectory)
+            || FPaths::IsSamePath(FPaths::ConvertRelativePathToFull(UserDirectory), FPaths::ProjectDir())
+            || IFileManager::Get().DirectoryExists(*(FPaths::ProjectSavedDir() / TEXT("SaveGames")))) return;
+        auto* Progression = Character->GetProgression();
+        int32 BranchIndex = 0;
+        if (Progression)
+            for (const auto* Tree : Progression->GetAvailableTrees())
+            {
+                if (!Tree || Tree->Currency != EBreakerPointCurrency::DoctrinePoints) continue;
+                if (Tree->TreeId == FName(*DoctrineId)
+                    && Tree->RequiredClass == Progression->GetProgressionState().PermanentClass)
+                {
+                    SkillBoardTab = 0;
+                    SkillBranchIndex = BranchIndex;
+                    ResetBoardView();
+                    Rebuild(EBreakerMenuScreen::SkillTrees);
+                    UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] actual doctrine board %s branch=%d nodes=%d"),
+                        *Tree->TreeId.ToString(), BranchIndex, Tree->Nodes.Num());
+                    return;
+                }
+                ++BranchIndex;
+            }
+        UE_LOG(LogTemp, Warning, TEXT("[BreakerCapture] Doctrine refused: requested tree is not available to this preview class."));
+        return;
+    }
+#endif
     FString Board;
     if (FParse::Value(FCommandLine::Get(), TEXT("BreakerCaptureBoard="), Board))
     {
@@ -8366,6 +8399,17 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             const float DrawWidth = !bRoleLayout ? Width : bFocused ? Width / FitScale : FMath::Max(Width, 1.0f / FitScale);
             AddCanvasSegment(Canvas, A + Direction * EndInset, B - Direction * EndInset, Color, DrawWidth);
         };
+        // Anything authored in canvas units draws at FitScale, so a name that
+        // is to be READ has to be authored at its screen size divided back
+        // out. The clamp is the guard on a degenerate fit, not a taste.
+        const int32 BoardNameSize = FMath::Clamp(FMath::RoundToInt(12.0f / FitScale), 12, 140);
+        const int32 BoardSectorSize = FMath::Clamp(FMath::RoundToInt(15.0f / FitScale), 15, 160);
+        auto CenteredText = [&](const FString& Text, int32 Size, const FLinearColor& Color) -> TSharedRef<SWidget>
+        {
+            TSharedRef<STextBlock> Block = MenuText(FText::FromString(Text), Size, Color, true);
+            Block->SetJustification(ETextJustify::Center);
+            return Block;
+        };
         // The overview is an atlas, not a field of undersized purchase targets.
         // Its full-height constellation buttons open the same graph at 1:1.
         if (!bFocused)
@@ -8374,10 +8418,18 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             {
                 const FVector2D Angles = BreakerCoreBoard::SectorAngles(Layout, Layout.Sectors[Sector]);
                 const float Angle = Angles.X;
+                // A 1-unit stroke on the role board is a fifth of a pixel: the
+                // sector divisions were being drawn and never arriving.
                 AddCanvasSegment(Canvas, BreakerCoreBoard::Polar(Layout.Hub, 100.0f, Angles.Y),
-                    BreakerCoreBoard::Polar(Layout.Hub, (bRoleLayout ? 1400.0f : 690.0f), Angles.Y), BorderRest, 1.0f);
+                    BreakerCoreBoard::Polar(Layout.Hub, (bRoleLayout ? 1400.0f : 690.0f), Angles.Y), BorderRest,
+                    bRoleLayout ? FMath::Max(1.0f, 1.5f / FitScale) : 1.0f);
                 if (!bRoleLayout) AddLabel(BreakerCoreBoard::Polar(Layout.Hub, 155.0f, Angle), FVector2D(180, 36),
                     MenuText(FText::FromString(Layout.Sectors[Sector].ToString().ToUpper()), 18, Muted, true));
+                // The role wheel's hub is a 620-unit hole. Five sector names
+                // sit in it at 100 screen pixels of arc apiece.
+                else AddLabel(BreakerCoreBoard::Polar(Layout.Hub, BreakerCoreBoard::RoleSectorLabelRadius, Angle),
+                    FVector2D(BoardSectorSize * 9.0f, BoardSectorSize * 1.8f),
+                    CenteredText(Layout.Sectors[Sector].ToString().ToUpper(), BoardSectorSize, Muted));
             }
         }
         if (!bRoleLayout) for (const FName Entry : Layout.Entries)
@@ -8394,6 +8446,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         }
         if (!bRoleLayout) AddLabel(Layout.Hub, FVector2D(76, 52),
             MakePlate(MenuText(FText::FromString(TEXT("CORE")), 16, Primary, true), PanelRaised, Amber, FMargin(8)));
+        else if (!bFocused) AddLabel(Layout.Hub, FVector2D(BoardSectorSize * 6.0f, BoardSectorSize * 1.8f),
+            CenteredText(TEXT("CORE"), BoardSectorSize, Amber));
         for (const UBreakerProgressionNode* Node : CoreTree->Nodes)
         {
             if (!Node) continue;
@@ -8464,12 +8518,32 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     [MenuText(FText::FromString(State), 11, bPurchasable ? Amber : Muted, true)]);
             }
         }
+        // OWNER REPORT: "the skill tree is absolutely unreadable (the core
+        // one)". Every text block on this canvas was gated off for the role
+        // layout, which is the shipped one, so the overview drew 187 identical
+        // markers and named none of them: nothing on the wheel said which
+        // spoke was PRECISION. The names come back at the fit zoom's scale,
+        // alternating radii so twenty-two of them have the arc to be read.
+        // Not buttons — the markers already open their wedge on click and the
+        // CONSTELLATIONS list already offers a named button for each.
+        if (!bFocused && bRoleLayout)
+        {
+            for (int32 W = 0; W < Layout.Wedges.Num(); ++W)
+            {
+                const BreakerCoreBoard::FWedge& Wedge = Layout.Wedges[W];
+                const float LabelRadius = (W % 2 == 0)
+                    ? BreakerCoreBoard::RoleLabelNearRadius : BreakerCoreBoard::RoleLabelFarRadius;
+                AddLabel(BreakerCoreBoard::Polar(Layout.Hub, LabelRadius, Wedge.AngleDegrees),
+                    FVector2D(BoardNameSize * 9.0f, BoardNameSize * 1.8f),
+                    CenteredText(Wedge.Name.ToString().ToUpper(), BoardNameSize, Primary));
+            }
+        }
         if (!bFocused && !bRoleLayout)
         {
             for (const BreakerCoreBoard::FWedge& Wedge : Layout.Wedges)
             {
                 const FName WedgeId = Wedge.Name;
-                AddLabel(BreakerCoreBoard::Polar(Layout.Hub, (bRoleLayout ? 1450.0f : BreakerCoreBoard::OverviewLabelRadius), Wedge.AngleDegrees), BreakerCoreBoard::OverviewHitSize(),
+                AddLabel(BreakerCoreBoard::Polar(Layout.Hub, BreakerCoreBoard::OverviewLabelRadius, Wedge.AngleDegrees), BreakerCoreBoard::OverviewHitSize(),
                     MakeButton(FText::FromString(Wedge.Name.ToString().ToUpper()), FOnClicked::CreateLambda([this, WedgeId]()
                     {
                         SkillExpandedConstellation = WedgeId;

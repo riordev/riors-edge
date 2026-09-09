@@ -4,6 +4,8 @@
 #include "Characters/BreakerCharacter.h"
 #include "Abilities/BreakerAbilityComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
+#include "Progression/BreakerProgressionLibrary.h"
+#include "Progression/BreakerProgressionTree.h"
 #include "Game/BreakerGameInstance.h"
 #include "Combat/BreakerBossEnemy.h"
 #include "Combat/BreakerCombatComponent.h"
@@ -41,6 +43,13 @@ namespace
 void BreakerSchedulePlateCapture(UWorld* World)
 {
  FString Mode,UserDirectory,VolatileMode,AbilityClass,RecorderMode,UplinkMode,MeridianMode;
+ FString DoctrineId;
+ EBreakerClassId DoctrineClass=EBreakerClassId::None;
+#if !UE_BUILD_SHIPPING
+ const bool bDoctrine=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureDoctrine="),DoctrineId);
+#else
+ const bool bDoctrine=false;
+#endif
  const bool bMeridian=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureMeridian="),MeridianMode);
  const bool bUplink=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureUplink="),UplinkMode);
  const bool bRecorder=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureRecorder="),RecorderMode);
@@ -49,7 +58,22 @@ void BreakerSchedulePlateCapture(UWorld* World)
  const bool bPlate=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureEnemyPlate="),Mode);
  const bool bCache=FParse::Param(FCommandLine::Get(),TEXT("BreakerCaptureCache"));
  const bool bScenery=FParse::Param(FCommandLine::Get(),TEXT("BreakerCaptureScenery"));
- if(!World||(!bPlate&&!bCache&&!bScenery&&!bVolatile&&!bAbilityMenu&&!bRecorder&&!bUplink&&!bMeridian))return;
+ if(!World||(!bPlate&&!bCache&&!bScenery&&!bVolatile&&!bAbilityMenu&&!bRecorder&&!bUplink&&!bMeridian&&!bDoctrine))return;
+ if(bDoctrine)
+ {
+    FString OtherBoard,OtherMenu;
+    if(bPlate||bCache||bScenery||bVolatile||bAbilityMenu||bRecorder||bUplink||bMeridian
+        ||FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureBoard="),OtherBoard)
+        ||FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureMenu="),OtherMenu))
+    {UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Doctrine requires only one actual tree ID; omit other setup, Board and Menu flags."));return;}
+    int32 Matches=0;
+    for(const auto* Tree:UBreakerProgressionLibrary::GetAllFallbackTrees())
+        if(Tree && Tree->TreeId==FName(*DoctrineId) && Tree->Currency==EBreakerPointCurrency::DoctrinePoints
+            && Tree->RequiredClass!=EBreakerClassId::None)
+        {DoctrineClass=Tree->RequiredClass;++Matches;}
+    if(Matches!=1)
+    {UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Doctrine refused: '%s' is not one unique registered doctrine tree."),*DoctrineId);return;}
+ }
  if(bMeridian)
  {
     FString Board;const bool bHasBoard=FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureBoard="),Board);
@@ -90,13 +114,27 @@ void BreakerSchedulePlateCapture(UWorld* World)
  {UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Mode must be open or blocked."));return;}
  // Core time advances while the arrival menu has paused world timers.
  // Weak UObject binding prevents setup after this world is destroyed.
- FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(World,[World,Mode,bCache,bPlate,bScenery,bVolatile,bAbilityMenu,AbilityClass,bRecorder,RecorderMode,bUplink,UplinkMode,bMeridian,MeridianMode](float)
+ FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(World,[World,Mode,bCache,bPlate,bScenery,bVolatile,bAbilityMenu,AbilityClass,bRecorder,RecorderMode,bUplink,UplinkMode,bMeridian,MeridianMode,bDoctrine,DoctrineId,DoctrineClass](float)
  {
-    if(bAbilityMenu||bRecorder||bUplink||bMeridian)
+    if(bAbilityMenu||bRecorder||bUplink||bMeridian||bDoctrine)
         if(const auto* Session=World->GetGameInstance<UBreakerGameInstance>(); Session && Session->IsArrivalCoverUp()) return true;
     auto* PC=World->GetFirstPlayerController();auto* Player=PC?Cast<ABreakerCharacter>(PC->GetPawn()):nullptr;
     if(!Player||!Player->HasAuthority())return false;
     Player->bRefuseSavesForPendingCharacter=true;
+    if(bDoctrine)
+    {
+        auto* Progression=Player->GetProgression();if(!Progression)return false;
+        // Isolated visual fixture only. No XP, wallet, unlock, purchase or
+        // explicit ability grant; use the existing normal class-selection operation.
+        Progression->bAutoLockSwiftIfFresh=false;
+        Progression->LoadProgressionState(FBreakerProgressionState{});
+        if(!Progression->ChoosePermanentClassById(DoctrineClass))
+        {UE_LOG(LogTemp,Warning,TEXT("[PlateCapture] Doctrine refused: normal class selection failed."));return false;}
+        Player->OpenMenuScreenForCapture(TEXT("SKILLTREES"));
+        UE_LOG(LogTemp,Display,TEXT("[PlateCapture] Doctrine visual fixture tree=%s class=%d level=%d; no progression awards or purchases."),
+            *DoctrineId,static_cast<int32>(DoctrineClass),Progression->GetCharacterLevel());
+        return false;
+    }
     if(bAbilityMenu)
     {
         auto* Progression=Player->GetProgression();

@@ -297,11 +297,11 @@ bool FBreakerAbilityGeometrySeamTest::RunTest(const FString& Parameters)
     UBreakerAbility_Rot* Rot = NewObject<UBreakerAbility_Rot>();
     UBreakerAbility_Cleave* Cleave = NewObject<UBreakerAbility_Cleave>();
 
-    // Before any purchase, the Class-Kits numbers exactly: 4 m, 6 s, 120°.
+    // Before any purchase, the authored numbers exactly: 4 m, 6 s, 120°, 6.5 m.
     TestEqual(TEXT("Rot's authored radius with no ranks"), Rot->ComputeEffectiveRadiusCm(Owner), 400.0f, 0.0001f);
     TestEqual(TEXT("Rot's authored duration with no ranks"), Rot->ComputeEffectiveDurationSeconds(Owner), 6.0f, 0.0001f);
     TestEqual(TEXT("Cleave's authored arc with no ranks"), Cleave->ComputeEffectiveArcDegrees(Owner), 120.0f, 0.0001f);
-    TestEqual(TEXT("Cleave's authored range with no ranks"), Cleave->ComputeEffectiveRangeCm(Owner), 450.0f, 0.0001f);
+    TestEqual(TEXT("Cleave's authored range with no ranks"), Cleave->ComputeEffectiveRangeCm(Owner), 650.0f, 0.0001f);
 
     // Lingering (VW tree): two ranks of +15% duration reach Rot's zone.
     UBreakerProgressionTree* VoidWhisperer = UBreakerProgressionLibrary::GetCasterVoidWhispererTree();

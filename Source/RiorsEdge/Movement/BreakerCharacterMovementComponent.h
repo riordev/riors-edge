@@ -285,7 +285,15 @@ public:
     // O192: the base kit is slower at level 1 so the tree's movement nodes
     // have room to be felt. Momentum's speed gates are fractions of WalkSpeed
     // and follow it; the crouch cap in the constructor does too.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float WalkSpeed = 595.0f;   // O2 PLACEHOLDER (O192)
+    //
+    // Owner report: "i feel so clunky maybe increase base player movement
+    // speed slightly". 595 -> 640 is +7.6%, deliberately the only speed dial
+    // that moved this pass so a fifth report attributes cleanly — the same
+    // discipline the gravity comment in the constructor records. SprintSpeed
+    // stays at 990, which narrows the sprint gain from 1.66x to 1.55x; if the
+    // next report is "sprint no longer feels like anything", raise that one
+    // and nothing else.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float WalkSpeed = 640.0f;   // WAS 595.0f // O2 PLACEHOLDER (O192)
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float SprintSpeed = 990.0f;   // O2 PLACEHOLDER (O192)
 
     // --- Weight (owner report: "movement should be less floaty") ---------

@@ -1,0 +1,9 @@
+# Caster doctrine board inspection
+
+The developer capture helper can select an actual registered doctrine tree by ID in a fresh, absolute, isolated UserDir. It rejects mixed capture modes and missing/unknown/Core IDs, sets the existing save-refusal flag, resets only that disposable preview and uses normal class selection. The board then resolves the same class-filtered tree list as the live menu. No explicit XP, point, token, unlock or ability grant is added. Normal class initialization still supplies its ordinary defaults; this is visual inspection, not earned progression evidence.
+
+Caster Spellblade, Void Whisperer and Multispell each rendered their actual 12-node board and 24 offered points at 1280x720. The class/branch selectors, right detail/totals panel, ring and footer fit within the viewport. Nodes remain separated. Multispell's thin links warrant a separate rendering check; this inspection does not claim finished icons, mouse hover, zoom behavior or paid node acceptance.
+
+All eight generated frames were inspected: the first malformed unquoted PowerShell argument was rejected and showed only the title screen (caster-voidwhisperer-1352); the corrected runs caster-voidwhisperer-1354, caster-spellblade-1356 and caster-multispell-1358 each show the initial title frame followed by the selected native doctrine. Logs identify branch1/0/2 respectively and12nodes. Quote the entire argument, for example '-BreakerCaptureDoctrine=Doctrine.Caster.VoidWhisperer'. Other flags: direct /Game/Breaker/Maps/Lvl_Fernhall, -game -windowed -ResX=1280 -ResY=720 -BreakerCaptureArrival -BreakerScreenshots=2, and a fresh absolute -UserDir. Omit other Board/Menu/setup selectors.
+
+Independent review covered registry resolution, view selection and isolation, including the normal class-choice substitution for the staged developer class switch. Build passed; full-suite results remain in STATE.

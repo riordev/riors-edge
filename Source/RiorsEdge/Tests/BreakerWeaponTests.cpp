@@ -1773,11 +1773,11 @@ bool FBreakerSprintFeelTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Gait clamps below walking"), FBreakerWeaponFeel::GaitStrideLength(Params, -1.0f), Params.StrideLengthCm);
     TestEqual(TEXT("Gait clamps above sprint"), FBreakerWeaponFeel::GaitStrideLength(Params, 2.0f), Params.SprintStrideLengthCm);
 
-    // Walk unchanged: one frame at the shipped walk speed over the shipped
-    // stride is 2π · 595 / (360 · 60) radians.
-    TestEqual(TEXT("The shipped walk's footfall rate is 595 over a 360 stride"),
+    // One frame at the shipped walk speed over the shipped stride is
+    // 2π · 640 / (360 · 60) radians.
+    TestEqual(TEXT("The shipped walk's footfall rate is 640 over a 360 stride"),
         FBreakerWeaponFeel::AdvanceBobPhase(0.0f, Movement->WalkSpeed, Frame, 360.0f),
-        2.0f * UE_PI * 595.0f / (360.0f * 60.0f), 0.00001f);
+        2.0f * UE_PI * 640.0f / (360.0f * 60.0f), 0.00001f);
     return true;
 }
 

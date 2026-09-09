@@ -70,7 +70,10 @@ public:
 
     static FName SwingWindowKey();
 
-    // Class-Kits §2.2 C1: 3 m.
+    // Owner report: "cleaves range is way too short". 450 -> 650. The reach
+    // is read CENTRE TO CENTRE (UBreakerMeleeSweep::IsInsideArc compares actor
+    // locations), so the surface-to-surface swing the player actually sees is
+    // this number less both capsule radii — roughly 80 cm of the total.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float RangeCm {}; // O246: authored in Data/abilities.json. // O2 PLACEHOLDER
     // O2 PLACEHOLDER: no design doc gives the base arc. SB8 Edge widens it to
     // 180, so the base must be narrower than that; 120 is a shape, not balance.

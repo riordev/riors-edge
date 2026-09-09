@@ -38,6 +38,14 @@ public:
     // Pure rule, world-free and testable: is a point inside the arc? The range
     // test is horizontal-plane only so an enemy standing on a crate is not
     // silently out of reach.
+    //
+    // GAP, recorded not faked: this reads CENTRE TO CENTRE. The overlap that
+    // feeds it is a sphere against the target's collision, so a body already
+    // touching the sphere is still rejected when its actor origin sits past
+    // RangeCm — the swing lands short of what the player sees by both capsule
+    // radii. Fixing it means the arc test taking a target radius, which is an
+    // API change across every future melee source; the authored range carries
+    // the difference until a second melee verb makes that change worth making.
     UFUNCTION(BlueprintPure, Category="Combat|Melee")
     static bool IsInsideArc(const FVector& Origin, const FVector& Forward, const FVector& TargetLocation, float RangeCm, float ArcDegrees);
 

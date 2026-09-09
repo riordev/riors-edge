@@ -106,7 +106,7 @@
 			"windowDuration": 0.3,
 			"numbers":
 			{
-				"RangeCm": 450,
+				"RangeCm": 650,
 				"ArcDegrees": 120,
 				"WeaponDamageCoefficient": 2.4,
 				"UnarmedDamage": 20,
