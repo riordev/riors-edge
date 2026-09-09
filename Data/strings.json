@@ -10,6 +10,7 @@
 		"hud.callout.marked": "MARKED",
 		"hud.callout.dodged": "DODGED",
 		"hud.callout.blocked": "BLOCKED",
+		"hud.ability.skillLevel": "SKILL",
 		"hud.banner.riftCleared": "RIFT CLEARED",
 		"hud.banner.runComplete": "RUN COMPLETE",
 		"hud.banner.levelUp": "LEVEL UP",

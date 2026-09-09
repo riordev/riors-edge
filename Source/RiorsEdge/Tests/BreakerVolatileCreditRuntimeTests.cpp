@@ -91,7 +91,6 @@ bool FBreakerVolatileCreditRuntimeTest::RunTest(const FString&)
     auto* VictimCombat = Victim->FindComponentByClass<UBreakerCombatComponent>();
     const auto* VictimAttr = Victim->GetAbilitySystemComponent()->GetSet<UBreakerAttributeSet>();
     if (!VictimCombat || !VictimAttr) return false;
-    const float VictimHealthBefore = VictimAttr->GetHealth();
 
     // ---- The player pops it -----------------------------------------------
     auto* BombCombat = Bomb->FindComponentByClass<UBreakerCombatComponent>();
@@ -106,6 +105,16 @@ bool FBreakerVolatileCreditRuntimeTest::RunTest(const FString&)
     TestTrue(TEXT("the Volatile died to the player's hit"), BombCombat->IsDead());
     TestEqual(TEXT("the corpse remembers who landed the killing blow"),
         BombCombat->GetLastDamageInstigator(), static_cast<AActor*>(Player));
+
+    // CAPTURED HERE, NOT BEFORE THE KILL. An ordinary enemy chain-detonates on
+    // death for 35% of its max health against every enemy within 420 cm
+    // (ABreakerEnemy::HandleDeath), so the victim has already lost 77 to the
+    // corpse by this line. Reading its health before the kill meant the blast
+    // assertion below passed on the CHAIN alone and would have stayed green
+    // with the Volatile blast entirely dead — the test measuring something it
+    // was not testing. The baseline is taken after the chain has been paid, so
+    // what it measures from here is the blast and only the blast.
+    const float VictimHealthBefore = VictimAttr->GetHealth();
 
     const int32 KillsBeforeFuse = Observer->Kills.Num();
     // ABreakerEnemy::Tick drives AdvanceModifiers and the fixture disables the

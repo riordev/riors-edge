@@ -31,6 +31,7 @@
     BREAKER_STRING(HudCalloutMarked,             "hud.callout.marked",              "") \
     BREAKER_STRING(HudCalloutDodged,             "hud.callout.dodged",              "") \
     BREAKER_STRING(HudCalloutBlocked,            "hud.callout.blocked",             "") \
+    BREAKER_STRING(HudAbilitySkillLevel,         "hud.ability.skillLevel",          "") \
     BREAKER_STRING(HudBannerRiftCleared,         "hud.banner.riftCleared",          "") \
     BREAKER_STRING(HudBannerRunComplete,         "hud.banner.runComplete",          "") \
     BREAKER_STRING(HudBannerLevelUp,             "hud.banner.levelUp",              "") \

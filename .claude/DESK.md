@@ -5,6 +5,35 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
+## Owner ruling needed — do enemies damage each other on death?
+
+An ordinary enemy chain-detonates when it dies: `ABreakerEnemy::HandleDeath`
+(`Combat/BreakerEnemy.cpp:1393-1411`) deals `MaxHealth * 0.35` Physical to
+every live enemy within 420 cm. `bExplodesOnDeath = true` is the CLASS
+DEFAULT (`Combat/BreakerEnemy.h:618`); only split copies and the boss opt
+out. It ships on and fires in ordinary play — a pack of four trash at area
+level 1 cascades itself: first kill leaves the survivors at 143, the second
+at 66, the third finishes them.
+
+- It was authorised once (commit `7766649`) but NO LIVE RULING covers it —
+  nothing in DECISIONS.md, nothing in Docs/spec/.
+- It contradicts the friendly-fire convention the rest of `Combat/` states
+  outright at `Combat/BreakerZoneActor.cpp:477-482`: "a zone cast by an enemy
+  never touches another enemy ... a pack melting itself in its own hazard
+  reads as a bug." Enemy projectiles keep the same rule.
+- The cascade's kills PAY THE PLAYER NOTHING — the dealer is the corpse, so
+  Feed, Scrap, on-kill nodes and deployable listeners never see them. Exactly
+  the defect O245 just fixed for the Volatile blast, in a second place.
+- Both magnitudes (0.35, 420 cm) carry no O2 PLACEHOLDER marker.
+
+THREE ANSWERS, all one commit: (a) it goes — flip the default to false, which
+authors nothing and matches the stated convention; (b) it stays and is ruled,
+in which case it needs CreditTo so a cascade kill pays the player, the two
+numbers get O2 markers, and the trash TTK bands are re-measured against O18;
+(c) it stays only for a named archetype rather than every trash body.
+NOT TAKEN UNILATERALLY: this changes how every fight feels, and it is the
+owner's mechanic to keep or cut.
+
 ## Cycle — the kit programme (O252-O260)
 
 The roster target is 55: eight actives, one ultimate and two passives per

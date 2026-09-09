@@ -8,6 +8,7 @@
 #include "Abilities/BreakerAbilityComponent.h"
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Abilities/BreakerAbilityStateComponent.h"
+#include "Abilities/BreakerGameplayAbility.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Progression/BreakerProgressionComponent.h"
 // Cap levels only, for stating what a level actually granted on the banner.
@@ -764,6 +765,22 @@ void ABreakerPlaytestHUD::DrawAbilityCluster(const ABreakerCharacter* Character)
         S(BreakerUI::HudUltimateX), Bottom - Ultimate, Ultimate, S(BreakerUI::HudUltimateMark), RailFor(EBreakerAbilitySlot::Ultimate));
     DrawAbilitySlot(Character, Abilities, EBreakerAbilitySlot::ClassAbilityTwo, TEXT("T"),
         S(BreakerUI::HudAbilityTwoX), Bottom - Tile, Tile, S(BreakerUI::HudAbilityMark), RailFor(EBreakerAbilitySlot::ClassAbilityTwo));
+
+    // O252's skill level, ONCE for the cluster rather than once per slot. The
+    // pool is shared, so every slot carries the same number and printing it
+    // three times would say three times that they are different. It sits above
+    // the row's left edge, muted and small: it changes a few times a session,
+    // so it is a readout the player can find, not a thing competing with the
+    // cooldowns beneath it. Without this the chase O253 sells is invisible,
+    // which by this project's own rule makes it dead content.
+    if (Character->GetProgression())
+    {
+        DrawSpecText(FString::Printf(TEXT("%s %d"),
+                *BreakerStrings::Get(EBreakerStringKey::HudAbilitySkillLevel),
+                UBreakerGameplayAbility::SkillLevelFor(Character)),
+            S(BreakerUI::HudAbilityOneX), Bottom - Tile - S(BreakerUI::Space12),
+            BreakerUI::TextMuted, 10.0f, 1.0f, ESpecFontRole::Mono);
+    }
 
     const UBreakerCombatComponent* Combat = Character->GetCombat();
     const bool bParryPreview = IsCapturePreview() && FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureParry"));
