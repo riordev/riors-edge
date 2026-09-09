@@ -77,10 +77,11 @@ struct RIORSEDGE_API FBreakerWorldPointSource
     // character with a permanent class is unrecoverable.
     UPROPERTY(BlueprintReadOnly) bool bMissable = false;
 
-    // False where the trigger does not exist in the build yet. This is the
-    // honest half of the registry: the list is canon, the wiring is not
-    // finished, and `make status` counts the gap rather than a document
-    // describing it.
+    // AUTHORING INTENT ONLY, AND NO LONGER COUNTED. CountWithBuiltTrigger
+    // derives the real figure from whether a mission beat names this source,
+    // because a bool a human sets by hand is a claim about the code rather
+    // than a measurement of it — this one said fourteen were missing while
+    // all fifteen were, for as long as the grant had no caller.
     UPROPERTY(BlueprintReadOnly) bool bTriggerBuilt = false;
 };
 

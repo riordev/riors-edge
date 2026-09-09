@@ -1,4 +1,5 @@
 #include "Progression/BreakerWorldPoints.h"
+#include "Save/BreakerMissionContent.h"
 
 namespace
 {
@@ -92,10 +93,32 @@ bool UBreakerWorldPointLibrary::IsKnownSource(FName SourceId)
 
 int32 UBreakerWorldPointLibrary::CountWithBuiltTrigger()
 {
+    // MEASURED, NOT DECLARED. This used to sum a hand-authored bool on each
+    // row, and a number a human types about the code is not a measurement of
+    // it: it read "one built, fourteen missing" for the whole time the grant
+    // had no caller at all and every one of the fifteen was unreachable.
+    //
+    // A source has a trigger when a mission beat names it, because that beat's
+    // flag is what UBreakerProgressionComponent::SettleWorldCorePoints walks.
+    // So the count asks the content, and a Core Point authored onto a beat
+    // starts counting the moment it is authored, with nobody remembering to
+    // flip anything.
+    TSet<FName> Triggered;
+    for (const FBreakerMissionDefinition& Mission : UBreakerMissionLibrary::GetMissions())
+    {
+        for (const FBreakerMissionBeat& Beat : Mission.Beats)
+        {
+            if (Beat.Kind == EBreakerMissionBeatKind::Unlock && !Beat.CorePoint.IsNone())
+            {
+                Triggered.Add(Beat.CorePoint);
+            }
+        }
+    }
+
     int32 Count = 0;
     for (const FBreakerWorldPointSource& Source : GetSources())
     {
-        if (Source.bTriggerBuilt) ++Count;
+        if (Triggered.Contains(Source.SourceId)) ++Count;
     }
     return Count;
 }
