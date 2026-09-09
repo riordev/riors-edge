@@ -24,7 +24,7 @@
 const TArray<BreakerPrototypeDestinations::FDefinition>& BreakerPrototypeDestinations::All()
 {
     // O2 PLACEHOLDER: authored district positions and fixed level brackets.
-    // Early/middle campaign side destinations; ordinary patrols never read
+    // Campaign side destinations; ordinary patrols never read
     // player level. Return visits retain these levels and normal loot gates.
     static const TArray<FDefinition> Definitions = {
         {TEXT("RedBasin"), TEXT("Lvl_RedBasin"), TEXT("Red Basin"),
@@ -34,7 +34,11 @@ const TArray<BreakerPrototypeDestinations::FDefinition>& BreakerPrototypeDestina
         {TEXT("StationZero"), TEXT("Lvl_StationZero"), TEXT("Station Zero"),
             TEXT("Prototype destination / fixed areas 24-28. Enter an overrun research hub through reception, specimen gardens and the containment laboratory. Hunt the Containment Custodian in the laboratory; supply lockers are optional. Either gate returns to Anchor 13."),
             {FVector(2000,0,0), FVector(8000,-1200,0), FVector(12500,3600,0)},
-            {TEXT("Research Reception"), TEXT("Specimen Gardens"), TEXT("Containment Laboratory")}, {24,26,28}}
+            {TEXT("Research Reception"), TEXT("Specimen Gardens"), TEXT("Containment Laboratory")}, {24,26,28}},
+        {TEXT("PortMeridian"), TEXT("Lvl_PortMeridian"), TEXT("Port Meridian"),
+            TEXT("Prototype destination / fixed areas 34-38. Cross a destroyed airport through the departures terminal, wreck-strewn apron and damaged maintenance hangar. Clear the three marked pockets and recover their supplies. Either gate returns to Anchor 13."),
+            {FVector(2200,0,0), FVector(8800,0,0), FVector(15400,0,0)},
+            {TEXT("Departures Terminal"), TEXT("Broken Apron"), TEXT("Maintenance Hangar")}, {34,36,38}}
     };
     return Definitions;
 }
@@ -67,11 +71,13 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
     UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr,TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
     if (!Cube || !Cylinder || !Material) return Result;
     const bool bBasin = Id == TEXT("RedBasin");
+    const bool bStation = Id == TEXT("StationZero");
+    const bool bAirport = Id == TEXT("PortMeridian");
     // O2 PLACEHOLDER palette/placement: scorched soil versus cool lab panels,
     // with amber route lamps. Rift teal remains reserved for travel objects.
-    const FLinearColor Ground = bBasin ? FLinearColor(.16f,.085f,.05f) : FLinearColor(.09f,.13f,.19f);
-    const FLinearColor Wall = bBasin ? FLinearColor(.27f,.14f,.08f) : FLinearColor(.18f,.25f,.34f);
-    const FLinearColor Trim = bBasin ? FLinearColor(.15f,.12f,.10f) : FLinearColor(.42f,.49f,.55f);
+    const FLinearColor Ground = bBasin ? FLinearColor(.16f,.085f,.05f) : bAirport ? FLinearColor(.13f,.14f,.15f) : FLinearColor(.09f,.13f,.19f);
+    const FLinearColor Wall = bBasin ? FLinearColor(.27f,.14f,.08f) : bAirport ? FLinearColor(.29f,.30f,.28f) : FLinearColor(.18f,.25f,.34f);
+    const FLinearColor Trim = bBasin ? FLinearColor(.15f,.12f,.10f) : bAirport ? FLinearColor(.52f,.40f,.16f) : FLinearColor(.42f,.49f,.55f);
     bool bGeometryValid = true;
     int32 RecorderCount=0;
     auto Shape = [&](const TCHAR* Name,UStaticMesh* Mesh,FVector At,FVector Size,FLinearColor Color,
@@ -107,7 +113,7 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
         FVector(ApproachDelta.Size2D()+600,2200,140),Ground,true,ApproachDelta.Rotation());
     Result.WalkingRoute={Result.Arrival};
     // O2 PLACEHOLDER: centimetre-authored wide walking route; ledges and cover
-    // are optional. Neither destination requires dash, wall-run or a class.
+    // are optional. No destination requires dash, wall-run or a class.
     for (int32 Pocket=0;Pocket<3;++Pocket)
     {
         const FVector C=Definition->Districts[Pocket];
@@ -142,7 +148,7 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
                         { Bed->SetActorEnableCollision(false); Bed->Tags.Add(TEXT("Destination.Landmark.ScorchedFields")); }
                     }
             }
-            else
+            else if (bStation)
             {
                 // Lab wings and broken roof bays frame an overrun research hub;
                 // the central specimen garden remains open to the sky.
@@ -178,10 +184,41 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
                     Dress(TEXT("Bush_Common"),C+FVector(1500,Side*2200,0),270,Side*70);
                 }
             }
+            else if (bAirport)
+            {
+                // O2 PLACEHOLDER: destroyed terminal facade and hangar portals
+                // frame a continuous central aisle; the apron stays open sky.
+                if (Pocket!=1)
+                    for (int32 Bay=0;Bay<5;++Bay)
+                    {
+                        const FVector Post=C+FVector(-2200+Bay*1100,Side*2450,0);
+                        const float Height=Pocket==0 ? 800.f : 1300.f;
+                        Shape(TEXT("AirportPortalPost"),Cube,Post+FVector(0,0,Height*.5f),FVector(130,130,Height),Wall);
+                        Dress(TEXT("Column_MetalSupport"),Post+FVector(0,Side*160,0),Height,90);
+                        if (Bay%2==0)
+                            if (auto* Roof=Shape(TEXT("BrokenAirportRoof"),Cube,C+FVector(-2200+Bay*1100,Side*1400,Height),
+                                FVector(950,2200,90),Wall,false,FRotator(0,0,Side*(Bay==2?7:0))))
+                                Roof->Tags.Add(Pocket==0 ? TEXT("Destination.Landmark.DeparturesTerminal") : TEXT("Destination.Landmark.MaintenanceHangar"));
+                        if (Pocket==0 && Bay!=2)
+                            Shape(TEXT("ShatteredTerminalWall"),Cube,Post+FVector(350,0,230),FVector(600,100,460),Wall);
+                    }
+                else
+                    for (int32 Mark=0;Mark<6;++Mark)
+                        if (auto* Paint=Shape(TEXT("ApronLaneMark"),Cube,C+FVector(-2200+Mark*850,Side*2200,1),
+                            FVector(500,30,2),Trim)) Paint->SetActorEnableCollision(false);
+                if(Pocket==0)
+                {
+                    // O2 PLACEHOLDER: vacant check-in desks face the open aisle;
+                    // cache on the opposite end remains physically accessible.
+                    for(int32 Desk=0;Desk<3;++Desk)
+                        Shape(TEXT("CheckInDesk"),Cube,C+FVector(-1900+Desk*500,Side*1900,65),FVector(380,240,130),Trim);
+                }
+                Dress(TEXT("Column_Pipes"),C+FVector(2600,Side*2450,0),420,Side*90);
+            }
             // Real low cover and a full-height line break, with side approaches.
             // O2 PLACEHOLDER: keep the laboratory southwest arrival diagonal
             // outside the full standing-capsule footprint of this cover.
-            const float CoverX=(!bBasin && Pocket==2 && Side<0) ? 850.f : -850.f;
+            const float CoverX=(bStation && Pocket==2 && Side<0) ? 850.f : -850.f;
             Shape(TEXT("LowCover"),Cube,C+FVector(CoverX,Side*600,55),FVector(550,240,110),Trim);
             Shape(TEXT("SightBreak"),Cube,C+FVector(100,Side*1150,200),FVector(240,650,400),Wall);
             auto* Lamp=World->SpawnActor<APointLight>(C+FVector(-1800,Side*1600,430),FRotator::ZeroRotator);
@@ -223,7 +260,7 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
                     Rim->Tags.Add(TEXT("Destination.Landmark.ImpactCrater"));
             }
         }
-        else if (Pocket==2)
+        else if (bStation && Pocket==2)
         {
             // O2 PLACEHOLDER: a breached specimen containment chamber, with
             // instrument rings and growth escaping the service collar.
@@ -235,6 +272,29 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
             Dress(TEXT("Column_Pipes"),At+FVector(-800,0,0),1100,180);
             Dress(TEXT("Bush_Common"),At+FVector(0,0,1500),550,0);
             Dress(TEXT("CommonTree_1"),At+FVector(350,0,1500),1100,45);
+        }
+        if(bAirport)
+        {
+            // O2 PLACEHOLDER: airport-specific silhouettes use existing native
+            // primitives. The wreck is outside all guard/cache/central routes.
+            if(Pocket==1)
+            {
+                const FVector Wreck=C+FVector(1700,-1950,0);
+                auto* Hull=Shape(TEXT("BrokenAircraftFuselage"),Cylinder,Wreck+FVector(0,0,210),
+                    FVector(350,350,1900),FLinearColor(.46f,.47f,.43f),false,FRotator(90,8,0));
+                if(Hull)Hull->Tags.Add(TEXT("Destination.Landmark.AircraftWreck"));
+                Shape(TEXT("TornAircraftWing"),Cube,Wreck+FVector(-150,-140,155),FVector(700,950,45),Wall,false,FRotator(0,-18,12));
+                Shape(TEXT("AircraftTailFin"),Cube,Wreck+FVector(700,20,410),FVector(330,65,470),Trim,false,FRotator(0,8,0));
+            }
+            if(Pocket==0)
+                Shape(TEXT("DeparturesSign"),Cube,C+FVector(-2500,0,760),FVector(100,1800,240),Trim);
+            if(Pocket==2)
+            {
+                for(int32 Bay=0;Bay<3;++Bay)
+                    Shape(TEXT("HangarRoofTruss"),Cube,C+FVector(-2100+Bay*2100,0,1400),FVector(110,5100,130),Trim);
+                Shape(TEXT("CollapsedHangarDoor"),Cube,C+FVector(2450,-2050,370),FVector(110,900,800),Wall,false,FRotator(0,10,15));
+                Dress(TEXT("Column_Pipes"),C+FVector(-2200,-2000,0),750,90);
+            }
         }
         TArray<ABreakerEnemy*> Guards;
         const FVector Offsets[]={FVector(-900,-350,100),FVector(50,450,100),FVector(1250,-500,100),
@@ -265,7 +325,7 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
             Enemy->Tags.Add(FName(*FString::Printf(TEXT("Destination.%s.Pocket.%d"),*Id.ToString(),Pocket)));
             // O2 PLACEHOLDER authored target assignment: the laboratory Warden
             // is the Containment Custodian; five surrounding guards are optional.
-            if (!bBasin && Pocket==2 && Index==3) UBreakerContainmentHunt::AttachTo(Enemy);
+            if (bStation && Pocket==2 && Index==3) UBreakerContainmentHunt::AttachTo(Enemy);
             UBreakerKillTelemetryComponent::AttachTo(Enemy);
             Guards.Add(Enemy); Result.Enemies.Add(Enemy);
         }
@@ -277,7 +337,7 @@ BreakerPrototypeDestinations::FLayout BreakerPrototypeDestinations::Build(UWorld
         const FVector CacheAt=C+FVector(1000,1700,90);
         if (auto* Cache=World->SpawnActor<ABreakerFernhallCache>(CacheAt,FRotator(0,180,0)))
         {
-            Cache->DisplayName=FText::FromString(Definition->DistrictNames[Pocket]+(bBasin?TEXT(" supply cache"):TEXT(" research supply locker")));
+            Cache->DisplayName=FText::FromString(Definition->DistrictNames[Pocket]+(bStation?TEXT(" research supply locker"):TEXT(" supply cache")));
             Cache->Tags.Remove(TEXT("Fernhall.Cache"));
             Cache->Tags.Add(TEXT("PrototypeDestination.Cache"));
             Cache->Tags.Add(FName(*FString::Printf(TEXT("Destination.Site.%s.%d"),*Id.ToString(),Pocket)));

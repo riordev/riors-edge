@@ -5,7 +5,7 @@ class ABreakerEnemy;
 class ABreakerFernhallCache;
 class ABreakerTravelPoint;
 
-// Two explicitly authored prototype destinations. These are fixed regional
+// Explicitly authored prototype destinations. These are fixed regional
 // layouts, not a generator or an alternate campaign progression framework.
 namespace BreakerPrototypeDestinations
 {

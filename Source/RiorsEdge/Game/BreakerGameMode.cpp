@@ -618,8 +618,13 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
                 const FVector BasinLooks[]={FVector(300,0,100),FVector(1800,-1750,350),FVector(1800,-1650,100)};
                 const FVector ResearchViews[]={FVector(-500,0,500),FVector(500,-500,850),FVector(-500,-500,900)};
                 const FVector ResearchLooks[]={FVector(-1500,1750,100),FVector(-2400,1600,450),FVector(1900,-1500,950)};
-                const FVector At=Centre+(bBasin?BasinViews[District]:ResearchViews[District]);
-                const FRotator Facing=(Centre+(bBasin?BasinLooks[District]:ResearchLooks[District])-At).Rotation();
+                const bool bAirport=Prototype->Id==TEXT("PortMeridian");
+                // O2 PLACEHOLDER: capture the terminal facade, aircraft wreck
+                // and hangar frame; these views do not alter live gameplay.
+                const FVector AirportViews[]={FVector(-1800,-800,700),FVector(-300,-600,650),FVector(-2100,-800,650)};
+                const FVector AirportLooks[]={FVector(0,1700,420),FVector(1700,-1950,250),FVector(1000,0,900)};
+                const FVector At=Centre+(bAirport?AirportViews[District]:bBasin?BasinViews[District]:ResearchViews[District]);
+                const FRotator Facing=(Centre+(bAirport?AirportLooks[District]:bBasin?BasinLooks[District]:ResearchLooks[District])-At).Rotation();
                 if (auto* Camera=GetWorld()->SpawnActor<ACameraActor>(At,Facing))
                 {
                     Camera->GetCameraComponent()->SetFieldOfView(90.f);

@@ -27,8 +27,8 @@ bool FBreakerHubTravelRegistryTest::RunTest(const FString& Parameters)
     // the original claim exactly as strong and adds the new one, rather than
     // loosening a 3 into a 4 and losing what the 3 was asserting.
     //
-    // GENERAL destinations — six: gym, Anchor, Fernhall and three earned
-    // erased Earths. The old "no third destination without checking
+    // GENERAL destinations — nine: gym, Anchor, Fernhall, three earned
+    // erased Earths and three packaged regional prototypes. The old "no third destination without checking
     // the selection UI exists" reason is discharged: SBreakerMenu's travel
     // screen is a real multi-card picker over GetAvailableDestinations.
     //
@@ -51,12 +51,11 @@ bool FBreakerHubTravelRegistryTest::RunTest(const FString& Parameters)
         if (!Destination.bEnabled) continue;
         if (Destination.bDoorOnly) ++DoorOnlyCount; else ++GeneralCount;
     }
-    TestEqual(TEXT("Eight general destinations include both packaged regional prototypes"), GeneralCount, 8);
+    TestEqual(TEXT("Nine general destinations include three packaged regional prototypes"), GeneralCount, 9);
     TestEqual(TEXT("Exactly one door-only destination: the Local Rift"), DoorOnlyCount, 1);
 
-    // A travel point never offers the place it stands in, which is what keeps
-    // each point at exactly one option and therefore inside the no-picker-yet
-    // rule above.
+    // A travel point excludes its current destination; other reachable entries
+    // appear in the existing multi-card picker.
     FBreakerTravelDestination Found;
     TestTrue(TEXT("The hub is a real destination"),
         ABreakerTravelPoint::FindDestination(ABreakerTravelPoint::HubDestinationId, Found));

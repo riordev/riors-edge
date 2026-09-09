@@ -11,6 +11,7 @@
 #include "EngineUtils.h"
 #include "Game/BreakerGameInstance.h"
 #include "Game/BreakerGameMode.h"
+#include "Game/BreakerContainmentHunt.h"
 #include "Game/BreakerLocalMapComponent.h"
 #include "Game/BreakerPrototypeDestinations.h"
 #include "GameFramework/PlayerController.h"
@@ -31,7 +32,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerPrototypeDestinationPackagesTest,
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FBreakerPrototypeDestinationPackagesTest::RunTest(const FString& Parameters)
 {
-    TestEqual(TEXT("Exactly two playable prototype definitions"),BreakerPrototypeDestinations::All().Num(),2);
+    TestEqual(TEXT("Exactly three playable prototype definitions"),BreakerPrototypeDestinations::All().Num(),3);
     for (const auto& D : BreakerPrototypeDestinations::All())
     {
         if (!TestTrue(TEXT("Run create_prototype_destination_maps.py: actual destination World package exists"),BreakerPrototypeDestinations::HasMapPackage(D))) return false;
@@ -108,12 +109,20 @@ bool FBreakerPrototypeDestinationRuntimeTest::RunTest(const FString& Parameters)
         // Existing capsule route, legal spawn and objective checks below remain.
         const TArray<FName> RequiredLandmarks=D.Id==TEXT("RedBasin")
             ? TArray<FName>{TEXT("Destination.Landmark.ScorchedFields"),TEXT("Destination.Landmark.BurnedHomestead"),TEXT("Destination.Landmark.ImpactCrater")}
-            : TArray<FName>{TEXT("Destination.Landmark.ResearchBench"),TEXT("Destination.Landmark.SpecimenGarden"),TEXT("Destination.Landmark.ContainmentLaboratory")};
+            : D.Id==TEXT("StationZero")
+                ? TArray<FName>{TEXT("Destination.Landmark.ResearchBench"),TEXT("Destination.Landmark.SpecimenGarden"),TEXT("Destination.Landmark.ContainmentLaboratory")}
+                : TArray<FName>{TEXT("Destination.Landmark.DeparturesTerminal"),TEXT("Destination.Landmark.AircraftWreck"),TEXT("Destination.Landmark.MaintenanceHangar")};
         for (FName Landmark : RequiredLandmarks)
         {
             AActor* Found=nullptr;
             for (TActorIterator<AActor> It(World);It;++It) if(It->ActorHasTag(Landmark)){Found=*It;break;}
             TestNotNull(*FString::Printf(TEXT("Authored setting landmark exists: %s"),*Landmark.ToString()),Found);
+        }
+        if(D.Id==TEXT("PortMeridian"))
+        {
+            for(auto* Enemy:Enemies)
+                TestFalse(TEXT("Airport guards never inherit Station Zero's priority hunt"),Enemy->ActorHasTag(UBreakerContainmentHunt::TargetTag()));
+            TestFalse(TEXT("Airport objective is real supply recovery, not a research mission"),Player->FindComponentByClass<UBreakerLocalMapComponent>()->GetCampaignObjective().ToString().Contains(TEXT("Custodian")));
         }
         for (auto* Gate : Gates)
         {
@@ -154,6 +163,35 @@ bool FBreakerPrototypeDestinationRuntimeTest::RunTest(const FString& Parameters)
                 TestTrue(TEXT("Route never requires a jump over a missing floor"),Floor.ImpactNormal.Z>.7f);
             }
             Previous=End;
+        }
+        if(D.Id==TEXT("PortMeridian"))
+        {
+            // Airport side access is tested with the same standing capsule;
+            // the main route alone does not prove caches or gates are usable.
+            TArray<TPair<FVector,FVector>> Spurs;
+            for(int32 Pocket=0;Pocket<Caches.Num();++Pocket)
+            {
+                const FVector Centre=D.Districts[Pocket];
+                const FName Site(*FString::Printf(TEXT("Destination.Site.PortMeridian.%d"),Pocket));
+                auto* const* Cache=Caches.FindByPredicate([&](const auto* C){return C->ActorHasTag(Site);});
+                if(!Cache)return false;
+                Spurs.Add({Centre,(*Cache)->GetActorLocation()});
+            }
+            for(auto* Gate:Gates)
+                Spurs.Add({Gate->GetActorLocation().X<0 ? BreakerPrototypeDestinations::ArrivalLocation() : D.Districts.Last(),Gate->GetActorLocation()});
+            for(const auto& Spur:Spurs)
+            {
+                FVector From=Spur.Key,To=Spur.Value;From.Z=To.Z=Half+3;
+                FHitResult Block;
+                TestFalse(TEXT("Airport cache/return approach fits the real standing capsule"),World->SweepSingleByObjectType(Block,From,To,FQuat::Identity,
+                    FCollisionObjectQueryParams(ECC_WorldStatic),FCollisionShape::MakeCapsule(Radius,Half),Query));
+                for(int32 Sample=0;Sample<=10;++Sample)
+                {
+                    const FVector At=FMath::Lerp(From,To,Sample/10.f);FHitResult Floor;
+                    TestTrue(TEXT("Airport cache/return approach has continuous floor"),World->LineTraceSingleByObjectType(Floor,At,At-FVector(0,0,Half+20),
+                        FCollisionObjectQueryParams(ECC_WorldStatic),Query));
+                }
+            }
         }
         TArray<int32> FixedLevels;
         for (auto* Enemy : Enemies) FixedLevels.Add(Enemy->GetAreaLevel());

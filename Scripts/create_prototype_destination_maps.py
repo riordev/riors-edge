@@ -1,10 +1,10 @@
-"""Create the two approved prototype map shells after compiling the native builder.
+"""Create the approved prototype map shells after compiling the native builder.
 Run in an isolated Unreal Editor process. Existing maps are verified, never replaced.
 Geometry, services, fixed encounters and rewards are authored in the native builder.
 """
 import unreal
 
-maps = ("Lvl_RedBasin", "Lvl_StationZero")
+maps = ("Lvl_RedBasin", "Lvl_StationZero", "Lvl_PortMeridian")
 levels = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 mode = unreal.load_class(None, "/Script/RiorsEdge.BreakerGameMode")
@@ -34,4 +34,4 @@ for name in maps:
 for name in maps:
     if not unreal.EditorAssetLibrary.does_asset_exist("/Game/Breaker/Maps/" + name):
         raise RuntimeError("Incomplete destination creation; native catalogue must remain package-gated")
-unreal.log("Prototype destination map packages verified: Red Basin and Station Zero")
+unreal.log("Prototype destination map packages verified: Red Basin, Station Zero and Port Meridian")
