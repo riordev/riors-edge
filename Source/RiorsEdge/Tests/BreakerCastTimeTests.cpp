@@ -62,10 +62,43 @@ bool FBreakerCastTimeShippedTest::RunTest(const FString& Parameters)
 
     // Movement and defensive verbs stay instant, OWNER-RULED: a dodge with a
     // wind-up is not a dodge. Closequarter is a blink, so it is movement.
-    for (const TCHAR* Instant : { TEXT("Caster.Closequarter"), TEXT("Swift.Slipcut"),
-        TEXT("Swift.HardStop"), TEXT("Swift.CadenceBreak"), TEXT("Tank.AnchorPoint") })
+    // THE INSTANT FOUR, and the roster is asserted CLOSED: an ability added
+    // later without a wind-up is a red, not a silent exemption.
+    const TSet<FName> Instant = {
+        FName(TEXT("Swift.Slipcut")),        // a tempo state, snapped on mid-fight
+        FName(TEXT("Swift.HardStop")),       // "cancels all velocity INSTANTLY", its own text
+        FName(TEXT("Caster.Closequarter")),  // a blink is movement
+        FName(TEXT("Tank.GroundZero")),      // an airborne commit already in flight
+        // AND the abilities that ALREADY OWN THEIR TIMING. A generic wind-up
+        // on top of a bespoke one casts the ability twice, which is how these
+        // three were found: Fracture has its own cast phase (see
+        // FractureCastPhaseRuntime), Siphon is a 5s channel, and Breach
+        // Charge's 1.2s fuse is the delay it already carries.
+        FName(TEXT("Caster.Fracture")),
+        FName(TEXT("Caster.Siphon")),
+        FName(TEXT("Tank.BreachCharge")),
+        // PARKED, not designed: Rot and Resonance want a wind-up and cannot
+        // have one yet. Their runtime fixtures build worlds that never call
+        // InitializeActorsForPlay, so a timer-driven cast can never resolve
+        // there, and adding the call crashes them outright — they were not
+        // written for a play world. That is fixture architecture, not a data
+        // edit, and it is on the desk as its own item.
+        FName(TEXT("Caster.Rot")),
+        FName(TEXT("Caster.Resonance")),
+        // Unmake opens the window that rewrites every Caster cost. A wind-up
+        // before that window opens moves the whole class's cost model, which
+        // is a design change rather than a delay, so it is parked with a
+        // ruling owed rather than authored in passing.
+        FName(TEXT("Caster.Unmake")),
+    };
+    for (const FName Id : Instant)
     {
-        TestEqual(*FString::Printf(TEXT("%s stays instant"), Instant), Authored(Instant), 0.0f, 0.0001f);
+        TestEqual(*FString::Printf(TEXT("%s stays instant"), *Id.ToString()), Authored(*Id.ToString()), 0.0f, 0.0001f);
+    }
+    for (const UBreakerAbilityDefinition* Definition : UBreakerAbilityDefinition::GetFallbackRegistry())
+    {
+        if (!Definition || Instant.Contains(Definition->AbilityId)) continue;
+        TestTrue(*FString::Printf(TEXT("%s winds up"), *Definition->AbilityId.ToString()), Definition->HasCastTime());
     }
 
     // Every registry row carries the key, so a row that forgot it is a load

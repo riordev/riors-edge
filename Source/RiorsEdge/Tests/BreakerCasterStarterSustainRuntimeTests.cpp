@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Tests/BreakerCasterDamageSplitObserver.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
@@ -139,6 +140,7 @@ bool FBreakerCasterStarterSustainRuntimeTest::RunTest(const FString& Parameters)
         TStrongObjectPtr<ABreakerZoneActor> CastZone;
         float FirstDeath = -1;
         if (bRot && !TestTrue(*(Label + TEXT(" pays for one opening Rot")), Abilities->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityTwo))) return false;
+        BreakerResolvePendingCast(World, Player);
         if (bRot)
         {
             for (const auto& Held : ABreakerZoneActor::GetLiveZones())

@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Fracture.h"
@@ -69,6 +70,7 @@ bool FBreakerGearManaSuspensionRuntimeTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("Traversal activates real Overrun gear regeneration"), GearRegen > 0)) return false;
     const auto Fracture = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Fracture::StaticClass(), 1));
     if (!TestTrue(TEXT("Paid starter cast makes room in normal Mana bank"), ASC->TryActivateAbility(Fracture))) return false;
+    BreakerResolvePendingCast(World, Player);
     const float BeforeRegen = Mana->GetMana();
     Equipment->TickComponent(.5f, LEVELTICK_All, nullptr);
     TestEqual(TEXT("Equipment does not independently pay regeneration"), Mana->GetMana(), BeforeRegen, .001f);
@@ -78,6 +80,7 @@ bool FBreakerGearManaSuspensionRuntimeTest::RunTest(const FString& Parameters)
     const auto Unmake = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Unmake::StaticClass(), 1));
     const float BeforeUltimate = Mana->GetMana();
     if (!TestTrue(TEXT("Actual paid Unmake activates"), ASC->TryActivateAbility(Unmake))) return false;
+    BreakerResolvePendingCast(World, Player);
     TestEqual(TEXT("Ultimate paid ordinary eighty Mana"), BeforeUltimate - Mana->GetMana(), 80.0f, .001f);
     TestTrue(TEXT("Actual ultimate owns Mana suspension"), Mana->IsGenerationSuspended());
     const float SuspendedMana = Mana->GetMana();

@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Rot.h"
@@ -125,6 +126,7 @@ bool FBreakerLongDarkRuntimeTest::RunTest(const FString& Parameters)
             if (!TestTrue(TEXT("live floor aim reaches intended refresh/placement point"), FVector::Dist(FloorHit.ImpactPoint, Aim) < 1)) return nullptr;
             const float Before = Mana->GetMana();
             if (!TestTrue(TEXT("real Rot activation"), ASC->TryActivateAbility(Rot))) return nullptr;
+            BreakerResolvePendingCast(World, Caster);
             TestTrue(TEXT("Rot pays its actual current-window cost"), Mana->GetMana() < Before);
             ABreakerZoneActor* Nearest = nullptr;
             for (const auto& Held : ABreakerZoneActor::GetLiveZones())
@@ -154,6 +156,7 @@ bool FBreakerLongDarkRuntimeTest::RunTest(const FString& Parameters)
         Mana->AdvanceLoop(30); // Ordinary pre-ultimate recovery; no combat-period refills.
         const float BeforeUnmake = Mana->GetMana();
         if (!TestTrue(TEXT("paid Long Dark Unmake"), ASC->TryActivateAbility(Unmake))) return false;
+        BreakerResolvePendingCast(World, Caster);
         TestTrue(TEXT("ultimate pays Mana"), Mana->GetMana() < BeforeUnmake);
         TestEqual(TEXT("real Long Dark window is twelve seconds"), State->GetWindowRemaining(UBreakerCasterAbility::UnmakeWindowKey()), 12.0f);
         TestEqual(TEXT("real Long Dark cost scalar is half"), State->GetWindowPayload(UBreakerCasterAbility::UnmakeWindowKey()), .5f);
@@ -205,6 +208,7 @@ bool FBreakerLongDarkRuntimeTest::RunTest(const FString& Parameters)
         {
             Mana->AdvanceLoop(30); // Natural recovery after cancellation, before a separate ultimate.
             if (!TestTrue(TEXT("later actual paid Unmake"), ASC->TryActivateAbility(Unmake))) return false;
+            BreakerResolvePendingCast(World, Caster);
             TestFalse(TEXT("new ultimate never rearms old placement"), Paused->IsExpiryPaused());
         }
         const float ReleasedLifetime = Paused->GetRemainingDuration(); Advance(10);

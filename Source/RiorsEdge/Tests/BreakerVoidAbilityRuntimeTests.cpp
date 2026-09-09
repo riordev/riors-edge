@@ -1,5 +1,6 @@
 #include "Tests/BreakerFractureTestHelpers.h"
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Siphon.h"
@@ -63,6 +64,7 @@ bool FBreakerVoidAbilityRuntimeTest::RunTest(const FString& Parameters)
     const auto Siphon = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Siphon::StaticClass(), 1));
     Combat->DodgeChance = 1;
     if (!TestTrue(TEXT("real Siphon activates against collision target"), ASC->TryActivateAbility(Siphon))) return false;
+    BreakerResolvePendingCast(World, Caster);
     Advance(12);
     TestEqual(TEXT("dodged channel tick deals no damage"), Health->GetHealth(), 10000.0f);
     TestFalse(TEXT("dodged channel tick cannot apply Void"), Status->HasStatus(VoidTag));
@@ -128,6 +130,7 @@ bool FBreakerVoidAbilityRuntimeTest::RunTest(const FString& Parameters)
         for (TActorIterator<ABreakerProjectileBase> It(World); It; ++It) Existing.Add(*It);
         Caster->GetAttributes()->ApplyClassResource(100);
         if (!TestTrue(TEXT("actual Fracture activates"), ASC->TryActivateAbility(Fracture))) return false;
+        BreakerResolvePendingCast(World, Caster);
         if (!BreakerWaitForFractureCast(World, ASC, Fracture)) return false;
         ABreakerProjectileBase* Projectile = nullptr;
         for (TActorIterator<ABreakerProjectileBase> It(World); It; ++It) if (!Existing.Contains(*It) && !It->HasImpacted()) { Projectile = *It; break; }
@@ -150,6 +153,7 @@ bool FBreakerVoidAbilityRuntimeTest::RunTest(const FString& Parameters)
         for (TActorIterator<ABreakerProjectileBase> It(World); It; ++It) Existing.Add(*It);
         Caster->GetAttributes()->ApplyClassResource(100); // Cast funding, no offensive stats.
         if (!TestTrue(TEXT("actual follow-up Fracture cast"), ASC->TryActivateAbility(Fracture))) return false;
+        BreakerResolvePendingCast(World, Caster);
         if (!BreakerWaitForFractureCast(World, ASC, Fracture)) return false;
         ABreakerProjectileBase* Projectile = nullptr;
         for (TActorIterator<ABreakerProjectileBase> It(World); It; ++It)

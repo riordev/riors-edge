@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Rot.h"
@@ -122,6 +123,7 @@ bool FBreakerRotNodesRuntimeTest::RunTest(const FString& Parameters)
     {
         Player->GetAttributes()->ApplyClassResource(100);
         TestTrue(TEXT("real Rot activation"), ASC->TryActivateAbility(RotHandle));
+        BreakerResolvePendingCast(World, Player);
         ABreakerZoneActor* Found = nullptr;
         for (const TWeakObjectPtr<ABreakerZoneActor>& Held : ABreakerZoneActor::GetLiveZones())
             if (ABreakerZoneActor* Candidate = Held.Get())

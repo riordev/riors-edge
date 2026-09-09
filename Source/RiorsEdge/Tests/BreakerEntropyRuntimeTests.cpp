@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Rot.h"
@@ -112,6 +113,7 @@ bool FBreakerEntropyRuntimeTest::RunTest(const FString& Parameters)
     Victim->AddInstanceComponent(VictimStatus); VictimStatus->RegisterComponent();
     const auto Cast = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Rot::StaticClass(), 1));
     if (!TestTrue(TEXT("actual Rot GAS activation"), ASC->TryActivateAbility(Cast))) return false;
+    BreakerResolvePendingCast(World, Caster);
     ABreakerZoneActor* Zone = nullptr;
     for (TActorIterator<ABreakerZoneActor> It(World); It; ++It)
         if (It->GetZoneInstigator() == Caster) { Zone = *It; break; }

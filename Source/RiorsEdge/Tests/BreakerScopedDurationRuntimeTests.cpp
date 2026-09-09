@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbilityComponent.h"
@@ -88,6 +89,7 @@ bool FBreakerScopedDurationRuntimeTest::RunTest(const FString& Parameters)
         const float ResourceBefore=Attributes->GetClassResource();
         const float Quote=Abilities->GetResourceCostForSlot(Slot);
         if(!TestTrue(FString::Printf(TEXT("Normal equipped %s activates"), *AbilityId.ToString()),Abilities->TryActivateSlot(Slot))) return false;
+        BreakerResolvePendingCast(World, Player);
         if(ClassId==EBreakerClassId::Caster)
         {
             TestEqual(TEXT("Rot pays its live Mana quote"),Attributes->GetClassResource(),ResourceBefore-Quote,.001f);

@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Cleave.h"
@@ -267,6 +268,7 @@ bool FBreakerCasterPaymentRuntimeTest::RunTest(const FString& Parameters)
         Caster->GetMana()->AdvanceLoop(1);
         Caster->GetAttributes()->ApplyClassResource(80);
         TestTrue(TEXT("Real Resonance GAS cast"), ASC->TryActivateAbility(Ability));
+        BreakerResolvePendingCast(World, Caster);
         TestEqual(TEXT("Payment pays only eligible distinct type after forty-Mana cost"), Caster->GetMana()->GetMana(), 40.0f + Rank * 2.0f);
         TestEqual(TEXT("Baseline consumption still removes all statuses"), Victim.Status->GetDistinctStatusTypeCount(), 0);
     }

@@ -1,5 +1,6 @@
 #include "Tests/BreakerFractureTestHelpers.h"
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Fracture.h"
@@ -36,6 +37,7 @@ namespace BreakerMultispellRuntime
         for (TActorIterator<ABreakerProjectileBase> It(Caster->GetWorld()); It; ++It) Existing.Add(*It);
         Caster->GetAttributes()->ApplyClassResource(100.0f);
         if (!Caster->GetAbilitySystemComponent()->TryActivateAbility(Handle)) return nullptr;
+        BreakerResolvePendingCast(Caster->GetWorld(), Caster);
         if (!BreakerWaitForFractureCast(Caster->GetWorld(), Caster->GetAbilitySystemComponent(), Handle)) return nullptr;
         for (TActorIterator<ABreakerProjectileBase> It(Caster->GetWorld()); It; ++It)
         {
@@ -189,6 +191,7 @@ bool FBreakerMultispellPurchasedRuntimeTest::RunTest(const FString& Parameters)
     Caster->GetAttributes()->ApplyClassResource(100.0f);
     const float BeforeBurst = Attributes->GetHealth();
     TestTrue(TEXT("baseline Resonance activates"), ASC->TryActivateAbility(Resonance));
+    BreakerResolvePendingCast(World, Caster);
     TestEqual(TEXT("baseline consumes statuses"), Status->GetDistinctStatusTypeCount(), 0);
     TestTrue(TEXT("baseline burst deals damage"), Attributes->GetHealth() < BeforeBurst);
     const float BaselineDetonationDamage = BeforeBurst - Attributes->GetHealth();
@@ -209,6 +212,7 @@ bool FBreakerMultispellPurchasedRuntimeTest::RunTest(const FString& Parameters)
     Caster->GetAttributes()->ApplyClassResource(100.0f);
     const float BeforeRewriteBurst = Attributes->GetHealth();
     TestTrue(TEXT("purchased Resonance activates"), ASC->TryActivateAbility(Resonance));
+    BreakerResolvePendingCast(World, Caster);
     if (!TestEqual(TEXT("purchased Resonance preserves physical types and earned Rot"), Status->GetDistinctStatusTypeCount(), 3)) return false;
     TestEqual(TEXT("surviving status duration is halved"), Status->GetActiveStatuses()[0].RemainingDuration, DurationBefore * 0.5f);
     TestEqual(TEXT("rewrite retains the same detonation damage"), BeforeRewriteBurst - Attributes->GetHealth(),

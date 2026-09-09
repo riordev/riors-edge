@@ -1,5 +1,6 @@
 #include "Tests/BreakerReactionRuntimeObserver.h"
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Resonance.h"
@@ -99,6 +100,7 @@ bool FBreakerInterferenceRuntimeTest::RunTest(const FString& Parameters)
         const float Expected=UBreakerGameplayAbility::AbilityBaseDamageFor(Caster,CurveDamage*AbilityScalar)*SourceMultiplier;
         const float ManaBefore=Mana->GetMana(); const float Quote=Abilities->GetResourceCostForSlot(Slot);
         if (!TestTrue(TEXT("Normally equipped paid Resonance activates"),Abilities->TryActivateSlot(Slot))) return false;
+        BreakerResolvePendingCast(World, Caster);
         const auto* Spec=ASC->FindAbilitySpecFromClass(UBreakerAbility_Resonance::StaticClass());
         const auto* Instance=Spec ? Cast<UBreakerAbility_Resonance>(Spec->GetPrimaryInstance()) : nullptr;
         if (!Instance||!TestEqual(TEXT("One authored burst, no reaction recursion"),Observer->Hits.Num(),1)) return false;

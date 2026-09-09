@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbilityComponent.h"
@@ -146,14 +147,17 @@ bool FBreakerResourceEfficiencyRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Caster HUD applies live efficiency exactly once"), Caster->GetAbilities()->GetCost(Slot), AuthoredCost * CasterMultiplier, .001f);
     const float BeforeMana = CasterAttributes->GetClassResource();
     if (!TestTrue(TEXT("Real paid efficient Siphon casts"), Caster->GetAbilities()->TryActivateSlot(Slot))) return false;
+    BreakerResolvePendingCast(World, Caster);
     TestEqual(TEXT("Caster debit is not squared efficiency"), BeforeMana - CasterAttributes->GetClassResource(), AuthoredCost * CasterMultiplier, .001f);
     CasterASC->CancelAllAbilities();
     Mana->AdvanceLoop(60);
     const auto Unmake = CasterASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Unmake::StaticClass(), 1));
     if (!TestTrue(TEXT("Actual paid Unmake opens free window"), CasterASC->TryActivateAbility(Unmake))) return false;
+    BreakerResolvePendingCast(World, Caster);
     TestEqual(TEXT("Unmake remains downstream and makes efficient Siphon free"), Caster->GetAbilities()->GetCost(Slot), 0.0f);
     const float BeforeFree = CasterAttributes->GetClassResource();
     if (!TestTrue(TEXT("Native free-window Siphon casts"), Caster->GetAbilities()->TryActivateSlot(Slot))) return false;
+    BreakerResolvePendingCast(World, Caster);
     TestEqual(TEXT("Free window cannot debit a second efficiency cost"), CasterAttributes->GetClassResource(), BeforeFree);    return true;
 }
 #endif

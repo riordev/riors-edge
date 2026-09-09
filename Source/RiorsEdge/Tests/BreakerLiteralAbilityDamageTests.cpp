@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Siphon.h"
@@ -91,6 +92,7 @@ bool FBreakerLiteralAbilityDamageTest::RunTest(const FString& Parameters)
     const float Before = Health->GetHealth();
     const float ManaBefore = Caster->GetAttributes()->GetClassResource();
     if (!TestTrue(TEXT("Actual paid Siphon activates"), ASC->TryActivateAbility(Handle))) return false;
+    BreakerResolvePendingCast(World, Caster);
     for (int32 Step = 0; Step < 20 && Health->GetHealth() == Before; ++Step) Advance(1);
     TestTrue(TEXT("Native channel pays Mana"), Caster->GetAttributes()->GetClassResource() < ManaBefore);
     TestTrue(TEXT("Native tick applies flat before Increased exactly once"), FMath::IsNearlyEqual(Before - Health->GetHealth(), Expected.BaseDamage * Expected.SourceDamageMultiplier, .01f));

@@ -485,3 +485,12 @@ void UBreakerAbilityStateComponent::ResetStreak()
     StreakCount = 0;
     LastHitTime = -1000.0f;
 }
+
+bool UBreakerAbilityStateComponent::HasActiveCastWindow() const
+{
+    for (const FName Key : GetActiveWindowKeys())
+    {
+        if (Key.ToString().StartsWith(TEXT("Window.Cast."))) return true;
+    }
+    return false;
+}

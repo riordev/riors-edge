@@ -89,6 +89,11 @@ public:
     // Keys of every window still open, so a cosmetic reader (the HUD) can show
     // "whatever is running" without hard-coding the ability roster.
     UFUNCTION(BlueprintPure, Category="Abilities|State") TArray<FName> GetActiveWindowKeys() const;
+    // O266: is any wind-up running on this owner? The cast window prefix is
+    // the one thing that identifies a pending cast from outside the ability,
+    // and a fixture that must wait for a swing should wait for exactly that
+    // rather than for a guessed number of seconds.
+    UFUNCTION(BlueprintPure, Category="Abilities|State") bool HasActiveCastWindow() const;
 
     // Marks ---------------------------------------------------------------
     // At most two independently timed marks, oldest cast first. The legacy

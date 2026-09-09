@@ -1,5 +1,6 @@
 #include "Tests/BreakerFractureTestHelpers.h"
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Fracture.h"
@@ -264,6 +265,7 @@ bool FBreakerWeaponAvoidedStatusRuntimeTest::RunTest(const FString& Parameters)
             Cast + 1, BeforeCast, Source->GetAbilities()->GetCost(EBreakerAbilitySlot::ClassAbilityOne),
             *Source->GetAbilities()->GetAbilityIdForSlot(EBreakerAbilitySlot::ClassAbilityOne).ToString()),
             Source->GetAbilities()->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityOne))) return false;
+            BreakerResolvePendingCast(World, Source);
         TestTrue(TEXT("Fracture spends existing Mana"), Mana->GetMana() < BeforeCast);
         if (!BreakerWaitForFractureCast(World, Source->GetAbilitySystemComponent(), Fracture)) return false;
         ABreakerProjectileBase* Projectile = nullptr;

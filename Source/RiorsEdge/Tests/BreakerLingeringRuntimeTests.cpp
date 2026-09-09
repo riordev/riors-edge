@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Rot.h"
@@ -80,6 +81,7 @@ bool FBreakerLingeringRuntimeTest::RunTest(const FString& Parameters)
             ECC_GameTraceChannel2, Query) && Hit.GetActor() == Floor && FVector::Dist(Hit.ImpactPoint, Aim) < 1)) return nullptr;
         const float Before = Mana->GetMana();
         if (!TestTrue(TEXT("actual paid Rot"), ASC->TryActivateAbility(Handle))) return nullptr;
+        BreakerResolvePendingCast(World, Player);
         TestTrue(TEXT("cast pays ordinary Mana"), Mana->GetMana() < Before);
         ABreakerZoneActor* Found = nullptr;
         for (const auto& Weak : ABreakerZoneActor::GetLiveZones())

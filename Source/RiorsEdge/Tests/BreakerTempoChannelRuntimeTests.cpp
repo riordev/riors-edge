@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Siphon.h"
@@ -65,6 +66,7 @@ bool FBreakerTempoChannelRuntimeTest::RunTest(const FString& Parameters)
         Caster->GetMana()->AdvanceLoop(20);
         const float BeforeMana = Caster->GetAttributes()->GetClassResource();
         if (!TestTrue(TEXT("Native paid channel activates"), ASC->TryActivateAbility(Handle))) return false;
+        BreakerResolvePendingCast(World, Caster);
         Cost = BeforeMana - Caster->GetAttributes()->GetClassResource();
         Hits = 0;
         for (int32 Step = 0; Step < 106; ++Step)

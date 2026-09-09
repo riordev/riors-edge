@@ -1,5 +1,6 @@
 #include "Tests/BreakerFractureTestHelpers.h"
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Fracture.h"
@@ -109,6 +110,7 @@ bool FBreakerCoreVelocityRuntimeTest::RunTest(const FString& Parameters)
     const auto Handle = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Fracture::StaticClass(), 1));
     const float Resource = Attr->GetClassResource();
     if (!ASC->TryActivateAbility(Handle)) return false;
+    BreakerResolvePendingCast(World, Player);
     TestTrue(TEXT("Native ability actually pays"), Attr->GetClassResource() < Resource);
     if (!BreakerWaitForFractureCast(World, ASC, Handle)) return false;
     ABreakerProjectileBase* Projectile = nullptr;

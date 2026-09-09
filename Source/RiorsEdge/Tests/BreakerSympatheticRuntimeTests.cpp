@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerSupportAbilities.h"
@@ -106,6 +107,7 @@ bool FBreakerSympatheticRuntimeTest::RunTest(const FString& Parameters)
         ASC->RemoveActiveEffectsWithGrantedTags(Cooldown);
         const auto Handle = ASC->GiveAbility(FGameplayAbilitySpec(Ability, 1));
         TestTrue(TEXT("native buff activation commits"), ASC->TryActivateAbility(Handle));
+        BreakerResolvePendingCast(World, Player);
         return Handle;
     };
     auto FinishSympathetic = [&](ABreakerCharacter* Player)

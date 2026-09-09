@@ -1,5 +1,6 @@
 #include "Tests/BreakerFractureTestHelpers.h"
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Fracture.h"
@@ -89,6 +90,7 @@ bool FBreakerAilmentRuleRuntimeTest::RunTest(const FString& Parameters)
             for (TActorIterator<ABreakerProjectileBase> It(World); It; ++It) Existing.Add(*It);
             const float BeforeMana = Caster->GetMana()->GetMana();
             if (!TestTrue(TEXT("Actual paid Fracture"), ASC->TryActivateAbility(Handle))) return false;
+            BreakerResolvePendingCast(World, Caster);
             TestTrue(TEXT("Fracture paid normal Mana"), Caster->GetMana()->GetMana() < BeforeMana);
             if (!BreakerWaitForFractureCast(World, ASC, Handle)) return false;
             ABreakerProjectileBase* Shot = nullptr;

@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbilityComponent.h"
@@ -68,6 +69,7 @@ bool FBreakerPreparedRuntimeTest::RunTest(const FString& Parameters)
         if(!Mana->TrySpendMana(Mana->GetMana()-(SpellPrice-19.f)))return false;
         TestEqual(TEXT("Cleave quotes ordinary price"),Abilities->GetResourceCostForSlot(Melee),12.f,.001f);
         if(!TestTrue(TEXT("Purchased spell enters the actual debt boundary"),Abilities->TryActivateSlot(Spell)))return false;
+        BreakerResolvePendingCast(World, Player);
         TestEqual(TEXT("Native paid cast reaches status-income debt boundary"),Mana->GetMana(),-19.f,.001f);ASC->CancelAllAbilities();
         auto* Target=World->SpawnActor<AActor>();if(!Target)return false;
         auto* Sink=NewObject<UBreakerCombatComponent>(Target);Target->AddInstanceComponent(Sink);Sink->RegisterComponent();
@@ -89,6 +91,7 @@ bool FBreakerPreparedRuntimeTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Prepared never discounts the actual spell quote"),Abilities->GetResourceCostForSlot(Spell),30.f,.001f);
         TestEqual(TEXT("HUD affordability uses authored deeper floor"),Abilities->CanAffordSlot(Spell),bBuyPrepared);
         TestEqual(TEXT("Native activation agrees with floor affordability"),Abilities->TryActivateSlot(Spell),bBuyPrepared);
+        BreakerResolvePendingCast(World, Player);
         TestEqual(TEXT("Refusal is free; accepted cast pays all thirty"),Mana->GetMana(),bBuyPrepared?-26.f:4.f,.001f);ASC->CancelAllAbilities();
         if(bBuyPrepared)
         {
@@ -97,6 +100,7 @@ bool FBreakerPreparedRuntimeTest::RunTest(const FString& Parameters)
             TestEqual(TEXT("Native floor clamp resolves old deeper debt"),Mana->GetMana(),-20.f,.001f);
             if(!Abilities->TryEquipAbility(Spell,TEXT("Caster.Fracture"),Reason))return false;Abilities->RefreshGrants();
             TestFalse(TEXT("Respec cannot retain deeper cast permission"),Abilities->TryActivateSlot(Spell));
+            BreakerResolvePendingCast(World, Player);
         }
     }
     return true;

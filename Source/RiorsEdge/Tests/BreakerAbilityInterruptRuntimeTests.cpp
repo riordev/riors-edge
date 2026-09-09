@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Siphon.h"
@@ -73,6 +74,7 @@ bool FBreakerAbilityInterruptRuntimeTest::RunTest(const FString& Parameters)
     Health->ApplyMaxHealth(10000); Health->ApplyHealth(10000); TargetCombat->BindAttributes(Health);
     const auto Siphon = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Siphon::StaticClass(), 1));
     if (!TestTrue(TEXT("real Siphon starts"), ASC->TryActivateAbility(Siphon))) return false;
+    BreakerResolvePendingCast(World, Player);
     Advance(12);
     if (!TestTrue(TEXT("Siphon actually ticks before interruption"), Health->GetHealth() < 10000)) return false;
     if (!TestTrue(TEXT("accepted stagger interrupts channel"), Player->GetCombat()->ApplyStagger(.5f))) return false;
@@ -80,12 +82,14 @@ bool FBreakerAbilityInterruptRuntimeTest::RunTest(const FString& Parameters)
     const float AfterInterrupt = Health->GetHealth();
     const float ManaBefore = Player->GetAttributes()->GetClassResource();
     TestFalse(TEXT("native GAS activation also refuses while staggered"), ASC->TryActivateAbility(Siphon));
+    BreakerResolvePendingCast(World, Player);
     TestEqual(TEXT("refused activation spends nothing"), Player->GetAttributes()->GetClassResource(), ManaBefore);
     Advance(12);
     TestEqual(TEXT("canceled Siphon timer cannot keep damaging"), Health->GetHealth(), AfterInterrupt);
     const auto Unmake = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Unmake::StaticClass(), 1));
     Player->GetAttributes()->ApplyClassResource(100);
     if (!TestTrue(TEXT("real Unmake starts"), ASC->TryActivateAbility(Unmake))) return false;
+    BreakerResolvePendingCast(World, Player);
     if (!TestTrue(TEXT("Unmake owns generation suspension"), Player->GetMana()->IsGenerationSuspended())) return false;
     Player->GetCombat()->ApplyStagger(.25f);
     TestFalse(TEXT("Unmake channel is canceled"), ASC->FindAbilitySpecFromHandle(Unmake)->IsActive());
@@ -94,6 +98,7 @@ bool FBreakerAbilityInterruptRuntimeTest::RunTest(const FString& Parameters)
     SetClass(EBreakerClassId::Tank);
     const auto Hold = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Hold::StaticClass(), 1));
     if (!TestTrue(TEXT("real timed Hold starts"), ASC->TryActivateAbility(Hold))) return false;
+    BreakerResolvePendingCast(World, Player);
     Player->GetCombat()->ApplyStagger(.25f);
     TestTrue(TEXT("already-applied timed buff survives stagger"), ASC->FindAbilitySpecFromHandle(Hold)->IsActive());
     ASC->CancelAbilityHandle(Hold); Advance(6);
@@ -187,6 +192,7 @@ bool FBreakerAbilityInterruptRuntimeTest::RunTest(const FString& Parameters)
     Player->GetAttributes()->ApplyClassResource(100);
     const float BeforeTakeoff = Player->GetAttributes()->GetHealth();
     if (!TestTrue(TEXT("real Breach charge placement"), ASC->TryActivateAbility(Breach))) return false;
+    BreakerResolvePendingCast(World, Player);
     Advance(26, true);
     TestTrue(TEXT("owned blast still pays actual self-damage"), Player->GetAttributes()->GetHealth() < BeforeTakeoff);
     if (!TestTrue(TEXT("actual Breach fuse launches player airborne"), Movement->IsFalling())) return false;

@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Rot.h"
@@ -105,6 +106,7 @@ bool FBreakerCoreZoneRuntimeTest::RunTest(const FString& Parameters)
     Player->GetCombat()->PushOutgoingModifier(TEXT("Test.Zone.Placement"), 3, 1.15f, 100);
     const float BeforeMana = Player->GetMana()->GetMana();
     if (!TestTrue(TEXT("Paid Rot activates"), ASC->TryActivateAbility(Handle))) return false;
+    BreakerResolvePendingCast(World, Player);
     TestTrue(TEXT("Native Rot resource debit occurs"), Player->GetMana()->GetMana() < BeforeMana);
     ABreakerZoneActor* Paid = nullptr;
     for (const auto& Held : ABreakerZoneActor::GetLiveZones())

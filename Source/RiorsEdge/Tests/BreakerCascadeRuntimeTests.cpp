@@ -1,5 +1,6 @@
 #include "Tests/BreakerFractureTestHelpers.h"
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Unmake.h"
@@ -110,6 +111,7 @@ bool FBreakerCascadeRuntimeTest::RunTest(const FString& Parameters)
             for (TActorIterator<ABreakerProjectileBase> It(World); It; ++It) Existing.Add(*It);
             const float Before = Mana->GetMana();
             if (!TestTrue(TEXT("real Fracture activation"), ASC->TryActivateAbility(Fracture))) return nullptr;
+            BreakerResolvePendingCast(World, Caster);
             TestTrue(TEXT("Fracture pays before the ultimate"), Mana->GetMana() < Before);
             if (!BreakerWaitForFractureCast(World, ASC, Fracture)) return nullptr;
             for (TActorIterator<ABreakerProjectileBase> It(World); It; ++It)
@@ -147,6 +149,7 @@ bool FBreakerCascadeRuntimeTest::RunTest(const FString& Parameters)
         if (!TestNotNull(TEXT("nearby potential Chain recipient"), Neighbor)) return false;
         const float BeforeUltimate = Mana->GetMana();
         if (!TestTrue(TEXT("actual paid Unmake activates"), ASC->TryActivateAbility(Unmake))) return false;
+        BreakerResolvePendingCast(World, Caster);
         TestTrue(TEXT("Unmake consumes its real resource cost"), Mana->GetMana() < BeforeUltimate);
         auto* State = UBreakerAbilityStateComponent::FindOrAdd(Caster);
         if (!TestTrue(TEXT("actual ultimate window opens"), State->IsWindowActive(UBreakerCasterAbility::UnmakeWindowKey()))) return false;

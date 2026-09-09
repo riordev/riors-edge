@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Siphon.h"
@@ -95,6 +96,7 @@ bool FBreakerElementSourceRuntimeTest::RunTest(const FString& Parameters)
     const float Before = Health->GetHealth();
     const float ManaBefore = Caster->GetAttributes()->GetClassResource();
     if (!TestTrue(TEXT("Actual paid Siphon activates"), ASC->TryActivateAbility(Handle))) return false;
+    BreakerResolvePendingCast(World, Caster);
     for (int32 Step = 0; Step < 20 && Health->GetHealth() == Before; ++Step) Advance(1);
     TestTrue(TEXT("Native channel pays Mana"), Caster->GetAttributes()->GetClassResource() < ManaBefore);
     TestTrue(TEXT("Buildup stats do not increase actual damage"), FMath::IsNearlyEqual(Before - Health->GetHealth(), Expected.BaseDamage * Expected.SourceDamageMultiplier, .01f));
@@ -167,6 +169,7 @@ bool FBreakerElementSourceRuntimeTest::RunTest(const FString& Parameters)
     const float DamageBefore = Health->GetHealth();
     const float CostBefore = Caster->GetAttributes()->GetClassResource();
     if (!TestTrue(TEXT("Native Siphon with purchased damage scopes activates"), ASC->TryActivateAbility(Handle))) return false;
+    BreakerResolvePendingCast(World, Caster);
     for (int32 Step = 0; Step < 20 && Health->GetHealth() == DamageBefore; ++Step) Advance(1);
     TestTrue(TEXT("Scoped cast pays actual Mana"), Caster->GetAttributes()->GetClassResource() < CostBefore);
     TestEqual(TEXT("Native Void delivery adds Increased once then pays selected Void More"),

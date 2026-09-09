@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Siphon.h"
@@ -134,6 +135,7 @@ bool FBreakerCasterContinuationRuntimeTest::RunTest(const FString& Parameters)
         if (Rank && !Buy(Void, TEXT("Caster.VoidWhisperer.Drain"))) return false;
         Player->GetAttributes()->ApplyClassResource(100); Player->GetAttributes()->ApplyHealth(100);
         if (!TestTrue(TEXT("Actual Siphon channel activates"), ASC->TryActivateAbility(Siphon))) return false;
+        BreakerResolvePendingCast(World, Player);
         FBreakerDamageRequest Incoming; Incoming.BaseDamage = Rank == 2 ? 12 : 8;
         Incoming.bCanCritical = false; Incoming.bBypassShield = true;
         Player->GetCombat()->ReceiveDamage(Incoming);

@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbilityComponent.h"
@@ -146,6 +147,7 @@ bool FBreakerCoreRosterAbilityRuntimeTest::RunTest(const FString& Parameters)
     const float Duration = GetDefault<UBreakerAbility_Fracture>()->BaseCastSeconds / Rate;
     const float BeforeMana = Mana->GetMana();
     if (!TestTrue(TEXT("Equipped Fracture cast starts"), Player->GetAbilities()->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityOne))) return false;
+    BreakerResolvePendingCast(World, Player);
     TestTrue(TEXT("Native resource payment"), Mana->GetMana() < BeforeMana);
     Tick(Duration - .005f); TestEqual(TEXT("No premature projectile"), Shots(), 0);
     Tick(.01f); TestEqual(TEXT("Actual ranked tempo completes emission"), Shots(), 1);

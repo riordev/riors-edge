@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Siphon.h"
@@ -58,6 +59,7 @@ bool FBreakerSiphonTargetDeathTest::RunTest(const FString& Parameters)
     };
     UBreakerCombatComponent* Target = SpawnTarget(10000);
     if (!TestTrue(TEXT("channel activates against living target"), ASC->TryActivateAbility(Handle))) return false;
+    BreakerResolvePendingCast(World, Caster);
     UBreakerAbilityStateComponent* State = Caster->FindComponentByClass<UBreakerAbilityStateComponent>();
     if (!TestNotNull(TEXT("channel publishes HUD window"), State)) return false;
     TestTrue(TEXT("channel is active before death"), Active());
@@ -70,12 +72,14 @@ bool FBreakerSiphonTargetDeathTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("external kill immediately clears HUD channel window"), State->IsWindowActive(UBreakerAbility_Siphon::ChannelWindowKey()));
     const float ManaBeforeCorpse = Caster->GetAttributes()->GetClassResource();
     ASC->TryActivateAbility(Handle);
+    BreakerResolvePendingCast(World, Caster);
     TestFalse(TEXT("corpse cannot start another channel"), Active());
     TestEqual(TEXT("corpse acquisition spends no Mana"), Caster->GetAttributes()->GetClassResource(), ManaBeforeCorpse);
     Target->GetOwner()->SetActorEnableCollision(false);
     UBreakerCombatComponent* NextTarget = SpawnTarget(1);
     Caster->GetAttributes()->ApplyHealth(20);
     if (!TestTrue(TEXT("new living target is immediately castable after death"), ASC->TryActivateAbility(Handle))) return false;
+    BreakerResolvePendingCast(World, Caster);
     TestTrue(TEXT("new channel actually remains active until its hit"), Active());
     Advance(12);
     TestTrue(TEXT("Siphon's own damage kills the next target"), NextTarget->IsDead());

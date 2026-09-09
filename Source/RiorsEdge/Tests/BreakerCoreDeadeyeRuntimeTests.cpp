@@ -1,6 +1,7 @@
 #include "Tests/BreakerFractureTestHelpers.h"
 #include "Tests/BreakerReactionRuntimeObserver.h"
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Fracture.h"
@@ -135,6 +136,7 @@ bool FBreakerCoreDeadeyeRuntimeTest::RunTest(const FString& Parameters)
     const auto Siphon = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Siphon::StaticClass(), 1));
     const float ManaBefore = Attr->GetClassResource();
     if (!TestTrue(TEXT("Paid Siphon activates"), ASC->TryActivateAbility(Siphon))) return false;
+    BreakerResolvePendingCast(World, Player);
     for (int32 I = 0; I < 20 && Observer->Hits.IsEmpty(); ++I) Advance(1);
     TestTrue(TEXT("Native ability debit occurred"), Attr->GetClassResource() < ManaBefore);
     if (!TestTrue(TEXT("Paid channel delivered"), !Observer->Hits.IsEmpty())) return false;
@@ -144,6 +146,7 @@ bool FBreakerCoreDeadeyeRuntimeTest::RunTest(const FString& Parameters)
     const auto Fracture = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Fracture::StaticClass(), 1));
     const float FractureMana = Attr->GetClassResource();
     if (!TestTrue(TEXT("Paid Fracture emits projectile"), ASC->TryActivateAbility(Fracture))) return false;
+    BreakerResolvePendingCast(World, Player);
     TestTrue(TEXT("Projectile cast debits resource"), Attr->GetClassResource() < FractureMana);
     if (!BreakerWaitForFractureCast(World, ASC, Fracture)) return false;
     ABreakerProjectileBase* Projectile = nullptr;

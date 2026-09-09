@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Rot.h"
@@ -94,6 +95,7 @@ bool FBreakerEntropyEncounterRuntimeTest::RunTest(const FString& Parameters)
         const auto CastHandle = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Rot::StaticClass(), 1));
         const float ManaBefore = Mana->GetMana();
         if (!TestTrue(*(Label + TEXT(" pays for a real Rot cast")), ASC->TryActivateAbility(CastHandle))) return false;
+        BreakerResolvePendingCast(World, Caster);
         ABreakerZoneActor* Zone = nullptr;
         for (const auto& Held : ABreakerZoneActor::GetLiveZones())
             if (auto* Candidate = Held.Get(); Candidate && Candidate->GetZoneInstigator() == Caster) { Zone = Candidate; break; }

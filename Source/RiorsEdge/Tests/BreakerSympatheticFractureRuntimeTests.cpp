@@ -1,5 +1,6 @@
 #include "Tests/BreakerFractureTestHelpers.h"
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerSupportAbilities.h"
@@ -116,6 +117,7 @@ bool FBreakerSympatheticFractureRuntimeTest::RunTest(const FString& Parameters)
         ASC->RemoveActiveEffectsWithGrantedTags(Cooldown);
         const auto Handle = ASC->GiveAbility(FGameplayAbilitySpec(Ability, 1));
         TestTrue(TEXT("native buff activation commits"), ASC->TryActivateAbility(Handle));
+        BreakerResolvePendingCast(World, Player);
         return Handle;
     };
     auto FinishSympathetic = [&](ABreakerCharacter* Player)
@@ -185,6 +187,7 @@ bool FBreakerSympatheticFractureRuntimeTest::RunTest(const FString& Parameters)
     if (!TestEqual(TEXT("fixture selects the actual authored Entropy position"), Cycle->PeekNextEntry().Element, EBreakerElement::Entropy)) return false;
     const auto Fracture = AllyASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Fracture::StaticClass(), 1));
     if (!TestTrue(TEXT("real Fracture cast commits"), AllyASC->TryActivateAbility(Fracture))) return false;
+    BreakerResolvePendingCast(World, Ally);
     TestTrue(TEXT("real Fracture spends Mana"), Ally->GetMana()->GetMana() < ManaBefore);
     if (!BreakerWaitForFractureCast(World, AllyASC, Fracture)) return false;
     ABreakerProjectileBase* Projectile = nullptr;

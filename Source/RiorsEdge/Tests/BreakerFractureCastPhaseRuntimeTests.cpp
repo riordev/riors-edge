@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Fracture.h"
@@ -46,10 +47,12 @@ bool FBreakerFractureCastPhaseRuntimeTest::RunTest(const FString& Parameters)
     const float Base = GetDefault<UBreakerAbility_Fracture>()->BaseCastSeconds;
     const int32 Cursor = Cycle->GetCursor(); const float Before = Mana->GetMana();
     if (!TestTrue(TEXT("Paid starter cast accepted"), ASC->TryActivateAbility(Handle))) return false;
+    BreakerResolvePendingCast(World, Player);
     const float Paid = Mana->GetMana();
     TestTrue(TEXT("Cost paid before windup"), Paid < Before);
     TestTrue(TEXT("GAS remains active"), Active()); TestEqual(TEXT("No instant projectile"), Shots().Num(), 0);
     TestFalse(TEXT("Repeated input cannot overlap same cast"), ASC->TryActivateAbility(Handle));
+    BreakerResolvePendingCast(World, Player);
     TestEqual(TEXT("Repeated input costs nothing"), Mana->GetMana(), Paid, .001f);
     Tick(Base * .45f); TestEqual(TEXT("No early emission"), Shots().Num(), 0); TestEqual(TEXT("Windup reserves but does not advance cycle"), Cycle->GetCursor(), Cursor);
     Tick(Base * .6f); auto Emitted = Shots();
@@ -58,11 +61,13 @@ bool FBreakerFractureCastPhaseRuntimeTest::RunTest(const FString& Parameters)
     Emitted[0]->Destroy();
     Mana->AdvanceLoop(30); const int32 CancelCursor = Cycle->GetCursor();
     if (!ASC->TryActivateAbility(Handle)) return false;
+    BreakerResolvePendingCast(World, Player);
     ASC->CancelAbilityHandle(Handle); Tick(Base * 1.1f);
     TestEqual(TEXT("Cancel discards projectile"), Shots().Num(), 0); TestEqual(TEXT("Cancel does not advance"), Cycle->GetCursor(), CancelCursor);
 
     Mana->AdvanceLoop(30);
     if (!ASC->TryActivateAbility(Handle)) return false;
+    BreakerResolvePendingCast(World, Player);
     ASC->ClearAbility(Handle); Tick(Base * 1.1f);
     TestEqual(TEXT("Removing ability discards pending cast"), Shots().Num(), 0);
     TestEqual(TEXT("Removing ability preserves cursor"), Cycle->GetCursor(), CancelCursor);
@@ -84,6 +89,7 @@ bool FBreakerFractureCastPhaseRuntimeTest::RunTest(const FString& Parameters)
     const float PaidDuration = Base / UBreakerGameplayAbility::AbilityCastRateMultiplierFor(Player);
     const float PaidStart = World->GetTimeSeconds();
     if (!ASC->TryActivateAbility(Handle)) return false;
+    BreakerResolvePendingCast(World, Player);
     if (!Progression->RespecCore(Reason)) return false;
     Tick(PaidDuration - .015f); TestTrue(TEXT("Purchased rate still has actual windup"), Active());
     Tick(.02f); TestFalse(TEXT("Paid cast retains snapshotted rate through respec"), Active());
@@ -95,12 +101,15 @@ bool FBreakerFractureCastPhaseRuntimeTest::RunTest(const FString& Parameters)
     if (!Progression->PurchaseNode(Tree, Conduction->NodeId, Reason)) return false;
     Mana->AdvanceLoop(30);
     if (!ASC->TryActivateAbility(Handle)) return false;
+    BreakerResolvePendingCast(World, Player);
     TestTrue(TEXT("Conduction leaves cast phase active"), Active()); TestEqual(TEXT("Conduction cannot emit instantly"), Shots().Num(), 0);
     TestFalse(TEXT("Conduction cannot bypass in-flight GAS cast"), ASC->TryActivateAbility(Handle));
+    BreakerResolvePendingCast(World, Player);
     ASC->CancelAbilityHandle(Handle); Tick(Base * 1.1f);
     if (!Progression->RespecCore(Reason)) return false;
     Mana->AdvanceLoop(30); const int32 DeathCursor = Cycle->GetCursor();
     if (!ASC->TryActivateAbility(Handle)) return false;
+    BreakerResolvePendingCast(World, Player);
     auto* Enemy = World->SpawnActor<AActor>(); FBreakerDamageRequest Kill; Kill.BaseDamage = 100000; Kill.DamageFamily = EBreakerDamageFamily::TrueDamage; Kill.bCanCritical = false; Kill.SetInstigator(Enemy); Combat->ReceiveDamage(Kill);
     TestTrue(TEXT("Real hostile damage kills caster"), Combat->IsDead()); Tick(Base * 1.1f);
     TestFalse(TEXT("Death ends active cast"), Active()); TestEqual(TEXT("Death discards emission"), Shots().Num(), 0); TestEqual(TEXT("Death preserves cycle"), Cycle->GetCursor(), DeathCursor);

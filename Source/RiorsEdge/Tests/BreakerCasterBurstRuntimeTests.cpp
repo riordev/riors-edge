@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerCastTestHelpers.h"
 #include "Misc/ScopeExit.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbility_Fracture.h"
@@ -132,6 +133,7 @@ bool FBreakerCasterBurstRuntimeTest::RunTest(const FString& Parameters)
         TStrongObjectPtr<ABreakerZoneActor> CastZone;
         float FirstDeath = -1;
         if (bRot && !TestTrue(*(Label + TEXT(" pays for one opening Rot")), ASC->TryActivateAbility(Rot))) return false;
+        BreakerResolvePendingCast(World, Player);
         if (bRot)
         {
             for (const auto& Held : ABreakerZoneActor::GetLiveZones())
@@ -180,6 +182,7 @@ bool FBreakerCasterBurstRuntimeTest::RunTest(const FString& Parameters)
         {
             Aim();
             if (bFracture && Step % 4 == 0 && ASC->TryActivateAbility(Fracture)) ++PaidCasts;
+            BreakerResolvePendingCast(World, Player);
             BeginSpawnedDelivery(); // Begin only safe delivery actors/components, never the save-loading Character.
             const float ManaBeforeTick = Mana->GetMana();
             Advance();
