@@ -729,6 +729,14 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
             const float MidY = Bar.Y + Bar.H * 0.5f;
             BreakerEnemyBarDrawFilledDiamond(*this, Bar.X - Gap - Half, MidY, Half, BreakerUI::System);
             BreakerEnemyBarDrawFilledDiamond(*this, Bar.X + Bar.W + Gap + Half, MidY, Half, BreakerUI::System);
+            // Damage labels avoid the rank marks as well as the central bar.
+            // The fill skips its zero-width end rows, then draws each remaining
+            // row one pixel high; reserve those actual scanline bounds.
+            const int32 Rows = FMath::Max(1, FMath::RoundToInt(Half));
+            const float Top = MidY - Rows + 1;
+            const float Height = 2.0f * Rows - 1;
+            ReservePlate(Bar.X - Gap - 2.0f * Half, Top, 2.0f * Half, Height);
+            ReservePlate(Bar.X + Bar.W + Gap, Top, 2.0f * Half, Height);
         }
 
         // ---- The column above the bar: marks, then the name ------------------

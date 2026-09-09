@@ -1,0 +1,5 @@
+# Champion rank marks and damage labels
+
+The damage-label avoidance list now includes the two diamonds drawn beside champion health bars. Previously it reserved the central bar but omitted these visible rank marks. New reservations follow the exact existing scanline bounds and viewport clipping; draw geometry and combat values are unchanged. Root and independent reviewer checked the rendered scanline formulas against both rectangles.
+
+All two1280x720 frames from seat/captures/champion-bounds-1240 were inspected. The existing one-enemy engaged crowd probe spawned an actual champion. Frame0 caught player redeployment after its attack; frame1 shows the living Skitter's name, bar and both rank diamonds. No ordinary weapon or Rot hit occurred, so these frames establish rank presentation only, not live damage-number collision acceptance. The probe's bare starter dying is retained evidence, not hidden with health changes. General encounter balance and wider historical overlap reports remain open.
