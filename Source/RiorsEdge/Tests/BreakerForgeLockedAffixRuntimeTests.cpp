@@ -39,6 +39,24 @@ namespace
         return Item;
     }
 
+    bool BreakerForgeCheckPreserved(FAutomationTestBase& Test, const FBreakerItemInstance& Before, const FBreakerItemInstance& After)
+    {
+        bool bValid = Test.TestTrue(TEXT("O248 preserves the stored item identity"), Before.ItemId == After.ItemId);
+        bValid &= Test.TestEqual(TEXT("O248 preserves the authored legendary identity"), After.LegendaryId, Before.LegendaryId);
+        bValid &= Test.TestEqual(TEXT("O248 preserves the rule"), static_cast<uint8>(After.Rule), static_cast<uint8>(Before.Rule));
+        bValid &= Test.TestEqual(TEXT("O248 preserves every over-budget affix"), After.Affixes.Num(), Before.Affixes.Num());
+        if (After.Affixes.Num() != Before.Affixes.Num()) return false;
+        for (int32 Index = 0; Index < Before.Affixes.Num(); ++Index)
+        {
+            const auto& A = Before.Affixes[Index]; const auto& B = After.Affixes[Index];
+            bValid &= Test.TestEqual(TEXT("Stored affix identity and order survive"), B.AffixId, A.AffixId);
+            bValid &= Test.TestEqual(TEXT("Stored affix tier survives"), B.Tier, A.Tier);
+            bValid &= Test.TestEqual(TEXT("Stored affix value survives"), B.Value, A.Value);
+            bValid &= Test.TestEqual(TEXT("Stored affix category survives"), static_cast<uint8>(B.Category), static_cast<uint8>(A.Category));
+        }
+        return bValid;
+    }
+
     bool BreakerForgeCheckAttuned(FAutomationTestBase& Test, const FBreakerItemInstance& Before, const FBreakerItemInstance& After)
     {
         bool bValid = Test.TestEqual(TEXT("Attune keeps every stored position"), After.Affixes.Num(), Before.Affixes.Num());
@@ -73,6 +91,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerForgeLockedAffixRuntimeTest, "RiorsEdge
 bool FBreakerForgeLockedAffixRuntimeTest::RunTest(const FString& Parameters)
 {
     auto* Save = NewObject<UBreakerSaveGame>();
+    Save->SaveVersion = 9; // Historical payload, before the O258 migration.
+    Save->CoreLayoutVersion = UBreakerSaveGame::ActiveCoreLayoutVersion;
     FBreakerItemInstance Legendary;
     for (int32 Seed = 1; Seed <= 100; ++Seed)
     {
@@ -85,6 +105,7 @@ bool FBreakerForgeLockedAffixRuntimeTest::RunTest(const FString& Parameters)
     // Reconstruct the old append-past-budget shape from real rolled lines.
     // This verifies preservation, not a policy to normalize legacy inventory.
     auto OverBudget = Legendary;
+    OverBudget.ItemId = FGuid::NewGuid(); // Distinct historical item, not a duplicate inventory identity.
     for (int32 Seed = 1; OverBudget.Affixes.Num() < 9 && Seed <= 100; ++Seed)
     {
         const auto Donor = UBreakerLootLibrary::RollItem(TEXT("Test.Forge.LegacyLines"), EBreakerEquipSlot::Boots, EBreakerItemRarity::Exceptional, 50, Seed);
@@ -96,10 +117,20 @@ bool FBreakerForgeLockedAffixRuntimeTest::RunTest(const FString& Parameters)
     }
     if (!TestEqual(TEXT("Historical overflow fixture exceeds eight seats without duplicate IDs"), OverBudget.Affixes.Num(), 9)) return false;
     Save->BackpackItems.Add(BreakerForgeHistoricalOrder(OverBudget));
+    auto EquippedOverBudget = Save->BackpackItems.Last();
+    EquippedOverBudget.ItemId = FGuid::NewGuid();
+    Save->EquippedItems.Add(EquippedOverBudget);
     TArray<uint8> Bytes;
     if (!TestTrue(TEXT("Historical-order item serializes through native save archive"), UGameplayStatics::SaveGameToMemory(Save, Bytes))) return false;
     auto* Restored = Cast<UBreakerSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes));
     if (!TestTrue(TEXT("Native save archive restores both historical items"), Restored && Restored->BackpackItems.Num() == 2)) return false;
+    if (!TestEqual(TEXT("Archive restores the equipped legacy item"), Restored->EquippedItems.Num(), 1)) return false;
+    FString Note;
+    if (!TestTrue(TEXT("Historical save migrates without normalizing item budgets"), UBreakerSaveGame::MigrateToCurrent(*Restored, Note))) return false;
+    if (!TestTrue(TEXT("Repeated save migration is harmless to owned affixes"), UBreakerSaveGame::MigrateToCurrent(*Restored, Note))) return false;
+    for (int32 Index = 0; Index < Save->BackpackItems.Num(); ++Index)
+        if (!BreakerForgeCheckPreserved(*this, Save->BackpackItems[Index], Restored->BackpackItems[Index])) return false;
+    if (!BreakerForgeCheckPreserved(*this, Save->EquippedItems[0], Restored->EquippedItems[0])) return false;
     Legendary = Restored->BackpackItems[0];
     TArray<FBreakerItemInstance> Cases{Legendary};
     Cases.Add(Restored->BackpackItems[1]);
@@ -126,7 +157,15 @@ bool FBreakerForgeLockedAffixRuntimeTest::RunTest(const FString& Parameters)
     auto* Equipment = NewObject<UBreakerEquipmentComponent>(Owner);
     auto* Attributes = NewObject<UBreakerAttributeSet>(Owner);
     Equipment->BindAttributes(Attributes);
-    if (!Equipment->AddToBackpack(Legendary)) return false;
+    Equipment->RestoreState(Restored->EquippedItems, Restored->BackpackItems);
+    if (!TestEqual(TEXT("Native load restores both backpack items"), Equipment->GetBackpack().Num(), 2)) return false;
+    if (!TestEqual(TEXT("Native load keeps the equipped over-budget item"), Equipment->GetEquipped().Num(), 1)) return false;
+    for (int32 Index = 0; Index < Restored->BackpackItems.Num(); ++Index)
+        if (!BreakerForgeCheckPreserved(*this, Restored->BackpackItems[Index], Equipment->GetBackpack()[Index])) return false;
+    if (!BreakerForgeCheckPreserved(*this, Restored->EquippedItems[0], Equipment->GetEquipped()[0])) return false;
+    // Craft the over-budget historical item through actual equipment payment,
+    // not only the pure Forge function exercised above.
+    Legendary = Restored->BackpackItems[1];
     const int32 Cost = UBreakerForgeLibrary::AttuneCost(Legendary).Amount;
     for (int32 Seed = 1; Equipment->GetForgeWallet().Get() < Cost && Seed <= 100; ++Seed)
     {

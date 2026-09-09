@@ -11,7 +11,7 @@ Continue validated blocks until the owner returns. Prioritize playable changes f
 3. O247 landed: Provoke forces its target for four seconds and grants lasting scaled threat; paid Standing Order cancellation verified.
 4. O250 landed: a broken Warden front stays broken through revival.
 5. O251 landed: static cover hides the entire enemy plate including bosses; open/blocked frames inspected.
-6. O248: grandfather existing over-budget special items; constrain new rolls without removing owned affixes.
+6. O248 verified: native archive, v9→v10/repeated migration, equipped/backpack restore and paid Attune retain historical over-budget affixes. No destructive normalization needed.
 7. Kit expansion under O252–O260: verify the registered roster, author reachable abilities/passives with real consumers, and reconcile counts before claiming the 55-entry target. Carom, Coup, Backstep, Pyre, Riftlance, Recall, Bulwark and Overwatch are named candidates. Rover, Barrel and Wildcard require additional mechanics. Check proposed names against Core/doctrine IDs.
 8. O246: remove duplicated compiled ability defaults only with a replacement schema/completeness test for Data/abilities.json.
 9. World Core Point coverage is already derived from mission Unlock.CorePoint references; verify remaining uncovered sources against actual flag delivery before changing content.
@@ -78,3 +78,5 @@ Current local build/census/full suite:842 passing,3 expected failures,0 unexpect
 - Swift starter: Slipcut replaces Skim; v10 preserves equipped order, refunds paid Slipcut/SkimDiscipline once and leaves frozen historical migrations intact. Paid starter, HardStop and save coverage pass. Four stale inventory/version assertions updated;841 passing,3 expected,0 unexpected. Registered abilities35→34 and total nodes371→370 reflect the explicit retirement; kit expansion remains open.
 
 - Enemy plates: bosses now obey the same static-cover rule. Native occlusion and full suite pass842/3/0; rendered1920×1080 open/blocked frames confirm full plate visibility/removal. Cache placement also inspected. Capture boot-map race avoided with explicit map launch; weak core ticker fixes paused setup. See Docs/reports/plate-cache-capture-2026-09-09.md; rough art/poses and live interaction remain open.
+
+- Legacy special items: strengthened existing native Forge test checks exact stored line order/identity/tier/value/category after serialization, repeated current migration, equipment restore, then paid Attune. Nine-line historical items survive. Build/full suite842/3/0; production preservation already existed, so no item rewrite or tuning change.
