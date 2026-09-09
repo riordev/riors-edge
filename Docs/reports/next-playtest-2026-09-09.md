@@ -29,3 +29,5 @@ This is a running handoff, not a claim that the seven-step programme is complete
 - The new enclosed Substation candidate is parked after its arrival-floor runtime check failed. Current campaign Rifts still use the existing environment.
 - Audio has installed main samples and authored reaction synth fallbacks. Native sample/queue checks do not establish actual speaker/headphone output.
 - Existing expected-red balance findings remain visible; pins were not moved to manufacture a green result.
+
+- Escape now returns from Character Sheet and Local Map to the existing root menu, matching BACK. Build/full suite857 passing,3 expected failures,0 unexpected. This closes two navigation dead ends; OS mouse-focus acceptance remains pending.

@@ -994,7 +994,7 @@ void SBreakerMenu::HandleEscape()
     // character screens were MISSING from this list when they were added, so
     // Escape on them did nothing at all — a dead end on the one screen a new
     // player cannot avoid.
-    if (CurrentScreen == EBreakerMenuScreen::Settings || CurrentScreen == EBreakerMenuScreen::Inventory || CurrentScreen == EBreakerMenuScreen::ClassSelect || CurrentScreen == EBreakerMenuScreen::SkillTrees || CurrentScreen == EBreakerMenuScreen::Forge || CurrentScreen == EBreakerMenuScreen::Abilities || CurrentScreen == EBreakerMenuScreen::Quartermaster || CurrentScreen == EBreakerMenuScreen::CharacterSelect || CurrentScreen == EBreakerMenuScreen::DevSandbox)
+    if (CurrentScreen == EBreakerMenuScreen::Settings || CurrentScreen == EBreakerMenuScreen::Inventory || CurrentScreen == EBreakerMenuScreen::ClassSelect || CurrentScreen == EBreakerMenuScreen::SkillTrees || CurrentScreen == EBreakerMenuScreen::Forge || CurrentScreen == EBreakerMenuScreen::Abilities || CurrentScreen == EBreakerMenuScreen::Quartermaster || CurrentScreen == EBreakerMenuScreen::CharacterSelect || CurrentScreen == EBreakerMenuScreen::DevSandbox || CurrentScreen == EBreakerMenuScreen::CharacterSheet || CurrentScreen == EBreakerMenuScreen::LocalMap)
     {
         Rebuild(RootScreen);
     }

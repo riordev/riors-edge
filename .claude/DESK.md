@@ -83,3 +83,5 @@ Current local build/full suite:857 passing,3 expected failures,0 unexpected; nat
 - Audio raw-file packaging now includes existing samples/footsteps; optional missing overrides use the unchanged synth without spurious read warnings. All13 fallback waveforms covered. Device routing/listening remains unverified; see Docs/reports/audio-readiness-2026-09-09.md.
 
 Detailed historical receipts: Docs/reports/playtest-pass-ledger-2026-09-09.md. Individual capture/measurement reports remain under Docs/reports.
+
+- Escape now returns from Character Sheet and Local Map to the existing root menu, matching BACK. Build/full suite857 passing,3 expected failures,0 unexpected. This closes two navigation dead ends; OS mouse-focus acceptance remains pending.
