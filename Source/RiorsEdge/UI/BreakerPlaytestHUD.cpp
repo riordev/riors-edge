@@ -376,11 +376,11 @@ void ABreakerPlaytestHUD::DrawHUD()
     //    same 40 pixels is what made it read as competing.
     // The sting that used to land on this same frame is gone by the same
     // ruling; the whole beat was over-produced rather than under-produced.
-    if (Character->IsAwaitingRespawn())
-    {
-        DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudDeathRedeploying),
-            Center.X, Center.Y + S(96.0f), BreakerUI::System, 14.0f, 1.0f, ESpecFontRole::Display);
-    }
+    // THE REDEPLOYING LINE IS GONE (owner, second playtest: "when you die theres
+    // deploy text on the bottom of the screen we dont need that either"). The
+    // black, the lowered weapon and the death screen already say the player is
+    // dead; a word underneath saying it again is the over-production this beat
+    // has now been trimmed for twice.
 
     TickCapturePreview(Character);
 
@@ -1459,8 +1459,18 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
     PlacedLabels.Append(EnemyPlateBounds);
     const float ClusterRadius = S(BreakerHUD::DamageClusterRadius);
 
+    // WHERE THE PLAYER IS, read once for the whole pass rather than per number.
+    const APawn* Viewer = GetOwningPawn();
+    const bool bHasViewer = Viewer != nullptr;
+    const FVector ViewerAt = bHasViewer ? Viewer->GetActorLocation() : FVector::ZeroVector;
+
     for (const FBreakerHUDDamageNumber* Number : Visible)
     {
+        // OUT OF READING RANGE, so not printed. Owner: "only used when in
+        // effective ranges". A yard is 106 m long and a number at the far
+        // pocket is a smear over a target too small to attach it to.
+        if (bHasViewer && FVector::DistSquared(ViewerAt, Number->World)
+            > FMath::Square(BreakerUI::DamageMaxDrawDistanceCm)) continue;
         const FVector Projected = Project(Number->World, false);
         if (Projected.Z <= 0.0f) continue;
         const FVector2D Screen(Projected.X, Projected.Y);
@@ -1586,9 +1596,10 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
         // ROT and ERASED on the same line even inside the old cluster budget.
         const FVector2D MainSize = MeasureSpecText(DamageText, SizePixels, ESpecFontRole::Mono);
         FString CaptionText;
-        if (Number->bKilled && Number->Overkill >= Number->Value * BreakerHUD::DamageOverkillCaptionFraction)
-            CaptionText = BreakerStrings::Format(EBreakerStringKey::HudDamageOverkill, *BreakerUI::FormatDamage(Number->Overkill));
-        else if (bAbsorbed)
+        // The overkill caption goes with it, by the same ruling. The absorbed
+        // caption stays: that one says the hit did not land, which is a thing
+        // the player has to act on rather than a bigger number.
+        if (bAbsorbed)
             CaptionText = BreakerStrings::Format(EBreakerStringKey::HudDamageAbsorbed, Number->MitigatedFraction * 100.0f);
         const FVector2D CaptionSize = CaptionText.IsEmpty() ? FVector2D::ZeroVector
             : MeasureSpecText(CaptionText, 13.0f, ESpecFontRole::Mono);
@@ -2634,14 +2645,14 @@ void ABreakerPlaytestHUD::ScheduleArrivalSound(float DelaySeconds, bool bKill)
 
 void ABreakerPlaytestHUD::HandlePlayerHitDealt(const FBreakerHitContext& Hit)
 {
-    // OVERKILL-INCLUSIVE, display only. Applied damage is clamped to what the
-    // target could still lose — correct for the vitals write, and a lie as a
-    // number: a 900-damage rocket on a 30 HP enemy printed 30, and the owner
-    // reads these numbers for TTK/balance, so a killing blow under-reporting
-    // by 30x poisons exactly the read they exist for. The clamped value still
-    // drives everything mechanical; only what is PRINTED adds the overkill.
+    // OVERKILL IS NOT PRINTED. Owner-ruled, second playtest: "or overkill damage
+    // on displayed numbers". This USED to add it, deliberately — a 900-damage
+    // rocket on a 30 HP enemy printed 30, and the argument was that the owner
+    // reads these numbers for TTK. He has now played it and ruled the other
+    // way: what the number says is what the target LOST. The overkill is still
+    // computed and still on the result for anything that wants it.
     const float Applied = Hit.Result.ShieldDamage + Hit.Result.HealthDamage;
-    const float Shown = Applied > 0.0f ? Applied + Hit.Result.OverkillDamage : Hit.Result.MitigatedDamage;
+    const float Shown = Applied > 0.0f ? Applied : Hit.Result.MitigatedDamage;
     if (Shown <= 0.0f) return;
 
     UWorld* World = GetWorld();

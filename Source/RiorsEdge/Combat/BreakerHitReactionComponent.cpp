@@ -163,6 +163,36 @@ void UBreakerHitReactionComponent::TickComponent(float DeltaTime, ELevelTick Tic
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
     UpdateDeathPresentation(DeltaTime);
     UpdateFlinch(DeltaTime);
+    UpdateStatusWash(DeltaTime);
+}
+
+void UBreakerHitReactionComponent::SetStatusWash(const FGameplayTag& StatusTag)
+{
+    const bool bWanted = StatusTag.IsValid();
+    const FLinearColor Wash = bWanted ? BreakerBodyPaint::StatusWashFor(StatusTag) : FLinearColor::White;
+    // IDEMPOTENT. ApplyBodyPaint writes to every registered part, and a body
+    // carrying a six-second Rot would otherwise repaint six times a second for
+    // nothing — times a pack of them. Only a CHANGE repaints.
+    if (bWanted == Paint.bStatus && (!bWanted || Wash.Equals(Paint.StatusPaint, 0.001f))) return;
+    Paint.bStatus = bWanted;
+    Paint.StatusPaint = Wash;
+    if (!bWanted)
+    {
+        StatusWashAge = 0.0f;
+        Paint.StatusPulse = 0.0f;
+    }
+    ApplyBodyPaint();
+}
+
+void UBreakerHitReactionComponent::UpdateStatusWash(float DeltaSeconds)
+{
+    if (!Paint.bStatus) return;
+    StatusWashAge += DeltaSeconds;
+    // A slow breath: fast enough to read as alive, slow enough that a pack of
+    // rotting bodies is not a strobe. O2 PLACEHOLDER.
+    constexpr float PulseHz = 0.9f;
+    Paint.StatusPulse = 0.5f + 0.5f * FMath::Sin(StatusWashAge * PulseHz * 2.0f * PI);
+    ApplyBodyPaint();
 }
 
 void UBreakerHitReactionComponent::NotifyFlinch(const FVector& AwayDirection, bool bWeakPoint)

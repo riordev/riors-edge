@@ -760,7 +760,19 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
             { return Entry.Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Rot")) && (Entry.bPersistentRot || Entry.RemainingDuration > 0); }) : nullptr;
         const float Threshold = Status ? Status->GetEntropyThreshold() : 0;
         const float Buildup = Status && Threshold > UE_SMALL_NUMBER ? FMath::Clamp(Status->GetEntropyBuildup() / Threshold, 0.0f, 1.0f) : 0;
-        const bool bShowEntropy = bShowName && (Rot || Buildup > 0);
+        // THE THREE STATUS ROWS ARE OFF. Owner: "we dont need bars for rot or
+        // any status we should be able to SEE it taking affect". Entropy, Void
+        // and Rift each printed a percentage and a rail under the enemy's
+        // name — three stacked readouts on every body in a pack — and the
+        // condition is now worn by the BODY as a pulsing wash
+        // (BreakerBodyPaint's status layer), which is where he asked for it.
+        //
+        // The predicates are forced false rather than the blocks deleted: the
+        // buildup arithmetic above is the same arithmetic the wash and the
+        // reactions read, every height below collapses to zero on its own, and
+        // if he wants a readout back for one of the three it is one word here.
+        constexpr bool bStatusRowsDrawn = false;   // owner-ruled, second playtest
+        const bool bShowEntropy = bStatusRowsDrawn && bShowName && (Rot || Buildup > 0);
         const float EntropyPixels = BreakerEnemyBar::NamePixels * Scale;
         const FString EntropyText = Rot && Rot->bPersistentRot ? BreakerStrings::Get(EBreakerStringKey::HudRotPersistent)
             : Rot ? BreakerStrings::Format(EBreakerStringKey::HudRotTimer, Rot->RemainingDuration)
@@ -773,7 +785,7 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
             { return Entry.Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Erased")) && Entry.RemainingDuration > 0; }) : nullptr;
         const float VoidThreshold = Status ? Status->GetVoidThreshold() : 0;
         const float VoidBuildup = Status && VoidThreshold > UE_SMALL_NUMBER ? FMath::Clamp(Status->GetVoidBuildup() / VoidThreshold, 0.0f, 1.0f) : 0;
-        const bool bShowVoid = bShowName && (Erased || VoidBuildup > 0);
+        const bool bShowVoid = bStatusRowsDrawn && bShowName && (Erased || VoidBuildup > 0);
         const FString VoidText = Erased ? BreakerStrings::Format(EBreakerStringKey::HudErasedTimer, Erased->RemainingDuration)
             : FString::Printf(TEXT("%s %d%%"), *BreakerStrings::Get(EBreakerStringKey::HudVoid), FMath::Clamp(FMath::RoundToInt(VoidBuildup * 100), 1, 100));
         const FVector2D VoidTextSize = bShowVoid ? MeasureSpecText(VoidText, EntropyPixels, ESpecFontRole::Mono) : FVector2D::ZeroVector;
@@ -783,7 +795,7 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
             { return Entry.Spec.StatusTag == FGameplayTag::RequestGameplayTag(TEXT("Status.Unstable")) && Entry.RemainingDuration > 0; }) : nullptr;
         const float RiftThreshold = Status ? Status->GetRiftThreshold() : 0;
         const float RiftBuildup = Status && RiftThreshold > UE_SMALL_NUMBER ? FMath::Clamp(Status->GetRiftBuildup() / RiftThreshold, 0.0f, 1.0f) : 0;
-        const bool bShowRift = bShowName && (Unstable || RiftBuildup > 0);
+        const bool bShowRift = bStatusRowsDrawn && bShowName && (Unstable || RiftBuildup > 0);
         const FString RiftText = Unstable ? BreakerStrings::Format(EBreakerStringKey::HudUnstableTimer, Unstable->RemainingDuration)
             : FString::Printf(TEXT("%s %d%%"), *BreakerStrings::Get(EBreakerStringKey::HudRift), FMath::Clamp(FMath::RoundToInt(RiftBuildup * 100), 1, 100));
         const FVector2D RiftTextSize = bShowRift ? MeasureSpecText(RiftText, EntropyPixels, ESpecFontRole::Mono) : FVector2D::ZeroVector;

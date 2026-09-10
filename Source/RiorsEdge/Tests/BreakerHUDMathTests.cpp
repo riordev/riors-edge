@@ -45,9 +45,26 @@ bool FBreakerHUDShippedTokensTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("The max sits in the small numeric"), HudVitalsMaxPixels, 13.0f);
     TestEqual(TEXT("The value sits in the large numeric"), HudVitalsValuePixels, 32.0f);
 
-    // O207: the play sizes stand, and the aggregation window with them.
-    TestEqual(TEXT("Body damage number 26"), DamageBodyPixels, 26.0f);
-    TestEqual(TEXT("Crit damage number 52"), DamageCritPixels, 52.0f);
+    // THE PLAY SIZES, RE-MEASURED BY PLAY. O207 pinned 26/52 from the owner
+    // calling them too big twice; a second playtest called them too big again
+    // and named the reference — "look at how destiny does damage numbers and
+    // replicate something similar" — so 18/34 supersedes it. Only another
+    // playtest can move these, which is why they are pinned at all.
+    TestEqual(TEXT("Body damage number 18"), DamageBodyPixels, 18.0f);
+    TestEqual(TEXT("Crit damage number 34"), DamageCritPixels, 34.0f);
+    // AND THE HIERARCHY IS THE POINT, not the absolute sizes: the ratios are
+    // what tell a body shot from a weak point from a crit, so they are asserted
+    // as ratios and cannot be lost to a future uniform shrink.
+    TestTrue(TEXT("A weak point reads bigger than a body shot"),
+        DamageWeakPointPixels > DamageBodyPixels * 1.3f);
+    TestTrue(TEXT("A crit reads bigger than a weak point"),
+        DamageCritPixels > DamageWeakPointPixels * 1.25f);
+    TestTrue(TEXT("A damage-over-time tick reads smaller than a body shot"),
+        DamageDoTPixels < DamageBodyPixels);
+    // Owner: "only used when in effective ranges". A yard is 106 m long, so the
+    // gate has to sit well inside one or it gates nothing.
+    TestTrue(TEXT("Numbers stop being drawn well inside a yard"),
+        DamageMaxDrawDistanceCm > 2000.0f && DamageMaxDrawDistanceCm < 8000.0f);
     TestEqual(TEXT("Magazine 32"), HudMagazinePixels, 32.0f);
     TestEqual(TEXT("Reserve 15"), HudReservePixels, 15.0f);
     TestEqual(TEXT("Direct merge window 120 ms"), BreakerDamageFeed::DirectMergeWindow, 0.12f);

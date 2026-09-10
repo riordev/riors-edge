@@ -497,6 +497,16 @@ protected:
     UPROPERTY() TObjectPtr<class UInstancedStaticMeshComponent> WeakPointRing;
     void BuildWeakPointRing();
 
+    // WHAT IS EATING THIS BODY, pushed to the paint layer. Owner: "we dont need
+    // bars for rot or any status we should be able to SEE it taking affect" —
+    // so the plate stopped printing a percentage and the body started wearing
+    // the condition. Bound to the status component's own applied/expired
+    // events rather than polled: a wash that lagged a frame behind the status
+    // would be a worse tell than the number it replaced.
+    UFUNCTION() void HandleStatusApplied(const FBreakerActiveStatus& Applied);
+    UFUNCTION() void HandleStatusExpired(const FBreakerActiveStatus& Expired);
+    void RefreshStatusWash();
+
 public:
     // --- THE NAMED BODY (the shipped look) --------------------------------
     // ABreakerNPC's pattern, skeletal: when BodyMeshAsset resolves it replaces

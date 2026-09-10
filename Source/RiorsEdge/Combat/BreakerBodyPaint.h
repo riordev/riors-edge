@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
 #include "Combat/BreakerMonsterChassis.h"
 
 // ---------------------------------------------------------------------------
@@ -249,6 +250,21 @@ namespace BreakerBodyPaint
         EReaction Reaction = EReaction::Rest;
         float ReactionAlpha = 0.0f;
         bool bReactionWeakPoint = false;
+        // LAYER 4: WHAT IS EATING THIS BODY. Owner: "we dont need bars for rot
+        // or any status we should be able to SEE it taking affect". Until now a
+        // status was visible ONLY as a percentage on the enemy's plate — the
+        // body carried no sign of it at all — so deleting that readout without
+        // this would have removed the only tell there was.
+        //
+        // It sits BELOW every reaction and ABOVE the rank and the wound: a hit
+        // flash still occludes it (a flash is white whatever the body was), and
+        // it occludes the rank, because what is currently killing a body
+        // matters more than what kind of body it is.
+        bool bStatus = false;
+        FLinearColor StatusPaint = FLinearColor::White;
+        // 0..1, driven by the owner so the wash breathes. A still tint reads as
+        // a repaint; a moving one reads as a process.
+        float StatusPulse = 0.0f;
     };
 
     // THE OVERLAY STRENGTH: how much of the resolved colour a NAMED body
@@ -259,6 +275,25 @@ namespace BreakerBodyPaint
     // rank badge wears its own authored blend weights, and the health ramp
     // rises with damage taken. Same state, same single writer; a second
     // strength table here would be the two-owners shape O128 deleted.
+    // WHAT EACH STATUS LOOKS LIKE ON A BODY. O2 PLACEHOLDER, matched on the
+    // tag's leaf rather than against registered tag handles so this stays a
+    // header table with no static initialisation order to get wrong.
+    //
+    // Coloured by what the status IS rather than by O179's verb table: these
+    // are not player actions, they are conditions, and a body wears them.
+    inline FLinearColor StatusWashFor(const FGameplayTag& StatusTag)
+    {
+        const FString Leaf = StatusTag.GetTagName().ToString();
+        if (Leaf.EndsWith(TEXT("Bleed")))    return FLinearColor(0.66f, 0.09f, 0.07f);
+        if (Leaf.EndsWith(TEXT("Rot")))      return FLinearColor(0.40f, 0.60f, 0.14f);
+        if (Leaf.EndsWith(TEXT("Erased")))   return FLinearColor(0.50f, 0.26f, 0.82f);
+        if (Leaf.EndsWith(TEXT("Unstable"))) return FLinearColor(0.16f, 0.74f, 0.78f);
+        // An unlisted status still SHOWS. A condition nobody authored a colour
+        // for is still something eating the body, and silence is the defect
+        // this whole layer exists to close.
+        return FLinearColor(0.62f, 0.62f, 0.66f);
+    }
+
     inline float ResolveOverlayStrength(const FState& State)
     {
         if (State.Reaction == EReaction::Flash) return 1.0f;
@@ -266,6 +301,13 @@ namespace BreakerBodyPaint
         // burnt out on a mech the same as on the primitives.
         if (State.Reaction == EReaction::DeathCrumple) return 1.0f;
         float Strength = RankBlendFor(State.Rank);
+        // The loudest of the quiet layers, and deliberately never full: a body
+        // being eaten is still a body you have to identify. O2 PLACEHOLDER.
+        if (State.bStatus)
+        {
+            Strength = FMath::Max(Strength,
+                FMath::Lerp(0.35f, 0.68f, FMath::Clamp(State.StatusPulse, 0.0f, 1.0f)));
+        }
         if (State.bHealthRamp)
         {
             // 0 at full health, up to 0.6 at none: the wound wash never fully
@@ -295,6 +337,14 @@ namespace BreakerBodyPaint
         // carries the pack's display-domain values, and only the ramp moves.
         FLinearColor Body = FMath::Lerp(State.FamilyPaint, RankHueFor(State.Rank), RankBlendFor(State.Rank));
         if (State.bHealthRamp) Body = ApplyHealthRamp(Body, State.Rank, State.HealthFraction);
+        // OVER the wound rather than under it, so a rotting body that is nearly
+        // dead reads as rotting first — that is the thing the player can still
+        // act on.
+        if (State.bStatus)
+        {
+            Body = FMath::Lerp(Body, State.StatusPaint,
+                FMath::Lerp(0.55f, 0.9f, FMath::Clamp(State.StatusPulse, 0.0f, 1.0f)));
+        }
         // THE BODY NEVER GOES OVERBRIGHT; ONLY THE REACTION DOES. Spending
         // the hit flash's vocabulary on a health value would cost the flash
         // its meaning. The clamp is inside DecodeChannel; this is the belt on

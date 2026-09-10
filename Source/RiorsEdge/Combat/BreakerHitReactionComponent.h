@@ -79,6 +79,11 @@ public:
     void SetHealthRampEnabled(bool bEnabled);
     void SetHealthFraction(float Fraction);
 
+    // The status this body is wearing, pushed by its owner; an invalid tag
+    // clears it. Idempotent, because a six-second Rot would otherwise repaint
+    // every registered part on every frame it is alive.
+    void SetStatusWash(const FGameplayTag& StatusTag);
+
     // The body answers a hit. No-op while the death beat owns the materials.
     void NotifyHit(bool bWeakPoint);
 
@@ -116,6 +121,7 @@ private:
     void EndHitFlash();
     void UpdateDeathPresentation(float DeltaSeconds);
     void UpdateFlinch(float DeltaSeconds);
+    void UpdateStatusWash(float DeltaSeconds);
 
     TArray<TWeakObjectPtr<UStaticMeshComponent>> Parts;
     TWeakObjectPtr<class UMeshComponent> OverlayBody;
@@ -133,5 +139,6 @@ private:
     FVector FlinchDirection = FVector::ZeroVector;
     float FlinchElapsed = -1.0f;
     float FlinchScale = 1.0f;
+    float StatusWashAge = 0.0f;
     bool bFlinchBaseCaptured = false;
 };

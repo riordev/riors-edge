@@ -357,6 +357,11 @@ void ABreakerEnemy::BeginPlay()
     Combat->OnDeath.AddDynamic(this, &ThisClass::HandleDeath);
     Combat->OnDamageReceived.AddDynamic(this, &ThisClass::HandleDamageReceived);
     Combat->OnDamageTaken.AddUniqueDynamic(this, &ThisClass::HandleThreatDamage);
+    if (UBreakerStatusComponent* Conditions = FindComponentByClass<UBreakerStatusComponent>())
+    {
+        Conditions->OnStatusApplied.AddUniqueDynamic(this, &ThisClass::HandleStatusApplied);
+        Conditions->OnStatusExpired.AddUniqueDynamic(this, &ThisClass::HandleStatusExpired);
+    }
     // The reaction layer paints these six, and since O128 it is the ONLY
     // thing that paints them. The family paint goes in before the first
     // registration so a part never lands on a default that a later layer has
@@ -949,6 +954,34 @@ void ABreakerEnemy::ClearThreat()
 {
     ThreatLedger.Reset(); CurrentThreatTarget.Reset(); CommittedAttackTarget.Reset();
     ProvokedTarget.Reset(); ProvokeEndsAt = 0; bProvokeEndsOnForeignDamage = false;
+}
+
+void ABreakerEnemy::HandleStatusApplied(const FBreakerActiveStatus& Applied)
+{
+    // The NEWEST condition wins the body. What just landed is the thing the
+    // player did most recently and the thing they are waiting to see work.
+    if (HitReaction && Applied.Spec.StatusTag.IsValid())
+    {
+        HitReaction->SetStatusWash(Applied.Spec.StatusTag);
+    }
+}
+
+void ABreakerEnemy::HandleStatusExpired(const FBreakerActiveStatus& Expired)
+{
+    RefreshStatusWash();
+}
+
+void ABreakerEnemy::RefreshStatusWash()
+{
+    if (!HitReaction) return;
+    const UBreakerStatusComponent* Conditions = FindComponentByClass<UBreakerStatusComponent>();
+    // Whatever is still on the body, or nothing. Reading the list back rather
+    // than counting applications: a status can leave by expiring, by being
+    // consumed by a detonation, or by the body being cleaned, and only the
+    // list knows about all three.
+    const FGameplayTag Wash = Conditions && Conditions->GetActiveStatuses().Num() > 0
+        ? Conditions->GetActiveStatuses()[0].Spec.StatusTag : FGameplayTag();
+    HitReaction->SetStatusWash(Wash);
 }
 
 void ABreakerEnemy::HandleThreatDamage(const FBreakerHitContext& Hit)

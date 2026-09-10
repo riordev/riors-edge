@@ -8,6 +8,7 @@
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerModifierComponent.h"
+#include "Combat/BreakerStatusComponent.h"
 #include "Combat/BreakerRangedEnemy.h"
 #include "Engine/World.h"
 #include "Game/BreakerPocketRift.h"
@@ -355,6 +356,26 @@ void BreakerScheduleWeakPointCapture(UWorld* World)
         // away with it because the thing it is looking at is either far off or
         // large; a head at close range is neither.
         Controller->SetIgnoreMoveInput(true);
+
+        // AND IT IS ROTTING. The status wash is the thing being judged here as
+        // much as the weak point is, and a body with nothing on it wears none.
+        // Applied through the shipped entry point, not by poking the field.
+        if (UBreakerStatusComponent* Conditions = Body->FindComponentByClass<UBreakerStatusComponent>())
+        {
+            // BLEED, NOT ROT, and that is the API's rule rather than a
+            // preference: ApplyStatus REFUSES Rot, Erased and Unstable outright
+            // — those three are earned through elemental buildup and are never
+            // a carried payload. Bleed is a physical status and applies
+            // directly, and the wash is the same layer whichever tag drives it.
+            FBreakerStatusApplicationSpec Bleed;
+            Bleed.StatusTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Bleed"));
+            Bleed.BaseDamagePerTick = 1.0f;
+            Bleed.Duration = 60.0f;      // capture only: long enough to photograph
+            Bleed.TickInterval = 1.0f;
+            Conditions->ApplyStatus(Bleed, EBreakerDamageFamily::Physical, Player);
+            UE_LOG(LogTemp, Display, TEXT("[WeakPointCapture] body wears %d status(es)."),
+                Conditions->GetActiveStatuses().Num());
+        }
 
         const FVector EyeAt = Player->GetActorLocation() + FVector(0.0f, 0.0f, 60.0f);
         // At the HEAD, which is where the marker lives. Aiming at the actor

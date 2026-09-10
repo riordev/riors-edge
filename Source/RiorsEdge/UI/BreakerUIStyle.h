@@ -353,12 +353,30 @@ namespace BreakerUI
     // and O207 rules the play measurement stands: 26 body, 52 crit. The
     // relative sizes are what carry the information, so the HIERARCHY is kept
     // and the width problem is solved by FormatDamage below, not by a third cut.
-    inline constexpr float DamageBodyPixels = 26.0f;      // O207
-    inline constexpr float DamageCritPixels = 52.0f;      // O207
-    inline constexpr float DamageWeakPointPixels = 40.0f; // O207
+    // 26/52/40 -> 18/34/26 (owner, second playtest: "number font needs to go
+    // down a little ... look at how destiny does damage numbers and replicate
+    // something similar"). Destiny's numbers are small, thin and read as
+    // confirmation rather than as an event; O207's play measurement is
+    // superseded by a second play measurement, which is the only thing that
+    // can supersede it.
+    //
+    // THE HIERARCHY IS PRESERVED EXACTLY. The ratios are unchanged to within a
+    // rounding — body 1.0, weak 1.5, crit 1.9 — because the relative sizes are
+    // what carry the information and shrinking them unevenly would delete the
+    // separation between a body shot, a weak point and a crit.
+    inline constexpr float DamageBodyPixels = 18.0f;      // O2 PLACEHOLDER
+    inline constexpr float DamageCritPixels = 34.0f;      // O2 PLACEHOLDER
+    inline constexpr float DamageWeakPointPixels = 26.0f; // O2 PLACEHOLDER
     // DoT ticks sit BELOW the body size: they are bookkeeping, not an event,
     // and at body size a three-target Bleed drowned the gunfire it rode over.
-    inline constexpr float DamageDoTPixels = 20.0f;    // O2 PLACEHOLDER
+    inline constexpr float DamageDoTPixels = 13.0f;    // O2 PLACEHOLDER
+
+    // HOW FAR A NUMBER IS WORTH PRINTING. Owner: "only used when in effective
+    // ranges". Past this a number is a smear of pixels over a target too small
+    // to read it against, and a yard is 106 m long, so a fight at the far
+    // pocket used to spray unreadable glyphs across the middle distance.
+    // The DAMAGE is unaffected — this is what is drawn, not what is dealt.
+    inline constexpr float DamageMaxDrawDistanceCm = 4200.0f;   // O2 PLACEHOLDER
     // Killing blows multiply whatever size their kind already earned: a kill
     // is the heaviest read of its own family, never a fourth colour.
     inline constexpr float DamageKillScale = 1.25f;    // O2 PLACEHOLDER

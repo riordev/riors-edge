@@ -2,6 +2,31 @@
 
 ## OWNER PLAYTEST, 2026-09-10 (SECOND) — THIS OUTRANKS EVERYTHING BELOW
 
+THE THIRD MESSAGE'S FOUR, ALL LANDED:
+- "we dont need bars for rot or any status we should be able to SEE it taking
+  affect". The three status rows on the enemy plate (Entropy, Void, Rift — a
+  percentage and a rail each, on every body in a pack) are off, and the BODY
+  wears the condition instead: a new layer 4 in BreakerBodyPaint, washing the
+  body toward the status's own colour on a slow breath. It sits below every
+  reaction and above the rank and the wound. Photographed with Bleed.
+  THE ROWS ARE FORCED FALSE, NOT DELETED: the buildup arithmetic above them is
+  what the wash and the reactions read, and if he wants one row back it is one
+  word. And ApplyStatus REFUSES Rot/Erased/Unstable by design — they are earned
+  through elemental buildup, never a carried payload — which is why the capture
+  applies Bleed.
+- "when you die theres deploy text on the bottom of the screen" — the
+  REDEPLOYING line is gone.
+- "or overkill damage on displayed numbers" — gone, and this OVERTURNS a
+  deliberate choice: the number used to add overkill so a 900-damage rocket on
+  a 30 HP enemy printed 900, argued for on the grounds that he reads these for
+  TTK. He has played it and ruled the other way. The overkill is still computed.
+- "number font needs to go down a little ... look at how destiny does damage
+  numbers" — 26/52/40/20 becomes 18/34/26/13, ratios preserved to a rounding so
+  the body/weak/crit hierarchy survives, and numbers past 42 m are not drawn at
+  all ("only used when in effective ranges"). O207's pin is superseded by a
+  second play measurement, which is the only thing that can supersede it.
+
+
 LANDED FROM IT ALREADY:
 - "the gym enemies are suddenly inside fernhall" — FIXED, AND THE FIRST
   DIAGNOSIS WAS WRONG. I blamed F1; he replied "i never pressed f1" and he was
