@@ -2,19 +2,19 @@
 	"coreAuthoringSources":
 	{
 		"Source/RiorsEdge/Data/BreakerCensus.cpp": "0c4abf0957363d7eba745c0fa46507efc425392e",
-		"Source/RiorsEdge/Progression/BreakerCoreRoster.cpp": "483d8e0fe1d537faf636257f0d47572a46418691",
-		"Source/RiorsEdge/Progression/BreakerCoreRoster.h": "4a1c778afe6d79d0bd0b5af8489a6d0b9b79c69a",
+		"Source/RiorsEdge/Progression/BreakerCoreRoster.cpp": "ca4b1707553c9da18d7b8af4ac7754112028a581",
+		"Source/RiorsEdge/Progression/BreakerCoreRoster.h": "79f375b9ff6fb7edcb722657408b7cb6e22371df",
 		"Source/RiorsEdge/Progression/BreakerCoreRosterAbility.cpp": "836b905cce0f3c20e6ff503cf8e459b8912e33c4",
 		"Source/RiorsEdge/Progression/BreakerCoreRosterDefence.cpp": "10ca13c3c4e35d6c6d4140b142cbd7afdbccb59c",
 		"Source/RiorsEdge/Progression/BreakerCoreRosterMovement.cpp": "c4e3d19c0d78b915eb217a8ffdb95577204d9f9f",
-		"Source/RiorsEdge/Progression/BreakerCoreRosterStatus.cpp": "db29ca37c23d3662db786083272d6c927e9b300f",
-		"Source/RiorsEdge/Progression/BreakerCoreRosterUtility.cpp": "ddd1500c029ac0f2cfa4f50822e95efc968f4c45",
+		"Source/RiorsEdge/Progression/BreakerCoreRosterStatus.cpp": "592d8f26222814cc89c9218ab95d1df1e293297a",
+		"Source/RiorsEdge/Progression/BreakerCoreRosterUtility.cpp": "af9b7c2f7635e1fbfe2aaded64cf2f521da001c9",
 		"Source/RiorsEdge/Progression/BreakerCoreRosterWeapon.cpp": "668dc0b08541588e995afe28301d8ae2bacb2106",
 		"Source/RiorsEdge/Progression/BreakerCoreTree.cpp": "0d1c3252ee7f95d02fea3445e83f7e71b05e15c2",
 		"Source/RiorsEdge/Progression/BreakerCoreTree.h": "d5cbc90580dd4568eeb1ee21d00f5159dc56bbae",
 		"Source/RiorsEdge/Progression/BreakerProgressionLibrary.cpp": "9e751f48bbbd8d9aad4afeb74e8d185f32a0b18c",
-		"Source/RiorsEdge/Progression/BreakerProgressionNode.h": "092c6560be0df6e02143690452adec272475a950",
-		"Source/RiorsEdge/Progression/BreakerProgressionTree.h": "aaf54881b733ca884baff936284824ef3d55a931",
+		"Source/RiorsEdge/Progression/BreakerProgressionNode.h": "b18436bdeeeef00075344254bd538c6fb1e3140e",
+		"Source/RiorsEdge/Progression/BreakerProgressionTree.h": "9dfcbac0af583d1da7c0e6ed117e8c94231d1395",
 		"Source/RiorsEdge/Progression/BreakerProgressionTypes.h": "9af9593a51de7633462b1c1a0ea22a182faaa255"
 	},
 	"budgets":

@@ -2,6 +2,7 @@
 #include "UI/BreakerCoreBoardLayout.h"
 #include "UI/BreakerCoreLayoutPreview.h"
 #include "UI/BreakerDoctrineBoardLayout.h"
+#include "UI/BreakerItemNameText.h"
 #include "UI/BreakerSandboxModel.h"
 #include "EngineUtils.h"
 #include "HAL/FileManager.h"
@@ -4446,20 +4447,12 @@ namespace
         }
     }
 
+    // The eight words live in UI/BreakerItemNameText.h now, where the stash
+    // and the swap picker read the same copy. This stays as the name the rest
+    // of this file already calls.
     FString SlotName(EBreakerEquipSlot Slot)
     {
-        switch (Slot)
-        {
-            case EBreakerEquipSlot::Helmet: return TEXT("HELMET");
-            case EBreakerEquipSlot::BodyArmour: return TEXT("BODY ARMOUR");
-            case EBreakerEquipSlot::Gloves: return TEXT("GLOVES");
-            case EBreakerEquipSlot::Boots: return TEXT("BOOTS");
-            case EBreakerEquipSlot::Necklace: return TEXT("NECKLACE");
-            case EBreakerEquipSlot::Waist: return TEXT("WAIST");
-            case EBreakerEquipSlot::Primary: return TEXT("PRIMARY");
-            case EBreakerEquipSlot::Secondary: return TEXT("SECONDARY");
-            default: return TEXT("SLOT");
-        }
+        return BreakerItemNameText::SlotWord(Slot);
     }
 
     // What to print on an item card's slot line. For armour that is the slot;
@@ -4696,66 +4689,17 @@ namespace
         return MenuWrappedText(FText::FromString(Text), BreakerUI::TypeCaption, Primary, WrapWidth, true);
     }
 
-    // WHAT THE CARD CALLS THIS ITEM.
-    // The reference's line one is "name plus item level — the two things
-    // scanned first", and its sample names ("Riftstep Greaves") are authored
-    // copy. FBreakerItemInstance has no display name: the only named items in
-    // the game are the legendaries, which carry one on
-    // FBreakerLegendaryDefinition. Everything else is identified by what it is,
-    // which for a weapon is its ARCHETYPE (the one fact not already implied by
-    // where the card sits) and for armour is its slot.
+    // WHAT THE CARD CALLS THIS ITEM — the reference's line one, "name plus
+    // item level, the two things scanned first".
     //
-    // THE GAP ABOVE IS NOW FILLED (O267, owner-ruled: PoE grammar). A rolled
-    // item names itself after its two strongest lines — prefix, base, "of"
-    // suffix — so the card leads with what the item IS instead of repeating
-    // its slot on both lines. The grammar and the ranking are pure and live
-    // in Items/BreakerItemNaming.h, proved there on a bare array; only the
-    // lookup that turns a rolled id into its word is here, because words are
-    // data and the grammar is a rule.
-    //
-    // A LEGENDARY IS NOT RENAMED. It already carries authored copy, and a
-    // legendary that called itself "Havoc Riftplate of Cast Speed" would bury
-    // the one name in the game somebody actually wrote.
-    FString BreakerMenuAffixWord(const FBreakerRolledAffix& Rolled)
-    {
-        const FBreakerAffixLibraryData& Library = UBreakerAffixLibrary::GetData();
-        for (const TArray<FBreakerAffixDefinition>* Pool : { &Library.Slice, &Library.Aberrant,
-            &Library.Unwritten, &Library.Downsides })
-            for (const FBreakerAffixDefinition& Affix : *Pool)
-                if (Affix.AffixId == Rolled.AffixId) return Affix.DisplayName.ToString();
-        if (Library.Elemental.AffixId == Rolled.AffixId) return Library.Elemental.DisplayName.ToString();
-        return FString();
-    }
-
+    // The rule MOVED to UI/BreakerItemNameText.h and this is now a call. It
+    // was file-local here, which is precisely how the swap picker came to grow
+    // its own copy of the same four answers and then miss O267's grammar
+    // entirely: two screens, two names, same item. The grammar itself stays
+    // pure in Items/BreakerItemNaming.h.
     FString ItemDisplayName(const FBreakerItemInstance& Item)
     {
-        if (Item.IsLegendary())
-        {
-            const FBreakerLegendaryDefinition Legendary = UBreakerItemRuleLibrary::FindLegendary(Item.LegendaryId);
-            if (Legendary.IsValid() && !Legendary.DisplayName.IsEmpty())
-            {
-                return Legendary.DisplayName.ToString().ToUpper();
-            }
-        }
-        // The starter. The one non-legendary item with a name, because it is
-        // the one non-legendary item every character is guaranteed to meet:
-        // standard-issue kit says so on the card, and the first drop that
-        // outclasses it reads as an upgrade over "the gun they gave me".
-        if (Item.DefinitionId == UBreakerEquipmentComponent::StarterRifleDefinitionId)
-        {
-            return TEXT("ISSUE RIFLE");
-        }
-        // The BASE the grammar wraps: a weapon is its archetype, armour its
-        // slot. Unchanged — this was always the right base, it simply had
-        // nothing wrapped around it.
-        const FString Base = Item.IsWeapon()
-            ? BreakerWeaponArchetypeNames::Short(Item.WeaponArchetype)
-            : SlotName(Item.Slot);
-        using namespace BreakerItemNaming;
-        const FBreakerRolledAffix* Prefix = StrongestOfCategory(Item.Affixes, EBreakerAffixCategory::Prefix);
-        const FBreakerRolledAffix* Suffix = StrongestOfCategory(Item.Affixes, EBreakerAffixCategory::Suffix);
-        return Compose(Prefix ? BreakerMenuAffixWord(*Prefix) : FString(), Base,
-            Suffix ? BreakerMenuAffixWord(*Suffix) : FString());
+        return BreakerItemNameText::DisplayName(Item);
     }
 
     // Line two: rarity and slot. Aberrant and Unwritten say so in their own

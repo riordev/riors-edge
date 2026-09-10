@@ -25,6 +25,7 @@
 #include "Characters/BreakerCharacter.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Items/BreakerItemRules.h"
+#include "UI/BreakerItemNameText.h"
 #include "UI/BreakerSwapPickerLayout.h"
 #include "UI/BreakerTypeRoles.h"
 #include "UI/BreakerUIStyle.h"
@@ -75,29 +76,26 @@ namespace
             ];
     }
 
-    // The name a row prints, in the loadout card's own order: a legendary's
-    // display name, the starter's ISSUE RIFLE, a weapon's archetype, an
-    // armour piece's slot word. The loadout's ItemDisplayName is file-local
-    // to BreakerMenu.cpp; the same four answers are given here.
+    // The name a row prints. This used to be a hand-copied duplicate of the
+    // loadout's file-local ItemDisplayName, and it was ALREADY WRONG: O267
+    // gave a rolled item a headline of its own — strongest prefix, base, "of"
+    // strongest suffix — and this copy never learned it, so the picker and the
+    // inventory card printed different names for the same item.
+    //
+    // Both now come from UI/BreakerItemNameText.h. The picker asks for the
+    // BASE rather than the headline, and that is a deliberate choice recorded
+    // here rather than an accident: this row is RowHeight (64) tall inside
+    // ModalWidth (640), which leaves its name column roughly 336 px against
+    // roughly 440 px for a name like "Sustained Accuracy Sidearm of Cast
+    // Speed". Wrapping is barred — ui.md: no auto-wrap where width matters,
+    // and a caller-computed wrap width is not derivable while the delta-mark
+    // column varies with the affix count — so the headline needs either a
+    // taller row or a wider plate, and both are changes to the owner's own
+    // sheet. OWNER RULING OWED, and it is the same species of decision as the
+    // inventory card's de-bloat: it belongs with that item, not ahead of it.
     FString BreakerSwapItemName(const FBreakerItemInstance& Item)
     {
-        if (Item.IsLegendary())
-        {
-            const FBreakerLegendaryDefinition Legendary = UBreakerItemRuleLibrary::FindLegendary(Item.LegendaryId);
-            if (Legendary.IsValid() && !Legendary.DisplayName.IsEmpty())
-            {
-                return Legendary.DisplayName.ToString().ToUpper();
-            }
-        }
-        if (Item.DefinitionId == UBreakerEquipmentComponent::StarterRifleDefinitionId)
-        {
-            return TEXT("ISSUE RIFLE");
-        }
-        if (Item.IsWeapon())
-        {
-            return BreakerWeaponArchetypeNames::Short(Item.WeaponArchetype);
-        }
-        return BreakerStashLayout::SlotWord(Item.Slot);
+        return BreakerItemNameText::BaseName(Item);
     }
 
     // The row's comparison column: one drawn mark per affix line of the

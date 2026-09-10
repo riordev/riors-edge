@@ -254,9 +254,19 @@ void ABreakerWardenEnemy::TickEngagedBehaviour(AActor* Player, float Distance, f
     // the mover has no stop distance while steering, by design, because the
     // ring "is always the behaviour's to govern, never the path's". So the
     // body walked into the player and, the player being a Pawn, through them.
+    //
+    // The label is set BEFORE the call, exactly as the base chase sets its own
+    // before it: the ring owns the label for the frames it governs, and it
+    // writes ATTACK holding at the ring and BACK OFF stepping out of it. Set
+    // after, it clobbered both, so a Warden holding station or backing away
+    // still printed ADVANCE over its head on the playtest HUD. Reachable only
+    // while both attacks are on cooldown — which is why nothing caught it, and
+    // why it is not pinned: a fixture cannot reach that frame without first
+    // eating a slam and a sweep, and the damage-free window is exactly the
+    // window where the label is honest anyway.
+    StateLabel = TEXT("ADVANCE");
     FVector Approach = ToPlayer;
     ApplyArrivalRing(Player, Distance, ToPlayer, OutDirection, OutSpeedScale, Approach);
-    StateLabel = TEXT("ADVANCE");
 
     // --- Slam: resolves first, because it is the attack that ignores facing
     // and therefore the one a player standing behind the Warden still has to

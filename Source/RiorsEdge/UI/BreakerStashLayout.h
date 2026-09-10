@@ -9,6 +9,8 @@
 // order the equipment column walks, so the two screens agree on what "head to
 // foot, then trinkets, then weapons" means.
 #include "UI/BreakerMenu.h"
+// BreakerItemNameText::SlotWord — the eight slot words, in one place.
+#include "UI/BreakerItemNameText.h"
 
 // ---------------------------------------------------------------------------
 // STASH LAYOUT — the stash screen's arithmetic and its text rules, world-free.
@@ -205,23 +207,13 @@ namespace BreakerStashLayout
         return FString();
     }
 
-    // The slot word on a cell. The loadout's own SlotName is file-local to
-    // BreakerMenu.cpp, so the stash carries the same eight words here where a
-    // test can hold them.
+    // The slot word on a cell. The eight words were carried here as a second
+    // copy because the loadout's own SlotName was file-local to
+    // BreakerMenu.cpp; they live in UI/BreakerItemNameText.h now, once, and
+    // this stays as the name the stash screen already calls.
     inline const TCHAR* SlotWord(EBreakerEquipSlot Slot)
     {
-        switch (Slot)
-        {
-            case EBreakerEquipSlot::Helmet:     return TEXT("HELMET");
-            case EBreakerEquipSlot::BodyArmour: return TEXT("BODY ARMOUR");
-            case EBreakerEquipSlot::Gloves:     return TEXT("GLOVES");
-            case EBreakerEquipSlot::Boots:      return TEXT("BOOTS");
-            case EBreakerEquipSlot::Necklace:   return TEXT("NECKLACE");
-            case EBreakerEquipSlot::Waist:      return TEXT("WAIST");
-            case EBreakerEquipSlot::Primary:    return TEXT("PRIMARY");
-            case EBreakerEquipSlot::Secondary:  return TEXT("SECONDARY");
-            default:                            return TEXT("SLOT");
-        }
+        return BreakerItemNameText::SlotWord(Slot);
     }
 
     // How many of the five tally cells a rarity fills: Standard one, Unwritten

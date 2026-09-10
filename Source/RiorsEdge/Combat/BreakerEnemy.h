@@ -255,6 +255,13 @@ public:
     // band never classifies Hold and the ring silently stops existing.
     UFUNCTION(BlueprintPure, Category="Enemy") float GetArrivalInnerRatio() const { return ArrivalInnerRatio; }
     UFUNCTION(BlueprintPure, Category="Enemy") float GetArrivalHysteresisCm() const { return ArrivalHysteresisCm; }
+    // WHICH BAND THE RING PUT THIS BODY IN, read-only. ArrivalBand is written
+    // in exactly one statement — inside ApplyArrivalRing — so a band that is
+    // not the default after an engaged frame is proof the archetype CALLED the
+    // ring rather than replacing it. That is the only external evidence a
+    // wholesale override has not dropped the spacing again, which is how the
+    // Warden walked through the player.
+    UFUNCTION(BlueprintPure, Category="Enemy") EBreakerRangedBand GetArrivalBand() const { return ArrivalBand; }
     UFUNCTION(BlueprintPure, Category="Enemy") float GetLungeRange() const { return LungeRange; }
     // The body capsule's scaled radius, read-only. The patrol hold below uses
     // it as its arrival threshold, so the shipped-configuration test must be
