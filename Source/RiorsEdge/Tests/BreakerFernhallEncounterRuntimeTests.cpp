@@ -301,12 +301,68 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
         }
         Mode->HandleStartingNewPlayer_Implementation(Controller);
         int32 AfterRepeat = 0, CourtyardAfterRepeat = 0;
+        // Everything alive before the repopulation probe below, so the body it
+        // finds afterwards is provably a NEW one rather than a survivor.
+        TSet<ABreakerEnemy*> PreExisting;
         for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
         {
             ++AfterRepeat;
+            PreExisting.Add(*It);
             CourtyardAfterRepeat += It->Tags.Contains(TEXT("Fernhall.Outdoor.Courtyard")) ? 1 : 0;
         }
         TestEqual(TEXT("Repeated startup preserves courtyard quartet"), CourtyardAfterRepeat, 4);
+        if (Visit == 0)
+        {
+            // ---- ARRIVAL FICTION: the courtyard comes back, THROUGH ITS DOOR
+            // The courtyard's roster was discarded at its call site, so the one
+            // pocket in the yard with an authored doorway was also the only one
+            // that never repopulated. Both halves are asserted here: that it
+            // registers slots at all, and that a returning body appears at the
+            // BAY MOUTH rather than resolving into existence standing on its
+            // post. Last in the visit, after the cleared-yard XP figure above,
+            // so a courtyard kill cannot move that number.
+            ABreakerEnemy* Standing = nullptr;
+            for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
+                if (It->Tags.Contains(TEXT("Fernhall.Outdoor.Courtyard")) && !It->IsDeadEnemy()) { Standing = *It; break; }
+            if (!TestNotNull(TEXT("A courtyard body is standing to be killed"), Standing)) return false;
+            const FVector Post = Standing->GetActorLocation();
+
+            // The clearance gate is real and is not being bypassed: the player
+            // is moved well beyond it so the refill is ALLOWED, which is the
+            // shipped rule rather than a test-only exemption.
+            Player->SetActorLocation(Post + FVector(0.0f, 0.0f, 40000.0f));
+            Mode->OutdoorRepopulationDelaySeconds = 0.1f;
+
+            Standing->DispatchBeginPlay();
+            FBreakerDamageRequest Kill;
+            Kill.BaseDamage = 1000000; Kill.bCanCritical = false; Kill.bBypassShield = true;
+            Kill.SetInstigator(Player);
+            if (!TestTrue(TEXT("The courtyard body dies to combat damage"),
+                Standing->FindComponentByClass<UBreakerCombatComponent>()->ReceiveDamage(Kill).bKilled)) return false;
+
+            for (int32 Step = 0; Step < 40; ++Step) { ++GFrameCounter; World->Tick(LEVELTICK_All, 0.05f); }
+
+            ABreakerEnemy* Returned = nullptr;
+            for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
+                if (*It != Standing && It->Tags.Contains(TEXT("Fernhall.Outdoor.Courtyard")) && !It->IsDeadEnemy()
+                    && !PreExisting.Contains(*It)) { Returned = *It; break; }
+            if (!TestNotNull(TEXT("The courtyard repopulates at all"), Returned)) return false;
+            TestTrue(TEXT("A returning courtyard body keeps the pocket's own tag"),
+                Returned->Tags.Contains(TEXT("Fernhall.Outdoor.Courtyard")));
+            // THE FICTION ITSELF. Appearing at the post is what every other
+            // pocket does and is what this pocket would do with no doorway; the
+            // courtyard has one, so the body starts a long way from where it is
+            // going and walks. The posts sit thousands of centimetres inside
+            // the bay, so this margin cannot be met by spawn jitter.
+            const float FromPost = FVector::Dist2D(Returned->GetActorLocation(), Post);
+            TestTrue(*FString::Printf(TEXT("It arrives through the doorway, not on its post (%.0f cm away)"), FromPost),
+                FromPost > 1000.0f);
+            // And it is pointed at where it is going, because it is arriving
+            // rather than standing.
+            const FVector ToPost = (Post - Returned->GetActorLocation()).GetSafeNormal2D();
+            TestTrue(TEXT("and faces the post it is walking to"),
+                FVector::DotProduct(Returned->GetActorForwardVector().GetSafeNormal2D(), ToPost) > 0.5f);
+        }
         TestEqual(TEXT("Repeated startup preserves the outdoor population"), AfterRepeat - CourtyardAfterRepeat, 17);
         TestEqual(TEXT("Repeated startup preserves seventeen outdoor plus courtyard four"), AfterRepeat, 21);
         TestFalse(TEXT("Clearing outdoor encounters never starts waves"), Mode->IsWaveActive());

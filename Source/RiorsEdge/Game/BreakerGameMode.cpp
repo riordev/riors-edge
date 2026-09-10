@@ -4135,7 +4135,7 @@ void ABreakerGameMode::TickOutdoorRepopulation(float DeltaSeconds)
         // KEEPS the wait it has accrued — walking away must not restart a clock
         // that has already run, or a patrolled route could never recover.
         const bool bClear = BreakerRepopulation::IsClearOfPlayer(
-            FVector::DistSquared(Slot.Home, PlayerAt), OutdoorRepopulationClearanceCm);
+            FVector::DistSquared(Slot.AppearsAt(), PlayerAt), OutdoorRepopulationClearanceCm);
         Candidates.Add(bHeld || !bClear ? 0.0f : Slot.EmptySeconds);
     }
 
@@ -4160,24 +4160,35 @@ ABreakerEnemy* ABreakerGameMode::RefillOutdoorSlot(FBreakerOutdoorSlot& Slot)
     if (ABreakerEnemy* Fallen = Slot.Occupant.Get()) Query.AddIgnoredActor(Fallen);
     const ABreakerEnemy* Template = GetDefault<ABreakerEnemy>(Slot.Class);
     const UCapsuleComponent* Body = Template ? Template->FindComponentByClass<UCapsuleComponent>() : nullptr;
-    if (Body && World->OverlapBlockingTestByChannel(Slot.Home, FQuat::Identity, ECC_Pawn,
+    const FVector Appears = Slot.AppearsAt();
+    if (Body && World->OverlapBlockingTestByChannel(Appears, FQuat::Identity, ECC_Pawn,
         FCollisionShape::MakeCapsule(Body->GetScaledCapsuleRadius(), Body->GetScaledCapsuleHalfHeight()), Query))
     {
         return nullptr;
     }
+    // A body that walks in through a door FACES ITS ROUTE, not the facing its
+    // post was authored with — it is arriving, not standing. A body appearing
+    // at its post keeps the authored facing, because that is the placement.
+    const FVector ToPost = (Slot.Home - Appears).GetSafeNormal2D();
+    const FRotator Facing = Slot.bHasArrival && !ToPost.IsNearlyZero() ? ToPost.Rotation() : Slot.Facing;
     FActorSpawnParameters Parameters;
     Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-    ABreakerEnemy* Patrol = World->SpawnActor<ABreakerEnemy>(Slot.Class, Slot.Home, Slot.Facing, Parameters);
+    ABreakerEnemy* Patrol = World->SpawnActor<ABreakerEnemy>(Slot.Class, Appears, Facing, Parameters);
     if (!Patrol) return nullptr;
     // Exactly what the authored placement gave this slot, including the elite
     // that a quest's elite-gated objective counts. ConfigureWave keeps the
     // per-body self-respawn off: this clock owns the return, not the corpse.
     Patrol->ConfigureWave(Slot.AreaLevel);
     if (Slot.bElite) Patrol->ConfigureElite();
+    // THE POST IS THE LEASH, AND THAT IS WHAT MAKES THE BODY WALK. The patrol
+    // target is derived from the leash origin, so a body that appeared at the
+    // doorway with its post as its origin walks to the post on the shipped
+    // patrol path — no new movement code, no scripted route, and it fights
+    // from wherever it has got to if the player interrupts the walk.
     Patrol->ConfigureEncounter(Slot.Home, Slot.PatrolPhase);
-    if (Slot.Pocket != INDEX_NONE)
+    if (!Slot.PocketTag.IsNone())
     {
-        Patrol->Tags.Add(FName(*FString::Printf(TEXT("Fernhall.Outdoor.%d"), Slot.Pocket)));
+        Patrol->Tags.Add(Slot.PocketTag);
     }
     UBreakerKillTelemetryComponent::AttachTo(Patrol);
     // The same protection every other arrival gets.
@@ -4328,7 +4339,7 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
             Slot.Facing = (-Forward).Rotation();
             Slot.PatrolPhase = Index * 1.3f;
             Slot.AreaLevel = AreaLevel;
-            Slot.Pocket = Pocket;
+            Slot.PocketTag = FName(*FString::Printf(TEXT("Fernhall.Outdoor.%d"), Pocket));
             Slot.bElite = bElite;
             Slot.Occupant = Enemy;
             PocketMembers.Add(Enemy);
@@ -4392,7 +4403,63 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
     BreakerFernhallCourtyard::FPlan Courtyard;
     FString CourtyardError;
     if (BreakerFernhallCourtyard::MakePlan(YardPieces, Courtyard, CourtyardError))
-        BreakerSpawnFernhallCourtyardEncounter(World, Courtyard);
+    {
+        // THE COURTYARD ROSTER WAS DISCARDED HERE. The encounter returns the
+        // bodies it placed and nobody took them, so the one pocket in the yard
+        // with an authored doorway was also the one pocket that never came
+        // back — cleared once and empty forever, while the five with nothing to
+        // arrive from all repopulated.
+        const TArray<ABreakerEnemy*> Placed = BreakerSpawnFernhallCourtyardEncounter(World, Courtyard);
+
+        // THE ARRIVAL POINT: the bay mouth, which is the only authored opening
+        // in the whole composed yard. Its transform comes from the same pure
+        // plan the builder built the doorway from, so the point cannot drift
+        // from the geometry. Just inside the entrance floor, on the route's own
+        // centre line, and traced to the floor rather than assumed onto it.
+        //
+        // A FAILED TRACE IS NOT A FAILED POCKET. Without an arrival point the
+        // slots still register and still repopulate — the body simply appears
+        // at its post, which is exactly what the other five pockets do. The
+        // doorway is the fiction, not the mechanism.
+        const float MouthOutward = FMath::Max(Courtyard.EntranceFloorStart + 200.0f, 300.0f);
+        const FVector MouthAbove = Courtyard.At(MouthOutward, 0.0f, 400.0f);
+        FHitResult MouthFloor;
+        FCollisionQueryParams MouthQuery(SCENE_QUERY_STAT(CourtyardArrivalFloor), false);
+        const bool bMouth = World->LineTraceSingleByObjectType(MouthFloor, MouthAbove,
+            MouthAbove - FVector(0.0f, 0.0f, 900.0f), FCollisionObjectQueryParams(ECC_WorldStatic), MouthQuery)
+            && MouthFloor.ImpactNormal.Z >= 0.7f;
+
+        for (int32 Index = 0; Index < Placed.Num(); ++Index)
+        {
+            ABreakerEnemy* Body = Placed[Index];
+            if (!IsValid(Body)) continue;
+            const UCapsuleComponent* Capsule = Body->FindComponentByClass<UCapsuleComponent>();
+            FBreakerOutdoorSlot& Slot = OutdoorSlots.AddDefaulted_GetRef();
+            Slot.Class = Body->GetClass();
+            Slot.Home = Body->GetActorLocation();
+            Slot.Facing = Body->GetActorRotation();
+            // The phase the encounter itself hands each body as it places them,
+            // so a returning patrol keeps its own leg of the formation's sweep
+            // rather than falling in step with the rest of the pocket.
+            Slot.PatrolPhase = Index * 1.3f;
+            Slot.AreaLevel = UBreakerZoneBuilder::FernhallRiftFor(NAME_None).EffectiveAreaLevel();
+            Slot.PocketTag = TEXT("Fernhall.Outdoor.Courtyard");
+            Slot.Occupant = Body;
+            if (bMouth && Capsule)
+            {
+                Slot.Arrival = MouthFloor.ImpactPoint
+                    + FVector(0.0f, 0.0f, Capsule->GetScaledCapsuleHalfHeight() + 2.0f);
+                Slot.bHasArrival = true;
+            }
+        }
+        UE_LOG(LogTemp, Display,
+            TEXT("[Fernhall] courtyard registered %d repopulation slots%s."),
+            Placed.Num(), bMouth ? TEXT(", arriving through the bay doorway") : TEXT(" (no doorway floor; arriving at post)"));
+    }
+    else
+    {
+        UE_LOG(LogTemp, Display, TEXT("[Fernhall] no courtyard: %s"), *CourtyardError);
+    }
 }
 void ABreakerGameMode::StartNextWave()
 {

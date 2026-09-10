@@ -535,8 +535,28 @@ private:
         FRotator Facing = FRotator::ZeroRotator;
         float PatrolPhase = 0.0f;
         int32 AreaLevel = 1;
-        int32 Pocket = INDEX_NONE;
+        // The tag the authored placement gave this body, carried rather than
+        // re-derived. It used to be an int the refill printed back into
+        // "Fernhall.Outdoor.%d", which cannot express the courtyard's own
+        // "Fernhall.Outdoor.Courtyard" — a returning body would have been
+        // tagged for a pocket that does not exist and dropped out of every
+        // consumer that reads the tag.
+        FName PocketTag;
         bool bElite = false;
+        // WHERE A RETURNING BODY COMES FROM, when the pocket has somewhere for
+        // one to come from. Unset for the five yard pockets: there is nothing
+        // to arrive out of there, so a body still appears at its post, which is
+        // what O268 already ships. The courtyard has an authored doorway, so a
+        // patrol returning to it walks OUT of the bay and to its post instead
+        // of resolving into existence standing on it.
+        FVector Arrival = FVector::ZeroVector;
+        bool bHasArrival = false;
+        // Where the body will actually APPEAR. The clearance gate reads this
+        // rather than Home, because "arrived already hunting" is decided where
+        // it materialises: a slot whose post is far away but whose doorway is
+        // at the player's shoulder must still be refused. The walk from the
+        // doorway to the post is the part the player is supposed to see.
+        FVector AppearsAt() const { return bHasArrival ? Arrival : Home; }
         // The body standing in it, or nothing. A slot is empty when its
         // occupant is gone OR dead: a corpse still lying in the pocket has
         // already stopped being a fight.
