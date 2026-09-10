@@ -1,14 +1,33 @@
 # Desk — next playtest
 
-## READ `.claude/FEEL.md` FIRST
+## THE FEEL REVIEW ARRIVES AS A MESSAGE, NOT A FILE
 
-It is the owner's felt review of the seven experiences he is sharpening: first
-five minutes, Fernhall combat, first transformative drop, quests, first rift,
-rift completion, quit and return. The lowest-scoring beat that names a
-one-thing is the next cycle's work, and it OUTRANKS everything in this file.
+The owner sends it after playing. The lowest-scoring beat that names a
+one-thing is the next cycle's work and it OUTRANKS everything in this file:
+this desk is the QUEUE, that message is the DIRECTION.
 
-This desk is the queue. That file is the direction. A queue item never beats a
-red beat.
+The seven beats and what each is trying to do — kept here because the seat
+needs the target to read a score, not because anyone maintains a form. These
+are drafted from Docs/VISION.md and the owner overturns any of them in a
+sentence; a wrong target misdirects every cycle that trusts it.
+
+1. FIRST 5 MINUTES — you know what you are, what you are holding and where to
+   go without being taught, and moving is fun before anything else is.
+2. FERNHALL COMBAT — the pack makes you MOVE, danger reads off silhouette, and
+   a kill feels like your gun and kit doing work.
+3. FIRST TRANSFORMATIVE DROP — it changes how you PLAY and you can tell without
+   reading a number. A build that changes nothing observable is not a build.
+4. QUESTS — you always know the next thing and why, and handing one in pays
+   rather than merely ending.
+5. FIRST RIFT — somewhere hostile and foreign running different rules, not the
+   same ground with a filter on it.
+6. RIFT COMPLETION — lands as something achieved and pays for it. The fiction's
+   weight is deliberately unspoken, so the payoff carries the moment alone.
+7. QUIT AND RETURN — immediately re-oriented, nothing to re-learn.
+
+Scored against the TARGET, not against a finished game. 1 bad, 3 inert,
+5 would show someone. THREE IS THE DANGEROUS ONE — not broken and not doing
+anything is how a slice ends up correct and dead.
 
 
 ## OWNER PLAYTEST, 2026-09-10 — READ THIS BEFORE PLANNING ANYTHING
