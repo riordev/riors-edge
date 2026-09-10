@@ -1,30 +1,39 @@
 # Desk — next playtest
 
-## TWO ABILITY TESTS ARE ORDER-DEPENDENT — THE SUITE'S GREEN IS PARTLY LUCK
+## THE FLAKY ABILITY TESTS ARE FIXED, AND IT WAS NEVER TEST ORDER
 
-`RiorsEdge.Abilities.MultispellPurchasedRuntime` and
-`.CleaveAcceptedHitRuntime` pass or fail depending on what ran before them.
-PROVEN, not suspected: Cleave passes alone and fails in the full suite;
-Multispell fails alone and PASSED in the full suite at e1ac97f5. Stashing all
-working changes and re-running at HEAD still fails Multispell, so it is not
-anything a recent commit did.
+THE DIAGNOSIS ON THIS DESK WAS WRONG. It read as order-dependence because a
+test passed alone and failed in the suite; it was a 5% COIN FLIP, and a longer
+run simply flips the coin more often. Three different tests were failing on it
+across four runs, which is what finally gave it away.
 
-Multispell's shape: it measures a detonation with the MS8 rewrite unpurchased,
-then again purchased, and asserts the two are EQUAL. They come out 405 and 270
-— exactly 3:2 — which is the ratio of three live status types to two. So one of
-the two runs sees a status the other does not, and which one depends on
-timing. Rot's cast time moves it (0.6 -> 0.45 flips the failure), which is why
-Rot's cast is pinned at 0.6 and marked do-not-touch until this is understood.
+THE MECHANISM, measured rather than reasoned: UBreakerAttributeSet's default
+critical chance is 0.05, and three fixtures compared damage figures that a
+critical multiplies by 1.5.
 
-WHY IT MATTERS MORE THAN THE TESTS: every "878 passing, 0 unexpected" in this
-session's commit messages is weaker than it reads, and one of them —
-286f1e68 — is simply WRONG: that run was 877 with this test red, and the
-message claims 0. The claim is corrected here rather than by rewriting a
-pushed commit.
+- MultispellPurchasedRuntime asserts two detonations are EQUAL. One critting
+  made them 405 and 270 — exactly the 1.5x, which is why the ratio looked like
+  three status types against two and sent this desk after a status bug.
+- SnapshotDisciplineRuntime asserts Cleave pays its quoted 15 Mana. A probe
+  printed the truth: the swing leaves the victim on 26.6 of 100, so a critical
+  KILLS it, a kill pays the Caster class resource back, and the spend reads 11.
+- CleaveAcceptedHitRuntime asserts both accepted hits carry Bleed. A critical
+  makes the swing lethal, and the file's own next branch says a lethal hit
+  cannot carry Bleed.
 
-FIX IT BEFORE TRUSTING A GREEN AGAIN. Likeliest cause is shared state between
-runtime fixtures — a static, an injected account save, or a library cache that
-one test leaves warm for the next.
+FIXED BY ZEROING THE CASTER'S CRITICAL CHANCE in those three fixtures. None of
+the three assertions is about criticals; SnapshotDiscipline still exercises them
+fully, because what it asserts is the PRODUCER's +25 percentage points and that
+one sample is recorded and reused, and those read from the base it is given.
+
+A WRONG FIX WORTH REMEMBERING: raising the targets' health for headroom made
+CleaveAcceptedHit fail CONSTANTLY instead. A fixture cannot just set MaxHealth —
+the pool is re-derived and snaps back to 100, so the assertion then compared
+10,000 against 100. Critical chance is read straight off the attributes at cast
+time and does stay put.
+
+Five consecutive RiorsEdge.Abilities runs clean, then a full suite: 880 passing,
+3 expected red, 0 unexpected. Rot's cast time is no longer pinned by this.
 
 ## THE FEEL REVIEW ARRIVES AS A MESSAGE, NOT A FILE
 

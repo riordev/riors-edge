@@ -86,6 +86,20 @@ bool FBreakerCleaveAcceptedHitRuntimeTest::RunTest(const FString& Parameters)
             // even starts swinging has lapsed by the time the arc lands. The
             // player reacts to the wind-up, so the fixture does too.
         }
+        // NO CRITICALS FROM THIS CASTER, AND THE FLAKE IS WHY. At the shipped
+        // 100 health this Cleave leaves a target low enough that the 5%
+        // critical multiplying the hit by 1.5 KILLS it — and a lethal hit
+        // cannot carry Bleed, which is the very thing scenario 0 asserts. It
+        // failed about one run in three on a coin nobody meant to flip.
+        //
+        // THE DIAL AND NOT THE HEALTH, because health does not stay where a
+        // fixture puts it: raising the targets to 10,000 made the failure
+        // CONSTANT instead of fixing it — the pool is re-derived and snapped
+        // back to 100, so "prevents health damage" then compared 10,000 with
+        // 100. Critical chance is read straight off the caster's attributes at
+        // cast time and stays where it is put. Lethality is scenario 4's
+        // subject and it still sets it explicitly below.
+        Caster->GetAttributes()->SetCriticalChance(0.0f);
         if (Scenario == 4) Front->GetAttributes()->ApplyHealth(1);
         auto* ASC = Caster->GetAbilitySystemComponent();
         const auto Handle = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Cleave::StaticClass(), 1));

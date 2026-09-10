@@ -91,17 +91,32 @@ bool FBreakerSnapshotDisciplineRuntimeTest::RunTest(const FString& Parameters)
     Victim->SetActorTickEnabled(false);Victim->GetBreakerMovement()->SetComponentTickEnabled(false);
     auto* VictimASC=Victim->GetAbilitySystemComponent();VictimASC->InitAbilityActorInfo(Victim,Victim);VictimASC->AddAttributeSetSubobject(Victim->GetAttributes());
     Victim->GetCombat()->BindAttributes(Victim->GetAttributes());Victim->GetCombat()->BeginPlay();
+    // NO BASE CRITICAL FROM THIS CASTER, AND THE FLAKE IS WHY. At the shipped
+    // 100 health this Cleave leaves the victim on 26.6, so the 5% critical that
+    // multiplies the hit by 1.5 KILLS it — and a kill pays the Caster class
+    // resource back, so the mana assertion below read 11 spent instead of 15
+    // about one run in twenty. Measured, not guessed: the probe line prints
+    // both numbers.
+    //
+    // THIS TEST STILL EXERCISES CRITICALS. What it asserts is the PRODUCER's
+    // +25 percentage points and that one sample is recorded and reused; those
+    // read from OriginalChance, so a zero base makes the producer 0.25 and
+    // every assertion below still means what it meant.
     auto* VictimStatus=Victim->FindComponentByClass<UBreakerStatusComponent>();if(!VictimStatus)return false;
     VictimStatus->BeginPlay();VictimStatus->SetComponentTickEnabled(false);
     auto* Abilities=Player->GetAbilities();
     if(!Abilities->TryEquipAbility(EBreakerAbilitySlot::ClassAbilityOne,TEXT("Caster.Cleave"),Reason))return false;
     Abilities->RefreshGrants();
+    Attributes->SetCriticalChance(0.0f);   // see the note above the victim
     const float OriginalChance=Attributes->GetCriticalChance();
     const float BeforeMana=Player->GetMana()->GetMana();
     const float QuotedCost=Abilities->GetResourceCostForSlot(EBreakerAbilitySlot::ClassAbilityOne);
     if(!TestTrue(TEXT("Normal equipped starter Cleave activates"),Abilities->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityOne)))return false;
         // O266: the swing lands at the END of its wind-up, not on the press.
         Clock(BreakerAuthoredCastSeconds(TEXT("Caster.Cleave"))+.05f);
+    AddInfo(FString::Printf(TEXT("SNAPSHOT PROBE  mana %.2f -> %.2f (quoted %.2f); victim %.1f of %.1f; crit chance %.3f"),
+        BeforeMana, Player->GetMana()->GetMana(), QuotedCost,
+        Victim->GetAttributes()->GetHealth(), Victim->GetAttributes()->GetMaxHealth(), OriginalChance));
     TestEqual(TEXT("Cleave pays its actual quoted Mana"),BeforeMana-Player->GetMana()->GetMana(),QuotedCost,.001f);
     const auto* NativeBleed=VictimStatus->GetActiveStatuses().FindByPredicate([](const FBreakerActiveStatus& Entry)
         {return Entry.Spec.StatusTag==FGameplayTag::RequestGameplayTag(TEXT("Status.Bleed"));});

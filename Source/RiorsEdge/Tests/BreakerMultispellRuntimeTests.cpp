@@ -76,6 +76,15 @@ bool FBreakerMultispellPurchasedRuntimeTest::RunTest(const FString& Parameters)
     ASC->InitAbilityActorInfo(Caster, Caster);
     ASC->AddAttributeSetSubobject(Caster->GetAttributes());
     Caster->GetCombat()->BindAttributes(Caster->GetAttributes());
+    // NO CRITICALS IN THIS FIXTURE, AND THE FLAKE IS WHY. The shipped default
+    // critical chance is 5%, and this test compares two detonations for
+    // EQUALITY — so one of them critting made the pair differ by exactly 1.5x
+    // and the test failed about one run in ten, on a different test each time
+    // as the same coin was flipped elsewhere. The rewrite rule being proved
+    // here has nothing to do with criticals; leaving them in was measuring the
+    // dice. Critical behaviour has its own coverage in
+    // RiorsEdge.Abilities.Caster.SnapshotDisciplineRuntime.
+    Caster->GetAttributes()->SetCriticalChance(0.0f);
     UBreakerProgressionComponent* Progression = Caster->GetProgression();
     TestTrue(TEXT("caster class chosen"), Progression->ChoosePermanentClassById(EBreakerClassId::Caster));
     // Provision only this transient fixture. This tests purchased effects, not
@@ -190,11 +199,15 @@ bool FBreakerMultispellPurchasedRuntimeTest::RunTest(const FString& Parameters)
     if (!EarnRot()) return false;
     Caster->GetAttributes()->ApplyClassResource(100.0f);
     const float BeforeBurst = Attributes->GetHealth();
+    AddInfo(FString::Printf(TEXT("MULTISPELL PROBE  baseline enters detonation with %d types, %d active"),
+        Status->GetDistinctStatusTypeCount(), Status->GetActiveStatuses().Num()));
     TestTrue(TEXT("baseline Resonance activates"), ASC->TryActivateAbility(Resonance));
     BreakerResolvePendingCast(World, Caster);
     TestEqual(TEXT("baseline consumes statuses"), Status->GetDistinctStatusTypeCount(), 0);
     TestTrue(TEXT("baseline burst deals damage"), Attributes->GetHealth() < BeforeBurst);
     const float BaselineDetonationDamage = BeforeBurst - Attributes->GetHealth();
+    AddInfo(FString::Printf(TEXT("MULTISPELL PROBE  baseline detonation %.2f, resonance cast %.3fs"),
+        BaselineDetonationDamage, BreakerAuthoredCastSeconds(TEXT("Caster.Resonance"))));
     TestFalse(TEXT("normal consumption removes earned Rot"), Status->HasStatus(RotTag));
     const float AfterConsumption = Attributes->GetHealth();
     Status->AdvanceStatuses(10);
@@ -215,6 +228,8 @@ bool FBreakerMultispellPurchasedRuntimeTest::RunTest(const FString& Parameters)
     BreakerResolvePendingCast(World, Caster);
     if (!TestEqual(TEXT("purchased Resonance preserves physical types and earned Rot"), Status->GetDistinctStatusTypeCount(), 3)) return false;
     TestEqual(TEXT("surviving status duration is halved"), Status->GetActiveStatuses()[0].RemainingDuration, DurationBefore * 0.5f);
+    AddInfo(FString::Printf(TEXT("MULTISPELL PROBE  rewrite detonation %.2f against baseline %.2f"),
+        BeforeRewriteBurst - Attributes->GetHealth(), BaselineDetonationDamage));
     TestEqual(TEXT("rewrite retains the same detonation damage"), BeforeRewriteBurst - Attributes->GetHealth(),
         BaselineDetonationDamage, 0.01f);
     const auto* RotAfter = Status->GetActiveStatuses().FindByPredicate([RotTag](const auto& Active) { return Active.Spec.StatusTag == RotTag; });
