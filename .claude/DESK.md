@@ -38,9 +38,22 @@ LANDED FROM IT ALREADY:
   primitives by ruling and has no named body to rock.
 
 STILL OPEN FROM IT, IN HIS WORDS:
-- "theres absolutely no shape to fernhall at all just the main opened portion".
-  THE BIGGEST ONE. Three yards of flat ground with cover on it is not shape.
-  Wants verticality, structures, enclosure — a composer job.
+- "theres absolutely no shape to fernhall at all" — FIRST PASS LANDED, HEIGHT
+  RATHER THAN ENCLOSURE. Every yard now carries two raised decks on opposite
+  flanks, each with its own stair, one running on into a catwalk: a place to
+  look down FROM, a covered place to walk UNDER, and a reason to leave the lane
+  that is not another box. Authored once as shape_pass() and instanced in all
+  three yards. 167 -> 275 pieces; every cover measurement unmoved, by
+  construction rather than luck — decks and stairs are flr_ (collision, not
+  cover) and piers and rails are dress_ (neither).
+  OWNER RULING OWED, AND IT IS PROBABLY THE REAL CAUSE OF THE FLATNESS: alleys
+  and rooms were the other obvious answer and they are BARRED by the cover
+  grammar's dash-corridor floor, which demands 16 m of clear ground between any
+  two full-height clusters. An alley is 6 to 8. That floor is a ruled number
+  and relaxing it for interior structures is his call — routing around it by
+  picking a prefix the measurement does not look at would be gaming the rule.
+  NOT ACCEPTED: photographed, not played. Whether a deck is somewhere worth
+  standing is his.
 - "i havent seen any chest" — MEASURED AND ANSWERED. Replaying his own session
   seed put four of six chests 14 to 19 metres off a lane the player walks down
   the middle of. The spread is RIGHT: being off the lane is the reward for

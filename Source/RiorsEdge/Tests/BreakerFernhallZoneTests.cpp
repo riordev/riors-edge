@@ -114,10 +114,11 @@ bool FBreakerFernhallPieceContractTest::RunTest(const FString& Parameters)
     // this file disagree about what the zone IS, and re-authoring both is the
     // deliberate act rather than the accident.
     //
-    // 113 -> 167 when the DEPOT landed. The per-yard figures did not move by
+    // 113 -> 167 with the DEPOT, 167 -> 275 with the shape pass (two raised
+    // decks, a catwalk, their stairs and their dressing, in each of the three). The per-yard figures did not move by
     // one, which is the point: a third yard authored from the validated frame
     // rather than by eye reproduces the lattice exactly.
-    TestEqual(TEXT("imported piece count"), Pieces.Num(), 167);
+    TestEqual(TEXT("imported piece count"), Pieces.Num(), 275);
 
     const TArray<FBreakerZoneField> Zone = UBreakerZoneBuilder::BuildZoneFields(Pieces, Markers);
     TestEqual(TEXT("the zone has three yards"), Zone.Num(), 3);

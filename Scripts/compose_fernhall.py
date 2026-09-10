@@ -273,6 +273,87 @@ for i, fwd in enumerate((19.0, 34.0, 49.0, 64.0, 79.0)):
 for i, (fwd, dz) in enumerate(((26.0, 17.0), (26.0, -17.0), (56.0, 17.0), (56.0, -17.0), (80.0, 17.0), (83.0, -18.0))):
     place("blk_full_dep_break%02d" % i, "full", (DEP_ANCHOR + fwd, 0.0, DEP_Z + dz), (3.0, 4.0, 3.0))
 
+# ---- SHAPE: THE YARDS STOP BEING FLAT ---------------------------------------
+# Owner: "theres absolutely no shape to fernhall at all just the main opened
+# portion". He is right, and the reason is structural rather than decorative:
+# every yard is one 106 x 56 m slab with cover standing on it, so however much
+# cover goes down it is still a rectangle you cross.
+#
+# WHAT IS ADDED IS HEIGHT, NOT MORE COVER. Two raised decks per yard on
+# opposite flanks, each with its own stair up and one of them running on into a
+# catwalk over the flank. That gives a yard three things it did not have: a
+# place to look down FROM, a place that is covered to walk UNDER, and a reason
+# to leave the lane that is not just "there is a box over there".
+#
+# WHY NOT ALLEYS AND ROOMS, which is the other obvious answer: the cover
+# grammar's dash-corridor floor requires 16 m of clear ground between any two
+# full-height clusters, and an alley is 6 to 8. That floor is very probably a
+# cause of the flatness he is describing, but it is a RULED number and
+# relaxing it is the owner's call, not a thing to route around by picking a
+# prefix the measurement does not look at. Recorded on the desk instead.
+#
+# EVERY DECK IS flr_ AND EVERY SUPPORT IS dress_. Floors carry collision, so a
+# deck is walkable and a stair is climbable; dressing carries none, so the
+# piers and rails cost the fight nothing and the space under a deck stays open
+# to walk through. Nothing here is blk_*, so the cover grammar is untouched by
+# construction rather than by luck.
+#
+# LATERALLY OUTBOARD OF EVERY POCKET, deliberately. The furthest a pocket sits
+# off the lane is 15 m and its formation spreads 3 m either side, so 19 m is
+# the first line where a structure cannot land on top of a fight. All O2
+# PLACEHOLDER.
+DECK_HEIGHT = 3.4
+CATWALK_HEIGHT = 3.4
+FAR_DECK_HEIGHT = 4.6
+STEP_RISE = 0.85
+
+def shape_pass(tag, anchor_x, centre_z):
+    """One yard's verticality, authored once in the yard's own frame and
+    instanced three times. fwd runs down the lane from the yard's anchor; lat
+    is across it, positive toward +z. The entry yard, the substation and the
+    depot all face +x, so the frame is a translation."""
+    def at(fwd, lat, height=0.0):
+        return (anchor_x + fwd, height, centre_z + lat)
+
+    # --- The near deck, on the +lat flank -----------------------------------
+    place("flr_%s_deck" % tag, "pavement", at(35.0, 23.0, DECK_HEIGHT), (18.0, 0.4, 8.0))
+    # Piers, so the deck is a structure rather than a slab hanging in the air.
+    for i, fwd in enumerate((27.5, 35.0, 42.5)):
+        for j, lat in enumerate((19.8, 26.2)):
+            place("dress_%s_pier%d%d" % (tag, i, j), "bldg_c", at(fwd, lat), (0.7, DECK_HEIGHT, 0.7))
+    # The stair up: four flat treads rather than a ramp. A leaned slab would
+    # have to survive place()'s bounding-box rescale, and a tread cannot be
+    # walked up wrong.
+    for i in range(4):
+        place("flr_%s_step%d" % (tag, i), "pavement",
+              at(23.0 + i * 2.6, 23.0, STEP_RISE * (i + 1)), (2.6, 0.35, 5.0))
+    # A rail along the open edge, so the drop reads before it is stepped off.
+    for i, fwd in enumerate((28.0, 34.0, 40.0)):
+        place("dress_%s_rail%d" % (tag, i), "chest", at(fwd, 19.2, DECK_HEIGHT + 0.4), (5.6, 0.9, 0.2))
+
+    # --- The catwalk, running on down the flank -----------------------------
+    place("flr_%s_catwalk" % tag, "pavement", at(54.0, 23.0, CATWALK_HEIGHT), (20.0, 0.4, 4.0))
+    for i, fwd in enumerate((48.0, 54.0, 60.0)):
+        place("dress_%s_cwpier%d" % (tag, i), "bldg_c", at(fwd, 23.0), (0.6, CATWALK_HEIGHT, 0.6))
+        place("dress_%s_cwrail%d" % (tag, i), "chest", at(fwd, 21.2, CATWALK_HEIGHT + 0.4), (5.6, 0.9, 0.2))
+
+    # --- The far deck, higher and on the opposite flank ---------------------
+    # Higher on purpose: two identical platforms are one platform twice, and
+    # the yard should have a best position rather than a mirrored pair.
+    place("flr_%s_fardeck" % tag, "pavement", at(62.0, -23.0, FAR_DECK_HEIGHT), (16.0, 0.4, 8.0))
+    for i, fwd in enumerate((55.5, 62.0, 68.5)):
+        for j, lat in enumerate((-19.8, -26.2)):
+            place("dress_%s_fpier%d%d" % (tag, i, j), "bldg_c", at(fwd, lat), (0.7, FAR_DECK_HEIGHT, 0.7))
+    for i in range(5):
+        place("flr_%s_fstep%d" % (tag, i), "pavement",
+              at(50.0 + i * 2.6, -23.0, STEP_RISE * (i + 1)), (2.6, 0.35, 5.0))
+    for i, fwd in enumerate((56.0, 62.0, 68.0)):
+        place("dress_%s_frail%d" % (tag, i), "chest", at(fwd, -19.2, FAR_DECK_HEIGHT + 0.4), (5.6, 0.9, 0.2))
+
+shape_pass("entry", 6.0, 0.0)
+shape_pass("sub", SUB_ANCHOR, SUB_Z)
+shape_pass("dep", DEP_ANCHOR, DEP_Z)
+
 # ---- Markers ----------------------------------------------------------------
 # THE NAME CARRIES A ROLE AND A YARD, and this is the authoring side of a
 # contract with two readers — BreakerZoneBuilder::ParseMarkerName and
