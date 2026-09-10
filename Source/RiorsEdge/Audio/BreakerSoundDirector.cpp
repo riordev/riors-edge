@@ -290,8 +290,10 @@ void ABreakerSoundDirector::PlayAbilityCast(FName AbilityId)
 
 void ABreakerSoundDirector::PlayWeaponFire(EBreakerWeaponArchetype Archetype)
 {
-    // Resolve the override once per archetype; a key present with a NULL wave
-    // is the "probed, none authored" sentinel, exactly as the ability cue does.
+    // Resolve the voice once per archetype and keep it. Every archetype now
+    // resolves to a sound of its own: an authored .wav if one is there, and
+    // otherwise its synthesized voice. The null sentinel this map used to hold
+    // is gone, because "none authored" no longer means "play the shared one".
     USoundWaveProcedural* Wave = FireWave;
     const TArray<int16>* Pcm = &FirePcm;
 
@@ -325,15 +327,28 @@ void ABreakerSoundDirector::PlayWeaponFire(EBreakerWeaponArchetype Archetype)
         }
         else
         {
-            // LOGGED, unlike the ability miss, and once per archetype per
-            // session. The four fixed verbs already log which path they took
-            // because "a silent fallback is visible in any run's log" is this
-            // file's rule; the same rule makes the naming convention
-            // DISCOVERABLE — the owner authoring gun audio reads the exact
-            // filename the game is looking for instead of guessing it.
-            UE_LOG(LogTemp, Log, TEXT("[BreakerSound] %s absent — %s fires the shared default."),
-                *FileName, *BreakerWeaponArchetypeNames::Display(Archetype));
-            ArchetypeFireWaves.Add(Archetype, nullptr);
+            // NO AUTHORED FILE IS NOT NO SOUND ANY MORE. This branch used to
+            // store a null sentinel and let every archetype fall back to the
+            // one shared render, which is exactly what the owner heard: "my gun
+            // sounds like a nerf gun" and "i dont know what weapon is in my
+            // hand" are the same finding, and the second one is the worse of
+            // the two. Eight guns played one sound.
+            //
+            // So the fallback is now SYNTHESIZED PER ARCHETYPE from
+            // BreakerSound::FireVoiceFor, and an authored .wav still overrides
+            // it the moment one is dropped in. The naming convention stays
+            // discoverable the same way: the log names the file it looked for.
+            TArray<int16> Rendered;
+            BreakerSound::RenderArchetypeFire(Rendered, Archetype);
+            TArray<int16>& Stored = ArchetypeFirePcm.Add(Archetype, MoveTemp(Rendered));
+            USoundWaveProcedural* Synth = MakeWave(BreakerSound::SampleRate);
+            ArchetypeFireWaves.Add(Archetype, Synth);
+            UE_LOG(LogTemp, Log,
+                TEXT("[BreakerSound] %s not authored; %s uses its synthesized voice (%.2fs)."),
+                *FileName, *BreakerWeaponArchetypeNames::Display(Archetype),
+                BreakerSound::FireVoiceFor(Archetype).DurationSeconds);
+            Wave = Synth;
+            Pcm = &Stored;
         }
     }
 

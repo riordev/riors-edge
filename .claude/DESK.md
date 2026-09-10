@@ -219,6 +219,29 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 ## Known issues to time-box
 
 - WARDEN WALK-THROUGH: FIXED, and the parked fixture was never the obstacle. The arrival ring lived in exactly one place, ABreakerEnemy::TickEngagedBehaviour, and ABreakerWardenEnemy::TickEngagedBehaviour replaces that function WHOLESALE without ever calling Super — so it wrote a full-speed vector straight at the player and fell off the end of the function with it intact whenever neither attack was armed. Nothing downstream re-added spacing, by design: the mover has no stop distance while steering because the ring "is always the behaviour's to govern, never the path's". The pass-through is the project's own recorded consequence of the player being a Pawn. The ring is now an extracted method every closing archetype CALLS rather than inherits, so an override cannot silently drop it. Base behaviour is bit-identical; only the Warden changes. Verified: the Boss is the sole override that calls Super, and ArrivalBand is written in exactly one statement, so no fourth class was affected. THE WIRING PIN IS NOW LANDED (RiorsEdge.Combat.Warden.ArrivalRingRuntime) AND THE RECORDED ANSWER WAS WRONG: a bare AActor can never be the target, because IsEligibleThreatTarget (BreakerEnemy.cpp:851) refuses anything that is not an ABreakerCharacter or an ABreakerDeployable with a live combat component, so it is never SELECTED and the engaged tick never runs against it. ResolveSweep/ResolveSlam bailing is true and irrelevant. The fixture uses a real character at its shipped 100 health and grants it nothing: neither attack is ever armed, because the approach leg runs entirely outside SlamRadiusCm (650) and asserts both that it stayed there and that the health is untouched. Leg order is load-bearing — closing inside slam radius arms a 0.9s wind-up that plants the body on every later frame. FIXED AT THE SITE AND DELIBERATELY NOT PINNED: the same override wrote StateLabel = ADVANCE AFTER the ring call, clobbering the ring's own ATTACK/BACK OFF, so a Warden holding station or backing off printed ADVANCE on the playtest HUD. The label now precedes the call as the base chase does; the state is reachable only with both attacks on cooldown, which a damage-free fixture cannot reach.
+- WEAPON SOUND PASS, PER ARCHETYPE: LANDED. Owner-authorised, and the desk's
+  framing was half wrong: the per-archetype ROUTE already shipped
+  (ABreakerSoundDirector::PlayWeaponFire, ArchetypeFireWaves), it just resolved
+  to an authored .wav per archetype and none is authored — so all eight fell
+  back to one shared render. "my gun sounds like a nerf gun" and "i dont know
+  what weapon is in my hand" are the same finding, and the second is worse.
+  Eight voices now, synthesized: a Sidearm short and bright, a Sniper a hard
+  crack with a long tail, a Shotgun mostly body, a Rocket nearly all rush, the
+  three rifles close to each other and far from those. THE RIFLE IS UNMOVED on
+  purpose — it is the gun the owner has held through every playtest.
+  TWO NOISE COLOURS, both memoryless because every sample must stay a pure
+  function of its index or the determinism the whole header rests on breaks: a
+  first difference (a 6 dB/octave high-pass) for the crack, a quarter-rate
+  interpolation for the body and the room. Measured: 2670 crossings against 481
+  over the same window.
+  A REAL DEFECT FOUND BY MEASUREMENT: the shared envelope's release reached
+  zero AT the duration, but the last rendered sample sits one sample short of
+  it — so a loud enough cue ended on 1 instead of 0, which is a click on every
+  shot. The Machinegun was the first voice loud enough at that instant to show
+  it. Fixed in Envelope, which affects every cue in the game.
+  NOT ACCEPTED: nobody has heard any of this. An automated run can prove eight
+  reports differ in length, weight and colour, and can prove none clicks or
+  clips; it cannot prove one sounds like a gun.
 - RIFT DEBRIEF: LANDED. Owner-asked, "i really like the entering rift screen so
   maybe when a rift is closed we can add something very similar that shows the
   items we gained ... kinda like a loot highlight". Built as the BRIEFING'S

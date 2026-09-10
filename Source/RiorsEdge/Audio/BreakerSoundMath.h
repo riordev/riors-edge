@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Weapons/BreakerWeaponArchetype.h"
 
 // ---------------------------------------------------------------------------
 // The placeholder sounds, SYNTHESIZED. Pure, header-inline, no world,
@@ -66,6 +67,15 @@ namespace BreakerSound
         if (T < 0.0f || T >= DurationSeconds) return 0.0f;
         const float Attack = FMath::Min(T / 0.002f, 1.0f);
         const float Remaining = DurationSeconds - T;
+        // THE RELEASE HAS TO REACH ZERO AT THE LAST SAMPLE, not at the
+        // duration. The last rendered index sits one sample SHORT of the
+        // duration, so a fade that only arrives at the duration leaves a small
+        // nonzero value there — and for a loud enough cue that value quantizes
+        // to 1 rather than 0, which is a click on every shot. Found by
+        // measurement: the Machinegun's voice was the first one loud enough at
+        // that instant for it to show.
+        constexpr float LastSample = 1.0f / SampleRate;
+        if (Remaining <= LastSample) return 0.0f;
         const float Release = FMath::Min(Remaining / 0.010f, 1.0f);
         return Attack * Release * FMath::Exp(-T * DecayRate);
     }
@@ -73,14 +83,178 @@ namespace BreakerSound
     // WEAPON FIRE: a noise burst over a falling body tone — the crack and the
     // thump of a report, in that order of weight. Gain 0.5 leaves headroom
     // for the hit and kill sounds to land on top of sustained fire.
-    inline float WeaponFireSample(int32 Index)
+    // ---- A GUN THAT SOUNDS LIKE ITSELF ----------------------------------
+    // Owner: "my gun sounds like a nerf gun", and "i dont know what weapon is
+    // in my hand". Both are the same finding from two directions: every one of
+    // the eight archetypes played the IDENTICAL burst above. The per-archetype
+    // route already existed in ABreakerSoundDirector - it just resolved to an
+    // authored .wav per archetype, none is authored, and so all eight fell
+    // back to the one shared render.
+    //
+    // TWO NOISE COLOURS, BOTH MEMORYLESS. A real report is a bright crack over
+    // a dark thump, and a one-pole filter cannot be used here: every sample has
+    // to be a pure function of its index or the determinism test that makes
+    // this whole header defensible stops holding. So the colour comes from the
+    // hash's own rate instead.
+    //
+    //   BrightNoise is a first DIFFERENCE of the noise, which is a 6 dB/octave
+    //   high-pass: the snap of the round leaving the barrel.
+    //   DarkNoise samples the hash a quarter as often and interpolates between,
+    //   which is noise two octaves down: the body of the blast and the room.
+    //
+    // Nothing here is mastered and nothing here is final. Every figure is O2
+    // PLACEHOLDER; what is authored is the SHAPE of the differences, which is
+    // the part a player hears as "that is the shotgun".
+    inline float BrightNoise(uint32 Index)
+    {
+        return 0.5f * (NoiseAt(Index) - NoiseAt(Index - 1));
+    }
+
+    inline float DarkNoise(uint32 Index)
+    {
+        const uint32 Coarse = Index / 4;
+        const float Blend = static_cast<float>(Index % 4) * 0.25f;
+        return FMath::Lerp(NoiseAt(Coarse), NoiseAt(Coarse + 1), Blend);
+    }
+
+    // What separates one gun from another, as numbers rather than as eight
+    // hand-written functions: eight bespoke renders would drift the moment one
+    // was retuned, and nothing could assert that they still differed.
+    struct FFireVoice
+    {
+        float DurationSeconds = FireDurationSeconds;
+        // The snap. A high decay is a crack; a low one is a roar.
+        float CrackDecay = 55.0f;
+        float CrackGain = 0.65f;
+        // The thump under it, and how far it falls while it sounds.
+        float BodyStartHz = 160.0f;
+        float BodyFallHz = 400.0f;
+        float BodyDecay = 30.0f;
+        float BodyGain = 0.35f;
+        // The room answering: dark noise on its own slow decay. This is what
+        // makes a big gun sound big and a small one sound close.
+        float TailDecay = 22.0f;
+        float TailGain = 0.0f;
+        float Gain = 0.5f;
+    };
+
+    // THE EIGHT VOICES. Read them as a set rather than one at a time: what is
+    // authored is that a Sidearm is short and bright, a Sniper is a hard crack
+    // with a long tail, a Shotgun is mostly body, a Rocket is nearly all tail,
+    // and the three rifles differ from each other by far less than any of them
+    // differs from those. All O2 PLACEHOLDER.
+    inline FFireVoice FireVoiceFor(EBreakerWeaponArchetype Archetype)
+    {
+        FFireVoice Voice;
+        switch (Archetype)
+        {
+        case EBreakerWeaponArchetype::SMG:
+            // Fast and small: almost no body, and short enough that sustained
+            // fire reads as a rattle rather than as overlapping reports.
+            Voice.DurationSeconds = 0.09f;
+            Voice.CrackDecay = 80.0f; Voice.CrackGain = 0.78f;
+            Voice.BodyStartHz = 210.0f; Voice.BodyFallHz = 520.0f;
+            Voice.BodyDecay = 46.0f;    Voice.BodyGain = 0.22f;
+            Voice.TailGain = 0.06f;     Voice.Gain = 0.42f;
+            break;
+        case EBreakerWeaponArchetype::Sidearm:
+            // The smallest thing in the game, and it should sound like it:
+            // brightest crack, least body, shortest of all.
+            Voice.DurationSeconds = 0.08f;
+            Voice.CrackDecay = 95.0f; Voice.CrackGain = 0.82f;
+            Voice.BodyStartHz = 240.0f; Voice.BodyFallHz = 600.0f;
+            Voice.BodyDecay = 55.0f;    Voice.BodyGain = 0.18f;
+            Voice.TailGain = 0.04f;     Voice.Gain = 0.40f;
+            break;
+        case EBreakerWeaponArchetype::Sniper:
+            // A hard crack and a LONG tail: the shot is over instantly and the
+            // room is not. This is the one archetype whose sound should still
+            // be going after the player has stopped looking at what they hit.
+            Voice.DurationSeconds = 0.42f;
+            Voice.CrackDecay = 42.0f; Voice.CrackGain = 0.70f;
+            Voice.BodyStartHz = 120.0f; Voice.BodyFallHz = 220.0f;
+            Voice.BodyDecay = 16.0f;    Voice.BodyGain = 0.36f;
+            Voice.TailDecay = 7.0f;     Voice.TailGain = 0.30f;
+            Voice.Gain = 0.62f;
+            break;
+        case EBreakerWeaponArchetype::Shotgun:
+            // Mostly body. The crack is there and it is not the point; a
+            // shotgun is a low, wide shove of air.
+            Voice.DurationSeconds = 0.30f;
+            Voice.CrackDecay = 26.0f; Voice.CrackGain = 0.40f;
+            Voice.BodyStartHz = 95.0f;  Voice.BodyFallHz = 150.0f;
+            Voice.BodyDecay = 12.0f;    Voice.BodyGain = 0.60f;
+            Voice.TailDecay = 11.0f;    Voice.TailGain = 0.26f;
+            Voice.Gain = 0.66f;
+            break;
+        case EBreakerWeaponArchetype::Rocket:
+            // Nearly all tail and almost no crack: a launch is a rush, not a
+            // report, and it must not be mistakable for any of the guns.
+            Voice.DurationSeconds = 0.55f;
+            Voice.CrackDecay = 9.0f;  Voice.CrackGain = 0.22f;
+            Voice.BodyStartHz = 78.0f;  Voice.BodyFallHz = 90.0f;
+            Voice.BodyDecay = 7.0f;     Voice.BodyGain = 0.42f;
+            Voice.TailDecay = 4.0f;     Voice.TailGain = 0.46f;
+            Voice.Gain = 0.70f;
+            break;
+        case EBreakerWeaponArchetype::Machinegun:
+            // Heavier than the rifle and slower to die, so a held trigger
+            // reads as weight rather than as speed.
+            Voice.DurationSeconds = 0.17f;
+            Voice.CrackDecay = 44.0f; Voice.CrackGain = 0.60f;
+            Voice.BodyStartHz = 130.0f; Voice.BodyFallHz = 300.0f;
+            Voice.BodyDecay = 22.0f;    Voice.BodyGain = 0.44f;
+            Voice.TailDecay = 15.0f;    Voice.TailGain = 0.16f;
+            Voice.Gain = 0.58f;
+            break;
+        case EBreakerWeaponArchetype::BurstRifle:
+            // The rifle, tightened. Three of these land inside a third of a
+            // second, so it has to be the shortest of the three rifles or the
+            // burst smears into one noise.
+            Voice.DurationSeconds = 0.11f;
+            Voice.CrackDecay = 66.0f; Voice.CrackGain = 0.70f;
+            Voice.BodyStartHz = 175.0f; Voice.BodyFallHz = 440.0f;
+            Voice.BodyDecay = 36.0f;    Voice.BodyGain = 0.30f;
+            Voice.TailGain = 0.08f;     Voice.Gain = 0.48f;
+            break;
+        default:
+            // RIFLE, and it keeps the shipped numbers exactly. It is the gun
+            // the owner has spent every playtest holding, so it is the one that
+            // must not move underneath him in the same pass that gives the
+            // other seven a voice. The tail is the only addition.
+            Voice.TailDecay = 18.0f; Voice.TailGain = 0.12f;
+            break;
+        }
+        return Voice;
+    }
+
+    inline float WeaponFireSample(int32 Index, const FFireVoice& Voice)
     {
         const float T = static_cast<float>(Index) / SampleRate;
-        const float Crack = NoiseAt(static_cast<uint32>(Index)) * Envelope(T, FireDurationSeconds, 55.0f);
-        const float BodyHz = 160.0f - 400.0f * T;   // falls through the burst
-        const float Body = FMath::Sin(2.0f * PI * BodyHz * T) * Envelope(T, FireDurationSeconds, 30.0f);
-        return 0.5f * (0.65f * Crack + 0.35f * Body);
+        const uint32 Sample = static_cast<uint32>(Index);
+        const float Crack = BrightNoise(Sample) * Envelope(T, Voice.DurationSeconds, Voice.CrackDecay);
+        const float BodyHz = Voice.BodyStartHz - Voice.BodyFallHz * T;
+        const float Body = FMath::Sin(2.0f * PI * BodyHz * T)
+            * Envelope(T, Voice.DurationSeconds, Voice.BodyDecay);
+        const float Tail = DarkNoise(Sample ^ 0x9E37u) * Envelope(T, Voice.DurationSeconds, Voice.TailDecay);
+        // NORMALISED BY THE MIX, so raising one part cannot quietly raise the
+        // whole sound past clipping. Gain above is then the only dial that
+        // decides how loud this gun is against the others.
+        const float Mix = Voice.CrackGain + Voice.BodyGain + Voice.TailGain;
+        const float Blend = Mix > KINDA_SMALL_NUMBER
+            ? (Voice.CrackGain * Crack + Voice.BodyGain * Body + Voice.TailGain * Tail) / Mix : 0.0f;
+        return Voice.Gain * Blend;
     }
+
+    // The shared fallback, kept so a caller with no archetype in hand still
+    // has a sound. It is the RIFLE, not a ninth voice: a default that is
+    // nothing in particular is how a weapon ends up sounding like neither
+    // itself nor anything else.
+    inline float WeaponFireSample(int32 Index)
+    {
+        return WeaponFireSample(Index, FireVoiceFor(EBreakerWeaponArchetype::Rifle));
+    }
+
 
     // HIT CONFIRM: a short bright tick, pitched well above the fire sound so
     // it reads THROUGH sustained fire rather than under it.
@@ -168,7 +342,23 @@ namespace BreakerSound
         return 0.6f * FMath::Sin(Phase) * Envelope(T, PlayerDeathDurationSeconds, 4.0f);   // O2 PLACEHOLDER
     }
 
-    inline void RenderWeaponFire(TArray<int16>& Out) { RenderPcm16(Out, FireDurationSeconds, &WeaponFireSample); }
+    // WeaponFireSample is overloaded now, so its address is ambiguous: the
+    // lambda names which one. A cast would have worked and would have been the
+    // wrong answer - it silently picks an overload where this states it.
+    inline void RenderWeaponFire(TArray<int16>& Out)
+    {
+        RenderPcm16(Out, FireDurationSeconds, [](int32 Index) { return WeaponFireSample(Index); });
+    }
+
+    // One archetype's own report. The duration comes from the voice, so a
+    // Sniper renders four times the buffer a Sidearm does and neither is
+    // padded with silence it has to queue.
+    inline void RenderArchetypeFire(TArray<int16>& Out, EBreakerWeaponArchetype Archetype)
+    {
+        const FFireVoice Voice = FireVoiceFor(Archetype);
+        RenderPcm16(Out, Voice.DurationSeconds,
+            [&Voice](int32 Index) { return WeaponFireSample(Index, Voice); });
+    }
     // A brief dry crack followed by a falling, rough tail: the start of decay.
     inline float EntropyActivationSample(int32 Index)
     {
