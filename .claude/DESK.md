@@ -1,5 +1,16 @@
 # Desk — next playtest
 
+## READ `.claude/FEEL.md` FIRST
+
+It is the owner's felt review of the seven experiences he is sharpening: first
+five minutes, Fernhall combat, first transformative drop, quests, first rift,
+rift completion, quit and return. The lowest-scoring beat that names a
+one-thing is the next cycle's work, and it OUTRANKS everything in this file.
+
+This desk is the queue. That file is the direction. A queue item never beats a
+red beat.
+
+
 ## OWNER PLAYTEST, 2026-09-10 — READ THIS BEFORE PLANNING ANYTHING
 
 LANDED SINCE HE WROTE THIS (3b0c3465, 0af06a89, ba24dd2d, 236767fc):
