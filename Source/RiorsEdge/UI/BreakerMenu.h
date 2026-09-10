@@ -157,7 +157,27 @@ namespace BreakerInventoryLayout
     // Floors. Below these the copy stops fitting rather than merely looking
     // tight, and the backpack is the last zone that should give ground because
     // it is where the cards are.
-    inline constexpr float MinBackpackColumn = 320.0f;
+    // The single-card floor. Held equal-or-above MinReadableCardWidth by a
+    // static_assert below, so the zone can never be narrower than the one card
+    // it is supposed to be able to draw.
+    inline constexpr float MinBackpackColumn = 340.0f;
+    // THE DETAIL RAIL'S ZONE. Affixes left the card (see MinReadableCardWidth)
+    // and live here, so this column is sized by the thing it draws: the longest
+    // stat name on one line beside its delta, which is exactly the requirement
+    // the CARD used to carry. Nothing was deleted — the budget moved to the
+    // surface that still needs it.
+    inline constexpr float SpecDetailColumn = 360.0f;
+    // Written out rather than composed, because SolveColumns below needs it and
+    // its three parts are defined further down with the rest of the text
+    // budget. It is EXACTLY MinAffixColumnWidth (26 chars x 6.9) plus
+    // AffixTailWidth (14 + 48 + 4) plus CardChrome (3 + 2 + 32), and a
+    // static_assert down there holds the two in step, so a change to any part
+    // fails a compile rather than silently narrowing the rail.
+    // 282.4 exactly, rounded UP to the next whole pixel: the composed sum is a
+    // float and lands a hair above its own decimal literal, which failed the
+    // static_assert below by less than a thousandth of a pixel. A rail is
+    // measured in whole pixels anyway.
+    inline constexpr float MinDetailColumn = 283.0f;
 
     inline constexpr float MinEquipmentColumn = 280.0f;
     // One equipment row: a 44px icon square (the system's minimum hit target)
@@ -168,16 +188,26 @@ namespace BreakerInventoryLayout
     {
         float Equipment = SpecEquipmentColumn;
         float Backpack = SpecBackpackColumn;
+        float Detail = SpecDetailColumn;
     };
 
-    // Two useful zones: equipment stays visible while the backpack gets the
-    // remaining width. Whole pixels avoid fractional clipping at card edges.
+    // THREE useful zones now: equipment, the card grid, and the detail rail the
+    // affix list moved to. The order of the clamps is the priority: equipment
+    // keeps its share, the BACKPACK is offered its single-card floor next, and
+    // the rail takes what that leaves within its own bounds — so a narrowing
+    // window loses rail width before it loses a readable card, and the rail is
+    // never dropped outright, because a rail that disappears takes the affix
+    // list with it and there is nowhere else to read one.
+    // Whole pixels avoid fractional clipping at card edges.
     inline FColumns SolveColumns(float PanelWidth, float Gutters)
     {
         const float Room = FMath::Max(0.0f, PanelWidth - Gutters);
         FColumns Columns;
         Columns.Equipment = FMath::Min(Room, FMath::Clamp(FMath::FloorToFloat(Room * 0.28f), MinEquipmentColumn, SpecEquipmentColumn));
-        Columns.Backpack = Room - Columns.Equipment;
+        const float AfterEquipment = FMath::Max(0.0f, Room - Columns.Equipment);
+        Columns.Detail = FMath::Min(AfterEquipment,
+            FMath::Clamp(FMath::FloorToFloat(AfterEquipment - MinBackpackColumn), MinDetailColumn, SpecDetailColumn));
+        Columns.Backpack = FMath::Max(0.0f, AfterEquipment - Columns.Detail);
         return Columns;
     }
 
@@ -271,10 +301,48 @@ namespace BreakerInventoryLayout
         // The outer equipment SBox has padding in addition to the plate.
         return FMath::Max(120.0f, EquipmentColumnWidth - 2.0f * BreakerUI::Space16 - CardChrome);
     }
-    // THE RULE THIS SCREEN IS NOW HELD TO: a card is only worth drawing at a
-    // width where the longest stat name fits on one line beside its delta.
+    // ---- WHAT A CARD IS NOW HELD TO, AND WHY IT MOVED --------------------
+    // The rule USED to be "a card is only worth drawing at a width where the
+    // longest stat name fits on one line beside its delta", because the card
+    // printed every affix. It does not any more: the list moved to the detail
+    // rail, so the widest thing left on a card is its NAME.
+    //
+    // That is not automatically narrower, and this is the part worth saying
+    // out loud: O267 made names long. The floor is now the longest headline the
+    // grammar can build, over a bounded number of lines — the same shape as the
+    // swap picker's row, because it is the same question about the same string.
+    //
+    // MinAffixColumnWidth is NOT deleted. It is what the DETAIL RAIL is sized
+    // by, which is the whole point: the requirement did not go away, it moved
+    // to the surface that still has to satisfy it.
     inline constexpr float MinAffixColumnWidth = LongestAffixNameChars * CaptionAdvance;
-    inline constexpr float MinReadableCardWidth = MinAffixColumnWidth + AffixTailWidth + CardChrome;
+    static_assert(MinDetailColumn >= MinAffixColumnWidth + AffixTailWidth + CardChrome,
+        "The detail rail must still hold the longest stat name on one line beside its delta.");
+
+    // One glyph's advance as a FRACTION of its point size, taken from the
+    // caption estimate this file already trusted, so the title estimate and the
+    // caption estimate cannot drift apart.
+    inline constexpr float GlyphAdvanceRatio = CaptionAdvance / static_cast<float>(BreakerUI::TypeCaption);
+    inline constexpr float TitleAdvance = GlyphAdvanceRatio * static_cast<float>(BreakerUI::TypeH2);
+    // "BODY ARMOUR", the longest base the grammar wraps.
+    inline constexpr int32 LongestBaseNameChars = 11;
+    // Longest prefix word, space, longest base, " of ", longest suffix word.
+    inline constexpr int32 WorstCaseNameChars =
+        LongestAffixNameChars * 2 + 1 + LongestBaseNameChars + 4;
+    // Three lines of title is already a lot of card. Past this the name stops
+    // being a headline and becomes a paragraph.
+    inline constexpr int32 MaxCardNameLines = 3;
+    inline constexpr float MinReadableCardWidth =
+        (WorstCaseNameChars * TitleAdvance) / MaxCardNameLines + CardChrome;
+    static_assert(MinBackpackColumn >= MinReadableCardWidth,
+        "The backpack zone must be able to hold the one card it falls back to.");
+    // The interior width at which all three zones can hold their own floors at
+    // once. Below it the screen is simply too narrow for the layout it is
+    // drawing and every zone gives ground together; above it the priorities in
+    // SolveColumns are guaranteed rather than merely attempted. Named here so
+    // the test asserts the rule instead of inventing a threshold of its own.
+    inline constexpr float MinThreeZoneRoom =
+        MinEquipmentColumn + MinBackpackColumn + MinDetailColumn;
 
     // How many cards a zone can hold READABLY. Three is the target and the cap;
     // below the readable width it drops to two, then to one. One card that can
@@ -824,6 +892,21 @@ private:
     // through SetContent; it is never driven by a per-frame attribute, and it
     // never changes width, so the board cannot reflow when it populates.
     TSharedPtr<SBox> SkillDetailHost;
+    // THE INVENTORY'S DETAIL RAIL, the skill screen's fixed host applied to the
+    // backpack. The affix list left the card and lives here.
+    //
+    // A FIXED HOST, NOT A TOOLTIP, and the reason is the same one that gave the
+    // tree its rail: this project has no SToolTip anywhere, and a floating
+    // tooltip is unphotographable even at rest, so a rule about it could never
+    // be checked. A host draws its content in every frame of every capture.
+    //
+    // Filled IMPERATIVELY on hover — SetContent, never a rebuild — for the same
+    // reason EquipSlotOutlines is imperative: a rebuild per hover is the
+    // pattern that produced the historical screen jitter. It is also STICKY:
+    // leaving a card leaves its detail up rather than blanking the rail, so the
+    // rail is never empty once anything has been pointed at, and a capture with
+    // no cursor still shows the backpack's first piece.
+    TSharedPtr<SBox> InventoryDetailHost;
     // Which node the detail rail is showing. Survives the screen rebuild that a
     // purchase triggers; the card itself is rebuilt from live data, never
     // restored as a stale widget.

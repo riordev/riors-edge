@@ -97,23 +97,46 @@ bool FBreakerInventoryLayoutColumnsTest::RunTest(const FString& Parameters)
 {
     using namespace BreakerInventoryLayout;
 
-    // Only equipment and backpack divide the usable interior; no hidden
-    // preview reservation remains at any supported viewport size.
+    // THREE zones divide the usable interior now: equipment, the card grid,
+    // and the detail rail the affix list moved to. No hidden preview
+    // reservation remains at any supported viewport size.
     for (const float PanelWidth : { 1920.0f, 1760.0f, 1600.0f, 1440.0f, 1120.0f, 900.0f, 720.0f })
     {
         const float Gutter = 1.0f;
         const FColumns Columns = SolveColumns(PanelWidth, Gutter);
-        TestEqual(FString::Printf(TEXT("two zones tile %.0f"), PanelWidth),
-            Columns.Equipment + Columns.Backpack + Gutter, PanelWidth, 0.01f);
+        TestEqual(FString::Printf(TEXT("three zones tile %.0f"), PanelWidth),
+            Columns.Equipment + Columns.Backpack + Columns.Detail + Gutter, PanelWidth, 0.01f);
+        TestTrue(TEXT("no zone is negative"),
+            Columns.Equipment >= 0.0f && Columns.Backpack >= 0.0f && Columns.Detail >= 0.0f);
         TestTrue(TEXT("equipment remains readable"), Columns.Equipment >= MinEquipmentColumn);
         TestTrue(TEXT("equipment does not consume extra backpack room"), Columns.Equipment <= SpecEquipmentColumn);
+        TestTrue(TEXT("the rail never grows past its spec"), Columns.Detail <= SpecDetailColumn);
+        // THE FLOORS ARE A PROMISE ONLY ABOVE MinThreeZoneRoom. Below it the
+        // interior cannot hold all three at once and they give ground
+        // together, which is a stated consequence rather than a silent one —
+        // and the alternative, dropping the rail, would put the affix list
+        // somewhere the player cannot reach at all.
+        if (PanelWidth - Gutter < MinThreeZoneRoom) continue;
         TestTrue(TEXT("backpack preserves readable card space"), Columns.Backpack >= MinBackpackColumn);
+        TestTrue(TEXT("the rail holds its own floor"), Columns.Detail >= MinDetailColumn);
         const float InnerTotals = Columns.Backpack - 64.0f;
         const int32 Count = SolveTotalColumns(InnerTotals);
         TestTrue(TEXT("totals use one to three cells"), Count >= 1 && Count <= 3);
         TestTrue(TEXT("total label/value cell remains readable"),
             (InnerTotals - 24.0f * (Count - 1)) / Count >= 260.0f);
     }
+
+    // THE DE-BLOAT'S OWN ARITHMETIC. A card no longer has to hold the longest
+    // stat name on one line, because it no longer prints one — but O267 names
+    // are long, so the floor did not simply vanish, it MOVED to the headline.
+    // Both halves are asserted so neither can drift without a red.
+    // The CONTENT width, not the outer width: chrome cannot hold text, and an
+    // assertion that let it would be looser than the definition it guards.
+    TestTrue(TEXT("a card is sized by the longest headline it can be given"),
+        (MinReadableCardWidth - CardChrome) * MaxCardNameLines
+            >= WorstCaseNameChars * TitleAdvance - KINDA_SMALL_NUMBER);
+    TestTrue(TEXT("and the rail is sized by the affix line the card gave up"),
+        MinDetailColumn >= MinAffixColumnWidth + AffixTailWidth + CardChrome);
     TestTrue(TEXT("narrow equipment gives space to cards"), SolveColumns(1120, 1).Equipment < SolveColumns(1920, 1).Equipment);
     TestEqual(TEXT("wide layout supports three totals columns"), SolveTotalColumns(SolveColumns(1920, 1).Backpack - 64), 3);
     return true;

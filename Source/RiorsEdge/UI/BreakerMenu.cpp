@@ -4599,6 +4599,10 @@ namespace
             [MenuWrappedText(Rule.Description, BreakerUI::TypeCaption, SoftText, ContentWidth)];
     }
 
+    // Declared ahead of MakeItemDetailCard, which draws it into the rail.
+    TSharedRef<SWidget> MakeAffixLines(const FBreakerItemInstance& Item, const TArray<FBreakerAffixComparison>& Deltas,
+        float CardWidth);
+
     TSharedRef<SWidget> MakeAffixLines(const FBreakerItemInstance& Item, const TArray<FBreakerAffixComparison>& Deltas,
         float CardWidth)
     {
@@ -4736,6 +4740,40 @@ namespace
         return Row;
     }
 
+    // WHAT THE DETAIL RAIL DRAWS: the piece's name, and then the affix list that
+    // used to be on every card at once.
+    //
+    // THE LIST ITSELF IS UNCHANGED, and that is deliberate — MakeAffixLines is
+    // still the one place affix text is produced, it still takes a width and
+    // wraps at a figure computed before layout, and it still draws the deltas
+    // against the equipped piece. Only the SURFACE moved. A second affix
+    // producer for the rail would have been the duplicate-concept mistake this
+    // file has already paid for twice this week.
+    TSharedRef<SWidget> MakeItemDetailCard(const FBreakerItemInstance& Item,
+        const TArray<FBreakerAffixComparison>& Deltas, float RailWidth)
+    {
+        return SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight()
+            [
+                MenuWrappedText(FText::FromString(ItemDisplayName(Item)), BreakerUI::TypeH2,
+                    RarityColor(Item.Rarity), BreakerInventoryLayout::CardTitleWrapWidth(RailWidth), true)
+            ]
+            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+            [
+                MenuWrappedText(FText::FromString(ItemRarityAndSlot(Item)), BreakerUI::TypeCaption,
+                    RarityTagColor(Item.Rarity), BreakerInventoryLayout::CardContentWidth(RailWidth), true)
+            ]
+            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, BreakerUI::Space8)
+            [
+                SNew(SBox).HeightOverride(BreakerUI::BorderThin)[SolidBlock(BorderEmphasis)]
+            ]
+            + SVerticalBox::Slot().AutoHeight()
+            [
+                MakeAffixLines(Item, Deltas, RailWidth)
+            ];
+    }
+
+
     // The five rarity beams, as the empty backpack draws them: one vertical
     // bar per tier in the same ramp the ground drops use, so the screen and
     // the world teach the same lesson.
@@ -4801,6 +4839,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
 
     const float EquipmentColumnWidth = Columns.Equipment;
     const float BackpackZoneWidth = Columns.Backpack;
+    const float DetailColumnWidth = Columns.Detail;
+    // What the detail rail shows before anything is hovered: the first backpack
+    // card built below. Declared here because the rail is assembled at the end
+    // of this function, long after the loop that fills it.
+    TOptional<TPair<FBreakerItemInstance, TArray<FBreakerAffixComparison>>> DetailSeed;
 
     // One equipment row, to the reference's CARD ANATOMY for the equipment
     // column: a 44px icon square ringed in the rarity, the slot name over the
@@ -5144,6 +5187,19 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         const EBreakerEquipSlot DoomedSlot = Preview.LimitDisplaced.Slot;
         const FGuid DoomedId = Preview.LimitDisplaced.ItemId;
 
+        // The rail's seed: the FIRST card built, so the rail has content before
+        // anything is pointed at and a capture is never of a blank rectangle.
+        if (!DetailSeed.IsSet())
+        {
+            DetailSeed = TPair<FBreakerItemInstance, TArray<FBreakerAffixComparison>>(Item, Preview.AffixDeltas);
+        }
+        // What this card puts in the rail. Captured by VALUE and built lazily
+        // in the hover handler: building 25 detail trees per rebuild to throw
+        // 24 of them away is the kind of work this screen is already careful
+        // not to do.
+        const TArray<FBreakerAffixComparison> HoverDeltas = Preview.AffixDeltas;
+        const FBreakerItemInstance HoverItem = Item;
+
         const FOnClicked DiscardOne = FOnClicked::CreateLambda([this, ItemId]()
         {
             const bool bDiscarded = Character.IsValid() && Character->GetEquipment()
@@ -5245,9 +5301,19 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                             // The hover half of the limit tell. Event-driven on
                             // purpose: this paints one border on enter and
                             // clears it on leave, and never runs on a tick.
-                            .OnHovered(FSimpleDelegate::CreateLambda([this, bLimitTell, DoomedSlot]()
+                            .OnHovered(FSimpleDelegate::CreateLambda(
+                                [this, bLimitTell, DoomedSlot, HoverItem, HoverDeltas, DetailColumnWidth]()
                             {
                                 if (bLimitTell) SetEquipSlotOutline(DoomedSlot, true);
+                                // SetContent, never Rebuild: a rebuild per
+                                // hover is the historical jitter pattern, and
+                                // it would also destroy the widget whose hover
+                                // is being handled.
+                                if (InventoryDetailHost.IsValid())
+                                {
+                                    InventoryDetailHost->SetContent(
+                                        MakeItemDetailCard(HoverItem, HoverDeltas, DetailColumnWidth));
+                                }
                             }))
                             .OnUnhovered(FSimpleDelegate::CreateLambda([this, bLimitTell, DoomedSlot]()
                             {
@@ -5286,13 +5352,14 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                                     MakeWeaponBaseDamageLine(Item, Character.IsValid() ? Character->GetWeapon() : nullptr,
                                         BreakerInventoryLayout::CardContentWidth(BackpackCardWidth))
                                 ]
-                                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
-                                [
-                                    // Line 3 of the card anatomy: every affix
-                                    // carrying its delta against the equipped
-                                    // piece in this slot.
-                                    MakeAffixLines(Item, Preview.AffixDeltas, BackpackCardWidth)
-                                ]
+                                // LINE 3 USED TO BE EVERY AFFIX ON EVERY CARD,
+                                // and that is what made a wall of loot
+                                // unreadable: nothing on a card stood out
+                                // because everything was on it. The list is on
+                                // the detail rail now (InventoryDetailHost),
+                                // which is why the card's own width budget is
+                                // no longer solved against the longest stat
+                                // name — see MinReadableCardWidth.
                                 // THE FOOTER, above a 1px divider as the
                                 // reference draws it: structure reads off
                                 // borders in this system, never off gaps.
@@ -5605,6 +5672,46 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
     Body->AddSlot().FillWidth(1.0f).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
     [
         BackpackColumn
+    ];
+    // THE DETAIL RAIL. Third zone, on the far side of the cards, holding the
+    // affix list every card used to carry at once. Fixed width from
+    // SolveColumns so the grid beside it cannot be pushed around by what the
+    // rail happens to be showing.
+    Body->AddSlot().AutoWidth()[SNew(SBox).WidthOverride(BreakerUI::BorderThin)[SolidBlock(BorderRest)]];
+    Body->AddSlot().AutoWidth().Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
+    [
+        SNew(SBox).WidthOverride(DetailColumnWidth)
+        [
+            // ON A PLATE, like the two zones beside it. The first capture of
+            // this rail had it as bare text floating on the world, because the
+            // equipment rows and the totals panel each carry their own plate
+            // and a raw SBox carries none. Structure reads off borders in this
+            // system, never off position.
+            MakePlate(
+                SNew(SVerticalBox)
+                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+                [
+                    MenuText(FText::FromString(TEXT("DETAIL")), BreakerUI::TypeCaption, Muted, true)
+                ]
+                + SVerticalBox::Slot().AutoHeight()
+                [
+                    SAssignNew(InventoryDetailHost, SBox)
+                    [
+                        // THE SEED, and it is why the rail is never a blank
+                        // rectangle: the backpack's first piece is drawn at
+                        // build time, so a capture with no cursor in it still
+                        // shows what the rail is for. The harness cannot hover
+                        // — that limitation is exactly why this is a host and
+                        // not a tooltip.
+                        DetailSeed.IsSet()
+                            ? MakeItemDetailCard(DetailSeed.GetValue().Key, DetailSeed.GetValue().Value, DetailColumnWidth)
+                            : StaticCastSharedRef<SWidget>(MenuWrappedText(
+                                FText::FromString(TEXT("NOTHING IN THE BACKPACK")), BreakerUI::TypeCaption,
+                                Muted, BreakerInventoryLayout::CardContentWidth(DetailColumnWidth), true))
+                    ]
+                ],
+                PanelRaised, Cyan, FMargin(BreakerUI::Space16))
+        ]
     ];
 
     // No footer by design (UI-Inventory-Spec "Zones"): the input hints live in

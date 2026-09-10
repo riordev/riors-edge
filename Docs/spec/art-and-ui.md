@@ -78,9 +78,12 @@ shows connected branches from its inner entries; doctrine shows class paths.
 Each board makes its prerequisites, purchased ranks and available points clear.
 
 **Inventory gives its width to usable gear.** Equipped slots stay in a left
-column; backpack cards and compact totals occupy the remaining width. No empty
-character-preview placeholder reserves space. Cards wrap affixes and choose a
-readable column count; cleanup controls stay beside the backpack.
+column; backpack cards and compact totals take the middle; a fixed detail rail
+on the right holds the pointed-at piece's affix list. No empty
+character-preview placeholder reserves space. A card carries its name, rarity
+and slot only, so a wall of loot is scannable; a card's width is set by the
+longest name it can be given, and the rail's by the longest stat name beside
+its delta. Cleanup controls stay beside the backpack.
 
 **Tooltip order is signatures, then prefixes, then suffixes, never
 interleaved**, with tier badges in a fixed column so the eye can scan one axis.
