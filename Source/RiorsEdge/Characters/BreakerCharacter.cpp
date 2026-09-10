@@ -302,7 +302,7 @@ void ABreakerCharacter::Tick(float DeltaSeconds)
     // enforce our own floor relative to the spawn point.
     if (HasAuthority() && GetActorLocation().Z < FallKillZ)
     {
-        ResetPlaytest();
+        RecoverFromFall();
         return;
     }
     // The traversal execution that ran here (the smoothstep SetActorLocation
@@ -2326,6 +2326,34 @@ void ABreakerCharacter::UpdateCameraFieldOfView()
         ApplyBaseFieldOfView();
     }
     bCameraFOVOffsetApplied = bOffsetLive;
+}
+
+void ABreakerCharacter::RecoverFromFall()
+{
+    // THE PLAYER COMES BACK. THE WORLD IS NOT TOUCHED. This used to call
+    // ResetPlaytest, and the owner reported the consequence without ever
+    // knowing the cause: "the gym enemies are suddenly inside fernhall",
+    // followed by "i never pressed f1". He was right — no key was involved.
+    // Falling below spawn minus forty metres ran the whole dev reset, and the
+    // dev reset destroys every enemy in the world and rebuilds the GYM's
+    // dummies and encounter wherever it is standing.
+    //
+    // AND IT IS LOGGED, because a recovery that happens silently is a hole in
+    // the level nobody can find twice. The Z it fell from is the thing worth
+    // knowing: it names where the gap is.
+    UE_LOG(LogTemp, Warning,
+        TEXT("[BreakerFall] recovered from %s (floor was z %.0f); the world is untouched."),
+        *GetActorLocation().ToString(), FallKillZ);
+    SetActorTransform(PlaytestSpawnTransform, false, nullptr, ETeleportType::TeleportPhysics);
+    GetCharacterMovement()->StopMovementImmediately();
+    DashFeedbackElapsed = -1.0f;
+    bDashRollApplied = false;
+    ApplyBaseFieldOfView();
+    if (Controller) Controller->SetControlRotation(PlaytestSpawnTransform.Rotator());
+    // Vitals only. Not the ammunition and not the playtest stats: a fall is
+    // an accident in the middle of a run, and a run whose numbers reset
+    // underneath it stops measuring the thing it was measuring.
+    if (Combat) Combat->RestoreVitals();
 }
 
 void ABreakerCharacter::ResetPlaytest()

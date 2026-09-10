@@ -393,6 +393,14 @@ private:
     bool bCameraFOVOffsetApplied = false;
     void ApplyBaseFieldOfView();
     void ResetPlaytest();
+
+    // FALLING OUT OF THE MAP IS NOT A DEV RESET. The recovery used to call
+    // ResetPlaytest, which rebuilds the GYM's target dummies and standing
+    // encounter — so one fall through a seam in Fernhall deleted the yard's
+    // patrols and put gym content in their place, with no key pressed and no
+    // way for the player to know why. This puts the player back and touches
+    // nothing else in the world.
+    void RecoverFromFall();
     void CopyPlaytestReport();
     void TogglePlaytestDiagnostics();
     void IncreaseFOV();

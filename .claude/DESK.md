@@ -3,13 +3,26 @@
 ## OWNER PLAYTEST, 2026-09-10 (SECOND) — THIS OUTRANKS EVERYTHING BELOW
 
 LANDED FROM IT ALREADY:
-- "the gym enemies are suddenly inside fernhall" — FOUND AND FIXED. F1 RESET
-  (ResetPlaytestTargets) destroys EVERY enemy in the world and rebuilds the
-  GYM's target dummies and standing encounter, and it ran in whatever map the
-  key was pressed in. In Fernhall it deleted the yard's patrols, the courtyard,
-  the quest's elites and every repopulation slot's occupant, and put gym
-  content on top. It refuses outside the gym now; the character half of the
-  reset still runs, which is the useful part.
+- "the gym enemies are suddenly inside fernhall" — FIXED, AND THE FIRST
+  DIAGNOSIS WAS WRONG. I blamed F1; he replied "i never pressed f1" and he was
+  right. NO KEY IS INVOLVED. ABreakerCharacter::Tick calls ResetPlaytest on
+  fall-out-of-map recovery — below spawn minus 40 m — and ResetPlaytest calls
+  ResetPlaytestTargets, which destroys EVERY enemy in the world and rebuilds
+  the GYM's target dummies and standing encounter wherever it is standing. One
+  fall through a gap in Fernhall deleted the yard's patrols, the courtyard, the
+  quest's elites and every repopulation slot's occupant, and put gym content in
+  the hole — silently, with nothing the player did to explain it.
+  A fall now calls RecoverFromFall: the player comes back, vitals restore, and
+  the world is untouched. Ammunition and playtest stats are NOT reset either —
+  a fall is an accident mid-run and a run whose numbers reset stops measuring.
+  AND IT LOGS THE POSITION IT FELL FROM, which is the tool for the next half:
+  WHERE the hole is. Candidate found by arithmetic and NOT confirmed: the
+  composed floor has an enclosed void at x 143..153.5, z 89..92 between the
+  substation's north wall and the second seam's corner. It is walled on three
+  sides, so reaching it needs a mantle or a dash over a wall. The next fall's
+  log line settles it.
+  The F1 guard landed too and is still right — that path could do the same
+  damage on purpose.
 - "multiple bars ... which dont help at all as to what they are ... keep it as
   one combined bar" — shield and health share one track now, split by their
   maxima so the seam does not slide while you are being shot, and the 20% tick
