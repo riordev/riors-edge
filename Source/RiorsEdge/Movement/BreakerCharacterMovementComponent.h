@@ -293,8 +293,15 @@ public:
     // stays at 990, which narrows the sprint gain from 1.66x to 1.55x; if the
     // next report is "sprint no longer feels like anything", raise that one
     // and nothing else.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float WalkSpeed = 640.0f;   // WAS 595.0f // O2 PLACEHOLDER (O192)
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float SprintSpeed = 990.0f;   // O2 PLACEHOLDER (O192)
+    // 640 -> 672 and 990 -> 1039, owner playtest 2026-09-10: "movement needs a
+    // subtle polish slighjt increase in speed". BOTH by the same 5%, so the
+    // SPRINT GAIN IS UNCHANGED at 1.55x — he is asking for the whole thing to
+    // move, not for sprint to pull away from walk, and moving one alone is how
+    // the gain narrowed to 1.55 in the first place. Deliberately small: he said
+    // subtle, and a dial that overshoots costs a whole playtest to find out.
+    // Both O2 PLACEHOLDER (O192).
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float WalkSpeed = 672.0f;   // WAS 595 -> 640 // O2 PLACEHOLDER (O192)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float SprintSpeed = 1039.0f;   // WAS 990 // O2 PLACEHOLDER (O192)
 
     // --- Weight (owner report: "movement should be less floaty") ---------
     // Everything in this category is new; the OLD behaviour is "no curve at

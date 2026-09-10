@@ -1774,10 +1774,16 @@ bool FBreakerSprintFeelTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Gait clamps above sprint"), FBreakerWeaponFeel::GaitStrideLength(Params, 2.0f), Params.SprintStrideLengthCm);
 
     // One frame at the shipped walk speed over the shipped stride is
-    // 2π · 640 / (360 · 60) radians.
-    TestEqual(TEXT("The shipped walk's footfall rate is 640 over a 360 stride"),
+    // 2π · v / (360 · 60) radians.
+    //
+    // THE SPEED IS READ, NOT RESTATED. This asserted the formula against a
+    // hard-coded 640 while taking the speed from the component on the other
+    // side, so it was really two copies of one constant and a walk-speed
+    // retune failed it for no reason of its own. What it exists to pin is the
+    // RELATION between speed, stride and phase; that holds at any speed.
+    TestEqual(TEXT("The walk's footfall rate is its speed over a 360 stride"),
         FBreakerWeaponFeel::AdvanceBobPhase(0.0f, Movement->WalkSpeed, Frame, 360.0f),
-        2.0f * UE_PI * 640.0f / (360.0f * 60.0f), 0.00001f);
+        2.0f * UE_PI * Movement->WalkSpeed / (360.0f * 60.0f), 0.00001f);
     return true;
 }
 
