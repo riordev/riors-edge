@@ -65,6 +65,16 @@ namespace
         AberrantWeight += Shifted * 0.12f;
         UnwrittenWeight += Shifted * 0.03f;
 
+        // THE EARLY-LEVEL EXCEPTIONAL RAMP, applied here too. This helper is a
+        // DELIBERATE second copy of the pre-O249 weight formula, kept so this
+        // file can prove that O249 changed nothing below the Drop Chance cap.
+        // The ramp is a different and later ruling, so it belongs on BOTH
+        // sides of that comparison — carrying it on one side only would make
+        // the ramp look like an O249 side effect, which it is not. The suite
+        // caught exactly that, and it is the repeated-shape defect
+        // Scripts/shapecheck.py exists to find.
+        ExceptionalWeight *= UBreakerDropTableLibrary::ExceptionalWeightScalar(ItemLevel, Params);
+
         Weights[static_cast<int32>(EBreakerItemRarity::Standard)] = StandardWeight;
         Weights[static_cast<int32>(EBreakerItemRarity::Uncommon)] = UncommonWeight;
         Weights[static_cast<int32>(EBreakerItemRarity::Exceptional)] = ExceptionalWeight;

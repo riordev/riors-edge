@@ -219,6 +219,27 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 ## Known issues to time-box
 
 - WARDEN WALK-THROUGH: FIXED, and the parked fixture was never the obstacle. The arrival ring lived in exactly one place, ABreakerEnemy::TickEngagedBehaviour, and ABreakerWardenEnemy::TickEngagedBehaviour replaces that function WHOLESALE without ever calling Super — so it wrote a full-speed vector straight at the player and fell off the end of the function with it intact whenever neither attack was armed. Nothing downstream re-added spacing, by design: the mover has no stop distance while steering because the ring "is always the behaviour's to govern, never the path's". The pass-through is the project's own recorded consequence of the player being a Pawn. The ring is now an extracted method every closing archetype CALLS rather than inherits, so an override cannot silently drop it. Base behaviour is bit-identical; only the Warden changes. Verified: the Boss is the sole override that calls Super, and ArrivalBand is written in exactly one statement, so no fourth class was affected. THE WIRING PIN IS NOW LANDED (RiorsEdge.Combat.Warden.ArrivalRingRuntime) AND THE RECORDED ANSWER WAS WRONG: a bare AActor can never be the target, because IsEligibleThreatTarget (BreakerEnemy.cpp:851) refuses anything that is not an ABreakerCharacter or an ABreakerDeployable with a live combat component, so it is never SELECTED and the engaged tick never runs against it. ResolveSweep/ResolveSlam bailing is true and irrelevant. The fixture uses a real character at its shipped 100 health and grants it nothing: neither attack is ever armed, because the approach leg runs entirely outside SlamRadiusCm (650) and asserts both that it stayed there and that the health is untouched. Leg order is load-bearing — closing inside slam radius arms a 0.9s wind-up that plants the body on every later frame. FIXED AT THE SITE AND DELIBERATELY NOT PINNED: the same override wrote StateLabel = ADVANCE AFTER the ring call, clobbering the ring's own ATTACK/BACK OFF, so a Warden holding station or backing off printed ADVANCE on the playtest HUD. The label now precedes the call as the base chase does; the state is reachable only with both attacks on cooldown, which a damage-free fixture cannot reach.
+- EXCEPTIONALS AT LEVELS 1-13: THINNED, NOT GATED. Owner: "exceptionals
+  basically drop instantly which they shouldnt (i think we should reduce their
+  drop rate a little bit in the earlier levels 1-13)". Raising the unlock would
+  have been the wrong reading — he asked for LESS, not none, and the unlock at
+  item level 8 already answers "none" for 1-7. So the Exceptional WEIGHT now
+  ramps from 35% of itself at ilvl 8 to its full value at 14 and is untouched
+  above that: the gate empties 1-7, the ramp thins 8-13, and 14 onward is the
+  table he has not complained about. Measured through the analytic projection:
+  a trash-only hour pays 2.32 Exceptionals at ilvl 8 against 6.19 at ilvl 14.
+  The pinned drops-per-hour band is unmoved at 134.
+  THE SUITE CAUGHT A DELIBERATE DUPLICATE: BreakerDropChanceOverflowTests keeps
+  its own copy of the pre-O249 weight formula so it can prove O249 changed
+  nothing below the Drop Chance cap. The ramp is a later, separate ruling and
+  belongs on BOTH sides of that comparison — carrying it on one side made the
+  ramp look like an O249 side effect. This is exactly the repeated-shape defect
+  Scripts/shapecheck.py exists to find.
+  AND A CHEST DEFECT THE SAME RUN FOUND, which the earlier fix had NOT closed:
+  an enemy capsule does not block the Pawn channel the way a chest does, so
+  widening the placement overlap still could not see a patrol. Chests ask the
+  bodies directly now, with 90 cm of walking room. Three consecutive Fernhall
+  runs clean afterwards.
 - WEAPON SOUND PASS, PER ARCHETYPE: LANDED. Owner-authorised, and the desk's
   framing was half wrong: the per-archetype ROUTE already shipped
   (ABreakerSoundDirector::PlayWeaponFire, ArchetypeFireWaves), it just resolved

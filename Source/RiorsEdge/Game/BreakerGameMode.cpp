@@ -4608,6 +4608,9 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
         const ABreakerEnemy* EnemyTemplate = GetDefault<ABreakerEnemy>();
         const UCapsuleComponent* EnemyTemplateBody = EnemyTemplate
             ? EnemyTemplate->FindComponentByClass<UCapsuleComponent>() : nullptr;
+        // Room to walk between the two rather than merely not intersecting: a
+        // chest touching a patrol is reachable and unreadable. O2 PLACEHOLDER.
+        constexpr float ChestBodyMarginCm = 90.0f;
         int32 ChestsPlaced = 0;
         for (int32 YardIndex = 0; YardIndex < UE_ARRAY_COUNT(ChestYards) && ChestBody; ++YardIndex)
         {
@@ -4635,21 +4638,35 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
                 }
                 const float Height = ChestBody->GetScaledCapsuleHalfHeight();
                 const FVector At = Floor.ImpactPoint + FVector(0, 0, Height + 2.0f);
-                // CLEAR OF THE WIDEST BODY THAT CAN STAND HERE, not merely of
-                // its own footprint. The first version tested the chest's own
-                // capsule and the suite caught it inside a minute: a chest is
-                // narrower than an enemy, so a spot the chest fits in can still
-                // be inside a patrol's capsule — and the encounter test's
-                // "every body is clear of world props" assertion went red on a
-                // random roll, which is worse than the overlap itself because
-                // it makes a shipped-configuration test depend on a dice throw.
-                const float BodyClearanceCm = EnemyTemplateBody
-                    ? EnemyTemplateBody->GetScaledCapsuleRadius() : 0.0f;
+                // CLEAR OF THE WORLD, and then clear of the BODIES, and the
+                // two are separate questions for a reason the suite had to
+                // teach twice. First a chest is narrower than an enemy, so a
+                // spot the chest fits in can still be inside a patrol. Then —
+                // and this is the part a wider overlap shape did NOT fix — an
+                // enemy capsule does not block the Pawn channel the way the
+                // chest does, so widening the query still could not see one.
+                // The encounter test's "every body is clear of world props"
+                // assertion went red on a random roll, which is worse than the
+                // overlap itself because it makes a shipped-configuration test
+                // depend on a dice throw.
+                //
+                // So the bodies are asked about DIRECTLY rather than through a
+                // channel whose responses this lane does not own.
                 if (World->OverlapBlockingTestByChannel(At, FQuat::Identity, ECC_Pawn,
-                    FCollisionShape::MakeCapsule(ChestBody->GetScaledCapsuleRadius() + BodyClearanceCm, Height), Query))
+                    FCollisionShape::MakeCapsule(ChestBody->GetScaledCapsuleRadius(), Height), Query))
                 {
                     continue;
                 }
+                const float BodyClearanceCm = ChestBody->GetScaledCapsuleRadius()
+                    + (EnemyTemplateBody ? EnemyTemplateBody->GetScaledCapsuleRadius() : 0.0f)
+                    + ChestBodyMarginCm;
+                bool bCrowded = false;
+                for (TActorIterator<ABreakerEnemy> It(World); It && !bCrowded; ++It)
+                {
+                    bCrowded = FVector::DistSquared2D(It->GetActorLocation(), At)
+                        < FMath::Square(BodyClearanceCm);
+                }
+                if (bCrowded) continue;
                 // Facing back down the yard, so the player meets its front and
                 // its reward lands on the side they walked in from.
                 ABreakerSupplyChest* Chest = World->SpawnActor<ABreakerSupplyChest>(At, (-Forward).Rotation());

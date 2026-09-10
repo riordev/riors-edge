@@ -78,6 +78,13 @@ namespace
     // the same thing and cannot drift out of sync with the weights.
     void BreakerDropApplyGates(int32 ItemLevel, EBreakerMonsterRank Rank, const FBreakerDropTableParams& Params, float(&Weights)[BreakerDropRarityCount])
     {
+        // THE EARLY RAMP, applied HERE and not at the roll, because the roll
+        // and the analytic projection both come through this function and the
+        // two must never be able to disagree about what a level actually
+        // drops. That is the same discipline the gates themselves keep.
+        Weights[static_cast<int32>(EBreakerItemRarity::Exceptional)]
+            *= UBreakerDropTableLibrary::ExceptionalWeightScalar(ItemLevel, Params);
+
         for (int32 Index = 0; Index < BreakerDropRarityCount; ++Index)
         {
             if (!UBreakerDropTableLibrary::IsRarityUnlocked(static_cast<EBreakerItemRarity>(Index), ItemLevel, Rank, Params))
@@ -294,6 +301,25 @@ FBreakerLootRateProjection UBreakerDropTableLibrary::ProjectLootRate(const FBrea
     Projection.HoursPerUnwritten = Projection.UnwrittenPerHour > 0.0f
         ? 1.0f / Projection.UnwrittenPerHour : TNumericLimits<float>::Max();
     return Projection;
+}
+
+float UBreakerDropTableLibrary::ExceptionalWeightScalar(int32 ItemLevel, const FBreakerDropTableParams& Params)
+{
+    // Below the unlock the gate has already zeroed the weight; returning zero
+    // here as well is not belt-and-braces, it is what makes this function
+    // answerable on its own. A caller reading the curve must not have to know
+    // that something else clips its left end.
+    if (ItemLevel < Params.ExceptionalMinimumItemLevel) return 0.0f;
+    if (ItemLevel >= Params.ExceptionalFullWeightItemLevel) return 1.0f;
+
+    const float Floor = FMath::Clamp(Params.ExceptionalEarlyFloor, 0.0f, 1.0f);
+    const int32 Span = Params.ExceptionalFullWeightItemLevel - Params.ExceptionalMinimumItemLevel;
+    // A full level that is at or below the unlock is a dial turned to nothing:
+    // the ramp disappears and the rarity carries its full weight the moment it
+    // unlocks, which is what the table did before this ruling.
+    if (Span <= 0) return 1.0f;
+    const float Along = static_cast<float>(ItemLevel - Params.ExceptionalMinimumItemLevel) / Span;
+    return FMath::Lerp(Floor, 1.0f, FMath::Clamp(Along, 0.0f, 1.0f));
 }
 
 FBreakerForgeWallet UBreakerDropTableLibrary::RollCurrencyDrop(int32 RandomSeed, int32 ItemLevel, EBreakerMonsterRank Rank,

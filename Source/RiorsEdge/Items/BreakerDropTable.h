@@ -157,6 +157,24 @@ struct RIORSEDGE_API FBreakerDropTableParams
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Gates", meta=(ClampMin="1"))
     int32 ExceptionalMinimumItemLevel = 8;   // O2 PLACEHOLDER
 
+    // --- THE EARLY RAMP ----------------------------------------------------
+    // Owner: "exceptionals basically drop instantly which they shouldnt (i
+    // think we should reduce their drop rate a little bit in the earlier levels
+    // 1-13)". A HARD GATE WOULD HAVE BEEN THE WRONG READING of that sentence:
+    // he asked for less, not for none, and the unlock at 8 already answers
+    // "none" for levels 1-7.
+    //
+    // So the Exceptional weight RAMPS from a fraction of itself at its unlock
+    // level up to its full value at the level below, and is untouched above
+    // that. The two figures are chosen to cover exactly the range he named:
+    // the gate makes 1-7 empty, the ramp makes 8-13 thinner, and 14 onward is
+    // the table he has not complained about. Both O2 PLACEHOLDER.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Gates", meta=(ClampMin="1"))
+    int32 ExceptionalFullWeightItemLevel = 14;   // O2 PLACEHOLDER
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Gates", meta=(ClampMin="0", ClampMax="1"))
+    float ExceptionalEarlyFloor = 0.35f;   // O2 PLACEHOLDER
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Gates", meta=(ClampMin="1"))
     int32 AberrantMinimumItemLevel = 25;   // O2 PLACEHOLDER
 
@@ -410,6 +428,14 @@ public:
     // The currency-per-hour arithmetic, analytic like ProjectLootRate and for
     // the same reason: a projection nobody can compute without a 100k-roll
     // sweep is not a tool anyone will use to retune the O2 placeholders above.
+    // How much of its authored weight Exceptional actually carries at this
+    // item level. 0 below the unlock (the gate has already said so), rising
+    // from ExceptionalEarlyFloor at the unlock to 1 at
+    // ExceptionalFullWeightItemLevel, and 1 above it. Public so the owner can
+    // read the curve he is tuning without running a sweep.
+    UFUNCTION(BlueprintPure, Category="Items|Drops")
+    static float ExceptionalWeightScalar(int32 ItemLevel, const FBreakerDropTableParams& Params);
+
     UFUNCTION(BlueprintPure, Category="Items|Drops")
     static FBreakerCurrencyRateProjection ProjectCurrencyRate(const FBreakerKillRateSample& Kills, int32 ItemLevel,
         const FBreakerCurrencyDropParams& Params);
