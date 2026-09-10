@@ -1,4 +1,5 @@
 #include "Combat/BreakerModifierComponent.h"
+#include "UI/BreakerEffectRenderer.h"
 
 #include "Attributes/BreakerAttributeSet.h"
 #include "Combat/BreakerCombatComponent.h"
@@ -483,6 +484,26 @@ void UBreakerEnemyModifierComponent::HandleOwnerDamaged(const FBreakerHitContext
     bReflecting = true;
     AttackerCombat->ReceiveDamage(Request);
     bReflecting = false;
+
+    // AND IT SAYS WHICH BODY DID IT. Owner: "warden or random enemy inside
+    // fernhall station rift just reflects a portion of my damage back at me" —
+    // the modifier is authored and working (12% back, capped at 5% of the
+    // enemy's health), and the enemy's bar already carries a chevron for it.
+    // What was missing is a tell AT THE MOMENT, so the player takes damage out
+    // of nowhere and has no way to connect it to the thing they just shot.
+    //
+    // Harm red, because that is the colour of being hurt (O179), and on the
+    // body rather than on the HUD because the answer to "what hit me" is a
+    // place in the world. Through the pooled effect path — this lane is a named
+    // consumer of it — so it costs no component and no asset.
+    if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(GetWorld()))
+    {
+        BreakerFX::FEffectTiming Timing;
+        Timing.DurationSeconds = 0.22f;   // O2 PLACEHOLDER
+        Timing.FadeOutSeconds = 0.16f;    // O2 PLACEHOLDER — a pop, then gone
+        Effects->AddGlow(GetOwner()->GetActorLocation() + FVector(0.0f, 0.0f, 40.0f),
+            34.0f, BreakerUI::Harm, 3.0f, Timing);
+    }
 }
 
 bool UBreakerEnemyModifierComponent::TryConsumeWakefulRevive(bool bKilledByWeakPoint)

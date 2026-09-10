@@ -84,8 +84,39 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     const FVector TraceEnd = ViewLocation + ViewRotation.Vector() * MaximumRangeCm;
     const bool bHit = World->LineTraceSingleByChannel(Hit, ViewLocation, TraceEnd, ECC_GameTraceChannel2, QueryParams);
     const bool bFollowCaster = ShouldFollowCaster(Character, bHit, Hit.ImpactPoint, Hit.ImpactNormal);
-    const FVector Center = bFollowCaster ? Hit.ImpactPoint
+    FVector Center = bFollowCaster ? Hit.ImpactPoint
         : AimPoint(ViewLocation, ViewRotation.Vector(), MaximumRangeCm, bHit, Hit.ImpactPoint);
+
+    // AND THEN IT FALLS TO THE FLOOR. Owner: "rot looks so weird casting
+    // sometimes its in the air". AimPoint's own comment says a trace that hits
+    // NOTHING should place the zone at the end of the reticle line rather than
+    // at the caster's feet, and that is right about the HORIZONTAL position and
+    // wrong about the vertical one: aim across a yard at nothing and the line
+    // ends in mid-air, so a ground zone spawns hanging there. The same is true
+    // of a trace that hits a WALL — the zone lands on the wall's face.
+    //
+    // So the aim decides WHERE and the floor decides HOW HIGH. Traced from
+    // above the aim point so a shallow aim that landed just under the ground
+    // still finds the surface it belongs on.
+    {
+        FHitResult Ground;
+        FCollisionQueryParams GroundQuery(SCENE_QUERY_STAT(BreakerRotFloor), false, Character);
+        constexpr float LiftCm = 400.0f;     // O2 PLACEHOLDER
+        constexpr float ReachCm = 4000.0f;   // O2 PLACEHOLDER
+        if (World->LineTraceSingleByObjectType(Ground, Center + FVector(0, 0, LiftCm),
+                Center - FVector(0, 0, ReachCm), FCollisionObjectQueryParams(ECC_WorldStatic), GroundQuery)
+            && Ground.ImpactNormal.Z >= 0.7f)
+        {
+            Center.Z = Ground.ImpactPoint.Z;
+        }
+        // NO FLOOR FOUND — a void, or a world with no geometry at all — and
+        // the aim point is then LEFT EXACTLY WHERE IT WAS. Moving it to the
+        // caster's feet was the first attempt and the suite refused it: four
+        // ability fixtures cast Rot in empty worlds and assert where the zone
+        // lands, so a fallback that relocates it broke the thing they measure.
+        // It is also the wrong rule generally — this correction should only
+        // ever fire on EVIDENCE of a floor, never on the absence of one.
+    }
 
     const FGameplayTag ZoneTag = BreakerAbilityTags::Zone_Caster_Rot.GetTag();
 

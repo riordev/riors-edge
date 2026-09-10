@@ -49,10 +49,28 @@ STILL OPEN FROM IT, IN HIS WORDS:
   which goes out when it is opened. Still not on the map, so it is still found
   by looking. If he crosses a yard and still misses one, the next lever is the
   spread, not the light.
-- "rot looks so weird casting sometimes its in the air or half baked".
-- "warden or random enemy inside fernhall station rift just reflects a portion
-  of my damage back at me" — a modifier doing its job with no tell, or a bug.
-  Find which before touching it.
+- "rot looks so weird casting sometimes its in the air" — HALF FIXED. AimPoint
+  places the zone at the END OF THE RETICLE LINE when the aim trace hits
+  nothing, and its own comment argues for that: a far aim should not drop the
+  zone at your feet. It is right about the HORIZONTAL and wrong about the
+  vertical — aim across a yard at nothing and the line ends in mid-air, so a
+  ground zone hangs there; aim at a wall and it lands on the wall's face. The
+  aim decides WHERE now and a floor trace decides HOW HIGH.
+  ONLY ON EVIDENCE OF A FLOOR. The first attempt fell back to the caster's feet
+  when no floor was found and the suite refused it: four ability fixtures cast
+  Rot in empty worlds and assert where the zone lands. A correction that fires
+  on the ABSENCE of geometry is the wrong rule anyway.
+  STILL OPEN: "half baked" is not diagnosed. Needs a capture of the zone actor
+  mid-cast; nothing in the harness photographs one yet.
+- "warden or random enemy ... reflects a portion of my damage back at me" —
+  IDENTIFIED, NOT A BUG, NOW LEGIBLE. It is the authored Reflective modifier:
+  12% of what you deal comes back as TrueDamage, capped at 5% of that enemy's
+  max health, never off a DoT and never off a reflect. The enemy's bar already
+  carries a chevron for it. What was missing is a tell AT THE MOMENT it fires,
+  so damage arrives from nowhere and cannot be connected to the body that did
+  it. The reflecting body now pops harm-red for 0.22 s through the pooled
+  effect path — in the world rather than on the HUD, because the answer to
+  "what hit me" is a place.
 - "the skill menu is so overwhelming and displays way too much information".
 - "i cant make it to the end of the rift even with all those extra points
   because my base character is just so weak". Balance, and it is the same
