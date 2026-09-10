@@ -1,5 +1,28 @@
 # Desk — next playtest
 
+## THE LIST IS DONE. FOUR THINGS WANT YOUR HANDS, NOT MINE.
+
+Every item from the Fernhall message landed. What is below is the record; what
+is here is only the part that cannot move without you.
+
+1. THE LATTICE HAS NO BODY BY YOUR OWN RULING (2026-08-29,
+   Assets/enemies/LICENSE-NOTE.txt). If you are overturning it, say so and it
+   is quick: Enemy_EyeDrone and Enemy_QuadShell are both in the repo with full
+   rigs and animation sets, and NOTHING references either.
+2. THE WEAK POINT'S SIZE. The ball was the hitbox drawn true — 40 cm of mesh
+   over a 20 cm collision radius — so it is a ring now rather than a smaller
+   ball. If it still reads too big, the honest lever is the HITBOX, and
+   shrinking that makes weak-point shots harder. That is your call.
+3. THE WATCHKEEPER STANDS IN A BUSH. His authored marker is a few metres from
+   dress_trees05. Moving him is a composer re-export.
+4. NOBODY HAS HEARD THE GUNS. Eight reports now differ in length, weight and
+   colour and none of them clicks or clips — a test can prove that much and
+   cannot prove one sounds like a gun.
+
+AND ONE THING TO KNOW: chest items are NOT inside the pinned drops-per-hour
+band. That band is projected from a kill rate and a chest is not a kill.
+
+
 ## THE FLAKY ABILITY TESTS ARE FIXED, AND IT WAS NEVER TEST ORDER
 
 THE DIAGNOSIS ON THIS DESK WAS WRONG. It read as order-dependence because a
