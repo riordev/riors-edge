@@ -447,6 +447,15 @@ bool UBreakerGameplayAbility::BeginCastIfNeeded(const FGameplayAbilitySpecHandle
         ? EffectiveCastSeconds(Definition->GetCastTimeSeconds(), AbilityCastRateMultiplierFor(Character)) : 0.0f;
     if (Seconds <= 0.0f || !World) return true;
 
+    // THE ABILITY'S OWN REFUSAL, BEFORE THE PRICE. Every "this press would do
+    // nothing" guard an ability owns used to sit in its body, which a wind-up
+    // moves to the far side of the payment. Asking here keeps a dead key free.
+    if (!PrepareCast())
+    {
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+        return false;
+    }
+
     // O266: the price goes on the KEYPRESS. A refused commit is a refused
     // cast — no window, no timer, and the ability ends the way it always did.
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
@@ -463,6 +472,9 @@ bool UBreakerGameplayAbility::BeginCastIfNeeded(const FGameplayAbilitySpecHandle
     {
         State->StartWindow(CastWindowKey(Definition->AbilityId), Seconds);
     }
+    // Whatever this ability must start at the cast rather than at the landing.
+    // After the window opens, so an override can read its own cast window.
+    OnCastBegan();
     // Damage interrupts (O266). Bound per cast and released with it, so an
     // ability that is not casting pays nothing for the rule.
     if (UBreakerCombatComponent* Combat = Character->FindComponentByClass<UBreakerCombatComponent>())
@@ -510,6 +522,37 @@ void UBreakerGameplayAbility::HandleCastInterrupt(const FBreakerDamageResult& Re
     // casting free to attempt.
     bCastCommitted = false;
     EndAbility(CastHandle, CurrentActorInfo, CastActivationInfo, true, true);
+}
+
+void UBreakerGameplayAbility::EndAbility(const FGameplayAbilitySpecHandle Handle,
+    const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
+    bool bReplicateEndAbility, bool bWasCancelled)
+{
+    // Only while a cast is actually pending: an ordinary end — the body ran
+    // and finished — has an already-fired timer and a closed window, so this
+    // costs nothing and changes nothing on the path every ability takes.
+    if (bCastPending)
+    {
+        ABreakerCharacter* Character = GetBreakerCharacter();
+        if (UWorld* World = Character ? Character->GetWorld() : nullptr)
+        {
+            World->GetTimerManager().ClearTimer(CastTimer);
+        }
+        if (const UBreakerAbilityDefinition* Definition = GetAbilityDefinition())
+        {
+            if (UBreakerAbilityStateComponent* State = Character
+                ? Character->FindComponentByClass<UBreakerAbilityStateComponent>() : nullptr)
+            {
+                State->CloseWindow(CastWindowKey(Definition->AbilityId));
+            }
+        }
+        EndCastBinding();
+        bCastPending = false;
+        // NO REFUND, the same rule the damage interrupt states: the Mana went
+        // on the keypress and the wind-up is the risk that buys it back.
+        bCastCommitted = false;
+    }
+    Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
 void UBreakerGameplayAbility::EndCastBinding()

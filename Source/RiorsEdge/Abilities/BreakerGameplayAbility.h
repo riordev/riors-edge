@@ -91,11 +91,45 @@ public:
     bool BeginCastIfNeeded(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
         const FGameplayAbilityActivationInfo ActivationInfo);
 
+    // THE TWO CAST-START SEAMS, and both exist because a wind-up moves WHEN an
+    // ability's decisions happen, not just when its effect lands.
+    //
+    // PrepareCast runs BEFORE the cost is committed and may REFUSE. Without it
+    // every "this key would do nothing, do not charge for it" guard an ability
+    // owns silently moved to the far side of the payment: Resonance refuses to
+    // charge 40 Mana for a target with no statuses, and once a wind-up exists
+    // that check runs after the Mana is gone. A refusal here ends the ability
+    // exactly as a failed commit does.
+    //
+    // OnCastBegan runs once the wind-up is actually running — cost paid, window
+    // open. It is for the part of an ability that must start at the CAST rather
+    // than at the landing: Unmake suspends Mana generation, and a suspension
+    // that waited for the landing would let the bank refill during the cast,
+    // which is the debt interaction the ultimate is built on.
+    //
+    // Both are no-ops by default, so an ability that authors no cast time and
+    // an ability that overrides neither behave exactly as they did.
+    virtual bool PrepareCast() { return true; }
+    virtual void OnCastBegan() {}
+
     // Damage interrupts a cast (O266). No refund — the Mana went on the
     // keypress and an interrupted cast is a loss, which is the whole point of
     // a wind-up being a risk.
     UFUNCTION() void HandleCastInterrupt(const FBreakerDamageResult& Result);
     bool IsCasting() const { return bCastPending; }
+
+    // A CANCELLED CAST MUST NOT STILL LAND. The wind-up timer was cleared on
+    // exactly one path — a damage interrupt — and this class overrode nothing,
+    // so any OTHER way an ability ends while winding up (CancelAllAbilities, a
+    // class swap, death, a cancel tag) left the timer running: it fired on its
+    // own clock, re-entered ActivateAbility with bCastPending still set, and
+    // the ability resolved in full after it had been cancelled. Every ability
+    // that authors a wind-up was exposed, not only the two that gained one.
+    // Teardown is unconditional here, in the precedent Unmake's own EndAbility
+    // sets, because a cast that resolves after its cancel is the same species
+    // of failure as a Caster left with free casts.
+    virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+        const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
 private:
     void EndCastBinding();

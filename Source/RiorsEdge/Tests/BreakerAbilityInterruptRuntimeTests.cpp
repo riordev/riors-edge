@@ -95,6 +95,27 @@ bool FBreakerAbilityInterruptRuntimeTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Unmake channel is canceled"), ASC->FindAbilitySpecFromHandle(Unmake)->IsActive());
     TestFalse(TEXT("Unmake cancellation restores generation"), Player->GetMana()->IsGenerationSuspended());
     Advance(6);
+
+    // A CANCELLED CAST MUST NOT STILL LAND, and this is the one that was
+    // getting through. The wind-up timer was cleared on exactly one path — a
+    // damage interrupt — so ANY other end while winding up (a cancel, a class
+    // swap, death) left it running: it fired on its own clock, re-entered
+    // ActivateAbility with the cast still pending, and the ability resolved in
+    // full after it had been cancelled. Every ability that authors a wind-up
+    // was exposed. The cancel here happens DURING the wind-up, with no
+    // ResolvePendingCast, and then the clock runs well past the cast.
+    Player->GetAttributes()->ApplyClassResource(100);
+    if (!TestTrue(TEXT("Unmake starts a second time"), ASC->TryActivateAbility(Unmake))) return false;
+    TestTrue(TEXT("The suspension is live during the wind-up"), Player->GetMana()->IsGenerationSuspended());
+    ASC->CancelAbilityHandle(Unmake);
+    TestFalse(TEXT("Cancelling mid-wind-up releases the suspension at once"),
+        Player->GetMana()->IsGenerationSuspended());
+    Advance(40);   // far beyond any authored wind-up
+    TestFalse(TEXT("and the cancelled cast never lands on its own clock"),
+        Player->GetMana()->IsGenerationSuspended());
+    TestFalse(TEXT("nor leaves its ability instance running"),
+        ASC->FindAbilitySpecFromHandle(Unmake)->IsActive());
+    Advance(6);
     SetClass(EBreakerClassId::Tank);
     const auto Hold = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Hold::StaticClass(), 1));
     if (!TestTrue(TEXT("real timed Hold starts"), ASC->TryActivateAbility(Hold))) return false;

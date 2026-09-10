@@ -26,6 +26,59 @@ UBreakerAbility_Resonance::UBreakerAbility_Resonance()
     SetAssetTags(Tags);
 }
 
+bool UBreakerAbility_Resonance::AcquireDetonationTarget(AActor*& OutTarget, int32& OutDistinctTypes,
+    int32& OutRefundable) const
+{
+    OutTarget = nullptr;
+    OutDistinctTypes = 0;
+    OutRefundable = 0;
+
+    const ABreakerCharacter* Character = GetBreakerCharacter();
+    const UWorld* World = Character ? Character->GetWorld() : nullptr;
+    if (!World) return false;
+
+    FVector ViewLocation = Character->GetActorLocation();
+    FRotator ViewRotation = Character->GetControlRotation();
+    if (const AController* Controller = Character->GetController())
+    {
+        Controller->GetPlayerViewPoint(ViewLocation, ViewRotation);
+    }
+
+    FHitResult Hit;
+    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(BreakerResonance), false, Character);
+    const FVector TraceEnd = ViewLocation + ViewRotation.Vector() * MaximumRangeCm;
+    if (World->LineTraceSingleByChannel(Hit, ViewLocation, TraceEnd, ECC_GameTraceChannel2, QueryParams))
+    {
+        OutTarget = Hit.GetActor();
+    }
+
+    const UBreakerStatusComponent* Status = OutTarget
+        ? OutTarget->FindComponentByClass<UBreakerStatusComponent>() : nullptr;
+    if (!Status) return false;
+    OutDistinctTypes = Status->GetDistinctStatusTypeCount();
+    for (const FBreakerActiveStatus& Active : Status->GetActiveStatuses())
+        if (Active.ResourceProcCoefficient > 0.0f) ++OutRefundable;
+    return OutDistinctTypes > 0;
+}
+
+bool UBreakerAbility_Resonance::PrepareCast()
+{
+    AActor* Target = nullptr;
+    int32 DistinctTypes = 0;
+    int32 Refundable = 0;
+    if (!AcquireDetonationTarget(Target, DistinctTypes, Refundable))
+    {
+        bCastSnapshotValid = false;
+        CastSnapshotTarget.Reset();
+        return false;
+    }
+    CastSnapshotTarget = Target;
+    CastSnapshotDistinctTypes = DistinctTypes;
+    CastSnapshotRefundable = Refundable;
+    bCastSnapshotValid = true;
+    return true;
+}
+
 void UBreakerAbility_Resonance::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
     // O266: the wind-up. Returns false when it has started a cast — the cost
@@ -40,35 +93,41 @@ void UBreakerAbility_Resonance::ActivateAbility(const FGameplayAbilitySpecHandle
         return;
     }
 
-    FVector ViewLocation = Character->GetActorLocation();
-    FRotator ViewRotation = Character->GetControlRotation();
-    if (const AController* Controller = Character->GetController())
-    {
-        Controller->GetPlayerViewPoint(ViewLocation, ViewRotation);
-    }
-
-    FHitResult Hit;
-    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(BreakerResonance), false, Character);
-    const FVector TraceEnd = ViewLocation + ViewRotation.Vector() * MaximumRangeCm;
+    // THE COUNT COMES FROM THE CAST START WHEN THERE WAS ONE. Owner-ruled: the
+    // payload is snapshotted like a damage-over-time source's is, or the
+    // wind-up eats the very statuses it is paid from. The TARGET is snapshotted
+    // with it — a cast commits to what it was aimed at, and re-tracing at the
+    // landing would let the payload follow the crosshair for free.
+    //
+    // With no authored cast time there is no snapshot and this asks the same
+    // question inline, which is what keeps a zero-cast-time build identical.
     AActor* Target = nullptr;
-    if (World->LineTraceSingleByChannel(Hit, ViewLocation, TraceEnd, ECC_GameTraceChannel2, QueryParams))
+    int32 DistinctCount = 0;
+    int32 RefundableCount = 0;
+    if (bCastSnapshotValid)
     {
-        Target = Hit.GetActor();
+        bCastSnapshotValid = false;
+        Target = CastSnapshotTarget.Get();
+        DistinctCount = CastSnapshotDistinctTypes;
+        RefundableCount = CastSnapshotRefundable;
+        CastSnapshotTarget.Reset();
+    }
+    else if (!AcquireDetonationTarget(Target, DistinctCount, RefundableCount))
+    {
+        // Never charged: the refusal is the same one PrepareCast makes on the
+        // cast path, for the reason Closequarter states — charging 40 Mana for
+        // a press that provably cannot do anything is a dead key, not a risk
+        // the design asked for.
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+        return;
     }
 
-    UBreakerStatusComponent* Status = Target ? Target->FindComponentByClass<UBreakerStatusComponent>() : nullptr;
-    const int32 DistinctCount = Status ? Status->GetDistinctStatusTypeCount() : 0;
-    int32 RefundableCount = 0;
-    if (Status)
-        for (const FBreakerActiveStatus& Active : Status->GetActiveStatuses())
-            if (Active.ResourceProcCoefficient > 0.0f) ++RefundableCount;
-
-    // Target acquisition and the status count both happen BEFORE the commit,
-    // for the reason Closequarter states: charging 40 Mana for a cast that
-    // provably cannot do anything is a dead key, not a risk the design asked
-    // for. Detonating an unstatused target is exactly that — the whole ability
-    // is "consume what is there", and there is nothing there.
-    if (DistinctCount <= 0 || !CommitAbility(Handle, ActorInfo, ActivationInfo))
+    // THE TARGET CAN DIE OR LEAVE DURING A WIND-UP. There is no refund (O266:
+    // the Mana went on the keypress and the wind-up is the risk that buys it
+    // back), so this is a spent cast rather than an error.
+    UBreakerStatusComponent* Status = IsValid(Target)
+        ? Target->FindComponentByClass<UBreakerStatusComponent>() : nullptr;
+    if (!Status || DistinctCount <= 0 || !CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return;

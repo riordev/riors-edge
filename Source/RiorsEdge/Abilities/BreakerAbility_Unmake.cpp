@@ -309,6 +309,18 @@ void UBreakerAbility_Unmake::EndCascadeListening()
     CascadeListeners.Empty();
 }
 
+void UBreakerAbility_Unmake::OnCastBegan()
+{
+    // The suspension starts with the CAST. Its own window has not opened yet
+    // and may never open — an interrupted cast ends the ability, and
+    // HandleUnmakeOwnerDeath and the ordinary end both pop this same key — so
+    // the caster is never left suspended by a cast that did not land.
+    if (UBreakerManaComponent* Mana = GetManaComponent())
+    {
+        Mana->PushGenerationSuspension(GenerationSuspensionKey());
+    }
+}
+
 void UBreakerAbility_Unmake::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
     // O266: the wind-up. Returns false when it has started a cast — the cost
@@ -355,7 +367,10 @@ void UBreakerAbility_Unmake::ActivateAbility(const FGameplayAbilitySpecHandle Ha
     }
 
     // "Mana generation is suspended" (Class-Kits §2.2). Keyed push/pop so an
-    // early end reverts exactly its own entry.
+    // early end reverts exactly its own entry — and PushGenerationSuspension
+    // is keyed, so the cast-start push (OnCastBegan) and this one are the same
+    // entry rather than two. This line therefore still holds for a build with
+    // no authored cast time, and is a no-op when the cast already pushed it.
     if (UBreakerManaComponent* Mana = GetManaComponent())
     {
         Mana->PushGenerationSuspension(GenerationSuspensionKey());

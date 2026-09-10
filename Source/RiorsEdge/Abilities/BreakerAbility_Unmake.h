@@ -59,6 +59,15 @@ public:
     virtual bool IsStaggerInterruptible() const override { return true; }
 
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+
+    // O266's wind-up, and this ultimate is the one where the wind-up could
+    // NERF the thing it delays. "Mana generation is suspended" is the ultimate's
+    // whole debt interaction; a suspension that waited for the landing would
+    // hand the caster a free window of generation for casting it, so a longer
+    // cast would mean a fuller bank. The suspension therefore starts at the
+    // CAST, not at the payoff. Keyed push/pop as before, so the existing
+    // early-end and death cleanup release exactly their own entry.
+    virtual void OnCastBegan() override;
     virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
     // Suspension key on the Mana component, shared so activate and teardown

@@ -25,6 +25,35 @@ public:
 
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
+    // O266's wind-up moved two things to the cast start, and they are the same
+    // two things.
+    //
+    // THE REFUSAL. This ability has always declined to charge for a target
+    // carrying nothing — "the whole ability is consume what is there, and there
+    // is nothing there". With a wind-up that check sat AFTER the Mana was
+    // spent, so a mis-aimed press became a 40 Mana fine. It runs here instead.
+    //
+    // THE SNAPSHOT, owner-ruled: the count is taken at cast start, like a
+    // damage-over-time source snapshots its own. Without it the wind-up eats
+    // the payload it is paid from — statuses tick down during the cast and
+    // expire, so the same press that would have detonated six types detonates
+    // four, and the ability gets weaker the longer it takes to fire. What is
+    // CONSUMED is still whatever is live at the landing; only the count the
+    // damage is scaled by is frozen.
+    virtual bool PrepareCast() override;
+
+private:
+    // The trace and the count, in one place because the cast start and the
+    // no-cast-time path must not be able to ask the question differently.
+    bool AcquireDetonationTarget(AActor*& OutTarget, int32& OutDistinctTypes, int32& OutRefundable) const;
+
+    TWeakObjectPtr<AActor> CastSnapshotTarget;
+    int32 CastSnapshotDistinctTypes = 0;
+    int32 CastSnapshotRefundable = 0;
+    bool bCastSnapshotValid = false;
+
+public:
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Resonance") FBreakerDetonationParams Detonation;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Resonance") EBreakerDetonationCurve Curve = EBreakerDetonationCurve::Linear;
     // MS8's rewrite: do not consume, halve the remaining durations instead.

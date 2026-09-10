@@ -123,8 +123,17 @@ bool FBreakerOverreachRuntimeTest::RunTest(const FString& Parameters)
     if(!EnterDebt())return false;
     if(!CastSlot(Ultimate,0))return false;
     const float SuspendedBank=Mana->GetMana();
+    // O266: THE ULTIMATE WINDS UP NOW, and the suspension starts with the CAST
+    // rather than with the window. That ordering is the whole reason this
+    // fixture's interaction survives a wind-up: a suspension that waited for
+    // the payoff would let the bank regenerate for the length of the cast and
+    // clear the very debt these lines exist to hold.
+    TestTrue(TEXT("The suspension is live during the wind-up, not only the window"),Mana->IsGenerationSuspended());
+    Clock(BreakerAuthoredCastSeconds(TEXT("Caster.Unmake"))+.05f);
+    TestEqual(TEXT("The wind-up itself generates nothing"),Mana->GetMana(),SuspendedBank,.001f);
     TestTrue(TEXT("Literal Overreach includes Unmake suspension"),Mana->IsGenerationSuspended());
     const float Duration=State->GetWindowRemaining(UBreakerCasterAbility::UnmakeWindowKey());
+    if(!TestTrue(TEXT("The window opens on the far side of the cast"),Duration>0.f))return false;
     Clock(Duration-.05f);
     TestEqual(TEXT("Free Unmake retains exact negative bank while live"),Mana->GetMana(),SuspendedBank,.001f);
     Clock(.10f);
@@ -135,6 +144,9 @@ bool FBreakerOverreachRuntimeTest::RunTest(const FString& Parameters)
     // the literal authored interaction, recorded rather than silently nerfed.
     const float RenewedBank=Mana->GetMana();ASC->CancelAllAbilities();
     TestFalse(TEXT("Cancellation releases suspension"),Mana->IsGenerationSuspended());
+    // The cancelled-cast teardown is proved in RiorsEdge.Abilities
+    // .InterruptRuntime, NOT here: catching it needs a tick past the whole
+    // wind-up, and these lines depend on containing no recovery frame at all.
     if(!CastSlot(Ultimate,0))return false;
     TestEqual(TEXT("Same-frame free renewal retains debt"),Mana->GetMana(),RenewedBank,.001f);
     if(!Progression->PurchaseNode(Core,Conduction->NodeId,Reason))return false;

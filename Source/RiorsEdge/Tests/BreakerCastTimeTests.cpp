@@ -77,28 +77,37 @@ bool FBreakerCastTimeShippedTest::RunTest(const FString& Parameters)
         FName(TEXT("Caster.Fracture")),
         FName(TEXT("Caster.Siphon")),
         FName(TEXT("Tank.BreachCharge")),
-        // Unmake stays instant on a MEASURED interaction, not a hunch. Its
-        // window suspends Mana generation, and a wind-up means the bank
-        // regenerates for the length of the cast BEFORE the suspension
-        // starts — deep enough that OverreachRuntime's debt clears and a
-        // second free Unmake is no longer available. That fixture says in
-        // its own comment that the interaction is authored and "recorded
-        // rather than silently nerfed", so a wind-up here is a balance
-        // change the owner rules on, not a delay.
-        FName(TEXT("Caster.Unmake")),
-        // Resonance is parked on a MEASURED consequence rather than a fixture.
-        // It detonates the statuses on a target and is paid out of their
-        // remaining damage budget — and a wind-up burns budget before the
-        // detonation collects it, so the same cast deals measurably less
-        // (405 -> 270 in MultispellPurchasedRuntime). Whether Resonance should
-        // SNAPSHOT its statuses when the cast begins, the way DoT sources
-        // already snapshot, is a ruling and not a number.
-        FName(TEXT("Caster.Resonance")),
+        // UNMAKE AND RESONANCE HAVE LEFT THIS SET, owner-ruled, and both were
+        // parked here on real measurements rather than hunches — so what moved
+        // is the mechanism each measurement was about, not the number.
+        //
+        // Unmake was instant because its window suspends Mana generation and a
+        // wind-up let the bank regenerate for the length of the cast BEFORE the
+        // suspension started, deep enough to clear OverreachRuntime's debt and
+        // hand back a second free Unmake. The suspension now starts at the CAST
+        // (UBreakerAbility_Unmake::OnCastBegan), so there is no generating
+        // window to exploit and that fixture's interaction stands untouched.
+        //
+        // Resonance was instant because it is paid out of the target's
+        // remaining status budget and a wind-up burned that budget before the
+        // detonation collected it — 405 -> 270. It now SNAPSHOTS the count at
+        // cast start, the way DoT sources already snapshot, which was named
+        // here as the ruling this needed. What is consumed is still whatever is
+        // live at the landing; only the count the damage scales by is frozen.
     };
     for (const FName Id : Instant)
     {
         TestEqual(*FString::Printf(TEXT("%s stays instant"), *Id.ToString()), Authored(*Id.ToString()), 0.0f, 0.0001f);
     }
+
+    // The two that left the set, pinned by VALUE rather than only by the
+    // sweep below: each one's wind-up is the thing a ruling bought, so a
+    // silent return to zero is a regression and not a retune.
+    TestEqual(TEXT("Resonance winds up before it detonates"), Authored(TEXT("Caster.Resonance")), 0.45f, 0.0001f);
+    TestEqual(TEXT("Unmake winds up before the window opens"), Authored(TEXT("Caster.Unmake")), 0.8f, 0.0001f);
+    TestTrue(TEXT("The ultimate is the most committal cast in the class"),
+        Authored(TEXT("Caster.Unmake")) > Authored(TEXT("Caster.Cleave"))
+        && Authored(TEXT("Caster.Unmake")) > Authored(TEXT("Caster.Resonance")));
     for (const UBreakerAbilityDefinition* Definition : UBreakerAbilityDefinition::GetFallbackRegistry())
     {
         if (!Definition || Instant.Contains(Definition->AbilityId)) continue;
