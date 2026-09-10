@@ -1,5 +1,31 @@
 # Desk — next playtest
 
+## TWO ABILITY TESTS ARE ORDER-DEPENDENT — THE SUITE'S GREEN IS PARTLY LUCK
+
+`RiorsEdge.Abilities.MultispellPurchasedRuntime` and
+`.CleaveAcceptedHitRuntime` pass or fail depending on what ran before them.
+PROVEN, not suspected: Cleave passes alone and fails in the full suite;
+Multispell fails alone and PASSED in the full suite at e1ac97f5. Stashing all
+working changes and re-running at HEAD still fails Multispell, so it is not
+anything a recent commit did.
+
+Multispell's shape: it measures a detonation with the MS8 rewrite unpurchased,
+then again purchased, and asserts the two are EQUAL. They come out 405 and 270
+— exactly 3:2 — which is the ratio of three live status types to two. So one of
+the two runs sees a status the other does not, and which one depends on
+timing. Rot's cast time moves it (0.6 -> 0.45 flips the failure), which is why
+Rot's cast is pinned at 0.6 and marked do-not-touch until this is understood.
+
+WHY IT MATTERS MORE THAN THE TESTS: every "878 passing, 0 unexpected" in this
+session's commit messages is weaker than it reads, and one of them —
+286f1e68 — is simply WRONG: that run was 877 with this test red, and the
+message claims 0. The claim is corrected here rather than by rewriting a
+pushed commit.
+
+FIX IT BEFORE TRUSTING A GREEN AGAIN. Likeliest cause is shared state between
+runtime fixtures — a static, an injected account save, or a library cache that
+one test leaves warm for the next.
+
 ## THE FEEL REVIEW ARRIVES AS A MESSAGE, NOT A FILE
 
 The owner sends it after playing. The lowest-scoring beat that names a
