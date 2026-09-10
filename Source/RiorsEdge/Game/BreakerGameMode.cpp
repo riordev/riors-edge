@@ -961,6 +961,10 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
     SpawnJumpGapRun();
     SpawnCombatEncounter();
     SpawnWorldDressing();
+    // Recorded HERE rather than inferred from a map name: this is the one
+    // place that actually builds a gym field, so it is the only place that can
+    // honestly answer whether one exists.
+    bGymFieldBuilt = true;
     // THE HUB, and its travel point back to this gym. Placed BEHIND the safe
     // ring, on the opposite side from the encounter, so it cannot overlap the
     // field SpawnExpandedField just built or the arena the combat spawns use.
@@ -5199,6 +5203,24 @@ int32 ABreakerGameMode::GetWaveEnemiesAlive() const
 void ABreakerGameMode::ResetPlaytestTargets()
 {
     if (!GetWorld()) return;
+    // THE GYM ONLY. This function destroys EVERY enemy in the world and then
+    // rebuilds the GYM's target dummies and standing encounter — and it ran
+    // wherever the player pressed F1. In Fernhall that deleted the yard's
+    // authored patrols, the courtyard, the quest's elites and the repopulation
+    // slots' occupants, and spawned gym content on top: "the gym enemies are
+    // suddenly inside fernhall".
+    //
+    // Refusing rather than rebuilding the yard, deliberately. F1 is dev
+    // tooling; the CHARACTER half of the reset (health, ammo, stats, spawn
+    // transform) still runs and is the useful part outside the gym, and
+    // rebuilding a destination's population correctly is the repopulation
+    // clock's job, not a debug key's.
+    if (!bGymFieldBuilt)
+    {
+        UE_LOG(LogTemp, Display,
+            TEXT("[BreakerGym] RESET refused: this map has no gym field. The player reset; the world is left alone."));
+        return;
+    }
     for (TActorIterator<ABreakerTargetDummy> It(GetWorld()); It; ++It) It->Destroy();
     for (TActorIterator<ABreakerEnemy> It(GetWorld()); It; ++It) It->Destroy();
     // The destroy loop above just killed the parked reserve too; the weak

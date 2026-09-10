@@ -1,4 +1,5 @@
 #include "Combat/BreakerHitReactionComponent.h"
+#include "Combat/BreakerFlinchMath.h"
 
 #include "Components/MeshComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -161,6 +162,62 @@ void UBreakerHitReactionComponent::TickComponent(float DeltaTime, ELevelTick Tic
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
     UpdateDeathPresentation(DeltaTime);
+    UpdateFlinch(DeltaTime);
+}
+
+void UBreakerHitReactionComponent::NotifyFlinch(const FVector& AwayDirection, bool bWeakPoint)
+{
+    UMeshComponent* Body = OverlayBody.Get();
+    // NO BODY, NO FLINCH, and that is a real case rather than a guard: the
+    // Lattice is composed primitives by owner ruling and has no named body to
+    // rock. Its parts are code-animated, so offsetting them here would fight
+    // the animation that draws it. Recorded rather than faked.
+    if (!Body) return;
+    // The death beat owns the transform once it starts; a hit landing on a
+    // corpse mid-crumple must not fight it for the same component.
+    if (DeathPresentationElapsed >= 0.0f) return;
+
+    if (!bFlinchBaseCaptured)
+    {
+        FlinchBaseLocation = Body->GetRelativeLocation();
+        FlinchBaseRotation = Body->GetRelativeRotation();
+        bFlinchBaseCaptured = true;
+    }
+    AActor* Owner = GetOwner();
+    const FVector Away = AwayDirection.IsNearlyZero() && Owner
+        ? -Owner->GetActorForwardVector() : AwayDirection;
+    FlinchDirection = Away.GetSafeNormal2D();
+    FlinchScale = bWeakPoint ? BreakerFlinch::WeakPointScale : 1.0f;
+    // RESTARTED, NEVER STACKED. Sustained fire lands faster than the hitch
+    // decays, and adding them would walk the mesh off its own capsule.
+    FlinchElapsed = 0.0f;
+}
+
+void UBreakerHitReactionComponent::UpdateFlinch(float DeltaSeconds)
+{
+    if (FlinchElapsed < 0.0f) return;
+    UMeshComponent* Body = OverlayBody.Get();
+    if (!Body) { FlinchElapsed = -1.0f; return; }
+
+    FlinchElapsed += DeltaSeconds;
+    const float Amount = BreakerFlinch::Amount(FlinchElapsed, BreakerFlinch::DurationSeconds) * FlinchScale;
+    if (Amount <= 0.0f)
+    {
+        // BACK TO EXACTLY WHERE IT WAS. Not "close enough": the pose is
+        // written from the captured base rather than nudged toward it, so a
+        // thousand hits leave the body where one hit found it.
+        Body->SetRelativeLocation(FlinchBaseLocation);
+        Body->SetRelativeRotation(FlinchBaseRotation);
+        FlinchElapsed = -1.0f;
+        return;
+    }
+    const FVector Local = GetOwner()
+        ? GetOwner()->GetActorTransform().InverseTransformVectorNoScale(
+            BreakerFlinch::Offset(FlinchDirection, Amount, BreakerFlinch::ReachCm))
+        : FVector::ZeroVector;
+    Body->SetRelativeLocation(FlinchBaseLocation + Local);
+    Body->SetRelativeRotation(FlinchBaseRotation
+        + FRotator(BreakerFlinch::Pitch(Amount, BreakerFlinch::PitchDegrees), 0.0f, 0.0f));
 }
 
 void UBreakerHitReactionComponent::UpdateDeathPresentation(float DeltaSeconds)

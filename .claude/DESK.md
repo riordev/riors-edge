@@ -1,5 +1,47 @@
 # Desk — next playtest
 
+## OWNER PLAYTEST, 2026-09-10 (SECOND) — THIS OUTRANKS EVERYTHING BELOW
+
+LANDED FROM IT ALREADY:
+- "the gym enemies are suddenly inside fernhall" — FOUND AND FIXED. F1 RESET
+  (ResetPlaytestTargets) destroys EVERY enemy in the world and rebuilds the
+  GYM's target dummies and standing encounter, and it ran in whatever map the
+  key was pressed in. In Fernhall it deleted the yard's patrols, the courtyard,
+  the quest's elites and every repopulation slot's occupant, and put gym
+  content on top. It refuses outside the gym now; the character half of the
+  reset still runs, which is the useful part.
+- "multiple bars ... which dont help at all as to what they are ... keep it as
+  one combined bar" — shield and health share one track now, split by their
+  maxima so the seam does not slide while you are being shot, and the 20% tick
+  is cut at 20% of the HEALTH pool rather than of the whole bar. And the
+  resource rail finally DRAWS ITS LABEL: it has computed one (MANA, MOMENTUM,
+  SCRAP, GRIT, CHARGE) since it was written and nothing ever drew it, which is
+  most of "dont help as to what they are". Four rails down to three, all named.
+- "enemies should stagger or flinch when shot" — the STAGGER state already
+  ships and is applied by a Tank ability and the Warden slam, which is correct
+  and stays: a rifle round that staggered would be a stunlock. What was missing
+  is the cosmetic half. Bodies rock back along the shot and settle over 0.12s,
+  harder on a weak point. The Lattice does not flinch — it is composed
+  primitives by ruling and has no named body to rock.
+
+STILL OPEN FROM IT, IN HIS WORDS:
+- "theres absolutely no shape to fernhall at all just the main opened portion".
+  THE BIGGEST ONE. Three yards of flat ground with cover on it is not shape.
+  Wants verticality, structures, enclosure — a composer job.
+- "i havent seen any chest". Six are placed per session and he found none.
+  Either the roll is putting them where nobody walks, or they are too small to
+  notice at range. MEASURE BEFORE MOVING ANYTHING: log where they land against
+  where he actually walked.
+- "rot looks so weird casting sometimes its in the air or half baked".
+- "warden or random enemy inside fernhall station rift just reflects a portion
+  of my damage back at me" — a modifier doing its job with no tell, or a bug.
+  Find which before touching it.
+- "the skill menu is so overwhelming and displays way too much information".
+- "i cant make it to the end of the rift even with all those extra points
+  because my base character is just so weak". Balance, and it is the same
+  complaint as "abilities feel irrelevant at the start" from the last message.
+
+
 ## THE LIST IS DONE. FOUR THINGS WANT YOUR HANDS, NOT MINE.
 
 Every item from the Fernhall message landed. What is below is the record; what

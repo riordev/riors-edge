@@ -82,6 +82,15 @@ public:
     // The body answers a hit. No-op while the death beat owns the materials.
     void NotifyHit(bool bWeakPoint);
 
+    // THE BODY ROCKS WHEN IT IS HIT. Owner: "enemies should stagger or flinch
+    // when shot". Purely cosmetic and deliberately NOT a stagger: the stagger
+    // state ships and is applied by a Tank ability and the Warden's slam, and
+    // a rifle round that staggered would be a stunlock. AwayDirection points
+    // from the shooter toward this body; a zero vector falls back to the
+    // owner's own backward, which is where a shooter usually is in a
+    // first-person game.
+    void NotifyFlinch(const FVector& AwayDirection, bool bWeakPoint);
+
     void StartDeathPresentation(bool bWeakPointKill);
     // The revive restore: settles any reaction, returns scale, recomputes the
     // resting colour. Safe to call when nothing ran.
@@ -106,6 +115,7 @@ private:
     void ApplyBodyPaint();
     void EndHitFlash();
     void UpdateDeathPresentation(float DeltaSeconds);
+    void UpdateFlinch(float DeltaSeconds);
 
     TArray<TWeakObjectPtr<UStaticMeshComponent>> Parts;
     TWeakObjectPtr<class UMeshComponent> OverlayBody;
@@ -115,4 +125,13 @@ private:
     bool bDeathBeatWeakPoint = false;
     bool bDeathPresentationRan = false;
     FVector DeathBaseScale = FVector::OneVector;
+    // THE POSE THE BODY RESTS IN, captured on the first flinch and never
+    // recomputed. Reading it fresh each time would read a body mid-hitch and
+    // the offsets would accumulate until the mesh walked off its own capsule.
+    FVector FlinchBaseLocation = FVector::ZeroVector;
+    FRotator FlinchBaseRotation = FRotator::ZeroRotator;
+    FVector FlinchDirection = FVector::ZeroVector;
+    float FlinchElapsed = -1.0f;
+    float FlinchScale = 1.0f;
+    bool bFlinchBaseCaptured = false;
 };

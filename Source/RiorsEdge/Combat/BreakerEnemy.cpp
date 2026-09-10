@@ -954,6 +954,22 @@ void ABreakerEnemy::ClearThreat()
 void ABreakerEnemy::HandleThreatDamage(const FBreakerHitContext& Hit)
 {
     if (!HasAuthority() || bDead || (Combat && Combat->IsDead()) || Hit.Target != this) return;
+
+    // THE BODY ANSWERS THE SHOT WITH MOTION. Owner: "enemies should stagger or
+    // flinch when shot". Fired HERE, above every threat rule below it, because
+    // a hit that earns no threat still landed — a hit from something this body
+    // will not chase must still look like a hit.
+    //
+    // FlinchesWhenHit is the family's own answer and is already ruled: the
+    // late-stage Altered does not flinch, and this does not overrule it.
+    if (HitReaction && FlinchesWhenHit()
+        && Hit.Result.HealthDamage + Hit.Result.ShieldDamage > 0.0f)
+    {
+        const AActor* From = Hit.Instigator ? Hit.Instigator.Get() : Hit.ThreatSource.Get();
+        HitReaction->NotifyFlinch(From ? GetActorLocation() - From->GetActorLocation() : FVector::ZeroVector,
+            Hit.Result.bWeakPoint);
+    }
+
     if (bProvokeEndsOnForeignDamage && ProvokedTarget.IsValid() && Hit.Instigator != ProvokedTarget.Get()
         && Hit.Result.HealthDamage + Hit.Result.ShieldDamage > 0) ProvokedTarget.Reset();
     AActor* Source = Hit.ThreatSource.Get();

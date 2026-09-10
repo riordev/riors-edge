@@ -721,17 +721,19 @@ void ABreakerPlaytestHUD::DrawVitals(const ABreakerCharacter* Character)
             BreakerUI::TextSecondary, BreakerUI::HudVitalsMaxPixels, 1.0f, ESpecFontRole::Mono);
     }
 
-    // --- Shield layer -----------------------------------------------------------
-    // Drains instantly, recovers linear: the component's own value does both,
-    // so the fill is the raw fraction with no chip.
-    if (Vitals.bDrawShield)
-    {
-        const float ShieldY = S(BreakerUI::HudShieldTop);
-        const float ShieldH = S(BreakerUI::HudShieldHeight);
-        DrawTrack(Left, ShieldY, Width, ShieldH, Attributes->GetShield() / MaxShield,
-            BreakerUI::TextSecondary, BreakerUI::BgBase);
-        DrawBorder(Left, ShieldY, Width, ShieldH, BreakerUI::BorderEmphasis, S(BreakerUI::BorderThin));
-    }
+    // --- ONE BAR, TWO POOLS -------------------------------------------------
+    // Owner: "multiple bars appearing over my hud which dont help at all as to
+    // what they are ... keep it as one combined bar". The shield used to have
+    // its own 6 px track fourteen pixels above the health bar, and two stacked
+    // rails of the same width read as one thing with a seam in it rather than
+    // as two pools.
+    //
+    // So the shield lives INSIDE the health bar now, drawn below with the two
+    // pools sharing one track and splitting it by their maxima — health from
+    // the left, shield from the right — so the bar's total length is what you
+    // have and the split is where one pool ends and the other begins. The two
+    // numbers still print separately above it, which is the other half of what
+    // he asked for.
 
     // --- Health bar ---------------------------------------------------------------
     // The fill drains at once; the chip holds where the health WAS and
@@ -746,22 +748,70 @@ void ABreakerPlaytestHUD::DrawVitals(const ABreakerCharacter* Character)
     }
     HealthShownFraction = HealthFraction;
     const float ChipFraction = BreakerHUDMath::HealthChipShown(HealthChip, HealthFraction, Now);
-    DrawTrack(Left, HealthY, Width, HealthH, HealthFraction, BreakerUI::System, BreakerUI::BgBase);
+
+    // THE SPLIT. The track's width is shared between the two pools in
+    // proportion to their MAXIMA, so the seam does not move while you are
+    // being shot — a boundary that slid around would be a third moving thing
+    // to read. A character with no shield gets the whole bar and no seam,
+    // which is the shape this HUD has always had.
+    const float HealthShare = Vitals.bDrawShield && (MaxHealth + MaxShield) > UE_SMALL_NUMBER
+        ? MaxHealth / (MaxHealth + MaxShield) : 1.0f;
+    const float HealthWidth = Width * HealthShare;
+    const float ShieldWidth = Width - HealthWidth;
+
+    DrawTrack(Left, HealthY, HealthWidth, HealthH, HealthFraction, BreakerUI::System, BreakerUI::BgBase);
     if (ChipFraction > HealthFraction)
     {
-        const float ChipX = Left + Width * HealthFraction;
-        const float ChipW = Width * (ChipFraction - HealthFraction);
+        const float ChipX = Left + HealthWidth * HealthFraction;
+        const float ChipW = HealthWidth * (ChipFraction - HealthFraction);
         DrawHatch(ChipX, HealthY, ChipW, HealthH, BreakerUI::HarmDeep, BreakerUI::Harm,
             BreakerUI::HudHealthChipHatchPeriod, BreakerUI::HudHealthChipHatchStripe);
     }
-    // The 20 % tick, cut into the bar in bg-0 so it reads over fill and chip.
-    DrawRect(BreakerUI::BgVoid, Left + Width * BreakerUI::HudHealthLowFraction, HealthY,
+    // The 20 % tick belongs to the HEALTH pool and is cut at 20 % of ITS
+    // length, not of the whole bar. Against a shielded character the two are
+    // different places, and the one that means "you are nearly dead" is this.
+    DrawRect(BreakerUI::BgVoid, Left + HealthWidth * BreakerUI::HudHealthLowFraction, HealthY,
         FMath::Max(S(1.0f), 1.0f), HealthH);
+
+    if (Vitals.bDrawShield && ShieldWidth > 0.0f)
+    {
+        // The shield fills from the SEAM outward, in the secondary tone rather
+        // than the bone the health wears: same bar, same height, plainly a
+        // different pool. Its own hairline divider keeps the two from reading
+        // as one long fill when both are full.
+        const float ShieldFraction = MaxShield > UE_SMALL_NUMBER
+            ? FMath::Clamp(Attributes->GetShield() / MaxShield, 0.0f, 1.0f) : 0.0f;
+        DrawTrack(Left + HealthWidth, HealthY, ShieldWidth, HealthH, ShieldFraction,
+            BreakerUI::TextSecondary, BreakerUI::BgBase);
+        DrawRect(BreakerUI::BgVoid, Left + HealthWidth, HealthY, FMath::Max(S(2.0f), 1.0f), HealthH);
+    }
     DrawBorder(Left, HealthY, Width, HealthH, BreakerUI::BorderEmphasis, S(BreakerUI::BorderThin));
 
     // --- Resource track ---------------------------------------------------------
-    DrawResourceTrack(ResolveResourceRow(Character), Left, S(BreakerUI::HudResourceTop), Width,
-        S(BreakerUI::HudResourceHeight));
+    // AND IT SAYS WHAT IT IS. Owner: "multiple bars appearing over my hud which
+    // dont help at all as to what they are". The row has computed a Label —
+    // MANA, MOMENTUM, SCRAP, GRIT, CHARGE — since it was written, and nothing
+    // ever drew it. Three unlabelled rails of the same width stacked on top of
+    // each other are not three readouts, they are one shape with seams.
+    //
+    // LABEL FIRST AND THE RAIL TAKES WHAT IS LEFT, the same row the XP rail
+    // below already uses. There is no vertical room down here — the XP rail
+    // learned that when its label landed on the health bar — so it is
+    // horizontal or it collides.
+    {
+        const BreakerHUD::FResourceRow Row = ResolveResourceRow(Character);
+        const float ResourceY = S(BreakerUI::HudResourceTop);
+        const float ResourceH = S(BreakerUI::HudResourceHeight);
+        float TrackLeft = Left;
+        if (!Row.Label.IsEmpty())
+        {
+            const FVector2D LabelSize = MeasureSpecText(Row.Label, BreakerUI::HudXpLevelPixels, ESpecFontRole::Mono);
+            DrawSpecText(Row.Label, Left, ResourceY + ResourceH * 0.5f - LabelSize.Y * 0.5f,
+                BreakerUI::TextMuted, BreakerUI::HudXpLevelPixels, 1.0f, ESpecFontRole::Mono);
+            TrackLeft = Left + LabelSize.X + S(BreakerUI::Space8);
+        }
+        DrawResourceTrack(Row, TrackLeft, ResourceY, FMath::Max(0.0f, Right - TrackLeft), ResourceH);
+    }
 
     // --- XP -----------------------------------------------------------------
     // "i cant see my xp" (owner, playtest 2026-09-10). It was not small or

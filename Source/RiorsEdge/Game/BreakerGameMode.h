@@ -587,6 +587,13 @@ private:
         TWeakObjectPtr<class ABreakerEnemy> Occupant;
         float EmptySeconds = 0.0f;
     };
+    // WHETHER THIS MAP IS THE GYM. F1 RESET is gym tooling — it destroys every
+    // enemy in the world and rebuilds the gym's target dummies and standing
+    // encounter — and it ran in whatever map the player happened to be in.
+    // Pressed in Fernhall it deleted the yard's patrols and put gym content in
+    // their place, which is exactly what the owner reported as "the gym enemies
+    // are suddenly inside fernhall".
+    bool bGymFieldBuilt = false;
     TArray<FBreakerOutdoorSlot> OutdoorSlots;
     TArray<FBreakerItemInstance> RiftRunLoot;
     int32 RiftRunStartRiftglass = 0;
