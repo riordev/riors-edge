@@ -280,6 +280,9 @@ namespace
         Writer.WriteValue(TEXT("id"), Affix.AffixId.ToString());
         Writer.WriteValue(TEXT("pool"), FString(Pool));
         Writer.WriteValue(TEXT("displayName"), Affix.DisplayName.ToString());
+        // Round-tripped, or the next `ue-census.sh` rewrites affixes.json from
+        // what the library loaded and silently deletes every authored name word.
+        Writer.WriteValue(TEXT("nameWord"), Affix.NameWord);
         Writer.WriteValue(TEXT("category"), BreakerCensusEnumName(Affix.Category));
         Writer.WriteValue(TEXT("target"), BreakerCensusEnumName(Affix.StatTarget));
         Writer.WriteValue(TEXT("bucket"), BreakerCensusEnumName(Affix.StatBucket));

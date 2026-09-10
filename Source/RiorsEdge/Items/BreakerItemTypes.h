@@ -278,6 +278,17 @@ struct RIORSEDGE_API FBreakerAffixDefinition
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FName AffixId = NAME_None;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FText DisplayName;
+    // THE ONE WORD THIS LINE CONTRIBUTES TO AN ITEM'S NAME (owner, playtest
+    // 2026-09-10: names are "at max 3 words", built as "a special word per
+    // prefix then item type then affix with a quirky name").
+    //
+    // SEPARATE FROM DisplayName ON PURPOSE. The display name is what the stat
+    // line has to say to be understood — "Physical Damage Reduction" — and
+    // O267 named an item by concatenating those, which is how the owner's own
+    // boots ended up called "Movement Speed BOOTS of Ailment Avoidance". A
+    // name and a stat description are different jobs; this is the name's half,
+    // and being ONE word is the property the three-word ceiling rests on.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) FString NameWord;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerAffixCategory Category = EBreakerAffixCategory::Prefix;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerStatTarget StatTarget = EBreakerStatTarget::Health;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerStatBucket StatBucket = EBreakerStatBucket::Flat;

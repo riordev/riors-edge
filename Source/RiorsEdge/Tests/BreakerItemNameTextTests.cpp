@@ -89,10 +89,60 @@ bool FBreakerItemNameTextTest::RunTest(const FString& Parameters)
     Rolled.Affixes.Add(BreakerItemNameTextRoll(Suffix->AffixId, 1, EBreakerAffixCategory::Suffix));
 
     const FString Headline = DisplayName(Rolled);
-    TestTrue(TEXT("the headline leads with the prefix word"),
-        Headline.StartsWith(Prefix->DisplayName.ToString()));
-    TestTrue(TEXT("the headline closes with 'of' the suffix word"),
-        Headline.EndsWith(FString(TEXT(" of ")) + Suffix->DisplayName.ToString()));
+    // THE AUTHORED NAME WORD, NOT THE DISPLAY NAME. A display name describes a
+    // stat and is as long as it needs to be; a name word is a name. Building
+    // names out of display names is what produced "Movement Speed BOOTS of
+    // Ailment Avoidance" in the owner's own inventory.
+    TestTrue(TEXT("the headline leads with the prefix's name word"),
+        Headline.StartsWith(Prefix->NameWord));
+    TestTrue(TEXT("the headline closes with 'of' the suffix's name word"),
+        Headline.EndsWith(FString(TEXT(" of ")) + Suffix->NameWord));
+    TestTrue(*FString::Printf(TEXT("and it is at most %d words: \"%s\""),
+            BreakerItemNaming::MaxNameWords, *Headline),
+        BreakerItemNaming::CountNameWords(Headline) <= BreakerItemNaming::MaxNameWords);
+
+    // ---- THE CEILING, OVER THE WHOLE LIBRARY -----------------------------
+    // Owner-ruled: "it should at max be 3 words". One sample name proves the
+    // grammar; this proves the CONTENT, which is where a three-word rule
+    // actually breaks — a single affix authored with a two-word name word
+    // lengthens every item that ever rolls it, and nothing else would notice.
+    // Composed against the widest base in the game, so a name that fits here
+    // fits everywhere.
+    int32 Checked = 0;
+    const auto SweepPool = [&](const TArray<FBreakerAffixDefinition>& Pool)
+    {
+        for (const FBreakerAffixDefinition& Affix : Pool)
+        {
+            TestFalse(*FString::Printf(TEXT("%s authors a name word"), *Affix.AffixId.ToString()),
+                Affix.NameWord.IsEmpty());
+            TestFalse(*FString::Printf(TEXT("%s's name word is ONE word, got \"%s\""),
+                    *Affix.AffixId.ToString(), *Affix.NameWord),
+                Affix.NameWord.TrimStartAndEnd().Contains(TEXT(" ")));
+
+            FBreakerItemInstance Widest;
+            Widest.Slot = EBreakerEquipSlot::BodyArmour;   // the longest label there is
+            Widest.Affixes.Add(BreakerItemNameTextRoll(Affix.AffixId, 1, Affix.Category));
+            const FString Name = DisplayName(Widest);
+            TestTrue(*FString::Printf(TEXT("%s composes inside the ceiling: \"%s\""),
+                    *Affix.AffixId.ToString(), *Name),
+                BreakerItemNaming::CountNameWords(Name) <= BreakerItemNaming::MaxNameWords);
+            ++Checked;
+        }
+    };
+    SweepPool(Library.Slice);
+    SweepPool(Library.Aberrant);
+    SweepPool(Library.Unwritten);
+    SweepPool(Library.Downsides);
+    TestTrue(TEXT("the sweep actually walked the library"), Checked >= 90);
+    AddInfo(FString::Printf(TEXT("Name words checked: %d. Sample: \"%s\""), Checked, *Headline));
+
+    // The multi-word LABELS keep their words; only the NAME takes one. A card's
+    // rarity line still reads BODY ARMOUR.
+    FBreakerItemInstance Plate;
+    Plate.Slot = EBreakerEquipSlot::BodyArmour;
+    TestEqual(TEXT("the slot label is unchanged"), FString(SlotWord(EBreakerEquipSlot::BodyArmour)),
+        FString(TEXT("BODY ARMOUR")));
+    TestEqual(TEXT("but the name takes one word for it"), DisplayName(Plate), FString(TEXT("PLATE")));
 
     // And the pin that would have caught the two screens disagreeing: the kind
     // a narrow row prints is a PART of the headline a card prints. They can

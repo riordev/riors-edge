@@ -85,24 +85,42 @@ namespace BreakerItemNameText
     // The archetype is the one fact not already implied by where the card
     // sits, and weapon drops randomise it, so it is the only place the class
     // is visible before equipping.
+    //
+    // ONE WORD, ALWAYS, and that is a NAME rule rather than a label rule. The
+    // slot words and archetype names stay exactly as they are wherever they are
+    // read as labels — a card's rarity line still says BODY ARMOUR. Three of
+    // them are two words, and inside a name each would spend a word the
+    // three-word ceiling does not have: "Fleet Body Armour of Warding" is four.
+    // So the name takes the half that identifies the thing.
     inline FString KindWord(const FBreakerItemInstance& Item)
     {
-        return Item.IsWeapon()
+        const FString Label = Item.IsWeapon()
             ? BreakerWeaponArchetypeNames::Short(Item.WeaponArchetype)
             : FString(SlotWord(Item.Slot));
+        if (Label.Equals(TEXT("BODY ARMOUR"))) return TEXT("PLATE");
+        if (Label.Equals(TEXT("ROCKET LAUNCHER"))) return TEXT("LAUNCHER");
+        if (Label.Equals(TEXT("BURST RIFLE"))) return TEXT("BURSTGUN");
+        return Label;
     }
 
-    // The word a rolled line contributes to the name. Words are the affix's
-    // own display name until flavour words are authored: a later data pass
-    // changes the wording without touching the grammar or this lookup.
+    // The word a rolled line contributes to the name — the affix's authored
+    // NameWord, not its display name.
+    //
+    // THIS IS THE FIX FOR THE OWNER'S OWN BOOTS. O267 built a name out of
+    // display names, so "Movement Speed" + BOOTS + "Ailment Avoidance" came out
+    // as a six-word sentence. A display name has to describe a stat; a name
+    // word has to be a name. They are different jobs and now they are different
+    // fields. Empty is impossible for an authored line — the library refuses to
+    // load an affix without one — so an empty here means an unauthored id, and
+    // the composer drops that half rather than inventing words for it.
     inline FString AffixWord(const FBreakerRolledAffix& Rolled)
     {
         const FBreakerAffixLibraryData& Library = UBreakerAffixLibrary::GetData();
         for (const TArray<FBreakerAffixDefinition>* Pool : { &Library.Slice, &Library.Aberrant,
             &Library.Unwritten, &Library.Downsides })
             for (const FBreakerAffixDefinition& Affix : *Pool)
-                if (Affix.AffixId == Rolled.AffixId) return Affix.DisplayName.ToString();
-        if (Library.Elemental.AffixId == Rolled.AffixId) return Library.Elemental.DisplayName.ToString();
+                if (Affix.AffixId == Rolled.AffixId) return Affix.NameWord;
+        if (Library.Elemental.AffixId == Rolled.AffixId) return Library.Elemental.NameWord;
         return FString();
     }
 

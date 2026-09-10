@@ -210,6 +210,24 @@ namespace
         }
         Out.DisplayName = FText::FromString(DisplayName);
 
+        // REQUIRED, not optional. An affix with no name word cannot contribute
+        // to an item's name at all, and a silent fallback to the display name
+        // is exactly the multi-word sprawl the ceiling exists to stop — so a
+        // new line without one fails the whole load rather than quietly
+        // lengthening every item that rolls it.
+        FString NameWord;
+        if (!Row.TryGetStringField(TEXT("nameWord"), NameWord) || NameWord.IsEmpty())
+        {
+            Errors.Add(FString::Printf(TEXT("%s: no \"nameWord\""), *Id));
+            bOk = false;
+        }
+        else if (NameWord.TrimStartAndEnd().Contains(TEXT(" ")))
+        {
+            Errors.Add(FString::Printf(TEXT("%s: \"nameWord\" must be ONE word, got \"%s\""), *Id, *NameWord));
+            bOk = false;
+        }
+        Out.NameWord = NameWord;
+
         bOk = BreakerAffixReadEnum(Row, TEXT("category"), Id, Out.Category, Errors) && bOk;
         bOk = BreakerAffixReadEnum(Row, TEXT("target"), Id, Out.StatTarget, Errors) && bOk;
         bOk = BreakerAffixReadEnum(Row, TEXT("bucket"), Id, Out.StatBucket, Errors) && bOk;

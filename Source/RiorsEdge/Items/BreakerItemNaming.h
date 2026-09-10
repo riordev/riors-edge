@@ -56,6 +56,23 @@ namespace BreakerItemNaming
     // Words come from the affix's own display name until flavour words are
     // authored: the RULE is what this file owns, and a later data pass that
     // adds a proper name word changes the words without touching the grammar.
+    // THE CEILING, owner-ruled 2026-09-10: "it should at max be 3 words".
+    // "of" is a connector rather than a word — "Fleet Boots of Warding" is
+    // three — so it does not count against the budget. Written as a rule and
+    // asserted rather than left to the discipline of whoever authors the next
+    // affix: the ceiling only holds if something enforces it.
+    inline constexpr int32 MaxNameWords = 3;
+
+    inline int32 CountNameWords(const FString& Name)
+    {
+        TArray<FString> Parts;
+        Name.ParseIntoArray(Parts, TEXT(" "), /*InCullEmpty=*/true);
+        int32 Words = 0;
+        for (const FString& Part : Parts)
+            if (!Part.Equals(TEXT("of"), ESearchCase::IgnoreCase)) ++Words;
+        return Words;
+    }
+
     inline FString Compose(const FString& PrefixWord, const FString& BaseName, const FString& SuffixWord)
     {
         FString Name;
