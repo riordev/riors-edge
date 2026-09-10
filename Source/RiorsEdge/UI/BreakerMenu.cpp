@@ -65,6 +65,8 @@
 #include "Widgets/SCanvas.h"
 #include "UI/BreakerSkillProjection.h"
 #include "UI/BreakerTypeRoles.h"
+#include "UI/BreakerAbilityCostLine.h"
+#include "UI/BreakerDoctrineWallet.h"
 #include "UI/BreakerUIStyle.h"
 #include "UI/BreakerCharacterSheetMath.h"
 #include "Combat/BreakerStatusComponent.h"
@@ -8913,10 +8915,30 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
     HeaderRight->AddSlot().FillWidth(1.0f)[SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))];
     // Two counters as separate railed chips — doctrine on the system rail,
     // core on gold (O204) — so the two currencies are never read as one pool.
-    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
-    [
-        MakePointChip(TEXT("DOCTRINE POINTS"), UnspentClass, ClassSpent, Sys)
-    ];
+    //
+    // THE DOCTRINE WALLET DOES NOT APPEAR UNTIL THE STORY HAS PAID ONE. Owner:
+    // "class points shouldnt be shown till a quests completion". A level pays
+    // no doctrine point (O111 retired that currency's level grant); the only
+    // thing that pays one is a mission Unlock beat, four of them across the
+    // campaign. So a character before the first turn-in carries a chip reading
+    // 0 UNSPENT · 0 SPENT for a currency nothing has offered them yet, three
+    // lines of the busiest header in the game explaining a wallet that is not
+    // open. Once the story pays, it is theirs and it stays.
+    //
+    // VISIBILITY ONLY, AND THE PICK IS NOT GATED. O215 sites doctrine
+    // commitment at the first Kess turn-in and NEVER gates it on that turn-in:
+    // the Forge accepts a commitment at any point after the class lock. A gate
+    // here would be a different, ruled-against feature wearing this one's
+    // words.
+    const bool bDoctrineWalletOpen = BreakerDoctrineWallet::IsOpen(UnspentClass, ClassSpent,
+        Progression ? Progression->GetProgressionState().LevelDoctrinePointsGranted : 0);
+    if (bDoctrineWalletOpen)
+    {
+        HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
+        [
+            MakePointChip(TEXT("DOCTRINE POINTS"), UnspentClass, ClassSpent, Sys)
+        ];
+    }
     HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space16, 0.0f)
     [
         MakePointChip(TEXT("CORE POINTS"), UnspentCore, CoreSpent, Amber)
@@ -10612,7 +10634,19 @@ TSharedRef<SWidget> SBreakerMenu::BuildAbilitiesScreen()
                 [SNew(SVerticalBox)
                     + SVerticalBox::Slot().AutoHeight()[MenuWrappedText(FText::FromString(Entry.Label), BreakerUI::TypeCaption, Muted, Metrics.PanelWidth / 3 - 2 * BreakerUI::Space24, true)]
                     + SVerticalBox::Slot().AutoHeight().Padding(0, BreakerUI::Space4, 0, 0)
-                    [MenuWrappedText(Active ? Active->DisplayName : FText::GetEmpty(), BreakerUI::TypeBody, Primary, Metrics.PanelWidth / 3 - 2 * BreakerUI::Space24, true)]],
+                    [MenuWrappedText(Active ? Active->DisplayName : FText::GetEmpty(), BreakerUI::TypeBody, Primary, Metrics.PanelWidth / 3 - 2 * BreakerUI::Space24, true)]
+                    // WHAT THE EQUIPPED ABILITY COSTS, at the price the
+                    // character actually pays: GetCost reads the granted
+                    // instance, so a Cost Reduction node shows up here and the
+                    // authored number below in the catalogue does not move.
+                    // The catalogue is a menu; this is a receipt.
+                    + SVerticalBox::Slot().AutoHeight().Padding(0, BreakerUI::Space4, 0, 0)
+                    [MenuWrappedText(Active
+                        ? FText::FromString(BreakerAbilityCost::Flatten(BreakerAbilityCost::Compose(
+                            Abilities->GetCost(Slot), Active->CooldownSeconds, Active->CastTimeSeconds,
+                            BreakerAbilityCost::ResourceWordFor(PermanentClass))))
+                        : FText::GetEmpty(),
+                        BreakerUI::TypeCaption, Amber, Metrics.PanelWidth / 3 - 2 * BreakerUI::Space24, true)]],
                 AbilityPickerSlot == Slot ? Cyan : BorderRest, AbilityPickerSlot == Slot ? BreakerUI::BorderSelected : BreakerUI::BorderThin)];
         }
         for (const FSlotEntry& SlotEntry : SlotEntries)
@@ -10660,6 +10694,10 @@ TSharedRef<SWidget> SBreakerMenu::BuildAbilitiesScreen()
                     && Progression->GetProgressionState().AbilityLoadout.Contains(AbilityId);
                 const bool bImplemented = Definition && Definition->IsImplemented();
                 const FName CapturedId = AbilityId;
+                const BreakerAbilityCost::FCostLine CostLine = Definition
+                    ? BreakerAbilityCost::Compose(Definition->ResourceCost, Definition->CooldownSeconds,
+                        Definition->CastTimeSeconds, BreakerAbilityCost::ResourceWordFor(PermanentClass))
+                    : BreakerAbilityCost::FCostLine();
 
                 SlotBody->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)
                 [
@@ -10715,6 +10753,32 @@ TSharedRef<SWidget> SBreakerMenu::BuildAbilitiesScreen()
                                     !bImplemented
                                         ? StaticCastSharedRef<SWidget>(MenuText(FText::FromString(TEXT("NOT IMPLEMENTED")), BreakerUI::TypeCaption, Disabled, true))
                                         : SNullWidget::NullWidget
+                                ]
+                            ]
+                            // THE PRICE, ABOVE THE PROSE. Owner: "spell costs
+                            // actually appearing in the skill menu". A player
+                            // choosing between two abilities is choosing what
+                            // to spend a pool on, and this screen has never
+                            // once said what either one takes. The AUTHORED
+                            // numbers, not the granted instance's: this row is
+                            // a catalogue of things you could equip, and three
+                            // of them are not equipped, so there is no granted
+                            // instance to ask.
+                            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+                            [
+                                SNew(SHorizontalBox)
+                                + SHorizontalBox::Slot().AutoWidth()
+                                [
+                                    MenuText(FText::FromString(CostLine.CostText), BreakerUI::TypeCaption,
+                                        bIsEquippedChoice ? Amber : SoftText, true)
+                                ]
+                                + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space12, 0.0f, 0.0f, 0.0f)
+                                [
+                                    MenuText(FText::FromString(CostLine.GateText), BreakerUI::TypeCaption, Muted, true)
+                                ]
+                                + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space12, 0.0f, 0.0f, 0.0f)
+                                [
+                                    MenuText(FText::FromString(CostLine.CastText), BreakerUI::TypeCaption, Muted, true)
                                 ]
                             ]
                             + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)

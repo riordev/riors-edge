@@ -727,14 +727,26 @@ void ABreakerPlaytestHUD::DrawVitals(const ABreakerCharacter* Character)
     // WHAT is part of the read, not context for it.
     DrawSpecText(Vitals.MaxText, Left + ValueSize.X + S(BreakerUI::HudVitalsMaxGap),
         ValueTop + ValueSize.Y - MaxSize.Y, BreakerUI::TextMuted, BreakerUI::HudVitalsMaxPixels, 1.0f, ESpecFontRole::Mono);
-    // The shield number, small, at the row's right edge, only when a pool
-    // exists (O199). Right-aligned so it cannot collide with a long max, and in
-    // the shield's OWN BLUE (O269) — it is the third number in a row of greys
-    // otherwise, and which pool it counts was left to position alone.
+    // The shield numbers, small, at the row's right edge, only when a pool
+    // exists (O199). Right-aligned so they cannot collide with a long health
+    // max, and in the shield's OWN BLUE (O269) — otherwise it is a third
+    // number in a row of greys and which pool it counts is left to position.
+    //
+    // BOTH POOLS PRINT OUT OF WHAT (owner: "make sure maximum shield/health is
+    // displayed next to current in some fashion"). The shield used to print a
+    // bare current, so 41 could have been a scratch on a big pool or almost all
+    // of a small one, and the two pools were formatted differently from each
+    // other for no reason a player could see. Same shape as health now: the
+    // value, then the total behind it in the muted tone.
     if (Vitals.bDrawShield)
     {
         const FVector2D ShieldSize = MeasureSpecText(Vitals.ShieldText, BreakerUI::HudVitalsMaxPixels, ESpecFontRole::Mono);
-        DrawSpecTextRight(Vitals.ShieldText, Right, ValueTop + ValueSize.Y - ShieldSize.Y,
+        const FString ShieldMaxText = BreakerUI::FormatTicker(MaxShield);
+        const FVector2D ShieldMaxSize = MeasureSpecText(ShieldMaxText, BreakerUI::HudVitalsMaxPixels, ESpecFontRole::Mono);
+        const float ShieldBaseline = ValueTop + ValueSize.Y - ShieldSize.Y;
+        DrawSpecTextRight(ShieldMaxText, Right, ShieldBaseline,
+            BreakerUI::TextMuted, BreakerUI::HudVitalsMaxPixels, 1.0f, ESpecFontRole::Mono);
+        DrawSpecTextRight(Vitals.ShieldText, Right - ShieldMaxSize.X - S(BreakerUI::HudVitalsMaxGap), ShieldBaseline,
             BreakerUI::VitalShield, BreakerUI::HudVitalsMaxPixels, 1.0f, ESpecFontRole::Mono);
     }
 
@@ -803,7 +815,17 @@ void ABreakerPlaytestHUD::DrawVitals(const ABreakerCharacter* Character)
             BreakerUI::VitalShield, BreakerUI::VitalShieldDeep);
         DrawRect(BreakerUI::BgVoid, Left + HealthWidth, HealthY, FMath::Max(S(2.0f), 1.0f), HealthH);
     }
-    DrawBorder(Left, HealthY, Width, HealthH, BreakerUI::BorderEmphasis, S(BreakerUI::BorderThin));
+    // THE BAR IS OUTLINED (owner: "give the bar a subtle outline as well so it
+    // stands out a little bit more"). Two strokes rather than a thicker one:
+    // a dark ring OUTSIDE the bar and the bright border on its edge. The bar is
+    // drawn over whatever the world happens to be — a sunlit concrete yard is
+    // as likely as a dark interior — and a single border cannot hold against
+    // both. The dark ring is what separates it from a bright ground; the bright
+    // edge is what holds it on a dark one.
+    const float Outline = FMath::Max(S(BreakerUI::BorderThin), 1.0f);
+    DrawBorder(Left - Outline, HealthY - Outline, Width + Outline * 2.0f, HealthH + Outline * 2.0f,
+        BreakerUI::BgVoid, Outline);
+    DrawBorder(Left, HealthY, Width, HealthH, BreakerUI::BorderHigh, S(BreakerUI::BorderThin));
 
     // THE NUMBER COLUMN AT THE RIGHT END OF A RAIL. Owner: "can we get numeric
     // values for xp and mana that are shown". Both rails below want the same

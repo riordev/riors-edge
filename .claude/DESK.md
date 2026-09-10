@@ -35,8 +35,41 @@ LANDED, THE HUD HALF (O269):
   fabricated in the preview now, dev-only and command-line-gated, through the
   same drawing paths the real pools use.
 
-STILL OPEN FROM IT, AND THEY ARE THE MENU:
-- "spell costs actually appearing in the skill menu".
+ALSO LANDED, THE MENU'S FIRST HALF:
+- "spell costs actually appearing in the skill menu" — every catalogue row and
+  every slot chip now states price, gate and wind-up: "20 MOMENTUM  4S
+  COOLDOWN", "100 MOMENTUM  COST GATED  0.5S CAST". NOTHING WAS AUTHORED: the
+  definitions have carried ResourceCost, CooldownSeconds and CastTimeSeconds
+  since they were written and Data/abilities.json fills all three; no screen
+  had ever read them, and the only thing anywhere that said "cost" was the
+  character sheet's RESOURCE COST multiplier, which is a modifier and not a
+  price. The chips print the LIVE cost (GetCost reads the granted instance, so
+  a reduction shows) and the catalogue prints the AUTHORED one, because three
+  of the rows are not equipped and have no instance to ask.
+  A zero cooldown prints COST GATED, not "0S" — that is the ruled distinction
+  (Class-Kits: "Mana IS the cooldown"), and a bare zero says its opposite.
+- "class points shouldnt be shown till a quests completion" — the DOCTRINE
+  POINTS chip is absent until the story has actually paid one. A level pays no
+  doctrine point (O111 retired that grant); only four mission Unlock beats do.
+  So a new character was reading three lines of the busiest header in the game
+  about a wallet nothing had offered them. Once open it stays open — a counter
+  that vanishes at zero teaches that zero is impossible.
+- "maximum shield/health displayed next to current" and "give the bar a subtle
+  outline" (his message mid-cycle) — the shield prints 41 60 the way health
+  prints 12 100, and the bar carries a dark ring outside a bright edge. Two
+  strokes rather than one: the bar is drawn over a sunlit yard as often as a
+  dark interior and one border cannot hold against both.
+
+QUESTION ON THE DESK, from the wallet item: he asked for the chip to wait for
+"a quests completion AND you reach the threshold to pick your subclass". THERE
+IS NO SUCH THRESHOLD AND O215 FORBIDS ONE — doctrine commitment is sited at
+the first Kess turn-in and explicitly never gated on it; the Forge accepts a
+commitment at any point after the class lock. So this landed as VISIBILITY
+only, and the part still unruled is whether the CLASS board tab and the COMMIT
+TO THIS BRANCH control should also wait for that first payment. Hiding the
+wallet while the commit button still sits there is the state to look at.
+
+STILL OPEN FROM IT:
 - "core tree is still an asolute mess ... give it a new shape ... connect the
   traveling nodes together in a clean path".
 - "class points shouldnt be shown till a quests completion and you reach the
