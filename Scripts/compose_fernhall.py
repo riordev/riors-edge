@@ -305,9 +305,10 @@ for i, (fwd, dz) in enumerate(((26.0, 17.0), (26.0, -17.0), (56.0, 17.0), (56.0,
 DECK_HEIGHT = 3.4
 CATWALK_HEIGHT = 3.4
 FAR_DECK_HEIGHT = 4.6
+GANTRY_HEIGHT = 9.0
 STEP_RISE = 0.85
 
-def shape_pass(tag, anchor_x, centre_z):
+def shape_pass(tag, anchor_x, centre_z, gantries, masses):
     """One yard's verticality, authored once in the yard's own frame and
     instanced three times. fwd runs down the lane from the yard's anchor; lat
     is across it, positive toward +z. The entry yard, the substation and the
@@ -350,9 +351,67 @@ def shape_pass(tag, anchor_x, centre_z):
     for i, fwd in enumerate((56.0, 62.0, 68.0)):
         place("dress_%s_frail%d" % (tag, i), "chest", at(fwd, -19.2, FAR_DECK_HEIGHT + 0.4), (5.6, 0.9, 0.2))
 
-shape_pass("entry", 6.0, 0.0)
-shape_pass("sub", SUB_ANCHOR, SUB_Z)
-shape_pass("dep", DEP_ANCHOR, DEP_Z)
+    # --- GANTRIES OVER THE LANE ---------------------------------------------
+    # "theres absolutely no shape to fernhall at all" was said AGAIN after the
+    # decks landed, and he was right: they hug the perimeter at 19 to 27 m out,
+    # so the thing the player actually walks down — 106 m of clear floor with
+    # nothing above 4 m in it — was untouched. A yard you can see the whole
+    # length of is a rectangle however much you build along its edges.
+    #
+    # So this crosses it. A span at nine metres with its legs outboard of the
+    # dash corridor: it cuts the long sightline, it puts something OVER the
+    # player, and it makes the lane a sequence of spaces instead of one run.
+    #
+    # NOT WALKABLE, deliberately. Reaching nine metres needs eleven treads and
+    # twenty-eight metres of run, which would be a bigger structure than the
+    # yard has room for; the decks are where height is walked. This is a pipe
+    # bridge over an industrial yard, which is what it should look like.
+    #
+    # The legs stand at 13 m off the lane — outboard of the 9 m dash corridor
+    # the cover grammar protects, and inboard of the decks — so the player
+    # walks between them.
+    for i, fwd in enumerate(gantries):
+        place("flr_%s_gantry%d" % (tag, i), "pavement", at(fwd, 0.0, GANTRY_HEIGHT), (5.0, 0.5, 30.0))
+        for j, lat in enumerate((-13.0, 13.0)):
+            place("wall_%s_gleg%d%d" % (tag, i, j), "bldg_c", at(fwd, lat), (2.0, GANTRY_HEIGHT, 2.0))
+            place("dress_%s_gbrace%d%d" % (tag, i, j), "chest",
+                  at(fwd, lat * 0.72, GANTRY_HEIGHT - 1.6), (1.0, 1.6, 8.0))
+        # A rail down each edge of the span, so it reads as a walkway from
+        # below rather than as a slab floating over the yard.
+        for j, lat in enumerate((-14.0, 14.0)):
+            place("dress_%s_grail%d%d" % (tag, i, j), "chest",
+                  at(fwd, lat, GANTRY_HEIGHT + 0.6), (4.0, 1.2, 0.25))
+
+    # --- ONE BIG MASS, OFF THE LANE -----------------------------------------
+    # Twelve metres tall and eleven across: not cover, a BUILDING. Cover tops
+    # out at four metres, so no amount of it breaks a sightline down a yard —
+    # this does, and it makes the far half of the yard something you come
+    # around rather than something you can see from the door.
+    #
+    # wall_ rather than blk_full_, and that is not prefix-shopping: the
+    # perimeter buildings are wall_ pieces already, so this is the same
+    # vocabulary at the same scale, standing inside instead of around. As
+    # blk_full_ it would enter the cover footprint band (0.5-5% of the yard)
+    # and one of these is 2% on its own.
+    for i, (fwd, lat) in enumerate(masses):
+        place("wall_%s_mass%d" % (tag, i), "bldg_a", at(fwd, lat), (11.0, 12.0, 9.0))
+        # A lower shoulder against it, so the mass has a silhouette rather than
+        # being one box.
+        place("wall_%s_massb%d" % (tag, i), "garage",
+              at(fwd + 7.0, lat + (2.5 if lat > 0 else -2.5)), (6.0, 6.5, 7.0))
+
+# WHERE THE STRUCTURE GOES, PER YARD, and the positions are not free choices.
+# A pocket sits every 14 + 75*fraction metres down the lane and its arrival tear
+# sits 7.5 m behind it; a leg or a mass landing on either would spawn a fight
+# inside a building. These are the gaps left between them in each yard, which is
+# why the three lists differ instead of being one shared set.
+#
+#   entry pockets  32.75  47.75  66.5   (+ tears at 40.25  55.25  74.0)
+#   sub   pockets  51.5   74.0          (+ tears at 59.0   81.5)
+#   depot pockets  32.75  55.25  77.75  (+ tears at 40.25  62.75  85.25)
+shape_pass("entry", 6.0, 0.0, gantries=(20.0, 82.0), masses=((60.0, -19.0),))
+shape_pass("sub", SUB_ANCHOR, SUB_Z, gantries=(20.0, 66.0), masses=((40.0, 19.0),))
+shape_pass("dep", DEP_ANCHOR, DEP_Z, gantries=(20.0, 70.0), masses=((48.0, -19.0),))
 
 # ---- Markers ----------------------------------------------------------------
 # THE NAME CARRIES A ROLE AND A YARD, and this is the authoring side of a

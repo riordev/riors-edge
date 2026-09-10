@@ -63,6 +63,23 @@ LANDED FROM IT ALREADY:
   primitives by ruling and has no named body to rock.
 
 STILL OPEN FROM IT, IN HIS WORDS:
+- "fernhall is still just a giant rectangle honestly" — SAID AFTER THE FIRST
+  SHAPE PASS, AND HE WAS RIGHT. The decks hug the perimeter at 19-27 m out, so
+  the thing the player actually walks down — 106 m of clear floor with nothing
+  above 4 m in it — was untouched. Building along a rectangle's edges does not
+  stop it being a rectangle.
+  SECOND PASS ATTACKS THE LANE ITSELF: two gantries per yard SPANNING it at 9 m
+  with their legs at 13 m off centre (outboard of the dash corridor, inboard of
+  the decks), plus one 12 m building mass per yard off the lane with a lower
+  shoulder against it. The lane is a sequence of framed spaces now and the far
+  half of each yard is something you come around. Cover is four metres tall at
+  most, so no amount of it could ever have done this.
+  NOT WALKABLE, deliberately: nine metres needs eleven treads and 28 m of run.
+  The decks are where height is walked; the gantries are what the yard looks
+  like. 275 -> 323 pieces, every cover measurement still unmoved.
+  POSITIONS ARE CONSTRAINED, NOT CHOSEN: a pocket sits every 14+75*fraction
+  metres and its tear 7.5 m behind it, so the free gaps differ per yard and the
+  three position lists are passed in rather than shared.
 - "theres absolutely no shape to fernhall at all" — FIRST PASS LANDED, HEIGHT
   RATHER THAN ENCLOSURE. Every yard now carries two raised decks on opposite
   flanks, each with its own stair, one running on into a catwalk: a place to

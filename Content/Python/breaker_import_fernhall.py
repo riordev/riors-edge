@@ -35,14 +35,14 @@ GLB = os.path.normpath(os.path.join(PROJECT_DIR, "Assets", "zones",
 DEST = "/Game/Breaker/Meshes/fernhall_rift" if RUINED else "/Game/Breaker/Meshes/fernhall_yard"
 MAP_PACKAGE = "/Game/Breaker/Maps/Lvl_Fernhall"
 
-# The living yard's 275 pieces, plus the ruined target's dressing chunks. The
-# ruin is ADDITIVE — same 275 names, the same measured boxes, with dress_ruin_*
+# The living yard's 323 pieces, plus the ruined target's dressing chunks. The
+# ruin is ADDITIVE — same 323 names, the same measured boxes, with dress_ruin_*
 # leaned against them — so its total is the yard's plus the debris.
 #
 # 113 -> 167 when the DEPOT yard landed: a third place, its own seam, its own
 # lattice. The ruin's own chunk count follows the cover it leans on, so it grew
 # with it rather than being re-authored.
-EXPECTED_TOTAL = 323 if RUINED else 275
+EXPECTED_TOTAL = 371 if RUINED else 323
 SOLID_PREFIXES = ("blk_full_", "blk_chest_", "wall_", "flr_")
 
 # THE MARKER CONTRACT, PARSED — not a fixed list of three names. This used to

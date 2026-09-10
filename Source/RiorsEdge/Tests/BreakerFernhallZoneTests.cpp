@@ -118,7 +118,7 @@ bool FBreakerFernhallPieceContractTest::RunTest(const FString& Parameters)
     // decks, a catwalk, their stairs and their dressing, in each of the three). The per-yard figures did not move by
     // one, which is the point: a third yard authored from the validated frame
     // rather than by eye reproduces the lattice exactly.
-    TestEqual(TEXT("imported piece count"), Pieces.Num(), 275);
+    TestEqual(TEXT("imported piece count"), Pieces.Num(), 323);
 
     const TArray<FBreakerZoneField> Zone = UBreakerZoneBuilder::BuildZoneFields(Pieces, Markers);
     TestEqual(TEXT("the zone has three yards"), Zone.Num(), 3);
