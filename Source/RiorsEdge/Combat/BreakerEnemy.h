@@ -490,6 +490,12 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UBoxComponent> BodyHitBox;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<USphereComponent> WeakPoint;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UStaticMeshComponent> WeakPointVisual;
+    // THE MARK, DRAWN AS A RING AT THE HITBOX'S OWN RADIUS. Built on first use
+    // and only for a body that actually sockets to a head bone: a primitive
+    // body has nothing to draw a ring around and keeps the solid marker, which
+    // is the only thing standing there.
+    UPROPERTY() TObjectPtr<class UInstancedStaticMeshComponent> WeakPointRing;
+    void BuildWeakPointRing();
 
 public:
     // --- THE NAMED BODY (the shipped look) --------------------------------

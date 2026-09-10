@@ -941,6 +941,7 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
         BreakerSchedulePocketRiftCapture(GetWorld());
         BreakerScheduleChestCapture(GetWorld());
         BreakerScheduleNpcCapture(GetWorld());
+        BreakerScheduleWeakPointCapture(GetWorld());
         ScheduleScreenshots();
         UE_LOG(LogTemp, Log, TEXT("[BreakerMap] fernhall — %s."),
             bRiftInstance ? TEXT("RIFT INSTANCE, waves live") : TEXT("the yard, no gym field"));

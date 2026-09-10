@@ -26,6 +26,8 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/SphereComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "UI/BreakerUIStyle.h"
 #include "Components/StaticMeshComponent.h"
 #include "EngineUtils.h"
 #include "Game/BreakerGameMode.h"
@@ -479,6 +481,84 @@ void ABreakerEnemy::ApplyBodyMesh()
         WeakPoint->AttachToComponent(NamedBody,
             FAttachmentTransformRules::SnapToTargetNotIncludingScale, BreakerHeadBoneName);
         WeakPoint->SetRelativeLocation(FVector::ZeroVector);
+        // AND IT STOPS BEING A BALL AROUND THE HEAD. Owner: "find a way to fix
+        // the critical spots to the models so they dont just have random
+        // circles coming out of them". The SOCKET half of that was already
+        // done — the sphere has ridden the Head bone and tracked the gait for
+        // some time — so what he is looking at is the drawing.
+        //
+        // AND THE DRAWING IS NOT DECORATION: the engine sphere is 100 cm
+        // across and the authored 0.4 makes it exactly 40, which is exactly
+        // twice the collision sphere's 20 cm radius. The ball IS the hitbox,
+        // drawn true. It protrudes because the HITBOX is wider than a mech's
+        // head, not because the art is careless — so shrinking the visual, as
+        // this first tried, would have made the picture lie about where a
+        // weak-point shot actually lands.
+        //
+        // So the hitbox is untouched and the drawing changes shape: a ring at
+        // the same 20 cm, in gold (O179 spends gold on the weak point), which
+        // still says exactly how far the weak point reaches and lets the head
+        // be seen through it. Same argument as the Volatile blast, which went
+        // from a filled disc to a dashed ring for the same reason and reads.
+        if (WeakPointVisual)
+        {
+            WeakPointVisual->SetVisibility(false);
+            BuildWeakPointRing();
+        }
+    }
+}
+
+void ABreakerEnemy::BuildWeakPointRing()
+{
+    // A WORLD, FIRST. RegisterComponent on an actor that is not in a world
+    // ensures inside the engine, and the body-facing fixture builds an enemy
+    // outside one on purpose — it is asking a question about the ref pose, not
+    // about the level. The ring is cosmetic, so having none there is correct.
+    if (!WeakPoint || WeakPointRing || !GetWorld()) return;
+    WeakPointRing = NewObject<UInstancedStaticMeshComponent>(this, TEXT("WeakPointRing"));
+    if (!WeakPointRing) return;
+    WeakPointRing->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    WeakPointRing->SetCastShadow(false);
+    // REGISTER THEN ATTACH. SetupAttachment is constructor-only and silently
+    // does nothing at runtime; this project has shipped an invisible component
+    // that way once already.
+    WeakPointRing->RegisterComponent();
+    WeakPointRing->AttachToComponent(WeakPoint, FAttachmentTransformRules::KeepRelativeTransform);
+    if (UStaticMesh* Segment = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")))
+    {
+        WeakPointRing->SetStaticMesh(Segment);
+    }
+    // THE LIT BASIC SHAPE AND NOT THE ADDITIVE GLOW, and that is measured
+    // rather than preferred: a material must declare
+    // MATUSAGE_InstancedStaticMeshes to draw on an instanced component, and
+    // EngineMaterials/EmissiveMeshMaterial does not while BasicShapeMaterial
+    // does. The pocket tear paid for that finding by photographing solid black.
+    if (UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr,
+        TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")))
+    {
+        if (UMaterialInstanceDynamic* Gold = UMaterialInstanceDynamic::Create(Base, WeakPointRing))
+        {
+            Gold->SetVectorParameterValue(TEXT("Color"), BreakerUI::Gold);
+            WeakPointRing->SetMaterial(0, Gold);
+        }
+    }
+
+    // The ring's radius is READ FROM THE HITBOX, never restated. That is the
+    // whole point of changing the shape rather than the size: the drawing has
+    // to keep telling the truth about how far the weak point reaches.
+    const float Radius = WeakPoint->GetUnscaledSphereRadius();
+    constexpr int32 Segments = 14;               // O2 PLACEHOLDER
+    constexpr float ThicknessCm = 2.4f;          // O2 PLACEHOLDER
+    constexpr float DashFraction = 0.62f;        // O2 PLACEHOLDER
+    const float Chord = 2.0f * PI * Radius / Segments * DashFraction;
+    for (int32 Index = 0; Index < Segments; ++Index)
+    {
+        const float Angle = 2.0f * PI * Index / Segments;
+        const FVector Offset(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.0f);
+        const FRotator Facing(0.0f, FMath::RadiansToDegrees(Angle) + 90.0f, 0.0f);
+        // The engine cube is 100 cm on a side, so every extent is cm/100.
+        WeakPointRing->AddInstance(FTransform(Facing, Offset,
+            FVector(Chord / 100.0f, ThicknessCm / 100.0f, ThicknessCm / 100.0f)));
     }
 }
 

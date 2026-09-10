@@ -320,3 +320,51 @@ void BreakerScheduleNpcCapture(UWorld* World)
             *Nearest->GetActorLocation().ToString());
     }), 1.0f, false);
 }
+
+void BreakerScheduleWeakPointCapture(UWorld* World)
+{
+    if (!World || !FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureWeakPoint"))) return;
+    FTimerHandle Setup;
+    World->GetTimerManager().SetTimer(Setup, FTimerDelegate::CreateWeakLambda(World, [World]()
+    {
+        auto* Controller = World->GetFirstPlayerController();
+        auto* Player = Controller ? Cast<ABreakerCharacter>(Controller->GetPawn()) : nullptr;
+        if (!Player || !Player->HasAuthority()) return;
+        Player->ResumeFromMenu();
+        // Every OTHER body freezes; the one being photographed is spawned below
+        // and left ticking so its idle plays and the marker rides the gait,
+        // which is the thing being judged.
+        for (TActorIterator<ABreakerEnemy> It(World); It; ++It) It->SetActorTickEnabled(false);
+
+        FActorSpawnParameters Spawn;
+        Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+        // Close enough that a head fills a useful part of the frame. It is NOT
+        // killed: this is about what a living enemy looks like to aim at.
+        auto* Body = World->SpawnActor<ABreakerEnemy>(
+            Player->GetActorLocation() + Player->GetActorForwardVector() * 420.0f,
+            FRotator::ZeroRotator, Spawn);
+        if (!Body) return;
+        Body->ConfigureCrowdProbe();
+        Body->DispatchBeginPlay();
+        Body->SetActorRotation((Player->GetActorLocation() - Body->GetActorLocation()).Rotation());
+
+        // AND THE PLAYER STOPS WALKING. The first attempt spawned the body four
+        // metres ahead and photographed an empty lane: -BreakerAutoPlay keeps
+        // driving, and at 672 cm/s the player is past a body four metres away
+        // before the second frame lands. Every other capture in this file gets
+        // away with it because the thing it is looking at is either far off or
+        // large; a head at close range is neither.
+        Controller->SetIgnoreMoveInput(true);
+
+        const FVector EyeAt = Player->GetActorLocation() + FVector(0.0f, 0.0f, 60.0f);
+        // At the HEAD, which is where the marker lives. Aiming at the actor
+        // origin would put the crosshair on its waist and the thing being
+        // looked at near the top of frame.
+        Controller->SetControlRotation(
+            (Body->GetActorLocation() + FVector(0.0f, 0.0f, 78.0f) - EyeAt).Rotation());
+        if (Controller->PlayerCameraManager) Controller->PlayerCameraManager->UpdateCamera(0.05f);
+        UE_LOG(LogTemp, Display, TEXT("[WeakPointCapture] body at %s, %.0f cm ahead"),
+            *Body->GetActorLocation().ToString(),
+            FVector::Dist(Body->GetActorLocation(), Player->GetActorLocation()));
+    }), 1.0f, false);
+}

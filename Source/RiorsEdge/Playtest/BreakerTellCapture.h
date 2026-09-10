@@ -18,3 +18,8 @@ void BreakerScheduleChestCapture(UWorld* World);
 // say. The ordinary route walks past the Fernhall contract giver without ever
 // looking at him, which is why nobody noticed he had no body.
 void BreakerScheduleNpcCapture(UWorld* World);
+// -BreakerCaptureWeakPoint: stand a live body at close range and aim at its
+// head. Nothing in the ordinary route puts an enemy near enough to judge what
+// its critical spot looks like, which is how a 40 cm marker on a 25 cm head
+// went unnoticed for as long as it did.
+void BreakerScheduleWeakPointCapture(UWorld* World);

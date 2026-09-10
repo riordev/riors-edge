@@ -219,6 +219,27 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 ## Known issues to time-box
 
 - WARDEN WALK-THROUGH: FIXED, and the parked fixture was never the obstacle. The arrival ring lived in exactly one place, ABreakerEnemy::TickEngagedBehaviour, and ABreakerWardenEnemy::TickEngagedBehaviour replaces that function WHOLESALE without ever calling Super — so it wrote a full-speed vector straight at the player and fell off the end of the function with it intact whenever neither attack was armed. Nothing downstream re-added spacing, by design: the mover has no stop distance while steering because the ring "is always the behaviour's to govern, never the path's". The pass-through is the project's own recorded consequence of the player being a Pawn. The ring is now an extracted method every closing archetype CALLS rather than inherits, so an override cannot silently drop it. Base behaviour is bit-identical; only the Warden changes. Verified: the Boss is the sole override that calls Super, and ArrivalBand is written in exactly one statement, so no fourth class was affected. THE WIRING PIN IS NOW LANDED (RiorsEdge.Combat.Warden.ArrivalRingRuntime) AND THE RECORDED ANSWER WAS WRONG: a bare AActor can never be the target, because IsEligibleThreatTarget (BreakerEnemy.cpp:851) refuses anything that is not an ABreakerCharacter or an ABreakerDeployable with a live combat component, so it is never SELECTED and the engaged tick never runs against it. ResolveSweep/ResolveSlam bailing is true and irrelevant. The fixture uses a real character at its shipped 100 health and grants it nothing: neither attack is ever armed, because the approach leg runs entirely outside SlamRadiusCm (650) and asserts both that it stayed there and that the health is untouched. Leg order is load-bearing — closing inside slam radius arms a 0.9s wind-up that plants the body on every later frame. FIXED AT THE SITE AND DELIBERATELY NOT PINNED: the same override wrote StateLabel = ADVANCE AFTER the ring call, clobbering the ring's own ATTACK/BACK OFF, so a Warden holding station or backing off printed ADVANCE on the playtest HUD. The label now precedes the call as the base chase does; the state is reachable only with both attacks on cooldown, which a damage-free fixture cannot reach.
+- WEAK POINTS: THE SOCKET HALF ALREADY SHIPPED; THE DRAWING IS WHAT CHANGED.
+  Owner: "find a way to fix the critical spots to the models so they dont just
+  have random circles coming out of them". The sphere has ridden the Head bone
+  and tracked the gait for some time — this is the SEVENTH note claiming
+  something missing that ships.
+  AND THE CIRCLE IS NOT DECORATION, which is the finding that matters: the
+  engine sphere is 100 cm and the authored 0.4 makes it exactly 40, which is
+  exactly twice the collision sphere's 20 cm radius. THE BALL IS THE HITBOX,
+  DRAWN TRUE. So the first fix — shrinking the visual so it sat inside the head
+  — was WRONG and was reverted before it landed: it would have made the picture
+  lie about where a weak-point shot lands.
+  What landed instead changes the SHAPE and not the size: a dashed gold ring at
+  the hitbox's own radius, read from the collision sphere rather than restated,
+  so the drawing still says exactly how far the weak point reaches and the head
+  is visible through it. Same argument as the Volatile blast going from a
+  filled disc to a dashed ring. Photographed with -BreakerCaptureWeakPoint,
+  which is new because nothing in the ordinary route puts an enemy near enough
+  to judge one.
+  STILL OPEN AND IT IS THE OWNER'S: if the ball still reads as too big, the
+  honest lever is the HITBOX, and shrinking that makes weak-point shots harder.
+  That is a balance call, not a legibility one.
 - THE WATCHKEEPER IS A PERSON NOW. Owner: "replace the random npc in fernhall
   with one of the human assets we have for the time being and check the
   dialogue in general". Both halves done.
