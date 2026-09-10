@@ -81,6 +81,21 @@ namespace BreakerUI
     inline const FLinearColor VioletDim = Hex(0x463367);
     inline const FLinearColor RiftDamage = Hex(0x35E8FF); // damage numbers only (rift-hot)
 
+    // --- The shield is blue (O269) ------------------------------------------
+    // Owner: "the health should be a proper read and shield a light blue or
+    // something". The combined bar put both pools on one track and told them
+    // apart by bone against text-2 — two greys a hairline apart, which is the
+    // same defect the four unlabelled rails had, one level down.
+    //
+    // IT IS NOT A VERB AND DOES NOT BREAK O179. Every HUE means one player
+    // action; a pool is not an action, and the two pools a player HAS are the
+    // one place the HUD has to say "these are different things" without a word
+    // to spare. Health keeps the bone every readout of the player's own state
+    // wears; the shield takes a blue that is not the movement cyan (0x6FC3E8 is
+    // a cyan, this is a blue) and not the reserved teal band.
+    inline const FLinearColor VitalShield = Hex(0x6E9BE0);
+    inline const FLinearColor VitalShieldDeep = Hex(0x23324F);
+
     // --- Teal object law ---------------------------------------------------
     // Legal on rift geometry, suppression hardware, and Unwritten items.
     // Never on chrome: buttons, rails, focus rings, tracks, tooltips.

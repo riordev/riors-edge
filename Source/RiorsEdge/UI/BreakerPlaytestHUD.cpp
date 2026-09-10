@@ -683,15 +683,32 @@ void ABreakerPlaytestHUD::DrawVitals(const ABreakerCharacter* Character)
     const float Left = S(BreakerUI::HudVitalsLeft);
     const float Width = S(BreakerUI::HudVitalsWidth);
     const float Right = Left + Width;
-    const float MaxShield = Attributes->GetMaxShield();
     const float MaxHealth = Attributes->GetMaxHealth();
     // The preview forces the near-death state: nothing in a headless run can
     // lose health, so without this the harm value, the tick's meaning and the
     // frame are unphotographable.
     const float HealthFraction = IsCapturePreview() ? 0.12f
         : (MaxHealth > UE_SMALL_NUMBER ? FMath::Clamp(Attributes->GetHealth() / MaxHealth, 0.0f, 1.0f) : 0.0f);
+
+    // AND IT FABRICATES A SHIELD POOL, for the same reason and under the same
+    // gate. The playable classes ship with no shield at all today, so the
+    // combined bar's SEAM — the whole point of putting two pools on one track
+    // — has never once appeared in a capture, and neither has the blue that
+    // tells them apart. A layout nobody can photograph is a layout that ships
+    // broken; the wave banner and the damage numbers both did.
+    //
+    // Numbers only. The split, the tick, the seam and the fills all go through
+    // the same code the real pools would.
+    const bool bFabricateShield = IsCapturePreview() && Attributes->GetMaxShield() <= 0.0f;
+    const float MaxShield = bFabricateShield ? 60.0f : Attributes->GetMaxShield();
+    const float Shield = bFabricateShield ? 41.0f : Attributes->GetShield();
+    // AND THE NUMBER AGREES WITH THE BAR IN A CAPTURE. The preview forces the
+    // FRACTION and used to leave the figure at the character's real health, so
+    // every frame this harness has ever produced showed a full-health number
+    // over a near-empty bar — and the frames are how this cluster is read.
+    const float ShownHealth = IsCapturePreview() ? MaxHealth * HealthFraction : Attributes->GetHealth();
     const BreakerUI::FVitalsRow Vitals =
-        BreakerUI::FormatVitalsRow(Attributes->GetShield(), MaxShield, Attributes->GetHealth(), MaxHealth);
+        BreakerUI::FormatVitalsRow(Shield, MaxShield, ShownHealth, MaxHealth);
 
     // --- Value and max --------------------------------------------------------
     // Both share one baseline: the max is small and sits on the value's
@@ -702,23 +719,23 @@ void ABreakerPlaytestHUD::DrawVitals(const ABreakerCharacter* Character)
     DrawSpecText(Vitals.HealthText, Left, ValueTop,
         BreakerHUDMath::VitalsValueIsHarm(HealthFraction) ? BreakerUI::Harm : BreakerUI::System,
         BreakerUI::HudVitalsValuePixels, 1.0f, ESpecFontRole::Mono);
-    // THE MAX IS ONLY WORTH PRINTING WHEN IT DIFFERS. At full health the row
-    // read "162  162" — the same number twice, a hand's width apart, which is
-    // what made this cluster look cluttered in the owner's frame. A max is
-    // context for a value that has moved; when nothing has moved it is noise
-    // wearing the shape of information.
-    if (HealthFraction < 1.0f)
-    {
-        DrawSpecText(Vitals.MaxText, Left + ValueSize.X + S(BreakerUI::HudVitalsMaxGap),
-            ValueTop + ValueSize.Y - MaxSize.Y, BreakerUI::TextSecondary, BreakerUI::HudVitalsMaxPixels, 1.0f, ESpecFontRole::Mono);
-    }
+    // THE MAX ALWAYS PRINTS, and this overturns my own de-clutter from the last
+    // cycle. It used to be hidden at full health on the argument that "162 162"
+    // is the same number twice; the owner played that and asked for "a proper
+    // read" of health, and he is right — a readout that drops half of itself
+    // when the value is full is a readout you cannot learn the shape of. Out of
+    // WHAT is part of the read, not context for it.
+    DrawSpecText(Vitals.MaxText, Left + ValueSize.X + S(BreakerUI::HudVitalsMaxGap),
+        ValueTop + ValueSize.Y - MaxSize.Y, BreakerUI::TextMuted, BreakerUI::HudVitalsMaxPixels, 1.0f, ESpecFontRole::Mono);
     // The shield number, small, at the row's right edge, only when a pool
-    // exists (O199). Right-aligned so it cannot collide with a long max.
+    // exists (O199). Right-aligned so it cannot collide with a long max, and in
+    // the shield's OWN BLUE (O269) — it is the third number in a row of greys
+    // otherwise, and which pool it counts was left to position alone.
     if (Vitals.bDrawShield)
     {
         const FVector2D ShieldSize = MeasureSpecText(Vitals.ShieldText, BreakerUI::HudVitalsMaxPixels, ESpecFontRole::Mono);
         DrawSpecTextRight(Vitals.ShieldText, Right, ValueTop + ValueSize.Y - ShieldSize.Y,
-            BreakerUI::TextSecondary, BreakerUI::HudVitalsMaxPixels, 1.0f, ESpecFontRole::Mono);
+            BreakerUI::VitalShield, BreakerUI::HudVitalsMaxPixels, 1.0f, ESpecFontRole::Mono);
     }
 
     // --- ONE BAR, TWO POOLS -------------------------------------------------
@@ -775,17 +792,48 @@ void ABreakerPlaytestHUD::DrawVitals(const ABreakerCharacter* Character)
 
     if (Vitals.bDrawShield && ShieldWidth > 0.0f)
     {
-        // The shield fills from the SEAM outward, in the secondary tone rather
-        // than the bone the health wears: same bar, same height, plainly a
-        // different pool. Its own hairline divider keeps the two from reading
-        // as one long fill when both are full.
+        // The shield fills from the SEAM outward, in its own blue rather than in
+        // the bone the health wears: same bar, same height, plainly a different
+        // pool. Text-2 against bone was two greys a hairline apart, so the
+        // combined bar read as one fill with a seam in it — which is the thing
+        // combining them was supposed to fix.
         const float ShieldFraction = MaxShield > UE_SMALL_NUMBER
-            ? FMath::Clamp(Attributes->GetShield() / MaxShield, 0.0f, 1.0f) : 0.0f;
+            ? FMath::Clamp(Shield / MaxShield, 0.0f, 1.0f) : 0.0f;
         DrawTrack(Left + HealthWidth, HealthY, ShieldWidth, HealthH, ShieldFraction,
-            BreakerUI::TextSecondary, BreakerUI::BgBase);
+            BreakerUI::VitalShield, BreakerUI::VitalShieldDeep);
         DrawRect(BreakerUI::BgVoid, Left + HealthWidth, HealthY, FMath::Max(S(2.0f), 1.0f), HealthH);
     }
     DrawBorder(Left, HealthY, Width, HealthH, BreakerUI::BorderEmphasis, S(BreakerUI::BorderThin));
+
+    // THE NUMBER COLUMN AT THE RIGHT END OF A RAIL. Owner: "can we get numeric
+    // values for xp and mana that are shown". Both rails below want the same
+    // shape — label at the left, figures at the right, rail taking what is
+    // between — so it is one lambda rather than the same eight lines twice.
+    //
+    // RIGHT-ALIGNED AND THE RAIL SHORTENS. Drawing the pair OVER the rail was
+    // the other option and it is wrong twice: an 8 px track cannot hold a 12 px
+    // glyph, and a number whose background is a moving fill is a number you
+    // read twice. Returns the x the rail must stop at.
+    const auto DrawRailPair = [this, Right](const FString& ValueText, const FString& TotalText,
+        float RowY, float RowH) -> float
+    {
+        if (ValueText.IsEmpty()) return Right;
+        const float Pixels = BreakerUI::HudXpLevelPixels;
+        float Cursor = Right;
+        if (!TotalText.IsEmpty())
+        {
+            // The total is MUTED against the current value's text-2: the thing
+            // that moves is the thing the eye should land on.
+            const FVector2D TotalSize = MeasureSpecText(TotalText, Pixels, ESpecFontRole::Mono);
+            DrawSpecTextRight(TotalText, Cursor, RowY + RowH * 0.5f - TotalSize.Y * 0.5f,
+                BreakerUI::TextMuted, Pixels, 1.0f, ESpecFontRole::Mono);
+            Cursor -= TotalSize.X + S(BreakerUI::Space4);
+        }
+        const FVector2D CurrentSize = MeasureSpecText(ValueText, Pixels, ESpecFontRole::Mono);
+        DrawSpecTextRight(ValueText, Cursor, RowY + RowH * 0.5f - CurrentSize.Y * 0.5f,
+            BreakerUI::TextSecondary, Pixels, 1.0f, ESpecFontRole::Mono);
+        return Cursor - CurrentSize.X - S(BreakerUI::Space8);
+    };
 
     // --- Resource track ---------------------------------------------------------
     // AND IT SAYS WHAT IT IS. Owner: "multiple bars appearing over my hud which
@@ -810,7 +858,8 @@ void ABreakerPlaytestHUD::DrawVitals(const ABreakerCharacter* Character)
                 BreakerUI::TextMuted, BreakerUI::HudXpLevelPixels, 1.0f, ESpecFontRole::Mono);
             TrackLeft = Left + LabelSize.X + S(BreakerUI::Space8);
         }
-        DrawResourceTrack(Row, TrackLeft, ResourceY, FMath::Max(0.0f, Right - TrackLeft), ResourceH);
+        const float TrackRight = DrawRailPair(Row.ValueText, Row.MaxText, ResourceY, ResourceH);
+        DrawResourceTrack(Row, TrackLeft, ResourceY, FMath::Max(0.0f, TrackRight - TrackLeft), ResourceH);
     }
 
     // --- XP -----------------------------------------------------------------
@@ -818,9 +867,18 @@ void ABreakerPlaytestHUD::DrawVitals(const ABreakerCharacter* Character)
     // hidden — the HUD had NO experience readout of any kind, in a game whose
     // first contract's whole reward is a level.
     //
-    // A LEVEL AND A RAIL, and nothing else. Not a number pair: the exact XP
-    // total is a thing to check in a menu, while what a player wants mid-route
-    // is "am I close". The fraction is the progression library's own
+    // A LEVEL, A RAIL AND THE PAIR. The figures are owner-ruled ("can we get
+    // numeric values for xp and mana that are shown") and they overturn this
+    // block's own argument that the exact total belongs in a menu. What they
+    // answer that the rail cannot: whether the next pocket finishes the level.
+    //
+    // XP INTO THE CURRENT LEVEL, NOT THE CUMULATIVE TOTAL. The stored quantity
+    // is cumulative on purpose — it is the representation that survives a
+    // curve retune — but "14 402" beside a bar a third full tells a player
+    // nothing. At the cap there is no next level, so the lifetime total prints
+    // alone rather than as a pair against a zero.
+    //
+    // The fraction is the progression library's own
     // (LevelProgressFraction), so the bar cannot disagree with the level-up it
     // is predicting. At the cap the rail fills and stays full rather than
     // vanishing — an empty space where a bar was reads as a bug.
@@ -842,7 +900,17 @@ void ABreakerPlaytestHUD::DrawVitals(const ABreakerCharacter* Character)
         DrawSpecText(LevelText, Left, XpY + XpH * 0.5f - LevelSize.Y * 0.5f,
             BreakerUI::TextMuted, BreakerUI::HudXpLevelPixels, 1.0f, ESpecFontRole::Mono);
         const float RailLeft = Left + LevelSize.X + S(BreakerUI::Space8);
-        DrawTrack(RailLeft, XpY, FMath::Max(0.0f, Right - RailLeft), XpH, Fraction,
+        const int32 Reached = UBreakerExperienceLibrary::TotalXpToReachLevel(
+            State.CharacterLevel, Progression->ExperienceCurve);
+        const int32 Needed = UBreakerExperienceLibrary::XpToNextLevel(
+            State.CharacterLevel, Progression->ExperienceCurve);
+        const int32 IntoLevel = FMath::Max(0, State.TotalExperience - Reached);
+        const float RailRight = (bCapped || Needed <= 0)
+            ? DrawRailPair(BreakerUI::FormatTicker(static_cast<float>(State.TotalExperience)),
+                FString(), XpY, XpH)
+            : DrawRailPair(BreakerUI::FormatTicker(static_cast<float>(IntoLevel)),
+                BreakerUI::FormatTicker(static_cast<float>(Needed)), XpY, XpH);
+        DrawTrack(RailLeft, XpY, FMath::Max(0.0f, RailRight - RailLeft), XpH, Fraction,
             BreakerUI::TextSecondary, BreakerUI::BgBase);
     }
 }
@@ -1074,29 +1142,49 @@ BreakerHUD::FResourceRow ABreakerPlaytestHUD::ResolveResourceRow(const ABreakerC
 {
     if (!Character) return BreakerHUD::ResolveEmptyResourceRow();
 
+    // ALL FIVE SHARE ONE MAXIMUM — MaxClassResource on the attribute set is what
+    // every one of the five components clamps its own bank against — so the
+    // numeric pair is read once here rather than threaded through five resolver
+    // signatures and the fixtures behind them.
+    const UBreakerAttributeSet* Attributes = Character->GetAttributes();
+    const float MaxResource = Attributes ? Attributes->GetMaxClassResource() : 0.0f;
+
     if (const UBreakerMomentumComponent* Momentum = Character->GetMomentum(); Momentum && Momentum->IsActiveForOwner())
     {
-        return BreakerHUD::ResolveMomentumRow(Momentum->GetMomentumFraction(), Momentum->GetMomentumState());
+        BreakerHUD::FResourceRow Row = BreakerHUD::ResolveMomentumRow(
+            Momentum->GetMomentumFraction(), Momentum->GetMomentumState());
+        BreakerHUD::SetResourceValue(Row, Momentum->GetMomentum(), MaxResource);
+        return Row;
     }
     if (const UBreakerManaComponent* Mana = Character->GetMana(); Mana && Mana->IsActiveForOwner())
     {
         // GetManaFraction() clamps to [0,1] and so cannot express the debt;
         // the raw bank and the floor can, and both are already public.
-        const UBreakerAttributeSet* Attributes = Character->GetAttributes();
-        const float MaxMana = Attributes ? Attributes->GetMaxClassResource() : 0.0f;
-        return BreakerHUD::ResolveManaRow(Mana->GetMana(), MaxMana, Mana->GetOvercastFloor());
+        BreakerHUD::FResourceRow Row = BreakerHUD::ResolveManaRow(
+            Mana->GetMana(), MaxResource, Mana->GetOvercastFloor());
+        BreakerHUD::SetResourceValue(Row, Mana->GetMana(), MaxResource);
+        return Row;
     }
     if (const UBreakerScrapComponent* Scrap = Character->GetScrap(); Scrap && Scrap->IsActiveForOwner())
     {
-        return BreakerHUD::ResolveScrapRow(Scrap->GetScrapFraction(), Scrap->GetScrapState());
+        BreakerHUD::FResourceRow Row = BreakerHUD::ResolveScrapRow(
+            Scrap->GetScrapFraction(), Scrap->GetScrapState());
+        BreakerHUD::SetResourceValue(Row, Scrap->GetScrap(), MaxResource);
+        return Row;
     }
     if (const UBreakerGritComponent* Grit = Character->GetGrit(); Grit && Grit->IsActiveForOwner())
     {
-        return BreakerHUD::ResolveGritRow(Grit->GetGritFraction(), Grit->GetGritBand());
+        BreakerHUD::FResourceRow Row = BreakerHUD::ResolveGritRow(
+            Grit->GetGritFraction(), Grit->GetGritBand());
+        BreakerHUD::SetResourceValue(Row, Grit->GetGrit(), MaxResource);
+        return Row;
     }
     if (const UBreakerChargeComponent* Charge = Character->GetCharge(); Charge && Charge->IsActiveForOwner())
     {
-        return BreakerHUD::ResolveChargeRow(Charge->GetChargeFraction(), Charge->GetChargeBand());
+        BreakerHUD::FResourceRow Row = BreakerHUD::ResolveChargeRow(
+            Charge->GetChargeFraction(), Charge->GetChargeBand());
+        BreakerHUD::SetResourceValue(Row, Charge->GetCharge(), MaxResource);
+        return Row;
     }
     return BreakerHUD::ResolveEmptyResourceRow();
 }

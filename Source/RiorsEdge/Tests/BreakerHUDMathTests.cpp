@@ -5,7 +5,9 @@
 #include "Game/BreakerGameMode.h"
 #include "Game/BreakerWaveBudget.h"
 #include "UI/BreakerDamageFeed.h"
+#include "Progression/BreakerExperience.h"
 #include "UI/BreakerHUDMath.h"
+#include "UI/BreakerHUDResourceRow.h"
 #include "UI/BreakerUIStyle.h"
 
 // The combat HUD's drawing cannot be tested — no viewport, no way to assert a
@@ -439,6 +441,107 @@ bool FBreakerHUDWaveCellsTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("MakeRiftWaveBudget(3) bosses every 3"), UBreakerWaveBudgetLibrary::MakeRiftWaveBudget(3).BossWaveInterval, 3);
     TestEqual(TEXT("The shipped rift row is three cells"), WaveCellTotal(true, Rift.BossWaveInterval), 3);
     TestEqual(TEXT("The shipped gym row is empty"), WaveCellTotal(false, FBreakerWaveBudgetParams().BossWaveInterval), 0);
+    return true;
+}
+
+// --------------------------------------------------------------------------
+// HUD.NumericReadouts: the figures the owner asked to be able to read, and the
+// shield's own colour.
+//
+// Owner, playtest 2026-09-10: "can we get numeric values for xp and mana that
+// are shown ... the health should be a proper read and shield a light blue or
+// something". Three separate claims, and all three are assertable without a
+// viewport: the pair a resource row carries, the arithmetic behind the XP pair,
+// and that the shield's colour is actually distinguishable from the health's.
+// --------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerHUDNumericReadoutsTest,
+    "RiorsEdge.UI.HUD.NumericReadouts",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerHUDNumericReadoutsTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerUI;
+
+    // --- THE SHIELD IS TOLD APART BY COLOUR, NOT BY POSITION ----------------
+    // Both pools share one track under O199's combined bar, so the only thing
+    // that can separate them is the fill. Text-2 against bone did not: these
+    // assert a real separation rather than merely a different constant.
+    TestFalse(TEXT("The shield blue is not the health bone"), VitalShield.Equals(System, 0.05f));
+    TestFalse(TEXT("The shield blue is not text-2"), VitalShield.Equals(TextSecondary, 0.05f));
+    // O179 stands: the movement verb keeps the cyan and the shield is a blue.
+    TestFalse(TEXT("The shield blue is not the movement verb"), VitalShield.Equals(VerbMove, 0.05f));
+    TestFalse(TEXT("The shield blue is not reserved teal"), IsReservedTeal(VitalShield));
+    // BLUE MEANS BLUE: more blue than red and more blue than green, or the name
+    // is a lie and a retune could drift it grey without failing anything.
+    TestTrue(TEXT("The shield blue is bluest"), VitalShield.B > VitalShield.G && VitalShield.G > VitalShield.R);
+    // And its track reads as a track: the empty half is darker than the fill.
+    TestTrue(TEXT("The shield's empty track is darker than its fill"),
+        VitalShieldDeep.GetLuminance() < VitalShield.GetLuminance());
+
+    // --- THE RESOURCE ROW CARRIES A PAIR -----------------------------------
+    {
+        BreakerHUD::FResourceRow Row = BreakerHUD::ResolveManaRow(68.0f, 120.0f, -20.0f);
+        BreakerHUD::SetResourceValue(Row, 68.0f, 120.0f);
+        TestEqual(TEXT("Mana in credit prints its bank"), Row.ValueText, FString(TEXT("68")));
+        TestEqual(TEXT("Mana in credit prints its pool"), Row.MaxText, FString(TEXT("120")));
+    }
+    {
+        // OVERCAST KEEPS ITS SIGN. The one state where the bank goes below zero
+        // is the one state where a bare figure would read as credit.
+        BreakerHUD::FResourceRow Row = BreakerHUD::ResolveManaRow(-12.0f, 120.0f, -20.0f);
+        BreakerHUD::SetResourceValue(Row, -12.0f, 120.0f);
+        TestTrue(TEXT("Overcast prints a debt"), Row.ValueText.StartsWith(TEXT("-")));
+        TestEqual(TEXT("Overcast still counts against the credit pool"), Row.MaxText, FString(TEXT("120")));
+    }
+    {
+        // NO TOTAL MEANS NO TOTAL. A component with no published maximum prints
+        // one figure rather than a confident zero.
+        BreakerHUD::FResourceRow Row = BreakerHUD::ResolveMomentumRow(0.5f, EBreakerMomentumState::Settled);
+        BreakerHUD::SetResourceValue(Row, 50.0f, 0.0f);
+        TestEqual(TEXT("A pool with no maximum prints its value"), Row.ValueText, FString(TEXT("50")));
+        TestTrue(TEXT("A pool with no maximum prints no total"), Row.MaxText.IsEmpty());
+    }
+    {
+        // AN INACTIVE ROW PRINTS NOTHING. The empty row is drawn, never omitted
+        // (the cluster must not change height between classes), and a figure on
+        // it would be a number describing a pool the class does not have.
+        BreakerHUD::FResourceRow Row = BreakerHUD::ResolveEmptyResourceRow();
+        BreakerHUD::SetResourceValue(Row, 50.0f, 100.0f);
+        TestTrue(TEXT("A class with no resource prints no value"), Row.ValueText.IsEmpty());
+        TestTrue(TEXT("A class with no resource prints no total"), Row.MaxText.IsEmpty());
+    }
+
+    // --- THE XP PAIR IS INTO-LEVEL OVER NEEDED -----------------------------
+    // The HUD derives "how far into this level" by subtracting the cumulative
+    // cost of reaching it from the stored total. That is only honest if the
+    // curve's two functions agree, so this walks the whole ladder.
+    {
+        const FBreakerExperienceCurve Curve;
+        for (int32 Level = 1; Level < UBreakerExperienceLibrary::MaxCharacterLevel; ++Level)
+        {
+            const int32 Reached = UBreakerExperienceLibrary::TotalXpToReachLevel(Level, Curve);
+            const int32 Needed = UBreakerExperienceLibrary::XpToNextLevel(Level, Curve);
+            const int32 NextReached = UBreakerExperienceLibrary::TotalXpToReachLevel(Level + 1, Curve);
+            if (!TestEqual(*FString::Printf(TEXT("Level %d's cost closes the gap to %d"), Level, Level + 1),
+                Reached + Needed, NextReached)) return false;
+            if (!TestTrue(*FString::Printf(TEXT("Level %d costs something"), Level), Needed > 0)) return false;
+
+            // A character exactly halfway up this level: the figure the HUD
+            // prints must sit inside the level it belongs to, never past its
+            // own denominator and never negative.
+            const int32 Total = Reached + Needed / 2;
+            const int32 IntoLevel = Total - Reached;
+            if (!TestTrue(*FString::Printf(TEXT("Halfway up level %d is inside it"), Level),
+                IntoLevel >= 0 && IntoLevel < Needed)) return false;
+            if (!TestEqual(*FString::Printf(TEXT("Halfway up level %d is still level %d"), Level, Level),
+                UBreakerExperienceLibrary::LevelForTotalXp(Total, Curve), Level)) return false;
+        }
+        // AT THE CAP THERE IS NO NEXT LEVEL, which is why the HUD prints the
+        // lifetime total alone there instead of a pair over a zero.
+        TestEqual(TEXT("The cap needs nothing further"),
+            UBreakerExperienceLibrary::XpToNextLevel(UBreakerExperienceLibrary::MaxCharacterLevel, Curve), 0);
+    }
     return true;
 }
 

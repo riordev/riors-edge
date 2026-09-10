@@ -75,10 +75,39 @@ namespace BreakerHUD
         // The fill's resting colour. The track's loud states (banked, debt)
         // still own the fill; this is what draws beneath them.
         FLinearColor FillColor = BreakerUI::TextSecondary;
+        // THE NUMBERS. Owner: "can we get numeric values for xp and mana that
+        // are shown". The row has always carried a fraction and nothing else,
+        // on the argument that a bar answers "how much is left" better than a
+        // figure does. It does — but a Caster spending 35 of a 120 pool cannot
+        // tell from a bar whether the next cast is affordable, and that is the
+        // question the bar was asked. The fraction stays the carrier; these sit
+        // beside it.
+        //
+        // Empty means NOT KNOWN rather than zero, so a row whose component
+        // publishes no total prints no pair instead of a confident "0".
+        FString ValueText;
+        FString MaxText;
         // False when no class resource applies. The label/state word still
         // render (in text/disabled) so the row is never a blank strip.
         bool bActive = false;
     };
+
+    // THE NUMERIC PAIR, set after a resolver rather than inside one. Every one
+    // of the five components publishes its absolute bank (GetMana, GetScrap,
+    // GetGrit, GetCharge, GetMomentum) and all five share one maximum on the
+    // attribute set, so this is one call at the HUD's seam instead of five
+    // changed signatures and five changed fixtures.
+    //
+    // A DEBT STILL PRINTS ITS OWN SIGN. Overcast is the one state where the
+    // value goes below zero, and FormatTicker already carries the minus; the
+    // maximum is still the credit pool, because the pool is what the number is
+    // a share of.
+    inline void SetResourceValue(FResourceRow& Row, float Value, float Max)
+    {
+        if (!Row.bActive) return;
+        Row.ValueText = BreakerUI::FormatTicker(Value);
+        Row.MaxText = Max > 0.0f ? BreakerUI::FormatTicker(Max) : FString();
+    }
 
     // No class resource: every class that has not been wired yet.
     inline FResourceRow ResolveEmptyResourceRow()

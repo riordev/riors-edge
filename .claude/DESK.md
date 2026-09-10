@@ -1,5 +1,52 @@
 # Desk — next playtest
 
+## OWNER PLAYTEST, 2026-09-10 (FOURTH) — THE MENU MESSAGE
+
+His words: "can we get numeric values for xp and mana that are shown same thing
+with spell costs actually appearing in the skill menu / core tree is still an
+asolute mess / maybe just give it a new shape or something and connect the
+traveling nodes together in a clean path / class points shouldnt be shown till a
+quests completion and you reach the threshold to pick your subclass honestly so
+much information everywhere we needd to condense this to where its only there
+when hovered or clocked or something i dont know / the health should be a proper
+read and shield a light blue or something"
+
+LANDED, THE HUD HALF (O269):
+- "numeric values for xp and mana that are shown" — both rails print a pair at
+  their right end now and the rail shortens to make room. Mana (and Momentum,
+  Scrap, Grit, Charge — all five publish a bank and all five share one maximum)
+  reads 68 120; XP reads INTO-LEVEL over what the level costs, 480 656, not the
+  cumulative total, because "14 402" beside a third-full bar says nothing. At
+  the cap the lifetime total prints alone rather than a pair over a zero.
+- "the health should be a proper read" — the max prints at all times again.
+  This OVERTURNS my own de-clutter from the last cycle, which hid it at full
+  health on the argument that "162 162" is the same number twice. A readout
+  that drops half of itself when the value is full is one you cannot learn.
+- "shield a light blue" — the shield half of the combined bar and its figure
+  are both a blue now. Text-2 against bone was two greys a hairline apart, so
+  the combined bar read as one fill with a seam in it, which is the thing
+  combining them was meant to fix. O179 is untouched: a pool is not a verb, the
+  movement cyan is still the movement cyan, and the blue is outside the
+  reserved teal band. Asserted, not merely chosen.
+- AND THE CAPTURE STOPPED LYING TWICE. The playable classes ship with no shield
+  pool, so the combined bar's seam had NEVER appeared in a frame; and the
+  preview forced the health FRACTION while leaving the figure at full, so every
+  frame this harness ever made showed 100 over a near-empty bar. Both are
+  fabricated in the preview now, dev-only and command-line-gated, through the
+  same drawing paths the real pools use.
+
+STILL OPEN FROM IT, AND THEY ARE THE MENU:
+- "spell costs actually appearing in the skill menu".
+- "core tree is still an asolute mess ... give it a new shape ... connect the
+  traveling nodes together in a clean path".
+- "class points shouldnt be shown till a quests completion and you reach the
+  threshold to pick your subclass".
+- "so much information everywhere ... condense this to where its only there
+  when hovered or clocked". NOTE THE HARNESS CANNOT SEE HOVER: it moves no
+  mouse, so a hover state is unverifiable by capture and has to be read as a
+  pure layout function plus a played frame.
+
+
 ## OWNER PLAYTEST, 2026-09-10 (SECOND) — THIS OUTRANKS EVERYTHING BELOW
 
 THE THIRD MESSAGE'S FOUR, ALL LANDED:
