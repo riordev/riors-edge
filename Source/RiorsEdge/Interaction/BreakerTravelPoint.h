@@ -146,6 +146,16 @@ protected:
     // overhead "TRAVEL" label rides in the HUD with the NPC name labels.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<class UStaticMeshComponent> Beacon;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<class UPointLightComponent> BeaconLight;
+    // THE FRAME AROUND THE BEAM. Owner: "the travel points can stop being just
+    // a pillar lets make a minor asset for them". Three raked struts and a
+    // collar, composed from primitives rather than imported: it reads as a
+    // device the beam is mounted IN, where a bare cylinder reads as a post
+    // somebody painted. Cosmetic throughout — the capsule, the range and the
+    // travel list are untouched.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<class UStaticMeshComponent> StrutA;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<class UStaticMeshComponent> StrutB;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<class UStaticMeshComponent> StrutC;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<class UStaticMeshComponent> Collar;
 
     // O2 PLACEHOLDER — layout, not balance, but sized like the NPC default
     // (BreakerNPC::InteractionRange) so the two interactable kinds feel the

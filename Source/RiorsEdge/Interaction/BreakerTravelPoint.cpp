@@ -31,20 +31,70 @@ ABreakerTravelPoint::ABreakerTravelPoint()
     Body->SetCollisionProfileName(TEXT("BlockAllDynamic"));
     SetRootComponent(Body);
 
-    // A distinct silhouette from ABreakerNPC's cube-and-sphere read — a
-    // vertical marker (cylinder) rather than a person shape, so a player
-    // scanning the hub can tell "thing to walk into" from "person to talk
-    // to" before they are in range.
+    // A DEVICE, NOT A POST. Owner: "the travel points can stop being just a
+    // pillar lets make a minor asset for them". It is still built from
+    // primitives — importing a prop is a pipeline job and this is not — but
+    // out of FOUR of them instead of one, which is the whole difference
+    // between a painted cylinder and something that was installed here.
+    //
+    // The silhouette still does its original job: nothing else in the world is
+    // a squat plinth with a beam standing out of it, so a player scanning the
+    // hub can tell "thing to walk into" from "person to talk to" well before
+    // they are in range. It just no longer reads as scaffolding.
+    //
+    // ALL COSMETIC. The capsule, the interaction range and the destination
+    // list are untouched; this actor decides where you can go, and none of
+    // that is decided by its shape.
+    UStaticMesh* Cylinder = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+    UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+
+    // THE PLINTH. Keeps the name Visual because half a dozen other things
+    // reach for that member; what changed is its proportions. The capsule is
+    // 100 cm of half-height, so -92 puts an 18 cm slab on the ground.
     Visual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Visual"));
     Visual->SetupAttachment(Body);
     Visual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    Visual->SetRelativeScale3D(FVector(0.5f, 0.5f, 2.0f));
-    Visual->SetRelativeLocation(FVector(0.0f, 0.0f, -12.0f));
-    UStaticMesh* Cylinder = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+    Visual->SetRelativeScale3D(FVector(1.45f, 1.45f, 0.18f));   // O2 PLACEHOLDER
+    Visual->SetRelativeLocation(FVector(0.0f, 0.0f, -92.0f));
     if (Cylinder)
     {
         Visual->SetStaticMesh(Cylinder);
     }
+
+    // THREE RAKED STRUTS, leaning in toward the beam. Three rather than four
+    // because three reads as a mount and four reads as a cage, and because an
+    // odd count never presents a flat face to the player however they walk up.
+    // All O2 PLACEHOLDER.
+    constexpr float StrutRadiusCm = 52.0f;
+    constexpr float StrutLeanDegrees = 16.0f;
+    constexpr float StrutHeightCm = 132.0f;
+    TObjectPtr<UStaticMeshComponent>* const Struts[] = { &StrutA, &StrutB, &StrutC };
+    const TCHAR* const StrutNames[] = { TEXT("StrutA"), TEXT("StrutB"), TEXT("StrutC") };
+    for (int32 Index = 0; Index < 3; ++Index)
+    {
+        UStaticMeshComponent* Strut = CreateDefaultSubobject<UStaticMeshComponent>(StrutNames[Index]);
+        *Struts[Index] = Strut;
+        Strut->SetupAttachment(Body);
+        Strut->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        if (Cube) Strut->SetStaticMesh(Cube);
+        const float Angle = 2.0f * PI * Index / 3.0f;
+        const FVector Around(FMath::Cos(Angle) * StrutRadiusCm, FMath::Sin(Angle) * StrutRadiusCm, 0.0f);
+        Strut->SetRelativeLocation(Around + FVector(0.0f, 0.0f, -92.0f + StrutHeightCm * 0.5f));
+        // Leaning INWARD: roll about the axis tangent to the ring, which is the
+        // yaw plus ninety degrees. Derived rather than three hand-written
+        // rotators, so moving the count from three does not need new numbers.
+        Strut->SetRelativeRotation(FRotator(0.0f, FMath::RadiansToDegrees(Angle), 0.0f)
+            + FRotator(StrutLeanDegrees, 0.0f, 0.0f));
+        Strut->SetRelativeScale3D(FVector(0.11f, 0.11f, StrutHeightCm / 100.0f));
+    }
+
+    // THE COLLAR the beam rises through, sitting where the struts meet.
+    Collar = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Collar"));
+    Collar->SetupAttachment(Body);
+    Collar->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    if (Cylinder) Collar->SetStaticMesh(Cylinder);
+    Collar->SetRelativeScale3D(FVector(0.66f, 0.66f, 0.07f));   // O2 PLACEHOLDER
+    Collar->SetRelativeLocation(FVector(0.0f, 0.0f, -92.0f + StrutHeightCm));
 
     // The beacon column: ~14 m of thin unlit teal rising out of the marker.
     // Tall enough to clear the boundary pillars (2.6-scale, ~2.6 m) many times
@@ -83,10 +133,18 @@ void ABreakerTravelPoint::BeginPlay()
     if (UMaterialInterface* BaseMaterial = LoadObject<UMaterialInterface>(
             nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")))
     {
-        if (UMaterialInstanceDynamic* Dynamic = UMaterialInstanceDynamic::Create(BaseMaterial, Visual))
+        // EVERY HARDWARE PIECE, not just the plinth. One instance per component
+        // because a dynamic material instance belongs to the mesh it was made
+        // for; sharing one across four would work today and break the first
+        // time any of them wants its own colour.
+        for (UStaticMeshComponent* Piece : { Visual.Get(), StrutA.Get(), StrutB.Get(), StrutC.Get(), Collar.Get() })
         {
-            Dynamic->SetVectorParameterValue(TEXT("Color"), BreakerUI::TealHardware);
-            Visual->SetMaterial(0, Dynamic);
+            if (!Piece) continue;
+            if (UMaterialInstanceDynamic* Dynamic = UMaterialInstanceDynamic::Create(BaseMaterial, Piece))
+            {
+                Dynamic->SetVectorParameterValue(TEXT("Color"), BreakerUI::TealHardware);
+                Piece->SetMaterial(0, Dynamic);
+            }
         }
     }
     if (UMaterialInstanceDynamic* GlowMaterial = BreakerUI::MakeGlowMaterial(Beacon))

@@ -219,6 +219,19 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 ## Known issues to time-box
 
 - WARDEN WALK-THROUGH: FIXED, and the parked fixture was never the obstacle. The arrival ring lived in exactly one place, ABreakerEnemy::TickEngagedBehaviour, and ABreakerWardenEnemy::TickEngagedBehaviour replaces that function WHOLESALE without ever calling Super — so it wrote a full-speed vector straight at the player and fell off the end of the function with it intact whenever neither attack was armed. Nothing downstream re-added spacing, by design: the mover has no stop distance while steering because the ring "is always the behaviour's to govern, never the path's". The pass-through is the project's own recorded consequence of the player being a Pawn. The ring is now an extracted method every closing archetype CALLS rather than inherits, so an override cannot silently drop it. Base behaviour is bit-identical; only the Warden changes. Verified: the Boss is the sole override that calls Super, and ArrivalBand is written in exactly one statement, so no fourth class was affected. THE WIRING PIN IS NOW LANDED (RiorsEdge.Combat.Warden.ArrivalRingRuntime) AND THE RECORDED ANSWER WAS WRONG: a bare AActor can never be the target, because IsEligibleThreatTarget (BreakerEnemy.cpp:851) refuses anything that is not an ABreakerCharacter or an ABreakerDeployable with a live combat component, so it is never SELECTED and the engaged tick never runs against it. ResolveSweep/ResolveSlam bailing is true and irrelevant. The fixture uses a real character at its shipped 100 health and grants it nothing: neither attack is ever armed, because the approach leg runs entirely outside SlamRadiusCm (650) and asserts both that it stayed there and that the health is untouched. Leg order is load-bearing — closing inside slam radius arms a 0.9s wind-up that plants the body on every later frame. FIXED AT THE SITE AND DELIBERATELY NOT PINNED: the same override wrote StateLabel = ADVANCE AFTER the ring call, clobbering the ring's own ATTACK/BACK OFF, so a Warden holding station or backing off printed ADVANCE on the playtest HUD. The label now precedes the call as the base chase does; the state is reachable only with both attacks on cooldown, which a damage-free fixture cannot reach.
+- TRAVEL POINTS ARE A DEVICE NOW, NOT A POST. Owner: "the travel points can
+  stop being just a pillar lets make a minor asset for them". Still primitives,
+  because importing a prop is a pipeline job and this is not — but four of them
+  instead of one: a low plinth, three raked struts leaning in around the beam,
+  and a collar where they meet. Three struts rather than four because three
+  reads as a mount and four reads as a cage, and an odd count never presents a
+  flat face however the player walks up. The strut placement is derived from
+  one radius and one lean rather than three hand-written rotators.
+  The beacon column is untouched: it does the navigate-by-it job and he did not
+  complain about it. All cosmetic — the capsule, the interaction range and the
+  destination list are the same.
+  PHOTOGRAPHED in the Anchor, where the hub's travel point reads as a tripod
+  with the beam standing through it.
 - QUEST-MARKED ENEMIES: THE BUG WAS ARITHMETIC, AND THE DESK'S EARLIER READING
   WAS HALF WRONG. It said the owner was mistaking ordinary elites for quest
   ones. Elites ARE the quest ones — Quest.Pattern's objective is elite-gated —
