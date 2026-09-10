@@ -317,6 +317,14 @@ namespace BreakerUI
 
     // Periphery: zone name at (40, 40) display 24; countdown numeric 16 on the
     // line beneath; quest line right edge 1880, top 40, max 320 wide, body 14.
+    // How far a travel point's label sits ABOVE its world anchor, in screen
+    // pixels. The anchor is 260 cm up, which is generous at the door and
+    // negligible at range, so without this the name lands on the crosshair
+    // from across a yard. O2 PLACEHOLDER.
+    inline constexpr float HudTravelLabelLiftPixels = 64.0f;
+    // Past this the door keeps its NAME and drops its "AREA n" line: a
+    // qualifier is for a door you are walking to. O2 PLACEHOLDER.
+    inline constexpr float HudTravelDetailCm = 2500.0f;
     inline constexpr float HudZoneLeft = 40.0f;               // 02-hud
     inline constexpr float HudZoneTop = 40.0f;                // 02-hud
     inline constexpr float HudZonePixels = 24.0f;             // 02-hud

@@ -1779,7 +1779,18 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
         // that F can act at this distance. The focused plate owns that hint.
         const float GateScale = DistanceScaleFor(Distance);
         const FString NounWord = TravelPoint->GetDisplayName().ToString().ToUpper();
-        float LabelY = Projected.Y;
+        // LIFTED CLEAR OF THE AIM POINT (owner, playtest 2026-09-10: "the rift
+        // text is too in the way"). The world anchor is 260 cm up, which is a
+        // healthy gap when you are standing at the door and almost nothing at
+        // range — so from across the yard the name landed exactly on the
+        // crosshair, over the thing you were shooting at.
+        //
+        // A SCREEN-SPACE lift rather than a taller world anchor, because the
+        // world anchor is already the right answer for the near case and the
+        // note above says why: a label at the beacon's tip leaves the screen
+        // the moment the player walks up to it. This moves the label out of the
+        // reticle without moving it off the object.
+        float LabelY = Projected.Y - S(BreakerUI::HudTravelLabelLiftPixels);
         if (!NounWord.IsEmpty())
         {
             DrawSpecTextCentered(NounWord, Projected.X, LabelY, BreakerUI::TealUnwritten, 13.0f * GateScale, 1.0f, ESpecFontRole::Display);
@@ -1790,7 +1801,12 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
         // level — and this lane owns only how it draws: muted and small, under
         // the name and over the verb, because it qualifies the place rather
         // than announcing it.
-        const FString DetailWord = TravelPoint->GetDisplayDetail().ToString().ToUpper();
+        // THE DETAIL LINE IS FOR ARRIVING, NOT FOR SCANNING. "AREA 5"
+        // qualifies a door you are walking to; from across the yard it is a
+        // second line of text on a thing you are not interacting with, and two
+        // stacked labels are most of what made this feel in the way.
+        const FString DetailWord = Distance <= BreakerUI::HudTravelDetailCm
+            ? TravelPoint->GetDisplayDetail().ToString().ToUpper() : FString();
         if (!DetailWord.IsEmpty())
         {
             DrawSpecTextCentered(DetailWord, Projected.X, LabelY, BreakerUI::TextMuted, 10.0f * GateScale);
