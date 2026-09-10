@@ -880,6 +880,7 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
         BuildZoneCaptureTour(Markers);
         BreakerScheduleFeedstockCapture(GetWorld());
         BreakerScheduleTellCapture(GetWorld());
+        BreakerScheduleBlastCapture(GetWorld());
         ScheduleScreenshots();
         UE_LOG(LogTemp, Log, TEXT("[BreakerMap] fernhall — %s."),
             bRiftInstance ? TEXT("RIFT INSTANCE, waves live") : TEXT("the yard, no gym field"));

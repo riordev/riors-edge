@@ -163,6 +163,31 @@ private:
     bool bPhaseTelegraphing = false;
     UPROPERTY(Replicated) float FuseRemaining = -1.0f;
     float FuseTotal = 0.0f;
+
+    // THE BLAST RING. A flat disc on the ground at the detonation's OUTER
+    // radius, shown only while the fuse is lit.
+    //
+    // WHY A RING AND NOT A LABEL. The corpse already carried a screen-space
+    // "DETONATES 1.4s" mark, and it answered the wrong question: the player is
+    // not asking WHETHER it goes off, they are asking WHETHER THEY ARE IN IT.
+    // A number over a body cannot answer that, and it was culled by any
+    // occluder and at the screen edge — which is exactly when you are close
+    // and cannot see the body.
+    //
+    // IT SITS AT THE OUTER RADIUS AND DOES NOT SHRINK. The Warden's slam
+    // telegraph states the rule this follows: the preview IS the hitbox, and a
+    // preview that lies is worse than no preview at all. A ring that closed
+    // inward would read as a shrinking danger while the blast still reached
+    // just as far. Urgency is carried by the PULSE instead, which costs no
+    // truth.
+    //
+    // Orange, per O179: explosion is the weapon/explosion/deployable verb. It
+    // is not the retired O203 modifier disc — that ruling retired a coloured
+    // badge under a LIVING body standing for its modifier; this is a hazard
+    // volume on a corpse, drawn at a real radius.
+    UPROPERTY() TObjectPtr<class UInstancedStaticMeshComponent> BlastRingVisual;
+    UPROPERTY() TObjectPtr<class UMaterialInstanceDynamic> BlastRingMaterial;
+    void UpdateBlastRing();
     // Who popped this Volatile, snapshotted on the death frame rather than
     // read at detonation: the fuse outlives the death by design, and the
     // answer must be the killing blow's, not whatever touched the corpse

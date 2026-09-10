@@ -4,7 +4,12 @@
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerZoneActor.h"
+#include "Components/CapsuleComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/World.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "UI/BreakerUIStyle.h"
 #include "EngineUtils.h"
 #include "Net/UnrealNetwork.h"
 
@@ -142,6 +147,109 @@ void UBreakerEnemyModifierComponent::ApplyPersistentModifiers()
     // half is the whole design anyway: §1.2 says the slow is the punish.
 }
 
+void UBreakerEnemyModifierComponent::UpdateBlastRing()
+{
+    AActor* Body = GetOwner();
+    UWorld* World = Body ? Body->GetWorld() : nullptr;
+    if (!Body || !World) return;
+    const bool bLit = IsFuseLit();
+
+    if (!bLit)
+    {
+        if (BlastRingVisual) BlastRingVisual->SetVisibility(false, true);
+        return;
+    }
+
+    // Built on first use rather than in the constructor: only a Volatile body
+    // ever needs one, and every OTHER enemy in a wave would otherwise carry a
+    // mesh component it never shows.
+    //
+    // AN OUTLINE, NOT A DISC, AND THE CAPTURE IS WHY. The first version was a
+    // scaled cylinder — the same filled disc the Warden's slam telegraph uses
+    // — and at this radius it swallowed a third of the screen in solid orange.
+    // The Warden gets away with a fill because his is 650 cm for 0.9 s; this
+    // is 900 cm for the whole fuse. So it is a ring of segments: one instanced
+    // component, one draw, and the floor stays visible inside it, which is the
+    // floor the player is deciding whether to leave.
+    if (!BlastRingVisual)
+    {
+        BlastRingVisual = NewObject<UInstancedStaticMeshComponent>(Body, TEXT("BlastRingVisual"));
+        if (!BlastRingVisual) return;
+        BlastRingVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        BlastRingVisual->SetCastShadow(false);
+        // REGISTER THEN ATTACH, in that order. SetupAttachment is a
+        // CONSTRUCTOR-only call and silently does nothing at runtime — an
+        // earlier version used it and the component registered unparented.
+        BlastRingVisual->RegisterComponent();
+        BlastRingVisual->AttachToComponent(Body->GetRootComponent(),
+            FAttachmentTransformRules::KeepRelativeTransform);
+        if (UStaticMesh* Segment = LoadObject<UStaticMesh>(nullptr,
+            TEXT("/Engine/BasicShapes/Cube.Cube")))
+        {
+            BlastRingVisual->SetStaticMesh(Segment);
+        }
+        if (UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr,
+            TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")))
+        {
+            BlastRingMaterial = UMaterialInstanceDynamic::Create(Base, BlastRingVisual);
+            BlastRingVisual->SetMaterial(0, BlastRingMaterial);
+        }
+    }
+
+    // ON THE FLOOR, FOUND BY TRACING FOR IT — not by subtracting the capsule's
+    // half-height from the body. An earlier version did that and the capture
+    // showed no ring at all: a corpse RAGDOLLS, so after death the capsule
+    // stops describing where the body lies and the disc sat at world Z -61,
+    // buried under the yard. The player is asking which FLOOR is dangerous, so
+    // the floor is the thing to ask.
+    const FVector Centre = Body->GetActorLocation();
+    FHitResult Ground;
+    FCollisionQueryParams GroundQuery(SCENE_QUERY_STAT(BreakerBlastRingFloor), false, Body);
+    const bool bFloor = World->LineTraceSingleByChannel(Ground, Centre + FVector(0, 0, 200.0f),
+        Centre - FVector(0, 0, 1000.0f), ECC_WorldStatic, GroundQuery);
+    const float GroundZ = bFloor ? Ground.ImpactPoint.Z + 4.0f : Centre.Z;
+
+    // The segments are laid once and then left alone: the radius is fixed for
+    // the life of the fuse, so rebuilding them per frame would be work for an
+    // identical answer.
+    const float Radius = FMath::Max(0.0f, Params.VolatileOuterRadiusCm);
+    if (BlastRingVisual->GetInstanceCount() == 0 && Radius > 0.0f)
+    {
+        constexpr int32 Segments = 32;            // O2 PLACEHOLDER
+        constexpr float SegmentThicknessCm = 24.0f;   // O2 PLACEHOLDER
+        constexpr float SegmentHeightCm = 8.0f;       // O2 PLACEHOLDER
+        // Chord of one segment, with a gap: a dashed ring reads as a boundary
+        // where a solid one reads as another piece of level geometry.
+        const float Chord = 2.0f * PI * Radius / Segments * 0.6f;
+        for (int32 Index = 0; Index < Segments; ++Index)
+        {
+            const float Angle = 2.0f * PI * Index / Segments;
+            const FVector Offset(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.0f);
+            const FRotator Facing(0.0f, FMath::RadiansToDegrees(Angle) + 90.0f, 0.0f);
+            // The engine cube is 100 cm on a side, so each extent is cm/100.
+            BlastRingVisual->AddInstance(FTransform(Facing, Offset,
+                FVector(Chord / 100.0f, SegmentThicknessCm / 100.0f, SegmentHeightCm / 100.0f)));
+        }
+    }
+    BlastRingVisual->SetWorldLocation(FVector(Centre.X, Centre.Y, GroundZ));
+    BlastRingVisual->SetVisibility(true, true);
+
+    if (BlastRingMaterial)
+    {
+        // THE PULSE CARRIES THE CLOCK. Remaining fraction drives how fast it
+        // blinks, so a fuse about to go reads as frantic without the ring ever
+        // misreporting its reach. Squared so the last third is where the
+        // acceleration is actually felt.
+        const float Remaining = FuseTotal > 0.0f
+            ? FMath::Clamp(FuseRemaining / FuseTotal, 0.0f, 1.0f) : 0.0f;
+        const float Urgency = (1.0f - Remaining) * (1.0f - Remaining);
+        const float Hz = 2.0f + 10.0f * Urgency;   // O2 PLACEHOLDER
+        const float Phase = FuseTotal - FuseRemaining;
+        const float Blink = 0.55f + 0.45f * FMath::Abs(FMath::Sin(Phase * Hz * PI));
+        BlastRingMaterial->SetVectorParameterValue(TEXT("Color"), BreakerUI::Orange * Blink);
+    }
+}
+
 void UBreakerEnemyModifierComponent::AdvanceModifiers(float DeltaSeconds)
 {
     if (Modifiers.IsEmpty() || DeltaSeconds <= 0.0f) return;
@@ -154,7 +262,12 @@ void UBreakerEnemyModifierComponent::AdvanceModifiers(float DeltaSeconds)
         if (FuseRemaining <= 0.0f)
         {
             FuseRemaining = -1.0f;
+            UpdateBlastRing();   // takes the ring away with the fuse
             DetonateVolatile();
+        }
+        else
+        {
+            UpdateBlastRing();
         }
         return;
     }
