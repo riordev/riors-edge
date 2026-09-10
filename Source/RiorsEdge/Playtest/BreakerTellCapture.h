@@ -10,3 +10,7 @@ void BreakerScheduleBlastCapture(UWorld* World);
 // moment a patrol comes through. A tear is 750 cm behind a formation and
 // therefore never in shot on the ordinary Fernhall route.
 void BreakerSchedulePocketRiftCapture(UWorld* World);
+// -BreakerCaptureChest: stand in front of the nearest supply chest. They are
+// placed by a session roll rather than authored, so there is no fixed point to
+// aim a camera at.
+void BreakerScheduleChestCapture(UWorld* World);

@@ -40,6 +40,7 @@
 #include "Combat/BreakerStatusComponent.h"
 #include "Interaction/BreakerNPC.h"
 #include "Interaction/BreakerFernhallCache.h"
+#include "Interaction/BreakerSupplyChest.h"
 #include "Interaction/BreakerBasinRecorder.h"
 #include "Interaction/BreakerCoastalUplink.h"
 #include "Interaction/BreakerTravelPoint.h"
@@ -1658,7 +1659,8 @@ void ABreakerPlaytestHUD::DrawInteractPrompt(const ABreakerCharacter* Character,
     if (const ABreakerNPC* NearbyNPC = Character->FindNearbyNPC())
     {
         // Low cache/recorder consoles need a body anchor; the person-head offset leaves the viewport at normal use range.
-        const FVector PromptAnchor = (Cast<ABreakerFernhallCache>(NearbyNPC) || Cast<ABreakerBasinRecorder>(NearbyNPC) || Cast<ABreakerCoastalUplink>(NearbyNPC)) ? NearbyNPC->GetActorLocation()
+        const FVector PromptAnchor = (Cast<ABreakerFernhallCache>(NearbyNPC) || Cast<ABreakerBasinRecorder>(NearbyNPC)
+            || Cast<ABreakerCoastalUplink>(NearbyNPC) || Cast<ABreakerSupplyChest>(NearbyNPC)) ? NearbyNPC->GetActorLocation()
             : NearbyNPC->GetActorLocation() + FVector(0.0f, 0.0f, 150.0f);
         const FVector Projected = Project(PromptAnchor, false);
         if (Projected.Z <= 0.0f) return;
@@ -1667,6 +1669,7 @@ void ABreakerPlaytestHUD::DrawInteractPrompt(const ABreakerCharacter* Character,
             Uplink ? Uplink->GetUplinkPrompt(Character).ToString()
                 : Cast<ABreakerBasinRecorder>(NearbyNPC) ? Cast<ABreakerBasinRecorder>(NearbyNPC)->GetRecorderPrompt().ToString()
                 : Cast<ABreakerFernhallCache>(NearbyNPC) ? Cast<ABreakerFernhallCache>(NearbyNPC)->GetCachePrompt().ToString()
+                : Cast<ABreakerSupplyChest>(NearbyNPC) ? Cast<ABreakerSupplyChest>(NearbyNPC)->GetChestPrompt().ToString()
                 : BreakerStrings::Format(EBreakerStringKey::HudPromptTalkNamed, *NearbyNPC->GetDisplayName().ToString().ToUpper()), !Uplink || !Uplink->IsTransmitting());
     }
 }
@@ -1748,6 +1751,9 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
         // Cache objectives already have map markers. Only the single focused
         // interaction plate names them in-world, using actual range and LOS.
         if (Cache) continue;
+        // A chest is not a person and has no name worth floating: it is found
+        // by walking into range, and the focused plate is the whole tell.
+        if (Cast<ABreakerSupplyChest>(NPC)) continue;
         const float Distance = FVector::Distance(ViewerLocation, NPC->GetActorLocation());
         if (Distance > LabelMaxDistance) continue;
         // Above the head sphere (rel Z 92 + radius), same idiom as the enemy

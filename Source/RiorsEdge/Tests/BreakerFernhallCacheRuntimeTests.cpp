@@ -23,6 +23,7 @@
 #include "GameFramework/WorldSettings.h"
 #include "Interaction/BreakerFeedstockPickup.h"
 #include "Interaction/BreakerFernhallCache.h"
+#include "Interaction/BreakerSupplyChest.h"
 #include "Items/BreakerLootPickup.h"
 #include "Items/BreakerDropTable.h"
 #include "Items/BreakerEquipmentComponent.h"
@@ -185,6 +186,63 @@ bool FBreakerFernhallCacheRuntimeTest::RunTest(const FString& Parameters)
         Cache->Configure(AreaLevel,{},0);
         Player->SetActorLocation(Cache->GetActorLocation());
         TestFalse(TEXT("Reconfiguration cannot rearm a paid cache"),Cache->TryOpen(Player));
+
+        // ---- SUPPLY CHESTS, IN THE SAME SHIPPED WORLD --------------------
+        // The pure rules are proved on bare seeds in
+        // RiorsEdge.Items.SupplyChest.Contents; what needs a world is that the
+        // shipped Fernhall actually PLACES them, that they reach the F key
+        // through the same NPC search the cache uses, and that each of the two
+        // payouts really lands. A chest that rolls onto no walkable floor is
+        // simply not there, so the count is a FLOOR rather than a figure.
+        TArray<ABreakerSupplyChest*> Chests;
+        for (TActorIterator<ABreakerSupplyChest> It(World); It; ++It) Chests.Add(*It);
+        AddInfo(FString::Printf(TEXT("SUPPLY CHESTS  %d placed across three yards"), Chests.Num()));
+        if (!TestTrue(TEXT("Shipping Fernhall places supply chests"), Chests.Num() >= 3)) return false;
+        if (auto* Map = Player->FindComponentByClass<UBreakerLocalMapComponent>())
+            for (const auto& Marker : Map->GetMarkers())
+                for (const ABreakerSupplyChest* Chest : Chests)
+                    TestFalse(TEXT("A chest is found by walking, not by a map pin"),
+                        Marker.Location.Equals(Chest->GetActorLocation()));
+
+        // BOTH PAYOUTS, and the world is what decides which chests exist — so
+        // take one of each KIND if the session rolled one, and say so if it
+        // did not rather than asserting against a coin flip.
+        int32 PaidCurrency = 0, PaidItem = 0;
+        for (ABreakerSupplyChest* Chest : Chests)
+        {
+            const bool bCurrency = Chest->PaysCurrency();
+            if ((bCurrency && PaidCurrency) || (!bCurrency && PaidItem)) continue;
+            Player->SetActorLocation(Chest->GetActorLocation() + Chest->GetActorForwardVector() * 180.0f);
+            TestTrue(TEXT("Shipping NPC search reaches a chest"), Player->FindNearbyNPC() == Chest);
+            TestEqual(TEXT("An unopened chest names its verb"),
+                Chest->GetChestPrompt().ToString(), FString(TEXT("OPEN CHEST")));
+            TestFalse(TEXT("Null interactor refused"), Chest->TryOpen(nullptr));
+            const int32 WalletBefore = Player->GetEquipment()->GetForgeWallet().Get();
+            int32 PickupsBefore = 0;
+            for (TActorIterator<ABreakerLootPickup> It(World); It; ++It) ++PickupsBefore;
+            if (!TestTrue(TEXT("An unguarded chest opens on sight"), Chest->TryOpen(Player))) return false;
+            const int32 WalletAfter = Player->GetEquipment()->GetForgeWallet().Get();
+            int32 PickupsAfter = 0;
+            for (TActorIterator<ABreakerLootPickup> It(World); It; ++It) ++PickupsAfter;
+            if (bCurrency)
+            {
+                ++PaidCurrency;
+                TestTrue(TEXT("A currency chest credits Riftglass"), WalletAfter > WalletBefore);
+                TestEqual(TEXT("and drops nothing physical"), PickupsAfter, PickupsBefore);
+            }
+            else
+            {
+                ++PaidItem;
+                TestEqual(TEXT("An item chest drops exactly one thing"), PickupsAfter, PickupsBefore + 1);
+                TestEqual(TEXT("and credits no currency"), WalletAfter, WalletBefore);
+            }
+            // ONE PAYOUT PER CHEST, whichever it was.
+            TestFalse(TEXT("A chest cannot pay twice"), Chest->TryOpen(Player));
+            TestTrue(TEXT("An opened chest drops its prompt"), Chest->GetChestPrompt().IsEmpty());
+            TestFalse(TEXT("and stops capturing the F key"), Player->FindNearbyNPC() == Chest);
+        }
+        AddInfo(FString::Printf(TEXT("SUPPLY CHESTS  opened %d currency, %d item"), PaidCurrency, PaidItem));
+        TestTrue(TEXT("At least one chest paid something"), PaidCurrency + PaidItem > 0);
     }
     return true;
 }

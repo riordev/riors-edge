@@ -11,6 +11,7 @@
 #include "Combat/BreakerRangedEnemy.h"
 #include "Engine/World.h"
 #include "Game/BreakerPocketRift.h"
+#include "Interaction/BreakerSupplyChest.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 #include "Misc/CommandLine.h"
@@ -221,5 +222,53 @@ void BreakerSchedulePocketRiftCapture(UWorld* World)
         {
             if (ABreakerPocketRift* Tear = Watched.Get()) Tear->Flare();
         }), 2.5f, true, 1.5f);
+    }), 1.0f, false);
+}
+
+void BreakerScheduleChestCapture(UWorld* World)
+{
+    if (!World || !FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureChest"))) return;
+    FTimerHandle Setup;
+    World->GetTimerManager().SetTimer(Setup, FTimerDelegate::CreateWeakLambda(World, [World]()
+    {
+        auto* Controller = World->GetFirstPlayerController();
+        auto* Player = Controller ? Cast<ABreakerCharacter>(Controller->GetPawn()) : nullptr;
+        if (!Player || !Player->HasAuthority()) return;
+        Player->ResumeFromMenu();
+        for (TActorIterator<ABreakerEnemy> It(World); It; ++It) It->SetActorTickEnabled(false);
+
+        ABreakerSupplyChest* Nearest = nullptr;
+        double Best = TNumericLimits<double>::Max();
+        int32 Found = 0;
+        for (TActorIterator<ABreakerSupplyChest> It(World); It; ++It)
+        {
+            ++Found;
+            const double Distance = FVector::DistSquared(It->GetActorLocation(), Player->GetActorLocation());
+            if (Distance < Best) { Best = Distance; Nearest = *It; }
+        }
+        if (!Nearest)
+        {
+            UE_LOG(LogTemp, Error, TEXT("[ChestCapture] this session rolled no chest anywhere."));
+            return;
+        }
+        // Inside the interaction range, so the frame carries the PROMPT as well
+        // as the box: the prompt is half of what the owner is judging.
+        const FVector Stand = Nearest->GetActorLocation()
+            + Nearest->GetActorForwardVector() * 240.0f + FVector(0.0f, 0.0f, 40.0f);
+        Player->SetActorLocation(Stand, false, nullptr, ETeleportType::TeleportPhysics);
+        // THE EYE IS COMPUTED, NOT ASKED FOR. GetPlayerViewPoint answers from
+        // the camera manager, which has not caught up with a teleport made this
+        // frame — so the first version aimed from where the player USED to be
+        // and put the crosshair on the skyline behind the chest.
+        //
+        // And it aims at the BOX rather than the actor: the origin is the
+        // capsule's centre, and the chest is a low body hanging below it.
+        const FVector EyeAt = Stand + FVector(0.0f, 0.0f, 60.0f);
+        Controller->SetControlRotation(
+            (Nearest->GetActorLocation() - FVector(0.0f, 0.0f, 45.0f) - EyeAt).Rotation());
+        if (Controller->PlayerCameraManager) Controller->PlayerCameraManager->UpdateCamera(0.05f);
+        UE_LOG(LogTemp, Display, TEXT("[ChestCapture] %d chests; nearest at %s pays %s"),
+            Found, *Nearest->GetActorLocation().ToString(),
+            Nearest->PaysCurrency() ? TEXT("currency") : TEXT("an item"));
     }), 1.0f, false);
 }

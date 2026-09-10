@@ -219,6 +219,29 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 ## Known issues to time-box
 
 - WARDEN WALK-THROUGH: FIXED, and the parked fixture was never the obstacle. The arrival ring lived in exactly one place, ABreakerEnemy::TickEngagedBehaviour, and ABreakerWardenEnemy::TickEngagedBehaviour replaces that function WHOLESALE without ever calling Super — so it wrote a full-speed vector straight at the player and fell off the end of the function with it intact whenever neither attack was armed. Nothing downstream re-added spacing, by design: the mover has no stop distance while steering because the ring "is always the behaviour's to govern, never the path's". The pass-through is the project's own recorded consequence of the player being a Pawn. The ring is now an extracted method every closing archetype CALLS rather than inherits, so an override cannot silently drop it. Base behaviour is bit-identical; only the Warden changes. Verified: the Boss is the sole override that calls Super, and ArrivalBand is written in exactly one statement, so no fourth class was affected. THE WIRING PIN IS NOW LANDED (RiorsEdge.Combat.Warden.ArrivalRingRuntime) AND THE RECORDED ANSWER WAS WRONG: a bare AActor can never be the target, because IsEligibleThreatTarget (BreakerEnemy.cpp:851) refuses anything that is not an ABreakerCharacter or an ABreakerDeployable with a live combat component, so it is never SELECTED and the engaged tick never runs against it. ResolveSweep/ResolveSlam bailing is true and irrelevant. The fixture uses a real character at its shipped 100 health and grants it nothing: neither attack is ever armed, because the approach leg runs entirely outside SlamRadiusCm (650) and asserts both that it stayed there and that the health is untouched. Leg order is load-bearing — closing inside slam radius arms a 0.9s wind-up that plants the body on every later frame. FIXED AT THE SITE AND DELIBERATELY NOT PINNED: the same override wrote StateLabel = ADVANCE AFTER the ring call, clobbering the ring's own ATTACK/BACK OFF, so a Warden holding station or backing off printed ADVANCE on the playtest HUD. The label now precedes the call as the base chase does; the state is reachable only with both attacks on cooldown, which a damage-free fixture cannot reach.
+- SUPPLY CHESTS: LANDED. Owner-asked, "randomly spawning chests the player can
+  open with either currency or an item in there weighted more towards lower
+  value stuff". Two per yard, six across the three, placed by ONE session roll
+  so a route walked twice is not identical the third time; not on the local map,
+  because marking them turns "found something while crossing the yard" into
+  "walk to the pin". Contents are a pure function of the seed the log prints:
+  62% currency, 38% an item rolled at trash odds with the player's own Drop
+  Chance deliberately NOT applied, then stepped down a tier half the time.
+  Shaped as the cache's subclass of ABreakerNPC, which is what puts it on the
+  F key with no change of lane; the difference from a cache is that it is
+  UNGUARDED, and that is why it pays less.
+  TWO DEFECTS THE SUITE CAUGHT WITHIN A MINUTE OF EACH OTHER: a chest tested
+  only its OWN capsule for clearance, so one landed inside a patrol and turned
+  a shipped-configuration assertion into a dice throw; and a chest paid the
+  KILL currency roll straight through, which is 0-1 Riftglass for a trash body,
+  so one credited nothing at all. Chests now clear the widest body that can
+  stand there, and the payout has a floor that climbs with the yard.
+  A THIRD, AND IT IS A TRAP FOR ANY FUTURE SESSION ROLL: the seed came from
+  FMath::Rand, which advances a PROCESS-GLOBAL stream every test in the suite
+  shares. It is a GUID hash now.
+  OWED, and the owner should know: chest items are NOT inside the pinned
+  drops-per-hour band. That band is projected from a kill rate and a chest is
+  not a kill, so the measured 134/hour does not see them.
 - FERNHALL IS THREE YARDS NOW. Owner-asked: "expand the size a lot as well and
   add more pockets". The DEPOT sits past a second dog-leg seam out of the
   substation's north flank, same 106x56 footprint and the same frame-relative

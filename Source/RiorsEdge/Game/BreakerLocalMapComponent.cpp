@@ -3,6 +3,7 @@
 #include "Game/BreakerContainmentHunt.h"
 #include "Combat/BreakerEnemy.h"
 #include "Interaction/BreakerFernhallCache.h"
+#include "Interaction/BreakerSupplyChest.h"
 #include "Interaction/BreakerBasinRecorder.h"
 #include "Interaction/BreakerCoastalUplink.h"
 #include "Interaction/BreakerMeridianGroundCrew.h"
@@ -168,7 +169,10 @@ TArray<FBreakerLocalMapMarker> UBreakerLocalMapComponent::GetMarkers() const
     }
     for (TActorIterator<ABreakerNPC> It(World); It; ++It)
     {
-        if (!IsValid(*It) || It->IsA<ABreakerFernhallCache>() || It->IsA<ABreakerBasinRecorder>() || It->IsA<ABreakerCoastalUplink>() || It->IsA<ABreakerMeridianGroundCrew>()) continue;
+        // A CHEST IS NOT ON THE MAP, DELIBERATELY. It is placed by a session
+        // roll rather than authored, so marking it would turn "found something
+        // while crossing the yard" into "walk to the pin".
+        if (!IsValid(*It) || It->IsA<ABreakerFernhallCache>() || It->IsA<ABreakerBasinRecorder>() || It->IsA<ABreakerCoastalUplink>() || It->IsA<ABreakerMeridianGroundCrew>() || It->IsA<ABreakerSupplyChest>()) continue;
         auto& Marker = Out.AddDefaulted_GetRef();
         Marker.Location = It->GetActorLocation(); Marker.Label = It->GetDisplayName();
         // NPC appearances can change with the player's body; discovery belongs

@@ -68,6 +68,7 @@
 #include "Items/BreakerLootLibrary.h"
 #include "Interaction/BreakerNPC.h"
 #include "Interaction/BreakerFernhallCache.h"
+#include "Interaction/BreakerSupplyChest.h"
 #include "Interaction/BreakerBasinRecorder.h"
 #include "Interaction/BreakerCoastalUplink.h"
 #include "Interaction/BreakerTravelPoint.h"
@@ -2673,6 +2674,7 @@ ABreakerNPC* ABreakerCharacter::FindNearbyNPC() const
     for (TActorIterator<ABreakerNPC> It(GetWorld()); It; ++It)
     {
         if (const auto* Cache = Cast<ABreakerFernhallCache>(*It); Cache && !Cache->IsInteractionReachable(this)) continue;
+        if (const auto* Chest = Cast<ABreakerSupplyChest>(*It); Chest && !Chest->IsInteractionReachable(this)) continue;
         if (const auto* Recorder=Cast<ABreakerBasinRecorder>(*It);Recorder&&!Recorder->IsInteractionReachable(this))continue;
         if (const auto* Uplink=Cast<ABreakerCoastalUplink>(*It);Uplink&&!Uplink->IsInteractionReachable(this))continue;
         const float DistanceSq = FVector::DistSquared(GetActorLocation(), It->GetActorLocation());
@@ -2799,6 +2801,12 @@ void ABreakerCharacter::InteractWithNearbyNPC()
     {
         if (HasAuthority()) Cache->TryOpen(this);
         else ServerOpenFernhallCache(Cache);
+        return;
+    }
+    if (auto* Chest = Cast<ABreakerSupplyChest>(NPC))
+    {
+        if (HasAuthority()) Chest->TryOpen(this);
+        else ServerOpenSupplyChest(Chest);
         return;
     }
     OpenMenu(false);
@@ -3025,6 +3033,11 @@ void ABreakerCharacter::ServerInteractBasinRecorder_Implementation(ABreakerBasin
 void ABreakerCharacter::ServerOpenFernhallCache_Implementation(ABreakerFernhallCache* Cache)
 {
     if (IsValid(Cache)) Cache->TryOpen(this);
+}
+
+void ABreakerCharacter::ServerOpenSupplyChest_Implementation(ABreakerSupplyChest* Chest)
+{
+    if (IsValid(Chest)) Chest->TryOpen(this);
 }
 
 bool ABreakerCharacter::IsCoopCombatProfile() const

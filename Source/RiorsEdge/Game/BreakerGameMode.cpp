@@ -1,6 +1,8 @@
 #include "Game/BreakerGameMode.h"
 #include "Game/BreakerRepopulationMath.h"
 #include "Game/BreakerPocketRift.h"
+#include "Interaction/BreakerSupplyChest.h"
+#include "Interaction/BreakerSupplyChestMath.h"
 #include "Game/BreakerPrototypeDestinations.h"
 #include "Game/BreakerCoopCombatTest.h"
 #include "GameFramework/PawnMovementComponent.h"
@@ -883,6 +885,7 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
         BreakerScheduleTellCapture(GetWorld());
         BreakerScheduleBlastCapture(GetWorld());
         BreakerSchedulePocketRiftCapture(GetWorld());
+        BreakerScheduleChestCapture(GetWorld());
         ScheduleScreenshots();
         UE_LOG(LogTemp, Log, TEXT("[BreakerMap] fernhall — %s."),
             bRiftInstance ? TEXT("RIFT INSTANCE, waves live") : TEXT("the yard, no gym field"));
@@ -4522,6 +4525,88 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
         }
     }
     UE_LOG(LogTemp, Display, TEXT("[Fernhall] %d finite outdoor enemies placed across %d pockets; no wave controller."), Spawned, PocketCount);
+    // ---- SUPPLY CHESTS, ONE ROLL PER SESSION --------------------------------
+    // Owner-asked: "randomly spawning chests the player can open with either
+    // currency or an item in there weighted more towards lower value stuff".
+    //
+    // RANDOM PER SESSION, NOT PER AUTHORED PLACEMENT. What the owner asked for
+    // is a route that is not identical the third time it is walked, and one
+    // seed drawn here gives every chest in the world a position and a content
+    // that a test can reproduce from that seed alone.
+    //
+    // NOT GATED ON A FIGHT, which is the whole difference from the cache
+    // standing at pocket 3 — and it is why they pay less. The arithmetic for
+    // "less" is in BreakerSupplyChestMath.h where a bare test can read it.
+    {
+        // NOT FMath::Rand, AND THE REASON IS THE SUITE. That function advances
+        // a PROCESS-GLOBAL stream which every test in the run shares, so a
+        // session roll drawn from it silently changes the seeds every later
+        // fixture sees — and this one is drawn once per Fernhall build, which
+        // several runtime tests do. A GUID gives per-session variation without
+        // touching anything else's arithmetic.
+        const int32 ChestSeed = static_cast<int32>(GetTypeHash(FGuid::NewGuid()));
+        const FName ChestYards[] = { NAME_None, FName(TEXT("substation")), FName(TEXT("depot")) };
+        const ABreakerSupplyChest* ChestTemplate = GetDefault<ABreakerSupplyChest>();
+        const UCapsuleComponent* ChestBody = ChestTemplate
+            ? ChestTemplate->FindComponentByClass<UCapsuleComponent>() : nullptr;
+        // The body a patrol stands in, which is the thing a chest must not be
+        // able to share ground with.
+        const ABreakerEnemy* EnemyTemplate = GetDefault<ABreakerEnemy>();
+        const UCapsuleComponent* EnemyTemplateBody = EnemyTemplate
+            ? EnemyTemplate->FindComponentByClass<UCapsuleComponent>() : nullptr;
+        int32 ChestsPlaced = 0;
+        for (int32 YardIndex = 0; YardIndex < UE_ARRAY_COUNT(ChestYards) && ChestBody; ++YardIndex)
+        {
+            FVector2D Origin2D, Forward2D;
+            if (!UBreakerZoneBuilder::YardFrame(Markers, ChestYards[YardIndex], Origin2D, Forward2D)) continue;
+            const FVector Forward(Forward2D.X, Forward2D.Y, 0);
+            const FVector Right = FVector::CrossProduct(FVector::UpVector, Forward);
+            const FBreakerCoverFieldParams Field = UBreakerZoneBuilder::FernhallFieldParams(ChestYards[YardIndex]);
+            const int32 AreaLevel = UBreakerZoneBuilder::FernhallYardAreaLevel(ChestYards[YardIndex]);
+            for (int32 Index = 0; Index < BreakerSupplyChest::ChestsPerYard; ++Index)
+            {
+                const int32 Salt = YardIndex * 16 + Index;
+                const float Fraction = BreakerSupplyChest::PlacementFraction(ChestSeed, Salt);
+                const float Lateral = BreakerSupplyChest::PlacementLateral(ChestSeed, Salt, Field.BandHalfWidthCm);
+                const FVector Desired = FVector(Origin2D.X, Origin2D.Y, 0)
+                    + Forward * FMath::Lerp(Field.BandNearCm, Field.BandFarCm, Fraction)
+                    + Right * Lateral;
+                FHitResult Floor;
+                FCollisionQueryParams Query(SCENE_QUERY_STAT(FernhallChestFloor), false);
+                if (!World->LineTraceSingleByObjectType(Floor, Desired + FVector(0, 0, 3000),
+                        Desired - FVector(0, 0, 3000), FCollisionObjectQueryParams(ECC_WorldStatic), Query)
+                    || Floor.ImpactNormal.Z < 0.7f)
+                {
+                    continue;   // rolled onto nothing walkable; that chest is simply not there
+                }
+                const float Height = ChestBody->GetScaledCapsuleHalfHeight();
+                const FVector At = Floor.ImpactPoint + FVector(0, 0, Height + 2.0f);
+                // CLEAR OF THE WIDEST BODY THAT CAN STAND HERE, not merely of
+                // its own footprint. The first version tested the chest's own
+                // capsule and the suite caught it inside a minute: a chest is
+                // narrower than an enemy, so a spot the chest fits in can still
+                // be inside a patrol's capsule — and the encounter test's
+                // "every body is clear of world props" assertion went red on a
+                // random roll, which is worse than the overlap itself because
+                // it makes a shipped-configuration test depend on a dice throw.
+                const float BodyClearanceCm = EnemyTemplateBody
+                    ? EnemyTemplateBody->GetScaledCapsuleRadius() : 0.0f;
+                if (World->OverlapBlockingTestByChannel(At, FQuat::Identity, ECC_Pawn,
+                    FCollisionShape::MakeCapsule(ChestBody->GetScaledCapsuleRadius() + BodyClearanceCm, Height), Query))
+                {
+                    continue;
+                }
+                // Facing back down the yard, so the player meets its front and
+                // its reward lands on the side they walked in from.
+                ABreakerSupplyChest* Chest = World->SpawnActor<ABreakerSupplyChest>(At, (-Forward).Rotation());
+                if (!Chest) continue;
+                Chest->Configure(AreaLevel, BreakerSupplyChest::Mix(ChestSeed, Salt * 101 + 7));
+                ++ChestsPlaced;
+            }
+        }
+        UE_LOG(LogTemp, Display, TEXT("[Fernhall] %d supply chests placed from seed %d."), ChestsPlaced, ChestSeed);
+    }
+
     BreakerFernhallCourtyard::FPlan Courtyard;
     FString CourtyardError;
     if (BreakerFernhallCourtyard::MakePlan(YardPieces, Courtyard, CourtyardError))

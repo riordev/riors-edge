@@ -34,6 +34,7 @@ class UBreakerAbilityComponent;
 class UBreakerQuestJournal;
 class ABreakerNPC;
 class ABreakerFernhallCache;
+class ABreakerSupplyChest;
 class ABreakerBasinRecorder;
 class ABreakerCoastalUplink;
 class ABreakerLootPickup;
@@ -410,6 +411,7 @@ private:
     void ToggleLocalMap();
     void InteractWithNearbyNPC();
     UFUNCTION(Server, Reliable) void ServerOpenFernhallCache(ABreakerFernhallCache* Cache);
+    UFUNCTION(Server, Reliable) void ServerOpenSupplyChest(ABreakerSupplyChest* Chest);
     UFUNCTION(Server, Reliable) void ServerInteractBasinRecorder(ABreakerBasinRecorder* Recorder);
     UFUNCTION(Server, Reliable) void ServerInteractCoastalUplink(ABreakerCoastalUplink* Uplink);
     UFUNCTION(Server, Reliable) void ServerPickupLoot(ABreakerLootPickup* Pickup);
