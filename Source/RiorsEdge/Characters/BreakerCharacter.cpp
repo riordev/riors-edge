@@ -4,7 +4,6 @@
 #include "Game/BreakerCoopCombatVerification.h"
 #include "Net/UnrealNetwork.h"
 #include "Interaction/BreakerFeedstockPickup.h"
-#include "Audio/BreakerFootstepComponent.h"
 #include "Game/BreakerLocalMapComponent.h"
 #include "Characters/BreakerFirstPersonArms.h"
 #include "Combat/BreakerStatusCycleComponent.h"
@@ -116,7 +115,6 @@ ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer
     Progression = CreateDefaultSubobject<UBreakerProgressionComponent>(TEXT("Progression"));
     Combat = CreateDefaultSubobject<UBreakerCombatComponent>(TEXT("Combat"));
     Weapon = CreateDefaultSubobject<UBreakerWeaponComponent>(TEXT("Weapon"));
-    Footsteps = CreateDefaultSubobject<UBreakerFootstepComponent>(TEXT("Footsteps"));
     LocalMap = CreateDefaultSubobject<UBreakerLocalMapComponent>(TEXT("LocalMap"));
     Playtest = CreateDefaultSubobject<UBreakerPlaytestComponent>(TEXT("Playtest"));
     Equipment = CreateDefaultSubobject<UBreakerEquipmentComponent>(TEXT("Equipment"));

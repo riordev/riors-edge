@@ -71,7 +71,6 @@ public:
     ABreakerSoundDirector();
     void ApplyVolumeSettings(float Master, float Effects);
     static void PlaySettingsTest(UWorld* World);
-    static void PlayFootstep(UWorld* World);
 
     // The trigger was pulled and a round left. Per cosmetic shot, not per
     // pellet: a shotgun blast is one report.
@@ -101,7 +100,6 @@ public:
     // it was there. This one is uncalled on purpose and says so.
     void PlayKill();
     // The player took real damage. Immediate — being hit has no flight.
-    void PlayTakeHit();
     // The player died (O193): one low sound at the death beat's hard cut to
     // black. The HUD schedules it at the character's DeathBeat
     // LowerAndDropSeconds, so the cue lands with the black rather than with
@@ -129,15 +127,9 @@ protected:
 private:
     // One persistent voice per verb; PCM cached at BeginPlay and queued
     // verbatim per trigger.
-    UPROPERTY() TObjectPtr<UAudioComponent> FootstepVoice;
-    UPROPERTY() TArray<TObjectPtr<USoundWaveProcedural>> FootstepWaves;
-    TArray<TArray<int16>> FootstepPcm;
-    int32 NextFootstep = 0;
-    double LastFootstepTime = -1000;
     UPROPERTY() TObjectPtr<UAudioComponent> FireVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> HitVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> KillVoice;
-    UPROPERTY() TObjectPtr<UAudioComponent> TakeHitVoice;
     // One voice for every ability: a cast cuts the previous cast, exactly as
     // the other four verbs cut themselves.
     UPROPERTY() TObjectPtr<UAudioComponent> AbilityVoice;
@@ -163,7 +155,6 @@ private:
     UPROPERTY() TObjectPtr<USoundWaveProcedural> FireWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> HitWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> KillWave;
-    UPROPERTY() TObjectPtr<USoundWaveProcedural> TakeHitWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> AbilityDefaultWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> PlayerDeathWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> LevelUpWave;
@@ -181,7 +172,6 @@ private:
     TArray<int16> FirePcm;
     TArray<int16> HitPcm;
     TArray<int16> KillPcm;
-    TArray<int16> TakeHitPcm;
     TArray<int16> AbilityDefaultPcm;
     TArray<int16> PlayerDeathPcm;
     TArray<int16> LevelUpPcm;

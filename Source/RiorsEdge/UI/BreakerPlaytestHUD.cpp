@@ -10,6 +10,7 @@
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Abilities/BreakerAbilityStateComponent.h"
 #include "Abilities/BreakerGameplayAbility.h"
+#include "Abilities/BreakerSkillLevelMath.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Progression/BreakerProgressionComponent.h"
 // Cap levels only, for stating what a level actually granted on the banner.
@@ -463,34 +464,17 @@ void ABreakerPlaytestHUD::DrawHUD()
     if (const UBreakerCombatComponent* PlayerCombat = Character->GetCombat(); PlayerCombat && PlayerCombat->GetSecondsSinceDamage() < 0.28f)
     {
         // Harm is instant: full-bleed edge lines, no inset, no fade in.
+        //
+        // THE WORD IS GONE (owner, playtest 2026-09-10): "theres no need for
+        // DAMAGE to appear when im taking damage". The frame IS the tell — it
+        // is instant, it is peripheral, and it does not ask to be read. A word
+        // in the middle of the screen asks to be read, every time, for
+        // something the player already knows happened to them.
+        //
+        // The plate-avoidance search went with it. It existed ONLY to keep this
+        // label off the enemy status rows; with no label there is nothing to
+        // move, and EnemyPlateBounds keeps its other readers.
         const FLinearColor DamageColor = BreakerUI::Alpha(BreakerUI::Harm, 0.85f);
-        const FString DamageLabel = BreakerStrings::Get(EBreakerStringKey::HudCalloutDamage);
-        const FVector2D DamageLabelSize = MeasureSpecText(DamageLabel, 16.0f, ESpecFontRole::Display);
-        const float LabelLeft = Center.X - DamageLabelSize.X * .5f;
-        const float LabelRight = Center.X + DamageLabelSize.X * .5f;
-        float DamageLabelY = Center.Y - S(80.0f);
-        // The player-damage callout shares screen space with enemy status rows.
-        // Move above their actual measured bounds, including any newly crossed
-        // row; never overwrite the Rot timer with this independent HUD pass.
-        for (int32 Pass = 0; Pass < EnemyPlateBounds.Num(); ++Pass)
-        {
-            bool bMoved = false;
-            for (const FBox2D& Taken : EnemyPlateBounds)
-            {
-                if (LabelLeft < Taken.Max.X && LabelRight > Taken.Min.X
-                    && DamageLabelY < Taken.Max.Y && DamageLabelY + DamageLabelSize.Y > Taken.Min.Y)
-                {
-                    DamageLabelY = Taken.Min.Y - S(BreakerUI::Space8) - DamageLabelSize.Y;
-                    bMoved = true;
-                }
-            }
-            if (!bMoved) break;
-        }
-        // If no on-screen slot remains, the unchanged full-screen harm frame
-        // still announces the hit; do not clip the text at the viewport edge.
-        if (LabelLeft >= 0 && LabelRight <= Canvas->ClipX && DamageLabelY >= 0
-            && DamageLabelY + DamageLabelSize.Y <= Canvas->ClipY)
-            DrawSpecTextCentered(DamageLabel, Center.X, DamageLabelY, DamageColor, 16.0f, 1.0f, ESpecFontRole::Display);
         const float T = S(4.0f);
         DrawRect(DamageColor, 0.0f, 0.0f, Canvas->ClipX, T);
         DrawRect(DamageColor, 0.0f, Canvas->ClipY - T, Canvas->ClipX, T);
@@ -500,10 +484,11 @@ void ABreakerPlaytestHUD::DrawHUD()
     // The near-death frame, after the transient damage flash so the flash
     // always reads over it.
     DrawNearDeathFrame(Character);
-    if ((Weapon && Weapon->IsReloading()) || (IsCapturePreview() && bPreviewReload))
-    {
-        DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudCalloutReloading), Center.X, Center.Y + S(48.0f), BreakerUI::Orange, 14.0f, 1.0f, ESpecFontRole::Display);
-    }
+    // RELOADING NO LONGER SHOUTS (owner, playtest 2026-09-10): "reloading
+    // doesnt need to have giant text on screen at all theres an animation".
+    // Three things already say it — the reload animation, the magazine rail
+    // turning orange, and the rail filling as the reload runs — so the centred
+    // callout was the fourth and the only one that interrupted aiming.
 
     // The old fixed-position damage readout is gone: floating world-space
     // numbers say the same thing at the impact point. Only the weak-point
@@ -576,6 +561,12 @@ void ABreakerPlaytestHUD::DrawPlaytestInstrumentation(const ABreakerCharacter* C
     // bright sky is unreadable — which is exactly how the first pass shipped.
     // Below the zone line and its countdown, which own the top-left corner.
     const float LegendTop = BreakerUI::HudCountdownTop + BreakerUI::HudCountdownPixels + BreakerUI::Space16;   // O2 PLACEHOLDER
+    // THE LEGEND IS PART OF THE DIAGNOSTICS NOW, not permanent chrome (owner,
+    // playtest 2026-09-10): "the top left menu is ugly and half the mechanics
+    // are unnecessary now". It was on screen in every frame of every session,
+    // advertising dev keys over the top-left corner of a game it says of itself
+    // it is "never shipping". F3 brings it back with the numbers it belongs to.
+    if (Playtest && Playtest->AreDiagnosticsVisible())
     {
         const FString KeyLegend(TEXT("F1 RESET   F2 REPORT   F3 DIAGNOSTICS   ESC MENU"));
         const FVector2D LegendSize = MeasureSpecText(KeyLegend, 11.0f, ESpecFontRole::Mono);
@@ -802,7 +793,21 @@ void ABreakerPlaytestHUD::DrawAbilityCluster(const ABreakerCharacter* Character)
     // so it is a readout the player can find, not a thing competing with the
     // cooldowns beneath it. Without this the chase O253 sells is invisible,
     // which by this project's own rule makes it dead content.
-    if (Character->GetProgression())
+    //
+    // IT ONLY DRAWS ONCE IT MEANS SOMETHING (owner, playtest 2026-09-10). He
+    // listed "the SKILL 1 above the ability on E" among the things that make
+    // the HUD feel bad, and at MinLevel that is exactly what it was: a label
+    // permanently announcing its own default. A readout that changes a few
+    // times a session should be absent until it has changed.
+    //
+    // NOT DELETED OUTRIGHT, and this is a judgement worth overruling if he
+    // wants it gone: the comment above is the site's own warning that without
+    // any readout O253's chase is invisible, which by this project's rule
+    // makes it dead content. Hiding the default keeps the noise off the screen
+    // and keeps the earned number findable. Deleting it entirely is this
+    // if-statement and its body.
+    if (Character->GetProgression()
+        && UBreakerGameplayAbility::SkillLevelFor(Character) > BreakerSkillLevel::MinLevel)
     {
         DrawSpecText(FString::Printf(TEXT("%s %d"),
                 *BreakerStrings::Get(EBreakerStringKey::HudAbilitySkillLevel),
@@ -2857,14 +2862,13 @@ void ABreakerPlaytestHUD::HandlePlayerDamageReceived(const FBreakerDamageResult&
     // carries the one sound the player's death has (O193) — a low cue at the
     // hard cut to black, scheduled below at the character's own
     // LowerAndDropSeconds so the sound and the black arrive together.
-    if (!Result.bKilled && (Result.HealthDamage > 0.0f || Result.ShieldDamage > 0.0f))
-    {
-        if (ABreakerSoundDirector* Sound = GetSoundDirector())
-        {
-            Sound->PlayTakeHit();
-        }
-    }
-    else if (Result.bKilled)
+    //
+    // THE TAKE-HIT VOCAL IS GONE (owner, playtest 2026-09-10): "i dont need
+    // audio of my character groaning when i take damage (its so fucking
+    // annoying)". It fired on every landed hit, which in a pack fight is most
+    // seconds of the fight. The harm frame still announces the hit and the
+    // health bar still moves; neither of them talks.
+    if (Result.bKilled)
     {
         // The delay is read from the pawn's authored timeline, not a copy of
         // it: the character's beat and this cue cannot drift apart. A pawn

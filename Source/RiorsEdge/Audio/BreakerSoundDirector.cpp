@@ -31,11 +31,9 @@ ABreakerSoundDirector::ABreakerSoundDirector()
         Voice->bIsUISound = true;
         return Voice;
     };
-    FootstepVoice = MakeVoice(TEXT("FootstepVoice"));
     FireVoice = MakeVoice(TEXT("FireVoice"));
     HitVoice = MakeVoice(TEXT("HitVoice"));
     KillVoice = MakeVoice(TEXT("KillVoice"));
-    TakeHitVoice = MakeVoice(TEXT("TakeHitVoice"));
     AbilityVoice = MakeVoice(TEXT("AbilityVoice"));
     PlayerDeathVoice = MakeVoice(TEXT("PlayerDeathVoice"));
     LevelUpVoice = MakeVoice(TEXT("LevelUpVoice"));
@@ -95,22 +93,9 @@ void ABreakerSoundDirector::BeginPlay()
     UBreakerGameSettings* Settings = NewObject<UBreakerGameSettings>(this);
     Settings->LoadOrDefaults();
     ApplyVolumeSettings(Settings->MasterVolume, Settings->EffectsVolume);
-    for (int32 Index = 0; Index < 5; ++Index)
-    {
-        const FString Path = FPaths::ProjectContentDir() / FString::Printf(TEXT("Breaker/Audio/kenney/impact-sounds/footstep_concrete_%03d.wav"), Index);
-        TArray<uint8> Bytes;
-        if (!FFileHelper::LoadFileToArray(Bytes, *Path)) continue;
-        BreakerWave::FParsedWave Sample = BreakerWave::ParseWav(Bytes);
-        if (!Sample.IsValid()) continue;
-        FootstepWaves.Add(MakeWave(Sample.SampleRate));
-        FootstepPcm.Add(MoveTemp(Sample.Samples));
-    }
-    UE_LOG(LogTemp, Log, TEXT("[BreakerSound] concrete footsteps: %d shipped PCM samples loaded."), FootstepPcm.Num());
-
     const int32 FireRate = LoadOrSynth(TEXT("weapon_fire.wav"), &BreakerSound::RenderWeaponFire, FirePcm);
     const int32 HitRate = LoadOrSynth(TEXT("hit_confirm.wav"), &BreakerSound::RenderHitConfirm, HitPcm);
     const int32 KillRate = LoadOrSynth(TEXT("kill_confirm.wav"), &BreakerSound::RenderKill, KillPcm);
-    const int32 TakeHitRate = LoadOrSynth(TEXT("take_hit.wav"), &BreakerSound::RenderTakeHit, TakeHitPcm);
 
     // The ability DEFAULT loads here with the other four. Per-ability overrides
     // do NOT: there are THIRTY-FIVE abilities — seven per class across five —
@@ -127,11 +112,9 @@ void ABreakerSoundDirector::BeginPlay()
     FireWave = MakeWave(FireRate);
     HitWave = MakeWave(HitRate);
     KillWave = MakeWave(KillRate);
-    TakeHitWave = MakeWave(TakeHitRate);
     FireVoice->SetSound(FireWave);
     HitVoice->SetSound(HitWave);
     KillVoice->SetSound(KillWave);
-    TakeHitVoice->SetSound(TakeHitWave);
     AbilityDefaultWave = MakeWave(AbilityRate);
     AbilityVoice->SetSound(AbilityDefaultWave);
     PlayerDeathWave = MakeWave(PlayerDeathRate);
@@ -168,25 +151,6 @@ void ABreakerSoundDirector::ApplyVolumeSettings(float Master, float Effects)
     }
 }
 
-void ABreakerSoundDirector::PlayFootstep(UWorld* World)
-{
-    if (!World || World->GetNetMode() == NM_DedicatedServer) return;
-    ABreakerSoundDirector* Director = nullptr;
-    for (TActorIterator<ABreakerSoundDirector> It(World); It; ++It)
-        if (IsValid(*It) && !It->IsActorBeingDestroyed()) { Director = *It; break; }
-    if (!Director)
-    {
-        FActorSpawnParameters Params;
-        Params.ObjectFlags |= RF_Transient;
-        Director = World->SpawnActor<ABreakerSoundDirector>(ABreakerSoundDirector::StaticClass(), FTransform::Identity, Params);
-    }
-    if (Director) Director->SetLifeSpan(0); // Adopt a settings-preview director for ongoing gameplay.
-    if (!Director || Director->FootstepPcm.IsEmpty() || World->GetTimeSeconds() - Director->LastFootstepTime < .28) return;
-    Director->LastFootstepTime = World->GetTimeSeconds();
-    const int32 Index = Director->NextFootstep++ % Director->FootstepPcm.Num();
-    Director->FootstepVoice->SetSound(Director->FootstepWaves[Index]);
-    Director->Trigger(Director->FootstepVoice, Director->FootstepWaves[Index], Director->FootstepPcm[Index]);
-}
 
 void ABreakerSoundDirector::PlaySettingsTest(UWorld* World)
 {
@@ -378,6 +342,5 @@ void ABreakerSoundDirector::PlayWeaponFire(EBreakerWeaponArchetype Archetype)
 }
 void ABreakerSoundDirector::PlayHitConfirm() { Trigger(HitVoice, HitWave, HitPcm); }
 void ABreakerSoundDirector::PlayKill()       { Trigger(KillVoice, KillWave, KillPcm); }
-void ABreakerSoundDirector::PlayTakeHit()    { Trigger(TakeHitVoice, TakeHitWave, TakeHitPcm); }
 void ABreakerSoundDirector::PlayPlayerDeath() { Trigger(PlayerDeathVoice, PlayerDeathWave, PlayerDeathPcm); }
 void ABreakerSoundDirector::PlayLevelUp() { Trigger(LevelUpVoice, LevelUpWave, LevelUpPcm); }

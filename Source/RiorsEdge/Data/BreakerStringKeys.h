@@ -23,8 +23,6 @@
 //   stash.    the stash screen (UI/BreakerStashScreen.cpp)
 #define BREAKER_STRING_KEYS(BREAKER_STRING) \
     BREAKER_STRING(HudDeathRedeploying,          "hud.death.redeploying",           "") \
-    BREAKER_STRING(HudCalloutDamage,             "hud.callout.damage",              "") \
-    BREAKER_STRING(HudCalloutReloading,          "hud.callout.reloading",           "") \
     BREAKER_STRING(HudCalloutWeakPoint,          "hud.callout.weakPoint",           "") \
     BREAKER_STRING(HudCalloutEliteDown,          "hud.callout.eliteDown",           "") \
     BREAKER_STRING(HudCalloutOverdriveActive,    "hud.callout.overdriveActive",     "") \

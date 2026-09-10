@@ -2,8 +2,6 @@
 	"version": 1,
 	"strings": {
 		"hud.death.redeploying": "REDEPLOYING",
-		"hud.callout.damage": "DAMAGE",
-		"hud.callout.reloading": "RELOADING",
 		"hud.callout.weakPoint": "WEAK POINT",
 		"hud.callout.eliteDown": "ELITE DOWN",
 		"hud.callout.overdriveActive": "OVERDRIVE ACTIVE",
