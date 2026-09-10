@@ -2565,6 +2565,22 @@ void ABreakerCharacter::OpenMenuScreenForCapture(const FString& ScreenName)
     // in a rift instance. The model is built from the live session so the
     // frame photographs the variant this world would raise; a capture run
     // with no rift set photographs the campaign frame.
+    // The rift debrief, guarded for the same reason: its only door is closing a
+    // rift. Composed from the live session and the game mode's own run ledger,
+    // so the frame shows the run this world actually had — a capture with no
+    // run behind it photographs the empty-handed variant, which is a real state
+    // and worth looking at rather than a harness artifact.
+    else if (Wanted == TEXT("RIFTDEBRIEF"))
+    {
+        Screen = EBreakerMenuScreen::RiftDebrief;
+        const UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>();
+        ABreakerGameMode* GameMode = GetWorld() ? Cast<ABreakerGameMode>(GetWorld()->GetAuthGameMode()) : nullptr;
+        MenuWidget->ShowRiftDebrief(BreakerRiftDebrief::Compose(
+            Session ? Session->PendingRift : FBreakerRiftDefinition(),
+            GameMode ? GameMode->GetRiftRunLoot() : TArray<FBreakerItemInstance>(),
+            GameMode ? GameMode->RiftRunRiftglassGained(this) : 0,
+            GameMode ? GameMode->RiftRunExperienceGained(this) : 0));
+    }
     else if (Wanted == TEXT("DEATH"))
     {
         Screen = EBreakerMenuScreen::Death;
@@ -3038,6 +3054,14 @@ void ABreakerCharacter::ServerOpenFernhallCache_Implementation(ABreakerFernhallC
 void ABreakerCharacter::ServerOpenSupplyChest_Implementation(ABreakerSupplyChest* Chest)
 {
     if (IsValid(Chest)) Chest->TryOpen(this);
+}
+
+void ABreakerCharacter::ShowRiftDebrief(const BreakerRiftDebrief::FModel& Model)
+{
+    // OpenMenu first, exactly as the death beat does: the widget has to exist
+    // and the world has to be paused under it before a screen can be raised.
+    OpenMenu(false);
+    if (MenuWidget.IsValid()) MenuWidget->ShowRiftDebrief(Model);
 }
 
 bool ABreakerCharacter::IsCoopCombatProfile() const

@@ -16,6 +16,7 @@
 #include "Settings/BreakerGameSettings.h"
 // Complete type: the death screen's model is a member by value.
 #include "Game/BreakerDeathBudgetMath.h"
+#include "UI/BreakerRiftDebriefMath.h"
 // Complete type: BreakerMenuLayout::DialogueRail walks a node list's choices.
 #include "Interaction/BreakerNPC.h"
 
@@ -103,7 +104,15 @@ enum class EBreakerMenuScreen : uint8
     // own TU (UI/BreakerDeathScreen.cpp). Appended last, same rule as
     // Travel.
     Death,
-    LocalMap
+    LocalMap,
+    // The rift debrief (owner-asked: "when a rift is closed we can add
+    // something very similar that shows the items we gained ... kinda like a
+    // loot highlight"). The briefing's twin, raised by the completion beat: a
+    // reward screen with ONE verb, because the run is over and the only
+    // question left is when the player is finished looking. Builds in its own
+    // TU (UI/BreakerRiftDebriefScreen.cpp). Appended last, same rule as
+    // Travel.
+    RiftDebrief
 };
 
 // ---------------------------------------------------------------------------
@@ -584,6 +593,9 @@ public:
     // hands over the model the world-free rule built
     // (Game/BreakerDeathBudgetMath.h). Defined in UI/BreakerDeathScreen.cpp.
     void ShowDeath(const FBreakerDeathScreenModel& Model);
+    // The rift debrief, raised on completion. Takes its model by value for the
+    // same reason ShowDeath does: the pane outlives the call.
+    void ShowRiftDebrief(const BreakerRiftDebrief::FModel& Model);
     void HandleEscape();
     // Enter/Space, routed from the input component rather than from Slate
     // focus - see ABreakerCharacter::ConfirmMenuKey for why.
@@ -986,7 +998,10 @@ private:
     // screen is shown. The two verbs call the game mode's RetryRift and
     // ReturnToAnchor, both level travels.
     TSharedRef<SWidget> BuildDeathScreen();
+    TSharedRef<SWidget> BuildRiftDebriefScreen();
+    FReply CloseRiftDebrief();
     FBreakerDeathScreenModel DeathModel;
+    BreakerRiftDebrief::FModel RiftDebriefModel;
     bool bDeathActionPending = false;
     FReply ExecuteDeathAction(bool bRetry);
     // Abilities tab: result line echoed under the slot that was last clicked,

@@ -11,6 +11,7 @@
 // below publishes the delegate, and its signature is declared beside the rift
 // rather than here so a consumer needs the rift header, not this one.
 #include "Game/BreakerRiftDefinition.h"
+#include "Items/BreakerItemTypes.h"
 #include "BreakerGameMode.generated.h"
 
 class ABreakerEffectRenderer;
@@ -56,6 +57,23 @@ public:
     // the state has a producer that exists TODAY rather than being an API
     // nobody can fire. Refuses per CanCompleteRiftRun and says why.
     UFUNCTION(BlueprintCallable, Category="Playtest|Rift") void CompleteRiftRun(APawn* Player);
+
+    // ---- THE RUN LEDGER --------------------------------------------------
+    // What a rift actually handed the player, recorded while they are inside
+    // it so the debrief pane can be composed from FACTS rather than from a
+    // guess at the difference between two backpacks. Opened when the player
+    // arrives in a rift instance, appended by the equipment component's own
+    // acquisition delegate — the single funnel every item entering a backpack
+    // already passes through — and read once at completion.
+    //
+    // ITEMS TAKEN, NOT ITEMS DROPPED. A drop the player walked past is not
+    // something they gained, and a beat that claimed it would be lying about
+    // the run they just had.
+    UFUNCTION() void HandleRiftRunItemAcquired(const FBreakerItemInstance& Item);
+    void OpenRiftRunLedger(APawn* Player);
+    const TArray<FBreakerItemInstance>& GetRiftRunLoot() const { return RiftRunLoot; }
+    int32 RiftRunRiftglassGained(APawn* Player) const;
+    int32 RiftRunExperienceGained(APawn* Player) const;
 
     // MARKING AND BINDING ARE ONE ACT, deliberately. FIELD's raise is guarded
     // on the mark, so only a marked body can ever fire — which means binding
@@ -570,6 +588,10 @@ private:
         float EmptySeconds = 0.0f;
     };
     TArray<FBreakerOutdoorSlot> OutdoorSlots;
+    TArray<FBreakerItemInstance> RiftRunLoot;
+    int32 RiftRunStartRiftglass = 0;
+    int32 RiftRunStartExperience = 0;
+    bool bRiftRunLedgerOpen = false;
     // THE PACE, SHARED RATHER THAN PER-SLOT. Every empty slot accrues in
     // parallel while a pocket stands cleared, so without one clock they all
     // come due in the same frame and the pocket refills as a WAVE — which is

@@ -35,6 +35,7 @@ class UBreakerQuestJournal;
 class ABreakerNPC;
 class ABreakerFernhallCache;
 class ABreakerSupplyChest;
+namespace BreakerRiftDebrief { struct FModel; }
 class ABreakerBasinRecorder;
 class ABreakerCoastalUplink;
 class ABreakerLootPickup;
@@ -412,6 +413,13 @@ private:
     void InteractWithNearbyNPC();
     UFUNCTION(Server, Reliable) void ServerOpenFernhallCache(ABreakerFernhallCache* Cache);
     UFUNCTION(Server, Reliable) void ServerOpenSupplyChest(ABreakerSupplyChest* Chest);
+
+public:
+    // THE REWARD BEAT, raised by the game mode when a rift run completes. The
+    // character owns it for the same reason it owns the death screen: the menu
+    // widget is its own, and nothing else in the project may reach inside it.
+    void ShowRiftDebrief(const BreakerRiftDebrief::FModel& Model);
+private:
     UFUNCTION(Server, Reliable) void ServerInteractBasinRecorder(ABreakerBasinRecorder* Recorder);
     UFUNCTION(Server, Reliable) void ServerInteractCoastalUplink(ABreakerCoastalUplink* Uplink);
     UFUNCTION(Server, Reliable) void ServerPickupLoot(ABreakerLootPickup* Pickup);

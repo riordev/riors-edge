@@ -103,7 +103,7 @@ a regression. Never widen an asserted range to make a red go green.
 Frames land in `Saved/Screenshots/breaker_NN.png`. Standalone:
 `UnrealEditor-Cmd.exe "<repo>/riors_edge.uproject" -game -windowed -ResX=1920 -ResY=1080`
 plus switches: `-BreakerAutoPlay[=Anchor|Gym|Fernhall]`, `-BreakerScreenshots=N`,
-`-BreakerCaptureMenu=<SCREEN>`, `-BreakerCaptureBoard=<BOARD>`,
+`-BreakerCaptureMenu=<SCREEN>` (incl. `RIFTDEBRIEF`), `-BreakerCaptureBoard=<BOARD>`,
 `-BreakerCaptureTour`, `-BreakerCaptureHUD` (false-negative on damage-number
 aggregation — read that through `RiorsEdge.UI.Damage.Aggregation`),
 `-BreakerCycleWeapons=<s>`, `-BreakerBossOnStart`,

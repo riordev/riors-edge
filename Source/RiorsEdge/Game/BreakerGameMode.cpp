@@ -2,6 +2,8 @@
 #include "Game/BreakerRepopulationMath.h"
 #include "Game/BreakerPocketRift.h"
 #include "Interaction/BreakerSupplyChest.h"
+#include "Progression/BreakerProgressionComponent.h"
+#include "UI/BreakerRiftDebriefMath.h"
 #include "Interaction/BreakerSupplyChestMath.h"
 #include "Game/BreakerPrototypeDestinations.h"
 #include "Game/BreakerCoopCombatTest.h"
@@ -306,7 +308,56 @@ void ABreakerGameMode::CompleteRiftRun(APawn* Player)
             }
         }
     }
+    // THE DEBRIEF, before the broadcast's listeners can travel the player out
+    // from under it. Composed from the ledger this run kept rather than from a
+    // difference between two backpacks, because a backpack difference cannot
+    // tell a drop the player took from one they discarded to make room for it.
+    if (ABreakerCharacter* Breaker = Cast<ABreakerCharacter>(Player))
+    {
+        Breaker->ShowRiftDebrief(BreakerRiftDebrief::Compose(Rift, RiftRunLoot,
+            RiftRunRiftglassGained(Player), RiftRunExperienceGained(Player)));
+    }
     OnRiftCompleted.Broadcast(Rift, Player);
+}
+
+// ---------------------------------------------------------------------------
+// THE RUN LEDGER. Opened when a player arrives inside a rift instance; the
+// ordinary world keeps none, because there is nothing there to debrief.
+// ---------------------------------------------------------------------------
+void ABreakerGameMode::OpenRiftRunLedger(APawn* Player)
+{
+    ABreakerCharacter* Breaker = bRiftInstance ? Cast<ABreakerCharacter>(Player) : nullptr;
+    if (!Breaker || bRiftRunLedgerOpen) return;
+    UBreakerEquipmentComponent* Equipment = Breaker->GetEquipment();
+    if (!Equipment) return;
+    bRiftRunLedgerOpen = true;
+    RiftRunLoot.Reset();
+    RiftRunStartRiftglass = Equipment->GetForgeWallet().Get();
+    RiftRunStartExperience = Breaker->GetProgression()
+        ? Breaker->GetProgression()->GetProgressionState().TotalExperience : 0;
+    // AddUnique, because arriving twice in one instance must not double every
+    // item the player then picks up.
+    Equipment->OnItemAcquired.AddUniqueDynamic(this, &ABreakerGameMode::HandleRiftRunItemAcquired);
+}
+
+void ABreakerGameMode::HandleRiftRunItemAcquired(const FBreakerItemInstance& Item)
+{
+    if (!bRiftRunLedgerOpen || !Item.IsValid()) return;
+    RiftRunLoot.Add(Item);
+}
+
+int32 ABreakerGameMode::RiftRunRiftglassGained(APawn* Player) const
+{
+    const ABreakerCharacter* Breaker = Cast<ABreakerCharacter>(Player);
+    const UBreakerEquipmentComponent* Equipment = Breaker ? Breaker->GetEquipment() : nullptr;
+    return Equipment ? Equipment->GetForgeWallet().Get() - RiftRunStartRiftglass : 0;
+}
+
+int32 ABreakerGameMode::RiftRunExperienceGained(APawn* Player) const
+{
+    const ABreakerCharacter* Breaker = Cast<ABreakerCharacter>(Player);
+    const UBreakerProgressionComponent* Progression = Breaker ? Breaker->GetProgression() : nullptr;
+    return Progression ? Progression->GetProgressionState().TotalExperience - RiftRunStartExperience : 0;
 }
 
 void ABreakerGameMode::HandleRiftEntryRequested(const FBreakerRiftDefinition& Rift, APawn* RequestingPawn)
@@ -466,6 +517,9 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
     // world now, not over a black void. A map with an authored directional
     // light (Lvl_FirstPerson) suppresses this entirely.
     UBreakerWorldBasics::EnsureWorldLighting(GetWorld());
+
+    // The rift's run ledger opens the moment its player exists.
+    OpenRiftRunLedger(NewPlayer->GetPawn());
 
     // AN UNATTENDED RUN THAT CANNOT EXIT IS A HANG, NOT A FAILURE, and this is
     // the third time that shape has cost someone a cycle: the crowd probe's

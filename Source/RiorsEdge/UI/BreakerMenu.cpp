@@ -1434,6 +1434,7 @@ void SBreakerMenu::ApplyScreen(EBreakerMenuScreen NewScreen)
         case EBreakerMenuScreen::CharacterSheet: ContentHost->SetContent(BuildCharacterSheetScreen()); break;
         case EBreakerMenuScreen::Stash: ContentHost->SetContent(BuildStashScreen()); break;
         case EBreakerMenuScreen::Death: ContentHost->SetContent(BuildDeathScreen()); break;
+        case EBreakerMenuScreen::RiftDebrief: ContentHost->SetContent(BuildRiftDebriefScreen()); break;
         default: ContentHost->SetContent(BuildMainScreen()); break;
     }
 
