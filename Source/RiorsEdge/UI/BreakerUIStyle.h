@@ -220,6 +220,17 @@ namespace BreakerUI
     inline constexpr float HudShieldHeight = 6.0f;            // 02-hud
     inline constexpr float HudHealthTop = 990.0f;             // 02-hud
     inline constexpr float HudHealthHeight = 16.0f;           // 02-hud
+    // THE XP RAIL, under the health bar (owner, playtest 2026-09-10: "i cant
+    // see my xp"). Thinner than the shield rail because it is the slowest bar
+    // on the screen and must never compete with a vital: it is a thing you
+    // glance at between fights, not during one. O2 PLACEHOLDER.
+    // BELOW the resource track (1010 + 8 = 1018), not on it. 1012 put the rail
+    // exactly inside the resource bar and the capture showed them stacked.
+    // The design canvas is 1080 with a 40 px safe gutter, so 1026 is the last
+    // row that clears both the track above and the margin below.
+    inline constexpr float HudXpTop = 1026.0f;                // O2 PLACEHOLDER
+    inline constexpr float HudXpHeight = 4.0f;                // O2 PLACEHOLDER
+    inline constexpr float HudXpLevelPixels = 12.0f;          // O2 PLACEHOLDER
     inline constexpr float HudResourceTop = 1010.0f;          // 02-hud
     inline constexpr float HudResourceHeight = 8.0f;          // 02-hud
     inline constexpr float HudResourceNotchFraction = 0.70f;  // 02-hud

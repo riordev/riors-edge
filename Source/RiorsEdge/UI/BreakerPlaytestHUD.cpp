@@ -701,8 +701,16 @@ void ABreakerPlaytestHUD::DrawVitals(const ABreakerCharacter* Character)
     DrawSpecText(Vitals.HealthText, Left, ValueTop,
         BreakerHUDMath::VitalsValueIsHarm(HealthFraction) ? BreakerUI::Harm : BreakerUI::System,
         BreakerUI::HudVitalsValuePixels, 1.0f, ESpecFontRole::Mono);
-    DrawSpecText(Vitals.MaxText, Left + ValueSize.X + S(BreakerUI::HudVitalsMaxGap),
-        ValueTop + ValueSize.Y - MaxSize.Y, BreakerUI::TextSecondary, BreakerUI::HudVitalsMaxPixels, 1.0f, ESpecFontRole::Mono);
+    // THE MAX IS ONLY WORTH PRINTING WHEN IT DIFFERS. At full health the row
+    // read "162  162" — the same number twice, a hand's width apart, which is
+    // what made this cluster look cluttered in the owner's frame. A max is
+    // context for a value that has moved; when nothing has moved it is noise
+    // wearing the shape of information.
+    if (HealthFraction < 1.0f)
+    {
+        DrawSpecText(Vitals.MaxText, Left + ValueSize.X + S(BreakerUI::HudVitalsMaxGap),
+            ValueTop + ValueSize.Y - MaxSize.Y, BreakerUI::TextSecondary, BreakerUI::HudVitalsMaxPixels, 1.0f, ESpecFontRole::Mono);
+    }
     // The shield number, small, at the row's right edge, only when a pool
     // exists (O199). Right-aligned so it cannot collide with a long max.
     if (Vitals.bDrawShield)
@@ -753,6 +761,39 @@ void ABreakerPlaytestHUD::DrawVitals(const ABreakerCharacter* Character)
     // --- Resource track ---------------------------------------------------------
     DrawResourceTrack(ResolveResourceRow(Character), Left, S(BreakerUI::HudResourceTop), Width,
         S(BreakerUI::HudResourceHeight));
+
+    // --- XP -----------------------------------------------------------------
+    // "i cant see my xp" (owner, playtest 2026-09-10). It was not small or
+    // hidden — the HUD had NO experience readout of any kind, in a game whose
+    // first contract's whole reward is a level.
+    //
+    // A LEVEL AND A RAIL, and nothing else. Not a number pair: the exact XP
+    // total is a thing to check in a menu, while what a player wants mid-route
+    // is "am I close". The fraction is the progression library's own
+    // (LevelProgressFraction), so the bar cannot disagree with the level-up it
+    // is predicting. At the cap the rail fills and stays full rather than
+    // vanishing — an empty space where a bar was reads as a bug.
+    if (const UBreakerProgressionComponent* Progression = Character->GetProgression())
+    {
+        const FBreakerProgressionState& State = Progression->GetProgressionState();
+        const bool bCapped = State.CharacterLevel >= UBreakerExperienceLibrary::MaxCharacterLevel;
+        const float Fraction = bCapped ? 1.0f
+            : FMath::Clamp(UBreakerExperienceLibrary::LevelProgressFraction(
+                State.TotalExperience, Progression->ExperienceCurve), 0.0f, 1.0f);
+        // LABEL AND RAIL SHARE ONE ROW, the label first and the rail taking
+        // what is left. The first attempt stacked the label ABOVE the rail and
+        // the capture showed it sitting on top of the health bar — there is no
+        // vertical room down here, so the row is horizontal or it collides.
+        const float XpY = S(BreakerUI::HudXpTop);
+        const float XpH = S(BreakerUI::HudXpHeight);
+        const FString LevelText = FString::Printf(TEXT("LV %d"), State.CharacterLevel);
+        const FVector2D LevelSize = MeasureSpecText(LevelText, BreakerUI::HudXpLevelPixels, ESpecFontRole::Mono);
+        DrawSpecText(LevelText, Left, XpY + XpH * 0.5f - LevelSize.Y * 0.5f,
+            BreakerUI::TextMuted, BreakerUI::HudXpLevelPixels, 1.0f, ESpecFontRole::Mono);
+        const float RailLeft = Left + LevelSize.X + S(BreakerUI::Space8);
+        DrawTrack(RailLeft, XpY, FMath::Max(0.0f, Right - RailLeft), XpH, Fraction,
+            BreakerUI::TextSecondary, BreakerUI::BgBase);
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -946,13 +987,27 @@ void ABreakerPlaytestHUD::DrawWeaponReadout(const ABreakerCharacter* Character)
         SwapName = Weapon->GetArchetypeName().ToUpper();
     }
     bWasSwapping = bSwapping;
+    // THE NAME RESTS ON SCREEN NOW (owner, playtest 2026-09-10: "i dont know
+    // what weapon is in my hand"). It was never missing — it was TRANSIENT. It
+    // animated in on the swap and then left, so the answer to "what am I
+    // holding" was only available in the two seconds after it changed, which is
+    // exactly when the player already knows.
+    //
+    // The slide is kept as what it always was: the ENTRY. Sliding and settled
+    // are the same readout at two moments, so the name is drawn from the live
+    // archetype rather than the latched one and the slide supplies only the
+    // offset and the alpha while it runs. Settled it is TextSecondary — present
+    // to be found, not competing with the magazine count beside it.
     const BreakerHUDMath::FSwapSlide Slide = BreakerHUDMath::WeaponNameSwap(static_cast<float>(Now - SwapStartTime));
-    if (Slide.bVisible && !SwapName.IsEmpty())
+    const FString HeldName = Weapon->GetArchetypeName().ToUpper();
+    if (!HeldName.IsEmpty())
     {
-        const FVector2D NameSize = MeasureSpecText(SwapName, BreakerUI::HudWeaponNamePixels, ESpecFontRole::Display);
-        DrawSpecTextRight(SwapName, Right,
-            MagazineTop - NameSize.Y - S(BreakerUI::Space4) + S(Slide.OffsetPixels),
-            BreakerUI::TextPrimary, BreakerUI::HudWeaponNamePixels, Slide.Alpha, ESpecFontRole::Display);
+        const FVector2D NameSize = MeasureSpecText(HeldName, BreakerUI::HudWeaponNamePixels, ESpecFontRole::Display);
+        const float SlideOffset = Slide.bVisible ? S(Slide.OffsetPixels) : 0.0f;
+        DrawSpecTextRight(HeldName, Right,
+            MagazineTop - NameSize.Y - S(BreakerUI::Space4) + SlideOffset,
+            Slide.bVisible ? BreakerUI::TextPrimary : BreakerUI::TextSecondary,
+            BreakerUI::HudWeaponNamePixels, Slide.bVisible ? Slide.Alpha : 1.0f, ESpecFontRole::Display);
     }
 }
 
