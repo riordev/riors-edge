@@ -1,4 +1,6 @@
 #include "Game/BreakerGameInstance.h"
+#include "Items/BreakerEquipmentComponent.h"
+#include "Characters/BreakerCharacter.h"
 #include "Game/BreakerPrototypeDestinations.h"
 #include "Game/BreakerCoopCombatTest.h"
 
@@ -208,8 +210,29 @@ void UBreakerGameInstance::BeginTravel(FName MapName)
         // campaign ignores it, and the endgame decrement stays parked behind
         // O122 either way.
         const int32 EliteBonus = GetDefault<ABreakerEnemy>()->GetEliteDropItemLevelBonus();
+        // WHAT THE PLAYER IS CARRYING, read off the equipped primary. That is
+        // the number the power curve cancels the area's health against, so it
+        // is the honest thing to compare — a character level would compare the
+        // wrong two curves. Zero when there is no pawn yet (a headless run, a
+        // travel before possession), and the briefing then makes no comparison
+        // rather than inventing one.
+        int32 PlayerItemLevel = 0;
+        if (const APlayerController* Controller = GetFirstLocalPlayerController())
+        {
+            if (const ABreakerCharacter* Breaker = Cast<ABreakerCharacter>(Controller->GetPawn()))
+            {
+                if (const UBreakerEquipmentComponent* Equipment = Breaker->GetEquipment())
+                {
+                    FBreakerItemInstance Primary;
+                    if (Equipment->GetEquippedItem(EBreakerEquipSlot::Primary, Primary) && Primary.IsValid())
+                    {
+                        PlayerItemLevel = Primary.ItemLevel;
+                    }
+                }
+            }
+        }
         const FBreakerDeploymentBriefing Briefing = SBreakerLoadingScreen::MakeBriefing(
-            PendingRift, EliteBonus, UBreakerRiftLibrary::SoloEndgameDeathBudget);
+            PendingRift, EliteBonus, UBreakerRiftLibrary::SoloEndgameDeathBudget, PlayerItemLevel);
 
         TSharedRef<SBreakerLoadingScreen> Pane = SNew(SBreakerLoadingScreen).Briefing(Briefing);
         Pane->SetStage(FText::FromString(TEXT("OPENING THE RIFT")));

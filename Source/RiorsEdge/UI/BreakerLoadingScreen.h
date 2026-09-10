@@ -31,6 +31,22 @@ struct RIORSEDGE_API FBreakerDeploymentBriefing
     float HealthMultiplier = 1.0f;
     float DamageMultiplier = 1.0f;
     FString DeathAllowance;
+    // HOW READY THE PLAYER IS, and it is here because a briefing that states
+    // the area's level without stating yours is only half a briefing.
+    //
+    // Owner: "i cant make it to the end of the rift ... my base character is
+    // just so weak". Measured (RiorsEdge.Combat.PowerCurve.UnderLevelled): on
+    // -level gear kills a trash body in 16.9 shots at EVERY area level — the
+    // curves cancel exactly — and starter gear needs 87 in the Breach. He was
+    // not weak everywhere; he was carrying item level 1 into area level 20,
+    // and the door told him nothing. Entry to the Breach is gated on two story
+    // flags and NOTHING else.
+    //
+    // A LINE, NOT A LOCK. Refusing entry would strand a campaign that sends
+    // the player there; what was missing is the player being able to see it
+    // coming.
+    int32 PlayerItemLevel = 0;
+    FString ReadinessLine;
 };
 
 // ---------------------------------------------------------------------------
@@ -60,8 +76,11 @@ public:
     // no widget: EliteBonus is the enemy's authored loot bonus (read from the
     // CDO by the caller, passed in per the rift library's own contract), and
     // EndgameDeathsRemaining feeds O123's readout — campaign ignores it.
+    // PlayerItemLevel of 0 means "not known", and the readiness line is then
+    // omitted rather than guessed — a briefing that invented a comparison
+    // would be worse than one that made none.
     static FBreakerDeploymentBriefing MakeBriefing(const FBreakerRiftDefinition& Rift,
-        int32 EliteBonus, int32 EndgameDeathsRemaining);
+        int32 EliteBonus, int32 EndgameDeathsRemaining, int32 PlayerItemLevel = 0);
 
     // The pane must eat input: the world underneath is paused-or-loading, and
     // a click that fell through to a menu mid-beat would act on a screen the

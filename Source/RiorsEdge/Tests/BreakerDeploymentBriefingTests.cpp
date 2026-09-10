@@ -3,6 +3,7 @@
 #include "Misc/AutomationTest.h"
 #include "Game/BreakerRiftDefinition.h"
 #include "UI/BreakerLoadingScreen.h"
+#include "Combat/BreakerMonsterChassis.h"
 
 // ---------------------------------------------------------------------------
 // THE DEPLOYMENT BRIEFING — the composition, exercised with no widget, no
@@ -37,6 +38,41 @@ bool FBreakerDeploymentBriefingDerivationTest::RunTest(const FString& Parameters
     const int32 EliteBonus = 5;
     const FBreakerDeploymentBriefing Briefing =
         SBreakerLoadingScreen::MakeBriefing(Rift, EliteBonus, UBreakerRiftLibrary::SoloEndgameDeathBudget);
+    // THE READINESS LINE. Owner: "i cant make it to the end of the rift ... my
+    // base character is just so weak", and the measurement in
+    // RiorsEdge.Combat.PowerCurve.UnderLevelled says why: on-level gear kills a
+    // trash body in 16.9 shots at EVERY area level, and starter gear needs 87
+    // in the Breach. The briefing states the area's level; it now states his.
+    {
+        const int32 Expected = UBreakerMonsterChassisLibrary::GetDropItemLevel(Rift.EffectiveAreaLevel());
+        // NOT KNOWN MEANS NOT SAID. A briefing that invented a comparison
+        // would be worse than one that made none.
+        const FBreakerDeploymentBriefing Silent =
+            SBreakerLoadingScreen::MakeBriefing(Rift, EliteBonus, UBreakerRiftLibrary::SoloEndgameDeathBudget, 0);
+        TestTrue(TEXT("an unknown gear level says nothing"), Silent.ReadinessLine.IsEmpty());
+
+        // ON LEVEL: stated, and not a warning.
+        const FBreakerDeploymentBriefing Ready =
+            SBreakerLoadingScreen::MakeBriefing(Rift, EliteBonus, UBreakerRiftLibrary::SoloEndgameDeathBudget, Expected);
+        TestFalse(TEXT("on-level gear still names itself"), Ready.ReadinessLine.IsEmpty());
+        TestFalse(TEXT("and is not called under-levelled"), Ready.ReadinessLine.Contains(TEXT("UNDER")));
+
+        // A WHOLE TIER BEHIND: warned, and the gap is NAMED rather than
+        // implied — "you are under-levelled" without a number is something the
+        // player cannot act on.
+        const FBreakerDeploymentBriefing Behind = SBreakerLoadingScreen::MakeBriefing(
+            Rift, EliteBonus, UBreakerRiftLibrary::SoloEndgameDeathBudget, FMath::Max(Expected - 9, 1));
+        TestTrue(TEXT("gear a tier behind is called out"), Behind.ReadinessLine.Contains(TEXT("UNDER")));
+        TestTrue(TEXT("and the line carries the player's own level"),
+            Behind.PlayerItemLevel == FMath::Max(Expected - 9, 1));
+
+        // ONE OR TWO UNDER IS ORDINARY PLAY. A warning that fires on every
+        // deployment stops being read, which is the failure mode this
+        // threshold exists to avoid.
+        const FBreakerDeploymentBriefing Slightly = SBreakerLoadingScreen::MakeBriefing(
+            Rift, EliteBonus, UBreakerRiftLibrary::SoloEndgameDeathBudget, FMath::Max(Expected - 1, 1));
+        TestFalse(TEXT("a level or two under is not a warning"), Slightly.ReadinessLine.Contains(TEXT("UNDER")));
+    }
 
     // The authored fields pass through untouched.
     TestEqual(TEXT("The area name passes through"), Briefing.AreaName.ToString(), Rift.AreaName.ToString());

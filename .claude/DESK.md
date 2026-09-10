@@ -110,9 +110,33 @@ STILL OPEN FROM IT, IN HIS WORDS:
   effect path — in the world rather than on the HUD, because the answer to
   "what hit me" is a place.
 - "the skill menu is so overwhelming and displays way too much information".
-- "i cant make it to the end of the rift even with all those extra points
-  because my base character is just so weak". Balance, and it is the same
-  complaint as "abilities feel irrelevant at the start" from the last message.
+- "i cant make it to the end of the rift ... my base character is just so
+  weak" — MEASURED, AND IT IS NOT WHAT IT SOUNDS LIKE. New diagnostic
+  RiorsEdge.Combat.PowerCurve.UnderLevelled prints the whole shape:
+
+      on-level gear  16.9 shots per trash body at EVERY area level
+      starter gear   23.9 at the entry yard, 33.7 substation,
+                     47.6 depot, 87.0 in the Breach
+
+  The character is not weak everywhere. The power curves cancel exactly, as
+  designed — the composition test already proved that and states the assumption
+  it rests on: "the player is carrying what this content drops". He was
+  carrying item level 1 into area level 20, and NOTHING TOLD HIM. Entry to
+  breach.marshalling is gated on two story flags and nothing else: no level
+  check, no gear check, no warning.
+  The deployment briefing now prints his own gear level under the area's drop
+  range, in harm red when he is a whole tier behind, with the gap NAMED. A LINE
+  AND NOT A LOCK: refusing entry would strand a campaign that sends him there.
+  TWO RULINGS OWED, both his:
+  1. THE STARTER RIFLE IS OFF ITS OWN CURVE. It is item level 1 ("little to no
+     stats taken at its word") in a yard that drops item level 5, so the very
+     first fight in the game is 1.4x harder than the curve intends — 23.9 shots
+     against 16.9. Raising it is one line, and it MOVES A PINNED BAND: the
+     ability-vs-rifle parity figures are measured with the starter at level 1.
+     Not touched without him.
+  2. SHOULD THE BREACH BE ENTERABLE AT ALL 15 LEVELS UNDER? A warning is the
+     smallest honest answer; a level gate, or scaling the rift to the player,
+     are the other two and both are design decisions.
 
 
 ## THE LIST IS DONE. FOUR THINGS WANT YOUR HANDS, NOT MINE.

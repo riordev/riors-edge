@@ -1,4 +1,5 @@
 #include "UI/BreakerLoadingScreen.h"
+#include "Combat/BreakerMonsterChassis.h"
 
 #include "Data/BreakerStrings.h"
 #include "Engine/Engine.h"
@@ -52,7 +53,7 @@ namespace
 }
 
 FBreakerDeploymentBriefing SBreakerLoadingScreen::MakeBriefing(const FBreakerRiftDefinition& Rift,
-    int32 EliteBonus, int32 EndgameDeathsRemaining)
+    int32 EliteBonus, int32 EndgameDeathsRemaining, int32 PlayerItemLevel)
 {
     FBreakerDeploymentBriefing Briefing;
     Briefing.AreaName = Rift.AreaName;
@@ -70,6 +71,31 @@ FBreakerDeploymentBriefing SBreakerLoadingScreen::MakeBriefing(const FBreakerRif
     Briefing.TierKicker = BreakerStrings::Get(Rift.Tier == EBreakerRiftTier::Campaign
         ? EBreakerStringKey::LoadingTitleCampaign
         : EBreakerStringKey::LoadingTitleEndgame);
+
+    // THE READINESS READ. Compared against the item level this area DROPS
+    // rather than against its area level: what decides a fight is the gear the
+    // player is holding against the gear the content assumes, and those are
+    // the two numbers the power curve is built to cancel.
+    Briefing.PlayerItemLevel = FMath::Max(PlayerItemLevel, 0);
+    if (Briefing.PlayerItemLevel > 0)
+    {
+        const int32 Expected = UBreakerMonsterChassisLibrary::GetDropItemLevel(Briefing.AreaLevel);
+        const int32 Behind = Expected - Briefing.PlayerItemLevel;
+        // The threshold is a WHOLE TIER of gear, not a point: a level or two
+        // under is ordinary play and saying so every time would make the line
+        // noise, which is how a warning stops being read.
+        constexpr int32 UnderLevelledBy = 4;   // O2 PLACEHOLDER
+        if (Behind >= UnderLevelledBy)
+        {
+            Briefing.ReadinessLine = FString::Printf(
+                TEXT("YOUR GEAR IS i%d — %d LEVELS UNDER THIS AREA"),
+                Briefing.PlayerItemLevel, Behind);
+        }
+        else
+        {
+            Briefing.ReadinessLine = FString::Printf(TEXT("YOUR GEAR IS i%d"), Briefing.PlayerItemLevel);
+        }
+    }
     return Briefing;
 }
 
@@ -159,6 +185,15 @@ void SBreakerLoadingScreen::Construct(const FArguments& InArgs)
             [
                 BreakerMonoText(FText::FromString(BreakerStrings::Format(EBreakerStringKey::LoadingItemLevel,
                     Briefing.ItemLevelMin, Briefing.ItemLevelMax)), 12, BreakerUI::TextSecondary, 0.16f)
+            ]
+            // WHAT YOU ARE BRINGING, directly under what the area drops, so
+            // the comparison is made by the layout rather than by the player.
+            // Harm-coloured only when it is a whole tier of gear behind: a
+            // warning that fires on every deployment is not read.
+            + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right)
+            [
+                BreakerMonoText(FText::FromString(Briefing.ReadinessLine), 12,
+                    Briefing.ReadinessLine.Contains(TEXT("UNDER")) ? BreakerUI::Harm : BreakerUI::TextMuted, 0.16f)
             ]
         ];
 
