@@ -5,6 +5,7 @@
 #include "Items/BreakerEquipmentComponent.h"
 #include "Items/BreakerItemTypes.h"
 #include "Items/BreakerLootLibrary.h"
+#include "Items/BreakerAffixLibrary.h"
 #include "UI/BreakerSwapPickerLayout.h"
 
 // ---------------------------------------------------------------------------
@@ -183,8 +184,33 @@ bool FBreakerSwapPickerTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("The incoming line"), IncomingLine(EBreakerEquipSlot::Waist), FString(TEXT("INCOMING · WAIST")));
     TestEqual(TEXT("KEEP CURRENT"), FString(KeepCurrentLabel()), FString(TEXT("KEEP CURRENT")));
     TestEqual(TEXT("A row in the incoming slot would read SWAP"), FString(RowButtonLabel(Gloves, BetterGloves)), FString(TEXT("SWAP")));
-    TestEqual(TEXT("The modal is 640 wide"), ModalWidth, 640.0f);
-    TestEqual(TEXT("A row is 64 tall"), RowHeight, 64.0f);
+    // ---- THE NAME COLUMN, AND WHY THE PLATE IS THE WIDTH IT IS ------------
+    // The picker prints the item's real O267 headline now, so the plate has to
+    // hold the longest one the grammar can build. This is the assertion the
+    // width was SOLVED against rather than a restatement of it: at the worst
+    // delta count the name still gets MaxNameLines to fit WorstCaseNameChars.
+    // A wider affix name, a longer base or a narrower plate fails here instead
+    // of truncating the most-read line of the modal.
+    int32 WorstDeltaCount = 0;
+    // The rarity enum has no Count sentinel (it is serialized by value and
+    // append-only), so Unwritten is walked as the last authored tier.
+    for (int32 Rarity = 0; Rarity <= static_cast<int32>(EBreakerItemRarity::Unwritten); ++Rarity)
+    {
+        int32 Minimum = 0, Maximum = 0;
+        UBreakerAffixLibrary::AffixCountRangeForRarity(static_cast<EBreakerItemRarity>(Rarity), Minimum, Maximum);
+        WorstDeltaCount = FMath::Max(WorstDeltaCount, Maximum);
+    }
+    TestTrue(TEXT("the affix ladder has a worst case to solve against"), WorstDeltaCount > 0);
+    const float Column = NameWrapWidth(WorstDeltaCount);
+    TestTrue(TEXT("the name column survives the widest comparison column"), Column >= MinNameColumn);
+    TestTrue(FString::Printf(TEXT("the longest headline fits %d lines at %.0f px"), MaxNameLines, Column),
+        Column * MaxNameLines >= EstimateNameWidth(WorstCaseNameChars));
+    // More marks can only take room from the name, never give it.
+    TestTrue(TEXT("the column shrinks as the comparison column grows"),
+        NameWrapWidth(0) > NameWrapWidth(WorstDeltaCount));
+
+    TestEqual(TEXT("The modal is 800 wide"), ModalWidth, 800.0f);
+    TestEqual(TEXT("A row is 72 tall"), RowHeight, 72.0f);
     return true;
 }
 

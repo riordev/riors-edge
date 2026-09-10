@@ -76,26 +76,27 @@ namespace
             ];
     }
 
-    // The name a row prints. This used to be a hand-copied duplicate of the
-    // loadout's file-local ItemDisplayName, and it was ALREADY WRONG: O267
-    // gave a rolled item a headline of its own — strongest prefix, base, "of"
-    // strongest suffix — and this copy never learned it, so the picker and the
-    // inventory card printed different names for the same item.
-    //
-    // Both now come from UI/BreakerItemNameText.h. The picker asks for the
-    // BASE rather than the headline, and that is a deliberate choice recorded
-    // here rather than an accident: this row is RowHeight (64) tall inside
-    // ModalWidth (640), which leaves its name column roughly 336 px against
-    // roughly 440 px for a name like "Sustained Accuracy Sidearm of Cast
-    // Speed". Wrapping is barred — ui.md: no auto-wrap where width matters,
-    // and a caller-computed wrap width is not derivable while the delta-mark
-    // column varies with the affix count — so the headline needs either a
-    // taller row or a wider plate, and both are changes to the owner's own
-    // sheet. OWNER RULING OWED, and it is the same species of decision as the
-    // inventory card's de-bloat: it belongs with that item, not ahead of it.
+    // The name a row prints — the SAME headline the inventory card prints,
+    // from UI/BreakerItemNameText.h. This used to be a hand-copied duplicate
+    // of the loadout's file-local ItemDisplayName, and it was already wrong:
+    // O267 gave a rolled item a headline of its own and the copy never learned
+    // it, so the picker and the card named the same item differently.
     FString BreakerSwapItemName(const FBreakerItemInstance& Item)
     {
-        return BreakerItemNameText::BaseName(Item);
+        return BreakerItemNameText::DisplayName(Item);
+    }
+
+    // The name, wrapped at a width the LAYOUT computed from the plate — never
+    // at an allotted one (ui.md). The row is the only thing on this screen
+    // whose text can outrun its column, because a headline is as long as the
+    // two affix names that built it.
+    TSharedRef<STextBlock> BreakerSwapWrappedText(const FText& Text, int32 Size, const FLinearColor& Colour, float WrapAt)
+    {
+        return SNew(STextBlock)
+            .Text(Text)
+            .ColorAndOpacity(Colour)
+            .WrapTextAt(WrapAt)
+            .Font(Size >= BreakerUI::TypeH2 ? BreakerDisplayFont(Size, false) : BreakerBodyFont(Size, false));
     }
 
     // The row's comparison column: one drawn mark per affix line of the
@@ -132,8 +133,9 @@ namespace
         ];
     }
 
-    // One 64px row on the rarity's identity rail: icon, kind over name, the
-    // comparison marks beside the item level, then the row's verb. The row
+    // One row on the rarity's identity rail: icon, the item's name across two
+    // wrapped lines, the comparison marks beside the item level, then the
+    // row's verb. The row
     // body takes the focus; the verb confirms. The focused row carries the
     // hover face and the 2px high ring; the rest sit on the base face at 1px.
     TSharedRef<SWidget> BreakerSwapRow(const FBreakerItemInstance& Row, const FBreakerItemInstance& Incoming, bool bFocused,
@@ -145,16 +147,15 @@ namespace
         Body->AddSlot().AutoWidth().VAlign(VAlign_Center)[BreakerSwapIconSquare()];
         Body->AddSlot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(BreakerSwapPickerLayout::RowPaddingX, 0.0f, 0.0f, 0.0f)
         [
-            SNew(SVerticalBox)
-            + SVerticalBox::Slot().AutoHeight()
-            [
-                BreakerMonoText(FText::FromString(BreakerStashLayout::SlotWord(Row.Slot)), BreakerSwapPickerLayout::KindSize, BreakerUI::TextSecondary, 0.08f)
-            ]
-            + SVerticalBox::Slot().AutoHeight()
-            [
-                BreakerSwapText(FText::FromString(BreakerSwapItemName(Row)), BreakerSwapPickerLayout::NameSize,
-                    bFocused ? BreakerUI::TextPrimary : BreakerUI::TextSecondary)
-            ]
+            // ONE LINE OF TEXT, NOT TWO. The slot word used to sit above the
+            // name, and it was only ever there because the name was the slot
+            // word: with the real headline the row would read "BODY ARMOUR"
+            // over "Sustained Body Armour of Cast Speed". The kind is inside
+            // the name now, so the name gets both lines.
+            BreakerSwapWrappedText(FText::FromString(BreakerSwapItemName(Row)),
+                BreakerSwapPickerLayout::NameSize,
+                bFocused ? BreakerUI::TextPrimary : BreakerUI::TextSecondary,
+                BreakerSwapPickerLayout::NameWrapWidth(Deltas.Num()))
         ];
         Body->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerSwapPickerLayout::RowPaddingX, 0.0f)
         [
@@ -183,7 +184,7 @@ namespace
             ]
         ];
 
-        return SNew(SBox).HeightOverride(BreakerSwapPickerLayout::RowHeight)
+        return SNew(SBox).HeightOverride(BreakerSwapPickerLayout::IncomingRowHeight)
         [
             BreakerSwapRing(
                 SNew(SHorizontalBox)
@@ -224,7 +225,12 @@ namespace
             ]
             + SVerticalBox::Slot().AutoHeight()
             [
-                BreakerSwapText(FText::FromString(BreakerSwapItemName(Incoming)), BreakerSwapPickerLayout::NameSize, BreakerUI::TextPrimary)
+                // NameWrapWidth(0) is deliberately conservative here: this row
+                // carries no delta marks and no verb button, so it has more
+                // room than the width asks for and simply wraps a little
+                // early. One number, one rule, no second derivation.
+                BreakerSwapWrappedText(FText::FromString(BreakerSwapItemName(Incoming)), BreakerSwapPickerLayout::NameSize,
+                    BreakerUI::TextPrimary, BreakerSwapPickerLayout::NameWrapWidth(0))
             ]
         ];
         Body->AddSlot().AutoWidth().VAlign(VAlign_Center)
@@ -232,7 +238,7 @@ namespace
             BreakerMonoText(FText::FromString(FString::Printf(TEXT("i%d"), Incoming.ItemLevel)), BreakerSwapPickerLayout::LevelSize, BreakerUI::TextSecondary)
         ];
 
-        return SNew(SBox).HeightOverride(BreakerSwapPickerLayout::RowHeight)
+        return SNew(SBox).HeightOverride(BreakerSwapPickerLayout::IncomingRowHeight)
         [
             BreakerSwapRing(
                 SNew(SHorizontalBox)
