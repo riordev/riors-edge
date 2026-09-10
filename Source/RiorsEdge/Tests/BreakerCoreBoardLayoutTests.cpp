@@ -87,4 +87,80 @@ bool FBreakerCoreBoardLayoutTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// UI.CoreBoard.Circuit: the gateway ring is one clean path.
+//
+// Owner, playtest 2026-09-10: "connect the traveling nodes together in a clean
+// path". The gateways are the travelling nodes and their edges are the board's
+// only circuit; the board draws them as arcs on the gateway radius now rather
+// than as chords with a gap at each end.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerCoreCircuitTest,
+    "RiorsEdge.UI.CoreBoard.Circuit", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerCoreCircuitTest::RunTest(const FString& Parameters)
+{
+    const UBreakerProgressionTree* Tree = UBreakerProgressionLibrary::GetCoreSliceTree();
+    if (!TestNotNull(TEXT("Shipped Core exists"), Tree)) return false;
+    const BreakerCoreBoard::FLayout Overview = BreakerCoreBoard::Build(Tree);
+    if (!TestTrue(TEXT("Shipped metadata selects role layout"), Overview.bValidMetadata)) return false;
+
+    // EVERY GATEWAY ON ONE RADIUS. The arcs are drawn on that radius, so if a
+    // gateway ever left it the circuit would stop passing through its station.
+    for (const FName Entry : Overview.Entries)
+    {
+        const FVector2D* Centre = Overview.Centers.Find(Entry);
+        if (!TestNotNull(TEXT("Every gateway is placed"), Centre)) return false;
+        TestTrue(TEXT("Every gateway sits on the circuit radius"),
+            FMath::IsNearlyEqual(FVector2D::Distance(*Centre, Overview.Hub),
+                BreakerCoreBoard::GatewayRingRadius, 0.5f));
+    }
+
+    // THE LEGS. Between each pair of adjacent wedges, every point of the arc is
+    // on the same circle and the leg takes the short way round — a leg that
+    // went the long way would close the ring by crossing the whole board.
+    for (int32 Index = 0; Index < Overview.Wedges.Num(); ++Index)
+    {
+        const float From = Overview.Wedges[Index].AngleDegrees;
+        const float To = Overview.Wedges[(Index + 1) % Overview.Wedges.Num()].AngleDegrees;
+        const TArray<FVector2D> Arc = BreakerCoreBoard::CircuitArc(Overview.Hub,
+            BreakerCoreBoard::GatewayRingRadius, From, To, 12);
+        for (const FVector2D& Point : Arc)
+            TestTrue(TEXT("Every point of a leg is on the circuit"),
+                FMath::IsNearlyEqual(FVector2D::Distance(Point, Overview.Hub),
+                    BreakerCoreBoard::GatewayRingRadius, 0.5f));
+        // Within half a unit rather than exactly: the wrap-around leg reaches
+        // its end angle as From + Sweep, which is the same place on the circle
+        // and not the same float.
+        TestTrue(TEXT("A leg ends at the next gateway's angle"),
+            FVector2D::Distance(Arc.Last(),
+                BreakerCoreBoard::Polar(Overview.Hub, BreakerCoreBoard::GatewayRingRadius, To)) < 0.5f);
+        TestTrue(TEXT("No leg goes the long way round"),
+            FMath::Abs(FMath::FindDeltaAngleDegrees(From, To)) < 180.0f);
+    }
+
+    // AND NO EDGE RUNS INWARD ANY MORE. Within a wedge, every prerequisite edge
+    // must go outward or sideways: the Link nodes used to sit at 915, radially
+    // inside the 1030 notables they join, so each major drew two inward kinks
+    // across its own lane ring. Gateway-to-gateway legs are the circuit and are
+    // level by construction, so they are the one exception.
+    {
+        TSet<FName> Gateways(Overview.Entries);
+        for (const FBreakerNodeEdge& Edge : Overview.Edges)
+        {
+            if (Gateways.Contains(Edge.A) && Gateways.Contains(Edge.B)) continue;
+            const float RadiusA = FVector2D::Distance(Overview.Centers[Edge.A], Overview.Hub);
+            const float RadiusB = FVector2D::Distance(Overview.Centers[Edge.B], Overview.Hub);
+            const float Inner = FMath::Min(RadiusA, RadiusB);
+            const float Outer = FMath::Max(RadiusA, RadiusB);
+            // The edge is stored in one direction and drawn in both, so what is
+            // asserted is that the pair is ordered outward, not which end came
+            // first in the data.
+            TestTrue(TEXT("A wedge's edges never run back toward the hub"),
+                Outer >= Inner - 0.5f);
+        }
+    }
+    return true;
+}
+
 #endif

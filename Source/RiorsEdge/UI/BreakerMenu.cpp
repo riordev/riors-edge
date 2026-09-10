@@ -65,6 +65,7 @@
 #include "Widgets/SCanvas.h"
 #include "UI/BreakerSkillProjection.h"
 #include "UI/BreakerTypeRoles.h"
+#include "Brushes/SlateRoundedBoxBrush.h"
 #include "UI/BreakerAbilityCostLine.h"
 #include "UI/BreakerDoctrineWallet.h"
 #include "UI/BreakerUIStyle.h"
@@ -192,6 +193,118 @@ namespace
 
     // 1px ring around a control. Buttons in this system are a fill plus a
     // border; Slate's button brush has no border, so it gets one here.
+    // ---- THE SIX SECTORS, IN THE VERB PALETTE -----------------------------
+    // The core wheel drew 242 edges in one grey, so a branch's identity had to
+    // be read off the name ring at the rim. Colouring the branches is what
+    // every passive tree the owner pointed at does, and O179 already says which
+    // hue means what — so the sectors take the verbs they ARE rather than six
+    // new colours: a Weapon constellation's lanes are weapon-orange, Movement's
+    // are movement-cyan, Ability's are the ultimate violet, Status wears harm,
+    // Defence wears the shield blue (O269) and Utility takes reward gold.
+    //
+    // EDGES AND NAMES ONLY. A node's colour is its STATE — owned, purchasable,
+    // locked — and that has to stay readable at a glance on a board this size;
+    // the lanes between them are what carry the branch.
+    FLinearColor BreakerMenuSectorHue(FName Sector)
+    {
+        const FString Name = Sector.ToString();
+        if (Name.Equals(TEXT("Weapon"), ESearchCase::IgnoreCase))   return BreakerUI::Orange;
+        if (Name.Equals(TEXT("Defence"), ESearchCase::IgnoreCase))  return BreakerUI::VitalShield;
+        if (Name.Equals(TEXT("Ability"), ESearchCase::IgnoreCase))  return BreakerUI::Violet;
+        if (Name.Equals(TEXT("Status"), ESearchCase::IgnoreCase))   return BreakerUI::Harm;
+        if (Name.Equals(TEXT("Movement"), ESearchCase::IgnoreCase)) return BreakerUI::VerbMove;
+        if (Name.Equals(TEXT("Utility"), ESearchCase::IgnoreCase))  return BreakerUI::Gold;
+        // A sector nobody has authored a verb for is drawn, not guessed at.
+        return BreakerUI::BorderEmphasis;
+    }
+
+    // ---- ROUND NODES ------------------------------------------------------
+    // Owner, playtest 2026-09-10, with a passive tree on screen beside it:
+    // "honestly the boxy nodes are bad". They were: a square button in a square
+    // border, and a diamond was the same square turned forty-five degrees. On a
+    // board of 187 of them the only thing separating a minor from a keystone
+    // was eight pixels of side length.
+    //
+    // ONE WHITE DISC, CACHED PER SIZE, TINTED AT THE CALL. A rounded-box brush
+    // whose corner radius is half its size IS a circle, and Slate tints a brush
+    // by the border's colour, so every state the ladder already computes still
+    // arrives without a second asset. Cached because a board builds two of
+    // these per node and a brush allocated per marker would be 374 of them per
+    // rebuild.
+    const FSlateBrush* BreakerMenuDiscBrush(float Size)
+    {
+        static TMap<int32, TSharedPtr<FSlateRoundedBoxBrush>> Discs;
+        const int32 Key = FMath::Clamp(FMath::RoundToInt(Size), 2, 4096);
+        if (const TSharedPtr<FSlateRoundedBoxBrush>* Found = Discs.Find(Key)) return Found->Get();
+        const TSharedPtr<FSlateRoundedBoxBrush> Brush = MakeShared<FSlateRoundedBoxBrush>(
+            FLinearColor::White, Key * 0.5f, FVector2f(static_cast<float>(Key), static_cast<float>(Key)));
+        Discs.Add(Key, Brush);
+        return Brush.Get();
+    }
+
+    TSharedRef<SWidget> SolidDisc(const FLinearColor& Colour, float Size)
+    {
+        return SNew(SBorder)
+            .BorderImage(BreakerMenuDiscBrush(Size))
+            .BorderBackgroundColor(Colour)
+            [
+                SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))
+            ];
+    }
+
+    // A ring around a face, both round. Thickness is the ring; CoreFraction is
+    // the pip in the middle, zero for a node whose state is carried by the face
+    // alone.
+    TSharedRef<SWidget> BreakerMenuDiscMarker(float Size, float RingWidth, const FLinearColor& Ring,
+        const FLinearColor& Fill, const FLinearColor& Core, float CoreFraction)
+    {
+        const float Inner = FMath::Max(2.0f, Size - RingWidth * 2.0f);
+        const float Pip = FMath::Max(0.0f, Size * CoreFraction);
+        TSharedRef<SWidget> Centre = Pip >= 2.0f
+            ? StaticCastSharedRef<SWidget>(SNew(SBox).WidthOverride(Pip).HeightOverride(Pip)[SolidDisc(Core, Pip)])
+            : StaticCastSharedRef<SWidget>(SNew(SSpacer).Size(FVector2D(1.0f, 1.0f)));
+        return SNew(SBox).WidthOverride(Size).HeightOverride(Size)
+        [
+            SNew(SBorder)
+            .BorderImage(BreakerMenuDiscBrush(Size))
+            .BorderBackgroundColor(Ring)
+            .Padding(FMargin(RingWidth))
+            .HAlign(HAlign_Center).VAlign(VAlign_Center)
+            [
+                SNew(SBorder)
+                .BorderImage(BreakerMenuDiscBrush(Inner))
+                .BorderBackgroundColor(Fill)
+                .Padding(FMargin(0.0f))
+                .HAlign(HAlign_Center).VAlign(VAlign_Center)
+                [
+                    Centre
+                ]
+            ]
+        ];
+    }
+
+    // The same disc as a BUTTON, so a marker can be round and still hover and
+    // click. The engine's button brush is what made every node boxy; this
+    // replaces its four state brushes with the disc and lets the button's own
+    // colour do the state.
+    const FButtonStyle* BreakerMenuDiscButtonStyle(float Size)
+    {
+        static TMap<int32, TSharedPtr<FButtonStyle>> Styles;
+        const int32 Key = FMath::Clamp(FMath::RoundToInt(Size), 2, 4096);
+        if (const TSharedPtr<FButtonStyle>* Found = Styles.Find(Key)) return Found->Get();
+        const TSharedPtr<FButtonStyle> Style = MakeShared<FButtonStyle>(
+            FCoreStyle::Get().GetWidgetStyle<FButtonStyle>(TEXT("Button")));
+        const FSlateBrush* Disc = BreakerMenuDiscBrush(Key);
+        Style->SetNormal(*Disc);
+        Style->SetHovered(*Disc);
+        Style->SetPressed(*Disc);
+        Style->SetDisabled(*Disc);
+        Style->SetNormalPadding(FMargin(0.0f));
+        Style->SetPressedPadding(FMargin(0.0f));
+        Styles.Add(Key, Style);
+        return Style.Get();
+    }
+
     TSharedRef<SWidget> BorderWrap(const TSharedRef<SWidget>& Inner, const FLinearColor& BorderColor, float Thickness = BreakerUI::BorderThin)
     {
         return SNew(SBorder)
@@ -7790,29 +7903,23 @@ namespace
             case ESkillMarkerKind::Notable:
             {
                 const float Core = FMath::Max(6.0f, MarkerPixels * 0.27f);
-                return SNew(SBox).WidthOverride(Core).HeightOverride(Core)[SolidBlock(StateColor)];
+                return SNew(SBox).WidthOverride(Core).HeightOverride(Core)[SolidDisc(StateColor, Core)];
             }
             case ESkillMarkerKind::Convergence:
             {
                 const float Core = FMath::Max(8.0f, MarkerPixels * 0.31f);
-                return SNew(SBox).WidthOverride(Core).HeightOverride(Core)[SolidBlock(StateColor)];
+                return SNew(SBox).WidthOverride(Core).HeightOverride(Core)[SolidDisc(StateColor, Core)];
             }
             case ESkillMarkerKind::Keystone:
             {
                 // Ring, gap, core — concentric, which nothing else on the
                 // board is.
                 const float Core = FMath::Max(14.0f, MarkerPixels * 0.50f);
+                // Ring, gap, core — concentric, which nothing else on the board
+                // is, and now actually concentric rather than three squares.
                 return SNew(SBox).WidthOverride(Core).HeightOverride(Core)
                 [
-                    BorderWrap(
-                        SNew(SBorder)
-                        .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
-                        .BorderBackgroundColor(Face)
-                        .Padding(FMargin(BreakerUI::Space4))
-                        [
-                            SolidBlock(StateColor)
-                        ],
-                        StateColor, BreakerUI::BorderSelected)
+                    BreakerMenuDiscMarker(Core, BreakerUI::BorderSelected, StateColor, Face, StateColor, 0.42f)
                 ];
             }
             default:
@@ -8300,10 +8407,20 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
     auto WireMarker = [this](const UBreakerProgressionTree* Tree, const UBreakerProgressionNode* Node,
         const FSkillNodeView& View, bool bPurchasable, const FString& LockReason,
         const FLinearColor& Fill, const FLinearColor& Ring, float RingThickness,
-        const TSharedRef<SWidget>& Inner) -> TSharedRef<SWidget>
+        const TSharedRef<SWidget>& Inner, float MarkerSize) -> TSharedRef<SWidget>
     {
-        return BorderWrap(
+        // ROUND, RINGED, AND STILL A BUTTON. The ring is a disc behind the
+        // button rather than a square border around it, so a node reads as a
+        // node at any size instead of as a tile.
+        return SNew(SBorder)
+            .BorderImage(BreakerMenuDiscBrush(MarkerSize))
+            .BorderBackgroundColor(Ring)
+            .Padding(FMargin(RingThickness))
+            .HAlign(HAlign_Center)
+            .VAlign(VAlign_Center)
+            [
             SNew(SButton)
+            .ButtonStyle(BreakerMenuDiscButtonStyle(FMath::Max(2.0f, MarkerSize - RingThickness * 2.0f)))
             .ButtonColorAndOpacity(Fill)
             .ContentPadding(FMargin(0.0f))
             .HAlign(HAlign_Center)
@@ -8357,8 +8474,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             }))
             [
                 Inner
-            ],
-            Ring, RingThickness);
+            ]
+            ];
     };
 
     // Shared empty-board plate. Every one of these paths exists today and is
@@ -8427,18 +8544,34 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 const bool bOwned = Rank > 0;
                 const ESkillMarkerKind Kind = ClassifyNode(Node);
                 const bool bKeystone = Kind == ESkillMarkerKind::Keystone;
-                const float Size = bKeystone ? 64.0f : 48.0f;
+                // SIZE CARRIES THE RANK OF THE NODE, not just its glyph. Owner,
+                // with a passive tree on screen: "the boxy nodes are bad". On a
+                // board where every node was a 48-unit square, what a node WAS
+                // had to be read off a core dot four pixels across.
+                const float Size = bKeystone ? 76.0f
+                    : Kind == ESkillMarkerKind::Convergence ? 62.0f
+                    : Kind == ESkillMarkerKind::Notable ? 54.0f : 40.0f;
                 const FBreakerMenuSkillRung Rung = BreakerMenuSkillLadderRung(Kind, bOwned, bPurchasable,
                     BreakerMenuSkillKeystoneRefused(Progression, Tree, Node));
                 const FSkillNodeView View = MakeSkillNodeView(Node, Rank, bPurchasable, LockReason, Spent, Snapshot);
                 const FLinearColor Ring = bOwned ? Cyan : bPurchasable ? Amber : Muted;
-                TSharedRef<SWidget> Marker = WireMarker(Tree, Node, View, bPurchasable, LockReason,
-                    Rung.Fill, Ring, 2.0f, MakeMarkerCore(Kind, bOwned || bPurchasable ? Rung.Core : SoftText, Rung.Fill, Size));
-                if (MarkerIsDiamond(Kind)) Marker = RotateFortyFive(Marker);
+                const TSharedRef<SWidget> Marker = WireMarker(Tree, Node, View, bPurchasable, LockReason,
+                    Rung.Fill, Ring, 3.0f,
+                    MakeMarkerCore(Kind, bOwned || bPurchasable ? Rung.Core : SoftText, Rung.Fill, Size), Size);
                 Canvas->AddSlot().Position(Center - FVector2D(Size * 0.5f)).Size(FVector2D(Size))[Marker];
-                Canvas->AddSlot().Position(Center + FVector2D(-40, Size * 0.5f + 10)).Size(FVector2D(80, 26))
-                [SNew(SBox).HAlign(HAlign_Center)
-                    [MenuText(FText::FromString(FString::Printf(TEXT("%d / %d"), Rank, Node->MaxRank)), 14, bKeystone ? Amber : SoftText, true)]];
+                // THE RANK LABEL IS FOR NODES YOU HAVE BOUGHT. Owner: "so much
+                // information everywhere we needd to condense this to where its
+                // only there when hovered or clocked". Every node carried a
+                // "0 / 2" under it, so the board printed the same non-fact
+                // twenty times and the handful of numbers that meant something
+                // were lost among them. Hovering any node still puts its full
+                // rank, cost and projection in the rail.
+                if (Rank > 0)
+                {
+                    Canvas->AddSlot().Position(Center + FVector2D(-40, Size * 0.5f + 10)).Size(FVector2D(80, 26))
+                    [SNew(SBox).HAlign(HAlign_Center)
+                        [MenuText(FText::FromString(FString::Printf(TEXT("%d / %d"), Rank, Node->MaxRank)), 14, bKeystone ? Amber : SoftText, true)]];
+                }
             }
             OffsetX += Layout.Size.X + BreakerUI::Space40;
         }
@@ -8470,9 +8603,26 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         const bool bRoleLayout = Layout.bUsesCoreRoles;
         const float FitScale = FMath::Max(.01f, Metrics.GameUIScale * FMath::Min(Metrics.BoardViewWidth / Layout.Size.X, FMath::Max(320.0f, Metrics.PanelHeight - 272.0f) / Layout.Size.Y));
         const float RoleMarkerSize = bFocused ? 28.0f / FitScale : 44.0f;
+        // WHAT A NODE IS, AT A GLANCE, BY SIZE. Every marker on this board was
+        // the same square and the wheel read as noise because of it. A minor is
+        // small, a notable is bigger, a convergence bigger again, a keystone is
+        // the largest thing in its wedge, and a gateway — the station the
+        // circuit passes through — sits between them.
+        auto RoleMarkerScale = [](EBreakerCoreNodeRole Role)
+        {
+            switch (Role)
+            {
+            case EBreakerCoreNodeRole::Keystone:    return 1.55f;
+            case EBreakerCoreNodeRole::Convergence: return 1.25f;
+            case EBreakerCoreNodeRole::LaneNotable: return 1.05f;
+            case EBreakerCoreNodeRole::Gateway:     return 1.15f;
+            default:                                return 0.78f;
+            }
+        };
         const TSet<FName> Dark = bStructuralPreview ? TSet<FName>() : BreakerCoreDarkConstellations(CoreTree);
         int32 TreeSpent = 0, TreeTotal = 0;
         ProgressionTreeInvestment(Progression, CoreTree, TreeSpent, TreeTotal);
+
         TSharedRef<SCanvas> Canvas = SNew(SCanvas);
         auto AddLabel = [&](FVector2D Center, FVector2D Size, const TSharedRef<SWidget>& Widget)
         {
@@ -8506,7 +8656,14 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 const float Angle = Angles.X;
                 // A 1-unit stroke on the role board is a fifth of a pixel: the
                 // sector divisions were being drawn and never arriving.
-                AddCanvasSegment(Canvas, BreakerCoreBoard::Polar(Layout.Hub, 100.0f, Angles.Y),
+                // FROM OUTSIDE THE CIRCUIT, NOT FROM THE HUB. The spokes used
+                // to run from 100 out past the gateway ring at 620, so six of
+                // them cut the one path on this board that is a circuit, and
+                // the ring read as a broken outline. A sector divides the
+                // wedges, and the wedges are outboard.
+                const float SpokeStart = bRoleLayout
+                    ? BreakerCoreBoard::GatewayRingRadius + 90.0f : 100.0f;
+                AddCanvasSegment(Canvas, BreakerCoreBoard::Polar(Layout.Hub, SpokeStart, Angles.Y),
                     BreakerCoreBoard::Polar(Layout.Hub, (bRoleLayout ? 1400.0f : 690.0f), Angles.Y), BorderRest,
                     bRoleLayout ? FMath::Max(1.0f, 1.5f / FitScale) : 1.0f);
                 if (!bRoleLayout) AddLabel(BreakerCoreBoard::Polar(Layout.Hub, 155.0f, Angle), FVector2D(180, 36),
@@ -8515,7 +8672,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 // sit in it at 100 screen pixels of arc apiece.
                 else AddLabel(BreakerCoreBoard::Polar(Layout.Hub, BreakerCoreBoard::RoleSectorLabelRadius, Angle),
                     FVector2D(BoardSectorSize * 9.0f, BoardSectorSize * 1.8f),
-                    CenteredText(Layout.Sectors[Sector].ToString().ToUpper(), BoardSectorSize, Muted));
+                    CenteredText(Layout.Sectors[Sector].ToString().ToUpper(), BoardSectorSize,
+                        BreakerMenuSectorHue(Layout.Sectors[Sector])));
             }
         }
         if (!bRoleLayout) for (const FName Entry : Layout.Entries)
@@ -8523,12 +8681,49 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             const bool bOwned = ProgressionGetNodeRank(Progression, Entry, CoreTree->Currency) > 0;
             DrawLink(Layout.Hub, Layout.Centers[Entry], bOwned ? Cyan : BorderEmphasis, bOwned ? 3.0f : 2.0f);
         }
+        // THE CIRCUIT IS AN ARC; EVERYTHING ELSE IS A LINE. Owner: "connect the
+        // traveling nodes together in a clean path". Gateway to gateway is the
+        // board's only inter-wedge edge and the only one whose two ends share a
+        // radius, so drawing it straight cut the circle it belongs to, inset a
+        // marker's width at each end, twenty-two times. Curved, uninset and
+        // heavier, the same edges read as one path passing through the
+        // stations. No node, edge or rule moved to get it.
+        const TSet<FName> CircuitNodes(Layout.Entries);
+        // Which sector a node belongs to, once, so the edge loop below is a
+        // lookup rather than a walk per edge.
+        TMap<FName, FLinearColor> NodeHue;
+        for (const BreakerCoreBoard::FWedge& Wedge : Layout.Wedges)
+        {
+            const FLinearColor Hue = BreakerMenuSectorHue(Wedge.Sector);
+            for (const FName Id : Wedge.Nodes) NodeHue.Add(Id, Hue);
+        }
         for (const FBreakerNodeEdge& Edge : Layout.Edges)
         {
             const bool bOwnedA = ProgressionGetNodeRank(Progression, Edge.A, CoreTree->Currency) > 0;
             const bool bOwnedB = ProgressionGetNodeRank(Progression, Edge.B, CoreTree->Currency) > 0;
-            DrawLink(Layout.Centers[Edge.A], Layout.Centers[Edge.B],
-                bOwnedA && bOwnedB ? Cyan : (bOwnedA || bOwnedB ? Muted : BorderEmphasis), bOwnedA && bOwnedB ? 3.0f : 2.0f);
+            // Owned is the system bone whatever the branch — what you have
+            // taken is a fact about you, not about the sector — and everything
+            // still unowned is dimmed to a third so the lit path reads over it.
+            const FLinearColor* Hue = bRoleLayout ? NodeHue.Find(Edge.A) : nullptr;
+            const FLinearColor Unowned = Hue ? *Hue * 0.34f : BorderEmphasis;
+            const FLinearColor EdgeColour = bOwnedA && bOwnedB ? Cyan
+                : (bOwnedA || bOwnedB ? (Hue ? *Hue * 0.7f : Muted) : Unowned);
+            const bool bCircuit = bRoleLayout && !bFocused
+                && CircuitNodes.Contains(Edge.A) && CircuitNodes.Contains(Edge.B);
+            if (bCircuit)
+            {
+                const FVector2D FromDelta = Layout.Centers[Edge.A] - Layout.Hub;
+                const FVector2D ToDelta = Layout.Centers[Edge.B] - Layout.Hub;
+                const TArray<FVector2D> Arc = BreakerCoreBoard::CircuitArc(Layout.Hub,
+                    BreakerCoreBoard::GatewayRingRadius,
+                    FMath::RadiansToDegrees(FMath::Atan2(FromDelta.Y, FromDelta.X)),
+                    FMath::RadiansToDegrees(FMath::Atan2(ToDelta.Y, ToDelta.X)), 10);
+                const float CircuitWidth = FMath::Max(4.0f, 3.0f / FitScale);
+                for (int32 Point = 1; Point < Arc.Num(); ++Point)
+                    AddCanvasSegment(Canvas, Arc[Point - 1], Arc[Point], EdgeColour, CircuitWidth);
+                continue;
+            }
+            DrawLink(Layout.Centers[Edge.A], Layout.Centers[Edge.B], EdgeColour, bOwnedA && bOwnedB ? 3.0f : 2.0f);
         }
         if (!bRoleLayout) AddLabel(Layout.Hub, FVector2D(76, 52),
             MakePlate(MenuText(FText::FromString(TEXT("CORE")), 16, Primary, true), PanelRaised, Amber, FMargin(8)));
@@ -8561,27 +8756,28 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             // Gateway/minor squares have no glyph, so their ring must also
             // communicate the Rung's purchasable Primary versus locked state.
             const FLinearColor MarkerRing = bRoleLayout && !bOwned && bPurchasable ? Rung.Core : Rung.Ring;
-            const TSharedRef<SWidget> Core = MakeMarkerCore(Kind, Rung.Core, MarkerFill, bRoleLayout ? RoleMarkerSize : 44.0f);
+            const float NodeSize = bRoleLayout ? RoleMarkerSize * RoleMarkerScale(Node->CoreRole) : 44.0f;
+            const TSharedRef<SWidget> Core = MakeMarkerCore(Kind, Rung.Core, MarkerFill, NodeSize);
             TSharedRef<SWidget> Marker = bFocused && !bSealed
-                ? WireMarker(CoreTree, Node, View, bPurchasable, LockReason, MarkerFill, MarkerRing, RingWidth, Core)
-                : BorderWrap(SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
-                    .BorderBackgroundColor(MarkerFill).Padding(0).HAlign(HAlign_Center).VAlign(VAlign_Center)[Core], MarkerRing, RingWidth);
-            if (MarkerIsDiamond(Kind))
-            {
-                Marker = RotateFortyFive(Marker);
-                if (bRoleLayout) Marker = SNew(SBox).HAlign(HAlign_Center).VAlign(VAlign_Center)
-                    [SNew(SBox).WidthOverride(RoleMarkerSize / 1.414214f).HeightOverride(RoleMarkerSize / 1.414214f)[Marker]];
-            }
+                ? WireMarker(CoreTree, Node, View, bPurchasable, LockReason, MarkerFill, MarkerRing, RingWidth, Core, NodeSize)
+                : SNew(SBorder).BorderImage(BreakerMenuDiscBrush(NodeSize))
+                    .BorderBackgroundColor(MarkerRing).Padding(FMargin(RingWidth))
+                    .HAlign(HAlign_Center).VAlign(VAlign_Center)
+                    [SNew(SBorder).BorderImage(BreakerMenuDiscBrush(FMath::Max(2.0f, NodeSize - RingWidth * 2.0f)))
+                        .BorderBackgroundColor(MarkerFill).Padding(FMargin(0.0f))
+                        .HAlign(HAlign_Center).VAlign(VAlign_Center)[Core]];
             if (bRoleLayout && !bFocused)
             {
                 const FName WedgeId = Node->Constellation;
-                Marker = SNew(SButton).ContentPadding(0).ButtonColorAndOpacity(Rung.Fill)
+                Marker = SNew(SButton).ContentPadding(0)
+                    .ButtonStyle(BreakerMenuDiscButtonStyle(NodeSize))
+                    .ButtonColorAndOpacity(Rung.Fill)
                     .ToolTipText(FText::FromString(View.Name + TEXT(" — ") + RankLabel(Rank, Node->MaxRank)))
                     .OnClicked(FOnClicked::CreateLambda([this, WedgeId]()
                     { SkillExpandedConstellation = WedgeId; ResetBoardView(); Rebuild(EBreakerMenuScreen::SkillTrees); return FReply::Handled(); }))
                     [Marker];
             }
-            AddLabel(*Center, bRoleLayout ? FVector2D(RoleMarkerSize, RoleMarkerSize) : bFocused ? FVector2D(44, 44) : FVector2D(32, 32), Marker);
+            AddLabel(*Center, bRoleLayout ? FVector2D(NodeSize, NodeSize) : bFocused ? FVector2D(44, 44) : FVector2D(32, 32), Marker);
             if (bFocused && bRoleLayout && Node->CoreRole == EBreakerCoreNodeRole::LaneMinor)
             {
                 TSharedRef<SHorizontalBox> Pips = SNew(SHorizontalBox);
@@ -8621,7 +8817,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     ? BreakerCoreBoard::RoleLabelNearRadius : BreakerCoreBoard::RoleLabelFarRadius;
                 AddLabel(BreakerCoreBoard::Polar(Layout.Hub, LabelRadius, Wedge.AngleDegrees),
                     FVector2D(BoardNameSize * 9.0f, BoardNameSize * 1.8f),
-                    CenteredText(Wedge.Name.ToString().ToUpper(), BoardNameSize, Primary));
+                    CenteredText(Wedge.Name.ToString().ToUpper(), BoardNameSize,
+                        BreakerMenuSectorHue(Wedge.Sector)));
             }
         }
         if (!bFocused && !bRoleLayout)

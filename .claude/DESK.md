@@ -69,6 +69,41 @@ only, and the part still unruled is whether the CLASS board tab and the COMMIT
 TO THIS BRANCH control should also wait for that first payment. Hiding the
 wallet while the commit button still sits there is the state to look at.
 
+THE TREE, RESHAPED (his second message, with two passive trees attached:
+"why can't we do somehing like this for the skill tree that you can zoom and
+look around on and honestly the boxy nodes are bad"):
+- ROUND NODES, SIZED BY WHAT THEY ARE. Every node on both boards was a square
+  button in a square border, and a diamond was that same square turned forty
+  five degrees; on the core wheel all 187 were the same 44 units, so what a
+  node WAS had to be read off a core dot four pixels across. One cached
+  rounded-box brush is a disc, tinted per node, so a minor is small, a notable
+  bigger, a convergence bigger again, a keystone the largest in its wedge, and
+  a gateway sits between. Costs no asset and no new state.
+- THE CIRCUIT IS AN ARC. The gateways are the travelling nodes and their edges
+  are the board's only inter-wedge path. They were drawn as 22 straight chords,
+  inset a marker's width at each end, at about a pixel wide, and then cut by
+  six sector spokes that ran from the hub straight through them. Now: arcs on
+  the gateway radius, uninset, heavier, and the spokes start OUTSIDE the ring.
+  No node, edge, cost or rule moved to get it.
+- LINKS STOPPED KINKING INWARD. They sat at radius 915, radially inside the
+  1030 notables they join, so every major wedge drew two inward Vs across its
+  own lane ring. 1105 now, and every radius grows outward from the gateway:
+  620, 800, 1030, 1105, 1190, 1340. Pinned by UI.CoreBoard.Circuit.
+- THE SIX SECTORS TOOK THE VERB PALETTE (O179), so the branches read as
+  branches: Weapon orange, Movement cyan, Ability violet, Status harm, Defence
+  the new shield blue, Utility gold. EDGES AND NAMES ONLY — a node's colour is
+  its state, and that has to stay readable at this size.
+- ZOOM AND PAN WERE ALREADY THERE (wheel at the cursor, drag to pan, FAR/NEAR/
+  RESET). What was missing was anything worth looking at when you got there.
+- AND ONE PIECE OF THE DENSITY ITEM: the class board printed "0 / 2" under
+  every unbought node. The rank label is for nodes you have actually put a
+  point into now; hover still puts the full card in the rail.
+
+AN ATLAS WAS BUILT AND THROWN AWAY, and it is worth one line: the first answer
+to "give it a new shape" drew only the 22 stations and hid the other 165 behind
+a click. It photographed well. It is also not what he asked for once he showed
+the reference — he wants the whole graph, zoomable. Git has it.
+
 STILL OPEN FROM IT:
 - "core tree is still an asolute mess ... give it a new shape ... connect the
   traveling nodes together in a clean path".

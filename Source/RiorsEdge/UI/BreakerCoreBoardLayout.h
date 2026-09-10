@@ -7,6 +7,10 @@
 // rules or synthetic travel nodes live in the layout.
 namespace BreakerCoreBoard
 {
+    // The radius the gateway ring sits on. Named rather than repeated: the
+    // layout places the gateways here and the board draws the circuit here, and
+    // the two agreeing is what makes the arcs pass through the markers.
+    constexpr float GatewayRingRadius = 620.0f;   // O2 presentation.
     constexpr float FocusHitSize = 44.0f;
     constexpr float OverviewLabelRadius = 720.0f; // O2 presentation.
     // Role-overview name ring. Twenty-two names on ONE radius leave 414 canvas
@@ -130,7 +134,7 @@ namespace BreakerCoreBoard
                 FVector2D Position;
                 if (Focus.IsNone())
                 {
-                    float Radius = 620, Offset = 0;
+                    float Radius = GatewayRingRadius, Offset = 0;
                     const float LaneStep = 100.0f / Tree->CoreWedgeOrder.Num();
                     if (Slot >= 1 && Slot <= 6)
                     {
@@ -138,7 +142,13 @@ namespace BreakerCoreBoard
                         Offset = (Lane - (Lanes - 1) * .5f) * LaneStep;
                         Radius = Slot <= 3 ? 800 : 1030;
                     }
-                    else if (Slot == 7 || Slot == 8) { Radius = 915; Offset = (Slot == 7 ? -.5f : .5f) * LaneStep; }
+                    // LINKS SIT OUTSIDE THE NOTABLES THEY JOIN. At 915 they
+                    // sat radially INSIDE the 1030 notables they connect, so
+                    // every major wedge drew two inward V kinks crossing its
+                    // own lane ring — a big part of what made the wheel read as
+                    // scribble. Every radius now grows outward from the
+                    // gateway: 620, 800, 1030, 1105, 1190, 1340.
+                    else if (Slot == 7 || Slot == 8) { Radius = 1105; Offset = (Slot == 7 ? -.5f : .5f) * LaneStep; }
                     else if (Slot == 9) Radius = 1190;
                     else if (Slot == 10) Radius = 1340;
                     Position = Polar(Layout.Hub, Radius, Wedge.AngleDegrees + Offset);
@@ -170,6 +180,30 @@ namespace BreakerCoreBoard
         for (FName Id : Tree->EntryNodeIds) if (Layout.Centers.Contains(Id)) Layout.Entries.Add(Id);
         return Layout;
     }
+    // THE CIRCUIT BETWEEN TWO GATEWAYS, as points on the SAME radius.
+    //
+    // Owner, playtest 2026-09-10: "connect the traveling nodes together in a
+    // clean path". The travelling nodes are the gateways: one per constellation
+    // and the graph's only inter-wedge edges (BreakerCoreTree joins each pair
+    // of adjacent entries). They were drawn as twenty-two straight CHORDS, each
+    // inset by a marker's width at both ends and stroked at about a pixel, and
+    // then cut by six sector spokes running from the hub out past them — so the
+    // one path on the board that is a circuit read as a gapped polygon.
+    //
+    // An arc reads as one path that happens to pass through the stations.
+    // Shortest way round, so the wrap from the last gateway to the first curves
+    // the same direction as every other leg instead of crossing the board.
+    inline TArray<FVector2D> CircuitArc(const FVector2D& Hub, float Radius,
+        float FromDegrees, float ToDegrees, int32 Segments)
+    {
+        TArray<FVector2D> Points;
+        Segments = FMath::Max(1, Segments);
+        const float Sweep = FMath::Fmod(ToDegrees - FromDegrees + 540.0f, 360.0f) - 180.0f;
+        for (int32 Index = 0; Index <= Segments; ++Index)
+            Points.Add(Polar(Hub, Radius, FromDegrees + Sweep * (static_cast<float>(Index) / Segments)));
+        return Points;
+    }
+
     inline FLayout Build(const UBreakerProgressionTree* Tree, FName Focus = NAME_None)
     {
         FLayout Layout;
