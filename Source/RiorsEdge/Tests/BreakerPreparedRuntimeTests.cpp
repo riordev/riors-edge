@@ -67,7 +67,7 @@ bool FBreakerPreparedRuntimeTest::RunTest(const FString& Parameters)
         const float SpellPrice=Abilities->GetResourceCostForSlot(Spell);
         if(!TestTrue(TEXT("Paid boundary setup remains above zero"),SpellPrice>19.f))return false;
         if(!Mana->TrySpendMana(Mana->GetMana()-(SpellPrice-19.f)))return false;
-        TestEqual(TEXT("Cleave quotes ordinary price"),Abilities->GetResourceCostForSlot(Melee),12.f,.001f);
+        TestEqual(TEXT("Cleave quotes ordinary price"),Abilities->GetResourceCostForSlot(Melee),15.f,.001f);
         if(!TestTrue(TEXT("Purchased spell enters the actual debt boundary"),Abilities->TryActivateSlot(Spell)))return false;
         BreakerResolvePendingCast(World, Player);
         TestEqual(TEXT("Native paid cast reaches status-income debt boundary"),Mana->GetMana(),-19.f,.001f);ASC->CancelAllAbilities();

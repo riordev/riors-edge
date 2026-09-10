@@ -103,8 +103,8 @@ bool FBreakerCastTimeShippedTest::RunTest(const FString& Parameters)
     // The two that left the set, pinned by VALUE rather than only by the
     // sweep below: each one's wind-up is the thing a ruling bought, so a
     // silent return to zero is a regression and not a retune.
-    TestEqual(TEXT("Resonance winds up before it detonates"), Authored(TEXT("Caster.Resonance")), 0.45f, 0.0001f);
-    TestEqual(TEXT("Unmake winds up before the window opens"), Authored(TEXT("Caster.Unmake")), 0.8f, 0.0001f);
+    TestEqual(TEXT("Resonance winds up before it detonates"), Authored(TEXT("Caster.Resonance")), 0.35f, 0.0001f);
+    TestEqual(TEXT("Unmake winds up before the window opens"), Authored(TEXT("Caster.Unmake")), 0.4f, 0.0001f);
     TestTrue(TEXT("The ultimate is the most committal cast in the class"),
         Authored(TEXT("Caster.Unmake")) > Authored(TEXT("Caster.Cleave"))
         && Authored(TEXT("Caster.Unmake")) > Authored(TEXT("Caster.Resonance")));

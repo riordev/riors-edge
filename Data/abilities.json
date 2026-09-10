@@ -107,17 +107,17 @@
 		{
 			"id": "Caster.Cleave",
 			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, castTimeSeconds, windowDuration, numbers and variants are authored here.",
-			"resourceCost": 12,
+			"resourceCost": 15,
 			"cooldownSeconds": 0,
 			"castTimeSeconds": 0.35,
-			"windowDuration": 0.3,
+			"windowDuration": 0.2,
 			"numbers":
 			{
 				"RangeCm": 650,
 				"ArcDegrees": 120,
-				"WeaponDamageCoefficient": 2.4,
-				"UnarmedDamage": 20,
-				"AnimationLockSeconds": 0.3,
+				"WeaponDamageCoefficient": 3.0,
+				"UnarmedDamage": 25,
+				"AnimationLockSeconds": 0.2,
 				"BleedDamagePerTick": 6,
 				"BleedDuration": 4,
 				"BleedTickInterval": 1,
@@ -215,7 +215,7 @@
 			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, castTimeSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 40,
 			"cooldownSeconds": 0,
-			"castTimeSeconds": 0.45,
+			"castTimeSeconds": 0.35,
 			"windowDuration": 0,
 			"numbers":
 			{
@@ -232,7 +232,7 @@
 			"_comment": "O2 PLACEHOLDER: ability magnitudes require playtest validation; resourceCost, cooldownSeconds, castTimeSeconds, windowDuration, numbers and variants are authored here.",
 			"resourceCost": 80,
 			"cooldownSeconds": 0,
-			"castTimeSeconds": 0.8,
+			"castTimeSeconds": 0.4,
 			"windowDuration": 6,
 			"numbers":
 			{

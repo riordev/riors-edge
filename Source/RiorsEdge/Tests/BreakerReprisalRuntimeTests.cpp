@@ -67,7 +67,7 @@ bool FBreakerReprisalRuntimeTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Cleave still lands real melee damage"),Target->GetAttributes()->GetHealth()<VictimBefore);
         return true;
     };
-    if(!CastCleave(12)) return false; Clock(.5f);
+    if(!CastCleave(15)) return false; Clock(.5f);
     Progression->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(5,Progression->ExperienceCurve));
     if(!Progression->PurchaseNode(UBreakerProgressionLibrary::GetCoreSliceTree(),TEXT("Core.Bulwark.Read"),Reason)) return false;
     int32 Seed=1; int32 LastPassiveBlockSeed=0;
@@ -117,12 +117,12 @@ bool FBreakerReprisalRuntimeTest::RunTest(const FString& Parameters)
     Clock(.5f);
     if(!CastCleave(0))return false;
     Clock(.5f);
-    TestEqual(TEXT("Spent opportunity restores ordinary quote"),Abilities->GetResourceCostForSlot(Slot),12.f,.001f);
+    TestEqual(TEXT("Spent opportunity restores ordinary quote"),Abilities->GetResourceCostForSlot(Slot),15.f,.001f);
     if(!EarnPassiveBlock())return false;
     Clock(GetDefault<UBreakerAbility_Cleave>()->ReprisalWindowSeconds+.05f);
     TestFalse(TEXT("Unused opportunity expires on authored clock"),Combat->HasReprisalCharge());
     Mana->AdvanceLoop(30);
-    if(!CastCleave(12))return false; Clock(.5f);
+    if(!CastCleave(15))return false; Clock(.5f);
     if(!EarnPassiveBlock())return false;
     if(!Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints,true,Reason))return false;
     TestFalse(TEXT("Respec invalidates earned opportunity"),Combat->HasReprisalCharge());
