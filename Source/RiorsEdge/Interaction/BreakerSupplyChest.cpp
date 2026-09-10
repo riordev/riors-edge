@@ -10,6 +10,7 @@
 #include "Items/BreakerLootPickup.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
+#include "UI/BreakerGlowMaterial.h"
 #include "UI/BreakerUIStyle.h"
 
 ABreakerSupplyChest::ABreakerSupplyChest()
@@ -36,11 +37,59 @@ ABreakerSupplyChest::ABreakerSupplyChest()
             Band->SetVectorParameterValue(TEXT("Color"), BreakerUI::Gold);
         }
     }
+    // THE MOTE, so a chest can be seen from the lane. Created here because
+    // SetupAttachment is constructor-only; its material is made in BeginPlay,
+    // where a dynamic instance belongs.
+    PrimaryActorTick.bCanEverTick = true;
+    Glint = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Glint"));
+    Glint->SetupAttachment(GetRootComponent());
+    Glint->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    Glint->SetCastShadow(false);
+    Glint->SetRelativeLocation(FVector(0.0f, 0.0f, GlintLidTopCm + GlintHeightCm));
+    Glint->SetRelativeScale3D(FVector(GlintSizeCm / 100.0f));
+    if (UStaticMesh* Sphere = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere")))
+    {
+        Glint->SetStaticMesh(Sphere);
+    }
+
     DisplayName = FText::FromString(TEXT("Supply chest"));
     DialogueId = NAME_None;
     DialogueNodes.Reset();
     EntryOverrides.Reset();
     Tags.Add(TEXT("Fernhall.Chest"));
+}
+
+void ABreakerSupplyChest::BeginPlay()
+{
+    Super::BeginPlay();
+    // UNLIT ADDITIVE, so the mote reads as light across a 56 m yard rather
+    // than as a painted ball that goes grey in a building's shadow. A plain
+    // mesh component, so the additive glow actually draws on it — it does not
+    // declare instanced usage, which is what made the pocket tear black.
+    if (Glint)
+    {
+        GlintMaterial = BreakerUI::MakeGlowMaterial(Glint);
+        if (GlintMaterial) Glint->SetMaterial(0, GlintMaterial);
+    }
+}
+
+void ABreakerSupplyChest::Tick(float DeltaSeconds)
+{
+    Super::Tick(DeltaSeconds);
+    if (!Glint) return;
+    if (bOpened)
+    {
+        // SPENT, AND IT SAYS SO. An opened chest that kept glinting would send
+        // the player back across the yard to something they already took.
+        Glint->SetVisibility(false);
+        return;
+    }
+    GlintAge += DeltaSeconds;
+    const float Breath = 0.5f + 0.5f * FMath::Sin(GlintAge * GlintHz * 2.0f * PI);
+    if (GlintMaterial)
+    {
+        BreakerUI::SetGlowColor(GlintMaterial, BreakerUI::Gold, FMath::Lerp(GlintLow, GlintHigh, Breath));
+    }
 }
 
 void ABreakerSupplyChest::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

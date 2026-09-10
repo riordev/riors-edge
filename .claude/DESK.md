@@ -28,10 +28,14 @@ STILL OPEN FROM IT, IN HIS WORDS:
 - "theres absolutely no shape to fernhall at all just the main opened portion".
   THE BIGGEST ONE. Three yards of flat ground with cover on it is not shape.
   Wants verticality, structures, enclosure — a composer job.
-- "i havent seen any chest". Six are placed per session and he found none.
-  Either the roll is putting them where nobody walks, or they are too small to
-  notice at range. MEASURE BEFORE MOVING ANYTHING: log where they land against
-  where he actually walked.
+- "i havent seen any chest" — MEASURED AND ANSWERED. Replaying his own session
+  seed put four of six chests 14 to 19 metres off a lane the player walks down
+  the middle of. The spread is RIGHT: being off the lane is the reward for
+  leaving it. What was missing is that a dark 90 cm box at that range says
+  nothing. Each chest now carries a gold mote above the lid on a slow breath,
+  which goes out when it is opened. Still not on the map, so it is still found
+  by looking. If he crosses a yard and still misses one, the next lever is the
+  spread, not the light.
 - "rot looks so weird casting sometimes its in the air or half baked".
 - "warden or random enemy inside fernhall station rift just reflects a portion
   of my damage back at me" — a modifier doing its job with no tell, or a bug.
