@@ -167,6 +167,24 @@ float UBreakerCharacterMovementComponent::LandingSpeedScale(float ImpactSpeed, f
     return FMath::Lerp(1.0f, Clamped, Alpha);
 }
 
+float UBreakerCharacterMovementComponent::LandedPlanarSpeed(float EntrySpeed, float Scale,
+    bool bSlideOwnsLanding, float SlideEntrySpeed)
+{
+    const float Arrived = FMath::Max(0.0f, EntrySpeed);
+    const float Scrubbed = Arrived * FMath::Clamp(Scale, 0.0f, 1.0f);
+    if (!bSlideOwnsLanding) return Scrubbed;
+    // The floor, and it is clamped to what the player arrived with so it can
+    // only ever SAVE a slide, never grant one.
+    return FMath::Max(Scrubbed, FMath::Min(Arrived, FMath::Max(0.0f, SlideEntrySpeed)));
+}
+
+float UBreakerCharacterMovementComponent::SlidingSpeedCap(float SprintSpeed, float SlideMultiplier,
+    float BoostedCeiling)
+{
+    return FMath::Max(FMath::Max(0.0f, SprintSpeed) * FMath::Max(0.0f, SlideMultiplier),
+        FMath::Max(0.0f, BoostedCeiling));
+}
+
 FVector UBreakerCharacterMovementComponent::NewFallVelocity(const FVector& InitialVelocity, const FVector& Gravity, float DeltaTime) const
 {
     // The project uses standard downward gravity everywhere (dash and slide
@@ -345,13 +363,33 @@ void UBreakerCharacterMovementComponent::ProcessLanded(const FHitResult& Hit, fl
     // A queued slide owns its landing: scrubbing speed here would drop the
     // player under SlideEntrySpeed and silently eat the slide.
     const bool bSlideOwnsLanding = bSliding || (bSlideRequested && !bSlideRequestConsumed);
-    const float Scale = bSlideOwnsLanding
-        ? 1.0f
-        : LandingSpeedScale(ImpactSpeed, LandingHeavyFallSpeed, LandingMaxFallSpeed, LandingMinimumSpeedScale);
-    if (Scale < 1.0f)
+    // THE SCRUB NOW APPLIES TO A QUEUED SLIDE TOO, floored rather than skipped.
+    // It used to be exempt outright, so crouch held in the air paid no landing
+    // toll at any fall speed — a free momentum keep for one held key. The
+    // intent was only ever that the scrub must not drop the player under
+    // SlideEntrySpeed and eat the slide it was queuing, and that is a floor.
+    const float Scale = LandingSpeedScale(ImpactSpeed, LandingHeavyFallSpeed,
+        LandingMaxFallSpeed, LandingMinimumSpeedScale);
+    const float EntryPlanarSpeed = Velocity.Size2D();
+    const float LandedSpeed = LandedPlanarSpeed(EntryPlanarSpeed, Scale, bSlideOwnsLanding, SlideEntrySpeed);
+    // MOTION CANNOT BE PHOTOGRAPHED (movement.md), so the landing prints its
+    // own arithmetic under -BreakerMoveTrace: the toll a queued slide pays is
+    // the whole repair, and a screenshot of a man on the ground shows none of
+    // it. Inert in a shipped session.
+    if (bMoveTraceArmed)
     {
-        Velocity.X *= Scale;
-        Velocity.Y *= Scale;
+        UE_LOG(LogTemp, Display,
+            TEXT("[BreakerMoveTrace] LANDING impact=%.1f entry=%.1f landed=%.1f scale=%.3f slideowns=%d ceiling=%.1f restingcap=%.1f"),
+            ImpactSpeed, EntryPlanarSpeed, LandedSpeed, Scale, bSlideOwnsLanding ? 1 : 0,
+            BoostedSpeedCeiling, GetGroundedSpeedCap());
+    }
+    if (EntryPlanarSpeed > KINDA_SMALL_NUMBER && LandedSpeed < EntryPlanarSpeed)
+    {
+        // Scaled as a VECTOR rather than per axis, so the direction the player
+        // was travelling is untouched by the cost.
+        const float Retained = LandedSpeed / EntryPlanarSpeed;
+        Velocity.X *= Retained;
+        Velocity.Y *= Retained;
         // BoostedSpeedCeiling is not CLEARED here: it is a ceiling, not a
         // floor, so the player does not snap back to it, and clearing it
         // outright would quietly change how dash momentum survives a landing.
@@ -366,13 +404,12 @@ void UBreakerCharacterMovementComponent::ProcessLanded(const FHitResult& Hit, fl
     // an air dash still lands with its momentum — but the chain now converges
     // instead of ratcheting, because only a fresh grant re-arms it.
     //
-    // TWO ADJACENT FINDINGS, recorded not repaired, because one report moves
-    // one dial: (1) bSlideOwnsLanding exempts a merely REQUESTED slide from
-    // the landing cost entirely, so crouch held in the air pays no toll at any
-    // fall speed — the stated intent is only that the scrub must not drop the
-    // player under SlideEntrySpeed, which is a floor, not an exemption; and
-    // (2) GetMaxSpeed while sliding returns max(SprintSpeed * mult,
-    // Velocity.Size2D()), a cap that reads its own current speed.
+    // THE TWO ADJACENT FINDINGS THIS RECORDED ARE BOTH REPAIRED NOW: the slide
+    // exemption became the floor it was always described as (above), and
+    // GetMaxSpeed's sliding branch no longer reads its own velocity back as a
+    // cap (see GetMaxSpeed). Both are continuations of this same report rather
+    // than new dials — a cap that is whatever you are already doing is how the
+    // momentum kept compounding in the first place.
     LatchBoostedCeilingBleed();
     bJumpCutArmed = false;
 
@@ -575,7 +612,17 @@ float UBreakerCharacterMovementComponent::GetMaxSpeed() const
     if (IsOwnerStaggered()) return 0.0f;
     if (bSliding)
     {
-        return FMath::Max(SprintSpeed * GetComposedSlideSpeedMultiplier(), Velocity.Size2D());
+        // A CAP MAY NOT READ ITS OWN CURRENT SPEED. This was
+        // max(SprintSpeed * mult, Velocity.Size2D()), which is not a cap at
+        // all: whatever speed the slide was entered with became its own
+        // ceiling, so a slide preserved arbitrary momentum for as long as it
+        // lasted and the O264 compounding had a second door. The earned-speed
+        // term is BoostedSpeedCeiling — the same decaying ceiling the grounded
+        // branch below already maxes against, armed only by a fresh grant and
+        // latched to bleed on a landing — so a dash or momentum entry still
+        // slides fast and still converges, while crouch after a sprint no
+        // longer mints its own cap.
+        return SlidingSpeedCap(SprintSpeed, GetComposedSlideSpeedMultiplier(), BoostedSpeedCeiling);
     }
     return FMath::Max(GetGroundedSpeedCap(), BoostedSpeedCeiling);
 }
@@ -1279,6 +1326,53 @@ void UBreakerCharacterMovementComponent::TickMoveTrace()
         SetSlideRequested(false);
         CharacterOwner->LaunchCharacter(FVector(0.0f, 0.0f, JumpZVelocity), false, true);
         UE_LOG(LogTemp, Display, TEXT("[BreakerMoveTrace] t=%.2f EVENT slide-jump in=%.1f out=%.1f"), T, SpeedIntoJump, Velocity.Size2D());
+    }
+    // HIGH-DROP PROBE. The slide-jump's own apex arrives at about 870 cm/s,
+    // under LandingHeavyFallSpeed (950), so every landing this script has ever
+    // reached was free and the landing cost went untraced no matter which leg
+    // ran. A real player reaches a heavy landing by dropping off something; the
+    // gym has no authored ledge on this lane, so the instrument LIFTS the body
+    // to where a ledge would put it and lets it fall. Nothing is granted —
+    // height is not speed, the fall is the engine's own, and the toll is
+    // whatever the curve charges for arriving that fast.
+    else if (MoveTraceStep == 6 && T >= 8.6)
+    {
+        MoveTraceStep = 7;
+        SetSlideRequested(false);
+        const FVector Lifted = UpdatedComponent->GetComponentLocation() + FVector(0.0f, 0.0f, MoveTraceDropHeightCm);
+        CharacterOwner->SetActorLocation(Lifted, false, nullptr, ETeleportType::TeleportPhysics);
+        UE_LOG(LogTemp, Display,
+            TEXT("[BreakerMoveTrace] t=%.2f EVENT high-drop probe lifted %.0fcm speed=%.1f ceiling=%.1f"),
+            T, MoveTraceDropHeightCm, Velocity.Size2D(), BoostedSpeedCeiling);
+    }
+    // The same drop again with crouch HELD, so the two landings differ in one
+    // bit and the toll is the difference between two traced numbers rather
+    // than a claim. The second lift waits until the first has LANDED — a probe
+    // that re-lifts a still-falling body measures one drop of twice the height
+    // and prints a single landing, which is what the first run of this did.
+    else if (MoveTraceStep == 7 && T >= 9.8)
+    {
+        MoveTraceStep = 8;
+        const FVector Lifted = UpdatedComponent->GetComponentLocation() + FVector(0.0f, 0.0f, MoveTraceDropHeightCm);
+        CharacterOwner->SetActorLocation(Lifted, false, nullptr, ETeleportType::TeleportPhysics);
+        SetSlideRequested(true);
+        UE_LOG(LogTemp, Display,
+            TEXT("[BreakerMoveTrace] t=%.2f EVENT high-drop probe WITH crouch held speed=%.1f ceiling=%.1f"),
+            T, Velocity.Size2D(), BoostedSpeedCeiling);
+    }
+    // AIR-CROUCH LEG, and it closes a gap this script has always had: every
+    // earlier leg lands with no slide queued and no ceiling left armed, so the
+    // landing cost was never traced at all. Crouch is held here while the
+    // slide-jump is still rising, so the body arrives with a QUEUED slide and a
+    // ceiling the dash at 6.8 armed — the exact frame where a merely requested
+    // slide used to buy the whole landing for free.
+    else if (MoveTraceStep == 5 && T >= 8.1)
+    {
+        MoveTraceStep = 6;
+        SetSlideRequested(true);
+        UE_LOG(LogTemp, Display,
+            TEXT("[BreakerMoveTrace] t=%.2f EVENT air-crouch (slide queued in the air) speed=%.1f vz=%.1f ceiling=%.1f"),
+            T, Velocity.Size2D(), Velocity.Z, BoostedSpeedCeiling);
     }
 
     // The rate-limited speed line, 10 Hz.

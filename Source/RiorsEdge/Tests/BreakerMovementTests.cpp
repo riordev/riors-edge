@@ -207,6 +207,39 @@ bool FBreakerMovementWeightTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("A scale of one disables the landing cost"), FMovement::LandingSpeedScale(2400.0f, 950.0f, 2400.0f, 1.0f), 1.0f);
     TestEqual(TEXT("A degenerate range never divides by zero"), FMovement::LandingSpeedScale(2400.0f, 2400.0f, 2400.0f, 0.78f), 1.0f);
 
+    // --- The queued slide's landing: a FLOOR, never an exemption ----------
+    // A merely REQUESTED slide used to skip the landing cost outright, so
+    // crouch held in the air paid no toll at any fall speed. These four hold
+    // the floor's whole shape, and the third is the one that matters: the floor
+    // may never hand out speed the player did not arrive with.
+    const float HeavyScale = FMovement::LandingSpeedScale(2400.0f, 950.0f, 2400.0f, 0.78f);
+    TestTrue(TEXT("Without a slide the scrub is the whole answer"),
+        FMath::IsNearlyEqual(FMovement::LandedPlanarSpeed(1000.0f, HeavyScale, false, 550.0f), 1000.0f * HeavyScale, 0.01f));
+    TestTrue(TEXT("A queued slide still PAYS the landing, down to the floor"),
+        FMovement::LandedPlanarSpeed(1000.0f, 0.2f, true, 550.0f) < 1000.0f);
+    TestEqual(TEXT("and is caught at SlideEntrySpeed rather than dropping under it"),
+        FMovement::LandedPlanarSpeed(1000.0f, 0.2f, true, 550.0f), 550.0f);
+    TestEqual(TEXT("The floor cannot lift a landing above what it arrived with"),
+        FMovement::LandedPlanarSpeed(300.0f, 0.5f, true, 550.0f), 300.0f);
+    TestEqual(TEXT("A free landing is untouched either way"),
+        FMovement::LandedPlanarSpeed(1000.0f, 1.0f, true, 550.0f), 1000.0f);
+    TestTrue(TEXT("A heavy fall into a queued slide is no longer free"),
+        FMovement::LandedPlanarSpeed(2000.0f, HeavyScale, true, 550.0f) < 2000.0f);
+
+    // --- The sliding cap, which used to be whatever the slide was doing -----
+    // The assertion that matters here is the SIGNATURE: SlidingSpeedCap takes
+    // no velocity, so it structurally cannot read back the speed it caps. What
+    // is left to pin is that the earned-speed term is the decaying ceiling and
+    // that it can only ever raise the floor, never lower it.
+    TestEqual(TEXT("With no boost armed the cap is the sprint-slide product"),
+        FMovement::SlidingSpeedCap(990.0f, 1.2f, 0.0f), 990.0f * 1.2f);
+    TestEqual(TEXT("An armed ceiling above the product raises the cap"),
+        FMovement::SlidingSpeedCap(990.0f, 1.2f, 1600.0f), 1600.0f);
+    TestEqual(TEXT("A ceiling below the product cannot lower it"),
+        FMovement::SlidingSpeedCap(990.0f, 1.2f, 400.0f), 990.0f * 1.2f);
+    TestEqual(TEXT("A malformed multiplier is floored rather than negative"),
+        FMovement::SlidingSpeedCap(990.0f, -2.0f, 0.0f), 0.0f);
+
     // --- Shipped defaults ------------------------------------------------
     UBreakerCharacterMovementComponent* Movement = NewObject<UBreakerCharacterMovementComponent>();
     TestTrue(TEXT("The fall is heavier than the rise"), Movement->FallGravityMultiplier > 1.0f);

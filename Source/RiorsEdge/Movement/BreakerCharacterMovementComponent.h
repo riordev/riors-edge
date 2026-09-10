@@ -548,6 +548,30 @@ public:
     // impact speed. 1.0 up to HeavyFallSpeed, then a linear ramp to
     // MinimumScale at MaxFallSpeed, clamped.
     static float LandingSpeedScale(float ImpactSpeed, float HeavyFallSpeed, float MaxImpactSpeed, float MinimumScale);
+    // The planar speed a landing actually leaves behind, and the reason it is
+    // a function: a queued slide used to be EXEMPT from the landing cost
+    // entirely, so crouch held in the air paid no toll at any fall speed. The
+    // stated intent was never an exemption — it was that the scrub must not
+    // drop the player under SlideEntrySpeed and silently eat the slide, which
+    // is a FLOOR. So the scrub applies and the floor catches it.
+    //
+    // THE FLOOR CANNOT LIFT. It is clamped to the speed the player arrived
+    // with, because a floor that raised a slow landing would hand out free
+    // speed for holding crouch — the same thing the exemption did, upside
+    // down.
+    static float LandedPlanarSpeed(float EntrySpeed, float Scale, bool bSlideOwnsLanding, float SlideEntrySpeed);
+    // THE SLIDING SPEED CAP, and the point of extracting it is the SIGNATURE:
+    // there is no velocity term, so the cap can no longer read back the speed
+    // it is supposed to be capping. It used to be
+    // max(SprintSpeed * mult, Velocity.Size2D()), which made every slide its
+    // own ceiling. The earned-speed term is the decaying BoostedSpeedCeiling
+    // the grounded cap already uses, so a dash entry still slides fast and
+    // still converges.
+    static float SlidingSpeedCap(float SprintSpeed, float SlideMultiplier, float BoostedCeiling);
+    // How far the -BreakerMoveTrace high-drop probe lifts the body before
+    // letting it fall. Sized to clear LandingHeavyFallSpeed comfortably under
+    // the fall curve; a DEV INSTRUMENT constant, never a gameplay number.
+    static constexpr float MoveTraceDropHeightCm = 900.0f;
 
 private:
     bool IsOwnerStaggered() const;
