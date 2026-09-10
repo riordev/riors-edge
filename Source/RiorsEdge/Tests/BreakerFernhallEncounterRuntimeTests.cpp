@@ -181,7 +181,16 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
         // first contract's elite objective counts, and it has to stay exactly
         // one; the depot's is the rank the deepest yard carries, and it is two
         // seams away from anything the contract measures.
-        TestEqual(TEXT("Two ranked outdoor bodies, one per ranked yard"), Elites, 2);
+        // FOUR, AND THE NUMBER IS THE QUEST'S. Quest.Pattern asks for three
+        // marked kills and its objective is elite-gated, so the world has to
+        // stand at least three where the player will meet them or the counter
+        // reaches 2 of 3 and stops — which is what "quest marked enemies are
+        // still bugged" actually was. One in the entry yard, TWO in the
+        // substation, one in the depot: three before the deepest seam and a
+        // fourth past it. Assert the RELATIONSHIP as well as the figure, so a
+        // future population change that drops below the quest fails here.
+        TestEqual(TEXT("Four ranked outdoor bodies"), Elites, 4);
+        TestTrue(TEXT("and enough of them for the marked-kill contract"), Elites >= 3);
         TestEqual(TEXT("The depot carries exactly one of them"), DepotElites, 1);
         TestEqual(TEXT("and a Warden to anchor its set piece"), DepotWardens, 1);
         TestEqual(TEXT("Nine bodies stand in the third yard"), DepotBodies, 9);

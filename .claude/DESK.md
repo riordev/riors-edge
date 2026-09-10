@@ -219,6 +219,19 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 ## Known issues to time-box
 
 - WARDEN WALK-THROUGH: FIXED, and the parked fixture was never the obstacle. The arrival ring lived in exactly one place, ABreakerEnemy::TickEngagedBehaviour, and ABreakerWardenEnemy::TickEngagedBehaviour replaces that function WHOLESALE without ever calling Super — so it wrote a full-speed vector straight at the player and fell off the end of the function with it intact whenever neither attack was armed. Nothing downstream re-added spacing, by design: the mover has no stop distance while steering because the ring "is always the behaviour's to govern, never the path's". The pass-through is the project's own recorded consequence of the player being a Pawn. The ring is now an extracted method every closing archetype CALLS rather than inherits, so an override cannot silently drop it. Base behaviour is bit-identical; only the Warden changes. Verified: the Boss is the sole override that calls Super, and ArrivalBand is written in exactly one statement, so no fourth class was affected. THE WIRING PIN IS NOW LANDED (RiorsEdge.Combat.Warden.ArrivalRingRuntime) AND THE RECORDED ANSWER WAS WRONG: a bare AActor can never be the target, because IsEligibleThreatTarget (BreakerEnemy.cpp:851) refuses anything that is not an ABreakerCharacter or an ABreakerDeployable with a live combat component, so it is never SELECTED and the engaged tick never runs against it. ResolveSweep/ResolveSlam bailing is true and irrelevant. The fixture uses a real character at its shipped 100 health and grants it nothing: neither attack is ever armed, because the approach leg runs entirely outside SlamRadiusCm (650) and asserts both that it stayed there and that the health is untouched. Leg order is load-bearing — closing inside slam radius arms a 0.9s wind-up that plants the body on every later frame. FIXED AT THE SITE AND DELIBERATELY NOT PINNED: the same override wrote StateLabel = ADVANCE AFTER the ring call, clobbering the ring's own ATTACK/BACK OFF, so a Warden holding station or backing off printed ADVANCE on the playtest HUD. The label now precedes the call as the base chase does; the state is reachable only with both attacks on cooldown, which a damage-free fixture cannot reach.
+- QUEST-MARKED ENEMIES: THE BUG WAS ARITHMETIC, AND THE DESK'S EARLIER READING
+  WAS HALF WRONG. It said the owner was mistaking ordinary elites for quest
+  ones. Elites ARE the quest ones — Quest.Pattern's objective is elite-gated —
+  and they ARE marked: the rank paint washes them amber and they carry a bar
+  above trash. The defect is that the quest asks for THREE marked kills and the
+  world stood TWO, so the counter reached 2 of 3 and stopped, which reads
+  exactly like a broken quest.
+  Two more elites, both in the SUBSTATION: three are met before the depot and a
+  fourth waits past it. Nothing went into the entry yard, because a cleared
+  entry yard has to stay under the 279 XP that reaches level two and an elite is
+  worth more than a Skitter. Measured: entry clear still 207.
+  The encounter test asserts the RELATIONSHIP as well as the count now, so a
+  population change that drops below what the contract asks fails and says why.
 - WEAK POINTS: THE SOCKET HALF ALREADY SHIPPED; THE DRAWING IS WHAT CHANGED.
   Owner: "find a way to fix the critical spots to the models so they dont just
   have random circles coming out of them". The sphere has ridden the Head bone

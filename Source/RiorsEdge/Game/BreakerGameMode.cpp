@@ -4472,7 +4472,9 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
         if (Pocket == 2)
         {
             for (int32 Index = 0; Index < Roster.Wardens; ++Index) Spawn(ABreakerWardenEnemy::StaticClass(), false);
-            for (int32 Index = 0; Index < 2; ++Index) Spawn(ABreakerEnemy::StaticClass(), false);
+            // ONE OF THE TWO FLANKERS CARRIES A RANK. See the note at pocket 4:
+            // Quest.Pattern asks for three marked kills and the world stood two.
+            for (int32 Index = 0; Index < 2; ++Index) Spawn(ABreakerEnemy::StaticClass(), Index == 0);
             for (int32 Index = 0; Index < Roster.Skirmishers; ++Index) Spawn(ABreakerSkirmisherEnemy::StaticClass(), false);
         }
         // The second wave's melee, split between the two yards' quiet halves.
@@ -4487,9 +4489,24 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
         // wave keeps the pacing the campaign was tuned against while still
         // nearly doubling what stands in the world. Owner-ruled. O2.
         const int32 PerQuietPocket = Second.Skitters / 4;
+        // QUEST.PATTERN ASKS FOR THREE MARKED KILLS AND THE WORLD STOOD TWO.
+        // That is the owner's "quest marked enemies are still bugged", and the
+        // desk's earlier reading — that he was mistaking ordinary elites for
+        // quest ones — was only half of it. Elites ARE the quest ones (the
+        // objective is elite-gated) and they ARE marked: the rank paint puts an
+        // amber wash on them and they carry a bar above trash. The defect is
+        // arithmetic. One elite stood in the entry yard and one in the depot,
+        // so the counter could reach 2 of 3 and stop, which reads exactly like
+        // a broken quest.
+        //
+        // Two more, both in the SUBSTATION: it is the yard between the two, so
+        // three are met before the depot and a fourth waits past it. Nothing
+        // went into the ENTRY yard, because a cleared entry yard has to stay
+        // under the 279 XP that reaches level two and an elite is worth more
+        // than a Skitter.
         if (Pocket == 3 || Pocket == 4 || Pocket == 5 || Pocket == 7)
             for (int32 Index = 0; Index < PerQuietPocket; ++Index)
-                Spawn(ABreakerEnemy::StaticClass(), false);
+                Spawn(ABreakerEnemy::StaticClass(), Pocket == 4 && Index == 0);
         if (Pocket == 6)
         {
             // THE DEPOT'S SET PIECE. A yard reached through two seams that held
