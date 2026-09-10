@@ -1,5 +1,82 @@
 # Desk — next playtest
 
+## OWNER PLAYTEST, 2026-09-10 — READ THIS BEFORE PLANNING ANYTHING
+
+The owner played 9b64906e and the verdict is not about any feature landed this
+session. It is that the game reads as a TEST ENVIRONMENT rather than as Rior's
+Edge, and that breadth is outrunning proven fun. His words: "The project may be
+expanding breadth faster than it proves fun ... I would be wary of adding many
+more systems before one 20-30 minute route feels excellent."
+
+THE STANDING INSTRUCTION THAT FOLLOWS FROM IT: no new systems until one route
+feels excellent. Prefer DELETION and polish over addition. A cycle that adds a
+mechanic needs a reason that survives that sentence.
+
+He also names three risks worth keeping in front of the seat:
+- Automated proof as a SUBSTITUTE. Tests cannot establish weapon satisfaction,
+  movement flow, encounter rhythm, spatial readability, reward excitement, or
+  whether a build choice feels transformative. Activity is still oriented
+  toward what can be asserted.
+- Maintainability. ~189k lines of C++; BreakerMenu.cpp ~615 KB,
+  BreakerGameMode.cpp ~272 KB, several more at 150-220 KB. Splitting by owner
+  is already a legitimate work item (lanes.md says so at 3,000 lines).
+- Scope. Campaign, seven destinations, 34 abilities, coop networking and
+  generated rifts are all competing for one slice's attention.
+
+### HUD, and he calls these "little shit that makes things feel bad"
+
+- "SKILL 1" prints above the ability on E. Delete the label.
+- RELOADING draws as giant centred text (BreakerPlaytestHUD.cpp:505) while an
+  animation already says it. Delete the callout; the magazine rail already
+  turns orange and fills (884-918).
+- DAMAGE appears when the player TAKES damage. Not wanted at all.
+- The reticle is rough, and the gun bounces around the crosshair awkwardly.
+- XP IS NOWHERE ON THE HUD. Checked: BreakerPlaytestHUD.cpp has no experience
+  readout of any kind.
+- "i dont know what weapon is in my hand". The weapon name exists but ONLY as a
+  swap slide (944-950): it animates in on a swap and then leaves. There is no
+  resting weapon identity.
+- Quest text top-right is ugly ("PUT THE MARKED ONES DOWN 0/3").
+- A MINIMAP IS NEEDED.
+- The top-left dev bar (F1 RESET / F2 REPORT / F3 DIAGNOSTICS / ESC MENU,
+  BreakerPlaytestHUD.cpp:580) is ugly and half of what it offers is no longer
+  relevant.
+- The health/resource cluster bottom-left reads cluttered in his frames: the
+  big number overlaps a small duplicate of itself and a second figure.
+
+### Audio
+
+- The character GROANS when taking damage. Remove it. "so fucking annoying".
+- Footsteps, same verdict (Audio/BreakerFootstepComponent ->
+  ABreakerSoundDirector::PlayFootstep).
+- "my gun sounds like a nerf gun".
+
+### Items
+
+- Inventory clutter is "so ugly".
+- GEAR NAMES ARE WRONG. THREE WORDS MAXIMUM. His scheme, verbatim: "assign a
+  special word per prefix then item type then affix with a quirky name". So the
+  O267 grammar stays but the WORDS stop being raw affix display names —
+  "Movement Speed BOOTS of Ailment Avoidance" is the failure case, from his own
+  frame. This is the authored-flavour-words data pass O267 always named, plus a
+  hard three-word ceiling the naming rule must enforce rather than hope for.
+
+### Kit
+
+- "all of the abilities just feel so irrelevant and unfun at the start". This is
+  the starter experience, not a tuning number.
+
+### Movement
+
+- Needs subtle polish and a SLIGHT INCREASE IN SPEED. Note this arrives after
+  the landing/slide repairs landed, so it may be a reading of those.
+
+### Codebase
+
+- "a lot of the codebase also might just need large QoL and deletions on things
+  that arent relevant anymore at all".
+
+
 ## Working scope
 
 Continue validated blocks until the owner returns. Prioritize playable changes for the next large playtest. Investigate an individual bug for at most five minutes, then record its evidence and park the affected change if unresolved. Independent agents stage on disjoint files; one engine build/suite runs at a time. Every landed block follows BUILD → SUITE → Scripts/status.py → COMMIT → PUSH. Larger changes receive independent review. Never count placeholders or pure-maths tests as complete gameplay.
