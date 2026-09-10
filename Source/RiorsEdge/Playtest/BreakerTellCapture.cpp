@@ -10,6 +10,7 @@
 #include "Combat/BreakerModifierComponent.h"
 #include "Combat/BreakerRangedEnemy.h"
 #include "Engine/World.h"
+#include "Game/BreakerPocketRift.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 #include "Misc/CommandLine.h"
@@ -145,5 +146,69 @@ void BreakerScheduleBlastCapture(UWorld* World)
         Body->FindComponentByClass<UBreakerCombatComponent>()->ReceiveDamage(Kill);
         UE_LOG(LogTemp, Display, TEXT("[BlastCapture] fuse lit=%d remaining=%.1fs radius=%.0fcm"),
             Fuse->IsFuseLit() ? 1 : 0, Fuse->GetFuseRemainingSeconds(), Fuse->Params.VolatileOuterRadiusCm);
+    }), 1.0f, false);
+}
+
+// ---------------------------------------------------------------------------
+// THE POCKET TEAR. Placed 750 cm BEHIND each formation, which is the right
+// place for it and the wrong place to photograph it from: the ordinary
+// Fernhall route never gets past the fight to see one. So this walks the
+// player to the nearest tear, faces it, and flares it on a loop — the frames
+// then carry both states and the difference between them is the thing being
+// judged.
+// ---------------------------------------------------------------------------
+void BreakerSchedulePocketRiftCapture(UWorld* World)
+{
+    if (!World || !FParse::Param(FCommandLine::Get(), TEXT("BreakerCapturePocketRift"))) return;
+    FTimerHandle Setup;
+    World->GetTimerManager().SetTimer(Setup, FTimerDelegate::CreateWeakLambda(World, [World]()
+    {
+        auto* Controller = World->GetFirstPlayerController();
+        auto* Player = Controller ? Cast<ABreakerCharacter>(Controller->GetPawn()) : nullptr;
+        if (!Player || !Player->HasAuthority()) return;
+        Player->ResumeFromMenu();
+        // The tears are behind live fights. Freezing the bodies keeps the frame
+        // about the tear rather than about whatever reached the player first.
+        for (TActorIterator<ABreakerEnemy> It(World); It; ++It) It->SetActorTickEnabled(false);
+
+        ABreakerPocketRift* Nearest = nullptr;
+        double Best = TNumericLimits<double>::Max();
+        int32 Found = 0;
+        for (TActorIterator<ABreakerPocketRift> It(World); It; ++It)
+        {
+            ++Found;
+            const double Distance = FVector::DistSquared(It->GetActorLocation(), Player->GetActorLocation());
+            if (Distance < Best) { Best = Distance; Nearest = *It; }
+        }
+        if (!Nearest)
+        {
+            UE_LOG(LogTemp, Error, TEXT("[PocketRiftCapture] no tear exists in this world."));
+            return;
+        }
+        // In FRONT of it, which is the side a body walks out toward, and far
+        // enough back that the whole 280 cm tear is in frame with ground under
+        // it. The actor's forward is the walk direction, so standing along it
+        // is standing where the player would be when the patrol arrives.
+        const FVector Stand = Nearest->GetActorLocation()
+            + Nearest->GetActorForwardVector() * 620.0f + FVector(0.0f, 0.0f, 120.0f);
+        Player->SetActorLocation(Stand, false, nullptr, ETeleportType::TeleportPhysics);
+        FVector Eye; FRotator View;
+        Controller->GetPlayerViewPoint(Eye, View);
+        Controller->SetControlRotation(
+            (Nearest->GetActorLocation() + FVector(0.0f, 0.0f, 140.0f) - Eye).Rotation());
+        if (Controller->PlayerCameraManager) Controller->PlayerCameraManager->UpdateCamera(0.05f);
+
+        UE_LOG(LogTemp, Display,
+            TEXT("[PocketRiftCapture] %d tears; nearest at %s with %d segments; standing at %s"),
+            Found, *Nearest->GetActorLocation().ToString(), Nearest->SegmentCount(), *Stand.ToString());
+
+        // On a loop, so consecutive frames land on different parts of the
+        // flare rather than all four catching the same instant.
+        TWeakObjectPtr<ABreakerPocketRift> Watched = Nearest;
+        FTimerHandle Pulse;
+        World->GetTimerManager().SetTimer(Pulse, FTimerDelegate::CreateWeakLambda(World, [Watched]()
+        {
+            if (ABreakerPocketRift* Tear = Watched.Get()) Tear->Flare();
+        }), 2.5f, true, 1.5f);
     }), 1.0f, false);
 }

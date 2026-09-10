@@ -36,17 +36,13 @@ measurement without judging it.
 
 ## Tests
 
-- passing: 877
+- passing: 879
 - expected red: 3
-- **unexpected red: 1**
+- **unexpected red: 0**
 - asserted invariants with no test: 35
 
 Expected-red, unexpected-red and unimplemented are three different states.
 A test that was never written is the worst of the three: it looks asserted.
-
-**Unexpected red**
-
-- `RiorsEdge.Abilities.MultispellPurchasedRuntime`
 
 **Expected red**
 

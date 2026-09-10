@@ -1,5 +1,6 @@
 #include "Game/BreakerGameMode.h"
 #include "Game/BreakerRepopulationMath.h"
+#include "Game/BreakerPocketRift.h"
 #include "Game/BreakerPrototypeDestinations.h"
 #include "Game/BreakerCoopCombatTest.h"
 #include "GameFramework/PawnMovementComponent.h"
@@ -881,6 +882,7 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
         BreakerScheduleFeedstockCapture(GetWorld());
         BreakerScheduleTellCapture(GetWorld());
         BreakerScheduleBlastCapture(GetWorld());
+        BreakerSchedulePocketRiftCapture(GetWorld());
         ScheduleScreenshots();
         UE_LOG(LogTemp, Log, TEXT("[BreakerMap] fernhall — %s."),
             bRiftInstance ? TEXT("RIFT INSTANCE, waves live") : TEXT("the yard, no gym field"));
@@ -4203,6 +4205,14 @@ ABreakerEnemy* ABreakerGameMode::RefillOutdoorSlot(FBreakerOutdoorSlot& Slot)
     UBreakerKillTelemetryComponent::AttachTo(Patrol);
     // The same protection every other arrival gets.
     Patrol->GrantEmergenceWindow();
+    // AND THE TEAR ANSWERS. The flare is fired here rather than on the tick
+    // that decided the slot was due, because this is the first line at which a
+    // body definitely exists: the overlap test above refuses and returns, and a
+    // rift that flashed for a refusal would be lying about what came through.
+    if (ABreakerPocketRift* Tear = Slot.Rift.Get())
+    {
+        Tear->Flare();
+    }
     Slot.Occupant = Patrol;
     Slot.EmptySeconds = 0.0f;
     return Patrol;
@@ -4272,6 +4282,9 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
             + Right * Laterals[Pocket];
         const int32 AreaLevel = UBreakerZoneBuilder::FernhallRiftFor(Yards[Pocket]).EffectiveAreaLevel();
         TArray<ABreakerEnemy*> PocketMembers;
+        // Where this pocket's slots start, so the tear placed below can reach
+        // exactly the bodies it is the source of and no others.
+        const int32 SlotFirst = OutdoorSlots.Num();
         int32 Placement = 0;
         auto Spawn = [&](TSubclassOf<ABreakerEnemy> Class, bool bElite)
         {
@@ -4407,6 +4420,69 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
                 else UE_LOG(LogTemp, Error, TEXT("[Fernhall] cache approach is obstructed."));
             }
             else UE_LOG(LogTemp, Error, TEXT("[Fernhall] cache has no walkable floor."));
+        }
+
+        // ---- WHERE THIS POCKET'S PATROLS COME BACK FROM --------------------
+        // O268 gave the world a return and left it ILLEGIBLE: a body resolved
+        // into existence standing on its post. The desk's answer was authored
+        // mouths — doors, gaps, building openings — and its own finding is that
+        // the composed yard has none, and that authoring five is a composer job
+        // rather than a code one. A tear needs no geometry, works on any
+        // ground, and is a better sentence about Fernhall than a door would be.
+        //
+        // BEHIND THE FORMATION, not beside it. The bodies are placed facing
+        // -Forward because that is where the player comes from, so +Forward is
+        // the far side of the fight: a patrol steps out of the tear with its
+        // back to open ground and walks toward the post, which is the walk the
+        // player is supposed to see. The offset clears the widest formation
+        // (three rows at 300 cm) with room left.
+        //
+        // NO TEAR, NO ARRIVAL, DELIBERATELY. If the ground fails its trace or
+        // the actor cannot spawn, the slots keep the shipped O268 behaviour and
+        // the body appears at its post. An arrival point with nothing standing
+        // at it would be strictly WORSE than that — a body popping into open
+        // ground away from its post — so the two are coupled.
+        if (OutdoorSlots.Num() > SlotFirst)
+        {
+            constexpr float PocketRiftOffsetCm = 750.0f;   // O2 PLACEHOLDER
+            const FVector Desired = Center + Forward * PocketRiftOffsetCm;
+            FHitResult Ground;
+            FCollisionQueryParams RiftQuery(SCENE_QUERY_STAT(FernhallPocketRiftFloor), false);
+            ABreakerPocketRift* Tear = nullptr;
+            if (World->LineTraceSingleByObjectType(Ground, Desired + FVector(0, 0, 3000),
+                    Desired - FVector(0, 0, 3000), FCollisionObjectQueryParams(ECC_WorldStatic), RiftQuery)
+                && Ground.ImpactNormal.Z >= 0.7f)
+            {
+                FActorSpawnParameters RiftParameters;
+                RiftParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+                // Facing the way a body leaving it walks, which is also the way
+                // the player arrives: the tear is flat, so it has a front.
+                Tear = World->SpawnActor<ABreakerPocketRift>(ABreakerPocketRift::StaticClass(),
+                    Ground.ImpactPoint, (-Forward).Rotation(), RiftParameters);
+            }
+            if (Tear)
+            {
+                for (int32 Index = SlotFirst; Index < OutdoorSlots.Num(); ++Index)
+                {
+                    FBreakerOutdoorSlot& Slot = OutdoorSlots[Index];
+                    const ABreakerEnemy* Template = Slot.Class ? GetDefault<ABreakerEnemy>(Slot.Class) : nullptr;
+                    const UCapsuleComponent* Capsule = Template
+                        ? Template->FindComponentByClass<UCapsuleComponent>() : nullptr;
+                    if (!Capsule) continue;
+                    // A capsule CENTRE, matching what Home holds — the refill
+                    // spawns at this point and overlap-tests a capsule around
+                    // it, so a floor point here would bury every arrival.
+                    Slot.Arrival = Ground.ImpactPoint
+                        + FVector(0.0f, 0.0f, Capsule->GetScaledCapsuleHalfHeight() + 2.0f);
+                    Slot.bHasArrival = true;
+                    Slot.Rift = Tear;
+                }
+            }
+            else
+            {
+                UE_LOG(LogTemp, Display,
+                    TEXT("[Fernhall] pocket %d has no ground for a tear; its patrols return to their posts."), Pocket);
+            }
         }
     }
     UE_LOG(LogTemp, Display, TEXT("[Fernhall] %d finite outdoor enemies placed across %d pockets; no wave controller."), Spawned, PocketCount);

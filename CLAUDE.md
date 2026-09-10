@@ -106,7 +106,8 @@ plus switches: `-BreakerAutoPlay[=Anchor|Gym|Fernhall]`, `-BreakerScreenshots=N`
 `-BreakerCaptureMenu=<SCREEN>`, `-BreakerCaptureBoard=<BOARD>`,
 `-BreakerCaptureTour`, `-BreakerCaptureHUD` (false-negative on damage-number
 aggregation — read that through `RiorsEdge.UI.Damage.Aggregation`),
-`-BreakerCycleWeapons=<s>`, `-BreakerBossOnStart`. The harness cannot move a
+`-BreakerCycleWeapons=<s>`, `-BreakerBossOnStart`,
+`-BreakerCaptureBlast`, `-BreakerCapturePocketRift`. The harness cannot move a
 mouse: hover, tooltip and zoom states are unverifiable by it.
 
 ## Machines

@@ -210,6 +210,30 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 ## Known issues to time-box
 
 - WARDEN WALK-THROUGH: FIXED, and the parked fixture was never the obstacle. The arrival ring lived in exactly one place, ABreakerEnemy::TickEngagedBehaviour, and ABreakerWardenEnemy::TickEngagedBehaviour replaces that function WHOLESALE without ever calling Super — so it wrote a full-speed vector straight at the player and fell off the end of the function with it intact whenever neither attack was armed. Nothing downstream re-added spacing, by design: the mover has no stop distance while steering because the ring "is always the behaviour's to govern, never the path's". The pass-through is the project's own recorded consequence of the player being a Pawn. The ring is now an extracted method every closing archetype CALLS rather than inherits, so an override cannot silently drop it. Base behaviour is bit-identical; only the Warden changes. Verified: the Boss is the sole override that calls Super, and ArrivalBand is written in exactly one statement, so no fourth class was affected. THE WIRING PIN IS NOW LANDED (RiorsEdge.Combat.Warden.ArrivalRingRuntime) AND THE RECORDED ANSWER WAS WRONG: a bare AActor can never be the target, because IsEligibleThreatTarget (BreakerEnemy.cpp:851) refuses anything that is not an ABreakerCharacter or an ABreakerDeployable with a live combat component, so it is never SELECTED and the engaged tick never runs against it. ResolveSweep/ResolveSlam bailing is true and irrelevant. The fixture uses a real character at its shipped 100 health and grants it nothing: neither attack is ever armed, because the approach leg runs entirely outside SlamRadiusCm (650) and asserts both that it stayed there and that the health is untouched. Leg order is load-bearing — closing inside slam radius arms a 0.9s wind-up that plants the body on every later frame. FIXED AT THE SITE AND DELIBERATELY NOT PINNED: the same override wrote StateLabel = ADVANCE AFTER the ring call, clobbering the ring's own ATTACK/BACK OFF, so a Warden holding station or backing off printed ADVANCE on the playtest HUD. The label now precedes the call as the base chase does; the state is reachable only with both attacks on cooldown, which a damage-free fixture cannot reach.
+- POCKET ARRIVAL TEARS: LANDED, AND THE ARRIVAL FICTION IS NOW WHOLE. All five
+  yard pockets have a small rift 750 cm behind the formation — a ragged vertical
+  lens of dashed segments on the additive glow, teal because teal is
+  canon-reserved for rift objects — and every slot in a pocket arrives out of it
+  and walks to its post on the shipped patrol path. It flares on the frame a
+  body comes through and eases out over 1.6 s. Photograph it with
+  -BreakerCapturePocketRift; the ordinary Fernhall route never gets behind a
+  fight to see one. THREE DEFECTS THE CAPTURE FOUND AND REASONING DID NOT, one
+  of which is a trap for every future in-world visual: (1) Sin(PI) in single
+  precision is -8.7e-8, so a fractional Pow of it is NaN and the tear's top
+  point NaN'd every segment touching it; (2) A MATERIAL MUST DECLARE
+  MATUSAGE_InstancedStaticMeshes TO DRAW ON AN INSTANCED COMPONENT — probed:
+  /Engine/EngineMaterials/EmissiveMeshMaterial (the additive glow every tracer
+  and beacon uses) does NOT, /Engine/BasicShapes/BasicShapeMaterial (which the
+  blast ring uses) DOES, which is exactly why the first tear photographed SOLID
+  BLACK while the blast ring drew orange from the same shape. So instancing and
+  additive light are mutually exclusive with the engine content in this tree;
+  the tear is 27 plain mesh components because it has to read as light; (3) a
+  clean lens with three level bars reads as an EMBLEM, not a tear — the edge now
+  wanders on a deterministic hash and the fractures are slanted and lopsided.
+  STILL OWED: the flare fires AT the spawn, not before it, so nothing warns the
+  player a body is coming; a lead-in needs the refill split into two stages. No
+  audio cue. The courtyard keeps its authored doorway and gets no tear, which is
+  right — it is the one pocket with real geometry to walk out of.
 - ARRIVAL FICTION: THE COURTYARD HALF IS LANDED. Its roster was DISCARDED at its call site, so the one pocket with an authored doorway was the only one that never repopulated. The slots register now and a returning patrol appears at the bay mouth, faces its post and walks there on the shipped patrol path (ConfigureEncounter makes the post the leash origin). The clearance gate reads where the body APPEARS rather than where it is going, which is the honest reading of the rule it encodes. The pocket tag is carried on the slot instead of being printed back from an int, which could not express the courtyard's own tag. STILL OWED: the other four pockets have nothing to arrive from — authoring mouths across the yard is a composer job — and no arrival VFX or audio cue exists, though the pooled primitives that would draw one without art do.
 
 - ARRIVAL FICTION, THE ORIGINAL SCOUT: SCOUTED, PLAN READY, NOT BUILT, and the reason is geometry rather than plumbing. Both arrival sites are single-line location decisions already fed a point by their caller (RefillOutdoorSlot spawns at Slot.Home; AcquirePooledEnemy at the SpawnLocation passed to it), so an emergence point needs NO new plumbing to reach them. The distance half is already engineered and honest too: the wave solve places its arena through SolveContainedSpawnCentre against an authored band and LOGS when the yard cannot hold it. What is missing is something to come OUT of. The composed Fernhall contains no door, gap or opening usable as an arrival point except two seam mouths (compose_fernhall.py:97-98, 155-157), which are walked routes; every other wall_* piece is a solid abutting slab. ONE REAL DOORWAY SHIPS AND IS ALREADY BUILT: BreakerFernhallCourtyard::MakePlan/Build replaces a perimeter piece with an 8m x 7m bay of shoulders and lintel (BreakerFernhallCourtyardBuilder.cpp:145-147), it is in the shipped yard (BreakerZoneBuilder.cpp:685-686), and its transform comes from a pure function the game mode already calls. Door_Metal art is committed, placed in four builders and asserted by a test. No portal, spawner or ingress actor exists; ABreakerRiftDoor is a player travel point and is NOT reusable. No arrival VFX or audio cue exists, but the pooled primitive vocabulary that would draw one without art does (ABreakerEffectRenderer AddGlow/AddStroke/AddBlinkLight) and GROUND is already a named consumer. NO FRUSTUM OR VIEW TEST EXISTS ANYWHERE in the project, so the repopulation clearance gate is a plain distance where it could be a view test. THE CYCLE WHEN IT COMES: register the courtyard roster as slots (it is discarded at its call site today and registers none, a gap this session opened) and give that pocket the doorway as its arrival point, walking the body out of the bay. Do NOT build a general arrival-point system first: for four of five pockets there is nothing to arrive from, and authoring mouths across the yard is a composer job, not a code one.
@@ -276,7 +300,7 @@ Opt-in fixed-Fernhall cooperative sandbox exists: distinct transient Swift profi
 
 ## Latest validated baseline
 
-Current local build/full suite: 878 passing, 3 expected failures, 0 unexpected; native census refreshed for54 quest flags and current ability declarations. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
+Current local build/full suite: 879 passing, 3 expected failures, 0 unexpected; native census refreshed for54 quest flags and current ability declarations. Completed historical work lives in git; this queue lists pending work rather than replaying earlier sessions.
 
 ## Playtest handoff
 

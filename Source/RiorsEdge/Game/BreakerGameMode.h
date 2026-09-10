@@ -557,6 +557,12 @@ private:
         // at the player's shoulder must still be refused. The walk from the
         // doorway to the post is the part the player is supposed to see.
         FVector AppearsAt() const { return bHasArrival ? Arrival : Home; }
+        // THE TEAR THIS POCKET'S PATROLS COME OUT OF, when one could be placed.
+        // Cosmetic and nullable by design: a pocket whose arrival ground failed
+        // its floor trace keeps the O268 behaviour exactly — a body appears at
+        // its post — rather than losing its repopulation because a visual was
+        // unavailable.
+        TWeakObjectPtr<class ABreakerPocketRift> Rift;
         // The body standing in it, or nothing. A slot is empty when its
         // occupant is gone OR dead: a corpse still lying in the pocket has
         // already stopped being a fight.
