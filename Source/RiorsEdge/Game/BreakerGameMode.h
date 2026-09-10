@@ -361,7 +361,16 @@ public:
     // Both values are EditAnywhere so a playtest can sweep the curve without a
     // recompile. Area level also drives drop item level, which is the mechanism
     // that makes rising item level correspond to gameplay.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Area", meta=(ClampMin="1", ClampMax="100")) int32 GymAreaLevel = 1;   // O2 PLACEHOLDER
+    // THE LEVEL THE SANDBOX FIELDS, and it follows the SHIPPED KIT. It was 1
+    // because the starter rifle was item level 1; the owner has ruled the
+    // starter up to the level of the yard it is issued for, so a gym still at
+    // area 1 would measure the kit against content no player ever meets it in
+    // — the boss fell to 17.0s against O18's 20s floor, which is the sandbox
+    // reporting that it had stopped matching the game.
+    //
+    // O2 PLACEHOLDER, and moved because its input moved by ruling — not to
+    // make a red go green.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Area", meta=(ClampMin="1", ClampMax="100")) int32 GymAreaLevel = 5;   // O2 PLACEHOLDER
 
     // Logs what the gym built, so a headless smoke run can prove the
     // encounter spawned rather than merely that the process started.

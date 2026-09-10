@@ -3,6 +3,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Combat/BreakerMonsterChassis.h"
+#include "Items/BreakerEquipmentComponent.h"
 #include "Game/BreakerZoneBuilder.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Weapons/BreakerWeaponMath.h"
@@ -70,8 +71,12 @@ bool FBreakerUnderLevelledTest::RunTest(const FString& Parameters)
     };
 
     // The gear a player is actually carrying when they first reach the entry
-    // yard: the starter rifle, which is item level 1. Nothing has dropped yet.
-    constexpr int32 StarterItemLevel = 1;
+    // yard: the starter rifle itself, READ FROM THE SHIPPED ITEM rather than
+    // restated. A diagnostic that keeps printing a number the game no longer
+    // issues is worse than no diagnostic — this one said "starter i1" for one
+    // run after the owner ruled the starter up, which is exactly the drift it
+    // exists to catch in everything else.
+    const int32 StarterItemLevel = UBreakerEquipmentComponent::MakeStarterRifle().ItemLevel;
     for (const FStop& Stop : Stops)
     {
         const int32 OnLevel = UBreakerMonsterChassisLibrary::GetDropItemLevel(Stop.AreaLevel);
@@ -79,8 +84,8 @@ bool FBreakerUnderLevelledTest::RunTest(const FString& Parameters)
         const float Starter = BreakerUnderLevelledShotsToKill(StarterItemLevel, Stop.AreaLevel, Params);
         const float Penalty = Geared > UE_SMALL_NUMBER ? Starter / Geared : 0.0f;
         AddInfo(FString::Printf(
-            TEXT("UNDER-LEVELLED  %-20s area %3d | on-level gear i%-3d %5.1f shots | starter i1 %6.1f shots | %5.1fx"),
-            Stop.Name, Stop.AreaLevel, OnLevel, Geared, Starter, Penalty));
+            TEXT("UNDER-LEVELLED  %-20s area %3d | on-level gear i%-3d %5.1f shots | starter i%-2d %6.1f shots | %5.1fx"),
+            Stop.Name, Stop.AreaLevel, OnLevel, Geared, StarterItemLevel, Starter, Penalty));
 
         // ON-LEVEL GEAR HOLDS ITS TIME-TO-KILL. This is the composition test's
         // claim, re-asserted here against the campaign's OWN stops rather than
@@ -110,6 +115,15 @@ bool FBreakerUnderLevelledTest::RunTest(const FString& Parameters)
             TEXT("UNDER-LEVELLED  starter gear costs %.1fx as many shots in the Breach as in the entry yard"),
             Ratio));
         TestTrue(TEXT("the deepest content is harder in starter gear than the shallowest"), Ratio > 1.0f);
+
+        // AND THE STARTER IS ON-CURVE FOR THE YARD IT IS ISSUED IN. Owner-ruled
+        // ("lets just raise the damage of the starter rifle"): the first fight
+        // in the game used to cost 23.9 shots against the 16.9 that on-level
+        // gear pays everywhere else. If the entry yard's level is ever retuned
+        // and the starter is not, this is where it says so.
+        const int32 EntryOnLevel = UBreakerMonsterChassisLibrary::GetDropItemLevel(Stops[0].AreaLevel);
+        TestEqual(TEXT("the starter rifle is on-level for the yard it is issued in"),
+            StarterItemLevel, EntryOnLevel);
     }
     return true;
 }

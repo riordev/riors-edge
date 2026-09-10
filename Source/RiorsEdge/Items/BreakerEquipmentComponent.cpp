@@ -1,4 +1,5 @@
 #include "Items/BreakerEquipmentComponent.h"
+#include "Combat/BreakerMonsterChassis.h"
 #include "Data/BreakerStrings.h"
 
 #include "Items/BreakerItemRequirements.h"
@@ -55,18 +56,39 @@ void UBreakerEquipmentComponent::BeginPlay()
 
 const FName UBreakerEquipmentComponent::StarterRifleDefinitionId(TEXT("IssueRifle"));
 
+// THE AREA THE CAMPAIGN ISSUES THIS RIFLE FOR. Fernhall's entry yard, whose
+// authored level lives in UBreakerZoneBuilder — named here as a constant
+// rather than reached for, because Items/ pulling in the zone builder to read
+// one integer would be a lane crossing for nothing. If the entry yard moves,
+// this moves with it and the test below says so.
+static constexpr int32 BreakerStartingAreaLevel = 5;
+
 FBreakerItemInstance UBreakerEquipmentComponent::MakeStarterRifle()
 {
-    // Standard, ilvl 1, no affixes: "little to no stats" taken at its word.
+    // Standard, no affixes: "little to no stats" still taken at its word — it
+    // rolls nothing, and the first real drop still displaces it through the
+    // ordinary equip path. What changed is its ITEM LEVEL.
+    //
+    // OWNER-RULED: "lets just raise the damage of the starter rifle". It was
+    // item level 1 in a starting yard that drops item level 5, and the whole
+    // power curve is built on those two numbers cancelling — so the first
+    // fight in the game was 1.4x harder than the curve intends, 23.9 shots per
+    // trash body against the 16.9 that on-level gear pays at EVERY area level
+    // (RiorsEdge.Combat.PowerCurve.UnderLevelled).
+    //
+    // DERIVED FROM THE YARD IT STARTS IN rather than picked: the starter is
+    // on-level for the content it is issued for, whatever that content is
+    // retuned to. A number chosen by feel here would drift the moment the
+    // entry yard's level moved.
+    //
     // A real item rather than a phantom archetype, so SyncArchetypesToEquipment
-    // arms it, the save serialises it, and the first real drop displaces it
-    // through the ordinary equip path.
+    // arms it and the save serialises it.
     FBreakerItemInstance Item;
     Item.ItemId = FGuid::NewGuid();
     Item.DefinitionId = StarterRifleDefinitionId;
     Item.Slot = EBreakerEquipSlot::Primary;
     Item.Rarity = EBreakerItemRarity::Standard;
-    Item.ItemLevel = 1;
+    Item.ItemLevel = UBreakerMonsterChassisLibrary::GetDropItemLevel(BreakerStartingAreaLevel);
     Item.WeaponArchetype = EBreakerWeaponArchetype::Rifle;
     return Item;
 }
