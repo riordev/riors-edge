@@ -87,10 +87,17 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
         TArray<ABreakerEnemy*> Enemies;
         int32 CourtyardCount = 0, CourtyardMelee = 0, CourtyardLattices = 0;
         TArray<FVector> PocketCenters;
-        PocketCenters.Init(FVector::ZeroVector, 5);
-        int32 PocketCounts[] = { 0, 0, 0, 0, 0 };
+        PocketCenters.Init(FVector::ZeroVector, 8);
+        int32 PocketCounts[] = { 0, 0, 0, 0, 0, 0, 0, 0 };
         int32 Elites = 0;
         int32 SubstationMelee = 0, SubstationWardens = 0, SubstationSkirmishers = 0, EntryLattices = 0;
+        int32 DepotWardens = 0, DepotElites = 0, DepotBodies = 0;
+        // THE ENTRY YARD ALONE, for the XP pin below. It is read off the body's
+        // own AREA LEVEL rather than off a list of pocket indices, because a
+        // list is what was wrong here before: the loop skipped pocket 2 and
+        // counted pocket 4 — a SUBSTATION fight — as entry-yard XP. A yard's
+        // level is the thing that actually says which yard a body is in.
+        int32 EntryXp = 0;
         ABreakerEnemy* SubstationSkirmisher = nullptr;
         ABreakerEnemy* SubstationWarden = nullptr;
         for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
@@ -102,7 +109,7 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
             TestFalse(TEXT("Outdoor enemy cannot complete a rift"), Enemy->IsRiftTerminator());
             Elites += Enemy->GetMonsterRank() != EBreakerMonsterRank::Trash ? 1 : 0;
             int32 Pocket = INDEX_NONE;
-            for (int32 Index = 0; Index < 5; ++Index)
+            for (int32 Index = 0; Index < 8; ++Index)
                 if (Enemy->Tags.Contains(FName(*FString::Printf(TEXT("Fernhall.Outdoor.%d"), Index)))) Pocket = Index;
             if (!TestTrue(TEXT("Every body belongs to an authored pocket or courtyard"), Pocket != INDEX_NONE || bCourtyard)) return false;
             if (bCourtyard)
@@ -126,6 +133,13 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
                 if (Enemy->IsA<ABreakerWardenEnemy>()) { ++SubstationWardens; SubstationWarden = Enemy; }
                 if (Enemy->IsA<ABreakerSkirmisherEnemy>()) { ++SubstationSkirmishers; SubstationSkirmisher = Enemy; }
             }
+            if (Pocket >= 5)
+            {
+                ++DepotBodies;
+                if (Enemy->IsA<ABreakerWardenEnemy>()) ++DepotWardens;
+                if (Enemy->GetMonsterRank() != EBreakerMonsterRank::Trash) ++DepotElites;
+                TestEqual(TEXT("The depot is the deepest yard and says so"), Enemy->GetAreaLevel(), 13);
+            }
             const UCapsuleComponent* Capsule = Enemy->FindComponentByClass<UCapsuleComponent>();
             if (!TestNotNull(TEXT("Enemy capsule"), Capsule)) return false;
             FCollisionQueryParams Query(SCENE_QUERY_STAT(FernhallOutdoorTest), false, Enemy);
@@ -141,8 +155,9 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
             TestTrue(TEXT("Arrival is outside every patrol's detection range"),
                 FVector::Dist2D(Player->GetActorLocation(), Enemy->GetActorLocation()) > Enemy->GetDetectionRange());
         }
-        AddInfo(FString::Printf(TEXT("FERNHALL POCKETS  total %d, per pocket %d/%d/%d/%d/%d, elites %d"),
-            Enemies.Num(), PocketCounts[0], PocketCounts[1], PocketCounts[2], PocketCounts[3], PocketCounts[4], Elites));
+        AddInfo(FString::Printf(TEXT("FERNHALL POCKETS  total %d, per pocket %d/%d/%d/%d/%d/%d/%d/%d, elites %d"),
+            Enemies.Num(), PocketCounts[0], PocketCounts[1], PocketCounts[2], PocketCounts[3],
+            PocketCounts[4], PocketCounts[5], PocketCounts[6], PocketCounts[7], Elites));
         // 11 -> 17. Before this the persistent world held fifteen bodies and a
         // player crossed two 106 m yards meeting three fights; the far half of
         // each yard was walked and never contested. The added six are HALF of
@@ -154,13 +169,24 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
         // the whole wave took a cleared entry yard from 159 XP to 375, past
         // the 279 that reaches level two, which would have made the first
         // contract a reward for something the player had already outgrown.
-        if (!TestEqual(TEXT("Seventeen outdoor enemies populate each fresh visit"), Enemies.Num(), 17)) return false;
+        // 17 -> 26 WITH A THIRD YARD. The depot is two seams deep, so its nine
+        // bodies cannot reach the entry yard's XP and cannot change what the
+        // first contract is worth; that is why the expansion went there rather
+        // than into the yards the player already crosses.
+        if (!TestEqual(TEXT("Twenty-six outdoor enemies populate each fresh visit"), Enemies.Num(), 26)) return false;
         TestEqual(TEXT("Four additional courtyard enemies"), CourtyardCount, 4);
         TestEqual(TEXT("Three ordinary courtyard melee"), CourtyardMelee, 3);
         TestEqual(TEXT("One courtyard Lattice"), CourtyardLattices, 1);
-        TestEqual(TEXT("Roster retains one elite for the initial contract"), Elites, 1);
-        const int32 ExpectedCounts[] = { 4, 3, 4, 3, 3 };
-        for (int32 Index = 0; Index < 5; ++Index)
+        // ONE IN THE ENTRY YARD, ONE IN THE DEPOT. The entry elite is what the
+        // first contract's elite objective counts, and it has to stay exactly
+        // one; the depot's is the rank the deepest yard carries, and it is two
+        // seams away from anything the contract measures.
+        TestEqual(TEXT("Two ranked outdoor bodies, one per ranked yard"), Elites, 2);
+        TestEqual(TEXT("The depot carries exactly one of them"), DepotElites, 1);
+        TestEqual(TEXT("and a Warden to anchor its set piece"), DepotWardens, 1);
+        TestEqual(TEXT("Nine bodies stand in the third yard"), DepotBodies, 9);
+        const int32 ExpectedCounts[] = { 4, 3, 4, 3, 3, 3, 3, 3 };
+        for (int32 Index = 0; Index < 8; ++Index)
         {
             if (!TestEqual(TEXT("Distinct pocket roster"), PocketCounts[Index], ExpectedCounts[Index])) return false;
             PocketCenters[Index] /= PocketCounts[Index];
@@ -182,7 +208,15 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
                        FVector::Dist2D(PocketCenters[3], PocketCenters[1])) > 1800);
         TestTrue(TEXT("The substation's off-lane pocket is its own ground"),
             FVector::Dist2D(PocketCenters[4], PocketCenters[2]) > 1800);
-        TestTrue(TEXT("Rank still sits in exactly one outdoor fight"), Elites == 1);
+        // The depot's three are their own ground too, by the same measure.
+        for (int32 Index = 5; Index < 8; ++Index)
+            for (int32 Other = 0; Other < 8; ++Other)
+                if (Other != Index)
+                    TestTrue(*FString::Printf(TEXT("Depot pocket %d is its own ground against %d"), Index, Other),
+                        FVector::Dist2D(PocketCenters[Index], PocketCenters[Other]) > 1800);
+        // And the third yard is a YARD away, not a corner of the second.
+        TestTrue(TEXT("The depot occupies its own yard"),
+            FVector::Dist2D(PocketCenters[6], PocketCenters[2]) > 4000);
 
         // THE CONTRACT GIVER, ON THE MARKER THE COMPOSER SHIPPED. The yard
         // authored marker_npc_contract, the loader validated it, and nothing
@@ -260,7 +294,9 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
         const int32 XpBefore = Player->GetProgression()->GetProgressionState().TotalExperience;
         for (ABreakerEnemy* Enemy : Enemies)
         {
-            if (Enemy->Tags.Contains(FName(TEXT("Fernhall.Outdoor.2")))) continue;
+            // ENTRY YARD ONLY. Read off the body's area level, not off a list
+            // of pocket numbers — see the note at EntryXp above.
+            if (Enemy->GetAreaLevel() != 5) continue;
             Enemy->DispatchBeginPlay();
             FBreakerDamageRequest Kill;
             Kill.BaseDamage = 1000000;
@@ -279,7 +315,14 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
         // three each. Assert the relationship, not just the figure — a future
         // population change that crosses the line should fail here and say so.
         const int32 ClearedYardXp = Player->GetProgression()->GetProgressionState().TotalExperience - XpBefore;
-        TestEqual(TEXT("Entry kills retain their natural XP"), ClearedYardXp, 267);
+        EntryXp = ClearedYardXp;
+        AddInfo(FString::Printf(TEXT("ENTRY YARD CLEARED  %d XP, ceiling 279"), EntryXp));
+        // 267 -> 207, AND THE OLD FIGURE WAS NEVER THE ENTRY YARD'S. This loop
+        // used to skip pocket 2 by name and count pocket 4 — a SUBSTATION fight
+        // — as entry XP, so the pin it fed was measuring two yards and calling
+        // them one. Reading the body's own area level fixes that permanently:
+        // a yard added anywhere else can no longer move this number.
+        TestEqual(TEXT("Entry kills retain their natural XP"), ClearedYardXp, 207);
         TestTrue(TEXT("A cleared yard still leaves level two to the contract's turn-in"),
             ClearedYardXp < 279);
         if (Visit == 0)
@@ -363,8 +406,8 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
             TestTrue(TEXT("and faces the post it is walking to"),
                 FVector::DotProduct(Returned->GetActorForwardVector().GetSafeNormal2D(), ToPost) > 0.5f);
         }
-        TestEqual(TEXT("Repeated startup preserves the outdoor population"), AfterRepeat - CourtyardAfterRepeat, 17);
-        TestEqual(TEXT("Repeated startup preserves seventeen outdoor plus courtyard four"), AfterRepeat, 21);
+        TestEqual(TEXT("Repeated startup preserves the outdoor population"), AfterRepeat - CourtyardAfterRepeat, 26);
+        TestEqual(TEXT("Repeated startup preserves twenty-six outdoor plus courtyard four"), AfterRepeat, 30);
         TestFalse(TEXT("Clearing outdoor encounters never starts waves"), Mode->IsWaveActive());
     }
     return true;

@@ -199,6 +199,8 @@ public:
     // derives from item level rather than being stored, so "AREA 23" means
     // level-23 content and there is no second number to show. Authored here
     // beside the yard it belongs to, O2 PLACEHOLDER, and the door publishes it.
+    // The area level of a Fernhall yard, whether or not it has a rift door.
+    static int32 FernhallYardAreaLevel(FName Yard);
     static FBreakerRiftDefinition FernhallRiftFor(FName Yard);
 
     // The grammar params the yard is measured against. Band and exclusions are

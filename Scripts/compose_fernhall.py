@@ -195,7 +195,10 @@ place("flr_riftpad_sub", "pavement", (SUB_X + 41.0, 0.0, SUB_Z), (10.0, 0.08, 10
 
 # Perimeter, with a mouth on the south flank where the seam arrives (x 106..116).
 for i, x in enumerate(range(int(SUB_X) - 46, int(SUB_X) + 50, 10)):
-    place("wall_sub_n%02d" % i, BLDG[i % 4], (float(x), 0.0, SUB_Z + 25.0), (10.0, 7.0, 3.0))
+    # The NORTH flank now has a mouth of its own at x 130..140: this yard is no
+    # longer the end of the world, and the second seam leaves through it.
+    if not 130.0 <= float(x) <= 140.0:
+        place("wall_sub_n%02d" % i, BLDG[i % 4], (float(x), 0.0, SUB_Z + 25.0), (10.0, 7.0, 3.0))
     if 106.0 <= float(x) <= 116.0:
         continue   # the seam's far mouth
     place("wall_sub_s%02d" % i, BLDG[(i + 2) % 4], (float(x), 0.0, SUB_Z - 25.0), (10.0, 7.0, 3.0))
@@ -218,6 +221,57 @@ for i, fwd in enumerate((19.0, 34.0, 49.0, 64.0, 79.0)):
     place("blk_chest_sub_s%02d" % i, "chest", (SUB_ANCHOR + fwd, 0.0, SUB_Z - 10.5), (3.0, 1.2, 1.2))
 for i, (fwd, dz) in enumerate(((26.0, 17.0), (26.0, -17.0), (56.0, 17.0), (56.0, -17.0), (80.0, 17.0), (83.0, -18.0))):
     place("blk_full_sub_break%02d" % i, "full", (SUB_ANCHOR + fwd, 0.0, SUB_Z + dz), (3.0, 4.0, 3.0))
+
+# ---- THE SECOND SEAM: substation -> depot ------------------------------------
+# Same rule as the first, and the same shape read off it rather than copied by
+# eye: the mouth is a CEILING (10 m, under the 12 m cap), the walk is a CEILING
+# (28 m, under 30), and it TURNS so neither mouth can see the other. It leaves
+# through the substation's NORTH flank and turns EAST, away from the entry yard,
+# which is what keeps three yards on one plane without any of them overlapping.
+place("flr_seam2_a", "pavement", (135.0, -0.06, 90.0), (10.0, 0.06, 10.0))
+place("flr_seam2_b", "pavement", (142.0, -0.06, 100.0), (24.0, 0.06, 10.0))
+# THE OUTSIDE OF THE CORNER IS WHAT BLOCKS THE SIGHTLINE. The wall that matters
+# is the third one: without it a body standing at the depot mouth can see
+# diagonally across the corner to the substation mouth, which is the exact
+# through-sight the dog-leg exists to remove.
+place("wall_seam2_w", "garage", (128.5, 0.0, 90.0), (3.0, 7.0, 10.0))
+place("wall_seam2_wn", "garage", (128.5, 0.0, 100.0), (3.0, 7.0, 10.0))
+place("wall_seam2_corner", "garage", (146.5, 0.0, 93.5), (13.0, 7.0, 3.0))
+place("wall_seam2_e", "garage", (141.5, 0.0, 88.5), (3.0, 7.0, 7.0))
+place("wall_seam2_n", "garage", (142.0, 0.0, 106.5), (24.0, 7.0, 3.0))
+
+# ---- The DEPOT yard, the third place in the world ---------------------------
+# Owner-asked: "expand the size a lot as well and add more pockets". Fernhall
+# was two yards and a seam, and a third is what the file already said growth
+# looks like — a yard anchor plus that yard's own markers, changing nothing
+# else. Same 106 x 56 footprint and the same frame-relative lattice, because
+# the substation's own note records what happens when a second yard is authored
+# by eye instead: identical pieces, 4 m short, and a failed exposed-crossing
+# measurement the first yard passed.
+#
+# NO RIFT DOOR, DELIBERATELY. A yard with no door is a legal yard, and a second
+# door into the substation undercroft would be two ways into one place. With no
+# rift to point at, the frame keeps +X — which is the direction the player is
+# already walking when they come out of the seam.
+DEP_X, DEP_Z = 206.5, 120.0   # centre
+DEP_ANCHOR = DEP_X - 41.0
+place("flr_yard_dep", "pavement", (DEP_X, -0.06, DEP_Z), (106.0, 0.06, 56.0))
+
+# Perimeter. The mouth is in the WEST flank, where the seam arrives, so the
+# west wall is two stubs and the other three sides are solid.
+place("wall_dep_w_s", "bldg_b", (DEP_X - 53.5, 0.0, DEP_Z - 26.5), (3.0, 7.0, 3.0))
+place("wall_dep_w_n", "bldg_b", (DEP_X - 53.5, 0.0, DEP_Z + 6.5), (3.0, 7.0, 43.0))
+place("wall_dep_e", "bldg_c", (DEP_X + 53.5, 0.0, DEP_Z), (3.0, 7.0, 56.0))
+for i, x in enumerate(range(int(DEP_X) - 46, int(DEP_X) + 50, 10)):
+    place("wall_dep_n%02d" % i, BLDG[i % 4], (float(x), 0.0, DEP_Z + 25.0), (10.0, 7.0, 3.0))
+    place("wall_dep_s%02d" % i, BLDG[(i + 2) % 4], (float(x), 0.0, DEP_Z - 25.0), (10.0, 7.0, 3.0))
+
+# The lattice, frame-relative and unchanged.
+for i, fwd in enumerate((19.0, 34.0, 49.0, 64.0, 79.0)):
+    place("blk_chest_dep_n%02d" % i, "chest", (DEP_ANCHOR + fwd, 0.0, DEP_Z + 10.5), (3.0, 1.2, 1.2))
+    place("blk_chest_dep_s%02d" % i, "chest", (DEP_ANCHOR + fwd, 0.0, DEP_Z - 10.5), (3.0, 1.2, 1.2))
+for i, (fwd, dz) in enumerate(((26.0, 17.0), (26.0, -17.0), (56.0, 17.0), (56.0, -17.0), (80.0, 17.0), (83.0, -18.0))):
+    place("blk_full_dep_break%02d" % i, "full", (DEP_ANCHOR + fwd, 0.0, DEP_Z + dz), (3.0, 4.0, 3.0))
 
 # ---- Markers ----------------------------------------------------------------
 # THE NAME CARRIES A ROLE AND A YARD, and this is the authoring side of a
@@ -256,6 +310,11 @@ place("marker_npc_contract", None, (13.0, 0.0, -14.0), marker=True)
 place("marker_yard_substation", None, (SUB_X - 41.0, 0.0, SUB_Z), marker=True)
 place("marker_rift_substation", None, (SUB_X + 41.0, 0.0, SUB_Z), marker=True)
 
+# The DEPOT yard's anchor, and nothing else: no rift marker, because it has no
+# door. YardFrame falls back to +X when a yard points at no rift, which is the
+# direction this yard runs anyway.
+place("marker_yard_depot", None, (DEP_ANCHOR, 0.0, DEP_Z), marker=True)
+
 # ---- Dressing (O24: vegetation over ruins) ---------------------------------
 for i, (x, z) in enumerate(((18.0, 20.0), (35.0, -21.0), (50.0, 21.0), (68.0, -20.0), (88.0, 20.0), (10.0, -20.0))):
     place("dress_trees%02d" % i, "trees", (x, 0.0, z), (6.0, 4.0, 4.0))
@@ -263,6 +322,9 @@ place("dress_mound", "mound", (47.5, 0.0, -19.0), (8.0, 0.8, 8.0))
 for i, (dx, dz) in enumerate(((-33.0, 20.0), (-16.0, -21.0), (1.0, 21.0), (19.0, -20.0), (39.0, 20.0), (-41.0, -20.0))):
     place("dress_trees_sub%02d" % i, "trees", (SUB_X + dx, 0.0, SUB_Z + dz), (6.0, 4.0, 4.0))
 place("dress_mound_sub", "mound", (SUB_X - 3.5, 0.0, SUB_Z - 19.0), (8.0, 0.8, 8.0))
+for i, (dx, dz) in enumerate(((-33.0, 20.0), (-16.0, -21.0), (1.0, 21.0), (19.0, -20.0), (39.0, 20.0), (-41.0, -20.0))):
+    place("dress_trees_dep%02d" % i, "trees", (DEP_X + dx, 0.0, DEP_Z + dz), (6.0, 4.0, 4.0))
+place("dress_mound_dep", "mound", (DEP_X - 3.5, 0.0, DEP_Z - 19.0), (8.0, 0.8, 8.0))
 for i, (x, z) in enumerate(((22.0, 4.0), (30.0, -7.0), (44.0, 6.0), (58.0, -4.0), (73.0, 7.0), (81.0, -6.0), (15.0, 9.0), (90.0, -8.0))):
     place("dress_grass%02d" % i, "grass", (x, 0.0, z))
 

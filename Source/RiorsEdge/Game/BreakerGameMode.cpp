@@ -4247,9 +4247,24 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
     // walked and never contested. Fractions are spread across the validated
     // band rather than clustered, so the ground between them is the reason to
     // keep moving. All O2 PLACEHOLDER.
+    //
+    // EIGHT NOW, BECAUSE THERE ARE THREE YARDS. The DEPOT is the third place in
+    // the world and it opens with three pockets of its own: two flanking
+    // fights of plain melee and, in the middle, the rank the deepest yard has
+    // to carry. Owner-asked — "expand the size a lot as well and add more
+    // pockets" — and the expansion is a whole yard rather than a wider one,
+    // because the composer's own note records what a yard authored by eye does
+    // to the cover grammar.
+    //
+    // NOTHING WAS ADDED TO THE ENTRY YARD, and that is the XP economy rather
+    // than taste: a cleared entry yard has to stay under the 279 that reaches
+    // level two, or the first contract's turn-in stops being what levels the
+    // player. The depot is two seams away and the player arrives there long
+    // past that moment.
     const FName Yards[] = { NAME_None, NAME_None, FName(TEXT("substation")),
-                            NAME_None, FName(TEXT("substation")) };
-    const float Fractions[] = { 0.25f, 0.70f, 0.50f, 0.45f, 0.80f };
+                            NAME_None, FName(TEXT("substation")),
+                            FName(TEXT("depot")), FName(TEXT("depot")), FName(TEXT("depot")) };
+    const float Fractions[] = { 0.25f, 0.70f, 0.50f, 0.45f, 0.80f, 0.25f, 0.55f, 0.85f };
     // OFF THE LANE, and that is the point of the two new ones. The original
     // three sit on the yard's centreline, so the whole fight of Fernhall
     // happened in a strip down the middle and the flanks were scenery you ran
@@ -4261,8 +4276,8 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
     // is 7500 cm with fights already at 0.25 and 0.70, so a third between
     // them can never be more than ~1690 cm from both. Lateral offset makes
     // that distance two-dimensional. All O2 PLACEHOLDER.
-    const float Laterals[] = { 0.0f, 0.0f, 0.0f, 1400.0f, -1400.0f };
-    constexpr int32 PocketCount = 5;
+    const float Laterals[] = { 0.0f, 0.0f, 0.0f, 1400.0f, -1400.0f, 1400.0f, -1500.0f, 900.0f };
+    constexpr int32 PocketCount = 8;
     TArray<FBreakerZonePiece> YardPieces;
     UBreakerZoneBuilder::CollectZonePieces(UBreakerZoneBuilder::FernhallMeshFolder(), YardPieces);
     int32 Spawned = 0;
@@ -4280,7 +4295,10 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
         const FVector Center = FVector(Origin2D.X, Origin2D.Y, 0)
             + Forward * FMath::Lerp(Field.BandNearCm, Field.BandFarCm, Fractions[Pocket])
             + Right * Laterals[Pocket];
-        const int32 AreaLevel = UBreakerZoneBuilder::FernhallRiftFor(Yards[Pocket]).EffectiveAreaLevel();
+        // THE YARD'S OWN LEVEL, not a rift's. The depot has no door, so asking
+        // FernhallRiftFor for its level would have quietly handed back the
+        // entry yard's — a third yard two seams deep populated at level five.
+        const int32 AreaLevel = UBreakerZoneBuilder::FernhallYardAreaLevel(Yards[Pocket]);
         TArray<ABreakerEnemy*> PocketMembers;
         // Where this pocket's slots start, so the tear placed below can reach
         // exactly the bodies it is the source of and no others.
@@ -4293,10 +4311,12 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
             // separate capsules while leaving the shoulder cover usable.
             FVector Desired = Center + Forward * ((Index / 3) * 300.0f - 150.0f)
                 + Right * ((Index % 3 - 1) * 300.0f);
-            if (Pocket == 2)
+            if (Pocket == 2 || Pocket == 6)
             {
                 // Warden holds the approach; two melee bodies pressure its
                 // flanks while the Skirmisher uses an authored line break.
+                // The depot's set piece borrows the same formation and simply
+                // has no Skirmisher, so that branch never fires for it.
                 Desired = Center - Forward * 200.0f;
                 if (Class == ABreakerEnemy::StaticClass())
                     Desired += Right * (Index == 1 ? -550.0f : 550.0f) - Forward * 250.0f;
@@ -4396,9 +4416,25 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
         // wave keeps the pacing the campaign was tuned against while still
         // nearly doubling what stands in the world. Owner-ruled. O2.
         const int32 PerQuietPocket = Second.Skitters / 4;
-        if (Pocket == 3 || Pocket == 4)
+        if (Pocket == 3 || Pocket == 4 || Pocket == 5 || Pocket == 7)
             for (int32 Index = 0; Index < PerQuietPocket; ++Index)
                 Spawn(ABreakerEnemy::StaticClass(), false);
+        if (Pocket == 6)
+        {
+            // THE DEPOT'S SET PIECE. A yard reached through two seams that held
+            // nothing but trash would be the longest walk in the game for the
+            // least reason, so the middle pocket carries a Warden and an elite
+            // — the same shape pocket 2 uses, which is the one fight in the
+            // world already proved to work at range and in close.
+            //
+            // A WARDEN AND NOT A LATTICE, deliberately: the Lattice is the one
+            // archetype with no body mesh (owner-ruled, 2026-08-29), and a
+            // fresh yard is the worst place to put the thing that reads worst.
+            for (int32 Index = 0; Index < Roster.Wardens; ++Index)
+                Spawn(ABreakerWardenEnemy::StaticClass(), false);
+            for (int32 Index = 0; Index < 2; ++Index)
+                Spawn(ABreakerEnemy::StaticClass(), Index == 0);
+        }
         if (Pocket == 3)
         {
             // Existing yard-frame fraction; no marker or existing site moves.

@@ -108,15 +108,19 @@ bool FBreakerFernhallPieceContractTest::RunTest(const FString& Parameters)
         return false;
     }
 
-    // The composer's roster: 113 meshes across TWO yards and the seam between
-    // them, of which 32 are measured cover \u2014 16 per yard, the same lattice in
-    // each yard's own frame. A drifted count means the composer and this file
-    // disagree about what the zone IS, and re-authoring both is the deliberate
-    // act rather than the accident.
-    TestEqual(TEXT("imported piece count"), Pieces.Num(), 113);
+    // The composer's roster: 167 meshes across THREE yards and the two seams
+    // between them, of which 48 are measured cover — 16 per yard, the same
+    // lattice in each yard's own frame. A drifted count means the composer and
+    // this file disagree about what the zone IS, and re-authoring both is the
+    // deliberate act rather than the accident.
+    //
+    // 113 -> 167 when the DEPOT landed. The per-yard figures did not move by
+    // one, which is the point: a third yard authored from the validated frame
+    // rather than by eye reproduces the lattice exactly.
+    TestEqual(TEXT("imported piece count"), Pieces.Num(), 167);
 
     const TArray<FBreakerZoneField> Zone = UBreakerZoneBuilder::BuildZoneFields(Pieces, Markers);
-    TestEqual(TEXT("the zone has two yards"), Zone.Num(), 2);
+    TestEqual(TEXT("the zone has three yards"), Zone.Num(), 3);
 
     int32 TotalCover = 0;
     for (const FBreakerZoneField& Yard : Zone)
@@ -129,7 +133,7 @@ bool FBreakerFernhallPieceContractTest::RunTest(const FString& Parameters)
         TestEqual(FString::Printf(TEXT("yard '%s' full-height pieces"), *YardName),
             UBreakerCoverLayoutLibrary::CountOfClass(Yard.Pieces, EBreakerCoverClass::FullHeight), 6);
     }
-    TestEqual(TEXT("measured cover across the zone"), TotalCover, 32);
+    TestEqual(TEXT("measured cover across the zone"), TotalCover, 48);
     const TArray<FBreakerCoverPiece> Cover = Zone[0].Pieces;
 
     // The name prefix claims a class; the imported geometry must actually BE
@@ -160,14 +164,31 @@ bool FBreakerFernhallPieceContractTest::RunTest(const FString& Parameters)
     // which is what keeps the pre-yards export valid unchanged — and this
     // assertion is what will move, deliberately, on the day a second yard is
     // authored.
-    TestEqual(TEXT("the zone authors five markers"), Markers.All.Num(), 5);
-    TestEqual(TEXT("two yards means two rift doors"),
+    TestEqual(TEXT("the zone authors six markers"), Markers.All.Num(), 6);
+    TestEqual(TEXT("three yards, two rift doors"),
         Markers.OfRole(EBreakerZoneMarkerRole::Rift).Num(), 2);
-    TestEqual(TEXT("and one anchor for the yard that is not the entry"),
-        Markers.OfRole(EBreakerZoneMarkerRole::Yard).Num(), 1);
+    TestEqual(TEXT("and an anchor for each yard that is not the entry"),
+        Markers.OfRole(EBreakerZoneMarkerRole::Yard).Num(), 2);
     TestTrue(TEXT("the substation yard has both an anchor and a door"),
         Markers.Has(EBreakerZoneMarkerRole::Yard, FName(TEXT("substation")))
         && Markers.Has(EBreakerZoneMarkerRole::Rift, FName(TEXT("substation"))));
+    // THREE YARDS, AND ONLY TWO DOORS. A yard with no rift is a legal yard and
+    // the depot is the first one: a second door into the substation undercroft
+    // would be two ways into one place, and a third rift definition would be an
+    // encounter nobody can reach. Its anchor alone gives it a frame, and
+    // YardFrame keeps +X when a yard points at no rift — the direction the
+    // player is already walking when they leave the second seam.
+    TestTrue(TEXT("the depot has an anchor"),
+        Markers.Has(EBreakerZoneMarkerRole::Yard, FName(TEXT("depot"))));
+    TestFalse(TEXT("and deliberately no door"),
+        Markers.Has(EBreakerZoneMarkerRole::Rift, FName(TEXT("depot"))));
+    // Each yard is DEEPER than the one before it. The ORDERING is asserted, not
+    // the three magnitudes: the gap is what is authored and every one is O2.
+    TestTrue(TEXT("each yard is deeper than the one before it"),
+        UBreakerZoneBuilder::FernhallYardAreaLevel(NAME_None)
+            < UBreakerZoneBuilder::FernhallYardAreaLevel(FName(TEXT("substation")))
+        && UBreakerZoneBuilder::FernhallYardAreaLevel(FName(TEXT("substation")))
+            < UBreakerZoneBuilder::FernhallYardAreaLevel(FName(TEXT("depot"))));
     return true;
 }
 

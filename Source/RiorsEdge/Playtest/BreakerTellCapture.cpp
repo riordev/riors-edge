@@ -159,9 +159,16 @@ void BreakerScheduleBlastCapture(UWorld* World)
 // ---------------------------------------------------------------------------
 void BreakerSchedulePocketRiftCapture(UWorld* World)
 {
-    if (!World || !FParse::Param(FCommandLine::Get(), TEXT("BreakerCapturePocketRift"))) return;
+    // BOTH FORMS, because FParse::Param does not match a switch carrying a
+    // value: -BreakerCapturePocketRift is the nearest tear, and
+    // -BreakerCapturePocketRift=<n> is the nth. The first attempt only checked
+    // Param and the =7 run silently photographed nothing at all.
+    int32 Wanted = 0;
+    const bool bIndexed = World && FParse::Value(FCommandLine::Get(),
+        TEXT("BreakerCapturePocketRift="), Wanted);
+    if (!World || (!bIndexed && !FParse::Param(FCommandLine::Get(), TEXT("BreakerCapturePocketRift")))) return;
     FTimerHandle Setup;
-    World->GetTimerManager().SetTimer(Setup, FTimerDelegate::CreateWeakLambda(World, [World]()
+    World->GetTimerManager().SetTimer(Setup, FTimerDelegate::CreateWeakLambda(World, [World, Wanted]()
     {
         auto* Controller = World->GetFirstPlayerController();
         auto* Player = Controller ? Cast<ABreakerCharacter>(Controller->GetPawn()) : nullptr;
@@ -171,15 +178,19 @@ void BreakerSchedulePocketRiftCapture(UWorld* World)
         // about the tear rather than about whatever reached the player first.
         for (TActorIterator<ABreakerEnemy> It(World); It; ++It) It->SetActorTickEnabled(false);
 
-        ABreakerPocketRift* Nearest = nullptr;
-        double Best = TNumericLimits<double>::Max();
-        int32 Found = 0;
-        for (TActorIterator<ABreakerPocketRift> It(World); It; ++It)
+        // -BreakerCapturePocketRift=<n> picks the nth tear by distance, so the
+        // yards past the first two are photographable at all: the harness has
+        // no way to walk two seams, and the depot's tears are 200 m away.
+        TArray<ABreakerPocketRift*> Tears;
+        for (TActorIterator<ABreakerPocketRift> It(World); It; ++It) Tears.Add(*It);
+        const FVector From = Player->GetActorLocation();
+        Tears.Sort([From](const ABreakerPocketRift& A, const ABreakerPocketRift& B)
         {
-            ++Found;
-            const double Distance = FVector::DistSquared(It->GetActorLocation(), Player->GetActorLocation());
-            if (Distance < Best) { Best = Distance; Nearest = *It; }
-        }
+            return FVector::DistSquared(A.GetActorLocation(), From)
+                 < FVector::DistSquared(B.GetActorLocation(), From);
+        });
+        const int32 Found = Tears.Num();
+        ABreakerPocketRift* Nearest = Tears.IsValidIndex(Wanted) ? Tears[Wanted] : nullptr;
         if (!Nearest)
         {
             UE_LOG(LogTemp, Error, TEXT("[PocketRiftCapture] no tear exists in this world."));

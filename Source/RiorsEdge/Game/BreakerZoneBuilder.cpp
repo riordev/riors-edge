@@ -540,6 +540,23 @@ TArray<FBreakerZoneField> UBreakerZoneBuilder::BuildZoneFields(const TArray<FBre
     return Fields;
 }
 
+int32 UBreakerZoneBuilder::FernhallYardAreaLevel(FName Yard)
+{
+    // HOW FAR THE PLAYER HAS WALKED, expressed as a number. A yard reached
+    // through another yard is content they earned their way to, and the GAP
+    // between the three is the thing being authored rather than any one
+    // magnitude. All O2 PLACEHOLDER.
+    //
+    // THIS IS SEPARATE FROM FernhallRiftFor ON PURPOSE. Two of the three yards
+    // have a rift door and carry a definition; the DEPOT has none, and giving
+    // it a rift definition purely to read one field off it would be authoring
+    // an encounter the player can never reach.
+    if (Yard == FName(TEXT("breach"))) return 20;
+    if (Yard == FName(TEXT("depot"))) return 13;
+    if (Yard == FName(TEXT("substation"))) return 9;
+    return 5;
+}
+
 FBreakerRiftDefinition UBreakerZoneBuilder::FernhallRiftFor(FName Yard)
 {
     FBreakerRiftDefinition Rift;
@@ -553,7 +570,7 @@ FBreakerRiftDefinition UBreakerZoneBuilder::FernhallRiftFor(FName Yard)
         Rift.EncounterId = TEXT("breach.marshalling");
         Rift.AreaName = FText::FromString(TEXT("Breach Marshalling Yard"));
         Rift.AreaLine = FText::FromString(TEXT("Beyond the altered contact, the Field Marshal gathers the breach forces."));
-        Rift.AreaLevel = 20; // O2 PLACEHOLDER, Act II encounter tuning.
+        Rift.AreaLevel = FernhallYardAreaLevel(Yard);
         return Rift;
     }
 
@@ -567,7 +584,7 @@ FBreakerRiftDefinition UBreakerZoneBuilder::FernhallRiftFor(FName Yard)
         // player arrives at — a yard reached through another yard is content
         // they have walked to. The GAP between the two is the thing being
         // authored; both magnitudes are O2 PLACEHOLDER.
-        Rift.AreaLevel = 9;   // O2 PLACEHOLDER
+        Rift.AreaLevel = FernhallYardAreaLevel(Yard);
         return Rift;
     }
 
@@ -575,7 +592,7 @@ FBreakerRiftDefinition UBreakerZoneBuilder::FernhallRiftFor(FName Yard)
     Rift.AreaName = FText::FromString(TEXT("Fernhall Substation"));
     Rift.AreaLine = FText::FromString(
         TEXT("The tear under the substation, where the yard stops being quiet."));
-    Rift.AreaLevel = 5;   // O2 PLACEHOLDER
+    Rift.AreaLevel = FernhallYardAreaLevel(Yard);
     return Rift;
 }
 
@@ -598,6 +615,20 @@ TArray<FBreakerZoneConnection> UBreakerZoneBuilder::FernhallConnections()
     Seam.MouthWidthCm = 1000.0f;   // O2 PLACEHOLDER
     Seam.LengthCm = 2900.0f;   // O2 PLACEHOLDER
     Seam.bThroughSight = false;
+
+    // THE SECOND SEAM, out of the substation's north flank and turning east.
+    // Same terms, same ceilings, and the same reason: a straight corridor
+    // between two yards lets a body in the far one hold a player whose cover
+    // was never laid for that angle. 10 m mouth under the 12 m ceiling, 28 m
+    // walked under the 30 m one. O2 PLACEHOLDER, and the geometry honours
+    // these numbers rather than deriving them.
+    FBreakerZoneConnection& Second = Out.AddDefaulted_GetRef();
+    Second.Name = FName(TEXT("substation-depot"));
+    Second.FromYard = FName(TEXT("substation"));
+    Second.ToYard = FName(TEXT("depot"));
+    Second.MouthWidthCm = 1000.0f;   // O2 PLACEHOLDER
+    Second.LengthCm = 2800.0f;   // O2 PLACEHOLDER
+    Second.bThroughSight = false;
     return Out;
 }
 
