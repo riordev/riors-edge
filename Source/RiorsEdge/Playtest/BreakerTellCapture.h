@@ -14,3 +14,7 @@ void BreakerSchedulePocketRiftCapture(UWorld* World);
 // placed by a session roll rather than authored, so there is no fixed point to
 // aim a camera at.
 void BreakerScheduleChestCapture(UWorld* World);
+// -BreakerCaptureNpc: stand in front of the nearest NPC who has something to
+// say. The ordinary route walks past the Fernhall contract giver without ever
+// looking at him, which is why nobody noticed he had no body.
+void BreakerScheduleNpcCapture(UWorld* World);

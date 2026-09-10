@@ -940,6 +940,7 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
         BreakerScheduleBlastCapture(GetWorld());
         BreakerSchedulePocketRiftCapture(GetWorld());
         BreakerScheduleChestCapture(GetWorld());
+        BreakerScheduleNpcCapture(GetWorld());
         ScheduleScreenshots();
         UE_LOG(LogTemp, Log, TEXT("[BreakerMap] fernhall — %s."),
             bRiftInstance ? TEXT("RIFT INSTANCE, waves live") : TEXT("the yard, no gym field"));
@@ -3937,6 +3938,18 @@ ABreakerNPC* ABreakerGameMode::SpawnFinaleResident(FName RowId, const FVector& A
     NPC->DisplayName = FText::FromString(Row->DisplayName);
     NPC->StartNodeId = Row->StartNodeId; NPC->DialogueNodes = Row->Nodes; NPC->EntryOverrides = Row->Entries;
     NPC->Tags.Add(RowId);
+    // A PERSON, NOT A CUBE WITH A SPHERE ON TOP. Owner-asked: "replace the
+    // random npc in fernhall with one of the human assets we have for the time
+    // being". Everyone who arrives through this path is somebody the player
+    // walks up to and talks to, so everyone gets a body and a talking idle;
+    // the two named Anchor spawners already did, and this generic one was the
+    // reason the one person in the field did not.
+    //
+    // The male base rather than the female one, because Kess wears the female
+    // base in the hub and two people ought to be told apart at a glance.
+    // AlternateSelf overrides both below - it is the PLAYER, and wears what
+    // the player is wearing.
+    NPC->ApplyHumanBody(EBreakerNPCBody::Male, EBreakerNPCIdle::Talking);
     if (RowId == FName(TEXT("AlternateSelf")))
     {
         // The same currently equipped character mesh, presented as a living

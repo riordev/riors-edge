@@ -109,6 +109,29 @@ struct FBreakerDialogueData
 
 // A friendly, talkable actor: the groundwork for vendors, the Forge Keeper,
 // and quest givers. Dialogue is a flat node list navigated by id.
+// THE PROJECT HAS TWO RIGGED BODIES AND THIS IS BOTH OF THEM.
+// Assets/npcs/universal-base-characters ships one female and one male base
+// under the one-body-family ruling; naming them here rather than repeating
+// their asset paths at every spawner is what stopped the Fernhall contract
+// giver being a cube with a sphere on top while the two Anchor NPCs were
+// people. A third person does not need a third body - it needs a body.
+UENUM()
+enum class EBreakerNPCBody : uint8
+{
+    Female,
+    Male
+};
+
+// A person standing still is a prop; the pose is what makes them a person who
+// is waiting for you. TALKING is for anyone who has something to say when you
+// walk up, which is every contract giver in the game.
+UENUM()
+enum class EBreakerNPCIdle : uint8
+{
+    Standing,
+    Talking
+};
+
 UCLASS(Blueprintable)
 class RIORSEDGE_API ABreakerNPC : public AActor
 {
@@ -190,6 +213,12 @@ public:
     static ABreakerNPC* SpawnForgeKeeper(UWorld* World, const FVector& Location, const FRotator& Rotation);
     static ABreakerNPC* SpawnQuartermaster(UWorld* World, const FVector& Location, const FRotator& Rotation);
 
+protected:
+public:
+    // Dress this NPC as one of the two rigged people, in one of the two poses,
+    // and apply it. The asset paths live in one place because they were living
+    // in two and a third caller would have made three.
+    void ApplyHumanBody(EBreakerNPCBody Person, EBreakerNPCIdle Idle);
 protected:
     void ConfigureConsoleBody();
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UCapsuleComponent> Body;

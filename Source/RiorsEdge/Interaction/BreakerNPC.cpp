@@ -652,9 +652,7 @@ ABreakerNPC* ABreakerNPC::SpawnForgeKeeper(UWorld* World, const FVector& Locatio
     // (npc_kess) stands down for the rigged base at a talking idle. Note: the
     // Anchor has TWO NPCs — "Forge Keeper" is Kess's own title, not a third
     // person.
-    NPC->BodyMeshAsset = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/npcs/Superhero_Female_FullBody/SkeletalMeshes/Superhero_Female.Superhero_Female"));
-    NPC->BodyIdleAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/npcs/Superhero_Female_FullBody/Anims/UAL1_Standard/SkeletalMeshes/UAL1_StandardIdle_Talking_Loop.UAL1_StandardIdle_Talking_Loop"));
-    NPC->ApplyBodyMesh();
+    NPC->ApplyHumanBody(EBreakerNPCBody::Female, EBreakerNPCIdle::Talking);
     return NPC;
 }
 
@@ -670,10 +668,33 @@ ABreakerNPC* ABreakerNPC::SpawnQuartermaster(UWorld* World, const FVector& Locat
     NPC->EntryOverrides = Row.Entries;
     // The Quartermaster wears the male base at a plain idle — the second of
     // the pack's two bodies, distinct from Kess at a glance.
-    NPC->BodyMeshAsset = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/npcs/Superhero_Male_FullBody/SkeletalMeshes/SuperHero_Male.SuperHero_Male"));
-    NPC->BodyIdleAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/npcs/Superhero_Male_FullBody/Anims/UAL1_Standard/SkeletalMeshes/UAL1_StandardIdle_Loop.UAL1_StandardIdle_Loop"));
-    NPC->ApplyBodyMesh();
+    NPC->ApplyHumanBody(EBreakerNPCBody::Male, EBreakerNPCIdle::Standing);
     return NPC;
+}
+
+void ABreakerNPC::ApplyHumanBody(EBreakerNPCBody Person, EBreakerNPCIdle Idle)
+{
+    // The asset paths, in ONE place. They were written out at two spawners and
+    // the Fernhall contract giver - who goes through a third, generic path -
+    // got neither, so the one person the player meets in the field was cubes
+    // while the two in the hub were people.
+    //
+    // The mesh names differ in case between the two bases (Superhero_Female
+    // against SuperHero_Male) and that is the intake pack's own inconsistency,
+    // not a typo here: they are what the imported assets are called.
+    const TCHAR* Mesh = Person == EBreakerNPCBody::Female
+        ? TEXT("/Game/Breaker/Meshes/npcs/Superhero_Female_FullBody/SkeletalMeshes/Superhero_Female.Superhero_Female")
+        : TEXT("/Game/Breaker/Meshes/npcs/Superhero_Male_FullBody/SkeletalMeshes/SuperHero_Male.SuperHero_Male");
+    const TCHAR* Folder = Person == EBreakerNPCBody::Female
+        ? TEXT("/Game/Breaker/Meshes/npcs/Superhero_Female_FullBody/Anims/UAL1_Standard/SkeletalMeshes/")
+        : TEXT("/Game/Breaker/Meshes/npcs/Superhero_Male_FullBody/Anims/UAL1_Standard/SkeletalMeshes/");
+    const TCHAR* Clip = Idle == EBreakerNPCIdle::Talking
+        ? TEXT("UAL1_StandardIdle_Talking_Loop.UAL1_StandardIdle_Talking_Loop")
+        : TEXT("UAL1_StandardIdle_Loop.UAL1_StandardIdle_Loop");
+
+    BodyMeshAsset = FSoftObjectPath(Mesh);
+    BodyIdleAnimation = FSoftObjectPath(FString(Folder) + Clip);
+    ApplyBodyMesh();
 }
 
 void ABreakerNPC::ConfigureConsoleBody()

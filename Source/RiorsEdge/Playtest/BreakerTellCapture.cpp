@@ -11,6 +11,7 @@
 #include "Combat/BreakerRangedEnemy.h"
 #include "Engine/World.h"
 #include "Game/BreakerPocketRift.h"
+#include "Interaction/BreakerNPC.h"
 #include "Interaction/BreakerSupplyChest.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
@@ -270,5 +271,52 @@ void BreakerScheduleChestCapture(UWorld* World)
         UE_LOG(LogTemp, Display, TEXT("[ChestCapture] %d chests; nearest at %s pays %s"),
             Found, *Nearest->GetActorLocation().ToString(),
             Nearest->PaysCurrency() ? TEXT("currency") : TEXT("an item"));
+    }), 1.0f, false);
+}
+
+void BreakerScheduleNpcCapture(UWorld* World)
+{
+    if (!World || !FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureNpc"))) return;
+    FTimerHandle Setup;
+    World->GetTimerManager().SetTimer(Setup, FTimerDelegate::CreateWeakLambda(World, [World]()
+    {
+        auto* Controller = World->GetFirstPlayerController();
+        auto* Player = Controller ? Cast<ABreakerCharacter>(Controller->GetPawn()) : nullptr;
+        if (!Player || !Player->HasAuthority()) return;
+        Player->ResumeFromMenu();
+        for (TActorIterator<ABreakerEnemy> It(World); It; ++It) It->SetActorTickEnabled(false);
+
+        ABreakerNPC* Nearest = nullptr;
+        double Best = TNumericLimits<double>::Max();
+        int32 Found = 0;
+        for (TActorIterator<ABreakerNPC> It(World); It; ++It)
+        {
+            // SOMEBODY WHO TALKS. Caches, chests and consoles are all NPC
+            // subclasses; a capture aimed at the nearest of those would
+            // photograph a box and call it a person.
+            if (It->DialogueId.IsNone()) continue;
+            ++Found;
+            const double Distance = FVector::DistSquared(It->GetActorLocation(), Player->GetActorLocation());
+            if (Distance < Best) { Best = Distance; Nearest = *It; }
+        }
+        if (!Nearest)
+        {
+            UE_LOG(LogTemp, Error, TEXT("[NpcCapture] nobody in this world has anything to say."));
+            return;
+        }
+        // In front of their face and inside interaction range, so the frame
+        // carries the prompt as well as the person.
+        const FVector Stand = Nearest->GetActorLocation()
+            + Nearest->GetActorForwardVector() * 260.0f + FVector(0.0f, 0.0f, 20.0f);
+        Player->SetActorLocation(Stand, false, nullptr, ETeleportType::TeleportPhysics);
+        // The eye is COMPUTED, not asked for: the camera manager has not caught
+        // up with a teleport made this frame. The chest capture learned that.
+        const FVector EyeAt = Stand + FVector(0.0f, 0.0f, 60.0f);
+        Controller->SetControlRotation(
+            (Nearest->GetActorLocation() + FVector(0.0f, 0.0f, 40.0f) - EyeAt).Rotation());
+        if (Controller->PlayerCameraManager) Controller->PlayerCameraManager->UpdateCamera(0.05f);
+        UE_LOG(LogTemp, Display, TEXT("[NpcCapture] %d speakers; nearest is %s (%s) at %s"),
+            Found, *Nearest->GetDisplayName().ToString(), *Nearest->DialogueId.ToString(),
+            *Nearest->GetActorLocation().ToString());
     }), 1.0f, false);
 }
