@@ -2,6 +2,37 @@
 
 ## OWNER PLAYTEST, 2026-09-10 — READ THIS BEFORE PLANNING ANYTHING
 
+LANDED SINCE HE WROTE THIS (3b0c3465, 0af06a89, ba24dd2d, 236767fc):
+- The quiet pass. Damage groan, footsteps, the RELOADING callout and the
+  DAMAGE-taken word are DELETED, not muted — call sites, verbs, voices, waves,
+  the footstep component and its test. The dev bar is part of the F3
+  diagnostics now instead of permanent chrome. "SKILL n" draws only above
+  MinLevel; deleting it outright is one if-statement if he wants that instead.
+- The three that were MISSING. The weapon name rests on screen (it existed only
+  as a swap slide that animated in and left), XP exists at all for the first
+  time (a level and a rail), and the duplicate max is gone at full health.
+- Gear names. Every affix authors a one-word nameWord; names are now
+  "Steady BOOTS of Vigour". The three-word ceiling is enforced by the loader
+  and swept over all 96 pooled affixes, and the census exporter round-trips the
+  words so a re-export cannot delete them.
+- Speed. Walk 672, sprint 1039, both +5% so the 1.55x gain is unchanged and is
+  now pinned as a ratio.
+
+STILL OPEN FROM HIS LIST, IN HIS WORDS:
+- "the reticle is rough as well and the gun like bounces around your crosshair
+  awkwardly" — NOT STARTED. Needs to know what "rough" means before guessing.
+- "my gun sounds like a nerf gun" — not started.
+- A MINIMAP is wanted. It is the one NEW system he asked for; sequenced after
+  the subtractions on purpose.
+- Quest text top-right is ugly.
+- "all of the abilities just feel so irrelevant and unfun at the start" — the
+  biggest item on his list and the least like the others. It is not polish and
+  probably is a system change; its own block, once the HUD is quiet.
+- Inventory clutter beyond the names.
+- FOLLOW-UP: the swap picker's plate was widened 640 -> 800 to hold a
+  68-character worst-case name. Names are far shorter now, so it can probably
+  go back — left alone because the harness cannot open that modal.
+
 The owner played 9b64906e and the verdict is not about any feature landed this
 session. It is that the game reads as a TEST ENVIRONMENT rather than as Rior's
 Edge, and that breadth is outrunning proven fun. His words: "The project may be
