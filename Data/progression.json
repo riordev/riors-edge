@@ -579,7 +579,8 @@
 		"TargetAtCloseRange",
 		"TargetBandBroken",
 		"RecentlyLedgeTraversed",
-		"ParryCounter"
+		"ParryCounter",
+		"RecentlyRepositioned"
 	],
 	"trees": [
 		{

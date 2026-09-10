@@ -640,6 +640,21 @@ namespace BreakerPowerBandTest
         State.Set(EBreakerBuildCondition::Airborne, true);
         State.Set(EBreakerBuildCondition::RecentlyDashed, true);
         State.Set(EBreakerBuildCondition::Redline, true);
+        // RecentlyRepositioned is TRUE BY CONSTRUCTION wherever RecentlyDashed
+        // is: the window is "dashed or completed a ledge traversal inside the
+        // last three seconds", and this state already posits the dash. Setting
+        // it is describing the same rotation instant more completely, not
+        // granting the build anything.
+        //
+        // IT HAS TO BE SET EXPLICITLY, and that is the trap this state carries:
+        // it is a hand-written bitmask, not an evaluation, so a condition it
+        // does not name reads FALSE and every line gated on that condition goes
+        // silently dark in the measurement. When the eight Swift-locked dash
+        // lines were generalised onto this bit, the band fell 12.89x to 10.89x
+        // and it looked exactly like a balance consequence — it was this line
+        // missing. Scaling those eight affixes to half magnitude moved the band
+        // not one thousandth, which is what proved it.
+        State.Set(EBreakerBuildCondition::RecentlyRepositioned, true);
         return State;
     }
 

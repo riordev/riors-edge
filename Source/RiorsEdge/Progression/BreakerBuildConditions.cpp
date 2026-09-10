@@ -114,6 +114,7 @@ const TCHAR* FBreakerBuildConditionState::DescribeCondition(EBreakerBuildConditi
     case EBreakerBuildCondition::TargetBandBroken:      return TEXT("TargetBandBroken");
     case EBreakerBuildCondition::RecentlyLedgeTraversed: return TEXT("RecentlyLedgeTraversed");
     case EBreakerBuildCondition::ParryCounter: return TEXT("ParryCounter");
+    case EBreakerBuildCondition::RecentlyRepositioned: return TEXT("RecentlyRepositioned");
     // No default. A new enum entry must fail to compile here rather than fall
     // through to a placeholder — "STAT" in UI/BreakerMenu.cpp's two label
     // switches is exactly that mistake, and it is why every damage node on the
@@ -256,7 +257,14 @@ FBreakerBuildConditionState FBreakerBuildConditionState::EvaluateForActor(const 
             // timestamp, negative sentinel for never). The Recently* family
             // constant, not a new one.
             const float SinceLedge = World->GetTimeSeconds() - static_cast<float>(Movement->GetLastLedgeTraversalTime());
-            State.Set(EBreakerBuildCondition::RecentlyLedgeTraversed, SinceLedge >= 0.0f && SinceLedge <= RecentEventSeconds);
+            const bool bRecentLedge = SinceLedge >= 0.0f && SinceLedge <= RecentEventSeconds;
+            State.Set(EBreakerBuildCondition::RecentlyLedgeTraversed, bRecentLedge);
+            // THE CLASS-BLIND WINDOW. A dash is Swift's alone; a vault or a
+            // mantle is everybody's. Composed from the two timestamps already
+            // read above rather than recorded a third time, so it cannot
+            // disagree with either half.
+            State.Set(EBreakerBuildCondition::RecentlyRepositioned,
+                (SinceDash >= 0.0f && SinceDash <= RecentDashSeconds) || bRecentLedge);
         }
     }
 

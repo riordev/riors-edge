@@ -223,6 +223,46 @@ enum class EBreakerBuildCondition : uint8
     // A live window opened only by a successful Core Parry.
     ParryCounter,
 
+    // ---- SELF, appended (28-29): the two class-blind twins ---------------
+    // THE PROBLEM THESE SOLVE, measured: the drop roll is class-blind, and 15
+    // of 97 affixes were gated on Redline or RecentlyDashed — both Swift-only
+    // by construction, because the momentum loop is inert for every other
+    // class and CanUseDash is a hard PermanentClass check. That is 765 of 5793
+    // roll weight, so 13.2% of every rolled line landed DEAD for four classes
+    // in five, on gear the game had no way to avoid giving them.
+    //
+    // Within RecentEventSeconds of a dash OR a completed ledge traversal. The
+    // generalisation of RecentlyDashed, and it works for every class because
+    // VAULT AND MANTLE ARE UNIVERSAL — a Tank cannot dash but can absolutely
+    // vault a rail, so the fantasy ("you just moved, hit harder") is one every
+    // class can buy into with the kit it already has.
+    //
+    // A SLIDE-JUMP IS NOT A THIRD SOURCE HERE, deliberately: nothing records a
+    // slide-jump timestamp, and adding a recorder to Movement for a window
+    // that dash-or-traversal already makes reachable by every class is a
+    // component field bought for nothing. The day a node wants to distinguish
+    // them, KIT adds the recorder and this reads a third time.
+    RecentlyRepositioned,
+    // THE REDLINE HALF IS DESIGNED, NOT BUILT, AND THE BLOCKER IS THE BIT
+    // BUDGET. The other seven Swift-locked lines are gated on Redline, and the
+    // generalisation they want is a ResourceCharged twin of ResourceDepleted:
+    // resource fraction at or above HighVitalFraction, GATED ON THE LOOP NOT
+    // RESTING FULL. That gate is what makes it honest and is why it is not the
+    // bare "ResourceHigh" this file already refused with reason — Mana idles
+    // full, so an ungated bit is free for a standing Caster and earned by
+    // everyone else, the same dead-weight bug upside down. Momentum, Grit,
+    // Scrap and Charge all idle EMPTY, so filling one is an achievement, and
+    // each loop's own IsRestingStateFull() is already the authority.
+    //
+    // It costs THE LAST SPARE BIT. RiorsEdge.Progression.ConditionVocabulary
+    // .Ceiling requires four of the thirty-two to stay unspent so the next
+    // axis is a design choice rather than a storage change, and adding both
+    // twins at once leaves three. Its own instruction is to CUT before
+    // widening the type, so this one waits: RecentlyRepositioned generalises
+    // eight of the fifteen dead lines, ResourceCharged would generalise the
+    // other seven, and whether the last spare bit is better spent here or held
+    // for the next axis is the owner's call, not a compile-time one.
+
     Count UMETA(Hidden)
 };
 

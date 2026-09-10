@@ -727,7 +727,7 @@
 			"valueAtT12": 5,
 			"valueAtT1": 48,
 			"rollWeight": 45,
-			"condition": "RecentlyDashed",
+			"condition": "RecentlyRepositioned",
 			"minimumRarity": "Standard",
 			"pairedAffixId": ""
 		},
@@ -893,7 +893,7 @@
 			"valueAtT12": 5,
 			"valueAtT1": 48,
 			"rollWeight": 45,
-			"condition": "RecentlyDashed",
+			"condition": "RecentlyRepositioned",
 			"minimumRarity": "Standard",
 			"pairedAffixId": ""
 		},
@@ -1359,7 +1359,7 @@
 			"valueAtT12": 1.5,
 			"valueAtT1": 16,
 			"rollWeight": 45,
-			"condition": "RecentlyDashed",
+			"condition": "RecentlyRepositioned",
 			"minimumRarity": "Standard",
 			"pairedAffixId": ""
 		},
@@ -1379,7 +1379,7 @@
 			"valueAtT12": 1.5,
 			"valueAtT1": 16,
 			"rollWeight": 45,
-			"condition": "RecentlyDashed",
+			"condition": "RecentlyRepositioned",
 			"minimumRarity": "Standard",
 			"pairedAffixId": ""
 		},
@@ -1499,7 +1499,7 @@
 			"valueAtT12": 8,
 			"valueAtT1": 60,
 			"rollWeight": 40,
-			"condition": "RecentlyDashed",
+			"condition": "RecentlyRepositioned",
 			"minimumRarity": "Standard",
 			"pairedAffixId": ""
 		},
@@ -1535,7 +1535,7 @@
 			"valueAtT12": 3,
 			"valueAtT1": 30,
 			"rollWeight": 40,
-			"condition": "RecentlyDashed",
+			"condition": "RecentlyRepositioned",
 			"minimumRarity": "Standard",
 			"pairedAffixId": ""
 		},
@@ -1573,7 +1573,7 @@
 			"valueAtT12": 2.5,
 			"valueAtT1": 24,
 			"rollWeight": 45,
-			"condition": "RecentlyDashed",
+			"condition": "RecentlyRepositioned",
 			"minimumRarity": "Standard",
 			"pairedAffixId": ""
 		},
