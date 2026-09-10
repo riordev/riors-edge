@@ -674,8 +674,34 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
     // fall-through filling the yard with dummies.
     if (UBreakerGameInstance::IsFernhallMap(this))
     {
+        // WHICH BUILD THIS IS, DECIDED BEFORE ANYTHING IS BUILT. ONE MAP, TWO
+        // BUILDS: with a PendingRift set this is a RIFT RUN in the yard's
+        // geometry; without one it is the yard itself. Reading the session
+        // rather than a second map is what makes this an INSTANCE.
+        //
+        // This used to be resolved sixty lines BELOW the build, which was
+        // harmless while both builds read the same meshes and stopped being
+        // harmless the moment a rift could read its own: the yard was assembled
+        // against a flag that was still false, so a rift always built the living
+        // yard and the ruined twin could never appear. Photographing it is what
+        // found that — the frames were identical and the spawn count said 107.
+        UBreakerGameInstance* RiftSession = GetGameInstance<UBreakerGameInstance>();
+        // -BreakerRiftInstance: the harness's way INTO a run. The interior is a
+        // mode of this map that only TRAVEL can reach — the door writes
+        // PendingRift and travels — and the capture harness cannot press F, so
+        // without this the one build that matters is the one build nobody can
+        // photograph. A command-line switch, so a shipped build cannot reach it,
+        // and it never overwrites a rift a door already authored.
+        if (RiftSession && !RiftSession->PendingRift.IsSet()
+            && FParse::Param(FCommandLine::Get(), TEXT("BreakerRiftInstance")))
+        {
+            RiftSession->PendingRift = UBreakerZoneBuilder::FernhallRiftFor(NAME_None);
+            UE_LOG(LogTemp, Display, TEXT("[Rift] -BreakerRiftInstance seeded a run; this is a capture, not a door."));
+        }
+        bRiftInstance = RiftSession && RiftSession->PendingRift.IsSet();
+
         FBreakerZoneMarkers Markers;
-        if (!UBreakerZoneBuilder::BuildFernhallYard(GetWorld(), Markers)) return;
+        if (!UBreakerZoneBuilder::BuildFernhallYard(GetWorld(), Markers, bRiftInstance)) return;
         {
             // The entry yard's frame. A zone has exactly one player start
             // (FBreakerZoneMarkers::IsComplete), and the arrival yard's rift
@@ -723,26 +749,9 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
             // ONE MAP, TWO BUILDS. With a PendingRift set this is a RIFT RUN
             // in the yard's geometry; without one it is the yard itself. The
             // difference is what stands in it: a run has a fight and a way out,
-            // the yard has a door and no fight. Reading the session rather than
-            // a second map is what makes this an INSTANCE.
-            UBreakerGameInstance* RiftSession = GetGameInstance<UBreakerGameInstance>();
-
-            // -BreakerRiftInstance: the harness's way INTO a run. The interior
-            // is a mode of this map that only TRAVEL can reach — the door
-            // writes PendingRift and travels — and the capture harness cannot
-            // press F, so without this the one build that matters is the one
-            // build nobody can photograph. Same construction and same reason as
-            // -BreakerCaptureDeployBeat, which seeds a rift for the briefing:
-            // a command-line switch, so a shipped build cannot reach it, and it
-            // never overwrites a rift a door already authored.
-            if (RiftSession && !RiftSession->PendingRift.IsSet()
-                && FParse::Param(FCommandLine::Get(), TEXT("BreakerRiftInstance")))
-            {
-                RiftSession->PendingRift = UBreakerZoneBuilder::FernhallRiftFor(NAME_None);
-                UE_LOG(LogTemp, Display, TEXT("[Rift] -BreakerRiftInstance seeded a run; this is a capture, not a door."));
-            }
-
-            bRiftInstance = RiftSession && RiftSession->PendingRift.IsSet();
+            // the yard has a door and no fight. Which build this is was already
+            // decided above, before the yard was assembled, because the yard
+            // itself now depends on the answer.
 
             // The way back. Both builds need one — the yard must not be a trap,
             // and a rift the player cannot leave is worse. Placed off the lane

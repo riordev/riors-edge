@@ -672,12 +672,39 @@ FBreakerCoverFieldParams UBreakerZoneBuilder::FernhallFieldParams(FName Yard)
     return Params;
 }
 
-bool UBreakerZoneBuilder::BuildFernhallYard(UWorld* World, FBreakerZoneMarkers& OutMarkers)
+const TCHAR* UBreakerZoneBuilder::FernhallFolderFor(bool bRiftInstance)
+{
+    if (!bRiftInstance) return FernhallMeshFolder();
+    // ASKED OF THE REGISTRY DIRECTLY, and QUIETLY, rather than through
+    // CollectZonePieces. That function logs an Error on an empty folder and is
+    // right to — a missing LIVING yard is a broken build, and the suite treats
+    // a logged error as a failure. An absent ruined twin is not broken, it is
+    // a checkout that has not imported one, so asking about it must not raise.
+    FAssetRegistryModule& AssetRegistry =
+        FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
+    AssetRegistry.Get().ScanPathsSynchronous({ FString(FernhallRiftMeshFolder()) }, /*bForceRescan=*/false);
+    TArray<FAssetData> Ruined;
+    AssetRegistry.Get().GetAssetsByPath(FName(FernhallRiftMeshFolder()), Ruined, /*bRecursive=*/true);
+    if (Ruined.Num() > 0)
+    {
+        return FernhallRiftMeshFolder();
+    }
+    UE_LOG(LogTemp, Display,
+        TEXT("[Zone] no ruined Fernhall imported (%s); the rift builds from the living yard."),
+        FernhallRiftMeshFolder());
+    return FernhallMeshFolder();
+}
+
+bool UBreakerZoneBuilder::BuildFernhallYard(UWorld* World, FBreakerZoneMarkers& OutMarkers, bool bRiftInstance)
 {
     if (!World) return false;
 
     TArray<FBreakerZonePiece> Pieces;
-    if (!CollectZonePieces(FernhallMeshFolder(), Pieces)) return false;
+    // The ruined twin when this is a rift and one has been imported; the living
+    // yard otherwise. Same piece NAMES either way, so the markers, the
+    // courtyard plan and the cover grammar all read the same yard — it is the
+    // silhouette that changes, not the layout.
+    if (!CollectZonePieces(FernhallFolderFor(bRiftInstance), Pieces)) return false;
     if (!ExtractMarkers(Pieces, OutMarkers)) return false;
 
     BreakerFernhallCourtyard::FPlan Courtyard;

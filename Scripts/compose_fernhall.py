@@ -30,22 +30,57 @@
 # claims.
 #
 # Authored in glTF space: X forward (toward the rift), Y up, Z lateral.
+#
+# THE RUINED TARGET (--ruined) writes Assets/zones/fernhall_rift.glb instead:
+# the SAME layout under the SAME names, with the cover pieces swapped for the
+# megakit's broken twins. Same names because the whole consumer chain keys off
+# them — the markers, the courtyard plan, the local map and the grammar test
+# all read a piece by its name, so a rift built from this file is the same yard
+# to every one of them and a different PLACE to look at.
+#
+# RUIN IS ADDED, NOT SWAPPED, AND THE FRAMES ARE WHY. The first version of this
+# swapped the cover pieces themselves for the megakit's broken twins, which is
+# safe — place() forces every piece to the cover registry's authored dimensions,
+# so the measured box cannot move — and photographing it showed the swap was
+# also INVISIBLE. A broken wall is 0.68 x 3.01 x 4.82 m; squashed into a
+# 3.0 x 1.2 x 1.2 chest-high box the break is scaled out of existence, and the
+# two targets rendered identically. The forced size is exactly what made the
+# swap safe and exactly what made it null.
+#
+# So the cover stays the cover, at its authored box, and the ruin arrives as
+# dress_ruin_* — broken chunks at their OWN proportions, rotated, leaned
+# against the cover and along the perimeter. dress_* carries no collision and
+# is not measured, so the fight is untouched and the silhouette is not.
+#
+# PERIMETER BUILDINGS ARE NOT TOUCHED EITHER. wall_* pieces BOUND the field,
+# and a broken perimeter is a hole a player walks out of.
 import os
+import sys
 import numpy as np
 import trimesh
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 KIT = os.path.join(ROOT, "Assets", "zones", "kit")
-OUT = os.path.join(ROOT, "Assets", "zones", "fernhall_yard.glb")
+RUINED = "--ruined" in sys.argv
+OUT = os.path.join(ROOT, "Assets", "zones",
+                   "fernhall_rift.glb" if RUINED else "fernhall_yard.glb")
 
 def load_piece(name):
     path = os.path.join(KIT, name)
     loaded = trimesh.load(path, force="mesh")
     return loaded
 
+# The broken twins, from the sci-fi megakit that was materialised for exactly
+# this and used by nothing until now. Two of them, so chest and full-height
+# cover do not read as the same object at two scales.
+BROKEN_CHEST = "modular-sci-fi-megakit/glTF/Walls/WallBand_Straight_Broken.gltf"
+BROKEN_FULL = "modular-sci-fi-megakit/glTF/Walls/WallAstra_Straight_Broken.gltf"
+
 PIECES = {
     "chest": load_piece("fps_wall-low.glb"),
     "full": load_piece("fps_wall-high.glb"),
+    "ruin_chunk": load_piece(BROKEN_CHEST),
+    "ruin_slab": load_piece(BROKEN_FULL),
     "bldg_a": load_piece("city_building-small-a.glb"),
     "bldg_b": load_piece("city_building-small-b.glb"),
     "bldg_c": load_piece("city_building-small-c.glb"),
@@ -58,14 +93,23 @@ PIECES = {
 
 SCENE = {}
 
-def place(out_name, piece_key, at, target_size=None, marker=False):
+def place(out_name, piece_key, at, target_size=None, marker=False, yaw=0.0, lean=0.0):
     """Bake one instance: scale the piece to target_size metres (if given),
     ground it (min-Y to 0), translate to `at` (x, z lateral) and register
-    under its contract name."""
+    under its contract name.
+
+    yaw/lean rotate the piece about the up axis and about X before it is
+    grounded. Only the ruin dressing uses them: a field of rubble all facing
+    the same way reads as a row of props, not as collapse. They are applied
+    BEFORE the ground-and-translate below, so a leaned chunk still sits on the
+    floor rather than hovering or sinking."""
     if marker:
         mesh = trimesh.creation.box(extents=(0.5, 0.5, 0.5))
     else:
         mesh = PIECES[piece_key].copy()
+    if yaw or lean:
+        mesh.apply_transform(trimesh.transformations.rotation_matrix(np.radians(yaw), (0, 1, 0)))
+        mesh.apply_transform(trimesh.transformations.rotation_matrix(np.radians(lean), (1, 0, 0)))
     bounds = mesh.bounds
     size = bounds[1] - bounds[0]
     if target_size is not None:
@@ -222,7 +266,48 @@ place("dress_mound_sub", "mound", (SUB_X - 3.5, 0.0, SUB_Z - 19.0), (8.0, 0.8, 8
 for i, (x, z) in enumerate(((22.0, 4.0), (30.0, -7.0), (44.0, 6.0), (58.0, -4.0), (73.0, 7.0), (81.0, -6.0), (15.0, 9.0), (90.0, -8.0))):
     place("dress_grass%02d" % i, "grass", (x, 0.0, z))
 
+# ---- THE RUIN, dressing only (--ruined) ------------------------------------
+# Placed against the cover the yard already has rather than instead of it, so
+# every measured box is identical in both targets and the fight is the same
+# fight. Deterministic: the offsets and angles are a fixed table walked in
+# order, so the ruined yard is the SAME ruined yard every time it is composed —
+# a rift that rearranged itself between builds could not be photographed or
+# bug-reported.
+if RUINED:
+    RUIN_PLAN = ((0.0, 25.0), (1.0, 200.0), (-1.0, 110.0), (0.6, 295.0), (-0.7, 65.0), (1.3, 155.0))
+    Ruins = 0
+
+    def ruin_beside(anchor_name, dx, dz, key, size, yaw, lean):
+        """One chunk leaned against a piece the yard already placed. Reads the
+        anchor's baked bounds so the rubble follows the cover it belongs to
+        rather than a second copy of the cover's coordinates."""
+        global Ruins
+        if anchor_name not in SCENE:
+            return
+        b = SCENE[anchor_name].bounds
+        centre = (b[0] + b[1]) * 0.5
+        place("dress_ruin%02d" % Ruins, key, (centre[0] + dx, 0.0, centre[2] + dz),
+              size, yaw=yaw, lean=lean)
+        Ruins += 1
+
+    # A chunk fallen beside each piece of chest-high cover, alternating side and
+    # angle down the yard so the debris does not read as a repeated prop.
+    Chest = sorted(n for n in SCENE if n.startswith("blk_chest_"))
+    for i, name in enumerate(Chest):
+        lean, yaw = RUIN_PLAN[i % len(RUIN_PLAN)]
+        side = 2.2 if i % 2 == 0 else -2.2
+        ruin_beside(name, 0.9 if i % 3 else -0.9, side, "ruin_chunk", (0.9, 1.6, 2.4), yaw, 62.0 + lean * 8.0)
+
+    # A collapsed slab against each full-height break, standing closer to
+    # upright: these are the pieces that carry the skyline at distance.
+    Full = sorted(n for n in SCENE if n.startswith("blk_full_"))
+    for i, name in enumerate(Full):
+        lean, yaw = RUIN_PLAN[i % len(RUIN_PLAN)]
+        ruin_beside(name, -2.6 if i % 2 else 2.6, 1.1 * lean, "ruin_slab", (1.4, 3.4, 3.0), yaw, 14.0 + lean * 6.0)
+
+    print("ruin dressing:", Ruins, "chunks")
+
 scene = trimesh.Scene(SCENE)
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 scene.export(OUT)
-print("wrote", OUT, "meshes:", len(SCENE))
+print("wrote", OUT, "meshes:", len(SCENE), "ruined" if RUINED else "intact")

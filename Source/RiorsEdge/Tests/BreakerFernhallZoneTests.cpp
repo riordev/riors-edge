@@ -493,3 +493,49 @@ bool FBreakerSpawnContainmentTest::RunTest(const FString& Parameters)
         AheadF > Params.BandNearCm + 500.0f && FMath::Abs(AheadR) < 1.0f);
     return true;
 }
+
+// ---------------------------------------------------------------------------
+// WHICH YARD A RIFT BUILDS FROM.
+//
+// The ruined twin is composed by `python Scripts/compose_fernhall.py --ruined`
+// into Assets/zones/fernhall_rift.glb and imported to its own mesh folder. The
+// rule under test is deliberately the SELECTION and not the current contents,
+// because the contents change the day the import lands and a test that pinned
+// "the rift folder is empty" would have to be rewritten to allow the feature it
+// exists to protect.
+//
+// The file header above says an absent asset folder is a FAILURE and not a
+// skip. That still holds — for the LIVING yard, which is committed. The ruined
+// twin is the one case where absence is a legal state, because the fallback
+// makes it inert rather than broken: a checkout without the import builds the
+// rift exactly as it builds one today.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerFernhallRuinedFolderTest,
+    "RiorsEdge.Zone.Fernhall.RuinedFolder",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerFernhallRuinedFolderTest::RunTest(const FString& Parameters)
+{
+    const FString Living = UBreakerZoneBuilder::FernhallMeshFolder();
+    const FString Ruined = UBreakerZoneBuilder::FernhallRiftMeshFolder();
+    TestNotEqual(TEXT("the two yards are different folders"), Living, Ruined);
+
+    // The ordinary world never asks for the ruin. Under O268 the rift and the
+    // world run different rules on the same geometry, and this is the seam that
+    // keeps a cleared yard from inheriting a ruin it was never in.
+    TestEqual(TEXT("the ordinary yard builds from the living folder"),
+        FString(UBreakerZoneBuilder::FernhallFolderFor(false)), Living);
+
+    // A rift builds from ONE OF THE TWO, and whichever it picks has pieces in
+    // it. That is the whole contract: it holds before the import (falls back to
+    // the living yard) and after it (takes the ruin), so this assertion does
+    // not have to move when the twin lands.
+    const FString Chosen = UBreakerZoneBuilder::FernhallFolderFor(true);
+    TestTrue(TEXT("a rift builds from one of the two authored yards"),
+        Chosen == Living || Chosen == Ruined);
+    TArray<FBreakerZonePiece> Pieces;
+    TestTrue(TEXT("and never from a folder with nothing in it"),
+        UBreakerZoneBuilder::CollectZonePieces(Chosen, Pieces) && Pieces.Num() > 0);
+    AddInfo(FString::Printf(TEXT("A rift currently builds from %s (%d pieces)."), *Chosen, Pieces.Num()));
+    return true;
+}

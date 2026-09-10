@@ -19,12 +19,26 @@ Run:
 import os
 import unreal
 
+# THE RUINED TWIN, selected by environment rather than by argv: the runner is
+# `-run=pythonscript -script="..."` and what it forwards after the script name
+# is version-dependent, while an env var is not.
+#
+#   set BREAKER_ZONE_TARGET=ruined && UnrealEditor-Cmd.exe ... -script="breaker_import_fernhall.py"
+#
+# The ruined target imports MESHES ONLY. It creates no map: a rift is not a
+# level, it is the existing level built from the other folder, so a second
+# Lvl_Fernhall would be a map nothing ever loads.
 PROJECT_DIR = unreal.SystemLibrary.get_project_directory()
-GLB = os.path.normpath(os.path.join(PROJECT_DIR, "Assets", "zones", "fernhall_yard.glb"))
-DEST = "/Game/Breaker/Meshes/fernhall_yard"
+RUINED = os.environ.get("BREAKER_ZONE_TARGET", "").lower() == "ruined"
+GLB = os.path.normpath(os.path.join(PROJECT_DIR, "Assets", "zones",
+                                    "fernhall_rift.glb" if RUINED else "fernhall_yard.glb"))
+DEST = "/Game/Breaker/Meshes/fernhall_rift" if RUINED else "/Game/Breaker/Meshes/fernhall_yard"
 MAP_PACKAGE = "/Game/Breaker/Maps/Lvl_Fernhall"
 
-EXPECTED_TOTAL = 113
+# The living yard's 113 pieces, plus the ruined target's dressing chunks. The
+# ruin is ADDITIVE — same 113 names, the same measured boxes, with dress_ruin_*
+# leaned against them — so its total is the yard's plus the debris.
+EXPECTED_TOTAL = 145 if RUINED else 113
 SOLID_PREFIXES = ("blk_full_", "blk_chest_", "wall_", "flr_")
 
 # THE MARKER CONTRACT, PARSED — not a fixed list of three names. This used to
@@ -78,7 +92,9 @@ if not os.path.isfile(GLB):
     raise RuntimeError("[Fernhall] source GLB missing: %s (run Scripts/compose_fernhall.py)" % GLB)
 
 # ---- The map. Idempotent, same as breaker_make_levels: never overwrite. ----
-if not unreal.EditorAssetLibrary.does_asset_exist(MAP_PACKAGE):
+if RUINED:
+    unreal.log("[Fernhall] ruined target: meshes only, no map.")
+elif not unreal.EditorAssetLibrary.does_asset_exist(MAP_PACKAGE):
     level_sub = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
     if not level_sub.new_level(MAP_PACKAGE):
         raise RuntimeError("[Fernhall] could not create %s" % MAP_PACKAGE)

@@ -115,6 +115,25 @@ class RIORSEDGE_API UBreakerZoneBuilder : public UBlueprintFunctionLibrary
 
 public:
     static const TCHAR* FernhallMeshFolder() { return TEXT("/Game/Breaker/Meshes/fernhall_yard"); }
+    // THE RUINED TWIN OF THE YARD. Same layout, same piece NAMES, cover swapped
+    // for the megakit's broken pieces — composed by
+    // `python Scripts/compose_fernhall.py --ruined` into
+    // Assets/zones/fernhall_rift.glb and imported here.
+    //
+    // Under O268 the rift and the world run different rules on the same
+    // geometry, so the visual is what tells the player which one they are
+    // standing in before they act on it. The colour half already ships
+    // (BreakerZonePalette derives a ruined palette from the living one); a
+    // recolour over IDENTICAL geometry has a ceiling, because at a glance it
+    // reads as different lighting rather than as ruin. This is the silhouette.
+    static const TCHAR* FernhallRiftMeshFolder() { return TEXT("/Game/Breaker/Meshes/fernhall_rift"); }
+    // Which of the two a build should read. A rift asks for the ruin and FALLS
+    // BACK to the living yard when the ruined folder holds nothing, which is
+    // the state of a checkout whose fernhall_rift.glb has not been imported
+    // yet: the rift then looks exactly as it does today rather than building
+    // an empty world. The fallback is the reason this can land before the
+    // import does, and the reason a seat that never imports is not broken.
+    static const TCHAR* FernhallFolderFor(bool bRiftInstance);
 
     // Asset-registry sweep of one zone folder into the piece list. The single
     // source both the spawner and the suite's grammar test read, so what the
@@ -197,5 +216,7 @@ public:
     // the marker transforms for the game mode to place the player, the rift
     // site and the contract NPC. Fails loudly and spawns nothing on a missing
     // folder or an incomplete marker set.
-    static bool BuildFernhallYard(UWorld* World, FBreakerZoneMarkers& OutMarkers);
+    // bRiftInstance chooses the ruined twin when one is imported. Defaulted so
+    // every existing caller keeps building the living yard verbatim.
+    static bool BuildFernhallYard(UWorld* World, FBreakerZoneMarkers& OutMarkers, bool bRiftInstance = false);
 };
