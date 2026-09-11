@@ -93,6 +93,8 @@
 #include "TimerManager.h"
 #include "Framework/SlateDelegates.h"
 #include "UI/BreakerMenu.h"
+#include "Characters/BreakerHarmPresentationMath.h"
+#include "UI/BreakerUIStyle.h"
 
 ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer.SetDefaultSubobjectClass<UBreakerCharacterMovementComponent>(ACharacter::CharacterMovementComponentName))
@@ -283,6 +285,7 @@ void ABreakerCharacter::Tick(float DeltaSeconds)
     UpdateCameraShake(DeltaSeconds);
     ReconcileClientDeathPresentation();
     UpdateDeathBeat(DeltaSeconds);
+    UpdateHarmPresentation();
     if (bTraversalDemoArmed)
     {
         TickTraversalDemo();
@@ -1842,6 +1845,33 @@ void ABreakerCharacter::ReconcileClientDeathPresentation()
     }
 }
 
+void ABreakerCharacter::UpdateHarmPresentation()
+{
+    if (!FirstPersonCamera) return;
+    const UWorld* World = GetWorld();
+    const double Now = World ? World->GetTimeSeconds() : 0.0;
+    const float SecondsSinceHit = LastRealDamageTime >= 0.0
+        ? static_cast<float>(Now - LastRealDamageTime) : -1.0f;
+    float HealthFraction = 1.0f;
+    if (const UBreakerAttributeSet* Vitals = GetAttributes())
+    {
+        const float MaxHealth = Vitals->GetMaxHealth();
+        HealthFraction = MaxHealth > UE_SMALL_NUMBER
+            ? FMath::Clamp(Vitals->GetHealth() / MaxHealth, 0.0f, 1.0f) : 1.0f;
+    }
+    // The low line is the HUD's own, so the bar going harm and the world
+    // closing in are one event at one number.
+    const BreakerHarmPresentation::FLook Look = BreakerHarmPresentation::Compose(
+        SecondsSinceHit, HealthFraction, BreakerUI::HudHealthLowFraction, Now, DeathBeatSaturation);
+
+    FPostProcessSettings& Settings = FirstPersonCamera->PostProcessSettings;
+    Settings.bOverride_VignetteIntensity = true;
+    Settings.VignetteIntensity = Look.Vignette;
+    Settings.bOverride_ColorSaturation = true;
+    Settings.ColorSaturation = FVector4(Look.Saturation, Look.Saturation, Look.Saturation, 1.0f);
+    FirstPersonCamera->PostProcessBlendWeight = Look.BlendWeight;
+}
+
 void ABreakerCharacter::UpdateDeathBeat(float DeltaSeconds)
 {
     if (DeathBeatElapsed < 0.0f) return;
@@ -1902,12 +1932,10 @@ void ABreakerCharacter::UpdateDeathBeat(float DeltaSeconds)
     if (FirstPersonCamera)
     {
         FirstPersonCamera->SetRelativeLocation(CameraRestLocation - FVector(0.0, 0.0, Beat.CameraDropCm));
-        // Colour drains through the camera's own post-process slot; the
-        // blend weight rides the same channel so a full-colour frame costs
-        // the renderer nothing.
-        FirstPersonCamera->PostProcessSettings.bOverride_ColorSaturation = true;
-        FirstPersonCamera->PostProcessSettings.ColorSaturation = FVector4(Beat.Saturation, Beat.Saturation, Beat.Saturation, 1.0f);
-        FirstPersonCamera->PostProcessBlendWeight = bDone ? 0.0f : 1.0f - Beat.Saturation;
+        // The colour drain is handed to the harm composer rather than written
+        // here: the camera has one post-process slot and one blend weight,
+        // and the hit pulse and the low-health radius share it.
+        DeathBeatSaturation = bDone ? 1.0f : Beat.Saturation;
     }
     const FRotator NewOffset(Beat.CameraPitchDegrees, 0.0f, Beat.CameraRollDegrees);
     if (Controller && (!NewOffset.IsNearlyZero() || !LastDeathBeatOffset.IsNearlyZero()))
@@ -1981,6 +2009,12 @@ void ABreakerCharacter::HandleClassResourceDamageTaken(const FBreakerHitContext&
     // fully dodged or zeroed hit moves nothing.
     if (Hit.Result.HealthDamage > 0.0f || Hit.Result.ShieldDamage > 0.0f)
     {
+        // The harm look reads THIS clock, not the combat component's
+        // seconds-since-damage: that one arms on a parried hit and at the
+        // end of every ReceiveDamage, so the old red frame fired on hits that
+        // cost nothing. Same gate as the shake and the flinch — one hit, four
+        // answers, one gate.
+        LastRealDamageTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
         ShakeTrauma = BreakerShake::AddTrauma(ShakeTrauma, BreakerShakeDamageTrauma);
         // The body flinches with the shake and the take-hit sound: one hit,
         // three answers, one gate.

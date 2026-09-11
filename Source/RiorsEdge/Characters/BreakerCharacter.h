@@ -530,6 +530,19 @@ private:
     // teleport fires at BreakerDeathBeat::TeleportAtSeconds, under the black.
     void UpdateDeathBeat(float DeltaSeconds);
     void ReconcileClientDeathPresentation();
+    // THE ONE WRITER of the camera's post-process look (O270): the hit pulse,
+    // the low-health light radius and the death beat's colour drain composed
+    // by Characters/BreakerHarmPresentationMath.h into one vignette, one
+    // saturation and one blend weight. The beat used to write the camera
+    // itself; it now hands its saturation to this and nothing else touches
+    // the slot, because a second writer of PostProcessBlendWeight would be
+    // the two of them fighting every frame.
+    void UpdateHarmPresentation();
+    // The death beat's current colour drain, 1 when no beat is running.
+    float DeathBeatSaturation = 1.0f;
+    // World time of the last hit that actually took health or shield; a
+    // parried or fully-mitigated hit does not move it. Negative = never.
+    double LastRealDamageTime = -1000.0;
     bool bClientAwaitingHealthRevival = false;
     // Negative = no beat in flight.
     float DeathBeatElapsed = -1.0f;

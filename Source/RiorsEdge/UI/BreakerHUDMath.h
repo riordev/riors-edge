@@ -114,25 +114,12 @@ namespace BreakerHUDMath
     }
 
     // --- Near-death ---------------------------------------------------------
-    inline bool NearDeathVisible(float HealthFraction)
-    {
-        return HealthFraction < BreakerUI::HudHealthLowFraction;
-    }
-
+    // The line under which the health bar wears harm. The world's own answer
+    // to the same line — the closing edges and the drained colour — lives in
+    // Characters/BreakerHarmPresentationMath.h and reads this same number.
     inline bool VitalsValueIsHarm(float HealthFraction)
     {
         return HealthFraction < BreakerUI::HudHealthLowFraction;
-    }
-
-    // The frame's border: 8→16→8 over one pulse, ease-in-out, looping.
-    inline float NearDeathFrameWidth(double Now)
-    {
-        const float Period = BreakerUI::HudNearDeathPulseSeconds;
-        const float Phase = Period > 0.0f
-            ? FMath::Fmod(static_cast<float>(FMath::Max(Now, 0.0)), Period) / Period : 0.0f;
-        const float Triangle = 1.0f - FMath::Abs(2.0f * Phase - 1.0f);
-        const float Eased = FMath::SmoothStep(0.0f, 1.0f, Triangle);
-        return FMath::Lerp(BreakerUI::HudNearDeathFrameMin, BreakerUI::HudNearDeathFrameMax, Eased);
     }
 
     // --- Damage numbers -----------------------------------------------------

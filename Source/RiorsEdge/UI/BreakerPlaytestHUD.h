@@ -152,7 +152,6 @@ private:
     void DrawDefenseFeedback(const FVector2D& Center);
     // The near-death frame: a full-screen harm border pulsing 8→16 px under
     // 20 % health, with four corner brackets that do not pulse.
-    void DrawNearDeathFrame(const ABreakerCharacter* Character);
     // Returns the height it consumed, so the stack above it knows where it ends.
     float DrawStatusReadout(const ABreakerCharacter* Character, float X, float BottomY, float Width);
     // Vitals, bottom-left: value + max, the shield layer, the health bar with

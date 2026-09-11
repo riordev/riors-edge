@@ -282,12 +282,6 @@ namespace BreakerUI
 
     // Near-death frame — full screen, border pulsing 8→16→8 over 1.6 s;
     // corner brackets 64×64, 4px L-shapes at 24px from each corner.
-    inline constexpr float HudNearDeathFrameMin = 8.0f;       // 02-hud
-    inline constexpr float HudNearDeathFrameMax = 16.0f;      // 02-hud
-    inline constexpr float HudNearDeathPulseSeconds = 1.6f;   // 02-hud
-    inline constexpr float HudNearDeathBracketSize = 64.0f;   // 02-hud
-    inline constexpr float HudNearDeathBracketStroke = 4.0f;  // 02-hud
-    inline constexpr float HudNearDeathBracketInset = 24.0f;  // 02-hud
 
     // Abilities — bottom-centre, 232 wide at (844, 936), bottoms on y = 1024.
     inline constexpr float HudAbilityTile = 64.0f;            // 02-hud

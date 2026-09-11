@@ -462,29 +462,15 @@ void ABreakerPlaytestHUD::DrawHUD()
     DrawBanners(Center);
     DrawDefenseFeedback(Center);
     DrawInteractPrompt(Character, Center);
-    if (const UBreakerCombatComponent* PlayerCombat = Character->GetCombat(); PlayerCombat && PlayerCombat->GetSecondsSinceDamage() < 0.28f)
-    {
-        // Harm is instant: full-bleed edge lines, no inset, no fade in.
-        //
-        // THE WORD IS GONE (owner, playtest 2026-09-10): "theres no need for
-        // DAMAGE to appear when im taking damage". The frame IS the tell — it
-        // is instant, it is peripheral, and it does not ask to be read. A word
-        // in the middle of the screen asks to be read, every time, for
-        // something the player already knows happened to them.
-        //
-        // The plate-avoidance search went with it. It existed ONLY to keep this
-        // label off the enemy status rows; with no label there is nothing to
-        // move, and EnemyPlateBounds keeps its other readers.
-        const FLinearColor DamageColor = BreakerUI::Alpha(BreakerUI::Harm, 0.85f);
-        const float T = S(4.0f);
-        DrawRect(DamageColor, 0.0f, 0.0f, Canvas->ClipX, T);
-        DrawRect(DamageColor, 0.0f, Canvas->ClipY - T, Canvas->ClipX, T);
-        DrawRect(DamageColor, 0.0f, 0.0f, T, Canvas->ClipY);
-        DrawRect(DamageColor, Canvas->ClipX - T, 0.0f, T, Canvas->ClipY);
-    }
-    // The near-death frame, after the transient damage flash so the flash
-    // always reads over it.
-    DrawNearDeathFrame(Character);
+    // THE RED FRAMES ARE GONE (owner, 2026-09-11: "a giant red border around
+    // your entire screen is just not good looking"). Two of them lived here:
+    // four full-bleed edge bars for 0.28 s after any hit — including a parried
+    // or fully-mitigated one, because the clock they read arms on every
+    // ReceiveDamage — and a border pulsing 8 to 16 px for as long as health
+    // sat under a fifth. Both were chrome painted over the world. Being hurt is
+    // told by the world now: the edges of vision close and the colour drains
+    // (Characters/BreakerHarmPresentationMath.h, on the camera's own
+    // post-process slot), and the health bar wears harm under the line.
     // RELOADING NO LONGER SHOUTS (owner, playtest 2026-09-10): "reloading
     // doesnt need to have giant text on screen at all theres an animation".
     // Three things already say it — the reload animation, the magazine rail
@@ -3255,38 +3241,6 @@ void ABreakerPlaytestHUD::DrawCrosshairMarks(const FVector2D& Center)
 // and a full-shield character at 10 % health is still one mistake from dying.
 // Sits under the transient damage flash, which draws after it and brighter.
 // --------------------------------------------------------------------------
-void ABreakerPlaytestHUD::DrawNearDeathFrame(const ABreakerCharacter* Character)
-{
-    const UBreakerAttributeSet* Attributes = Character ? Character->GetAttributes() : nullptr;
-    if (!Attributes || !Canvas) return;
-    const float MaxHealth = Attributes->GetMaxHealth();
-    // The preview forces the state: nothing in a headless run can lose
-    // health, so without this the frame is unphotographable — the exact
-    // failure mode the capture harness exists to close.
-    const float Fraction = IsCapturePreview() ? 0.12f
-        : (MaxHealth > UE_SMALL_NUMBER ? Attributes->GetHealth() / MaxHealth : 1.0f);
-    if (!BreakerHUDMath::NearDeathVisible(Fraction)) return;
-
-    const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
-    const float W = Canvas->ClipX;
-    const float H = Canvas->ClipY;
-    DrawBorder(0.0f, 0.0f, W, H, BreakerUI::Harm, S(BreakerHUDMath::NearDeathFrameWidth(Now)));
-
-    const float Inset = S(BreakerUI::HudNearDeathBracketInset);
-    const float Size = S(BreakerUI::HudNearDeathBracketSize);
-    const float Stroke = S(BreakerUI::HudNearDeathBracketStroke);
-    for (int32 Index = 0; Index < 4; ++Index)
-    {
-        const bool bRight = (Index & 1) != 0;
-        const bool bBottom = (Index & 2) != 0;
-        const float CornerX = bRight ? W - Inset : Inset;
-        const float CornerY = bBottom ? H - Inset : Inset;
-        // Each L: a horizontal arm and a vertical arm meeting at the corner.
-        DrawRect(BreakerUI::Harm, bRight ? CornerX - Size : CornerX, bBottom ? CornerY - Stroke : CornerY, Size, Stroke);
-        DrawRect(BreakerUI::Harm, bRight ? CornerX - Stroke : CornerX, bBottom ? CornerY - Size : CornerY, Stroke, Size);
-    }
-}
-
 // --------------------------------------------------------------------------
 // Status chips, sitting above the vitals plate. BottomY is the row's bottom
 // edge so the chips grow upward and never displace the plate.

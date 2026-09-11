@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "Attributes/BreakerAttributeSet.h"
+#include "Characters/BreakerHarmPresentationMath.h"
 #include "Game/BreakerGameMode.h"
 #include "Game/BreakerWaveBudget.h"
 #include "UI/BreakerDamageFeed.h"
@@ -191,36 +192,83 @@ bool FBreakerHUDHealthChipTest::RunTest(const FString& Parameters)
 }
 
 // --------------------------------------------------------------------------
-// Near-death: visible under 20 %, the frame pulsing 8→16→8 over 1.6 s.
+// Being hurt is told by the world, not by a frame (O270).
+//
+// Owner: "the red screen flash, how you have just a giant red border around
+// your entire screen is just not good looking ... maybe reduce visibility in
+// some way, think about Path of Exile's light radius". The HUD's part is one
+// line — the bar wears harm under it — and the camera's part is composed in
+// Characters/BreakerHarmPresentationMath.h off that same line.
 // --------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-    FBreakerHUDNearDeathPulseTest,
-    "RiorsEdge.UI.HUD.NearDeathPulse",
+    FBreakerHUDHarmPresentationTest,
+    "RiorsEdge.UI.HUD.HarmPresentation",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-bool FBreakerHUDNearDeathPulseTest::RunTest(const FString& Parameters)
+bool FBreakerHUDHarmPresentationTest::RunTest(const FString& Parameters)
 {
     using namespace BreakerHUDMath;
+    using namespace BreakerHarmPresentation;
     using namespace BreakerUI;
 
-    TestTrue(TEXT("Under the threshold shows"), NearDeathVisible(0.19f));
-    TestFalse(TEXT("At the threshold does not"), NearDeathVisible(HudHealthLowFraction));
-    TestFalse(TEXT("Full health does not"), NearDeathVisible(1.0f));
-    TestTrue(TEXT("The value goes harm at the same line"), VitalsValueIsHarm(0.19f));
+    TestTrue(TEXT("The value goes harm under the line"), VitalsValueIsHarm(0.19f));
     TestFalse(TEXT("The value stays bone at the line"), VitalsValueIsHarm(HudHealthLowFraction));
 
-    TestEqual(TEXT("The pulse starts thin"), NearDeathFrameWidth(0.0), HudNearDeathFrameMin, BreakerHUDMathTolerance);
-    TestEqual(TEXT("Half a period is the thick edge"), NearDeathFrameWidth(HudNearDeathPulseSeconds * 0.5), HudNearDeathFrameMax, BreakerHUDMathTolerance);
-    TestEqual(TEXT("A whole period is thin again"), NearDeathFrameWidth(HudNearDeathPulseSeconds), HudNearDeathFrameMin, BreakerHUDMathTolerance);
-    TestEqual(TEXT("It loops"), NearDeathFrameWidth(HudNearDeathPulseSeconds * 2.5), HudNearDeathFrameMax, BreakerHUDMathTolerance);
-    for (double Now = 0.0; Now < HudNearDeathPulseSeconds * 3.0; Now += 0.05)
+    // A HEALTHY, UNHIT FRAME COSTS NOTHING. The blend weight is zero, so the
+    // renderer skips the slot entirely.
     {
-        const float Width = NearDeathFrameWidth(Now);
-        TestTrue(*FString::Printf(TEXT("Width stays inside 8..16 at t=%.2f (got %.2f)"), Now, Width),
-            Width >= HudNearDeathFrameMin - BreakerHUDMathTolerance && Width <= HudNearDeathFrameMax + BreakerHUDMathTolerance);
+        const FLook Look = Compose(-1.0f, 1.0f, HudHealthLowFraction, 3.0, 1.0f);
+        TestEqual(TEXT("Nothing happening is no vignette"), Look.Vignette, 0.0f);
+        TestEqual(TEXT("Nothing happening is full colour"), Look.Saturation, 1.0f);
+        TestEqual(TEXT("and the slot is off"), Look.BlendWeight, 0.0f);
     }
-    // Ease-in-out: the quarter point sits below the linear midpoint.
-    TestTrue(TEXT("The pulse eases"), NearDeathFrameWidth(HudNearDeathPulseSeconds * 0.125) < (HudNearDeathFrameMin + HudNearDeathFrameMax) * 0.5f);
+    // A HIT CLOSES THE EDGES FOR A MOMENT, loudest on its first frame and
+    // gone before the next shot lands at any shipped cadence.
+    {
+        TestEqual(TEXT("The pulse starts full"), HitPulse(0.0f), 1.0f, BreakerHUDMathTolerance);
+        TestTrue(TEXT("The pulse eases out"), HitPulse(HitPulseSeconds * 0.5f) < 0.5f);
+        TestEqual(TEXT("The pulse is over at its end"), HitPulse(HitPulseSeconds), 0.0f);
+        TestEqual(TEXT("A hit that never happened is no pulse"), HitPulse(-1.0f), 0.0f);
+        const FLook Look = Compose(0.0f, 1.0f, HudHealthLowFraction, 3.0, 1.0f);
+        TestEqual(TEXT("A fresh hit closes the edges"), Look.Vignette, HitVignette, BreakerHUDMathTolerance);
+        TestTrue(TEXT("and drains a little colour"), Look.Saturation < 1.0f);
+        TestEqual(TEXT("and the slot is on"), Look.BlendWeight, 1.0f);
+        TestTrue(TEXT("but never blacks the screen"), Look.Vignette < 1.0f && Look.Saturation > 0.5f);
+    }
+    // THE LIGHT RADIUS: nothing above the line, and closing in the further
+    // under it you are — never total, a player at one hit point still has to
+    // see the thing about to hit them.
+    {
+        TestEqual(TEXT("Above the line has no depth"), LowHealthDepth(0.5f, HudHealthLowFraction), 0.0f);
+        TestEqual(TEXT("At the line has no depth"), LowHealthDepth(HudHealthLowFraction, HudHealthLowFraction), 0.0f);
+        TestEqual(TEXT("Half way under is half"), LowHealthDepth(HudHealthLowFraction * 0.5f, HudHealthLowFraction), 0.5f, BreakerHUDMathTolerance);
+        TestEqual(TEXT("Empty is full depth"), LowHealthDepth(0.0f, HudHealthLowFraction), 1.0f);
+        const FLook AtLine = Compose(-1.0f, HudHealthLowFraction * 0.999f, HudHealthLowFraction, 0.0, 1.0f);
+        const FLook Empty = Compose(-1.0f, 0.0f, HudHealthLowFraction, 0.0, 1.0f);
+        TestTrue(TEXT("Under the line the edges are closing"), AtLine.Vignette >= LowVignetteAtLine - BreakerHUDMathTolerance);
+        TestTrue(TEXT("and close further toward empty"), Empty.Vignette > AtLine.Vignette);
+        TestTrue(TEXT("and the colour drains toward empty"), Empty.Saturation < AtLine.Saturation);
+        TestTrue(TEXT("but the world never goes fully dark"), Empty.Vignette < 1.0f && Empty.Saturation > 0.3f);
+        // The breath moves the edges, and stays inside the ceiling.
+        float Lowest = 1.0f, Highest = 0.0f;
+        for (double Now = 0.0; Now < BreathSeconds * 2.0; Now += 0.05)
+        {
+            const float V = Compose(-1.0f, 0.0f, HudHealthLowFraction, Now, 1.0f).Vignette;
+            Lowest = FMath::Min(Lowest, V);
+            Highest = FMath::Max(Highest, V);
+        }
+        TestTrue(TEXT("The low state breathes"), Highest - Lowest > BreathVignette * 0.9f);
+        TestTrue(TEXT("and the breath never reaches total"), Highest < 1.0f);
+    }
+    // THE DEATH BEAT'S DRAIN COMPOSES, NEVER FIGHTS. Whatever else is
+    // happening, the beat's saturation is a floor the look cannot rise above.
+    {
+        const FLook Look = Compose(-1.0f, 1.0f, HudHealthLowFraction, 0.0, 0.2f);
+        TestEqual(TEXT("The beat's drain comes through"), Look.Saturation, 0.2f, BreakerHUDMathTolerance);
+        TestEqual(TEXT("and the slot is on for it"), Look.BlendWeight, 1.0f);
+        const FLook Both = Compose(0.0f, 0.0f, HudHealthLowFraction, 0.0, 0.2f);
+        TestTrue(TEXT("A hit at the point of death cannot brighten the beat"), Both.Saturation <= 0.2f + BreakerHUDMathTolerance);
+    }
     return true;
 }
 
