@@ -602,17 +602,40 @@ place("marker_rift_substation", None, (SUB_X + 41.0, 0.0, SUB_Z), marker=True)
 place("marker_yard_depot", None, (DEP_ANCHOR, 0.0, DEP_Z), marker=True)
 
 # ---- Dressing (O24: vegetation over ruins) ---------------------------------
-for i, (x, z) in enumerate(((18.0, 20.0), (35.0, -21.0), (50.0, 21.0), (68.0, -20.0), (88.0, 20.0), (10.0, -20.0))):
-    place("dress_trees%02d" % i, "trees", (x, 0.0, z), (6.0, 4.0, 4.0))
-place("dress_mound", "mound", (47.5, 0.0, -19.0), (8.0, 0.8, 8.0))
-for i, (dx, dz) in enumerate(((-33.0, 20.0), (-16.0, -21.0), (1.0, 21.0), (19.0, -20.0), (39.0, 20.0), (-41.0, -20.0))):
-    place("dress_trees_sub%02d" % i, "trees", (SUB_X + dx, 0.0, SUB_Z + dz), (6.0, 4.0, 4.0))
-place("dress_mound_sub", "mound", (SUB_X - 3.5, 0.0, SUB_Z - 19.0), (8.0, 0.8, 8.0))
-for i, (dx, dz) in enumerate(((-33.0, 20.0), (-16.0, -21.0), (1.0, 21.0), (19.0, -20.0), (39.0, 20.0), (-41.0, -20.0))):
-    place("dress_trees_dep%02d" % i, "trees", (DEP_X + dx, 0.0, DEP_Z + dz), (6.0, 4.0, 4.0))
-place("dress_mound_dep", "mound", (DEP_X - 3.5, 0.0, DEP_Z - 19.0), (8.0, 0.8, 8.0))
-for i, (x, z) in enumerate(((22.0, 4.0), (30.0, -7.0), (44.0, 6.0), (58.0, -4.0), (73.0, 7.0), (81.0, -6.0), (15.0, 9.0), (90.0, -8.0))):
-    place("dress_grass%02d" % i, "grass", (x, 0.0, z))
+# WHERE PLANTS GROW. Owner: "some graphical assets that are imported that are
+# placed randomly, like trees". They were: six clumps per yard at coordinates
+# chosen by hand to be spread out, which is the one arrangement nature never
+# produces in a paved yard. Vegetation reclaims ground from the edges — it
+# comes through where the slab meets a wall, fills the corners nothing drives
+# through, and stands where a building's shadow kept the concrete damp. So
+# every clump stands against a boundary or in a corner, with grass at its
+# foot, and the open lane stays open because that is where the traffic was.
+def grow(tag, anchor_x, centre_z, corners=True):
+    """Clumps against the flanks and in the corners of one yard, frame-
+    relative like everything else that was authored from the validated first
+    yard rather than by eye."""
+    def at(fwd, lat, height=0.0):
+        return (anchor_x + fwd, height, centre_z + lat)
+    # Against the north and south flanks, pressed to the boundary face at
+    # 23.5 m, at forward positions that avoid every dock, bay, gantry leg and
+    # deck pier the yard has.
+    for i, (fwd, lat) in enumerate(((9.0, 22.5), (57.0, -22.6), (73.0, 22.4), (26.0, -22.3))):
+        place("dress_%s_tree%d" % (tag, i), "trees", at(fwd, lat), (5.0, 4.2, 3.4))
+        place("dress_%s_treegrass%d" % (tag, i), "grass", at(fwd + 1.5, lat - (1.8 if lat > 0 else -1.8)))
+    if corners:
+        # The corners: one bigger clump in each of the two the entrance does
+        # not use, with a grass mound under it where the slab has heaved.
+        for i, (fwd, lat) in enumerate(((2.5, 23.0), (2.5, -23.0))):
+            place("dress_%s_corner%d" % (tag, i), "trees", at(fwd, lat), (6.5, 5.0, 4.5))
+            place("dress_%s_cornermound%d" % (tag, i), "mound", at(fwd + 1.0, lat), (7.0, 0.5, 5.0))
+    # Grass in the seams of the slab: along the boundary foot, never in the
+    # lane.
+    for i, fwd in enumerate((18.0, 41.0, 66.0, 90.0)):
+        place("dress_%s_seamgrass%d" % (tag, i), "grass", at(fwd, 22.0 if i % 2 else -22.0))
+
+grow("entry", 6.0, 0.0)
+grow("sub", SUB_ANCHOR, SUB_Z)
+grow("dep", DEP_ANCHOR, DEP_Z)
 
 # ---- THE RUIN, dressing only (--ruined) ------------------------------------
 # Placed against the cover the yard already has rather than instead of it, so
@@ -638,20 +661,63 @@ if RUINED:
               size, yaw=yaw, lean=lean)
         Ruins += 1
 
-    # A chunk fallen beside each piece of chest-high cover, alternating side and
-    # angle down the yard so the debris does not read as a repeated prop.
-    Chest = sorted(n for n in SCENE if n.startswith("blk_chest_"))
-    for i, name in enumerate(Chest):
-        lean, yaw = RUIN_PLAN[i % len(RUIN_PLAN)]
-        side = 2.2 if i % 2 == 0 else -2.2
-        ruin_beside(name, 0.9 if i % 3 else -0.9, side, "ruin_chunk", (0.9, 1.6, 2.4), yaw, 62.0 + lean * 8.0)
+    # COLLAPSE, NOT CLUTTER. Owner: "the dilapidated just looks like a mess.
+    # It doesn't even look dilapidated, it just has random assets that are
+    # broken laying in random places." It did: one chunk leaned against each
+    # piece of cover, evenly, down the whole yard — rubble with no building it
+    # came from. A ruin is a building that FELL, and what fell lands in a fan
+    # below the place it left: big pieces near the wall, smaller further out,
+    # a slab still leaning on what is left standing, and the vegetation
+    # thickest right there, because that is the ground nothing has cleared.
+    def collapse(tag, wall_name, into, seed):
+        """A fan of debris at the foot of one perimeter building, spreading
+        `into` the yard (+1 or -1 in z). Reads the building's baked bounds."""
+        global Ruins
+        if wall_name not in SCENE:
+            return
+        b = SCENE[wall_name].bounds
+        cx = (b[0][0] + b[1][0]) * 0.5
+        face = b[0][2] if into < 0 else b[1][2]     # the face toward the yard
+        # The slab that came off the face, leaning back on it.
+        lean, yaw = RUIN_PLAN[seed % len(RUIN_PLAN)]
+        place("dress_ruin%02d" % Ruins, "ruin_slab", (cx - 1.5, 0.0, face + into * 1.6),
+              (1.6, 4.2, 3.6), yaw=180.0 if into < 0 else 0.0, lean=-into * 22.0)
+        Ruins += 1
+        # The fan: six chunks, biggest nearest the wall, each further out and
+        # a little further along than the last, each at its own angle.
+        for i in range(6):
+            lean, yaw = RUIN_PLAN[(seed + i) % len(RUIN_PLAN)]
+            out = 1.2 + 1.1 * i
+            along = (i % 3 - 1) * 1.7 + (0.6 if i % 2 else -0.6)
+            size = max(0.5, 1.0 - 0.13 * i)
+            place("dress_ruin%02d" % Ruins, "ruin_chunk", (cx + along, 0.0, face + into * out),
+                  (size * 1.1, size * 1.4, size * 2.2), yaw=yaw + 30.0 * i, lean=55.0 + lean * 12.0)
+            Ruins += 1
+        # And the ground has taken it back: grass through the rubble and one
+        # clump against the standing stub.
+        place("dress_ruin%02d" % Ruins, "grass", (cx + 1.8, 0.0, face + into * 3.0))
+        Ruins += 1
+        place("dress_ruin%02d" % Ruins, "trees", (cx - 3.2, 0.0, face + into * 1.2), (4.0, 3.4, 2.8))
+        Ruins += 1
 
-    # A collapsed slab against each full-height break, standing closer to
-    # upright: these are the pieces that carry the skyline at distance.
+    # Two collapses per yard, on different flanks, at buildings that do not
+    # carry a canopy, a bay or a dock — those are the profiles that stayed up.
+    for tag, (n, s_) in (("", ("wall_n03", "wall_s06")),
+                         ("sub", ("wall_sub_n02", "wall_sub_s07")),
+                         ("dep", ("wall_dep_n05", "wall_dep_s01"))):
+        collapse(tag, n, -1, 1)
+        collapse(tag, s_, 1, 4)
+
+    # A few chunks still beside the full-height breaks in the lane, standing
+    # close to upright: the pieces that carry the skyline at distance. Fewer
+    # than before, and only at the breaks, so the lane reads as a place things
+    # fell INTO from the sides rather than as a field of props.
     Full = sorted(n for n in SCENE if n.startswith("blk_full_"))
     for i, name in enumerate(Full):
+        if i % 2:
+            continue
         lean, yaw = RUIN_PLAN[i % len(RUIN_PLAN)]
-        ruin_beside(name, -2.6 if i % 2 else 2.6, 1.1 * lean, "ruin_slab", (1.4, 3.4, 3.0), yaw, 14.0 + lean * 6.0)
+        ruin_beside(name, -2.6 if i % 4 else 2.6, 1.1 * lean, "ruin_slab", (1.4, 3.4, 3.0), yaw, 14.0 + lean * 6.0)
 
     print("ruin dressing:", Ruins, "chunks")
 

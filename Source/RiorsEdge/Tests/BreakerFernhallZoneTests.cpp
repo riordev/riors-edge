@@ -125,7 +125,10 @@ bool FBreakerFernhallPieceContractTest::RunTest(const FString& Parameters)
     // broken laying in random places ... the goal is to have a decent starting
     // area". Every piece added is wall_, flr_ or dress_; not one measured cover
     // box moved, which is why the grammar tests beside this one did not.
-    TestEqual(TEXT("imported piece count"), Pieces.Num(), 453);
+    // 453 -> 472 with the vegetation pass: the six random clumps a yard became
+    // trees against the flanks and in the corners with grass at their feet,
+    // and the lane stays open because that is where the traffic was.
+    TestEqual(TEXT("imported piece count"), Pieces.Num(), 472);
 
     const TArray<FBreakerZoneField> Zone = UBreakerZoneBuilder::BuildZoneFields(Pieces, Markers);
     TestEqual(TEXT("the zone has three yards"), Zone.Num(), 3);
