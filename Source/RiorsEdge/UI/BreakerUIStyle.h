@@ -95,6 +95,18 @@ namespace BreakerUI
     // a cyan, this is a blue) and not the reserved teal band.
     inline const FLinearColor VitalShield = Hex(0x6E9BE0);
     inline const FLinearColor VitalShieldDeep = Hex(0x23324F);
+    // AND HEALTH IS RED (owner: "the actual currently white part of the bar
+    // should be red for health, or a lighter red, and the number value should
+    // stay white"). Bone said "this is one of your own readouts" and nothing
+    // else; against a blue shield on the same track it said even less.
+    //
+    // LIGHTER THAN HARM ON PURPOSE. Harm (0xD9402F) is the colour of damage
+    // arriving — the chip behind a drop, the near-death frame, a reflect — and
+    // a full health bar is not an alarm. This sits above it in value and a
+    // little off its hue, so a full bar reads as health and the harm marks
+    // drawn over it still read as harm.
+    inline const FLinearColor VitalHealth = Hex(0xE2645A);
+    inline const FLinearColor VitalHealthDeep = Hex(0x3A1613);
 
     // --- Teal object law ---------------------------------------------------
     // Legal on rift geometry, suppression hardware, and Unwritten items.
@@ -243,7 +255,12 @@ namespace BreakerUI
     // exactly inside the resource bar and the capture showed them stacked.
     // The design canvas is 1080 with a 40 px safe gutter, so 1026 is the last
     // row that clears both the track above and the margin below.
-    inline constexpr float HudXpTop = 1026.0f;                // O2 PLACEHOLDER
+    // MOVED DOWN AGAIN (owner: "we can honestly move the XP bar down just a
+    // little bit because it makes the HUD feel kind of clogged"). Six pixels
+    // off the resource track above it: the gap between the two rails was eight
+    // and the two read as one block of stripes. 1032 with a 4 px rail ends at
+    // 1036, still inside the 40 px safe gutter.
+    inline constexpr float HudXpTop = 1032.0f;                // O2 PLACEHOLDER
     inline constexpr float HudXpHeight = 4.0f;                // O2 PLACEHOLDER
     inline constexpr float HudXpLevelPixels = 12.0f;          // O2 PLACEHOLDER
     inline constexpr float HudResourceTop = 1010.0f;          // 02-hud

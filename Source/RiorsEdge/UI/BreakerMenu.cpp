@@ -193,6 +193,11 @@ namespace
 
     // 1px ring around a control. Buttons in this system are a fill plus a
     // border; Slate's button brush has no border, so it gets one here.
+    // The zoom at which a node starts saying its name. One step in from the
+    // opening zoom, so the first wheel notch is the one that reveals it.
+    // O2 PLACEHOLDER.
+    constexpr float BreakerMenuNodeNameZoom = 0.63f;
+
     // ---- THE SIX SECTORS, IN THE VERB PALETTE -----------------------------
     // The core wheel drew 242 edges in one grey, so a branch's identity had to
     // be read off the name ring at the rim. Colouring the branches is what
@@ -225,31 +230,65 @@ namespace
     // board of 187 of them the only thing separating a minor from a keystone
     // was eight pixels of side length.
     //
-    // ONE WHITE DISC, CACHED PER SIZE, TINTED AT THE CALL. A rounded-box brush
-    // whose corner radius is half its size IS a circle, and Slate tints a brush
-    // by the border's colour, so every state the ladder already computes still
-    // arrives without a second asset. Cached because a board builds two of
-    // these per node and a brush allocated per marker would be 374 of them per
-    // rebuild.
-    const FSlateBrush* BreakerMenuDiscBrush(float Size)
+    // ONE DISC, ONE DRAW, ITS OWN OUTLINE. Owner: "the resolution of the
+    // preexisting ones that have just been remade are really low, and they're
+    // kinda bad ... I like the high quality, spherical shape".
+    //
+    // The first round pass stacked a disc inside a disc inside a disc to get a
+    // ring, a face and a core: three widgets, three quantised rectangles, and
+    // at the fit zoom the ring landed on a half pixel and smeared. Slate's
+    // rounded box draws its outline in the SAME primitive as its fill, on the
+    // shader's own distance field, so a ring drawn this way is exact at every
+    // zoom — which is the whole reason to use a vector brush rather than a
+    // stack of boxes.
+    //
+    // COLOURS LIVE IN THE BRUSH, so the widget takes no tint: a tint multiplies
+    // fill and outline together and cannot give a node a bright ring over a
+    // dark face. The cache is keyed on everything that can differ, and the key
+    // space is small on purpose — a board has five node sizes and the ladder
+    // has a handful of states, not 187 of anything.
+    const FSlateBrush* BreakerMenuNodeBrush(float Size, const FLinearColor& Fill,
+        const FLinearColor& Outline, float OutlineWidth)
     {
-        static TMap<int32, TSharedPtr<FSlateRoundedBoxBrush>> Discs;
-        const int32 Key = FMath::Clamp(FMath::RoundToInt(Size), 2, 4096);
-        if (const TSharedPtr<FSlateRoundedBoxBrush>* Found = Discs.Find(Key)) return Found->Get();
-        const TSharedPtr<FSlateRoundedBoxBrush> Brush = MakeShared<FSlateRoundedBoxBrush>(
-            FLinearColor::White, Key * 0.5f, FVector2f(static_cast<float>(Key), static_cast<float>(Key)));
-        Discs.Add(Key, Brush);
-        return Brush.Get();
-    }
+        struct FKey
+        {
+            int32 Size = 0;
+            uint32 Fill = 0;
+            uint32 Outline = 0;
+            int32 Width = 0;
+            bool operator==(const FKey& Other) const
+            {
+                return Size == Other.Size && Fill == Other.Fill
+                    && Outline == Other.Outline && Width == Other.Width;
+            }
+        };
+        struct FKeyFuncs
+        {
+            static uint32 Hash(const FKey& Key)
+            {
+                return HashCombine(HashCombine(GetTypeHash(Key.Size), Key.Fill),
+                    HashCombine(Key.Outline, GetTypeHash(Key.Width)));
+            }
+        };
 
-    TSharedRef<SWidget> SolidDisc(const FLinearColor& Colour, float Size)
-    {
-        return SNew(SBorder)
-            .BorderImage(BreakerMenuDiscBrush(Size))
-            .BorderBackgroundColor(Colour)
-            [
-                SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))
-            ];
+        FKey Key;
+        Key.Size = FMath::Clamp(FMath::RoundToInt(Size), 2, 4096);
+        Key.Fill = Fill.ToFColor(false).ToPackedRGBA();
+        Key.Outline = Outline.ToFColor(false).ToPackedRGBA();
+        Key.Width = FMath::Clamp(FMath::RoundToInt(OutlineWidth * 4.0f), 0, 1024);
+
+        static TArray<TPair<uint32, TSharedPtr<FSlateRoundedBoxBrush>>> Cache;
+        static TArray<FKey> Keys;
+        const uint32 Hash = FKeyFuncs::Hash(Key);
+        for (int32 Index = 0; Index < Cache.Num(); ++Index)
+            if (Cache[Index].Key == Hash && Keys[Index] == Key) return Cache[Index].Value.Get();
+
+        const TSharedPtr<FSlateRoundedBoxBrush> Brush = MakeShared<FSlateRoundedBoxBrush>(
+            FSlateColor(Fill), Key.Size * 0.5f, FSlateColor(Outline), OutlineWidth,
+            FVector2f(static_cast<float>(Key.Size), static_cast<float>(Key.Size)));
+        Cache.Add(TPair<uint32, TSharedPtr<FSlateRoundedBoxBrush>>(Hash, Brush));
+        Keys.Add(Key);
+        return Brush.Get();
     }
 
     // A ring around a face, both round. Thickness is the ring; CoreFraction is
@@ -258,27 +297,20 @@ namespace
     TSharedRef<SWidget> BreakerMenuDiscMarker(float Size, float RingWidth, const FLinearColor& Ring,
         const FLinearColor& Fill, const FLinearColor& Core, float CoreFraction)
     {
-        const float Inner = FMath::Max(2.0f, Size - RingWidth * 2.0f);
         const float Pip = FMath::Max(0.0f, Size * CoreFraction);
         TSharedRef<SWidget> Centre = Pip >= 2.0f
-            ? StaticCastSharedRef<SWidget>(SNew(SBox).WidthOverride(Pip).HeightOverride(Pip)[SolidDisc(Core, Pip)])
+            ? StaticCastSharedRef<SWidget>(SNew(SBox).WidthOverride(Pip).HeightOverride(Pip)
+                [SNew(SImage).Image(BreakerMenuNodeBrush(Pip, Core, FLinearColor::Transparent, 0.0f))])
             : StaticCastSharedRef<SWidget>(SNew(SSpacer).Size(FVector2D(1.0f, 1.0f)));
         return SNew(SBox).WidthOverride(Size).HeightOverride(Size)
         [
             SNew(SBorder)
-            .BorderImage(BreakerMenuDiscBrush(Size))
-            .BorderBackgroundColor(Ring)
-            .Padding(FMargin(RingWidth))
+            .BorderImage(BreakerMenuNodeBrush(Size, Fill, Ring, RingWidth))
+            .BorderBackgroundColor(FLinearColor::White)
+            .Padding(FMargin(0.0f))
             .HAlign(HAlign_Center).VAlign(VAlign_Center)
             [
-                SNew(SBorder)
-                .BorderImage(BreakerMenuDiscBrush(Inner))
-                .BorderBackgroundColor(Fill)
-                .Padding(FMargin(0.0f))
-                .HAlign(HAlign_Center).VAlign(VAlign_Center)
-                [
-                    Centre
-                ]
+                Centre
             ]
         ];
     }
@@ -287,21 +319,32 @@ namespace
     // click. The engine's button brush is what made every node boxy; this
     // replaces its four state brushes with the disc and lets the button's own
     // colour do the state.
-    const FButtonStyle* BreakerMenuDiscButtonStyle(float Size)
+    // The same disc as a BUTTON, so a marker can be round and still hover and
+    // click. The hovered state brightens the ring rather than the face: on a
+    // board where the face is the node's state, a hover that repainted the face
+    // would look like the state had changed.
+    const FButtonStyle* BreakerMenuNodeButtonStyle(float Size, const FLinearColor& Fill,
+        const FLinearColor& Ring, float RingWidth)
     {
-        static TMap<int32, TSharedPtr<FButtonStyle>> Styles;
-        const int32 Key = FMath::Clamp(FMath::RoundToInt(Size), 2, 4096);
-        if (const TSharedPtr<FButtonStyle>* Found = Styles.Find(Key)) return Found->Get();
+        static TArray<TPair<uint32, TSharedPtr<FButtonStyle>>> Cache;
+        const uint32 Hash = HashCombine(
+            HashCombine(GetTypeHash(FMath::RoundToInt(Size)), Fill.ToFColor(false).ToPackedRGBA()),
+            HashCombine(Ring.ToFColor(false).ToPackedRGBA(), GetTypeHash(FMath::RoundToInt(RingWidth * 4.0f))));
+        for (const TPair<uint32, TSharedPtr<FButtonStyle>>& Entry : Cache)
+            if (Entry.Key == Hash) return Entry.Value.Get();
+
         const TSharedPtr<FButtonStyle> Style = MakeShared<FButtonStyle>(
             FCoreStyle::Get().GetWidgetStyle<FButtonStyle>(TEXT("Button")));
-        const FSlateBrush* Disc = BreakerMenuDiscBrush(Key);
-        Style->SetNormal(*Disc);
-        Style->SetHovered(*Disc);
-        Style->SetPressed(*Disc);
-        Style->SetDisabled(*Disc);
+        const FSlateBrush* Rest = BreakerMenuNodeBrush(Size, Fill, Ring, RingWidth);
+        const FSlateBrush* Lit = BreakerMenuNodeBrush(Size, Fill,
+            FMath::Lerp(Ring, FLinearColor::White, 0.55f), RingWidth * 1.6f);
+        Style->SetNormal(*Rest);
+        Style->SetHovered(*Lit);
+        Style->SetPressed(*Lit);
+        Style->SetDisabled(*Rest);
         Style->SetNormalPadding(FMargin(0.0f));
         Style->SetPressedPadding(FMargin(0.0f));
-        Styles.Add(Key, Style);
+        Cache.Add(TPair<uint32, TSharedPtr<FButtonStyle>>(Hash, Style));
         return Style.Get();
     }
 
@@ -702,23 +745,38 @@ namespace
             : _BoardSize(FVector2D(1000.0f, 800.0f))
             , _InitialZoom(1.0f)
             , _FitOnOpen(false)
+            , _MinOpenZoom(0.0f)
             , _InitialPan(FVector2D::ZeroVector)
             {}
             SLATE_ARGUMENT(FVector2D, BoardSize)
             SLATE_ARGUMENT(float, InitialZoom)
             SLATE_ARGUMENT(bool, FitOnOpen)
+            // A floor under the opening zoom. Fitting a 3200-unit board into a
+            // 730-pixel view puts a node at ten pixels, which is a speck; the
+            // board opens no further out than this even when that means the rim
+            // starts off screen. FAR is one click away and it fits everything.
+            SLATE_ARGUMENT(float, MinOpenZoom)
             SLATE_ARGUMENT(FVector2D, InitialPan)
             SLATE_EVENT(FOnBoardViewChanged, OnViewChanged)
             SLATE_DEFAULT_SLOT(FArguments, Content)
         SLATE_END_ARGS()
 
-        // Two views: the complete board and 1:1 detail.
+        // Two BUTTONS, but not two views. Owner: "as you zoom in you get more
+        // clarification on what the node is, but you could still tell what it
+        // is from a distance". The wheel used to snap between exactly two
+        // levels — the whole board, or 1:1 — so there was no "in a bit" and
+        // nothing between a speck and a full-size node. It is a continuous
+        // ramp now, floored at whatever fits the board and ceilinged past 1:1,
+        // because the nodes are vector brushes and stay exact when enlarged.
         static constexpr float NearZoom = 1.0f;
+        static constexpr float MaxZoom = 1.8f;
+        static constexpr float ZoomStep = 1.25f;
 
         void Construct(const FArguments& InArgs)
         {
             BoardSize = InArgs._BoardSize;
             bFitOnOpen = InArgs._FitOnOpen;
+            MinOpenZoom = FMath::Clamp(InArgs._MinOpenZoom, 0.0f, NearZoom);
             DefaultZoom = FMath::Clamp(InArgs._InitialZoom, 0.1f, NearZoom);
             Zoom = DefaultZoom;
             Pan = InArgs._InitialPan;
@@ -741,9 +799,36 @@ namespace
                 bFitOnOpen = false;
                 const FVector2D View = AllottedGeometry.GetLocalSize();
                 Zoom = FMath::Min(1.0f, static_cast<float>(FMath::Min(View.X / BoardSize.X, View.Y / BoardSize.Y)));
+                Zoom = FMath::Max(Zoom, MinOpenZoom);
+                // Centred on the board's middle either way. Past the fit the
+                // pan goes negative, which is the board overflowing the window
+                // equally on both sides — exactly what ClampPan allows.
                 Pan = (View - BoardSize * Zoom) * 0.5f;
+                ClampPan();
                 ApplyTransform();
                 Notify();
+            }
+
+            // AND A BOARD THAT FITS STAYS CENTRED, every frame it fits. The
+            // opening pan is computed from a measured panel width, the viewport
+            // is re-created on every rebuild with the pan it published last
+            // time, and either of those can predate the panel having its final
+            // size — which is how the core wheel came to sit hard against the
+            // left edge of a board twice its width. There is nothing to pan to
+            // on an axis where the whole board is visible, so nothing is taken
+            // away by owning that axis here.
+            const FVector2D View = AllottedGeometry.GetLocalSize();
+            if (View.GetMin() > 1)
+            {
+                const FVector2D Scaled = BoardSize * Zoom;
+                FVector2D Wanted = Pan;
+                if (Scaled.X <= View.X) Wanted.X = (View.X - Scaled.X) * 0.5;
+                if (Scaled.Y <= View.Y) Wanted.Y = (View.Y - Scaled.Y) * 0.5;
+                if (!Wanted.Equals(Pan, 0.5))
+                {
+                    Pan = Wanted;
+                    ApplyTransform();
+                }
             }
         }
 
@@ -855,9 +940,10 @@ namespace
         void ZoomAbout(const FVector2D& LocalPoint, float Notches)
         {
             const float Previous = Zoom;
-            // Wheel up (or +) is NEAR, wheel down (or -) is FAR. Two levels,
-            // so the notch count does not matter — only its sign.
-            Zoom = Notches > 0.0f ? NearZoom : FitZoom();
+            // Wheel up is nearer, wheel down is further, one step per notch,
+            // and the floor is the whole board: you can never zoom out past
+            // "all of it" and lose the thing you were reading.
+            Zoom = FMath::Clamp(Zoom * FMath::Pow(ZoomStep, Notches), FitZoom(), MaxZoom);
             if (FMath::IsNearlyEqual(Previous, Zoom)) return;
             // Keep the board point under LocalPoint exactly where it is:
             //   board = (Local - Pan) / Previous, and Pan' = Local - Zoom*board.
@@ -873,11 +959,17 @@ namespace
             const FVector2D Scaled = BoardSize * Zoom;
             auto ClampAxis = [](float Offset, float Content, float Visible)
             {
-                // Smaller than the window: pinned inside it. Larger: the edges
-                // may not be dragged past the window, so the board can never
-                // be flung somewhere the player cannot find it again.
+                // Smaller than the window: CENTRED in it, not merely pinned
+                // inside it. Clamping to a range let a board that fits sit
+                // anywhere in that range, and a pan restored from a rebuild
+                // that happened before the panel had its final width put the
+                // whole core wheel hard against the left edge of its own board
+                // — which is what shipped. There is nothing to pan to when the
+                // board fits, so there is nothing to preserve either.
+                // Larger: the edges may not be dragged past the window, so the
+                // board can never be flung somewhere it cannot be found again.
                 return Content <= Visible
-                    ? FMath::Clamp(Offset, 0.0f, Visible - Content)
+                    ? (Visible - Content) * 0.5f
                     : FMath::Clamp(Offset, Visible - Content, 0.0f);
             };
             Pan.X = ClampAxis(static_cast<float>(Pan.X), static_cast<float>(Scaled.X), static_cast<float>(View.X));
@@ -905,6 +997,7 @@ namespace
         float DefaultZoom = 1.0f;
         bool bDragging = false;
         bool bFitOnOpen = false;
+        float MinOpenZoom = 0.0f;
         FOnBoardViewChanged OnViewChanged;
     };
 
@@ -933,8 +1026,14 @@ namespace
                 BorderEmphasis);
         };
 
-        return MakePlate(
-            SNew(SHorizontalBox)
+        // THE CHIPS ALONE, for a caller that already has a row to put them in.
+        // Owner: "so much information everywhere". This used to be its own
+        // plate, its own border and its own band of vertical space above the
+        // board, carrying the word VIEW and a hint — "WHEEL ZOOMS AT THE CURSOR
+        // · DRAG THE BOARD TO PAN" — that the footer of the same screen already
+        // states. The chips are what the row was for; the rest was the row
+        // explaining itself.
+        return SNew(SHorizontalBox)
             + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
             [
                 MenuText(FText::FromString(TEXT("VIEW")), BreakerUI::TypeCaption, Muted, true)
@@ -951,17 +1050,7 @@ namespace
             [
                 MakeStep(TEXT("RESET VIEW"), 0.0f)
             ]
-            + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).HAlign(HAlign_Right)
-            [
-                // Clipped, because an SHorizontalBox draws an oversized child
-                // straight through its neighbour rather than shrinking it.
-                SNew(SBox).Clipping(EWidgetClipping::ClipToBounds).HAlign(HAlign_Right)
-                [
-                    MenuText(FText::FromString(TEXT("WHEEL ZOOMS AT THE CURSOR  ·  DRAG THE BOARD TO PAN")),
-                        BreakerUI::TypeCaption, Muted, true)
-                ]
-            ],
-            BreakerUI::BgRaised, BorderEmphasis, FMargin(BreakerUI::Space16, BreakerUI::Space4));
+            ;
     }
 
     // Diamond markers are square markers turned 45 degrees. The rotation is a
@@ -7903,12 +7992,14 @@ namespace
             case ESkillMarkerKind::Notable:
             {
                 const float Core = FMath::Max(6.0f, MarkerPixels * 0.27f);
-                return SNew(SBox).WidthOverride(Core).HeightOverride(Core)[SolidDisc(StateColor, Core)];
+                return SNew(SBox).WidthOverride(Core).HeightOverride(Core)
+                    [SNew(SImage).Image(BreakerMenuNodeBrush(Core, StateColor, FLinearColor::Transparent, 0.0f))];
             }
             case ESkillMarkerKind::Convergence:
             {
                 const float Core = FMath::Max(8.0f, MarkerPixels * 0.31f);
-                return SNew(SBox).WidthOverride(Core).HeightOverride(Core)[SolidDisc(StateColor, Core)];
+                return SNew(SBox).WidthOverride(Core).HeightOverride(Core)
+                    [SNew(SImage).Image(BreakerMenuNodeBrush(Core, StateColor, FLinearColor::Transparent, 0.0f))];
             }
             case ESkillMarkerKind::Keystone:
             {
@@ -8409,19 +8500,14 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         const FLinearColor& Fill, const FLinearColor& Ring, float RingThickness,
         const TSharedRef<SWidget>& Inner, float MarkerSize) -> TSharedRef<SWidget>
     {
-        // ROUND, RINGED, AND STILL A BUTTON. The ring is a disc behind the
-        // button rather than a square border around it, so a node reads as a
-        // node at any size instead of as a tile.
-        return SNew(SBorder)
-            .BorderImage(BreakerMenuDiscBrush(MarkerSize))
-            .BorderBackgroundColor(Ring)
-            .Padding(FMargin(RingThickness))
-            .HAlign(HAlign_Center)
-            .VAlign(VAlign_Center)
+        // ROUND, RINGED, AND STILL A BUTTON — as ONE primitive. The ring is the
+        // brush's own outline rather than a second widget behind the button, so
+        // there is no seam to quantise and the node stays exact at any zoom.
+        return SNew(SBox).WidthOverride(MarkerSize).HeightOverride(MarkerSize)
             [
             SNew(SButton)
-            .ButtonStyle(BreakerMenuDiscButtonStyle(FMath::Max(2.0f, MarkerSize - RingThickness * 2.0f)))
-            .ButtonColorAndOpacity(Fill)
+            .ButtonStyle(BreakerMenuNodeButtonStyle(MarkerSize, Fill, Ring, RingThickness))
+            .ButtonColorAndOpacity(FLinearColor::White)
             .ContentPadding(FMargin(0.0f))
             .HAlign(HAlign_Center)
             .VAlign(VAlign_Center)
@@ -8588,7 +8674,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             [SNew(SBox).WidthOverride(BoardWidth).HeightOverride(BoardHeight)
                 [SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush"))).BorderBackgroundColor(Panel).Padding(0)[Canvas]]];
         return SNew(SVerticalBox)
-            + SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, BreakerUI::Space8)[MakeBoardViewControls(Viewport)]
+            + SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, BreakerUI::Space8)
+            [MakePlate(MakeBoardViewControls(Viewport), BreakerUI::BgRaised, BorderEmphasis,
+                FMargin(BreakerUI::Space16, BreakerUI::Space4))]
             + SVerticalBox::Slot().FillHeight(1.0f)
                 [SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush"))).BorderBackgroundColor(Panel).Padding(0)[Viewport.ToSharedRef()]];
     };
@@ -8760,24 +8848,59 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             const TSharedRef<SWidget> Core = MakeMarkerCore(Kind, Rung.Core, MarkerFill, NodeSize);
             TSharedRef<SWidget> Marker = bFocused && !bSealed
                 ? WireMarker(CoreTree, Node, View, bPurchasable, LockReason, MarkerFill, MarkerRing, RingWidth, Core, NodeSize)
-                : SNew(SBorder).BorderImage(BreakerMenuDiscBrush(NodeSize))
-                    .BorderBackgroundColor(MarkerRing).Padding(FMargin(RingWidth))
-                    .HAlign(HAlign_Center).VAlign(VAlign_Center)
-                    [SNew(SBorder).BorderImage(BreakerMenuDiscBrush(FMath::Max(2.0f, NodeSize - RingWidth * 2.0f)))
-                        .BorderBackgroundColor(MarkerFill).Padding(FMargin(0.0f))
-                        .HAlign(HAlign_Center).VAlign(VAlign_Center)[Core]];
+                : StaticCastSharedRef<SWidget>(SNew(SBorder)
+                    .BorderImage(BreakerMenuNodeBrush(NodeSize, MarkerFill, MarkerRing, RingWidth))
+                    .BorderBackgroundColor(FLinearColor::White).Padding(FMargin(0.0f))
+                    .HAlign(HAlign_Center).VAlign(VAlign_Center)[Core]);
             if (bRoleLayout && !bFocused)
             {
                 const FName WedgeId = Node->Constellation;
                 Marker = SNew(SButton).ContentPadding(0)
-                    .ButtonStyle(BreakerMenuDiscButtonStyle(NodeSize))
-                    .ButtonColorAndOpacity(Rung.Fill)
+                    .ButtonStyle(BreakerMenuNodeButtonStyle(NodeSize, MarkerFill, MarkerRing, RingWidth))
+                    .ButtonColorAndOpacity(FLinearColor::White)
                     .ToolTipText(FText::FromString(View.Name + TEXT(" — ") + RankLabel(Rank, Node->MaxRank)))
                     .OnClicked(FOnClicked::CreateLambda([this, WedgeId]()
                     { SkillExpandedConstellation = WedgeId; ResetBoardView(); Rebuild(EBreakerMenuScreen::SkillTrees); return FReply::Handled(); }))
                     [Marker];
             }
             AddLabel(*Center, bRoleLayout ? FVector2D(NodeSize, NodeSize) : bFocused ? FVector2D(44, 44) : FVector2D(32, 32), Marker);
+
+            // MORE OF THE NODE AS YOU COME CLOSER. Owner: "as you zoom in you
+            // get more clarification on what the node is, but you could still
+            // tell what it is from a distance". From a distance a node is its
+            // shape, its size and its sector's colour; past this zoom it also
+            // says its name.
+            //
+            // COLLAPSED, NOT REBUILT. The visibility is an attribute over the
+            // zoom the viewport publishes, so crossing the threshold costs one
+            // predicate per node per frame and no rebuild — rebuilding the
+            // board from inside a wheel event would be destroying the widget
+            // that is handling it.
+            //
+            // Named roles only. A minor is one line of a lane and its name is
+            // its rank card's business; twenty-two wedges of every node shouting
+            // at once is the board this pass is undoing.
+            const bool bNamedRole = bRoleLayout && !bFocused
+                && (Node->CoreRole == EBreakerCoreNodeRole::Gateway
+                    || Node->CoreRole == EBreakerCoreNodeRole::LaneNotable
+                    || Node->CoreRole == EBreakerCoreNodeRole::Convergence
+                    || Node->CoreRole == EBreakerCoreNodeRole::Keystone);
+            if (bNamedRole)
+            {
+                // Authored at twice the size it is wanted at, because it first
+                // appears at about half zoom.
+                constexpr int32 NodeNameSize = 22;
+                TSharedRef<STextBlock> NameBlock = MenuText(FText::FromString(View.Name),
+                    NodeNameSize, bOwned || bPurchasable ? Primary : Muted, true);
+                NameBlock->SetJustification(ETextJustify::Center);
+                NameBlock->SetVisibility(TAttribute<EVisibility>::CreateLambda([this]()
+                {
+                    return SkillBoardZoom >= BreakerMenuNodeNameZoom
+                        ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
+                }));
+                AddLabel(*Center + FVector2D(0.0f, NodeSize * 0.5f + NodeNameSize * 0.9f),
+                    FVector2D(NodeNameSize * 11.0f, NodeNameSize * 1.6f), NameBlock);
+            }
             if (bFocused && bRoleLayout && Node->CoreRole == EBreakerCoreNodeRole::LaneMinor)
             {
                 TSharedRef<SHorizontalBox> Pips = SNew(SHorizontalBox);
@@ -8843,6 +8966,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         SAssignNew(Viewport, SBreakerBoardViewport)
             .BoardSize(Layout.Size)
             .FitOnOpen(SkillBoardZoom <= 0.0f)
+            // A minor node is 34 canvas units, so this opens it at about
+            // eighteen pixels — small, but a disc with a ring rather than a
+            // speck, and the wedge you are looking at is legible without a
+            // gesture. O2 PLACEHOLDER.
+            .MinOpenZoom(0.0f)
             .InitialZoom(SkillBoardZoom > 0.0f ? SkillBoardZoom : OpeningZoom)
             .InitialPan(SkillBoardZoom > 0.0f ? SkillBoardPan : OpeningPan)
             .OnViewChanged(FOnBoardViewChanged::CreateSP(this, &SBreakerMenu::HandleBoardViewChanged))
@@ -8860,12 +8988,15 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         Heading->AddSlot().FillWidth(1).VAlign(VAlign_Center)
             [MenuText(FText::FromString(bStructuralPreview ? FString(TEXT("STRUCTURAL PREVIEW — ")) + (bFocused ? SkillExpandedConstellation.ToString().ToUpper() : TEXT("187 NODES / 22 WEDGES")) : bFocused ? SkillExpandedConstellation.ToString().ToUpper() : TEXT("CORE CONSTELLATIONS")),
                 BreakerUI::TypeH2, Primary, true)];
-        Heading->AddSlot().AutoWidth().VAlign(VAlign_Center)
+        Heading->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, BreakerUI::Space16, 0)
             [MenuText(FText::FromString(FString::Printf(TEXT("%d / %d INVESTED"), TreeSpent, TreeTotal)), BreakerUI::TypeCaption, Muted, true)];
+        // The view chips live in the heading rather than in a band of their own
+        // between it and the board: one row of chrome above a map instead of
+        // two.
+        Heading->AddSlot().AutoWidth().VAlign(VAlign_Center)[MakeBoardViewControls(Viewport)];
         return SNew(SVerticalBox)
             + SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 8)
             [MakePlate(Heading, BreakerUI::BgRaised, Amber, FMargin(16, 8))]
-            + SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 8)[MakeBoardViewControls(Viewport)]
             + SVerticalBox::Slot().FillHeight(1)
             [SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
                 .BorderBackgroundColor(BreakerUI::BgRaised).Padding(0)[Viewport.ToSharedRef()]];

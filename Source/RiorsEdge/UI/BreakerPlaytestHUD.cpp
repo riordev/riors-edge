@@ -716,8 +716,13 @@ void ABreakerPlaytestHUD::DrawVitals(const ABreakerCharacter* Character)
     const float ValueTop = S(BreakerUI::HudVitalsTop);
     const FVector2D ValueSize = MeasureSpecText(Vitals.HealthText, BreakerUI::HudVitalsValuePixels, ESpecFontRole::Mono);
     const FVector2D MaxSize = MeasureSpecText(Vitals.MaxText, BreakerUI::HudVitalsMaxPixels, ESpecFontRole::Mono);
-    DrawSpecText(Vitals.HealthText, Left, ValueTop,
-        BreakerHUDMath::VitalsValueIsHarm(HealthFraction) ? BreakerUI::Harm : BreakerUI::System,
+    // THE NUMBER STAYS WHITE (owner, and it is the other half of colouring the
+    // bar): the figure used to turn harm-red near death, which was the only
+    // state colour this cluster had. Now the BAR is red and the number is the
+    // reading, so turning the number red as well would say the same thing
+    // twice and leave the player with nothing that is simply legible. The
+    // near-death tell is the frame pulse, which is a different instrument.
+    DrawSpecText(Vitals.HealthText, Left, ValueTop, BreakerUI::System,
         BreakerUI::HudVitalsValuePixels, 1.0f, ESpecFontRole::Mono);
     // THE MAX ALWAYS PRINTS, and this overturns my own de-clutter from the last
     // cycle. It used to be hidden at full health on the argument that "162 162"
@@ -788,7 +793,14 @@ void ABreakerPlaytestHUD::DrawVitals(const ABreakerCharacter* Character)
     const float HealthWidth = Width * HealthShare;
     const float ShieldWidth = Width - HealthWidth;
 
-    DrawTrack(Left, HealthY, HealthWidth, HealthH, HealthFraction, BreakerUI::System, BreakerUI::BgBase);
+    // AND THE BAR CARRIES THE ALARM the number used to. Past the low line the
+    // fill drops from the health red to HARM itself: same hue family, louder
+    // and darker, so the change reads as a state rather than as a different
+    // readout. VitalsValueIsHarm is the same predicate and the same line the
+    // number used, moved to the instrument that is now doing the talking.
+    DrawTrack(Left, HealthY, HealthWidth, HealthH, HealthFraction,
+        BreakerHUDMath::VitalsValueIsHarm(HealthFraction) ? BreakerUI::Harm : BreakerUI::VitalHealth,
+        BreakerUI::VitalHealthDeep);
     if (ChipFraction > HealthFraction)
     {
         const float ChipX = Left + HealthWidth * HealthFraction;

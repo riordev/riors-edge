@@ -69,6 +69,45 @@ only, and the part still unruled is whether the CLASS board tab and the COMMIT
 TO THIS BRANCH control should also wait for that first payment. Hiding the
 wallet while the commit button still sits there is the state to look at.
 
+THE TREE, SECOND VISUAL PASS (his third message: "I really wanted the circles
+of the tree to flow better ... the resolution of the preexisting ones that have
+just been remade are really low ... I like the high quality, spherical shape ...
+zoomed out it looks good, but as you zoom in you get more clarification on what
+the node is"):
+- ONE PRIMITIVE PER NODE. The first round pass stacked a disc inside a disc
+  inside a disc to make a ring, a face and a core: three widgets, three
+  quantised rectangles, and at the fit zoom the ring landed on a half pixel and
+  smeared. Slate's rounded box draws its outline in the SAME primitive as its
+  fill, on the shader's distance field, so a node is now exact at every zoom.
+  Colours live in the brush rather than in a tint, because a tint multiplies
+  fill and outline together and cannot put a bright ring on a dark face.
+- CONTINUOUS ZOOM. The wheel snapped between exactly two levels, the whole
+  board or 1:1, so there was no "in a bit". One step per notch now, floored at
+  the whole board and ceilinged past 1:1 (the brushes are vector, so enlarging
+  costs nothing).
+- AND MORE OF THE NODE AS YOU COME CLOSER: past 0.63 zoom every gateway,
+  notable, convergence and keystone says its name. Collapsed, not rebuilt — the
+  visibility is an attribute over the published zoom, because rebuilding the
+  board from inside a wheel event would destroy the widget handling it.
+- A SHIPPED BUG FELL OUT OF IT: the core wheel sat hard against the LEFT EDGE
+  of a board twice its width. The opening pan is computed from a measured panel
+  width and the viewport is re-created on every rebuild with the pan it last
+  published, and either can predate the panel having its final size. A board
+  that fits its window is centred in it every frame now.
+- HUD: health is red and the number stays white (the near-death tell moved from
+  the figure to the bar, which is the instrument now doing the talking); the XP
+  rail dropped six pixels off the resource track above it.
+- AND ONE MORE BAND OF CHROME WENT: the VIEW row was its own plate, its own
+  border and its own hint — "WHEEL ZOOMS AT THE CURSOR - DRAG THE BOARD TO PAN"
+  — which the footer of the same screen already states. The chips moved into
+  the heading and the board got the height.
+- A FLAKE WAS CLOSED, NOT PAPERED OVER: Campaign.FernhallCacheRuntime went red
+  once and green on a re-run with nothing changed. Chest placement is rolled per
+  session and the F-key search returns the NEAREST interactable, so two chests
+  landing within a search radius made "standing in front of one finds that one"
+  a coin flip. A chest with a nearer neighbour is skipped and said out loud; the
+  claim asserted below the loop is that the search reaches a chest at all.
+
 THE TREE, RESHAPED (his second message, with two passive trees attached:
 "why can't we do somehing like this for the skill tree that you can zoom and
 look around on and honestly the boxy nodes are bad"):
