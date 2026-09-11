@@ -1,12 +1,47 @@
 # Desk — next playtest
 
-## Cycle — OWNER PLAYTEST, 2026-09-11 (FIFTH), SECOND HALF
+## OWNER PLAYTEST, 2026-09-11 (FIFTH) — LANDED, THE SECOND HALF
 
-- [ ] "multiple quests cannot be held (or rather it doesnt show you where
-      they are or what needs to happen)"
-- [ ] "only one weapon has a model and thats the standard issue rifle
-      everything else uses ugly random guns or different arms"
-- [ ] "the sounds are still rough they sound really flat or ticky"
+- "multiple quests cannot be held (or rather it doesnt show you where they
+  are or what needs to happen)" — the journal held them; the tracker drew
+  one line, the first mission's beat, and returned. Quest.Watch (the
+  Watchkeeper's, in no mission) never appeared. TrackerLines now: the beat,
+  then one line per unmissioned quest with its objective text and n/N;
+  the HUD stacks them. WHERE: the local map already flagged the beat's
+  NPC / door / gate as the objective; the HUD now prints the objective's
+  distance when nothing is tracked, and a gold OBJECTIVE word under the
+  NPC or gate that is it. When the beat's NPC is in another map (his
+  frame: Quartermaster, from Fernhall) the gate home is the objective.
+  PHOTOGRAPHED: "Travel · 48m" under the beat line in the Gym.
+  FOUND: the reverse (NPC in a field zone, player in the Anchor) has no
+  gate marker — the beat names an NPC, not a world; a destination on
+  contact beats is LEDGER plumbing not yet built. Quest.Watch's counter
+  is unscoped, so no marker on the substation door: it would be a lie.
+- "only one weapon has a model … everything else uses ugly random guns or
+  different arms" — two gates from c72845d5: five archetypes mapped to the
+  flat gun-pack, two to primitives, and the skeletal arms were withheld
+  from everything but the Rifle by one `&&`. Every archetype names a
+  sci-fi gun now — Sidearm wears Gun_Pistol and Sniper Gun_Sniper (both
+  shipped, textured, and never wired); SMG, Shotgun, Rocket, BurstRifle,
+  Machinegun wear Gun_Rifle scaled to their own silhouette — all on the
+  same arms at the same hand points. PHOTOGRAPHED: the Shotgun on the
+  rifle's arms. Pistol and Sniper resolve by test; his eyes are owed.
+  ASSETS: no textured SMG / burst / MG / shotgun / rocket mesh in any
+  vendored pack; no one-hand or pump pose (the rifle anim set is the only
+  one), so the pistol's support hand floats ~15 cm past its muzzle.
+- "the sounds are still rough they sound really flat or ticky" — three
+  things were true. The rifle's 0.9 s recording (weapon_fire.wav) was
+  loaded and never played: 20978c0f routed every gun to a 140 ms synth
+  burst while claiming the rifle unmoved. One voice per verb cut every
+  shot's tail at 600 RPM. Nothing varied. Now: the Rifle plays the
+  recording; fire rotates three voices so a shot rings under the next;
+  every play carries a deterministic ±6% pitch (O2).
+  ASSETS, recorded, not faked: seven guns have no recording
+  (weapon_fire_<Archetype>.wav); the hit confirm is a 90 ms transient
+  per round; the kill confirm (1.33 s) is loaded and unplayed by ruling;
+  death / level-up / entropy / void / rift / reaction are pure sines and
+  will stay flat until a sample exists; no reverb submix anywhere. Code
+  cannot make a sine not flat.
 
 ## OWNER PLAYTEST, 2026-09-11 (SIXTH) — LANDED, THE RIFT'S END
 

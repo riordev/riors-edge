@@ -115,7 +115,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerNamedWeaponResolveTest::RunTest(const FString& Parameters)
 {
-    const FString WeaponsDir = FPaths::ProjectContentDir() / TEXT("Breaker/Meshes/weapons/gun-pack");
+    const FString WeaponsDir = FPaths::ProjectContentDir() / TEXT("Breaker/Meshes/weapons/sci-fi");
     if (!IFileManager::Get().DirectoryExists(*WeaponsDir))
     {
         return true;
@@ -131,9 +131,9 @@ bool FBreakerNamedWeaponResolveTest::RunTest(const FString& Parameters)
                 Index, *Layout.NamedMeshPath.ToString()),
             Layout.NamedMeshPath.TryLoad());
     }
-    // Six named, two deliberately primitive (Shotgun, Rocket — no vendored
-    // candidate). A seventh named gun is fine; a fifth is a lost mapping.
-    TestTrue(TEXT("at least six archetypes carry a named gun"), Named >= 6);
+    // Every archetype carries a named gun. One fewer is a lost mapping.
+    TestEqual(TEXT("every archetype carries a named gun"), Named,
+        static_cast<int32>(EBreakerWeaponArchetype::Count));
     return true;
 }
 
@@ -152,7 +152,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerNamedWeaponFacesForwardTest::RunTest(const FString& Parameters)
 {
-    const FString WeaponsDir = FPaths::ProjectContentDir() / TEXT("Breaker/Meshes/weapons/gun-pack");
+    const FString WeaponsDir = FPaths::ProjectContentDir() / TEXT("Breaker/Meshes/weapons/sci-fi");
     if (!IFileManager::Get().DirectoryExists(*WeaponsDir))
     {
         return true;

@@ -3,6 +3,7 @@
 	"strings": {
 		"hud.death.redeploying": "REDEPLOYING",
 		"hud.callout.eliteDown": "ELITE DOWN",
+		"hud.objective": "OBJECTIVE",
 		"hud.callout.overdriveActive": "OVERDRIVE ACTIVE",
 		"hud.callout.marked": "MARKED",
 		"hud.callout.dodged": "DODGED",

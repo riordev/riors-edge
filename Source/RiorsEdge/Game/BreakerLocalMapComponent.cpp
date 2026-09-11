@@ -101,6 +101,7 @@ TArray<FBreakerLocalMapMarker> UBreakerLocalMapComponent::GetMarkers() const
     const auto* Beat = BreakerMapCurrentBeat(GetOwner());
     const auto* Mode = Cast<ABreakerGameMode>(World->GetAuthGameMode());
     const FString Region = UGameplayStatics::GetCurrentLevelName(this, true) + (Mode && Mode->IsRiftInstance() ? TEXT(".instance") : TEXT(""));
+    TArray<int32> HomeGates;
     for (TActorIterator<ABreakerTravelPoint> It(World); It; ++It)
     {
         if (!IsValid(*It)) continue;
@@ -108,12 +109,15 @@ TArray<FBreakerLocalMapMarker> UBreakerLocalMapComponent::GetMarkers() const
         Marker.Location = It->GetActorLocation(); Marker.Label = It->GetDisplayName(); Marker.Detail = It->GetDisplayDetail();
         const auto* Door = Cast<ABreakerRiftDoor>(*It);
         Marker.bRift = Door != nullptr;
+        const auto Destinations = It->GetAvailableDestinations();
+        if (Destinations.ContainsByPredicate([](const auto& Destination) { return Destination.Id == ABreakerTravelPoint::HubDestinationId; }))
+            HomeGates.Add(Out.Num() - 1);
         if (Beat)
         {
             if ((Beat->Kind == EBreakerMissionBeatKind::Encounter || Beat->Kind == EBreakerMissionBeatKind::Boss)
                 && Door && !Beat->Rift.IsNone()) Marker.bObjective = Door->Rift.EncounterId == Beat->Rift;
             else if (Beat->Kind == EBreakerMissionBeatKind::Travel)
-                Marker.bObjective = It->GetAvailableDestinations().ContainsByPredicate([Beat](const auto& Destination)
+                Marker.bObjective = Destinations.ContainsByPredicate([Beat](const auto& Destination)
                     { return Destination.Id == Beat->Destination; });
         }
         // Generic gates have no authored registry id. Their fixed site coordinates
@@ -167,6 +171,8 @@ TArray<FBreakerLocalMapMarker> UBreakerLocalMapComponent::GetMarkers() const
         auto& Marker=Out.AddDefaulted_GetRef();Marker.Id=It->IsExtraction()?FName(TEXT("RedBasin.Extraction")):FName(TEXT("RedBasin.Recovery"));
         Marker.Label=It->GetDisplayName();Marker.Detail=It->GetRecorderPrompt();Marker.Location=It->GetActorLocation();Marker.bObjective=true;
     }
+    const bool bContactBeat = Beat && (Beat->Kind == EBreakerMissionBeatKind::Dialogue || Beat->Kind == EBreakerMissionBeatKind::Return);
+    bool bContactHere = false;
     for (TActorIterator<ABreakerNPC> It(World); It; ++It)
     {
         // A CHEST IS NOT ON THE MAP, DELIBERATELY. It is placed by a session
@@ -182,9 +188,17 @@ TArray<FBreakerLocalMapMarker> UBreakerLocalMapComponent::GetMarkers() const
             FMath::RoundToInt(Position.X), FMath::RoundToInt(Position.Y), FMath::RoundToInt(Position.Z));
         Marker.Id = FName(*(Region + TEXT(".npc.") + Site));
         Marker.Detail = FText::FromString(TEXT("SERVICE / CONTACT"));
-        Marker.bObjective = Beat && (Beat->Kind == EBreakerMissionBeatKind::Dialogue || Beat->Kind == EBreakerMissionBeatKind::Return)
-            && !It->DialogueId.IsNone() && It->DialogueId == Beat->Npc;
+        Marker.bObjective = bContactBeat && !It->DialogueId.IsNone() && It->DialogueId == Beat->Npc;
+        bContactHere |= Marker.bObjective;
     }
+    // THE WAY TO THE QUARTERMASTER FROM FERNHALL IS THE GATE HOME. A contact
+    // beat whose NPC stands in no actor of this world has nothing here to pin,
+    // and the player was left with a tracker line and an empty map. The gates
+    // that offer the hub carry the objective instead. Gap: a contact who lives
+    // in a field zone while the player stands in the hub gets no gate marker —
+    // the beat names an NPC, not the world that NPC lives in.
+    if (bContactBeat && !bContactHere)
+        for (int32 Index : HomeGates) Out[Index].bObjective = true;
     // This authored world encounter already has a dedicated live actor. Guide
     // the current investigation to that actor without inventing discovery or
     // marking every ordinary enemy as a map site.

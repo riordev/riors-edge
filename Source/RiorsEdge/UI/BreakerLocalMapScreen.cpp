@@ -1,4 +1,5 @@
 #include "UI/BreakerMenu.h"
+#include "Data/BreakerStrings.h"
 #include "Characters/BreakerCharacter.h"
 #include "Game/BreakerLocalMapComponent.h"
 #include "UI/BreakerTypeRoles.h"
@@ -84,7 +85,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildLocalMapScreen()
     {
         if (!Map->IsVisible(Marker)) continue;
         const FString Detail = Marker.Detail.IsEmpty() ? TEXT("") : Marker.Detail.ToString() + TEXT("   ·   ");
-        const FString Caption = FString::Printf(TEXT("%d   %s%s\n%s%dm"), ++Index, Marker.bObjective ? TEXT("OBJECTIVE · ") : TEXT(""), *Marker.Label.ToString(), *Detail,
+        const FString Caption = FString::Printf(TEXT("%d   %s%s\n%s%dm"), ++Index, Marker.bObjective ? *(BreakerStrings::Get(EBreakerStringKey::HudObjective) + TEXT(" · ")) : TEXT(""), *Marker.Label.ToString(), *Detail,
             FMath::RoundToInt(FVector::Dist2D(Player->GetActorLocation(), Marker.Location) / 100));
         List->AddSlot().AutoHeight().Padding(0,0,0,8)
         [

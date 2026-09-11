@@ -27,16 +27,24 @@ bool FBreakerAudioVolumeRoutingTest::RunTest(const FString& Parameters)
     if (!TestNotNull(TEXT("Sound director"), Director)) return false;
     TArray<UAudioComponent*> Voices;
     Director->GetComponents(Voices);
-    // ELEVEN, DOWN FROM THIRTEEN (owner, playtest 2026-09-10). The footstep and
-    // take-hit voices are gone with the cues they carried: "i dont need audio
-    // of my character groaning when i take damage (its so fucking annoying same
-    // thing with footsteps)". This count is not a range being widened to go
-    // green — it is the roster, and the roster shrank by decision. The
-    // ASSERTION it exists for is the one below: every voice that remains is
-    // routed through the settings pool.
-    if (!TestEqual(TEXT("All eleven player cues have voices"), Voices.Num(), 11)) return false;
+    // THIRTEEN: ten single voices plus the weapon-fire pool of three. The
+    // footstep and take-hit voices are gone with the cues they carried
+    // (owner, playtest 2026-09-10: "i dont need audio of my character groaning
+    // when i take damage (its so fucking annoying same thing with
+    // footsteps)"), and weapon fire went from one voice to a round-robin of
+    // three so a shot stops cutting the previous shot's tail ("ticky"). This
+    // count is not a range being widened to go green — it is the roster, and
+    // the roster moved by decision both times. The ASSERTION it exists for is
+    // the one below: every voice, pool slots included, is routed through the
+    // settings pool.
+    if (!TestEqual(TEXT("All thirteen player cue voices exist"), Voices.Num(), 13)) return false;
     TestFalse(TEXT("Footsteps are gone, not merely silenced"), Voices.ContainsByPredicate([](const UAudioComponent* Voice) { return Voice->GetFName() == TEXT("FootstepVoice"); }));
     TestFalse(TEXT("The take-hit vocal is gone with them"), Voices.ContainsByPredicate([](const UAudioComponent* Voice) { return Voice->GetFName() == TEXT("TakeHitVoice"); }));
+    TestFalse(TEXT("The single fire voice is gone, replaced by the pool"), Voices.ContainsByPredicate([](const UAudioComponent* Voice) { return Voice->GetFName() == TEXT("FireVoice"); }));
+    for (const TCHAR* Slot : {TEXT("FireVoice0"), TEXT("FireVoice1"), TEXT("FireVoice2")})
+    {
+        TestTrue(FString::Printf(TEXT("Fire pool slot %s exists"), Slot), Voices.ContainsByPredicate([Slot](const UAudioComponent* Voice) { return Voice->GetFName() == Slot; }));
+    }
     TestTrue(TEXT("Void activation has its own voice"), Voices.ContainsByPredicate([](const UAudioComponent* Voice) { return Voice->GetFName() == TEXT("VoidMarkVoice"); }));
     TestTrue(TEXT("Void payout has its own voice"), Voices.ContainsByPredicate([](const UAudioComponent* Voice) { return Voice->GetFName() == TEXT("VoidBurstVoice"); }));
     TestTrue(TEXT("Rift activation has its own voice"), Voices.ContainsByPredicate([](const UAudioComponent* Voice) { return Voice->GetFName() == TEXT("RiftVoice"); }));

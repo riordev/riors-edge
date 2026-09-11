@@ -140,11 +140,15 @@ bool FBreakerWeaponVoiceTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("a sniper lasts longer than an SMG"), Sniper.Samples > SMG.Samples);
     TestTrue(TEXT("a shotgun hits harder than a sidearm"), Shotgun.Rms > Sidearm.Rms);
 
-    // THE RIFLE IS UNMOVED, which is deliberate and worth pinning: it is the
-    // gun the owner has held through every playtest, and this pass must not
-    // change it underneath him while giving the other seven a voice. Its
-    // duration is still the shared FireDurationSeconds.
-    TestEqual(TEXT("the rifle keeps the shipped report length"),
+    // THE RIFLE'S SYNTH VOICE IS THE FLOOR, NOT WHAT SHIPS. This file measures
+    // renders, not routing: in the shipped configuration the director routes
+    // the Rifle to the weapon_fire.wav recording, and this synth voice plays
+    // only for a clone with no audio assets or a file that failed to load.
+    // An earlier pass pinned this as "the rifle is unmoved" — it was not; the
+    // recording had been cut out of the route and this synth played instead.
+    // What is pinned is that the floor still renders at the shared
+    // FireDurationSeconds, so RenderWeaponFire and FireVoiceFor(Rifle) agree.
+    TestEqual(TEXT("the rifle's synth floor keeps the shared report length"),
         BreakerSound::FireVoiceFor(EBreakerWeaponArchetype::Rifle).DurationSeconds,
         BreakerSound::FireDurationSeconds);
 

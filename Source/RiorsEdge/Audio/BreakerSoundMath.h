@@ -59,6 +59,22 @@ namespace BreakerSound
         return static_cast<float>(H) * (2.0f / 4294967295.0f) - 1.0f;
     }
 
+    // PER-PLAY PITCH. Every trigger of every verb was bit-identical: the same
+    // PCM at the same rate from the same phase, shot after shot. A body hears
+    // that sameness as "flat" — a real gun never makes the same sound twice,
+    // and an ear picks the repeat out of a burst before it can say why. So
+    // each play carries one pitch multiplier inside ±PitchSpread, drawn from
+    // the same integer hash the renders use: NoiseAt is already [-1, 1], so
+    // the spread is the whole of the map. NOT FRand — the sequence has to be
+    // walkable by a test, and a seeded stream a test cannot replay would make
+    // its range and mean unprovable. The PCM is untouched; the voice
+    // resamples on play, which is a free knob the director was never turning.
+    constexpr float PitchSpread = 0.06f;   // O2 PLACEHOLDER
+    inline float PitchForPlay(uint32 PlayIndex)
+    {
+        return 1.0f + PitchSpread * NoiseAt(PlayIndex ^ 0x51DEu);
+    }
+
     // Shared shape: a 2 ms attack ramp in and a hard fade over the final 10 ms
     // out, so no waveform ever starts or stops off zero. The decay between
     // them belongs to each sound.
@@ -218,10 +234,15 @@ namespace BreakerSound
             Voice.TailGain = 0.08f;     Voice.Gain = 0.48f;
             break;
         default:
-            // RIFLE, and it keeps the shipped numbers exactly. It is the gun
-            // the owner has spent every playtest holding, so it is the one that
-            // must not move underneath him in the same pass that gives the
-            // other seven a voice. The tail is the only addition.
+            // RIFLE. These are the original shared-burst numbers with a tail
+            // added, and the seven voices above are authored relative to them
+            // — but this render is NOT what the shipped Rifle plays. The
+            // director routes the Rifle to the weapon_fire.wav recording when
+            // that file loads (it ships), and this voice is the floor under
+            // it: a clone with no audio assets, or a broken file, hears this.
+            // An earlier pass claimed the rifle was "unmoved" by keeping these
+            // numbers; it was not — the recording it was supposed to play had
+            // been cut out of the route entirely and this synth played instead.
             Voice.TailDecay = 18.0f; Voice.TailGain = 0.12f;
             break;
         }

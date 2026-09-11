@@ -175,21 +175,27 @@ bool FBreakerSoundSynthShapeTest::RunTest(const FString& Parameters)
     // a format the reader speaks, or the fallback would engage silently over
     // a broken commit.
     //
-    // FIVE: ability_cast.wav joined this list the day it was authored (a cut
-    // from the converted Kenney set — provenance in SOURCES.txt), exactly per
-    // the deletion condition the four-name version of this comment carried.
-    // The per-ability overrides (ability_<Id>.wav) never join, because every
-    // one of them is optional by construction, and candidates/ is invisible
-    // here on purpose — audition copies are consumed by nothing.
+    // FOUR: the files the director names eagerly at BeginPlay and that ship.
+    // ability_cast.wav joined the day it was authored (a cut from the
+    // converted Kenney set — provenance in SOURCES.txt). take_hit.wav left
+    // when the take-hit verb was retired (owner, playtest 2026-09-10; the
+    // volume routing test records the voice is gone): the file may still sit
+    // on disk, but nothing names it, so pinning it asserts nothing about the
+    // game. The per-ability overrides (ability_<Id>.wav) never join, because
+    // every one of them is optional by construction, and candidates/ is
+    // invisible here on purpose — audition copies are consumed by nothing.
     // player_death.wav (O193) is named eagerly by the director but is not on
     // this list: no sample is authored and the synth is its floor. It joins
     // the day one is, under the same condition ability_cast.wav met.
+    //
+    // weapon_fire.wav is the one on this list that is now actually HEARD: it
+    // is the Rifle's report. The other three are heard on their verbs.
     {
         const FString AudioDir = FPaths::ProjectContentDir() / TEXT("Breaker/Audio");
         if (IFileManager::Get().DirectoryExists(*AudioDir))
         {
             for (const TCHAR* Name : {TEXT("weapon_fire.wav"), TEXT("hit_confirm.wav"),
-                TEXT("kill_confirm.wav"), TEXT("take_hit.wav"), TEXT("ability_cast.wav")})
+                TEXT("kill_confirm.wav"), TEXT("ability_cast.wav")})
             {
                 TArray<uint8> Bytes;
                 TestTrue(FString::Printf(TEXT("%s ships"), Name),
@@ -201,6 +207,52 @@ bool FBreakerSoundSynthShapeTest::RunTest(const FString& Parameters)
             }
         }
     }
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// PER-PLAY PITCH. Owner: the sounds are "really flat". Every play of every
+// verb was bit-identical, and this is the rule that ends that: one pitch
+// multiplier per play, inside ±PitchSpread, from the same replayable hash the
+// renders use. What a test can prove about it: it stays inside the spread
+// (a multiplier outside it is a different sound, not a variation), no two
+// consecutive plays match (the sameness was the finding), it centres on 1.0
+// (a spread with a bias would detune every gun, not vary it), and the
+// shipped spread is the number the owner will feel.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerSoundPitchVariationTest,
+    "RiorsEdge.Audio.PitchVariation",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerSoundPitchVariationTest::RunTest(const FString& Parameters)
+{
+    TestEqual(TEXT("PitchSpread ships at 0.06"), BreakerSound::PitchSpread, 0.06f);
+
+    const float Low = 1.0f - BreakerSound::PitchSpread;
+    const float High = 1.0f + BreakerSound::PitchSpread;
+    double Sum = 0.0;
+    float Previous = BreakerSound::PitchForPlay(0);
+    int32 OutOfRange = 0;
+    int32 Repeats = 0;
+    constexpr uint32 Plays = 1000;
+    for (uint32 PlayIndex = 1; PlayIndex <= Plays; ++PlayIndex)
+    {
+        const float Pitch = BreakerSound::PitchForPlay(PlayIndex);
+        if (Pitch < Low || Pitch > High) ++OutOfRange;
+        if (Pitch == Previous) ++Repeats;
+        Sum += Pitch;
+        Previous = Pitch;
+    }
+    TestEqual(TEXT("every play's pitch stays inside +-PitchSpread"), OutOfRange, 0);
+    TestEqual(TEXT("no two consecutive plays share a pitch"), Repeats, 0);
+    const double Mean = Sum / Plays;
+    TestTrue(FString::Printf(TEXT("the pitch centres on 1.0 (mean %.4f)"), Mean),
+        FMath::Abs(Mean - 1.0) < 0.01);
+
+    // Replayable: the whole point of a hash over a seeded stream.
+    TestEqual(TEXT("the sequence is deterministic"),
+        BreakerSound::PitchForPlay(37), BreakerSound::PitchForPlay(37));
     return true;
 }
 

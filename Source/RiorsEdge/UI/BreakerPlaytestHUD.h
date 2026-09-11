@@ -17,6 +17,9 @@
 // parameter, so UHT needs the complete type (same reason
 // BreakerMomentumComponent.h includes it).
 #include "Weapons/BreakerWeaponComponent.h"
+// The local map's marker row, held per frame (a TArray member needs the
+// complete type).
+#include "Game/BreakerLocalMapComponent.h"
 #include "BreakerPlaytestHUD.generated.h"
 
 class ABreakerCharacter;
@@ -170,6 +173,12 @@ private:
     void DrawZoneLine(const ABreakerCharacter* Character);
     // Top-right: the tracked quest as one right-aligned line.
     void DrawQuestLine(const ABreakerCharacter* Character);
+    // The local map's markers, walked once a frame. GetMarkers is four actor
+    // walks and a sort; the quest line and the world labels both read it, and
+    // a draw that asked three times a frame was three walks for one answer.
+    const TArray<FBreakerLocalMapMarker>& MarkersThisFrame(const ABreakerCharacter* Character);
+    TArray<FBreakerLocalMapMarker> FrameMarkers;
+    uint64 FrameMarkersStamp = 0;
     // The crosshair's hit / kill / weak-point marks, on the arrival clock.
     void DrawCrosshairMarks(const FVector2D& Center);
     // ---- Density instruments (see DrawHUD) --------------------------------

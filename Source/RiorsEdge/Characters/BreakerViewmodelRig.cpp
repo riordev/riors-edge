@@ -96,11 +96,7 @@ FBreakerViewmodelLayout BreakerViewmodel::ArchetypeLayout(EBreakerWeaponArchetyp
             Part(EBreakerProxyShape::Box,       FVector( 2.0f, 0.0f,-11.0f), FVector( 4.5f, 3.4f,21.0f),   Polymer, FRotator(-4.0f, 0.0f, 0.0f)),
             Part(EBreakerProxyShape::Box,       FVector(-4.0f, 0.0f, -7.0f), FVector( 4.5f, 3.8f,10.0f),   Polymer, FRotator(14.0f, 0.0f, 0.0f)),
         };
-        L.HipOffsetCm = FVector(46.0f, 14.0f, -13.0f);
         L.SightHeightCm = 6.5f;
-        L.AdsForwardCm = 46.0f;
-        L.SupportHandCm = FVector(21.0f, 0.0f, -4.5f);
-        L.FiringHandCm = FVector(-4.0f, 0.0f, -6.0f);
         L.MuzzleCm = FVector(34.5f, 0.0f, 1.5f);
         break;
 
@@ -119,11 +115,7 @@ FBreakerViewmodelLayout BreakerViewmodel::ArchetypeLayout(EBreakerWeaponArchetyp
             Part(EBreakerProxyShape::Box,       FVector(-11.0f,0.0f,  4.7f), FVector( 7.0f, 4.8f, 1.2f),   TapeOffWhite),
             Part(EBreakerProxyShape::Box,       FVector(-2.0f, 0.0f, -7.5f), FVector( 5.0f, 4.0f,10.0f),   Polymer, FRotator(12.0f, 0.0f, 0.0f)),
         };
-        L.HipOffsetCm = FVector(44.0f, 14.0f, -13.0f);
         L.SightHeightCm = 12.0f;
-        L.AdsForwardCm = 44.0f;
-        L.SupportHandCm = FVector(30.0f, 0.0f, -3.5f);
-        L.FiringHandCm = FVector(-2.0f, 0.0f, -6.5f);
         L.MuzzleCm = FVector(73.0f, 0.0f, 2.0f);
         break;
 
@@ -143,14 +135,7 @@ FBreakerViewmodelLayout BreakerViewmodel::ArchetypeLayout(EBreakerWeaponArchetyp
             Part(EBreakerProxyShape::Box,       FVector(-9.0f, 0.0f,  0.0f), FVector(22.0f, 5.0f, 8.0f),   Polymer),
             Part(EBreakerProxyShape::Box,       FVector(-1.0f, 0.0f, -8.0f), FVector( 5.5f, 4.5f,10.0f),   Polymer, FRotator(14.0f, 0.0f, 0.0f)),
         };
-        L.HipOffsetCm = FVector(46.0f, 15.0f, -14.0f);
         L.SightHeightCm = 7.2f;
-        L.AdsForwardCm = 46.0f;
-        // The support hand goes on the PUMP, not the handguard. It is the one
-        // hand position in the table that is about the action rather than the
-        // barrel, and it puts the hand where the mechanism is.
-        L.SupportHandCm = FVector(30.0f, 0.0f, -6.0f);
-        L.FiringHandCm = FVector(-1.0f, 0.0f, -7.0f);
         L.MuzzleCm = FVector(57.0f, 0.0f, 3.0f);
         break;
 
@@ -168,11 +153,7 @@ FBreakerViewmodelLayout BreakerViewmodel::ArchetypeLayout(EBreakerWeaponArchetyp
             Part(EBreakerProxyShape::Box,       FVector( 2.0f, 0.0f, -4.0f), FVector( 5.5f, 4.5f,12.0f),   Polymer, FRotator(12.0f, 0.0f, 0.0f)),
             Part(EBreakerProxyShape::Box,       FVector(27.0f, 0.0f, -4.0f), FVector( 5.0f, 4.0f,10.0f),   Polymer, FRotator(-10.0f, 0.0f, 0.0f)),
         };
-        L.HipOffsetCm = FVector(72.0f, 19.0f, -22.0f);
         L.SightHeightCm = 15.0f;
-        L.AdsForwardCm = 72.0f;
-        L.SupportHandCm = FVector(24.0f, 0.0f, -6.0f);
-        L.FiringHandCm = FVector(2.0f, 0.0f, -6.0f);
         L.MuzzleCm = FVector(56.0f, 0.0f, 6.0f);
         break;
 
@@ -191,11 +172,7 @@ FBreakerViewmodelLayout BreakerViewmodel::ArchetypeLayout(EBreakerWeaponArchetyp
             Part(EBreakerProxyShape::Box,       FVector(-9.0f, 0.0f,  1.5f), FVector(22.0f, 4.2f, 5.4f),   Polymer),
             Part(EBreakerProxyShape::Box,       FVector(-1.0f, 0.0f, -8.0f), FVector( 5.0f, 4.0f,11.0f),   Polymer, FRotator(12.0f, 0.0f, 0.0f)),
         };
-        L.HipOffsetCm = FVector(46.0f, 14.0f, -13.0f);
         L.SightHeightCm = 12.4f;
-        L.AdsForwardCm = 46.0f;
-        L.SupportHandCm = FVector(33.0f, 0.0f, -3.5f);
-        L.FiringHandCm = FVector(-1.0f, 0.0f, -7.0f);
         L.MuzzleCm = FVector(69.5f, 0.0f, 2.0f);
         break;
 
@@ -216,11 +193,7 @@ FBreakerViewmodelLayout BreakerViewmodel::ArchetypeLayout(EBreakerWeaponArchetyp
             Part(EBreakerProxyShape::Box,       FVector(-10.0f,0.0f,  0.5f), FVector(22.0f, 5.0f, 7.0f),   Polymer),
             Part(EBreakerProxyShape::Box,       FVector(-2.0f, 0.0f, -8.0f), FVector( 5.5f, 4.5f,11.0f),   Polymer, FRotator(12.0f, 0.0f, 0.0f)),
         };
-        L.HipOffsetCm = FVector(48.0f, 16.0f, -15.0f);
         L.SightHeightCm = 9.1f;
-        L.AdsForwardCm = 47.0f;
-        L.SupportHandCm = FVector(30.0f, 0.0f, -6.5f);
-        L.FiringHandCm = FVector(-2.0f, 0.0f, -7.0f);
         L.MuzzleCm = FVector(62.5f, 0.0f, 2.0f);
         break;
 
@@ -236,14 +209,7 @@ FBreakerViewmodelLayout BreakerViewmodel::ArchetypeLayout(EBreakerWeaponArchetyp
             Part(EBreakerProxyShape::Box,       FVector( 0.0f, 0.0f,  3.6f), FVector( 2.0f, 3.0f, 1.4f),   SteelBright),
             Part(EBreakerProxyShape::Box,       FVector(-1.5f, 0.0f, -7.0f), FVector( 4.6f, 3.6f,12.0f),   Polymer, FRotator(16.0f, 0.0f, 0.0f)),
         };
-        // Held closer to the centre line and higher than any long gun, which is
-        // both how a pistol is actually carried and a second, positional tell.
-        L.HipOffsetCm = FVector(40.0f, 11.0f, -11.0f);
         L.SightHeightCm = 4.4f;
-        L.AdsForwardCm = 40.0f;
-        // Both hands stack at the grip: there is nothing out front to hold.
-        L.SupportHandCm = FVector(-2.5f, -3.5f, -8.0f);
-        L.FiringHandCm = FVector(-1.5f, 1.0f, -6.5f);
         L.MuzzleCm = FVector(18.5f, 0.0f, 0.6f);
         break;
 
@@ -261,62 +227,48 @@ FBreakerViewmodelLayout BreakerViewmodel::ArchetypeLayout(EBreakerWeaponArchetyp
             Part(EBreakerProxyShape::Box,       FVector(-8.0f, 0.0f,  0.5f), FVector(22.0f, 4.5f, 6.5f),   Polymer),
             Part(EBreakerProxyShape::Box,       FVector(-1.0f, 0.0f, -8.0f), FVector( 5.0f, 4.0f,11.0f),   Polymer, FRotator(12.0f, 0.0f, 0.0f)),
         };
-        L.HipOffsetCm = FVector(46.0f, 14.0f, -13.0f);
-        L.SightHeightCm = 8.3f;
-        L.AdsForwardCm = 46.0f;
-        L.SupportHandCm = FVector(34.0f, 0.0f, -3.5f);
-        L.FiringHandCm = FVector(-1.0f, 0.0f, -7.0f);
-        L.MuzzleCm = FVector(61.5f, 0.0f, 2.5f);
-        // O2 first-person fit: keep the shoulder cuts below/behind the camera
-        // instead of holding the entire third-person arm pose 46 cm forward.
-        L.HipOffsetCm = FVector(26.0f, 12.0f, -15.0f);
-        L.AdsForwardCm = 34.0f;
         L.SightHeightCm = 11.5f;
+        L.MuzzleCm = FVector(61.5f, 0.0f, 2.5f);
         break;
     }
 
-    // The named guns: the intake pack's meshes over the proxies, per archetype.
-    // Shotgun and Rocket author NO path on purpose — no vendored pack ships a
-    // candidate for either, so they keep the primitive read rather than wear a
-    // lie. Paths are the import script's contract
-    // (Content/Python/breaker_import_characters.py -> weapons/gun-pack); the
-    // NamedGunsResolve test loads every one, so a renamed asset fails the
-    // suite instead of silently restoring the primitives. All O2.
+    // THE ARMS ARE SHARED. Every archetype wears the same skeletal
+    // SKM_FirstPersonArms (Characters/BreakerFirstPersonArms.cpp), and
+    // Configure scales those arms uniformly by the span between the two hand
+    // points and seats them on the rig at the hip and aim offsets. The four
+    // numbers below are the ones the arms were fitted at, so they are one
+    // value for the whole table: a row with its own hand span would shrink or
+    // stretch the arms, and a row with its own hip offset would put the
+    // shoulder cuts in front of the camera. The offsets keep those cuts
+    // below and behind the camera rather than holding the rig 46 cm forward.
+    // Parts, SightHeightCm and MuzzleCm stay per row: those carry the
+    // silhouette and the sight line, not the hands. O2 PLACEHOLDER.
+    L.HipOffsetCm = FVector(26.0f, 12.0f, -15.0f);
+    L.AdsForwardCm = 34.0f;
+    L.SupportHandCm = FVector(34.0f, 0.0f, -3.5f);
+    L.FiringHandCm = FVector(-1.0f, 0.0f, -7.0f);
+
+    // THE NAMED GUN. Every archetype wears a textured mesh from the sci-fi
+    // pack (MI_Guns_Batch1/2) over its proxy parts: the Sidearm wears
+    // Gun_Pistol, the Sniper wears Gun_Sniper, and the other five wear
+    // Gun_Rifle until a textured model exists for each. FitNamedWeapon scales
+    // the mesh to the row's OverallLengthCm(), so the silhouette order the
+    // proxies author survives a shared mesh. The pack's thin muzzle faces -X
+    // (measured from LOD0 geometry by BreakerArms and by the
+    // EveryNamedGunFacesForward test), so every row pays the same 180° yaw.
+    // The EveryAuthoredGunResolves test loads each path, so a renamed asset
+    // fails the suite instead of silently restoring the primitives, which
+    // remain the fallback for a mesh that does not load. All O2.
     {
-        const TCHAR* NamedGun = nullptr;
+        const TCHAR* NamedGun = TEXT("Gun_Rifle");
         switch (Archetype)
         {
-        case EBreakerWeaponArchetype::Rifle:      NamedGun = TEXT("AR_1");     break;
-        case EBreakerWeaponArchetype::BurstRifle: NamedGun = TEXT("AR_4");     break;
-        case EBreakerWeaponArchetype::Machinegun: NamedGun = TEXT("AR_6");     break;
-        case EBreakerWeaponArchetype::SMG:        NamedGun = TEXT("SMG_1");    break;
-        case EBreakerWeaponArchetype::Sniper:     NamedGun = TEXT("Sniper_1"); break;
-        case EBreakerWeaponArchetype::Sidearm:    NamedGun = TEXT("Pistol_1"); break;
+        case EBreakerWeaponArchetype::Sidearm: NamedGun = TEXT("Gun_Pistol"); break;
+        case EBreakerWeaponArchetype::Sniper:  NamedGun = TEXT("Gun_Sniper"); break;
         default: break;
         }
-        if (NamedGun)
-        {
-            L.NamedMeshPath = FSoftObjectPath(FString::Printf(
-                TEXT("/Game/Breaker/Meshes/weapons/gun-pack/%s.%s"), NamedGun, NamedGun));
-            // The pack imports facing +X, muzzle already on rig forward, so
-            // no source-axis correction. MEASURED, not photographed: the
-            // EveryNamedGunFacesForward test reads each mesh's vertices and
-            // finds the thin end (the barrel) at +X on all six guns, and the
-            // capture reel under the earlier 180° yaw showed every barrel
-            // aimed at the camera. The first reading of one photograph
-            // back-solved the source to -X; a photograph of a blockout gun
-            // cannot tell a stock from a barrel, a vertex buffer can. The
-            // field stays so a pack authored down another axis pays one
-            // rotator here and the test still guards it.
-            L.NamedMeshRotation = FRotator::ZeroRotator;
-        }
-    }
-
-    if (Archetype == EBreakerWeaponArchetype::Rifle)
-    {
-        L.NamedMeshPath = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/weapons/sci-fi/Gun_Rifle.Gun_Rifle"));
-        // Measured from LOD0 geometry by BreakerArms: this pack's thin muzzle
-        // faces -X, unlike the gun-pack meshes used by the other archetypes.
+        L.NamedMeshPath = FSoftObjectPath(FString::Printf(
+            TEXT("/Game/Breaker/Meshes/weapons/sci-fi/%s.%s"), NamedGun, NamedGun));
         L.NamedMeshRotation = FRotator(0.0f, 180.0f, 0.0f);
     }
     return L;

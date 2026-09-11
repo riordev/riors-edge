@@ -421,4 +421,134 @@ bool FBreakerMissionTrackerLineTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// THE TRACKER LINES: the story's ask first, then every live quest no mission
+// sequences. Walked on a bare flag set through the Watchkeeper's contract,
+// the one shipped quest outside every mission: absent until offered,
+// its objective with the count while Active, the return verb once the count
+// is met, gone once turned in. Every expected string is built from the rows
+// the same way the TrackerLine walk builds its own -- the quest's giver, the
+// objective's text and count -- so the assertion is that the quest's line
+// has the same one home the beat's line does.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerMissionTrackerLinesTest,
+    "RiorsEdge.Missions.TrackerLines",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerMissionTrackerLinesTest::RunTest(const FString& Parameters)
+{
+    // ---- the shipped configuration ----------------------------------------
+    // Exactly one quest in the registry belongs to no mission, and it is the
+    // Watchkeeper's. A second unlisted quest is either a mission that forgot
+    // to list it or a side quest this test does not yet walk; either way it
+    // is named here.
+    TArray<FName> Unlisted;
+    for (const FBreakerQuestDefinition& Quest : UBreakerQuestLibrary::GetFallbackQuests())
+    {
+        bool bListed = false;
+        for (const FBreakerMissionDefinition& Mission : UBreakerMissionLibrary::GetMissions())
+        {
+            if (Mission.Quests.Contains(Quest.QuestId)) { bListed = true; break; }
+        }
+        if (!bListed) Unlisted.Add(Quest.QuestId);
+    }
+    const FString UnlistedNames = FString::JoinBy(Unlisted, TEXT(", "), [](const FName& QuestId) { return QuestId.ToString(); });
+    TestEqual(FString::Printf(TEXT("Exactly one quest belongs to no mission (found: %s)"), *UnlistedNames), Unlisted.Num(), 1);
+    if (Unlisted.Num() == 1)
+    {
+        TestEqual(TEXT("The quest no mission lists is the Watchkeeper's"), Unlisted[0], FName(TEXT("Quest.Watch")));
+    }
+
+    const FBreakerQuestDefinition* Watch = BreakerMissionTrackerQuestWhere(
+        [](const FBreakerQuestDefinition& Candidate) { return Candidate.QuestId == FName(TEXT("Quest.Watch")); });
+    if (!TestNotNull(TEXT("Quest.Watch is in the shipped registry"), Watch)) return false;
+    if (!TestEqual(TEXT("Quest.Watch has one objective"), Watch->Objectives.Num(), 1)) return false;
+    const FBreakerQuestObjective& Flank = Watch->Objectives[0];
+    TestEqual(TEXT("The Watchkeeper's giver row"), Watch->Giver, FString(TEXT("WATCHKEEPER")));
+    TestEqual(TEXT("The flank's authored text"), Flank.Text, FString(TEXT("Clear the substation flank")));
+    TestEqual(TEXT("The flank counts six"), Flank.RequiredCount, 6);
+    TestEqual(TEXT("The flank's counter"), Flank.ProgressCounter, FName(TEXT("Quest.Watch.Kills")));
+
+    // ---- fresh: the story's first ask, and nothing else ------------------
+    FBreakerQuestFlagSet Flags;
+    {
+        const TArray<FString> Lines = UBreakerMissionLibrary::TrackerLines(Flags);
+        if (TestEqual(TEXT("Fresh set: one line"), Lines.Num(), 1))
+        {
+            TestEqual(TEXT("Fresh set: the Quartermaster's ask"), Lines[0], FString(TEXT("SPEAK TO THE QUARTERMASTER")));
+        }
+    }
+
+    // ---- offered: the giver, by the same verb the Dialogue beat uses -------
+    Flags.Add(Watch->OfferedFlag);
+    {
+        const TArray<FString> Lines = UBreakerMissionLibrary::TrackerLines(Flags);
+        if (TestEqual(TEXT("Offered: two lines"), Lines.Num(), 2))
+        {
+            TestEqual(TEXT("Offered: the story's ask stays first"), Lines[0], FString(TEXT("SPEAK TO THE QUARTERMASTER")));
+            TestEqual(TEXT("Offered: speak to the Watchkeeper"), Lines[1], FString::Printf(UBreakerMissionLibrary::SpeakToVerb, TEXT("WATCHKEEPER")));
+        }
+    }
+
+    // ---- active: the objective with its count -----------------------------
+    Flags.Add(Watch->AcceptedFlag);
+    {
+        const TArray<FString> Lines = UBreakerMissionLibrary::TrackerLines(Flags);
+        if (TestEqual(TEXT("Active: two lines"), Lines.Num(), 2))
+        {
+            TestEqual(TEXT("Active: the story's ask stays first"), Lines[0], FString(TEXT("SPEAK TO THE QUARTERMASTER")));
+            TestEqual(TEXT("Active: the flank at zero, as the rows spell it"), Lines[1], FString(TEXT("CLEAR THE SUBSTATION FLANK  0/6")));
+            TestEqual(TEXT("Active: the flank at zero, as the objective line builds it"), Lines[1], BreakerMissionTrackerObjectiveLine(Flank, 0));
+        }
+    }
+
+    // The counter as NotifyEnemyKilled raises it, one short of done.
+    {
+        FBreakerQuestFlagSet Nearly = Flags;
+        Nearly.RaiseCounter(Flank.ProgressCounter, Flank.RequiredCount - 1);
+        const TArray<FString> Lines = UBreakerMissionLibrary::TrackerLines(Nearly);
+        if (TestEqual(TEXT("Nearly: two lines"), Lines.Num(), 2))
+        {
+            TestEqual(TEXT("Nearly: the flank reads one short"), Lines[1], FString(TEXT("CLEAR THE SUBSTATION FLANK  5/6")));
+        }
+    }
+
+    // ---- ready: the count met and the flag set, the return verb -----------
+    Flags.RaiseCounter(Flank.ProgressCounter, Flank.RequiredCount);
+    Flags.Add(Flank.CompletionFlag);
+    {
+        const TArray<FString> Lines = UBreakerMissionLibrary::TrackerLines(Flags);
+        if (TestEqual(TEXT("Ready: two lines"), Lines.Num(), 2))
+        {
+            TestEqual(TEXT("Ready: the story's ask stays first"), Lines[0], FString(TEXT("SPEAK TO THE QUARTERMASTER")));
+            TestEqual(TEXT("Ready: return to the Watchkeeper"), Lines[1], FString::Printf(UBreakerMissionLibrary::ReturnToVerb, TEXT("WATCHKEEPER")));
+        }
+    }
+
+    // ---- turned in: back to the story alone --------------------------------
+    Flags.Add(Watch->TurnedInFlag);
+    {
+        const TArray<FString> Lines = UBreakerMissionLibrary::TrackerLines(Flags);
+        if (TestEqual(TEXT("Turned in: one line"), Lines.Num(), 1))
+        {
+            TestEqual(TEXT("Turned in: the story's ask alone"), Lines[0], FString(TEXT("SPEAK TO THE QUARTERMASTER")));
+        }
+    }
+
+    // A quest a mission lists never repeats below the beat line: Quest.Watch
+    // is the only live quest, and the story's own quests stay silent even
+    // when offered, because their beat speaks for them.
+    {
+        const FBreakerQuestDefinition* First = BreakerMissionTrackerQuestWhere(
+            [](const FBreakerQuestDefinition& Candidate) { return Candidate.QuestId == FName(TEXT("Quest.FirstContract")); });
+        if (TestNotNull(TEXT("Quest.FirstContract is in the shipped registry"), First))
+        {
+            FBreakerQuestFlagSet Story;
+            Story.Add(First->OfferedFlag);
+            const TArray<FString> Lines = UBreakerMissionLibrary::TrackerLines(Story);
+            TestEqual(TEXT("A mission's own quest is not repeated below its beat"), Lines.Num(), 1);
+        }
+    }
+    return true;
+}
+
 #endif

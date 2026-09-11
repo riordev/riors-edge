@@ -31,7 +31,12 @@ ABreakerSoundDirector::ABreakerSoundDirector()
         Voice->bIsUISound = true;
         return Voice;
     };
-    FireVoice = MakeVoice(TEXT("FireVoice"));
+    // The fire pool: FireVoice0..2, same construction as every other voice so
+    // the settings routing (which walks every component) picks them up.
+    for (int32 Slot = 0; Slot < FireVoiceCount; ++Slot)
+    {
+        FireVoices.Add(MakeVoice(*FString::Printf(TEXT("FireVoice%d"), Slot)));
+    }
     HitVoice = MakeVoice(TEXT("HitVoice"));
     KillVoice = MakeVoice(TEXT("KillVoice"));
     AbilityVoice = MakeVoice(TEXT("AbilityVoice"));
@@ -58,8 +63,9 @@ USoundWaveProcedural* ABreakerSoundDirector::MakeWave(int32 SampleRate)
     return Wave;
 }
 
-int32 ABreakerSoundDirector::LoadOrSynth(const TCHAR* FileName, void (*Synth)(TArray<int16>&), TArray<int16>& OutPcm)
+int32 ABreakerSoundDirector::LoadOrSynth(const TCHAR* FileName, void (*Synth)(TArray<int16>&), TArray<int16>& OutPcm, bool* bOutLoaded)
 {
+    if (bOutLoaded) *bOutLoaded = false;
     const FString Path = FPaths::ProjectContentDir() / TEXT("Breaker/Audio") / FileName;
     TArray<uint8> Bytes;
     const bool bOverrideExists = FPaths::FileExists(Path);
@@ -71,6 +77,7 @@ int32 ABreakerSoundDirector::LoadOrSynth(const TCHAR* FileName, void (*Synth)(TA
             OutPcm = MoveTemp(Parsed.Samples);
             UE_LOG(LogTemp, Log, TEXT("[BreakerSound] %s: sample loaded (%d Hz, %.2f s)."),
                 FileName, Parsed.SampleRate, static_cast<float>(OutPcm.Num()) / Parsed.SampleRate);
+            if (bOutLoaded) *bOutLoaded = true;
             return Parsed.SampleRate;
         }
         UE_LOG(LogTemp, Warning, TEXT("[BreakerSound] %s exists but is not 16-bit PCM WAV — synth fallback."), FileName);
@@ -93,7 +100,7 @@ void ABreakerSoundDirector::BeginPlay()
     UBreakerGameSettings* Settings = NewObject<UBreakerGameSettings>(this);
     Settings->LoadOrDefaults();
     ApplyVolumeSettings(Settings->MasterVolume, Settings->EffectsVolume);
-    const int32 FireRate = LoadOrSynth(TEXT("weapon_fire.wav"), &BreakerSound::RenderWeaponFire, FirePcm);
+    FireRate = LoadOrSynth(TEXT("weapon_fire.wav"), &BreakerSound::RenderWeaponFire, FirePcm, &bFireSampleLoaded);
     const int32 HitRate = LoadOrSynth(TEXT("hit_confirm.wav"), &BreakerSound::RenderHitConfirm, HitPcm);
     const int32 KillRate = LoadOrSynth(TEXT("kill_confirm.wav"), &BreakerSound::RenderKill, KillPcm);
 
@@ -109,10 +116,17 @@ void ABreakerSoundDirector::BeginPlay()
     const int32 LevelUpRate = LoadOrSynth(TEXT("level_up.wav"), &BreakerSound::RenderLevelUp, LevelUpPcm);
     const int32 EntropyRate = LoadOrSynth(TEXT("entropy_activate.wav"), &BreakerSound::RenderEntropyActivation, EntropyPcm);
 
-    FireWave = MakeWave(FireRate);
+    // One wave per pool slot, seeded at the shared clip's rate; PlayWeaponFire
+    // re-rates a slot per play to match whichever archetype's clip it carries.
+    FireWaves.Reset();
+    for (int32 Slot = 0; Slot < FireVoices.Num(); ++Slot)
+    {
+        USoundWaveProcedural* SlotWave = MakeWave(FireRate);
+        FireWaves.Add(SlotWave);
+        if (FireVoices[Slot]) FireVoices[Slot]->SetSound(SlotWave);
+    }
     HitWave = MakeWave(HitRate);
     KillWave = MakeWave(KillRate);
-    FireVoice->SetSound(FireWave);
     HitVoice->SetSound(HitWave);
     KillVoice->SetSound(KillWave);
     AbilityDefaultWave = MakeWave(AbilityRate);
@@ -229,6 +243,11 @@ void ABreakerSoundDirector::Trigger(UAudioComponent* Voice, USoundWaveProcedural
     // start the clip over. Stop() first so a voice whose source ended when
     // its queue ran dry comes back.
     Voice->Stop();
+    // THIS PLAY'S PITCH, set on the stopped voice so Play() below makes a
+    // source with it. One site, every verb: the clip bytes never change, the
+    // rate they are read at does, inside ±PitchSpread, and no two consecutive
+    // plays anywhere in the director are identical.
+    Voice->SetPitchMultiplier(BreakerSound::PitchForPlay(++PlayCounter));
     Wave->ResetAudio();
     Wave->QueueAudio(reinterpret_cast<const uint8*>(Pcm.GetData()), Pcm.Num() * sizeof(int16));
     Voice->Play();
@@ -290,20 +309,19 @@ void ABreakerSoundDirector::PlayAbilityCast(FName AbilityId)
 
 void ABreakerSoundDirector::PlayWeaponFire(EBreakerWeaponArchetype Archetype)
 {
-    // Resolve the voice once per archetype and keep it. Every archetype now
-    // resolves to a sound of its own: an authored .wav if one is there, and
-    // otherwise its synthesized voice. The null sentinel this map used to hold
-    // is gone, because "none authored" no longer means "play the shared one".
-    USoundWaveProcedural* Wave = FireWave;
-    const TArray<int16>* Pcm = &FirePcm;
+    // Resolve the clip once per archetype and keep it: the PCM and the rate it
+    // was authored at. Every archetype resolves to a sound of its own — an
+    // authored .wav if one is there, the shipped recording for the Rifle,
+    // otherwise its synthesized voice. A key present in ArchetypeFireRates
+    // means "probed"; there is no null sentinel because "none authored" no
+    // longer means "play the shared one".
+    const TArray<int16>* Pcm = nullptr;
+    int32 Rate = 0;
 
-    if (const TObjectPtr<USoundWaveProcedural>* Found = ArchetypeFireWaves.Find(Archetype))
+    if (const int32* FoundRate = ArchetypeFireRates.Find(Archetype))
     {
-        if (*Found)
-        {
-            Wave = *Found;
-            Pcm = ArchetypeFirePcm.Find(Archetype);
-        }
+        Rate = *FoundRate;
+        Pcm = ArchetypeFirePcm.Find(Archetype);
     }
     else
     {
@@ -317,43 +335,75 @@ void ABreakerSoundDirector::PlayWeaponFire(EBreakerWeaponArchetype Archetype)
 
         if (Parsed.IsValid())
         {
-            TArray<int16>& Stored = ArchetypeFirePcm.Add(Archetype, MoveTemp(Parsed.Samples));
-            USoundWaveProcedural* Override = MakeWave(Parsed.SampleRate);
-            ArchetypeFireWaves.Add(Archetype, Override);
+            Rate = Parsed.SampleRate;
+            Pcm = &ArchetypeFirePcm.Add(Archetype, MoveTemp(Parsed.Samples));
+            ArchetypeFireRates.Add(Archetype, Rate);
             UE_LOG(LogTemp, Log, TEXT("[BreakerSound] %s: per-archetype fire cue loaded (%d Hz)."),
-                *FileName, Parsed.SampleRate);
-            Wave = Override;
-            Pcm = &Stored;
+                *FileName, Rate);
+        }
+        else if (Archetype == EBreakerWeaponArchetype::Rifle && bFireSampleLoaded)
+        {
+            // THE RECORDING PLAYS FOR THE GUN HE HOLDS. The header's ruling is
+            // recorded samples first, synth as fallback, and weapon_fire.wav
+            // ships — but the per-archetype pass routed EVERY archetype with
+            // no weapon_fire_<Archetype>.wav to its synth, which is all eight
+            // of them, so the recording was loaded at BeginPlay and never
+            // played. The Rifle is the Standard Issue gun and the recording is
+            // its report; the other seven keep their synth voices, because
+            // sharing one recording across eight guns is the sameness the
+            // per-archetype pass ended. A copy, not a move, so FirePcm stays
+            // what BeginPlay loaded.
+            Rate = FireRate;
+            Pcm = &ArchetypeFirePcm.Add(Archetype, FirePcm);
+            ArchetypeFireRates.Add(Archetype, Rate);
+            UE_LOG(LogTemp, Log,
+                TEXT("[BreakerSound] %s not authored; Rifle uses the shipped weapon_fire.wav recording (%d Hz, %.2fs)."),
+                *FileName, Rate, static_cast<float>(Pcm->Num()) / FMath::Max(Rate, 1));
         }
         else
         {
-            // NO AUTHORED FILE IS NOT NO SOUND ANY MORE. This branch used to
-            // store a null sentinel and let every archetype fall back to the
-            // one shared render, which is exactly what the owner heard: "my gun
+            // NO AUTHORED FILE IS NOT NO SOUND. This branch used to store a
+            // null sentinel and let every archetype fall back to the one
+            // shared render, which is exactly what the owner heard: "my gun
             // sounds like a nerf gun" and "i dont know what weapon is in my
             // hand" are the same finding, and the second one is the worse of
             // the two. Eight guns played one sound.
             //
-            // So the fallback is now SYNTHESIZED PER ARCHETYPE from
+            // So the fallback is SYNTHESIZED PER ARCHETYPE from
             // BreakerSound::FireVoiceFor, and an authored .wav still overrides
             // it the moment one is dropped in. The naming convention stays
             // discoverable the same way: the log names the file it looked for.
+            // The Rifle lands here only when weapon_fire.wav failed to load.
             TArray<int16> Rendered;
             BreakerSound::RenderArchetypeFire(Rendered, Archetype);
-            TArray<int16>& Stored = ArchetypeFirePcm.Add(Archetype, MoveTemp(Rendered));
-            USoundWaveProcedural* Synth = MakeWave(BreakerSound::SampleRate);
-            ArchetypeFireWaves.Add(Archetype, Synth);
+            Rate = BreakerSound::SampleRate;
+            Pcm = &ArchetypeFirePcm.Add(Archetype, MoveTemp(Rendered));
+            ArchetypeFireRates.Add(Archetype, Rate);
             UE_LOG(LogTemp, Log,
                 TEXT("[BreakerSound] %s not authored; %s uses its synthesized voice (%.2fs)."),
                 *FileName, *BreakerWeaponArchetypeNames::Display(Archetype),
                 BreakerSound::FireVoiceFor(Archetype).DurationSeconds);
-            Wave = Synth;
-            Pcm = &Stored;
         }
     }
 
-    if (Wave && FireVoice && FireVoice->Sound != Wave) FireVoice->SetSound(Wave);
-    if (Pcm) Trigger(FireVoice, Wave, *Pcm);
+    if (!Pcm || Pcm->IsEmpty() || FireVoices.IsEmpty() || FireWaves.Num() != FireVoices.Num()) return;
+
+    // ROTATE THE POOL. This shot takes the next slot; the slot it cuts is the
+    // one FireVoiceCount shots back, whose clip has had that many shot
+    // intervals to ring out.
+    const int32 Slot = NextFireVoice;
+    NextFireVoice = (NextFireVoice + 1) % FireVoices.Num();
+    UAudioComponent* Voice = FireVoices[Slot];
+    USoundWaveProcedural* Wave = FireWaves[Slot];
+    if (!Voice || !Wave) return;
+    // The slot's wave carries whatever rate the last clip through it was
+    // authored at, and the recording and the synth voices differ. Trigger
+    // stops the voice before Play() makes a fresh source, and a procedural
+    // wave reports SampleRate verbatim, so the rate is set here per play and
+    // is read at that source's init — never under a running one.
+    Wave->SetSampleRate(Rate);
+    if (Voice->Sound != Wave) Voice->SetSound(Wave);
+    Trigger(Voice, Wave, *Pcm);
 }
 void ABreakerSoundDirector::PlayHitConfirm() { Trigger(HitVoice, HitWave, HitPcm); }
 void ABreakerSoundDirector::PlayKill()       { Trigger(KillVoice, KillWave, KillPcm); }

@@ -1398,28 +1398,48 @@ void ABreakerPlaytestHUD::DrawZoneLine(const ABreakerCharacter* Character)
 }
 
 // --------------------------------------------------------------------------
-// The quest line — one right-aligned string at (1880, 40), body 14, text-2,
-// on every map: a contract accepted in camp is worked in the field.
+// The quest tracker — right-aligned lines from (1880, 40), body 14, text-2,
+// 22 apart, on every map: a contract accepted in camp is worked in the field.
 //
 // DERIVED, never stored: quest state is a pure function of the journal's flag
-// set (Save/BreakerQuestContent.h), so this line asks ComputeQuestState and
-// the counters and can never disagree with the dialogue system about where a
-// quest stands. The strings are the tracker's own, and the two verbs are
-// UBreakerMissionLibrary's; no new player-facing words (O195).
+// set (Save/BreakerQuestContent.h), so every line here comes out of
+// UBreakerMissionLibrary::TrackerLines and can never disagree with the
+// dialogue system about where a quest stands. The strings are the tracker's
+// own; no new player-facing words (O195). This function draws, it does not
+// compose: the one builder lives in Save, beside the content it reads.
 //
-// THE MISSION FIRST. A mission's current beat (Save/BreakerMissionContent.h)
-// is the story's ask, and its TrackerLine outranks the quest's own state: a
-// Travel beat says where to go when no quest says anything. A beat whose
-// line is empty (Reward, Unlock) falls through to the quest line below. At a
-// fresh save the first beat is a Dialogue and is current before its quest is
-// Offered, so SPEAK TO THE QUARTERMASTER shows from the first frame.
+// THE MISSION FIRST. Line one is the current beat's TrackerLine
+// (Save/BreakerMissionContent.h) — the story's ask, which outranks any
+// quest's own state; a Travel beat says where to go when no quest says
+// anything. At a fresh save the first beat is a Dialogue and is current
+// before its quest is Offered, so SPEAK TO THE QUARTERMASTER shows from the
+// first frame. Then one line per quest held outside any mission, so a second
+// contract taken from a vendor is not silently dropped behind the first:
 //
 //   Offered       -> SpeakToVerb over the giver
 //   Active        -> the first unfinished objective, with its counter
 //   ReadyToTurnIn -> ReturnToVerb over the giver
 // NotOffered and Complete draw nothing — an empty corner is the truthful
 // state, not a placeholder's.
+//
+// WHERE, under the stack, in gold: the tracked marker's label and distance
+// when the player has picked one on the map, else the first marker the map
+// flags as the campaign objective — the NPC, rift door or travel gate the
+// current beat points at — so the objective's distance shows without a map
+// visit. The gold slot never rises above where it sits today (+46), so the
+// one-quest layout the owner has played does not move.
 // --------------------------------------------------------------------------
+const TArray<FBreakerLocalMapMarker>& ABreakerPlaytestHUD::MarkersThisFrame(const ABreakerCharacter* Character)
+{
+    if (FrameMarkersStamp != GFrameCounter)
+    {
+        FrameMarkersStamp = GFrameCounter;
+        const UBreakerLocalMapComponent* LocalMap = Character ? Character->GetLocalMap() : nullptr;
+        FrameMarkers = LocalMap ? LocalMap->GetMarkers() : TArray<FBreakerLocalMapMarker>();
+    }
+    return FrameMarkers;
+}
+
 void ABreakerPlaytestHUD::DrawQuestLine(const ABreakerCharacter* Character)
 {
     const UBreakerQuestJournal* Journal = Character ? Character->GetQuestJournal() : nullptr;
@@ -1428,110 +1448,94 @@ void ABreakerPlaytestHUD::DrawQuestLine(const ABreakerCharacter* Character)
     // Fitted into the 320 rather than trusted to be short; never wrapped.
     const float Right = S(BreakerUI::HudWeaponRight);
     const float Limit = S(BreakerUI::HudQuestTrackerWidth);
-    FBreakerLocalMapMarker MapTarget;
-    if (Character->GetLocalMap()->GetTrackedMarker(MapTarget))
-    {
-        const FString Direction = FString::Printf(TEXT("%s · %dm"), *MapTarget.Label.ToString(),
-            FMath::RoundToInt(FVector::Dist2D(Character->GetActorLocation(), MapTarget.Location) / 100));
-        DrawSpecTextRight(Direction, Right, S(BreakerUI::HudQuestLineTop + 46), BreakerUI::Gold,
-            FitSpecPixels(Direction, BreakerUI::HudQuestLinePixels, Limit, 11.0f));
-    }
+    // O2 PLACEHOLDER — the sheet's tracker line pitch.
+    constexpr float LinePitch = 22.0f;
 
-    // These side destinations have a live cache objective, not a campaign
-    // dialogue beat. Share the map's actual state without writing quest flags.
+    TArray<FString> Lines;
     if (BreakerPrototypeDestinations::ForWorld(Character))
     {
-        FString Objective=Character->GetLocalMap()->GetCampaignObjective().ToString();
-        FString Detail;
-        // Reuse the map's two authored sentences in the existing two-line
-        // tracker space; retain the tracked-site direction below them.
-        const int32 Sentence=Objective.Find(TEXT(". "));
-        if (Sentence!=INDEX_NONE)
+        // These side destinations have a live cache objective, not a campaign
+        // dialogue beat. Share the map's actual state without writing quest
+        // flags: the map's two authored sentences become the two lines.
+        FString Objective = Character->GetLocalMap()->GetCampaignObjective().ToString();
+        const int32 Sentence = Objective.Find(TEXT(". "));
+        if (Sentence != INDEX_NONE)
         {
-            Detail=Objective.Mid(Sentence+2);
-            Objective=Objective.Left(Sentence+1);
+            Lines.Add(Objective.Left(Sentence + 1));
+            Lines.Add(Objective.Mid(Sentence + 2));
         }
-        if (!Objective.IsEmpty())
-            DrawSpecTextRight(Objective,Right,S(BreakerUI::HudQuestLineTop),BreakerUI::TextSecondary,
-                FitSpecPixels(Objective,BreakerUI::HudQuestLinePixels,Limit,11.0f));
-        if (!Detail.IsEmpty())
-            DrawSpecTextRight(Detail,Right,S(BreakerUI::HudQuestLineTop+22),BreakerUI::TextSecondary,
-                FitSpecPixels(Detail,BreakerUI::HudQuestLinePixels,Limit,11.0f));
-        return;
-    }
-
-    for (const FBreakerMissionDefinition& Mission : UBreakerMissionLibrary::GetMissions())
-    {
-        const FBreakerMissionBeat* Beat = UBreakerMissionLibrary::CurrentBeat(Mission, Journal->GetState());
-        if (!Beat) continue;
-        const FString BeatLine = UBreakerMissionLibrary::TrackerLine(*Beat, Journal->GetState());
-        if (BeatLine.IsEmpty()) continue;
-        DrawSpecTextRight(BeatLine, Right, S(BreakerUI::HudQuestLineTop), BreakerUI::TextSecondary,
-            FitSpecPixels(BeatLine, BreakerUI::HudQuestLinePixels, Limit, 11.0f));
-        if (Beat->WorldEncounter == FName(TEXT("earth.survivor_extraction")))
-        {
-            for (TActorIterator<ABreakerSurvivor> It(GetWorld()); It; ++It)
-            {
-                FString Detail;
-                if (It->IsEscortActive())
-                {
-                    const int32 Seconds = FMath::CeilToInt(It->GetLucidityRemaining());
-                    Detail = FString::Printf(TEXT("LUCIDITY %d:%02d  |  STAY CLOSE"), Seconds / 60, Seconds % 60);
-                }
-                else Detail = TEXT("RETURN TO THE SHELTER TO RETRY");
-                DrawSpecTextRight(Detail, Right, S(BreakerUI::HudQuestLineTop + 22), BreakerUI::TextSecondary,
-                    FitSpecPixels(Detail, BreakerUI::HudQuestLinePixels, Limit, 11.0f));
-                break;
-            }
-        }
-        return;
-    }
-
-    // The first quest that is live in any form is the tracked one. The slice
-    // ships one quest; when the campaign ships more, "first live" is still the
-    // right minimal policy for one line, and a picker can replace it.
-    const FBreakerQuestDefinition* Tracked = nullptr;
-    EBreakerQuestState TrackedState = EBreakerQuestState::NotOffered;
-    for (const FBreakerQuestDefinition& Quest : UBreakerQuestLibrary::GetFallbackQuests())
-    {
-        const EBreakerQuestState State = UBreakerQuestLibrary::ComputeQuestState(Quest, Journal->GetState());
-        if (State == EBreakerQuestState::Offered || State == EBreakerQuestState::Active
-            || State == EBreakerQuestState::ReadyToTurnIn)
-        {
-            Tracked = &Quest;
-            TrackedState = State;
-            break;
-        }
-    }
-    if (!Tracked) return;
-
-    FString Line;
-    if (TrackedState == EBreakerQuestState::Offered)
-    {
-        Line = FString::Printf(UBreakerMissionLibrary::SpeakToVerb, *Tracked->Giver.ToUpper());
-    }
-    else if (TrackedState == EBreakerQuestState::ReadyToTurnIn)
-    {
-        Line = FString::Printf(UBreakerMissionLibrary::ReturnToVerb, *Tracked->Giver.ToUpper());
+        else if (!Objective.IsEmpty()) Lines.Add(Objective);
     }
     else
     {
-        for (const FBreakerQuestObjective& Objective : Tracked->Objectives)
+        Lines = UBreakerMissionLibrary::TrackerLines(Journal->GetState());
+        // The escort's live clock rides directly under the beat line it
+        // details, ahead of any side quest. Only the extraction beat has a
+        // survivor to read, so the beat is found again just for that test.
+        for (const FBreakerMissionDefinition& Mission : UBreakerMissionLibrary::GetMissions())
         {
-            if (Journal->HasFlag(Objective.CompletionFlag)) continue;
-            Line = Objective.Text.ToUpper();
-            if (Objective.RequiredCount > 0)
+            const FBreakerMissionBeat* Beat = UBreakerMissionLibrary::CurrentBeat(Mission, Journal->GetState());
+            if (!Beat || UBreakerMissionLibrary::TrackerLine(*Beat, Journal->GetState()).IsEmpty()) continue;
+            if (Beat->WorldEncounter == FName(TEXT("earth.survivor_extraction")))
             {
-                const int32 Count = FMath::Clamp(Journal->GetCounter(Objective.ProgressCounter), 0, Objective.RequiredCount);
-                Line += FString::Printf(TEXT("  %d/%d"), Count, Objective.RequiredCount);
+                for (TActorIterator<ABreakerSurvivor> It(GetWorld()); It; ++It)
+                {
+                    FString Detail;
+                    if (It->IsEscortActive())
+                    {
+                        const int32 Seconds = FMath::CeilToInt(It->GetLucidityRemaining());
+                        Detail = FString::Printf(TEXT("LUCIDITY %d:%02d  |  STAY CLOSE"), Seconds / 60, Seconds % 60);
+                    }
+                    else Detail = TEXT("RETURN TO THE SHELTER TO RETRY");
+                    Lines.Insert(Detail, FMath::Min(1, Lines.Num()));
+                    break;
+                }
             }
             break;
         }
     }
-    if (Line.IsEmpty()) return;
 
-    DrawSpecTextRight(Line, Right, S(BreakerUI::HudQuestLineTop), BreakerUI::TextSecondary,
-        FitSpecPixels(Line, BreakerUI::HudQuestLinePixels, Limit, 11.0f));
+    float Y = S(BreakerUI::HudQuestLineTop);
+    for (const FString& Line : Lines)
+    {
+        if (Line.IsEmpty()) continue;
+        DrawSpecTextRight(Line, Right, Y, BreakerUI::TextSecondary,
+            FitSpecPixels(Line, BreakerUI::HudQuestLinePixels, Limit, 11.0f));
+        Y += S(LinePitch);
+    }
+
+    FBreakerLocalMapMarker MapTarget;
+    bool bHaveTarget = false;
+    const UBreakerLocalMapComponent* LocalMap = Character->GetLocalMap();
+    const TArray<FBreakerLocalMapMarker>& Markers = MarkersThisFrame(Character);
+    // The tracked marker first (the same rule GetTrackedMarker applies, read
+    // off the one walk), then the beat's own objective when nothing is tracked.
+    if (!LocalMap->GetTracked().IsNone())
+    {
+        for (const FBreakerLocalMapMarker& Marker : Markers)
+        {
+            if (Marker.Id == LocalMap->GetTracked() && LocalMap->IsVisible(Marker)) { MapTarget = Marker; bHaveTarget = true; break; }
+        }
+    }
+    if (!bHaveTarget)
+    {
+        for (const FBreakerLocalMapMarker& Marker : Markers)
+        {
+            if (!Marker.bObjective) continue;
+            MapTarget = Marker;
+            bHaveTarget = true;
+            break;
+        }
+    }
+    if (bHaveTarget)
+    {
+        const FString Direction = FString::Printf(TEXT("%s · %dm"), *MapTarget.Label.ToString(),
+            FMath::RoundToInt(FVector::Dist2D(Character->GetActorLocation(), MapTarget.Location) / 100));
+        // +46 is two pitches and the 2 px breath the played layout has under
+        // them; a taller stack keeps that same breath. O2 PLACEHOLDER.
+        DrawSpecTextRight(Direction, Right, FMath::Max(S(BreakerUI::HudQuestLineTop + 46), Y + S(2.0f)), BreakerUI::Gold,
+            FitSpecPixels(Direction, BreakerUI::HudQuestLinePixels, Limit, 11.0f));
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -1910,6 +1914,25 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
     // sits on the same anchor and says the same name with the key on it.
     const AActor* Plated = BreakerHUD::BreakerHUDPlatedInteractable(Character);
 
+    // THE OBJECTIVE SAYS SO ON ITS FACE. The local map already flags the NPC,
+    // rift door or travel gate the current beat points at (bObjective); the
+    // actor standing where such a marker stands gets the word under its name,
+    // so "where" is answered by looking, not by opening the map. The word is
+    // the map screen's own prefix (BreakerLocalMapScreen.cpp), and it is a
+    // word rather than a tint because gold alone is not a signal. Matched by
+    // position because markers name sites, not actors — a metre is well inside
+    // any two of these standing apart.
+    TArray<FVector> ObjectiveSites;
+    for (const FBreakerLocalMapMarker& Marker : MarkersThisFrame(Character))
+        if (Marker.bObjective) ObjectiveSites.Add(Marker.Location);
+    constexpr float ObjectiveSiteRadiusCm = 100.0f;   // O2 PLACEHOLDER
+    const auto IsObjectiveSite = [&](const FVector& Location)
+    {
+        for (const FVector& Site : ObjectiveSites)
+            if (FVector::DistSquared(Site, Location) <= ObjectiveSiteRadiusCm * ObjectiveSiteRadiusCm) return true;
+        return false;
+    };
+
     for (TActorIterator<ABreakerNPC> It(World); It; ++It)
     {
         const ABreakerNPC* NPC = *It;
@@ -1932,6 +1955,11 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
             Projected.X, Projected.Y, PersonWarm, 12.0f * NameScale, 1.0f, ESpecFontRole::Display);
         // Service names remain useful at a distance. Action keys belong only
         // to the single eligible actor selected by the real interaction path.
+        if (IsObjectiveSite(NPC->GetActorLocation()))
+        {
+            DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudObjective), Projected.X, Projected.Y + S(15.0f) * NameScale,   // O2 PLACEHOLDER: the drop under the name
+                BreakerUI::Gold, 10.0f * NameScale, 1.0f, ESpecFontRole::Display);
+        }
     }
 
     for (TActorIterator<ABreakerTravelPoint> It(World); It; ++It)
@@ -1985,7 +2013,14 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
             DrawSpecTextCentered(DetailWord, Projected.X, LabelY, BreakerUI::TextMuted, 10.0f * GateScale);
             LabelY += S(13.0f) * GateScale;
         }
-
+        // The gate the beat sends you through — or the gate home, when the
+        // beat's NPC is in another map — is the exception to the one-line
+        // rule above: this is the door you are meant to be walking to.
+        if (IsObjectiveSite(TravelPoint->GetActorLocation()))
+        {
+            DrawSpecTextCentered(BreakerStrings::Get(EBreakerStringKey::HudObjective), Projected.X, LabelY, BreakerUI::Gold, 10.0f * GateScale, 1.0f, ESpecFontRole::Display);
+            LabelY += S(13.0f) * GateScale;
+        }
     }
 }
 

@@ -20,8 +20,10 @@ clock retain idle rather than inventing progress.
 
 Firing uses the shared recoil spring. The supplied fire clip is mesh-space
 additive and requires a native additive layer before it can play over idle.
-Other weapon archetypes retain their existing presentation until fitted poses
-are authored. The imported materials, fixed rifle magazine and stock reload
+Every archetype wears the same arms at the same hand points, hip offset and aim
+distance. The Sidearm wears `Gun_Pistol` and the Sniper `Gun_Sniper`; the other
+five wear `Gun_Rifle` until a textured model exists for each, scaled to the
+archetype's own silhouette length. The imported materials, fixed rifle magazine and stock reload
 gesture remain placeholders; this is not a finished animation/art set.
 
 Muzzle effects and tracers follow the presented weapon. The rifle emission point

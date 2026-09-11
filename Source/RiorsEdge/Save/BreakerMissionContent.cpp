@@ -843,6 +843,48 @@ namespace
             [Npc](const FBreakerDialogueRow& Candidate) { return Candidate.Id == Npc; });
         return Row ? Row->DisplayName.ToUpper() : FString();
     }
+
+    // Whether any mission's Quests names this quest. A listed quest is the
+    // story's to sequence; TrackerLines speaks only for the unlisted.
+    bool BreakerMissionListsQuest(FName QuestId)
+    {
+        for (const FBreakerMissionDefinition& Mission : UBreakerMissionLibrary::GetMissions())
+        {
+            if (Mission.Quests.Contains(QuestId)) return true;
+        }
+        return false;
+    }
+
+    // A quest's own line by state, over its rows: the same verbs a Dialogue
+    // and a Return beat use, and the same objective line an Encounter uses,
+    // with the quest's Giver where a beat would have an NPC. Empty for
+    // NotOffered and Complete -- nothing is asked.
+    FString BreakerMissionQuestLine(const FBreakerQuestDefinition& Quest, const FBreakerQuestFlagSet& Flags)
+    {
+        switch (UBreakerQuestLibrary::ComputeQuestState(Quest, Flags))
+        {
+        case EBreakerQuestState::Offered:
+            return FString::Printf(UBreakerMissionLibrary::SpeakToVerb, *Quest.Giver.ToUpper());
+
+        case EBreakerQuestState::ReadyToTurnIn:
+            return FString::Printf(UBreakerMissionLibrary::ReturnToVerb, *Quest.Giver.ToUpper());
+
+        case EBreakerQuestState::Active:
+            for (const FBreakerQuestObjective& Objective : Quest.Objectives)
+            {
+                if (Flags.Has(Objective.CompletionFlag)) continue;
+                return BreakerMissionObjectiveLine(Objective, Flags);
+            }
+            // Active with every objective held is ReadyToTurnIn by
+            // ComputeQuestState; unreachable, and empty is the truthful ask.
+            return FString();
+
+        case EBreakerQuestState::NotOffered:
+        case EBreakerQuestState::Complete:
+            break;
+        }
+        return FString();
+    }
 }
 
 TArray<FName> UBreakerMissionLibrary::BeatCompletionFlags(const FBreakerMissionBeat& Beat)
@@ -964,6 +1006,34 @@ FString UBreakerMissionLibrary::TrackerLine(const FBreakerMissionBeat& Beat, con
         return FString();
     }
     return FString();
+}
+
+TArray<FString> UBreakerMissionLibrary::TrackerLines(const FBreakerQuestFlagSet& Flags)
+{
+    TArray<FString> Lines;
+
+    // The story first: the first mission with a current beat that asks. A
+    // beat whose line is empty (Reward, Unlock) is skipped for the next
+    // mission's, the walk the HUD's corner makes.
+    for (const FBreakerMissionDefinition& Mission : GetMissions())
+    {
+        const FBreakerMissionBeat* Beat = CurrentBeat(Mission, Flags);
+        if (!Beat) continue;
+        FString BeatLine = TrackerLine(*Beat, Flags);
+        if (BeatLine.IsEmpty()) continue;
+        Lines.Add(MoveTemp(BeatLine));
+        break;
+    }
+
+    // Then every live quest no mission sequences, in registry (file) order.
+    for (const FBreakerQuestDefinition& Quest : UBreakerQuestLibrary::GetFallbackQuests())
+    {
+        if (BreakerMissionListsQuest(Quest.QuestId)) continue;
+        FString QuestLine = BreakerMissionQuestLine(Quest, Flags);
+        if (QuestLine.IsEmpty()) continue;
+        Lines.Add(MoveTemp(QuestLine));
+    }
+    return Lines;
 }
 
 int32 UBreakerMissionLibrary::DoctrinePointEntitlement(const FBreakerQuestFlagSet& Flags)

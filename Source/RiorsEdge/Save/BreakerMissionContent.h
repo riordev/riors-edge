@@ -185,6 +185,22 @@ public:
     static constexpr TCHAR ReturnToVerb[] = TEXT("RETURN TO THE %s");
     static FString TrackerLine(const FBreakerMissionBeat& Beat, const FBreakerQuestFlagSet& Flags);
 
+    // THE TRACKER LINES: everything the corner draws, in draw order. The
+    // first is the story's ask -- TrackerLine of the current beat of the
+    // first mission (file order) whose current beat has a non-empty line,
+    // omitted when no mission is asking. After it, one line per quest that is
+    // Offered, Active or ReadyToTurnIn and listed in NO mission's Quests: a
+    // quest the story does not sequence (the Watchkeeper's) still has to say
+    // where it is and what it needs. Those lines use the same words the beat
+    // kinds use for the same states, over the quest's own rows:
+    //   Offered       -> SpeakToVerb over the quest's Giver.
+    //   Active        -> BreakerMissionObjectiveLine of the first objective
+    //                    (row order) whose CompletionFlag the set lacks.
+    //   ReadyToTurnIn -> ReturnToVerb over the quest's Giver.
+    // A quest a mission lists is never repeated here: its beat already spoke
+    // for it, or its mission has not reached it yet.
+    static TArray<FString> TrackerLines(const FBreakerQuestFlagSet& Flags);
+
     // O43: doctrine points are granted by mission beats, not by level. The
     // sum of doctrinePoints over every reached Unlock beat across every
     // mission; the component settles it against LevelDoctrinePointsGranted.

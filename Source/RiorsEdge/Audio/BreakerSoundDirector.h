@@ -36,10 +36,12 @@ class USoundWaveProcedural;
 // Content/Breaker/Audio/SOURCES.txt. The synth's original job — proving
 // the audio path end to end — is done; it remains as the floor.
 //
-// The rest is unchanged from the first pass: pooled persistent voices
-// (retrigger cuts, separate voices overlap each other), client-side
-// cosmetic actor spawned lazily by the HUD, replicates nothing, never
-// ticks.
+// The rest is unchanged from the first pass: persistent voices (retrigger
+// cuts on every verb but weapon fire, which rotates a small pool so a shot
+// never cuts the previous shot's tail; separate voices overlap each other),
+// client-side cosmetic actor spawned lazily by the HUD, replicates nothing,
+// never ticks. Every play, every verb, carries its own pitch multiplier
+// (BreakerSound::PitchForPlay): two consecutive plays are never identical.
 // ---------------------------------------------------------------------------
 // The per-archetype fire cue's filename, pure and world-free so the one rule
 // it carries can be asserted: EVERY ARCHETYPE MUST PRODUCE A DISTINCT NAME.
@@ -79,8 +81,9 @@ public:
     // bad ... does not sound like real guns". This verb took no argument, so a
     // sidearm, a rifle and a shotgun fired the IDENTICAL clip — sameness no
     // amount of asset quality fixes. Same override shape as the ability cue one
-    // level over: weapon_fire_<Archetype>.wav, then weapon_fire.wav, then the
-    // synth. Still one verb; no generic PlaySound, no asset field.
+    // level over: weapon_fire_<Archetype>.wav, then — for the Rifle only —
+    // the shipped weapon_fire.wav recording, then each archetype's own synth
+    // voice. Still one verb; no generic PlaySound, no asset field.
     void PlayWeaponFire(EBreakerWeaponArchetype Archetype);
     // A hit the player dealt landed — any source, never a DoT tick (the
     // caller owns that exclusion). Scheduled by the caller on the round's
@@ -126,8 +129,25 @@ protected:
 
 private:
     // One persistent voice per verb; PCM cached at BeginPlay and queued
-    // verbatim per trigger.
-    UPROPERTY() TObjectPtr<UAudioComponent> FireVoice;
+    // verbatim per trigger. Weapon fire is the exception, below.
+    //
+    // WEAPON FIRE IS A ROUND-ROBIN POOL. One voice per verb means a
+    // retrigger cuts, and at 600 RPM that is every shot killing the previous
+    // shot's tail at 100 ms: the owner heard it as "ticky". Three voice+wave
+    // pairs taken in turn, so a shot only ever cuts the one three shots back.
+    // Each slot owns its wave because a procedural wave IS its queue — two
+    // voices reading one wave would split the clip between them. The PCM
+    // stays per archetype (ArchetypeFirePcm); the slots are what play it, and
+    // a slot's wave takes the clip's sample rate per play, since the shipped
+    // recording and the synth voices are not authored at the same rate.
+    static constexpr int32 FireVoiceCount = 3;   // O2 PLACEHOLDER
+    UPROPERTY() TArray<TObjectPtr<UAudioComponent>> FireVoices;
+    UPROPERTY() TArray<TObjectPtr<USoundWaveProcedural>> FireWaves;
+    int32 NextFireVoice = 0;
+    // Every play of every verb gets its own pitch (BreakerSound::PitchForPlay).
+    // One counter across all verbs, so a hit confirm landing between two shots
+    // does not make the shots' pitches line up.
+    uint32 PlayCounter = 0;
     UPROPERTY() TObjectPtr<UAudioComponent> HitVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> KillVoice;
     // One voice for every ability: a cast cuts the previous cast, exactly as
@@ -152,7 +172,6 @@ private:
     UPROPERTY() TObjectPtr<USoundWaveProcedural> VoidBurstWave;
     TArray<int16> VoidMarkPcm, VoidBurstPcm;
     double LastVoidMarkTime = -1000, LastVoidBurstTime = -1000;
-    UPROPERTY() TObjectPtr<USoundWaveProcedural> FireWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> HitWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> KillWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> AbilityDefaultWave;
@@ -163,13 +182,19 @@ private:
     // means "probed, no override authored" — the sentinel is what stops a
     // missing file being re-opened on every cast.
     UPROPERTY() TMap<FName, TObjectPtr<USoundWaveProcedural>> AbilityWaves;
-    // Per-archetype fire overrides, same lazy resolve and same NULL-value
-    // sentinel meaning "probed, none authored". Eight archetypes, not
-    // thirty-five, but the cost of eager loading is still eight failed opens
-    // for files that do not exist yet.
-    UPROPERTY() TMap<EBreakerWeaponArchetype, TObjectPtr<USoundWaveProcedural>> ArchetypeFireWaves;
+    // Per-archetype fire clips, resolved lazily: a key present means "probed",
+    // and the value is the sample rate the clip in ArchetypeFirePcm was
+    // authored at. No wave lives here any more — the pool slots own the
+    // waves. Eight archetypes, not thirty-five, but the cost of eager
+    // resolution is still eight failed opens for files that do not exist yet.
+    TMap<EBreakerWeaponArchetype, int32> ArchetypeFireRates;
 
+    // The shared weapon_fire.wav recording (or its synth floor), and whether
+    // the recording actually loaded. The Rifle resolves to it when no
+    // weapon_fire_Rifle.wav is authored; the other seven never do.
     TArray<int16> FirePcm;
+    int32 FireRate = 0;
+    bool bFireSampleLoaded = false;
     TArray<int16> HitPcm;
     TArray<int16> KillPcm;
     TArray<int16> AbilityDefaultPcm;
@@ -185,7 +210,9 @@ private:
     // Loads Content/Breaker/Audio/<FileName> into OutPcm and returns its
     // sample rate, or renders the synth fallback and returns the synth
     // rate. Logs which path each verb took, once, so a silent fallback is
-    // visible in any run's log.
-    int32 LoadOrSynth(const TCHAR* FileName, void (*Synth)(TArray<int16>&), TArray<int16>& OutPcm);
+    // visible in any run's log. bOutLoaded, when given, says which path.
+    int32 LoadOrSynth(const TCHAR* FileName, void (*Synth)(TArray<int16>&), TArray<int16>& OutPcm, bool* bOutLoaded = nullptr);
+    // The one site every verb plays through: cuts the voice, sets this play's
+    // pitch, queues the clip, plays.
     void Trigger(UAudioComponent* Voice, USoundWaveProcedural* Wave, const TArray<int16>& Pcm);
 };

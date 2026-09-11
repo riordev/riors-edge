@@ -150,12 +150,48 @@ bool FBreakerViewmodelSilhouetteOrderTest::RunTest(const FString& Parameters)
         Bulk(EBreakerWeaponArchetype::Sniper) < Bulk(EBreakerWeaponArchetype::Machinegun) &&
         Sniper > Machinegun);
 
-    // The support hand MOVES per archetype. If it did not, every gun would be
-    // held identically and the hands would stop being information.
-    const FVector RifleHand = BreakerViewmodel::ArchetypeLayout(EBreakerWeaponArchetype::Rifle).SupportHandCm;
-    const FVector SidearmHand = BreakerViewmodel::ArchetypeLayout(EBreakerWeaponArchetype::Sidearm).SupportHandCm;
-    TestTrue(TEXT("The sidearm's hands stack at the grip rather than out front"),
-        SidearmHand.X < RifleHand.X - 20.0f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerViewmodelSharedArmsTest,
+    "RiorsEdge.Characters.ViewmodelSharedArms",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerViewmodelSharedArmsTest::RunTest(const FString& Parameters)
+{
+    // Every archetype wears the same skeletal arms, and those arms were fitted
+    // at ONE hip offset, ONE aim distance and ONE pair of hand points: the
+    // arms component scales itself by the hand span and seats itself at the
+    // hip, so a row with its own numbers would shrink the arms or push the
+    // shoulder cuts in front of the camera. The rows are pinned EQUAL to the
+    // rifle's rather than to a value, so the four can be retuned together
+    // without turning this red. Every archetype also authors a textured gun
+    // from the sci-fi pack: a row without one falls back to grey primitives,
+    // which is the bug this rule exists to keep out.
+    const FBreakerViewmodelLayout Rifle = BreakerViewmodel::ArchetypeLayout(EBreakerWeaponArchetype::Rifle);
+    const FString PackRoot = TEXT("/Game/Breaker/Meshes/weapons/sci-fi/");
+
+    for (int32 Index = 0; Index < static_cast<int32>(EBreakerWeaponArchetype::Count); ++Index)
+    {
+        const EBreakerWeaponArchetype Archetype = static_cast<EBreakerWeaponArchetype>(Index);
+        const FBreakerViewmodelLayout Layout = BreakerViewmodel::ArchetypeLayout(Archetype);
+        const FString Name = BreakerWeaponArchetypeNames::Display(Archetype);
+
+        TestTrue(*FString::Printf(TEXT("%s authors a named gun"), *Name), Layout.NamedMeshPath.IsValid());
+        TestTrue(*FString::Printf(TEXT("%s's named gun comes from the textured sci-fi pack: %s"),
+                *Name, *Layout.NamedMeshPath.ToString()),
+            Layout.NamedMeshPath.ToString().StartsWith(PackRoot));
+
+        TestTrue(*FString::Printf(TEXT("%s holds the rig at the rifle's hip offset"), *Name),
+            Layout.HipOffsetCm.Equals(Rifle.HipOffsetCm, 0.001f));
+        TestEqual(*FString::Printf(TEXT("%s aims at the rifle's distance"), *Name),
+            Layout.AdsForwardCm, Rifle.AdsForwardCm, 0.001f);
+        TestTrue(*FString::Printf(TEXT("%s puts the support hand where the rifle does"), *Name),
+            Layout.SupportHandCm.Equals(Rifle.SupportHandCm, 0.001f));
+        TestTrue(*FString::Printf(TEXT("%s puts the firing hand where the rifle does"), *Name),
+            Layout.FiringHandCm.Equals(Rifle.FiringHandCm, 0.001f));
+    }
 
     return true;
 }

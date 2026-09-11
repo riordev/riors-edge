@@ -1618,12 +1618,11 @@ void ABreakerCharacter::RebuildViewmodelParts()
                 FVector(ActiveLayout.MuzzleCm.X * 0.5f, 0.0f, -4.0f),
                 ActiveLayout.NamedMeshRotation.Quaternion(),
                 FitScale, FitLocation);
-            if (ActiveLayout.NamedMeshPath.GetAssetName() == TEXT("Gun_Rifle"))
-            {
-                // O2 fitted grip offset. Bounds-only centering put the fingers
-                // in the open stock behind the grip in the reload capture.
-                FitLocation = ActiveLayout.FiringHandCm;
-            }
+            // O2 fitted grip offset, every named gun. Bounds-only centering
+            // put the fingers in the open stock behind the grip in the reload
+            // capture; the shared arms are socketed to the gun at this point,
+            // so the gun sits where the hand is.
+            FitLocation = ActiveLayout.FiringHandCm;
             NamedWeaponVisual->SetRelativeScale3D(FVector(FitScale));
             NamedWeaponVisual->SetRelativeLocation(FitLocation);
             NamedWeaponVisual->SetRelativeRotation(ActiveLayout.NamedMeshRotation);
@@ -1641,7 +1640,9 @@ void ABreakerCharacter::RebuildViewmodelParts()
         }
         PoseArm(LeftArmVisual, LeftGloveVisual, SupportShoulderAnchorCm, ActiveLayout.SupportHandCm);
         PoseArm(RightArmVisual, RightGloveVisual, FiringShoulderAnchorCm, ActiveLayout.FiringHandCm);
-        if (PresentedArchetype == EBreakerWeaponArchetype::Rifle && FirstPersonArms
+        // Every named gun wears the skeletal arms; the box limbs posed above
+        // stand only when Configure refuses (missing arms asset or anims).
+        if (FirstPersonArms
             && FirstPersonArms->Configure(NamedWeaponVisual, ActiveLayout.FiringHandCm, ActiveLayout.SupportHandCm))
         {
             for (UStaticMeshComponent* Limb : {LeftArmVisual.Get(), RightArmVisual.Get(), LeftGloveVisual.Get(), RightGloveVisual.Get()})

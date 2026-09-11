@@ -24,6 +24,7 @@
 #define BREAKER_STRING_KEYS(BREAKER_STRING) \
     BREAKER_STRING(HudDeathRedeploying,          "hud.death.redeploying",           "") \
     BREAKER_STRING(HudCalloutEliteDown,          "hud.callout.eliteDown",           "") \
+    BREAKER_STRING(HudObjective,                 "hud.objective",                   "") \
     BREAKER_STRING(HudCalloutOverdriveActive,    "hud.callout.overdriveActive",     "") \
     BREAKER_STRING(HudCalloutMarked,             "hud.callout.marked",              "") \
     BREAKER_STRING(HudCalloutDodged,             "hud.callout.dodged",              "") \

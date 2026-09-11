@@ -111,8 +111,9 @@ struct RIORSEDGE_API FBreakerViewmodelLayout
     TArray<FBreakerProxyPart> Parts;
 
     // Where the rig origin sits relative to the camera when hip firing,
-    // centimetres. Bigger weapons sit further out and lower; the sidearm sits
-    // closer to the centre line, which is how a pistol is actually held.
+    // centimetres. One value for every archetype: the arms were fitted at
+    // it so their cut shoulders stay behind the camera, and a gun that sat
+    // further out would bring them into frame.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Viewmodel")
     FVector HipOffsetCm = FVector(26.0f, 13.0f, -16.0f);
 
@@ -150,14 +151,17 @@ struct RIORSEDGE_API FBreakerViewmodelLayout
     float OverallLengthCm() const;
 
     // --- THE NAMED GUN (asset-intake wiring) ------------------------------
-    // When this resolves to a static mesh it replaces the proxy PARTS whole:
-    // the intake gun scales so its longest bound equals OverallLengthCm() —
-    // the same figure the silhouette-ordering law reads, so a named sidearm
-    // stays shorter than a named sniper by construction — and its bounds
-    // centre lands halfway to the muzzle. Arms, muzzle flash and the recoil
-    // rig are untouched: the named gun rides the same driven transform. Unset
-    // (Shotgun and Rocket — no pack ships a candidate) the primitives stand,
-    // and a clean clone without Content still plays. All O2.
+    // Every archetype authors one: a textured mesh from the sci-fi pack. The
+    // Sidearm wears Gun_Pistol, the Sniper wears Gun_Sniper, and the other
+    // five wear Gun_Rifle until a textured model exists for each. When it
+    // resolves it replaces the proxy PARTS whole: the gun scales so its
+    // longest bound equals OverallLengthCm() — the same figure the
+    // silhouette-ordering law reads, so a named sidearm stays shorter than a
+    // named sniper by construction — and seats at the firing hand. Every
+    // archetype then wears the same skeletal arms, socketed to that gun at
+    // the shared hand points; the recoil rig drives all of it. A mesh that
+    // fails to load leaves the primitives standing, so a clean clone without
+    // Content still plays. All O2.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Viewmodel")
     FSoftObjectPath NamedMeshPath;
     // Source-axis correction onto rig X-forward, per pack convention.
