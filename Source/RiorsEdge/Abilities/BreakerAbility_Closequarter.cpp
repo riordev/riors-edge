@@ -14,6 +14,7 @@
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "UI/BreakerEffectRenderer.h"
+#include "UI/BreakerEffectCompositions.h"
 #include "UI/BreakerUIStyle.h"
 
 namespace
@@ -37,6 +38,18 @@ namespace
         ArriveTiming.FadeOutSeconds = 0.22f;
         Effects->AddGlow(Arrival + Lift, 60.0f, Paint, 4.0f, ArriveTiming);
         Effects->AddBlinkLight(Arrival + Lift, 500.0f, Paint, 3000.0f, ArriveTiming);
+        // THE PATH BETWEEN. Two glows twelve metres apart said "something
+        // happened twice"; a trail racing from the one to the other in a
+        // twelfth of a second says the caster went from here to there, which
+        // is what a blink is. Low, off the camera's axis.
+        BreakerFXCompose::Trail(Effects, Departure + FVector(0.0f, 0.0f, 25.0f), Arrival + FVector(0.0f, 0.0f, 25.0f),
+            6, 4.0f, Paint, 2.8f, 0.08f, 0.2f);
+        // And a ring where the body lands, opening as it arrives.
+        BreakerFX::FEffectTiming LandTiming;
+        LandTiming.DurationSeconds = 0.3f;
+        LandTiming.FadeInSeconds = 0.0f;
+        LandTiming.FadeOutSeconds = 0.22f;
+        BreakerFXCompose::GroundRing(Effects, Arrival - FVector(0.0f, 0.0f, 60.0f), 90.0f, Paint, 3.0f, 2.4f, LandTiming, 0.08f, 0.06f);
     }
 }
 

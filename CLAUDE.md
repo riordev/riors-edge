@@ -106,7 +106,10 @@ plus switches: `-BreakerAutoPlay[=Anchor|Gym|Fernhall]`, `-BreakerScreenshots=N`
 `-BreakerCaptureMenu=<SCREEN>` (incl. `RIFTDEBRIEF`), `-BreakerCaptureBoard=<BOARD>`,
 `-BreakerCaptureTour`, `-BreakerCaptureHUD` (false-negative on damage-number
 aggregation — read that through `RiorsEdge.UI.Damage.Aggregation`),
-`-BreakerCycleWeapons=<s>`, `-BreakerBossOnStart`,
+`-BreakerCycleWeapons=<s>`, `-BreakerBossOnStart`, `-BreakerAbilityProbe[=<Class>[:<AbilityId>]]`
+(casts slots one/two/ultimate at 5.85/7.6/9.6 s), `-BreakerScreenshotFirst=<s>`,
+`-BreakerScreenshotInterval=<s>` (frame cadence; the default 6 s then every 2 s
+cannot photograph a quarter-second burst — probe abilities at 0.2 s),
 `-BreakerCaptureBlast`, `-BreakerCapturePocketRift[=<n>]`, `-BreakerCaptureChest`, `-BreakerCaptureNpc`, `-BreakerCaptureWeakPoint`. The harness cannot move a
 mouse: hover, tooltip and zoom states are unverifiable by it.
 

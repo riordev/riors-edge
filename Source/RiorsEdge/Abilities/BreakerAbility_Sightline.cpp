@@ -6,6 +6,7 @@
 #include "Characters/BreakerCharacter.h"
 #include "Engine/World.h"
 #include "UI/BreakerEffectRenderer.h"
+#include "UI/BreakerEffectCompositions.h"
 #include "UI/BreakerUIStyle.h"
 #include "Weapons/BreakerWeaponComponent.h"
 
@@ -133,9 +134,15 @@ void UBreakerAbility_Sightline::ActivateAbility(const FGameplayAbilitySpecHandle
             // end-on dot a camera-origin stroke collapses to (the Lead
             // photograph's lesson, applied here by principle).
             const FVector Side = FVector::CrossProduct(Aim, FVector::UpVector).GetSafeNormal();
-            Effects->AddStroke(Eye + Aim * 110.0f + Side * 25.0f - FVector(0.0f, 0.0f, 18.0f),
-                Eye + Aim * 2200.0f, 2.5f, GetPresentationColor(), 2.8f, LineTiming);
-            Effects->AddGlow(Eye + Aim * 130.0f, 22.0f, GetPresentationColor(), 3.0f, LineTiming);
+            const FLinearColor Paint = GetPresentationColor();
+            const FVector LineStart = Eye + Aim * 110.0f + Side * 25.0f - FVector(0.0f, 0.0f, 18.0f);
+            const FVector LineEnd = Eye + Aim * 2200.0f;
+            Effects->AddStroke(LineStart, LineEnd, 2.5f, Paint, 2.8f, LineTiming);
+            Effects->AddGlow(Eye + Aim * 130.0f, 22.0f, Paint, 3.0f, LineTiming);
+            // PIPS DOWN THE LINE, born outward: the sightline is a REACH — the
+            // next shot pierces everything on it — and one thin stroke does not
+            // say how far. Five glows walking out to twenty-two metres do.
+            BreakerFXCompose::Pips(Effects, LineStart, LineEnd, 5, 14.0f, Paint, 2.4f, LineTiming, 0.12f);
         }
     }
 

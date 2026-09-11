@@ -13,6 +13,7 @@
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "UI/BreakerEffectRenderer.h"
+#include "UI/BreakerEffectCompositions.h"
 #include "UI/BreakerUIStyle.h"
 #include "UObject/UObjectIterator.h"
 
@@ -400,6 +401,13 @@ void UBreakerAbility_Unmake::ActivateAbility(const FGameplayAbilitySpecHandle Ha
             const FVector Out = FRotator(0.0f, 60.0f * Index, 0.0f).Vector();
             Effects->AddStroke(Feet + Out * 40.0f, Feet + Out * 150.0f, 4.5f, GetPresentationColor(), 2.8f, BurstTiming, 0.03f * Index);
         }
+        // THE SHOCKWAVE, the ultimate's own signature shared with Overdrive:
+        // two rings leaving the feet, the second wider and later.
+        BreakerFX::FEffectTiming WaveTiming;
+        WaveTiming.DurationSeconds = 0.6f;
+        WaveTiming.FadeInSeconds = 0.0f;
+        WaveTiming.FadeOutSeconds = 0.4f;
+        BreakerFXCompose::Ripple(Effects, Feet, 180.0f, 320.0f, GetPresentationColor(), 4.0f, 2.8f, WaveTiming, 0.12f);
     }
 
     // Cascade (Class-Kits §2.2): the reaction ultimate. Only when the resolved

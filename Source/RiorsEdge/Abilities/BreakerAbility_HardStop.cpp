@@ -10,6 +10,7 @@
 #include "Progression/BreakerProgressionLibrary.h"
 #include "TimerManager.h"
 #include "UI/BreakerEffectRenderer.h"
+#include "UI/BreakerEffectCompositions.h"
 #include "UI/BreakerUIStyle.h"
 
 UBreakerAbility_HardStop::UBreakerAbility_HardStop()
@@ -145,6 +146,10 @@ void UBreakerAbility_HardStop::ActivateAbility(const FGameplayAbilitySpecHandle 
                 const FVector Out = FRotator(0.0f, Yaw, 0.0f).Vector();
                 Effects->AddStroke(Feet + Out * 25.0f, Feet + Out * 85.0f, 4.0f, GetPresentationColor(), 2.4f, PlantTiming);
             }
+            // AND A RING CLOSING IN. Velocity gathered to nothing is the
+            // ability; a wide ring first and a tight one a beat later is that
+            // gathering, drawn.
+            BreakerFXCompose::Ripple(Effects, Feet, 160.0f, 80.0f, GetPresentationColor(), 3.0f, 2.4f, PlantTiming, 0.08f);
         }
     }
 

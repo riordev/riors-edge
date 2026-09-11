@@ -7,6 +7,7 @@
 
 class UBreakerCombatComponent;
 class UPointLightComponent;
+class UMaterialInstanceDynamic;
 class UStaticMeshComponent;
 class ABreakerEffectRenderer;
 
@@ -205,6 +206,10 @@ protected:
     UPROPERTY(VisibleAnywhere) TObjectPtr<USceneComponent> Root;
     UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Footprint;
     UPROPERTY(VisibleAnywhere) TObjectPtr<UPointLightComponent> Glow;
+    // The footprint's additive material and its breath clock. The material is
+    // owned by the footprint component; this is a handle for the tick.
+    UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> FootprintGlow;
+    float FootprintBreath = 0.0f;
 
     UPROPERTY(ReplicatedUsing=OnRep_Spec) FBreakerZoneSpec Spec;
     UFUNCTION() void OnRep_Spec();

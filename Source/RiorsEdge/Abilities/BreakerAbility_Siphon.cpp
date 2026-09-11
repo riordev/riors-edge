@@ -13,6 +13,7 @@
 #include "Progression/BreakerProgressionComponent.h"
 #include "TimerManager.h"
 #include "UI/BreakerEffectRenderer.h"
+#include "UI/BreakerEffectCompositions.h"
 #include "UI/BreakerUIStyle.h"
 
 UBreakerAbility_Siphon::UBreakerAbility_Siphon()
@@ -210,6 +211,19 @@ void UBreakerAbility_Siphon::TickChannel()
     // shield-absorbed tick must not pay the caster full value. This is the
     // whole reason the heal is a portion of the RESULT.
     const float HealAmount = HealForTick(Result.HealthDamage + Result.ShieldDamage, LeechFraction);
+    // EVERY TICK IS VISIBLE ON THE BEAM. The beam alone is a line between two
+    // bodies that could mean anything; a pulse running down it from the
+    // target to the caster on each tick is a leech, and a tick that healed
+    // nothing (dodged, blocked, absorbed) runs nothing.
+    if (HealAmount > 0.0f && Target && Character)
+    {
+        if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(GetWorld()))
+        {
+            const FVector Lift(0.0f, 0.0f, 50.0f);
+            BreakerFXCompose::Trail(Effects, Target->GetActorLocation() + Lift, Character->GetActorLocation() + Lift,
+                5, 7.0f, GetPresentationColor(), 3.0f, 0.14f, 0.12f);
+        }
+    }
     if (HealAmount > 0.0f && CasterCombat)
     {
         FBreakerHealRequest Heal;

@@ -12,6 +12,7 @@
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "UI/BreakerEffectRenderer.h"
+#include "UI/BreakerEffectCompositions.h"
 #include "UI/BreakerUIStyle.h"
 
 UBreakerAbility_Resonance::UBreakerAbility_Resonance()
@@ -174,9 +175,15 @@ void UBreakerAbility_Resonance::ActivateAbility(const FGameplayAbilitySpecHandle
         BreakerFX::FEffectTiming BurstTiming;
         BurstTiming.DurationSeconds = 0.35f;
         BurstTiming.FadeOutSeconds = 0.28f;
-        Effects->AddGlow(BurstCenter, BurstRadius, GetPresentationColor(), 4.5f, BurstTiming);
-        Effects->AddBlinkLight(BurstCenter, 300.0f + 120.0f * Counted, GetPresentationColor(),
-            2000.0f + 1200.0f * Counted, BurstTiming);
+        const FLinearColor Paint = GetPresentationColor();
+        // A DETONATION, not a glow: spokes off the body and a ring on the
+        // ground under it, both sized by how many statuses it counted, so a
+        // three-status Resonance is visibly a bigger event than a one-status
+        // one — which is the whole reason to set it up.
+        BreakerFXCompose::Burst(Effects, BurstCenter, BurstRadius, Paint, 4.5f, BurstTiming,
+            300.0f + 120.0f * Counted, 2000.0f + 1200.0f * Counted);
+        BreakerFXCompose::GroundRing(Effects, Target->GetActorLocation() - FVector(0.0f, 0.0f, 80.0f),
+            110.0f + 50.0f * Counted, Paint, 3.5f, 2.6f, BurstTiming, 0.06f);
     }
 
     if (UBreakerCombatComponent* TargetCombat = Target->FindComponentByClass<UBreakerCombatComponent>())

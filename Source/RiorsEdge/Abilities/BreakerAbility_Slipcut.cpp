@@ -10,6 +10,7 @@
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "UI/BreakerEffectRenderer.h"
+#include "UI/BreakerEffectCompositions.h"
 #include "UI/BreakerUIStyle.h"
 #include "Weapons/BreakerWeaponComponent.h"
 
@@ -193,11 +194,31 @@ void UBreakerAbility_Slipcut::ActivateAbility(const FGameplayAbilitySpecHandle H
             SnapTiming.DurationSeconds = 0.22f;
             SnapTiming.FadeInSeconds = 0.0f;
             SnapTiming.FadeOutSeconds = 0.16f;
-            Effects->AddGlow(Chest + Aim * 60.0f, 30.0f, GetPresentationColor(), 3.0f, SnapTiming);
-            // Two short rails bracketing the aim line: the cadence opening.
+            const FLinearColor Paint = GetPresentationColor();
+            // OFF THE CAMERA'S AXIS (O179). The glow used to sit sixty
+            // centimetres straight ahead of the chest — a thirty-centimetre
+            // additive sphere a hand's width from the lens, which the probe
+            // photographed as an orange pool over the whole lower frame. The
+            // weapon is on the right; the tell goes there, further out and
+            // smaller.
             const FVector Side = FVector::CrossProduct(Aim, FVector::UpVector).GetSafeNormal();
-            Effects->AddStroke(Chest + Side * 35.0f + Aim * 20.0f, Chest + Side * 25.0f + Aim * 110.0f, 3.5f, GetPresentationColor(), 2.6f, SnapTiming);
-            Effects->AddStroke(Chest - Side * 35.0f + Aim * 20.0f, Chest - Side * 25.0f + Aim * 110.0f, 3.5f, GetPresentationColor(), 2.6f, SnapTiming);
+            Effects->AddGlow(Chest + Aim * 95.0f - Side * 26.0f - FVector(0.0f, 0.0f, 14.0f), 14.0f, Paint, 3.0f, SnapTiming);
+            // THE CADENCE OPENING: three speed rails on the weapon side racing
+            // forward one after another — the thing this ability does is make
+            // the next shots come faster, and three lines arriving in a rush
+            // says that where two static rails said "a bracket".
+            // Cross(Aim, Up) points LEFT in this handedness; the weapon is on
+            // the right, so the rails ride -Side.
+            for (int32 Rail = 0; Rail < 3; ++Rail)
+            {
+                const float Drop = 6.0f * Rail;
+                const FVector Start = Chest - Side * (38.0f - 5.0f * Rail) + Aim * (15.0f + 10.0f * Rail) - FVector(0.0f, 0.0f, Drop);
+                const FVector End = Start + Aim * 150.0f + Side * 8.0f;
+                BreakerFXCompose::Trail(Effects, Start, End, 3, 3.0f, Paint, 2.6f, 0.06f, 0.16f, 0.03f * Rail);
+            }
+            // And the mirror rail on the off side, single, so the bracket the
+            // player learned still reads.
+            Effects->AddStroke(Chest + Side * 35.0f + Aim * 20.0f, Chest + Side * 25.0f + Aim * 110.0f, 3.0f, Paint, 2.2f, SnapTiming);
         }
     }
 

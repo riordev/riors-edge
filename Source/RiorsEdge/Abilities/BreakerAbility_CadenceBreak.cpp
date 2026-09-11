@@ -9,6 +9,7 @@
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "UI/BreakerEffectRenderer.h"
+#include "UI/BreakerEffectCompositions.h"
 #include "UI/BreakerUIStyle.h"
 
 UBreakerAbility_CadenceBreak::UBreakerAbility_CadenceBreak()
@@ -211,9 +212,18 @@ void UBreakerAbility_CadenceBreak::ActivateAbility(const FGameplayAbilitySpecHan
             SnapTiming.DurationSeconds = 0.20f;
             SnapTiming.FadeInSeconds = 0.0f;
             SnapTiming.FadeOutSeconds = 0.15f;
-            Effects->AddGlow(Chest + Aim * 55.0f, 26.0f, GetPresentationColor(), 3.4f, SnapTiming);
-            Effects->AddStroke(Chest + Aim * 40.0f + Side * 30.0f - FVector(0.0f, 0.0f, 25.0f),
-                Chest + Aim * 70.0f - Side * 30.0f + FVector(0.0f, 0.0f, 25.0f), 4.0f, GetPresentationColor(), 2.8f, SnapTiming);
+            const FLinearColor Paint = GetPresentationColor();
+            // THE BREAK: a burst at the muzzle — the reload slamming home —
+            // and a ring closing at the feet a beat later, because what opens
+            // here is a STATE (consecutive hits stack), and a ring that closes
+            // in says "locked in" where one glow said "something happened".
+            BreakerFXCompose::Burst(Effects, Chest + Aim * 55.0f, 22.0f, Paint, 3.4f, SnapTiming, 320.0f, 1800.0f);
+            const FVector Feet = Character->GetActorLocation() - FVector(0.0f, 0.0f, Character->GetSimpleCollisionHalfHeight() * 0.85f);
+            BreakerFX::FEffectTiming LockTiming;
+            LockTiming.DurationSeconds = 0.34f;
+            LockTiming.FadeInSeconds = 0.0f;
+            LockTiming.FadeOutSeconds = 0.22f;
+            BreakerFXCompose::Ripple(Effects, Feet, 120.0f, 70.0f, Paint, 3.0f, 2.4f, LockTiming, 0.07f);
         }
     }
 

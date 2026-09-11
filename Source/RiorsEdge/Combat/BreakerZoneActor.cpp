@@ -1,4 +1,5 @@
 #include "Combat/BreakerZoneActor.h"
+#include "UI/BreakerGlowMaterial.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbilityStateComponent.h"
 #include "Abilities/BreakerAbilityTags.h"
@@ -31,6 +32,12 @@ namespace BreakerZoneActorLocal
     // so it does not catch it.
     static const TCHAR* BreakerZoneFootprintMesh = TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
     static const TCHAR* BreakerZoneShapeMaterial = TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial");
+    // The fill's resting brightness on the additive glow material, and how
+    // far it breathes above that. A still tint reads as a repaint; a moving
+    // one reads as a process. O2 PLACEHOLDER.
+    static constexpr float BreakerZoneFillIntensity = 0.22f;
+    static constexpr float BreakerZoneFillBreath = 0.10f;
+    static constexpr float BreakerZoneBreathHz = 0.7f;
 
     // Live server-side zones. A weak list rather than a world iterator so an
     // exit can ask "is this actor still standing in another zone of the same
@@ -353,6 +360,15 @@ void ABreakerZoneActor::HandleLongDarkTagChanged(FGameplayTag Tag, int32 Count)
 void ABreakerZoneActor::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+    // The fill breathes. Client and server both run this; it writes only a
+    // material parameter, and a parameter is not state.
+    if (FootprintGlow && Footprint && Footprint->IsVisible())
+    {
+        FootprintBreath += DeltaSeconds;
+        const float Pulse = 0.5f + 0.5f * FMath::Sin(FootprintBreath * BreakerZoneActorLocal::BreakerZoneBreathHz * 2.0f * PI);
+        BreakerUI::SetGlowColor(FootprintGlow, Spec.ZoneColor,
+            BreakerZoneActorLocal::BreakerZoneFillIntensity + BreakerZoneActorLocal::BreakerZoneFillBreath * Pulse);
+    }
     if (HasAuthority()) AdvanceZone(DeltaSeconds);
 }
 
@@ -709,14 +725,17 @@ void ABreakerZoneActor::RefreshPresentation()
         // scale is a metre. Deliberately flat: this stands in for a decal.
         const float Diameter = FMath::Max(Spec.RadiusCm, 1.0f) * 2.0f / 100.0f;
         Footprint->SetRelativeScale3D(FVector(Diameter, Diameter, 0.06f));
-        if (UMaterialInterface* BaseMaterial = LoadObject<UMaterialInterface>(nullptr, BreakerZoneActorLocal::BreakerZoneShapeMaterial))
-        {
-            if (UMaterialInstanceDynamic* Dynamic = UMaterialInstanceDynamic::Create(BaseMaterial, Footprint))
-            {
-                Dynamic->SetVectorParameterValue(TEXT("Color"), Spec.ZoneColor);
-                Footprint->SetMaterial(0, Dynamic);
-            }
-        }
+        // LIGHT ON THE GROUND, NOT PAINT ON IT. Owner: "Rot is literally just
+        // an orange circle on the ground". It was: the LIT BasicShapeMaterial
+        // at the zone's full colour, which under a sun is a solid disc of
+        // orange plastic. The glow material is unlit and additive — the same
+        // one every pooled effect and the pocket tear already wear — so the
+        // disc reads as the zone's own light lying on the floor, and the rim
+        // strokes, the throw and the cast flash are visibly the same stuff.
+        // Dim on purpose: the rim is the edge and the fill is the field.
+        // (GLASS's published glow header, consumed here by FIELD.)
+        FootprintGlow = BreakerUI::MakeGlowMaterial(Footprint);
+        BreakerUI::SetGlowColor(FootprintGlow, Spec.ZoneColor, BreakerZoneActorLocal::BreakerZoneFillIntensity);
     }
     // Mobile rings belong to the zone transform/lifetime, not a fixed pooled
     // world-space clip. Replicated Spec builds the same footprint on clients.

@@ -191,7 +191,18 @@ int32 ABreakerEffectRenderer::PlayMomentNow(EBreakerEffectMoment Moment, const F
     // Not authored yet: the pooled primitives stand in.
     const BreakerFX::FMomentFallback Fallback = BreakerFX::MomentFallback(Moment);
     if (!Fallback.bDrawn) return 0;
-    const int32 Handle = AddGlow(Location, Fallback.RadiusCm, Color, Fallback.Intensity, Fallback.Timing);
+    int32 Handle = 0;
+    if (Fallback.RadiusCm > 0.0f)
+    {
+        Handle = AddGlow(Location, Fallback.RadiusCm, Color, Fallback.Intensity, Fallback.Timing);
+    }
+    if (Fallback.TongueCm > 0.0f)
+    {
+        const FVector Facing = Direction.IsNearlyZero() ? FVector::UpVector : Direction.GetSafeNormal();
+        const int32 Tongue = AddStroke(Location, Location + Facing * Fallback.TongueCm,
+            Fallback.TongueThicknessCm, Color, Fallback.Intensity, Fallback.Timing);
+        if (Handle == 0) Handle = Tongue;
+    }
     if (Fallback.LightRadiusCm > 0.0f)
     {
         AddBlinkLight(Location, Fallback.LightRadiusCm, Color, Fallback.LightIntensity, Fallback.Timing);

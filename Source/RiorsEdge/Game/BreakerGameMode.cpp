@@ -1776,6 +1776,13 @@ void ABreakerGameMode::ScheduleScreenshots()
     }
     else
     {
+        // THE CADENCE IS A SWITCH. Two seconds between frames photographs a
+        // yard; it cannot photograph a quarter-second ability burst, and the
+        // ability probe fires three of those. -BreakerScreenshotFirst=<s> and
+        // -BreakerScreenshotInterval=<s> override the defaults for a run.
+        FParse::Value(FCommandLine::Get(), TEXT("BreakerScreenshotFirst="), ScreenshotFirstDelaySeconds);
+        FParse::Value(FCommandLine::Get(), TEXT("BreakerScreenshotInterval="), ScreenshotIntervalSeconds);
+        ScreenshotIntervalSeconds = FMath::Max(0.05f, ScreenshotIntervalSeconds);
         NextScreenshotTime = FPlatformTime::Seconds() + FMath::Max(0.1f, ScreenshotFirstDelaySeconds);
         UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] %d screenshots, first at %.1fs, every %.1fs after."),
             ScreenshotsRemaining, ScreenshotFirstDelaySeconds, ScreenshotIntervalSeconds);

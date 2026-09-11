@@ -91,7 +91,10 @@ bool FBreakerEffectMomentFallbackTest::RunTest(const FString& Parameters)
         const FMomentFallback F = MomentFallback(Moment);
         if (!F.bDrawn) continue;
         TestTrue(TEXT("A drawn fallback lasts"), F.Timing.DurationSeconds > 0.0f);
-        TestTrue(TEXT("A drawn fallback has size"), F.RadiusCm >= 0.5f);   // the renderer hides anything smaller
+        // A drawn fallback is SOMETHING: a disc the renderer will not hide
+        // (it drops anything under half a centimetre), or a tongue. The
+        // muzzle is the tongue case — its disc is zero on purpose.
+        TestTrue(TEXT("A drawn fallback has size"), F.RadiusCm >= 0.5f || F.TongueCm > 0.0f);
         TestTrue(TEXT("A drawn fallback has light"), F.Intensity > 0.0f);
         TestTrue(TEXT("Fades fit inside the clip"),
             F.Timing.FadeInSeconds + F.Timing.FadeOutSeconds <= F.Timing.DurationSeconds + KINDA_SMALL_NUMBER);
@@ -111,7 +114,7 @@ bool FBreakerEffectMomentFallbackTest::RunTest(const FString& Parameters)
     return true;
 }
 
-// The muzzle draws only from an authored NS_Muzzle; there is no primitive
+// The muzzle draws a tongue and a light until NS_Muzzle is authored; no disc
 // stand-in. The muzzle is the one moment drawn at a fixed offset from the
 // player's own camera, so its size is a screen question: a flash must not
 // reach the reticle at either shipped muzzle offset (GLASS-5, O179's camera
@@ -151,9 +154,27 @@ bool FBreakerEffectMomentMuzzleReticleTest::RunTest(const FString& Parameters)
         MuzzleFallbackRadiusCeilingCm(FVector(95.0f, 18.0f, 0.0f), Clearance),
         MuzzleFallbackRadiusCeilingCm(FVector(95.0f, 0.0f, -18.0f), Clearance), 1.0e-3f));
 
-    // Shipped configuration: nothing is drawn at the muzzle, so nothing can
-    // reach the reticle; the death fallback is untouched by that rule.
-    TestFalse(TEXT("The muzzle fallback is off"), MomentFallback(EBreakerEffectMoment::Muzzle).bDrawn);
+    // Shipped configuration: the muzzle DRAWS now (a tongue and a light), and
+    // it draws NO DISC, because the largest disc that clears the reticle at
+    // the aimed muzzle offset (95, 2, -6) is under four centimetres. A
+    // tongue down the barrel from an off-axis muzzle converges toward the
+    // axis and never reaches it; the death fallback is untouched by any of
+    // this.
+    const FMomentFallback Muzzle = MomentFallback(EBreakerEffectMoment::Muzzle);
+    TestTrue(TEXT("The muzzle fallback is on"), Muzzle.bDrawn);
+    TestEqual(TEXT("and draws no disc"), Muzzle.RadiusCm, 0.0f);
+    TestTrue(TEXT("but a tongue"), Muzzle.TongueCm > 0.0f && Muzzle.TongueThicknessCm > 0.0f);
+    TestTrue(TEXT("and a light"), Muzzle.LightRadiusCm > 0.0f);
+    // A disc would not have cleared: the ceiling at the aimed offset is tiny.
+    TestTrue(TEXT("The aimed offset leaves no room for a disc"),
+        MuzzleFallbackRadiusCeilingCm(FVector(95.0f, 2.0f, -6.0f), Clearance) < 5.0f);
+    // The tongue's thickness is inside even that, so its near end cannot
+    // reach the reticle at the aimed offset either.
+    TestTrue(TEXT("The tongue is thinner than the aimed ceiling"),
+        Muzzle.TongueThicknessCm * 0.5f < MuzzleFallbackRadiusCeilingCm(FVector(95.0f, 2.0f, -6.0f), Clearance));
+    // And it is over before the next shot at any shipped cadence (900 RPM is
+    // 0.067 s).
+    TestTrue(TEXT("A flash does not outlive a shot interval"), Muzzle.Timing.DurationSeconds <= 60.0f / 900.0f);
     TestTrue(TEXT("Death keeps its fallback"), MomentFallback(EBreakerEffectMoment::Death).bDrawn);
     return true;
 }

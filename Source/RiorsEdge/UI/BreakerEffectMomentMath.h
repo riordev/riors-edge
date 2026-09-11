@@ -112,10 +112,18 @@ namespace BreakerFX
     struct FMomentFallback
     {
         bool bDrawn = true;
+        // 0: no glow disc at all (the muzzle — see below).
         float RadiusCm = 30.0f;
         float Intensity = 3.0f;
         float LightRadiusCm = 0.0f;   // 0: no blink light
         float LightIntensity = 0.0f;
+        // A TONGUE along Direction rather than a disc: a stroke starting at
+        // the location and running TongueCm forward. 0: none. This is the
+        // muzzle's shape, because a stroke parallel to the view axis from an
+        // off-axis muzzle converges TOWARD the reticle and never crosses it,
+        // where a disc of any useful size at the aimed muzzle offset does.
+        float TongueCm = 0.0f;
+        float TongueThicknessCm = 0.0f;
         FEffectTiming Timing;
     };
 
@@ -125,9 +133,29 @@ namespace BreakerFX
         switch (Moment)
         {
         case EBreakerEffectMoment::Muzzle:
-            // The muzzle has no primitive stand-in; it draws only when
-            // NS_Muzzle is authored. Any future fallback passes MuzzleFallbackRadiusCeilingCm.
-            F.bDrawn = false;
+            // THE GUN FLASHES. Owner, 2026-09-11: "visual effects, whether
+            // that's your gun and stuff like that". The muzzle drew NOTHING
+            // until NS_Muzzle was authored, and NS_Muzzle is an ASSETS item
+            // (O190) that nobody has made, so every shot in the game has been
+            // a silent tracer leaving a gun that did not move a photon.
+            //
+            // NO DISC. MuzzleFallbackRadiusCeilingCm says the largest glow that
+            // clears the reticle at the AIMED muzzle offset (95, 2, -6) is
+            // under four centimetres, which is nothing; that is why this was
+            // off. A tongue — a short bright stroke down the barrel — starts
+            // at the muzzle's own off-axis angle and converges toward the
+            // axis without reaching it, so it reads at any size, and a blink
+            // light at the muzzle lights the gun and the nearest wall, which
+            // is most of what a muzzle flash IS. Both are one frame's worth
+            // of life: a flash that lingers is a lamp.
+            F.RadiusCm = 0.0f;
+            F.TongueCm = 34.0f;               // O2 PLACEHOLDER
+            F.TongueThicknessCm = 3.2f;       // O2 PLACEHOLDER
+            F.Intensity = 4.0f;               // O2 PLACEHOLDER
+            F.LightRadiusCm = 360.0f;         // O2 PLACEHOLDER
+            F.LightIntensity = 2600.0f;       // O2 PLACEHOLDER
+            F.Timing.DurationSeconds = 0.06f; // O2 PLACEHOLDER
+            F.Timing.FadeOutSeconds = 0.04f;  // O2 PLACEHOLDER
             break;
         case EBreakerEffectMoment::Impact:
             F.bDrawn = false;

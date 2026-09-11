@@ -9,6 +9,7 @@
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
 #include "UI/BreakerEffectRenderer.h"
+#include "UI/BreakerEffectCompositions.h"
 #include "UI/BreakerUIStyle.h"
 
 UBreakerAbility_Lead::UBreakerAbility_Lead()
@@ -105,7 +106,19 @@ void UBreakerAbility_Lead::ActivateAbility(const FGameplayAbilitySpecHandle Hand
             MarkPoint, 2.0f, GetPresentationColor(), 2.6f, PaintTiming);
         if (MarkedTarget.IsValid())
         {
-            Effects->AddGlow(MarkPoint, 28.0f, GetPresentationColor(), 3.2f, PaintTiming);
+            const FLinearColor Paint = GetPresentationColor();
+            Effects->AddGlow(MarkPoint, 28.0f, Paint, 3.2f, PaintTiming);
+            // THE MARK IS A RING AROUND THE BODY, not a dot on it: a gold band
+            // at the mark's height that opens round the target in a tenth of a
+            // second and holds for most of a second, so "that one is marked" is
+            // readable from across the yard and not only at the instant of
+            // the cast. The mark itself lasts longer; this is its arrival.
+            BreakerFX::FEffectTiming BandTiming;
+            BandTiming.DurationSeconds = 0.9f;
+            BandTiming.FadeInSeconds = 0.02f;
+            BandTiming.FadeOutSeconds = 0.5f;
+            BreakerFXCompose::GroundRing(Effects, MarkedTarget->GetActorLocation() + FVector(0.0f, 0.0f, 40.0f),
+                70.0f, Paint, 3.0f, 2.8f, BandTiming, 0.1f);
         }
     }
 
