@@ -552,7 +552,24 @@ public:
     // Optional one-shot on death — without it a named body keeps its gait
     // loop through the corpse beat, which reads as a glitch, not a kill.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy") FSoftObjectPath BodyDeathAnimation;
+    // Optional: a one-shot on a hit that cost health or shield, and a looped
+    // gait for when the body is moving. Owner, 2026-09-11: "monsters have no
+    // indication that they're taking damage, and they all kind of just walk in
+    // a straight line". The mech pack ships neither (Walk and Death only); the
+    // QuadShell rig ships both, and it was in the repo unused. A body with no
+    // hit animation still flashes and flinches — this is on top, not instead.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy") FSoftObjectPath BodyHitAnimation;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy") FSoftObjectPath BodyRunAnimation;
 protected:
+    // The named body's animation state. A hit plays over the gait and hands
+    // back to it when its sequence ends; the gait itself follows the body's
+    // own velocity, so a rig with a Run stops walking on the spot.
+    void PlayBodyHit();
+    void RestoreBodyGait();
+    void UpdateBodyGait();
+    FTimerHandle BodyHitTimer;
+    bool bBodyRunning = false;
+    bool bBodyHitPlaying = false;
     // Hidden until BodyMeshAsset resolves.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<class USkeletalMeshComponent> NamedBody;
     // The mesh-space forward ApplyBodyMesh read from the rig and yawed onto
@@ -697,8 +714,16 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Approach", meta=(ClampMin="1")) float SprintSpeedMultiplier = 1.4f;
     // Lateral sinusoidal weave layered on the chase vector. Per-enemy phase
     // (seeded from PatrolPhase) keeps a pack from strafing in lockstep.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Approach", meta=(ClampMin="0")) float WeaveFrequency = 1.6f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Approach", meta=(ClampMin="0", ClampMax="1")) float WeaveStrength = 0.45f;
+    //
+    // A WEAVE YOU CAN SEE. At 1.6 rad/s one full swing took 3.9 s, and a body
+    // closes from sprint range in three or four, so the "weave" was one slow
+    // drift to one side — indistinguishable from the straight line the owner
+    // described. 4.2 rad/s is a swing every 1.5 s, two or three across the
+    // approach; 0.6 is 31 degrees off the chase vector, inside the 35 degree
+    // cone that keeps the mover on a straight-line steer rather than a path.
+    // Both O2 PLACEHOLDER.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Approach", meta=(ClampMin="0")) float WeaveFrequency = 4.2f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Approach", meta=(ClampMin="0", ClampMax="1")) float WeaveStrength = 0.6f;
     // Committed lunge: a short burst inside this range, telegraphed one
     // frame ahead through StateLabel so the HUD shows "LUNGE".
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Approach", meta=(ClampMin="0")) float LungeRange = 450.0f;

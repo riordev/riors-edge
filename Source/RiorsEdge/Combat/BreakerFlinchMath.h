@@ -27,8 +27,10 @@ namespace BreakerFlinch
     // All O2 PLACEHOLDER. Short on purpose: sustained fire lands four or five
     // rounds a second, so a hitch that outlives its own interval would stop
     // being a reaction and become a wobble.
-    inline constexpr float DurationSeconds = 0.12f;
-    inline constexpr float ReachCm = 9.0f;
+    // Up from 0.12 s and 9 cm: at a rifle's range a nine-centimetre rock on a
+    // body two metres tall was under a pixel of motion. O2 PLACEHOLDER.
+    inline constexpr float DurationSeconds = 0.18f;
+    inline constexpr float ReachCm = 14.0f;
     inline constexpr float PitchDegrees = 5.0f;
     // A weak-point hit is worth more of everything. The same multiplier on
     // both, so the shape does not change with the hit — only its size.

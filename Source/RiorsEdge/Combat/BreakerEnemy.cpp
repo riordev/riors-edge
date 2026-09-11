@@ -1076,9 +1076,53 @@ AActor* ABreakerEnemy::SelectThreatTarget()
     return Best;
 }
 
+void ABreakerEnemy::PlayBodyHit()
+{
+    if (!NamedBody || !NamedBody->IsVisible() || bDead || (Combat && Combat->IsDead())) return;
+    UAnimSequence* HitAnim = Cast<UAnimSequence>(BodyHitAnimation.TryLoad());
+    if (!HitAnim) return;
+    UWorld* World = GetWorld();
+    if (!World) return;
+    NamedBody->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+    NamedBody->PlayAnimation(HitAnim, /*bLooping=*/false);
+    bBodyHitPlaying = true;
+    // Back to the gait when the sequence ends — a hit that left the body
+    // frozen on its last frame would read as a second, worse bug. A second
+    // hit inside the first simply restarts the clock.
+    World->GetTimerManager().SetTimer(BodyHitTimer, this, &ABreakerEnemy::RestoreBodyGait,
+        FMath::Max(0.05f, HitAnim->GetPlayLength()), false);
+}
+
+void ABreakerEnemy::RestoreBodyGait()
+{
+    bBodyHitPlaying = false;
+    if (!NamedBody || !NamedBody->IsVisible() || bDead || (Combat && Combat->IsDead())) return;
+    UAnimSequence* Gait = nullptr;
+    if (bBodyRunning) Gait = Cast<UAnimSequence>(BodyRunAnimation.TryLoad());
+    if (!Gait) Gait = Cast<UAnimSequence>(BodyIdleAnimation.TryLoad());
+    if (!Gait) return;
+    NamedBody->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+    NamedBody->PlayAnimation(Gait, /*bLooping=*/true);
+}
+
+void ABreakerEnemy::UpdateBodyGait()
+{
+    // A rig with no Run has one gait and nothing to switch; the mechs' "idle"
+    // IS their walk, which is why they never looked wrong standing still and
+    // never looked right doing it either.
+    if (!NamedBody || !NamedBody->IsVisible() || !BodyRunAnimation.IsValid()) return;
+    if (bBodyHitPlaying || bDead || (Combat && Combat->IsDead())) return;
+    constexpr float MovingSpeed = 40.0f;   // O2 PLACEHOLDER: under this the body is standing
+    const bool bMoving = GetVelocity().SizeSquared2D() > MovingSpeed * MovingSpeed;
+    if (bMoving == bBodyRunning) return;
+    bBodyRunning = bMoving;
+    RestoreBodyGait();
+}
+
 void ABreakerEnemy::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+    UpdateBodyGait();
     // The cosmetic death beat advances in the reaction COMPONENT's own tick
     // now — client-legal presentation, so a dead server-side pawn still
     // finishes its crumple with no line here.
@@ -1530,6 +1574,9 @@ void ABreakerEnemy::HandleDeath()
     // parts, so the timing contract (pop, crumple, hide) is untouched.
     if (NamedBody && NamedBody->IsVisible())
     {
+        // A hit's gait restore must not land on the corpse.
+        if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(BodyHitTimer);
+        bBodyHitPlaying = false;
         if (UAnimSequence* DeathAnim = Cast<UAnimSequence>(BodyDeathAnimation.TryLoad()))
         {
             NamedBody->SetAnimationMode(EAnimationMode::AnimationSingleNode);
@@ -1806,6 +1853,8 @@ void ABreakerEnemy::HandleDamageReceived(const FBreakerDamageResult& Result)
     // lives in the shared reaction component now (see its header), so the
     // target dummy answers exactly the same way.
     if (HitReaction) HitReaction->NotifyHit(Result.bWeakPoint);
+    // And the rig answers, when it has an answer authored.
+    PlayBodyHit();
     // O129's health ramp: the body reddens as it dies, and this is the event
     // that moves it. Pushed here rather than read on tick — a hundred enemies
     // sampling two attributes every frame to find out nothing changed is the

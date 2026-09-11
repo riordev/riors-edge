@@ -38,12 +38,20 @@ namespace
 
 ABreakerRangedEnemy::ABreakerRangedEnemy()
 {
-    // THE LATTICE STAYS PRIMITIVES BY RULING (owner, 2026-08-29, recorded in
-    // Assets/enemies/LICENSE-NOTE.txt): it is composed in-engine, code-
-    // animated, BodyPaint material — the one enemy the mech cast does not
-    // dress. The base constructor defaults Stan; this clears it.
-    BodyMeshAsset = FSoftObjectPath();
-    BodyIdleAnimation = FSoftObjectPath();
+    // THE LATTICE WEARS THE QUADSHELL (owner, 2026-09-11: "take a look at
+    // adding in some of the meshes that we had that were preexisting, that we
+    // just never actually ended up using"). This overturns the 2026-08-29
+    // primitives ruling, which stood while no rig fit it; Enemy_QuadShell has
+    // sat in Content/Breaker/Meshes/enemies with a full set — Idle, Look,
+    // Attack, Hit, Charge, Run, TurnOff — referenced by nothing. It is the one
+    // rig in the repo that ships a HIT and a RUN, which is exactly the two
+    // things the owner says the monsters lack. The primitive Lattice stays as
+    // the fallback for a seat whose LFS pull has not landed.
+    BodyMeshAsset = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/Enemy_QuadShell.Enemy_QuadShell"));
+    BodyIdleAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/Enemy_QuadShellRig_Idle.Enemy_QuadShellRig_Idle"));
+    BodyRunAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/Enemy_QuadShellRig_Run.Enemy_QuadShellRig_Run"));
+    BodyHitAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/Enemy_QuadShellRig_Hit.Enemy_QuadShellRig_Hit"));
+    BodyDeathAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/Enemy_QuadShellRig_TurnOff.Enemy_QuadShellRig_TurnOff"));
     // --- Chassis (O2 PLACEHOLDER) ------------------------------------------
     // This archetype used to ship at the base chassis' flat 220 deliberately,
     // because trash and elite health were mid-re-anchor. O27 landed, so

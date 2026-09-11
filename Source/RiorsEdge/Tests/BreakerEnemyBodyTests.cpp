@@ -122,15 +122,20 @@ bool FBreakerEnemyBodyForwardAxisTest::RunTest(const FString& Parameters)
 // This pin was NoEnemyShipsANamedBody for exactly one cycle — the hook landed
 // default-off pending the readability call, and the owner then ruled the mech
 // cast ON (2026-08-29). The pin moves with the ruling, per its own note:
-// every enemy class either RESOLVES its shipped body (a renamed uasset fails
-// here, not in a screenshot) or is the ranged Lattice, which must ship NONE —
-// composed primitives by the same ruling. Gated on the imported mechs
-// existing, the shipped-samples shape: a clean clone still fights as
-// primitives and still passes.
+// every enemy class RESOLVES its shipped body (a renamed uasset fails here,
+// not in a screenshot). The ranged Lattice used to be the exception —
+// composed primitives by the 2026-08-29 ruling — and the owner overturned
+// that on 2026-09-11 ("take a look at adding in some of the meshes that we had
+// that were preexisting, that we just never actually ended up using"): it
+// wears Enemy_QuadShell, the one rig in the repo that ships a HIT and a RUN,
+// and this now asserts that those two resolve as well, because a body with a
+// hit animation that fails to load is a body with no indication it is taking
+// damage, which is the complaint. Gated on the imported mechs existing, the
+// shipped-samples shape: a clean clone still fights as primitives and passes.
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerEnemyBodyCastTest,
-    "RiorsEdge.Combat.EnemyBody.MechCastResolvesAndLatticeStaysPrimitive",
+    "RiorsEdge.Combat.EnemyBody.CastResolves",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FBreakerEnemyBodyCastTest::RunTest(const FString& Parameters)
@@ -147,14 +152,21 @@ bool FBreakerEnemyBodyCastTest::RunTest(const FString& Parameters)
         const ABreakerEnemy* Defaults = It->GetDefaultObject<ABreakerEnemy>();
         if (!Defaults) continue;
         const bool bIsLattice = It->IsChildOf(ABreakerRangedEnemy::StaticClass());
-        if (bIsLattice)
-        {
-            TestFalse(FString::Printf(TEXT("%s (Lattice) ships primitives by ruling"), *It->GetName()),
-                      Defaults->BodyMeshAsset.IsValid());
-            continue;
-        }
         TestTrue(FString::Printf(TEXT("%s ships a named body"), *It->GetName()),
                  Defaults->BodyMeshAsset.IsValid());
+        if (bIsLattice)
+        {
+            // THE TWO ANIMATIONS THE OWNER'S COMPLAINT NEEDS. The QuadShell is
+            // on the Lattice because it is the rig that has them.
+            TestTrue(TEXT("The Lattice ships a hit animation"), Defaults->BodyHitAnimation.IsValid());
+            TestTrue(TEXT("The Lattice ships a run animation"), Defaults->BodyRunAnimation.IsValid());
+            if (Defaults->BodyHitAnimation.IsValid())
+                TestNotNull(TEXT("The Lattice's hit resolves"), Defaults->BodyHitAnimation.TryLoad());
+            if (Defaults->BodyRunAnimation.IsValid())
+                TestNotNull(TEXT("The Lattice's run resolves"), Defaults->BodyRunAnimation.TryLoad());
+            if (Defaults->BodyDeathAnimation.IsValid())
+                TestNotNull(TEXT("The Lattice's death resolves"), Defaults->BodyDeathAnimation.TryLoad());
+        }
         if (Defaults->BodyMeshAsset.IsValid())
         {
             TestNotNull(*FString::Printf(TEXT("%s's body resolves: %s"), *It->GetName(),

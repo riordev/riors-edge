@@ -14,7 +14,12 @@ namespace
     // caller is the two-owners shape O128 exists to delete. All O2
     // PLACEHOLDER, tuned by eye against capture stills; prefixed for the
     // unity build as always.
-    constexpr float BreakerReactionHitFlashSeconds = 0.07f;
+    // 0.07 was four frames at sixty and one at fifteen: a flash that a frame
+    // of hitching could delete entirely, which is what "no indication that
+    // they're taking damage" measures out to. Long enough to be seen, short
+    // enough that a rifle at 600 RPM still reads as ten flashes and not one.
+    // O2 PLACEHOLDER.
+    constexpr float BreakerReactionHitFlashSeconds = 0.12f;
     constexpr float BreakerReactionDeathPopSeconds = 0.12f;
     constexpr float BreakerReactionDeathBeatSeconds = 0.45f;
     constexpr float BreakerReactionDeathBeatWeakPointSeconds = 0.60f;

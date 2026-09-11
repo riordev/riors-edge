@@ -1,8 +1,11 @@
 ﻿Enemy intake rulings (owner, 2026-08-29):
 
-- ULTIMATE SPACE KIT IS CUT - do not re-hunt or re-download it. The
-  Lattice enemy is composed in-engine from primitives (code-animated,
-  BodyPaint material); no external pack serves it.
+- ULTIMATE SPACE KIT IS CUT - do not re-hunt or re-download it.
+- The Lattice wears Enemy_QuadShell (owner, 2026-09-11: use the meshes that
+  were imported and never used). The primitive Lattice remains as the
+  fallback when the rig does not resolve.
+- Enemy_EyeDrone is imported with a full rig and still unused: it is a
+  hovering body and no chassis flies. It waits on a flyer, not on a ruling.
 - The Animated Mech Pack's four mechs carry human names (George, Leela,
   Mike, Stan) - see animated-mech/LICENSE-NOTE.txt before assuming any
   zip holding those names is a character pack.
