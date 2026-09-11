@@ -14,11 +14,14 @@
 // O168's third commit, proven: the rift completion payout. The pure math is
 // pinned where it lives, and the handler is exercised by direct call — the
 // same seam the BeginPlay bind routes into, minus the world the bind needs.
-// The forced drops ("at least two forced drops that are decent") are proven
-// the same way: count, item level and rarity floor on every completion, and
-// the floor's gate against the default-constructed drop table. O270's salt
-// is proven in the payout test: the clear counter climbs once per paid
-// completion and a re-clear of the same rift pays a different pair.
+// The offer (O270: a closed rift offers three, the player chooses one on the
+// closing card, the other two are gone) is proven the same way: count, item
+// level and rarity floor on every completion, the floor's gate against the
+// default-constructed drop table, and the claim — a completion moves the
+// pack not at all, a claim moves it by exactly the chosen item and closes the
+// offer, and a bad index or a second claim is a refusal that moves nothing.
+// O270's salt is proven in the payout test: the clear counter climbs once per
+// paid completion and a re-clear of the same rift offers a different trio.
 //
 // WHAT THIS DOES NOT COVER: the bind itself (one authority-gated
 // AddWeakLambda in BeginPlay — a live rift run is the check) and the
@@ -60,9 +63,9 @@ bool FBreakerRiftRewardMathTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("a runaway area level pays the clamp ceiling"),
         RiftglassForCompletion(9999), RiftglassForCompletion(100));
 
-    // THE FORCED DROPS, shipped configuration. Owner: "at least two forced
-    // drops that are decent". Two, and "decent" is the elite floor.
-    TestEqual(TEXT("a closed rift is worth two forced items"), CompletionItemCount, 2);
+    // THE OFFER, shipped configuration. O270: a closed rift offers three
+    // items; the player chooses one. Three, and "decent" is the elite floor.
+    TestEqual(TEXT("a closed rift offers three items (O270)"), CompletionOfferCount, 3);
     TestTrue(TEXT("the rarity floor is the elite floor (Exceptional)"),
         CompletionRarityFloor == EBreakerItemRarity::Exceptional);
 
@@ -91,6 +94,11 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerRiftRewardPayoutTest::RunTest(const FString& Parameters)
 {
+    // The refusals under test are loud by design (a refused claim and an
+    // overwritten offer both warn), and this test drives each at least once.
+    AddExpectedError(TEXT("claim refused"), EAutomationExpectedErrorFlags::Contains, 0);
+    AddExpectedError(TEXT("still pending from an earlier completion"), EAutomationExpectedErrorFlags::Contains, 0);
+
     // A transient, never-persisting account, injected so the suite exercises
     // the record and the first-clear rule WITHOUT touching the machine's
     // real account slot.
@@ -123,33 +131,23 @@ bool FBreakerRiftRewardPayoutTest::RunTest(const FString& Parameters)
         GetDefault<ABreakerEnemy>()->GetEliteDropItemLevelBonus(), BandMin, BandMax);
     const EBreakerItemRarity ExpectedFloor = BreakerRiftReward::CompletionRarity(BandMax, FBreakerDropTableParams{});
 
-    // Every completion item is at the band's ceiling and at or above the
-    // floor its item level allows. Checked over the LAST Count items added,
-    // so each clear proves its own pair.
-    const auto CheckForcedDrops = [&](const TCHAR* Clear)
+    // Every offered item is at the band's ceiling and at or above the floor
+    // its item level allows, and the offer is exactly the ruled count.
+    // Checked over the pending offer, so each clear proves its own trio.
+    const auto CheckOffer = [&](const TCHAR* Clear)
     {
-        const TArray<FBreakerItemInstance>& Pack = Equipment->GetBackpack();
-        for (int32 Back = 1; Back <= BreakerRiftReward::CompletionItemCount && Back <= Pack.Num(); ++Back)
+        const TArray<FBreakerItemInstance>& Offer = Progression->GetRiftCompletionOffer();
+        TestEqual(*FString::Printf(TEXT("%s: the offer is exactly the ruled count (O270)"), Clear),
+            Offer.Num(), BreakerRiftReward::CompletionOfferCount);
+        for (int32 Index = 0; Index < Offer.Num(); ++Index)
         {
-            const FBreakerItemInstance& Item = Pack[Pack.Num() - Back];
-            TestTrue(*FString::Printf(TEXT("%s: forced item %d is at or above the floor"), Clear, Back),
+            const FBreakerItemInstance& Item = Offer[Index];
+            TestTrue(*FString::Printf(TEXT("%s: offered item %d is at or above the floor"), Clear, Index),
                 Item.Rarity >= ExpectedFloor);
-            TestEqual(*FString::Printf(TEXT("%s: forced item %d is at the band ceiling"), Clear, Back),
+            TestEqual(*FString::Printf(TEXT("%s: offered item %d is at the band ceiling"), Clear, Index),
                 Item.ItemLevel, BandMax);
-            TestTrue(*FString::Printf(TEXT("%s: forced item %d is a real item"), Clear, Back), Item.IsValid());
+            TestTrue(*FString::Printf(TEXT("%s: offered item %d is a real item"), Clear, Index), Item.IsValid());
         }
-    };
-
-    // The LAST Count items in the backpack — the pair this clear just paid.
-    const auto LastPair = [&]()
-    {
-        TArray<FBreakerItemInstance> Pair;
-        const TArray<FBreakerItemInstance>& Pack = Equipment->GetBackpack();
-        for (int32 Back = BreakerRiftReward::CompletionItemCount; Back >= 1; --Back)
-        {
-            if (Back <= Pack.Num()) Pair.Add(Pack[Pack.Num() - Back]);
-        }
-        return Pair;
     };
 
     // Whether two rolled items are the same roll. ItemId is a fresh GUID on
@@ -170,66 +168,99 @@ bool FBreakerRiftRewardPayoutTest::RunTest(const FString& Parameters)
         return true;
     };
 
+    // Nothing is offered before anything is cleared, and a claim on nothing
+    // is a refusal that moves nothing.
+    TestEqual(TEXT("nothing is offered before a clear"), Progression->GetRiftCompletionOffer().Num(), 0);
+    TestFalse(TEXT("a claim with no offer pending is refused"), Progression->ClaimRiftCompletionOffer(0));
+    TestEqual(TEXT("and the refused claim moves the pack not at all"), Equipment->GetBackpack().Num(), PackBefore);
+
     // A broadcast for SOMEBODY ELSE'S pawn pays this character nothing —
-    // and advances no record, and forces no drop, and counts no clear.
+    // and advances no record, and offers nothing, and counts no clear.
     APawn* Stranger = NewObject<ADefaultPawn>();
     Progression->HandleRiftCompleted(Rift, Stranger);
     TestEqual(TEXT("another pawn's completion pays no XP here"),
         Progression->GetProgressionState().TotalExperience, XpBefore);
     TestEqual(TEXT("another pawn's completion advances no record"), Account->HighestClearedAreaLevel, 0);
-    TestEqual(TEXT("another pawn's completion forces no drop here"), Equipment->GetBackpack().Num(), PackBefore);
+    TestEqual(TEXT("another pawn's completion moves no pack here"), Equipment->GetBackpack().Num(), PackBefore);
+    TestEqual(TEXT("another pawn's completion leaves the offer empty (O270)"),
+        Progression->GetRiftCompletionOffer().Num(), 0);
     TestEqual(TEXT("another pawn's completion counts no clear here (O270)"),
         static_cast<int32>(Progression->GetProgressionState().RiftClearCount), 0);
 
     // The FIRST clear pays both halves and advances the account record
-    // (One-AA: a first clear pays the ladder) — and forces the two drops.
+    // (One-AA: a first clear pays the ladder) — and OFFERS the three. The
+    // pack does not move at completion: the pack moves at the claim.
     Progression->HandleRiftCompleted(Rift, Owner);
     TestEqual(TEXT("first clear pays the composed XP"),
         Progression->GetProgressionState().TotalExperience, XpBefore + ExpectedXp);
     TestEqual(TEXT("first clear pays the composed Riftglass onto the wallet"),
         Equipment->GetForgeWallet().Get(), GlassBefore + ExpectedRiftglass);
     TestEqual(TEXT("first clear advances the account record"), Account->HighestClearedAreaLevel, 3);
-    TestEqual(TEXT("first clear forces exactly the two drops into the backpack"),
-        Equipment->GetBackpack().Num(), PackBefore + BreakerRiftReward::CompletionItemCount);
+    TestEqual(TEXT("first clear moves the pack not at all — the offer is not yet a grant (O270)"),
+        Equipment->GetBackpack().Num(), PackBefore);
     TestEqual(TEXT("first clear is clear number one (O270)"),
         static_cast<int32>(Progression->GetProgressionState().RiftClearCount), 1);
-    CheckForcedDrops(TEXT("first clear"));
-    const TArray<FBreakerItemInstance> FirstPair = LastPair();
+    CheckOffer(TEXT("first clear"));
+    // A copy: the claim below closes the offer, and the salt assertion
+    // further down compares this trio against the re-clear's.
+    const TArray<FBreakerItemInstance> FirstOffer = Progression->GetRiftCompletionOffer();
+
+    // THE CHOICE. An index past the offer or below it is refused and moves
+    // nothing — the offer stays pending for a real answer.
+    TestFalse(TEXT("a claim past the offer is refused"),
+        Progression->ClaimRiftCompletionOffer(BreakerRiftReward::CompletionOfferCount));
+    TestFalse(TEXT("a negative claim is refused"), Progression->ClaimRiftCompletionOffer(-1));
+    TestEqual(TEXT("refused claims move the pack not at all"), Equipment->GetBackpack().Num(), PackBefore);
+    TestEqual(TEXT("refused claims leave the offer pending"),
+        Progression->GetRiftCompletionOffer().Num(), BreakerRiftReward::CompletionOfferCount);
+    // The chosen one goes into the pack; the other two are gone.
+    TestTrue(TEXT("claiming the second offered item succeeds"), Progression->ClaimRiftCompletionOffer(1));
+    TestEqual(TEXT("the claim moves the pack by exactly one"), Equipment->GetBackpack().Num(), PackBefore + 1);
+    if (Equipment->GetBackpack().Num() == PackBefore + 1 && FirstOffer.IsValidIndex(1))
+    {
+        TestTrue(TEXT("the item that landed is the one that was chosen (Offer[1])"),
+            SameRoll(Equipment->GetBackpack().Last(), FirstOffer[1]));
+    }
+    TestEqual(TEXT("the claim closes the offer: the other two are gone (O270)"),
+        Progression->GetRiftCompletionOffer().Num(), 0);
+    TestFalse(TEXT("a second claim of the same offer is refused"), Progression->ClaimRiftCompletionOffer(0));
+    TestEqual(TEXT("and moves the pack not at all"), Equipment->GetBackpack().Num(), PackBefore + 1);
 
     // A RE-CLEAR pays no purse and moves no record — going back is allowed;
     // going back is not the game. (Drops and kill XP never route through
-    // this handler and are untouched.) The forced drops are NOT the purse:
-    // they are the floor of what a closed rift is worth, and a re-clear
-    // closes the rift too.
+    // this handler and are untouched.) The offer is NOT the purse: it is the
+    // floor of what a closed rift is worth, and a re-clear closes the rift
+    // too.
     Progression->HandleRiftCompleted(Rift, Owner);
     TestEqual(TEXT("a re-clear pays no purse"),
         Progression->GetProgressionState().TotalExperience, XpBefore + ExpectedXp);
     TestEqual(TEXT("a re-clear pays no Riftglass"),
         Equipment->GetForgeWallet().Get(), GlassBefore + ExpectedRiftglass);
     TestEqual(TEXT("a re-clear moves no record"), Account->HighestClearedAreaLevel, 3);
-    TestEqual(TEXT("a re-clear still forces the two drops"),
-        Equipment->GetBackpack().Num(), PackBefore + 2 * BreakerRiftReward::CompletionItemCount);
+    TestEqual(TEXT("a re-clear moves the pack not at all — it offers"),
+        Equipment->GetBackpack().Num(), PackBefore + 1);
     TestEqual(TEXT("a re-clear is clear number two (O270)"),
         static_cast<int32>(Progression->GetProgressionState().RiftClearCount), 2);
-    CheckForcedDrops(TEXT("re-clear"));
+    CheckOffer(TEXT("re-clear"));
 
-    // O270: "salted per run, never the same pair twice." The same rift at the
-    // same level, cleared again by the same character, pays a DIFFERENT pair:
-    // the clear count is the salt, so at least one of the two items has to
-    // come out a different roll. Both pairs are still at the band ceiling and
-    // at the floor (CheckForcedDrops above) — the salt moves what the item is,
-    // never what it is worth.
-    const TArray<FBreakerItemInstance> SecondPair = LastPair();
-    TestEqual(TEXT("both clears paid a full pair"), FirstPair.Num(), SecondPair.Num());
+    // O270: "salted per run." The same rift at the same level, cleared again
+    // by the same character, OFFERS a different trio: the clear count is the
+    // salt, so at least one of the three has to come out a different roll.
+    // Both offers are still at the band ceiling and at the floor (CheckOffer
+    // above) — the salt moves what the item is, never what it is worth.
+    const TArray<FBreakerItemInstance> SecondOffer = Progression->GetRiftCompletionOffer();
+    TestEqual(TEXT("both clears offered a full trio"), FirstOffer.Num(), SecondOffer.Num());
     bool bAnyDiffers = false;
-    for (int32 Index = 0; Index < FirstPair.Num() && Index < SecondPair.Num(); ++Index)
+    for (int32 Index = 0; Index < FirstOffer.Num() && Index < SecondOffer.Num(); ++Index)
     {
-        if (!SameRoll(FirstPair[Index], SecondPair[Index])) bAnyDiffers = true;
+        if (!SameRoll(FirstOffer[Index], SecondOffer[Index])) bAnyDiffers = true;
     }
-    TestTrue(TEXT("the re-clear's pair is not the first clear's pair (O270: never the same pair twice)"), bAnyDiffers);
+    TestTrue(TEXT("the re-clear's offer is not the first clear's offer (O270: salted per run)"), bAnyDiffers);
 
     // A DEEPER first clear pays again and advances again — the ladder is
-    // climbed once per rung, not once.
+    // climbed once per rung, not once. The re-clear's offer was never
+    // claimed, so this completion overwrites it (one offer at a time) and
+    // the pack still does not move.
     FBreakerRiftDefinition Deeper = Rift;
     Deeper.AreaLevel = 5;
     Progression->HandleRiftCompleted(Deeper, Owner);
@@ -237,8 +268,8 @@ bool FBreakerRiftRewardPayoutTest::RunTest(const FString& Parameters)
         Progression->GetProgressionState().TotalExperience,
         XpBefore + ExpectedXp + BreakerRiftReward::XpForCompletion(5));
     TestEqual(TEXT("and advances the record to it"), Account->HighestClearedAreaLevel, 5);
-    TestEqual(TEXT("and forces its own two drops"),
-        Equipment->GetBackpack().Num(), PackBefore + 3 * BreakerRiftReward::CompletionItemCount);
+    TestEqual(TEXT("and moves the pack not at all — an unclaimed offer is overwritten, never banked"),
+        Equipment->GetBackpack().Num(), PackBefore + 1);
     TestEqual(TEXT("and is clear number three: the salt counts every rift, not per rift (O270)"),
         static_cast<int32>(Progression->GetProgressionState().RiftClearCount), 3);
     // The owner's rift was i5–i10: area level 5, band ceiling 10, and 10 is
@@ -250,14 +281,20 @@ bool FBreakerRiftRewardPayoutTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("the owner's rift band tops at i10"), DeeperMax, 10);
     TestTrue(TEXT("the owner's rift pays Exceptional at its ceiling"),
         BreakerRiftReward::CompletionRarity(DeeperMax, FBreakerDropTableParams{}) == EBreakerItemRarity::Exceptional);
-    const TArray<FBreakerItemInstance>& Pack = Equipment->GetBackpack();
-    for (int32 Back = 1; Back <= BreakerRiftReward::CompletionItemCount; ++Back)
+    const TArray<FBreakerItemInstance>& DeeperOffer = Progression->GetRiftCompletionOffer();
+    TestEqual(TEXT("deeper clear: the offer is exactly the ruled count, the stale one overwritten (O270)"),
+        DeeperOffer.Num(), BreakerRiftReward::CompletionOfferCount);
+    for (int32 Index = 0; Index < DeeperOffer.Num(); ++Index)
     {
-        TestTrue(*FString::Printf(TEXT("deeper clear: forced item %d is Exceptional or better"), Back),
-            Pack[Pack.Num() - Back].Rarity >= EBreakerItemRarity::Exceptional);
-        TestEqual(*FString::Printf(TEXT("deeper clear: forced item %d is i10"), Back),
-            Pack[Pack.Num() - Back].ItemLevel, 10);
+        TestTrue(*FString::Printf(TEXT("deeper clear: offered item %d is Exceptional or better"), Index),
+            DeeperOffer[Index].Rarity >= EBreakerItemRarity::Exceptional);
+        TestEqual(*FString::Printf(TEXT("deeper clear: offered item %d is i10"), Index),
+            DeeperOffer[Index].ItemLevel, 10);
     }
+    // And the deeper offer claims the same way: the first, this time.
+    TestTrue(TEXT("deeper clear: claiming the first offered item succeeds"), Progression->ClaimRiftCompletionOffer(0));
+    TestEqual(TEXT("deeper clear: the pack moved by exactly one"), Equipment->GetBackpack().Num(), PackBefore + 2);
+    TestEqual(TEXT("deeper clear: the claim closed the offer"), Progression->GetRiftCompletionOffer().Num(), 0);
 
     UBreakerAccountSave::ResetCacheForTesting();
     return true;

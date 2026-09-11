@@ -515,6 +515,6 @@ Maximum wedges reached with65, including ring transit; cells show **wedges / min
 
 **O269** — A pool the player HAS is named by colour, and a pool is not a verb. Health keeps the bone every readout of the player's own state wears; the shield takes a blue that is neither the movement cyan nor the reserved teal band. O179 is untouched: hues still mean one player action each, and this says that the two halves of one shared track are allowed to differ because nothing else can tell them apart. Both pools also print their figures — health over its maximum, the class resource over its pool, XP into the level over what the level costs — which overturns the earlier "the exact total is a thing to check in a menu": a bar answers how much is left and a figure answers whether the next cast or the next pocket is enough, and those are different questions.
 
-**O270** — A closed rift pays two items into the pack at the ceiling of the area's item-level band, floored at Exceptional where the level allows it and Uncommon below; the pair is salted per run, never the same twice.
+**O270** — A closed rift offers three items at the ceiling of the area's item-level band, floored at Exceptional where the level allows it and Uncommon below, salted per run; the player chooses one on the closing card and that one goes into the pack. The other two are gone.
 
 **O271** — A Rot recast spawns a new puddle wherever it lands; nothing merges into a live one. A press during a wind-up queues one cast, which fires when the wind-up resolves. A refused or interrupted cast makes no sound.

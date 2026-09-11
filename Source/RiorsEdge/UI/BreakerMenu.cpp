@@ -4983,8 +4983,19 @@ namespace
                 MakeAffixLines(Item, Deltas, RailWidth)
             ];
     }
+}
 
+// The published face of the card above, for the rift debrief's offer squares
+// (O270, UI/BreakerRiftDebriefScreen.cpp). A wrapper and nothing more: the
+// one affix producer stays file-local, and this is the one door to it.
+TSharedRef<SWidget> SBreakerMenu::MakeItemDetail(const FBreakerItemInstance& Item,
+    const TArray<FBreakerAffixComparison>& Deltas, float RailWidth)
+{
+    return MakeItemDetailCard(Item, Deltas, RailWidth);
+}
 
+namespace
+{
     // The five rarity beams, as the empty backpack draws them: one vertical
     // bar per tier in the same ramp the ground drops use, so the screen and
     // the world teach the same lesson.

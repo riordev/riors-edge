@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Attributes/BreakerAttributeAggregation.h"
+#include "Items/BreakerItemTypes.h"
 #include "Progression/BreakerProgressionTypes.h"
 #include "Progression/BreakerExperience.h"
 #include "BreakerProgressionComponent.generated.h"
@@ -134,6 +135,26 @@ public:
     // pawn that is not this owner: the event carries WHO completed, and a
     // second player's rift is not this character's payday.
     void HandleRiftCompleted(const FBreakerRiftDefinition& Rift, APawn* Player);
+
+    // O270: a closed rift OFFERS three items; the player chooses one on the
+    // closing card and that one goes into the pack. The other two are gone.
+    // Rolls the offer for this completion — CompletionOfferCount items at the
+    // ceiling of the rift's item-level band, at the completion floor, salted
+    // by State.RiftClearCount (the caller has already counted the clear) —
+    // into RiftCompletionOffer, touching the backpack not at all. Called from
+    // HandleRiftCompleted inside the owner guard; public so the offer is
+    // testable by direct call with no world. A roll while an offer is still
+    // pending overwrites it, loudly.
+    void RollRiftCompletionOffer(const FBreakerRiftDefinition& Rift);
+    // The pending offer, empty when nothing is offered. The closing card reads
+    // this to draw its three.
+    const TArray<FBreakerItemInstance>& GetRiftCompletionOffer() const { return RiftCompletionOffer; }
+    // The choice. Refuses (false, loud) an empty offer or an index outside it;
+    // otherwise the chosen item lands in the backpack as a paid grant (One-AB:
+    // past the cap rather than destroyed — the rift was cleared), the whole
+    // offer is cleared (the other two are gone), and the add's result is
+    // returned. A second claim of the same offer is a refusal, by construction.
+    bool ClaimRiftCompletionOffer(int32 Index);
 
     // ORDERS ruling 1: the node id of Swift's enhanced-dash passive, seeded
     // at rank 1 wherever a character becomes (or loads as) Swift — the class's
@@ -384,6 +405,13 @@ private:
 
     UPROPERTY(VisibleInstanceOnly, Category="Progression") FBreakerProgressionState State;
     UPROPERTY() TObjectPtr<UBreakerAttributeSet> Attributes;
+    // O270: the pending offer. NOT in FBreakerProgressionState — not
+    // serialized. The offer dies with the pawn — travel, or a quit on the
+    // debrief — and that is accepted: the salt (State.RiftClearCount) already
+    // advanced, so the next clear is a new trio; a persisted offer would be a
+    // save field for a state held for seconds. GAP RECORDED: a player who
+    // quits on the closing card loses the offer, and nothing here says so.
+    UPROPERTY() TArray<FBreakerItemInstance> RiftCompletionOffer;
 
     FBreakerNodeStats CachedStats;
     // No base-value cache lives here any more. The attribute set owns the one

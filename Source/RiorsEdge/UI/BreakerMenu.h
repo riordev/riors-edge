@@ -718,6 +718,16 @@ private:
     // strings are BreakerSwapPickerLayout.
     TSharedRef<SWidget> BuildSwapPickerModal();
     TSharedRef<SWidget> MakeButton(const FText& Label, const FOnClicked& OnClicked, bool bPrimary = false) const;
+    // THE ITEM STATS DETAIL, as the inventory's rail draws it: name, RARITY ·
+    // SLOT, rule, then the affix list with its deltas against the equipped
+    // piece. Published so the rift debrief's offer squares (O270) paint the
+    // SAME card on hover rather than growing a second affix producer in their
+    // own TU — the duplicate-concept mistake this file has already paid for.
+    // Deltas is UBreakerEquipmentComponent::PreviewEquip(Item).AffixDeltas;
+    // RailWidth is the host's width, the wrap figure is computed from it
+    // before layout. World-free: a wrapper over the file-local card builder.
+    static TSharedRef<SWidget> MakeItemDetail(const FBreakerItemInstance& Item,
+        const TArray<FBreakerAffixComparison>& Deltas, float RailWidth);
     FReply GoBack();
 
     // The title gate. The owner asked for the game to open on the main menu
@@ -1008,6 +1018,11 @@ private:
     FReply CloseRiftDebrief();
     FBreakerDeathScreenModel DeathModel;
     BreakerRiftDebrief::FModel RiftDebriefModel;
+    // The offer squares' stats host (O270), under the three squares. Filled
+    // by SetContent on hover — never a rebuild — for the same reason
+    // InventoryDetailHost is; the click on a square is the one thing that
+    // rebuilds, because the ring is drawn from the model.
+    TSharedPtr<SBox> RiftDebriefDetailHost;
     bool bDeathActionPending = false;
     FReply ExecuteDeathAction(bool bRetry);
     // Abilities tab: result line echoed under the slot that was last clicked,

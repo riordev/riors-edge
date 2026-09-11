@@ -53,14 +53,15 @@ namespace BreakerRiftReward
         return FMath::RoundToInt32(CompletionXpBase * CompletionScale(EffectiveAreaLevel));
     }
 
-    // THE FORCED DROPS. Owner, after a rift that came back with nothing: "give
-    // you at least two forced drops that are decent". Until this there was no
+    // THE OFFER. Owner, after a rift that came back with nothing: "give you
+    // at least two forced drops that are decent". Until this there was no
     // guaranteed item on completion at all — the purse was Riftglass and XP,
-    // first clear only, and items came only from kills as ground pickups. A
-    // closed rift is now worth at least this many items, on EVERY completion
-    // (the purse is the ladder's pay; the items are the rift's), straight into
-    // the backpack: that is what "came back with you" means.
-    constexpr int32 CompletionItemCount = 2;   // O2 PLACEHOLDER — "at least two"
+    // first clear only, and items came only from kills as ground pickups.
+    // O270: a closed rift OFFERS this many items at the ceiling of the area's
+    // item-level band, salted per run, on EVERY completion (the purse is the
+    // ladder's pay; the offer is the rift's); the player chooses one on the
+    // closing card and that one goes into the pack. The other two are gone.
+    constexpr int32 CompletionOfferCount = 3;   // O2 PLACEHOLDER — O270: "offers three items"
 
     // "Decent" is the codebase's elite floor: the rarity an elite that has
     // decided to drop is lifted to (ABreakerEnemy::GrantLoot), and the quest

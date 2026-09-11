@@ -324,13 +324,18 @@ void ABreakerGameMode::CompleteRiftRun(APawn* Player)
         }
     }
     // THE EVENT, THEN THE SCREEN — in that order, and the order is the
-    // feature. The completion payout is paid ON the broadcast: LEDGER's
-    // listener hands over the purse and puts the completion's items into the
-    // backpack, and every one of those lands in the run ledger through the
-    // same acquisition funnel a kill drop does. A debrief composed before the
-    // broadcast lists the run WITHOUT its payout — the loot line the player
-    // most wants to read is the one that is not there yet. So the screen
-    // composes after, from the ledger as it stands once the payout is in.
+    // feature. The event ROLLS the offer (O270): LEDGER's listener hands over
+    // the purse and rolls three items the rift offers, and holds them on the
+    // progression component. It puts NOTHING in the pack. The pack changes
+    // only on the claim — the player picks one of the three on the closing
+    // card, ClaimRiftCompletionOffer puts that one item into the backpack
+    // through the same acquisition funnel a kill drop uses, and the run
+    // ledger hears the claim there, exactly as it hears a pickup. The other
+    // two are gone. A debrief composed before the broadcast would carry no
+    // offer to choose from, so the screen composes after, from the ledger as
+    // it stands and the offer as the event rolled it. The ledger is still
+    // open while the card is up: the claim lands in it before ReturnFromRift
+    // closes anything.
     //
     // The screen used to go up first out of a fear that a listener would
     // travel the player out from under it. No listener travels: every
@@ -341,10 +346,14 @@ void ABreakerGameMode::CompleteRiftRun(APawn* Player)
     OnRiftCompleted.Broadcast(Rift, Player);
     // Composed from the ledger this run kept rather than from a difference
     // between two backpacks, because a backpack difference cannot tell a
-    // drop the player took from one they discarded to make room for it.
+    // drop the player took from one they discarded to make room for it. The
+    // offer is read from the pawn's progression, which is where the event
+    // left it; a pawn with no progression has nothing to choose from.
     if (ABreakerCharacter* Breaker = Cast<ABreakerCharacter>(Player))
     {
+        const UBreakerProgressionComponent* Progression = Breaker->GetProgression();
         Breaker->ShowRiftDebrief(BreakerRiftDebrief::Compose(Rift, RiftRunLoot,
+            Progression ? Progression->GetRiftCompletionOffer() : TArray<FBreakerItemInstance>(),
             RiftRunRiftglassGained(Player), RiftRunExperienceGained(Player)));
     }
 }

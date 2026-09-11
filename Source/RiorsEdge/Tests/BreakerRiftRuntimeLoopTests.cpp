@@ -248,7 +248,11 @@ bool FBreakerRiftRuntimeLoopTest::RunTest(const FString& Parameters)
 // design (no save-slot load) and the ledger casts to ABreakerCharacter, so
 // this test stands a real character up the way the Act II and containment
 // fixtures do, runs the same startup, kills the terminator through combat,
-// and reads the ledger — not the wallet — afterwards.
+// and reads the ledger — not the wallet — afterwards. O270 split the item
+// half of the payout in two: the event ROLLS a three-item offer and puts
+// nothing in the pack; the pack changes only on the claim, and the ledger is
+// still open to hear it. So the ledger is empty after the boss and holds
+// exactly the claimed item after the claim.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerRiftLedgerHearsCompletionTest,
     "RiorsEdge.Zone.Rift.LedgerHearsTheCompletion", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
@@ -353,8 +357,23 @@ bool FBreakerRiftLedgerHearsCompletionTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Actual boss damage killed the terminator"), Boss->IsDeadEnemy());
     if (!TestEqual(TEXT("Terminator death broadcasts completion exactly once"), Completions, 1)) return false;
     const int32 Level = Session->PendingRift.EffectiveAreaLevel();
-    TestEqual(TEXT("The ledger holds exactly the completion's forced items"),
-        Mode->GetRiftRunLoot().Num(), BreakerRiftReward::CompletionItemCount);
+    // THE OFFER, NOT THE PACK (O270). The event rolled three items and handed
+    // none of them over: the ledger has heard nothing, and the progression
+    // component holds the three for the closing card.
+    TestEqual(TEXT("The completion put nothing in the ledger: the event rolls the offer, the claim fills the pack"),
+        Mode->GetRiftRunLoot().Num(), 0);
+    if (!TestEqual(TEXT("A closed rift offers three items (O270)"),
+        Progression->GetRiftCompletionOffer().Num(), 3)) return false;
+    // THE CLAIM. The card is up and the ledger is still open — the claim goes
+    // through the acquisition funnel and the ledger hears it as it hears a
+    // pickup. Copied before the claim, because the offer is spent by it.
+    const FBreakerItemInstance Chosen = Progression->GetRiftCompletionOffer()[0];
+    TestTrue(TEXT("The offered item is a real item"), Chosen.IsValid());
+    Progression->ClaimRiftCompletionOffer(0);
+    if (!TestEqual(TEXT("The ledger heard the claim while it was still open: exactly one item"),
+        Mode->GetRiftRunLoot().Num(), 1)) return false;
+    TestEqual(TEXT("The item the ledger heard is the one the player chose"),
+        Mode->GetRiftRunLoot()[0].ItemId, Chosen.ItemId);
     TestEqual(TEXT("The ledger's Riftglass gain is kill income plus the completion purse, never the wallet total"),
         Mode->RiftRunRiftglassGained(Player),
         (GlassBeforePurse - CarriedRiftglass) + BreakerRiftReward::RiftglassForCompletion(Level));
@@ -362,7 +381,7 @@ bool FBreakerRiftLedgerHearsCompletionTest::RunTest(const FString& Parameters)
         Mode->RiftRunRiftglassGained(Player), Equipment->GetForgeWallet().Get() - CarriedRiftglass);
     TestEqual(TEXT("The ledger's XP gain is the run's, measured from the start of the run"),
         Mode->RiftRunExperienceGained(Player), Progression->GetProgressionState().TotalExperience - XpBeforeRun);
-    AddInfo(TEXT("A real character ran the substation rift; the run ledger bound at startup, listed the completion's forced items and reported the run's gain rather than the wallet."));
+    AddInfo(TEXT("A real character ran the substation rift; the run ledger bound at startup, heard nothing from the completion itself, heard the one item the player claimed from the three offered, and reported the run's gain rather than the wallet."));
     return true;
 }
 

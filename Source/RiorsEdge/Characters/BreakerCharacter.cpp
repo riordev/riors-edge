@@ -2675,9 +2675,21 @@ void ABreakerCharacter::OpenMenuScreenForCapture(const FString& ScreenName)
         Screen = EBreakerMenuScreen::RiftDebrief;
         const UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>();
         ABreakerGameMode* GameMode = GetWorld() ? Cast<ABreakerGameMode>(GetWorld()->GetAuthGameMode()) : nullptr;
+        // The offer squares (O270) are the point of photographing this
+        // screen, and a capture run has closed no rift, so nothing has rolled
+        // one. Roll it here when it is empty — A REAL ROLL through the
+        // progression component, not a fixture. The salt lives with the
+        // completion, not the roll, so nothing serialized moves; and a
+        // harness run never saves in any case.
+        // Dev-only by the enclosing !UE_BUILD_SHIPPING.
+        if (Progression && Progression->GetRiftCompletionOffer().IsEmpty())
+        {
+            Progression->RollRiftCompletionOffer(Session ? Session->PendingRift : FBreakerRiftDefinition());
+        }
         MenuWidget->ShowRiftDebrief(BreakerRiftDebrief::Compose(
             Session ? Session->PendingRift : FBreakerRiftDefinition(),
             GameMode ? GameMode->GetRiftRunLoot() : TArray<FBreakerItemInstance>(),
+            Progression ? Progression->GetRiftCompletionOffer() : TArray<FBreakerItemInstance>(),
             GameMode ? GameMode->RiftRunRiftglassGained(this) : 0,
             GameMode ? GameMode->RiftRunExperienceGained(this) : 0));
     }

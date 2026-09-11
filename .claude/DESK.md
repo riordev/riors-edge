@@ -34,13 +34,23 @@
   10% of the size (min 2 px) shared by the draw and the bounds. All O2.
   PHOTOGRAPHED.
 
-## Cycle — OWNER PLAYTEST, 2026-09-11 (SEVENTH) — THE RIFT'S END, AGAIN
+## OWNER PLAYTEST, 2026-09-11 (SEVENTH) — LANDED, THE RIFT'S END AGAIN
 
-- [ ] "the boss drops 3 different items you can choose from when closing a
-      rift, on the rift closing screen — 3 squares side by side with the
-      item icon, hover each for its stats". RULING: this replaces O270's
-      two forced drops with three offered, one chosen; the debrief gets the
-      choice. Write the O270 line, then build.
+- "the boss drops 3 different items you can choose from … 3 squares side
+  by side, hover each for its stats" — O270 rewritten: three offered, one
+  chosen on the closing card, the other two gone. The completion ROLLS
+  three (salted) and puts nothing in the pack; a square selects (hover
+  fills the inventory's own detail card — affix lines with the deltas
+  against what you wear); CONTINUE claims the chosen one, which lands past
+  the cap (One-AB) and reaches the run ledger, then travels. The verb is
+  CHOOSE ONE, painted disabled, until a square is chosen. PHOTOGRAPHED:
+  the squares under the headline (beside it, "RIFT CLOSED" clipped to
+  RIFT CLOSE), names wrapping, the detail card, the stat row, the lattice.
+  The offer is not saved: quit on the card and it is gone; the next clear
+  is a new trio. GAP, RECORDED. FOUND: a capture run rolls a real offer to
+  photograph, harmlessly (no save under the harness).
+  QUESTION: the boss's own floor drop — is the offer the answer, or does a
+  rift terminator's loot go to the pack (FIELD)? He said "leave open".
 
 ## DESIGN SEAT — OWNER PLAYTEST, 2026-09-11 (SEVENTH). NOT ONE BUILD EACH.
 

@@ -79,6 +79,8 @@
     BREAKER_STRING(LoadingStageOpening,          "loading.stage.opening",           "") \
     BREAKER_STRING(LoadingStageOnSite,           "loading.stage.onSite",            "") \
     BREAKER_STRING(LoadingStageClosing,          "loading.stage.closing",           "") \
+    BREAKER_STRING(DebriefContinue,              "debrief.continue",                "") \
+    BREAKER_STRING(DebriefChooseOne,             "debrief.chooseOne",               "") \
     BREAKER_STRING(StashMoveToStash,             "stash.moveToStash",               "") \
     BREAKER_STRING(StashTakeToBackpack,          "stash.takeToBackpack",            "") \
     BREAKER_STRING(StashTitle,                   "stash.title",                     "") \

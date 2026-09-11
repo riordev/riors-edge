@@ -157,65 +157,16 @@ void UBreakerProgressionComponent::HandleRiftCompleted(const FBreakerRiftDefinit
 
     const int32 AreaLevel = Rift.EffectiveAreaLevel();
 
-    // THE FORCED DROPS, before the first-clear gate — every completion, not
-    // just the first. Owner: "give you at least two forced drops that are
-    // decent". O168 pays on the event; these two items are the floor of what a
-    // closed rift is worth, and unlike the purse below they are not the
-    // ladder's pay, so a re-clear earns them too. They roll at the TOP of the
-    // band the briefing printed (GetDropItemLevelRange, the same call, the
-    // same elite bonus — read from the enemy's authored default, never
-    // restated) so the guaranteed item is the best item level the rift could
-    // have dropped, at the elite floor if that level unlocks it. Straight to
-    // the backpack, not the floor: AddToBackpack broadcasts OnItemAcquired, so
-    // the run ledger lists them and the debrief can stop saying nothing came
-    // back. The seed is (rift, area level, index, clear count): O270 salts the
-    // pair per run — "never the same pair twice" — and the salt is the
-    // character's own completion counter, so a bug report still reproduces a
-    // completion from the save it came from rather than from a wall clock.
-    int32 BandMin = 1;
-    int32 BandMax = 1;
-    UBreakerRiftLibrary::GetDropItemLevelRange(AreaLevel,
-        GetDefault<ABreakerEnemy>()->GetEliteDropItemLevelBonus(), BandMin, BandMax);
-    const EBreakerItemRarity ForcedRarity = BreakerRiftReward::CompletionRarity(BandMax, FBreakerDropTableParams{});
-    // O270, salted per run: one more completion this character is paid for.
-    // Counted before the roll so the first clear is salt 1, never salt 0.
+    // THE OFFER, before the first-clear gate — every completion, not just the
+    // first. Owner: "give you at least two forced drops that are decent";
+    // O270 rules the shape: a closed rift OFFERS three, the player chooses one
+    // on the closing card, the other two are gone. The offer is the floor of
+    // what a closed rift is worth, and unlike the purse below it is not the
+    // ladder's pay, so a re-clear earns it too. O270, salted per run: one
+    // more completion this character is paid for. Counted before the roll so
+    // the first clear is salt 1, never salt 0.
     ++State.RiftClearCount;
-    if (UBreakerEquipmentComponent* Equipment = GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>())
-    {
-        // A paid grant, not a refusable entry (One-AB): the rift was cleared,
-        // so the item lands even past the cap rather than being destroyed —
-        // the same rule the quest turn-in follows. Loud when that happens,
-        // because a backpack past its cap is the pre-payment check this site
-        // owes and did not run.
-        const int32 Held = Equipment->GetBackpack().Num();
-        if (Held >= UBreakerEquipmentComponent::BackpackCapacity)
-        {
-            UE_LOG(LogTemp, Warning, TEXT("[BreakerProgression] rift complete (AL %d): backpack holds %d of %d — the %d completion item(s) land past the cap (One-AB: a paid grant is never destroyed)."),
-                AreaLevel, Held, UBreakerEquipmentComponent::BackpackCapacity, BreakerRiftReward::CompletionItemCount);
-        }
-        for (int32 Index = 0; Index < BreakerRiftReward::CompletionItemCount; ++Index)
-        {
-            // O270: the clear count folds in last, so the (rift, level, index)
-            // hash every earlier completion used stays the inner term.
-            const int32 Seed = HashCombine(
-                HashCombine(GetTypeHash(Rift.AreaName.ToString()), AreaLevel * 7919 + Index),
-                State.RiftClearCount);
-            const EBreakerEquipSlot Slot = UBreakerLootLibrary::RollDropSlot(Seed);
-            const FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(TEXT("RiftCompletion"), Slot, ForcedRarity, BandMax, Seed);
-            if (!Equipment->AddToBackpack(Item))
-            {
-                UE_LOG(LogTemp, Warning, TEXT("[BreakerProgression] rift complete (AL %d): completion item %d of %d NOT granted — the equipment component refused the add."),
-                    AreaLevel, Index + 1, BreakerRiftReward::CompletionItemCount);
-            }
-        }
-        UE_LOG(LogTemp, Display, TEXT("[BreakerProgression] rift complete (%s, AL %d): %d forced item(s) at item level %d, rarity floor %d (O168; \"at least two forced drops that are decent\")."),
-            *Rift.AreaName.ToString(), AreaLevel, BreakerRiftReward::CompletionItemCount, BandMax, static_cast<int32>(ForcedRarity));
-    }
-    else
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[BreakerProgression] rift complete (AL %d): no equipment component holds the backpack — %d completion item(s) NOT granted."),
-            AreaLevel, BreakerRiftReward::CompletionItemCount);
-    }
+    RollRiftCompletionOffer(Rift);
 
     // One-AA: A FIRST CLEAR PAYS THE LADDER, A RE-CLEAR PAYS THE LOOT. The
     // completion purse is the ladder's pay, so it lands only when this
@@ -257,6 +208,98 @@ void UBreakerProgressionComponent::HandleRiftCompleted(const FBreakerRiftDefinit
         UE_LOG(LogTemp, Warning, TEXT("[BreakerProgression] rift complete (AL %d): +%d XP granted, but no equipment component holds the wallet — %d Riftglass NOT paid."),
             AreaLevel, Xp, Riftglass);
     }
+}
+
+void UBreakerProgressionComponent::RollRiftCompletionOffer(const FBreakerRiftDefinition& Rift)
+{
+    // See the declaration. The three roll at the TOP of the band the briefing
+    // printed (GetDropItemLevelRange, the same call, the same elite bonus —
+    // read from the enemy's authored default, never restated) so every
+    // offered item is the best item level the rift could have dropped, at
+    // the elite floor if that level unlocks it. The seed is (rift, area
+    // level, index, clear count): O270 salts the offer per run — "never the
+    // same pair twice" — and the salt is the character's own completion
+    // counter, so a bug report still reproduces a completion from the save
+    // it came from rather than from a wall clock. Nothing touches the
+    // backpack here: the pack moves at the claim, and only then.
+    const int32 AreaLevel = Rift.EffectiveAreaLevel();
+    int32 BandMin = 1;
+    int32 BandMax = 1;
+    UBreakerRiftLibrary::GetDropItemLevelRange(AreaLevel,
+        GetDefault<ABreakerEnemy>()->GetEliteDropItemLevelBonus(), BandMin, BandMax);
+    const EBreakerItemRarity ForcedRarity = BreakerRiftReward::CompletionRarity(BandMax, FBreakerDropTableParams{});
+    if (RiftCompletionOffer.Num() > 0)
+    {
+        // A pending offer is overwritten, not stacked: one closing card, one
+        // trio. Loud, because a completion that lands on an unclaimed offer
+        // means a card was never shown or never answered.
+        UE_LOG(LogTemp, Warning, TEXT("[BreakerProgression] rift complete (AL %d): %d offered item(s) still pending from an earlier completion — overwritten by this roll (O270: one offer at a time)."),
+            AreaLevel, RiftCompletionOffer.Num());
+        RiftCompletionOffer.Reset();
+    }
+    for (int32 Index = 0; Index < BreakerRiftReward::CompletionOfferCount; ++Index)
+    {
+        // O270: the clear count folds in last, so the (rift, level, index)
+        // hash every earlier completion used stays the inner term.
+        const int32 Seed = HashCombine(
+            HashCombine(GetTypeHash(Rift.AreaName.ToString()), AreaLevel * 7919 + Index),
+            State.RiftClearCount);
+        const EBreakerEquipSlot Slot = UBreakerLootLibrary::RollDropSlot(Seed);
+        const FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(TEXT("RiftCompletion"), Slot, ForcedRarity, BandMax, Seed);
+        RiftCompletionOffer.Add(Item);
+    }
+    UE_LOG(LogTemp, Display, TEXT("[BreakerProgression] rift complete (%s, AL %d): %d item(s) offered at item level %d, rarity floor %d (O270: the player chooses one on the closing card)."),
+        *Rift.AreaName.ToString(), AreaLevel, BreakerRiftReward::CompletionOfferCount, BandMax, static_cast<int32>(ForcedRarity));
+}
+
+bool UBreakerProgressionComponent::ClaimRiftCompletionOffer(int32 Index)
+{
+    // See the declaration. Refusals cost nothing and clear nothing: the offer
+    // stays pending for a valid claim.
+    if (RiftCompletionOffer.Num() == 0)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[BreakerProgression] claim refused: no rift completion offer is pending (O270)."));
+        return false;
+    }
+    if (!RiftCompletionOffer.IsValidIndex(Index))
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[BreakerProgression] claim refused: index %d is outside the %d-item offer (O270)."),
+            Index, RiftCompletionOffer.Num());
+        return false;
+    }
+    UBreakerEquipmentComponent* Equipment = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>() : nullptr;
+    if (!Equipment)
+    {
+        // No backpack to land in. The offer is left pending rather than
+        // destroyed: a claim that could not be honoured must not read as
+        // "the other two are gone" for the one that was chosen too.
+        UE_LOG(LogTemp, Warning, TEXT("[BreakerProgression] claim refused: no equipment component holds the backpack — the offer stays pending (O270)."));
+        return false;
+    }
+    // A paid grant, not a refusable entry (One-AB): the rift was cleared, so
+    // the chosen item lands even past the cap rather than being destroyed —
+    // the same rule the quest turn-in follows. Loud when that happens,
+    // because a backpack past its cap is the pre-payment check this site owes
+    // and did not run. AddToBackpack broadcasts OnItemAcquired, so the run
+    // ledger lists the one that came back.
+    const int32 Held = Equipment->GetBackpack().Num();
+    if (Held >= UBreakerEquipmentComponent::BackpackCapacity)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[BreakerProgression] rift offer claim: backpack holds %d of %d — the chosen item lands past the cap (One-AB: a paid grant is never destroyed)."),
+            Held, UBreakerEquipmentComponent::BackpackCapacity);
+    }
+    const FBreakerItemInstance Chosen = RiftCompletionOffer[Index];
+    const bool bAdded = Equipment->AddToBackpack(Chosen);
+    if (!bAdded)
+    {
+        // A refusal clears nothing: the offer stands for a second try.
+        UE_LOG(LogTemp, Warning, TEXT("[BreakerProgression] rift offer claim: item %d NOT granted — the equipment component refused the add; the offer stands."), Index);
+        return false;
+    }
+    // The other two are gone (O270). No listener on OnItemAcquired reads the
+    // offer (the run ledger only appends), so the order is not observable.
+    RiftCompletionOffer.Reset();
+    return true;
 }
 
 void UBreakerProgressionComponent::DevForceClass(EBreakerClassId ClassId)
