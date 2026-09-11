@@ -1,5 +1,37 @@
 # Desk — next playtest
 
+## Cycle — OWNER RULINGS, 2026-09-11 — THE CODE THEY ASK FOR
+
+Ruled in DECISIONS (O203 amended, O18/O114 numbers, O270, O271). Each
+line below is the edit that makes the ruling true:
+
+- [ ] O203: the Elite's health bar is the Exceptional rarity colour
+      (RarityColor(Exceptional)); the ellipse stays the contract's mark and
+      is otherwise untouched. Pin: the elite bar colour equals the third
+      rarity's and differs from the trash bar.
+- [ ] O271: a Rot recast spawns a new puddle — remove the
+      FindRefreshableZone merge from Rot's cast (the Wellspring follow path
+      is a separate question; leave it). Pin: two casts on one spot are two
+      live zones.
+- [ ] O271: a press during a wind-up queues ONE cast, fired when the
+      wind-up resolves (the aim is solved at the queued press, per the
+      snapshot). Pin: press, press during wind-up, resolve -> two puddles,
+      the second where the second press pointed.
+- [ ] O270: salt the completion drop seed per run (run counter or the
+      completion's world time; never the same pair twice). Pin: two clears
+      of one rift pay different pairs.
+- [ ] "raise the base just a smidge": Rot RadiusCm 400 -> 440, Cleave
+      RangeCm 650 -> 700 (O2). Move the pins that read them (AreaLane,
+      GeometrySeam, CombatRuntimeTargeting range 650).
+
+OPEN, HE HAS NOT SAID:
+- The boss's own floor drop is left behind on completion. Accept, or route
+  a rift terminator's loot to the pack (FIELD)?
+- Rot's tick is 20 DPS beside a 240 DPS rifle. Wanted?
+- RETURN TO TITLE does not save. Save on it?
+- The halo goes dark at ReadyToTurnIn, not hand-in — "does it matter?" —
+  left as is.
+
 ## OWNER PLAYTEST, 2026-09-11 (FIFTH) — LANDED, THE SECOND HALF
 
 - "multiple quests cannot be held (or rather it doesnt show you where they
