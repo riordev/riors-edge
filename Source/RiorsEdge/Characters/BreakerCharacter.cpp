@@ -1243,13 +1243,16 @@ void ABreakerCharacter::UpdateViewmodelKick()
                 ViewmodelBobPhase, StrideSpeed, Delta,
                 FBreakerWeaponFeel::GaitStrideLength(ViewmodelMotion, ViewmodelSprintFraction));
         }
-        // ADS quiets motion exactly as it quiets the kick: through the
-        // profile's aim-blended viewmodel multiplier.
+        // ADS STILLS THE MOTION — the sway and the bob — through the motion
+        // params' own aim multiplier, not the recoil profile's. The profile's
+        // AimViewmodelMultiplier is a statement about the KICK and was being
+        // read as one about breathing, so a sighted gun kept tracing its idle
+        // figure at nearly half size around the reticle. A braced weapon does
+        // not breathe; the kick still does, through its own multiplier.
         float MotionScale = 1.0f;
         if (Weapon)
         {
-            const FBreakerRecoilProfile Profile = Weapon->GetRecoilProfile();
-            MotionScale = FMath::Lerp(1.0f, Profile.AimViewmodelMultiplier, Weapon->GetAimAlpha());
+            MotionScale = FMath::Lerp(1.0f, ViewmodelMotion.AimMotionMultiplier, Weapon->GetAimAlpha());
         }
         // The profile's view-bob slider, 0..1, over whatever ADS left. At 1.0
         // this is the unscaled call (RiorsEdge.Weapons.ViewmodelMotion).

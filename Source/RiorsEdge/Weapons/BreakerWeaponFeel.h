@@ -29,9 +29,20 @@ struct RIORSEDGE_API FBreakerRecoilProfile
 
     // ---- Per-shot kick -----------------------------------------------------
 
-    // Upward kick of a single shot, before ramp and ADS scaling. O2 PLACEHOLDER
+    // Upward kick of a single shot, before ramp and ADS scaling.
+    //
+    // Owner: "recoil should just be up with a slight horizontal, but mostly
+    // vertical ... but there's no effective recoil". It was not that the kick
+    // was small — it was that recovery ATE it: at 600 RPM the rifle climbed
+    // 4.2 degrees a second against a 14 degree-per-second settle that started
+    // 0.08 s after every shot, so a held trigger reached about 0.8 degrees and
+    // sat there, a ninth of its own 7 degree ceiling. The kick is up, and the
+    // recovery below now waits longer than a shot interval, so holding the
+    // trigger walks the aim up and the player has something to control.
+    // O2 PLACEHOLDER, and the first constant on this sheet to be felt rather
+    // than reasoned — movement.md says a feel change is traced, not argued.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Recoil", meta=(ClampMin="0"))
-    float VerticalKickDegrees = 0.42f;
+    float VerticalKickDegrees = 0.6f;
 
     // Peak sideways kick. The sign follows a repeating deterministic curve so
     // the pattern is learnable rather than sprayed. O2 PLACEHOLDER
@@ -130,7 +141,11 @@ struct RIORSEDGE_API FBreakerRecoilProfile
     // Dead time after the last shot before the aim starts settling back.
     // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Recoil|Recovery", meta=(ClampMin="0"))
-    float RecoveryDelaySeconds = 0.08f;
+    // LONGER THAN THE RIFLE'S SHOT INTERVAL (0.1 s at 600 RPM), which is the
+    // rule that makes recoil accumulate at all: recovery may not begin between
+    // two held shots. RiorsEdge.Weapons.ArchetypeRecoil pins that for every
+    // automatic archetype.
+    float RecoveryDelaySeconds = 0.14f;
 
     // Proportional settle: fast at first, slowing as it closes. O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Recoil|Recovery", meta=(ClampMin="0"))
@@ -139,7 +154,7 @@ struct RIORSEDGE_API FBreakerRecoilProfile
     // Constant floor on the settle so recovery actually reaches zero instead
     // of asymptoting forever. O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Recoil|Recovery", meta=(ClampMin="0"))
-    float RecoveryConstantDegreesPerSecond = 14.0f;
+    float RecoveryConstantDegreesPerSecond = 10.0f;
 
     // Fraction of each kick that is recoverable. Below 1.0 a sliver of every
     // shot is permanent and the player must correct it. O2 PLACEHOLDER
@@ -182,13 +197,25 @@ struct RIORSEDGE_API FBreakerRecoilProfile
     float ViewmodelKickUnits = 3.2f;
 
     // Sideways component of that displacement; follows the horizontal recoil
-    // sign so mesh and aim agree. O2 PLACEHOLDER
+    // sign so mesh and aim agree.
+    //
+    // SMALL, BECAUSE THIS WAS THE CIRCLE. Owner: "when you're ADSing the gun
+    // kinda bounces in a circle around your reticle". The lateral impulse
+    // rides the horizontal pattern's sine on a seven-shot period while the
+    // pitch impulse fires every shot: two axes on two phases through an
+    // underdamped spring that never settled at 600 RPM is an orbit, and ADS
+    // scaled the impulses but not the spring, so it survived aiming at 45%.
+    // A hint of sideways is all the mesh needs to agree with the aim.
+    // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Recoil|Viewmodel", meta=(ClampMin="0"))
-    float ViewmodelKickLateralUnits = 0.9f;
+    float ViewmodelKickLateralUnits = 0.25f;
 
-    // Muzzle-up rotation of the weapon mesh per shot. O2 PLACEHOLDER
+    // Muzzle-up rotation of the weapon mesh per shot. Under the aim's own
+    // climb per shot now: the mesh used to pitch 1.08 degrees aimed against
+    // an aim that barely moved, which is a gun that bounces while the
+    // crosshair sits still. O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Recoil|Viewmodel", meta=(ClampMin="0"))
-    float ViewmodelKickPitchDegrees = 2.4f;
+    float ViewmodelKickPitchDegrees = 1.6f;
 
     // Ceilings so sustained fire cannot walk the mesh off the screen.
     // O2 PLACEHOLDER
@@ -198,14 +225,20 @@ struct RIORSEDGE_API FBreakerRecoilProfile
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Recoil|Viewmodel", meta=(ClampMin="0"))
     float MaxViewmodelKickPitchDegrees = 7.0f;
 
-    // Spring that pulls the mesh back to rest. Damping below
-    // 2*sqrt(Stiffness) overshoots slightly, which reads as snap.
+    // Spring that pulls the mesh back to rest.
+    //
+    // AT OR ABOVE CRITICAL FOR ANYTHING AUTOMATIC. The old note said damping
+    // below 2*sqrt(Stiffness) "overshoots slightly, which reads as snap", and
+    // for a single shot it does — the sniper and the shotgun keep theirs. For
+    // a weapon fired ten times a second, an overshoot that takes 0.39 s to
+    // die is one that is still ringing when the next shot lands, forever, and
+    // that ring is the bounce. 2*sqrt(260) is 32.2; this sits just over it.
     // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Recoil|Viewmodel", meta=(ClampMin="1"))
     float ViewmodelSpringStiffness = 260.0f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Recoil|Viewmodel", meta=(ClampMin="0"))
-    float ViewmodelSpringDamping = 26.0f;
+    float ViewmodelSpringDamping = 33.0f;
 
     // Viewmodel kick scale while aiming down sights: a sighted weapon must
     // stay readable through the sight. O2 PLACEHOLDER
@@ -254,6 +287,14 @@ struct FBreakerViewmodelMotionParams
     float SwayVerticalCm = 0.12f;         // O2 PLACEHOLDER
     float SwayFrequencyHz = 0.45f;        // O2 PLACEHOLDER
     float SwayPitchDegrees = 0.15f;       // O2 PLACEHOLDER
+    // WHAT AIMING DOES TO ALL OF THE ABOVE. Zero: a sighted weapon is a braced
+    // one, and the sway and the bob go still. The ambient motion used to be
+    // quieted by the RECOIL profile's aim multiplier (0.45), which is a
+    // statement about the kick and was never a statement about breathing — so
+    // the gun kept tracing its figure at nearly half size through the sight,
+    // which is the other half of "bounces in a circle around your reticle".
+    // Hip fire is byte-identical: this only reads at aim alpha above zero.
+    float AimMotionMultiplier = 0.0f;     // O2 PLACEHOLDER
 
     // Locomotion bob: a figure-8 driven by DISTANCE, not time — phase
     // advances with ground covered, so slowing down slows the cycle rather

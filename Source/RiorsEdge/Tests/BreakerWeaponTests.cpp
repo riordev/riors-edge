@@ -602,6 +602,49 @@ bool FBreakerArchetypeRecoilTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("The sidearm snaps back fastest of the whole table"),
         Sidearm.RecoveryInterpSpeed > SMG.RecoveryInterpSpeed);
 
+    // ---- RECOIL IS A PATTERN, NOT A JITTER ---------------------------------
+    // Owner: "when you're ADSing the gun kinda bounces in a circle around your
+    // reticle ... recoil should just be up with a slight horizontal, but
+    // mostly vertical. But there's no effective recoil." Three rules, each
+    // arithmetic over the shipped table, each of which the table used to fail
+    // for every automatic weapon in it.
+    {
+        const EBreakerWeaponArchetype Automatics[] = {
+            EBreakerWeaponArchetype::Rifle, EBreakerWeaponArchetype::SMG,
+            EBreakerWeaponArchetype::Machinegun };
+        for (const EBreakerWeaponArchetype Archetype : Automatics)
+        {
+            Weapon->EquipArchetype(Archetype);
+            const FBreakerRecoilProfile Profile = Weapon->GetRecoilProfile();
+            const UBreakerWeaponDefinition* Definition = Weapon->GetActiveDefinition();
+            if (!TestNotNull(TEXT("An automatic archetype has a definition"), Definition)) return false;
+            const FString Name = Definition->WeaponId.ToString();
+            const float Interval = 60.0f / FMath::Max(1.0f, Definition->RoundsPerMinute);
+
+            // 1. HOLDING THE TRIGGER WALKS THE AIM UP. Recovery may not begin
+            // between two held shots, or the settle eats the climb and the
+            // ceiling is never approached: the rifle sat at 0.8 of its 7.
+            TestTrue(*FString::Printf(TEXT("%s: recovery waits out a shot interval"), *Name),
+                Profile.RecoveryDelaySeconds >= Interval);
+
+            // 2. MOSTLY VERTICAL. The horizontal is the slight part.
+            TestTrue(*FString::Printf(TEXT("%s: the kick is mostly up"), *Name),
+                Profile.HorizontalKickDegrees < Profile.VerticalKickDegrees);
+
+            // 3. THE MESH DOES NOT RING. At ten shots a second an underdamped
+            // spring is still overshooting when the next impulse lands, and
+            // that standing overshoot on two axes is the orbit. Critical is
+            // 2*sqrt(k); anything automatic sits at or above it.
+            const float Critical = 2.0f * FMath::Sqrt(Profile.ViewmodelSpringStiffness);
+            TestTrue(*FString::Printf(TEXT("%s: the viewmodel spring is at least critically damped"), *Name),
+                Profile.ViewmodelSpringDamping >= Critical * 0.98f);
+            // And the sideways part of the mesh kick is a hint, not a swing:
+            // it is what drew the circle's width.
+            TestTrue(*FString::Printf(TEXT("%s: the lateral kick is a fraction of the back kick"), *Name),
+                Profile.ViewmodelKickLateralUnits <= Profile.ViewmodelKickUnits * 0.4f);
+        }
+    }
+
     // The formerly dead levers, now authored: RecoveryFraction separates the
     // guns that fully settle from the guns the player must re-plant, and the
     // spring CHARACTER (damping) separates the light weapons that used to
@@ -1614,6 +1657,24 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerViewmodelMotionTest::RunTest(const FString& Parameters)
 {
+    // AIMED, THE GUN IS STILL. Owner: "when you're ADSing the gun kinda
+    // bounces in a circle around your reticle". The ambient motion was quieted
+    // through the recoil profile's aim multiplier (0.45), a number about the
+    // kick, so a sighted weapon kept breathing at nearly half size. The motion
+    // params carry their own aim multiplier now and it is zero.
+    {
+        const FBreakerViewmodelMotionParams Shipped;
+        TestEqual(TEXT("Aiming stills the sway and the bob"), Shipped.AimMotionMultiplier, 0.0f);
+        const float Aimed = FMath::Lerp(1.0f, Shipped.AimMotionMultiplier, 1.0f);
+        const FBreakerViewmodelMotionOffset Still = FBreakerWeaponFeel::MotionOffsets(Shipped, 3.7f, 1.2f, 1.0f, Aimed, 0.0f);
+        TestTrue(TEXT("A fully aimed gun traces no figure"),
+            FMath::IsNearlyZero(Still.LateralCm) && FMath::IsNearlyZero(Still.VerticalCm)
+            && FMath::IsNearlyZero(Still.PitchDegrees));
+        // And hip fire is untouched by the new lever.
+        const float Hip = FMath::Lerp(1.0f, Shipped.AimMotionMultiplier, 0.0f);
+        TestEqual(TEXT("Hip fire keeps its full motion"), Hip, 1.0f);
+    }
+
     FBreakerViewmodelMotionParams Params;
 
     // The bob is distance-driven: zero speed advances nothing, and equal

@@ -107,7 +107,7 @@ namespace
         case EBreakerWeaponArchetype::SMG:
             // Buzzy: barely moves per shot, but 900 RPM stacks it fast and it
             // wanders sideways more than it climbs. Recovers quickly.
-            Profile.VerticalKickDegrees = 0.26f;              // O2 PLACEHOLDER
+            Profile.VerticalKickDegrees = 0.40f;              // O2 PLACEHOLDER
             Profile.HorizontalKickDegrees = 0.24f;            // O2 PLACEHOLDER
             Profile.HorizontalPatternPeriod = 5;              // O2 PLACEHOLDER
             Profile.VerticalRandomFraction = 0.18f;           // O2 PLACEHOLDER
@@ -117,23 +117,23 @@ namespace
             Profile.MaxVerticalDegrees = 8.0f;                // O2 PLACEHOLDER
             Profile.MaxHorizontalDegrees = 4.5f;              // O2 PLACEHOLDER
             Profile.AimRecoilMultiplier = 0.72f;              // O2 PLACEHOLDER
-            Profile.RecoveryDelaySeconds = 0.06f;             // O2 PLACEHOLDER
+            Profile.RecoveryDelaySeconds = 0.09f;   // over the 0.067 s interval at 900 RPM             // O2 PLACEHOLDER
             Profile.RecoveryInterpSpeed = 12.0f;              // O2 PLACEHOLDER
-            Profile.RecoveryConstantDegreesPerSecond = 20.0f; // O2 PLACEHOLDER
+            Profile.RecoveryConstantDegreesPerSecond = 12.0f; // O2 PLACEHOLDER
             Profile.BloomPerShotDegrees = 0.11f;              // O2 PLACEHOLDER
             Profile.MaxBloomDegrees = 2.4f;                   // O2 PLACEHOLDER
             Profile.BloomRecoveryDegreesPerSecond = 3.0f;     // O2 PLACEHOLDER
             Profile.AimBloomMultiplier = 0.5f;                // O2 PLACEHOLDER
             Profile.BurstResetSeconds = 0.28f;                // O2 PLACEHOLDER
             Profile.ViewmodelKickUnits = 2.0f;                // O2 PLACEHOLDER
-            Profile.ViewmodelKickLateralUnits = 1.0f;         // O2 PLACEHOLDER
+            Profile.ViewmodelKickLateralUnits = 0.30f;         // O2 PLACEHOLDER
             Profile.ViewmodelKickPitchDegrees = 1.6f;         // O2 PLACEHOLDER
             Profile.ViewmodelSpringStiffness = 320.0f;        // O2 PLACEHOLDER
             // Its own damping too: the four light weapons all sat on the
             // struct's 26, so their springs shared one CHARACTER and differed
             // only in amplitude. The SMG rattles — under-damped for its
             // stiffness relative to the others.
-            Profile.ViewmodelSpringDamping = 30.0f;           // O2 PLACEHOLDER
+            Profile.ViewmodelSpringDamping = 36.0f;  // critical for sqrt(320): no ring at 900 RPM           // O2 PLACEHOLDER
             // Fastest into the sights and the least punished for running with
             // them up: the SMG is the one weapon that is allowed to be a
             // run-and-gun ADS weapon.
@@ -166,7 +166,7 @@ namespace
             Profile.AimBloomMultiplier = 0.35f;               // O2 PLACEHOLDER
             Profile.BurstResetSeconds = 0.9f;                 // O2 PLACEHOLDER
             Profile.ViewmodelKickUnits = 9.0f;                // O2 PLACEHOLDER
-            Profile.ViewmodelKickLateralUnits = 1.6f;         // O2 PLACEHOLDER
+            Profile.ViewmodelKickLateralUnits = 0.6f;         // O2 PLACEHOLDER
             Profile.ViewmodelKickPitchDegrees = 6.5f;         // O2 PLACEHOLDER
             Profile.ViewmodelSpringStiffness = 150.0f;        // O2 PLACEHOLDER
             Profile.ViewmodelSpringDamping = 17.0f;           // O2 PLACEHOLDER
@@ -207,7 +207,7 @@ namespace
             Profile.BloomRecoveryDegreesPerSecond = 2.4f;     // O2 PLACEHOLDER
             Profile.BurstResetSeconds = 0.6f;                 // O2 PLACEHOLDER
             Profile.ViewmodelKickUnits = 8.0f;                // O2 PLACEHOLDER
-            Profile.ViewmodelKickLateralUnits = 1.4f;         // O2 PLACEHOLDER
+            Profile.ViewmodelKickLateralUnits = 0.5f;         // O2 PLACEHOLDER
             Profile.ViewmodelKickPitchDegrees = 5.2f;         // O2 PLACEHOLDER
             Profile.ViewmodelSpringStiffness = 180.0f;        // O2 PLACEHOLDER
             Profile.ViewmodelSpringDamping = 19.0f;           // O2 PLACEHOLDER
@@ -247,7 +247,7 @@ namespace
             Profile.BloomRecoveryDegreesPerSecond = 1.2f;     // O2 PLACEHOLDER
             Profile.BurstResetSeconds = 0.8f;                 // O2 PLACEHOLDER
             Profile.ViewmodelKickUnits = 10.0f;               // O2 PLACEHOLDER
-            Profile.ViewmodelKickLateralUnits = 1.2f;         // O2 PLACEHOLDER
+            Profile.ViewmodelKickLateralUnits = 0.45f;         // O2 PLACEHOLDER
             Profile.ViewmodelKickPitchDegrees = 6.8f;         // O2 PLACEHOLDER
             Profile.ViewmodelSpringStiffness = 140.0f;        // O2 PLACEHOLDER
             Profile.ViewmodelSpringDamping = 16.0f;           // O2 PLACEHOLDER
@@ -299,10 +299,10 @@ namespace
             // dead-accurate first shot. That IS the archetype.
             Profile.BurstResetSeconds = 0.22f;                // O2 PLACEHOLDER
             Profile.ViewmodelKickUnits = 3.4f;                // O2 PLACEHOLDER
-            Profile.ViewmodelKickLateralUnits = 0.5f;         // O2 PLACEHOLDER
+            Profile.ViewmodelKickLateralUnits = 0.25f;         // O2 PLACEHOLDER
             Profile.ViewmodelKickPitchDegrees = 2.8f;         // O2 PLACEHOLDER
             Profile.ViewmodelSpringStiffness = 300.0f;        // O2 PLACEHOLDER
-            Profile.ViewmodelSpringDamping = 24.0f;           // O2 PLACEHOLDER, a shade loose: the burst rocks
+            Profile.ViewmodelSpringDamping = 35.0f;           // O2 PLACEHOLDER: the burst is three shots at rifle cadence, and a loose spring rang through all three
             Profile.AimInSeconds = 0.22f;                     // O2 PLACEHOLDER
             Profile.MoveSpreadDegrees = 0.55f;                // O2 PLACEHOLDER
             Profile.AimMoveSpreadMultiplier = 2.4f;           // O2 PLACEHOLDER
@@ -316,7 +316,7 @@ namespace
             // most of the punishing — it is the only archetype whose held cone
             // grows past the shotgun's — which is what turns "hold the trigger"
             // into "hold the trigger in bursts, planted".
-            Profile.VerticalKickDegrees = 0.34f;              // O2 PLACEHOLDER
+            Profile.VerticalKickDegrees = 0.50f;              // O2 PLACEHOLDER
             Profile.HorizontalKickDegrees = 0.30f;            // O2 PLACEHOLDER
             Profile.HorizontalPatternPeriod = 11;             // O2 PLACEHOLDER
             Profile.VerticalRandomFraction = 0.22f;           // O2 PLACEHOLDER
@@ -328,21 +328,21 @@ namespace
             Profile.AimRecoilMultiplier = 0.68f;              // O2 PLACEHOLDER
             Profile.RecoveryDelaySeconds = 0.18f;             // O2 PLACEHOLDER
             Profile.RecoveryInterpSpeed = 5.5f;               // O2 PLACEHOLDER
-            Profile.RecoveryConstantDegreesPerSecond = 11.0f; // O2 PLACEHOLDER
+            Profile.RecoveryConstantDegreesPerSecond = 7.0f; // O2 PLACEHOLDER
             Profile.BloomPerShotDegrees = 0.10f;              // O2 PLACEHOLDER
             Profile.MaxBloomDegrees = 4.2f;                   // O2 PLACEHOLDER
             Profile.BloomRecoveryDegreesPerSecond = 2.0f;     // O2 PLACEHOLDER
             Profile.AimBloomMultiplier = 0.6f;                // O2 PLACEHOLDER
             Profile.BurstResetSeconds = 0.5f;                 // O2 PLACEHOLDER
             Profile.ViewmodelKickUnits = 2.6f;                // O2 PLACEHOLDER
-            Profile.ViewmodelKickLateralUnits = 1.5f;         // O2 PLACEHOLDER
+            Profile.ViewmodelKickLateralUnits = 0.35f;         // O2 PLACEHOLDER
             Profile.ViewmodelKickPitchDegrees = 1.9f;         // O2 PLACEHOLDER
             Profile.ViewmodelSpringStiffness = 240.0f;        // O2 PLACEHOLDER
             // The belt gun wallows — softest spring character of the
             // automatics — and sustained fire leaves the deepest residue:
             // the largest never-settled share in the table, so a long burst
             // must be re-planted rather than waited out.
-            Profile.ViewmodelSpringDamping = 20.0f;           // O2 PLACEHOLDER
+            Profile.ViewmodelSpringDamping = 31.0f;  // critical for sqrt(240)           // O2 PLACEHOLDER
             Profile.RecoveryFraction = 0.90f;                 // O2 PLACEHOLDER
             // The heaviest weapon in the table to bring up and the most rooted
             // once it is up — harsher than the sniper on speed, because the
@@ -384,10 +384,10 @@ namespace
             Profile.AimBloomMultiplier = 0.5f;                // O2 PLACEHOLDER
             Profile.BurstResetSeconds = 0.20f;                // O2 PLACEHOLDER
             Profile.ViewmodelKickUnits = 2.2f;                // O2 PLACEHOLDER
-            Profile.ViewmodelKickLateralUnits = 0.7f;         // O2 PLACEHOLDER
+            Profile.ViewmodelKickLateralUnits = 0.25f;         // O2 PLACEHOLDER
             Profile.ViewmodelKickPitchDegrees = 2.0f;         // O2 PLACEHOLDER
             Profile.ViewmodelSpringStiffness = 340.0f;        // O2 PLACEHOLDER
-            Profile.ViewmodelSpringDamping = 34.0f;           // O2 PLACEHOLDER, crisp: the snappiest return in the table
+            Profile.ViewmodelSpringDamping = 37.0f;           // O2 PLACEHOLDER, crisp: the snappiest return in the table
             // Snaps up faster than anything else and barely slows you: a
             // sidearm you cannot bring up in a hurry is not a sidearm.
             Profile.AimInSeconds = 0.10f;                     // O2 PLACEHOLDER
