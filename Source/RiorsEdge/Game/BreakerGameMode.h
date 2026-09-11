@@ -689,6 +689,14 @@ public:
     // RETURN TO ANCHOR: the hub travel, which clears PendingRift and the
     // counter with it.
     void ReturnToAnchor(APawn* RequestingPawn);
+    // RETURN FROM RIFT: the debrief's verb. The Fernhall travel, which clears
+    // PendingRift like any ordinary travel and LEAVES the session's entry
+    // transform for the yard's build to consume, so the player comes back
+    // to the door he went in by rather than to the yard's PlayerStart. The
+    // gate on the entry plaza reaches the same travel by hand and gets the
+    // same landing; this exists so the completion beat has one named way
+    // out that the debrief screen can call without knowing destination ids.
+    void ReturnFromRift(APawn* RequestingPawn);
     // Every piece of hard cover the level built, read-only: an archetype
     // choosing a firing flank asks this rather than tracing the whole field.
     const FBreakerCoverRegistry& GetCoverRegistry() const { return CoverRegistry; }

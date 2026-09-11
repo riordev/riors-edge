@@ -192,6 +192,19 @@ void ABreakerGameMode::HandleHubTravelSelected(FName DestinationId, APawn* Reque
         Session->PendingRift = FBreakerRiftDefinition();
         // The counter goes with the rift it counted for (O82).
         Session->EndgameDeathsRemaining = UBreakerRiftLibrary::SoloEndgameDeathBudget;
+        // THE ENTRY TRANSFORM IS NOT CLEARED HERE FOR A FERNHALL TRAVEL —
+        // that travel is the way back from a rift, and the yard's build
+        // consumes the transform on arrival (and clears it there). Any OTHER
+        // destination drops it: a player who died inside and went to the
+        // Anchor, then later walked to Fernhall by the ordinary gate, would
+        // otherwise land at the door of a run that ended somewhere else. A
+        // Fernhall travel that is NOT a return — the Anchor's gate — has
+        // already had the flag dropped by whichever travel took the player
+        // out of the yard, so it lands at the PlayerStart as before.
+        if (DestinationId != ABreakerTravelPoint::FernhallDestinationId)
+        {
+            Session->bRiftEntryTransformSet = false;
+        }
     }
     if (const auto* Prototype=BreakerPrototypeDestinations::Find(DestinationId))
     {
@@ -308,16 +321,30 @@ void ABreakerGameMode::CompleteRiftRun(APawn* Player)
             }
         }
     }
-    // THE DEBRIEF, before the broadcast's listeners can travel the player out
-    // from under it. Composed from the ledger this run kept rather than from a
-    // difference between two backpacks, because a backpack difference cannot
-    // tell a drop the player took from one they discarded to make room for it.
+    // THE EVENT, THEN THE SCREEN — in that order, and the order is the
+    // feature. The completion payout is paid ON the broadcast: LEDGER's
+    // listener hands over the purse and puts the completion's items into the
+    // backpack, and every one of those lands in the run ledger through the
+    // same acquisition funnel a kill drop does. A debrief composed before the
+    // broadcast lists the run WITHOUT its payout — the loot line the player
+    // most wants to read is the one that is not there yet. So the screen
+    // composes after, from the ledger as it stands once the payout is in.
+    //
+    // The screen used to go up first out of a fear that a listener would
+    // travel the player out from under it. No listener travels: every
+    // consumer writes travel-surviving state and stays in the world (the
+    // header's contract), and the travel out is the debrief's own verb now
+    // (ReturnFromRift), taken when the player closes the screen — not
+    // something the event does to him.
+    OnRiftCompleted.Broadcast(Rift, Player);
+    // Composed from the ledger this run kept rather than from a difference
+    // between two backpacks, because a backpack difference cannot tell a
+    // drop the player took from one they discarded to make room for it.
     if (ABreakerCharacter* Breaker = Cast<ABreakerCharacter>(Player))
     {
         Breaker->ShowRiftDebrief(BreakerRiftDebrief::Compose(Rift, RiftRunLoot,
             RiftRunRiftglassGained(Player), RiftRunExperienceGained(Player)));
     }
-    OnRiftCompleted.Broadcast(Rift, Player);
 }
 
 // ---------------------------------------------------------------------------
@@ -380,6 +407,29 @@ void ABreakerGameMode::HandleRiftEntryRequested(const FBreakerRiftDefinition& Ri
         UE_LOG(LogTemp, Error,
             TEXT("[Rift] a rift door was entered with no definition on it (AreaLevel 0). Refusing travel."));
         return;
+    }
+
+    // WHERE HE STOOD, before anything else about the session changes. The
+    // interior is this same yard rebuilt, and the way back out is another
+    // rebuild; the pawn standing at this door does not survive either, so
+    // the place it is standing is recorded on the session for the yard's
+    // build to put the returning pawn back on. World space is valid across
+    // the reload because the yard is assembled at identity in both builds.
+    //
+    // Only when the door stands IN Fernhall. Every door today does, but a
+    // door in another map would record that map's coordinates and the yard
+    // would honour them as its own — a player returning from a rift entered
+    // elsewhere is better placed at the yard's PlayerStart than at a point
+    // that belongs to a different world. The flag stays false and the yard
+    // takes its default landing.
+    if (UBreakerGameInstance::IsFernhallMap(this))
+    {
+        Session->RiftEntryTransform = RequestingPawn->GetActorTransform();
+        Session->bRiftEntryTransformSet = true;
+    }
+    else
+    {
+        Session->bRiftEntryTransformSet = false;
     }
 
     // THE WRITE IS THE WHOLE FEATURE. Every consumer downstream already
@@ -454,6 +504,17 @@ void ABreakerGameMode::RetryRift(APawn* RequestingPawn)
 void ABreakerGameMode::ReturnToAnchor(APawn* RequestingPawn)
 {
     HandleHubTravelSelected(ABreakerTravelPoint::HubDestinationId, RequestingPawn);
+}
+
+void ABreakerGameMode::ReturnFromRift(APawn* RequestingPawn)
+{
+    // The same travel the entry plaza's gate makes when Fernhall is chosen
+    // from inside a run, and deliberately nothing more: PendingRift is
+    // cleared by the travel so the load builds the yard and not another
+    // run, and the entry transform the door recorded is left standing so
+    // that build can put the player back where he went in. One travel path
+    // in the project; this only names it for the completion beat.
+    HandleHubTravelSelected(ABreakerTravelPoint::FernhallDestinationId, RequestingPawn);
 }
 
 AActor* ABreakerGameMode::ChoosePlayerStart_Implementation(AController* Player)
@@ -776,8 +837,23 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
                 // same arithmetic as the fallback PlayerStart), facing the
                 // rift end of the yard so the first thing seen is somewhere
                 // to go.
-                const FVector StandAt = StartAt + FVector(0.0f, 0.0f, 112.0f);
-                const FRotator Facing = YardForward.Rotation();
+                FVector StandAt = StartAt + FVector(0.0f, 0.0f, 112.0f);
+                FRotator Facing = YardForward.Rotation();
+                // UNLESS THIS IS THE WAY BACK. A yard build with the door's
+                // recorded entry transform on the session is a player
+                // returning from a run, and he comes back to where he stood
+                // when the door took him — same feet, same facing — rather
+                // than to the start of the yard with the whole lane to walk
+                // again. Never inside a run: the instance is the fight, and
+                // the transform waits for the build after it. Read once and
+                // cleared, so the next ordinary arrival is ordinary.
+                if (!bRiftInstance && RiftSession && RiftSession->bRiftEntryTransformSet)
+                {
+                    StandAt = RiftSession->RiftEntryTransform.GetLocation();
+                    Facing = RiftSession->RiftEntryTransform.Rotator();
+                    RiftSession->bRiftEntryTransformSet = false;
+                    UE_LOG(LogTemp, Display, TEXT("[Rift] returned to the door at %s"), *StandAt.ToString());
+                }
                 Pawn->TeleportTo(StandAt, Facing);
                 if (AController* Controller = Pawn->GetController())
                 {

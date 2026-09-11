@@ -190,7 +190,48 @@ bool FBreakerRiftRuntimeLoopTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Repeated completion cannot pay twice"), Completions, 1);
     TestEqual(TEXT("Repeated completion preserves paid XP"), Progression->GetProgressionState().TotalExperience, PaidXp);
     TestFalse(TEXT("Completed rift cannot restart waves through the manual wave command"), Mode->IsWaveActive());
-    AddInfo(TEXT("Validated actual Fernhall build, naturally clock-advanced waves, boss damage, completion subscription, purse and exit offers; cross-map loading is not simulated."));
+
+    // THE WAY HOME. ReturnFromRift is the debrief's verb: the Fernhall travel
+    // with the door's entry transform left on the session for the yard's
+    // build to land the player on. The session writes are the observable
+    // boundary here — the load itself is suppressed through the world-local
+    // sandbox guard the retry test uses, added AFTER the build so it cannot
+    // change what was built. Cross-map loading is not simulated, so the
+    // yard's consumption of the transform (the teleport in the non-rift
+    // Fernhall build) is not asserted in this fixture.
+    //
+    // The transform is seeded rather than written by the door: this rig's
+    // pawn is a DefaultPawn by design (no save-slot load), and the door's
+    // gate (ABreakerRiftDoor::CanEnterRift) refuses anything that is not a
+    // living ABreakerCharacter, so HandleRiftEntryRequested — private to the
+    // game mode and reached only through a door's delegate — cannot fire
+    // here. The entry write is therefore not asserted in this file either;
+    // it is one line beside PendingRift's, in the same function.
+    World->URL.AddOption(TEXT("BreakerCoopCombat=1"));
+    const FTransform EntryTransform(FRotator(0.0f, 135.0f, 0.0f), FVector(2600.0f, -840.0f, 112.0f));
+    Session->RiftEntryTransform = EntryTransform;
+    Session->bRiftEntryTransformSet = true;
+    Mode->ReturnFromRift(Pawn);
+    TestEqual(TEXT("Return from a rift is the Fernhall travel"),
+        Session->PendingDestinationId, ABreakerTravelPoint::FernhallDestinationId);
+    TestFalse(TEXT("Return from a rift clears the pending rift so the load builds the yard, not a run"),
+        Session->PendingRift.IsSet());
+    TestTrue(TEXT("Return from a rift leaves the entry transform for the yard to consume"),
+        Session->bRiftEntryTransformSet);
+    TestTrue(TEXT("Return from a rift leaves the entry transform's value untouched"),
+        Session->RiftEntryTransform.Equals(EntryTransform));
+    TestEqual(TEXT("Return from a rift resets the death counter with the rift it counted for"),
+        Session->EndgameDeathsRemaining, UBreakerRiftLibrary::SoloEndgameDeathBudget);
+    // A travel that does NOT go back to the yard drops the transform: a
+    // later ordinary walk into Fernhall must land at the yard's PlayerStart,
+    // not at the door of a run that ended somewhere else.
+    Session->bRiftEntryTransformSet = true;
+    Mode->ReturnToAnchor(Pawn);
+    TestEqual(TEXT("Return to the Anchor is the hub travel"),
+        Session->PendingDestinationId, ABreakerTravelPoint::HubDestinationId);
+    TestFalse(TEXT("A travel anywhere but Fernhall drops the entry transform"),
+        Session->bRiftEntryTransformSet);
+    AddInfo(TEXT("Validated actual Fernhall build, naturally clock-advanced waves, boss damage, completion subscription, purse, exit offers and the return travel's session writes; cross-map loading is not simulated."));
     return true;
 }
 

@@ -2,6 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "Combat/BreakerMonsterChassis.h"
+#include "Items/BreakerDropTable.h"
+#include "Items/BreakerItemTypes.h"
 
 // ---------------------------------------------------------------------------
 // The rift completion payout, pure (O168's third commit; O137's law). LEDGER
@@ -49,5 +51,33 @@ namespace BreakerRiftReward
     inline int32 XpForCompletion(int32 EffectiveAreaLevel)
     {
         return FMath::RoundToInt32(CompletionXpBase * CompletionScale(EffectiveAreaLevel));
+    }
+
+    // THE FORCED DROPS. Owner, after a rift that came back with nothing: "give
+    // you at least two forced drops that are decent". Until this there was no
+    // guaranteed item on completion at all — the purse was Riftglass and XP,
+    // first clear only, and items came only from kills as ground pickups. A
+    // closed rift is now worth at least this many items, on EVERY completion
+    // (the purse is the ladder's pay; the items are the rift's), straight into
+    // the backpack: that is what "came back with you" means.
+    constexpr int32 CompletionItemCount = 2;   // O2 PLACEHOLDER — "at least two"
+
+    // "Decent" is the codebase's elite floor: the rarity an elite that has
+    // decided to drop is lifted to (ABreakerEnemy::GrantLoot), and the quest
+    // reward's default. Aberrant would be a jackpot, not a floor.
+    constexpr EBreakerItemRarity CompletionRarityFloor = EBreakerItemRarity::Exceptional;   // O2 PLACEHOLDER — "decent": the elite floor
+
+    // The floor composes with the drop table's gates rather than competing
+    // with them, exactly as the elite floor does: a completion can never hand
+    // out a rarity its item level forbids. Below the Exceptional unlock the
+    // floor drops to Uncommon — the top ungated rarity, so the two items are
+    // still never Standard. The rank lever reads Elite because the item level
+    // the caller rolls at is the elite's (trash level plus the elite bonus):
+    // the completion pays what an elite here would have paid, at the floor.
+    inline EBreakerItemRarity CompletionRarity(int32 ItemLevel, const FBreakerDropTableParams& Table)
+    {
+        return UBreakerDropTableLibrary::IsRarityUnlocked(CompletionRarityFloor, ItemLevel, EBreakerMonsterRank::Elite, Table)
+            ? CompletionRarityFloor
+            : EBreakerItemRarity::Uncommon;
     }
 }

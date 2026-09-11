@@ -50,6 +50,49 @@ struct RIORSEDGE_API FBreakerDeploymentBriefing
 };
 
 // ---------------------------------------------------------------------------
+// SBreakerRiftLattice — the card's pulse: the 7-cell lattice, the stage line
+// with its cursor block, and the orange crawl, all driven by ONE active timer
+// that stops with the widget. The lattice and stage line are this widget's
+// own content; the crawl is built here too (the timer moves its fill) but is
+// handed to the caller through GetCrawl() because it belongs on the card's
+// bottom edge, full bleed, not in the content column. Shared by the
+// deployment card and its twin, the rift debrief, so the two beats breathe
+// identically; every animation is indeterminate by design — O120: progress is
+// never a percentage.
+// ---------------------------------------------------------------------------
+class RIORSEDGE_API SBreakerRiftLattice : public SCompoundWidget
+{
+public:
+    SLATE_BEGIN_ARGS(SBreakerRiftLattice) {}
+    SLATE_END_ARGS()
+
+    void Construct(const FArguments& InArgs);
+
+    // The stage line in words is the honest signal (O120). The caller moves
+    // it: the deploy words while the beat holds, the arrival words on the far
+    // side of the load, the closing words on the debrief.
+    void SetStage(const FText& StageWords);
+
+    // The crawl, for the card's bottom slot. Built in Construct, so this is
+    // always valid after it.
+    TSharedRef<SWidget> GetCrawl() const { return Crawl.ToSharedRef(); }
+
+private:
+    // One active timer drives the lattice, the cursor blink and the crawl —
+    // imperative writes on a clock, never paint-time attributes, exactly the
+    // menu's rule. It stops with the widget.
+    EActiveTimerReturnType Animate(double CurrentTime, float DeltaTime);
+
+    TSharedPtr<STextBlock> StageText;
+    TSharedPtr<SBorder> BlinkBlock;
+    TArray<TSharedPtr<SBorder>> LatticeCells;
+    TSharedPtr<SBox> CrawlFill;
+    TSharedPtr<SWidget> Crawl;
+    float CrawlFillWidth = 422.0f;
+    double StartSeconds = 0.0;
+};
+
+// ---------------------------------------------------------------------------
 // SBreakerLoadingScreen — the deployment beat's pane, drawn to the pack's
 // loading spec (README-UE5.txt) on the tokens' 64px margin, every field live
 // from the briefing. Shown on the game WINDOW's overlay by
@@ -57,6 +100,12 @@ struct RIORSEDGE_API FBreakerDeploymentBriefing
 // deploy hold and the arrival beat), freezes honestly for the blocking
 // OpenLevel between them, and both animations are indeterminate by design —
 // O120: loading progress is never a percentage.
+//
+// THE CARD IS A KIT. The chrome (MakeCardFrame), the headline block, the
+// gold-railed side block and the stat row are static builders on this class
+// so the rift debrief — the briefing's twin — is drawn from the same pieces
+// at the same sizes rather than from a copy of them. Construct is a caller of
+// the same builders: what the debrief renders is what the deployment renders.
 // ---------------------------------------------------------------------------
 class RIORSEDGE_API SBreakerLoadingScreen : public SCompoundWidget
 {
@@ -71,6 +120,24 @@ public:
     // moves it: the deploy words while the beat holds, the arrival words on
     // the far side of the load.
     void SetStage(const FText& StageWords);
+
+    // The card's chrome: opaque BgBase, the 2px top rule, the insignia mark
+    // and its caption in the corner, Content centred at the card's content
+    // width, Crawl on the bottom edge. Static and world-free: the frame reads
+    // nothing, it only places what it is handed.
+    static TSharedRef<SWidget> MakeCardFrame(TSharedRef<SWidget> Content, TSharedRef<SWidget> Crawl);
+
+    // The headline block: Name at the display scale, heavy, upper-cased and
+    // wrapped at the name column's derived width, with Line under it at the
+    // body scale.
+    static TSharedRef<SWidget> MakeHeadline(const FString& Name, const FText& Line);
+
+    // The side block: a gold rail on the block's edge, Body beside it.
+    static TSharedRef<SWidget> MakeRailedBlock(TSharedRef<SWidget> Body);
+
+    // The stat row: caption-over-value readouts split by 1px dividers, in the
+    // order given.
+    static TSharedRef<SWidget> MakeStatRow(const TArray<TPair<FString, FString>>& Stats);
 
     // The composer, static and world-free so the drift test can call it with
     // no widget: EliteBonus is the enemy's authored loot bonus (read from the
@@ -95,15 +162,5 @@ public:
     }
 
 private:
-    // One active timer drives the lattice, the cursor blink and the crawl —
-    // imperative writes on a clock, never paint-time attributes, exactly the
-    // menu's rule. It stops with the widget.
-    EActiveTimerReturnType Animate(double CurrentTime, float DeltaTime);
-
-    TSharedPtr<STextBlock> StageText;
-    TSharedPtr<SBorder> BlinkBlock;
-    TArray<TSharedPtr<SBorder>> LatticeCells;
-    TSharedPtr<SBox> CrawlFill;
-    float CrawlFillWidth = 422.0f;
-    double StartSeconds = 0.0;
+    TSharedPtr<SBreakerRiftLattice> Lattice;
 };

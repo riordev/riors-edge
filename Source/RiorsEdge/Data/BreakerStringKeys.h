@@ -77,6 +77,9 @@
     BREAKER_STRING(LoadingStatDeaths,            "loading.stat.deaths",             "") \
     BREAKER_STRING(LoadingStatMultiplier,        "loading.stat.multiplier",         "%.2f") \
     BREAKER_STRING(LoadingInsignia,              "loading.insignia",                "") \
+    BREAKER_STRING(LoadingStageOpening,          "loading.stage.opening",           "") \
+    BREAKER_STRING(LoadingStageOnSite,           "loading.stage.onSite",            "") \
+    BREAKER_STRING(LoadingStageClosing,          "loading.stage.closing",           "") \
     BREAKER_STRING(StashMoveToStash,             "stash.moveToStash",               "") \
     BREAKER_STRING(StashTakeToBackpack,          "stash.takeToBackpack",            "") \
     BREAKER_STRING(StashTitle,                   "stash.title",                     "") \

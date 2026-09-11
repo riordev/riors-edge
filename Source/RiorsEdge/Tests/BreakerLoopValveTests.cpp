@@ -353,20 +353,22 @@ bool FBreakerAbilityAreaLaneTest::RunTest(const FString& Parameters)
     UBreakerAbility_Cleave* Cleave = NewObject<UBreakerAbility_Cleave>();
     FText Failure;
 
-    // Anchor (Core Arc wedge): three ranks of +6% AbilityArea reach every
+    // Anchor (Core Arc wedge): three ranks of +12% AbilityArea reach every
     // consumer. Prime is the wedge's gateway and authors no area of its own.
+    // 12 a rank because 6 was invisible: one rank moved a 4 m puddle's rim
+    // 24 cm and the owner bought it, looked, and saw the same disc. O2.
     UBreakerProgressionTree* Core = UBreakerProgressionLibrary::GetCoreSliceTree();
     TestTrue(TEXT("Arc Prime buys"), BreakerBuyToMax(*this, Progression, Core, TEXT("Core.Arc.Prime")));
     TestEqual(TEXT("Prime alone leaves Rot's radius authored"), Rot->ComputeEffectiveRadiusCm(Owner), 400.0f, 0.0001f);
     TestTrue(TEXT("Arc Anchor buys"), BreakerBuyToMax(*this, Progression, Core, TEXT("Core.Arc.Anchor")));
-    TestEqual(TEXT("Anchor widens Rot's puddle (400 -> 472)"), Rot->ComputeEffectiveRadiusCm(Owner), 472.0f, 0.01f);
-    TestEqual(TEXT("Anchor lengthens Cleave's reach (650 -> 767)"), Cleave->ComputeEffectiveRangeCm(Owner), 767.0f, 0.01f);
-    TestEqual(TEXT("Anchor widens Cleave's arc (135 -> 159.3)"), Cleave->ComputeEffectiveArcDegrees(Owner), 159.3f, 0.5f);
+    TestEqual(TEXT("Anchor widens Rot's puddle (400 -> 544)"), Rot->ComputeEffectiveRadiusCm(Owner), 544.0f, 0.01f);
+    TestEqual(TEXT("Anchor lengthens Cleave's reach (650 -> 884)"), Cleave->ComputeEffectiveRangeCm(Owner), 884.0f, 0.01f);
+    TestEqual(TEXT("Anchor widens Cleave's arc (135 -> 183.6)"), Cleave->ComputeEffectiveArcDegrees(Owner), 183.6f, 0.5f);
 
     // Core is its own pool: a Doctrine respec leaves the wedge standing, and
     // the Core respec (free at this level) returns all three to authored.
     TestTrue(TEXT("A Doctrine respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, true, Failure));
-    TestEqual(TEXT("A Doctrine respec does not touch the Core wedge"), Rot->ComputeEffectiveRadiusCm(Owner), 472.0f, 0.01f);
+    TestEqual(TEXT("A Doctrine respec does not touch the Core wedge"), Rot->ComputeEffectiveRadiusCm(Owner), 544.0f, 0.01f);
     TestTrue(TEXT("Core respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure));
     TestEqual(TEXT("Core respec returns Rot's radius to authored"), Rot->ComputeEffectiveRadiusCm(Owner), 400.0f, 0.0001f);
     TestEqual(TEXT("Core respec returns Cleave's reach to authored"), Cleave->ComputeEffectiveRangeCm(Owner), 650.0f, 0.0001f);

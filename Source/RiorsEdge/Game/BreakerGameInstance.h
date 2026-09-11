@@ -51,6 +51,25 @@ public:
     // every legacy path on the game mode's GymAreaLevel dev fallback.
     UPROPERTY(BlueprintReadWrite, Category="Breaker|Session") FBreakerRiftDefinition PendingRift;
 
+    // WHERE THE PLAYER STOOD WHEN THE DOOR TOOK THEM. A rift is Fernhall
+    // rebuilt with PendingRift set, and the way out is a second Fernhall
+    // load; without this the yard puts a returning player at its PlayerStart
+    // facing the rift end, which is where the game starts and not where he
+    // left. The pawn that stood at the door dies with the interior, so the
+    // transform is carried here, in world space: the yard is assembled at
+    // identity in both builds, so a point in the living yard is the same
+    // point in the yard the player comes back to.
+    //
+    // Same contract as PendingRift — TRANSIENT TRAVEL STATE, not a save.
+    // Written by the door (HandleRiftEntryRequested), read ONCE by the yard's
+    // build and cleared there; a travel that does not return to Fernhall
+    // drops it (HandleHubTravelSelected), so a later ordinary visit cannot
+    // land at a door from a run that ended somewhere else. The flag is the
+    // read gate: an identity transform is a legal place to stand, so the
+    // transform's own value cannot say whether it was authored.
+    UPROPERTY(BlueprintReadWrite, Category="Breaker|Session") FTransform RiftEntryTransform;
+    UPROPERTY(BlueprintReadWrite, Category="Breaker|Session") bool bRiftEntryTransformSet = false;
+
     // THE DEATH BUDGET'S COUNTER (O82). Here and not on the game mode because
     // RETRY THE RIFT is a level travel that constructs a new game mode, and a
     // budget that reset on every retry would be no budget. Seeded to the solo

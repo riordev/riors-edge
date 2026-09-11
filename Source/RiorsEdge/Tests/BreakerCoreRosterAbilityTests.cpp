@@ -67,13 +67,13 @@ bool FBreakerCoreRosterAbilityAuthoringTest::RunTest(const FString& Parameters)
     };
     Effect(TEXT("Core.Arc.Prime"), T::AbilityDamage, B::IncreasedPercent, 8.f);
     Effect(TEXT("Core.Arc.Channel"), T::AbilityDamage, B::IncreasedPercent, 6.f);
-    Effect(TEXT("Core.Arc.Widen"), T::AbilityArea, B::IncreasedPercent, 15.f);
+    Effect(TEXT("Core.Arc.Widen"), T::AbilityArea, B::IncreasedPercent, 25.f);
     Effect(TEXT("Core.Arc.Vent"), T::AddedAbilityPower, B::Flat, 4.f);
     Effect(TEXT("Core.Arc.Reach"), T::AbilityDamage, B::IncreasedPercent, 25.f);
-    Effect(TEXT("Core.Arc.Anchor"), T::AbilityArea, B::IncreasedPercent, 6.f);
+    Effect(TEXT("Core.Arc.Anchor"), T::AbilityArea, B::IncreasedPercent, 12.f);
     Effect(TEXT("Core.Arc.Persistence"), T::ZoneAndWindowDuration, B::IncreasedPercent, 20.f);
     Effect(TEXT("Core.Arc.Recycle"), T::AddedAbilityPower, B::Flat, 3.f);
-    Effect(TEXT("Core.Arc.Spillover"), T::AbilityArea, B::IncreasedPercent, 8.f);
+    Effect(TEXT("Core.Arc.Spillover"), T::AbilityArea, B::IncreasedPercent, 15.f);
     Effect(TEXT("Core.Arc.Overflow"), T::AbilityDamage, B::MorePercent, 26.f);
     Effect(TEXT("Core.Tempo.Metronome"), T::AbilityCastRate, B::IncreasedPercent, 6.f);
     Effect(TEXT("Core.Tempo.Quicken"), T::AbilityCastRate, B::IncreasedPercent, 4.f);

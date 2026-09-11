@@ -19,14 +19,14 @@ void AppendAbility(UObject* Outer, TArray<FBreakerCoreWedgeDefinition>& Wedges)
         Node(Outer, TEXT("Core.Arc.Prime"), TEXT("Prime"), TEXT("8% increased Ability Damage and 6 Critical Damage."), {Effect(T::AbilityDamage, B::IncreasedPercent, 8.f), Effect(T::CriticalDamage, B::Flat, 6.f)}), // O2 PLACEHOLDER
         {
             {Node(Outer, TEXT("Core.Arc.Channel"), TEXT("Channel"), TEXT("6% increased Ability Damage and 2% Critical Chance per rank."), {Effect(T::AbilityDamage, B::IncreasedPercent, 6.f), Effect(T::CriticalChance, B::Flat, 2.f)}), // O2 PLACEHOLDER
-             Node(Outer, TEXT("Core.Arc.Widen"), TEXT("Widen"), TEXT("15% increased Ability Area."), {Effect(T::AbilityArea, B::IncreasedPercent, 15.f)})}, // O2 PLACEHOLDER
+             Node(Outer, TEXT("Core.Arc.Widen"), TEXT("Widen"), TEXT("25% increased Ability Area."), {Effect(T::AbilityArea, B::IncreasedPercent, 25.f)})}, // O2 PLACEHOLDER
             {Node(Outer, TEXT("Core.Arc.Vent"), TEXT("Vent"), TEXT("4 Added Ability Power per rank."), {Effect(T::AddedAbilityPower, B::Flat, 4.f)}), // O2 PLACEHOLDER
              Node(Outer, TEXT("Core.Arc.Reach"), TEXT("Reach"), TEXT("25% increased Ability Damage and 25 Critical Damage."), {Effect(T::AbilityDamage, B::IncreasedPercent, 25.f), Effect(T::CriticalDamage, B::Flat, 25.f)})}, // O2 PLACEHOLDER
-            {Node(Outer, TEXT("Core.Arc.Anchor"), TEXT("Anchor"), TEXT("6% increased Ability Area per rank."), {Effect(T::AbilityArea, B::IncreasedPercent, 6.f)}), // O2 PLACEHOLDER
+            {Node(Outer, TEXT("Core.Arc.Anchor"), TEXT("Anchor"), TEXT("12% increased Ability Area per rank."), {Effect(T::AbilityArea, B::IncreasedPercent, 12.f)}), // O2 PLACEHOLDER
              Node(Outer, TEXT("Core.Arc.Persistence"), TEXT("Persistence"), TEXT("20% increased zone and window duration."), {Effect(T::ZoneAndWindowDuration, B::IncreasedPercent, 20.f)})} // O2 PLACEHOLDER
         },
         {Node(Outer, TEXT("Core.Arc.Recycle"), TEXT("Recycle"), TEXT("3 Added Ability Power."), {Effect(T::AddedAbilityPower, B::Flat, 3.f)}), // O2 PLACEHOLDER
-         Node(Outer, TEXT("Core.Arc.Spillover"), TEXT("Spillover"), TEXT("8% increased Ability Area."), {Effect(T::AbilityArea, B::IncreasedPercent, 8.f)})}, // O2 PLACEHOLDER
+         Node(Outer, TEXT("Core.Arc.Spillover"), TEXT("Spillover"), TEXT("15% increased Ability Area."), {Effect(T::AbilityArea, B::IncreasedPercent, 15.f)})}, // O2 PLACEHOLDER
         Node(Outer, TEXT("Core.Arc.Overflow"), TEXT("Overflow"), TEXT("26% More Ability Damage."), {Effect(T::AbilityDamage, B::MorePercent, 26.f)}), // O2 PLACEHOLDER
         Node(Outer, TEXT("Core.Arc.Detonation"), TEXT("Detonation"), TEXT("Zones no longer tick. They pay their whole remaining damage on expiry. FORFEIT: no sustained pressure."), {}, {TEXT("Progression.Node.Core.Detonation")})});
     Wedges.Add({TEXT("Tempo"), TEXT("Ability"), true,

@@ -1,17 +1,5 @@
 # Desk — next playtest
 
-## Cycle — OWNER PLAYTEST, 2026-09-11 (SIXTH), THE RIFT'S END
-
-- [ ] "that completion screen is not the same as the loading in one but just
-      with loot or similar animation and loading style (it should pull you
-      back to where you entered the rift on completion and give you at least
-      two forced drops that are decent)" (frames: RIFT CLOSED is a dim
-      overlay on the live world with NOTHING CAME BACK WITH YOU, Riftglass
-      207, Experience 5570, CONTINUE; the deployment screen is the full
-      black card with the area level, item-level band, YOUR GEAR IS i5, the
-      health/damage/deaths row and the OPENING THE RIFT pips)
-- [ ] "aoe doesnt look like its effecting anything"
-
 ## Cycle — OWNER PLAYTEST, 2026-09-11 (FIFTH), SECOND HALF
 
 - [ ] "multiple quests cannot be held (or rather it doesnt show you where
@@ -19,6 +7,41 @@
 - [ ] "only one weapon has a model and thats the standard issue rifle
       everything else uses ugly random guns or different arms"
 - [ ] "the sounds are still rough they sound really flat or ticky"
+
+## OWNER PLAYTEST, 2026-09-11 (SIXTH) — LANDED, THE RIFT'S END
+
+- "that completion screen is not the same as the loading in one … it should
+  pull you back to where you entered the rift on completion and give you at
+  least two forced drops that are decent" — three lanes, one build:
+  GLASS: the deployment card's chrome (frame, headline, gold rail, stat row,
+  the seven pips with their blink and the crawl) is lifted into builders on
+  the loading screen's TU and the debrief is built from them: RIFT CLOSED at
+  the deploy headline size, the haul on the gold rail where the level block
+  sits, CLOSING THE RIFT under the pips, CONTINUE the one verb. The stage
+  words (OPENING / ON SITE / CLOSING THE RIFT) are string keys now.
+  PHOTOGRAPHED: the twin. The harness has no rift instance so its frame has
+  no area name and no haul; in play both are there.
+  GROUND: the door records the pawn's transform when it opens the rift; the
+  yard's next non-rift build stands you there, once. CONTINUE travels
+  (ReturnFromRift) then resumes. The debrief composes AFTER the completion
+  event, so what the event pays is on the screen. The exit-plaza gate stays
+  for the abandon path. FOUND: the boss's own ground drop is left behind on
+  every completion (the world is paused under the debrief). Either the two
+  forced items are the answer, or the terminator's loot goes to the backpack
+  in a rift — a FIELD change; his call.
+  LEDGER: every completion pays CompletionItemCount (2) items at the band's
+  ceiling, floored at Exceptional where the item level allows it (i8+) and
+  Uncommon below, straight to the backpack past the cap (a paid grant,
+  One-AB). Seeded by (area, level, index): the same rift pays the SAME pair
+  every clear — reproducible by construction; a salt wants a ruling.
+  RULING OWED: one line for "a completion pays N items at the area's band,
+  floored at decent". Both numbers O2.
+- "aoe doesnt look like its effecting anything" — the lane was proven end to
+  end (membership, ticks, flash, numbers). The magnitude was the answer:
+  Anchor 6 -> 12 %/rank, Widen 15 -> 25, Spillover 8 -> 15 (O2). Three Anchor
+  ranks now put Rot at 5.4 m, Cleave at 8.8 m / 184°. Census re-exported.
+  FOUND: Rot's own damage is 20 DPS beside a 240 DPS rifle; a full puddle
+  does not kill a trash body alone. That is a number he has not asked about.
 
 ## OWNER PLAYTEST, 2026-09-11 (SIXTH) — LANDED, THE BODIES AND THE CAST
 

@@ -4,7 +4,7 @@
 		"Source/RiorsEdge/Data/BreakerCensus.cpp": "008789b0d8c55cfc5604cf0a7b9e9122c2e314bf",
 		"Source/RiorsEdge/Progression/BreakerCoreRoster.cpp": "ca4b1707553c9da18d7b8af4ac7754112028a581",
 		"Source/RiorsEdge/Progression/BreakerCoreRoster.h": "79f375b9ff6fb7edcb722657408b7cb6e22371df",
-		"Source/RiorsEdge/Progression/BreakerCoreRosterAbility.cpp": "836b905cce0f3c20e6ff503cf8e459b8912e33c4",
+		"Source/RiorsEdge/Progression/BreakerCoreRosterAbility.cpp": "58f89f76c8bcb18370d1c294fd6d11ce69d8bfbe",
 		"Source/RiorsEdge/Progression/BreakerCoreRosterDefence.cpp": "10ca13c3c4e35d6c6d4140b142cbd7afdbccb59c",
 		"Source/RiorsEdge/Progression/BreakerCoreRosterMovement.cpp": "c4e3d19c0d78b915eb217a8ffdb95577204d9f9f",
 		"Source/RiorsEdge/Progression/BreakerCoreRosterStatus.cpp": "592d8f26222814cc89c9218ab95d1df1e293297a",
@@ -3957,7 +3957,7 @@
 						{
 							"target": "AbilityArea",
 							"bucket": "IncreasedPercent",
-							"valuePerRank": 15,
+							"valuePerRank": 25,
 							"condition": "Always",
 							"alsoRequires": []
 						}
@@ -4045,7 +4045,7 @@
 						{
 							"target": "AbilityArea",
 							"bucket": "IncreasedPercent",
-							"valuePerRank": 6,
+							"valuePerRank": 12,
 							"condition": "Always",
 							"alsoRequires": []
 						}
@@ -4136,7 +4136,7 @@
 						{
 							"target": "AbilityArea",
 							"bucket": "IncreasedPercent",
-							"valuePerRank": 8,
+							"valuePerRank": 15,
 							"condition": "Always",
 							"alsoRequires": []
 						}

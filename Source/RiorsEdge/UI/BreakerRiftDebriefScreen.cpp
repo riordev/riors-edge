@@ -4,24 +4,32 @@
 //
 // Owner-asked: "i really like the entering rift screen so maybe when a rift is
 // closed we can add something very similar that shows the items we gained from
-// completion/on completion kinda like a loot highlight". So this is the
-// BRIEFING'S TWIN and reads like one — a kicker, a headline, then the run's
-// haul — and it decides nothing: every string and every number arrives in
+// completion/on completion kinda like a loot highlight", and then, on seeing
+// the first draft: "that completion screen is not the same as the loading in
+// one". So this is the BRIEFING'S TWIN and is DRAWN FROM THE BRIEFING'S OWN
+// PIECES (UI/BreakerLoadingScreen.h): the same card frame, the same headline
+// block, the same gold rail, the same stat row, the same lattice breathing
+// under the stage line. Where the deployment card puts the area level, this
+// puts the haul. It decides nothing: every string and every number arrives in
 // BreakerRiftDebrief::FModel, composed from the game mode's run ledger.
 //
 // ONE VERB. The death screen has two because both are level travels and the
 // player must choose; here the run is already over and the only question left
-// is when they have finished looking. The rift's exit offer is its own beat and
-// this screen does not pre-empt it.
+// is when they have finished looking. CONTINUE takes the player back to where
+// they entered the rift from — the game mode's ReturnFromRift — so the screen
+// is the whole of the closing beat, not a curtain in front of one.
 //
 // COLOUR BY VERB (O179). Rarity colours the item's own rail, because rarity is
 // a noun the player already reads that way everywhere else; GOLD is the reward
-// accent and carries the two totals. Nothing here is cyan (movement) or teal (a
-// rift object) — the rift is closed, and this is what came out of it.
+// accent and carries the haul's rail. Nothing here is cyan (movement) or teal
+// (a rift object) — the rift is closed, and this is what came out of it.
 
 #include "UI/BreakerMenu.h"
 
 #include "Characters/BreakerCharacter.h"
+#include "Data/BreakerStrings.h"
+#include "Game/BreakerGameMode.h"
+#include "UI/BreakerLoadingScreen.h"
 #include "UI/BreakerTypeRoles.h"
 #include "UI/BreakerUIStyle.h"
 
@@ -35,16 +43,15 @@
 namespace
 {
     // Geometry, all O2 PLACEHOLDER until the owner has closed a rift on it.
-    // The column matches the death screen's so the two beats sit in the same
-    // place on screen: a reward and a loss that jump about read as two
-    // different games.
-    constexpr int32 BreakerDebriefHeadlinePixels = 40;
-    constexpr float BreakerDebriefColumnWidth = 720.0f;
+    // The haul sits where the deployment card's level block sits, and its
+    // width is the one number that is this screen's own: the card's headline
+    // wraps at the content width minus 320, so anything wider than that
+    // narrows the name column under RIFT CLOSED.
+    constexpr float BreakerDebriefHaulWidth = 360.0f;
     constexpr float BreakerDebriefRowHeight = 34.0f;
     constexpr float BreakerDebriefRailWidth = 4.0f;
     constexpr float BreakerDebriefLevelColumn = 56.0f;
     constexpr float BreakerDebriefVerbWidth = 260.0f;
-    constexpr float BreakerDebriefGroupGap = 24.0f;
     constexpr float BreakerDebriefVerbGap = 32.0f;
 
     TSharedRef<SWidget> BreakerDebriefSolid(const FLinearColor& Colour)
@@ -60,7 +67,9 @@ namespace
     // One line of the haul: a rarity rail, the item's own name, its level.
     // THE RAIL CARRIES THE RARITY AND THE TEXT DOES NOT, deliberately — a name
     // printed in its own rarity is unreadable at the bottom of the ladder,
-    // which is where most of a haul lives.
+    // which is where most of a haul lives. The name ends in an ellipsis rather
+    // than spilling over the level column: the column is fixed, the name is
+    // not, and a name that crossed the card's edge would read as a defect.
     TSharedRef<SWidget> BreakerDebriefRow(const BreakerRiftDebrief::FLine& Line)
     {
         return SNew(SBox).HeightOverride(BreakerDebriefRowHeight)
@@ -79,6 +88,7 @@ namespace
                 SNew(STextBlock)
                     .Text(FText::FromString(Line.Name))
                     .ColorAndOpacity(BreakerUI::TextPrimary)
+                    .OverflowPolicy(ETextOverflowPolicy::Ellipsis)
                     .Font(BreakerBodyFont(BreakerUI::TypeBody, false))
             ]
             + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
@@ -93,28 +103,6 @@ namespace
                 ]
             ]
         ];
-    }
-
-    // A total, named and valued on one row. Gold on the value alone: the label
-    // is what it is, and the number is the reward.
-    TSharedRef<SWidget> BreakerDebriefTotal(const TCHAR* Label, int32 Value)
-    {
-        return SNew(SHorizontalBox)
-            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-            [
-                SNew(STextBlock)
-                    .Text(FText::FromString(Label))
-                    .ColorAndOpacity(BreakerUI::TextMuted)
-                    .Font(BreakerBodyFont(BreakerUI::TypeCaption, true))
-            ]
-            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-              .Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
-            [
-                SNew(STextBlock)
-                    .Text(FText::FromString(FString::FromInt(Value)))
-                    .ColorAndOpacity(BreakerUI::Gold)
-                    .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), BreakerUI::TypeBody))
-            ];
     }
 }
 
@@ -131,39 +119,15 @@ TSharedRef<SWidget> SBreakerMenu::BuildRiftDebriefScreen()
 {
     const BreakerRiftDebrief::FModel& M = RiftDebriefModel;
 
-    TSharedRef<SVerticalBox> Column = SNew(SVerticalBox);
-    Column->AddSlot().AutoHeight()
-    [
-        SNew(STextBlock)
-            .Text(FText::FromString(M.TierKicker))
-            .ColorAndOpacity(BreakerUI::TextMuted)
-            .Font(BreakerBodyFont(BreakerUI::TypeCaption, true))
-    ];
-    Column->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
-    [
-        SNew(STextBlock)
-            .Text(FText::FromString(M.Headline))
-            .ColorAndOpacity(BreakerUI::TextPrimary)
-            .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), BreakerDebriefHeadlinePixels))
-    ];
-    Column->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
-    [
-        SNew(STextBlock)
-            .Text(M.AreaName)
-            .ColorAndOpacity(BreakerUI::TextSecondary)
-            .Font(BreakerBodyFont(BreakerUI::TypeBody, false))
-    ];
-
-    Column->AddSlot().AutoHeight().Padding(0.0f, BreakerDebriefGroupGap, 0.0f, BreakerUI::Space8)
-    [
-        SNew(SBox).HeightOverride(1.0f)[ BreakerDebriefSolid(BreakerUI::BorderRest) ]
-    ];
-
+    // ---- The haul ----------------------------------------------------------
+    // Where the deployment card prints the area level, this prints what the
+    // run paid, on the same gold rail.
+    TSharedRef<SVerticalBox> Haul = SNew(SVerticalBox);
     if (M.IsEmptyHanded())
     {
         // SAID PLAINLY. An empty box reads as a broken screen; a sentence reads
         // as a run that paid nothing, which is what happened.
-        Column->AddSlot().AutoHeight()
+        Haul->AddSlot().AutoHeight()
         [
             SNew(STextBlock)
                 .Text(FText::FromString(TEXT("NOTHING CAME BACK WITH YOU")))
@@ -173,14 +137,14 @@ TSharedRef<SWidget> SBreakerMenu::BuildRiftDebriefScreen()
     }
     for (const BreakerRiftDebrief::FLine& Line : M.Highlights)
     {
-        Column->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)
+        Haul->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)
         [
             BreakerDebriefRow(Line)
         ];
     }
     if (M.MoreCount > 0)
     {
-        Column->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+        Haul->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
         [
             SNew(STextBlock)
                 .Text(FText::FromString(FString::Printf(TEXT("AND %d MORE IN YOUR PACK"), M.MoreCount)))
@@ -188,20 +152,45 @@ TSharedRef<SWidget> SBreakerMenu::BuildRiftDebriefScreen()
                 .Font(BreakerBodyFont(BreakerUI::TypeCaption, true))
         ];
     }
+    const TSharedRef<SWidget> HaulBlock = SBreakerLoadingScreen::MakeRailedBlock(
+        SNew(SBox).WidthOverride(BreakerDebriefHaulWidth)[Haul]);
 
-    Column->AddSlot().AutoHeight().Padding(0.0f, BreakerDebriefGroupGap, 0.0f, BreakerUI::Space8)
+    // ---- The stat row ------------------------------------------------------
+    // The two totals, in the deployment card's own readout shape.
+    TArray<TPair<FString, FString>> Stats;
+    Stats.Emplace(FString(TEXT("RIFTGLASS")), FString::FromInt(M.Riftglass));
+    Stats.Emplace(FString(TEXT("EXPERIENCE")), FString::FromInt(M.Experience));
+    const TSharedRef<SWidget> StatRow = SBreakerLoadingScreen::MakeStatRow(Stats);
+
+    // ---- The lattice -------------------------------------------------------
+    // The same pulse the deployment card breathes under OPENING THE RIFT; the
+    // stage words are set here the way UBreakerGameInstance sets its own.
+    const TSharedRef<SBreakerRiftLattice> Lattice = SNew(SBreakerRiftLattice);
+    Lattice->SetStage(FText::FromString(BreakerStrings::Get(EBreakerStringKey::LoadingStageClosing)));
+
+    // ---- The content block -------------------------------------------------
+    // Kicker, headline over area name beside the haul, the stat row, the
+    // lattice — the deployment card's order, slot for slot — then the verb.
+    TSharedRef<SVerticalBox> Content = SNew(SVerticalBox);
+    Content->AddSlot().AutoHeight()
     [
-        SNew(SBox).HeightOverride(1.0f)[ BreakerDebriefSolid(BreakerUI::BorderRest) ]
+        BreakerMonoText(FText::FromString(M.TierKicker), 11, BreakerUI::TextMuted, 0.22f)
     ];
-    Column->AddSlot().AutoHeight()
+    Content->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
     [
         SNew(SHorizontalBox)
-        + SHorizontalBox::Slot().AutoWidth()[ BreakerDebriefTotal(TEXT("RIFTGLASS"), M.Riftglass) ]
-        + SHorizontalBox::Slot().AutoWidth().Padding(BreakerDebriefGroupGap, 0.0f, 0.0f, 0.0f)
-          [ BreakerDebriefTotal(TEXT("EXPERIENCE"), M.Experience) ]
+        + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Top)
+        [
+            SBreakerLoadingScreen::MakeHeadline(M.Headline, M.AreaName)
+        ]
+        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top).Padding(BreakerUI::Space40, 0.0f, 0.0f, 0.0f)
+        [
+            HaulBlock
+        ]
     ];
-
-    Column->AddSlot().AutoHeight().Padding(0.0f, BreakerDebriefVerbGap, 0.0f, 0.0f)
+    Content->AddSlot().AutoHeight().Padding(0.0f, 56.0f, 0.0f, 0.0f)[StatRow];
+    Content->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space40, 0.0f, 0.0f)[Lattice];
+    Content->AddSlot().AutoHeight().Padding(0.0f, BreakerDebriefVerbGap, 0.0f, 0.0f)
     [
         SNew(SBox).WidthOverride(BreakerDebriefVerbWidth)
         [
@@ -210,29 +199,24 @@ TSharedRef<SWidget> SBreakerMenu::BuildRiftDebriefScreen()
         ]
     ];
 
-    // THE SCRIM AND THE CENTRED COLUMN, exactly as the death beat wraps its
-    // own. The first capture returned the bare column and the host stretched
-    // it: the kicker started off the left edge and CONTINUE ran the full
-    // width of a 1920 screen. A screen is not a column; it is a column placed.
-    return SNew(SOverlay)
-        + SOverlay::Slot()
-        [
-            BreakerDebriefSolid(BreakerUI::Alpha(BreakerUI::BgVoid, 0.72f))   // O2 PLACEHOLDER
-        ]
-        + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(BreakerDebriefVerbGap)
-        [
-            SNew(SBox).WidthOverride(BreakerDebriefColumnWidth)
-            [
-                Column
-            ]
-        ];
+    // THE CARD, not a scrim. The first draft laid a column over the live world
+    // and the owner read it as a different screen from the one he liked; the
+    // frame is the deployment card's own — opaque, ruled, badged, crawling.
+    return SBreakerLoadingScreen::MakeCardFrame(Content, Lattice->GetCrawl());
 }
 
 FReply SBreakerMenu::CloseRiftDebrief()
 {
-    // BACK TO THE WORLD, not to a menu. The pawn under this screen is alive and
-    // standing in a rift that is now closed; the exit offer is its own beat and
-    // this screen must not stand in front of it.
+    // BACK TO WHERE YOU ENTERED FROM. The pawn under this screen is standing in
+    // a rift that is now closed, and CONTINUE is the whole of the way out: the
+    // game mode's ReturnFromRift is the one travel path for a closed rift, the
+    // same shape the local map's travel rows use. Travel FIRST, resume second —
+    // travel is legal while the menu holds the pause, and resuming first would
+    // unpause a world that is about to be torn down by the level change.
+    if (!Character.IsValid()) return FReply::Handled();
+    UWorld* World = Character->GetWorld();
+    ABreakerGameMode* Mode = World ? World->GetAuthGameMode<ABreakerGameMode>() : nullptr;
+    if (Mode) Mode->ReturnFromRift(Character.Get());
     if (Character.IsValid()) Character->ResumeFromMenu();
     return FReply::Handled();
 }

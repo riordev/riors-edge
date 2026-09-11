@@ -2,9 +2,11 @@
 #include "Combat/BreakerCombatComponent.h"
 
 #include "Abilities/BreakerAbilityDefinition.h"
+#include "Combat/BreakerEnemy.h"
 #include "Game/BreakerGameMode.h"
 #include "Game/BreakerRiftDefinition.h"
 #include "Items/BreakerEquipmentComponent.h"
+#include "Items/BreakerLootLibrary.h"
 #include "Progression/BreakerCoreWheelMath.h"
 #include "Progression/BreakerRiftRewardMath.h"
 #include "Save/BreakerAccountSave.h"
@@ -154,6 +156,57 @@ void UBreakerProgressionComponent::HandleRiftCompleted(const FBreakerRiftDefinit
     if (!GetOwner() || GetOwner() != Player) return;
 
     const int32 AreaLevel = Rift.EffectiveAreaLevel();
+
+    // THE FORCED DROPS, before the first-clear gate — every completion, not
+    // just the first. Owner: "give you at least two forced drops that are
+    // decent". O168 pays on the event; these two items are the floor of what a
+    // closed rift is worth, and unlike the purse below they are not the
+    // ladder's pay, so a re-clear earns them too. They roll at the TOP of the
+    // band the briefing printed (GetDropItemLevelRange, the same call, the
+    // same elite bonus — read from the enemy's authored default, never
+    // restated) so the guaranteed item is the best item level the rift could
+    // have dropped, at the elite floor if that level unlocks it. Straight to
+    // the backpack, not the floor: AddToBackpack broadcasts OnItemAcquired, so
+    // the run ledger lists them and the debrief can stop saying nothing came
+    // back. The seed is (rift, area level, index): a completion is
+    // reproducible in a bug report rather than a different pair every time.
+    int32 BandMin = 1;
+    int32 BandMax = 1;
+    UBreakerRiftLibrary::GetDropItemLevelRange(AreaLevel,
+        GetDefault<ABreakerEnemy>()->GetEliteDropItemLevelBonus(), BandMin, BandMax);
+    const EBreakerItemRarity ForcedRarity = BreakerRiftReward::CompletionRarity(BandMax, FBreakerDropTableParams{});
+    if (UBreakerEquipmentComponent* Equipment = GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>())
+    {
+        // A paid grant, not a refusable entry (One-AB): the rift was cleared,
+        // so the item lands even past the cap rather than being destroyed —
+        // the same rule the quest turn-in follows. Loud when that happens,
+        // because a backpack past its cap is the pre-payment check this site
+        // owes and did not run.
+        const int32 Held = Equipment->GetBackpack().Num();
+        if (Held >= UBreakerEquipmentComponent::BackpackCapacity)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[BreakerProgression] rift complete (AL %d): backpack holds %d of %d — the %d completion item(s) land past the cap (One-AB: a paid grant is never destroyed)."),
+                AreaLevel, Held, UBreakerEquipmentComponent::BackpackCapacity, BreakerRiftReward::CompletionItemCount);
+        }
+        for (int32 Index = 0; Index < BreakerRiftReward::CompletionItemCount; ++Index)
+        {
+            const int32 Seed = HashCombine(GetTypeHash(Rift.AreaName.ToString()), AreaLevel * 7919 + Index);
+            const EBreakerEquipSlot Slot = UBreakerLootLibrary::RollDropSlot(Seed);
+            const FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(TEXT("RiftCompletion"), Slot, ForcedRarity, BandMax, Seed);
+            if (!Equipment->AddToBackpack(Item))
+            {
+                UE_LOG(LogTemp, Warning, TEXT("[BreakerProgression] rift complete (AL %d): completion item %d of %d NOT granted — the equipment component refused the add."),
+                    AreaLevel, Index + 1, BreakerRiftReward::CompletionItemCount);
+            }
+        }
+        UE_LOG(LogTemp, Display, TEXT("[BreakerProgression] rift complete (%s, AL %d): %d forced item(s) at item level %d, rarity floor %d (O168; \"at least two forced drops that are decent\")."),
+            *Rift.AreaName.ToString(), AreaLevel, BreakerRiftReward::CompletionItemCount, BandMax, static_cast<int32>(ForcedRarity));
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[BreakerProgression] rift complete (AL %d): no equipment component holds the backpack — %d completion item(s) NOT granted."),
+            AreaLevel, BreakerRiftReward::CompletionItemCount);
+    }
 
     // One-AA: A FIRST CLEAR PAYS THE LADDER, A RE-CLEAR PAYS THE LOOT. The
     // completion purse is the ladder's pay, so it lands only when this

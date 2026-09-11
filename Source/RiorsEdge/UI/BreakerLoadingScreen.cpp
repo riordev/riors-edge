@@ -99,10 +99,12 @@ FBreakerDeploymentBriefing SBreakerLoadingScreen::MakeBriefing(const FBreakerRif
     return Briefing;
 }
 
-void SBreakerLoadingScreen::Construct(const FArguments& InArgs)
-{
-    const FBreakerDeploymentBriefing& Briefing = InArgs._Briefing;
+// ===========================================================================
+// SBreakerRiftLattice
+// ===========================================================================
 
+void SBreakerRiftLattice::Construct(const FArguments&)
+{
     // The crawl fill is sized from the viewport ONCE, at construction — the
     // derived-width rule; the widget lives seconds, so a mid-beat resize is
     // not a case worth a re-layout path.
@@ -156,137 +158,12 @@ void SBreakerLoadingScreen::Construct(const FArguments& InArgs)
             ]
         ];
 
-    // ---- The level block ---------------------------------------------------
-    // 3px gold rail on the block's edge, the area level at the display scale
-    // in reward gold, the item-level range under it. Numbers ride the mono
-    // role's Medium — the closest weight the pack's own family carries to the
-    // spec's mono 700.
-    const TSharedRef<SWidget> LevelBlock = SNew(SHorizontalBox)
-        + SHorizontalBox::Slot().AutoWidth()
-        [
-            SNew(SBox).WidthOverride(BreakerUI::RailThickness)[BreakerDeploySolid(BreakerUI::Gold)]
-        ]
-        + SHorizontalBox::Slot().AutoWidth().Padding(28.0f, 0.0f, 0.0f, 0.0f)
-        [
-            SNew(SVerticalBox)
-            + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right)
-            [
-                BreakerMonoText(FText::FromString(BreakerStrings::Get(EBreakerStringKey::LoadingAreaLevel)), BreakerUI::TypeCaption,
-                    BreakerUI::TextMuted, 0.16f)
-            ]
-            + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right)
-            [
-                SNew(STextBlock)
-                    .Text(FText::AsNumber(Briefing.AreaLevel))
-                    .ColorAndOpacity(BreakerUI::Gold)
-                    .Font(BreakerMonoFont(BreakerDeployNamePixels, 0.0f, /*bMedium=*/true))
-            ]
-            + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right)
-            [
-                BreakerMonoText(FText::FromString(BreakerStrings::Format(EBreakerStringKey::LoadingItemLevel,
-                    Briefing.ItemLevelMin, Briefing.ItemLevelMax)), 12, BreakerUI::TextSecondary, 0.16f)
-            ]
-            // WHAT YOU ARE BRINGING, directly under what the area drops, so
-            // the comparison is made by the layout rather than by the player.
-            // Harm-coloured only when it is a whole tier of gear behind: a
-            // warning that fires on every deployment is not read.
-            + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right)
-            [
-                BreakerMonoText(FText::FromString(Briefing.ReadinessLine), 12,
-                    Briefing.ReadinessLine.Contains(TEXT("UNDER")) ? BreakerUI::Harm : BreakerUI::TextMuted, 0.16f)
-            ]
-        ];
-
-    // ---- The stat row ------------------------------------------------------
-    // Three readouts split by 1px dividers. The third is O123's field: always
-    // present, only the value moves.
-    auto MakeStat = [](const FString& Caption, const FString& Value) -> TSharedRef<SWidget>
-    {
-        return SNew(SVerticalBox)
-            + SVerticalBox::Slot().AutoHeight()
-            [
-                BreakerMonoText(FText::FromString(Caption), BreakerUI::TypeCaption, BreakerUI::TextMuted, 0.16f)
-            ]
-            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
-            [
-                BreakerMonoText(FText::FromString(Value), BreakerUI::TypeBody, BreakerUI::TextPrimary, 0.0f)
-            ];
-    };
-    auto MakeStatDivider = []() -> TSharedRef<SWidget>
-    {
-        return SNew(SBox).WidthOverride(BreakerUI::BorderThin).Padding(0.0f)
-        [
-            BreakerDeploySolid(BreakerUI::BorderRest)
-        ];
-    };
-    const TSharedRef<SWidget> StatRow = SNew(SHorizontalBox)
-        + SHorizontalBox::Slot().AutoWidth()
-        [
-            MakeStat(BreakerStrings::Get(EBreakerStringKey::LoadingStatMonsterHealth),
-                BreakerStrings::Format(EBreakerStringKey::LoadingStatMultiplier, Briefing.HealthMultiplier))
-        ]
-        + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space24, 0.0f)[MakeStatDivider()]
-        + SHorizontalBox::Slot().AutoWidth()
-        [
-            MakeStat(BreakerStrings::Get(EBreakerStringKey::LoadingStatMonsterDamage),
-                BreakerStrings::Format(EBreakerStringKey::LoadingStatMultiplier, Briefing.DamageMultiplier))
-        ]
-        + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space24, 0.0f)[MakeStatDivider()]
-        + SHorizontalBox::Slot().AutoWidth()
-        [
-            MakeStat(BreakerStrings::Get(EBreakerStringKey::LoadingStatDeaths), Briefing.DeathAllowance)
-        ];
-
-    // ---- The content block -------------------------------------------------
-    TSharedRef<SVerticalBox> Content = SNew(SVerticalBox);
-    Content->AddSlot().AutoHeight()
-    [
-        BreakerMonoText(FText::FromString(Briefing.TierKicker), 11, BreakerUI::TextMuted, 0.22f)
-    ];
-    Content->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
-    [
-        SNew(SHorizontalBox)
-        + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Top)
-        [
-            SNew(SVerticalBox)
-            + SVerticalBox::Slot().AutoHeight()
-            [
-                // WRAPPED at the name column's derived width — the content
-                // block minus the level block and the gap. The spec's own
-                // 0.92 line height is the tell that long names are MEANT to
-                // break: the first capture photographed "FERNHALL SU" clipped
-                // against the level rail instead.
-                SNew(STextBlock)
-                    .Text(FText::FromString(Briefing.AreaName.ToString().ToUpper()))
-                    .ColorAndOpacity(BreakerUI::TextPrimary)
-                    .WrapTextAt(BreakerDeployContentWidth - 320.0f)
-                    .LineHeightPercentage(0.92f)
-                    .Font(BreakerDisplayFont(BreakerDeployNamePixels, /*bHeavy=*/true))
-            ]
-            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
-            [
-                SNew(STextBlock)
-                    .Text(Briefing.AreaLine)
-                    .ColorAndOpacity(BreakerUI::TextSecondary)
-                    .WrapTextAt(760.0f)
-                    .Font(BreakerBodyFont(BreakerDeployLinePixels))
-            ]
-        ]
-        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top).Padding(BreakerUI::Space40, 0.0f, 0.0f, 0.0f)
-        [
-            LevelBlock
-        ]
-    ];
-    Content->AddSlot().AutoHeight().Padding(0.0f, 56.0f, 0.0f, 0.0f)[StatRow];
-    Content->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space40, 0.0f, 0.0f)[Lattice];
-    Content->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)[StageRow];
-
     // ---- The crawl ---------------------------------------------------------
     SAssignNew(CrawlFill, SBox).WidthOverride(CrawlFillWidth).HeightOverride(BreakerCrawlHeight)
     [
         BreakerDeploySolid(BreakerUI::Orange)
     ];
-    const TSharedRef<SWidget> Crawl = SNew(SBox).HeightOverride(BreakerCrawlHeight)
+    Crawl = SNew(SBox).HeightOverride(BreakerCrawlHeight)
         .Clipping(EWidgetClipping::ClipToBounds)
     [
         SNew(SOverlay)
@@ -296,38 +173,15 @@ void SBreakerLoadingScreen::Construct(const FArguments& InArgs)
 
     ChildSlot
     [
-        SNew(SOverlay)
-        + SOverlay::Slot()[BreakerDeploySolid(BreakerUI::BgBase)]
-        // The top edge: a 2px rule, full bleed.
-        + SOverlay::Slot().VAlign(VAlign_Top)
-        [
-            SNew(SBox).HeightOverride(2.0f)[BreakerDeploySolid(BreakerUI::BorderRest)]
-        ]
-        // The corner identity: the breakers mark and its caption.
-        + SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top)
-            .Padding(BreakerDeployMargin, 80.0f, 0.0f, 0.0f)
-        [
-            SNew(SHorizontalBox)
-            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-            [
-                BreakerMark(TEXT("/Game/Breaker/UI/Marks/T_InsigniaBreakers.T_InsigniaBreakers"), 34.0f)
-            ]
-            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(18.0f, 0.0f, 0.0f, 0.0f)
-            [
-                BreakerMonoText(FText::FromString(BreakerStrings::Get(EBreakerStringKey::LoadingInsignia)), 11, BreakerUI::TextMuted, 0.22f)
-            ]
-        ]
-        + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
-        [
-            SNew(SBox).WidthOverride(BreakerDeployContentWidth)[Content]
-        ]
-        + SOverlay::Slot().VAlign(VAlign_Bottom)[Crawl]
+        SNew(SVerticalBox)
+        + SVerticalBox::Slot().AutoHeight()[Lattice]
+        + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)[StageRow]
     ];
 
-    RegisterActiveTimer(0.0f, FWidgetActiveTimerDelegate::CreateSP(this, &SBreakerLoadingScreen::Animate));
+    RegisterActiveTimer(0.0f, FWidgetActiveTimerDelegate::CreateSP(this, &SBreakerRiftLattice::Animate));
 }
 
-void SBreakerLoadingScreen::SetStage(const FText& StageWords)
+void SBreakerRiftLattice::SetStage(const FText& StageWords)
 {
     if (StageText.IsValid())
     {
@@ -335,7 +189,7 @@ void SBreakerLoadingScreen::SetStage(const FText& StageWords)
     }
 }
 
-EActiveTimerReturnType SBreakerLoadingScreen::Animate(double CurrentTime, float)
+EActiveTimerReturnType SBreakerRiftLattice::Animate(double CurrentTime, float)
 {
     if (StartSeconds <= 0.0) StartSeconds = CurrentTime;
     const float Elapsed = static_cast<float>(CurrentTime - StartSeconds);
@@ -369,4 +223,199 @@ EActiveTimerReturnType SBreakerLoadingScreen::Animate(double CurrentTime, float)
             FSlateRenderTransform(FVector2D(Offset, 0.0f))));
     }
     return EActiveTimerReturnType::Continue;
+}
+
+// ===========================================================================
+// SBreakerLoadingScreen — the card's builders, then the deployment card
+// ===========================================================================
+
+TSharedRef<SWidget> SBreakerLoadingScreen::MakeCardFrame(TSharedRef<SWidget> Content, TSharedRef<SWidget> Crawl)
+{
+    return SNew(SOverlay)
+        + SOverlay::Slot()[BreakerDeploySolid(BreakerUI::BgBase)]
+        // The top edge: a 2px rule, full bleed.
+        + SOverlay::Slot().VAlign(VAlign_Top)
+        [
+            SNew(SBox).HeightOverride(2.0f)[BreakerDeploySolid(BreakerUI::BorderRest)]
+        ]
+        // The corner identity: the breakers mark and its caption.
+        + SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top)
+            .Padding(BreakerDeployMargin, 80.0f, 0.0f, 0.0f)
+        [
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+            [
+                BreakerMark(TEXT("/Game/Breaker/UI/Marks/T_InsigniaBreakers.T_InsigniaBreakers"), 34.0f)
+            ]
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(18.0f, 0.0f, 0.0f, 0.0f)
+            [
+                BreakerMonoText(FText::FromString(BreakerStrings::Get(EBreakerStringKey::LoadingInsignia)), 11, BreakerUI::TextMuted, 0.22f)
+            ]
+        ]
+        + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+        [
+            SNew(SBox).WidthOverride(BreakerDeployContentWidth)[Content]
+        ]
+        + SOverlay::Slot().VAlign(VAlign_Bottom)[Crawl];
+}
+
+TSharedRef<SWidget> SBreakerLoadingScreen::MakeHeadline(const FString& Name, const FText& Line)
+{
+    return SNew(SVerticalBox)
+        + SVerticalBox::Slot().AutoHeight()
+        [
+            // WRAPPED at the name column's derived width — the content
+            // block minus the side block and the gap. The spec's own
+            // 0.92 line height is the tell that long names are MEANT to
+            // break: the first capture photographed "FERNHALL SU" clipped
+            // against the level rail instead.
+            SNew(STextBlock)
+                .Text(FText::FromString(Name.ToUpper()))
+                .ColorAndOpacity(BreakerUI::TextPrimary)
+                .WrapTextAt(BreakerDeployContentWidth - 320.0f)
+                .LineHeightPercentage(0.92f)
+                .Font(BreakerDisplayFont(BreakerDeployNamePixels, /*bHeavy=*/true))
+        ]
+        + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
+        [
+            SNew(STextBlock)
+                .Text(Line)
+                .ColorAndOpacity(BreakerUI::TextSecondary)
+                .WrapTextAt(760.0f)
+                .Font(BreakerBodyFont(BreakerDeployLinePixels))
+        ];
+}
+
+TSharedRef<SWidget> SBreakerLoadingScreen::MakeRailedBlock(TSharedRef<SWidget> Body)
+{
+    // 3px gold rail on the block's edge, the body beside it.
+    return SNew(SHorizontalBox)
+        + SHorizontalBox::Slot().AutoWidth()
+        [
+            SNew(SBox).WidthOverride(BreakerUI::RailThickness)[BreakerDeploySolid(BreakerUI::Gold)]
+        ]
+        + SHorizontalBox::Slot().AutoWidth().Padding(28.0f, 0.0f, 0.0f, 0.0f)
+        [
+            Body
+        ];
+}
+
+TSharedRef<SWidget> SBreakerLoadingScreen::MakeStatRow(const TArray<TPair<FString, FString>>& Stats)
+{
+    // Readouts split by 1px dividers.
+    auto MakeStat = [](const FString& Caption, const FString& Value) -> TSharedRef<SWidget>
+    {
+        return SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight()
+            [
+                BreakerMonoText(FText::FromString(Caption), BreakerUI::TypeCaption, BreakerUI::TextMuted, 0.16f)
+            ]
+            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+            [
+                BreakerMonoText(FText::FromString(Value), BreakerUI::TypeBody, BreakerUI::TextPrimary, 0.0f)
+            ];
+    };
+    auto MakeStatDivider = []() -> TSharedRef<SWidget>
+    {
+        return SNew(SBox).WidthOverride(BreakerUI::BorderThin).Padding(0.0f)
+        [
+            BreakerDeploySolid(BreakerUI::BorderRest)
+        ];
+    };
+    TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
+    for (int32 Index = 0; Index < Stats.Num(); ++Index)
+    {
+        if (Index > 0)
+        {
+            Row->AddSlot().AutoWidth().Padding(BreakerUI::Space24, 0.0f)[MakeStatDivider()];
+        }
+        Row->AddSlot().AutoWidth()[MakeStat(Stats[Index].Key, Stats[Index].Value)];
+    }
+    return Row;
+}
+
+void SBreakerLoadingScreen::Construct(const FArguments& InArgs)
+{
+    const FBreakerDeploymentBriefing& Briefing = InArgs._Briefing;
+
+    // ---- The level block ---------------------------------------------------
+    // The area level at the display scale in reward gold, the item-level
+    // range under it, on the gold rail. Numbers ride the mono role's Medium —
+    // the closest weight the pack's own family carries to the spec's mono 700.
+    const TSharedRef<SWidget> LevelBlock = MakeRailedBlock(
+        SNew(SVerticalBox)
+        + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right)
+        [
+            BreakerMonoText(FText::FromString(BreakerStrings::Get(EBreakerStringKey::LoadingAreaLevel)), BreakerUI::TypeCaption,
+                BreakerUI::TextMuted, 0.16f)
+        ]
+        + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right)
+        [
+            SNew(STextBlock)
+                .Text(FText::AsNumber(Briefing.AreaLevel))
+                .ColorAndOpacity(BreakerUI::Gold)
+                .Font(BreakerMonoFont(BreakerDeployNamePixels, 0.0f, /*bMedium=*/true))
+        ]
+        + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right)
+        [
+            BreakerMonoText(FText::FromString(BreakerStrings::Format(EBreakerStringKey::LoadingItemLevel,
+                Briefing.ItemLevelMin, Briefing.ItemLevelMax)), 12, BreakerUI::TextSecondary, 0.16f)
+        ]
+        // WHAT YOU ARE BRINGING, directly under what the area drops, so
+        // the comparison is made by the layout rather than by the player.
+        // Harm-coloured only when it is a whole tier of gear behind: a
+        // warning that fires on every deployment is not read.
+        + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right)
+        [
+            BreakerMonoText(FText::FromString(Briefing.ReadinessLine), 12,
+                Briefing.ReadinessLine.Contains(TEXT("UNDER")) ? BreakerUI::Harm : BreakerUI::TextMuted, 0.16f)
+        ]);
+
+    // ---- The stat row ------------------------------------------------------
+    // Three readouts. The third is O123's field: always present, only the
+    // value moves.
+    TArray<TPair<FString, FString>> Stats;
+    Stats.Emplace(BreakerStrings::Get(EBreakerStringKey::LoadingStatMonsterHealth),
+        BreakerStrings::Format(EBreakerStringKey::LoadingStatMultiplier, Briefing.HealthMultiplier));
+    Stats.Emplace(BreakerStrings::Get(EBreakerStringKey::LoadingStatMonsterDamage),
+        BreakerStrings::Format(EBreakerStringKey::LoadingStatMultiplier, Briefing.DamageMultiplier));
+    Stats.Emplace(BreakerStrings::Get(EBreakerStringKey::LoadingStatDeaths), Briefing.DeathAllowance);
+    const TSharedRef<SWidget> StatRow = MakeStatRow(Stats);
+
+    // ---- The content block -------------------------------------------------
+    TSharedRef<SVerticalBox> Content = SNew(SVerticalBox);
+    Content->AddSlot().AutoHeight()
+    [
+        BreakerMonoText(FText::FromString(Briefing.TierKicker), 11, BreakerUI::TextMuted, 0.22f)
+    ];
+    Content->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
+    [
+        SNew(SHorizontalBox)
+        + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Top)
+        [
+            MakeHeadline(Briefing.AreaName.ToString(), Briefing.AreaLine)
+        ]
+        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top).Padding(BreakerUI::Space40, 0.0f, 0.0f, 0.0f)
+        [
+            LevelBlock
+        ]
+    ];
+    Content->AddSlot().AutoHeight().Padding(0.0f, 56.0f, 0.0f, 0.0f)[StatRow];
+    Content->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space40, 0.0f, 0.0f)
+    [
+        SAssignNew(Lattice, SBreakerRiftLattice)
+    ];
+
+    ChildSlot
+    [
+        MakeCardFrame(Content, Lattice->GetCrawl())
+    ];
+}
+
+void SBreakerLoadingScreen::SetStage(const FText& StageWords)
+{
+    if (Lattice.IsValid())
+    {
+        Lattice->SetStage(StageWords);
+    }
 }

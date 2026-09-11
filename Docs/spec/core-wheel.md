@@ -32,7 +32,7 @@ Each line below: gateway; lane A; lane B; lane C if major; links if major; conve
 
 ## Ability
 
-**Arc (major)**: Prime +8% Increased Ability Damage; Channel +6% Increased Ability Damage/rank -> Widen +15% Ability Area; Vent +4 Added Ability Power/rank -> Reach +25% Increased Ability Damage; Anchor +6% Ability Area/rank -> Persistence +20% zone/window duration; Recycle +3 Added Ability Power, Spillover +8% Ability Area; Overflow1.26x More ability damage; Detonation zones no longer tick, pay whole remaining damage on expiry (no sustained pressure).
+**Arc (major)**: Prime +8% Increased Ability Damage; Channel +6% Increased Ability Damage/rank -> Widen +25% Ability Area; Vent +4 Added Ability Power/rank -> Reach +25% Increased Ability Damage; Anchor +12% Ability Area/rank -> Persistence +20% zone/window duration; Recycle +3 Added Ability Power, Spillover +15% Ability Area; Overflow1.26x More ability damage; Detonation zones no longer tick, pay whole remaining damage on expiry (no sustained pressure).
 
 **Tempo (major)**: Metronome +6% cast rate; Quicken +4% cast rate/rank -> Reset +15% Increased Ability Damage; Recovery +5% cooldown recovery/rank -> Second Wind -12% ability cost; Flow +4% channel rate/rank -> Cascade +12% cooldown recovery and cast rate; Prep -8% ability cost, Follow Through +5% cast rate; Overclock cooldown recovery bonus also applies half-value to cast/channel rate; Conduction no ability cooldown, FORFEIT each cast raises next cast cost40%, decaying over5s.
 

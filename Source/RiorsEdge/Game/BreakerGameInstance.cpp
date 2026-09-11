@@ -1,4 +1,5 @@
 #include "Game/BreakerGameInstance.h"
+#include "Data/BreakerStrings.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Characters/BreakerCharacter.h"
 #include "Game/BreakerPrototypeDestinations.h"
@@ -235,7 +236,7 @@ void UBreakerGameInstance::BeginTravel(FName MapName)
             PendingRift, EliteBonus, UBreakerRiftLibrary::SoloEndgameDeathBudget, PlayerItemLevel);
 
         TSharedRef<SBreakerLoadingScreen> Pane = SNew(SBreakerLoadingScreen).Briefing(Briefing);
-        Pane->SetStage(FText::FromString(TEXT("OPENING THE RIFT")));
+        Pane->SetStage(FText::FromString(BreakerStrings::Get(EBreakerStringKey::LoadingStageOpening)));
         if (!AddCover(Pane))
         {
             // Headless: no window to put a cover on.
@@ -344,7 +345,7 @@ void UBreakerGameInstance::HandlePostLoadMap(UWorld* LoadedWorld)
     // through the gate.
     if (DeployScreen.IsValid())
     {
-        DeployScreen->SetStage(FText::FromString(TEXT("ON SITE")));
+        DeployScreen->SetStage(FText::FromString(BreakerStrings::Get(EBreakerStringKey::LoadingStageOnSite)));
     }
     BeginReveal();
 }
