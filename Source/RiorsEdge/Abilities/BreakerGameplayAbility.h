@@ -59,6 +59,18 @@ public:
     // Unmake makes every Caster ability free for its duration (Class-Kits §2.2).
     // CheckCost and ApplyCost both read through this, so there is exactly one
     // answer to "what does this cost right now".
+    // WHAT COLOUR THIS ABILITY DRAWS IN THE WORLD (O179: colour by VERB, never
+    // by class or slot; the ultimate slot is violet whatever its verb).
+    //
+    // Every ability used to hand-pick a token at its own draw site, and three
+    // of them picked wrong: Cleave's swing, Siphon's beam and Resonance's
+    // detonation were all painted BreakerUI::Cyan, which is a literal alias of
+    // VerbMove — the MOVEMENT colour — on a weapon, a leech and an explosion.
+    // The HUD has read the verb table for its ability rails since O179; this is
+    // the same table, reachable from the world draw, so the tile on the HUD and
+    // the effect in the world cannot disagree about what an ability is.
+    UFUNCTION(BlueprintPure, Category="Abilities") FLinearColor GetPresentationColor() const;
+
     UFUNCTION(BlueprintPure, Category="Abilities") float GetResourceCost() const;
     virtual float GetUnmodifiedResourceCost() const;
     virtual float GetAuthoredResourceCost() const;

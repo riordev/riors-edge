@@ -220,6 +220,7 @@ void UBreakerAbility_Unmake::BeginCascadeListening(UWorld* World, ABreakerCharac
     if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World))
     {
         const FVector Lift(0.0f, 0.0f, 60.0f);
+        const FLinearColor CascadePaint = GetPresentationColor();
         FVector Previous = Character->GetActorLocation() + Lift;
         BreakerFX::FEffectTiming LegTiming;
         LegTiming.DurationSeconds = 0.45f;
@@ -232,8 +233,12 @@ void UBreakerAbility_Unmake::BeginCascadeListening(UWorld* World, ABreakerCharac
             if (!LegTarget) continue;
             const FVector Next = LegTarget->GetActorLocation() + Lift;
             const float Delay = 0.08f * LegIndex;
-            Effects->AddStroke(Previous, Next, 4.0f, BreakerUI::Cyan, 2.4f, LegTiming, Delay);
-            Effects->AddGlow(Next, 30.0f, BreakerUI::Cyan, 2.4f, LegTiming, Delay);
+            // THE CHAIN IS THE ULTIMATE'S OWN COLOUR. It was Cyan — the movement
+            // verb — so the loudest thing a Caster can do painted itself the
+            // colour of a dash, on a board where every other violet mark means
+            // "an ultimate is happening".
+            Effects->AddStroke(Previous, Next, 4.0f, CascadePaint, 2.4f, LegTiming, Delay);
+            Effects->AddGlow(Next, 30.0f, CascadePaint, 2.4f, LegTiming, Delay);
             Previous = Next;
             ++LegIndex;
         }
@@ -388,12 +393,12 @@ void UBreakerAbility_Unmake::ActivateAbility(const FGameplayAbilitySpecHandle Ha
         BurstTiming.DurationSeconds = 0.55f;
         BurstTiming.FadeInSeconds = 0.02f;
         BurstTiming.FadeOutSeconds = 0.40f;
-        Effects->AddGlow(Feet, 70.0f, BreakerUI::Violet, 3.6f, BurstTiming);
-        Effects->AddBlinkLight(Centre, 650.0f, BreakerUI::Violet, 3600.0f, BurstTiming);
+        Effects->AddGlow(Feet, 70.0f, GetPresentationColor(), 3.6f, BurstTiming);
+        Effects->AddBlinkLight(Centre, 650.0f, GetPresentationColor(), 3600.0f, BurstTiming);
         for (int32 Index = 0; Index < 6; ++Index)
         {
             const FVector Out = FRotator(0.0f, 60.0f * Index, 0.0f).Vector();
-            Effects->AddStroke(Feet + Out * 40.0f, Feet + Out * 150.0f, 4.5f, BreakerUI::Violet, 2.8f, BurstTiming, 0.03f * Index);
+            Effects->AddStroke(Feet + Out * 40.0f, Feet + Out * 150.0f, 4.5f, GetPresentationColor(), 2.8f, BurstTiming, 0.03f * Index);
         }
     }
 

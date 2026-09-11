@@ -211,9 +211,9 @@ void UBreakerAbility_CadenceBreak::ActivateAbility(const FGameplayAbilitySpecHan
             SnapTiming.DurationSeconds = 0.20f;
             SnapTiming.FadeInSeconds = 0.0f;
             SnapTiming.FadeOutSeconds = 0.15f;
-            Effects->AddGlow(Chest + Aim * 55.0f, 26.0f, BreakerUI::Orange, 3.4f, SnapTiming);
+            Effects->AddGlow(Chest + Aim * 55.0f, 26.0f, GetPresentationColor(), 3.4f, SnapTiming);
             Effects->AddStroke(Chest + Aim * 40.0f + Side * 30.0f - FVector(0.0f, 0.0f, 25.0f),
-                Chest + Aim * 70.0f - Side * 30.0f + FVector(0.0f, 0.0f, 25.0f), 4.0f, BreakerUI::Orange, 2.8f, SnapTiming);
+                Chest + Aim * 70.0f - Side * 30.0f + FVector(0.0f, 0.0f, 25.0f), 4.0f, GetPresentationColor(), 2.8f, SnapTiming);
         }
     }
 

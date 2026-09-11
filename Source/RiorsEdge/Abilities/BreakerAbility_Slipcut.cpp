@@ -193,11 +193,11 @@ void UBreakerAbility_Slipcut::ActivateAbility(const FGameplayAbilitySpecHandle H
             SnapTiming.DurationSeconds = 0.22f;
             SnapTiming.FadeInSeconds = 0.0f;
             SnapTiming.FadeOutSeconds = 0.16f;
-            Effects->AddGlow(Chest + Aim * 60.0f, 30.0f, BreakerUI::Orange, 3.0f, SnapTiming);
+            Effects->AddGlow(Chest + Aim * 60.0f, 30.0f, GetPresentationColor(), 3.0f, SnapTiming);
             // Two short rails bracketing the aim line: the cadence opening.
             const FVector Side = FVector::CrossProduct(Aim, FVector::UpVector).GetSafeNormal();
-            Effects->AddStroke(Chest + Side * 35.0f + Aim * 20.0f, Chest + Side * 25.0f + Aim * 110.0f, 3.5f, BreakerUI::Orange, 2.6f, SnapTiming);
-            Effects->AddStroke(Chest - Side * 35.0f + Aim * 20.0f, Chest - Side * 25.0f + Aim * 110.0f, 3.5f, BreakerUI::Orange, 2.6f, SnapTiming);
+            Effects->AddStroke(Chest + Side * 35.0f + Aim * 20.0f, Chest + Side * 25.0f + Aim * 110.0f, 3.5f, GetPresentationColor(), 2.6f, SnapTiming);
+            Effects->AddStroke(Chest - Side * 35.0f + Aim * 20.0f, Chest - Side * 25.0f + Aim * 110.0f, 3.5f, GetPresentationColor(), 2.6f, SnapTiming);
         }
     }
 

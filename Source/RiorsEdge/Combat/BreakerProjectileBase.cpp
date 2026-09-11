@@ -1,4 +1,7 @@
 #include "Combat/BreakerProjectileBase.h"
+#include "UI/BreakerEffectMath.h"
+#include "UI/BreakerEffectMomentMath.h"
+#include "UI/BreakerEffectRenderer.h"
 #include "Combat/BreakerStatusCycleComponent.h"
 
 #include "Combat/BreakerCombatComponent.h"
@@ -250,6 +253,43 @@ void ABreakerProjectileBase::MulticastImpactCosmetics_Implementation(const FVect
 
 void ABreakerProjectileBase::PlayImpactCosmetics(const FVector& Location)
 {
-    // Nothing by default. The delegate above is the hook; a subclass overrides
-    // this when it needs to change itself rather than notify someone else.
+    // A ROUND THAT LANDS MAKES A MARK. Owner: "adding some minor visual effects
+    // for each of them is super important". This body was empty, so Fracture's
+    // orb — the ability's whole visible existence — simply stopped existing on
+    // contact: no flash, no debris, nothing to tell a player the shot arrived
+    // rather than expired.
+    //
+    // IN THE ORB'S OWN COLOUR, which already carries the status it is delivering
+    // (SetOrbColor tints it per carried tag), so a Bleed round and a Rot round
+    // do not land identically.
+    UWorld* World = GetWorld();
+    if (!World) return;
+    ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World);
+    if (!Effects) return;
+
+    const FVector Forward = GetVelocity().GetSafeNormal();
+    Effects->PlayMoment(EBreakerEffectMoment::Impact, Location,
+        Forward.IsNearlyZero() ? FVector::UpVector : -Forward, OrbColor);
+
+    BreakerFX::FEffectTiming Burst;
+    Burst.DurationSeconds = 0.20f;     // O2 PLACEHOLDER
+    Burst.FadeInSeconds = 0.0f;        // an impact is a hard edge, not a swell
+    Burst.FadeOutSeconds = 0.16f;
+    Effects->AddGlow(Location, 26.0f, OrbColor, 3.4f, Burst);
+    Effects->AddBlinkLight(Location, 280.0f, OrbColor, 1600.0f, Burst);
+
+    // Four splinters away from the surface. Short, thin and staggered by a
+    // frame each, so the mark has a direction instead of being a dot.
+    BreakerFX::FEffectTiming Splinter = Burst;
+    Splinter.DurationSeconds = 0.16f;
+    const FVector Out = Forward.IsNearlyZero() ? FVector::UpVector : -Forward;
+    const FVector Side = FVector::CrossProduct(Out, FVector::UpVector).GetSafeNormal();
+    const FVector Up = FVector::CrossProduct(Side, Out).GetSafeNormal();
+    const FVector Spread[4] = { Side, -Side, Up, -Up };
+    for (int32 Index = 0; Index < 4; ++Index)
+    {
+        const FVector Direction = (Out * 0.55f + Spread[Index] * 0.85f).GetSafeNormal();
+        Effects->AddStroke(Location + Direction * 12.0f, Location + Direction * 62.0f,
+            2.5f, OrbColor, 2.4f, Splinter, 0.015f * Index);
+    }
 }

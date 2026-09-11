@@ -174,8 +174,8 @@ void UBreakerAbility_Resonance::ActivateAbility(const FGameplayAbilitySpecHandle
         BreakerFX::FEffectTiming BurstTiming;
         BurstTiming.DurationSeconds = 0.35f;
         BurstTiming.FadeOutSeconds = 0.28f;
-        Effects->AddGlow(BurstCenter, BurstRadius, BreakerUI::Cyan, 4.5f, BurstTiming);
-        Effects->AddBlinkLight(BurstCenter, 300.0f + 120.0f * Counted, BreakerUI::Cyan,
+        Effects->AddGlow(BurstCenter, BurstRadius, GetPresentationColor(), 4.5f, BurstTiming);
+        Effects->AddBlinkLight(BurstCenter, 300.0f + 120.0f * Counted, GetPresentationColor(),
             2000.0f + 1200.0f * Counted, BurstTiming);
     }
 

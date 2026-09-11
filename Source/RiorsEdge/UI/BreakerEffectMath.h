@@ -127,6 +127,47 @@ namespace BreakerFX
         OutB = ArcVertex(Origin, Forward, ArcDegrees, RangeCm, Index + 1, Count);
     }
 
+    // --- The swept BLADE ----------------------------------------------------
+    // Owner, on Cleave: "it's just a blue line that goes across your screen".
+    // It was: eight chords on the OUTER RIM only, at one radius, drawn at
+    // ActorLocation + 60 cm — within centimetres of the first-person camera. A
+    // 120-degree arc at six and a half metres seen from its own centre, at eye
+    // height, IS a line across the screen; there was nothing else to see
+    // because the sweep had no interior and no thickness in depth.
+    //
+    // The blade is three arcs at different radii on one origin, so the swing
+    // has a near edge and a far edge and reads as a fan passing THROUGH the
+    // world rather than a fence popping up in it. Fractions rather than
+    // authored distances: an Edge-widened cleave grows all three together, and
+    // a shorter weapon shrinks them, with nothing to keep in step by hand.
+    //
+    // WHY THREE. Four is the stroke budget talking: the pool holds 48 and a
+    // live zone rim is 16 of them, so a sweep is allowed 24 and three rings of
+    // eight is exactly that with none left over for a second cleave mid-air.
+    constexpr int32 SweptArcRings = 3;                              // O2 PLACEHOLDER
+    inline float SweptArcRingFraction(int32 Ring)
+    {
+        // Not evenly spaced: the outer edge is the one that says how far the
+        // swing reaches, so it keeps its own ring and the inner two crowd
+        // toward it rather than filling the middle evenly.
+        constexpr float Fractions[SweptArcRings] = { 0.42f, 0.74f, 1.0f };   // O2 PLACEHOLDER
+        return Fractions[FMath::Clamp(Ring, 0, SweptArcRings - 1)];
+    }
+    // The inner rings are thinner and shorter-lived: an afterimage behind the
+    // edge, not three edges.
+    inline float SweptArcRingThickness(int32 Ring, float EdgeThicknessCm)
+    {
+        constexpr float Scale[SweptArcRings] = { 0.45f, 0.7f, 1.0f };        // O2 PLACEHOLDER
+        return EdgeThicknessCm * Scale[FMath::Clamp(Ring, 0, SweptArcRings - 1)];
+    }
+    // And they arrive a little before the edge does, so the swing has a
+    // direction in TIME as well as in angle.
+    inline float SweptArcRingDelay(int32 Ring, float SweepSeconds)
+    {
+        constexpr float Lead[SweptArcRings] = { 0.0f, 0.35f, 0.7f };         // O2 PLACEHOLDER
+        return SweepSeconds * Lead[FMath::Clamp(Ring, 0, SweptArcRings - 1)] * 0.25f;
+    }
+
     // --- What colour a status is --------------------------------------------
     // The tint a carried status lends the thing carrying it (Fracture's
     // round). Total: an unmapped tag keeps the projectile's shipped violet

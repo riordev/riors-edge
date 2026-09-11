@@ -6,6 +6,7 @@
 #include "Abilities/BreakerMeleeSweep.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
+#include "Components/CapsuleComponent.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerDamageLibrary.h"
 #include "Combat/BreakerStatusComponent.h"
@@ -15,6 +16,7 @@
 #include "Progression/BreakerProgressionLibrary.h"
 #include "TimerManager.h"
 #include "UI/BreakerEffectRenderer.h"
+#include "UI/BreakerEffectMomentMath.h"
 #include "UI/BreakerUIStyle.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Weapons/BreakerWeaponDefinition.h"
@@ -191,20 +193,64 @@ void UBreakerAbility_Cleave::ActivateAbility(const FGameplayAbilitySpecHandle Ha
     // (Server-only ability, cosmetic call — see BreakerEffectRenderer.h.)
     if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World))
     {
-        const FVector ArcOrigin = Params.Origin + FVector(0.0f, 0.0f, 60.0f);
+        // ON THE GROUND, NOT AT THE EYE. Params.Origin is the capsule centre
+        // and the old +60 cm put the arc within a few centimetres of the
+        // first-person camera: a horizontal arc drawn at eye height, seen from
+        // its own centre, PROJECTS TO A HORIZONTAL LINE no matter how much
+        // geometry it has. That is the whole of "a blue line that goes across
+        // your screen", and dropping it to the chest only moves the line down.
+        //
+        // At the feet the same arc is seen from above, so it reads as what it
+        // is: a fan opening across the floor in front of you. This is also
+        // O179's camera law — a self-anchored draw sits at the feet, off the
+        // axis of the one camera guaranteed to be standing in it.
+        const float FeetDrop = Character->GetCapsuleComponent()
+            ? Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 88.0f;
+        const FVector ArcOrigin = Params.Origin - FVector(0.0f, 0.0f, FeetDrop - 8.0f);
+        const FLinearColor Paint = GetPresentationColor();
         BreakerFX::FEffectTiming SwingTiming;
         SwingTiming.DurationSeconds = 0.22f;
         SwingTiming.FadeInSeconds = 0.02f;
         SwingTiming.FadeOutSeconds = 0.12f;
         const float SweepSeconds = 0.16f;
-        for (int32 Index = 0; Index < BreakerFX::SweptArcStrokes; ++Index)
+        for (int32 Ring = 0; Ring < BreakerFX::SweptArcRings; ++Ring)
         {
-            FVector A, B;
-            BreakerFX::ArcStroke(ArcOrigin, Params.Forward, Params.ArcDegrees, Params.RangeCm,
-                Index, BreakerFX::SweptArcStrokes, A, B);
-            Effects->AddStroke(A, B, 6.0f, BreakerUI::Cyan, 3.0f, SwingTiming,
-                SweepSeconds * Index / BreakerFX::SweptArcStrokes);
+            const float Radius = Params.RangeCm * BreakerFX::SweptArcRingFraction(Ring);
+            const float Thickness = BreakerFX::SweptArcRingThickness(Ring, 7.0f);
+            // The near rings live a little shorter, so what is left at the end
+            // of the swing is the edge and not a stack of three.
+            BreakerFX::FEffectTiming RingTiming = SwingTiming;
+            RingTiming.DurationSeconds = SwingTiming.DurationSeconds * (0.7f + 0.15f * Ring);
+            for (int32 Index = 0; Index < BreakerFX::SweptArcStrokes; ++Index)
+            {
+                FVector A, B;
+                BreakerFX::ArcStroke(ArcOrigin, Params.Forward, Params.ArcDegrees, Radius,
+                    Index, BreakerFX::SweptArcStrokes, A, B);
+                Effects->AddStroke(A, B, Thickness, Paint, 3.0f, RingTiming,
+                    BreakerFX::SweptArcRingDelay(Ring, SweepSeconds)
+                        + SweepSeconds * Index / BreakerFX::SweptArcStrokes);
+            }
         }
+        // AND THE FAN HAS RIBS. Four spokes from the inner ring out to the
+        // edge, swept in the same left-to-right order as the arcs: without
+        // them three concentric arcs are three lines, and with them the swing
+        // is one shape that opens.
+        for (int32 Spoke = 0; Spoke <= 4; ++Spoke)
+        {
+            const FVector Inner = BreakerFX::ArcVertex(ArcOrigin, Params.Forward, Params.ArcDegrees,
+                Params.RangeCm * BreakerFX::SweptArcRingFraction(0), Spoke * 2, BreakerFX::SweptArcStrokes);
+            const FVector Outer = BreakerFX::ArcVertex(ArcOrigin, Params.Forward, Params.ArcDegrees,
+                Params.RangeCm, Spoke * 2, BreakerFX::SweptArcStrokes);
+            Effects->AddStroke(Inner, Outer, 3.0f, Paint, 2.2f, SwingTiming,
+                SweepSeconds * (Spoke * 2) / BreakerFX::SweptArcStrokes);
+        }
+
+        // AND THE SWING STARTS SOMEWHERE. A flash at the caster's own shoulder
+        // on the leading edge: the cast moment the renderer has carried since
+        // it was written and which nothing in the project has ever called.
+        Effects->PlayMoment(EBreakerEffectMoment::Cast,
+            Params.Origin + Params.Forward.RotateAngleAxis(-Params.ArcDegrees * 0.5f, FVector::UpVector) * 70.0f,
+            Params.Forward, Paint);
     }
 
     int32 TargetIndex = 0;

@@ -22,7 +22,8 @@ namespace
     // brighter one plus a blink light where they truly arrived, so a sweep-
     // shortened blink reads honestly. All figures O2 PLACEHOLDER.
     // (Server-only ability, cosmetic call — see BreakerEffectRenderer.h.)
-    void BreakerClosequarterBlinkCosmetics(UWorld* World, const FVector& Departure, const FVector& Arrival)
+    void BreakerClosequarterBlinkCosmetics(UWorld* World, const FVector& Departure, const FVector& Arrival,
+        const FLinearColor& Paint)
     {
         ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World);
         if (!Effects) return;
@@ -30,12 +31,12 @@ namespace
         BreakerFX::FEffectTiming DepartTiming;
         DepartTiming.DurationSeconds = 0.22f;
         DepartTiming.FadeOutSeconds = 0.18f;
-        Effects->AddGlow(Departure + Lift, 45.0f, BreakerUI::Cyan, 2.2f, DepartTiming);
+        Effects->AddGlow(Departure + Lift, 45.0f, Paint, 2.2f, DepartTiming);
         BreakerFX::FEffectTiming ArriveTiming;
         ArriveTiming.DurationSeconds = 0.30f;
         ArriveTiming.FadeOutSeconds = 0.22f;
-        Effects->AddGlow(Arrival + Lift, 60.0f, BreakerUI::Cyan, 4.0f, ArriveTiming);
-        Effects->AddBlinkLight(Arrival + Lift, 500.0f, BreakerUI::Cyan, 3000.0f, ArriveTiming);
+        Effects->AddGlow(Arrival + Lift, 60.0f, Paint, 4.0f, ArriveTiming);
+        Effects->AddBlinkLight(Arrival + Lift, 500.0f, Paint, 3000.0f, ArriveTiming);
     }
 }
 
@@ -191,7 +192,7 @@ void UBreakerAbility_Closequarter::ActivateAbility(const FGameplayAbilitySpecHan
         // The blink's two events, drawn where they truly happened — arrival
         // is read back AFTER the swept move, never from the requested
         // destination the sweep may have refused.
-        BreakerClosequarterBlinkCosmetics(World, UntargetedDeparture, Character->GetActorLocation());
+        BreakerClosequarterBlinkCosmetics(World, UntargetedDeparture, Character->GetActorLocation(), GetPresentationColor());
         // No target, no refund: the refund gate reads target health.
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
         return;
@@ -218,7 +219,7 @@ void UBreakerAbility_Closequarter::ActivateAbility(const FGameplayAbilitySpecHan
     {
         Movement->Velocity = FVector::ZeroVector;
     }
-    BreakerClosequarterBlinkCosmetics(World, Departure, Character->GetActorLocation());
+    BreakerClosequarterBlinkCosmetics(World, Departure, Character->GetActorLocation(), GetPresentationColor());
     const UBreakerProgressionComponent* TransferProgression = Character->GetProgression();
     const int32 TransferRank = TransferProgression ? TransferProgression->GetNodeRank(TEXT("Caster.Spellblade.MomentumTransfer"), EBreakerPointCurrency::DoctrinePoints) : 0;
     if (TransferRank > 0 && !Character->GetActorLocation().Equals(Departure, 1.0f)

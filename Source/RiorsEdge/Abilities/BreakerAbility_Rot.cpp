@@ -12,6 +12,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "UI/BreakerEffectMath.h"
+#include "UI/BreakerEffectMomentMath.h"
+#include "UI/BreakerEffectRenderer.h"
 
 UBreakerAbility_Rot::UBreakerAbility_Rot()
 {
@@ -99,15 +101,29 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     // above the aim point so a shallow aim that landed just under the ground
     // still finds the surface it belongs on.
     {
-        FHitResult Ground;
+        TArray<FHitResult> Ground;
         FCollisionQueryParams GroundQuery(SCENE_QUERY_STAT(BreakerRotFloor), false, Character);
         constexpr float LiftCm = 400.0f;     // O2 PLACEHOLDER
         constexpr float ReachCm = 4000.0f;   // O2 PLACEHOLDER
-        if (World->LineTraceSingleByObjectType(Ground, Center + FVector(0, 0, LiftCm),
-                Center - FVector(0, 0, ReachCm), FCollisionObjectQueryParams(ECC_WorldStatic), GroundQuery)
-            && Ground.ImpactNormal.Z >= 0.7f)
+        // EVERY SURFACE UNDER THE AIM POINT, not just the first one. The rule
+        // that picks among them is BreakerRotFloor::PickFloorZ, which is pure
+        // and tested; this is only the part that has to touch a world.
+        World->LineTraceMultiByObjectType(Ground, Center + FVector(0, 0, LiftCm),
+            Center - FVector(0, 0, ReachCm), FCollisionObjectQueryParams(ECC_WorldStatic), GroundQuery);
+        TArray<BreakerRotFloor::FProbeHit> Probe;
+        Probe.Reserve(Ground.Num());
+        for (const FHitResult& Surface : Ground)
         {
-            Center.Z = Ground.ImpactPoint.Z;
+            BreakerRotFloor::FProbeHit Entry;
+            Entry.PointZ = Surface.ImpactPoint.Z;
+            Entry.NormalZ = Surface.ImpactNormal.Z;
+            Entry.bStartPenetrating = Surface.bStartPenetrating;
+            Probe.Add(Entry);
+        }
+        float FloorZ = 0.0f;
+        if (BreakerRotFloor::PickFloorZ(Probe, FloorZ))
+        {
+            Center.Z = FloorZ;
         }
         // NO FLOOR FOUND — a void, or a world with no geometry at all — and
         // the aim point is then LEFT EXACTLY WHERE IT WAS. Moving it to the
@@ -116,6 +132,34 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
         // lands, so a fallback that relocates it broke the thing they measure.
         // It is also the wrong rule generally — this correction should only
         // ever fire on EVIDENCE of a floor, never on the absence of one.
+    }
+
+    // AND THE CAST IS VISIBLE AT THE CASTER. Rot drew NOTHING at the character
+    // — this file did not even include the renderer — so the whole ability was
+    // a disc that appeared somewhere ahead of you with no act that produced it.
+    // The moment slot, its colour law and its primitive fallback have been
+    // built since the renderer was written and nothing in the project had ever
+    // called one (O190: the Niagara asset is an ASSETS item; this ships the
+    // slot and the fallback, never the frame).
+    if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World))
+    {
+        const FVector Chest = Character->GetActorLocation() + FVector(0.0f, 0.0f, 20.0f);
+        const FVector Aim = (Center - Chest).GetSafeNormal();
+        const FLinearColor Paint = GetPresentationColor();
+        Effects->PlayMoment(EBreakerEffectMoment::Cast, Chest + Aim * 60.0f, Aim, Paint);
+        // A short fall of light from the caster's hand to the ground it lands
+        // on, so the disc has a cause and a direction.
+        BreakerFX::FEffectTiming Throw;
+        Throw.DurationSeconds = 0.26f;
+        Throw.FadeInSeconds = 0.02f;
+        Throw.FadeOutSeconds = 0.18f;
+        for (int32 Step = 0; Step < 3; ++Step)
+        {
+            const float Near = 0.18f + 0.26f * Step;
+            const float Far = Near + 0.24f;
+            Effects->AddStroke(FMath::Lerp(Chest, Center, Near), FMath::Lerp(Chest, Center, Far),
+                3.0f, Paint, 2.2f, Throw, 0.03f * Step);
+        }
     }
 
     const FGameplayTag ZoneTag = BreakerAbilityTags::Zone_Caster_Rot.GetTag();

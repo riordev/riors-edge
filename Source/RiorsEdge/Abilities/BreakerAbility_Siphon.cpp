@@ -131,7 +131,7 @@ void UBreakerAbility_Siphon::ActivateAbility(const FGameplayAbilitySpecHandle Ha
         BeamTiming.DurationSeconds = FMath::Max(0.05f, ChannelSeconds);
         BeamTiming.FadeInSeconds = 0.08f;
         BeamTiming.FadeOutSeconds = 0.15f;
-        BeamHandle = Effects->AddBeam(Character, Target, 5.0f, BreakerUI::Cyan, 2.6f, BeamTiming, 50.0f);
+        BeamHandle = Effects->AddBeam(Character, Target, 5.0f, GetPresentationColor(), 2.6f, BeamTiming, 50.0f);
     }
 
     const float Interval = FMath::Max(0.05f, TickIntervalSeconds / AbilityChannelRateMultiplierFor(Character));

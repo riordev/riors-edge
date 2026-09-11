@@ -1,4 +1,5 @@
 #include "Abilities/BreakerGameplayAbility.h"
+#include "UI/BreakerHUDMath.h"
 
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbilityComponent.h"
@@ -86,6 +87,16 @@ const UBreakerAbilityDefinition* UBreakerGameplayAbility::GetAbilityDefinition()
         return AbilityDefinition;
     }
     return UBreakerAbilityDefinition::FindFallback(FallbackAbilityId);
+}
+
+FLinearColor UBreakerGameplayAbility::GetPresentationColor() const
+{
+    const UBreakerAbilityDefinition* Definition = GetAbilityDefinition();
+    // An unsaid verb takes the resting border rather than a guess — the same
+    // answer the HUD rail gives, for the same reason.
+    return BreakerHUDMath::AbilityRailColor(
+        Definition ? Definition->Verb : EBreakerAbilityVerb::None,
+        Definition && Definition->IsUltimate());
 }
 
 float UBreakerGameplayAbility::GetResourceCost() const

@@ -102,10 +102,10 @@ void UBreakerAbility_Lead::ActivateAbility(const FGameplayAbilitySpecHandle Hand
         // player it is for (caught by the ability probe's first photograph).
         const FVector PaintSide = FVector::CrossProduct(ViewRotation.Vector(), FVector::UpVector).GetSafeNormal();
         Effects->AddStroke(ViewLocation + ViewRotation.Vector() * 90.0f + PaintSide * 25.0f - FVector(0.0f, 0.0f, 20.0f),
-            MarkPoint, 2.0f, BreakerUI::Gold, 2.6f, PaintTiming);
+            MarkPoint, 2.0f, GetPresentationColor(), 2.6f, PaintTiming);
         if (MarkedTarget.IsValid())
         {
-            Effects->AddGlow(MarkPoint, 28.0f, BreakerUI::Gold, 3.2f, PaintTiming);
+            Effects->AddGlow(MarkPoint, 28.0f, GetPresentationColor(), 3.2f, PaintTiming);
         }
     }
 

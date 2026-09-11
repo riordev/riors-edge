@@ -134,8 +134,8 @@ void UBreakerAbility_Sightline::ActivateAbility(const FGameplayAbilitySpecHandle
             // photograph's lesson, applied here by principle).
             const FVector Side = FVector::CrossProduct(Aim, FVector::UpVector).GetSafeNormal();
             Effects->AddStroke(Eye + Aim * 110.0f + Side * 25.0f - FVector(0.0f, 0.0f, 18.0f),
-                Eye + Aim * 2200.0f, 2.5f, BreakerUI::Gold, 2.8f, LineTiming);
-            Effects->AddGlow(Eye + Aim * 130.0f, 22.0f, BreakerUI::Gold, 3.0f, LineTiming);
+                Eye + Aim * 2200.0f, 2.5f, GetPresentationColor(), 2.8f, LineTiming);
+            Effects->AddGlow(Eye + Aim * 130.0f, 22.0f, GetPresentationColor(), 3.0f, LineTiming);
         }
     }
 

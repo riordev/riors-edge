@@ -137,12 +137,12 @@ void UBreakerAbility_Overdrive::ActivateAbility(const FGameplayAbilitySpecHandle
             // wash — and an ignition should light the room, not blind the
             // player igniting it. The blink light stays at the body so the
             // surroundings still answer.
-            Effects->AddGlow(Feet, 70.0f, BreakerUI::Violet, 3.6f, BurstTiming);
-            Effects->AddBlinkLight(Centre, 650.0f, BreakerUI::Violet, 3600.0f, BurstTiming);
+            Effects->AddGlow(Feet, 70.0f, GetPresentationColor(), 3.6f, BurstTiming);
+            Effects->AddBlinkLight(Centre, 650.0f, GetPresentationColor(), 3600.0f, BurstTiming);
             for (int32 Index = 0; Index < 6; ++Index)
             {
                 const FVector Out = FRotator(0.0f, 60.0f * Index, 0.0f).Vector();
-                Effects->AddStroke(Feet + Out * 40.0f, Feet + Out * 150.0f, 4.5f, BreakerUI::Violet, 2.8f, BurstTiming, 0.03f * Index);
+                Effects->AddStroke(Feet + Out * 40.0f, Feet + Out * 150.0f, 4.5f, GetPresentationColor(), 2.8f, BurstTiming, 0.03f * Index);
             }
         }
     }

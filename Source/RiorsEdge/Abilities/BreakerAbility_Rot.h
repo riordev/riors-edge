@@ -16,6 +16,61 @@ class UBreakerAttributeSet;
 // ABreakerZoneActor, because Support's Suppress, Gunsmith's Disruptor, every
 // boss telegraph and every environmental hazard need the same volume. What is
 // Rot's and only Rot's is the aim solve, the payload, and the anti-stack call.
+// ---------------------------------------------------------------------------
+// WHICH HIT IS THE FLOOR.
+//
+// Owner: "rot ... doesn't even place correctly half the time". The downward
+// probe under the aim point used to be a SINGLE-hit trace with a normal gate
+// on the one hit it returned, and that is wrong in two ways that between them
+// cover most of a yard:
+//
+//   * Aim at a wall, a pillar, a railing or a ramp and the FIRST thing under
+//     the aim point is that same surface. Its normal is not floor-like, the
+//     gate rejects it, and the correction gives up — leaving the zone on the
+//     wall's face. The floor two metres below was never looked at.
+//   * When the aim point sits exactly ON a vertical face, the probe starts
+//     inside that geometry. A trace that starts penetrating reports the START
+//     POINT with an up normal, which PASSES the gate, and the zone is lifted to
+//     the top of the probe — four metres in the air. Which of the two happens
+//     is numerically decided, which is the "half the time".
+//
+// So the rule is: walk the hits from the top down, ignore anything that starts
+// penetrating, and take the first surface flat enough to stand on. No floor in
+// the list leaves the aim point exactly where it was — four ability fixtures
+// cast Rot in empty worlds and assert where the zone lands, and a correction
+// that fires on the ABSENCE of evidence is the wrong rule anyway.
+// ---------------------------------------------------------------------------
+namespace BreakerRotFloor
+{
+    // The floor-ness gate. A ramp at 45 degrees has a normal Z of 0.707, so
+    // this admits every walkable slope and no wall. O2 PLACEHOLDER.
+    inline constexpr float MinimumFloorNormalZ = 0.7f;
+
+    struct FProbeHit
+    {
+        float PointZ = 0.0f;
+        float NormalZ = 0.0f;
+        // True when the trace began inside this geometry. Such a hit reports
+        // the trace's own start and an invented up normal; it is evidence of
+        // nothing.
+        bool bStartPenetrating = false;
+    };
+
+    // Returns true and writes the floor height when one of the hits is a floor.
+    // Hits are expected in trace order, which is top-down.
+    inline bool PickFloorZ(TArrayView<const FProbeHit> Hits, float& OutZ)
+    {
+        for (const FProbeHit& Hit : Hits)
+        {
+            if (Hit.bStartPenetrating) continue;
+            if (Hit.NormalZ < MinimumFloorNormalZ) continue;
+            OutZ = Hit.PointZ;
+            return true;
+        }
+        return false;
+    }
+}
+
 UCLASS()
 class RIORSEDGE_API UBreakerAbility_Rot : public UBreakerCasterAbility
 {

@@ -135,15 +135,15 @@ void UBreakerAbility_HardStop::ActivateAbility(const FGameplayAbilitySpecHandle 
             PlantTiming.DurationSeconds = 0.30f;
             PlantTiming.FadeInSeconds = 0.0f;
             PlantTiming.FadeOutSeconds = 0.22f;
-            Effects->AddGlow(Feet, 55.0f, BreakerUI::Cyan, 3.2f, PlantTiming);
-            Effects->AddBlinkLight(Feet + FVector(0.0f, 0.0f, 40.0f), 420.0f, BreakerUI::Cyan, 2400.0f, PlantTiming);
+            Effects->AddGlow(Feet, 55.0f, GetPresentationColor(), 3.2f, PlantTiming);
+            Effects->AddBlinkLight(Feet + FVector(0.0f, 0.0f, 40.0f), 420.0f, GetPresentationColor(), 2400.0f, PlantTiming);
             // Four short strokes bracing outward at the compass points: the
             // stance planting, read from above or the side.
             for (int32 Index = 0; Index < 4; ++Index)
             {
                 const float Yaw = 90.0f * Index + 45.0f;
                 const FVector Out = FRotator(0.0f, Yaw, 0.0f).Vector();
-                Effects->AddStroke(Feet + Out * 25.0f, Feet + Out * 85.0f, 4.0f, BreakerUI::Cyan, 2.4f, PlantTiming);
+                Effects->AddStroke(Feet + Out * 25.0f, Feet + Out * 85.0f, 4.0f, GetPresentationColor(), 2.4f, PlantTiming);
             }
         }
     }
