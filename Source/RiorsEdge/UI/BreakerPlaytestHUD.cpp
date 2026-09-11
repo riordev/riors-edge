@@ -148,7 +148,7 @@ namespace BreakerHUD
     // Derived from the window rather than set beside it, so the two cannot
     // drift back apart.
     static constexpr float DamageDoTLifetime = BreakerDamageFeed::MinimumDoTLifetime;
-    // Longer than a crit's 1.1 s: the kill is the one number worth reading
+    // Longer than a crit's 1.2 s: the kill is the one number worth reading
     // after the fight moves on.
     static constexpr float DamageKillLifetime = 1.25f;   // O2 PLACEHOLDER
     // Two non-DoT numbers born this close together on DIFFERENT targets are
@@ -163,10 +163,8 @@ namespace BreakerHUD
     static constexpr float DamageMagnitudeReference = 1000.0f;
     static constexpr float DamageMagnitudeGainPerDecade = 0.05f;
     static constexpr float DamageMagnitudeScaleCap = 1.15f;
-    // The pop's peak: how far over its resting size a number swells before
-    // the settle. Crits and kills pop harder than body hits. O2 PLACEHOLDER.
-    static constexpr float DamagePopScale = 1.15f;
-    static constexpr float DamageCritPopScale = 1.4f;
+    // The snap-in's peaks are BreakerUI::DamagePopScale / DamageCritPopScale,
+    // beside DamageKillScale, where the test that pins them can see them.
 
     // The banners' holds, ins, out and rectangles are BreakerBannerQueue's
     // (04-death-banners). The label and title sizes on the plate. O2 PLACEHOLDER.
@@ -433,6 +431,9 @@ void ABreakerPlaytestHUD::DrawHUD()
     DrawCrosshair(Center, S(CrosshairGapPx), AdsBlend);
     // Hit, kill and weak-point marks over the ticks, on the arrival clock.
     DrawCrosshairMarks(Center);
+    // Where the damage the player is TAKING came from: harm arcs outside the
+    // ticks, one per source, on the camera-relative bearing.
+    DrawHitTells(Center);
 
     // --- Bottom-left: what the player IS ---------------------------------
     DrawVitals(Character);
@@ -1555,18 +1556,24 @@ void ABreakerPlaytestHUD::DrawQuestLine(const ABreakerCharacter* Character)
     }
     if (bHaveTarget)
     {
-        const FString Direction = FString::Printf(TEXT("%s · %dm"), *MapTarget.Label.ToString(),
-            FMath::RoundToInt(FVector::Dist2D(Character->GetActorLocation(), MapTarget.Location) / 100));
+        // THE DISTANCE, NOT THE TRACKER (owner, playtest 2026-09-11: "the
+        // giant tracker ... is in the way"). The beat lines above already name
+        // the objective, so under them the figure alone is the read; only a
+        // manually tracked marker, which nothing above names, keeps its label.
+        // Muted and a step smaller than the beat line: it qualifies the beat.
+        // Not gold — gold is the reward lane (O179) and a distance is not one.
+        const FString Direction = BreakerHUDMath::FormatTrackerDistance(MapTarget.Label.ToString(),
+            static_cast<float>(FVector::Dist2D(Character->GetActorLocation(), MapTarget.Location)), MapTarget.bObjective);
         // +46 is two pitches and the 2 px breath the played layout has under
         // them; a taller stack keeps that same breath. O2 PLACEHOLDER.
-        DrawSpecTextRight(Direction, Right, FMath::Max(S(BreakerUI::HudQuestLineTop + 46), Y + S(2.0f)), BreakerUI::Gold,
-            FitSpecPixels(Direction, BreakerUI::HudQuestLinePixels, Limit, 11.0f));
+        DrawSpecTextRight(Direction, Right, FMath::Max(S(BreakerUI::HudQuestLineTop + 46), Y + S(2.0f)), BreakerUI::TextMuted,
+            FitSpecPixels(Direction, BreakerUI::HudQuestDistancePixels, Limit, 11.0f));
     }
 }
 
 // --------------------------------------------------------------------------
-// Floating damage numbers. The timeline is the sheet's (pop, settle, rise,
-// fade; a crit holds longer) through BreakerHUDMath::DamageNumberFrame; the
+// Floating damage numbers. The timeline (snap in at the peak, settle, hold,
+// rise, fade; a crit holds longer) is BreakerHUDMath::DamageNumberFrame; the
 // sizes are the play measurements (O207); crit is weapon orange and gold is
 // the weak-point promise (O208). Clusters stack instead of overlapping, and
 // the fourth number in one cluster is dropped rather than drawn.
@@ -1630,12 +1637,12 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
         // than its parent. Colour separates KIND, size separates WEIGHT.
         FLinearColor Face = BreakerUI::TextSecondary;
         float SizePixels = BreakerUI::DamageBodyPixels;
-        float PopScale = BreakerHUD::DamagePopScale;
+        float PopScale = BreakerUI::DamagePopScale;
         if (Number->bCritical)
         {
             Face = BreakerUI::Orange;
             SizePixels = BreakerUI::DamageCritPixels;
-            PopScale = BreakerHUD::DamageCritPopScale;
+            PopScale = BreakerUI::DamageCritPopScale;
         }
         else if (Number->bWeakPoint)
         {
@@ -1662,7 +1669,7 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
         if (Number->bKilled)
         {
             SizePixels *= BreakerUI::DamageKillScale;
-            PopScale = FMath::Max(PopScale, BreakerHUD::DamageCritPopScale);
+            PopScale = FMath::Max(PopScale, BreakerUI::DamageCritPopScale);
             // A body-shot kill brightens to full white. Crit and weak-point
             // kills keep their accents — the accent is the rarer read.
             if (!Number->bCritical && !Number->bWeakPoint) Face = BreakerUI::TextPrimary;
@@ -1697,9 +1704,10 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
         const bool bAbsorbed = Number->MitigatedFraction >= BreakerUI::DamageAbsorbedThreshold;
         if (bAbsorbed) Face = BreakerUI::TextMuted;
 
-        // The timeline: pop to PopScale, settle to 1, rise easing out, fade
-        // over the last 300 ms of whatever lifetime this kind was given. A
-        // DoT tick, plain and bookkeeping, does not pop.
+        // The timeline: born AT PopScale and settling to 1, held still, then
+        // the rise easing out, and the fade over the last 300 ms of whatever
+        // lifetime this kind was given. A DoT tick, plain and bookkeeping,
+        // does not snap in.
         const BreakerHUDMath::FDamageNumberFrame Frame = BreakerHUDMath::DamageNumberFrame(
             Age, Number->Lifetime, Number->bFromDoT && !Number->bCritical && !Number->bWeakPoint ? 1.0f : PopScale);
         SizePixels *= Frame.Scale;
@@ -1734,7 +1742,7 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
         // The number is the whole label. An absorbed hit prints muted and
         // nothing under it; overkill is not printed.
         const FVector2D MainSize = MeasureSpecText(DamageText, SizePixels, ESpecFontRole::Mono);
-        const float Outline = FMath::Max(S(FMath::Max(SizePixels, 13.0f) * .05f), 1.0f);
+        const float Outline = BreakerHUDMath::DamageOutlineOffset(S(FMath::Max(SizePixels, 13.0f)));
         const float HalfWidth = MainSize.X * .5f + Outline;
         const float LabelHeight = MainSize.Y + 2 * Outline;
         const float LabelGap = S(3.0f); // O2 presentation spacing between actual glyph boxes.
@@ -2102,9 +2110,13 @@ void ABreakerPlaytestHUD::EnsureDamageBinding(const ABreakerCharacter* Character
     if (BoundCombat)
     {
         BoundCombat->OnDamageReceived.RemoveDynamic(this, &ABreakerPlaytestHUD::HandlePlayerDamageReceived);
+        BoundCombat->OnDamageTaken.RemoveDynamic(this, &ABreakerPlaytestHUD::HandlePlayerDamageTaken);
         BoundCombat->OnHitDealt.RemoveDynamic(this, &ABreakerPlaytestHUD::HandlePlayerHitDealt);
     }
     Combat->OnDamageReceived.AddDynamic(this, &ABreakerPlaytestHUD::HandlePlayerDamageReceived);
+    // The same hit again, with its instigator: OnDamageReceived cannot say
+    // where a hit came from, and the hit tell is nothing without a bearing.
+    Combat->OnDamageTaken.AddDynamic(this, &ABreakerPlaytestHUD::HandlePlayerDamageTaken);
     // EVERY damage the player deals, not just the ones a gun dealt. Owner:
     // "there is no damage indicators for anything but bullet damage" — and
     // that was exactly true, because the floating numbers had a single feed,
@@ -3173,6 +3185,23 @@ void ABreakerPlaytestHUD::HandlePlayerDamageReceived(const FBreakerDamageResult&
     }
 }
 
+// THE HIT TELL'S FEED (owner, playtest 2026-09-11: "no indicator that I'm
+// taking damage from behind"). Every non-dodged hit arrives here with its
+// instigator; the bearing is taken from the CAMERA, not the pawn, because
+// the crosshair the arc sits around is the camera's. A blocked hit still
+// tells — the enemy is still there. An unattributed hit (a hazard, a test) has
+// no bearing and draws nothing; a hit the player dealt themselves is not a
+// direction worth pointing at.
+void ABreakerPlaytestHUD::HandlePlayerDamageTaken(const FBreakerHitContext& Context)
+{
+    const AActor* Source = Context.Instigator;
+    if (!Source || Source == GetOwningPawn()) return;
+    if (!PlayerOwner || !PlayerOwner->PlayerCameraManager) return;
+    const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    const FVector CameraLocation = PlayerOwner->PlayerCameraManager->GetCameraLocation();
+    BreakerHUDMath::HitTellsOnHit(HitTells, BreakerHUDMath::HitWorldYaw(CameraLocation, Source->GetActorLocation()), Now);
+}
+
 void ABreakerPlaytestHUD::DrawDefenseFeedback(const FVector2D& Center)
 {
     const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
@@ -3375,6 +3404,46 @@ float ABreakerPlaytestHUD::DrawStatusReadout(const ABreakerCharacter* Character,
     return BottomY - (RowBottom + RowGap);
 }
 
+// --------------------------------------------------------------------------
+// The hit tells: one harm arc per source, HudHitTellRadius out from the
+// crosshair — outside the tips of the fully spread ticks — on the bearing the
+// hit came from RELATIVE TO THE CAMERA THIS FRAME, so turning toward the
+// enemy swings its arc to the top. Each fades over HudHitTellSeconds. The arc
+// is a segmented polyline, the ADS ring's idiom: the system has no arc
+// primitive. Under -BreakerCaptureHUD one tell is forced at 180° — dead
+// behind — because nothing in a headless run can hit the player, and behind
+// is the case the owner could not read.
+// --------------------------------------------------------------------------
+void ABreakerPlaytestHUD::DrawHitTells(const FVector2D& Center)
+{
+    const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    const float CameraYaw = PlayerOwner && PlayerOwner->PlayerCameraManager
+        ? static_cast<float>(PlayerOwner->PlayerCameraManager->GetCameraRotation().Yaw) : 0.0f;
+    const float Radius = S(BreakerUI::HudHitTellRadius);
+    const float Stroke = S(BreakerUI::HudHitTellStroke);
+    constexpr int32 Segments = 8;   // O2 PLACEHOLDER
+    const auto DrawTell = [&](float ScreenDegrees, float Alpha)
+    {
+        const FLinearColor Color = BreakerUI::Alpha(BreakerUI::HudHitTell, Alpha);
+        const float Start = ScreenDegrees - BreakerUI::HudHitTellHalfAngleDegrees;
+        const float Span = 2.0f * BreakerUI::HudHitTellHalfAngleDegrees;
+        FVector2D Previous = Center + BreakerHUDMath::HitTellArcPoint(Start) * Radius;
+        for (int32 Index = 1; Index <= Segments; ++Index)
+        {
+            const FVector2D Point = Center + BreakerHUDMath::HitTellArcPoint(Start + Span * static_cast<float>(Index) / Segments) * Radius;
+            DrawLine(Previous.X, Previous.Y, Point.X, Point.Y, Color, Stroke);
+            Previous = Point;
+        }
+    };
+    for (const BreakerHUDMath::FHitTell& Tell : HitTells)
+    {
+        const float Alpha = BreakerHUDMath::HitTellAlpha(static_cast<float>(Now - Tell.Time));
+        if (Alpha <= 0.0f) continue;
+        DrawTell(BreakerHUDMath::HitTellScreenDegrees(Tell.WorldYawDegrees, CameraYaw), Alpha);
+    }
+    if (IsCapturePreview()) DrawTell(180.0f, 1.0f);
+}
+
 // ==========================================================================
 // Drawing primitives
 // ==========================================================================
@@ -3521,18 +3590,27 @@ void ABreakerPlaytestHUD::DrawSpecTextCentered(const FString& Text, float Center
     DrawSpecText(Text, CenterX - MeasureSpecText(Text, SpecPixels, FontRole).X * 0.5f, Y, Color, SpecPixels, TextAlpha, FontRole);
 }
 
-// §4: a 2px outline in a near-black tinted toward the number's own hue, so the
-// outline never reads as grey mud.
+// §4: an outline in a near-black tinted toward the number's own hue, so the
+// outline never reads as grey mud. The stroke is DamageOutlineFraction of the
+// glyph, floored at DamageOutlineMinPixels (owner, playtest 2026-09-11: "more
+// oomph" — a 1 px hairline at 18 px let the world show straight through the
+// glyph). Eight taps, the diagonals as well as the axes, so the corners of a
+// stroke that is now wider than a pixel close rather than notch.
 void ABreakerPlaytestHUD::DrawOutlinedNumber(const FString& Text, float CenterX, float Y, const FLinearColor& Face, float SpecPixels, float TextAlpha)
 {
     if (TextAlpha <= 0.0f) return;
     const float X = CenterX - MeasureSpecText(Text, SpecPixels, ESpecFontRole::Mono).X * 0.5f;
     const FLinearColor Outline(Face.R * 0.10f, Face.G * 0.10f, Face.B * 0.10f, 0.9f * TextAlpha);
-    const float Offset = FMath::Max(S(SpecPixels * 0.05f), 1.0f);
+    const float Offset = BreakerHUDMath::DamageOutlineOffset(S(SpecPixels));
+    const float Diagonal = Offset * 0.7071f;
     DrawSpecText(Text, X - Offset, Y, Outline, SpecPixels, 1.0f, ESpecFontRole::Mono);
     DrawSpecText(Text, X + Offset, Y, Outline, SpecPixels, 1.0f, ESpecFontRole::Mono);
     DrawSpecText(Text, X, Y - Offset, Outline, SpecPixels, 1.0f, ESpecFontRole::Mono);
     DrawSpecText(Text, X, Y + Offset, Outline, SpecPixels, 1.0f, ESpecFontRole::Mono);
+    DrawSpecText(Text, X - Diagonal, Y - Diagonal, Outline, SpecPixels, 1.0f, ESpecFontRole::Mono);
+    DrawSpecText(Text, X + Diagonal, Y - Diagonal, Outline, SpecPixels, 1.0f, ESpecFontRole::Mono);
+    DrawSpecText(Text, X - Diagonal, Y + Diagonal, Outline, SpecPixels, 1.0f, ESpecFontRole::Mono);
+    DrawSpecText(Text, X + Diagonal, Y + Diagonal, Outline, SpecPixels, 1.0f, ESpecFontRole::Mono);
     DrawSpecText(Text, X, Y, Face, SpecPixels, TextAlpha, ESpecFontRole::Mono);
 }
 

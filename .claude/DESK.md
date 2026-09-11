@@ -1,21 +1,38 @@
 # Desk — next playtest
 
-## Cycle — OWNER PLAYTEST, 2026-09-11 (SEVENTH) — LIVING
+## OWNER PLAYTEST, 2026-09-11 (SEVENTH) — LANDED, LIVING
 
-- [ ] "damage is super high … a lot of things one-shot my character in the
-      first rift … the second rift's boss one-shot me completely … enemies
-      should deal a lot less damage in general" — measure the shipped
-      monster damage against the character's health at AL1-AL5 and the
-      boss slam; cut against O18's time-to-die (four to five seconds bare).
-- [ ] "the skirmishers always shoot other random enemies, not the player"
-      — target selection.
-- [ ] "no indicator that I'm taking damage from behind … dying to enemies
-      in one hit because I didn't know where they were" — a directional
-      hit tell on the reticle ring.
-- [ ] "the giant tracker telling you exactly where things are doesn't need
-      to be there, it's in the way" (frame: "Breach Marshalling Yard · 77m"
-      in gold at 18px top-right). Smaller, dimmer, or the distance only.
-- [ ] "the damage numbers are kinda ugly, awkward, they need more oomph".
+- "damage is super high … one-shot my character" — MEASURED: player
+  health is 100 + gear (200 baseline; no per-level term, and ilvl 5 rolls
+  the same Health tier as ilvl 9, so under-level gear was NOT this). Trash
+  was exactly on O18's "four to five seconds bare" (4.50 s, one attacker).
+  The one-shot was the boss: rank x2 on the Warden's x1.86 on the slam's
+  x1.31 = 267 at AL5 against his 201. RULED ON HIS WORD: O18's bare
+  time-to-die is seven to eight seconds (BaseDamage 51.1 -> 30.7, ranged
+  58.4 -> 35.0) and a boss hits like its archetype, rank pays no damage
+  (x2 -> x1). Boss slam 80 at AL5; 7.5 s bare at both ends of the ladder.
+  BossHitsToDie pins: no single boss attack kills the baseline from full,
+  AL 1..50, both bosses, read off the CDOs. The re-ruled band is asserted
+  as 7-8, not widened from 4.
+- "the skirmishers always shoot other random enemies" — they never
+  targeted anything but him and never could hit an enemy (O217). The
+  round's deferred spawn re-rotated its world velocity by its own yaw at
+  FinishSpawning (engine default bInitialVelocityInLocalSpace): a shot at
+  yaw θ flew at 2θ, so only a player due east was ever hit. One line in
+  the projectile base. SkirmisherRoundFliesAtThePlayer pins it on +Y, the
+  yaw that exposes it; the old test stood on +X, the one yaw where 2θ = θ.
+- "no indicator that I'm taking damage from behind" — a harm-red arc on
+  a 60 px ring at the attacker's bearing, 0.6 s fade, merged within 20°,
+  four at most, pinned to the world yaw so it stays on the enemy as he
+  turns. PHOTOGRAPHED (the preview forces one at 180°). FOUND: a DoT tick
+  re-stamps its source's tell every tick — honest, may read as noise.
+- "the giant tracker … is in the way" — the gold "Label · 77m" under the
+  beat is a muted 12 px "77m" now; the label prints only for a marker he
+  tracked by hand on the map. The beat lines are untouched.
+- "the damage numbers need more oomph" — born at their peak (1.35x, crit
+  1.7x) and settling, a 100 ms hold before the rise, an 8-tap stroke at
+  10% of the size (min 2 px) shared by the draw and the bounds. All O2.
+  PHOTOGRAPHED.
 
 ## Cycle — OWNER PLAYTEST, 2026-09-11 (SEVENTH) — THE RIFT'S END, AGAIN
 

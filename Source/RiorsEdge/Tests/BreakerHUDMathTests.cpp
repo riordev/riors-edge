@@ -93,12 +93,110 @@ bool FBreakerHUDShippedTokensTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("The hatch is 6 of 8"), HudHatchPeriod - HudHatchStripe, 2.0f);
 
     // The damage-number timeline's numbers.
-    TestEqual(TEXT("Pop 60 ms"), MotionDamagePop, 0.06f);
+    TestEqual(TEXT("Hold 100 ms"), MotionDamageHold, 0.10f);
     TestEqual(TEXT("Settle 120 ms"), MotionDamageSettle, 0.12f);
     TestEqual(TEXT("Rise 700 ms"), MotionDamageRise, 0.70f);
     TestEqual(TEXT("Fade 300 ms"), MotionDamageFade, 0.30f);
     TestEqual(TEXT("Crit hold 400 ms"), MotionCritHold, 0.40f);
     TestEqual(TEXT("Rise 24 px"), DamageRisePixels, 24.0f);
+    // The snap-in and the stroke (owner, 2026-09-11: "more oomph").
+    TestEqual(TEXT("A number is born at 1.35"), DamagePopScale, 1.35f);
+    TestTrue(TEXT("A crit is born larger than a body hit"), DamageCritPopScale > DamagePopScale);
+    TestEqual(TEXT("The outline is a tenth of the glyph"), DamageOutlineFraction, 0.10f);
+
+    // The hit tell: harm, outside the spread ticks' tips, gone in 600 ms.
+    TestTrue(TEXT("The hit tell is harm"), HudHitTell.Equals(Harm, BreakerHUDMathTolerance));
+    TestTrue(TEXT("The hit tell clears the open crosshair"),
+        HudHitTellRadius > HudCrosshairGapSpread + HudCrosshairTickLength);
+    TestEqual(TEXT("The hit tell fades over 600 ms"), HudHitTellSeconds, 0.6f);
+
+    // The tracker's distance sits under the beat line, smaller than it.
+    TestTrue(TEXT("The distance line is smaller than the beat line"), HudQuestDistancePixels < HudQuestLinePixels);
+    return true;
+}
+
+// --------------------------------------------------------------------------
+// HUD.HitTell: where a hit came from, on the crosshair's ring.
+//
+// Owner, playtest 2026-09-11: "no indicator that I'm taking damage from
+// behind". The bearing is world yaw from the camera to the source; on screen
+// it is that yaw less the camera's, so behind is ±180 whichever way the
+// player is facing. Each tell fades over HudHitTellSeconds; a second hit
+// from the same direction refreshes the tell rather than stacking a new one,
+// and a fifth distinct direction takes the oldest's slot.
+// --------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerHUDHitTellTest,
+    "RiorsEdge.UI.HUD.HitTell",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerHUDHitTellTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerHUDMath;
+    using namespace BreakerUI;
+
+    // --- THE BEARING -----------------------------------------------------------
+    const FVector Camera = FVector::ZeroVector;
+    TestEqual(TEXT("A source at -X is behind a camera at yaw 0"),
+        HitTellScreenDegrees(HitWorldYaw(Camera, FVector(-100.0f, 0.0f, 0.0f)), 0.0f), 180.0f, BreakerHUDMathTolerance);
+    TestEqual(TEXT("A source at +Y is to the right of a camera at yaw 0"),
+        HitTellScreenDegrees(HitWorldYaw(Camera, FVector(0.0f, 100.0f, 0.0f)), 0.0f), 90.0f, BreakerHUDMathTolerance);
+    TestEqual(TEXT("A source at +X is ahead of a camera at yaw 0"),
+        HitTellScreenDegrees(HitWorldYaw(Camera, FVector(100.0f, 0.0f, 0.0f)), 0.0f), 0.0f, BreakerHUDMathTolerance);
+    TestEqual(TEXT("Turn to yaw 90 and the source at +X is on the left"),
+        HitTellScreenDegrees(HitWorldYaw(Camera, FVector(100.0f, 0.0f, 0.0f)), 90.0f), -90.0f, BreakerHUDMathTolerance);
+    TestEqual(TEXT("Height does not bend the bearing"),
+        HitWorldYaw(Camera, FVector(0.0f, 100.0f, 500.0f)), 90.0f, BreakerHUDMathTolerance);
+    // The arc's direction on the canvas, y down: ahead is up, behind is down.
+    TestTrue(TEXT("Ahead points up"), HitTellArcPoint(0.0f).Equals(FVector2D(0.0f, -1.0f), BreakerHUDMathTolerance));
+    TestTrue(TEXT("Right points right"), HitTellArcPoint(90.0f).Equals(FVector2D(1.0f, 0.0f), BreakerHUDMathTolerance));
+    TestTrue(TEXT("Behind points down"), HitTellArcPoint(180.0f).Equals(FVector2D(0.0f, 1.0f), BreakerHUDMathTolerance));
+
+    // --- THE FADE ----------------------------------------------------------------
+    TestEqual(TEXT("Full at the hit"), HitTellAlpha(0.0f), 1.0f, BreakerHUDMathTolerance);
+    TestEqual(TEXT("Half at 300 ms"), HitTellAlpha(0.3f), 0.5f, BreakerHUDMathTolerance);
+    TestEqual(TEXT("Gone at 600 ms"), HitTellAlpha(0.6f), 0.0f, BreakerHUDMathTolerance);
+    TestEqual(TEXT("Before its own time is nothing"), HitTellAlpha(-0.1f), 0.0f);
+    TestEqual(TEXT("A never-struck tell is nothing"), HitTellAlpha(static_cast<float>(10.0 - FHitTell().Time)), 0.0f);
+
+    // --- MERGE AND EVICTION ----------------------------------------------------
+    TArray<FHitTell> Tells;
+    HitTellsOnHit(Tells, 0.0f, 10.0);
+    TestEqual(TEXT("The first hit makes one tell"), Tells.Num(), 1);
+    HitTellsOnHit(Tells, 10.0f, 10.1);
+    TestEqual(TEXT("A hit 10 degrees off a live tell refreshes it"), Tells.Num(), 1);
+    TestEqual(TEXT("The refreshed tell restarts its clock"), Tells[0].Time, 10.1);
+    TestEqual(TEXT("The refreshed tell follows the source"), Tells[0].WorldYawDegrees, 10.0f);
+    HitTellsOnHit(Tells, 100.0f, 10.2);
+    HitTellsOnHit(Tells, -170.0f, 10.3);
+    HitTellsOnHit(Tells, -80.0f, 10.4);
+    TestEqual(TEXT("Four distinct bearings are four tells"), Tells.Num(), HudHitTellMax);
+    HitTellsOnHit(Tells, 45.0f, 10.5);
+    TestEqual(TEXT("A fifth bearing does not grow the array"), Tells.Num(), HudHitTellMax);
+    bool bOldestGone = true;
+    bool bNewestPresent = false;
+    for (const FHitTell& Tell : Tells)
+    {
+        if (FMath::IsNearlyEqual(Tell.WorldYawDegrees, 10.0f)) bOldestGone = false;
+        if (FMath::IsNearlyEqual(Tell.WorldYawDegrees, 45.0f) && Tell.Time == 10.5) bNewestPresent = true;
+    }
+    TestTrue(TEXT("The fifth bearing evicts the oldest"), bOldestGone);
+    TestTrue(TEXT("and takes its slot"), bNewestPresent);
+    // The merge wraps: -170 and 175 are ten degrees apart, not 345.
+    HitTellsOnHit(Tells, 175.0f, 10.6);
+    TestEqual(TEXT("A hit across the seam refreshes rather than stacks"), Tells.Num(), HudHitTellMax);
+    // A hit on a dead tell's bearing is a new tell with a fresh clock, and
+    // exactly one tell is live after it.
+    TArray<FHitTell> Stale;
+    HitTellsOnHit(Stale, 0.0f, 20.0);
+    const double Later = 20.0 + HudHitTellSeconds + 1.0;
+    HitTellsOnHit(Stale, 0.0f, Later);
+    int32 Live = 0;
+    for (const FHitTell& Tell : Stale)
+    {
+        if (HitTellAlpha(static_cast<float>(Later - Tell.Time)) > 0.0f) ++Live;
+    }
+    TestEqual(TEXT("One tell is live after a hit on a dead bearing"), Live, 1);
     return true;
 }
 
@@ -273,7 +371,7 @@ bool FBreakerHUDHarmPresentationTest::RunTest(const FString& Parameters)
 }
 
 // --------------------------------------------------------------------------
-// The damage-number timeline: pop, settle, rise, fade, the crit hold.
+// The damage-number timeline: snap in, settle, hold, rise, fade, the crit hold.
 // --------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerHUDDamageNumberTimelineTest,
@@ -287,32 +385,36 @@ bool FBreakerHUDDamageNumberTimelineTest::RunTest(const FString& Parameters)
 
     const float Plain = DamageNumberLifetime(false);
     const float Crit = DamageNumberLifetime(true);
-    TestEqual(TEXT("A plain number lives the rise"), Plain, MotionDamageRise);
-    TestEqual(TEXT("A crit holds longer"), Crit, MotionDamageRise + MotionCritHold);
+    TestEqual(TEXT("A plain number lives the hold and the rise"), Plain, MotionDamageHold + MotionDamageRise);
+    TestEqual(TEXT("A crit holds longer"), Crit, MotionDamageHold + MotionDamageRise + MotionCritHold);
 
     constexpr float PopScale = 1.4f;
     const FDamageNumberFrame Birth = DamageNumberFrame(0.0f, Plain, PopScale);
-    TestEqual(TEXT("Born at rest size"), Birth.Scale, 1.0f);
+    TestEqual(TEXT("Born at its peak"), Birth.Scale, PopScale, BreakerHUDMathTolerance);
     TestEqual(TEXT("Born at the impact"), Birth.RiseFraction, 0.0f);
     TestEqual(TEXT("Born opaque"), Birth.Alpha, 1.0f);
 
-    TestEqual(TEXT("The pop peaks at its end"), DamageNumberFrame(MotionDamagePop, Plain, PopScale).Scale, PopScale, BreakerHUDMathTolerance);
-    TestEqual(TEXT("The settle lands at rest"), DamageNumberFrame(MotionDamagePop + MotionDamageSettle, Plain, PopScale).Scale, 1.0f, BreakerHUDMathTolerance);
-    const float MidSettle = DamageNumberFrame(MotionDamagePop + MotionDamageSettle * 0.5f, Plain, PopScale).Scale;
+    TestEqual(TEXT("The settle lands at rest"), DamageNumberFrame(MotionDamageSettle, Plain, PopScale).Scale, 1.0f, BreakerHUDMathTolerance);
+    const float MidSettle = DamageNumberFrame(MotionDamageSettle * 0.5f, Plain, PopScale).Scale;
     TestTrue(TEXT("Mid-settle is between peak and rest"), MidSettle > 1.0f && MidSettle < PopScale);
+    TestTrue(TEXT("The settle eases out: most of it early"), MidSettle < (1.0f + PopScale) * 0.5f);
     TestEqual(TEXT("After the settle it stays at rest"), DamageNumberFrame(Plain * 0.5f, Plain, PopScale).Scale, 1.0f);
-    TestEqual(TEXT("A number that does not pop stays at rest"), DamageNumberFrame(MotionDamagePop, Plain, 1.0f).Scale, 1.0f);
+    TestEqual(TEXT("A number that does not pop stays at rest"), DamageNumberFrame(0.0f, Plain, 1.0f).Scale, 1.0f);
 
-    // The rise is monotonic and reaches its full travel by the rise time.
+    // The hold: no rise until MotionDamageHold, then it starts.
+    TestEqual(TEXT("Still through the hold"), DamageNumberFrame(MotionDamageHold - BreakerHUDMathTolerance, Plain, PopScale).RiseFraction, 0.0f);
+    TestTrue(TEXT("Rising after the hold"), DamageNumberFrame(MotionDamageHold + 0.05f, Plain, PopScale).RiseFraction > 0.0f);
+
+    // The rise is monotonic and reaches its full travel by hold + rise.
     float Previous = -1.0f;
-    for (float Age = 0.0f; Age <= MotionDamageRise + BreakerHUDMathTolerance; Age += 0.05f)
+    for (float Age = 0.0f; Age <= MotionDamageHold + MotionDamageRise + BreakerHUDMathTolerance; Age += 0.05f)
     {
         const float Rise = DamageNumberFrame(Age, Plain, PopScale).RiseFraction;
         TestTrue(*FString::Printf(TEXT("Rise is monotonic at %.2f"), Age), Rise >= Previous);
         Previous = Rise;
     }
-    TestEqual(TEXT("The rise completes at the rise time"), DamageNumberFrame(MotionDamageRise, Plain, PopScale).RiseFraction, 1.0f, BreakerHUDMathTolerance);
-    TestTrue(TEXT("The rise eases out: most of it early"), DamageNumberFrame(MotionDamageRise * 0.5f, Plain, PopScale).RiseFraction > 0.5f);
+    TestEqual(TEXT("The rise completes at hold + rise"), DamageNumberFrame(MotionDamageHold + MotionDamageRise, Plain, PopScale).RiseFraction, 1.0f, BreakerHUDMathTolerance);
+    TestTrue(TEXT("The rise eases out: most of it early"), DamageNumberFrame(MotionDamageHold + MotionDamageRise * 0.5f, Plain, PopScale).RiseFraction > 0.5f);
 
     // The fade owns the last 300 ms, whatever the lifetime.
     TestEqual(TEXT("Opaque until the fade"), DamageNumberFrame(Plain - MotionDamageFade, Plain, PopScale).Alpha, 1.0f);
@@ -344,6 +446,15 @@ bool FBreakerHUDCountdownTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("59.2 rounds up to the minute"), FormatCountdown(59.2f), FString(TEXT("01:00")));
     TestEqual(TEXT("Over a minute"), FormatCountdown(65.0f), FString(TEXT("01:05")));
     TestEqual(TEXT("Minutes past 59 stay minutes"), FormatCountdown(3600.0f), FString(TEXT("60:00")));
+
+    // The tracker's distance: the figure alone when the target is the beat's
+    // own objective (the beat line above already names it), the label only
+    // for a manually tracked marker nothing above names.
+    TestEqual(TEXT("The beat's objective is a bare distance"),
+        FormatTrackerDistance(TEXT("Breach Marshalling Yard"), 7700.0f, true), FString(TEXT("77m")));
+    TestEqual(TEXT("A tracked marker keeps its label"),
+        FormatTrackerDistance(TEXT("Breach Marshalling Yard"), 7700.0f, false), FString(TEXT("Breach Marshalling Yard · 77m")));
+    TestEqual(TEXT("Distance rounds to the metre"), FormatTrackerDistance(TEXT("X"), 7749.0f, true), FString(TEXT("77m")));
 
     // The swap slide.
     const FSwapSlide Start = WeaponNameSwap(0.0f);

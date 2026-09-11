@@ -64,14 +64,21 @@ struct RIORSEDGE_API FBreakerMonsterChassisParams
     // together — see BreakerRangedEnemy).
     //
     // O116 RETUNE. Was 14 with `d` at 0.055, which put time-to-die at 16.4s at
-    // area level 1 against O18's 4-5s: early content could not kill anybody,
+    // area level 1 against O18's band: early content could not kill anybody,
     // and hits-to-die then fell the whole way to the cap. Solved for TTD inside
     // the band at BOTH ends against the one authored baseline character, which
     // is what fixes the pair — anchoring on either end alone sends the other to
     // five times its target, and anchoring on the CEILING character (the bug
     // this retune was nearly built on) puts base damage 50% higher than this.
+    //
+    // O18 RE-RULED to seven-to-eight seconds bare, on the owner's word: "a lot
+    // of things would one-shot my character". 51.1 solved the old four-to-five
+    // (4.50s at level 1); this is that figure x0.6, and the same baseline (100
+    // base + four T12 Health lines = 200) at the melee cadence of 1.15s dies in
+    // 7.49s at level 1 and 7.55s at the cap. `d` did not move — the shape of
+    // the curve was never the complaint, its level was.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Chassis", meta=(ClampMin="0"))
-    float BaseDamage = 51.1f;   // O2 PLACEHOLDER
+    float BaseDamage = 30.7f;   // O2 PLACEHOLDER
 
     // g. 9% per level is x66.8 over 50 levels — Power-Curve.md's stated shape.
     // Geometric, not linear: linear scaling makes early levels identical and
@@ -123,8 +130,12 @@ struct RIORSEDGE_API FBreakerMonsterChassisParams
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Chassis|Rank", meta=(ClampMin="1"))
     float BossHealthMultiplier = 75.0f;   // O2 PLACEHOLDER (owner ruling 2026-08-16: boss HP x3, 25 -> 75; old doc band x20-40 triples with it)
 
+    // A boss's interest is its adds and phases (O27), not a bigger hit; rank
+    // pays no damage. Was 2.0, which on the Warden's x1.86 archetype and the
+    // slam's x1.31 landed a 249 slam on a 200-health baseline at area level 1
+    // — a one-shot from full. The archetype still hits like its archetype.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Chassis|Rank", meta=(ClampMin="1"))
-    float BossDamageMultiplier = 2.0f;   // O2 PLACEHOLDER
+    float BossDamageMultiplier = 1.0f;   // O2 PLACEHOLDER
 };
 
 UCLASS()

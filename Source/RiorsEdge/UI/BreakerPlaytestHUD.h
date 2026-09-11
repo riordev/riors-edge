@@ -108,6 +108,10 @@ private:
     // instantaneous results, so they have to be latched when broadcast
     // rather than polled from a persistent state.
     UFUNCTION() void HandlePlayerDamageReceived(const FBreakerDamageResult& Result);
+    // The victim-side context: the same hit, with WHO dealt it. This is the
+    // hit tell's feed — OnDamageReceived hands out a bare result and cannot
+    // say where the hit came from.
+    UFUNCTION() void HandlePlayerDamageTaken(const struct FBreakerHitContext& Context);
     UFUNCTION() void HandleLevelGained(int32 NewLevel, int32 LevelsGained);
     void EnsureProgressionBinding(const ABreakerCharacter* Character);
     // Levelling is the pause plate's (O210); the field carries only the
@@ -178,6 +182,12 @@ private:
     uint64 FrameMarkersStamp = 0;
     // The crosshair's hit / kill / weak-point marks, on the arrival clock.
     void DrawCrosshairMarks(const FVector2D& Center);
+    // The hit tells: one harm arc per source outside the crosshair, on the
+    // bearing the damage came from, swinging with the camera as the player
+    // turns. Fed by HandlePlayerDamageTaken; the arithmetic is
+    // BreakerHUDMath's.
+    void DrawHitTells(const FVector2D& Center);
+    TArray<BreakerHUDMath::FHitTell> HitTells;
     // ---- Density instruments (see DrawHUD) --------------------------------
     bool bHudStressSpawned = false;
     double HudCostWindowStart = 0.0;

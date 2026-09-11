@@ -332,6 +332,23 @@ namespace BreakerUI
     // the weapon's honest spread onto the 16→40 travel.
     inline constexpr float HudCrosshairFullSpreadDegrees = 6.0f;  // O2 PLACEHOLDER
 
+    // THE HIT TELL (owner, playtest 2026-09-11: "no indicator that I'm taking
+    // damage from behind"). One arc around the crosshair per source, on the
+    // bearing the hit came from relative to the camera, fading over
+    // HudHitTellSeconds. The radius clears the spread ticks' tips (gap 40 +
+    // tick 12 = 52) so an open crosshair never touches it. Harm, because
+    // damage arriving is the one thing that colour means. A second hit
+    // within HudHitTellMergeDegrees of a live tell refreshes it rather than
+    // stacking; past HudHitTellMax the oldest is replaced. O2 PLACEHOLDER,
+    // every number.
+    inline constexpr float HudHitTellSeconds = 0.6f;              // O2 PLACEHOLDER
+    inline constexpr float HudHitTellRadius = 60.0f;              // O2 PLACEHOLDER
+    inline constexpr float HudHitTellHalfAngleDegrees = 22.0f;    // O2 PLACEHOLDER
+    inline constexpr float HudHitTellStroke = 3.0f;               // O2 PLACEHOLDER
+    inline constexpr float HudHitTellMergeDegrees = 20.0f;        // O2 PLACEHOLDER
+    inline constexpr int32 HudHitTellMax = 4;                     // O2 PLACEHOLDER
+    inline const FLinearColor HudHitTell = Harm;
+
     // Crosshair marks: hit 80 ms, kill 200 ms, weak-point kill 320 ms.
     inline constexpr float HudHitMarkSeconds = 0.08f;         // 02-hud
     inline constexpr float HudKillMarkSeconds = 0.20f;        // 02-hud
@@ -359,6 +376,10 @@ namespace BreakerUI
     inline constexpr float HudQuestTrackerWidth = 320.0f;     // 02-hud
     inline constexpr float HudQuestLineTop = 40.0f;           // 02-hud
     inline constexpr float HudQuestLinePixels = 14.0f;        // 02-hud
+    // The distance line under the beat lines (owner, playtest 2026-09-11:
+    // "the giant tracker ... is in the way"). Smaller than the beat line it
+    // sits under: it qualifies the beat, it does not restate it.
+    inline constexpr float HudQuestDistancePixels = 12.0f;    // O2 PLACEHOLDER
 
     // The hatch: flat 135° stripes, A for 6px then B for 2px (period 8).
     inline constexpr float HudHatchPeriod = 8.0f;             // 01-tokens
@@ -406,6 +427,19 @@ namespace BreakerUI
     // Killing blows multiply whatever size their kind already earned: a kill
     // is the heaviest read of its own family, never a fourth colour.
     inline constexpr float DamageKillScale = 1.25f;    // O2 PLACEHOLDER
+    // THE SNAP-IN'S PEAK (owner, playtest 2026-09-11: "damage numbers need
+    // more oomph"). A number is BORN at this multiple of its resting size and
+    // settles down to 1 — it never swells up to it, because a 60 ms swell
+    // from rest is a frame or two the eye reads as a flicker, and a number
+    // that arrives large and shrinks reads as an impact. Crits and kills peak
+    // harder than body hits.
+    inline constexpr float DamagePopScale = 1.35f;       // O2 PLACEHOLDER
+    inline constexpr float DamageCritPopScale = 1.7f;    // O2 PLACEHOLDER
+    // The outline's stroke as a fraction of the glyph size, floored in device
+    // pixels: 1 px at 18 px was a hairline the world showed straight through.
+    // Read by the draw AND the label-bounds calculation, so the two agree.
+    inline constexpr float DamageOutlineFraction = 0.10f;   // O2 PLACEHOLDER
+    inline constexpr float DamageOutlineMinPixels = 2.0f;   // O2 PLACEHOLDER
 
     // How much of a hit has to disappear into mitigation before the number
     // says so. Below this it is ordinary armour shaving and saying so every
@@ -422,9 +456,12 @@ namespace BreakerUI
     inline constexpr float UltimateStepDownSeconds = 3.0f;
 
     // --- Motion (seconds) --------------------------------------------------
-    // The damage-number timeline (02-hud): pop 60 ms, settle 120 ms, rise
-    // 24px over 700 ms, fade over the last 300 ms; a crit holds 400 ms longer.
-    inline constexpr float MotionDamagePop = 0.06f;      // 02-hud
+    // The damage-number timeline: born at its peak and settling over 120 ms,
+    // held in place for 100 ms, then the 24px rise over 700 ms, the fade over
+    // the last 300 ms; a crit holds 400 ms longer. The hold is what lets the
+    // snap-in land before the number moves — a rise that starts at frame zero
+    // smears the impact it was meant to punctuate.
+    inline constexpr float MotionDamageHold = 0.10f;     // O2 PLACEHOLDER
     inline constexpr float MotionDamageSettle = 0.12f;   // 02-hud
     inline constexpr float MotionDamageRise = 0.70f;     // 02-hud
     inline constexpr float MotionDamageFade = 0.30f;     // 02-hud

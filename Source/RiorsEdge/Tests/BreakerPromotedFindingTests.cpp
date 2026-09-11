@@ -101,7 +101,7 @@ namespace BreakerPromotedFindingTest
     // THE BASELINE. What the one authored baseline character actually wears,
     // counted out of the shared loadout so it cannot drift from the build the
     // variance band is measured on. This is the subject of every MAGNITUDE
-    // question — TTD's 4-5s target and nothing else.
+    // question — TTD's seven-to-eight-second target and nothing else.
     float PromotedBaselineGearHealthAt(int32 ItemLevel)
     {
         return BreakerBaselineLoadout::BreakerBaselineLineCount(TEXT("Core.Health"))
@@ -334,9 +334,16 @@ bool FBreakerTimeToDieBareTest::RunTest(const FString& Parameters)
     using namespace BreakerPromotedFindingTest;
     const FBreakerMonsterChassisParams Params;
 
-    // O18: four to five seconds with no resources or sustain.
-    constexpr float TtdFloor = 4.0f;
-    constexpr float TtdCeiling = 5.0f;
+    // O18: seven to eight seconds with no resources or sustain.
+    //
+    // This is a RE-RULED band, not a widened one. The band was four to five and
+    // the chassis was solved to it (4.50s at level 1, 4.53s at the cap); the
+    // owner played it and ruled it down — "a lot of things would one-shot my
+    // character" — so both edges moved together and the floor moved with the
+    // ceiling. A band of four to eight would have kept the old chassis green,
+    // which is the widening the rules forbid.
+    constexpr float TtdFloor = 7.0f;
+    constexpr float TtdCeiling = 8.0f;
 
     for (const int32 AreaLevel : {1, 25, 50})
     {
@@ -410,6 +417,86 @@ bool FBreakerTimeToDieInvestedTest::RunTest(const FString& Parameters)
     TestTrue(*FString::Printf(TEXT("A defensive commitment buys at least %.1fx the bare figure (x%.2f)"),
         InvestedMustBeatBareBy, Invested / FMath::Max(Bare, UE_SMALL_NUMBER)),
         Invested >= Bare * InvestedMustBeatBareBy);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// NO SINGLE BOSS ATTACK KILLS THE BASELINE FROM FULL
+// ---------------------------------------------------------------------------
+// TimeToDieBare measures the trash melee attacker. The boss composes three more
+// terms on top of it — the rank row, the Warden's archetype ratio, and the
+// slam's ratio to the sweep — and none of the tests above ever multiplied them
+// out. Multiplied out at the old rank row of x2.0 they came to a 249 slam at
+// area level 1 against a 200-health baseline: the owner's "one-shot" was the
+// product of three numbers each of which looked fine alone.
+//
+// So this asserts the product. Every term is read off the shipped class default
+// object rather than transcribed, so a future archetype or slam retune is
+// caught here rather than felt. The Holdfast inherits the Field Marshal's
+// damage terms and is walked too, so a boss that later authors its own hit is
+// measured the day it does.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerDefenseCurveBossHitsToDieTest,
+    "RiorsEdge.Combat.DefenseCurve.BossHitsToDie",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerDefenseCurveBossHitsToDieTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerPromotedFindingTest;
+    const FBreakerMonsterChassisParams Params;
+
+    // Shipped configuration, against the default-constructed block. The owner
+    // ruled it: a boss hits like its archetype, rank adds no damage; and the
+    // trash base is the O18 seven-to-eight-second figure.
+    TestEqual(TEXT("Rank pays no damage: the boss damage row is exactly x1.0"),
+        Params.BossDamageMultiplier, 1.0f, 0.0001f);
+    TestEqual(TEXT("The melee trash base is the O18 seven-to-eight-second figure, 30.7"),
+        Params.BaseDamage, 30.7f, 0.0001f);
+
+    for (const ABreakerBossEnemy* Boss : { static_cast<const ABreakerBossEnemy*>(GetDefault<ABreakerBossEnemy>()),
+        static_cast<const ABreakerBossEnemy*>(GetDefault<ABreakerHoldfastEnemy>()) })
+    {
+        if (!TestNotNull(TEXT("The boss has a default object"), Boss)) continue;
+        const FString Name = Boss->GetClass()->GetName();
+        const float Archetype = Boss->GetArchetypeDamageMultiplier();
+        // The slam is the boss's heaviest single hit, authored as a ratio to
+        // the sweep the chassis output IS (GetSlamDamage = AttackDamage x this).
+        const float SlamRelativeToSweep = FMath::Max(0.0f, Boss->SlamDamageRelativeToSweep);
+
+        // No single attack from full — strictly more than one hit, at EVERY
+        // level, not a sample: the gear ladder sawtooths and the worst point
+        // is inside a tier band, not at its edge.
+        constexpr float HitsFloor = 1.0f;
+        float Worst = TNumericLimits<float>::Max();
+        int32 WorstAt = 1;
+        for (int32 AreaLevel = 1; AreaLevel <= 50; ++AreaLevel)
+        {
+            const float Sweep = UBreakerMonsterChassisLibrary::GetMonsterDamage(
+                AreaLevel, EBreakerMonsterRank::Boss, Params, Archetype);
+            const float Slam = Sweep * SlamRelativeToSweep;
+            const float Hits = PromotedEffectiveHealthAt(AreaLevel) / FMath::Max(Slam, UE_SMALL_NUMBER);
+            if (Hits < Worst) { Worst = Hits; WorstAt = AreaLevel; }
+        }
+        for (const int32 AreaLevel : {1, 5, 9, 50})
+        {
+            const float Sweep = UBreakerMonsterChassisLibrary::GetMonsterDamage(
+                AreaLevel, EBreakerMonsterRank::Boss, Params, Archetype);
+            AddInfo(FString::Printf(
+                TEXT("BOSS HITS-TO-DIE  %s area level %2d: sweep %.1f, slam %.1f against %.0f health = %.2f slams"),
+                *Name, AreaLevel, Sweep, Sweep * SlamRelativeToSweep, PromotedEffectiveHealthAt(AreaLevel),
+                PromotedEffectiveHealthAt(AreaLevel) / FMath::Max(Sweep * SlamRelativeToSweep, UE_SMALL_NUMBER)));
+        }
+        AddInfo(FString::Printf(
+            TEXT("BOSS HITS-TO-DIE  %s worst %.2f slams at area level %d (rank x%.2f, archetype x%.2f, slam x%.2f)"),
+            *Name, Worst, WorstAt,
+            UBreakerMonsterChassisLibrary::GetRankDamageMultiplier(EBreakerMonsterRank::Boss, Params),
+            Archetype, SlamRelativeToSweep));
+
+        TestTrue(*FString::Printf(
+            TEXT("No single %s attack kills the baseline from full at any level (worst %.2f slams at area level %d, floor >%.0f)"),
+            *Name, Worst, WorstAt, HitsFloor),
+            Worst > HitsFloor);
+    }
     return true;
 }
 

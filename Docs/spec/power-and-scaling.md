@@ -120,7 +120,7 @@ design; the values are the knob.
 ### The two curves
 
     MonsterHealth(AL) = BaseHealth * (1 + g)^(AL - 1) * Rank * Archetype
-    MonsterDamage(AL) = BaseDamage * (1 + d)^(AL - 1) * Rank
+    MonsterDamage(AL) = BaseDamage * (1 + d)^(AL - 1) * Rank * Archetype
     WeaponBase(ilvl)  = ArchetypeBase * (1 + w)^(ilvl - 1)
 
 `w = g`, so a baseline build's TTK is level-invariant and every felt gain comes
@@ -135,14 +135,13 @@ the two hold.
 | Constant | Value | Note |
 |---|---|---|
 | `BaseHealth` | 220 | Area level 1 is the chassis that was actually measured |
-| `BaseDamage` | 51.1 melee / 58.4 ranged | Per archetype at area level 1; the ratio is the authored thing |
+| `BaseDamage` | 30.7 melee / 35.0 ranged | Per archetype at area level 1; the ratio is the authored thing |
 | `g` health growth | 0.09 | x68 over 50 levels |
 | `d` damage growth | 0.0173 | x2.32, against what a baseline's gear buys, x2.33 |
 | `w` weapon growth | 0.09 | Equal to `g` by design, not by coincidence |
 
 Item level 1 is the anchor: the scalar is exactly 1.0 there, so the curve is
-opt-in by content rather than a silent retune of what has been played. An
-unequipped weapon is item level 1 for the same reason.
+opt-in by content, not a silent retune. An unequipped weapon is item level 1.
 
 ### Rank
 
@@ -151,12 +150,12 @@ unequipped weapon is item level 1 for the same reason.
 | Trash | x1 | x1 |
 | Veteran / elite | x3.0 | x1.5 |
 | Modifier-bearing | x2.5, +0.35 per modifier beyond the first | x1.25 |
-| Boss | x75 | x2.0 |
+| Boss | x75 | x1.0 |
 
 Ratios are derived from the targets, and a rank composes with the actor's
-archetype rather than standing alone: elite at three seconds over trash at one
-*is* a ratio of three; the boss's x75 on the Field Marshal's x0.30 is the
-**x22.5** a 21s kill needs. Against rank alone, an archetype reads as an error.
+archetype: the boss's x75 on the Field Marshal's x0.30 is the **x22.5** a 21s
+kill needs. A boss hits like its archetype and rank adds no damage: its
+interest is its adds and phases, and no boss attack kills the baseline from full.
 
 ### Targets
 
@@ -165,7 +164,7 @@ archetype rather than standing alone: elite at three seconds over trash at one
 | Trash TTK | a little under 1s, scaling exponentially with difficulty |
 | Elite TTK | ~3s |
 | Boss TTK, baseline build | 20–45s, unless a special enemy claims the exception explicitly |
-| TTD, no resources or sustain | 4–5s |
+| TTD, no resources or sustain | 7–8s; one trash melee attacker at 1.15s kills the baseline in 7.5s |
 | Optimized, and invested | substantially past the baseline figure, asserted separately |
 
 These describe a **baseline build in on-level content at archetype x1.0**; other
@@ -291,6 +290,7 @@ encounter ranks and modifiers to **content and modes**.
 | Hits-to-die does not fall, and a defensive commitment buys substantially more | `Combat.DefenseCurve.HitsToDie`, `Combat.DefenseCurve.TimeToDieInvested` |
 | Monster damage growth stays materially below health growth | `Combat.Chassis.DamageBelowHealth` |
 | Boss TTK for a baseline build lands inside its target band | `Combat.PowerCurve.BossBand` |
+| No single boss attack kills the baseline from full; the boss damage row is x1.0 | `Combat.DefenseCurve.BossHitsToDie` |
 | An optimized build kills a boss substantially faster than the baseline band | `Combat.PowerCurve.BossOptimized` |
 
 ## Open

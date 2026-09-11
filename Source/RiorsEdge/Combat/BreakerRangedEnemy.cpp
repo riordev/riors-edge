@@ -69,8 +69,10 @@ ABreakerRangedEnemy::ABreakerRangedEnemy()
     // from cover. The O116 retune raised the melee base to 51.1, and leaving
     // this at 16 would have inverted the pair to 0.31x — the ranged enemy
     // quietly becoming the safe one — without any test noticing, because
-    // nothing asserts the relationship. 51.1 x 1.143 = 58.4.
-    Chassis.BaseDamage = 58.4f;   // O2 PLACEHOLDER, carried by the projectile
+    // nothing asserts the relationship. The O18 re-rule to seven-to-eight
+    // seconds bare cut the melee base x0.6 to 30.7, and this moves with it at
+    // the same authored ratio: 30.7 x 1.143 = 35.0.
+    Chassis.BaseDamage = 35.0f;   // O2 PLACEHOLDER, carried by the projectile
     AttackRange = 0.0f;         // no contact attack — the base melee path is disabled
     AttackCooldown = 0.0f;
 

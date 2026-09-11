@@ -205,8 +205,8 @@ backlog.
 **Harm is instant and relief is slow.** A health bar drains immediately and
 recovers its chip over time.
 
-Damage numbers pop, settle, rise and fade. Criticals spawn larger and hold
-fractionally longer.
+Damage numbers snap in at their peak, settle, hold, rise and fade. Criticals
+spawn larger and hold fractionally longer.
 
 ## Boundaries
 

@@ -14,8 +14,9 @@
 //
 // Every curve the HUD sheet (Assets/design/02-hud/spec.md) states as a state
 // rule — the crosshair's spread and ADS collapse, the health chip's hold and
-// recovery, the near-death pulse, the damage number's pop/settle/rise/fade,
-// the weapon-name slide, the countdown's format — is a pure function of time
+// recovery, the near-death pulse, the damage number's snap/settle/hold/rise/
+// fade, the hit tell's bearing and fade, the weapon-name slide, the
+// countdown's format — is a pure function of time
 // and a token. They live here so a test can walk each one over its domain;
 // what stays on ABreakerPlaytestHUD is projection, the canvas and the world.
 //
@@ -78,6 +79,79 @@ namespace BreakerHUDMath
         return bAiming ? T : 1.0f - T;
     }
 
+    // --- The hit tell -------------------------------------------------------
+    // Where a hit came from, as an arc on the crosshair's ring. Each tell
+    // remembers the WORLD bearing of its source, not the screen angle: the
+    // player turns toward the thing and the arc must swing to the front as
+    // they do, which a latched screen angle cannot. A tell with a negative
+    // Time has never been struck.
+    struct FHitTell
+    {
+        double Time = -1000.0;
+        float WorldYawDegrees = 0.0f;
+    };
+
+    // The XY bearing from the camera to the source, in degrees, Unreal's
+    // frame (+X is yaw 0, +Y is yaw 90).
+    inline float HitWorldYaw(const FVector& CameraLocation, const FVector& SourceLocation)
+    {
+        const FVector Delta = SourceLocation - CameraLocation;
+        return static_cast<float>(FMath::RadiansToDegrees(FMath::Atan2(Delta.Y, Delta.X)));
+    }
+
+    // The bearing on screen: 0 straight ahead, +90 to the right, ±180 behind.
+    inline float HitTellScreenDegrees(float WorldYaw, float CameraYaw)
+    {
+        return FMath::UnwindDegrees(WorldYaw - CameraYaw);
+    }
+
+    // The unit direction from the crosshair for a screen bearing, in canvas
+    // coordinates (y down): 0 is up, +90 right, 180 down.
+    inline FVector2D HitTellArcPoint(float ScreenDegrees)
+    {
+        const float Radians = FMath::DegreesToRadians(ScreenDegrees);
+        return FVector2D(FMath::Sin(Radians), -FMath::Cos(Radians));
+    }
+
+    // 1 at the hit, linear to 0 at HudHitTellSeconds; 0 outside that window.
+    inline float HitTellAlpha(float Age)
+    {
+        if (Age < 0.0f || Age >= BreakerUI::HudHitTellSeconds) return 0.0f;
+        return 1.0f - Age / BreakerUI::HudHitTellSeconds;
+    }
+
+    // A hit lands. A LIVE tell within HudHitTellMergeDegrees of the bearing
+    // is refreshed in place — the same enemy, still there — rather than
+    // stacked; otherwise the hit gets its own tell, and past HudHitTellMax the
+    // oldest gives up its slot. The array never grows past the cap.
+    inline void HitTellsOnHit(TArray<FHitTell>& Tells, float WorldYaw, double Now)
+    {
+        for (FHitTell& Tell : Tells)
+        {
+            if (HitTellAlpha(static_cast<float>(Now - Tell.Time)) <= 0.0f) continue;
+            if (FMath::Abs(FMath::FindDeltaAngleDegrees(Tell.WorldYawDegrees, WorldYaw)) <= BreakerUI::HudHitTellMergeDegrees)
+            {
+                Tell.WorldYawDegrees = WorldYaw;
+                Tell.Time = Now;
+                return;
+            }
+        }
+        FHitTell Fresh;
+        Fresh.Time = Now;
+        Fresh.WorldYawDegrees = WorldYaw;
+        if (Tells.Num() < BreakerUI::HudHitTellMax)
+        {
+            Tells.Add(Fresh);
+            return;
+        }
+        int32 Oldest = 0;
+        for (int32 Index = 1; Index < Tells.Num(); ++Index)
+        {
+            if (Tells[Index].Time < Tells[Oldest].Time) Oldest = Index;
+        }
+        Tells[Oldest] = Fresh;
+    }
+
     // --- The health chip ---------------------------------------------------
     // On a drop the fill drains at once and a hatched chip stays where the
     // health WAS, holds, then recovers linearly down to the live value. From
@@ -123,18 +197,19 @@ namespace BreakerHUDMath
     }
 
     // --- Damage numbers -----------------------------------------------------
-    // How long a number lives: the rise, plus the crit hold.
+    // How long a number lives: the hold, the rise, plus the crit hold.
     inline constexpr float DamageNumberLifetime(bool bCritical)
     {
-        return BreakerUI::MotionDamageRise + (bCritical ? BreakerUI::MotionCritHold : 0.0f);
+        return BreakerUI::MotionDamageHold + BreakerUI::MotionDamageRise + (bCritical ? BreakerUI::MotionCritHold : 0.0f);
     }
 
     struct FDamageNumberFrame
     {
-        // Size multiplier: 1 at birth, PopScale at the end of the pop, 1 again
-        // at the end of the settle.
+        // Size multiplier: PopScale AT birth — the snap-in — easing down to 1
+        // by the end of the settle.
         float Scale = 1.0f;
-        // 0..1 of DamageRisePixels, easing out over MotionDamageRise.
+        // 0..1 of DamageRisePixels: 0 through MotionDamageHold, then easing
+        // out over MotionDamageRise.
         float RiseFraction = 0.0f;
         // 1 until the last MotionDamageFade of the lifetime, then linear to 0.
         float Alpha = 1.0f;
@@ -144,20 +219,38 @@ namespace BreakerHUDMath
     {
         FDamageNumberFrame Frame;
         const float A = FMath::Max(Age, 0.0f);
-        if (A < BreakerUI::MotionDamagePop)
+        if (A < BreakerUI::MotionDamageSettle)
         {
-            Frame.Scale = FMath::Lerp(1.0f, PopScale, A / BreakerUI::MotionDamagePop);
+            const float SettleT = A / BreakerUI::MotionDamageSettle;
+            Frame.Scale = FMath::Lerp(PopScale, 1.0f, 1.0f - FMath::Square(1.0f - SettleT));
         }
-        else if (A < BreakerUI::MotionDamagePop + BreakerUI::MotionDamageSettle)
-        {
-            Frame.Scale = FMath::Lerp(PopScale, 1.0f, (A - BreakerUI::MotionDamagePop) / BreakerUI::MotionDamageSettle);
-        }
-        const float RiseT = FMath::Clamp(A / BreakerUI::MotionDamageRise, 0.0f, 1.0f);
+        const float RiseAge = A - BreakerUI::MotionDamageHold;
+        const float RiseT = RiseAge <= 0.0f ? 0.0f : FMath::Clamp(RiseAge / BreakerUI::MotionDamageRise, 0.0f, 1.0f);
         Frame.RiseFraction = 1.0f - FMath::Square(1.0f - RiseT);
         const float FadeStart = FMath::Max(Lifetime - BreakerUI::MotionDamageFade, 0.0f);
         const float FadeSpan = FMath::Max(Lifetime - FadeStart, UE_KINDA_SMALL_NUMBER);
         Frame.Alpha = A <= FadeStart ? 1.0f : FMath::Clamp(1.0f - (A - FadeStart) / FadeSpan, 0.0f, 1.0f);
         return Frame;
+    }
+
+    // The outline's stroke for a glyph already scaled to device pixels: a
+    // fraction of the size, never under the floor. The draw and the
+    // label-bounds calculation both read this, so a number's collision box
+    // is exactly the box it paints.
+    inline float DamageOutlineOffset(float ScaledSizePixels)
+    {
+        return FMath::Max(ScaledSizePixels * BreakerUI::DamageOutlineFraction, BreakerUI::DamageOutlineMinPixels);
+    }
+
+    // --- The tracker's distance line ------------------------------------------
+    // The beat lines above already name the objective, so under them the
+    // distance alone is the read: "77m". Only a manually tracked map marker —
+    // which nothing above names — keeps its label in front of the figure.
+    inline FString FormatTrackerDistance(const FString& Label, float DistanceCm, bool bLabelIsTheBeat)
+    {
+        const int32 Metres = FMath::RoundToInt(DistanceCm / 100.0f);
+        if (bLabelIsTheBeat) return FString::Printf(TEXT("%dm"), Metres);
+        return FString::Printf(TEXT("%s · %dm"), *Label, Metres);
     }
 
     // --- Countdown ----------------------------------------------------------

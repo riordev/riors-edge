@@ -55,6 +55,15 @@ ABreakerProjectileBase::ABreakerProjectileBase()
     // enough that sidestepping it is a decision rather than a guess.
     Movement->ProjectileGravityScale = 0.0f;
     Movement->bRotationFollowsVelocity = true;
+    // InitializeProjectile always arms a WORLD direction. The engine default
+    // here is local space, and that is harmless for a plain SpawnActor (the
+    // component initialises with zero velocity and the arm lands afterwards)
+    // but a DEFERRED spawn arms first and initialises second: InitializeComponent
+    // saw a non-zero velocity and re-rotated it by the round's own yaw, which
+    // FireRound had already set to the aim. A round at yaw θ flew at 2θ, so
+    // only a player on world +X was ever hit — the owner saw it as skirmishers
+    // shooting at random.
+    Movement->bInitialVelocityInLocalSpace = false;
 }
 
 FVector ABreakerProjectileBase::PositionAfter(const FVector& Origin, const FVector& Direction, float Speed, float Seconds)
