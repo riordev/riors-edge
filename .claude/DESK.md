@@ -1,5 +1,83 @@
 # Desk — next playtest
 
+## Cycle — OWNER PLAYTEST, 2026-09-11 (SEVENTH) — DEFECTS
+
+His words, one item each. "Audio bug was on my end" — dropped.
+
+- [ ] "enemies are still walking offset" (frame: two SKITTER mechs; the
+      left one is yawed to its right of its travel line, the right one
+      faces the camera). The QuadShell fix was not this; scout the Skitter
+      mech's fit and its hold-band strafe before any edit.
+- [ ] "the sniper is just a small little rod in your hand" (frame: SNIPER,
+      a thin short bar). Gun_Sniper is scaled to the row's silhouette
+      length — its long axis is probably not the axis the fit reads.
+- [ ] "the floor when walking from the substation into the marshalling yard
+      flickers super heavily … there's an offset tile set close to the
+      marshalling yard" — two floor slabs overlapping on one Z.
+- [ ] "I killed the marshalling yard guy and didn't get a quest complete
+      because there's two rifts stacked on top of each other for entering
+      the breach and killing the field marshal" — two rift doors at one
+      spot; the one he took did not carry the beat's encounter.
+- [ ] "nothing came back with you — it's just bad" — he closed a rift on
+      this build and the pack got nothing listed. O270's two items are paid
+      on OnRiftCompleted; find why the ledger was empty (the stacked-door
+      run above may not have been a completion, or the equipment component
+      / acquired event is not what the ledger hears). Scout, don't assume.
+- [ ] "overkill damage is still appearing … we don't need the plus over" —
+      delete the "+N OVER" line.
+- [ ] "damage absorbed doesn't need a text — 'damage absorbed −35%' — the
+      greyed number is enough" — delete the label, keep the grey.
+- [ ] "the crit spot randomly appears on enemies sometimes" — the weak-point
+      marker shows when it should not; find the condition.
+- [ ] "there's no indicator for gaining riftglass anywhere" — a pickup /
+      award readout, the same shape as XP's.
+
+## Cycle — OWNER PLAYTEST, 2026-09-11 (SEVENTH) — LIVING
+
+- [ ] "damage is super high … a lot of things one-shot my character in the
+      first rift … the second rift's boss one-shot me completely … enemies
+      should deal a lot less damage in general" — measure the shipped
+      monster damage against the character's health at AL1-AL5 and the
+      boss slam; cut against O18's time-to-die (four to five seconds bare).
+- [ ] "the skirmishers always shoot other random enemies, not the player"
+      — target selection.
+- [ ] "no indicator that I'm taking damage from behind … dying to enemies
+      in one hit because I didn't know where they were" — a directional
+      hit tell on the reticle ring.
+- [ ] "the giant tracker telling you exactly where things are doesn't need
+      to be there, it's in the way" (frame: "Breach Marshalling Yard · 77m"
+      in gold at 18px top-right). Smaller, dimmer, or the distance only.
+- [ ] "the damage numbers are kinda ugly, awkward, they need more oomph".
+
+## Cycle — OWNER PLAYTEST, 2026-09-11 (SEVENTH) — THE RIFT'S END, AGAIN
+
+- [ ] "the boss drops 3 different items you can choose from when closing a
+      rift, on the rift closing screen — 3 squares side by side with the
+      item icon, hover each for its stats". RULING: this replaces O270's
+      two forced drops with three offered, one chosen; the debrief gets the
+      choice. Write the O270 line, then build.
+
+## DESIGN SEAT — OWNER PLAYTEST, 2026-09-11 (SEVENTH). NOT ONE BUILD EACH.
+
+His words, for ORDERS.md and rulings before any hand touches them:
+
+- "rifts are just everywhere … the cosmetic ones enemies spawn out of
+  should have an animation of them appearing and then the enemies slowly
+  come out of them. Enemies also don't always have to come out of rifts —
+  buildings, side doors, little areas next to the player they can see."
+- "all the bosses have bad routing — they should stand and hold positions,
+  or have a ranged attack, a giant projectile. Right now they awkwardly
+  walk at you. Boring."
+- "the doctrine points are wrong. Path of Exile's ascendancy: a big wheel,
+  you get two points, one travel node that scales you and then one cool
+  impactful node that changes how you play. You don't stack ranks. I
+  wanted the Rot-around-you node in my first two points and couldn't reach
+  it. For all the classes."
+- "another area to the west of where you spawn into the rift — a side-quest
+  rift instead of being forced into the quest."
+- "the chests are randomly on the floor in the most obvious places; no
+  sound; the loot is never good."
+
 ## LINGERING R2 — LANDED
 
 - A Rot cast over a live own Rot (within half a radius) lands 1 m wider;
