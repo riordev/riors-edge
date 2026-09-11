@@ -33,6 +33,35 @@ In his words, split into the cycles they are:
    they're taking damage, and they all kind of just walk in a straight line."
    Note 4 pays part of this: the QuadShell rig ships a Hit and a Run.
 
+EVERY ONE OF THE SIX LANDED, in eight cycles (63495405 .. 9b0dcd8f). What
+each is now, and what is still open inside it:
+
+1. ABILITIES — all thirteen have their own shape through five published
+   compositions (ring, ripple, burst, trail, pips); the verb colour law is
+   enforced from one accessor; Cleave sweeps the floor; Rot lands on the floor
+   and its disc is light not paint; Fracture lands with a mark; the gun has a
+   muzzle flash (a tongue and a light; no disc can clear the aimed reticle).
+   OPEN: Niagara systems for the four moments are still ASSETS-5 (O190) — the
+   fallbacks are what he sees. Weapon impact stays the tracer's spark.
+2. FERNHALL — skyline, bay, dock, vegetation from the edges, collapse with a
+   building it fell from. OPEN: the ground is still one flat slab; a level
+   change in the lane (a sunken bay, a raised apron) is the next lever, and the
+   seams are still bare corridors.
+3. RED SCREEN — gone. The world closes in and drains instead, on the camera's
+   post-process slot, one writer. OPEN: "reduce visibility" is a gameplay edge
+   and the numbers are O2; he plays it.
+4. MESHES — the QuadShell is on the Lattice with Hit and Run. OPEN: the EyeDrone
+   waits on a flyer chassis, which is a new behaviour.
+5. RECOIL — walks the aim up, the mesh does not ring, ADS is still. O2, felt
+   not traced: movement.md wants a -BreakerMoveTrace run before any of these
+   numbers is trusted.
+6. MONSTERS — hit and run animations on rigs that have them, flash and flinch
+   doubled, the weave at a visible period. OPEN: a real strafe or flank is a
+   new behaviour and is not built.
+
+AND THE EARLIER MENU ITEM IS CLOSED: the build totals fold to five rows and a
+count, the rank labels are for invested nodes, the view row is gone.
+
 
 ## OWNER PLAYTEST, 2026-09-10 (FOURTH) — THE MENU MESSAGE
 
