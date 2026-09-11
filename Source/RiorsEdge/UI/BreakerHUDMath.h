@@ -295,6 +295,60 @@ namespace BreakerHUDMath
         return bRiftSet ? FMath::Max(BossWaveInterval, 0) : 0;
     }
 
+    // --- The wallet gain ------------------------------------------------------
+    // "+N RIFTGLASS" for a moment after the wallet grows. The HUD has no seam
+    // from the wallet, so this DIFFS: each frame it is told the balance, and a
+    // rise is a gain. The first observation seeds silently — the account folds
+    // its whole balance in at spawn, and that is not a gain the player just
+    // made. A fall re-bases silently — a spend at the Forge is not a gain
+    // either. Gains inside one hold accumulate into one figure and restart
+    // the hold, so a pack's worth of kills reads as one rising number rather
+    // than a stutter of small ones. When the hold ends the figure is spent:
+    // the next gain starts from zero.
+    struct FBreakerWalletGainReadout
+    {
+        static constexpr float GainHoldSeconds = 1.6f;   // O2 PLACEHOLDER
+        // The last part of the hold fades linearly to nothing, the ELITE DOWN
+        // callout's shape.
+        static constexpr float GainFadeSeconds = 0.4f;   // O2 PLACEHOLDER
+
+        int32 Pending = 0;
+        int32 LastSeen = 0;
+        bool bSeeded = false;
+        double HoldStart = -1000.0;
+
+        bool IsShowing(double Now) const
+        {
+            const double Age = Now - HoldStart;
+            return Pending > 0 && Age >= 0.0 && Age < GainHoldSeconds;
+        }
+
+        float Alpha(double Now) const
+        {
+            if (!IsShowing(Now)) return 0.0f;
+            const float Age = static_cast<float>(Now - HoldStart);
+            const float FadeStart = FMath::Max(GainHoldSeconds - GainFadeSeconds, 0.0f);
+            const float FadeSpan = FMath::Max(GainHoldSeconds - FadeStart, UE_KINDA_SMALL_NUMBER);
+            return Age <= FadeStart ? 1.0f : FMath::Clamp(1.0f - (Age - FadeStart) / FadeSpan, 0.0f, 1.0f);
+        }
+
+        void Observe(int32 WalletNow, double Now)
+        {
+            if (!bSeeded)
+            {
+                bSeeded = true;
+                LastSeen = WalletNow;
+                return;
+            }
+            if (!IsShowing(Now)) Pending = 0;
+            const int32 Delta = WalletNow - LastSeen;
+            LastSeen = WalletNow;
+            if (Delta <= 0) return;
+            Pending += Delta;
+            HoldStart = Now;
+        }
+    };
+
     // --- The magazine --------------------------------------------------------
     inline bool MagazineIsLow(int32 Magazine, int32 Capacity)
     {

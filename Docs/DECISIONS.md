@@ -379,7 +379,7 @@ Numbers are permanent and never reused.
 
 **O207** — Where a play measurement and a canvas disagree on a size or a window, the play measurement stands: damage numbers 26/52, magazine 32, aggregation 120 ms.
 
-**O208** — Crit is weapon-orange and gold stays the weak-point promise (O179); an absorbed hit prints its value muted with the absorbed caption.
+**O208** — Crit is weapon-orange and gold stays the weak-point promise (O179); an absorbed hit prints its value muted.
 
 **O209** — The Anchor's NPCs are Kess and the Quartermaster until the story names more; a designed name with no dialogue row is not an NPC.
 

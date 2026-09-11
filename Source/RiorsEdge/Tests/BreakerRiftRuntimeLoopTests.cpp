@@ -1,5 +1,9 @@
 #include "Misc/AutomationTest.h"
 #include "Misc/ScopeExit.h"
+#include "AbilitySystemComponent.h"
+#include "Attributes/BreakerAttributeSet.h"
+#include "Characters/BreakerCharacter.h"
+#include "Combat/BreakerEnemy.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
 #include "EngineUtils.h"
@@ -232,6 +236,133 @@ bool FBreakerRiftRuntimeLoopTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("A travel anywhere but Fernhall drops the entry transform"),
         Session->bRiftEntryTransformSet);
     AddInfo(TEXT("Validated actual Fernhall build, naturally clock-advanced waves, boss damage, completion subscription, purse, exit offers and the return travel's session writes; cross-map loading is not simulated."));
+    return true;
+}
+
+// THE LEDGER HEARS THE COMPLETION. OpenRiftRunLedger reads bRiftInstance, and
+// it was called at the top of HandleStartingNewPlayer — 240 lines before the
+// Fernhall branch assigned the flag. So it returned without binding in every
+// run ever played: no item reached RiftRunLoot, the starting purse and XP
+// never latched, and the debrief printed the whole wallet as the run's gain
+// and NOTHING CAME BACK for the loot. The rig above is a DefaultPawn by
+// design (no save-slot load) and the ledger casts to ABreakerCharacter, so
+// this test stands a real character up the way the Act II and containment
+// fixtures do, runs the same startup, kills the terminator through combat,
+// and reads the ledger — not the wallet — afterwards.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerRiftLedgerHearsCompletionTest,
+    "RiorsEdge.Zone.Rift.LedgerHearsTheCompletion", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerRiftLedgerHearsCompletionTest::RunTest(const FString& Parameters)
+{
+    UBreakerAccountSave* Account = NewObject<UBreakerAccountSave>();
+    Account->bNeverPersist = true;
+    // THE BALANCE THE ACCOUNT BROUGHT IN, through the game's own seeding
+    // (LoadGameState reads Account->Riftglass into the wallet at BeginPlay).
+    // Not a grant to the run: it buys nothing here. It is the one number the
+    // unfixed ledger reported as the run's gain, so it is what the assertion
+    // below must see subtracted.
+    constexpr int32 CarriedRiftglass = 777;
+    Account->Riftglass = CarriedRiftglass;
+    UBreakerAccountSave::InjectForTesting(Account);
+    ON_SCOPE_EXIT { UBreakerAccountSave::ResetCacheForTesting(); };
+    UWorld::InitializationValues Init;
+    Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
+    UPackage* Package = CreatePackage(*FString::Printf(TEXT("/Temp/RiftLedger_%s/Lvl_Fernhall"),
+        *FGuid::NewGuid().ToString(EGuidFormats::Digits)));
+    Package->SetFlags(RF_Transient);
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, FName(TEXT("Lvl_Fernhall")), Package,
+        true, ERHIFeatureLevel::Num, &Init);
+    if (!TestNotNull(TEXT("Isolated Fernhall world"), World)) return false;
+    FWorldContext& Context = GEngine->CreateNewWorldContext(EWorldType::Game);
+    Context.SetCurrentWorld(World);
+    ON_SCOPE_EXIT { World->DestroyWorld(false); GEngine->DestroyWorldContext(World); };
+    UBreakerGameInstance* Session = NewObject<UBreakerGameInstance>();
+    World->SetGameInstance(Session);
+    Context.OwningGameInstance = Session;
+    // Isolate the character's BeginPlay load from any real character slot.
+    Session->ActiveCharacterId = FGuid::NewGuid();
+    Session->PendingRift = UBreakerZoneBuilder::FernhallRiftFor(FName(TEXT("substation")));
+    World->GetWorldSettings()->DefaultGameMode = ABreakerGameMode::StaticClass();
+    if (!TestTrue(TEXT("Real authority game mode installed"), World->SetGameMode(FURL()))) return false;
+    World->InitializeActorsForPlay(FURL());
+    ABreakerGameMode* Mode = World->GetAuthGameMode<ABreakerGameMode>();
+    if (!TestNotNull(TEXT("Rift game mode"), Mode)) return false;
+    Mode->DispatchBeginPlay();
+    ABreakerCharacter* Player = World->SpawnActor<ABreakerCharacter>();
+    APlayerController* Controller = World->SpawnActor<APlayerController>();
+    if (!TestNotNull(TEXT("Player"), Player) || !TestNotNull(TEXT("Controller"), Controller)) return false;
+    Player->bRefuseSavesForPendingCharacter = true;
+    Controller->Possess(Player);
+    UAbilitySystemComponent* ASC = Player->GetAbilitySystemComponent();
+    ASC->InitAbilityActorInfo(Player, Player);
+    ASC->AddAttributeSetSubobject(Player->GetAttributes());
+    Player->GetCombat()->BindAttributes(Player->GetAttributes());
+    Player->GetProgression()->BindAttributes(Player->GetAttributes());
+    Player->GetEquipment()->BindAttributes(Player->GetAttributes());
+    Player->GetProgression()->ChoosePermanentClassById(EBreakerClassId::Swift);
+    // The character's BeginPlay is the production path: the progression
+    // component binds the completion payout there, and the wallet is seeded
+    // from the account there.
+    Player->DispatchBeginPlay();
+    UBreakerEquipmentComponent* Equipment = Player->GetEquipment();
+    UBreakerProgressionComponent* Progression = Player->GetProgression();
+    if (!TestEqual(TEXT("The account's balance seeded the wallet before the run"), Equipment->GetForgeWallet().Get(), CarriedRiftglass)) return false;
+    const int32 XpBeforeRun = Progression->GetProgressionState().TotalExperience;
+    int32 Completions = 0, GlassBeforePurse = 0;
+    Mode->OnRiftCompleted.AddLambda([&](const FBreakerRiftDefinition&, APawn*)
+    {
+        ++Completions;
+        GlassBeforePurse = Equipment->GetForgeWallet().Get();
+    });
+    Mode->HandleStartingNewPlayer_Implementation(Controller);
+    if (!TestTrue(TEXT("Actual Fernhall startup entered a rift"), Mode->IsRiftInstance())) return false;
+    TestEqual(TEXT("Nothing is in the ledger before anything is earned"), Mode->GetRiftRunLoot().Num(), 0);
+    TestEqual(TEXT("The ledger latched the carried balance, so the gain starts at zero"), Mode->RiftRunRiftglassGained(Player), 0);
+    // Structural lethal hits, the same shape the loop test above uses: the
+    // emergence window is ended first because this fixture kills a wave in
+    // the frame it spawned.
+    auto Kill = [&](ABreakerEnemy* Enemy)
+    {
+        if (!Enemy->HasActorBegunPlay()) Enemy->DispatchBeginPlay();
+        Enemy->EndEmergenceWindow();
+        FBreakerDamageRequest Hit;
+        Hit.BaseDamage = 100000000.0f;
+        Hit.bCanCritical = false;
+        Hit.bBypassShield = true;
+        Hit.SetInstigator(Player);
+        Enemy->FindComponentByClass<UBreakerCombatComponent>()->ReceiveDamage(Hit);
+    };
+    ABreakerBossEnemy* Boss = nullptr;
+    for (int32 Wave = 0; Wave < 4 && !Boss; ++Wave)
+    {
+        TArray<ABreakerEnemy*> Enemies;
+        for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
+        {
+            if (It->IsDeadEnemy()) continue;
+            if (ABreakerBossEnemy* Found = Cast<ABreakerBossEnemy>(*It)) { Boss = Found; break; }
+            Enemies.Add(*It);
+        }
+        if (Boss) break;
+        if (!TestTrue(TEXT("Each pre-boss wave contains enemies"), Enemies.Num() > 0)) return false;
+        for (ABreakerEnemy* Enemy : Enemies) Kill(Enemy);
+        if (!TestTrue(TEXT("Clearing all native guards ends the current wave"), !Mode->IsWaveActive())) return false;
+        Mode->StartNextWave();
+    }
+    if (!TestNotNull(TEXT("Cleared waves culminate in a real boss"), Boss)) return false;
+    Kill(Boss);
+    TestTrue(TEXT("Actual boss damage killed the terminator"), Boss->IsDeadEnemy());
+    if (!TestEqual(TEXT("Terminator death broadcasts completion exactly once"), Completions, 1)) return false;
+    const int32 Level = Session->PendingRift.EffectiveAreaLevel();
+    TestEqual(TEXT("The ledger holds exactly the completion's forced items"),
+        Mode->GetRiftRunLoot().Num(), BreakerRiftReward::CompletionItemCount);
+    TestEqual(TEXT("The ledger's Riftglass gain is kill income plus the completion purse, never the wallet total"),
+        Mode->RiftRunRiftglassGained(Player),
+        (GlassBeforePurse - CarriedRiftglass) + BreakerRiftReward::RiftglassForCompletion(Level));
+    TestEqual(TEXT("The ledger's Riftglass gain excludes the balance the account brought in"),
+        Mode->RiftRunRiftglassGained(Player), Equipment->GetForgeWallet().Get() - CarriedRiftglass);
+    TestEqual(TEXT("The ledger's XP gain is the run's, measured from the start of the run"),
+        Mode->RiftRunExperienceGained(Player), Progression->GetProgressionState().TotalExperience - XpBeforeRun);
+    AddInfo(TEXT("A real character ran the substation rift; the run ledger bound at startup, listed the completion's forced items and reported the run's gain rather than the wallet."));
     return true;
 }
 

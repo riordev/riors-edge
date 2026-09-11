@@ -53,11 +53,8 @@ struct FBreakerHUDDamageNumber
     bool bFromDoT = false;
     EBreakerElement Element = EBreakerElement::None;
     FGameplayTag DamageTypeTag;
-    // A killing blow is the heaviest read on the screen and holds longer; the
-    // overkill share is carried separately so it can be printed as its own
-    // distinct mark rather than silently inflating the number.
+    // A killing blow is the heaviest read on the screen and holds longer.
     bool bKilled = false;
-    float Overkill = 0.0f;
     // A sibling hit from the same trigger pull on a DIFFERENT target — a chain
     // jump, a ricochet, an AoE's outer victims. Drawn lighter than the parent
     // so the aimed hit stays the loudest of its own family.
@@ -309,6 +306,11 @@ private:
     // The health fraction drawn last frame, so a drop is detected by the HUD
     // rather than needing a seam from Combat/.
     float HealthShownFraction = 1.0f;
+
+    // --- Riftglass gains ----------------------------------------------------
+    // Fed the wallet balance each frame by DrawVitals; prints "+N RIFTGLASS"
+    // for a hold after it rises. The gain, never the balance.
+    BreakerHUDMath::FBreakerWalletGainReadout WalletGain;
 
     // --- The weapon name on swap -------------------------------------------
     // Latched on the falling edge of IsSwapping(): the name that arrived.

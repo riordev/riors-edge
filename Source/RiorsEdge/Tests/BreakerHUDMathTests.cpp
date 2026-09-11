@@ -593,4 +593,95 @@ bool FBreakerHUDNumericReadoutsTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// --------------------------------------------------------------------------
+// HUD.WalletGainReadout: "+N RIFTGLASS" after the wallet grows, and nothing
+// after it is seeded, spent, or left alone.
+//
+// Owner, playtest 2026-09-11: "no indicator for gaining riftglass". The HUD
+// diffs the balance each frame, so the rule is entirely about which deltas
+// count and how they fold into one figure over one hold.
+// --------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerHUDWalletGainReadoutTest,
+    "RiorsEdge.UI.HUD.WalletGainReadout",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerHUDWalletGainReadoutTest::RunTest(const FString& Parameters)
+{
+    using BreakerHUDMath::FBreakerWalletGainReadout;
+    constexpr double Hold = FBreakerWalletGainReadout::GainHoldSeconds;
+
+    // --- SHIPPED CONFIGURATION ---------------------------------------------
+    {
+        const FBreakerWalletGainReadout Fresh;
+        TestEqual(TEXT("A fresh readout has nothing pending"), Fresh.Pending, 0);
+        TestFalse(TEXT("A fresh readout is not showing"), Fresh.IsShowing(0.0));
+        TestEqual(TEXT("A fresh readout draws at zero alpha"), Fresh.Alpha(0.0), 0.0f);
+        TestEqual(TEXT("The hold is 1.6 s"), FBreakerWalletGainReadout::GainHoldSeconds, 1.6f);
+        TestTrue(TEXT("The fade fits inside the hold"),
+            FBreakerWalletGainReadout::GainFadeSeconds > 0.0f
+            && FBreakerWalletGainReadout::GainFadeSeconds < FBreakerWalletGainReadout::GainHoldSeconds);
+    }
+
+    // --- THE FIRST OBSERVE SEEDS SILENTLY ------------------------------------
+    // The account folds its whole balance in at spawn. That is not a gain.
+    FBreakerWalletGainReadout Readout;
+    Readout.Observe(1250, 10.0);
+    TestFalse(TEXT("The seeding balance prints nothing"), Readout.IsShowing(10.0));
+    TestEqual(TEXT("The seeding balance leaves nothing pending"), Readout.Pending, 0);
+
+    // --- TWO GAINS INSIDE ONE HOLD FOLD INTO ONE FIGURE ----------------------
+    Readout.Observe(1251, 10.5);
+    TestTrue(TEXT("A gain shows"), Readout.IsShowing(10.5));
+    TestEqual(TEXT("A gain of one reads one"), Readout.Pending, 1);
+    TestEqual(TEXT("A fresh gain draws at full alpha"), Readout.Alpha(10.5), 1.0f);
+    Readout.Observe(1252, 11.0);
+    TestEqual(TEXT("A second gain inside the hold accumulates"), Readout.Pending, 2);
+    // The hold restarted at 11.0: the figure is still up when the first
+    // gain's own hold would have ended.
+    TestTrue(TEXT("The hold extends from the latest gain"), Readout.IsShowing(10.5 + Hold + 0.01));
+    TestFalse(TEXT("The extended hold still ends"), Readout.IsShowing(11.0 + Hold));
+
+    // --- A DECREASE IS A SPEND, NOT A GAIN ------------------------------------
+    // Well after the hold, so the figure is spent: the fall re-bases and
+    // prints nothing.
+    Readout.Observe(1200, 20.0);
+    TestFalse(TEXT("A spend prints nothing"), Readout.IsShowing(20.0));
+    TestEqual(TEXT("A spend leaves nothing pending"), Readout.Pending, 0);
+    // And it re-based: the next rise is measured from the lower balance.
+    Readout.Observe(1205, 20.5);
+    TestTrue(TEXT("A gain after a spend shows"), Readout.IsShowing(20.5));
+    TestEqual(TEXT("A gain after a spend is measured from the spent balance"), Readout.Pending, 5);
+
+    // --- THE FADE IS LINEAR OVER THE LAST PART OF THE HOLD --------------------
+    {
+        const double FadeStart = 20.5 + Hold - FBreakerWalletGainReadout::GainFadeSeconds;
+        TestEqual(TEXT("Full until the fade starts"), Readout.Alpha(FadeStart - 0.05), 1.0f);
+        TestTrue(TEXT("Half way through the fade is about half"),
+            FMath::IsNearlyEqual(Readout.Alpha(FadeStart + FBreakerWalletGainReadout::GainFadeSeconds * 0.5), 0.5f, 0.02f));
+        TestTrue(TEXT("The fade never rises"),
+            Readout.Alpha(FadeStart + FBreakerWalletGainReadout::GainFadeSeconds * 0.75)
+            < Readout.Alpha(FadeStart + FBreakerWalletGainReadout::GainFadeSeconds * 0.25));
+    }
+
+    // --- AFTER THE HOLD: NOT SHOWING, NOTHING PENDING -------------------------
+    const double AfterHold = 20.5 + Hold + 0.05;
+    TestFalse(TEXT("After the hold the figure is gone"), Readout.IsShowing(AfterHold));
+    TestEqual(TEXT("After the hold the alpha is zero"), Readout.Alpha(AfterHold), 0.0f);
+    Readout.Observe(1205, AfterHold);
+    TestEqual(TEXT("An unchanged balance after the hold spends the figure"), Readout.Pending, 0);
+
+    // --- A BOSS PURSE ON TOP OF A TRASH KILL READS THE SUM --------------------
+    Readout.Observe(1206, 30.0);
+    TestEqual(TEXT("A trash kill reads one"), Readout.Pending, 1);
+    Readout.Observe(1246, 30.4);
+    TestEqual(TEXT("A boss purse on top reads the sum"), Readout.Pending, 41);
+    TestTrue(TEXT("The sum is showing"), Readout.IsShowing(30.4));
+
+    // --- A NEW GAIN AFTER THE HOLD STARTS FROM ZERO ----------------------------
+    Readout.Observe(1250, 30.4 + Hold + 1.0);
+    TestEqual(TEXT("A gain after the hold does not carry the old figure"), Readout.Pending, 4);
+    return true;
+}
+
 #endif // WITH_DEV_AUTOMATION_TESTS

@@ -35,6 +35,8 @@
 #include "Combat/BreakerMonsterChassis.h"
 #include "Combat/BreakerRangedEnemy.h"
 #include "Combat/BreakerBossEnemy.h"
+#include "Combat/BreakerHoldfastEnemy.h"
+#include "Data/BreakerStrings.h"
 #include "Combat/BreakerEnemyModifiers.h"
 #include "Combat/BreakerModifierComponent.h"
 #include "Combat/BreakerSkirmisherEnemy.h"
@@ -579,8 +581,11 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
     // light (Lvl_FirstPerson) suppresses this entirely.
     UBreakerWorldBasics::EnsureWorldLighting(GetWorld());
 
-    // The rift's run ledger opens the moment its player exists.
-    OpenRiftRunLedger(NewPlayer->GetPawn());
+    // The rift's run ledger used to open HERE, "the moment its player
+    // exists" — and it read bRiftInstance, which the Fernhall branch sets 240
+    // lines below. So the ledger opened against false and returned without
+    // binding, and every rift ever closed on this build said NOTHING CAME
+    // BACK. It now opens beside the flag that decides it.
 
     // AN UNATTENDED RUN THAT CANNOT EXIT IS A HANG, NOT A FAILURE, and this is
     // the third time that shape has cost someone a cycle: the crowd probe's
@@ -817,6 +822,13 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
             UE_LOG(LogTemp, Display, TEXT("[Rift] -BreakerRiftInstance seeded a run; this is a capture, not a door."));
         }
         bRiftInstance = RiftSession && RiftSession->PendingRift.IsSet();
+        // THE RUN LEDGER OPENS THE LINE AFTER THE FLAG IT READS. It was
+        // called at the top of this function, before bRiftInstance was
+        // assigned, so it early-returned in every run: no item bound, no
+        // starting purse latched, and the debrief printed the whole wallet
+        // and the whole XP total as the run's gain — "nothing came back with
+        // you" was the ledger, not the payout.
+        OpenRiftRunLedger(NewPlayer->GetPawn());
 
         FBreakerZoneMarkers Markers;
         if (!UBreakerZoneBuilder::BuildFernhallYard(GetWorld(), Markers, bRiftInstance)) return;
@@ -973,7 +985,18 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
                 const FVector Direction(Forward.X, Forward.Y, 0);
                 AlteredContactPosition = FVector(Origin.X, Origin.Y, 0)
                     + Direction * FMath::Lerp(Field.BandNearCm, Field.BandFarCm, 0.85f);
-                BreachDoorPosition = AlteredContactPosition + Direction * 450.0f;
+                // OFF THE CENTRELINE, BY MORE THAN ONE INTERACTION SPHERE.
+                // The substation yard's forward IS the ray from its anchor to
+                // its own rift marker, so a Breach door placed on that ray at
+                // the contact's depth stood inside the substation door's
+                // interaction range: two rifts stacked on top of each other,
+                // and nearest-in-range picked the substation when he pressed
+                // F on the contract he had just earned. Pushed sideways by
+                // more than twice InteractionRange (450) so the two spheres
+                // can never overlap. Same idiom as the gate placement above.
+                constexpr float BreachDoorLateralCm = 1000.0f; // O2 PLACEHOLDER
+                const FVector Right = FVector::CrossProduct(FVector::UpVector, Direction).GetSafeNormal();
+                BreachDoorPosition = AlteredContactPosition + Direction * 450.0f + Right * BreachDoorLateralCm;
                 bFernhallMissionReady = true;
                 BindFernhallMissionJournal(NewPlayer->GetPawn());
             }
@@ -1773,7 +1796,16 @@ void ABreakerGameMode::HandleBossDefeated()
     // MEASUREMENT, and it is the boss TTK bucket that carries it — filed by the
     // kill-telemetry component from the boss's own rank, not from here.
     RefillPlayerAmmo();
-    UE_LOG(LogTemp, Display, TEXT("[BreakerGym] FIELD MARSHAL down. Boss TTK sample recorded; F2 copies the report."));
+    // THE BOSS THAT FELL, NOT THE FIRST BOSS THAT EXISTED. This printed the
+    // literal FIELD MARSHAL for every boss, so the Holdfast's death was
+    // logged as the Marshal's. The name comes from the same string keys the
+    // enemy bar draws over the body (BreakerEnemyHealthBars' name source is
+    // file-static, so the two-class map is repeated here rather than reached).
+    const ABreakerBossEnemy* Fallen = ActiveBoss;
+    const FString BossName = !Fallen ? FString(TEXT("Boss"))
+        : BreakerStrings::Get(Fallen->IsA<ABreakerHoldfastEnemy>()
+            ? EBreakerStringKey::EnemyHoldfast : EBreakerStringKey::EnemyFieldMarshal);
+    UE_LOG(LogTemp, Display, TEXT("[BreakerGym] %s down. Boss TTK sample recorded; F2 copies the report."), *BossName);
 }
 
 float ABreakerGameMode::ResolveGroundZ(const APawn* Pawn, bool* bOutFoundFloor) const

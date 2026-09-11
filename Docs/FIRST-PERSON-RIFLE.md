@@ -22,9 +22,11 @@ Firing uses the shared recoil spring. The supplied fire clip is mesh-space
 additive and requires a native additive layer before it can play over idle.
 Every archetype wears the same arms at the same hand points, hip offset and aim
 distance. The Sidearm wears `Gun_Pistol` and the Sniper `Gun_Sniper`; the other
-five wear `Gun_Rifle` until a textured model exists for each, scaled to the
-archetype's own silhouette length. The imported materials, fixed rifle magazine and stock reload
-gesture remain placeholders; this is not a finished animation/art set.
+five wear `Gun_Rifle` until a textured model exists for each, at the pack's
+reference scale (the Rifle row against `Gun_Rifle`), so the pack's own
+proportions carry the silhouette order. The imported materials, fixed rifle
+magazine and stock reload gesture remain placeholders; this is not a finished
+animation/art set.
 
 Muzzle effects and tracers follow the presented weapon. The rifle emission point
 is measured from its front-cap geometry and checked against the source asset in

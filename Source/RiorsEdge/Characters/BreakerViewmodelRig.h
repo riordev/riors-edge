@@ -154,14 +154,17 @@ struct RIORSEDGE_API FBreakerViewmodelLayout
     // Every archetype authors one: a textured mesh from the sci-fi pack. The
     // Sidearm wears Gun_Pistol, the Sniper wears Gun_Sniper, and the other
     // five wear Gun_Rifle until a textured model exists for each. When it
-    // resolves it replaces the proxy PARTS whole: the gun scales so its
-    // longest bound equals OverallLengthCm() — the same figure the
-    // silhouette-ordering law reads, so a named sidearm stays shorter than a
-    // named sniper by construction — and seats at the firing hand. Every
-    // archetype then wears the same skeletal arms, socketed to that gun at
-    // the shared hand points; the recoil rig drives all of it. A mesh that
-    // fails to load leaves the primitives standing, so a clean clone without
-    // Content still plays. All O2.
+    // resolves it replaces the proxy PARTS whole and seats at the firing
+    // hand. THE PACK-SCALE LAW: every named gun wears ONE scale — the one
+    // the Rifle row's OverallLengthCm() gives Gun_Rifle — and the pack's own
+    // proportions carry the silhouette order. The rows' lengths are NOT the
+    // named guns' lengths: pinning each mesh to its own row squeezed the
+    // sniper (1.62x the pack's rifle) into a row only 1.2x the rifle's, so it
+    // drew at 0.56 against the rifle's 0.755 — half the width, two-thirds
+    // the height, a rod. Every archetype then wears the same skeletal arms,
+    // socketed to that gun at the shared hand points; the recoil rig drives
+    // all of it. A mesh that fails to load leaves the primitives standing, so
+    // a clean clone without Content still plays. All O2.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Viewmodel")
     FSoftObjectPath NamedMeshPath;
     // Source-axis correction onto rig X-forward, per pack convention.
@@ -203,11 +206,38 @@ namespace BreakerViewmodel
     // The default table. O2 PLACEHOLDER throughout.
     RIORSEDGE_API FBreakerViewmodelLayout ArchetypeLayout(EBreakerWeaponArchetype Archetype);
 
+    // The target length that keeps the pack's own scale: the mesh's full
+    // length at the scale the reference row gives the reference mesh. With
+    // Gun_Rifle as the reference and the Rifle row's OverallLengthCm() as
+    // its length, every named gun fitted to this figure wears the rifle's
+    // scale, and a sniper the pack drew 1.62x its rifle draws 1.62x the
+    // rifle. Pure; the character feeds the result to FitNamedWeapon. A
+    // degenerate reference (no half-extent) returns the reference row length
+    // unchanged, which is the pre-pack rule and the fallback when the
+    // reference mesh fails to load.
+    inline float PackFitLengthCm(const float MeshHalfExtentMax, const float ReferenceHalfExtentMax,
+        const float ReferenceRowLengthCm)
+    {
+        if (ReferenceHalfExtentMax <= UE_KINDA_SMALL_NUMBER) return ReferenceRowLengthCm;
+        return 2.0f * MeshHalfExtentMax * (ReferenceRowLengthCm / (2.0f * ReferenceHalfExtentMax));
+    }
+
+    // Where a named gun's flash hangs when nothing has measured its cap: the
+    // front face of its bounds on the pack's muzzle axis (-X), in MESH space
+    // so the component's fitted scale carries it. Gun_Rifle keeps the
+    // measured RifleMuzzleMeshCm; every other named gun takes this until the
+    // arms commandlet measures caps for more than the rifle. O2 PLACEHOLDER.
+    inline FVector PackMuzzleFrontMeshCm(const FVector& BoundsOrigin, const FVector& BoundsExtent)
+    {
+        return FVector(BoundsOrigin.X - BoundsExtent.X, BoundsOrigin.Y, BoundsOrigin.Z);
+    }
+
     // The named gun's fit, pure so it is provable without a component: scale
-    // the mesh's longest bound to the layout's overall length (silhouette
-    // ordering survives by construction), cancel the bounds origin at that
-    // scale, and land the bounds centre at CentreAtCm in rig space. Degenerate
-    // bounds refuse the fit at identity, the same rule as the enemy body.
+    // the mesh's longest bound to TargetLengthCm — PackFitLengthCm above, so
+    // every named gun wears the pack's one scale and the pack's proportions
+    // carry the order — cancel the bounds origin at that scale, and land the
+    // bounds centre at CentreAtCm in rig space. Degenerate bounds refuse the
+    // fit at identity, the same rule as the enemy body.
     //
     // The cancel happens THROUGH the source-axis rotation the component wears:
     // a relative transform scales, then rotates, then translates, so a pivot

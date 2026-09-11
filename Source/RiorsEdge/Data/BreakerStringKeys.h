@@ -45,8 +45,6 @@
     BREAKER_STRING(HudPromptKeyed,               "hud.prompt.keyed",                "%s") \
     BREAKER_STRING(HudAbilitiesNoKit,            "hud.abilities.noKit",             "") \
     BREAKER_STRING(HudBackpackFull,              "hud.backpack.full",               "%d%d") \
-    BREAKER_STRING(HudDamageOverkill,            "hud.damage.overkill",             "%s") \
-    BREAKER_STRING(HudDamageAbsorbed,            "hud.damage.absorbed",             "%.0f%%") \
     BREAKER_STRING(HudWeaponRifle,               "hud.weapon.rifle",                "") \
     BREAKER_STRING(HudStatusUnnamed,             "hud.status.unnamed",              "") \
     BREAKER_STRING(HudResourceLabel,             "hud.resource.label",              "") \

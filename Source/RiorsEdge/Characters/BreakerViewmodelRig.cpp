@@ -251,14 +251,16 @@ FBreakerViewmodelLayout BreakerViewmodel::ArchetypeLayout(EBreakerWeaponArchetyp
     // THE NAMED GUN. Every archetype wears a textured mesh from the sci-fi
     // pack (MI_Guns_Batch1/2) over its proxy parts: the Sidearm wears
     // Gun_Pistol, the Sniper wears Gun_Sniper, and the other five wear
-    // Gun_Rifle until a textured model exists for each. FitNamedWeapon scales
-    // the mesh to the row's OverallLengthCm(), so the silhouette order the
-    // proxies author survives a shared mesh. The pack's thin muzzle faces -X
-    // (measured from LOD0 geometry by BreakerArms and by the
-    // EveryNamedGunFacesForward test), so every row pays the same 180° yaw.
-    // The EveryAuthoredGunResolves test loads each path, so a renamed asset
-    // fails the suite instead of silently restoring the primitives, which
-    // remain the fallback for a mesh that does not load. All O2.
+    // Gun_Rifle until a textured model exists for each. Every named gun wears
+    // the ONE scale the Rifle row's OverallLengthCm() gives Gun_Rifle
+    // (PackFitLengthCm); the pack's own proportions carry the silhouette
+    // order, so this row's length shapes the primitives and never the named
+    // mesh. The pack's thin muzzle faces -X (measured from LOD0 geometry by
+    // BreakerArms and by the EveryNamedGunFacesForward test), so every row
+    // pays the same 180° yaw. The EveryAuthoredGunResolves test loads each
+    // path, so a renamed asset fails the suite instead of silently restoring
+    // the primitives, which remain the fallback for a mesh that does not
+    // load. All O2.
     {
         const TCHAR* NamedGun = TEXT("Gun_Rifle");
         switch (Archetype)

@@ -571,3 +571,50 @@ bool FBreakerFernhallRuinedFolderTest::RunTest(const FString& Parameters)
     AddInfo(FString::Printf(TEXT("A rift currently builds from %s (%d pieces)."), *Chosen, Pieces.Num()));
     return true;
 }
+
+// ---------------------------------------------------------------------------
+// TWO FLOORS ON ONE PLANE IS A FLICKER. Every walkable slab in Fernhall shares
+// one top face, so a seam slab that starts at a wall's inner face and runs
+// across the yard slab beyond it is a coplanar fight, painted a different
+// colour — the ground the owner walked over into the marshalling yard. A seam
+// abuts its yard; it never lies on it. Measured over both folders, because the
+// ruin is the same floor.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerFernhallFloorsDisjointTest,
+    "RiorsEdge.Zone.Fernhall.FloorsDisjoint",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerFernhallFloorsDisjointTest::RunTest(const FString& Parameters)
+{
+    // Tops within half a centimetre are one plane; an overlap under a
+    // centimetre on either axis is an abutment, not a fight.
+    constexpr float BreakerFloorSamePlaneCm = 0.5f;
+    constexpr float BreakerFloorAbutCm = 1.0f;
+    for (const FString& Folder : { UBreakerZoneBuilder::FernhallMeshFolder(), UBreakerZoneBuilder::FernhallRiftMeshFolder() })
+    {
+        TArray<FBreakerZonePiece> Pieces;
+        if (!TestTrue(FString::Printf(TEXT("%s collects"), *Folder), UBreakerZoneBuilder::CollectZonePieces(Folder, Pieces))) return false;
+        TArray<const FBreakerZonePiece*> Floors;
+        for (const FBreakerZonePiece& Piece : Pieces)
+            if (Piece.Name.StartsWith(TEXT("flr_"))) Floors.Add(&Piece);
+        TestTrue(FString::Printf(TEXT("%s has floors"), *Folder), Floors.Num() > 0);
+        for (int32 A = 0; A < Floors.Num(); ++A)
+        {
+            for (int32 B = A + 1; B < Floors.Num(); ++B)
+            {
+                const FBreakerZonePiece& P = *Floors[A];
+                const FBreakerZonePiece& Q = *Floors[B];
+                const float TopP = P.Origin.Z + P.Extent.Z;
+                const float TopQ = Q.Origin.Z + Q.Extent.Z;
+                if (FMath::Abs(TopP - TopQ) > BreakerFloorSamePlaneCm) continue;
+                const float OverlapX = FMath::Min(P.Origin.X + P.Extent.X, Q.Origin.X + Q.Extent.X) - FMath::Max(P.Origin.X - P.Extent.X, Q.Origin.X - Q.Extent.X);
+                const float OverlapY = FMath::Min(P.Origin.Y + P.Extent.Y, Q.Origin.Y + Q.Extent.Y) - FMath::Max(P.Origin.Y - P.Extent.Y, Q.Origin.Y - Q.Extent.Y);
+                TestTrue(FString::Printf(TEXT("%s: %s and %s share a plane at Z %.1f and abut rather than overlap (overlap %.0f x %.0f cm)"),
+                    *Folder, *P.Name, *Q.Name, TopP, OverlapX, OverlapY),
+                    OverlapX <= BreakerFloorAbutCm || OverlapY <= BreakerFloorAbutCm);
+            }
+        }
+    }
+    return true;
+}

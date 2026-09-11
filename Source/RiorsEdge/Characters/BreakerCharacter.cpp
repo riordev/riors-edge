@@ -1600,13 +1600,29 @@ void ABreakerCharacter::RebuildViewmodelParts()
     // failure the primitives assemble exactly as before.
     UStaticMesh* NamedGun = ActiveLayout.NamedMeshPath.IsValid()
         ? Cast<UStaticMesh>(ActiveLayout.NamedMeshPath.TryLoad()) : nullptr;
+    FBoxSphereBounds GunBounds(ForceInit);
     if (NamedWeaponVisual)
     {
         NamedWeaponVisual->SetVisibility(NamedGun != nullptr);
         if (NamedGun)
         {
             if (NamedWeaponVisual->GetStaticMesh() != NamedGun) NamedWeaponVisual->SetStaticMesh(NamedGun);
-            const FBoxSphereBounds GunBounds = NamedGun->GetBounds();
+            GunBounds = NamedGun->GetBounds();
+            // THE PACK-SCALE LAW. The target length is this mesh's length at
+            // the scale the Rifle row gives Gun_Rifle, so every named gun
+            // wears one scale and the pack's proportions carry the order.
+            // Pinning each mesh to its own row's length drew the sniper at
+            // 0.56 against the rifle's 0.755 — a rod. When the reference
+            // fails to load the row length stands, the pre-pack rule.
+            const FBreakerViewmodelLayout RifleRow = ResolveViewmodelLayout(EBreakerWeaponArchetype::Rifle);
+            const UStaticMesh* Reference = RifleRow.NamedMeshPath.IsValid()
+                ? Cast<UStaticMesh>(RifleRow.NamedMeshPath.TryLoad()) : nullptr;
+            const float TargetLengthCm = Reference
+                ? BreakerViewmodel::PackFitLengthCm(
+                    static_cast<float>(GunBounds.BoxExtent.GetMax()),
+                    static_cast<float>(Reference->GetBounds().BoxExtent.GetMax()),
+                    RifleRow.OverallLengthCm())
+                : ActiveLayout.OverallLengthCm();
             float FitScale; FVector FitLocation;
             // Centred 4 cm BELOW the rig origin: the primitives author their
             // mass under the sight line and the first fit centred the gun ON
@@ -1615,7 +1631,7 @@ void ABreakerCharacter::RebuildViewmodelParts()
             // the source-axis yaw applied below, since the component rotates
             // before it translates.
             BreakerViewmodel::FitNamedWeapon(GunBounds.Origin, GunBounds.BoxExtent,
-                ActiveLayout.OverallLengthCm(),
+                TargetLengthCm,
                 FVector(ActiveLayout.MuzzleCm.X * 0.5f, 0.0f, -4.0f),
                 ActiveLayout.NamedMeshRotation.Quaternion(),
                 FitScale, FitLocation);
@@ -1635,9 +1651,18 @@ void ABreakerCharacter::RebuildViewmodelParts()
         {
             if (Component) Component->SetVisibility(false);
         }
-        if (PrototypeMuzzleFlash)
+        // The flash hangs on the named gun in MESH space, so the fitted scale
+        // carries it and the tracer origin (TryGetViewmodelMuzzle reads the
+        // flash) moves with it. Gun_Rifle keeps its measured front cap; every
+        // other named gun takes the front face of its bounds. O2 PLACEHOLDER
+        // until the arms commandlet measures caps for more than Gun_Rifle.
+        if (PrototypeMuzzleFlash && NamedWeaponVisual)
         {
-            PrototypeMuzzleFlash->SetRelativeLocation(ActiveLayout.MuzzleCm);
+            PrototypeMuzzleFlash->AttachToComponent(NamedWeaponVisual, FAttachmentTransformRules::KeepWorldTransform);
+            PrototypeMuzzleFlash->SetRelativeLocation(
+                ActiveLayout.NamedMeshPath.GetAssetName() == TEXT("Gun_Rifle")
+                    ? BreakerViewmodel::RifleMuzzleMeshCm
+                    : BreakerViewmodel::PackMuzzleFrontMeshCm(GunBounds.Origin, GunBounds.BoxExtent));
         }
         PoseArm(LeftArmVisual, LeftGloveVisual, SupportShoulderAnchorCm, ActiveLayout.SupportHandCm);
         PoseArm(RightArmVisual, RightGloveVisual, FiringShoulderAnchorCm, ActiveLayout.FiringHandCm);
@@ -1648,12 +1673,6 @@ void ABreakerCharacter::RebuildViewmodelParts()
         {
             for (UStaticMeshComponent* Limb : {LeftArmVisual.Get(), RightArmVisual.Get(), LeftGloveVisual.Get(), RightGloveVisual.Get()})
                 if (Limb) Limb->SetVisibility(false);
-            if (PrototypeMuzzleFlash)
-            {
-                PrototypeMuzzleFlash->AttachToComponent(NamedWeaponVisual, FAttachmentTransformRules::KeepWorldTransform);
-                if (ActiveLayout.NamedMeshPath.GetAssetName() == TEXT("Gun_Rifle"))
-                    PrototypeMuzzleFlash->SetRelativeLocation(BreakerViewmodel::RifleMuzzleMeshCm);
-            }
         }
         return;
     }

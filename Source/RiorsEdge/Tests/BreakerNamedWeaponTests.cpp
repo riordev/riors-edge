@@ -8,11 +8,10 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 // The named-gun fit is pure (BreakerViewmodel::FitNamedWeapon), so its rules
-// prove without a component: the longest bound scales to the layout's overall
-// length — which is how the silhouette-ordering law survives the swap from
-// primitives to intake meshes — the bounds origin cancels at the fitted
-// scale THROUGH the source-axis rotation, and degenerate bounds refuse at
-// identity.
+// prove without a component: the longest bound scales to the target length
+// (PackFitLengthCm's, proved by EveryNamedGunWearsThePackScale below), the
+// bounds origin cancels at the fitted scale THROUGH the source-axis
+// rotation, and degenerate bounds refuse at identity.
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerNamedWeaponFitTest,
@@ -198,6 +197,117 @@ bool FBreakerNamedWeaponFacesForwardTest::RunTest(const FString& Parameters)
         TestTrue(*FString::Printf(TEXT("%s's muzzle faces rig +X after the layout rotation (got %.2f)"),
                 *Name, RigAxis.X),
             RigAxis.X > 0.9);
+    }
+    return true;
+}
+
+// THE PACK-SCALE LAW. Every named gun wears the one scale the Rifle row gives
+// Gun_Rifle, and the pack's own proportions carry the order. The rule this
+// replaces pinned each mesh to its own row's length: the pack's sniper is
+// 1.62x its rifle, the rows are 1.2x, so the sniper drew at 0.559 against the
+// rifle's 0.755 — half the width, two-thirds the height (24.9 cm against
+// 28.2), a rod. The fit is computed here exactly as the character computes
+// it. Same gate as the resolve test; the pure pin below runs without Content.
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerNamedWeaponPackScaleTest,
+    "RiorsEdge.Weapons.NamedGun.EveryNamedGunWearsThePackScale",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerNamedWeaponPackScaleTest::RunTest(const FString& Parameters)
+{
+    // Pure pin with the measured numbers: the sniper's 85.9 half-extent at
+    // the rifle's 80 cm over 53.0 fits to 129.7; the rifle fits to its row.
+    TestEqual(TEXT("sniper keeps the pack's 1.62x at the rifle's scale"),
+        BreakerViewmodel::PackFitLengthCm(85.9f, 53.0f, 80.0f), 129.7f, 0.1f);
+    TestEqual(TEXT("the reference fits to its own row"),
+        BreakerViewmodel::PackFitLengthCm(53.0f, 53.0f, 80.0f), 80.0f, 1e-4f);
+    TestEqual(TEXT("a degenerate reference keeps the row length"),
+        BreakerViewmodel::PackFitLengthCm(85.9f, 0.0f, 80.0f), 80.0f, 1e-4f);
+    TestEqual(TEXT("the bounds front is the -X face at the bounds centre"),
+        BreakerViewmodel::PackMuzzleFrontMeshCm(FVector(4.0, -1.0, 6.0), FVector(85.9, 3.0, 16.5)),
+        FVector(-81.9, -1.0, 6.0), 1e-4f);
+
+    const FString WeaponsDir = FPaths::ProjectContentDir() / TEXT("Breaker/Meshes/weapons/sci-fi");
+    if (!IFileManager::Get().DirectoryExists(*WeaponsDir))
+    {
+        return true;
+    }
+
+    struct FFitted
+    {
+        FString Name;
+        float Scale = 0.0f;
+        float DrawnLengthCm = 0.0f;
+        float DrawnHeightCm = 0.0f;
+        FVector MuzzleMeshCm = FVector::ZeroVector;
+        FVector BoundsFrontCm = FVector::ZeroVector;
+        FRotator Rotation = FRotator::ZeroRotator;
+    };
+    const FBreakerViewmodelLayout RifleRow = BreakerViewmodel::ArchetypeLayout(EBreakerWeaponArchetype::Rifle);
+    UStaticMesh* Reference = Cast<UStaticMesh>(RifleRow.NamedMeshPath.TryLoad());
+    if (!TestNotNull(TEXT("Gun_Rifle, the pack's reference, loads"), Reference)) return false;
+    const float ReferenceHalf = static_cast<float>(Reference->GetBounds().BoxExtent.GetMax());
+
+    TArray<FFitted> Fitted;
+    for (const EBreakerWeaponArchetype Archetype :
+        {EBreakerWeaponArchetype::Sidearm, EBreakerWeaponArchetype::Rifle, EBreakerWeaponArchetype::Sniper})
+    {
+        const FBreakerViewmodelLayout Layout = BreakerViewmodel::ArchetypeLayout(Archetype);
+        FFitted& F = Fitted.AddDefaulted_GetRef();
+        F.Name = Layout.NamedMeshPath.GetAssetName();
+        F.Rotation = Layout.NamedMeshRotation;
+        UStaticMesh* Mesh = Cast<UStaticMesh>(Layout.NamedMeshPath.TryLoad());
+        if (!TestNotNull(*FString::Printf(TEXT("%s loads"), *F.Name), Mesh)) return false;
+        const FBoxSphereBounds Bounds = Mesh->GetBounds();
+        // The character's computation, step for step.
+        const float TargetLengthCm = BreakerViewmodel::PackFitLengthCm(
+            static_cast<float>(Bounds.BoxExtent.GetMax()), ReferenceHalf, RifleRow.OverallLengthCm());
+        FVector Location;
+        BreakerViewmodel::FitNamedWeapon(Bounds.Origin, Bounds.BoxExtent, TargetLengthCm,
+            FVector(Layout.MuzzleCm.X * 0.5f, 0.0f, -4.0f), Layout.NamedMeshRotation.Quaternion(),
+            F.Scale, Location);
+        const FVector RigExtent = Layout.NamedMeshRotation.RotateVector(Bounds.BoxExtent).GetAbs();
+        F.DrawnLengthCm = 2.0f * static_cast<float>(Bounds.BoxExtent.GetMax()) * F.Scale;
+        F.DrawnHeightCm = 2.0f * static_cast<float>(RigExtent.Z) * F.Scale;
+        F.BoundsFrontCm = BreakerViewmodel::PackMuzzleFrontMeshCm(Bounds.Origin, Bounds.BoxExtent);
+        F.MuzzleMeshCm = (F.Name == TEXT("Gun_Rifle"))
+            ? BreakerViewmodel::RifleMuzzleMeshCm : F.BoundsFrontCm;
+        UE_LOG(LogTemp, Display,
+            TEXT("[NamedGun] %s wears scale %.3f: drawn %.1f cm long, %.1f cm high, muzzle mesh (%.1f, %.1f, %.1f)"),
+            *F.Name, F.Scale, F.DrawnLengthCm, F.DrawnHeightCm,
+            F.MuzzleMeshCm.X, F.MuzzleMeshCm.Y, F.MuzzleMeshCm.Z);
+    }
+    const FFitted& Pistol = Fitted[0];
+    const FFitted& Rifle = Fitted[1];
+    const FFitted& Sniper = Fitted[2];
+
+    // One scale for the pack.
+    TestEqual(TEXT("the reference wears its row's scale"),
+        Rifle.Scale, RifleRow.OverallLengthCm() / (2.0f * ReferenceHalf), 1e-3f);
+    TestEqual(TEXT("the pistol wears the rifle's scale"), Pistol.Scale, Rifle.Scale, 1e-3f);
+    TestEqual(TEXT("the sniper wears the rifle's scale"), Sniper.Scale, Rifle.Scale, 1e-3f);
+
+    // The pack's proportions carry the order.
+    TestTrue(*FString::Printf(TEXT("pistol (%.1f) draws shorter than rifle (%.1f)"), Pistol.DrawnLengthCm, Rifle.DrawnLengthCm),
+        Pistol.DrawnLengthCm < Rifle.DrawnLengthCm);
+    TestTrue(*FString::Printf(TEXT("rifle (%.1f) draws shorter than sniper (%.1f)"), Rifle.DrawnLengthCm, Sniper.DrawnLengthCm),
+        Rifle.DrawnLengthCm < Sniper.DrawnLengthCm);
+    // The sniper is not a rod: its drawn height stands against the rifle's.
+    // The row-length rule gave 0.65 here; the pack gives 0.88.
+    TestTrue(*FString::Printf(TEXT("sniper height (%.1f) is at least 0.8x rifle height (%.1f)"), Sniper.DrawnHeightCm, Rifle.DrawnHeightCm),
+        Sniper.DrawnHeightCm >= 0.8f * Rifle.DrawnHeightCm);
+
+    // The flash: the rifle keeps its measured cap, the others take the front.
+    TestEqual(TEXT("rifle muzzle is the measured cap"), Rifle.MuzzleMeshCm, BreakerViewmodel::RifleMuzzleMeshCm, 1e-4f);
+    TestEqual(TEXT("pistol muzzle is its bounds front"), Pistol.MuzzleMeshCm, Pistol.BoundsFrontCm, 1e-4f);
+    TestEqual(TEXT("sniper muzzle is its bounds front"), Sniper.MuzzleMeshCm, Sniper.BoundsFrontCm, 1e-4f);
+    // The front lands ahead of the hand once the layout's yaw is applied.
+    for (const FFitted& F : {Pistol, Sniper})
+    {
+        const FVector RigMuzzle = F.Rotation.RotateVector(F.MuzzleMeshCm * F.Scale);
+        TestTrue(*FString::Printf(TEXT("%s's muzzle sits forward of the hand in rig space (%.1f)"), *F.Name, RigMuzzle.X),
+            RigMuzzle.X > 0.0);
     }
     return true;
 }

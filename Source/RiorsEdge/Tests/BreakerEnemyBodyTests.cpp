@@ -404,4 +404,63 @@ bool FBreakerEnemyBodyFacingTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// A PHASING BLINK GIVES BACK THE BODY IT TOOK, AND NOTHING ELSE. The owner:
+// "the crit spot randomly appears on enemies sometimes". On a mech body
+// ApplyBodyMesh hides the six primitives and the 40 cm gold ball (the ring
+// replaces it on the Head bone), and every re-show path — pool revive,
+// Wakeful rise, standing respawn — follows SetBodyVisible(true) with
+// ApplyBodyMesh, which hid them again. SetModifierUntargetable(false) does
+// not, and Phasing ends its blink through it every 6 s, so ~6 s into a
+// fight the carrier came back wearing the gold ball and the primitive
+// humanoid inside the mech. SetBodyVisible now re-shows only what the body
+// wears. NewObject, no world, gated on the imported mechs — the same fixture
+// as the revive pin above; the ring is not built outside a world, and the
+// rule under test must hold without it.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerEnemyBodyPhaseReturnTest,
+    "RiorsEdge.Combat.EnemyBody.PhaseReturnKeepsNamedBody",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerEnemyBodyPhaseReturnTest::RunTest(const FString& Parameters)
+{
+    const FString MechDir = FPaths::ProjectContentDir() / TEXT("Breaker/Meshes/enemies/mechs");
+    if (!IFileManager::Get().DirectoryExists(*MechDir))
+    {
+        return true;
+    }
+
+    ABreakerEnemy* Enemy = NewObject<ABreakerEnemy>();
+    if (!Enemy)
+    {
+        AddError(TEXT("Could not construct an enemy to blink."));
+        return false;
+    }
+    Enemy->ApplyBodyMesh();
+    USkeletalMeshComponent* Body = Enemy->GetNamedBody();
+    TestNotNull(TEXT("The enemy carries a named body component"), Body);
+    if (!Body) return false;
+    TestNotNull(TEXT("The shipped mesh resolved onto it"), Body->GetSkeletalMeshAsset());
+    if (!Body->GetSkeletalMeshAsset()) return false;
+    TestTrue(TEXT("The shipped mech ships a Head bone for the weak point to ride"),
+        Body->GetBoneIndex(FName(TEXT("Head"))) != INDEX_NONE);
+
+    auto* Ball = Cast<UPrimitiveComponent>(Enemy->GetDefaultSubobjectByName(TEXT("WeakPointVisual")));
+    auto* Torso = Cast<UPrimitiveComponent>(Enemy->GetDefaultSubobjectByName(TEXT("BodyVisual")));
+    TestNotNull(TEXT("The gold ball exists to be hidden"), Ball);
+    TestNotNull(TEXT("The primitive torso exists to be hidden"), Torso);
+    if (!Ball || !Torso) return false;
+
+    TestTrue(TEXT("A mech body stands visible after the fit"), Body->GetVisibleFlag());
+    TestFalse(TEXT("The fit hides the gold ball on a mech"), Ball->GetVisibleFlag());
+    TestFalse(TEXT("The fit hides the primitive torso on a mech"), Torso->GetVisibleFlag());
+
+    Enemy->SetModifierUntargetable(true);
+    Enemy->SetModifierUntargetable(false);
+
+    TestFalse(TEXT("The blink's return does not give a mech the gold ball"), Ball->GetVisibleFlag());
+    TestFalse(TEXT("The blink's return does not give a mech the primitive torso"), Torso->GetVisibleFlag());
+    TestTrue(TEXT("The named body stands through the blink"), Body->GetVisibleFlag());
+    return true;
+}
+
 #endif

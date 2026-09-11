@@ -163,8 +163,6 @@ namespace BreakerHUD
     static constexpr float DamageMagnitudeReference = 1000.0f;
     static constexpr float DamageMagnitudeGainPerDecade = 0.05f;
     static constexpr float DamageMagnitudeScaleCap = 1.15f;
-    // Overkill below a tenth of the printed number is trivia, not a mark.
-    static constexpr float DamageOverkillCaptionFraction = 0.10f;
     // The pop's peak: how far over its resting size a number swells before
     // the settle. Crits and kills pop harder than body hits. O2 PLACEHOLDER.
     static constexpr float DamagePopScale = 1.15f;
@@ -343,8 +341,11 @@ void ABreakerPlaytestHUD::DrawHUD()
         EnemyBlips.Reset();
         // What the player IS — health, resource — at the same corner as the
         // field, so the body does not move between the plaza and the fight.
+        // DrawVitals also carries the Riftglass GAIN readout, and it draws
+        // here on purpose: the 2026-09-07 removal was of the BALANCE, which
+        // belongs at the vendor and not permanently over gameplay. A fading
+        // "+N" after a salvage or a chest is not permanent and not a balance.
         DrawVitals(Character);
-        // Wallet balances belong at the vendor, not permanently over gameplay.
         DrawQuestLine(Character);
         DrawBanners(Center);
         // Who can be talked to and where the way out is, readable from
@@ -930,6 +931,31 @@ void ABreakerPlaytestHUD::DrawVitals(const ABreakerCharacter* Character)
                 BreakerUI::FormatTicker(static_cast<float>(Needed)), XpY, XpH);
         DrawTrack(RailLeft, XpY, FMath::Max(0.0f, RailRight - RailLeft), XpH, Fraction,
             BreakerUI::TextSecondary, BreakerUI::BgBase);
+    }
+
+    // --- Riftglass gains ----------------------------------------------------
+    // "no indicator for gaining riftglass" (owner, playtest 2026-09-11). The
+    // wallet is credited on kills, chests, the completion purse and salvage,
+    // and none of it reached the screen. This prints the GAIN, never the
+    // balance: the balance chip was removed on 2026-09-07 ("hide irrelevant
+    // Riftglass") and stays removed. "+12 RIFTGLASS" holding for a moment and
+    // fading is a fact about what just happened, not a figure standing over
+    // gameplay, which is why it also draws on the Anchor.
+    //
+    // The wallet publishes no seam to the HUD, so the readout diffs the
+    // balance each frame (BreakerHUDMath::FBreakerWalletGainReadout): the
+    // first read after the account folds in at spawn seeds silently, and a
+    // spend at the Forge re-bases silently.
+    if (const UBreakerEquipmentComponent* Equipment = Character->GetEquipment())
+    {
+        WalletGain.Observe(Equipment->GetForgeWallet().Riftglass, Now);
+        if (WalletGain.IsShowing(Now))
+        {
+            // One line under the LV row, at the LV row's size. O2 PLACEHOLDER placement.
+            const float GainY = S(BreakerUI::HudXpTop + BreakerUI::HudXpHeight + BreakerUI::Space8);
+            DrawSpecText(BreakerStrings::Format(EBreakerStringKey::HudWalletRiftglass, WalletGain.Pending),
+                Left, GainY, BreakerUI::Gold, BreakerUI::HudXpLevelPixels, WalletGain.Alpha(Now), ESpecFontRole::Mono);
+        }
     }
 }
 
@@ -1660,8 +1686,9 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
         // so the two states that most need separating were the two that read
         // most alike. Muted grey is unambiguous against all three of white,
         // gold and orange, and it says the right thing on sight: this one did
-        // not land. The mitigation caption underneath carries the accent, so
-        // the eye still gets one orange mark to catch.
+        // not land. Nothing prints under it: the muted face is the whole read
+        // (owner, playtest 2026-09-11: "the greyed number is enough"), and a
+        // killing blow's overkill is not printed either.
         //
         // The SIZE hierarchy is untouched. A crit that gets absorbed is still
         // a crit and still 52px — the sizes are the only thing separating a
@@ -1704,18 +1731,12 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
         // Compare the final animated glyph bounds, not the world anchor or an
         // average offset. Different rises and pop scales can otherwise place
         // ROT and ERASED on the same line even inside the old cluster budget.
+        // The number is the whole label. An absorbed hit prints muted and
+        // nothing under it; overkill is not printed.
         const FVector2D MainSize = MeasureSpecText(DamageText, SizePixels, ESpecFontRole::Mono);
-        FString CaptionText;
-        // The overkill caption goes with it, by the same ruling. The absorbed
-        // caption stays: that one says the hit did not land, which is a thing
-        // the player has to act on rather than a bigger number.
-        if (bAbsorbed)
-            CaptionText = BreakerStrings::Format(EBreakerStringKey::HudDamageAbsorbed, Number->MitigatedFraction * 100.0f);
-        const FVector2D CaptionSize = CaptionText.IsEmpty() ? FVector2D::ZeroVector
-            : MeasureSpecText(CaptionText, 13.0f, ESpecFontRole::Mono);
         const float Outline = FMath::Max(S(FMath::Max(SizePixels, 13.0f) * .05f), 1.0f);
-        const float HalfWidth = FMath::Max(MainSize.X, CaptionSize.X) * .5f + Outline;
-        const float LabelHeight = MainSize.Y + CaptionSize.Y + 2 * Outline;
+        const float HalfWidth = MainSize.X * .5f + Outline;
+        const float LabelHeight = MainSize.Y + 2 * Outline;
         const float LabelGap = S(3.0f); // O2 presentation spacing between actual glyph boxes.
         FBox2D Label(FVector2D(Screen.X - HalfWidth, NumberY - Outline),
             FVector2D(Screen.X + HalfWidth, NumberY - Outline + LabelHeight));
@@ -1738,29 +1759,6 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
         PlacedLabels.Add(Label);
         DrawOutlinedNumber(DamageText,
             Screen.X, NumberY, Face, SizePixels, DrawAlpha);
-
-        // The overkill share of a killing blow, stated as its own mark in the
-        // harm accent under the number: the number says how hard the blow
-        // was, the caption says how much of it the corpse never felt. Skipped
-        // when trivial — a sliver of overkill is trivia, not a read.
-        if (Number->bKilled && Number->Overkill >= Number->Value * BreakerHUD::DamageOverkillCaptionFraction)
-        {
-            const float NumberHeight = MainSize.Y;
-            DrawOutlinedNumber(BreakerStrings::Format(EBreakerStringKey::HudDamageOverkill, *BreakerUI::FormatDamage(Number->Overkill)),
-                Screen.X, NumberY + NumberHeight, BreakerUI::Harm, 13.0f, DrawAlpha);
-        }
-        else if (bAbsorbed)
-        {
-            // Caption under the number, at caption weight so it annotates
-            // rather than competes — the same relationship the class-resource
-            // state word has to its track. Position is MEASURED off the
-            // number's own glyph height, not a fixed nudge, so it holds at
-            // every one of the three damage sizes and at every UI scale.
-            const FString Caption = BreakerStrings::Format(EBreakerStringKey::HudDamageAbsorbed, Number->MitigatedFraction * 100.0f);
-            const float NumberHeight = MainSize.Y;
-            DrawOutlinedNumber(Caption, Screen.X, NumberY + NumberHeight,
-                BreakerUI::Orange, 13.0f, Fade);
-        }
     }
 }
 
@@ -2902,7 +2900,6 @@ void ABreakerPlaytestHUD::HandlePlayerHitDealt(const FBreakerHitContext& Hit)
             Existing.bKilled = true;
             Existing.Lifetime = BreakerHUD::DamageKillLifetime;
         }
-        Existing.Overkill += Hit.Result.OverkillDamage;
         // Deliberately NOT moving Existing.World: a merged number that chased
         // each pellet's impact point would jitter, and the first impact is as
         // honest a location as any for the sum.
@@ -2928,7 +2925,6 @@ void ABreakerPlaytestHUD::HandlePlayerHitDealt(const FBreakerHitContext& Hit)
     // the frame the round lands, beside the spark it belongs to.
     Number.Time = ArrivalTime;
     Number.bKilled = Hit.Result.bKilled;
-    Number.Overkill = Hit.Result.OverkillDamage;
     Number.Lifetime = Hit.Result.bKilled ? BreakerHUD::DamageKillLifetime
         : Hit.bFromDoT ? BreakerHUD::DamageDoTLifetime
         : BreakerHUDMath::DamageNumberLifetime(Hit.Result.bCritical);
@@ -3055,19 +3051,19 @@ void ABreakerPlaytestHUD::TickCapturePreview(const ABreakerCharacter* Character)
     struct FPreviewHit
     {
         float Value; bool bCrit; bool bWeak; float Mitigated; float Side; float Up;
-        bool bDoT = false; bool bKilled = false; float Overkill = 0.0f; bool bSecondary = false;
+        bool bDoT = false; bool bKilled = false; bool bSecondary = false;
     };
     // Every class of hit the hierarchy has to keep distinguishable at a
-    // glance: body, weak point, crit, absorbed crit, DoT tick, a killing blow
-    // with visible overkill, and a secondary (chain/ricochet) spill.
+    // glance: body, weak point, crit, absorbed crit, DoT tick, a killing
+    // blow, and a secondary (chain/ricochet) spill.
     static const FPreviewHit Hits[] = {
         { 8420.0f,   false, false, 0.00f, -1.30f,  40.0f },
         { 26800.0f,  false, true,  0.00f, -0.35f,  95.0f },
         { 148200.0f, true,  false, 0.00f,  0.55f, 150.0f },
         { 71500.0f,  true,  false, 0.47f,  1.55f,  60.0f },
         { 1240.0f,   false, false, 0.00f, -0.85f, 150.0f, true },
-        { 96400.0f,  false, false, 0.00f,  1.70f, 190.0f, false, true, 31200.0f },
-        { 6100.0f,   false, false, 0.00f, -1.75f, 100.0f, false, false, 0.0f, true },
+        { 96400.0f,  false, false, 0.00f,  1.70f, 190.0f, false, true },
+        { 6100.0f,   false, false, 0.00f, -1.75f, 100.0f, false, false, true },
     };
     for (const FPreviewHit& Hit : Hits)
     {
@@ -3080,7 +3076,6 @@ void ABreakerPlaytestHUD::TickCapturePreview(const ABreakerCharacter* Character)
         Number.Time = Now;
         Number.bFromDoT = Hit.bDoT;
         Number.bKilled = Hit.bKilled;
-        Number.Overkill = Hit.Overkill;
         Number.bSecondary = Hit.bSecondary;
         Number.Lifetime = Hit.bKilled ? BreakerHUD::DamageKillLifetime
             : Hit.bDoT ? BreakerHUD::DamageDoTLifetime
@@ -3124,6 +3119,11 @@ void ABreakerPlaytestHUD::TickCapturePreview(const ABreakerCharacter* Character)
         EnqueueBanner(EBreakerBannerKind::WaveClear, TEXT("WAVE 3 CLEAR"), FString());
         EnqueueBanner(EBreakerBannerKind::LevelUp, TEXT("LEVEL 12"), TEXT("+1 CLASS   +1 CORE"));
         EnqueueBanner(EBreakerBannerKind::RiftComplete, TEXT("FERNHALL"), TEXT("RIFT CLEARED"));
+        // A Riftglass gain on the same cadence: the harness kills nothing and
+        // opens nothing, so the wallet never moves. Seeded against the
+        // readout's own last-seen so the next real observe sees a fall and
+        // re-bases silently, exactly as a spend would.
+        WalletGain.Observe(WalletGain.LastSeen + 37, Now);
     }
 }
 

@@ -185,6 +185,26 @@ bool FBreakerActTwoRuntimeTest::RunTest(const FString& Parameters)
             TestEqual(TEXT("Report alone still requires Breach orders"), Doors(), 0);
             Journal->SetFlag(TEXT("Quest.Breach.Accepted"));
             TestEqual(TEXT("Report plus accepted orders creates one physical door"), Doors(), 1);
+            // ONE DOOR PER INTERACTION SPHERE. The earned Breach door stood on
+            // the substation door's ray at the substation's depth — "two rifts
+            // stacked on top of each other" — and the character's nearest-in-
+            // range pick opened the substation when he pressed F on the Breach
+            // he had just earned. Every pair of doors in the yard must be
+            // further apart than an interaction range, measured, not assumed.
+            {
+                TArray<ABreakerRiftDoor*> AllDoors;
+                for (TActorIterator<ABreakerRiftDoor> It(World); It; ++It) AllDoors.Add(*It);
+                TestTrue(TEXT("The yard holds the substation door and the earned Breach door"), AllDoors.Num() >= 2);
+                for (int32 A = 0; A < AllDoors.Num(); ++A)
+                    for (int32 B = A + 1; B < AllDoors.Num(); ++B)
+                    {
+                        const float Apart = FVector::Dist2D(AllDoors[A]->GetActorLocation(), AllDoors[B]->GetActorLocation());
+                        const float Range = FMath::Max(AllDoors[A]->GetInteractionRange(), AllDoors[B]->GetInteractionRange());
+                        TestTrue(*FString::Printf(TEXT("Doors %s and %s stand %.0f cm apart, beyond one interaction range (%.0f cm)"),
+                            *AllDoors[A]->Rift.EncounterId.ToString(), *AllDoors[B]->Rift.EncounterId.ToString(), Apart, Range),
+                            Apart > Range);
+                    }
+            }
             Mode->HandleStartingNewPlayer_Implementation(Controller);
             TestEqual(TEXT("Repeated startup cannot duplicate contact"), Contacts().Num(), 1);
             TestEqual(TEXT("Repeated startup cannot duplicate Breach door"), Doors(), 1);

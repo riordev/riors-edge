@@ -209,8 +209,10 @@ bool FBreakerLocomotionFacingTest::RunTest(const FString& Parameters)
 
     // Shipped configuration: the base enemy's weave is real, and the weave at
     // its authored strength is still closing on the player (NAV-1's cone),
-    // so a blocked chase still paths and the face-on-player rule has feet
-    // to hold against.
+    // so a blocked chase still paths, and a body that turns WITH its weave
+    // (NAV-4's default — no facing pinned to the player, which on a rig
+    // with one forward Walk cycle was a slide) never owes more than the
+    // cone's own turn: the weave cannot stall it.
     const ABreakerEnemy* Defaults = GetDefault<ABreakerEnemy>();
     TestNotNull(TEXT("The base enemy's defaults resolve"), Defaults);
     if (Defaults)
@@ -222,8 +224,8 @@ bool FBreakerLocomotionFacingTest::RunTest(const FString& Parameters)
         const FVector Weave = (Approach + Lateral * Strength).GetSafeNormal2D();
         TestTrue(TEXT("The weave at full strength never leaves the closing cone"),
             FVector::DotProduct(Weave, Approach) >= PathAlignCos);
-        TestEqual(TEXT("A weaving body with its face on the player owes no turn"),
-            AlignedSpeedScale(Approach, FacingFor(EBreakerLocomotionMode::Steer, Approach, Weave, FVector::ZeroVector)), 1.0f);
+        TestTrue(TEXT("A weaving body faces its weave and the weave never stalls it"),
+            AlignedSpeedScale(Approach, FacingFor(EBreakerLocomotionMode::Steer, FVector::ZeroVector, Weave, FVector::ZeroVector)) >= PathAlignCos);
     }
     return true;
 }

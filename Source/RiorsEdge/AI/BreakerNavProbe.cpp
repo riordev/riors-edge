@@ -337,6 +337,15 @@ namespace
             const float Facing = BreakerNavProbeDegreesBetween2D(BodyForward, Enemy->GetActorForwardVector());
             const float ToPlayer = BreakerNavProbeDegreesBetween2D(BodyForward,
                 Target->GetActorLocation() - Enemy->GetActorLocation());
+            // slide: that same visual forward against the way the body is
+            // actually moving. A rig with one forward Walk cycle and no
+            // strafe reads as sliding past this — the owner's "walking
+            // offset" — so it is judged, outside the states that legitimately
+            // stand (PATROL's arrival hold, HELD), attack in place, or back
+            // off facing the player. Zero while the body stands.
+            const float Slide = Mover && Mover->Velocity.SizeSquared2D() > 0.0f
+                ? BreakerNavProbeDegreesBetween2D(BodyForward, Mover->Velocity)
+                : 0.0f;
             const FString StateLabel = Enemy->GetEnemyStateLabel();
             // turn: the actor's yaw delta across the sample interval, in
             // deg/s. The first sample has nothing to differ against and
@@ -349,8 +358,8 @@ namespace
             State->bHasPreviousYaw = true;
             if (!State->bCover)
             {
-                UE_LOG(LogTemp, Display, TEXT("[BreakerNavProbe] t=%.1f dist=%.0f state=%s mode=%s touches=%d nav=%s facing=%.0f toplayer=%.0f turn=%.0f"),
-                    Elapsed, Distance, *StateLabel, Mode, Touches, Nav, Facing, ToPlayer, Turn);
+                UE_LOG(LogTemp, Display, TEXT("[BreakerNavProbe] t=%.1f dist=%.0f state=%s mode=%s touches=%d nav=%s facing=%.0f toplayer=%.0f slide=%.0f turn=%.0f"),
+                    Elapsed, Distance, *StateLabel, Mode, Touches, Nav, Facing, ToPlayer, Slide, Turn);
             }
             else
             {
@@ -363,8 +372,8 @@ namespace
                 const bool bHasGoal = Ranged && Ranged->GetCoverGoal(Goal);
                 const FString CoverText = bHasGoal
                     ? FString::Printf(TEXT("(%.0f,%.0f)"), Goal.X, Goal.Y) : FString(TEXT("none"));
-                UE_LOG(LogTemp, Display, TEXT("[BreakerNavProbe] t=%.1f dist=%.0f state=%s mode=%s touches=%d nav=%s facing=%.0f toplayer=%.0f turn=%.0f los=%d cover=%s"),
-                    Elapsed, Distance, *StateLabel, Mode, Touches, Nav, Facing, ToPlayer, Turn, bLos ? 1 : 0, *CoverText);
+                UE_LOG(LogTemp, Display, TEXT("[BreakerNavProbe] t=%.1f dist=%.0f state=%s mode=%s touches=%d nav=%s facing=%.0f toplayer=%.0f slide=%.0f turn=%.0f los=%d cover=%s"),
+                    Elapsed, Distance, *StateLabel, Mode, Touches, Nav, Facing, ToPlayer, Slide, Turn, bLos ? 1 : 0, *CoverText);
                 if (State->bCoverPlaced && !State->bReacquired)
                 {
                     const float SinceCover = static_cast<float>(World->GetTimeSeconds() - State->CoverPlacedTime);
@@ -386,6 +395,19 @@ namespace
             {
                 UE_LOG(LogTemp, Display, TEXT("[BreakerNavProbe] FACING FAIL body forward is %.0f deg off the actor's forward (tolerance %.0f)"),
                     Facing, BreakerNavProbeFacingToleranceDeg);
+            }
+            // A body that faces the player by rule while its feet go elsewhere
+            // is not a slide: the melee's BACK OFF, and the ranged class in every
+            // band (BreakerRangedEnemy pins DesiredFacing to the player, so its
+            // FALLING BACK is a reverse walk and its HOLDING / AIMING strafe is
+            // the muzzle held on the target). Only a body that is supposed to
+            // walk where it looks can fail this.
+            if (Slide > BreakerNavProbeFacingToleranceDeg && StateLabel != TEXT("PATROL") && StateLabel != TEXT("HELD")
+                && StateLabel != TEXT("ATTACK") && StateLabel != TEXT("BACK OFF")
+                && StateLabel != TEXT("FALLING BACK") && StateLabel != TEXT("HOLDING") && StateLabel != TEXT("AIMING"))
+            {
+                UE_LOG(LogTemp, Display, TEXT("[BreakerNavProbe] SLIDE FAIL body forward is %.0f deg off its velocity (tolerance %.0f)"),
+                    Slide, BreakerNavProbeFacingToleranceDeg);
             }
             if (Turn > Enemy->MaxTurnRateDegreesPerSecond + BreakerNavProbeTurnSlackDegPerSecond)
             {

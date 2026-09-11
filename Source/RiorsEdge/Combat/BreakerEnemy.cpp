@@ -1199,10 +1199,14 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
     // sideways while it came round. The speed scale is now multiplied by the
     // cosine of the turn still owed, against the facing the body WANTS, not
     // the capped one it gets this frame: a body 90 degrees off stands and
-    // turns; a retreat and a strafe still face the player, so they are
-    // unaffected. The committed lunge locks ToPlayer at the end of a wind-up
-    // the body spent facing the player, so its owed turn is whatever the
-    // player strafed during the tell — a few degrees, not a stall.
+    // turns; a retreat and a strafe still face the player (they set
+    // DesiredFacing explicitly), so they are unaffected. A weaving melee
+    // body asks for no facing and faces where it steers, weave included:
+    // the weave is inside NAV-1's cone, so the turn it owes each half-cycle
+    // is cos 31 at worst, never a stall. The committed lunge locks ToPlayer
+    // at the end of a wind-up the body spent facing the player, so its owed
+    // turn is whatever the player strafed during the tell — a few degrees,
+    // not a stall.
     const FVector CurrentForward = GetActorForwardVector();
     const FVector WantedFacing = BreakerLocomotionMath::FacingFor(
         Mover ? Mover->GetLastMode() : EBreakerLocomotionMode::Steer,
@@ -1234,10 +1238,17 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
             bHasPathGoal, PathGoal);
     }
 
-    // THE GAIT FOLLOWS THE GROUND SPEED. The named body's walk plays as a
-    // single-node loop; its rate is the body's planar speed over MoveSpeed,
-    // so a held body stands still instead of treadmilling and a closing body
-    // strides faster instead of sliding.
+    // THE GAIT FOLLOWS THE GROUND SPEED, AND ITS SIGN. The named body's walk
+    // plays as a single-node loop; its rate is the body's velocity along its
+    // own forward over MoveSpeed, so a held body stands still instead of
+    // treadmilling, a closing body strides faster instead of sliding, and a
+    // body backing off with its face on the player (the Retreat band) plays
+    // its Walk in reverse instead of moonwalking — the rate used to be the
+    // unsigned planar speed, so a body walking backwards at 0.6 strode
+    // forward at 0.6. A single-node sequence advances by rate x time and
+    // wraps when looping, so a negative rate is a legal reverse. The hit
+    // one-shot is left at the rate it was started with: it is not a gait,
+    // and reversing a flinch would be a new wrong.
     // O2 PLACEHOLDER: the reference speed is MoveSpeed until each sequence's
     // stride is measured; a sequence whose authored stride does not cover
     // MoveSpeed per cycle still slides by the ratio.
@@ -1245,10 +1256,13 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
     // STEER adds input to the integrating mover. StopChase aborts only an
     // active path; repeated steering frames retain velocity. A path-to-steer
     // transition may stop the path follower once before steering resumes.
-    if (Mover && NamedBody && MoveSpeed > 0.0f && NamedBody->IsPlaying())
+    if (Mover && NamedBody && MoveSpeed > 0.0f && NamedBody->IsPlaying() && !bBodyHitPlaying)
     {
         constexpr float MaxRate = 2.0f;   // O2 PLACEHOLDER
-        NamedBody->SetPlayRate(FMath::Clamp(Mover->Velocity.Size2D() / MoveSpeed, 0.0f, MaxRate));
+        const FVector PlanarVelocity(Mover->Velocity.X, Mover->Velocity.Y, 0.0);
+        const float AlongForward = static_cast<float>(
+            FVector::DotProduct(PlanarVelocity, GetActorForwardVector().GetSafeNormal2D()));
+        NamedBody->SetPlayRate(FMath::Clamp(AlongForward / MoveSpeed, -MaxRate, MaxRate));
     }
 }
 
@@ -1348,16 +1362,17 @@ void ABreakerEnemy::TickEngagedBehaviour(AActor* Player, float Distance, float D
         const FVector Lateral = FVector::CrossProduct(FVector::UpVector, Approach).GetSafeNormal2D();
         const float Weave = FMath::Sin((WeaveTime + PatrolPhase) * WeaveFrequency) * WeaveStrength;
         OutDirection = (Approach + Lateral * Weave).GetSafeNormal2D();
-        // THE FEET WEAVE, THE FACE STAYS ON THE PLAYER. The facing step
-        // states it for every strafer, and a weave at 0.6 is a 31 degree
-        // strafe on every half-cycle; a body that faced its weave walked at
-        // the player looking past its own shoulder. Steering only: a pathing
-        // body's feet are the follower's, not the weave's, and it faces the
-        // leg it walks (NAV-4).
-        if (DesiredFacing.IsNearlyZero() && (!Mover || Mover->GetLastMode() != EBreakerLocomotionMode::Path))
-        {
-            DesiredFacing = ToPlayer;
-        }
+        // THE FACE GOES WHERE THE FEET GO. This used to pin DesiredFacing to
+        // the player while the feet walked the weave, so the body "looked at
+        // the player over its shoulder" — on a rig with one forward Walk
+        // cycle and no strafe cycle, that was a nearest-fit fake: a body
+        // facing the camera squarely translating 31 degrees off its nose
+        // every half-cycle, and up to 60 off it when the arrival angle was
+        // in too. The owner saw the slide. No DesiredFacing here: the facing
+        // step's NAV-4 default stands, a steering body faces the direction
+        // it steers, and the weave is drawn by the whole body turning with
+        // it. A pathing body's feet are the follower's, and it faces the leg
+        // it walks, as before.
     }
 
     // (c) SKITTER's committed leap (Encounter-Design §2.1). Three stages:
@@ -1570,11 +1585,34 @@ float ABreakerEnemy::GetEffectiveSpreadDegrees(float AuthoredSpreadDegrees, floa
 
 void ABreakerEnemy::SetBodyVisible(bool bVisible)
 {
+    // ONLY WHAT THE BODY WEARS COMES BACK. This used to re-show the six
+    // primitives and the 40 cm gold ball on every true, and every re-show
+    // path but one followed it with ApplyBodyMesh, which hid them again. The
+    // one that did not is SetModifierUntargetable(false): the Phasing
+    // modifier's blink ends through it every 6 s, so a Phasing carrier came
+    // back wearing the gold ball and the primitive humanoid inside the mech —
+    // the "crit spot that randomly appears" the owner reported. A named body
+    // keeps its primitives hidden; the ball stays hidden when the weak point
+    // rides the named Head (ApplyBodyMesh's own test, restated here rather
+    // than read from the ring, because the ring is built only inside a
+    // world and the no-world fixture must see the same answer). The ring
+    // follows the blink and the death one-shot like the rest of the drawing.
+    // NamedBody is deliberately not in this list: the mech corpse stands
+    // through its death one-shot (HandleDeathPresentationFinished) and the
+    // Wakeful down hides it itself. RECORDED GAP: for the same reason a
+    // Phasing blink on a mech body hides only the ring — the mech itself
+    // stays drawn through its 0.35 s untargetable window, so the tell is
+    // the ring going out and the shots passing through, not an absence.
+    static const FName BreakerHeadBoneName(TEXT("Head"));
+    const bool bNamed = NamedBody && NamedBody->GetSkeletalMeshAsset() != nullptr;
+    const bool bWeakPointRidesNamedHead = bNamed && NamedBody->GetBoneIndex(BreakerHeadBoneName) != INDEX_NONE;
     for (UStaticMeshComponent* Part : { BodyVisual.Get(), HeadVisual.Get(), LeftArmVisual.Get(),
-        RightArmVisual.Get(), LeftLegVisual.Get(), RightLegVisual.Get(), WeakPointVisual.Get() })
+        RightArmVisual.Get(), LeftLegVisual.Get(), RightLegVisual.Get() })
     {
-        if (Part) Part->SetVisibility(bVisible, true);
+        if (Part) Part->SetVisibility(bVisible && !bNamed, true);
     }
+    if (WeakPointVisual) WeakPointVisual->SetVisibility(bVisible && !bWeakPointRidesNamedHead, true);
+    if (WeakPointRing) WeakPointRing->SetVisibility(bVisible, true);
 }
 
 void ABreakerEnemy::HandleDeath()

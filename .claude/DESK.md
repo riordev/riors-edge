@@ -1,37 +1,5 @@
 # Desk — next playtest
 
-## Cycle — OWNER PLAYTEST, 2026-09-11 (SEVENTH) — DEFECTS
-
-His words, one item each. "Audio bug was on my end" — dropped.
-
-- [ ] "enemies are still walking offset" (frame: two SKITTER mechs; the
-      left one is yawed to its right of its travel line, the right one
-      faces the camera). The QuadShell fix was not this; scout the Skitter
-      mech's fit and its hold-band strafe before any edit.
-- [ ] "the sniper is just a small little rod in your hand" (frame: SNIPER,
-      a thin short bar). Gun_Sniper is scaled to the row's silhouette
-      length — its long axis is probably not the axis the fit reads.
-- [ ] "the floor when walking from the substation into the marshalling yard
-      flickers super heavily … there's an offset tile set close to the
-      marshalling yard" — two floor slabs overlapping on one Z.
-- [ ] "I killed the marshalling yard guy and didn't get a quest complete
-      because there's two rifts stacked on top of each other for entering
-      the breach and killing the field marshal" — two rift doors at one
-      spot; the one he took did not carry the beat's encounter.
-- [ ] "nothing came back with you — it's just bad" — he closed a rift on
-      this build and the pack got nothing listed. O270's two items are paid
-      on OnRiftCompleted; find why the ledger was empty (the stacked-door
-      run above may not have been a completion, or the equipment component
-      / acquired event is not what the ledger hears). Scout, don't assume.
-- [ ] "overkill damage is still appearing … we don't need the plus over" —
-      delete the "+N OVER" line.
-- [ ] "damage absorbed doesn't need a text — 'damage absorbed −35%' — the
-      greyed number is enough" — delete the label, keep the grey.
-- [ ] "the crit spot randomly appears on enemies sometimes" — the weak-point
-      marker shows when it should not; find the condition.
-- [ ] "there's no indicator for gaining riftglass anywhere" — a pickup /
-      award readout, the same shape as XP's.
-
 ## Cycle — OWNER PLAYTEST, 2026-09-11 (SEVENTH) — LIVING
 
 - [ ] "damage is super high … a lot of things one-shot my character in the
@@ -85,6 +53,51 @@ His words, for ORDERS.md and rulings before any hand touches them:
   renew-and-grow. Node: "R2: a zone cast over a live one lands 1 m wider."
   LingeringPaidRadius pins the wider disc admitting a body the first
   missed.
+
+## OWNER PLAYTEST, 2026-09-11 (SEVENTH) — LANDED, THE DEFECTS
+
+- "enemies are still walking offset" — the Skitters are the base enemy on
+  the Stan rig, both playtests; the fit is exact (0.0° on all four mech
+  rigs). The slide was my sixth-cycle rule: face pinned to the player
+  while the feet weave, on a rig with one Walk and no strafe cycle. A
+  steering body walks where it faces now, and the weave is a zig-zag it
+  turns through; a retreating body plays its Walk in reverse. The nav
+  probe prints a `slide` column (body forward vs velocity).
+  QUESTION: a body that keeps its face on him while it juke-steps needs a
+  strafe cycle the mech pack does not ship.
+- "the sniper is just a small little rod" — the scale law: every gun was
+  stretched to its placeholder row's length, so the pack's 1.6×-longer
+  sniper wore 0.56 against the rifle's 0.755 and hung below the frame.
+  Every named gun wears the pack's own scale now (the Rifle row against
+  Gun_Rifle); the flash sits at each mesh's bounds front. PHOTOGRAPHED:
+  a rifle with a scope, on the arms. The SMG rod went with it — it is the
+  rifle's size, being the rifle's mesh.
+- "the floor flickers … an offset tile set near the marshalling yard" —
+  three seam slabs lay ON their yard slabs at Y=0 (3×10 m, 10×4 m,
+  0.5×10 m), painted a different colour. The composer cuts them to abut;
+  both GLBs re-exported and the six seam meshes re-imported through the
+  scripted pipeline. FloorsDisjoint pins: floors on one plane abut, never
+  overlap. FOUND: a gap between slabs is not checked; a follow-up test.
+- "two rifts stacked … no quest complete" — the earned Breach door was
+  placed on the substation door's ray at its depth; nearest-in-range
+  opened the SUBSTATION run, whose Holdfast the boss banner mislabelled
+  "FIELD MARSHAL". The door stands 10 m off the centreline now (O2) and
+  the banner names the boss that fell. ActTwo pins one door per
+  interaction sphere.
+- "nothing came back with you" — the run ledger was opened 240 lines
+  before bRiftInstance was set, so it never bound in ANY run: the two
+  O270 items were paid and nobody was listening, and the debrief's
+  Riftglass / XP were the whole wallet, not the run's. Opened after the
+  flag now. LedgerHearsTheCompletion pins loot count and the purse.
+- "+N OVER" — the draw survived 3b90700a's half-delete; gone, with its
+  key. "damage absorbed −35%" — gone; the muted number is the read (O208
+  amended). "the crit spot randomly appears" — a Phasing enemy's blink
+  re-showed the hidden gold sphere and primitive body inside the mech;
+  SetBodyVisible keeps a named body's hidden parts hidden.
+- "no indicator for gaining riftglass" — "+N RIFTGLASS" fades in under the
+  LV row on any gain, accumulating across kills (kill income is 0-1 a
+  body); a spend prints nothing. The balance stays hidden (his 09-07
+  ruling); a fading gain is not a permanent chip.
 
 ## OWNER RULINGS, 2026-09-11 — LANDED
 

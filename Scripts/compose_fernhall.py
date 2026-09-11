@@ -251,7 +251,11 @@ for i, (x, z) in enumerate(((32.0, 17.0), (32.0, -17.0), (62.0, 17.0), (62.0, -1
 # The dog-leg is the no-through-sight term made of geometry: east 15 m, then
 # north 14 m. 29 m walked, under the 30 m ceiling, and nothing at either mouth
 # can see the other.
-place("flr_seam_a", "pavement", (108.5, -0.06, 14.0), (15.0, 0.06, 10.0))
+# Seam slabs ABUT the yard slabs; they do not lie on them. Every floor here
+# shares one top face (Y=0), and a seam that started at the wall's inner face
+# ran 3 m across the yard slab that runs 4.5 m past the perimeter line — two
+# floors on one plane, painted different colours, is the flicker he walked over.
+place("flr_seam_a", "pavement", (110.0, -0.06, 14.0), (12.0, 0.06, 10.0))
 place("flr_seam_b", "pavement", (111.0, -0.06, 26.0), (10.0, 0.06, 14.0))
 # Seam walls. The OUTSIDE of the corner is what blocks the sightline.
 place("wall_seam_s", "garage", (108.5, 0.0, 8.5), (15.0, 7.0, 3.0))
@@ -302,8 +306,8 @@ for i, (fwd, dz) in enumerate(((26.0, 17.0), (26.0, -17.0), (56.0, 17.0), (56.0,
 # (28 m, under 30), and it TURNS so neither mouth can see the other. It leaves
 # through the substation's NORTH flank and turns EAST, away from the entry yard,
 # which is what keeps three yards on one plane without any of them overlapping.
-place("flr_seam2_a", "pavement", (135.0, -0.06, 90.0), (10.0, 0.06, 10.0))
-place("flr_seam2_b", "pavement", (142.0, -0.06, 100.0), (24.0, 0.06, 10.0))
+place("flr_seam2_a", "pavement", (135.0, -0.06, 92.0), (10.0, 0.06, 6.0))
+place("flr_seam2_b", "pavement", (141.75, -0.06, 100.0), (23.5, 0.06, 10.0))
 # THE OUTSIDE OF THE CORNER IS WHAT BLOCKS THE SIGHTLINE. The wall that matters
 # is the third one: without it a body standing at the depot mouth can see
 # diagonally across the corner to the substation mouth, which is the exact

@@ -44,9 +44,6 @@ bool FBreakerStringsLoadsTest::RunTest(const FString& Parameters)
         BreakerStrings::Get(EBreakerStringKey::HudBackpackFull).Replace(TEXT("%d"), TEXT("25")));
     TestEqual(TEXT("A %s row formats"), BreakerStrings::Format(EBreakerStringKey::HudPromptKeyed, TEXT("ENTER")),
         BreakerStrings::Get(EBreakerStringKey::HudPromptKeyed).Replace(TEXT("%s"), TEXT("ENTER")));
-    TestEqual(TEXT("A %.0f%% row formats and keeps its literal percent"),
-        BreakerStrings::Format(EBreakerStringKey::HudDamageAbsorbed, 42.0f),
-        BreakerStrings::Get(EBreakerStringKey::HudDamageAbsorbed).Replace(TEXT("%.0f"), TEXT("42")).Replace(TEXT("%%"), TEXT("%")));
     TestEqual(TEXT("A fixed row formats to itself"), BreakerStrings::Format(EBreakerStringKey::BarBoss),
         BreakerStrings::Get(EBreakerStringKey::BarBoss));
     return true;
