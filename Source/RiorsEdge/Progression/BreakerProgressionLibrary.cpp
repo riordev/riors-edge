@@ -1398,13 +1398,13 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterVoidWhispererTree(
     // The AbilityDuration lane is the node's perceptible half: zones linger
     // longer per rank (O2 PLACEHOLDER, consumed by Rot's
     // ComputeEffectiveDurationSeconds on the spawn and refresh paths). O271:
-    // a recast spawns a new puddle and nothing merges, so the only refresh a
-    // zone still receives is Wellspring's following puddle renewed by a
-    // recast; R2's one-time metre is claimed there
-    // (RiorsEdge.Abilities.RotPurchasedZones pins it). QUESTION, RECORDED: whether R2
-    // should instead grow a puddle cast over a live one is the owner's.
+    // a recast spawns a new puddle and nothing merges. R2's metre is a rule
+    // about the NEW puddle: cast over a live one, it lands 1 m bigger
+    // (RiorsEdge.Abilities.LingeringPaidRadius); Wellspring's following
+    // puddle, renewed by a recast, grows the same metre once
+    // (RiorsEdge.Abilities.RotPurchasedZones).
     Node = MakeNode(TEXT("Caster.VoidWhisperer.Lingering"), TEXT("Lingering"),
-        TEXT("Zones linger longer. R2: a refreshed zone grows by 1 m, once."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 2, 2, 1);
+        TEXT("Zones linger longer. R2: a zone cast over a live one lands 1 m wider."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.StandingWater"));
     AddEffect(Node, EBreakerNodeStatTarget::AbilityDuration, EBreakerNodeStatBucket::IncreasedPercent, 15.0f); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Lingering.GetTag());

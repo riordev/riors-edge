@@ -1,5 +1,13 @@
 # Desk — next playtest
 
+## LINGERING R2 — LANDED
+
+- A Rot cast over a live own Rot (within half a radius) lands 1 m wider;
+  the live ones are untouched; the following puddle keeps its
+  renew-and-grow. Node: "R2: a zone cast over a live one lands 1 m wider."
+  LingeringPaidRadius pins the wider disc admitting a body the first
+  missed.
+
 ## OWNER RULINGS, 2026-09-11 — LANDED
 
 - O203: the Elite's bar fills in the Exceptional rarity colour; every other

@@ -292,6 +292,19 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     // looking at got a little longer and no new puddle appeared. Two puddles
     // still cannot double-strip the same target; that guard is the zone
     // actor's own key, not a merge at the spawner.
+    //
+    // LINGERING R2 IS A RULE ABOUT THE NEW PUDDLE. "A zone cast over a live
+    // one grows by 1 m": the ground you keep working stays worked. Half a
+    // radius is the same overlap the old merge read, so the gesture that used
+    // to do nothing now lands a bigger disc. A fresh zone is grown once by
+    // construction; the old one is not touched. (Owner, on the desk's
+    // question; the following puddle keeps its renew-and-grow.)
+    if (!bFollowCaster
+        && Character->GetProgression()->GetNodeRank(TEXT("Caster.VoidWhisperer.Lingering"), EBreakerPointCurrency::DoctrinePoints) >= 2
+        && ABreakerZoneActor::FindRefreshableZone(World, Spec.ZoneTag, Character, Center, EffectiveRadiusCm, 0.5f))
+    {
+        Spec.RadiusCm += LingeringRefreshGrowthCm;
+    }
     FActorSpawnParameters SpawnParams;
     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     SpawnParams.Owner = Character;

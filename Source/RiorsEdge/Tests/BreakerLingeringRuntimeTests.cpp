@@ -108,16 +108,29 @@ bool FBreakerLingeringRuntimeTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("actual rank two purchase"), Progression->PurchaseNode(Tree, TEXT("Caster.VoidWhisperer.Lingering"), Reason))) return false;
     TestEqual(TEXT("path spends exactly four Doctrine"), Wallet - Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 4);
     Mana->AdvanceLoop(30); // Ordinary recovery between the rank-one and rank-two observations.
-    // R2's metre is claimed on a REFRESH, and under O271 a recast is not one:
-    // a third cast over the pair is a third puddle at the authored radius.
-    // The refresh that still grows a zone is Wellspring's following puddle
-    // renewed by a recast; RiorsEdge.Abilities.RotPurchasedZones pins the metre there,
-    // RecastSpawnsNew and the zone's own AntiStack test cover the geometry.
+    // R2 is a rule about the NEW puddle: cast over a live one it lands a
+    // metre wider, and the live ones are not touched. A fresh zone is grown
+    // once by construction.
+    const float Growth = GetDefault<UBreakerAbility_Rot>()->LingeringRefreshGrowthCm;
     auto* Third = Cast(Aim);
     if (!Third) return false;
     TestTrue(TEXT("rank two recast is still a new zone"), Third != Zone && Third != Second);
-    TestEqual(TEXT("rank two recast does not grow the live zone"), Zone->GetSpec().RadiusCm, InitialRadius);
-    TestEqual(TEXT("rank two recast starts unexpanded"), Third->GetSpec().RadiusCm, InitialRadius);
+    TestEqual(TEXT("rank two recast does not grow the live zones"), Zone->GetSpec().RadiusCm, InitialRadius);
+    TestEqual(TEXT("rank two recast lands a metre wider"), Third->GetSpec().RadiusCm, InitialRadius + Growth, 0.01f);
+    auto* Enemy = World->SpawnActor<ABreakerEnemy>(FVector(800, InitialRadius + 50, 100), FRotator::ZeroRotator);
+    if (!Enemy) return false;
+    Enemy->SetActorTickEnabled(false);
+    auto* EnemyHealth = FindObject<UBreakerAttributeSet>(Enemy, TEXT("Attributes"));
+    auto* EnemyCombat = Enemy->FindComponentByClass<UBreakerCombatComponent>();
+    if (!EnemyHealth || !EnemyCombat) return false;
+    auto* EnemyASC = Enemy->GetAbilitySystemComponent(); EnemyASC->InitAbilityActorInfo(Enemy, Enemy); EnemyASC->AddAttributeSetSubobject(EnemyHealth);
+    EnemyHealth->ApplyMaxHealth(1000); EnemyHealth->ApplyHealth(1000); EnemyCombat->BindAttributes(EnemyHealth);
+    Zone->AdvanceZone(.5f);
+    TestEqual(TEXT("the first zone still misses a body beyond its radius"), EnemyHealth->GetHealth(), 1000.0f);
+    Third->AdvanceZone(.5f);
+    TestEqual(TEXT("the wider zone admits it"), Third->GetOccupantCount(), 1);
+    Third->AdvanceZone(.5f);
+    TestTrue(TEXT("and delivers real damage"), EnemyHealth->GetHealth() < 1000);
     auto* Fresh = Cast(FVector(800, -1400, 0));
     if (!Fresh) return false;
     TestTrue(TEXT("separate paid placement creates new zone"), Fresh != Zone);
