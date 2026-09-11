@@ -91,6 +91,13 @@ public:
     UFUNCTION(BlueprintCallable, Category="Abilities") void RefreshGrants();
 
     UFUNCTION(BlueprintCallable, Category="Abilities") bool TryActivateSlot(EBreakerAbilitySlot Slot);
+    // O178/O266: a casting ability announces itself at the LANDING, not the
+    // press. TryActivateSlot withholds OnAbilityActivated for an ability that
+    // is still winding up when the press returns; the ability's own resolve
+    // calls this when the wind-up lands, and the interrupt and cancel paths
+    // never do. The slot is read back off the spec's InputID, which the grant
+    // wrote.
+    void NotifyCastResolved(FGameplayAbilitySpecHandle Handle);
     UFUNCTION(BlueprintPure, Category="Abilities") FName GetAbilityIdForSlot(EBreakerAbilitySlot Slot) const;
     UFUNCTION(BlueprintPure, Category="Abilities") UBreakerAbilityDefinition* GetDefinitionForSlot(EBreakerAbilitySlot Slot) const;
     UFUNCTION(BlueprintPure, Category="Abilities") bool IsSlotImplemented(EBreakerAbilitySlot Slot) const;

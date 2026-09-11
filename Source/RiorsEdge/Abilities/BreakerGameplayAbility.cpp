@@ -501,6 +501,16 @@ bool UBreakerGameplayAbility::BeginCastIfNeeded(const FGameplayAbilitySpecHandle
         // and the ability's own body finally runs.
         ActivateAbility(Handle, ActorInfo, ActivationInfo, nullptr);
         bCastCommitted = false;
+        // O178: THE CUE FIRES AT THE LANDING. TryActivateSlot withheld its
+        // OnAbilityActivated because this ability was still casting when the
+        // press returned; the resolution is the moment the ability exists, so
+        // this is where the slot is announced. The interrupt and cancel paths
+        // clear the timer and never reach here, which is the point.
+        ABreakerCharacter* Character = GetBreakerCharacter();
+        if (UBreakerAbilityComponent* Abilities = Character ? Character->GetAbilities() : nullptr)
+        {
+            Abilities->NotifyCastResolved(Handle);
+        }
     });
     World->GetTimerManager().SetTimer(CastTimer, Resolve, Seconds, false);
     return false;

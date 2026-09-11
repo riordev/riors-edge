@@ -60,34 +60,23 @@ bool UBreakerAbility_Rot::ShouldFollowCaster(const AActor* OwnerActor, bool bGro
         && FVector::Dist2D(OwnerActor->GetActorLocation(), HitPoint) <= WellspringSelfPlacementRadiusCm;
 }
 
-void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
+void UBreakerAbility_Rot::SolveAim(const ABreakerCharacter& Character, const UWorld& World, FAimSolve& Out) const
 {
-    // O266: the wind-up. Returns false when it has started a cast — the cost
-    // is already paid, the window is open, and this function is called again
-    // when the wind-up completes. Zero authored cast time is a no-op.
-    if (!BeginCastIfNeeded(Handle, ActorInfo, ActivationInfo)) return;
-    ABreakerCharacter* Character = GetBreakerCharacter();
-    UWorld* World = Character ? Character->GetWorld() : nullptr;
-    if (!World || !CommitAbility(Handle, ActorInfo, ActivationInfo))
-    {
-        EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-        return;
-    }
-
-    FVector ViewLocation = Character->GetActorLocation();
-    FRotator ViewRotation = Character->GetControlRotation();
-    if (const AController* Controller = Character->GetController())
+    FVector ViewLocation = Character.GetActorLocation();
+    FRotator ViewRotation = Character.GetControlRotation();
+    if (const AController* Controller = Character.GetController())
     {
         Controller->GetPlayerViewPoint(ViewLocation, ViewRotation);
     }
 
     FHitResult Hit;
-    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(BreakerRotAim), false, Character);
+    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(BreakerRotAim), false, &Character);
     const FVector TraceEnd = ViewLocation + ViewRotation.Vector() * MaximumRangeCm;
-    const bool bHit = World->LineTraceSingleByChannel(Hit, ViewLocation, TraceEnd, ECC_GameTraceChannel2, QueryParams);
-    const bool bFollowCaster = ShouldFollowCaster(Character, bHit, Hit.ImpactPoint, Hit.ImpactNormal);
-    FVector Center = bFollowCaster ? Hit.ImpactPoint
+    const bool bHit = World.LineTraceSingleByChannel(Hit, ViewLocation, TraceEnd, ECC_GameTraceChannel2, QueryParams);
+    Out.bFollowCaster = ShouldFollowCaster(&Character, bHit, Hit.ImpactPoint, Hit.ImpactNormal);
+    Out.Center = Out.bFollowCaster ? Hit.ImpactPoint
         : AimPoint(ViewLocation, ViewRotation.Vector(), MaximumRangeCm, bHit, Hit.ImpactPoint);
+    FVector& Center = Out.Center;
 
     // AND THEN IT FALLS TO THE FLOOR. Owner: "rot looks so weird casting
     // sometimes its in the air". AimPoint's own comment says a trace that hits
@@ -102,13 +91,13 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     // still finds the surface it belongs on.
     {
         TArray<FHitResult> Ground;
-        FCollisionQueryParams GroundQuery(SCENE_QUERY_STAT(BreakerRotFloor), false, Character);
+        FCollisionQueryParams GroundQuery(SCENE_QUERY_STAT(BreakerRotFloor), false, &Character);
         constexpr float LiftCm = 400.0f;     // O2 PLACEHOLDER
         constexpr float ReachCm = 4000.0f;   // O2 PLACEHOLDER
         // EVERY SURFACE UNDER THE AIM POINT, not just the first one. The rule
         // that picks among them is BreakerRotFloor::PickFloorZ, which is pure
         // and tested; this is only the part that has to touch a world.
-        World->LineTraceMultiByObjectType(Ground, Center + FVector(0, 0, LiftCm),
+        World.LineTraceMultiByObjectType(Ground, Center + FVector(0, 0, LiftCm),
             Center - FVector(0, 0, ReachCm), FCollisionObjectQueryParams(ECC_WorldStatic), GroundQuery);
         TArray<BreakerRotFloor::FProbeHit> Probe;
         Probe.Reserve(Ground.Num());
@@ -133,6 +122,58 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
         // It is also the wrong rule generally — this correction should only
         // ever fire on EVIDENCE of a floor, never on the absence of one.
     }
+}
+
+bool UBreakerAbility_Rot::PrepareCast()
+{
+    // THE PUDDLE LANDS WHERE THE PRESS POINTED, not where the reticle drifted
+    // to during the wind-up (O266: the wind-up delays the resolution, not the
+    // press). Solved here, before the price, and held until the landing.
+    // Never a refusal: a mis-aim is a puddle in the wrong place, and a key
+    // that does nothing is the worse feedback. A snapshot left over from a
+    // cast that never landed — a refused commit, an interrupt — is simply
+    // overwritten by the next press's solve.
+    const ABreakerCharacter* Character = GetBreakerCharacter();
+    const UWorld* World = Character ? Character->GetWorld() : nullptr;
+    bAimSnapshotValid = false;
+    if (!Character || !World) return true;
+    SolveAim(*Character, *World, CastAimSnapshot);
+    bAimSnapshotValid = true;
+    return true;
+}
+
+void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
+{
+    // O266: the wind-up. Returns false when it has started a cast — the cost
+    // is already paid, the window is open, and this function is called again
+    // when the wind-up completes. Zero authored cast time is a no-op.
+    if (!BeginCastIfNeeded(Handle, ActorInfo, ActivationInfo)) return;
+    ABreakerCharacter* Character = GetBreakerCharacter();
+    UWorld* World = Character ? Character->GetWorld() : nullptr;
+    if (!World || !CommitAbility(Handle, ActorInfo, ActivationInfo))
+    {
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+        return;
+    }
+
+    // THE AIM COMES FROM THE CAST START WHEN THERE WAS ONE. PrepareCast solved
+    // it at the press; this is the landing, and re-solving here would let the
+    // puddle follow the crosshair through the wind-up, which is the drift the
+    // owner reported. With no authored cast time there is no snapshot and the
+    // same solve runs inline, which is what keeps a zero-cast-time build
+    // identical.
+    FAimSolve Aimed;
+    if (bAimSnapshotValid)
+    {
+        bAimSnapshotValid = false;
+        Aimed = CastAimSnapshot;
+    }
+    else
+    {
+        SolveAim(*Character, *World, Aimed);
+    }
+    const bool bFollowCaster = Aimed.bFollowCaster;
+    const FVector Center = Aimed.Center;
 
     // AND THE CAST IS VISIBLE AT THE CASTER. Rot drew NOTHING at the character
     // — this file did not even include the renderer — so the whole ability was

@@ -302,6 +302,15 @@ bool FBreakerEnemyBodyReviveResetTest::RunTest(const FString& Parameters)
 // her), the fitted forward lands within 15 degrees of +X, and on a built
 // enemy the body's world forward agrees with the actor's. Gated on the
 // imported mechs existing, exactly as the cast pin is.
+//
+// The Lattice is in the cast, not exempt from it: its QuadShell names every
+// limb Front_/Back_ and offered none of the biped pairs, so it stood at
+// identity facing +Y and its hold-band strafe read as walking backwards.
+// The pair table now carries Front_Shoulder_L/R. Because the pure half
+// (yaw the pair's forward onto +X) is true by construction whatever axis
+// the pair yields, a rig that also has a Back_Shoulder_L gives a SECOND,
+// independent axis — front minus back is forward by the plain meaning of
+// the words — and the fitted forward must agree with it.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerEnemyBodyFacingTest,
     "RiorsEdge.Combat.EnemyBody.NamedBodyFacesActorForward",
@@ -322,13 +331,25 @@ bool FBreakerEnemyBodyFacingTest::RunTest(const FString& Parameters)
         return FMath::RadiansToDegrees(static_cast<float>(
             FMath::Acos(FMath::Clamp(FVector::DotProduct(FlatA, FlatB), -1.0, 1.0))));
     };
+    // A bone's component-space ref-pose position, composed up through every
+    // parent to the root — the same walk the fit's own reader makes.
+    const auto ComponentSpaceRefPosition = [](const FReferenceSkeleton& Ref, int32 BoneIndex) -> FVector
+    {
+        const TArray<FTransform>& Pose = Ref.GetRefBonePose();
+        FTransform Composed = FTransform::Identity;
+        for (int32 Bone = BoneIndex; Bone != INDEX_NONE; Bone = Ref.GetParentIndex(Bone))
+        {
+            Composed = Composed * Pose[Bone];
+        }
+        return Composed.GetLocation();
+    };
 
     int32 MeshesChecked = 0;
+    int32 SecondAxesChecked = 0;
     for (TObjectIterator<UClass> It; It; ++It)
     {
         if (!It->IsChildOf(ABreakerEnemy::StaticClass())) continue;
         if (It->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists)) continue;
-        if (It->IsChildOf(ABreakerRangedEnemy::StaticClass())) continue;
         const ABreakerEnemy* Defaults = It->GetDefaultObject<ABreakerEnemy>();
         if (!Defaults || !Defaults->BodyMeshAsset.IsValid()) continue;
         USkeletalMesh* Mesh = Cast<USkeletalMesh>(Defaults->BodyMeshAsset.TryLoad());
@@ -348,6 +369,22 @@ bool FBreakerEnemyBodyFacingTest::RunTest(const FString& Parameters)
         TestTrue(FString::Printf(TEXT("%s's fitted forward is within %.0f deg of +X (was %.1f)"), *Name, FacingToleranceDeg, FittedOffDeg),
             FittedOffDeg <= FacingToleranceDeg);
 
+        // The independent second axis: a rig with a front and a back
+        // shoulder on the same side says which way is forward without a
+        // left/right pair, and the fit's answer must agree with it.
+        const FReferenceSkeleton& Ref = Mesh->GetRefSkeleton();
+        const int32 FrontLeft = Ref.FindBoneIndex(FName(TEXT("Front_Shoulder_L")));
+        const int32 BackLeft = Ref.FindBoneIndex(FName(TEXT("Back_Shoulder_L")));
+        if (FrontLeft != INDEX_NONE && BackLeft != INDEX_NONE)
+        {
+            ++SecondAxesChecked;
+            const FVector FrontMinusBack = ComponentSpaceRefPosition(Ref, FrontLeft) - ComponentSpaceRefPosition(Ref, BackLeft);
+            const float SecondAxisOffDeg = DegreesBetween2D(
+                Fit.RelativeRotation.RotateVector(MeshForward), Fit.RelativeRotation.RotateVector(FrontMinusBack));
+            TestTrue(FString::Printf(TEXT("%s's fitted forward is within %.0f deg of its front-minus-back shoulder axis (was %.1f)"),
+                *Name, FacingToleranceDeg, SecondAxisOffDeg), SecondAxisOffDeg <= FacingToleranceDeg);
+        }
+
         // The wired half: a built enemy's body forward agrees with its actor.
         ABreakerEnemy* Enemy = NewObject<ABreakerEnemy>(GetTransientPackage(), *It);
         if (!Enemy)
@@ -361,6 +398,9 @@ bool FBreakerEnemyBodyFacingTest::RunTest(const FString& Parameters)
             BodyOffDeg <= FacingToleranceDeg);
     }
     TestTrue(TEXT("At least one shipped mech was checked"), MeshesChecked > 0);
+    // The Lattice's QuadShell ships Front_Shoulder_L and Back_Shoulder_L; a
+    // cast where no rig offered the second axis is a cast the check never ran on.
+    TestTrue(TEXT("At least one shipped rig offered a front/back second axis"), SecondAxesChecked > 0);
     return true;
 }
 

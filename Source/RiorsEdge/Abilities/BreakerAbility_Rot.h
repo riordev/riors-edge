@@ -4,8 +4,10 @@
 #include "Abilities/BreakerCasterAbility.h"
 #include "BreakerAbility_Rot.generated.h"
 
+class ABreakerCharacter;
 class ABreakerZoneActor;
 class UBreakerAttributeSet;
+class UWorld;
 
 // C3 Rot (Class-Kits §2.2, Ability-Implementation-Spec §5.3): 25 Mana, no
 // cooldown. "4 m radius zone at the aim point, 6s duration. Enemies inside take
@@ -81,6 +83,25 @@ public:
 
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
+    // THE AIM IS READ AT THE PRESS. O266's wind-up delays the RESOLUTION, not
+    // the press, and Rot was reading its whole aim — view, trace, floor probe,
+    // Wellspring's follow decision — on the far side of the 0.6 s. Owner: "rot
+    // has a tendency to not go off when pressed or off at another target
+    // location"; the reticle had moved on and the puddle went where it was
+    // pointing at the landing. The solve now runs here, at cast start, in
+    // Resonance's shape: snapshot at the press, consume at the landing. Rot
+    // never refuses on aim (AimPoint's own comment: a mis-aim is a puddle in
+    // the wrong place, not a swallowed input), so this always returns true.
+    virtual bool PrepareCast() override;
+
+    // Everything the aim decides, in one value: the centre after the floor
+    // probe and whether Wellspring makes the puddle ride the caster.
+    struct FAimSolve
+    {
+        FVector Center = FVector::ZeroVector;
+        bool bFollowCaster = false;
+    };
+
     // Pure rule: where the puddle lands. A zone dropped at the point the trace
     // hit is right for a floor; a zone dropped at the far end of a trace that
     // hit NOTHING must still be placed somewhere the player expects, which is
@@ -100,6 +121,16 @@ public:
     float ComputeEffectiveDurationSeconds(const AActor* OwnerActor) const;
     bool ShouldFollowCaster(const AActor* OwnerActor, bool bGroundHit, const FVector& HitPoint, const FVector& HitNormal) const;
 
+private:
+    // The whole aim question in one place, so the cast start and the
+    // no-cast-time path cannot ask it differently. Reads the world, writes
+    // nothing on the ability.
+    void SolveAim(const ABreakerCharacter& Character, const UWorld& World, FAimSolve& Out) const;
+
+    FAimSolve CastAimSnapshot;
+    bool bAimSnapshotValid = false;
+
+public:
     // Class-Kits §2.2 C3: 4 m radius, 6 s.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float RadiusCm {}; // O246: authored in Data/abilities.json.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float DurationSeconds {}; // O246: authored in Data/abilities.json.

@@ -40,6 +40,10 @@ public:
     // count; the ground snap owns the floor.
     int32 GetWorldTouchCount() const { return WorldTouchCount; }
     EBreakerLocomotionMode GetLastMode() const { return LastMode; }
+    // The leg the path follower is walking this body along, as a unit
+    // direction, or zero when it holds no path. The facing rule reads this
+    // and not the velocity, which the speed scale can erase.
+    FVector GetPathHeading() const;
 
     // A parked or revived body starts still, with nothing counted against it.
     void ResetForRevive();

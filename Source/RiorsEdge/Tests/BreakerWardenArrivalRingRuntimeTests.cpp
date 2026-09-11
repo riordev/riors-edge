@@ -88,6 +88,11 @@ bool FBreakerWardenArrivalRingRuntimeTest::RunTest(const FString& Parameters)
     // direction.
     const FVector Start(900.0f, 0.0f, 0.0f);
     Warden->SetActorLocation(Start);
+    // Facing the target already. A spawn faces +X, which here is straight
+    // away from the player, and TURN BEFORE WALK (NAV-4) stands a body that
+    // is 180 degrees off until it has come round at 100 deg/s -- longer than
+    // this leg. The ring is what is measured; the turn is another test's.
+    Warden->SetActorRotation((Player->GetActorLocation() - Start).GetSafeNormal2D().Rotation());
     ++GFrameCounter;
     World->Tick(LEVELTICK_All, 0.02f);
     // A guard rather than the proof — Advance is also the band's default, so

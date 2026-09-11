@@ -8887,36 +8887,22 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             const FLinearColor MarkerRing = bRoleLayout && !bOwned && bPurchasable ? Rung.Core : Rung.Ring;
             const float NodeSize = bRoleLayout ? RoleMarkerSize * RoleMarkerScale(Node->CoreRole) : 44.0f;
             const TSharedRef<SWidget> Core = MakeMarkerCore(Kind, Rung.Core, MarkerFill, NodeSize);
-            TSharedRef<SWidget> Marker = bFocused && !bSealed
+            // THE OVERVIEW BUYS. Owner: "you should be able to left click
+            // nodes we dont need the focus menu when you click into it". The
+            // role overview's marker used to be an inert border inside its own
+            // button whose click opened the wedge, so the one board the player
+            // reads from was the one board he could not buy on. Now it is the
+            // same WireMarker as the focused wedge: hover shows the rail card,
+            // click buys a rank, Shift-click buys to max, a locked node
+            // discloses why. Zoom and pan survive the purchase rebuild. The
+            // wedge is still reachable from the CONSTELLATIONS list in the
+            // rail. Sealed nodes stay an inert border.
+            const TSharedRef<SWidget> Marker = (bFocused || bRoleLayout) && !bSealed
                 ? WireMarker(CoreTree, Node, View, bPurchasable, LockReason, MarkerFill, MarkerRing, RingWidth, Core, NodeSize)
                 : StaticCastSharedRef<SWidget>(SNew(SBorder)
                     .BorderImage(BreakerMenuNodeBrush(NodeSize, MarkerFill, MarkerRing, RingWidth))
                     .BorderBackgroundColor(FLinearColor::White).Padding(FMargin(0.0f))
                     .HAlign(HAlign_Center).VAlign(VAlign_Center)[Core]);
-            if (bRoleLayout && !bFocused)
-            {
-                const FName WedgeId = Node->Constellation;
-                // THE OVERVIEW EXPLAINS ON HOVER TOO. Owner: "the nodes should
-                // have their names then when hovered how they help your
-                // character so you dont always have to click into the tree".
-                // This button used to carry a Slate tooltip of name and rank —
-                // a floating widget this project draws nowhere else and the
-                // capture harness cannot photograph — while the rail beside the
-                // board sat empty until a wedge was opened. Same handler as
-                // WireMarker's, so the rail shows the same card from either
-                // view. Click still opens the wedge.
-                Marker = SNew(SButton).ContentPadding(0)
-                    .ButtonStyle(BreakerMenuNodeButtonStyle(NodeSize, MarkerFill, MarkerRing, RingWidth))
-                    .ButtonColorAndOpacity(FLinearColor::White)
-                    .OnHovered(FSimpleDelegate::CreateLambda([this, View]()
-                    {
-                        SkillDetailNodeId = View.NodeId;
-                        if (SkillDetailHost.IsValid()) SkillDetailHost->SetContent(MakeSkillDetailCard(View));
-                    }))
-                    .OnClicked(FOnClicked::CreateLambda([this, WedgeId]()
-                    { SkillExpandedConstellation = WedgeId; ResetBoardView(); Rebuild(EBreakerMenuScreen::SkillTrees); return FReply::Handled(); }))
-                    [Marker];
-            }
             AddLabel(*Center, bRoleLayout ? FVector2D(NodeSize, NodeSize) : bFocused ? FVector2D(44, 44) : FVector2D(32, 32), Marker);
 
             // MORE OF THE NODE AS YOU COME CLOSER. Owner: "as you zoom in you
@@ -9004,8 +8990,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         // markers and named none of them: nothing on the wheel said which
         // spoke was PRECISION. The names come back at the fit zoom's scale,
         // alternating radii so twenty-two of them have the arc to be read.
-        // Not buttons — the markers already open their wedge on click and the
-        // CONSTELLATIONS list already offers a named button for each.
+        // Not buttons — the markers buy on click, and the CONSTELLATIONS list
+        // is what opens a wedge, with a named button for each.
         if (!bFocused && bRoleLayout)
         {
             for (int32 W = 0; W < Layout.Wedges.Num(); ++W)

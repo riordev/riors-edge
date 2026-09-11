@@ -590,6 +590,9 @@ FVector ABreakerEnemy::ReadBodyMeshForwardAxis(const USkeletalMesh* Mesh)
         { FName(TEXT("Shoulder_L")), FName(TEXT("Shoulder_R")) },
         { FName(TEXT("UpperArm_L")), FName(TEXT("UpperArm_R")) },
         { FName(TEXT("UpperLeg_L")), FName(TEXT("UpperLeg_R")) },
+        // The QuadShell's pair: its rig names every limb Front_/Back_, so it
+        // matched none of the biped pairs, stood at identity and faced +Y.
+        { FName(TEXT("Front_Shoulder_L")), FName(TEXT("Front_Shoulder_R")) },
     };
     for (const auto& Pair : BreakerBilateralPairs)
     {
@@ -1184,8 +1187,28 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
     // behaviour asked for, the body rotates toward it by at most
     // MaxTurnRateDegreesPerSecond this frame. The lunge and skitter lock a
     // DIRECTION, not a facing, and are not touched by this.
-    FVector Facing = DesiredFacing.IsNearlyZero() ? DesiredDirection : DesiredFacing;
-    Facing = ComputeCappedFacing(GetActorForwardVector(), Facing, MaxTurnRateDegreesPerSecond, DeltaSeconds);
+    //
+    // NAV-4: which way, and how fast while turning, are the mover's rule
+    // (AI/BreakerLocomotionMath). A body on a path faces the leg the follower
+    // is walking, not the chase line this function handed over; the mode read
+    // is last frame's, because this frame's Drive has not run yet, and the
+    // leg is the follower's own segment, not a velocity the speed scale
+    // below could erase. Then TURN BEFORE WALK: the cap
+    // rotates the body 1.7 degrees a frame but the mover used to take the
+    // full direction the same frame, so a body spawned at zero yaw sprinted
+    // sideways while it came round. The speed scale is now multiplied by the
+    // cosine of the turn still owed, against the facing the body WANTS, not
+    // the capped one it gets this frame: a body 90 degrees off stands and
+    // turns; a retreat and a strafe still face the player, so they are
+    // unaffected. The committed lunge locks ToPlayer at the end of a wind-up
+    // the body spent facing the player, so its owed turn is whatever the
+    // player strafed during the tell — a few degrees, not a stall.
+    const FVector CurrentForward = GetActorForwardVector();
+    const FVector WantedFacing = BreakerLocomotionMath::FacingFor(
+        Mover ? Mover->GetLastMode() : EBreakerLocomotionMode::Steer,
+        DesiredFacing, DesiredDirection, Mover ? Mover->GetPathHeading() : FVector::ZeroVector);
+    SpeedScale *= BreakerLocomotionMath::AlignedSpeedScale(CurrentForward, WantedFacing);
+    const FVector Facing = ComputeCappedFacing(CurrentForward, WantedFacing, MaxTurnRateDegreesPerSecond, DeltaSeconds);
     if (!Facing.IsNearlyZero()) SetActorRotation(Facing.Rotation());
 
     // The safe-zone edge is decided here, on the behaviour's own step, before
@@ -1325,6 +1348,16 @@ void ABreakerEnemy::TickEngagedBehaviour(AActor* Player, float Distance, float D
         const FVector Lateral = FVector::CrossProduct(FVector::UpVector, Approach).GetSafeNormal2D();
         const float Weave = FMath::Sin((WeaveTime + PatrolPhase) * WeaveFrequency) * WeaveStrength;
         OutDirection = (Approach + Lateral * Weave).GetSafeNormal2D();
+        // THE FEET WEAVE, THE FACE STAYS ON THE PLAYER. The facing step
+        // states it for every strafer, and a weave at 0.6 is a 31 degree
+        // strafe on every half-cycle; a body that faced its weave walked at
+        // the player looking past its own shoulder. Steering only: a pathing
+        // body's feet are the follower's, not the weave's, and it faces the
+        // leg it walks (NAV-4).
+        if (DesiredFacing.IsNearlyZero() && (!Mover || Mover->GetLastMode() != EBreakerLocomotionMode::Path))
+        {
+            DesiredFacing = ToPlayer;
+        }
     }
 
     // (c) SKITTER's committed leap (Encounter-Design §2.1). Three stages:

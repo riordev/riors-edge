@@ -123,4 +123,45 @@ namespace BreakerLocomotionMath
         const FVector Rotated = FRotator(0.0f, Sign * OffsetDeg, 0.0f).RotateVector(Bearing);
         return FVector(Target.X + Rotated.X * RingRadius, Target.Y + Rotated.Y * RingRadius, Target.Z);
     }
+
+    // Which way the body faces (NAV-4). An explicit facing — the Lattice's
+    // muzzle on the player while its feet strafe, the melee's face on the
+    // player while its feet weave — wins outright. Without one, a body on a
+    // path faces the leg the path follower is walking it along, which is
+    // not the chase line the behaviour handed over; a steering body faces
+    // the direction it steers. The leg is read from the follower's own
+    // segment, never from the velocity: the aligned speed scale below
+    // writes the speed that decides the velocity, and a rule that read the
+    // velocity back fed itself — zero speed, no heading, chase line, full
+    // speed, leg, zero speed — and the body jittered instead of turning.
+    // A pathing body with no segment yet faces the direction.
+    inline FVector FacingFor(EBreakerLocomotionMode Mode, const FVector& DesiredFacing,
+        const FVector& Direction, const FVector& PathHeading)
+    {
+        if (!DesiredFacing.IsNearlyZero()) return DesiredFacing.GetSafeNormal2D();
+        if (Mode == EBreakerLocomotionMode::Path && !PathHeading.IsNearlyZero())
+        {
+            return PathHeading.GetSafeNormal2D();
+        }
+        return Direction.GetSafeNormal2D();
+    }
+
+    // Turn before walk. The facing is rate-capped (100 deg/s) but the mover
+    // took the full direction the same frame, so a body spawned at zero yaw
+    // sprinted sideways while it was still turning. The speed scale is the
+    // cosine of the angle the body still has to turn, floored at zero: a
+    // body 90 degrees off stands and turns, one a few degrees off barely
+    // notices, one facing away stands until it has come round. The
+    // comparison is against where the body WANTS to face, not where it walks,
+    // so a retreat (facing the player, walking away) and a strafe are at
+    // full speed the whole time. Either side zero — no forward yet, or no
+    // facing asked for — is a 1: the rule only ever slows a body that has a
+    // turn to make.
+    inline float AlignedSpeedScale(const FVector& CurrentForward, const FVector& Facing)
+    {
+        const FVector Forward = CurrentForward.GetSafeNormal2D();
+        const FVector Face = Facing.GetSafeNormal2D();
+        if (Forward.IsNearlyZero() || Face.IsNearlyZero()) return 1.0f;
+        return FMath::Max(0.0f, static_cast<float>(FVector::DotProduct(Forward, Face)));
+    }
 }

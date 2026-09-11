@@ -157,6 +157,77 @@ bool FBreakerLocomotionArrivalGoalTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// NAV-4. Which way the body faces and how fast it may walk while it still
+// has a turn to make, proven without a world. An explicit facing wins (the
+// strafer's muzzle, the weaver's face); a pathing body faces the leg the
+// follower walks, not the chase line; a steering body faces its direction.
+// Turn before walk: the speed scale is the cosine of the turn still owed,
+// floored at zero, and a retreat — facing the player, walking away — owes
+// no turn and loses no speed. Shipped configuration: the base enemy weaves,
+// and the weave at its authored strength never leaves the closing cone.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerLocomotionFacingTest,
+    "RiorsEdge.AI.Locomotion.FacingAndAlignedSpeed",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerLocomotionFacingTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerLocomotionMath;
+    const FVector PlusX(1.0f, 0.0f, 0.0f);
+    const FVector PlusY(0.0f, 1.0f, 0.0f);
+    const FVector MinusX(-1.0f, 0.0f, 0.0f);
+    const FVector Leg(0.0f, 1.0f, 0.0f);          // the follower's segment
+
+    TestTrue(TEXT("An explicit facing beats the direction whatever the mode"),
+        FacingFor(EBreakerLocomotionMode::Steer, PlusX, PlusY, Leg).Equals(PlusX, 1e-4f));
+    TestTrue(TEXT("An explicit facing beats the leg on a path"),
+        FacingFor(EBreakerLocomotionMode::Path, PlusX, PlusY, Leg).Equals(PlusX, 1e-4f));
+    TestTrue(TEXT("A pathing body faces the leg it walks, not the chase line"),
+        FacingFor(EBreakerLocomotionMode::Path, FVector::ZeroVector, PlusX, Leg).Equals(PlusY, 1e-4f));
+    TestTrue(TEXT("A pathing body with no segment yet faces the direction"),
+        FacingFor(EBreakerLocomotionMode::Path, FVector::ZeroVector, PlusX, FVector::ZeroVector).Equals(PlusX, 1e-4f));
+    TestTrue(TEXT("A leg that is 180 degrees off is still the heading: the speed scale stands the body and turns it, the heading does not move"),
+        FacingFor(EBreakerLocomotionMode::Path, FVector::ZeroVector, PlusX, MinusX).Equals(MinusX, 1e-4f));
+    TestTrue(TEXT("A steering body faces its direction, whatever the follower holds"),
+        FacingFor(EBreakerLocomotionMode::Steer, FVector::ZeroVector, PlusX, Leg).Equals(PlusX, 1e-4f));
+    TestTrue(TEXT("A held body with no facing asked for faces nothing"),
+        FacingFor(EBreakerLocomotionMode::Idle, FVector::ZeroVector, FVector::ZeroVector, FVector::ZeroVector).IsNearlyZero());
+    TestTrue(TEXT("The facing is planar"),
+        FMath::IsNearlyZero(FacingFor(EBreakerLocomotionMode::Steer, FVector(1.0f, 0.0f, 5.0f), PlusY, Leg).Z));
+
+    TestEqual(TEXT("No turn owed walks at full speed"), AlignedSpeedScale(PlusX, PlusX), 1.0f);
+    TestTrue(TEXT("A body 90 degrees off stands and turns"), FMath::IsNearlyZero(AlignedSpeedScale(PlusX, PlusY), 1e-6f));
+    TestEqual(TEXT("A body facing away stands until it has come round"), AlignedSpeedScale(PlusX, MinusX), 0.0f);
+    TestEqual(TEXT("A retreat faces the player and walks away at full speed"),
+        AlignedSpeedScale(PlusX, FacingFor(EBreakerLocomotionMode::Steer, PlusX, MinusX, FVector::ZeroVector)), 1.0f);
+    TestEqual(TEXT("A strafe faces the player and walks sideways at full speed"),
+        AlignedSpeedScale(PlusX, FacingFor(EBreakerLocomotionMode::Steer, PlusX, PlusY, FVector::ZeroVector)), 1.0f);
+    TestEqual(TEXT("No forward yet is no turn owed"), AlignedSpeedScale(FVector::ZeroVector, PlusX), 1.0f);
+    TestEqual(TEXT("No facing asked for is no turn owed"), AlignedSpeedScale(PlusX, FVector::ZeroVector), 1.0f);
+    const float HalfTurn = AlignedSpeedScale(PlusX, (PlusX + PlusY).GetSafeNormal());
+    TestTrue(TEXT("45 degrees off walks at cos 45"), FMath::IsNearlyEqual(HalfTurn, 0.70711f, 1e-4f));
+
+    // Shipped configuration: the base enemy's weave is real, and the weave at
+    // its authored strength is still closing on the player (NAV-1's cone),
+    // so a blocked chase still paths and the face-on-player rule has feet
+    // to hold against.
+    const ABreakerEnemy* Defaults = GetDefault<ABreakerEnemy>();
+    TestNotNull(TEXT("The base enemy's defaults resolve"), Defaults);
+    if (Defaults)
+    {
+        const float Strength = Defaults->GetWeaveStrength();
+        TestTrue(TEXT("The base enemy weaves"), Strength > 0.0f);
+        const FVector Approach = PlusX;
+        const FVector Lateral = FVector::CrossProduct(FVector::UpVector, Approach).GetSafeNormal2D();
+        const FVector Weave = (Approach + Lateral * Strength).GetSafeNormal2D();
+        TestTrue(TEXT("The weave at full strength never leaves the closing cone"),
+            FVector::DotProduct(Weave, Approach) >= PathAlignCos);
+        TestEqual(TEXT("A weaving body with its face on the player owes no turn"),
+            AlignedSpeedScale(Approach, FacingFor(EBreakerLocomotionMode::Steer, Approach, Weave, FVector::ZeroVector)), 1.0f);
+    }
+    return true;
+}
+
 // The shipped configuration: every fielded enemy class is possessed on spawn
 // by the NAV controller, carries the NAV mover, and the project's navmesh
 // generates at runtime — the ini line that, lost, would leave every level

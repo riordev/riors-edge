@@ -751,9 +751,45 @@ bool UBreakerAbilityComponent::TryActivateSlot(EBreakerAbilitySlot Slot)
         // Broadcast here rather than inside each ability: this is the one
         // funnel every input path already goes through, and it fires on the
         // machine that pressed the key, which is where the HUD lives.
-        OnAbilityActivated.Broadcast(Slot);
+        //
+        // UNLESS THE ABILITY IS STILL CASTING. The HUD plays the cast cue off
+        // this broadcast, and firing it on the press dinged 0.6 s before Rot
+        // existed — and dinged for a cast a hit then interrupted (owner:
+        // "theres a ding everytime you press it but it shouldnt do that if
+        // you dont cast it"). O178: KIT owns WHEN the cue fires, and for a
+        // wind-up that is the landing — NotifyCastResolved, from the
+        // ability's own resolve. An instant verb is announced here as before.
+        // GAPS, recorded: a PrepareCast refusal (Resonance on a bare target)
+        // has already ended the ability by the time this reads, so it is
+        // announced exactly as an instant refusal always was — a dead key
+        // still dings, and closing that needs "did the body do anything",
+        // which no ability reports yet. And a remote client's instance never
+        // casts (a ServerOnly press is handed to the server), so a client
+        // still hears the press; the server's landing broadcast is its own.
+        const FGameplayAbilitySpec* Activated = ASC->FindAbilitySpecFromHandle(Handle);
+        const UBreakerGameplayAbility* Instance = Activated
+            ? Cast<UBreakerGameplayAbility>(Activated->GetPrimaryInstance()) : nullptr;
+        if (!Instance || !Instance->IsCasting())
+        {
+            OnAbilityActivated.Broadcast(Slot);
+        }
     }
     return bActivated;
+}
+
+void UBreakerAbilityComponent::NotifyCastResolved(FGameplayAbilitySpecHandle Handle)
+{
+    UAbilitySystemComponent* ASC = GetAbilitySystem();
+    const FGameplayAbilitySpec* Spec = ASC ? ASC->FindAbilitySpecFromHandle(Handle) : nullptr;
+    if (!Spec) return;
+    // The grant wrote the slot into InputID (RefreshGrants), so it is read
+    // back rather than searched for. A spec that reached the ASC some other
+    // way — a fixture handing an ability straight to it — carries INDEX_NONE
+    // and has no slot to announce.
+    const int32 InputId = Spec->InputID;
+    if (InputId < static_cast<int32>(EBreakerAbilitySlot::ClassAbilityOne)
+        || InputId > static_cast<int32>(EBreakerAbilitySlot::Ultimate)) return;
+    OnAbilityActivated.Broadcast(static_cast<EBreakerAbilitySlot>(InputId));
 }
 
 void UBreakerAbilityComponent::ServerActivateSlot_Implementation(EBreakerAbilitySlot Slot)

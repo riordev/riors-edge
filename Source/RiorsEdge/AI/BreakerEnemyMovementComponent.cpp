@@ -1,5 +1,6 @@
 #include "AI/BreakerEnemyMovementComponent.h"
 #include "AI/BreakerEnemyController.h"
+#include "Navigation/PathFollowingComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
@@ -141,4 +142,13 @@ void UBreakerEnemyMovementComponent::SnapToGround(float DeltaTime)
             : FMath::Min(TargetZ, CurrentZ + 600.0f * DeltaTime);
         UpdatedComponent->SetWorldLocation(FVector(Location.X, Location.Y, NewZ), false);
     }
+}
+
+FVector UBreakerEnemyMovementComponent::GetPathHeading() const
+{
+    const ABreakerEnemyController* Controller = PawnOwner
+        ? Cast<ABreakerEnemyController>(PawnOwner->GetController()) : nullptr;
+    const UPathFollowingComponent* Following = Controller ? Controller->GetPathFollowingComponent() : nullptr;
+    if (!Following || !Following->HasValidPath()) return FVector::ZeroVector;
+    return Following->GetCurrentDirection().GetSafeNormal2D();
 }

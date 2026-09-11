@@ -478,12 +478,10 @@ void ABreakerPlaytestHUD::DrawHUD()
     // callout was the fourth and the only one that interrupted aiming.
 
     // The old fixed-position damage readout is gone: floating world-space
-    // numbers say the same thing at the impact point. Only the weak-point
-    // callout survives, because it is a skill confirmation, not a value.
-    if (bRecentShot && Shot && Shot->bHit && Shot->bWeakPoint)
-    {
-        DrawSpecText(BreakerStrings::Get(EBreakerStringKey::HudCalloutWeakPoint), Center.X + S(24.0f), Center.Y + S(18.0f), BreakerUI::Gold, 11.0f, 1.0f, ESpecFontRole::Display);
-    }
+    // numbers say the same thing at the impact point. The weak-point word
+    // went with it: the number, the mark, the flash and the spark all go
+    // gold, and a word beside the reticle was the one tell that read as
+    // text (owner: "does not need to be there").
 
     // Latch elite kills: the shot feedback window is far shorter than the
     // time this callout should stay readable.

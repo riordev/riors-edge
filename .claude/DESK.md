@@ -1,5 +1,17 @@
 # Desk — next playtest
 
+## Cycle — OWNER PLAYTEST, 2026-09-11 (SIXTH), THE RIFT'S END
+
+- [ ] "that completion screen is not the same as the loading in one but just
+      with loot or similar animation and loading style (it should pull you
+      back to where you entered the rift on completion and give you at least
+      two forced drops that are decent)" (frames: RIFT CLOSED is a dim
+      overlay on the live world with NOTHING CAME BACK WITH YOU, Riftglass
+      207, Experience 5570, CONTINUE; the deployment screen is the full
+      black card with the area level, item-level band, YOUR GEAR IS i5, the
+      health/damage/deaths row and the OPENING THE RIFT pips)
+- [ ] "aoe doesnt look like its effecting anything"
+
 ## Cycle — OWNER PLAYTEST, 2026-09-11 (FIFTH), SECOND HALF
 
 - [ ] "multiple quests cannot be held (or rather it doesnt show you where
@@ -7,6 +19,46 @@
 - [ ] "only one weapon has a model and thats the standard issue rifle
       everything else uses ugly random guns or different arms"
 - [ ] "the sounds are still rough they sound really flat or ticky"
+
+## OWNER PLAYTEST, 2026-09-11 (SIXTH) — LANDED, THE BODIES AND THE CAST
+
+His words, and what each is now:
+
+- "enemies are a bit off axis … skitters are just sideways" — the QuadShell
+  rig has none of the bone pairs the body-fit knew (Shoulder, UpperArm,
+  UpperLeg), so it stood at identity, which for that mesh is 90° to its
+  right; its Hold-band strafe then read as walking backwards. The fit knows
+  Front_Shoulder_L/R now, and the rig test asserts the fitted forward
+  against an independent front-minus-back axis. The mechs were never
+  yaw-offset: they faced their weave (31° off the chase line). The feet
+  weave and the face stays on the player. PHOTOGRAPHED in Fernhall: the
+  mechs face the camera squarely. The Lattice is his to see.
+- "walk backwards from a distance or dont orient themselves before they
+  start walking" — TURN BEFORE WALK: speed is scaled by the cosine of the
+  turn still owed, so a body 90° off stands and turns (100°/s) and a
+  retreat, which already faces the player, is unaffected. A pathing body
+  faces the follower's own segment, never its velocity (which the speed
+  scale erases). FOUND: a Path-mode body slows briefly at a sharp corner
+  while its forward catches the new leg — the rule, not a defect; he has
+  not felt it yet.
+- "text that says 'weakpoint' … does not need to be there" — gone (draw,
+  key, row). The number, crosshair mark, body flash, spark and death flash
+  all go gold; the word was the one tell that read as text.
+- "rot … off at another target location; the cast should appear where you
+  originally cast it" — Rot read its aim at the LANDING, 0.6 s after the
+  press. PrepareCast now solves the aim at the press (Resonance's shape)
+  and the body consumes the snapshot. RotAimLockedAtPress: aim +X, press,
+  turn to +Y, resolve — the puddle is on +X.
+- "a ding everytime you press it but it shouldnt do that if you dont cast
+  it" — the cue fired on activation, which for a wind-up is cast START.
+  For a casting ability the broadcast moves to the landing; an interrupted
+  cast makes no sound. CueOnLandingRuntime pins press-silent, landing-once,
+  interrupt-silent. The HUD's rail flash moves with it (same broadcast).
+- "that overview menu you should be able to left click nodes we dont need
+  the focus menu" — the overview marker is the wedge's marker now: LMB buys
+  a rank, SHIFT+LMB to max, a locked node discloses its reason in the
+  rail; the CONSTELLATIONS list still opens a wedge. Footer says so.
+  PHOTOGRAPHED. The click is his to feel.
 
 ## OWNER PLAYTEST, 2026-09-11 (FIFTH) — LANDED, THE FIRST SIX
 

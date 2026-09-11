@@ -2,7 +2,6 @@
 	"version": 1,
 	"strings": {
 		"hud.death.redeploying": "REDEPLOYING",
-		"hud.callout.weakPoint": "WEAK POINT",
 		"hud.callout.eliteDown": "ELITE DOWN",
 		"hud.callout.overdriveActive": "OVERDRIVE ACTIVE",
 		"hud.callout.marked": "MARKED",
@@ -82,7 +81,7 @@
 		"settings.audio.description": "Master and effects control combat sounds. Music is not available yet.",
 		"settings.audio.test": "TEST SOUND",
 		"settings.audio.musicUnavailable": "Music is not available yet.",
-        "core.overviewHint": "SELECT A CONSTELLATION TO VIEW AND SPEND POINTS · WHEEL ZOOM · DRAG PAN · ESC BACK",
+        "core.overviewHint": "LMB BUY 1 RANK · SHIFT+LMB BUY TO MAX · HOVER FOR BEFORE / AFTER · WHEEL ZOOM · DRAG PAN · ESC BACK",
         "equipment.weaponBaseDamage": "BASE DAMAGE  %.1f",
         "equipment.weaponBasePellets": "BASE DAMAGE  %.1f × %d PELLETS",
         "sandbox.character": "CHARACTER",
