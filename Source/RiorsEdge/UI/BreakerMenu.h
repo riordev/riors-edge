@@ -877,6 +877,12 @@ private:
     // constellation map). One tab pair, not a mode toggle — the header and
     // the detail rail persist across the swap.
     int32 SkillBoardTab = 0;
+    // Whether the BUILD TOTALS plate shows every moved stat or only the five
+    // it always shows. Owner: "so much information everywhere we need to
+    // condense this to where it's only there when hovered or clicked". Click,
+    // not hover: the harness cannot hover and a state that cannot be
+    // photographed cannot be checked.
+    bool bSkillTotalsExpanded = false;
     // Which class BRANCH the path board draws: an index into the screen's
     // class-branch list, or -1 for the side-by-side compare view.
     //

@@ -8245,7 +8245,8 @@ namespace
     // splits its additive Increased bucket by layer, because "my tree gave me
     // +14% of this" is the sentence the owner said was missing.
     // -----------------------------------------------------------------------
-    TSharedRef<SWidget> MakeBuildTotalsPlate(const FBreakerSkillSnapshot& Snapshot, int32 ClassSpent, int32 CoreSpent)
+    TSharedRef<SWidget> MakeBuildTotalsPlate(const FBreakerSkillSnapshot& Snapshot, int32 ClassSpent, int32 CoreSpent,
+        bool bExpanded, FOnClicked OnToggle)
     {
         TSharedRef<SVerticalBox> Column = SNew(SVerticalBox);
         Column->AddSlot().AutoHeight()
@@ -8281,18 +8282,23 @@ namespace
         ];
 
         const TArray<FBreakerStatLine> Totals = BreakerSkillProjection::CurrentTotals(Snapshot);
+        int32 Folded = 0;
         for (int32 Index = 0; Index < Totals.Num(); ++Index)
         {
             const FBreakerStatLine& Line = Totals[Index];
             // The five composed rows always show — a player checking their
             // damage wants to see it whether or not the tree moved it. The
-            // tree-only rows show when the tree has actually moved them, so
-            // the plate does not become a wall of 1.00x.
+            // tree-only rows used to show whenever the tree had moved them,
+            // which on any invested character is up to eighteen more lines
+            // under the five: the single largest block of text on the screen,
+            // and the one the owner meant by "so much information everywhere".
+            // They are FOLDED now, counted, and one click away.
             const bool bAlwaysShow = Index < 5;
             const bool bAtIdentity = Line.Format == EBreakerStatFormat::Multiplier
                 ? FMath::IsNearlyEqual(Line.Before, 1.0f, 0.0005f)
                 : FMath::IsNearlyZero(Line.Before, 0.0005f);
             if (!bAlwaysShow && bAtIdentity) continue;
+            if (!bAlwaysShow && !bExpanded) { ++Folded; continue; }
 
             const FLinearColor ValueColor = Index == 0 ? BreakerUI::Orange
                 : (Index < 5 ? BreakerUI::TextPrimary : BreakerUI::System);
@@ -8313,6 +8319,26 @@ namespace
                         BreakerUI::TypeCaption, BreakerUI::TextMuted, false)
                 ];
             }
+        }
+
+        // THE FOLD. A count and a verb, so the player knows there is more and
+        // how much, and can leave it closed.
+        if (Folded > 0 || bExpanded)
+        {
+            const FString Word = bExpanded ? FString(TEXT("SHOW LESS"))
+                : FString::Printf(TEXT("%d MORE FROM THE TREE"), Folded);
+            Column->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f).HAlign(HAlign_Left)
+            [
+                BorderWrap(
+                    SNew(SButton)
+                    .ButtonColorAndOpacity(BreakerUI::Panel20)
+                    .ContentPadding(FMargin(BreakerUI::Space12, BreakerUI::Space4))
+                    .OnClicked(OnToggle)
+                    [
+                        MenuText(FText::FromString(Word), BreakerUI::TypeCaption, BreakerUI::TextSecondary, true)
+                    ],
+                    BreakerUI::BorderEmphasis)
+            ];
         }
 
         if (!Snapshot.bHasComposedAttributes)
@@ -9375,7 +9401,13 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
     // beneath it in its own scroll so a long node card can never push the
     // totals off the plate. The column's width is fixed by this box, so
     // populating the detail cannot reflow the board.
-    TSharedRef<SWidget> RailTop = MakeBuildTotalsPlate(Snapshot, ClassSpent, CoreSpent);
+    TSharedRef<SWidget> RailTop = MakeBuildTotalsPlate(Snapshot, ClassSpent, CoreSpent, bSkillTotalsExpanded,
+        FOnClicked::CreateLambda([this]()
+        {
+            bSkillTotalsExpanded = !bSkillTotalsExpanded;
+            Rebuild(EBreakerMenuScreen::SkillTrees);
+            return FReply::Handled();
+        }));
     if (bCoreBoard && SkillExpandedConstellation.IsNone() && !CoreTrees.IsEmpty() && !CoreTrees[0]->CoreWedgeOrder.IsEmpty())
     {
         TSharedRef<SVerticalBox> Chooser = SNew(SVerticalBox);
