@@ -16,7 +16,9 @@
 // same seam the BeginPlay bind routes into, minus the world the bind needs.
 // The forced drops ("at least two forced drops that are decent") are proven
 // the same way: count, item level and rarity floor on every completion, and
-// the floor's gate against the default-constructed drop table.
+// the floor's gate against the default-constructed drop table. O270's salt
+// is proven in the payout test: the clear counter climbs once per paid
+// completion and a re-clear of the same rift pays a different pair.
 //
 // WHAT THIS DOES NOT COVER: the bind itself (one authority-gated
 // AddWeakLambda in BeginPlay — a live rift run is the check) and the
@@ -138,14 +140,46 @@ bool FBreakerRiftRewardPayoutTest::RunTest(const FString& Parameters)
         }
     };
 
+    // The LAST Count items in the backpack — the pair this clear just paid.
+    const auto LastPair = [&]()
+    {
+        TArray<FBreakerItemInstance> Pair;
+        const TArray<FBreakerItemInstance>& Pack = Equipment->GetBackpack();
+        for (int32 Back = BreakerRiftReward::CompletionItemCount; Back >= 1; --Back)
+        {
+            if (Back <= Pack.Num()) Pair.Add(Pack[Pack.Num() - Back]);
+        }
+        return Pair;
+    };
+
+    // Whether two rolled items are the same roll. ItemId is a fresh GUID on
+    // every RollItem regardless of seed, so it proves nothing here; what a
+    // different seed moves is the slot draw, the archetype draw and the affix
+    // rows, and those are what this compares.
+    const auto SameRoll = [](const FBreakerItemInstance& A, const FBreakerItemInstance& B)
+    {
+        if (A.Slot != B.Slot || A.Rarity != B.Rarity || A.ItemLevel != B.ItemLevel) return false;
+        if (A.WeaponArchetype != B.WeaponArchetype || A.ArmourArchetype != B.ArmourArchetype) return false;
+        if (A.Affixes.Num() != B.Affixes.Num()) return false;
+        for (int32 Index = 0; Index < A.Affixes.Num(); ++Index)
+        {
+            if (A.Affixes[Index].AffixId != B.Affixes[Index].AffixId) return false;
+            if (A.Affixes[Index].Tier != B.Affixes[Index].Tier) return false;
+            if (!FMath::IsNearlyEqual(A.Affixes[Index].Value, B.Affixes[Index].Value)) return false;
+        }
+        return true;
+    };
+
     // A broadcast for SOMEBODY ELSE'S pawn pays this character nothing —
-    // and advances no record, and forces no drop.
+    // and advances no record, and forces no drop, and counts no clear.
     APawn* Stranger = NewObject<ADefaultPawn>();
     Progression->HandleRiftCompleted(Rift, Stranger);
     TestEqual(TEXT("another pawn's completion pays no XP here"),
         Progression->GetProgressionState().TotalExperience, XpBefore);
     TestEqual(TEXT("another pawn's completion advances no record"), Account->HighestClearedAreaLevel, 0);
     TestEqual(TEXT("another pawn's completion forces no drop here"), Equipment->GetBackpack().Num(), PackBefore);
+    TestEqual(TEXT("another pawn's completion counts no clear here (O270)"),
+        static_cast<int32>(Progression->GetProgressionState().RiftClearCount), 0);
 
     // The FIRST clear pays both halves and advances the account record
     // (One-AA: a first clear pays the ladder) — and forces the two drops.
@@ -157,7 +191,10 @@ bool FBreakerRiftRewardPayoutTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("first clear advances the account record"), Account->HighestClearedAreaLevel, 3);
     TestEqual(TEXT("first clear forces exactly the two drops into the backpack"),
         Equipment->GetBackpack().Num(), PackBefore + BreakerRiftReward::CompletionItemCount);
+    TestEqual(TEXT("first clear is clear number one (O270)"),
+        static_cast<int32>(Progression->GetProgressionState().RiftClearCount), 1);
     CheckForcedDrops(TEXT("first clear"));
+    const TArray<FBreakerItemInstance> FirstPair = LastPair();
 
     // A RE-CLEAR pays no purse and moves no record — going back is allowed;
     // going back is not the game. (Drops and kill XP never route through
@@ -172,7 +209,24 @@ bool FBreakerRiftRewardPayoutTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("a re-clear moves no record"), Account->HighestClearedAreaLevel, 3);
     TestEqual(TEXT("a re-clear still forces the two drops"),
         Equipment->GetBackpack().Num(), PackBefore + 2 * BreakerRiftReward::CompletionItemCount);
+    TestEqual(TEXT("a re-clear is clear number two (O270)"),
+        static_cast<int32>(Progression->GetProgressionState().RiftClearCount), 2);
     CheckForcedDrops(TEXT("re-clear"));
+
+    // O270: "salted per run, never the same pair twice." The same rift at the
+    // same level, cleared again by the same character, pays a DIFFERENT pair:
+    // the clear count is the salt, so at least one of the two items has to
+    // come out a different roll. Both pairs are still at the band ceiling and
+    // at the floor (CheckForcedDrops above) — the salt moves what the item is,
+    // never what it is worth.
+    const TArray<FBreakerItemInstance> SecondPair = LastPair();
+    TestEqual(TEXT("both clears paid a full pair"), FirstPair.Num(), SecondPair.Num());
+    bool bAnyDiffers = false;
+    for (int32 Index = 0; Index < FirstPair.Num() && Index < SecondPair.Num(); ++Index)
+    {
+        if (!SameRoll(FirstPair[Index], SecondPair[Index])) bAnyDiffers = true;
+    }
+    TestTrue(TEXT("the re-clear's pair is not the first clear's pair (O270: never the same pair twice)"), bAnyDiffers);
 
     // A DEEPER first clear pays again and advances again — the ladder is
     // climbed once per rung, not once.
@@ -185,6 +239,8 @@ bool FBreakerRiftRewardPayoutTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("and advances the record to it"), Account->HighestClearedAreaLevel, 5);
     TestEqual(TEXT("and forces its own two drops"),
         Equipment->GetBackpack().Num(), PackBefore + 3 * BreakerRiftReward::CompletionItemCount);
+    TestEqual(TEXT("and is clear number three: the salt counts every rift, not per rift (O270)"),
+        static_cast<int32>(Progression->GetProgressionState().RiftClearCount), 3);
     // The owner's rift was i5–i10: area level 5, band ceiling 10, and 10 is
     // past the Exceptional unlock — his "decent" is Exceptional there.
     int32 DeeperMin = 0;

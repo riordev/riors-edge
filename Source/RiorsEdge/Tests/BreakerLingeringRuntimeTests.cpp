@@ -68,6 +68,9 @@ bool FBreakerLingeringRuntimeTest::RunTest(const FString& Parameters)
     const auto Handle = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Rot::StaticClass(), 1));
     ++GFrameCounter; World->Tick(LEVELTICK_All, .05f); // Camera cache must have positive world time.
     if (!Controller->PlayerCameraManager) return false;
+    // Under O271 two casts on one spot are two zones, so a cast returns the
+    // zone it MADE: the live one at the aim that no earlier cast returned.
+    TSet<ABreakerZoneActor*> Seen;
     auto Cast = [&](FVector Aim) -> ABreakerZoneActor*
     {
         for (int32 Step = 0; Step < 3; ++Step)
@@ -86,36 +89,35 @@ bool FBreakerLingeringRuntimeTest::RunTest(const FString& Parameters)
         ABreakerZoneActor* Found = nullptr;
         for (const auto& Weak : ABreakerZoneActor::GetLiveZones())
             if (auto* Zone = Weak.Get(); Zone && Zone->GetZoneInstigator() == Player && !Zone->IsReleased()
-                && FVector::Dist(Zone->GetActorLocation(), Aim) < 1) Found = Zone;
-        if (Found) Found->SetActorTickEnabled(false);
+                && !Seen.Contains(Zone) && FVector::Dist(Zone->GetActorLocation(), Aim) < 1) Found = Zone;
+        if (Found) { Found->SetActorTickEnabled(false); Seen.Add(Found); }
         return Found;
     };
     const FVector Aim(800, 0, 0);
     auto* Zone = Cast(Aim);
     if (!Zone) return false;
     const float InitialRadius = Zone->GetSpec().RadiusCm;
-    TestEqual(TEXT("rank one overlap reuses zone"), Cast(Aim), Zone);
-    TestEqual(TEXT("rank one cannot grow radius"), Zone->GetSpec().RadiusCm, InitialRadius);
+    // O271: a recast spawns a new puddle wherever it lands; nothing merges
+    // into a live one. The overlap that used to refresh this zone is a
+    // second zone now, and the first is untouched by it.
+    auto* Second = Cast(Aim);
+    if (!Second) return false;
+    TestTrue(TEXT("rank one overlap is a second zone, not a refresh"), Second != Zone);
+    TestEqual(TEXT("the first zone keeps its radius"), Zone->GetSpec().RadiusCm, InitialRadius);
+    TestEqual(TEXT("the second starts at the authored radius"), Second->GetSpec().RadiusCm, InitialRadius);
     if (!TestTrue(TEXT("actual rank two purchase"), Progression->PurchaseNode(Tree, TEXT("Caster.VoidWhisperer.Lingering"), Reason))) return false;
     TestEqual(TEXT("path spends exactly four Doctrine"), Wallet - Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 4);
     Mana->AdvanceLoop(30); // Ordinary recovery between the rank-one and rank-two observations.
-    auto* Enemy = World->SpawnActor<ABreakerEnemy>(FVector(800, InitialRadius + 50, 100), FRotator::ZeroRotator);
-    if (!Enemy) return false;
-    Enemy->SetActorTickEnabled(false);
-    auto* EnemyHealth = FindObject<UBreakerAttributeSet>(Enemy, TEXT("Attributes"));
-    auto* EnemyCombat = Enemy->FindComponentByClass<UBreakerCombatComponent>();
-    if (!EnemyHealth || !EnemyCombat) return false;
-    auto* EnemyASC = Enemy->GetAbilitySystemComponent(); EnemyASC->InitAbilityActorInfo(Enemy, Enemy); EnemyASC->AddAttributeSetSubobject(EnemyHealth);
-    EnemyHealth->ApplyMaxHealth(1000); EnemyHealth->ApplyHealth(1000); EnemyCombat->BindAttributes(EnemyHealth);
-    Zone->AdvanceZone(.5f);
-    TestEqual(TEXT("enemy beyond original radius takes no damage"), EnemyHealth->GetHealth(), 1000.0f);
-    TestEqual(TEXT("rank two refresh keeps original zone"), Cast(Aim), Zone);
-    TestEqual(TEXT("rank two adds exactly one metre"), Zone->GetSpec().RadiusCm, InitialRadius + 100);
-    TestEqual(TEXT("growth immediately admits real enemy"), Zone->GetOccupantCount(), 1);
-    Zone->AdvanceZone(.5f);
-    TestTrue(TEXT("expanded ring delivers real damage"), EnemyHealth->GetHealth() < 1000);
-    TestEqual(TEXT("repeated paid refresh reuses grown zone"), Cast(Aim), Zone);
-    TestEqual(TEXT("repeated refresh cannot grow twice"), Zone->GetSpec().RadiusCm, InitialRadius + 100);
+    // R2's metre is claimed on a REFRESH, and under O271 a recast is not one:
+    // a third cast over the pair is a third puddle at the authored radius.
+    // The refresh that still grows a zone is Wellspring's following puddle
+    // renewed by a recast; RiorsEdge.Abilities.RotPurchasedZones pins the metre there,
+    // RecastSpawnsNew and the zone's own AntiStack test cover the geometry.
+    auto* Third = Cast(Aim);
+    if (!Third) return false;
+    TestTrue(TEXT("rank two recast is still a new zone"), Third != Zone && Third != Second);
+    TestEqual(TEXT("rank two recast does not grow the live zone"), Zone->GetSpec().RadiusCm, InitialRadius);
+    TestEqual(TEXT("rank two recast starts unexpanded"), Third->GetSpec().RadiusCm, InitialRadius);
     auto* Fresh = Cast(FVector(800, -1400, 0));
     if (!Fresh) return false;
     TestTrue(TEXT("separate paid placement creates new zone"), Fresh != Zone);

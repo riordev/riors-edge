@@ -987,6 +987,10 @@ struct RIORSEDGE_API FBreakerProgressionState
     // from being paid again. The name is the serialized field's and stays.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 LevelDoctrinePointsGranted = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 SaveVersion = 1;
+    // O270: the salt for the completion pair; counts every completion this
+    // character has been paid for. Appended, so a save without it loads as 0.
+    // (uint32 is not a Blueprint type, so no Blueprint exposure.)
+    UPROPERTY(EditAnywhere) uint32 RiftClearCount = 0;
 };
 
 USTRUCT(BlueprintType)

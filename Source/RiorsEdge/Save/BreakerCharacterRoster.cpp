@@ -1,6 +1,8 @@
 #include "Save/BreakerCharacterRoster.h"
 
 #include "Kismet/GameplayStatics.h"
+#include "Misc/CommandLine.h"
+#include "Playtest/BreakerHarnessMath.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "Progression/BreakerClassDefinition.h"
 #include "Progression/BreakerExperience.h"
@@ -44,6 +46,8 @@ UBreakerCharacterRoster* UBreakerCharacterRoster::LoadOrCreate()
 
 bool UBreakerCharacterRoster::SaveRoster() const
 {
+    // A harness run never writes the owner's roster (see SaveAccount).
+    if (BreakerHarness::IsHarnessCommandLine(FCommandLine::Get())) return true;
     return UGameplayStatics::SaveGameToSlot(const_cast<UBreakerCharacterRoster*>(this), RosterSlotName(), 0);
 }
 
@@ -147,6 +151,11 @@ FGuid UBreakerCharacterRoster::CreateCharacter(const FString& CharacterName, EBr
     Save->Model = Model;
     Save->Voice = Voice;
     Save->FaceIndex = FaceIndex;
+    if (BreakerHarness::IsHarnessCommandLine(FCommandLine::Get()))
+    {
+        OutFailureReason = LOCTEXT("SaveRefusedHarness", "A harness run does not create characters.");
+        return FGuid();
+    }
     if (!UGameplayStatics::SaveGameToSlot(Save, SlotNameForCharacter(Summary.CharacterId), 0))
     {
         OutFailureReason = LOCTEXT("SaveWriteFailed", "The character's save could not be written.");
@@ -187,7 +196,7 @@ bool UBreakerCharacterRoster::DeleteCharacter(const FGuid& CharacterId)
     return true;
 }
 
-bool UBreakerCharacterRoster::RefreshSummaryFromSave(const FGuid& CharacterId)
+bool UBreakerCharacterRoster::RefreshSummaryFromSave(const FGuid& CharacterId, bool bStampPlayed)
 {
     FBreakerCharacterSummary* Summary = Characters.FindByPredicate(
         [&CharacterId](const FBreakerCharacterSummary& S) { return S.CharacterId == CharacterId; });
@@ -206,8 +215,27 @@ bool UBreakerCharacterRoster::RefreshSummaryFromSave(const FGuid& CharacterId)
     Summary->TotalXp = Save->Progression.TotalExperience;
     Summary->CharacterLevel = UBreakerExperienceLibrary::LevelForTotalXp(
         Save->Progression.TotalExperience, FBreakerExperienceCurve());
-    Summary->LastPlayedUnixSeconds = FDateTime::UtcNow().ToUnixTimestamp();
+    // A read is not a play: only the pawn's write-time refresh moves the row
+    // to the top of the select screen's order.
+    if (bStampPlayed)
+    {
+        Summary->LastPlayedUnixSeconds = FDateTime::UtcNow().ToUnixTimestamp();
+    }
     return true;
+}
+
+void UBreakerCharacterRoster::RefreshAllSummariesFromSaves()
+{
+    // The write-time refresh serves only the character that just saved; every
+    // other row sits at whatever stamp it was last given until that character
+    // is played. Display re-derives all of them. A row whose slot is missing
+    // or refuses to load keeps its cached values (RefreshSummaryFromSave
+    // returns false without touching it), and the roster is NOT saved here —
+    // the disk copy catches up at the next real write.
+    for (const FBreakerCharacterSummary& Summary : Characters)
+    {
+        RefreshSummaryFromSave(Summary.CharacterId, /*bStampPlayed*/ false);
+    }
 }
 
 FGuid UBreakerCharacterRoster::AdoptLegacySaveIfPresent()
@@ -266,6 +294,7 @@ FGuid UBreakerCharacterRoster::AdoptLegacySaveIfPresent()
     Copy->Model = Legacy->Model;
     Copy->Voice = Legacy->Voice;
     Copy->FaceIndex = Legacy->FaceIndex;
+    if (BreakerHarness::IsHarnessCommandLine(FCommandLine::Get())) return FGuid();
     if (!UGameplayStatics::SaveGameToSlot(Copy, SlotNameForCharacter(Summary.CharacterId), 0)) return FGuid();
 
     Characters.Add(Summary);

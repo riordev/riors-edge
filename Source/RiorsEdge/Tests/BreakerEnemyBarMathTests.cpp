@@ -4,7 +4,9 @@
 #include "Combat/BreakerEnemyBarMath.h"
 #include "Combat/BreakerEnemyModifiers.h"
 #include "Combat/BreakerMonsterChassis.h"
+#include "Items/BreakerItemTypes.h"
 #include "Settings/BreakerGameSettings.h"
+#include "UI/BreakerUIStyle.h"
 
 // The nameplate's drawing cannot be tested — no viewport, no way to assert a
 // mark reads. Its ARITHMETIC can: every rule the nameplate sheet states is a
@@ -113,6 +115,36 @@ bool FBreakerEnemyBarMathTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Trash fill never under 3"), Trash.FillH >= MinFillH - BreakerEnemyBarMathTolerance);
         TestTrue(TEXT("Champion fill never under 3"), Champion.FillH >= MinFillH - BreakerEnemyBarMathTolerance);
         TestTrue(TEXT("Boss fill never under 3"), Boss.FillH >= MinFillH - BreakerEnemyBarMathTolerance);
+    }
+
+    // --- The fill's colour by rank (O203) -----------------------------------------
+    {
+        const FLinearColor Elite = BarFillColorFor(EBreakerMonsterRank::Elite);
+        const FLinearColor Trash = BarFillColorFor(EBreakerMonsterRank::Trash);
+        const FLinearColor Champion = BarFillColorFor(EBreakerMonsterRank::ModifierBearing);
+        const FLinearColor Boss = BarFillColorFor(EBreakerMonsterRank::Boss);
+        const FLinearColor Exceptional = BreakerUI::RarityColor(EBreakerItemRarity::Exceptional);
+
+        // The elite's fill IS the third rarity's colour, read off the same
+        // token the loot frame reads — not a hex authored beside it.
+        TestTrue(TEXT("Elite fill is the Exceptional rarity colour"), Elite.Equals(Exceptional, BreakerEnemyBarMathTolerance));
+        TestTrue(TEXT("Elite fill is not the trash fill"), !Elite.Equals(Trash, BreakerEnemyBarMathTolerance));
+        // One colour per rank; the other three fill in the system bone, so
+        // the champion's diamonds and the boss's phase geometry stay the read.
+        TestTrue(TEXT("Trash fill is the system bone"), Trash.Equals(BreakerUI::System, BreakerEnemyBarMathTolerance));
+        TestTrue(TEXT("Champion fill is the system bone"), Champion.Equals(BreakerUI::System, BreakerEnemyBarMathTolerance));
+        TestTrue(TEXT("Boss fill is the system bone"), Boss.Equals(BreakerUI::System, BreakerEnemyBarMathTolerance));
+
+        // Shipped configuration: the Exceptional token sits outside every
+        // reserved verb band (O179) and outside the teal noun, so an elite's
+        // bar cannot be misread as movement, a weak point, or a rift object.
+        TestTrue(TEXT("Exceptional is not the movement cyan (O179)"), !Exceptional.Equals(BreakerUI::VerbMove, BreakerEnemyBarMathTolerance));
+        TestTrue(TEXT("Exceptional is not the gold weak-point lane (O179)"), !Exceptional.Equals(BreakerUI::Gold, BreakerEnemyBarMathTolerance));
+        TestTrue(TEXT("Exceptional is not the orange weapon lane (O179)"), !Exceptional.Equals(BreakerUI::Orange, BreakerEnemyBarMathTolerance));
+        TestTrue(TEXT("Exceptional is not harm-red (O179)"), !Exceptional.Equals(BreakerUI::Harm, BreakerEnemyBarMathTolerance));
+        TestTrue(TEXT("Exceptional is not the ultimate violet (O179)"), !Exceptional.Equals(BreakerUI::Violet, BreakerEnemyBarMathTolerance));
+        TestFalse(TEXT("Exceptional is not a reserved teal"), BreakerUI::IsReservedTeal(Exceptional));
+        TestTrue(TEXT("Exceptional is not the system bone"), !Exceptional.Equals(BreakerUI::System, BreakerEnemyBarMathTolerance));
     }
 
     // --- The boss's phase geometry (O156: the phase lives on the body) ----------

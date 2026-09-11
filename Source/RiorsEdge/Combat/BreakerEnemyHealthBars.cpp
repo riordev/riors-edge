@@ -306,20 +306,26 @@ namespace
     // on the surface the owner actually plays.
     //
     // Plate, the rank's border (one pixel; two for the boss, so its edge reads
-    // at 640 wide), system fill at the live fraction; the chip's
+    // at 640 wide), the rank's fill colour at the live fraction; the chip's
     // hatch from the live fraction to the fraction the bar was showing; the
     // shield as a line along the top of the fill at its own fraction. The
     // chip and the shield are detail and the caller hides them past
     // ChipAndShieldHideCm. Bands are STATE (O135), not ticks: the bar draws no
     // dividers, and BreakerHealthBands is untouched by this.
     //
-    // Alpha is the only axis the two loops differ on: the enemy loop fades a
-    // trash bar out, the dummy loop never fades. BreakerUI::Alpha SETS the
-    // alpha channel rather than scaling it, and every colour here arrives from
-    // Hex() at A=1, so Alpha(C, 1.0f) is exactly C.
+    // The fill colour arrives from BreakerEnemyBarMath::BarFillColorFor, one
+    // per rank (O203 — an Elite's bar is the third rarity's colour, "it makes
+    // sense" (owner); every other rank fills in the system bone). It is a
+    // parameter, not a rank lookup here, so the dummy loop states its rank
+    // once at the same site it states its width.
+    //
+    // Alpha is the only other axis the two loops differ on: the enemy loop
+    // fades a trash bar out, the dummy loop never fades. BreakerUI::Alpha SETS
+    // the alpha channel rather than scaling it, and every colour here arrives
+    // from Hex() at A=1, so Alpha(C, 1.0f) is exactly C.
     void BreakerEnemyBarDrawBody(AHUD& HUD, const FBreakerEnemyBarRect& Bar,
         float HealthFraction, float ChipFraction, float ShieldFraction, bool bShowChipAndShield,
-        float ScaleUnit, float BarAlpha)
+        float ScaleUnit, float BarAlpha, const FLinearColor& Fill)
     {
         const float Border = Bar.Border;
         HUD.DrawRect(BreakerUI::Alpha(BreakerUI::Panel10, BarAlpha), Bar.X, Bar.Y, Bar.W, Bar.H);
@@ -335,7 +341,7 @@ namespace
         const float InnerY = Bar.Y + (Bar.H - InnerH) * 0.5f;
 
         const float Health = FMath::Clamp(HealthFraction, 0.0f, 1.0f);
-        HUD.DrawRect(BreakerUI::Alpha(BreakerUI::System, BarAlpha), InnerX, InnerY, InnerW * Health, InnerH);
+        HUD.DrawRect(BreakerUI::Alpha(Fill, BarAlpha), InnerX, InnerY, InnerW * Health, InnerH);
 
         if (!bShowChipAndShield) return;
 
@@ -693,12 +699,14 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         const float ShieldFraction = ShieldMax > UE_SMALL_NUMBER ? ShieldNow / ShieldMax : 0.0f;
 
         // ---- Rank, as geometry ---------------------------------------------
-        // No gold edge (O129: colour carries health, not rank), no rank glyph,
-        // no rank word. Elite is the ellipse at the feet (O203), drawn only
-        // while an active contract wants elite kills — it is the mark, not the
-        // rank; the champion is a filled diamond off each end of its wider bar;
-        // trash is the bar alone; the boss's phase geometry stands on the fill
-        // and is drawn after the body below.
+        // No gold edge, no rank glyph, no rank word. The body's colour carries
+        // health, not rank (O129); the BAR's fill is the one place rank is a
+        // colour, and only for the elite (O203, BarFillColorFor). The ellipse
+        // at the feet is drawn only while an active contract wants elite kills
+        // — it is the contract's mark, not the rank; the champion is a filled
+        // diamond off each end of its wider bar; trash is the bar alone; the
+        // boss's phase geometry stands on the fill and is drawn after the body
+        // below.
         if (Rank == EBreakerMonsterRank::Elite && bContractWantsElites)
         {
             const FVector Feet = Project(FeetWorld, false);
@@ -847,8 +855,11 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         }
 
         ReservePlate(Bar.X, Bar.Y, Bar.W, Bar.H);
+        // O203 — an Elite's bar is the third rarity's colour, "it makes sense"
+        // (owner). One colour per rank, chosen by the maths; the geometry
+        // above and below is untouched by it.
         BreakerEnemyBarDrawBody(*this, Bar, Fraction, ChipFraction, ShieldFraction, bShowChipAndShield,
-            ScaleUnit, BarAlpha);
+            ScaleUnit, BarAlpha, BreakerEnemyBarMath::BarFillColorFor(Rank));
 
         // ---- The boss: the phase on the body (O156) ----------------------------
         // Two gate marks standing on the fill at the boss's own health gates,
@@ -1014,7 +1025,8 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         // Full opacity: a dummy never fades, and Alpha(C, 1.0f) is exactly C.
         ReservePlate(Bar.X, Bar.Y, Bar.W, Bar.H);
         BreakerEnemyBarDrawBody(*this, Bar, Fraction, Fraction, ShieldFraction,
-            Distance < BreakerEnemyBarMath::ChipAndShieldHideCm, ScaleUnit, 1.0f);
+            Distance < BreakerEnemyBarMath::ChipAndShieldHideCm, ScaleUnit, 1.0f,
+            BreakerEnemyBarMath::BarFillColorFor(EBreakerMonsterRank::Trash));
         const float NameY = Bar.Y - BreakerEnemyBarMath::ColumnGapPx * Scale * ScaleUnit
             - BreakerEnemyBar::NameLinePixels * Scale * ScaleUnit;
         const FVector2D LabelSize = MeasureSpecText(Dummy->GetProfileLabel(), BreakerEnemyBar::NamePixels * Scale, ESpecFontRole::Display);

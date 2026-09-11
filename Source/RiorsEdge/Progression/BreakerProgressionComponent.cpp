@@ -168,13 +168,18 @@ void UBreakerProgressionComponent::HandleRiftCompleted(const FBreakerRiftDefinit
     // have dropped, at the elite floor if that level unlocks it. Straight to
     // the backpack, not the floor: AddToBackpack broadcasts OnItemAcquired, so
     // the run ledger lists them and the debrief can stop saying nothing came
-    // back. The seed is (rift, area level, index): a completion is
-    // reproducible in a bug report rather than a different pair every time.
+    // back. The seed is (rift, area level, index, clear count): O270 salts the
+    // pair per run — "never the same pair twice" — and the salt is the
+    // character's own completion counter, so a bug report still reproduces a
+    // completion from the save it came from rather than from a wall clock.
     int32 BandMin = 1;
     int32 BandMax = 1;
     UBreakerRiftLibrary::GetDropItemLevelRange(AreaLevel,
         GetDefault<ABreakerEnemy>()->GetEliteDropItemLevelBonus(), BandMin, BandMax);
     const EBreakerItemRarity ForcedRarity = BreakerRiftReward::CompletionRarity(BandMax, FBreakerDropTableParams{});
+    // O270, salted per run: one more completion this character is paid for.
+    // Counted before the roll so the first clear is salt 1, never salt 0.
+    ++State.RiftClearCount;
     if (UBreakerEquipmentComponent* Equipment = GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>())
     {
         // A paid grant, not a refusable entry (One-AB): the rift was cleared,
@@ -190,7 +195,11 @@ void UBreakerProgressionComponent::HandleRiftCompleted(const FBreakerRiftDefinit
         }
         for (int32 Index = 0; Index < BreakerRiftReward::CompletionItemCount; ++Index)
         {
-            const int32 Seed = HashCombine(GetTypeHash(Rift.AreaName.ToString()), AreaLevel * 7919 + Index);
+            // O270: the clear count folds in last, so the (rift, level, index)
+            // hash every earlier completion used stays the inner term.
+            const int32 Seed = HashCombine(
+                HashCombine(GetTypeHash(Rift.AreaName.ToString()), AreaLevel * 7919 + Index),
+                State.RiftClearCount);
             const EBreakerEquipSlot Slot = UBreakerLootLibrary::RollDropSlot(Seed);
             const FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(TEXT("RiftCompletion"), Slot, ForcedRarity, BandMax, Seed);
             if (!Equipment->AddToBackpack(Item))

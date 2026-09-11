@@ -156,10 +156,10 @@ bool FBreakerRotDefinitionTest::RunTest(const FString& Parameters)
     const UBreakerAbility_Rot* Rot = GetDefault<UBreakerAbility_Rot>();
     if (!TestNotNull(TEXT("Rot has a default object"), Rot)) return false;
 
-    // Class-Kits §2.2 C3 quotes these three exactly. They are the only Rot
-    // numbers the design supplies, so they are the only ones pinned here —
-    // everything else is O2 PLACEHOLDER and must stay free to move.
-    TestEqual(TEXT("Rot is a 4 m zone"), Rot->RadiusCm, 400.0f);
+    // The shipped configuration as Data/abilities.json authors it (O246). All
+    // three are O2 PLACEHOLDER; the pin catches drift between the file and the
+    // definition the game reads, not a design constant.
+    TestEqual(TEXT("Rot is a 4.4 m zone"), Rot->RadiusCm, 440.0f);
     TestEqual(TEXT("Rot lasts 6 s"), Rot->DurationSeconds, 6.0f);
     TestEqual(TEXT("Rot strips a flat 40 armour"), Rot->FlatArmorReduction, 40.0f);
 

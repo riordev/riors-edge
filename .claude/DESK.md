@@ -1,52 +1,35 @@
 # Desk — next playtest
 
-## Cycle — OWNER RULINGS, 2026-09-11 — THE CODE THEY ASK FOR
+## OWNER RULINGS, 2026-09-11 — LANDED
 
-Ruled in DECISIONS (O203 amended, O18/O114 numbers, O270, O271). Each
-line below is the edit that makes the ruling true:
-
-- [ ] O203: the Elite's health bar is the Exceptional rarity colour
-      (RarityColor(Exceptional)); the ellipse stays the contract's mark and
-      is otherwise untouched. Pin: the elite bar colour equals the third
-      rarity's and differs from the trash bar.
-- [ ] O271: a Rot recast spawns a new puddle — remove the
-      FindRefreshableZone merge from Rot's cast (the Wellspring follow path
-      is a separate question; leave it). Pin: two casts on one spot are two
-      live zones.
-- [ ] O271: a press during a wind-up queues ONE cast, fired when the
-      wind-up resolves (the aim is solved at the queued press, per the
-      snapshot). Pin: press, press during wind-up, resolve -> two puddles,
-      the second where the second press pointed.
-- [ ] O270: salt the completion drop seed per run (run counter or the
-      completion's world time; never the same pair twice). Pin: two clears
-      of one rift pay different pairs.
-- [ ] "raise the base just a smidge": Rot RadiusCm 400 -> 440, Cleave
-      RangeCm 650 -> 700 (O2). Move the pins that read them (AreaLane,
-      GeometrySeam, CombatRuntimeTargeting range 650).
-
-- [ ] "lets bring rot base damage up just a smidge": ZoneDamagePerTick
-      10 -> 12 (O2). Check the Rot-budget / PowerCurve pins that read it.
-- [ ] "save pls": RETURN TO TITLE calls SaveGameState before
-      ReturnToTitleMenu, so the roster row and the slot are current.
-- [ ] "character level still not fixed" — SCOUTED: the write-time refresh
-      ran (roster and slot share an mtime at his quit) but only for the
-      pawn that saves. casterplaytest2's row still says 1 / 0 XP while its
-      slot says 4 / 2401, and nothing will touch that row until that
-      character is played. And in his one session since the fix he opened
-      the list at launch, before any save. FIX: re-derive every row from
-      its own slot when the roster loads for display
-      (RefreshAllSummariesFromSaves, no LastPlayed stamp — a read is not a
-      play), called from EnsureRosterLoaded. Pin: LoadRefreshesEveryRow.
-- [ ] FOUND BY THE SCOUT, MINE TO FIX: today's -BreakerAutoPlay captures
-      wrote BreakerSave0.sav and BreakerAccount.sav at 10:20 — the save
-      guard (BreakerCharacter.cpp:513-517) refuses only -BreakerCaptureMenu.
-      Any -BreakerAutoPlay / -BreakerCapture* / -BreakerCrowdProbe run must
-      never write a save. Pin: the guard predicate against each switch.
-
-OPEN, HE HAS NOT SAID:
-- The boss's own floor drop is left behind on completion — "leave open".
-- The halo goes dark at ReadyToTurnIn, not hand-in — "does it matter?" —
-  left as is.
+- O203: the Elite's bar fills in the Exceptional rarity colour; every other
+  rank keeps the system colour. The ellipse is the contract's mark. His eyes
+  are owed the bar (the harness's vantage is too far to read one).
+- O271: a Rot recast spawns a new puddle; nothing merges. A press during a
+  wind-up queues one cast, aimed where that press pointed, fired at the
+  landing through the same GAS gate (cost, dead, stagger re-checked); a
+  third press is dropped. FOUND AND FIXED ON THE WAY: re-arming a timer
+  inside its own callback destroys the closure — the resolve body is a
+  member now. Recorded at the site: a queued press does not re-check cost
+  at the queue; a remote client is not queued.
+  LINGERING R2 followed: "refreshing a zone grows it 1 m" and the recast
+  merge WAS the refresh. The node says "a refreshed zone grows by 1 m,
+  once"; the one shipped refresh left is Wellspring's following puddle
+  renewed by a recast, and RotPurchasedZones pins the metre there.
+  QUESTION: should R2 instead grow a puddle cast over a live one?
+- O270: the completion pair is salted by RiftClearCount (appended to the
+  progression state, old saves read 0); a re-clear pays a different pair.
+- Bases: Rot 4.0 -> 4.4 m, Cleave 6.5 -> 7.0 m, Rot tick 10 -> 12 (O2);
+  thirteen pins moved with the arithmetic in their messages.
+- "save pls": RETURN TO TITLE saves first.
+- "character level still not fixed": every roster row is re-derived from
+  its own slot when the list loads (no play-stamp on a read); the write-time
+  refresh stays. casterplaytest2 reads 4 now.
+- The harness never writes a save: one predicate over every -Breaker*
+  switch, stood down under -UserDir= (the loop probe isolates its own
+  saves and needs them to survive travel), at SaveGameState, SaveAccount,
+  SaveRoster, CreateCharacter and the legacy adopt. A Fernhall capture
+  after the fix left every save's mtime alone.
 
 ## OWNER PLAYTEST, 2026-09-11 (FIFTH) — LANDED, THE SECOND HALF
 

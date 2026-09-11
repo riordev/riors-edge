@@ -16,7 +16,7 @@ paths:
 - Family-to-mesh mapping is DATA: swapping every placeholder mesh must be a
   content change with no C++ diff.
 - One resolver owns body `Color`; layers compose forward, none reads back
-  (O128). Colour carries health, not rank (O129).
+  (O128). Colour carries health, not rank (O129); the one exception is the Elite's bar fill, the Exceptional rarity colour (O203).
 - Locomotion: an enemy moves through its `AAIController` and movement
   component on the NavMesh. `AddActorWorldOffset` is not locomotion. The
   band classifier (`ClassifyBand`) picks the goal; MoveTo reaches it.

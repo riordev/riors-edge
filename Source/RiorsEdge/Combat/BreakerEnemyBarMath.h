@@ -4,6 +4,7 @@
 #include "Combat/BreakerBossPhases.h"
 #include "Combat/BreakerEnemyModifiers.h"
 #include "Combat/BreakerMonsterChassis.h"
+#include "UI/BreakerUIStyle.h"
 
 // ---------------------------------------------------------------------------
 // THE NAMEPLATE'S ARITHMETIC, with no HUD under it.
@@ -103,6 +104,20 @@ namespace BreakerEnemyBarMath
         }
         Size.FillH = FMath::Max(Size.H - 2.0f * Size.Border, MinFillH);
         return Size;
+    }
+
+    // --- The fill's colour ------------------------------------------------------
+    // One colour per rank. O203: an Elite's bar is the third rarity's colour —
+    // the same violet-blue an Exceptional drop wears, so the rank reads as
+    // the loot tier it stands for ("it makes sense", owner). Every other rank
+    // fills in the system bone: the champion's rank is its diamonds and its
+    // width, the boss's is its phase geometry, trash is the bar alone. The
+    // rarity token is read, never copied, so the two cannot drift apart.
+    inline FLinearColor BarFillColorFor(EBreakerMonsterRank Rank)
+    {
+        return Rank == EBreakerMonsterRank::Elite
+            ? BreakerUI::RarityColor(EBreakerItemRarity::Exceptional)
+            : BreakerUI::System;
     }
 
     // --- The boss's phase geometry ------------------------------------------------

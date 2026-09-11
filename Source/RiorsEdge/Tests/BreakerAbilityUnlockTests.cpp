@@ -4,6 +4,7 @@
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Abilities/BreakerAbilityComponent.h"
 #include "GameFramework/Actor.h"
+#include "Kismet/GameplayStatics.h"
 #include "Data/BreakerDataFile.h"
 #include "Progression/BreakerClassDefinition.h"
 #include "Progression/BreakerExperience.h"
@@ -511,6 +512,33 @@ bool FBreakerAbilitySaveLoadTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Unspent tokens round-trip"), Loaded->GetUnspentAbilityTokens(), Saved.UnspentAbilityTokens);
     TestEqual(TEXT("The granted counter round-trips"),
         Loaded->GetProgressionState().AbilityTokensGranted, Saved.AbilityTokensGranted);
+
+    // O270's clear counter, the field appended after SaveVersion. Two things
+    // to prove: a save that predates it loads as zero (the default-constructed
+    // state IS the old save's reading), and a save that carries it comes back
+    // through the ACTUAL UPROPERTY serializer with it intact — a component
+    // copy is `State = NewState` and would prove nothing. The counter is
+    // stamped onto the fixture the way the migration tests below stamp
+    // AbilityTokensGranted: a serialization fixture, not a grant.
+    TestEqual(TEXT("A save without the clear counter reads as zero clears (O270)"),
+        static_cast<int32>(FBreakerProgressionState{}.RiftClearCount), 0);
+    FBreakerProgressionState Stamped = Saved;
+    Stamped.RiftClearCount = 7;
+    UBreakerSaveGame* Written = NewObject<UBreakerSaveGame>();
+    Written->SaveVersion = UBreakerSaveGame::CurrentSaveVersion;
+    Written->Progression = Stamped;
+    TArray<uint8> Bytes;
+    TestTrue(TEXT("The save serializes"), UGameplayStatics::SaveGameToMemory(Written, Bytes));
+    UBreakerSaveGame* Read = Cast<UBreakerSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes));
+    if (!Read) { AddError(TEXT("The save did not deserialize")); return false; }
+    TestEqual(TEXT("The clear counter survives the save archive (O270)"),
+        static_cast<int32>(Read->Progression.RiftClearCount), 7);
+    UBreakerProgressionComponent* Reloaded = NewObject<UBreakerProgressionComponent>();
+    Reloaded->LoadProgressionState(Read->Progression);
+    TestEqual(TEXT("The clear counter reaches the component after a load (O270)"),
+        static_cast<int32>(Reloaded->GetProgressionState().RiftClearCount), 7);
+    TestEqual(TEXT("The unlocked set still round-trips beside it"),
+        Reloaded->GetProgressionState().UnlockedAbilityIds.Num(), Saved.UnlockedAbilityIds.Num());
     return true;
 }
 

@@ -461,7 +461,13 @@ bool UBreakerGameplayAbility::BeginCastIfNeeded(const FGameplayAbilitySpecHandle
     // THE ABILITY'S OWN REFUSAL, BEFORE THE PRICE. Every "this press would do
     // nothing" guard an ability owns used to sit in its body, which a wind-up
     // moves to the far side of the payment. Asking here keeps a dead key free.
-    if (!PrepareCast())
+    //
+    // UNLESS THIS CAST WAS QUEUED (O271). Its decisions were made at the
+    // queued press and promoted at the landing that started it; asking again
+    // here would solve them at the landing instead.
+    const bool bPromoted = bSkipPrepareOnce;
+    bSkipPrepareOnce = false;
+    if (!bPromoted && !PrepareCast())
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return false;
@@ -494,26 +500,77 @@ bool UBreakerGameplayAbility::BeginCastIfNeeded(const FGameplayAbilitySpecHandle
     }
 
     FTimerDelegate Resolve;
+    // NOTHING BUT THE CALL. A queued cast re-arms CastTimer from inside this
+    // callback, and FTimerManager::SetTimer on a handle that is currently
+    // executing removes that timer — and destroys this closure — before it
+    // returns. The arguments below are copied into the call before the closure
+    // can go, and the body lives in ResolveCast where the closure is never
+    // read again.
     Resolve.BindWeakLambda(this, [this, Handle, ActorInfo, ActivationInfo]()
     {
-        EndCastBinding();
-        // bCastPending is still true, so this re-entry passes the gate above
-        // and the ability's own body finally runs.
-        ActivateAbility(Handle, ActorInfo, ActivationInfo, nullptr);
-        bCastCommitted = false;
-        // O178: THE CUE FIRES AT THE LANDING. TryActivateSlot withheld its
-        // OnAbilityActivated because this ability was still casting when the
-        // press returned; the resolution is the moment the ability exists, so
-        // this is where the slot is announced. The interrupt and cancel paths
-        // clear the timer and never reach here, which is the point.
-        ABreakerCharacter* Character = GetBreakerCharacter();
-        if (UBreakerAbilityComponent* Abilities = Character ? Character->GetAbilities() : nullptr)
-        {
-            Abilities->NotifyCastResolved(Handle);
-        }
+        ResolveCast(Handle, ActorInfo, ActivationInfo);
     });
     World->GetTimerManager().SetTimer(CastTimer, Resolve, Seconds, false);
     return false;
+}
+
+void UBreakerGameplayAbility::ResolveCast(FGameplayAbilitySpecHandle Handle,
+    const FGameplayAbilityActorInfo* ActorInfo, FGameplayAbilityActivationInfo ActivationInfo)
+{
+    EndCastBinding();
+    // bCastPending is still true, so this re-entry passes the gate in
+    // BeginCastIfNeeded and the ability's own body finally runs.
+    ActivateAbility(Handle, ActorInfo, ActivationInfo, nullptr);
+    bCastCommitted = false;
+    // O178: THE CUE FIRES AT THE LANDING. TryActivateSlot withheld its
+    // OnAbilityActivated because this ability was still casting when the
+    // press returned; the resolution is the moment the ability exists, so
+    // this is where the slot is announced. The interrupt and cancel paths
+    // clear the timer and never reach here, which is the point.
+    ABreakerCharacter* Character = GetBreakerCharacter();
+    if (UBreakerAbilityComponent* Abilities = Character ? Character->GetAbilities() : nullptr)
+    {
+        Abilities->NotifyCastResolved(Handle);
+    }
+
+    // O271: THE QUEUED PRESS FIRES HERE, after the landing it waited behind.
+    // The body above ended the ability (every cast-timed body does), so the
+    // spec is no longer active and the same GAS gate that refused the press
+    // now admits it: CanActivateAbility — dead, staggered, cost, cooldown —
+    // then ActivateAbility, whose BeginCastIfNeeded pays and starts a second
+    // wind-up. Straight through the ASC rather than the component's
+    // TryActivateSlot: the slot funnel adds only its Hold/Deploy second-press
+    // handling and the landing-withheld cue, neither of which a queued cast
+    // needs, and this way no slot has to be looked up from the spec.
+    //
+    // GAPS, recorded: a queued press the bank cannot pay is refused at the
+    // gate exactly as a fresh press would be — dropped, not deferred until
+    // the Mana returns. And an ability whose body does NOT end itself (a
+    // window that outlives its landing) is still active here, so GAS refuses
+    // the re-activation and the queued press is dropped; no cast-timed
+    // ability does that today.
+    if (!bCastQueued) return;
+    bCastQueued = false;
+    PromoteQueuedCast();
+    bSkipPrepareOnce = true;
+    if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
+    {
+        ASC->TryActivateAbility(Handle);
+    }
+    // A refusal at the gate never reached BeginCastIfNeeded, so the flag
+    // would otherwise wait for the next real press and skip ITS solve.
+    bSkipPrepareOnce = false;
+}
+
+bool UBreakerGameplayAbility::QueuePressDuringCast()
+{
+    // ONE queued press: a third press during the wind-up is dropped rather
+    // than replacing the second — replacing would let a held key re-aim the
+    // queued cast on every frame, which is the drift again by another door.
+    if (!bCastPending || bCastQueued) return false;
+    if (!PrepareQueuedCast()) return false;
+    bCastQueued = true;
+    return true;
 }
 
 void UBreakerGameplayAbility::HandleCastInterrupt(const FBreakerDamageResult& Result)
@@ -542,6 +599,9 @@ void UBreakerGameplayAbility::HandleCastInterrupt(const FBreakerDamageResult& Re
     // the risk that buys it back; handing it over on an interrupt would make
     // casting free to attempt.
     bCastCommitted = false;
+    // O271: the press waiting behind this cast goes with it. It was never
+    // paid for, so nothing is owed; it simply did not happen.
+    bCastQueued = false;
     EndAbility(CastHandle, CurrentActorInfo, CastActivationInfo, true, true);
 }
 
@@ -572,6 +632,8 @@ void UBreakerGameplayAbility::EndAbility(const FGameplayAbilitySpecHandle Handle
         // NO REFUND, the same rule the damage interrupt states: the Mana went
         // on the keypress and the wind-up is the risk that buys it back.
         bCastCommitted = false;
+        // O271: a cancelled cast takes its queued press with it.
+        bCastQueued = false;
     }
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

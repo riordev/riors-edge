@@ -72,7 +72,7 @@ bool FBreakerCleaveWorldOcclusionTest::RunTest(const FString& Parameters)
     Sweep.RangeCm = Cleave->ComputeEffectiveRangeCm(nullptr);
     Sweep.ArcDegrees = Cleave->ComputeEffectiveArcDegrees(nullptr);
     Sweep.Forward = FVector::ForwardVector;
-    TestEqual(TEXT("shipped Cleave reach is 6.5 metres"), Sweep.RangeCm, 650.0f);
+    TestEqual(TEXT("shipped Cleave reach is 7 metres"), Sweep.RangeCm, 700.0f);
     TestTrue(TEXT("open enemy does not occlude itself"), UBreakerMeleeSweep::SweepTargets(World, nullptr, Sweep).Contains(Enemy));
     AActor* Wall = World->SpawnActor<AActor>();
     UBoxComponent* WallBody = NewObject<UBoxComponent>(Wall);
@@ -159,7 +159,7 @@ bool FBreakerZoneEntryAndEntropyTest::RunTest(const FString& Parameters)
     if (!TestNotNull(TEXT("Rot world"), World)) return false;
     ON_SCOPE_EXIT { World->DestroyWorld(false); };
     const UBreakerAbility_Rot* Rot = GetDefault<UBreakerAbility_Rot>();
-    TestEqual(TEXT("Rot has actual ten damage Entropy hits"), Rot->ZoneDamagePerTick, 10.0f);
+    TestEqual(TEXT("Rot has actual twelve damage Entropy hits"), Rot->ZoneDamagePerTick, 12.0f);
     TestEqual(TEXT("Rot hits every half second"), Rot->TickIntervalSeconds, 0.5f);
     FBreakerDamageSubject Target = BreakerMakeDamageSubject(World, FVector(100, 0, 0));
     ABreakerZoneActor* Zone = World->SpawnActor<ABreakerZoneActor>();
@@ -200,11 +200,11 @@ bool FBreakerZoneEntryAndEntropyTest::RunTest(const FString& Parameters)
     EntropyZone->ConfigureZone(EntropySpec, nullptr);
     EntropyZone->AdvanceZone(.5f);
     TestEqual(TEXT("Threshold hit consumes earned buildup"), EntropyTarget.Status->GetEntropyBuildup(), 0.0f);
-    TestTrue(TEXT("Actual ten damage zone hit earns Rot on the hundred-health fixture"), EntropyTarget.Status->HasStatus(FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"))));
+    TestTrue(TEXT("Actual twelve damage zone hit earns Rot on the hundred-health fixture (threshold 10% of 100)"), EntropyTarget.Status->HasStatus(FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"))));
     TestFalse(TEXT("Entropy zone does not apply old Poison payload"), EntropyTarget.Status->HasStatus(FGameplayTag::RequestGameplayTag(TEXT("Status.Poison"))));
     const float BeforeRot = EntropyTarget.Attributes->GetHealth();
     EntropyTarget.Status->AdvanceStatuses(4);
-    TestEqual(TEXT("Earned Rot pays half of triggering ten damage hit"), BeforeRot - EntropyTarget.Attributes->GetHealth(), 5.0f, .01f);
+    TestEqual(TEXT("Earned Rot pays half of triggering twelve damage hit (12 x 0.5 = 6)"), BeforeRot - EntropyTarget.Attributes->GetHealth(), 6.0f, .01f);
     return true;
 }
 #endif

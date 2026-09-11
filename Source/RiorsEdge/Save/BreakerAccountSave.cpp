@@ -1,6 +1,8 @@
 #include "Save/BreakerAccountSave.h"
 
 #include "Kismet/GameplayStatics.h"
+#include "Misc/CommandLine.h"
+#include "Playtest/BreakerHarnessMath.h"
 #include "Save/BreakerCharacterRoster.h"
 #include "Save/BreakerRiftglassFold.h"
 #include "Save/BreakerSaveGame.h"
@@ -95,5 +97,9 @@ void UBreakerAccountSave::ResetCacheForTesting()
 bool UBreakerAccountSave::SaveAccount() const
 {
     if (bNeverPersist) return true;
+    // A harness run never writes the owner's account: an -BreakerAutoPlay
+    // capture cleared a rift and overwrote his Riftglass. The pawn's own save
+    // is guarded the same way; this is the choke point for the other callers.
+    if (BreakerHarness::IsHarnessCommandLine(FCommandLine::Get())) return true;
     return UGameplayStatics::SaveGameToSlot(const_cast<UBreakerAccountSave*>(this), AccountSlotName(), 0);
 }

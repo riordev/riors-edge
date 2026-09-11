@@ -2054,6 +2054,9 @@ void SBreakerMenu::EnsureRosterLoaded()
     // moment anything asks for the roster — means their progress is simply
     // present on the select screen rather than apparently deleted.
     Roster->AdoptLegacySaveIfPresent();
+    // The row is derived; the slot wins. The pawn's write-time refresh serves
+    // only the character that just saved, so every other row is re-read here.
+    Roster->RefreshAllSummariesFromSaves();
     if (!SelectedCharacterId.IsValid())
     {
         SelectedCharacterId = Roster->LastPlayedCharacterId.IsValid()

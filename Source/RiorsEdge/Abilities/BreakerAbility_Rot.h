@@ -10,14 +10,16 @@ class UBreakerAttributeSet;
 class UWorld;
 
 // C3 Rot (Class-Kits §2.2, Ability-Implementation-Spec §5.3): 25 Mana, no
-// cooldown. "4 m radius zone at the aim point, 6s duration. Enemies inside take
+// cooldown. "A radius zone at the aim point, for a duration. Enemies inside take
 // Entropy damage and have their Armour reduced by a flat 40. Zones are the Void
 // Whisperer's whole grammar."
 //
 // The ability is deliberately thin: everything durable about it lives in
 // ABreakerZoneActor, because Support's Suppress, Gunsmith's Disruptor, every
 // boss telegraph and every environmental hazard need the same volume. What is
-// Rot's and only Rot's is the aim solve, the payload, and the anti-stack call.
+// Rot's and only Rot's is the aim solve and the payload. A recast spawns a new
+// puddle; nothing merges into a live one (O271). Wellspring's following puddle
+// is the one exception, renewed in place because there is only ever one.
 // ---------------------------------------------------------------------------
 // WHICH HIT IS THE FLOOR.
 //
@@ -94,6 +96,13 @@ public:
     // the wrong place, not a swallowed input), so this always returns true.
     virtual bool PrepareCast() override;
 
+    // O271: a press during the wind-up queues one cast, and ITS aim is read
+    // at that press too — into a second slot, because the first still belongs
+    // to the cast winding up. Promotion moves it into the active slot at the
+    // landing that fires the queued cast.
+    virtual bool PrepareQueuedCast() override;
+    virtual void PromoteQueuedCast() override;
+
     // Everything the aim decides, in one value: the centre after the floor
     // probe and whether Wellspring makes the puddle ride the caster.
     struct FAimSolve
@@ -114,7 +123,7 @@ public:
     // subclass's own differently-named UPROPERTYs — the shape the
     // EBreakerNodeStatTarget comments ask for. Actor-parameterised so a test
     // can pin them on a rigged owner with no world. With no owned ranks both
-    // are exactly the authored Class-Kits numbers (4 m, 6 s).
+    // are exactly the authored numbers in Data/abilities.json.
     UFUNCTION(BlueprintPure, Category="Rot")
     float ComputeEffectiveRadiusCm(const AActor* OwnerActor) const;
     UFUNCTION(BlueprintPure, Category="Rot")
@@ -129,9 +138,12 @@ private:
 
     FAimSolve CastAimSnapshot;
     bool bAimSnapshotValid = false;
+    // The queued press's aim (O271), waiting behind the active snapshot.
+    FAimSolve QueuedAimSnapshot;
+    bool bQueuedAimValid = false;
 
 public:
-    // Class-Kits §2.2 C3: 4 m radius, 6 s.
+    // Class-Kits §2.2 C3 names the shape; the numbers live in Data/abilities.json.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float RadiusCm {}; // O246: authored in Data/abilities.json.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float DurationSeconds {}; // O246: authored in Data/abilities.json.
     // O2 PLACEHOLDER: the doc gives radius and duration and nothing else. The

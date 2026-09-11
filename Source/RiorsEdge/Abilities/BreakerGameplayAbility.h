@@ -124,6 +124,28 @@ public:
     virtual bool PrepareCast() { return true; }
     virtual void OnCastBegan() {}
 
+    // --- The queue (O271) ---------------------------------------------------
+    // A press during a wind-up queues ONE cast, fired when the wind-up
+    // resolves; the aim is solved at the queued press. GAS refuses a second
+    // activation of an active InstancedPerActor instance, so before this the
+    // second press was swallowed and the owner's next puddle needed a third
+    // press timed after a landing he could not see.
+    //
+    // PrepareQueuedCast runs AT THE QUEUED PRESS and holds whatever the press
+    // decides into a second slot — Rot solves its aim there. It may refuse,
+    // and a refusal is a dropped press, never a queued one. PromoteQueuedCast
+    // runs at the first landing, after the body has consumed its own snapshot,
+    // and moves the queued decision into the active slot; the fresh cast that
+    // follows skips PrepareCast so the promoted snapshot is used as-is.
+    // Both are no-ops by default: an ability that overrides neither still
+    // queues (the second press is not lost) and solves nothing early.
+    virtual bool PrepareQueuedCast() { return true; }
+    virtual void PromoteQueuedCast() {}
+    // The press that GAS refused. True when it was queued; false when nothing
+    // is casting or one press is already waiting — a third press is dropped.
+    bool QueuePressDuringCast();
+    bool HasQueuedCast() const { return bCastQueued; }
+
     // Damage interrupts a cast (O266). No refund — the Mana went on the
     // keypress and an interrupted cast is a loss, which is the whole point of
     // a wind-up being a risk.
@@ -145,6 +167,12 @@ public:
 
 private:
     void EndCastBinding();
+    // The wind-up timer's landing. A member rather than the lambda's own body
+    // because a queued cast re-arms CastTimer from INSIDE this callback, and
+    // the timer manager destroys the executing timer's delegate — the closure
+    // — the moment its handle is re-set. Everything here is on the stack.
+    void ResolveCast(FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+        FGameplayAbilityActivationInfo ActivationInfo);
 public:
     virtual void CommitExecute(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) override;
     virtual bool CheckCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
@@ -244,6 +272,13 @@ private:
     // charge a second time.
     bool bCastPending = false;
     bool bCastCommitted = false;
+    // O271: one press waiting behind the running wind-up. Cleared by the
+    // landing that fires it and by every interrupt and cancel.
+    bool bCastQueued = false;
+    // The fresh cast a promoted queue starts must not re-run PrepareCast:
+    // that would solve the aim at the landing, which is exactly the drift the
+    // queue exists to avoid. Read and cleared by the next BeginCastIfNeeded.
+    bool bSkipPrepareOnce = false;
     FGameplayAbilitySpecHandle CastHandle;
     FGameplayAbilityActivationInfo CastActivationInfo;
     FTimerHandle CastTimer;

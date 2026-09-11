@@ -197,6 +197,34 @@ bool FBreakerRotNodesRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("leaving strong zone retains only weaker overlap"), EnemyCombat->GetComposedArmorReduction(), 40.0f);
     Weak->ReleaseAllOccupants();
     TestEqual(TEXT("final zone exit releases strip"), EnemyCombat->GetComposedArmorReduction(), 0.0f);
+    // Lingering R2's metre. O271 made a recast spawn rather than merge, so
+    // the following puddle's renewal is the one refresh a zone still gets
+    // and the one place R2 pays. The eight-point pool is the game's whole
+    // doctrine grant (O111), so the rank is bought after a respec on the
+    // nodes the follow path needs: Seep, Standing Water (Lingering's
+    // prerequisite), Lingering x2, Attrition, Wellspring — seven of eight.
+    FText R2Reason;
+    if (!TestTrue(TEXT("respec for the Lingering rank-two proof"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, true, R2Reason))
+        || !Buy(TEXT("Caster.VoidWhisperer.Seep")) || !Buy(TEXT("Caster.VoidWhisperer.StandingWater"))
+        || !Buy(TEXT("Caster.VoidWhisperer.Lingering"))
+        || !Buy(TEXT("Caster.VoidWhisperer.Lingering")) || !Buy(TEXT("Caster.VoidWhisperer.Attrition"))
+        || !Buy(TEXT("Caster.VoidWhisperer.Wellspring"))) return false;
+    TestEqual(TEXT("Lingering is rank two"), Progression->GetNodeRank(TEXT("Caster.VoidWhisperer.Lingering"), EBreakerPointCurrency::DoctrinePoints), 2);
+    Mobile->ReleaseAllOccupants(); Mobile->Destroy();
+    Player->SetActorLocation(FVector(0, 0, 0));
+    ABreakerZoneActor* Grown = CastRot();
+    if (!TestNotNull(TEXT("rank-two following zone"), Grown)) return false;
+    TestEqual(TEXT("it follows the caster"), Grown->GetFollowActor(), static_cast<AActor*>(Player));
+    const float FollowRadius = Grown->GetSpec().RadiusCm;
+    Grown->AdvanceZone(1);
+    TestEqual(TEXT("a recast renews the following zone"), CastRot(), Grown);
+    TestEqual(TEXT("rank two grows it by the authored metre"),
+        Grown->GetSpec().RadiusCm, FollowRadius + GetDefault<UBreakerAbility_Rot>()->LingeringRefreshGrowthCm, 0.01f);
+    Grown->AdvanceZone(1);
+    TestEqual(TEXT("a further renewal still renews it"), CastRot(), Grown);
+    TestEqual(TEXT("and grows it no second time"),
+        Grown->GetSpec().RadiusCm, FollowRadius + GetDefault<UBreakerAbility_Rot>()->LingeringRefreshGrowthCm, 0.01f);
+
     const UBreakerAbility_Rot* Rot = GetDefault<UBreakerAbility_Rot>();
     TestFalse(TEXT("sky miss is not self-placement"), Rot->ShouldFollowCaster(Player, false, Player->GetActorLocation(), FVector::UpVector));
     TestFalse(TEXT("wall hit is not self-placement"), Rot->ShouldFollowCaster(Player, true, Player->GetActorLocation(), FVector::ForwardVector));

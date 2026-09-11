@@ -19,14 +19,17 @@
 //
 // The roster is the index, NOT the data. Each character's actual save stays in
 // its own `UBreakerSaveGame` under its own slot name; this object holds only
-// what the SELECT screen needs to draw a row without loading five full saves.
-// That split is the point: adding a field to a character's save must never
-// mean rewriting the roster's format, and listing characters must never mean
-// deserializing their inventories.
+// what the SELECT screen needs to draw a row. That split is the point: adding
+// a field to a character's save must never mean rewriting the roster's format,
+// and the roster's format never has to know what a character carries.
 //
 // The summary is therefore DERIVED state and always re-derivable from the
 // character's own save. If the two ever disagree, the character save wins —
-// see RefreshSummaryFromSave.
+// see RefreshSummaryFromSave. The cached row is what draws a character whose
+// slot is absent or refuses to load; it is not a substitute for reading the
+// slot when the slot is there. Loading the roster for display re-derives
+// every row from its own slot (RefreshAllSummariesFromSaves), because the
+// write-time refresh only ever serves the one character that just saved.
 // ---------------------------------------------------------------------------
 
 USTRUCT(BlueprintType)
@@ -109,9 +112,18 @@ public:
     bool DeleteCharacter(const FGuid& CharacterId);
 
     // Re-derives a summary from the character's own save. The summary is a
-    // cache for the select screen; the save is the truth.
+    // cache for the select screen; the save is the truth. bStampPlayed marks
+    // the row as played-now; the pawn's write-time refresh passes true, a
+    // read for display passes false — a read is not a play, and stamping it
+    // would shuffle the select screen's order every time it opened.
     UFUNCTION(BlueprintCallable, Category="Save|Roster")
-    bool RefreshSummaryFromSave(const FGuid& CharacterId);
+    bool RefreshSummaryFromSave(const FGuid& CharacterId, bool bStampPlayed = true);
+
+    // Re-derives every row from its own slot, for display. A row whose slot
+    // is missing or refuses to load keeps its cached values. Does not save
+    // the roster: the disk copy catches up at the next real write.
+    UFUNCTION(BlueprintCallable, Category="Save|Roster")
+    void RefreshAllSummariesFromSaves();
 
     // ---- Pure rules, exposed for test ----------------------------------
     // A name the roster will accept. Trimmed, non-empty, bounded, and free of

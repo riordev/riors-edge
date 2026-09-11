@@ -297,18 +297,18 @@ bool FBreakerAbilityGeometrySeamTest::RunTest(const FString& Parameters)
     UBreakerAbility_Rot* Rot = NewObject<UBreakerAbility_Rot>();
     UBreakerAbility_Cleave* Cleave = NewObject<UBreakerAbility_Cleave>();
 
-    // Before any purchase, the authored numbers exactly: 4 m, 6 s, 135°, 6.5 m.
-    TestEqual(TEXT("Rot's authored radius with no ranks"), Rot->ComputeEffectiveRadiusCm(Owner), 400.0f, 0.0001f);
+    // Before any purchase, the authored numbers exactly: 4.4 m, 6 s, 135°, 7 m.
+    TestEqual(TEXT("Rot's authored radius with no ranks"), Rot->ComputeEffectiveRadiusCm(Owner), 440.0f, 0.0001f);
     TestEqual(TEXT("Rot's authored duration with no ranks"), Rot->ComputeEffectiveDurationSeconds(Owner), 6.0f, 0.0001f);
     TestEqual(TEXT("Cleave's authored arc with no ranks"), Cleave->ComputeEffectiveArcDegrees(Owner), 135.0f, 0.0001f);
-    TestEqual(TEXT("Cleave's authored range with no ranks"), Cleave->ComputeEffectiveRangeCm(Owner), 650.0f, 0.0001f);
+    TestEqual(TEXT("Cleave's authored range with no ranks"), Cleave->ComputeEffectiveRangeCm(Owner), 700.0f, 0.0001f);
 
     // Lingering (VW tree): two ranks of +15% duration reach Rot's zone.
     UBreakerProgressionTree* VoidWhisperer = UBreakerProgressionLibrary::GetCasterVoidWhispererTree();
     TestTrue(TEXT("Standing Water buys"), BreakerBuyToMax(*this, Progression, VoidWhisperer, TEXT("Caster.VoidWhisperer.StandingWater")));
     TestTrue(TEXT("Lingering buys"), BreakerBuyToMax(*this, Progression, VoidWhisperer, TEXT("Caster.VoidWhisperer.Lingering")));
     TestEqual(TEXT("Lingering lengthens Rot's zone (6s -> 7.8s)"), Rot->ComputeEffectiveDurationSeconds(Owner), 7.8f, 0.0001f);
-    TestEqual(TEXT("Lingering does not widen Rot's radius"), Rot->ComputeEffectiveRadiusCm(Owner), 400.0f, 0.0001f);
+    TestEqual(TEXT("Lingering does not widen Rot's radius"), Rot->ComputeEffectiveRadiusCm(Owner), 440.0f, 0.0001f);
 
     // Edge (Spellblade tree): the tag consumer — Cleave's arc becomes SB8's
     // 180 the moment the node is owned, and narrows back on respec.
@@ -359,19 +359,19 @@ bool FBreakerAbilityAreaLaneTest::RunTest(const FString& Parameters)
     // 24 cm and the owner bought it, looked, and saw the same disc. O2.
     UBreakerProgressionTree* Core = UBreakerProgressionLibrary::GetCoreSliceTree();
     TestTrue(TEXT("Arc Prime buys"), BreakerBuyToMax(*this, Progression, Core, TEXT("Core.Arc.Prime")));
-    TestEqual(TEXT("Prime alone leaves Rot's radius authored"), Rot->ComputeEffectiveRadiusCm(Owner), 400.0f, 0.0001f);
+    TestEqual(TEXT("Prime alone leaves Rot's radius authored"), Rot->ComputeEffectiveRadiusCm(Owner), 440.0f, 0.0001f);
     TestTrue(TEXT("Arc Anchor buys"), BreakerBuyToMax(*this, Progression, Core, TEXT("Core.Arc.Anchor")));
-    TestEqual(TEXT("Anchor widens Rot's puddle (400 -> 544)"), Rot->ComputeEffectiveRadiusCm(Owner), 544.0f, 0.01f);
-    TestEqual(TEXT("Anchor lengthens Cleave's reach (650 -> 884)"), Cleave->ComputeEffectiveRangeCm(Owner), 884.0f, 0.01f);
+    TestEqual(TEXT("Anchor widens Rot's puddle (440 x 1.36 -> 598.4)"), Rot->ComputeEffectiveRadiusCm(Owner), 598.4f, 0.01f);
+    TestEqual(TEXT("Anchor lengthens Cleave's reach (700 x 1.36 -> 952)"), Cleave->ComputeEffectiveRangeCm(Owner), 952.0f, 0.01f);
     TestEqual(TEXT("Anchor widens Cleave's arc (135 -> 183.6)"), Cleave->ComputeEffectiveArcDegrees(Owner), 183.6f, 0.5f);
 
     // Core is its own pool: a Doctrine respec leaves the wedge standing, and
     // the Core respec (free at this level) returns all three to authored.
     TestTrue(TEXT("A Doctrine respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, true, Failure));
-    TestEqual(TEXT("A Doctrine respec does not touch the Core wedge"), Rot->ComputeEffectiveRadiusCm(Owner), 544.0f, 0.01f);
+    TestEqual(TEXT("A Doctrine respec does not touch the Core wedge"), Rot->ComputeEffectiveRadiusCm(Owner), 598.4f, 0.01f);
     TestTrue(TEXT("Core respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure));
-    TestEqual(TEXT("Core respec returns Rot's radius to authored"), Rot->ComputeEffectiveRadiusCm(Owner), 400.0f, 0.0001f);
-    TestEqual(TEXT("Core respec returns Cleave's reach to authored"), Cleave->ComputeEffectiveRangeCm(Owner), 650.0f, 0.0001f);
+    TestEqual(TEXT("Core respec returns Rot's radius to authored"), Rot->ComputeEffectiveRadiusCm(Owner), 440.0f, 0.0001f);
+    TestEqual(TEXT("Core respec returns Cleave's reach to authored"), Cleave->ComputeEffectiveRangeCm(Owner), 700.0f, 0.0001f);
     TestEqual(TEXT("Core respec returns Cleave's arc to authored"), Cleave->ComputeEffectiveArcDegrees(Owner), 135.0f, 0.0001f);
     return true;
 }

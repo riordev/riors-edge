@@ -1395,16 +1395,16 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterVoidWhispererTree(
     Tree->Nodes.Add(Node);
 
     // --- Tier 2 (VW4-VW6) ----------------------------------------------------
-    // LIVE 2026-08-16: Lingering was a purchase that paid nothing — VW4's
-    // anti-stack rule was implemented unconditionally at the zone spawner
-    // (UBreakerAbility_Rot's FindRefreshableZone call, "the anti-stack rule
-    // lives at the SPAWNER, once"), so owning the node changed no behaviour
-    // at all. The AbilityDuration lane gives the fantasy a perceptible half:
-    // zones linger longer per rank (O2 PLACEHOLDER, consumed by Rot's
-    // ComputeEffectiveDurationSeconds on both the spawn and refresh paths).
-    // R2's flat radius growth is claimed once by the existing zone on refresh.
+    // The AbilityDuration lane is the node's perceptible half: zones linger
+    // longer per rank (O2 PLACEHOLDER, consumed by Rot's
+    // ComputeEffectiveDurationSeconds on the spawn and refresh paths). O271:
+    // a recast spawns a new puddle and nothing merges, so the only refresh a
+    // zone still receives is Wellspring's following puddle renewed by a
+    // recast; R2's one-time metre is claimed there
+    // (RiorsEdge.Abilities.RotPurchasedZones pins it). QUESTION, RECORDED: whether R2
+    // should instead grow a puddle cast over a live one is the owner's.
     Node = MakeNode(TEXT("Caster.VoidWhisperer.Lingering"), TEXT("Lingering"),
-        TEXT("Zones linger longer, and overlapping zones refresh instead of stacking. R2: refreshing a zone increases its radius by 1 m, once per zone."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 2, 2, 1);
+        TEXT("Zones linger longer. R2: a refreshed zone grows by 1 m, once."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.StandingWater"));
     AddEffect(Node, EBreakerNodeStatTarget::AbilityDuration, EBreakerNodeStatBucket::IncreasedPercent, 15.0f); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Lingering.GetTag());

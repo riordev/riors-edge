@@ -142,6 +142,31 @@ bool UBreakerAbility_Rot::PrepareCast()
     return true;
 }
 
+bool UBreakerAbility_Rot::PrepareQueuedCast()
+{
+    // O271: THE QUEUED PRESS IS AIMED AT THE QUEUED PRESS. The active snapshot
+    // belongs to the cast still winding up, so the second press solves into
+    // its own slot and waits. Same solve, same never-refuse rule.
+    const ABreakerCharacter* Character = GetBreakerCharacter();
+    const UWorld* World = Character ? Character->GetWorld() : nullptr;
+    bQueuedAimValid = false;
+    if (!Character || !World) return true;
+    SolveAim(*Character, *World, QueuedAimSnapshot);
+    bQueuedAimValid = true;
+    return true;
+}
+
+void UBreakerAbility_Rot::PromoteQueuedCast()
+{
+    // The first landing has consumed the active snapshot by the time this
+    // runs; the queued one takes its place and the fresh cast that follows
+    // skips PrepareCast, so this aim — not the reticle at the landing — is
+    // where the second puddle goes.
+    CastAimSnapshot = QueuedAimSnapshot;
+    bAimSnapshotValid = bQueuedAimValid;
+    bQueuedAimValid = false;
+}
+
 void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
     // O266: the wind-up. Returns false when it has started a cast — the cost
@@ -205,8 +230,8 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 
     const FGameplayTag ZoneTag = BreakerAbilityTags::Zone_Caster_Rot.GetTag();
 
-    // The geometry seam, read once for the whole cast so the anti-stack
-    // search, the spawned volume and the refresh all share one reading.
+    // The geometry seam, read once for the whole cast so the spawned volume
+    // and the Wellspring refresh share one reading.
     const float EffectiveRadiusCm = ComputeEffectiveRadiusCm(Character);
     const float EffectiveDuration = ComputeEffectiveDurationSeconds(Character);
     const UBreakerAttributeSet* SourceAttributes = GetBreakerAttributes();
@@ -239,6 +264,9 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 
     // Rot now builds Entropy on accepted zone hits; physical Poison remains a separate status.
 
+    // THE ONE REFRESH THAT REMAINS is Wellspring's: a puddle riding the caster
+    // is the caster's puddle, and a second one riding the same caster would be
+    // the same puddle twice. A recast while one follows renews it in place.
     auto RefreshExisting = [&](ABreakerZoneActor* Existing)
     {
         Existing->RefreshPaidPayload(Spec);
@@ -257,18 +285,13 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
                     return;
                 }
 
-    // VW4's anti-stack rule lives at the SPAWNER, once, exactly as the spec
-    // requires — never per ability. A recast on top of a live Rot refreshes it;
-    // two Rots do not stack their armour strip, and the zone actor's key makes
-    // sure even genuinely separate puddles cannot double-strip.
-    if (ABreakerZoneActor* Existing = ABreakerZoneActor::FindRefreshableZone(World, ZoneTag, Character, Center, EffectiveRadiusCm, 0.5f))
-    {
-        RefreshExisting(Existing);
-        if (bFollowCaster) Existing->SetFollowActor(Character);
-        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
-        return;
-    }
-
+    // A RECAST SPAWNS A NEW PUDDLE. NOTHING MERGES INTO A LIVE ONE (O271).
+    // VW4's anti-stack rule used to run here — a recast within half a radius
+    // of a live own Rot refreshed that one instead of spawning — and the
+    // owner felt it as the second press doing nothing: the puddle he was
+    // looking at got a little longer and no new puddle appeared. Two puddles
+    // still cannot double-strip the same target; that guard is the zone
+    // actor's own key, not a merge at the spawner.
     FActorSpawnParameters SpawnParams;
     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     SpawnParams.Owner = Character;

@@ -47,6 +47,7 @@
 #include "Misc/Parse.h"
 #include "Engine/StaticMeshActor.h"
 #include "Playtest/BreakerPlaytestComponent.h"
+#include "Playtest/BreakerHarnessMath.h"
 #include "Classes/BreakerManaComponent.h"
 #include "Classes/BreakerMomentumComponent.h"
 #include "Classes/BreakerScrapComponent.h"
@@ -492,27 +493,27 @@ void ABreakerCharacter::SaveGameState()
     // would stamp THIS pawn's state over that character's save — the exact
     // clobber that turned a freshly created Caster into Swift.
     if (bRefuseSavesForPendingCharacter) return;
-    // THE PROBE NEVER TOUCHES A SAVE (Part One-U item 16's guard, stated as
-    // its own refusal): an ability-probe session dev-forces classes and — once
-    // the dev equip surface lands — loadouts a real character has not earned,
-    // and a persisted probe state is save corruption wearing a convenience.
-    // The whole session refuses character-state writes, not just the probe
-    // frames, because the corrupting write is whichever one happens LAST.
-    FString ProbeValueScratch;
-    if (FParse::Param(FCommandLine::Get(), TEXT("BreakerAbilityProbe"))
-        || FParse::Value(FCommandLine::Get(), TEXT("BreakerAbilityProbe="), ProbeValueScratch))
+    // A HARNESS RUN NEVER TOUCHES A SAVE. This guard used to name two switches
+    // by hand — -BreakerAbilityProbe (Part One-U item 16: a probe session
+    // dev-forces classes a real character has not earned, and a persisted
+    // probe state is save corruption wearing a convenience) and
+    // -BreakerCaptureMenu= (a photograph must never persist anything). Every
+    // other harness switch walked past it: a -BreakerAutoPlay=Gym capture
+    // travelled to a real map, played, and on EndPlay wrote BreakerSave0.sav
+    // and BreakerAccount.sav into the owner's save directory, overwriting the
+    // account's Riftglass. ue-capture.sh passes no -UserDir, so there is no
+    // second line of defence. The refusal is now keyed on the harness's whole
+    // switch list (Playtest/BreakerHarnessMath.h), and the whole session
+    // refuses, not just the captured frames, because the corrupting write is
+    // whichever one happens LAST.
+    if (BreakerHarness::IsHarnessCommandLine(FCommandLine::Get()))
     {
-        return;
-    }
-    // A MENU CAPTURE REFUSES THE SAME WAY, and it has to now. The front-end
-    // guard below covered every capture run for free while captures were
-    // stranded in the front end; once they travel to a real map that guard
-    // stops applying, and ue-capture.sh passes no -UserDir, so the write
-    // would land in the OWNER'S save directory. A photograph must never
-    // persist anything.
-    FString CaptureScreenScratch;
-    if (FParse::Value(FCommandLine::Get(), TEXT("BreakerCaptureMenu="), CaptureScreenScratch))
-    {
+        static bool bLoggedHarnessRefusal = false;
+        if (!bLoggedHarnessRefusal)
+        {
+            bLoggedHarnessRefusal = true;
+            UE_LOG(LogTemp, Display, TEXT("SaveGameState refused: this is a harness run (a Breaker* switch is on the command line). No character, account or roster file is written for the whole session."));
+        }
         return;
     }
     // A FRONT-END pawn with no character has nothing worth persisting: its
@@ -2709,6 +2710,14 @@ void ABreakerCharacter::ResumeFromMenu()
 void ABreakerCharacter::ReturnToTitleMenu()
 {
     if (IsCoopCombatProfile()) return;
+    // "save pls." Returning to the title is the player leaving this
+    // character, and the only write on that path was EndPlay's — which never
+    // ran, because the pawn stays alive under the menu. A level gained and a
+    // roster row that never updated were the same absence. SaveGameState
+    // writes the slot, folds Riftglass to the account and refreshes the
+    // roster row; it refuses on its own under the harness, so nothing here
+    // has to know about captures.
+    SaveGameState();
     bShowingInitialMenu = true;
     if (MenuWidget.IsValid()) MenuWidget->ShowMainMenu();
 }
