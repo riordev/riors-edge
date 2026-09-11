@@ -24,11 +24,27 @@ line below is the edit that makes the ruling true:
       RangeCm 650 -> 700 (O2). Move the pins that read them (AreaLane,
       GeometrySeam, CombatRuntimeTargeting range 650).
 
+- [ ] "lets bring rot base damage up just a smidge": ZoneDamagePerTick
+      10 -> 12 (O2). Check the Rot-budget / PowerCurve pins that read it.
+- [ ] "save pls": RETURN TO TITLE calls SaveGameState before
+      ReturnToTitleMenu, so the roster row and the slot are current.
+- [ ] "character level still not fixed" — SCOUTED: the write-time refresh
+      ran (roster and slot share an mtime at his quit) but only for the
+      pawn that saves. casterplaytest2's row still says 1 / 0 XP while its
+      slot says 4 / 2401, and nothing will touch that row until that
+      character is played. And in his one session since the fix he opened
+      the list at launch, before any save. FIX: re-derive every row from
+      its own slot when the roster loads for display
+      (RefreshAllSummariesFromSaves, no LastPlayed stamp — a read is not a
+      play), called from EnsureRosterLoaded. Pin: LoadRefreshesEveryRow.
+- [ ] FOUND BY THE SCOUT, MINE TO FIX: today's -BreakerAutoPlay captures
+      wrote BreakerSave0.sav and BreakerAccount.sav at 10:20 — the save
+      guard (BreakerCharacter.cpp:513-517) refuses only -BreakerCaptureMenu.
+      Any -BreakerAutoPlay / -BreakerCapture* / -BreakerCrowdProbe run must
+      never write a save. Pin: the guard predicate against each switch.
+
 OPEN, HE HAS NOT SAID:
-- The boss's own floor drop is left behind on completion. Accept, or route
-  a rift terminator's loot to the pack (FIELD)?
-- Rot's tick is 20 DPS beside a 240 DPS rifle. Wanted?
-- RETURN TO TITLE does not save. Save on it?
+- The boss's own floor drop is left behind on completion — "leave open".
 - The halo goes dark at ReadyToTurnIn, not hand-in — "does it matter?" —
   left as is.
 
