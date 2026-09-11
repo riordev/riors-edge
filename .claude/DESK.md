@@ -1,5 +1,39 @@
 # Desk — next playtest
 
+## OWNER WORK ORDER, 2026-09-11 — THE SLICE'S FEEL. THIS OUTRANKS EVERYTHING.
+
+In his words, split into the cycles they are:
+
+1. ABILITY EFFECTS, SWIFT AND CASTER, ALL OF THEM. "Rot is literally just an
+   orange circle on the ground that doesn't even place correctly half the time.
+   And same thing with Cleave. It's just a blue line that goes across your
+   screen." Plus weapon effects. "That's the kind of abilities I wanna focus on
+   building in this slice."
+2. FERNHALL GETS SHAPE. "It's just a big rectangle with some pillars and
+   awkwardly generated not-really buildings on the left, right, front and back,
+   and then there's hallways to bigger sets of stuff. And there's some graphical
+   assets that are imported that are placed randomly, like trees, but then
+   everything else is just grey box. The whole level itself doesn't feel good,
+   and the dilapidated just looks like a mess — it doesn't even look
+   dilapidated, it just has random assets that are broken laying in random
+   places. The goal is to have a decent starting area."
+3. THE RED SCREEN FLASH IS OUT. "A giant red border around your entire screen is
+   just not good looking. We need to find an alternative way to signify low HP
+   or taking damage, maybe reduce visibility in some way — think about Path of
+   Exile's light radius."
+4. THE MESHES WE ALREADY HAVE GET USED. Enemy_EyeDrone and Enemy_QuadShell are
+   both in Content/Breaker/Meshes/enemies with full rigs — Idle, Look, Attack,
+   Hit, Run, Charge, TurnOff — and NOTHING references either. This is the
+   standing question from the desk, answered: use them.
+5. RECOIL IS A PATTERN, NOT A JITTER. "When you're ADSing the gun kinda bounces
+   in a circle around your reticle. Your gun shouldn't bounce like that. Recoil
+   should just be up with a slight horizontal, but mostly vertical recoil
+   pattern. But there's no effective recoil."
+6. MONSTERS TAKE HITS AND MOVE LIKE THINGS. "Monsters have no indication that
+   they're taking damage, and they all kind of just walk in a straight line."
+   Note 4 pays part of this: the QuadShell rig ships a Hit and a Run.
+
+
 ## OWNER PLAYTEST, 2026-09-10 (FOURTH) — THE MENU MESSAGE
 
 His words: "can we get numeric values for xp and mana that are shown same thing

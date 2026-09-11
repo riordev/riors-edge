@@ -89,6 +89,18 @@ PIECES = {
     "trees": load_piece("city_grass-trees.glb"),
     "grass": load_piece("fps_grass.glb"),
     "mound": load_piece("fps_platform-large-grass.glb"),
+    # THE MEGAKIT'S OWN VOCABULARY, and it was already in the repo. Owner:
+    # "there's some graphical assets that are imported that are placed
+    # randomly, like trees, but then everything else is just grey box". A yard
+    # made of scaled city blocks and two wall prototypes has nothing in it that
+    # says what the place DOES; these are the pieces that do.
+    "crate": load_piece("modular-sci-fi-megakit/glTF/Props/Prop_Crate4.gltf"),
+    "barrel": load_piece("modular-sci-fi-megakit/glTF/Props/Prop_Barrel_Large.gltf"),
+    "cable": load_piece("modular-sci-fi-megakit/glTF/Props/Prop_Cable_3.gltf"),
+    "panel": load_piece("modular-sci-fi-megakit/glTF/Walls/WallAstra_Straight.gltf"),
+    "stairs": load_piece("modular-sci-fi-megakit/glTF/Platforms/Platform_Stairs_4Wide.gltf"),
+    "rails": load_piece("modular-sci-fi-megakit/glTF/Platforms/Platform_Rails_4Wide.gltf"),
+    "column": load_piece("modular-sci-fi-megakit/glTF/Columns/Column_MetalSupport.gltf"),
 }
 
 SCENE = {}
@@ -129,9 +141,71 @@ place("flr_riftpad", "pavement", (92.0, 0.0, 0.0), (10.0, 0.08, 10.0))
 
 # ---- Perimeter: building slabs on both flanks and both ends ----------------
 BLDG = ["bldg_a", "bldg_b", "bldg_c", "garage"]
+
+# EVERY PERIMETER PIECE WAS THE SAME BOX. Ten of them a side, 10 x 7 x 3 m each,
+# at one distance, in one line: owner, "awkwardly generated not really buildings
+# on the left right front and back". A boundary made of one repeated box is a
+# fence, and a fence is what makes a yard read as a rectangle however much is
+# built inside it.
+#
+# So the boundary gets a SKYLINE: five profiles walked in order, differing in
+# height, in depth, and in how far back from the line they stand, with a smaller
+# second mass on some of them. Nothing here is measured by the cover grammar
+# (wall_ bounds the field, it does not stand in it), so this is silhouette work
+# and cannot move a single cover number.
+#
+#   height, depth, setback (+ is away from the yard), second mass or None
+SKYLINE = (
+    (7.0,  3.0, 0.0, None),
+    (11.5, 4.0, 0.8, ("tower", 3.2, 4.5)),
+    (5.5,  5.5, 2.2, ("canopy", 7.0, 0.5)),
+    (9.0,  3.0, 0.4, ("stack", 2.0, 3.0)),
+    (6.5,  6.0, 1.4, None),
+)
+
+def perimeter(tag, x, z, index, facing):
+    """One perimeter building on the line z, facing the yard (facing = -1 when
+    the yard is at lower z). The profile is chosen by index so the two flanks of
+    one yard never step in time with each other."""
+    height, depth, setback, second = SKYLINE[index % len(SKYLINE)]
+    # THE INNER FACE DOES NOT MOVE. Depth and setback grow AWAY from the yard,
+    # never into it: the old slab was 3 m deep on this line, so its inner face
+    # stood 1.5 m in from the centre, and that face is the boundary every other
+    # thing in this yard was authored against. The first version let a profile
+    # push toward the lane and a 5.5 m-deep building swallowed the courtyard
+    # route's walking line at z -21.3 — RiorsEdge.World.Fernhall.CourtyardRoute
+    # caught it, which is exactly the measurement that route probe is for.
+    inner = z + facing * 1.5
+    line = inner - facing * (depth * 0.5 + max(0.0, setback))
+    place("wall_%s%02d" % (tag, index), BLDG[index % 4], (x, 0.0, line), (10.0, height, depth))
+    if second is None:
+        return
+    kind, size, rise = second
+    if kind == "tower":
+        # A stair tower or a lift head: narrow, taller than its parent, and set
+        # to one side so the parent's roofline breaks rather than steps.
+        place("wall_%s%02dt" % (tag, index), "bldg_c", (x + 3.0, 0.0, line + facing * 0.6),
+              (size, height + rise, depth * 0.7))
+    elif kind == "canopy":
+        # A loading canopy over the ground in front of the building, on two
+        # columns. This is the piece that makes a wall read as somewhere goods
+        # came in and out of.
+        # Out over the ground in FRONT of the building, from the inner face and
+        # overhead: a canopy is the one profile that reaches toward the yard,
+        # and it does it at 3.9 m where nothing walks.
+        place("flr_%s%02dc" % (tag, index), "pavement", (x, rise + 3.4, inner + facing * 1.4),
+              (size, 0.35, 5.0))
+        for side, dx in enumerate((-2.6, 2.6)):
+            place("dress_%s%02dcol%d" % (tag, index, side), "column",
+                  (x + dx, 0.0, inner + facing * 3.4), (0.5, 3.4, 0.5))
+    elif kind == "stack":
+        # A vent stack on the roof: no footprint of its own, all silhouette.
+        place("dress_%s%02ds" % (tag, index), "column", (x - 2.5, height, line),
+              (size * 0.5, rise, size * 0.5))
+
 for i, x in enumerate(range(5, 100, 10)):
-    place("wall_n%02d" % i, BLDG[i % 4], (float(x), 0.0, 25.0), (10.0, 7.0, 3.0))
-    place("wall_s%02d" % i, BLDG[(i + 2) % 4], (float(x), 0.0, -25.0), (10.0, 7.0, 3.0))
+    perimeter("n", float(x), 25.0, i, -1.0)
+    perimeter("s", float(x), -25.0, i + 2, 1.0)
 place("wall_w", "bldg_b", (-1.5, 0.0, 0.0), (3.0, 7.0, 56.0))
 # THE EAST WALL HAS A MOUTH IN IT. Two stubs rather than one slab, leaving a
 # 10 m gap on the z 9..19 band: that gap is the entry yard's end of the seam to
@@ -198,10 +272,10 @@ for i, x in enumerate(range(int(SUB_X) - 46, int(SUB_X) + 50, 10)):
     # The NORTH flank now has a mouth of its own at x 130..140: this yard is no
     # longer the end of the world, and the second seam leaves through it.
     if not 130.0 <= float(x) <= 140.0:
-        place("wall_sub_n%02d" % i, BLDG[i % 4], (float(x), 0.0, SUB_Z + 25.0), (10.0, 7.0, 3.0))
+        perimeter("sub_n", float(x), SUB_Z + 25.0, i + 1, -1.0)
     if 106.0 <= float(x) <= 116.0:
         continue   # the seam's far mouth
-    place("wall_sub_s%02d" % i, BLDG[(i + 2) % 4], (float(x), 0.0, SUB_Z - 25.0), (10.0, 7.0, 3.0))
+    perimeter("sub_s", float(x), SUB_Z - 25.0, i + 3, 1.0)
 place("wall_sub_w", "bldg_b", (SUB_X - 53.5, 0.0, SUB_Z), (3.0, 7.0, 56.0))
 place("wall_sub_e", "bldg_c", (SUB_X + 53.5, 0.0, SUB_Z), (3.0, 7.0, 56.0))
 
@@ -263,8 +337,8 @@ place("wall_dep_w_s", "bldg_b", (DEP_X - 53.5, 0.0, DEP_Z - 26.5), (3.0, 7.0, 3.
 place("wall_dep_w_n", "bldg_b", (DEP_X - 53.5, 0.0, DEP_Z + 6.5), (3.0, 7.0, 43.0))
 place("wall_dep_e", "bldg_c", (DEP_X + 53.5, 0.0, DEP_Z), (3.0, 7.0, 56.0))
 for i, x in enumerate(range(int(DEP_X) - 46, int(DEP_X) + 50, 10)):
-    place("wall_dep_n%02d" % i, BLDG[i % 4], (float(x), 0.0, DEP_Z + 25.0), (10.0, 7.0, 3.0))
-    place("wall_dep_s%02d" % i, BLDG[(i + 2) % 4], (float(x), 0.0, DEP_Z - 25.0), (10.0, 7.0, 3.0))
+    perimeter("dep_n", float(x), DEP_Z + 25.0, i + 4, -1.0)
+    perimeter("dep_s", float(x), DEP_Z - 25.0, i, 1.0)
 
 # The lattice, frame-relative and unchanged.
 for i, fwd in enumerate((19.0, 34.0, 49.0, 64.0, 79.0)):
@@ -307,6 +381,72 @@ CATWALK_HEIGHT = 3.4
 FAR_DECK_HEIGHT = 4.6
 GANTRY_HEIGHT = 9.0
 STEP_RISE = 0.85
+
+def work_pass(tag, anchor_x, centre_z, bay_fwd, bay_side, dock_fwd, dock_side):
+    """A place where the yard's work happened: one enterable bay and one loading
+    dock, per yard.
+
+    Owner: "the whole level itself doesn't feel good ... the goal is to have a
+    decent starting area". What the yards had was cover, decks, gantries and a
+    boundary — every one of them a thing to FIGHT around, and not one of them a
+    thing that explains what the place was for. A yard you can walk into a
+    building in is a different kind of space from a yard you can only cross.
+
+    WHERE THIS IS LEGAL. The bay's walls are wall_ pieces, which bound space and
+    are not measured as cover, and its floor and roof are flr_. That is the same
+    vocabulary the perimeter and the gantry decks already use and it leaves
+    every cover measurement untouched — the dash-corridor floor is not relaxed,
+    and no piece of cover moved. What is NOT done here is building an alley out
+    of blk_ pieces and hoping the measurement misses it.
+
+    Both stand outboard of 18 m from the lane, clear of the gantry legs at 13 m
+    and of the pocket positions down the middle."""
+    def at(fwd, lat, height=0.0):
+        return (anchor_x + fwd, height, centre_z + lat)
+
+    # --- THE BAY: fourteen metres by ten, six tall, one mouth ---------------
+    # The mouth faces the lane, so it is somewhere you can be driven into or
+    # break line of sight in, rather than a shed with its back to the fight.
+    bw, bd, bh, wall = 14.0, 10.0, 6.0, 0.6
+    cheek = (bw - 5.0) * 0.5           # a five-metre doorway, centred
+    face = bay_side * (bd * 0.5)
+    place("flr_%s_bay" % tag, "pavement", at(bay_fwd, bay_side * 21.0), (bw, 0.3, bd))
+    place("flr_%s_bayroof" % tag, "pavement", at(bay_fwd, bay_side * 21.0, bh), (bw, 0.4, bd))
+    for side, dx in enumerate((-(bw - cheek) * 0.5, (bw - cheek) * 0.5)):
+        place("wall_%s_baycheek%d" % (tag, side), "panel",
+              at(bay_fwd + dx, bay_side * 21.0 - face), (cheek, bh, wall))
+    place("wall_%s_bayback" % tag, "panel", at(bay_fwd, bay_side * 21.0 + face), (bw, bh, wall))
+    for side, dx in enumerate((-bw * 0.5, bw * 0.5)):
+        place("wall_%s_bayside%d" % (tag, side), "panel",
+              at(bay_fwd + dx, bay_side * 21.0), (wall, bh, bd))
+    # What is inside it: stock, and a reason to look.
+    for i, (dx, dz) in enumerate(((-4.4, 2.6), (-3.0, 2.6), (-3.7, 1.4), (4.6, -2.2), (4.6, 3.0))):
+        place("dress_%s_baycrate%d" % (tag, i), "crate",
+              at(bay_fwd + dx, bay_side * 21.0 + dz), (1.3, 1.3, 1.3))
+    for i, dx in enumerate((-1.0, 1.6)):
+        place("dress_%s_baybarrel%d" % (tag, i), "barrel",
+              at(bay_fwd + dx, bay_side * 21.0 - face + bay_side * 1.6), (0.7, 1.2, 0.7))
+
+    # --- THE DOCK: a metre and a half of ground, with stairs ---------------
+    # Verticality you can stand on that is not nine metres up a gantry: high
+    # enough to shoot down off, low enough to vault back from, and pressed
+    # against the boundary so it reads as loading rather than as a platform
+    # somebody put in a field.
+    dh = 1.5
+    place("flr_%s_dock" % tag, "pavement", at(dock_fwd, dock_side * 20.5, dh), (16.0, 0.4, 7.0))
+    for side, dx in enumerate((-7.4, 7.4)):
+        place("wall_%s_dockface%d" % (tag, side), "panel",
+              at(dock_fwd + dx, dock_side * 20.5), (1.2, dh, 7.0))
+    place("wall_%s_dockfront" % tag, "panel",
+          at(dock_fwd, dock_side * 20.5 - dock_side * 3.5), (16.0, dh, 0.8))
+    place("flr_%s_dockstair" % tag, "stairs",
+          at(dock_fwd + 10.5, dock_side * 20.5), (4.0, dh, 5.0))
+    for i, (dx, dz) in enumerate(((-5.0, 1.0), (-3.6, 1.0), (-4.3, -0.4), (5.2, 1.2))):
+        place("dress_%s_dockcrate%d" % (tag, i), "crate",
+              at(dock_fwd + dx, dock_side * 20.5 + dz, dh + 0.2), (1.3, 1.3, 1.3))
+    place("dress_%s_dockcable" % tag, "cable",
+          at(dock_fwd - 8.5, dock_side * 20.5, dh), (1.6, 0.2, 5.5))
+
 
 def shape_pass(tag, anchor_x, centre_z, gantries, masses):
     """One yard's verticality, authored once in the yard's own frame and
@@ -410,8 +550,14 @@ def shape_pass(tag, anchor_x, centre_z, gantries, masses):
 #   sub   pockets  51.5   74.0          (+ tears at 59.0   81.5)
 #   depot pockets  32.75  55.25  77.75  (+ tears at 40.25  62.75  85.25)
 shape_pass("entry", 6.0, 0.0, gantries=(20.0, 82.0), masses=((60.0, -19.0),))
+# The bay and the dock go in the gaps the pockets and their tears leave, on the
+# flank the yard's building mass is NOT on, so one side of each yard is a place
+# to work and the other is a place to climb.
+work_pass("entry", 6.0, 0.0, bay_fwd=44.0, bay_side=1.0, dock_fwd=88.0, dock_side=-1.0)
 shape_pass("sub", SUB_ANCHOR, SUB_Z, gantries=(20.0, 66.0), masses=((40.0, 19.0),))
+work_pass("sub", SUB_ANCHOR, SUB_Z, bay_fwd=34.0, bay_side=-1.0, dock_fwd=88.0, dock_side=1.0)
 shape_pass("dep", DEP_ANCHOR, DEP_Z, gantries=(20.0, 70.0), masses=((48.0, -19.0),))
+work_pass("dep", DEP_ANCHOR, DEP_Z, bay_fwd=15.0, bay_side=1.0, dock_fwd=68.0, dock_side=-1.0)
 
 # ---- Markers ----------------------------------------------------------------
 # THE NAME CARRIES A ROLE AND A YARD, and this is the authoring side of a

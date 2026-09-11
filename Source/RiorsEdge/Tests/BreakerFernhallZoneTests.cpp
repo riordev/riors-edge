@@ -118,7 +118,14 @@ bool FBreakerFernhallPieceContractTest::RunTest(const FString& Parameters)
     // decks, a catwalk, their stairs and their dressing, in each of the three). The per-yard figures did not move by
     // one, which is the point: a third yard authored from the validated frame
     // rather than by eye reproduces the lattice exactly.
-    TestEqual(TEXT("imported piece count"), Pieces.Num(), 323);
+    // 275 -> 323 with the gantries and the building masses; 323 -> 453 with the
+    // WORK PASS — a perimeter that varies in height, depth and roofline instead
+    // of ten copies of one box, plus one enterable bay and one loading dock in
+    // each of the three yards. Owner: "it just has random assets that are
+    // broken laying in random places ... the goal is to have a decent starting
+    // area". Every piece added is wall_, flr_ or dress_; not one measured cover
+    // box moved, which is why the grammar tests beside this one did not.
+    TestEqual(TEXT("imported piece count"), Pieces.Num(), 453);
 
     const TArray<FBreakerZoneField> Zone = UBreakerZoneBuilder::BuildZoneFields(Pieces, Markers);
     TestEqual(TEXT("the zone has three yards"), Zone.Num(), 3);
