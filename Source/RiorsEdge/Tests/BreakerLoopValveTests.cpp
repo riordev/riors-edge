@@ -297,10 +297,10 @@ bool FBreakerAbilityGeometrySeamTest::RunTest(const FString& Parameters)
     UBreakerAbility_Rot* Rot = NewObject<UBreakerAbility_Rot>();
     UBreakerAbility_Cleave* Cleave = NewObject<UBreakerAbility_Cleave>();
 
-    // Before any purchase, the authored numbers exactly: 4 m, 6 s, 120°, 6.5 m.
+    // Before any purchase, the authored numbers exactly: 4 m, 6 s, 135°, 6.5 m.
     TestEqual(TEXT("Rot's authored radius with no ranks"), Rot->ComputeEffectiveRadiusCm(Owner), 400.0f, 0.0001f);
     TestEqual(TEXT("Rot's authored duration with no ranks"), Rot->ComputeEffectiveDurationSeconds(Owner), 6.0f, 0.0001f);
-    TestEqual(TEXT("Cleave's authored arc with no ranks"), Cleave->ComputeEffectiveArcDegrees(Owner), 120.0f, 0.0001f);
+    TestEqual(TEXT("Cleave's authored arc with no ranks"), Cleave->ComputeEffectiveArcDegrees(Owner), 135.0f, 0.0001f);
     TestEqual(TEXT("Cleave's authored range with no ranks"), Cleave->ComputeEffectiveRangeCm(Owner), 650.0f, 0.0001f);
 
     // Lingering (VW tree): two ranks of +15% duration reach Rot's zone.
@@ -320,8 +320,57 @@ bool FBreakerAbilityGeometrySeamTest::RunTest(const FString& Parameters)
 
     FText Failure;
     TestTrue(TEXT("Respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, true, Failure));
-    TestEqual(TEXT("Respec narrows the swing back"), Cleave->ComputeEffectiveArcDegrees(Owner), 120.0f, 0.0001f);
+    TestEqual(TEXT("Respec narrows the swing back"), Cleave->ComputeEffectiveArcDegrees(Owner), 135.0f, 0.0001f);
     TestEqual(TEXT("Respec shortens the zone back"), Rot->ComputeEffectiveDurationSeconds(Owner), 6.0f, 0.0001f);
+
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// The AbilityArea lane, end to end: a Core wedge's area ranks reach Rot's
+// radius and Cleave's range AND arc through the one accessor, and a Core
+// respec returns all three to authored (owner: "rot and cleave dont seem to
+// be affected by aoe on the tree").
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerAbilityAreaLaneTest,
+    "RiorsEdge.Abilities.AreaLane",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerAbilityAreaLaneTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerLoopValveTestHelpers;
+    AActor* Owner = NewObject<AActor>();
+    UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>(Owner);
+    UBreakerAttributeSet* Attributes = NewObject<UBreakerAttributeSet>();
+    Progression->IncreasedDamagePerSpentPoint = 0.0f;
+    Progression->BindAttributes(Attributes);
+    Progression->DevForceClass(EBreakerClassId::Caster);
+    // Core points are the game's own opening lump, not a test-only grant.
+    Progression->GrantPlaytestPoints(0, UBreakerProgressionLibrary::SliceCorePointGrant);
+
+    UBreakerAbility_Rot* Rot = NewObject<UBreakerAbility_Rot>();
+    UBreakerAbility_Cleave* Cleave = NewObject<UBreakerAbility_Cleave>();
+    FText Failure;
+
+    // Anchor (Core Arc wedge): three ranks of +6% AbilityArea reach every
+    // consumer. Prime is the wedge's gateway and authors no area of its own.
+    UBreakerProgressionTree* Core = UBreakerProgressionLibrary::GetCoreSliceTree();
+    TestTrue(TEXT("Arc Prime buys"), BreakerBuyToMax(*this, Progression, Core, TEXT("Core.Arc.Prime")));
+    TestEqual(TEXT("Prime alone leaves Rot's radius authored"), Rot->ComputeEffectiveRadiusCm(Owner), 400.0f, 0.0001f);
+    TestTrue(TEXT("Arc Anchor buys"), BreakerBuyToMax(*this, Progression, Core, TEXT("Core.Arc.Anchor")));
+    TestEqual(TEXT("Anchor widens Rot's puddle (400 -> 472)"), Rot->ComputeEffectiveRadiusCm(Owner), 472.0f, 0.01f);
+    TestEqual(TEXT("Anchor lengthens Cleave's reach (650 -> 767)"), Cleave->ComputeEffectiveRangeCm(Owner), 767.0f, 0.01f);
+    TestEqual(TEXT("Anchor widens Cleave's arc (135 -> 159.3)"), Cleave->ComputeEffectiveArcDegrees(Owner), 159.3f, 0.5f);
+
+    // Core is its own pool: a Doctrine respec leaves the wedge standing, and
+    // the Core respec (free at this level) returns all three to authored.
+    TestTrue(TEXT("A Doctrine respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, true, Failure));
+    TestEqual(TEXT("A Doctrine respec does not touch the Core wedge"), Rot->ComputeEffectiveRadiusCm(Owner), 472.0f, 0.01f);
+    TestTrue(TEXT("Core respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure));
+    TestEqual(TEXT("Core respec returns Rot's radius to authored"), Rot->ComputeEffectiveRadiusCm(Owner), 400.0f, 0.0001f);
+    TestEqual(TEXT("Core respec returns Cleave's reach to authored"), Cleave->ComputeEffectiveRangeCm(Owner), 650.0f, 0.0001f);
+    TestEqual(TEXT("Core respec returns Cleave's arc to authored"), Cleave->ComputeEffectiveArcDegrees(Owner), 135.0f, 0.0001f);
     return true;
 }
 

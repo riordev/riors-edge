@@ -102,11 +102,11 @@ struct RIORSEDGE_API FBreakerMonsterChassisParams
     // 1.81x too slow; the two errors were cancelling.
     //
     // Boss moved 25 -> 75 (owner ruling 2026-08-16: boss HP x3). The RANK row
-    // is what tripled, not the boss actor: ABreakerBossEnemy keeps its 0.35
-    // archetype ratio, so the fielded boss lands at a net x26.25 over trash
-    // (~3x the old effective x8.75) — inside O18's 20-45s band once the
-    // archetype discount is counted, where the old net fight was ending in
-    // single digits.
+    // is what tripled, not the boss actor: ABreakerBossEnemy carries its own
+    // 0.30 archetype ratio (the Holdfast 0.35), so the fielded Marshal lands at
+    // a net x22.5 over trash — inside O18's 20-45s band once the archetype
+    // discount is counted, where the old net fight was ending in single
+    // digits.
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Chassis|Rank", meta=(ClampMin="1"))
     float EliteHealthMultiplier = 3.0f;   // O2 PLACEHOLDER (doc band x3-4)

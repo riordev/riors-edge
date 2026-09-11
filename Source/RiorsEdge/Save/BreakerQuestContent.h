@@ -228,4 +228,9 @@ public:
     // Returns the number of objectives this kill completed. The one place that
     // turns a combat event into campaign state (Campaign-And-Story.md 6.3 #4).
     static int32 NotifyEnemyKilled(UBreakerQuestJournal& Journal, bool bEliteOrAbove);
+
+    // True while any ACTIVE quest has an unfinished elite-kill objective: the
+    // same walk NotifyEnemyKilled makes, asked before the kill instead of after
+    // it, so the elite halo (O203) is drawn only while a contract wants it.
+    static bool WantsEliteKills(const FBreakerQuestFlagSet& Flags);
 };

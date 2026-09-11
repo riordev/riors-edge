@@ -137,9 +137,9 @@ bool FBreakerChassisRankTest::RunTest(const FString& Parameters)
     // trash <1s and elite ~3s IS an elite health ratio of 3. The boss RANK row
     // tripled under the owner ruling 2026-08-16 (boss HP x3, 25 -> 75), so the
     // pinned band triples with it: x60-120 is the old doc band x20-40 times
-    // three. The boss ACTOR still carries its 0.35 archetype discount, so the
-    // fielded fight is a net x26.25 over trash — this pin is honestly the rank
-    // table's number, not the fielded one.
+    // three. The boss ACTOR still carries its archetype discount (Marshal 0.30,
+    // Holdfast 0.35), so the fielded fight is a net x22.5 / x26.25 over trash —
+    // this pin is honestly the rank table's number, not the fielded one.
     TestTrue(TEXT("Elite ratio sits in the doc's x3-4 band"),
         Params.EliteHealthMultiplier >= 3.0f && Params.EliteHealthMultiplier <= 4.0f);
     TestTrue(TEXT("Boss ratio sits in the tripled x60-120 band (owner ruling 2026-08-16)"),

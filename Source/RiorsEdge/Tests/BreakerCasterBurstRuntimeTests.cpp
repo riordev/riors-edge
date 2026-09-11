@@ -261,4 +261,33 @@ bool FBreakerCasterBurstRuntimeTest::RunTest(const FString& Parameters)
     }
     return true;
 }
+
+// A recast on a live puddle carries the caster's CURRENT footprint: a refresh
+// that dropped the radius made an area passive worth zero on recast, and one
+// that assigned it would shrink a Lingering-grown puddle back to authored.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerZoneRefreshFootprintRuntimeTest, "RiorsEdge.Combat.ZoneRefreshFootprint",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FBreakerZoneRefreshFootprintRuntimeTest::RunTest(const FString& Parameters)
+{
+    UWorld::InitializationValues Init;
+    Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+    if (!TestNotNull(TEXT("isolated zone world"), World)) return false;
+    GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+    ON_SCOPE_EXIT { World->DestroyWorld(false); GEngine->DestroyWorldContext(World); };
+    World->InitializeActorsForPlay(FURL());
+    auto* Zone = World->SpawnActor<ABreakerZoneActor>();
+    if (!TestNotNull(TEXT("actual zone"), Zone)) return false;
+    FBreakerZoneSpec Spec;
+    Spec.Duration = 6; Spec.TickInterval = 1; Spec.RadiusCm = 400;
+    Zone->ConfigureZone(Spec, nullptr);
+    TestEqual(TEXT("authored footprint arms"), Zone->GetSpec().RadiusCm, 400.0f, 0.0001f);
+    Spec.RadiusCm = 460; // The caster bought an area node between casts.
+    Zone->RefreshPaidPayload(Spec);
+    TestEqual(TEXT("a recast adopts the wider footprint"), Zone->GetSpec().RadiusCm, 460.0f, 0.0001f);
+    Spec.RadiusCm = 400; // The caster respecced; the live puddle keeps what it has.
+    Zone->RefreshPaidPayload(Spec);
+    TestEqual(TEXT("a recast never shrinks a live puddle"), Zone->GetSpec().RadiusCm, 460.0f, 0.0001f);
+    return true;
+}
 #endif

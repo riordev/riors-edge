@@ -504,8 +504,9 @@ bool FBreakerEliteTtkTest::RunTest(const FString& Parameters)
 // the resulting 126.9s was ruled on as two chassis errors. THE RANK ROW WAS
 // NEVER WRONG. The spec derives a rank multiplier as the ratio of its TTK
 // target to trash's, and that ratio lands on rank TIMES archetype, not on rank:
-// the fielded Field Marshal is x75 rank on a x0.35 archetype, a net x26.25 over
-// trash, and 26.25 x the 0.917s trash kill is 24.06s inside O18's 20-45s. Rank
+// the fielded Field Marshal is x75 rank on a x0.30 archetype, a net x22.5 over
+// trash, and 22.5 x the 0.917s trash kill is 20.63s inside O18's 20-45s (the
+// Holdfast keeps x0.35: x26.25, 24.06s). Rank
 // alone matches the ratio only for an archetype of 1.0, which no boss is. O59
 // stands, and the identity is asserted below so nobody re-derives the table a
 // third time.

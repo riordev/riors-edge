@@ -139,8 +139,8 @@ bool FBreakerEffectScheduleTest::RunTest(const FString& Parameters)
     {
         const FVector Origin(0.0f, 0.0f, 100.0f);
         const FVector Forward(1.0f, 0.0f, 0.0f);
-        const float Arc = 120.0f;      // Cleave's authored ArcDegrees
-        const float Range = 300.0f;    // Cleave's authored RangeCm
+        const float Arc = 120.0f;      // pure-geometry fixture; not read from the ability
+        const float Range = 300.0f;    // pure-geometry fixture; not read from the ability
         const int32 Count = BreakerFX::SweptArcStrokes;
         FVector PreviousB = FVector::ZeroVector;
         for (int32 Index = 0; Index < Count; ++Index)

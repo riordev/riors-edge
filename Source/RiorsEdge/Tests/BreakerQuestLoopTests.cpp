@@ -232,19 +232,39 @@ bool FBreakerQuestChainTest::RunTest(const FString& Parameters)
 
     UBreakerQuestJournal* Journal = NewObject<UBreakerQuestJournal>();
     const auto StateOf = [&Journal](const FBreakerQuestDefinition& Quest) { return UBreakerQuestLibrary::ComputeQuestState(Quest, Journal->GetState()); };
+    // The elite halo is the contract's mark (O203): it is drawn only while
+    // this returns true, so the walk pins it at every flag that flips it.
+    const auto WantsElites = [&Journal]() { return UBreakerQuestLibrary::WantsEliteKills(Journal->GetState()); };
+
+    // SHIPPED CONFIGURATION: exactly three objectives ask for elite kills —
+    // FirstContract/Elite, Pattern/Marked, Deeper/Sweep. A fourth is a new
+    // stretch of play where elites wear the halo; a second is one lost.
+    {
+        int32 EliteObjectives = 0;
+        for (const FBreakerQuestDefinition& Quest : UBreakerQuestLibrary::GetFallbackQuests())
+            for (const FBreakerQuestObjective& Objective : Quest.Objectives)
+                if (Objective.bRequiresEliteKill) ++EliteObjectives;
+        TestEqual(TEXT("Three objectives carry bRequiresEliteKill (FirstContract/Elite, Pattern/Marked, Deeper/Sweep)"), EliteObjectives, 3);
+    }
 
     // GATING ORDER. A fresh character can be offered nothing but the first
     // contract; each later offer appears only when the previous link closed.
     TestFalse(TEXT("Q2 unofferable before Q1 turned in"), OfferVisible(Kess, TEXT("Salvage"), Journal->GetState()));
     TestFalse(TEXT("Q3 unofferable before Q2 turned in"), OfferVisible(Quartermaster, TEXT("Pattern"), Journal->GetState()));
     TestFalse(TEXT("Q4 unofferable before Q3 turned in"), OfferVisible(Quartermaster, TEXT("Deeper"), Journal->GetState()));
+    TestFalse(TEXT("A fresh journal marks no elite"), WantsElites());
 
     // Close the first contract the way play does.
     Journal->SetFlag(FirstContractOffered);
+    TestFalse(TEXT("An offered, unaccepted contract marks no elite"), WantsElites());
     Journal->SetFlag(FirstContractAccepted);
+    TestTrue(TEXT("The accepted first contract marks elites"), WantsElites());
     for (int32 i = 0; i < 5; ++i) UBreakerQuestLibrary::NotifyEnemyKilled(*Journal, false);
+    TestTrue(TEXT("Thinning the spill leaves the elite marked"), WantsElites());
     UBreakerQuestLibrary::NotifyEnemyKilled(*Journal, true);
+    TestFalse(TEXT("The elite down, nothing is marked"), WantsElites());
     Journal->SetFlag(FirstContractTurnedIn);
+    TestFalse(TEXT("The closed first contract marks no elite"), WantsElites());
 
     TestTrue(TEXT("Q1 closed opens Q2"), OfferVisible(Kess, TEXT("Salvage"), Journal->GetState()));
     TestFalse(TEXT("Q1 closed does not skip to Q3"), OfferVisible(Quartermaster, TEXT("Pattern"), Journal->GetState()));
@@ -252,6 +272,7 @@ bool FBreakerQuestChainTest::RunTest(const FString& Parameters)
     // Q2: FEED THE FORGE. Any rank feeds an uncounted-rank objective.
     Journal->SetFlag(Salvage.OfferedFlag);
     Journal->SetFlag(Salvage.AcceptedFlag);
+    TestFalse(TEXT("The salvage contract marks no elite"), WantsElites());
     const int32 FeedstockRequired = Salvage.Objectives[0].RequiredCount;
     for (int32 i = 0; i < FeedstockRequired; ++i) UBreakerQuestLibrary::NotifyEnemyKilled(*Journal, true);
     TestFalse(TEXT("Kills alone cannot collect physical feedstock"), Journal->HasFlag(KessSalvageFeedstock));
@@ -280,27 +301,36 @@ bool FBreakerQuestChainTest::RunTest(const FString& Parameters)
 
     // Q3: THE PATTERN. Only the marked count.
     Journal->SetFlag(Pattern.OfferedFlag);
+    TestFalse(TEXT("The offered pattern marks no elite"), WantsElites());
     Journal->SetFlag(Pattern.AcceptedFlag);
+    TestTrue(TEXT("The accepted pattern marks elites"), WantsElites());
     for (int32 i = 0; i < 10; ++i) UBreakerQuestLibrary::NotifyEnemyKilled(*Journal, false);
     TestEqual(TEXT("Trash does not feed the pattern"), Journal->GetCounter(PatternEliteCounter), 0);
+    TestTrue(TEXT("Trash kills leave the marked marked"), WantsElites());
     const int32 MarkedRequired = Pattern.Objectives[0].RequiredCount;
     for (int32 i = 0; i < MarkedRequired; ++i) UBreakerQuestLibrary::NotifyEnemyKilled(*Journal, true);
     TestTrue(TEXT("The marked are down"), Journal->HasFlag(PatternMarkedDown));
+    TestFalse(TEXT("The marked down, nothing is marked"), WantsElites());
     TestEqual(TEXT("Quartermaster opens on the pattern turn-in"), Quartermaster->ResolveStartNodeId(Journal->GetState()), FName(TEXT("PatternTurnIn")));
     Journal->SetFlag(Pattern.TurnedInFlag);
     TestEqual(TEXT("Q3 closed"), StateOf(Pattern), EBreakerQuestState::Complete);
+    TestFalse(TEXT("The closed pattern marks no elite"), WantsElites());
 
     TestTrue(TEXT("Q3 closed opens Q4"), OfferVisible(Quartermaster, TEXT("Deeper"), Journal->GetState()));
 
     // Q4: DEEPER. Elite-or-above only; the boss pays into it like any elite.
     Journal->SetFlag(Deeper.OfferedFlag);
+    TestFalse(TEXT("The offered capstone marks no elite"), WantsElites());
     Journal->SetFlag(Deeper.AcceptedFlag);
+    TestTrue(TEXT("The accepted capstone marks elites"), WantsElites());
     const int32 SweepRequired = Deeper.Objectives[0].RequiredCount;
     for (int32 i = 0; i < SweepRequired; ++i) UBreakerQuestLibrary::NotifyEnemyKilled(*Journal, true);
     TestTrue(TEXT("The sweep is done"), Journal->HasFlag(DeeperSweepDone));
+    TestFalse(TEXT("The sweep done, nothing is marked"), WantsElites());
     TestEqual(TEXT("Quartermaster opens on the capstone turn-in"), Quartermaster->ResolveStartNodeId(Journal->GetState()), FName(TEXT("DeeperTurnIn")));
     Journal->SetFlag(Deeper.TurnedInFlag);
     TestEqual(TEXT("Q4 closed"), StateOf(Deeper), EBreakerQuestState::Complete);
+    TestFalse(TEXT("Act I closed marks no elite"), WantsElites());
     TestEqual(TEXT("Act I completion opens the Act II investigation"), Quartermaster->ResolveStartNodeId(Journal->GetState()), FName(TEXT("AlteredContactLead")));
 
     // The whole chain is flags, so the whole chain round-trips for free.

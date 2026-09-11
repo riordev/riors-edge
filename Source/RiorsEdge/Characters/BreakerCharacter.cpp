@@ -557,6 +557,20 @@ void ABreakerCharacter::SaveGameState()
     Save->DiscoveredMapSites = LocalMap->GetDiscovered();
     Save->TrackedMapSite = LocalMap->GetTracked();
     UGameplayStatics::SaveGameToSlot(Save, ActiveSaveSlotName(), 0);
+    // THE ROSTER ROW FOLLOWS THE SAVE. The row is derived state and the
+    // character save wins (BreakerCharacterRoster.h); until this, nothing
+    // re-derived it after CreateCharacter stamped level 1, so the select
+    // screen showed every character at the level it was born.
+    if (ActiveCharacterId.IsValid())
+    {
+        if (UBreakerCharacterRoster* Roster = UBreakerCharacterRoster::LoadOrCreate())
+        {
+            if (Roster->RefreshSummaryFromSave(ActiveCharacterId))
+            {
+                Roster->SaveRoster();
+            }
+        }
+    }
 }
 
 void ABreakerCharacter::AdoptSessionCharacter()

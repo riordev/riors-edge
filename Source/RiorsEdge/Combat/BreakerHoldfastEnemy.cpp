@@ -44,9 +44,12 @@ ABreakerHoldfastEnemy::ABreakerHoldfastEnemy()
     // from the other. O2 PLACEHOLDER by inheritance.
     PhaseParams.AddGateDamageReduction = FBreakerEnemyModifierParams().AuraDamageReduction;
 
-    // ArchetypeHealthMultiplier stays the base boss's 0.35: BossBand's 24.06 s
-    // holds ungated, and the gated worst case (every add alive through both
-    // early phases at the reduction above) is about 37 s, inside O18's 45.
+    // The Holdfast keeps the 0.35 ratio while the Marshal's falls to 0.30 (O214
+    // makes this Act I's own boss; the cut was asked of the Marshal alone), so
+    // its 5,775 / 866.25 / 37-round pins stand: BossBand's 24.06 s holds
+    // ungated, and the gated worst case (every add alive through both early
+    // phases at the reduction above) is about 37 s, inside O18's 45.
+    ArchetypeHealthMultiplier = 0.35f;   // O2 PLACEHOLDER
 }
 
 void ABreakerHoldfastEnemy::BeginPlay()

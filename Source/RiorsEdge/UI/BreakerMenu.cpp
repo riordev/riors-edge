@@ -194,8 +194,11 @@ namespace
     // 1px ring around a control. Buttons in this system are a fill plus a
     // border; Slate's button brush has no border, so it gets one here.
     // The zoom at which a node starts saying its name. One step in from the
-    // opening zoom, so the first wheel notch is the one that reveals it.
-    // O2 PLACEHOLDER.
+    // opening zoom, so the first wheel notch is the one that reveals it. At
+    // the opening fit (about 0.23 for the 3200-unit wheel at 1080p) a 22-unit
+    // label is five pixels and neighbours on the 177-unit gateway pitch
+    // collide, so at rest the overview names nothing and the rail on hover
+    // is the read. O2 PLACEHOLDER.
     constexpr float BreakerMenuNodeNameZoom = 0.63f;
 
     // ---- THE SIX SECTORS, IN THE VERB PALETTE -----------------------------
@@ -8678,12 +8681,24 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 // twenty times and the handful of numbers that meant something
                 // were lost among them. Hovering any node still puts its full
                 // rank, cost and projection in the rail.
+                //
+                // THE NAME IS NOT THAT NOISE. Owner: "the nodes should have
+                // their names then when hovered how they help your character".
+                // A doctrine node was a shape with a glyph and, once bought, a
+                // fraction; nothing on the board said which one was which
+                // until it was pointed at. One line under every node, the rank
+                // beneath it for the nodes that have one.
+                TSharedRef<STextBlock> NameBlock = MenuText(FText::FromString(View.Name), 12,
+                    bOwned || bPurchasable ? Primary : Muted, true);
+                NameBlock->SetJustification(ETextJustify::Center);
+                TSharedRef<SVerticalBox> Caption = SNew(SVerticalBox)
+                    + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)[NameBlock];
                 if (Rank > 0)
                 {
-                    Canvas->AddSlot().Position(Center + FVector2D(-40, Size * 0.5f + 10)).Size(FVector2D(80, 26))
-                    [SNew(SBox).HAlign(HAlign_Center)
-                        [MenuText(FText::FromString(FString::Printf(TEXT("%d / %d"), Rank, Node->MaxRank)), 14, bKeystone ? Amber : SoftText, true)]];
+                    Caption->AddSlot().AutoHeight().HAlign(HAlign_Center)
+                        [MenuText(FText::FromString(FString::Printf(TEXT("%d / %d"), Rank, Node->MaxRank)), 14, bKeystone ? Amber : SoftText, true)];
                 }
+                Canvas->AddSlot().Position(Center + FVector2D(-100, Size * 0.5f + 6)).Size(FVector2D(200, 44))[Caption];
             }
             OffsetX += Layout.Size.X + BreakerUI::Space40;
         }
@@ -8881,10 +8896,23 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             if (bRoleLayout && !bFocused)
             {
                 const FName WedgeId = Node->Constellation;
+                // THE OVERVIEW EXPLAINS ON HOVER TOO. Owner: "the nodes should
+                // have their names then when hovered how they help your
+                // character so you dont always have to click into the tree".
+                // This button used to carry a Slate tooltip of name and rank —
+                // a floating widget this project draws nowhere else and the
+                // capture harness cannot photograph — while the rail beside the
+                // board sat empty until a wedge was opened. Same handler as
+                // WireMarker's, so the rail shows the same card from either
+                // view. Click still opens the wedge.
                 Marker = SNew(SButton).ContentPadding(0)
                     .ButtonStyle(BreakerMenuNodeButtonStyle(NodeSize, MarkerFill, MarkerRing, RingWidth))
                     .ButtonColorAndOpacity(FLinearColor::White)
-                    .ToolTipText(FText::FromString(View.Name + TEXT(" — ") + RankLabel(Rank, Node->MaxRank)))
+                    .OnHovered(FSimpleDelegate::CreateLambda([this, View]()
+                    {
+                        SkillDetailNodeId = View.NodeId;
+                        if (SkillDetailHost.IsValid()) SkillDetailHost->SetContent(MakeSkillDetailCard(View));
+                    }))
                     .OnClicked(FOnClicked::CreateLambda([this, WedgeId]()
                     { SkillExpandedConstellation = WedgeId; ResetBoardView(); Rebuild(EBreakerMenuScreen::SkillTrees); return FReply::Handled(); }))
                     [Marker];
@@ -8913,8 +8941,10 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     || Node->CoreRole == EBreakerCoreNodeRole::Keystone);
             if (bNamedRole)
             {
-                // Authored at twice the size it is wanted at, because it first
-                // appears at about half zoom.
+                // Authored for about half zoom, where it is eleven pixels. It
+                // is on from the fit (see BreakerMenuNodeNameZoom) but five
+                // pixels there; the pitch between gateways leaves no room to
+                // author it larger.
                 constexpr int32 NodeNameSize = 22;
                 TSharedRef<STextBlock> NameBlock = MenuText(FText::FromString(View.Name),
                     NodeNameSize, bOwned || bPurchasable ? Primary : Muted, true);
@@ -8935,6 +8965,25 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                         [SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
                         .BorderBackgroundColor(Pip < Rank ? Cyan : BorderEmphasis).Padding(0)]];
                 AddLabel(*Center + FVector2D(0, RoleMarkerSize * .5f + 7 / FitScale), FVector2D(33 / FitScale,3 / FitScale), Pips);
+            }
+            // EVERY NODE IN AN OPEN WEDGE SAYS ITS NAME. Owner: "the nodes
+            // should have their names". The role wedge drew a minor as a disc
+            // and its rank pips and nothing else, so the one view built for
+            // reading a lane still made the player hover each disc to learn
+            // what it was. Authored at the fit scale like the wedge names, so
+            // it is twelve pixels at the opening zoom; below the pips where a
+            // minor has them, else straight under the marker. The wedge grid
+            // is 250 units apart at its tightest, so a name does not reach its
+            // neighbour.
+            if (bFocused && bRoleLayout)
+            {
+                const bool bHasPips = Node->CoreRole == EBreakerCoreNodeRole::LaneMinor;
+                const float NameOffset = bHasPips
+                    ? RoleMarkerSize * 0.5f + 21.0f / FitScale
+                    : NodeSize * 0.5f + 13.0f / FitScale;
+                AddLabel(*Center + FVector2D(0.0f, NameOffset),
+                    FVector2D(BoardNameSize * 11.0f, BoardNameSize * 1.6f),
+                    CenteredText(View.Name, BoardNameSize, bOwned || bPurchasable ? Primary : Muted));
             }
             if (bFocused && !bRoleLayout)
             {

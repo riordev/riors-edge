@@ -1,5 +1,63 @@
 # Desk — next playtest
 
+## Cycle — OWNER PLAYTEST, 2026-09-11 (FIFTH), SECOND HALF
+
+- [ ] "multiple quests cannot be held (or rather it doesnt show you where
+      they are or what needs to happen)"
+- [ ] "only one weapon has a model and thats the standard issue rifle
+      everything else uses ugly random guns or different arms"
+- [ ] "the sounds are still rough they sound really flat or ticky"
+
+## OWNER PLAYTEST, 2026-09-11 (FIFTH) — LANDED, THE FIRST SIX
+
+His words, and what each is now:
+
+- "random enemies are still marked regardless of quest state" — the ring
+  was the O203 Elite rank halo, drawn for every Elite, no journal asked.
+  It now draws only while an active contract has an unfinished elite-kill
+  objective (WantsEliteKills, the same walk NotifyEnemyKilled makes). It is
+  on from accepting the first contract until its one elite falls, off at
+  ReadyToTurnIn — not at hand-in. Bar and name still say Elite.
+  RULING OWED (O203): the Elite clause now reads "while a contract asks".
+  If rank must be readable at all times AND a quest mark is wanted, that is
+  a second visual. Design seat amends the line.
+- "cleave aoe needs to go up a little bit" — arc 120° -> 135°. Reach stays
+  650 (it was 450 -> 650 last time). Both together would be +50%.
+- "rot and cleave dont seem to be affected by aoe on the tree" — the lane
+  was wired and read; two things were true. Rot's recast-on-a-live-puddle
+  path copied duration and tick and dropped the radius, so buy-then-recast
+  kept the old footprint for the puddle's life; it grows now, never shrinks.
+  And the numbers are small: one Anchor rank is +6% (Rot 400 -> 424 cm),
+  Widen +15%. RiorsEdge.Abilities.AreaLane pins 3 Anchor ranks at Rot 472,
+  Cleave 767 / 159°, and a Core respec back to authored.
+  QUESTION: raise the Core.Arc percentages, or the ability bases? Both O2.
+- "the nodes should have their names then when hovered how they help" —
+  the hover card existed (name, description, EFFECTS PER RANK, before/after)
+  and the Core overview never wired it: its markers had a Slate tooltip
+  with name and rank. They fill the rail now, same as the wedge. Every node
+  in an opened Core wedge and on a class board carries its name. PHOTOGRAPHED
+  (Precision wedge, Swift Kinetic board): names print, long ones in full.
+  MEASURED AND NOT DONE: at the overview's opening zoom a name is five
+  pixels and gateways on a 177-unit pitch collide, so the overview at rest
+  stays name-free (one wheel notch reveals them, as before); the rail on
+  hover is the read there. FOUND: on the class board "Read the Room" sits on
+  the wedge's centre title — the node did before, the name makes it plain.
+  Hover itself is his to read; the harness has no mouse.
+- "the field marshal needs less health" — archetype x0.35 -> x0.30, the
+  deepest cut inside O18's 20 s floor (24.1 s -> 20.6 s on-level; front
+  breaks 3.09 s against a 3.0 s pin). AL1 4,950, AL20 25,453. Holdfast held
+  at x0.35 by its own line (O214).
+  RULING OWED (O18, O114): both restate x0.35 / x26.25 / 24 s. The number
+  he felt is the starter rifle (item level 5) in the AL20 breach: x3.64
+  health, ~88 s -> ~75 s. The two owed rulings (starter rifle off its
+  curve; breach enterable 15 levels under) are the lever, not the ratio.
+- "my characters on main menu dont display the correct level" — the roster
+  row is a cached summary stamped 1 at creation; RefreshSummaryFromSave
+  existed for exactly this and had no caller. SaveGameState calls it now,
+  so every save write (quit, quest, map) updates the row. LAST PLAYED was
+  creation time too — same fix. FOUND: RETURN TO TITLE does not save, so a
+  level gained since the last write prints on the next one.
+
 ## OWNER WORK ORDER, 2026-09-11 — THE SLICE'S FEEL. THIS OUTRANKS EVERYTHING.
 
 In his words, split into the cycles they are:

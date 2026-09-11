@@ -155,8 +155,8 @@ unequipped weapon is item level 1 for the same reason.
 
 Ratios are derived from the targets, and a rank composes with the actor's
 archetype rather than standing alone: elite at three seconds over trash at one
-*is* a ratio of three; the boss's x75 on the Field Marshal's x0.35 is the
-**x26.25** a 24s kill needs. Against rank alone, an archetype reads as an error.
+*is* a ratio of three; the boss's x75 on the Field Marshal's x0.30 is the
+**x22.5** a 21s kill needs. Against rank alone, an archetype reads as an error.
 
 ### Targets
 

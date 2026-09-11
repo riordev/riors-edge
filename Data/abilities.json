@@ -114,7 +114,7 @@
 			"numbers":
 			{
 				"RangeCm": 650,
-				"ArcDegrees": 120,
+				"ArcDegrees": 135,
 				"WeaponDamageCoefficient": 3.0,
 				"UnarmedDamage": 25,
 				"AnimationLockSeconds": 0.2,

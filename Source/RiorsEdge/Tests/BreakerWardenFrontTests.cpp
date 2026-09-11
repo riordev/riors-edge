@@ -115,7 +115,7 @@ bool FBreakerWardenFrontBreaksTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("An area-level-1 Warden has 704 health (220 x 3.2)"), WardenHealth, 704.0f, 0.01f);
     const float BossHealth = UBreakerMonsterChassisLibrary::GetMonsterHealth(
         1, EBreakerMonsterRank::Boss, Chassis, Boss->GetArchetypeHealthMultiplier());
-    TestEqual(TEXT("An area-level-1 boss has 5,775 health (220 x 75 x 0.35)"), BossHealth, 5775.0f, 0.01f);
+    TestEqual(TEXT("An area-level-1 boss has 4,950 health (220 x 75 x 0.30)"), BossHealth, 4950.0f, 0.01f);
     const float HoldfastHealth = UBreakerMonsterChassisLibrary::GetMonsterHealth(
         1, EBreakerMonsterRank::Boss, Chassis, Holdfast->GetArchetypeHealthMultiplier());
     TestEqual(TEXT("An area-level-1 Holdfast has 5,775 health (220 x 75 x 0.35)"), HoldfastHealth, 5775.0f, 0.01f);
@@ -136,7 +136,8 @@ bool FBreakerWardenFrontBreaksTest::RunTest(const FString& Parameters)
     AddInfo(FString::Printf(TEXT("FRONT  boss AL1 pool %.2f: %d rounds, %.2fs after the first"),
         BossPool, BossRounds, (BossRounds - 1) * SecondsPerRound));
     TestEqual(TEXT("The level-1 rifle breaks a Warden's front in five rounds"), WardenRounds, 5);
-    TestEqual(TEXT("The level-1 rifle breaks the boss's front in thirty-seven rounds"), BossRounds, 37);
+    TestEqual(TEXT("The boss's level-1 pool is 742.5"), BossPool, 742.5f, 0.01f);
+    TestEqual(TEXT("The level-1 rifle breaks the boss's front in thirty-one rounds"), BossRounds, 31);
     const float HoldfastPool = BreakerShield::FrontPool(HoldfastHealth, Holdfast->FrontShieldFractionOfMaxHealth);
     const int32 HoldfastRounds = BreakerShield::RoundsToBreak(HoldfastPool, Rifle->Damage);
     AddInfo(FString::Printf(TEXT("FRONT  Holdfast AL1 pool %.2f: %d rounds, %.2fs after the first"),

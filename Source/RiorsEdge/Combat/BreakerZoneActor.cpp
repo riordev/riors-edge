@@ -169,6 +169,17 @@ void ABreakerZoneActor::RefreshPaidPayload(const FBreakerZoneSpec& NewSpec)
     RefreshDuration(NewSpec.Duration);
     Spec.TickDamage = NewSpec.TickDamage;
     SnapshotDamageRules(NewSpec);
+    // The footprint refreshes with the payload: a refresh that dropped the
+    // radius made an area passive worth zero on recast. Max, never assign, so
+    // a Lingering-grown puddle is not shrunk back by the next cast.
+    const float RefreshedRadiusCm = FMath::Max(Spec.RadiusCm, NewSpec.RadiusCm);
+    if (!FMath::IsFinite(RefreshedRadiusCm) || RefreshedRadiusCm <= Spec.RadiusCm) return;
+    Spec.RadiusCm = RefreshedRadiusCm;
+    ResetRimEffect();
+    RefreshPresentation();
+    SubmitRimEffect();
+    ForceNetUpdate();
+    UpdateMembership();
 }
 
 void ABreakerZoneActor::SnapshotDamageRules(const FBreakerZoneSpec& NewSpec)

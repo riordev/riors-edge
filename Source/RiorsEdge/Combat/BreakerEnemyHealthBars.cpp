@@ -52,6 +52,10 @@
 #include "EngineUtils.h"
 #include "Engine/Canvas.h"
 #include "GameFramework/PlayerController.h"
+// Declared crossing, LEDGER -> FIELD: the elite halo asks the journal whether
+// a contract wants elite kills before it draws. Read only; nothing written.
+#include "Save/BreakerQuestContent.h"
+#include "Save/BreakerQuestJournal.h"
 #include "UI/BreakerHUDMath.h"
 #include "UI/BreakerUIStyle.h"
 #include "UI/BreakerRiftFeedback.h"
@@ -488,6 +492,13 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         }
     }
 
+    // The halo is the contract's mark, not a rank tell (O203 as the owner read
+    // it: "random enemies are still marked regardless of quest state"). Rank
+    // stays readable through the bar and the name. Resolved once per frame;
+    // a character without a journal has no contract, so no mark.
+    const UBreakerQuestJournal* Journal = Character->GetQuestJournal();
+    const bool bContractWantsElites = Journal && UBreakerQuestLibrary::WantsEliteKills(Journal->GetState());
+
     for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
     {
         const ABreakerEnemy* Enemy = *It;
@@ -683,11 +694,12 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
 
         // ---- Rank, as geometry ---------------------------------------------
         // No gold edge (O129: colour carries health, not rank), no rank glyph,
-        // no rank word. Elite is the ellipse at the feet (O203); the champion
-        // is a filled diamond off each end of its wider bar; trash is the bar
-        // alone; the boss's phase geometry stands on the fill and is drawn
-        // after the body below.
-        if (Rank == EBreakerMonsterRank::Elite)
+        // no rank word. Elite is the ellipse at the feet (O203), drawn only
+        // while an active contract wants elite kills — it is the mark, not the
+        // rank; the champion is a filled diamond off each end of its wider bar;
+        // trash is the bar alone; the boss's phase geometry stands on the fill
+        // and is drawn after the body below.
+        if (Rank == EBreakerMonsterRank::Elite && bContractWantsElites)
         {
             const FVector Feet = Project(FeetWorld, false);
             if (Feet.Z > 0.0f)

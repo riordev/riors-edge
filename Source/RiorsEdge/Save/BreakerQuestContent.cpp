@@ -442,6 +442,25 @@ int32 UBreakerQuestLibrary::NotifyEnemyKilled(UBreakerQuestJournal& Journal, boo
     return Completed;
 }
 
+bool UBreakerQuestLibrary::WantsEliteKills(const FBreakerQuestFlagSet& Flags)
+{
+    // Mirrors NotifyEnemyKilled predicate for predicate, so the halo can never
+    // mark an elite whose kill would not count, nor go dark on one that would.
+    for (const FBreakerQuestDefinition& Quest : GetFallbackQuests())
+    {
+        if (ComputeQuestState(Quest, Flags) != EBreakerQuestState::Active) continue;
+        for (const FBreakerQuestObjective& Objective : Quest.Objectives)
+        {
+            if (Objective.ProgressSource != EBreakerQuestProgressSource::Kill) continue;
+            if (Objective.RequiredCount <= 0 || Objective.ProgressCounter == NAME_None) continue;
+            if (!Objective.bRequiresEliteKill) continue;
+            if (Flags.Has(Objective.CompletionFlag)) continue;
+            return true;
+        }
+    }
+    return false;
+}
+
 namespace
 {
     // Collects every flag a piece of authored content references, so validation

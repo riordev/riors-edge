@@ -45,7 +45,7 @@ ABreakerBossEnemy::ABreakerBossEnemy()
     // 1 so the Warden's own 3.2x does not compound into a boss with eighty
     // times a trash mob's health — the boss's interest is the adds, not its
     // health bar.
-    ArchetypeHealthMultiplier = 0.35f;   // O2 PLACEHOLDER
+    ArchetypeHealthMultiplier = 0.30f;   // O2 PLACEHOLDER
     ArchetypeDamageMultiplier = 1.86f;   // inherits the Warden's sweep ratio
 
     // FAMILY (Assets/story-source.md §1.5). The Field Marshal is Altered at EARLY
