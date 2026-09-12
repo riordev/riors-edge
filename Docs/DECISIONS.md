@@ -540,3 +540,9 @@ Maximum wedges reached with65, including ring transit; cells show **wedges / min
 **O281** — A body at rest idles, a body moving walks, a body struck flinches: every enemy rig ships its idle, walk and hit cycles. Modifier rolls mix the session into the seed, so the same body never wears the same set two runs running; Fernhall's pocket elites roll modifiers like everyone else.
 
 **O282** — Every combat moment has a visible fallback that reads at play distance: a muzzle has a flash, an impact throws sparks, a tear turns, a cast has a shape — built from primitives in code until the ASSETS-5 Niagara systems land (O190).
+
+**O283** — Movement has a body: the camera and the hands answer every change of state — a sprint pushes the field of view, a stop plants the hands, a crouch eases the camera down instead of snapping it, a landing dips, and a speed the rules take away bleeds off over the momentum bleed instead of being cut in a frame. A slide is a sprint's crouch, never a walk's: the entry speed sits above walk, and a crouch refused standing is consumed, not armed.
+
+**O284** — A cast is felt before it is seen: the camera kicks, the field of view pulses, the hands kick, and a burst of the verb's colour leaves the hand — on the one hook every ability's landing already fires (O178), built from primitives (O282) until assets land.
+
+**O285** — A yard has levels down its middle, not only at its flanks: two raised aprons across the lane per yard, a storey's third high, climbed by stairs on all four sides, sited off every pocket, tear and chest pair. A body on an apron reads chest-high cover as a curb, so an apron never straddles a cover pair.

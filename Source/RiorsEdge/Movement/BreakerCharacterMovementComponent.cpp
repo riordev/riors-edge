@@ -880,7 +880,23 @@ void UBreakerCharacterMovementComponent::SetSprinting(bool bEnabled)
 {
     if (HasImmovable()) bEnabled = false;
     const bool bEnteringSprint = bEnabled && !bWantsToSprint;
+    const bool bLeavingSprint = !bEnabled && bWantsToSprint;
     bWantsToSprint = bEnabled;
+    if (bLeavingSprint)
+    {
+        // O283: a speed the rules take away bleeds off over the momentum
+        // bleed instead of being cut in a frame. The grounded cap has just
+        // dropped from the sprint cap to the walk cap under a body still
+        // carrying sprint speed, and the engine brakes an over-max velocity to
+        // MaxSpeed within about two frames — 1039 -> 672 in ~0.022 s. The
+        // speed the body has RIGHT NOW becomes the ceiling and D1(a)'s bleed
+        // walks it down to the walk cap over AboveCapDecaySeconds. Latched
+        // after bWantsToSprint is written so the resting cap the bleed reads
+        // is the walk cap; a ceiling already at or under it collapses to the
+        // sentinel inside the latch and nothing is felt.
+        BoostedSpeedCeiling = FMath::Max(BoostedSpeedCeiling, Velocity.Size2D());
+        LatchBoostedCeilingBleed();
+    }
     // Entering sprint ends automatic/burst fire; leaving sprint does not resume it.
     // Replaying historical movement must not send a new weapon RPC that
     // cancels a trigger press made after that saved move.
@@ -944,7 +960,14 @@ void UBreakerCharacterMovementComponent::OnTeleported()
 
 void UBreakerCharacterMovementComponent::LatchBoostedCeilingBleed()
 {
-    if (BoostedSpeedCeiling <= 0.0f || BoostedCeilingBleedRatePerSecond > 0.0f) return;
+    if (BoostedSpeedCeiling <= 0.0f)
+    {
+        // No ceiling, no bleed: a rate left behind by a ceiling that was
+        // zeroed elsewhere must not be inherited by the next latch.
+        BoostedCeilingBleedRatePerSecond = 0.0f;
+        return;
+    }
+    if (BoostedCeilingBleedRatePerSecond > 0.0f) return;
     const float RestingCap = GetGroundedSpeedCap();
     if (BoostedSpeedCeiling <= RestingCap)
     {
@@ -964,7 +987,12 @@ void UBreakerCharacterMovementComponent::PerformMovement(float DeltaTime)
         if (IsTraversingLedge() || bWantsLedgeTraversal || bHasPendingTraversal) InvalidateTraversalContinuity();
         Acceleration = FVector::ZeroVector;
         Velocity.X = Velocity.Y = 0.0f;
+        // EndSlide above latches a bleed on the way out (O283); a stagger
+        // confiscates the ceiling outright, so the rate goes with it or the
+        // next latch would inherit a rate computed for a gap that no longer
+        // exists.
         BoostedSpeedCeiling = 0.0f;
+        BoostedCeilingBleedRatePerSecond = 0.0f;
     }
     // This entry runs both local physics and authoritative remote movement;
     // actor Tick alone would miss server moves received between ticks.
@@ -1045,9 +1073,27 @@ bool UBreakerCharacterMovementComponent::TryDash(const FVector& RequestedDirecti
 
 bool UBreakerCharacterMovementComponent::BeginSlide()
 {
-    if (IsOwnerStaggered()) return false;
-    if (bSliding || !IsMovingOnGround() || Velocity.Size2D() < SlideEntrySpeed || !CharacterOwner)
+    if (bSliding || !CharacterOwner)
     {
+        return false;
+    }
+    if (!IsMovingOnGround())
+    {
+        // An airborne press stays ARMED: this is the queued slide, fired by
+        // the tick on the first grounded frame after the landing (and the
+        // landing's floor in LandedPlanarSpeed exists to keep it alive).
+        return false;
+    }
+    if (IsOwnerStaggered() || Velocity.Size2D() < SlideEntrySpeed)
+    {
+        // O283: a crouch refused standing is CONSUMED, not armed. The press
+        // used to stay live, so a crouch pressed at walking pace fired a
+        // slide whenever the frame speed later crossed the entry — a slide
+        // the player never asked for at the moment it happened. Spending the
+        // press here means the next slide needs the next press. The flag is
+        // the same one a successful slide spends, so the landing floor and
+        // the latent-slide tick both read one meaning: this press is done.
+        bSlideRequestConsumed = true;
         return false;
     }
 
@@ -1085,6 +1131,18 @@ void UBreakerCharacterMovementComponent::EndSlide()
     SlideEntryBoostRemaining = 0.0f;
     GroundFriction = SavedGroundFriction;
     BrakingDecelerationWalking = SavedBrakingDeceleration;
+    // O283: the cap is about to fall from the sliding cap to the grounded
+    // cap — the walk cap when sprint is not toggled, 1039 -> 672 — and a plain
+    // slide never armed BoostedSpeedCeiling, so D1(a)'s bleed had nothing to
+    // walk down and the engine braked the whole gap off in ~0.022 s. The
+    // speed the slide is leaving with becomes the ceiling and the bleed
+    // takes it to the resting cap over AboveCapDecaySeconds. With sprint
+    // still toggled the ceiling is at or under the sprint cap and the latch
+    // collapses it to the sentinel: nothing is felt, which is right. Ordered
+    // after bSliding clears so GetMaxSpeed reads the grounded branch from
+    // here on; PrepareSlideJump re-grants over this with the tolled speed.
+    BoostedSpeedCeiling = FMath::Max(BoostedSpeedCeiling, Velocity.Size2D());
+    LatchBoostedCeilingBleed();
     if (CharacterOwner)
     {
         CharacterOwner->UnCrouch();
@@ -1101,9 +1159,15 @@ void UBreakerCharacterMovementComponent::PrepareSlideJump()
     // the recon's finding — and the toll is what buys the verb choice back.
     const FVector Conserved = SlideJumpConservedVelocity(
         FVector(Velocity.X, Velocity.Y, 0.0f), SlideJumpSpeedConservation);
+    // EndSlide (O283) latches the UNTOLLED slide speed as a bleeding ceiling
+    // on the way out. That is right for a slide that simply ends; it is wrong
+    // here, where the toll is the whole point — so the ceiling is read before
+    // the exit and the grant below is exactly what it was: the conserved
+    // speed, maxed against whatever boost was already live.
+    const float CeilingBeforeExit = BoostedSpeedCeiling;
     EndSlide();
     SetSprinting(true);
-    BoostedSpeedCeiling = FMath::Max(BoostedSpeedCeiling, static_cast<float>(Conserved.Size()));
+    BoostedSpeedCeiling = FMath::Max(CeilingBeforeExit, static_cast<float>(Conserved.Size()));
     BoostedCeilingBleedRatePerSecond = 0.0f;
     Velocity.X = Conserved.X;
     Velocity.Y = Conserved.Y;
@@ -1191,6 +1255,11 @@ void UBreakerCharacterMovementComponent::TickComponent(float DeltaTime, ELevelTi
 
     ApplyAirSteering(DeltaTime);
 
+    // The queued slide: a crouch held through the air fires on the first
+    // grounded frame. This fires at most ONCE per press (O283) — BeginSlide
+    // spends the press whether it admits or refuses on the ground — so a
+    // press refused at walking pace cannot lie in wait for the speed to
+    // cross the entry later.
     if (bSlideRequested && !bSlideRequestConsumed && !bSliding && IsMovingOnGround())
     {
         BeginSlide();

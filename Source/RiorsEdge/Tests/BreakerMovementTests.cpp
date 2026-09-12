@@ -211,20 +211,23 @@ bool FBreakerMovementWeightTest::RunTest(const FString& Parameters)
     // A merely REQUESTED slide used to skip the landing cost outright, so
     // crouch held in the air paid no toll at any fall speed. These four hold
     // the floor's whole shape, and the third is the one that matters: the floor
-    // may never hand out speed the player did not arrive with.
+    // may never hand out speed the player did not arrive with. The floor IS
+    // the shipped entry speed (O283 moved it from 550 to 740), read off a
+    // default-constructed component so the floor and the gate cannot drift.
     const float HeavyScale = FMovement::LandingSpeedScale(2400.0f, 950.0f, 2400.0f, 0.78f);
+    const float Entry = NewObject<UBreakerCharacterMovementComponent>()->SlideEntrySpeed;
     TestTrue(TEXT("Without a slide the scrub is the whole answer"),
-        FMath::IsNearlyEqual(FMovement::LandedPlanarSpeed(1000.0f, HeavyScale, false, 550.0f), 1000.0f * HeavyScale, 0.01f));
+        FMath::IsNearlyEqual(FMovement::LandedPlanarSpeed(1000.0f, HeavyScale, false, Entry), 1000.0f * HeavyScale, 0.01f));
     TestTrue(TEXT("A queued slide still PAYS the landing, down to the floor"),
-        FMovement::LandedPlanarSpeed(1000.0f, 0.2f, true, 550.0f) < 1000.0f);
+        FMovement::LandedPlanarSpeed(1000.0f, 0.2f, true, Entry) < 1000.0f);
     TestEqual(TEXT("and is caught at SlideEntrySpeed rather than dropping under it"),
-        FMovement::LandedPlanarSpeed(1000.0f, 0.2f, true, 550.0f), 550.0f);
+        FMovement::LandedPlanarSpeed(1000.0f, 0.2f, true, Entry), Entry);
     TestEqual(TEXT("The floor cannot lift a landing above what it arrived with"),
-        FMovement::LandedPlanarSpeed(300.0f, 0.5f, true, 550.0f), 300.0f);
+        FMovement::LandedPlanarSpeed(300.0f, 0.5f, true, Entry), 300.0f);
     TestEqual(TEXT("A free landing is untouched either way"),
-        FMovement::LandedPlanarSpeed(1000.0f, 1.0f, true, 550.0f), 1000.0f);
+        FMovement::LandedPlanarSpeed(1000.0f, 1.0f, true, Entry), 1000.0f);
     TestTrue(TEXT("A heavy fall into a queued slide is no longer free"),
-        FMovement::LandedPlanarSpeed(2000.0f, HeavyScale, true, 550.0f) < 2000.0f);
+        FMovement::LandedPlanarSpeed(2000.0f, HeavyScale, true, Entry) < 2000.0f);
 
     // --- The sliding cap, which used to be whatever the slide was doing -----
     // The assertion that matters here is the SIGNATURE: SlidingSpeedCap takes
@@ -725,6 +728,19 @@ bool FBreakerMovementShippedSpeedsTest::RunTest(const FString& Parameters)
         Movement->SprintSpeed / Movement->WalkSpeed, 1.546f, 0.005f);
     TestEqual(TEXT("Air control ships at 0.35"), Movement->AirControl, 0.35f, 0.0001f);
     TestEqual(TEXT("Air control boost ships at 1.15"), Movement->AirControlBoostMultiplier, 1.15f, 0.0001f);
+
+    // O283: A SLIDE IS A SPRINT'S CROUCH, NEVER A WALK'S. The entry sits
+    // strictly between the two grounded caps — above walk so a crouch pressed
+    // at walking pace is refused, under sprint so a sprinting body can still
+    // drop into one. It shipped at 550, UNDER walk, which made every crouch
+    // press while walking a slide. The ordering is the invariant; the figure
+    // is the pin.
+    TestTrue(TEXT("The slide entry sits strictly between the walk and sprint caps"),
+        Movement->WalkSpeed < Movement->SlideEntrySpeed && Movement->SlideEntrySpeed < Movement->SprintSpeed);
+    TestEqual(TEXT("Slide entry ships at 740"), Movement->SlideEntrySpeed, 740.0f, 0.0001f);
+    // And a speed the rules take away bleeds over this window — SetSprinting
+    // and EndSlide both latch it — rather than being braked off in a frame.
+    TestEqual(TEXT("The above-cap bleed ships at half a second"), Movement->AboveCapDecaySeconds, 0.5f, 0.0001f);
 
     // Momentum's gates follow the walk speed: the threshold sits under a walk
     // (so an aimed state can still reach it) and the upper speed sits past a

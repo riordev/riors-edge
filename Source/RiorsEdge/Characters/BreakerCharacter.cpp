@@ -286,6 +286,9 @@ void ABreakerCharacter::Tick(float DeltaSeconds)
     UpdateCameraShake(DeltaSeconds);
     ReconcileClientDeathPresentation();
     UpdateDeathBeat(DeltaSeconds);
+    // After the beat: this is the camera-location writer, and it composes
+    // the beat's drop for this frame (O283, BreakerCharacterFeel.cpp).
+    UpdateMovementFeel(DeltaSeconds);
     UpdateHarmPresentation();
     if (bTraversalDemoArmed)
     {
@@ -1080,7 +1083,13 @@ void ABreakerCharacter::StartSlide()
     if (UBreakerCharacterMovementComponent* Movement = GetBreakerMovement())
     {
         Movement->SetSlideRequested(true);
-        if (Movement->BeginSlide()) OnSlideChanged(true);
+        if (Movement->BeginSlide())
+        {
+            OnSlideChanged(true);
+            // Slide entry plants the hands (O283): the same converter the
+            // brake edge pays, at the speed the body dropped into the slide.
+            PayPlantImpulse(static_cast<float>(Movement->Velocity.Size2D()));
+        }
     }
 }
 
@@ -1798,10 +1807,11 @@ void ABreakerCharacter::HandlePlayerDeath()
     DashFeedbackElapsed = -1.0f;
     bDashRollApplied = false;
     // The beat starts now; the teleport lands under the black. The rest
-    // location is re-read from the live camera, which is at rest with no beat
-    // running: a Blueprint child that re-seats the camera would otherwise
-    // have Done snap it back to the C++ constructor's figure.
-    if (FirstPersonCamera) CameraRestLocation = FirstPersonCamera->GetRelativeLocation();
+    // location is re-read from the live camera, less whatever the crouch
+    // ease has on it this frame (O283): a Blueprint child that re-seats the
+    // camera would otherwise have Done snap it back to the C++ constructor's
+    // figure, and a death mid-crouch would otherwise bake the ease into rest.
+    if (FirstPersonCamera) CameraRestLocation = FirstPersonCamera->GetRelativeLocation() - FVector(0.0, 0.0, AppliedCameraOffsetCm);
     DeathBeatElapsed = 0.0f;
     GetWorldTimerManager().SetTimer(RespawnTimer, this,
         &ABreakerCharacter::RespawnAtTilesetStart,
@@ -1870,7 +1880,8 @@ void ABreakerCharacter::ReconcileClientDeathPresentation()
         }
         DashFeedbackElapsed = -1.0f;
         bDashRollApplied = false;
-        if (FirstPersonCamera) CameraRestLocation = FirstPersonCamera->GetRelativeLocation();
+        // Less the crouch ease, as the server-side start does (O283).
+        if (FirstPersonCamera) CameraRestLocation = FirstPersonCamera->GetRelativeLocation() - FVector(0.0, 0.0, AppliedCameraOffsetCm);
         DeathBeatElapsed = 0.0f;
     }
     else
@@ -1962,13 +1973,15 @@ void ABreakerCharacter::UpdateDeathBeat(float DeltaSeconds)
         }
     }
 
-    // The drop is a relative offset under the rest location; the tilt rides
-    // the control rotation as a net-zero delta, the shake's technique, because
+    // The drop is a relative offset under the rest location, handed to
+    // UpdateMovementFeel — the camera location's one writer — which composes
+    // it with the crouch ease the same frame (O283). The tilt rides the
+    // control rotation as a net-zero delta, the shake's technique, because
     // the camera runs bUsePawnControlRotation and would discard a relative
     // roll or pitch of its own.
     if (FirstPersonCamera)
     {
-        FirstPersonCamera->SetRelativeLocation(CameraRestLocation - FVector(0.0, 0.0, Beat.CameraDropCm));
+        DeathBeatCameraDropCm = bDone ? 0.0f : Beat.CameraDropCm;
         // The colour drain is handed to the harm composer rather than written
         // here: the camera has one post-process slot and one blend weight,
         // and the hit pulse and the low-health radius share it.
@@ -2388,10 +2401,16 @@ void ABreakerCharacter::UpdateCameraFieldOfView()
     const float DashOffset = DashFOVPunch * DashFeedbackScale * GetDashFeedbackAlpha();
     const float AimNarrow = (!bWeaponsHolstered && Weapon && AimFOVNarrowDegrees > 0.0f)
         ? AimFOVNarrowDegrees * Weapon->GetAimAlpha() : 0.0f;
-    const bool bOffsetLive = DashOffset > UE_KINDA_SMALL_NUMBER || AimNarrow > UE_KINDA_SMALL_NUMBER;
+    // The sprint push (O283) rides the viewmodel's eased sprint fraction —
+    // the gait the feet are actually doing, already chased over
+    // GaitEaseSeconds by UpdateViewmodelKick — so the field widens with the
+    // stride and settles with it, never on the toggle's edge.
+    const float SprintPush = SprintFOVPushDegrees * ViewmodelSprintFraction;
+    const bool bOffsetLive = DashOffset > UE_KINDA_SMALL_NUMBER || AimNarrow > UE_KINDA_SMALL_NUMBER
+        || SprintPush > UE_KINDA_SMALL_NUMBER;
     if (bOffsetLive)
     {
-        FirstPersonCamera->SetFieldOfView(FMath::Clamp(BaseFieldOfView + DashOffset - AimNarrow, 5.0f, 170.0f));
+        FirstPersonCamera->SetFieldOfView(FMath::Clamp(BaseFieldOfView + DashOffset + SprintPush - AimNarrow, 5.0f, 170.0f));
     }
     else if (bCameraFOVOffsetApplied)
     {

@@ -303,6 +303,26 @@ protected:
     // without a rebuild. Holstered pawns never push. O2 PLACEHOLDER.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Aim", meta=(ClampMin="0", ClampMax="30")) float AimFOVNarrowDegrees = 6.0f;
 
+    // --- Movement feel (O283) ---------------------------------------------
+    // The camera and the hands answer every change of state: a sprint pushes
+    // the field of view, a stop plants the hands, a crouch eases the camera
+    // down instead of snapping it, a landing dips. The dash punch and the
+    // ADS narrow above are the same layer's older cues. Defined in
+    // Characters/BreakerCharacterFeel.cpp; the shapes are
+    // Characters/BreakerFeelPulseMath.h. Every dial O2 PLACEHOLDER.
+    // FOV added at full sprint gait, riding the SAME eased sprint fraction
+    // the viewmodel's sprint pose rides — read off ground speed, never the
+    // toggle, so a sprinting player standing still gets no push. Composed
+    // with the dash punch and the ADS narrow over the player's base FOV.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel", meta=(ClampMin="0", ClampMax="30")) float SprintFOVPushDegrees = 6.0f;   // O2 PLACEHOLDER
+    // Time constant of the camera's chase to the crouched or stood capsule.
+    // The capsule resizes in one frame (88 -> 40, a 48 cm step); the camera
+    // holds its world height on that frame and closes the gap over this.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel", meta=(ClampMin="0", ClampMax="1")) float CrouchCameraEaseSeconds = 0.12f;   // O2 PLACEHOLDER
+    // A released stick plants the hands only from at least this fraction of
+    // the walk cap: a shuffle stopping is not a stop worth a dip.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel", meta=(ClampMin="0", ClampMax="2")) float BrakePlantMinSpeedFraction = 0.5f;   // O2 PLACEHOLDER
+
     UFUNCTION(BlueprintImplementableEvent, Category="Combat") void OnFireInput(bool bPressed);
     UFUNCTION(BlueprintImplementableEvent, Category="Combat") void OnAimInput(bool bPressed);
     UFUNCTION(BlueprintImplementableEvent, Category="Combat") void OnReloadInput();
@@ -385,8 +405,8 @@ private:
     UFUNCTION() void HandleDashStarted(FVector DashDirection, float DashSpeed);
     void UpdateDashCameraFeedback(float DeltaSeconds);
     // The ONE writer of the camera's live FOV during play (D5): composes the
-    // player's base FOV, the dash punch and the ADS narrow every frame, so
-    // two effects can never fight over SetFieldOfView. Writes only while an
+    // player's base FOV, the dash punch, the sprint push (O283) and the ADS
+    // narrow every frame, so two effects can never fight over SetFieldOfView. Writes only while an
     // offset is live (or on the frame it dies), so an idle camera costs one
     // comparison.
     void UpdateCameraFieldOfView();
@@ -554,6 +574,41 @@ private:
     FRotator LastDeathBeatOffset = FRotator::ZeroRotator;
     bool bRespawnPending = false;
     FTimerHandle RespawnTimer;
+
+    // --- Movement feel state (O283), Characters/BreakerCharacterFeel.cpp ---
+    // The crouch hooks: the movement component's Crouch/UnCrouch resize the
+    // capsule the camera hangs from, so without these the camera steps the
+    // full half-height difference in one frame. Each seeds the offset that
+    // holds the camera where it was; UpdateMovementFeel eases it to rest.
+    virtual void OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
+    virtual void OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
+    // Per frame: the crouch ease, the brake-plant edge, and THE ONE WRITER of
+    // the camera's relative location during play — the crouch offset and the
+    // death beat's drop composed over CameraRestLocation, so the two can
+    // never fight over SetRelativeLocation. Runs after UpdateDeathBeat so it
+    // reads this frame's drop.
+    void UpdateMovementFeel(float DeltaSeconds);
+    // The hands plant: one impulse into the weapon's kick spring through the
+    // landing converter, scaled by the horizontal speed the body gave up.
+    // Paid by the brake edge and by slide entry.
+    void PayPlantImpulse(float HorizontalSpeed);
+    // Camera relative Z above (crouch) or below (stand) the rest location,
+    // easing to 0. Signed centimetres.
+    float CameraCrouchOffsetCm = 0.0f;
+    // Last frame: grounded with a live input vector. The brake plant fires on
+    // the frame this goes true -> false while still grounded.
+    bool bWasGroundedInput = false;
+    // Last frame's horizontal ground speed, the plant's threshold and scale.
+    float LastGroundedSpeed = 0.0f;
+    // The death beat's drop this frame, 0 when no beat runs. The beat writes
+    // this; UpdateMovementFeel composes it onto the camera.
+    float DeathBeatCameraDropCm = 0.0f;
+    // The Z offset the last composed write actually put on the camera, 0
+    // when the camera sits at rest. Doubles as the live flag (the FOV
+    // writer's own pattern: an idle camera costs one comparison, and a
+    // Blueprint child's re-seat is never overwritten at rest) and lets the
+    // death beat's rest re-read subtract exactly what is on the camera.
+    float AppliedCameraOffsetCm = 0.0f;
 public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Death Beat")
     FBreakerDeathBeatTimeline DeathBeat;

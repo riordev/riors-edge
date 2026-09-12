@@ -54,6 +54,54 @@ walk on the correct axis."
   the blueprint overrides it the shipped value is not the C++ default;
   the runtime pins read the live component, not the CDO.
 
+## O283 FEEL, MOVEMENT — LANDED
+
+- "starting and stopping + sliding feels clunky" — stop and start were
+  never slow (0.10 s / 25 cm from a walk, 0.16 s to walk speed); they
+  were ABRUPT and MUTE. Three things were the slide: the slide entry
+  sat at 550 under the 672 walk, so every crouch press while walking was
+  a slide with a 48 cm one-frame camera snap down and a 0.09 s burst to
+  sprint speed, then a 48 cm pop back up; a press refused standing
+  stayed armed and fired later mid-walk; and leaving a sprint (or a
+  slide) chopped 1039 -> 672 in one frame. Now: a slide is a sprint's
+  crouch (entry 740, pinned between walk and sprint), a refused press
+  is consumed, and a speed the rules take away bleeds over the 0.5 s
+  momentum bleed (firing out of a sprint too). The camera eases through
+  a crouch over 0.12 s; a stop plants the hands through the landing
+  converter; slide entry pays the same; a sprint pushes the FOV +6 deg
+  on the sprint fraction. FeelPulse, ShippedSpeeds, SprintExitBleeds,
+  RefusedSlideIsConsumed pin it. FOUND: the brake plant through the
+  landing converter is heavy (2.7 units at a walk stop, harder than a
+  1 m drop) — a scale dial if it reads as too much. FOUND: no movement
+  audio exists (no footstep, land or slide verb) — GLASS. FOUND:
+  landing at walking pace with crouch held no longer slides. NOT
+  PHOTOGRAPHED: motion.
+
+## Cycle — O284 FEEL, CAST
+
+- [ ] The character binds Abilities->OnAbilityActivated: pitch kick -1.5
+      deg over 0.12 s (net-zero control delta), FOV pulse +3 deg / 0.2
+      s, a viewmodel kick, and the Cast moment at the rig root in the
+      verb's rail colour; Cleave's and Rot's own Cast moments removed so
+      nothing double-flashes. GLASS crossing: the Cast fallback gains
+      five shards and drops its 40 cm disc (a full-frame wash at 35 cm).
+      ShardBurst/FallbackSchedule assert Cast shards; RotCueOnLanding
+      stays green.
+
+## Cycle — O285 LEVELS
+
+- [ ] compose_fernhall: apron_pass — per yard two 8 x 0.9 x 18 m
+      pavement tops with stair() runs on all four sides (0.30 m rises,
+      two treads; stair() gains a lateral axis), at the probed clear
+      positions: entry/siding 21.7-29.7 and 52.6-60.6, substation
+      37.75-45.75 and 67.5-75.5, depot 21.7-29.7 and 66.9-74.9; never
+      straddling a chest pair; probe_structures covers them.
+      EXPECTED_TOTAL 721/805 -> 793/877; PieceContract 793;
+      ApronsClimbable pins rises, abutment, clearance, two per yard,
+      half-width <= the corridor, disjoint from every chest pair.
+      OutdoorEncounterRuntime must stay at 35 bodies. Photograph the
+      lane from the entry and from an apron.
+
 ## EIGHTH — LANDED, THE FLOATING GEAR
 
 - "gear floats on the ground and doesn't go all the way down" — a drop

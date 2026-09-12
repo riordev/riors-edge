@@ -244,6 +244,14 @@ public:
     UFUNCTION(BlueprintPure, Category="Movement") bool IsSprinting() const { return bWantsToSprint; }
     UFUNCTION(BlueprintPure, Category="Movement") bool IsSliding() const { return bSliding; }
     UFUNCTION(BlueprintPure, Category="Movement") bool IsSlideRequested() const { return bSlideRequested; }
+    // O283: a held crouch that can still buy a slide. True only while the key
+    // is down AND the press has not been spent — either by the slide it
+    // produced or by a grounded refusal (standing, or under SlideEntrySpeed).
+    // An airborne press stays armed for the landing; that is the queued slide.
+    UFUNCTION(BlueprintPure, Category="Movement") bool IsSlideRequestArmed() const { return bSlideRequested && !bSlideRequestConsumed; }
+    // The ceiling the momentum bleed is currently walking down, 0 when there
+    // is none. Read-only: TryDash and PrepareSlideJump are the only grants.
+    UFUNCTION(BlueprintPure, Category="Movement") float GetBoostedSpeedCeiling() const { return BoostedSpeedCeiling; }
     UFUNCTION(BlueprintPure, Category="Movement") float GetHorizontalSpeed() const { return Velocity.Size2D(); }
     // World time of the last consumed dash charge; class loops watch it to
     // credit a dash exactly once.
@@ -439,7 +447,15 @@ public:
     // MaxSpeed. 0 restores the old instant cut exactly.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dash", meta=(ClampMin="0")) float AboveCapDecaySeconds = 0.5f;   // O2 PLACEHOLDER
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideEntrySpeed = 550.0f;   // O2 PLACEHOLDER
+    // O283: a slide is a sprint's crouch, never a walk's. The entry sits ABOVE
+    // WalkSpeed (672) and under SprintSpeed (1039), so a crouch pressed at
+    // walking pace is refused and consumed, and only a body already carrying
+    // sprint momentum drops into a slide. It was 550, under walk, which made
+    // every crouch press while walking a slide (O242: the slide IS the crouch;
+    // there is no static crouch verb). Not a constant expression of WalkSpeed
+    // because both are UPROPERTYs; the ordering WalkSpeed < SlideEntrySpeed <
+    // SprintSpeed is the invariant, and a shipped-configuration test pins it.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideEntrySpeed = 740.0f;   // WAS 550 (under walk) — O2 PLACEHOLDER (O283)
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideEntryBoost = 120.0f;   // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideEntryBoostDuration = 0.35f;   // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideBoostCooldown = 1.2f;   // O2 PLACEHOLDER
@@ -721,7 +737,10 @@ private:
     // O264: fold the boosted ceiling into its bleed. A nonzero rate IS the
     // latch (D1(a)), so this is idempotent — a second call cannot re-arm a
     // faster decay, and only a fresh grant (TryDash, PrepareSlideJump) clears
-    // the rate. Called on every break condition and on every landing.
+    // the rate. Called on every break condition, on every landing, and (O283)
+    // wherever a rule lowers the cap under a moving body — EndSlide and the
+    // leaving-sprint edge of SetSprinting — so the speed above the new cap
+    // bleeds over AboveCapDecaySeconds instead of being braked off in a frame.
     void LatchBoostedCeilingBleed();
 };
 
