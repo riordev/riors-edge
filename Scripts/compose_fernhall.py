@@ -183,7 +183,7 @@ COLUMN_HEIGHT = 3.4   # O2 PLACEHOLDER — the canopy posts and the roof stack
 # carrying copies of the megakit's wall tile at the tile's OWN size: `columns`
 # across and `storeys` up, stepping TILE_WIDTH along the face and STOREY up,
 # centred in the bay — a 10 m bay holds 8 m of tile and a metre of reveal each
-# side. The ground floor is WallAstra_Straight (the "panel" the bay walls use),
+# side. The ground floor is WallAstra_Straight (the "panel"),
 # every floor above it the _Window sibling. The box is EXACTLY storeys x
 # STOREY tall: no parapet, so a roofline is a whole number of storeys.
 #
@@ -335,13 +335,12 @@ def perimeter(tag, x, z, index, facing):
     kind, size, rise = second
     if kind == "tower":
         # A stair tower or a lift head: narrow, taller than its parent, and set
-        # to one side so the parent's roofline breaks rather than steps. Its
-        # inner face is the parent's (0.6 + 0.35 x depth is depth / 2 at the
-        # profile's depth 4), so it carries one column of tile on the storeys
-        # above the parent's roof only; the parent's tiles hold the face below.
-        # The tile is 4 m on a 3.2 m tower and hangs 0.4 m past each side.
+        # to one side so the parent's roofline breaks rather than steps. It is
+        # narrower than a tile (3.2 m against 4), so it carries none: a tile
+        # buried in a box leaves only its decal in the air. A bare box, the
+        # parent's tiles holding the face below its roof.
         facade("wall_%s%02dt" % (tag, index), (x + 3.0, 0.0, line + facing * 0.6), (size, depth * 0.7),
-               (0.0, facing), storeys_for(height + rise), 1, skip=storeys)
+               (0.0, facing), storeys_for(height + rise), 0)
     elif kind == "canopy":
         # A loading canopy over the ground in front of the building, on two
         # columns. This is the piece that makes a wall read as somewhere goods
@@ -690,11 +689,11 @@ def work_pass(tag, anchor_x, centre_z, bay_fwd, bay_side, dock_fwd, dock_side, d
     place("flr_%s_bay" % tag, "pavement", at(bay_fwd, bay_side * 21.0), (bw, 0.3, bd))
     place("flr_%s_bayroof" % tag, "pavement", at(bay_fwd, bay_side * 21.0, bh), (bw, 0.4, bd))
     for side, dx in enumerate((-(bw - cheek) * 0.5, (bw - cheek) * 0.5)):
-        place("wall_%s_baycheek%d" % (tag, side), "panel",
+        place("wall_%s_baycheek%d" % (tag, side), "pavement",
               at(bay_fwd + dx, bay_side * 21.0 - face), (cheek, bh, wall))
-    place("wall_%s_bayback" % tag, "panel", at(bay_fwd, bay_side * 21.0 + face), (bw, bh, wall))
+    place("wall_%s_bayback" % tag, "pavement", at(bay_fwd, bay_side * 21.0 + face), (bw, bh, wall))
     for side, dx in enumerate((-bw * 0.5, bw * 0.5)):
-        place("wall_%s_bayside%d" % (tag, side), "panel",
+        place("wall_%s_bayside%d" % (tag, side), "pavement",
               at(bay_fwd + dx, bay_side * 21.0), (wall, bh, bd))
     # What is inside it: stock, and a reason to look. The crate is the kit's
     # own 1.121 m cube and the barrel is scaled to a height (O280).
@@ -716,9 +715,9 @@ def work_pass(tag, anchor_x, centre_z, bay_fwd, bay_side, dock_fwd, dock_side, d
     dh = 1.5
     place("flr_%s_dock" % tag, "pavement", at(dock_fwd, dock_side * 20.25, dh), (16.0, 0.4, 6.5))
     for side, dx in enumerate((-7.4, 7.4)):
-        place("wall_%s_dockface%d" % (tag, side), "panel",
+        place("wall_%s_dockface%d" % (tag, side), "pavement",
               at(dock_fwd + dx, dock_side * 20.25), (1.2, dh, 6.5))
-    place("wall_%s_dockfront" % tag, "panel",
+    place("wall_%s_dockfront" % tag, "pavement",
           at(dock_fwd, dock_side * 20.5 - dock_side * 3.5), (16.0, dh, 0.8))
     # The stair climbs one END of the dock, the run lying along the flank: the
     # lane face is the dockfront, so the run takes whichever end the flank
@@ -728,8 +727,10 @@ def work_pass(tag, anchor_x, centre_z, bay_fwd, bay_side, dock_fwd, dock_side, d
     for i, (dx, dz) in enumerate(((-5.0, 1.0), (-3.6, 1.0), (-4.3, -0.4), (5.2, 1.2))):
         place("dress_%s_dockcrate%d" % (tag, i), "crate",
               at(dock_fwd + dx, dock_side * 20.5 + dz, dh + 0.2))
+    # The cable lies ON the dock along the flank wall, not on the ground at
+    # the dock's end where the stair lands and a body walks.
     place("dress_%s_dockcable" % tag, "cable",
-          at(dock_fwd - 8.5, dock_side * 20.5, dh))
+          at(dock_fwd, dock_side * 22.6, dh), yaw=90.0)
 
 
 def shape_pass(tag, anchor_x, centre_z, gantries, masses, near_fwd, far_fwd, near_climb=1.0, far_climb=1.0, forward=1.0):
@@ -758,7 +759,7 @@ def shape_pass(tag, anchor_x, centre_z, gantries, masses, near_fwd, far_fwd, nea
     # stretched to a column: a column is what a stretched miniature reads as.
     for i, dx in enumerate((-7.5, 0.0, 7.5)):
         for j, lat in enumerate((19.8, 22.7)):
-            place("dress_%s_pier%d%d" % (tag, i, j), "bldg_c", at(near_fwd + dx, lat), (0.7, DECK_HEIGHT, 0.7))
+            place("dress_%s_pier%d%d" % (tag, i, j), "pavement", at(near_fwd + dx, lat), (0.7, DECK_HEIGHT, 0.7))
     # The stair up, off one end of the deck.
     stair(tag, "step", at, near_fwd - near_climb * 9.0, STAIR_LAT, DECK_HEIGHT + 0.4, near_climb)
     # A rail along the open edge, so the drop reads before it is stepped off.
@@ -769,7 +770,7 @@ def shape_pass(tag, anchor_x, centre_z, gantries, masses, near_fwd, far_fwd, nea
     catwalk_fwd = near_fwd + near_climb * 19.0
     place("flr_%s_catwalk" % tag, "pavement", at(catwalk_fwd, 22.0, CATWALK_HEIGHT), (20.0, 0.4, 3.0))
     for i, dx in enumerate((-6.0, 0.0, 6.0)):
-        place("dress_%s_cwpier%d" % (tag, i), "bldg_c", at(catwalk_fwd + dx, 22.0), (0.6, CATWALK_HEIGHT, 0.6))
+        place("dress_%s_cwpier%d" % (tag, i), "pavement", at(catwalk_fwd + dx, 22.0), (0.6, CATWALK_HEIGHT, 0.6))
         place("dress_%s_cwrail%d" % (tag, i), "chest", at(catwalk_fwd + dx, 20.7, CATWALK_HEIGHT + 0.4), (5.6, 0.9, 0.2))
 
     # --- The far deck, higher and on the opposite flank ---------------------
@@ -778,7 +779,7 @@ def shape_pass(tag, anchor_x, centre_z, gantries, masses, near_fwd, far_fwd, nea
     place("flr_%s_fardeck" % tag, "pavement", at(far_fwd, -21.25, FAR_DECK_HEIGHT), (16.0, 0.4, 4.5))
     for i, dx in enumerate((-6.5, 0.0, 6.5)):
         for j, lat in enumerate((-19.8, -22.7)):
-            place("dress_%s_fpier%d%d" % (tag, i, j), "bldg_c", at(far_fwd + dx, lat), (0.7, FAR_DECK_HEIGHT, 0.7))
+            place("dress_%s_fpier%d%d" % (tag, i, j), "pavement", at(far_fwd + dx, lat), (0.7, FAR_DECK_HEIGHT, 0.7))
     stair(tag, "fstep", at, far_fwd - far_climb * 8.0, -STAIR_LAT, FAR_DECK_HEIGHT + 0.4, far_climb)
     for i, dx in enumerate((-6.0, 0.0, 6.0)):
         place("dress_%s_frail%d" % (tag, i), "chest", at(far_fwd + dx, -19.2, FAR_DECK_HEIGHT + 0.4), (5.6, 0.9, 0.2))
@@ -805,7 +806,7 @@ def shape_pass(tag, anchor_x, centre_z, gantries, masses, near_fwd, far_fwd, nea
     for i, fwd in enumerate(gantries):
         place("flr_%s_gantry%d" % (tag, i), "pavement", at(fwd, 0.0, GANTRY_HEIGHT), (5.0, 0.5, 30.0))
         for j, lat in enumerate((-13.0, 13.0)):
-            place("wall_%s_gleg%d%d" % (tag, i, j), "bldg_c", at(fwd, lat), (2.0, GANTRY_HEIGHT, 2.0))
+            place("wall_%s_gleg%d%d" % (tag, i, j), "pavement", at(fwd, lat), (2.0, GANTRY_HEIGHT, 2.0))
             place("dress_%s_gbrace%d%d" % (tag, i, j), "chest",
                   at(fwd, lat * 0.72, GANTRY_HEIGHT - 1.6), (1.0, 1.6, 8.0))
         # A rail down each edge of the span, so it reads as a walkway from

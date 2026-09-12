@@ -217,9 +217,8 @@ namespace
         UStaticMesh* EntryFloor = FindMesh(TEXT("flr_yard"));
         UStaticMesh* SubFloor = FindMesh(TEXT("flr_yard_sub"));
         UStaticMesh* Mound = FindMesh(TEXT("dress_mound"));
-        UStaticMesh* Building = FindMesh(TEXT("wall_n00"));
         UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
-        if (!EntryFloor || !SubFloor || !Mound || !Building || !Cube) return;
+        if (!EntryFloor || !SubFloor || !Mound || !Cube) return;
 
         auto Place = [&](UStaticMesh* Mesh, const TCHAR* Label, FVector Centre, FVector Size, FLinearColor Color) -> AStaticMeshActor*
         {
@@ -266,8 +265,10 @@ namespace
                 Place(Mound, TEXT("DistantRidge"), FVector(X + 500, Edge + Side * 3500, Height * .65f - 120),
                     FVector(3800, 2500, Height * 1.3f), BreakerZoneMoss * .72f);
             }
-            // Tall intact-material silhouettes behind the outward walls,
-            // with lower foliage breaking up their bases. No gameplay collision.
+            // Tall silhouettes behind the outward walls, with lower foliage
+            // breaking up their bases. No gameplay collision. A silhouette is a
+            // plain box: a yard wall carries a tiled facade (O278), and a facade
+            // stretched to 17 m reads as panels hanging in the sky.
             for (int32 Index = 0; Index < 5; ++Index)
             {
                 const float X = Centre.X + (Index - 2) * 1900.0f;
@@ -281,7 +282,7 @@ namespace
             {
                 const float Height = 1100.0f + ((Index + Yard) % 3) * 320.0f;
                 const float X = Centre.X + (Index - 1) * 2800.0f;
-                auto* Roof = Place(Building, TEXT("Roofline"), FVector(X, Edge + Side * 650, Height * .5f),
+                auto* Roof = Place(Cube, TEXT("Roofline"), FVector(X, Edge + Side * 650, Height * .5f),
                     FVector(1700, 850, Height), BreakerZoneConcrete * .82f);
                 auto* Housing = Place(Cube, TEXT("RoofServiceHousing"), FVector(X + 340, Edge + Side * 680, Height + 140),
                     FVector(450, 420, 280), BreakerZoneRust * .65f);
@@ -954,7 +955,13 @@ bool UBreakerZoneBuilder::BuildFernhallYard(UWorld* World, FBreakerZoneMarkers& 
         }
         // Replace only the noncolliding cone-tree dressing, retaining its
         // authored position and height. Cover/floor/boundary meshes are untouched.
-        if (BreakerZoneNameHasPrefix(Piece.Name, TEXT("dress_trees")))
+        // The composer names a clump dress_<yard>_tree<n> or dress_<yard>_corner<n>
+        // (the corner clumps are the same Kenney cones); the grass under a
+        // clump (_treegrass) is not a tree.
+        const bool bIsTreeClump = BreakerZoneNameHasPrefix(Piece.Name, TEXT("dress_"))
+            && (Piece.Name.Contains(TEXT("_tree")) || Piece.Name.Contains(TEXT("_corner")))
+            && !Piece.Name.Contains(TEXT("treegrass")) && !Piece.Name.Contains(TEXT("cornermound"));
+        if (bIsTreeClump)
         {
             const FBox Bounds = Mesh->GetBoundingBox();
             const FVector Center = Bounds.GetCenter();

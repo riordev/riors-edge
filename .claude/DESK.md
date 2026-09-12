@@ -1,5 +1,51 @@
 # Desk — next playtest
 
+## OWNER PLAYTEST, 2026-09-12 (EIGHTH)
+
+Owner walked the look pass and wrote: "half these assets are broken,
+trees are random, I don't know what I'm supposed to be looking at; half
+these textures are broken or clipped; things are awkward and clunky; all
+of the ground is still flat; the points don't make sense — there are
+points you actively don't want to take; the menu shows damage increases
+on all nodes when you put a point in; the x axis is all the same, no
+curve or hill or height to anything you walk on; enemies still don't
+walk on the correct axis."
+
+## EIGHTH — LANDED, THE BROKEN ASSETS
+
+- "half these assets are broken … clipped" — the skyline's Roofline
+  silhouettes stretched a whole facade mesh (wall_n00) to 17 x 8.5 m, so
+  its tiles and cables hung in the sky around every yard; they are plain
+  boxes. The towers (3.2 m) carried a 4 m tile buried in their box with
+  only its decal in the air; a tower is a bare box. Bay cheeks, bay backs,
+  bay sides, dock faces and dock fronts wore the kit panel stretched
+  across a face (the WARNING slab); they are plain slabs. Deck piers,
+  catwalk piers and gantry legs were a city miniature stretched to a
+  post; plain posts. The dock cable lay on the ground where the stair
+  lands; it lies on the dock along the wall.
+- "trees are random" — the builder's swap of the Kenney cone clumps for
+  the kit tree matched a prefix the composer never writes
+  (`dress_trees` vs `dress_<yard>_tree0` / `_corner0`), so every cone
+  shipped; the swap matches now. PHOTOGRAPHED: the entry — no panels in
+  the sky, no cones.
+
+## EIGHTH — OPEN
+
+- [ ] "enemies still don't walk on the correct axis" — the sixth cycle's
+      walk-where-facing and the seventh's zig-zag did not close it. Scout
+      with the nav probe's `slide` column on a live crowd before any edit.
+- [ ] "the ground is still flat … no curve or hill" — a ruling: the yard
+      slab as a gentle heightfield. FloorsDisjoint and every floor pin
+      assume planes; a cycle of its own after the ruling.
+- [ ] "points you actively don't want to take" — the trade nodes
+      (Detached Baton "declined solo" and its kind). QUESTION: which ones
+      did you hit? Otherwise every node whose text is a trade is listed
+      for you.
+- [ ] "the menu shows damage increases on all nodes" — the projection
+      panel (UI/BreakerSkillProjection) claims a damage gain for every
+      node; scout the before/after read.
+- [ ] "awkward and clunky" — unnamed; ask.
+
 ## O277 LIGHT & AIR — LANDED
 
 - One low warm sun (pitch -28, yaw 40, 5.5 lux, 5200 K), a cool sky fill
