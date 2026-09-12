@@ -74,7 +74,9 @@ bool FBreakerDeployCastRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Base cost paid once"), Live()[0]->GetScrapCost(), 35.0f);
     Clear();
     const UBreakerProgressionTree* Tree = UBreakerProgressionLibrary::GetGunsmithTinkererTree();
-    for (const TCHAR* Id : { TEXT("Gunsmith.Tinkerer.CheapWork"), TEXT("Gunsmith.Tinkerer.CheapWork"), TEXT("Gunsmith.Tinkerer.QuickSet"), TEXT("Gunsmith.Tinkerer.QuickSet"), TEXT("Gunsmith.Tinkerer.Tripwire"), TEXT("Gunsmith.Tinkerer.Tripwire"), TEXT("Gunsmith.Tinkerer.DeadGround") })
+    // O272: Dead Ground is Cheap Work's impactful half; the pair is two
+    // points, and Cheap Work's single rank is the 18-off Dry discount.
+    for (const TCHAR* Id : { TEXT("Gunsmith.Tinkerer.CheapWork"), TEXT("Gunsmith.Tinkerer.DeadGround") })
     { FText Reason; if (!TestTrue(Id, Player->GetProgression()->PurchaseNode(Tree, Id, Reason))) return false; }
     for (float Resource : {20.0f, 50.0f})
     {

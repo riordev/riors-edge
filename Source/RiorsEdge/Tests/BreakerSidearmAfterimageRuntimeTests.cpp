@@ -121,8 +121,11 @@ bool FBreakerSidearmAfterimageTest::RunTest(const FString&)
                 for (FName Flag : UBreakerMissionLibrary::BeatCompletionFlags(Beat)) Flags.Add(Flag);
             P->SettleDoctrineEntitlement(Flags);
             if (!P->CommitToBranch(UBreakerProgressionLibrary::GetGunsmithArmoryTree()->TreeId, Reason)) return false;
-            for (const TCHAR* Id : {TEXT("Gunsmith.Armory.Chambered"),TEXT("Gunsmith.Armory.Chambered"),
-                TEXT("Gunsmith.Armory.ColdBarrel"),TEXT("Gunsmith.Armory.ColdBarrel"),TEXT("Gunsmith.Armory.RigDiscipline")})
+            // O272: single-rank nodes. Rig Discipline hangs from Cold Barrel
+            // alone; Chambered is bought for its free first shot, which the
+            // baseline below accounts for.
+            for (const TCHAR* Id : {TEXT("Gunsmith.Armory.Chambered"),
+                TEXT("Gunsmith.Armory.ColdBarrel"),TEXT("Gunsmith.Armory.RigDiscipline")})
                 if (!TestTrue(FString::Printf(TEXT("Actual ranked Rig Discipline path %s"),Id), P->PurchaseNode(UBreakerProgressionLibrary::GetGunsmithArmoryTree(),Id,Reason))) return false;
         }
         Weapon->StartFire(); F.Tick(.4f); Weapon->StopFire(); Weapon->StartReload();

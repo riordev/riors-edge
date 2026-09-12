@@ -1660,35 +1660,36 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
 }
 
 // ---------------------------------------------------------------------------
-// GUNSMITH / TANK / SUPPORT — THE LAST THREE BRANCH LAYERS, AUTHORED AS ONE
-// PASS. Owner authorization 2026-08-16 ("feel free to do all 5 classes",
-// "keep building"); design sources Class-Kits-Gunsmith §4, Class-Kits-Tank
-// §3-5, Class-Kits-Support §4 — the full treatments, which WIN over
-// Class-Kits-Unbuilt.md where they disagree. Shared decisions stated once:
+// GUNSMITH — THREE DOCTRINES, EACH O272's WHEEL OF PAIRS. Design source
+// Class-Kits-Gunsmith §4, the full treatment, which WINS over
+// Class-Kits-Unbuilt.md where they disagree. Stated here once:
 //
-// TIER COMPRESSION, CITED. Each treatment authors the §0.2 five-tier grammar:
-// T1 entry (3 nodes, 2 ranks, cost 1, gate 0), T2 loop (3 nodes, 2 ranks,
-// cost 1, gate 3), T3 ability (2 nodes, 1 rank, cost 2, gate 6), T4 rewrite
-// (3 nodes, 1 rank, cost 2, gate 10), T5 keystone (1 node, cost 4, gate 16).
-// The library compresses that onto the shape every built class already uses:
-// doc tiers 1-4 keep their tier numbers (gates via GateForTier: 0/2/4/6, not
-// the doc's 0/3/6/10), and the keystone is AN ORDINARY TIER-4 NODE: cost 2,
-// gate 6 via GateForTier, still flagged bCornerstone because that flag is what
-// makes it the ultimate's rewrite site and what O37 gates on commitment.
+// Every doctrine is six pairs: one TRAVEL node (single rank, one point, the
+// figure its ranks used to total) whose purchase unlocks one IMPACTFUL node
+// (single rank, one point, a rule tag). No node has a second rank; every
+// consumer that used to split a rule by rank takes the rank-two figure at
+// rank one, and every description below states that figure. No pair is gated
+// below the keystone (every non-keystone node is tier 1, gate 0), so any pair
+// may be bought first and a benchmark's two points always land one whole
+// pair. The keystone is the impactful half of its own pair and the one gated
+// node: tier 4, so GateForTier prices it at six invested plus commitment, and
+// it costs one — the seventh or eighth point. Eight points buy four of the
+// six pairs. Pairs are authored travel-then-impactful in Tree->Nodes order,
+// board order, with the keystone pair last; the ceiling walks read the array
+// in that order. Every magnitude is an O2 PLACEHOLDER, and every node id, tag
+// and consumer stands from before the pairing.
 //
-// It used to be tier 3, cost 3, behind an 8-point CornerstoneInvestmentGate,
-// and that arithmetic was written against a per-level class budget where 11
-// was affordable. Against O111's 8-point doctrine wallet it was not, and every
-// keystone in this file was unbuyable. The gate is gone (see MakeTree) and the
-// cost is 2, which makes EVERY doctrine node cost two points to max — so the
-// wallet divides into exactly FOUR picks with nothing stranded, where a 3-point
-// keystone left one point that could buy nothing. A doctrine is four 2-point
-// picks, one of which rewrites the ultimate.
+// WHICH HALF IS WHICH. The travel half of each pair is the node that carries
+// a figure (a Scrap amount, a duration, a refund fraction, a band rewrite);
+// the impactful half is the node whose whole content is a rule. Where the
+// treatment's rewrite tier (AR9-AR11 / FT9-FT11 / TK9-TK11) supplied a rule
+// with no figure, it is an impactful here, at tier 1, unlocked by its travel.
 //
-// The recorded keystone-before-rewrites tier inversion above GetSwiftKineticTree
-// goes with it: the keystone now sits in the same tier as the rewrites it used
-// to precede, and competes with them for the last pick rather than preceding
-// them.
+// TANK AND SUPPORT BELOW author tiers 1-4 through GateForTier (gates
+// 0/2/4/6) with the keystone an ordinary tier-4 node at cost 2, flagged
+// bCornerstone because that flag is what makes it the ultimate's rewrite site
+// and what O37 gates on commitment. The paragraphs that follow apply to all
+// three classes.
 //
 // EVERY NON-KEYSTONE NODE SHIPS AS ITS TREATMENT RULE, VERBATIM, AS A TAG
 // WITH NO STAT EFFECT — the Caster posture (see the block comment above
@@ -1705,42 +1706,37 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
 // Dry/Surplus/Ironclad/Resonant, "near your own Anchor Point", "while a
 // deployable is active"). Authoring an unconditional stand-in line would be a
 // STRONGER node than designed — the invention O2 forbids — so the rule rides
-// the tag and the WAITING ON comment names the consumer. Not a shortfall; the
-// honest reading of "a node may only author effects the enum can express."
+// the tag and the site comment names the consumer, live or waiting. Not a
+// shortfall; the honest reading of "a node may only author effects the enum
+// can express."
 //
 // THE KEYSTONE MORES ARE NOT OWED. O95 rules that a doctrine authors NO More
 // multiplier at all: every one of the three slots lives in Core, where a
 // convergence behind a deep investment gate makes reaching one genuinely
 // expensive, and a doctrine pays in RULES instead — conversion, condition
-// change, rule rewrite.
+// change, rule rewrite. So the empty More slot on every keystone below is
+// CORRECT rather than pending. Nothing here waits for a condition vocabulary
+// wide enough to say "while no deployable is active" or "within 4 m of your
+// own Anchor Point" — even with that vocabulary the multiplier would still be
+// forbidden. What each keystone DOES pay is its rule, and the rule is live:
+// each grants its branch identity tag AND its Keystone.* tag, and the
+// ultimate variant rows in BreakerAbilityDefinition.cpp resolve from the day
+// the node is bought. That is the whole payload by design.
 //
-// So the empty More slot on every keystone below is CORRECT rather than
-// pending, and the comments at each site say so. They used to read "RESERVED,
-// not spent", which was honest about the code and wrong about the design: it
-// described a debt the ledger has since cancelled. Nothing here is waiting for
-// a condition vocabulary wide enough to say "while no deployable is active" or
-// "within 4 m of your own Anchor Point" — even with that vocabulary the
-// multiplier would still be forbidden.
-//
-// What each keystone DOES pay is its rule, and the rule is live: each grants
-// its branch identity tag AND its Keystone.* tag, and the ultimate variant rows
-// in BreakerAbilityDefinition.cpp resolve from the day the node is bought.
-// That is the whole payload by design, not the surviving half of one.
-//
-// "GRANTS X" TIER-3 NODES DO NOT RE-AUTHOR ABILITY GRANTS. All seven ability
-// ids per class are partitioned across StarterAbilityIds, UnlockableAbilityIds
-// and BaseUltimateId on the class definitions below
-// (the O39 kits-playable pass), and BreakerBuiltClassKitTests equips them
-// with zero node purchases — gating them now would repeat the exact failure
-// the Caster catalogue comment documents. Each Tier-3 node carries the REST
-// of its design row (the rewrite half distinct from the grant) as its tag.
+// "GRANTS X" NODES DO NOT RE-AUTHOR ABILITY GRANTS. All seven ability ids per
+// class are partitioned across StarterAbilityIds, UnlockableAbilityIds and
+// BaseUltimateId on the class definitions below (the O39 kits-playable pass),
+// and BreakerBuiltClassKitTests equips them with zero node purchases — gating
+// them here would repeat the exact failure the Caster catalogue comment
+// documents. Each such node carries the REST of its design row (the rewrite
+// half distinct from the grant) as its tag.
 //
 // KEYSTONE TAGS ARE REQUESTED BY STRING. The nine Keystone.Gunsmith/Tank/
 // Support.* tags are UE_DEFINE_GAMEPLAY_TAG_STATIC file-locals of
-// Abilities/BreakerAbilityDefinition.cpp, which this file must not edit this
-// wave; the string is what the ability layer's ResolveVariant matches anyway,
-// and the built-class kit tests already take exactly this posture ("the
-// string is what a granted GameplayEffect and a save actually key off").
+// Abilities/BreakerAbilityDefinition.cpp, which this file does not edit; the
+// string is what the ability layer's ResolveVariant matches anyway, and the
+// built-class kit tests take exactly this posture ("the string is what a
+// granted GameplayEffect and a save actually key off").
 // ---------------------------------------------------------------------------
 
 UBreakerProgressionTree* UBreakerProgressionLibrary::GetGunsmithArmoryTree()
@@ -1750,115 +1746,118 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetGunsmithArmoryTree()
 
     Tree = MakeTree(TEXT("Doctrine.Gunsmith.Armory"), TEXT("Gunsmith — Armory"), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith);
 
-    // --- Tier 1 (AR1-AR3) ---------------------------------------------------
-    // AR1. WAITING ON: UBreakerScrapComponent's reload-completed credit
-    // learning to fire on a partial reload (and R2, the magazine-dump source
-    // dropping its full-at-cycle-start requirement).
+    // --- Pair: Field Stripping (travel) -> No Reserve (impactful) -------------
+    // AR1. Consumed by UBreakerScrapComponent's reload source (pays on a
+    // partial reload with at least one round fired) and its magazine-dump
+    // source, which treats the magazine as having started full (the old
+    // rank-two rule, at rank one under O272).
     UBreakerProgressionNode* Node = MakeNode(TEXT("Gunsmith.Armory.FieldStripping"), TEXT("Field Stripping"),
-        TEXT("Reload Scrap also pays on a reload begun with rounds still chambered, provided at least one was fired. Opens the reload economy to tap-fire play."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 2, 1);
+        TEXT("Reload Scrap also pays on a reload begun with rounds still chambered, provided at least one was fired, and the magazine-dump payout no longer requires a magazine that started full. Opens the reload economy to tap-fire play."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_AR_FieldStripping.GetTag());
     Tree->Nodes.Add(Node);
 
+    // AR11. The cost-for-power rewrite with a real downside (the F11 pattern,
+    // named as such by the treatment). UBreakerScrapComponent doubles the
+    // reload and magazine sources off this tag; the halved reserve cap is
+    // Weapons/ territory and waits there.
+    Node = MakeNode(TEXT("Gunsmith.Armory.NoReserve"), TEXT("No Reserve"),
+        TEXT("Your maximum reserve is halved, and reload and magazine Scrap pay double. A real downside, taken on purpose."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Gunsmith.Armory.FieldStripping"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_AR_NoReserve.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Working Stock (travel) -> Overpressure (impactful) -------------
     // AR2. Reads a Scrap band and an affix reload tier; grants no percentage
-    // (the treatment's own Swift-K8-shape compliance note, §7). WAITING ON:
-    // the Dry/Stocked band state and a reload-tier affix reader.
+    // (the treatment's own Swift-K8-shape compliance note, §7). The band is
+    // Dry and Stocked (the old rank-two band, at rank one under O272), read
+    // through UBreakerScrapComponent::GetReloadTierShift.
     Node = MakeNode(TEXT("Gunsmith.Armory.WorkingStock"), TEXT("Working Stock"),
-        TEXT("While Dry, your reload is treated one tier faster by anything that reads reload tier. A band rewrite, not a speed percentage."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 2, 1);
+        TEXT("While Dry or Stocked, your reload is treated one tier faster by anything that reads reload tier. A band rewrite, not a speed percentage."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_AR_WorkingStock.GetTag());
     Tree->Nodes.Add(Node);
 
-    // AR3. WAITING ON: UBreakerWeaponComponent's reload-to-fire boundary
-    // reading this tag before it debits the magazine.
-    Node = MakeNode(TEXT("Gunsmith.Armory.Chambered"), TEXT("Chambered"),
-        TEXT("The first shot after a completed reload consumes no ammunition."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_AR_Chambered.GetTag());
+    // AR10. Overhaul's bet inverted. WAITING ON: UBreakerAbility_Overhaul
+    // inverting its conversion under this tag.
+    Node = MakeNode(TEXT("Gunsmith.Armory.Overpressure"), TEXT("Overpressure"),
+        TEXT("Overhaul's bet reverses: capacity converts into reserve instead, and every shot in the window restores a little of it."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Gunsmith.Armory.WorkingStock"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_AR_Overpressure.GetTag());
     Tree->Nodes.Add(Node);
 
-    // --- Tier 2 (AR4-AR6) ---------------------------------------------------
+    // --- Pair: Deep Pockets (travel) -> Bench Work (impactful) ----------------
     // AR4. Anti-farm by construction: requires reserve at maximum at pickup.
-    // WAITING ON: the ammo pickup path reporting over-max reserve to
-    // UBreakerScrapComponent.
+    // UBreakerScrapComponent::NotifyAmmoPickupOverflow meters the overflow at
+    // twice the per-round rate (the old rank-two figure, at rank one under
+    // O272), under the global per-second cap.
     Node = MakeNode(TEXT("Gunsmith.Armory.DeepPockets"), TEXT("Deep Pockets"),
-        TEXT("Reserve ammunition picked up over your maximum converts to Scrap instead of vanishing. Only while the reserve is actually full."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Gunsmith.Armory.FieldStripping"));
+        TEXT("Reserve ammunition picked up over your maximum converts to Scrap at twice the overflow rate instead of vanishing. Only while the reserve is actually full."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_AR_DeepPockets.GetTag());
     Tree->Nodes.Add(Node);
 
-    // AR5. Rewrites where "end of magazine" sits, for the Scrap source AND for
-    // Sidearm Rig's window. WAITING ON: UBreakerScrapComponent's magazine-dump
-    // source and UBreakerAbility_SidearmRig reading this tag.
-    Node = MakeNode(TEXT("Gunsmith.Armory.LastRound"), TEXT("Last Round"),
-        TEXT("The magazine-dump payout fires on your last round rather than on empty, and Sidearm Rig's window does not end on that round."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Gunsmith.Armory.FieldStripping"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_AR_LastRound.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // AR6. An EVENT-driven cooldown refund (per empty reload, once per
-    // reload), which the flat AbilityCooldown divisor lane cannot say — a
-    // divisor line here would pay on every ability at all times, a different
-    // and stronger node. WAITING ON: UBreakerAbility_SidearmRig ticking its
-    // own cooldown down when the reload event fires with this tag owned.
-    Node = MakeNode(TEXT("Gunsmith.Armory.ColdBarrel"), TEXT("Cold Barrel"),
-        TEXT("Completing a reload from an empty magazine shaves 1.5s from Sidearm Rig's cooldown (R2: 2.5s), once per reload."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Gunsmith.Armory.Chambered"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_AR_ColdBarrel.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 3 (AR7-AR8) ---------------------------------------------------
     // AR7. "Grants G2 Overhaul" is not authored (block comment above); the
     // conversion tail is the node. WAITING ON: UBreakerAbility_Overhaul
     // reading this tag when its window ends.
     Node = MakeNode(TEXT("Gunsmith.Armory.BenchWork"), TEXT("Bench Work"),
-        TEXT("Overhaul's conversion also applies to the next magazine loaded after the window ends, at half strength. The window has a tail."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 3, 1, 2);
+        TEXT("Overhaul's conversion also applies to the next magazine loaded after the window ends, at half strength. The window has a tail."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
     AddPrerequisite(Node, TEXT("Gunsmith.Armory.DeepPockets"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_AR_BenchWork.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Last Round (travel) -> Reciprocal (impactful) ------------------
+    // AR5. Rewrites where "end of magazine" sits, for the Scrap source AND for
+    // Sidearm Rig's window. WAITING ON: UBreakerScrapComponent's magazine-dump
+    // source and UBreakerAbility_SidearmRig reading this tag.
+    Node = MakeNode(TEXT("Gunsmith.Armory.LastRound"), TEXT("Last Round"),
+        TEXT("The magazine-dump payout fires on your last round rather than on empty, and Sidearm Rig's window does not end on that round."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_AR_LastRound.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // AR9. The explicit affix-to-class bridge (the treatment's F8 pattern):
+    // reads the Ammo Returned on Kill affix, duplicates nothing, does nothing
+    // for a player without it — and that is correct. Consumed by
+    // UBreakerScrapComponent::NotifyAmmoReturnedOnKill, outside the cap.
+    Node = MakeNode(TEXT("Gunsmith.Armory.Reciprocal"), TEXT("Reciprocal"),
+        TEXT("Ammo Returned on Kill triggers also pay Scrap, outside the per-second cap. Does nothing without the affix, and that is the design."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Gunsmith.Armory.LastRound"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_AR_Reciprocal.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Cold Barrel (travel) -> Rig Discipline (impactful) -------------
+    // AR6. An EVENT-driven cooldown refund (per empty reload, once per
+    // reload), which the flat AbilityCooldown divisor lane cannot say — a
+    // divisor line here would pay on every ability at all times, a different
+    // and stronger node. The shave is 2.5 s (the old rank-two figure, at rank
+    // one under O272), read by Sidearm Rig off the empty-reload event.
+    Node = MakeNode(TEXT("Gunsmith.Armory.ColdBarrel"), TEXT("Cold Barrel"),
+        TEXT("Completing a reload from an empty magazine shaves 2.5s from Sidearm Rig's cooldown, once per reload."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_AR_ColdBarrel.GetTag());
     Tree->Nodes.Add(Node);
 
     // AR8. WAITING ON: UBreakerAbility_SidearmRig measuring its window in
     // shots rather than the magazine.
     Node = MakeNode(TEXT("Gunsmith.Armory.RigDiscipline"), TEXT("Rig Discipline"),
-        TEXT("Sidearm Rig's window is counted in shots, not magazines: it survives one reload and ends only when its shots are spent."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 3, 1, 2);
+        TEXT("Sidearm Rig's window is counted in shots, not magazines: it survives one reload and ends only when its shots are spent."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
     AddPrerequisite(Node, TEXT("Gunsmith.Armory.ColdBarrel"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_AR_RigDiscipline.GetTag());
     Tree->Nodes.Add(Node);
 
-    // --- Tier 4 (AR9-AR11), the rewrite tier ---------------------------------
-    // AR9. The explicit affix-to-class bridge (the treatment's F8 pattern):
-    // reads the Ammo Returned on Kill affix, duplicates nothing, does nothing
-    // for a player without it — and that is correct. WAITING ON:
-    // UBreakerScrapComponent crediting off the affix's return event.
-    Node = MakeNode(TEXT("Gunsmith.Armory.Reciprocal"), TEXT("Reciprocal"),
-        TEXT("Ammo Returned on Kill triggers also pay Scrap, outside the per-second cap. Does nothing without the affix, and that is the design."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Gunsmith.Armory.LastRound"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_AR_Reciprocal.GetTag());
+    // --- Pair: Chambered (travel) -> Machinist (keystone) ---------------------
+    // AR3. WAITING ON: UBreakerWeaponComponent's reload-to-fire boundary
+    // reading this tag before it debits the magazine.
+    Node = MakeNode(TEXT("Gunsmith.Armory.Chambered"), TEXT("Chambered"),
+        TEXT("The first shot after a completed reload consumes no ammunition."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_AR_Chambered.GetTag());
     Tree->Nodes.Add(Node);
 
-    // AR10. A rewrite OF a Tier-3 rewrite's subject, so Bench Work is the
-    // load-bearing prerequisite. WAITING ON: UBreakerAbility_Overhaul
-    // inverting its conversion under this tag.
-    Node = MakeNode(TEXT("Gunsmith.Armory.Overpressure"), TEXT("Overpressure"),
-        TEXT("Overhaul's bet reverses: capacity converts into reserve instead, and every shot in the window restores a little of it."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Gunsmith.Armory.BenchWork"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_AR_Overpressure.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // AR11. The cost-for-power rewrite with a real downside (the F11 pattern,
-    // named as such by the treatment). WAITING ON: the weapon reserve cap and
-    // UBreakerScrapComponent's reload/magazine sources reading this tag.
-    Node = MakeNode(TEXT("Gunsmith.Armory.NoReserve"), TEXT("No Reserve"),
-        TEXT("Your maximum reserve is halved, and reload and magazine Scrap pay double. A real downside, taken on purpose."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Gunsmith.Armory.FieldStripping"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_AR_NoReserve.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // AR12 MACHINIST — the branch keystone, compressed to tier 3 / cost 3
-    // (block comment above). Its 1.25x weapon-damage More "while you have no
-    // deployables active" is NOT OWED (O95 bars a doctrine More): no deployable-state
-    // condition exists and WeaponDamage has no composed More lane. The
-    // keystone tag is live — Field Assembly's Machinist row resolves.
+    // AR12 MACHINIST — the branch keystone, the impactful half of its pair and
+    // the one gated node (tier 4, cost 1; block comment above). Its 1.25x
+    // weapon-damage More "while you have no deployables active" is NOT OWED
+    // (O95 bars a doctrine More): no deployable-state condition exists and
+    // WeaponDamage has no composed More lane. The keystone tag is live — Field
+    // Assembly's Machinist row resolves.
     Node = MakeNode(TEXT("Gunsmith.Armory.Machinist"), TEXT("Machinist"),
-        TEXT("Branch keystone. Rewrites Field Assembly: the ultimate becomes a personal buff for the Gunsmith who placed nothing."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Gunsmith.Armory.ColdBarrel"));
+        TEXT("Branch keystone. Rewrites Field Assembly: the ultimate becomes a personal buff for the Gunsmith who placed nothing."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 4, 1, 1);
+    AddPrerequisite(Node, TEXT("Gunsmith.Armory.Chambered"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_AR_Machinist.GetTag());
     Node->GrantedTags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Keystone.Gunsmith.Machinist")));
@@ -1874,108 +1873,118 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetGunsmithFieldTechTree()
 
     Tree = MakeTree(TEXT("Doctrine.Gunsmith.FieldTech"), TEXT("Gunsmith — Field Tech"), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith);
 
-    // --- Tier 1 (FT1-FT3) ---------------------------------------------------
-    // FT1. Refund, never profit: the treatment hard-caps the ceiling at 80%.
-    // WAITING ON: the deployable destruction refund path in
-    // Abilities/BreakerGunsmithAbilities.cpp reading this node's rank.
+    // --- Pair: Salvage (travel) -> Redundancy (impactful) ---------------------
+    // FT1. Refund, never profit: the treatment hard-caps the ceiling at 80%,
+    // and that is the figure rank one carries (the old rank-two figure under
+    // O272), read through
+    // UBreakerScrapComponent::GetEffectiveDestructionRefundFraction.
     UBreakerProgressionNode* Node = MakeNode(TEXT("Gunsmith.FieldTech.Salvage"), TEXT("Salvage"),
-        TEXT("Destroyed deployables refund 65% of cost instead of 50% (R2: 80%, the hard ceiling). Refund, never profit."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 2, 1);
+        TEXT("Destroyed deployables refund 80% of cost instead of 50%, the hard ceiling. Refund, never profit."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_FT_Salvage.GetTag());
     Tree->Nodes.Add(Node);
 
-    // FT2. Rewrites targeting; grants no damage. WAITING ON:
-    // UBreakerAbility_Turret's target acquisition reading this tag.
-    Node = MakeNode(TEXT("Gunsmith.FieldTech.Overwatch"), TEXT("Overwatch"),
-        TEXT("Your turrets prioritise the target you last damaged over the nearest one (R2: and re-acquire it instantly on its death)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_FT_Overwatch.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // FT3. Capped at double base lifetime — the anti-farm rule is the cap.
-    // WAITING ON: deployable lifetime extension off the reload event.
-    Node = MakeNode(TEXT("Gunsmith.FieldTech.SecondShift"), TEXT("Second Shift"),
-        TEXT("Reloading near a deployable adds 8s of lifetime (R2: 14s), once per deployable per reload, never past double its base."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_FT_SecondShift.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 2 (FT4-FT6) ---------------------------------------------------
-    // FT4. Band-gated (Surplus), so it accelerates the top of the bar where
-    // the ultimate lives. WAITING ON: UBreakerScrapComponent's band state and
-    // per-deployable ICD reading this tag.
-    Node = MakeNode(TEXT("Gunsmith.FieldTech.Tithe"), TEXT("Tithe"),
-        TEXT("While Surplus, deployable-damage Scrap ignores the per-second cap (R2: and its per-deployable cooldown shortens)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Gunsmith.FieldTech.Salvage"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_FT_Tithe.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // FT5. Compensates for being punished, never for being efficient —
-    // destroyed by an ENEMY only, not expiry, not the density cap. WAITING
-    // ON: the deployable destruction path distinguishing its causes.
-    Node = MakeNode(TEXT("Gunsmith.FieldTech.Requisition"), TEXT("Requisition"),
-        TEXT("A deployable an enemy destroys refunds immediately, and its replacement placed within 8s costs 10 less Scrap (R2: 18 less)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Gunsmith.FieldTech.Salvage"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_FT_Requisition.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // FT6. Field Tech's only sustain and its solo answer. WAITING ON:
-    // UBreakerAbility_AmmoCrate's interaction path (healing has no node lane
-    // either — the Support §5.1 overheal hook is the same missing seam).
-    Node = MakeNode(TEXT("Gunsmith.FieldTech.Foreman"), TEXT("Foreman"),
-        TEXT("Ammo Crate charges also restore a little health (R2: doubled), and a full-reserve interactor consumes charges at half rate."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Gunsmith.FieldTech.SecondShift"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_FT_Foreman.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 3 (FT7-FT8) ---------------------------------------------------
-    // FT7. Sharpens the starter rather than granting anything. WAITING ON:
-    // UBreakerAbility_Turret's acquisition and LOS-grace behaviour.
-    Node = MakeNode(TEXT("Gunsmith.FieldTech.Emplacement"), TEXT("Emplacement"),
-        TEXT("Turret acquires through your own crosshair's priority and holds a target through 1.2s of broken line of sight."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 3, 1, 2);
-    AddPrerequisite(Node, TEXT("Gunsmith.FieldTech.Overwatch"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_FT_Emplacement.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // FT8. "Grants G4 Ammo Crate" is not authored (block comment above); the
-    // density-cap exemption is the node — the single most build-enabling line
-    // in the branch. WAITING ON: the deployable density cap reading this tag.
-    Node = MakeNode(TEXT("Gunsmith.FieldTech.Logistics"), TEXT("Logistics"),
-        TEXT("Ammo Crate no longer counts against the density cap. Utility stops competing with firepower."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 3, 1, 2);
-    AddPrerequisite(Node, TEXT("Gunsmith.FieldTech.Foreman"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_FT_Logistics.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 4 (FT9-FT11), the rewrite tier ---------------------------------
     // FT9. The only node in the treatment that touches the total density cap,
-    // priced at tier 4 in one branch deliberately. WAITING ON: the density
-    // cap (4 total / 2 per type) reading this tag.
+    // in one branch deliberately. WAITING ON: the density cap (4 total / 2 per
+    // type) reading this tag.
     Node = MakeNode(TEXT("Gunsmith.FieldTech.Redundancy"), TEXT("Redundancy"),
-        TEXT("The deployable cap rises from 4 to 5 in total. Per-type stays 2."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Gunsmith.FieldTech.Requisition"));
+        TEXT("The deployable cap rises from 4 to 5 in total. Per-type stays 2."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Gunsmith.FieldTech.Salvage"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_FT_Redundancy.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Overwatch (travel) -> Automation (impactful) -------------------
+    // FT2. Rewrites targeting; grants no damage. The instant reacquire on the
+    // target's death is the old rank-two rule, at rank one under O272.
+    // WAITING ON: UBreakerAbility_Turret's target acquisition reading this
+    // tag.
+    Node = MakeNode(TEXT("Gunsmith.FieldTech.Overwatch"), TEXT("Overwatch"),
+        TEXT("Your turrets prioritise the target you last damaged over the nearest one, and re-acquire instantly when it dies."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_FT_Overwatch.GetTag());
     Tree->Nodes.Add(Node);
 
     // FT10. Bounded by requiring a kill; fired at one-shot proc coefficient.
     // WAITING ON: UBreakerAbility_Turret's reacquire path.
     Node = MakeNode(TEXT("Gunsmith.FieldTech.Automation"), TEXT("Automation"),
-        TEXT("When a turret's target dies, it fires a free burst at its next target instead of waiting out the reacquire delay."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Gunsmith.FieldTech.Emplacement"));
+        TEXT("When a turret's target dies, it fires a free burst at its next target instead of waiting out the reacquire delay."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Gunsmith.FieldTech.Overwatch"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_FT_Automation.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Second Shift (travel) -> Emplacement (impactful) ---------------
+    // FT3. Capped at double base lifetime — the anti-farm rule is the cap.
+    // The extension is 14 s (the old rank-two figure, at rank one under
+    // O272), applied by ABreakerDeployable off the reload event.
+    Node = MakeNode(TEXT("Gunsmith.FieldTech.SecondShift"), TEXT("Second Shift"),
+        TEXT("Reloading near a deployable adds 14s of lifetime, once per deployable per reload, never past double its base."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_FT_SecondShift.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // FT7. Sharpens the starter rather than granting anything. WAITING ON:
+    // UBreakerAbility_Turret's acquisition and LOS-grace behaviour.
+    Node = MakeNode(TEXT("Gunsmith.FieldTech.Emplacement"), TEXT("Emplacement"),
+        TEXT("Turret acquires through your own crosshair's priority and holds a target through 1.2s of broken line of sight."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Gunsmith.FieldTech.SecondShift"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_FT_Emplacement.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Requisition (travel) -> Deadman (impactful) --------------------
+    // FT5. Compensates for being punished, never for being efficient —
+    // destroyed by an ENEMY only, not expiry, not the density cap. The
+    // replacement discount is 18 (the old rank-two figure, at rank one under
+    // O272), read by ABreakerDeployable's enemy-destruction path.
+    Node = MakeNode(TEXT("Gunsmith.FieldTech.Requisition"), TEXT("Requisition"),
+        TEXT("A deployable an enemy destroys refunds immediately, and its replacement placed within 8s costs 18 less Scrap."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_FT_Requisition.GetTag());
     Tree->Nodes.Add(Node);
 
     // FT11. Turns the branch's failure state into its payoff; explicitly
     // cannot chain (a Deadman blast destroying a deployable triggers nothing).
     // WAITING ON: the enemy-destruction path in BreakerGunsmithAbilities.cpp.
     Node = MakeNode(TEXT("Gunsmith.FieldTech.Deadman"), TEXT("Deadman"),
-        TEXT("A deployable destroyed by an enemy detonates before refunding. Detonations never chain into other deployables."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 4, 1, 2);
+        TEXT("A deployable destroyed by an enemy detonates before refunding. Detonations never chain into other deployables."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
     AddPrerequisite(Node, TEXT("Gunsmith.FieldTech.Requisition"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_FT_Deadman.GetTag());
     Tree->Nodes.Add(Node);
 
-    // FT12 FOUNDRY — keystone, tier-3/cost-3 compression. Its 1.30x More on
-    // DEPLOYABLE damage is NOT OWED (O95): no deployable-damage stat target exists
-    // and no other partition can carry "the machines hit harder" honestly.
-    // Field Assembly's Foundry row resolves off the tag below.
+    // --- Pair: Foreman (travel) -> Logistics (impactful) ----------------------
+    // FT6. Field Tech's only sustain and its solo answer. The heal is 30 per
+    // charge (the old doubled rank-two figure, at rank one under O272;
+    // ForemanHealPerCharge, O2 PLACEHOLDER), applied by ABreakerDeployable's
+    // crate interaction through the one healing path, and the same path
+    // halves charge consumption for a full-reserve interactor.
+    Node = MakeNode(TEXT("Gunsmith.FieldTech.Foreman"), TEXT("Foreman"),
+        TEXT("Ammo Crate charges also restore 30 health each, and a full-reserve interactor consumes charges at half rate."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_FT_Foreman.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // FT8. "Grants G4 Ammo Crate" is not authored (block comment above); the
+    // density-cap exemption is the node — the single most build-enabling line
+    // in the branch. WAITING ON: the deployable density cap reading this tag.
+    Node = MakeNode(TEXT("Gunsmith.FieldTech.Logistics"), TEXT("Logistics"),
+        TEXT("Ammo Crate no longer counts against the density cap. Utility stops competing with firepower."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Gunsmith.FieldTech.Foreman"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_FT_Logistics.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Tithe (travel) -> Foundry (keystone) ---------------------------
+    // FT4. Band-gated (Surplus), so it accelerates the top of the bar where
+    // the ultimate lives. UBreakerScrapComponent's deployable-damage source
+    // bypasses the per-second cap off this tag while Surplus. The shortened
+    // per-deployable cooldown the treatment's second rank named is a gap
+    // recorded here: the ICD itself is recorded-unenforced
+    // (DeployableDamageInterval), so the node promises only the cap bypass.
+    Node = MakeNode(TEXT("Gunsmith.FieldTech.Tithe"), TEXT("Tithe"),
+        TEXT("While Surplus, deployable-damage Scrap ignores the per-second cap."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_FT_Tithe.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // FT12 FOUNDRY — the branch keystone, the impactful half of its pair and
+    // the one gated node (tier 4, cost 1; block comment above). Its 1.30x More
+    // on DEPLOYABLE damage is NOT OWED (O95): no deployable-damage stat target
+    // exists and no other partition can carry "the machines hit harder"
+    // honestly. Field Assembly's Foundry row resolves off the tag below.
     Node = MakeNode(TEXT("Gunsmith.FieldTech.Foundry"), TEXT("Foundry"),
-        TEXT("Branch keystone. Rewrites Field Assembly for the builder who spends their whole loadout on machines."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 4, 1, 2);
+        TEXT("Branch keystone. Rewrites Field Assembly for the builder who spends their whole loadout on machines."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 4, 1, 1);
     AddPrerequisite(Node, TEXT("Gunsmith.FieldTech.Tithe"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_FT_Foundry.GetTag());
@@ -1992,110 +2001,117 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetGunsmithTinkererTree()
 
     Tree = MakeTree(TEXT("Doctrine.Gunsmith.Tinkerer"), TEXT("Gunsmith — Tinkerer"), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith);
 
-    // --- Tier 1 (TK1-TK3) ---------------------------------------------------
+    // --- Pair: Cheap Work (travel) -> Dead Ground (impactful) -----------------
     // TK1. A band-gated cost reduction (Dry), which the AbilityCost lane
     // cannot say: the lane is unconditional and class-wide, and O30's
     // vocabulary has no resource-band bit. Unconditional would rescue the
-    // rich, not the broke — a different node. WAITING ON: the Dry band and a
-    // Tinkerer-scoped cost read in BreakerGunsmithAbilities.cpp.
+    // rich, not the broke — a different node. The discount is 18 (the old
+    // rank-two figure, at rank one under O272), read by the Tinkerer-scoped
+    // cost path in BreakerGunsmithAbilities.cpp.
     UBreakerProgressionNode* Node = MakeNode(TEXT("Gunsmith.Tinkerer.CheapWork"), TEXT("Cheap Work"),
-        TEXT("While Dry, Tinkerer deployables cost 10 less Scrap (R2: 18 less), to a floor of 10. Rescues a broke Gunsmith, never subsidises a rich one."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 2, 1);
+        TEXT("While Dry, Tinkerer deployables cost 18 less Scrap, to a floor of 10. Rescues a broke Gunsmith, never subsidises a rich one."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_TK_CheapWork.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // TK2. R2's trade is explicit: no delay, smaller trigger radius for 1s.
-    // WAITING ON: UBreakerAbility_MineCluster's arming delay.
-    Node = MakeNode(TEXT("Gunsmith.Tinkerer.QuickSet"), TEXT("Quick Set"),
-        TEXT("Mine Cluster's arming delay is halved (R2: removed, with a smaller trigger radius for the first second)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_TK_QuickSet.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // TK3. The node the deployable definition's swappable trigger field
-    // exists for. WAITING ON: UBreakerAbility_MineCluster's trigger condition
-    // becoming player-selectable.
-    Node = MakeNode(TEXT("Gunsmith.Tinkerer.Tripwire"), TEXT("Tripwire"),
-        TEXT("Mine charges may trigger on line of sight instead of proximity (R2: choose the condition per placement)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_TK_Tripwire.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 2 (TK4-TK6) ---------------------------------------------------
-    // TK4. Loop modifier on the trap economy that does not extend lifetime.
-    // WAITING ON: UBreakerAbility_MineCluster's charge bookkeeping.
-    Node = MakeNode(TEXT("Gunsmith.Tinkerer.Rearm"), TEXT("Rearm"),
-        TEXT("An emptied Mine Cluster rearms one charge every 6s (R2: 4s) for the rest of its lifetime, up to its original count."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Gunsmith.Tinkerer.QuickSet"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_TK_Rearm.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // TK5. WAITING ON: kill-inside-field detection on
-    // UBreakerAbility_Disruptor and a capless-but-proc-bounded Scrap credit.
-    Node = MakeNode(TEXT("Gunsmith.Tinkerer.AttritionField"), TEXT("Attrition Field"),
-        TEXT("Enemies killed inside a Disruptor field refund 8 Scrap (R2: 14), outside the global cap. A dense fight pays the field back."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Gunsmith.Tinkerer.CheapWork"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_TK_AttritionField.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // TK6. The explicit anti-stack rule stated as a benefit (the treatment's
-    // MS11-pattern citation). WAITING ON: Disruptor field overlap handling.
-    Node = MakeNode(TEXT("Gunsmith.Tinkerer.Overlap"), TEXT("Overlap"),
-        TEXT("Overlapping Disruptor fields never stack their armour cut, but extend each other's lifetime to the longer of the two."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Gunsmith.Tinkerer.Tripwire"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_TK_Overlap.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 3 (TK7-TK8) ---------------------------------------------------
-    // TK7. "Grants G5 Mine Cluster" is not authored (block comment above).
-    // The second clause is the anti-explosion clause and it is not optional
-    // (treatment's own words). WAITING ON: UBreakerAbility_MineCluster's
-    // scatter count and 1s same-instance detonation window.
-    Node = MakeNode(TEXT("Gunsmith.Tinkerer.Ordnance"), TEXT("Ordnance"),
-        TEXT("Mine Cluster scatters 4 charges instead of 3, and charges detonating within 1s count as ONE damage instance for procs."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 3, 1, 2);
-    AddPrerequisite(Node, TEXT("Gunsmith.Tinkerer.Rearm"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_TK_Ordnance.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // TK8. "Grants G6 Disruptor" is not authored. Delay, never cancel —
-    // cancellation is a control verb the class does not own. WAITING ON:
-    // UBreakerAbility_Disruptor and the enemy telegraph timers.
-    Node = MakeNode(TEXT("Gunsmith.Tinkerer.Interdiction"), TEXT("Interdiction"),
-        TEXT("Disruptor also delays the wind-up of telegraphed attacks begun inside it. Delays — never cancels."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 3, 1, 2);
-    AddPrerequisite(Node, TEXT("Gunsmith.Tinkerer.Overlap"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_TK_Interdiction.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 4 (TK9-TK11), the rewrite tier ---------------------------------
-    // TK9. Rewards the pre-placed field over the panic-placed one. WAITING
-    // ON: armed-time tracking on Tinkerer deployables.
-    Node = MakeNode(TEXT("Gunsmith.Tinkerer.Patience"), TEXT("Patience"),
-        TEXT("A trap armed and untriggered for 10s triggers harder: one extra charge, or double the Disruptor's flat armour cut on first entry."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Gunsmith.Tinkerer.Rearm"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_TK_Patience.GetTag());
     Tree->Nodes.Add(Node);
 
     // TK10. The class's stated weakness (placement takes time) inverted for
     // the branch that most needs it, re-imposed on the band that least does.
     // WAITING ON: the Dry/Stocked/Surplus bands and deploy cast time.
     Node = MakeNode(TEXT("Gunsmith.Tinkerer.DeadGround"), TEXT("Dead Ground"),
-        TEXT("While Dry or Stocked, Tinkerer placements are instant. While Surplus, their cast time doubles."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 4, 1, 2);
+        TEXT("While Dry or Stocked, Tinkerer placements are instant. While Surplus, their cast time doubles."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
     AddPrerequisite(Node, TEXT("Gunsmith.Tinkerer.CheapWork"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_TK_DeadGround.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Quick Set (travel) -> Ordnance (impactful) ---------------------
+    // TK2. The trade is explicit: no arming delay, and the trigger radius is
+    // 1 m smaller for the charge's first second (the old rank-two rule, at
+    // rank one under O272). ABreakerDeployable::QuickSetArmDelay and
+    // QuickSetTriggerRadius read both halves.
+    Node = MakeNode(TEXT("Gunsmith.Tinkerer.QuickSet"), TEXT("Quick Set"),
+        TEXT("Mine Cluster's arming delay is removed. For its first second a charge's trigger radius is 1 m smaller."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_TK_QuickSet.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // TK7. "Grants G5 Mine Cluster" is not authored (block comment above).
+    // The second clause is the anti-explosion clause and it is not optional
+    // (treatment's own words). WAITING ON: UBreakerAbility_MineCluster's
+    // scatter count and 1s same-instance detonation window.
+    Node = MakeNode(TEXT("Gunsmith.Tinkerer.Ordnance"), TEXT("Ordnance"),
+        TEXT("Mine Cluster scatters 4 charges instead of 3, and charges detonating within 1s count as ONE damage instance for procs."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Gunsmith.Tinkerer.QuickSet"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_TK_Ordnance.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Tripwire (travel) -> Patience (impactful) ----------------------
+    // TK3. The node the deployable definition's swappable trigger field
+    // exists for. The per-placement choice the treatment's second rank named
+    // is a gap recorded here, not promised by the text: no placement input
+    // carries a trigger selection. WAITING ON: UBreakerAbility_MineCluster's
+    // trigger condition reading this tag.
+    Node = MakeNode(TEXT("Gunsmith.Tinkerer.Tripwire"), TEXT("Tripwire"),
+        TEXT("Mine charges trigger on line of sight instead of proximity."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_TK_Tripwire.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // TK9. Rewards the pre-placed field over the panic-placed one. WAITING
+    // ON: armed-time tracking on Tinkerer deployables.
+    Node = MakeNode(TEXT("Gunsmith.Tinkerer.Patience"), TEXT("Patience"),
+        TEXT("A trap armed and untriggered for 10s triggers harder: one extra charge, or double the Disruptor's flat armour cut on first entry."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Gunsmith.Tinkerer.Tripwire"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_TK_Patience.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Rearm (travel) -> Command Detonation (impactful) ---------------
+    // TK4. Loop modifier on the trap economy that does not extend lifetime.
+    // The rearm interval is 4 s (the old rank-two figure, at rank one under
+    // O272), read by ABreakerDeployable's charge bookkeeping.
+    Node = MakeNode(TEXT("Gunsmith.Tinkerer.Rearm"), TEXT("Rearm"),
+        TEXT("An emptied Mine Cluster rearms one charge every 4s for the rest of its lifetime, up to its original count."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_TK_Rearm.GetTag());
     Tree->Nodes.Add(Node);
 
     // TK11. A timing input added without a base-kit verb — re-uses the
     // equipped ability's own input. WAITING ON:
     // UBreakerAbility_MineCluster's re-activation path.
     Node = MakeNode(TEXT("Gunsmith.Tinkerer.CommandDetonation"), TEXT("Command Detonation"),
-        TEXT("With no charges left to place, re-activating Mine Cluster detonates every armed charge you own at once. Refunds nothing."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Gunsmith.Tinkerer.Ordnance"));
+        TEXT("With no charges left to place, re-activating Mine Cluster detonates every armed charge you own at once. Refunds nothing."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Gunsmith.Tinkerer.Rearm"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_TK_CommandDetonation.GetTag());
     Tree->Nodes.Add(Node);
 
-    // TK12 MINEFIELD — keystone, tier-3/cost-3 compression. Its 1.20x More
-    // ("inside one of your Disruptor fields, or by a 10s-patient mine") is
-    // NOT OWED (O95) — both conditions are deployable state the vocabulary cannot
+    // --- Pair: Overlap (travel) -> Interdiction (impactful) -------------------
+    // TK6. The explicit anti-stack rule stated as a benefit (the treatment's
+    // MS11-pattern citation). WAITING ON: Disruptor field overlap handling.
+    Node = MakeNode(TEXT("Gunsmith.Tinkerer.Overlap"), TEXT("Overlap"),
+        TEXT("Overlapping Disruptor fields never stack their armour cut, but extend each other's lifetime to the longer of the two."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_TK_Overlap.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // TK8. "Grants G6 Disruptor" is not authored. Delay, never cancel —
+    // cancellation is a control verb the class does not own. WAITING ON:
+    // UBreakerAbility_Disruptor and the enemy telegraph timers.
+    Node = MakeNode(TEXT("Gunsmith.Tinkerer.Interdiction"), TEXT("Interdiction"),
+        TEXT("Disruptor also delays the wind-up of telegraphed attacks begun inside it. Delays — never cancels."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Gunsmith.Tinkerer.Overlap"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_TK_Interdiction.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Attrition Field (travel) -> Minefield (keystone) ---------------
+    // TK5. The refund is 14 (the old rank-two figure, at rank one under
+    // O272), credited outside the global cap by
+    // UBreakerScrapComponent::NotifyDisruptorFieldKill.
+    Node = MakeNode(TEXT("Gunsmith.Tinkerer.AttritionField"), TEXT("Attrition Field"),
+        TEXT("Enemies killed inside a Disruptor field refund 14 Scrap, outside the global cap. A dense fight pays the field back."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_TK_AttritionField.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // TK12 MINEFIELD — the branch keystone, the impactful half of its pair and
+    // the one gated node (tier 4, cost 1; block comment above). Its 1.20x More
+    // ("inside one of your Disruptor fields, or by a 10s-patient mine") is NOT
+    // OWED (O95) — both conditions are deployable state the vocabulary cannot
     // say. Field Assembly's Minefield row resolves off the tag below.
     Node = MakeNode(TEXT("Gunsmith.Tinkerer.Minefield"), TEXT("Minefield"),
-        TEXT("Branch keystone. Rewrites Field Assembly for the player who was right about where the enemy would be."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 4, 1, 2);
+        TEXT("Branch keystone. Rewrites Field Assembly for the player who was right about where the enemy would be."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 4, 1, 1);
     AddPrerequisite(Node, TEXT("Gunsmith.Tinkerer.AttritionField"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_TK_Minefield.GetTag());

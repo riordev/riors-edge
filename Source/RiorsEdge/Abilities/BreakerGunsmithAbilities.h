@@ -60,8 +60,8 @@ public:
     //    only when its shot budget is spent.
     static bool WindowClosesOnMagazineEmptied(bool bHasLastRound, bool bHasRigDiscipline);
     static bool WindowClosesOnReloadStart(bool bHasRigDiscipline, int32 ReloadsSurvived);
-    // AR6 Cold Barrel: seconds shaved per empty-magazine reload — 1.5 at rank
-    // 1, 2.5 at rank 2, both transcribed.
+    // AR6 Cold Barrel: seconds shaved per empty-magazine reload — 2.5 with
+    // the node (O2 PLACEHOLDER).
     static float ColdBarrelShave(int32 Rank);
     // AR6's application: winds the live cooldown effect back by the shave.
     // Called by the Scrap component, which is the component that actually
@@ -172,8 +172,7 @@ public:
     virtual float GetUnmodifiedResourceCost() const override;
 
     // The pure rule, pinned by tests: Cheap Work is Tinkerer-only (mines and
-    // Disruptors), Dry-only, 10 less at rank 1 / 18 at rank 2, to a floor of
-    // 10; the Requisition replacement discount then applies, floored at zero —
+    // Disruptors), Dry-only, 18 less with the node, to a floor of 10; the Requisition replacement discount then applies, floored at zero —
     // a refund credit may make a placement cheap, never paid-to-place.
     static float EffectiveDeployCost(float BaseCost, EBreakerDeployableType Type, EBreakerScrapState State, int32 CheapWorkRank, float ReplacementDiscount);
     static bool IsTinkererDeployable(EBreakerDeployableType Type);

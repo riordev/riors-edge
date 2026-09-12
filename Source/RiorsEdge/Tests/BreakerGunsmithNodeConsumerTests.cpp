@@ -12,13 +12,17 @@
 // ---------------------------------------------------------------------------
 // GUNSMITH NODE CONSUMERS (2026-08-16, the branch-tree pay pass).
 //
-// The nine Gunsmith branch trees shipped as rules-as-tags with WAITING ON
+// The three Gunsmith doctrine trees shipped as rules-as-tags with WAITING ON
 // comments naming their consumers; this file pins the consumers that now
 // exist. The shape is the BuiltClassKit shape throughout: a rig BUYS the node
 // through the real purchase path, and the rule observably changes Scrap /
 // deployable / ability behaviour — and without the purchase every path is
 // bit-identical to the pre-node behaviour, asserted first in each test so a
 // consumer can never leak its rule to a build that did not choose it.
+//
+// Every node is single rank (O272): a travel buys from a standing start, an
+// impactful buys behind its one travel, and the rank-one magnitude is what
+// the old rank two paid. There is no rank-two purchase anywhere below.
 // ---------------------------------------------------------------------------
 
 namespace BreakerGunsmithNodeConsumerTest
@@ -58,9 +62,10 @@ namespace BreakerGunsmithNodeConsumerTest
 }
 
 // ---------------------------------------------------------------------------
-// Armory: the Scrap-side consumers. Field Stripping R2 opens the dump source,
+// Armory: the Scrap-side consumers. Field Stripping opens the dump source,
 // No Reserve doubles the reload/magazine grants, and neither moves an inch
-// for a build without the node.
+// for a build without the node. Every node is one rank (O272): the rank-one
+// value is what the two-rank node used to pay at rank two.
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerGunsmithArmoryScrapNodesTest,
@@ -77,23 +82,22 @@ bool FBreakerGunsmithArmoryScrapNodesTest::RunTest(const FString& Parameters)
     // anti-farm clause), and the reload grant is the authored grant.
     Rig.Scrap->NotifyMagazineEmptied(false);
     Rig.Scrap->AdvanceLoop(1.0f);
-    TestEqual(TEXT("Without Field Stripping R2 a partial dump pays nothing"), Rig.Scrap->GetScrap(), 0.0f);
+    TestEqual(TEXT("Without Field Stripping a partial dump pays nothing"), Rig.Scrap->GetScrap(), 0.0f);
     Rig.Scrap->NotifyReloadCompleted(true);
     Rig.Scrap->AdvanceLoop(1.0f);
     TestEqual(TEXT("Without No Reserve the reload grant is the authored grant"), Rig.Scrap->GetScrap(), Rig.Scrap->ReloadGrant);
 
-    // Buy AR1 to rank 2: the "magazine was full at cycle start" requirement on
-    // the dump source is removed.
-    TestTrue(TEXT("Field Stripping purchases to rank 2"), BreakerBuy(Rig.Progression, Armory, TEXT("Gunsmith.Armory.FieldStripping"), 2));
+    // Buy AR1 Field Stripping: the "magazine was full at cycle start"
+    // requirement on the dump source is removed at rank one.
+    TestTrue(TEXT("Field Stripping purchases"), BreakerBuy(Rig.Progression, Armory, TEXT("Gunsmith.Armory.FieldStripping")));
     const float BeforeOpenDump = Rig.Scrap->GetScrap();
     Rig.Scrap->NotifyMagazineEmptied(false);
     Rig.Scrap->AdvanceLoop(1.0f);
-    TestEqual(TEXT("Field Stripping R2 pays the dump on a partial cycle"),
+    TestEqual(TEXT("Field Stripping pays the dump on a partial cycle"),
         Rig.Scrap->GetScrap(), BeforeOpenDump + Rig.Scrap->MagazineDumpGrant);
 
-    // Reach tier 4 and buy AR11 No Reserve: reload and magazine Scrap double.
-    TestTrue(TEXT("Working Stock purchases"), BreakerBuy(Rig.Progression, Armory, TEXT("Gunsmith.Armory.WorkingStock"), 2));
-    TestTrue(TEXT("Chambered purchases"), BreakerBuy(Rig.Progression, Armory, TEXT("Gunsmith.Armory.Chambered"), 2));
+    // AR11 No Reserve is Field Stripping's impactful half: it buys behind
+    // that one travel, and reload and magazine Scrap double.
     TestTrue(TEXT("No Reserve purchases"), BreakerBuy(Rig.Progression, Armory, TEXT("Gunsmith.Armory.NoReserve")));
     const float BeforeDoubled = Rig.Scrap->GetScrap();
     Rig.Scrap->NotifyReloadCompleted(true);
@@ -103,17 +107,19 @@ bool FBreakerGunsmithArmoryScrapNodesTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("No Reserve doubles the reload and magazine grants"),
         Rig.Scrap->GetScrap(), BeforeDoubled + 2.0f * Rig.Scrap->ReloadGrant + 2.0f * Rig.Scrap->MagazineDumpGrant);
 
-    // AR2 Working Stock is already owned at rank 2 by the walk above: Dry and
-    // Stocked read one tier faster, Surplus never does.
-    TestEqual(TEXT("Working Stock R2 shifts the reload tier while low"), Rig.Scrap->GetReloadTierShift(), 1);
+    // AR2 Working Stock, a travel root: Dry and Stocked read one tier faster,
+    // Surplus never does.
+    TestEqual(TEXT("Without Working Stock the reload tier does not shift"), Rig.Scrap->GetReloadTierShift(), 0);
+    TestTrue(TEXT("Working Stock purchases"), BreakerBuy(Rig.Progression, Armory, TEXT("Gunsmith.Armory.WorkingStock")));
+    TestEqual(TEXT("Working Stock shifts the reload tier while low"), Rig.Scrap->GetReloadTierShift(), 1);
     Rig.Attributes->ApplyClassResource(80.0f);   // Surplus at the shipped 0.60
     TestEqual(TEXT("No tier shift while Surplus"), Rig.Scrap->GetReloadTierShift(), 0);
     Rig.Attributes->ApplyClassResource(0.0f);
 
-    // The pure band rule, all ranks.
-    TestEqual(TEXT("Rank 1 shifts while Dry only"), UBreakerScrapComponent::ReloadTierShiftFor(1, EBreakerScrapState::Dry), 1);
-    TestEqual(TEXT("Rank 1 gives Stocked nothing"), UBreakerScrapComponent::ReloadTierShiftFor(1, EBreakerScrapState::Stocked), 0);
-    TestEqual(TEXT("Rank 2 extends to Stocked"), UBreakerScrapComponent::ReloadTierShiftFor(2, EBreakerScrapState::Stocked), 1);
+    // The pure band rule: rank one shifts Dry and Stocked, never Surplus.
+    TestEqual(TEXT("Rank 1 shifts while Dry"), UBreakerScrapComponent::ReloadTierShiftFor(1, EBreakerScrapState::Dry), 1);
+    TestEqual(TEXT("Rank 1 shifts while Stocked"), UBreakerScrapComponent::ReloadTierShiftFor(1, EBreakerScrapState::Stocked), 1);
+    TestEqual(TEXT("Rank 1 gives Surplus nothing"), UBreakerScrapComponent::ReloadTierShiftFor(1, EBreakerScrapState::Surplus), 0);
     TestEqual(TEXT("No node, no shift"), UBreakerScrapComponent::ReloadTierShiftFor(0, EBreakerScrapState::Dry), 0);
     return true;
 }
@@ -133,31 +139,26 @@ bool FBreakerGunsmithArmoryReceiverAndWindowTest::RunTest(const FString& Paramet
     FBreakerNodeConsumerRig Rig = BreakerMakeGunsmithRig(30);
     UBreakerProgressionTree* Armory = UBreakerProgressionLibrary::GetGunsmithArmoryTree();
 
-    // AR4 Deep Pockets: the overflow receiver pays nothing without the node.
+    // AR4 Deep Pockets: the overflow receiver pays nothing without the node;
+    // the single rank converts at the doubled rate (O272: rank one carries
+    // what rank two used to).
     Rig.Scrap->NotifyAmmoPickupOverflow(10.0f);
     Rig.Scrap->AdvanceLoop(1.0f);
     TestEqual(TEXT("Overflow pays nothing without Deep Pockets"), Rig.Scrap->GetScrap(), 0.0f);
-    TestTrue(TEXT("Field Stripping purchases"), BreakerBuy(Rig.Progression, Armory, TEXT("Gunsmith.Armory.FieldStripping"), 2));
-    TestTrue(TEXT("Deep Pockets rank 1 purchases"), BreakerBuy(Rig.Progression, Armory, TEXT("Gunsmith.Armory.DeepPockets")));
-    Rig.Scrap->NotifyAmmoPickupOverflow(10.0f);
-    Rig.Scrap->AdvanceLoop(1.0f);
-    TestEqual(TEXT("Rank 1 converts overflow at the fixed rate"),
-        Rig.Scrap->GetScrap(), 10.0f * Rig.Scrap->OverflowScrapPerRound);
-    TestTrue(TEXT("Deep Pockets rank 2 purchases"), BreakerBuy(Rig.Progression, Armory, TEXT("Gunsmith.Armory.DeepPockets")));
+    TestTrue(TEXT("Deep Pockets purchases"), BreakerBuy(Rig.Progression, Armory, TEXT("Gunsmith.Armory.DeepPockets")));
     const float BeforeDoubledOverflow = Rig.Scrap->GetScrap();
     Rig.Scrap->NotifyAmmoPickupOverflow(10.0f);
     Rig.Scrap->AdvanceLoop(1.0f);
-    TestEqual(TEXT("Rank 2 doubles the rate"),
+    TestEqual(TEXT("Rank 1 converts overflow at the doubled rate"),
         Rig.Scrap->GetScrap(), BeforeDoubledOverflow + 20.0f * Rig.Scrap->OverflowScrapPerRound);
 
     // AR9 Reciprocal: nothing without the node; with it, the credit lands
     // IMMEDIATELY — outside the metered budget — which is the node's clause.
+    // Reciprocal is Last Round's impactful half and buys behind it alone.
     const float BeforeReciprocal = Rig.Scrap->GetScrap();
     Rig.Scrap->NotifyAmmoReturnedOnKill(3);
     TestEqual(TEXT("Ammo return pays nothing without Reciprocal"), Rig.Scrap->GetScrap(), BeforeReciprocal);
-    TestTrue(TEXT("Last Round purchases"), BreakerBuy(Rig.Progression, Armory, TEXT("Gunsmith.Armory.LastRound"), 2));
-    TestTrue(TEXT("Cold Barrel purchases"), BreakerBuy(Rig.Progression, Armory, TEXT("Gunsmith.Armory.Chambered"), 2)
-        && BreakerBuy(Rig.Progression, Armory, TEXT("Gunsmith.Armory.ColdBarrel"), 2));
+    TestTrue(TEXT("Last Round purchases"), BreakerBuy(Rig.Progression, Armory, TEXT("Gunsmith.Armory.LastRound")));
     TestTrue(TEXT("Reciprocal purchases"), BreakerBuy(Rig.Progression, Armory, TEXT("Gunsmith.Armory.Reciprocal")));
     const float BeforeReciprocalPaid = Rig.Scrap->GetScrap();
     Rig.Scrap->NotifyAmmoReturnedOnKill(3);
@@ -179,8 +180,8 @@ bool FBreakerGunsmithArmoryReceiverAndWindowTest::RunTest(const FString& Paramet
         UBreakerAbility_SidearmRig::WindowClosesOnReloadStart(true, 1));
 
     // AR6 Cold Barrel's shave and AR7 Bench Work's tail, transcribed numbers.
-    TestEqual(TEXT("Cold Barrel shaves 1.5s at rank 1"), UBreakerAbility_SidearmRig::ColdBarrelShave(1), 1.5f);
-    TestEqual(TEXT("Cold Barrel shaves 2.5s at rank 2"), UBreakerAbility_SidearmRig::ColdBarrelShave(2), 2.5f);
+    // O2 PLACEHOLDER: the single rank shaves what rank two used to.
+    TestEqual(TEXT("Cold Barrel shaves 2.5s at rank 1"), UBreakerAbility_SidearmRig::ColdBarrelShave(1), 2.5f);
     TestEqual(TEXT("No node, no shave"), UBreakerAbility_SidearmRig::ColdBarrelShave(0), 0.0f);
     TestEqual(TEXT("Bench Work's tail is half the drawn capacity"), UBreakerAbility_Overhaul::BenchWorkTailRounds(10), 5);
     TestEqual(TEXT("A one-round window has no tail"), UBreakerAbility_Overhaul::BenchWorkTailRounds(1), 0);
@@ -212,17 +213,17 @@ bool FBreakerGunsmithFieldTechNodesTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Without Logistics the crate counts"),
         ABreakerDeployable::CountsAgainstDensityCap(EBreakerDeployableType::AmmoCrate, false));
 
-    // FT1 Salvage: 65% at rank 1, 80% at rank 2, observably at the refund.
-    TestTrue(TEXT("Salvage rank 1 purchases"), BreakerBuy(Rig.Progression, FieldTech, TEXT("Gunsmith.FieldTech.Salvage")));
+    // FT1 Salvage: the single rank is the 80% hard ceiling, observably at the
+    // refund. O2 PLACEHOLDER.
+    TestTrue(TEXT("Salvage purchases"), BreakerBuy(Rig.Progression, FieldTech, TEXT("Gunsmith.FieldTech.Salvage")));
+    TestEqual(TEXT("Rank 1 is the 80% hard ceiling"), Rig.Scrap->GetEffectiveDestructionRefundFraction(), 0.80f);
     Rig.Scrap->NotifyDeployableDestroyed(40.0f);
     Rig.Scrap->AdvanceLoop(5.0f);
-    TestEqual(TEXT("Rank 1 refunds 65% of a 40-cost deployable"), Rig.Scrap->GetScrap(), 26.0f);
-    TestTrue(TEXT("Salvage rank 2 purchases"), BreakerBuy(Rig.Progression, FieldTech, TEXT("Gunsmith.FieldTech.Salvage")));
-    TestEqual(TEXT("Rank 2 is the 80% hard ceiling"), Rig.Scrap->GetEffectiveDestructionRefundFraction(), 0.80f);
+    TestEqual(TEXT("Rank 1 refunds 80% of a 40-cost deployable"), Rig.Scrap->GetScrap(), 32.0f);
 
     // FT4 Tithe: while Surplus the deployable-damage source skips the meter —
     // the credit lands with NO AdvanceLoop at all; while Dry it still queues.
-    TestTrue(TEXT("Tithe purchases"), BreakerBuy(Rig.Progression, FieldTech, TEXT("Gunsmith.FieldTech.Tithe"), 2));
+    TestTrue(TEXT("Tithe purchases"), BreakerBuy(Rig.Progression, FieldTech, TEXT("Gunsmith.FieldTech.Tithe")));
     Rig.Attributes->ApplyClassResource(80.0f);   // Surplus
     const float BeforeTithe = Rig.Scrap->GetScrap();
     Rig.Scrap->NotifyDeployableDamageDealt(500.0f);
@@ -234,9 +235,9 @@ bool FBreakerGunsmithFieldTechNodesTest::RunTest(const FString& Parameters)
     Rig.Scrap->AdvanceLoop(1.0f);
     TestEqual(TEXT("...and pays through the loop"), Rig.Scrap->GetScrap(), BeforeMetered + 1.0f);
 
-    // FT9 Redundancy raises the resting cap to 5 for its owner.
-    TestTrue(TEXT("Requisition purchases"), BreakerBuy(Rig.Progression, FieldTech, TEXT("Gunsmith.FieldTech.Requisition"), 2));
-    TestTrue(TEXT("Redundancy purchases"), BreakerBuy(Rig.Progression, FieldTech, TEXT("Gunsmith.FieldTech.Redundancy")));
+    // FT9 Redundancy, Salvage's impactful half, raises the resting cap to 5
+    // for its owner.
+    TestTrue(TEXT("Redundancy purchases behind Salvage"), BreakerBuy(Rig.Progression, FieldTech, TEXT("Gunsmith.FieldTech.Redundancy")));
     TestEqual(TEXT("Redundancy's resting cap is 5"), ABreakerDeployable::TotalCapFor(Rig.Owner), 5);
     TestEqual(TEXT("The pure rule agrees"), ABreakerDeployable::BaseTotalCapFor(true), 5);
 
@@ -259,14 +260,19 @@ bool FBreakerGunsmithFieldTechNodesTest::RunTest(const FString& Parameters)
     ABreakerDeployable::ConsumeReplacementCredit(Rig.Owner, EBreakerDeployableType::Turret);
     TestEqual(TEXT("A consumed credit is gone"),
         ABreakerDeployable::PendingReplacementDiscount(Rig.Owner, EBreakerDeployableType::Turret, 50.0), 0.0f);
-    TestEqual(TEXT("The discount table is 10 then 18"), ABreakerDeployable::RequisitionDiscountFor(1), 10.0f);
-    TestEqual(TEXT("...transcribed at rank 2"), ABreakerDeployable::RequisitionDiscountFor(2), 18.0f);
+    TestEqual(TEXT("The discount is 18 at the single rank"), ABreakerDeployable::RequisitionDiscountFor(1), 18.0f);
+    TestEqual(TEXT("No node, no discount"), ABreakerDeployable::RequisitionDiscountFor(0), 0.0f);
 
-    // FT3 Second Shift's clock rule: +8/+14, hard 2x-base ceiling.
+    // FT3 Second Shift's clock rule: +14 at the single rank, hard 2x-base
+    // ceiling.
     TestEqual(TEXT("No node leaves the clock alone"), ABreakerDeployable::SecondShiftLifetime(0, 30.0f, 12.0f), 12.0f);
-    TestEqual(TEXT("Rank 1 adds 8s"), ABreakerDeployable::SecondShiftLifetime(1, 30.0f, 12.0f), 20.0f);
-    TestEqual(TEXT("Rank 2 adds 14s"), ABreakerDeployable::SecondShiftLifetime(2, 30.0f, 12.0f), 26.0f);
-    TestEqual(TEXT("Never past double the base"), ABreakerDeployable::SecondShiftLifetime(2, 30.0f, 55.0f), 60.0f);
+    TestEqual(TEXT("Rank 1 adds 14s"), ABreakerDeployable::SecondShiftLifetime(1, 30.0f, 12.0f), 26.0f);
+    TestEqual(TEXT("Never past double the base"), ABreakerDeployable::SecondShiftLifetime(1, 30.0f, 55.0f), 60.0f);
+
+    // FT6 Foreman's heal per charge is the single-rank number, read off the
+    // class default object: no rank multiplier is left for a reader to apply.
+    // O2 PLACEHOLDER.
+    TestEqual(TEXT("Foreman heals 30 per charge, default-constructed"), GetDefault<ABreakerDeployable>()->ForemanHealPerCharge, 30.0f);
     return true;
 }
 
@@ -287,51 +293,46 @@ bool FBreakerGunsmithTinkererNodesTest::RunTest(const FString& Parameters)
     FBreakerNodeConsumerRig Rig = BreakerMakeGunsmithRig(30);
     UBreakerProgressionTree* Tinkerer = UBreakerProgressionLibrary::GetGunsmithTinkererTree();
 
-    // TK5 Attrition Field: nothing without the node; 8 then 14, immediately.
+    // TK5 Attrition Field: nothing without the node; 14 at the single rank,
+    // immediately. Attrition Field is a travel root and buys from a standing
+    // start.
     Rig.Scrap->NotifyDisruptorFieldKill();
     TestEqual(TEXT("A field kill pays nothing without Attrition Field"), Rig.Scrap->GetScrap(), 0.0f);
-    TestTrue(TEXT("Cheap Work purchases"), BreakerBuy(Rig.Progression, Tinkerer, TEXT("Gunsmith.Tinkerer.CheapWork"), 2));
-    TestTrue(TEXT("Attrition Field rank 1 purchases"), BreakerBuy(Rig.Progression, Tinkerer, TEXT("Gunsmith.Tinkerer.AttritionField")));
+    TestTrue(TEXT("Attrition Field purchases"), BreakerBuy(Rig.Progression, Tinkerer, TEXT("Gunsmith.Tinkerer.AttritionField")));
     Rig.Scrap->NotifyDisruptorFieldKill();
-    TestEqual(TEXT("Rank 1 refunds 8, outside the meter"), Rig.Scrap->GetScrap(), 8.0f);
-    TestTrue(TEXT("Attrition Field rank 2 purchases"), BreakerBuy(Rig.Progression, Tinkerer, TEXT("Gunsmith.Tinkerer.AttritionField")));
-    Rig.Scrap->NotifyDisruptorFieldKill();
-    TestEqual(TEXT("Rank 2 refunds 14"), Rig.Scrap->GetScrap(), 22.0f);
+    TestEqual(TEXT("Rank 1 refunds 14, outside the meter"), Rig.Scrap->GetScrap(), 14.0f);
 
-    // TK1 Cheap Work, the whole pricing rule: Tinkerer-only, Dry-only, 10/18
+    // TK1 Cheap Work, the whole pricing rule: Tinkerer-only, Dry-only, 18 off
     // to a floor of 10, and the Requisition discount composes after it.
     using DeployAbility = UBreakerGunsmithDeployAbility;
     TestEqual(TEXT("No node, full price"),
         DeployAbility::EffectiveDeployCost(35.0f, EBreakerDeployableType::MineCluster, EBreakerScrapState::Dry, 0, 0.0f), 35.0f);
-    TestEqual(TEXT("Rank 1 Dry mine costs 10 less"),
-        DeployAbility::EffectiveDeployCost(35.0f, EBreakerDeployableType::MineCluster, EBreakerScrapState::Dry, 1, 0.0f), 25.0f);
-    TestEqual(TEXT("Rank 2 Dry mine costs 18 less"),
-        DeployAbility::EffectiveDeployCost(35.0f, EBreakerDeployableType::MineCluster, EBreakerScrapState::Dry, 2, 0.0f), 17.0f);
+    TestEqual(TEXT("Rank 1 Dry mine costs 18 less"),
+        DeployAbility::EffectiveDeployCost(35.0f, EBreakerDeployableType::MineCluster, EBreakerScrapState::Dry, 1, 0.0f), 17.0f);
     TestEqual(TEXT("The floor is 10"),
-        DeployAbility::EffectiveDeployCost(20.0f, EBreakerDeployableType::Disruptor, EBreakerScrapState::Dry, 2, 0.0f), 10.0f);
+        DeployAbility::EffectiveDeployCost(20.0f, EBreakerDeployableType::Disruptor, EBreakerScrapState::Dry, 1, 0.0f), 10.0f);
     TestEqual(TEXT("Stocked pays full price — rescue, not subsidy"),
-        DeployAbility::EffectiveDeployCost(35.0f, EBreakerDeployableType::MineCluster, EBreakerScrapState::Stocked, 2, 0.0f), 35.0f);
+        DeployAbility::EffectiveDeployCost(35.0f, EBreakerDeployableType::MineCluster, EBreakerScrapState::Stocked, 1, 0.0f), 35.0f);
     TestEqual(TEXT("A turret is not a Tinkerer deployable"),
-        DeployAbility::EffectiveDeployCost(40.0f, EBreakerDeployableType::Turret, EBreakerScrapState::Dry, 2, 0.0f), 40.0f);
+        DeployAbility::EffectiveDeployCost(40.0f, EBreakerDeployableType::Turret, EBreakerScrapState::Dry, 1, 0.0f), 40.0f);
     TestEqual(TEXT("The Requisition discount composes after the floor"),
-        DeployAbility::EffectiveDeployCost(20.0f, EBreakerDeployableType::Disruptor, EBreakerScrapState::Dry, 2, 18.0f), 0.0f);
+        DeployAbility::EffectiveDeployCost(20.0f, EBreakerDeployableType::Disruptor, EBreakerScrapState::Dry, 1, 18.0f), 0.0f);
     TestTrue(TEXT("The Tinkerer scope is mines and Disruptors exactly"),
         DeployAbility::IsTinkererDeployable(EBreakerDeployableType::MineCluster)
         && DeployAbility::IsTinkererDeployable(EBreakerDeployableType::Disruptor)
         && !DeployAbility::IsTinkererDeployable(EBreakerDeployableType::Turret)
         && !DeployAbility::IsTinkererDeployable(EBreakerDeployableType::AmmoCrate));
 
-    // TK2 Quick Set: halved, then removed with the 1s smaller-radius trade.
+    // TK2 Quick Set: the arm delay is removed at the single rank, with the
+    // 1 s smaller-radius trade that comes with it.
     TestEqual(TEXT("No node keeps the authored delay"), ABreakerDeployable::QuickSetArmDelay(0, 1.0f), 1.0f);
-    TestEqual(TEXT("Rank 1 halves the arm delay"), ABreakerDeployable::QuickSetArmDelay(1, 1.0f), 0.5f);
-    TestEqual(TEXT("Rank 2 removes it"), ABreakerDeployable::QuickSetArmDelay(2, 1.0f), 0.0f);
-    TestEqual(TEXT("Rank 2's fresh charge triggers 1 m short"), ABreakerDeployable::QuickSetTriggerRadius(2, 0.5f, 250.0f), 150.0f);
-    TestEqual(TEXT("...and reads full after its first second"), ABreakerDeployable::QuickSetTriggerRadius(2, 1.5f, 250.0f), 250.0f);
-    TestEqual(TEXT("Rank 1 never trades radius"), ABreakerDeployable::QuickSetTriggerRadius(1, 0.1f, 250.0f), 250.0f);
+    TestEqual(TEXT("Rank 1 removes the arm delay"), ABreakerDeployable::QuickSetArmDelay(1, 1.0f), 0.0f);
+    TestEqual(TEXT("Rank 1's fresh charge triggers 1 m short"), ABreakerDeployable::QuickSetTriggerRadius(1, 0.5f, 250.0f), 150.0f);
+    TestEqual(TEXT("...and reads full after its first second"), ABreakerDeployable::QuickSetTriggerRadius(1, 1.5f, 250.0f), 250.0f);
+    TestEqual(TEXT("No node never trades radius"), ABreakerDeployable::QuickSetTriggerRadius(0, 0.1f, 250.0f), 250.0f);
 
     // TK4 Rearm, TK7 Ordnance, TK9 Patience: transcribed numbers.
-    TestEqual(TEXT("Rearm at 6s"), ABreakerDeployable::RearmInterval(1), 6.0f);
-    TestEqual(TEXT("Rearm R2 at 4s"), ABreakerDeployable::RearmInterval(2), 4.0f);
+    TestEqual(TEXT("Rearm at 4s at the single rank"), ABreakerDeployable::RearmInterval(1), 4.0f);
     TestEqual(TEXT("No Rearm, no interval"), ABreakerDeployable::RearmInterval(0), 0.0f);
     TestEqual(TEXT("Ordnance scatters 4"), ABreakerDeployable::OrdnanceMineCount(true, 3), 4);
     TestEqual(TEXT("Without it, the authored 3"), ABreakerDeployable::OrdnanceMineCount(false, 3), 3);

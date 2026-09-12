@@ -12,7 +12,7 @@
 		"Source/RiorsEdge/Progression/BreakerCoreRosterWeapon.cpp": "668dc0b08541588e995afe28301d8ae2bacb2106",
 		"Source/RiorsEdge/Progression/BreakerCoreTree.cpp": "0d1c3252ee7f95d02fea3445e83f7e71b05e15c2",
 		"Source/RiorsEdge/Progression/BreakerCoreTree.h": "d5cbc90580dd4568eeb1ee21d00f5159dc56bbae",
-		"Source/RiorsEdge/Progression/BreakerProgressionLibrary.cpp": "14f61d45d08ca133b46579a3cf61f3c3ffde3e31",
+		"Source/RiorsEdge/Progression/BreakerProgressionLibrary.cpp": "110d75b02d094287bc6cb1aff832b374a30b6a83",
 		"Source/RiorsEdge/Progression/BreakerProgressionNode.h": "b18436bdeeeef00075344254bd538c6fb1e3140e",
 		"Source/RiorsEdge/Progression/BreakerProgressionTree.h": "9dfcbac0af583d1da7c0e6ed117e8c94231d1395",
 		"Source/RiorsEdge/Progression/BreakerProgressionTypes.h": "d1f683b84a26b912db1ef42a87f87eeff96d02e8"
@@ -8639,7 +8639,7 @@
 				{
 					"id": "Gunsmith.Armory.FieldStripping",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -8651,178 +8651,10 @@
 					"prerequisites": []
 				},
 				{
-					"id": "Gunsmith.Armory.WorkingStock",
-					"tier": 1,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Gunsmith.Armory.WorkingStock"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Gunsmith.Armory.Chambered",
-					"tier": 1,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Gunsmith.Armory.Chambered"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Gunsmith.Armory.DeepPockets",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Gunsmith.Armory.DeepPockets"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Gunsmith.Armory.FieldStripping",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Gunsmith.Armory.LastRound",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Gunsmith.Armory.LastRound"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Gunsmith.Armory.FieldStripping",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Gunsmith.Armory.ColdBarrel",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Gunsmith.Armory.ColdBarrel"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Gunsmith.Armory.Chambered",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Gunsmith.Armory.BenchWork",
-					"tier": 3,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Gunsmith.Armory.BenchWork"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Gunsmith.Armory.DeepPockets",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
-				},
-				{
-					"id": "Gunsmith.Armory.RigDiscipline",
-					"tier": 3,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Gunsmith.Armory.RigDiscipline"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Gunsmith.Armory.ColdBarrel",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
-				},
-				{
-					"id": "Gunsmith.Armory.Reciprocal",
-					"tier": 4,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Gunsmith.Armory.Reciprocal"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Gunsmith.Armory.LastRound",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 6
-				},
-				{
-					"id": "Gunsmith.Armory.Overpressure",
-					"tier": 4,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Gunsmith.Armory.Overpressure"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Gunsmith.Armory.BenchWork",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 6
-				},
-				{
 					"id": "Gunsmith.Armory.NoReserve",
-					"tier": 4,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
@@ -8835,14 +8667,159 @@
 							"id": "Gunsmith.Armory.FieldStripping",
 							"rank": 1
 						}
+					]
+				},
+				{
+					"id": "Gunsmith.Armory.WorkingStock",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Gunsmith.Armory.WorkingStock"
 					],
-					"requiredTreeInvestment": 6
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Gunsmith.Armory.Overpressure",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Gunsmith.Armory.Overpressure"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Gunsmith.Armory.WorkingStock",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Gunsmith.Armory.DeepPockets",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Gunsmith.Armory.DeepPockets"
+					],
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Gunsmith.Armory.BenchWork",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Gunsmith.Armory.BenchWork"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Gunsmith.Armory.DeepPockets",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Gunsmith.Armory.LastRound",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Gunsmith.Armory.LastRound"
+					],
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Gunsmith.Armory.Reciprocal",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Gunsmith.Armory.Reciprocal"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Gunsmith.Armory.LastRound",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Gunsmith.Armory.ColdBarrel",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Gunsmith.Armory.ColdBarrel"
+					],
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Gunsmith.Armory.RigDiscipline",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Gunsmith.Armory.RigDiscipline"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Gunsmith.Armory.ColdBarrel",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Gunsmith.Armory.Chambered",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Gunsmith.Armory.Chambered"
+					],
+					"exclusive": [],
+					"prerequisites": []
 				},
 				{
 					"id": "Gunsmith.Armory.Machinist",
 					"tier": 4,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": true,
 					"constellation": "None",
 					"effects": [],
@@ -8853,7 +8830,7 @@
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Gunsmith.Armory.ColdBarrel",
+							"id": "Gunsmith.Armory.Chambered",
 							"rank": 1
 						}
 					],
@@ -8873,7 +8850,7 @@
 				{
 					"id": "Gunsmith.FieldTech.Salvage",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -8885,9 +8862,28 @@
 					"prerequisites": []
 				},
 				{
+					"id": "Gunsmith.FieldTech.Redundancy",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Gunsmith.FieldTech.Redundancy"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Gunsmith.FieldTech.Salvage",
+							"rank": 1
+						}
+					]
+				},
+				{
 					"id": "Gunsmith.FieldTech.Overwatch",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -8899,9 +8895,28 @@
 					"prerequisites": []
 				},
 				{
+					"id": "Gunsmith.FieldTech.Automation",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Gunsmith.FieldTech.Automation"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Gunsmith.FieldTech.Overwatch",
+							"rank": 1
+						}
+					]
+				},
+				{
 					"id": "Gunsmith.FieldTech.SecondShift",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -8913,70 +8928,10 @@
 					"prerequisites": []
 				},
 				{
-					"id": "Gunsmith.FieldTech.Tithe",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Gunsmith.FieldTech.Tithe"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Gunsmith.FieldTech.Salvage",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Gunsmith.FieldTech.Requisition",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Gunsmith.FieldTech.Requisition"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Gunsmith.FieldTech.Salvage",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Gunsmith.FieldTech.Foreman",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Gunsmith.FieldTech.Foreman"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Gunsmith.FieldTech.SecondShift",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
 					"id": "Gunsmith.FieldTech.Emplacement",
-					"tier": 3,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
@@ -8986,77 +8941,30 @@
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Gunsmith.FieldTech.Overwatch",
+							"id": "Gunsmith.FieldTech.SecondShift",
 							"rank": 1
 						}
-					],
-					"requiredTreeInvestment": 4
+					]
 				},
 				{
-					"id": "Gunsmith.FieldTech.Logistics",
-					"tier": 3,
+					"id": "Gunsmith.FieldTech.Requisition",
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
 					"tags": [
-						"Progression.Node.Gunsmith.FieldTech.Logistics"
+						"Progression.Node.Gunsmith.FieldTech.Requisition"
 					],
 					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Gunsmith.FieldTech.Foreman",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
-				},
-				{
-					"id": "Gunsmith.FieldTech.Redundancy",
-					"tier": 4,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Gunsmith.FieldTech.Redundancy"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Gunsmith.FieldTech.Requisition",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 6
-				},
-				{
-					"id": "Gunsmith.FieldTech.Automation",
-					"tier": 4,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Gunsmith.FieldTech.Automation"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Gunsmith.FieldTech.Emplacement",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 6
+					"prerequisites": []
 				},
 				{
 					"id": "Gunsmith.FieldTech.Deadman",
-					"tier": 4,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
@@ -9069,14 +8977,60 @@
 							"id": "Gunsmith.FieldTech.Requisition",
 							"rank": 1
 						}
+					]
+				},
+				{
+					"id": "Gunsmith.FieldTech.Foreman",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Gunsmith.FieldTech.Foreman"
 					],
-					"requiredTreeInvestment": 6
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Gunsmith.FieldTech.Logistics",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Gunsmith.FieldTech.Logistics"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Gunsmith.FieldTech.Foreman",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Gunsmith.FieldTech.Tithe",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Gunsmith.FieldTech.Tithe"
+					],
+					"exclusive": [],
+					"prerequisites": []
 				},
 				{
 					"id": "Gunsmith.FieldTech.Foundry",
 					"tier": 4,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": true,
 					"constellation": "None",
 					"effects": [],
@@ -9107,7 +9061,7 @@
 				{
 					"id": "Gunsmith.Tinkerer.CheapWork",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -9119,158 +9073,10 @@
 					"prerequisites": []
 				},
 				{
-					"id": "Gunsmith.Tinkerer.QuickSet",
-					"tier": 1,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Gunsmith.Tinkerer.QuickSet"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Gunsmith.Tinkerer.Tripwire",
-					"tier": 1,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Gunsmith.Tinkerer.Tripwire"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Gunsmith.Tinkerer.Rearm",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Gunsmith.Tinkerer.Rearm"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Gunsmith.Tinkerer.QuickSet",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Gunsmith.Tinkerer.AttritionField",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Gunsmith.Tinkerer.AttritionField"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Gunsmith.Tinkerer.CheapWork",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Gunsmith.Tinkerer.Overlap",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Gunsmith.Tinkerer.Overlap"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Gunsmith.Tinkerer.Tripwire",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Gunsmith.Tinkerer.Ordnance",
-					"tier": 3,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Gunsmith.Tinkerer.Ordnance"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Gunsmith.Tinkerer.Rearm",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
-				},
-				{
-					"id": "Gunsmith.Tinkerer.Interdiction",
-					"tier": 3,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Gunsmith.Tinkerer.Interdiction"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Gunsmith.Tinkerer.Overlap",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
-				},
-				{
-					"id": "Gunsmith.Tinkerer.Patience",
-					"tier": 4,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Gunsmith.Tinkerer.Patience"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Gunsmith.Tinkerer.Rearm",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 6
-				},
-				{
 					"id": "Gunsmith.Tinkerer.DeadGround",
-					"tier": 4,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
@@ -9283,14 +9089,93 @@
 							"id": "Gunsmith.Tinkerer.CheapWork",
 							"rank": 1
 						}
+					]
+				},
+				{
+					"id": "Gunsmith.Tinkerer.QuickSet",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Gunsmith.Tinkerer.QuickSet"
 					],
-					"requiredTreeInvestment": 6
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Gunsmith.Tinkerer.Ordnance",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Gunsmith.Tinkerer.Ordnance"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Gunsmith.Tinkerer.QuickSet",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Gunsmith.Tinkerer.Tripwire",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Gunsmith.Tinkerer.Tripwire"
+					],
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Gunsmith.Tinkerer.Patience",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Gunsmith.Tinkerer.Patience"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Gunsmith.Tinkerer.Tripwire",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Gunsmith.Tinkerer.Rearm",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Gunsmith.Tinkerer.Rearm"
+					],
+					"exclusive": [],
+					"prerequisites": []
 				},
 				{
 					"id": "Gunsmith.Tinkerer.CommandDetonation",
-					"tier": 4,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
@@ -9300,17 +9185,63 @@
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Gunsmith.Tinkerer.Ordnance",
+							"id": "Gunsmith.Tinkerer.Rearm",
 							"rank": 1
 						}
+					]
+				},
+				{
+					"id": "Gunsmith.Tinkerer.Overlap",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Gunsmith.Tinkerer.Overlap"
 					],
-					"requiredTreeInvestment": 6
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Gunsmith.Tinkerer.Interdiction",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Gunsmith.Tinkerer.Interdiction"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Gunsmith.Tinkerer.Overlap",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Gunsmith.Tinkerer.AttritionField",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Gunsmith.Tinkerer.AttritionField"
+					],
+					"exclusive": [],
+					"prerequisites": []
 				},
 				{
 					"id": "Gunsmith.Tinkerer.Minefield",
 					"tier": 4,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": true,
 					"constellation": "None",
 					"effects": [],

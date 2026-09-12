@@ -192,8 +192,7 @@ bool UBreakerAbility_SidearmRig::WindowClosesOnReloadStart(bool bHasRigDisciplin
 
 float UBreakerAbility_SidearmRig::ColdBarrelShave(int32 Rank)
 {
-    if (Rank >= 2) return 2.5f;   // §AR6 R2, transcribed
-    if (Rank == 1) return 1.5f;   // §AR6, transcribed
+    if (Rank >= 1) return 2.5f;   // §AR6 single-rank (O272) — O2 PLACEHOLDER
     return 0.0f;
 }
 
@@ -549,15 +548,17 @@ bool UBreakerGunsmithDeployAbility::IsTinkererDeployable(EBreakerDeployableType 
 float UBreakerGunsmithDeployAbility::EffectiveDeployCost(float BaseCost, EBreakerDeployableType Type, EBreakerScrapState State, int32 CheapWorkRank, float ReplacementDiscount)
 {
     float Cost = FMath::Max(0.0f, BaseCost);
-    // TK1 Cheap Work: 10 less (R2: 18) while Dry, Tinkerer deployables only,
-    // to a floor of 10 — rescues the broke, never subsidises the rich.
-    if (CheapWorkRank > 0 && IsTinkererDeployable(Type) && State == EBreakerScrapState::Dry)
+    // TK1 Cheap Work (single-rank, O272): 18 less while Dry, Tinkerer
+    // deployables only, to a floor of 10 — rescues the broke, never
+    // subsidises the rich.
+    if (CheapWorkRank >= 1 && IsTinkererDeployable(Type) && State == EBreakerScrapState::Dry)
     {
-        const float Discount = CheapWorkRank >= 2 ? 18.0f : 10.0f;   // §TK1, transcribed
-        Cost = FMath::Max(10.0f, Cost - Discount);
+        const float Discount = 18.0f;   // §TK1 — O2 PLACEHOLDER
+        Cost = FMath::Max(10.0f, Cost - Discount);   // O2 PLACEHOLDER floor
     }
-    // FT5 Requisition: the replacement placed within 8s costs 10 (R2: 18)
-    // less. Applies after Cheap Work's floor and never below free.
+    // FT5 Requisition: the replacement placed within 8s costs less by the
+    // credit the deployable recorded (ABreakerDeployable::RequisitionDiscountFor
+    // owns the figure). Applies after Cheap Work's floor and never below free.
     return FMath::Max(0.0f, Cost - FMath::Max(0.0f, ReplacementDiscount));
 }
 

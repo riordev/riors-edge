@@ -293,14 +293,14 @@ void UBreakerScrapComponent::NotifyReloadCompleted(bool bAnyRoundFired)
 void UBreakerScrapComponent::NotifyMagazineEmptied(bool bStartedFull)
 {
     bMagazineEmptiedSinceReload = true;
-    // AR1 Field Stripping R2: the full-at-cycle-start requirement on the dump
-    // source is removed. (R1's clause — reload credit paying on a partial
-    // reload provided a round was fired — is ALREADY the shipped base rule:
-    // ReloadGeneration keys on bAnyRoundFired and nothing else, exactly the
-    // doc's own anti-farm wording. Rank 1 therefore changes nothing here and
-    // rank 2 is the rank that moves this event.)
+    // AR1 Field Stripping (single-rank, O272): the full-at-cycle-start
+    // requirement on the dump source is removed at rank one. (The node's
+    // other clause — reload credit paying on a partial reload provided a
+    // round was fired — is ALREADY the shipped base rule: ReloadGeneration
+    // keys on bAnyRoundFired and nothing else, exactly the doc's own
+    // anti-farm wording. This event is the one the node moves.)
     const bool bTreatAsFull = bStartedFull
-        || GetGunsmithNodeRank(TEXT("Gunsmith.Armory.FieldStripping")) >= 2;
+        || GetGunsmithNodeRank(TEXT("Gunsmith.Armory.FieldStripping")) >= 1;
     const float Multiplier = HasOwnedNodeTag(BreakerNodeTags::Node_AR_NoReserve.GetTag()) ? 2.0f : 1.0f;
     QueueGrant(MagazineDumpGeneration(bTreatAsFull, MagazineDumpGrant) * Multiplier);
 }
@@ -313,11 +313,11 @@ void UBreakerScrapComponent::NotifyDeployableDestroyed(float DeployableScrapCost
 void UBreakerScrapComponent::NotifyDeployableDamageDealt(float DamageAppliedToHealth)
 {
     const float Generated = DeployableDamageGeneration(DamageAppliedToHealth, DeployableDamagePerScrap);
-    // FT4 Tithe: while Surplus, deployable-damage Scrap ignores the per-second
-    // cap — paid directly instead of queued through the metered budget. The
-    // band gate keeps it accelerating the top of the bar only. (R2's shorter
-    // per-deployable ICD still waits: the ICD itself is recorded-unenforced,
-    // see DeployableDamageInterval.)
+    // FT4 Tithe (single-rank, O272): while Surplus, deployable-damage Scrap
+    // ignores the per-second cap — paid directly instead of queued through
+    // the metered budget. The band gate keeps it accelerating the top of the
+    // bar only. (The node's shorter per-deployable ICD still waits: the ICD
+    // itself is recorded-unenforced, see DeployableDamageInterval.)
     if (HasOwnedNodeTag(BreakerNodeTags::Node_FT_Tithe.GetTag())
         && GetScrapState() == EBreakerScrapState::Surplus)
     {
@@ -331,8 +331,9 @@ void UBreakerScrapComponent::NotifyAmmoPickupOverflow(float OverflowRounds)
 {
     const int32 Rank = GetGunsmithNodeRank(TEXT("Gunsmith.Armory.DeepPockets"));
     if (Rank <= 0 || OverflowRounds <= 0.0f) return;
-    // Metered (the node row: "respects the 15/s global cap"), doubled at R2.
-    QueueGrant(OverflowRounds * OverflowScrapPerRound * (Rank >= 2 ? 2.0f : 1.0f));
+    // Metered (the node row: "respects the 15/s global cap"), doubled at
+    // rank one (single-rank, O272).
+    QueueGrant(OverflowRounds * OverflowScrapPerRound * 2.0f);   // O2 PLACEHOLDER
 }
 
 void UBreakerScrapComponent::NotifyAmmoReturnedOnKill(int32 RoundsReturned)
@@ -362,26 +363,23 @@ float UBreakerScrapComponent::GetEffectiveDestructionRefundFraction() const
 
 float UBreakerScrapComponent::SalvageRefundFraction(int32 SalvageRank, float BaseFraction)
 {
-    // FT1: 65% at rank 1, 80% at rank 2 — "the hard ceiling", transcribed.
-    if (SalvageRank >= 2) return 0.80f;
-    if (SalvageRank == 1) return 0.65f;
+    // FT1 (single-rank, O272): 80% at rank one — "the hard ceiling".
+    if (SalvageRank >= 1) return 0.80f;   // O2 PLACEHOLDER
     return FMath::Clamp(BaseFraction, 0.0f, 1.0f);
 }
 
 float UBreakerScrapComponent::AttritionFieldRefund(int32 Rank)
 {
-    // TK5: 8 Scrap at rank 1, 14 at rank 2, transcribed.
-    if (Rank >= 2) return 14.0f;
-    if (Rank == 1) return 8.0f;
+    // TK5 (single-rank, O272): 14 Scrap at rank one.
+    if (Rank >= 1) return 14.0f;   // O2 PLACEHOLDER
     return 0.0f;
 }
 
 int32 UBreakerScrapComponent::ReloadTierShiftFor(int32 WorkingStockRank, EBreakerScrapState State)
 {
-    // AR2: one tier faster while Dry; R2 extends the band to Stocked. Never a
+    // AR2 (single-rank, O272): one tier faster while Dry or Stocked. Never a
     // percentage — a band-and-tier rewrite only.
-    if (WorkingStockRank >= 2) return State != EBreakerScrapState::Surplus ? 1 : 0;
-    if (WorkingStockRank == 1) return State == EBreakerScrapState::Dry ? 1 : 0;
+    if (WorkingStockRank >= 1) return State != EBreakerScrapState::Surplus ? 1 : 0;   // O2 PLACEHOLDER
     return 0;
 }
 

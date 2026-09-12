@@ -16,12 +16,12 @@ measurement without judging it.
 | Silent nodes | ceiling | 0 of 370 authored | ceiling 54 | ok |
 | Stat targets with no aggregation lane | ceiling | 1 of 88 | ceiling 6 | ok |
 | Aggregation lanes carrying nothing | ceiling | 1 of 86 lanes | ceiling 9 | ok |
-| Node tags with no consumer | ceiling | 129 of 209 declared | ceiling 143 | ok |
+| Node tags with no consumer | ceiling | 130 of 209 declared | ceiling 143 | ok |
 | Conditions no content authors | ceiling | 12 of 28 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 3 of 21 | ceiling 0 | **OUT** |
 | Asserted invariants with no test | ceiling | 35 of 137 asserted across 8 specs | ceiling 42, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 1.5 worst tree | floor 1.5 | ok |
-| Trees sitting exactly on the offered-to-spendable floor | ceiling | 4 of 16 | no pin — measurement only | — |
+| Trees sitting exactly on the offered-to-spendable floor | ceiling | 7 of 16 | no pin — measurement only | — |
 | Node-shape composition, per tree | band | 39 % ranked minors, all trees | no pin — measurement only | — |
 | Scaffolding nodes | ceiling | 0 of 370 authored | ceiling 50 | ok |
 | Conditions that can never be true | ceiling | 5.0 | ceiling 5, target 1 | ok |
@@ -74,7 +74,7 @@ Plumbing with no author, counted across BOTH authoring layers: node effects, and
 
 ## Node tags with no consumer
 
-**ceiling** · 129 of 209 declared · ceiling 143
+**ceiling** · 130 of 209 declared · ceiling 143
 
 A tag nothing reads. Some are legitimately reserved; most are a promise the game does not keep.
 
@@ -118,7 +118,7 @@ A tag nothing reads. Some are legitimately reserved; most are a promise the game
 - Node_FrenzyTrigger
 - Node_Loaded
 - Node_ShortLeash
-- …and 89 more
+- …and 90 more
 
 ## Conditions no content authors
 
@@ -201,9 +201,9 @@ Most of a build should be refusal. A CEILING here would lock the trees at their 
 - Doctrine.Caster.Multispell: 12 nodes, 12 points offered, 1.5x budget
 - Doctrine.Caster.Spellblade: 12 nodes, 12 points offered, 1.5x budget
 - Doctrine.Caster.VoidWhisperer: 12 nodes, 12 points offered, 1.5x budget
-- Doctrine.Gunsmith.Armory: 12 nodes, 24 points offered, 3.0x budget
-- Doctrine.Gunsmith.FieldTech: 12 nodes, 24 points offered, 3.0x budget
-- Doctrine.Gunsmith.Tinkerer: 12 nodes, 24 points offered, 3.0x budget
+- Doctrine.Gunsmith.Armory: 12 nodes, 12 points offered, 1.5x budget
+- Doctrine.Gunsmith.FieldTech: 12 nodes, 12 points offered, 1.5x budget
+- Doctrine.Gunsmith.Tinkerer: 12 nodes, 12 points offered, 1.5x budget
 - Doctrine.Support.Conductor: 12 nodes, 24 points offered, 3.0x budget
 - Doctrine.Support.Medic: 12 nodes, 24 points offered, 3.0x budget
 - Doctrine.Support.Warden: 12 nodes, 24 points offered, 3.0x budget
@@ -216,13 +216,16 @@ Most of a build should be refusal. A CEILING here would lock the trees at their 
 
 ## Trees sitting exactly on the offered-to-spendable floor
 
-**ceiling** · 4 of 16 · no pin — measurement only
+**ceiling** · 7 of 16 · no pin — measurement only
 
 A tree here is one node-price change away from red, and the floor section reports ok until the run it fails on. This falls when a tree is authored above its shape's arithmetic, never by moving a pin.
 
 - Doctrine.Caster.Multispell: 1.5x, exactly the floor
 - Doctrine.Caster.Spellblade: 1.5x, exactly the floor
 - Doctrine.Caster.VoidWhisperer: 1.5x, exactly the floor
+- Doctrine.Gunsmith.Armory: 1.5x, exactly the floor
+- Doctrine.Gunsmith.FieldTech: 1.5x, exactly the floor
+- Doctrine.Gunsmith.Tinkerer: 1.5x, exactly the floor
 - Doctrine.Swift.Kinetic: 1.5x, exactly the floor
 
 ## Node-shape composition, per tree

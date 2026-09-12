@@ -117,9 +117,15 @@ bool FBreakerMachinistAfterimageTest::RunTest(const FString&)
         FText Reason;
         if (!TestTrue(TEXT("Commit through actual Armory branch selection"),
             Progression->CommitToBranch(UBreakerProgressionLibrary::GetGunsmithArmoryTree()->TreeId, Reason))) return false;
-        for (const TCHAR* Id : { TEXT("Gunsmith.Armory.Chambered"), TEXT("Gunsmith.Armory.Chambered"),
-            TEXT("Gunsmith.Armory.ColdBarrel"), TEXT("Gunsmith.Armory.ColdBarrel"),
-            TEXT("Gunsmith.Armory.RigDiscipline"), TEXT("Gunsmith.Armory.Machinist") })
+        // O272: six single-point Armory nodes open Machinist's six-invested
+        // gate; Machinist is the seventh point of the eight. Chambered is its
+        // travel. Deep Pockets / Bench Work have no consumer firing here (no
+        // overflow pickups, no Overhaul) and Working Stock only shifts the
+        // reload tier, which the reload loop below waits out.
+        for (const TCHAR* Id : { TEXT("Gunsmith.Armory.Chambered"), TEXT("Gunsmith.Armory.ColdBarrel"),
+            TEXT("Gunsmith.Armory.RigDiscipline"), TEXT("Gunsmith.Armory.DeepPockets"),
+            TEXT("Gunsmith.Armory.BenchWork"), TEXT("Gunsmith.Armory.WorkingStock"),
+            TEXT("Gunsmith.Armory.Machinist") })
         {
             const bool bPurchased = Progression->PurchaseNode(UBreakerProgressionLibrary::GetGunsmithArmoryTree(), Id, Reason);
             if (!TestTrue(FString::Printf(TEXT("Paid %s: %s"), Id, *Reason.ToString()), bPurchased)) return false;

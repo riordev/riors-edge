@@ -85,8 +85,7 @@ bool FBreakerGunsmithWeaponHalfNodesTest::RunTest(const FString& Parameters)
     // the arm site is FinishReload (world-only), node-gated there.
     TestEqual(TEXT("The armed chambered round debits nothing"), FBreakerWeaponMath::MagazineDebitRounds(true), 0);
 
-    // ---- AR5 Last Round ---------------------------------------------------
-    TestTrue(TEXT("Field Stripping purchases to rank 2"), BreakerBuyNode(Rig.Progression, Armory, TEXT("Gunsmith.Armory.FieldStripping"), 2));
+    // ---- AR5 Last Round (a travel root, O272) ----------------------------
     TestTrue(TEXT("Last Round purchases"), BreakerBuyNode(Rig.Progression, Armory, TEXT("Gunsmith.Armory.LastRound")));
     TestTrue(TEXT("The bought tag is the one the weapon reads at the dump boundary"),
         Rig.Progression->HasNodeTag(BreakerNodeTags::Node_AR_LastRound.GetTag()));
@@ -96,9 +95,9 @@ bool FBreakerGunsmithWeaponHalfNodesTest::RunTest(const FString& Parameters)
     // pinned in the Gunsmith consumer suite.)
     TestEqual(TEXT("With Last Round the dump threshold is one chambered round"), FBreakerWeaponMath::MagazineDumpThresholdRounds(true), 1);
 
-    // ---- AR11 No Reserve --------------------------------------------------
-    TestTrue(TEXT("Working Stock purchases to rank 2"), BreakerBuyNode(Rig.Progression, Armory, TEXT("Gunsmith.Armory.WorkingStock"), 2));
-    TestTrue(TEXT("No Reserve purchases"), BreakerBuyNode(Rig.Progression, Armory, TEXT("Gunsmith.Armory.NoReserve")));
+    // ---- AR11 No Reserve, Field Stripping's impactful half ----------------
+    TestTrue(TEXT("Field Stripping purchases"), BreakerBuyNode(Rig.Progression, Armory, TEXT("Gunsmith.Armory.FieldStripping")));
+    TestTrue(TEXT("No Reserve purchases behind its travel"), BreakerBuyNode(Rig.Progression, Armory, TEXT("Gunsmith.Armory.NoReserve")));
     TestTrue(TEXT("The bought tag is the one the reserve ceiling reads"),
         Rig.Progression->HasNodeTag(BreakerNodeTags::Node_AR_NoReserve.GetTag()));
     TestEqual(TEXT("The halving is exact on an even ceiling"), FBreakerWeaponMath::ReserveCapRounds(175, 2.0f, true), 175);

@@ -118,19 +118,19 @@ public:
     // such affix event exists yet; the affix layer calls this when it lands.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Scrap|Generation") void NotifyAmmoReturnedOnKill(int32 RoundsReturned);
     // TK5 Attrition Field: an enemy killed inside the owner's Disruptor field.
-    // Called by ABreakerDeployable's kill-inside-field detection; pays 8 (R2:
-    // 14) outside the global cap, nothing without the node.
+    // Called by ABreakerDeployable's kill-inside-field detection; pays 14
+    // outside the global cap, nothing without the node.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Scrap") void NotifyDisruptorFieldKill();
 
     // AR2 Working Stock: how many tiers faster the owner's reload reads to
-    // anything that reads reload tier. 1 while Dry (R2: also Stocked) with the
+    // anything that reads reload tier. 1 while Dry or Stocked with the
     // node, else 0. PUBLISHED HALF: no reload-tier affix reader exists yet —
     // this is the band-side answer waiting for it, an honest number nobody
     // reads rather than a silent gap.
     UFUNCTION(BlueprintPure, Category="Scrap") int32 GetReloadTierShift() const;
 
-    // FT1 Salvage: the refund fraction destruction actually pays — 0.65 at rank
-    // 1, 0.80 at rank 2 (the hard ceiling), the authored default without it.
+    // FT1 Salvage: the refund fraction destruction actually pays — 0.80 with
+    // the node (the hard ceiling), the authored default without it.
     UFUNCTION(BlueprintPure, Category="Scrap") float GetEffectiveDestructionRefundFraction() const;
 
     // Pure rules for the above, pinned by tests.
@@ -219,7 +219,7 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Scrap|Generation", meta=(ClampMin="0")) float GlobalGenerationCap = 15.0f;   // O2 PLACEHOLDER
 
     // AR4's "fixed rate" (the doc authors the shape, not the number): Scrap per
-    // overflowed reserve round; rank 2 doubles it (doc: "R2: doubled rate").
+    // overflowed reserve round; the node pays double this per round.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Scrap|Generation", meta=(ClampMin="0")) float OverflowScrapPerRound = 0.5f;   // O2 PLACEHOLDER
     // AR9's per-returned-round rate (the doc authors no magnitude).
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Scrap|Generation", meta=(ClampMin="0")) float ReciprocalScrapPerReturn = 2.0f;   // O2 PLACEHOLDER

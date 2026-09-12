@@ -182,7 +182,37 @@
   the thirteenth as a travel with no impactful (Deadeye, Feed) — O272's
   "every id stands" forbids a merge.
 
-## Cycle — O272 DOCTRINE, GUNSMITH
+## O272 DOCTRINE, GUNSMITH — LANDED
+
+- The three Gunsmith doctrines are six pairs of single-rank nodes, travel
+  then impactful, keystone last, none unpaired. Armory: Field Stripping->
+  No Reserve, Working Stock->Overpressure, Deep Pockets->Bench Work, Last
+  Round->Reciprocal, Cold Barrel->Rig Discipline, Chambered->Machinist.
+  Field Tech: Salvage->Redundancy, Overwatch->Automation, Second Shift->
+  Emplacement, Requisition->Deadman, Foreman->Logistics, Tithe->Foundry.
+  Tinkerer: Cheap Work->Dead Ground, Quick Set->Ordnance, Tripwire->
+  Patience, Rearm->Command Detonation, Overlap->Interdiction, Attrition
+  Field->Minefield. No Gunsmith node carries Data: every magnitude is a
+  compiled reader, moved to rank one by declared crossing — Salvage 0.80,
+  Attrition Field 14, Working Stock Dry and Stocked, Deep Pockets doubled
+  overflow, Field Stripping ignores full-at-start, Cold Barrel 2.5 s,
+  Cheap Work 18, Requisition 18, Second Shift +14 s, Quick Set no delay
+  with the 1 m / 1 s trade, Rearm 4 s, Overwatch instant reacquire,
+  Foreman 30 a charge (the default, no multiplier). KeystoneAtShippedBudget
+  walks six points, commits, buys Machinist for one and leaves one.
+  FirstBenchmarkReachesAnImpactful asserts every Gunsmith tree. Census
+  re-exported. PHOTOGRAPHED: the Armory wheel through the doctrine
+  fixture (`-BreakerCaptureDoctrine=Doctrine.Gunsmith.Armory`, fresh
+  `-UserDir`, direct Lvl_Fernhall path, `-BreakerCaptureArrival`) and the
+  Caster's Void Whisperer wheel the same way — the Caster cycle's "not
+  photographed" is closed. QUESTION: Second Shift->Emplacement and
+  Working Stock->Overpressure are theme pairings, not the old chain;
+  yours to re-pair. FOUND: the wheel lays a travel's label against its
+  neighbour pair's first node (No Reserve / Working Stock, Wellspring /
+  Lingering) on every twelve-node board; one layout follow-up, not three.
+  FOUND: Tithe's shorter per-deployable ICD and Tripwire's per-placement
+  choice remain recorded gaps at their sites.
+
 ## Cycle — O272 DOCTRINE, TANK
 ## Cycle — O272 DOCTRINE, SUPPORT
 

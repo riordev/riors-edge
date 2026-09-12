@@ -32,7 +32,7 @@
 // choice, never purchasable). An unpaired root has no dependents and buys
 // with one point, or is already owned.
 //
-// This test states that shape for all six trees, buys every pair with
+// This test states that shape for all nine trees, buys every pair with
 // exactly one benchmark's points settled the way the game settles them, and
 // pins the data the travel magnitudes moved to.
 // ---------------------------------------------------------------------------
@@ -103,6 +103,27 @@ namespace
                 { TEXT("Swift.Frenzy.TriggerDiscipline"), TEXT("Swift.Frenzy.SecondWind") },
                 { TEXT("Swift.Frenzy.Overrev"), TEXT("Swift.Frenzy.Bloodrhythm") } },
                 { TEXT("Swift.Frenzy.Feed") } },
+            { TEXT("Armory"), EBreakerClassId::Gunsmith, UBreakerProgressionLibrary::GetGunsmithArmoryTree(), {
+                { TEXT("Gunsmith.Armory.FieldStripping"), TEXT("Gunsmith.Armory.NoReserve") },
+                { TEXT("Gunsmith.Armory.WorkingStock"), TEXT("Gunsmith.Armory.Overpressure") },
+                { TEXT("Gunsmith.Armory.DeepPockets"), TEXT("Gunsmith.Armory.BenchWork") },
+                { TEXT("Gunsmith.Armory.LastRound"), TEXT("Gunsmith.Armory.Reciprocal") },
+                { TEXT("Gunsmith.Armory.ColdBarrel"), TEXT("Gunsmith.Armory.RigDiscipline") },
+                { TEXT("Gunsmith.Armory.Chambered"), TEXT("Gunsmith.Armory.Machinist") } }, {} },
+            { TEXT("Field Tech"), EBreakerClassId::Gunsmith, UBreakerProgressionLibrary::GetGunsmithFieldTechTree(), {
+                { TEXT("Gunsmith.FieldTech.Salvage"), TEXT("Gunsmith.FieldTech.Redundancy") },
+                { TEXT("Gunsmith.FieldTech.Overwatch"), TEXT("Gunsmith.FieldTech.Automation") },
+                { TEXT("Gunsmith.FieldTech.SecondShift"), TEXT("Gunsmith.FieldTech.Emplacement") },
+                { TEXT("Gunsmith.FieldTech.Requisition"), TEXT("Gunsmith.FieldTech.Deadman") },
+                { TEXT("Gunsmith.FieldTech.Foreman"), TEXT("Gunsmith.FieldTech.Logistics") },
+                { TEXT("Gunsmith.FieldTech.Tithe"), TEXT("Gunsmith.FieldTech.Foundry") } }, {} },
+            { TEXT("Tinkerer"), EBreakerClassId::Gunsmith, UBreakerProgressionLibrary::GetGunsmithTinkererTree(), {
+                { TEXT("Gunsmith.Tinkerer.CheapWork"), TEXT("Gunsmith.Tinkerer.DeadGround") },
+                { TEXT("Gunsmith.Tinkerer.QuickSet"), TEXT("Gunsmith.Tinkerer.Ordnance") },
+                { TEXT("Gunsmith.Tinkerer.Tripwire"), TEXT("Gunsmith.Tinkerer.Patience") },
+                { TEXT("Gunsmith.Tinkerer.Rearm"), TEXT("Gunsmith.Tinkerer.CommandDetonation") },
+                { TEXT("Gunsmith.Tinkerer.Overlap"), TEXT("Gunsmith.Tinkerer.Interdiction") },
+                { TEXT("Gunsmith.Tinkerer.AttritionField"), TEXT("Gunsmith.Tinkerer.Minefield") } }, {} },
         };
     }
 

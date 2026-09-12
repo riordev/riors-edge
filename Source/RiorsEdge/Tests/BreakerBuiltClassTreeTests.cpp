@@ -14,26 +14,27 @@
 #include "Save/BreakerQuestJournal.h"
 
 // ---------------------------------------------------------------------------
-// GUNSMITH / TANK / SUPPORT BRANCH TREES — authored 2026-08-16 (owner
-// authorization: "feel free to do all 5 classes" + "keep building").
+// TANK / SUPPORT BRANCH TREES — authored 2026-08-16 (owner authorization:
+// "feel free to do all 5 classes" + "keep building").
 // ---------------------------------------------------------------------------
-// The branch-layer coverage for the last three classes, in the mold of
-// Tests/BreakerCasterTreeTests.cpp: registration through the same catalogue
-// the built classes use, exact per-branch content pins (twelve named nodes,
-// the Swift-shaped tier compression), the keystone-on-cornerstone guarantee's
-// branch-local half, and one full purchase walk at the SHIPPED level-11
-// budget — never an inflated test grant, which is exactly how the keystone
-// budget contradiction stayed invisible the first time.
+// The branch-layer coverage for the two classes still on the compressed
+// tier grammar, in the mold of Tests/BreakerCasterTreeTests.cpp:
+// registration through the same catalogue the built classes use, exact
+// per-branch content pins (twelve named nodes, the Swift-shaped tier
+// compression), and the keystone-on-cornerstone guarantee's branch-local
+// half. Gunsmith's three trees are six-pair doctrines (O272) and their shape
+// is stated in BreakerDoctrinePairTests.cpp with Caster's and Swift's; the
+// shipped-budget walk at the bottom of this file still runs on Armory.
 //
-// Every non-keystone node in these nine trees ships as its treatment rule
+// Every non-keystone node in these six trees ships as its treatment rule
 // verbatim, as a tag with NO stat effect, and every keystone More is RESERVED
-// rather than spent (the Edgework/Cascade posture) — see the block comment
-// above GetGunsmithArmoryTree in BreakerProgressionLibrary.cpp. Both facts
-// are pinned below as assertions, because a stat line or a More quietly
-// appearing in this content would be a content decision nobody made.
+// rather than spent (the Edgework/Cascade posture) — see the block comments
+// above the Tank and Support tree getters in BreakerProgressionLibrary.cpp.
+// Both facts are pinned below as assertions, because a stat line or a More
+// quietly appearing in this content would be a content decision nobody made.
 //
-// Keystone tags are requested by STRING deliberately: the nine
-// Keystone.Gunsmith/Tank/Support.* tags are file-static natives of
+// Keystone tags are requested by STRING deliberately: the six
+// Keystone.Tank/Support.* tags are file-static natives of
 // Abilities/BreakerAbilityDefinition.cpp, and the string is what a granted
 // GameplayEffect and the ultimate's ResolveVariant actually key off —
 // the posture BreakerBuiltClassKitTests already takes.
@@ -53,24 +54,6 @@ namespace BreakerBuiltClassTreeTestHelpers
     TArray<FBuiltBranch> BuiltBranches()
     {
         return {
-            { UBreakerProgressionLibrary::GetGunsmithArmoryTree(), EBreakerClassId::Gunsmith, TEXT("Keystone.Gunsmith.Machinist"), {
-                TEXT("Gunsmith.Armory.FieldStripping"), TEXT("Gunsmith.Armory.WorkingStock"), TEXT("Gunsmith.Armory.Chambered"),
-                TEXT("Gunsmith.Armory.DeepPockets"), TEXT("Gunsmith.Armory.LastRound"), TEXT("Gunsmith.Armory.ColdBarrel"),
-                TEXT("Gunsmith.Armory.BenchWork"), TEXT("Gunsmith.Armory.RigDiscipline"),
-                TEXT("Gunsmith.Armory.Reciprocal"), TEXT("Gunsmith.Armory.Overpressure"), TEXT("Gunsmith.Armory.NoReserve"),
-                TEXT("Gunsmith.Armory.Machinist") } },
-            { UBreakerProgressionLibrary::GetGunsmithFieldTechTree(), EBreakerClassId::Gunsmith, TEXT("Keystone.Gunsmith.Foundry"), {
-                TEXT("Gunsmith.FieldTech.Salvage"), TEXT("Gunsmith.FieldTech.Overwatch"), TEXT("Gunsmith.FieldTech.SecondShift"),
-                TEXT("Gunsmith.FieldTech.Tithe"), TEXT("Gunsmith.FieldTech.Requisition"), TEXT("Gunsmith.FieldTech.Foreman"),
-                TEXT("Gunsmith.FieldTech.Emplacement"), TEXT("Gunsmith.FieldTech.Logistics"),
-                TEXT("Gunsmith.FieldTech.Redundancy"), TEXT("Gunsmith.FieldTech.Automation"), TEXT("Gunsmith.FieldTech.Deadman"),
-                TEXT("Gunsmith.FieldTech.Foundry") } },
-            { UBreakerProgressionLibrary::GetGunsmithTinkererTree(), EBreakerClassId::Gunsmith, TEXT("Keystone.Gunsmith.Minefield"), {
-                TEXT("Gunsmith.Tinkerer.CheapWork"), TEXT("Gunsmith.Tinkerer.QuickSet"), TEXT("Gunsmith.Tinkerer.Tripwire"),
-                TEXT("Gunsmith.Tinkerer.Rearm"), TEXT("Gunsmith.Tinkerer.AttritionField"), TEXT("Gunsmith.Tinkerer.Overlap"),
-                TEXT("Gunsmith.Tinkerer.Ordnance"), TEXT("Gunsmith.Tinkerer.Interdiction"),
-                TEXT("Gunsmith.Tinkerer.Patience"), TEXT("Gunsmith.Tinkerer.DeadGround"), TEXT("Gunsmith.Tinkerer.CommandDetonation"),
-                TEXT("Gunsmith.Tinkerer.Minefield") } },
             { UBreakerProgressionLibrary::GetTankLeechTree(), EBreakerClassId::Tank, TEXT("Keystone.Tank.Vein"), {
                 TEXT("Tank.Leech.Clot"), TEXT("Tank.Leech.SlowBleed"), TEXT("Tank.Leech.OpenWound"),
                 TEXT("Tank.Leech.FeedTheWound"), TEXT("Tank.Leech.Bloodlet"), TEXT("Tank.Leech.Transfusion"),
@@ -112,10 +95,11 @@ namespace BreakerBuiltClassTreeTestHelpers
 }
 
 // ---------------------------------------------------------------------------
-// Registration: nine trees, three per class, found through the exact path
+// Registration: six trees, three per class, found through the exact path
 // GetAvailableTrees walks — GetAllFallbackTrees, GetTreesForClass, and each
-// class definition's BranchTrees. A Gunsmith character SEES its trees or this
-// fails by name.
+// class definition's BranchTrees. A Tank character SEES its trees or this
+// fails by name. The class-definition loop below still covers Gunsmith: its
+// definition lists three doctrines plus Core like every other class.
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerBuiltClassTreesRegisteredTest,
@@ -162,7 +146,7 @@ bool FBreakerBuiltClassTreesRegisteredTest::RunTest(const FString& Parameters)
 // Swift-shaped compression (doc tiers 1-4 keep their numbers; the doc's
 // tier-5 keystone sits at tier 3, cost 3, as a cornerstone), every node a
 // tag-carrying rule with NO stat effect and NO ability grant, and NO More
-// multiplier anywhere — all nine keystone Mores are reserved, the
+// multiplier anywhere — all six keystone Mores are reserved, the
 // Edgework/Cascade posture. Pinned by name so content cannot drift without a
 // diff saying so.
 // ---------------------------------------------------------------------------
@@ -194,7 +178,7 @@ bool FBreakerBuiltClassTreesShapeTest::RunTest(const FString& Parameters)
             if (!TestTrue(*(Context + TEXT(" tier is 1-4 (keystone compressed to 3)")), Node->Tier >= 1 && Node->Tier <= 4)) continue;
             ++TierCounts[Node->Tier];
 
-            // The compressed grammar, one rule set for all nine branches:
+            // The compressed grammar, one rule set for all six branches:
             // entry/loop nodes are two ranks at 1; tier 3 is single rank at 2
             // (rewrites) or 3 (the cornerstone keystone); tier 4 rewrites are
             // single rank at 2.
@@ -253,7 +237,7 @@ bool FBreakerBuiltClassTreesShapeTest::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// Keystones: each of the nine Keystone.* tags the shipped ultimate variant
+// Keystones: each of the six Keystone.* tags the shipped ultimate variant
 // rows key off is granted by exactly one node across all fallback trees, and
 // that node is its branch's cornerstone. This is the branch-local half of the
 // guarantee whose global half is BreakerKeystoneReachabilityTests — whose
@@ -357,20 +341,19 @@ bool FBreakerBuiltClassTreesPrerequisitesResolveTest::RunTest(const FString& Par
 // The grant is now read from the library rather than typed here, so a ruling
 // that moves the wallet moves this walk in the same commit.
 //
-// THE ORDER ALSO CHANGED, and finding out why was the interesting part.
-// The walk used to buy six points of Armory and THEN commit, so it could
-// assert the keystone refusing with its gate open and no commitment. Under
-// O111 that sequence cannot happen: doctrine points arrive AT commitment
-// and nowhere else, so a character with points has already committed and a
-// character without them cannot buy the six. The old middle step was
-// testing a state the game no longer has.
+// Armory is a six-pair doctrine (O272): every node is one point and one
+// rank, Machinist is the impactful half of Chambered's pair and keeps the
+// six-invested gate plus the commitment (O86). The walk is the one
+// BreakerDoctrinePairTests runs for every doctrine: the keystone's travel,
+// two whole pairs, a third travel, commit, keystone. Eight points buy seven
+// nodes; the eighth is the honest remainder and is asserted as one, not
+// spent on a node the walk did not need.
 //
-// O37's check is still live, and this walk still proves it — just on the
-// tree it can actually fire for. Commitment is per-doctrine, ordinary nodes
-// need none (O15), so a Gunsmith committed to Armory can spend Armory's
-// grant inside Tinkerer and still be refused Tinkerer's keystone. That is
-// the refusal a player can actually reach, and the commitment check runs
-// before the investment gate, so it is the reason reported.
+// O37's check is still live on the tree it can fire for: commitment is
+// per-doctrine, ordinary nodes need none (O15), so a Gunsmith committed to
+// Armory can spend Armory's grant inside Tinkerer and still be refused
+// Tinkerer's keystone. The commitment check runs before the investment
+// gate, so it is the reason reported.
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerBuiltClassTreesKeystoneBudgetTest,
@@ -393,15 +376,11 @@ bool FBreakerBuiltClassTreesKeystoneBudgetTest::RunTest(const FString& Parameter
     TestEqual(TEXT("A Gunsmith holds no doctrine points before committing"),
         Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
 
-    FText CommitFailure;
-    TestTrue(TEXT("Committing to Armory succeeds"), Progression->CommitToBranch(TEXT("Doctrine.Gunsmith.Armory"), CommitFailure));
-    // COMMITMENT PAYS NOTHING NOW. The grant moved off this event and onto
-    // four benchmarks, so the walk levels to the cap to hold the pool it is
-    // about to spend. Still exactly the grant and not one point more -- that
-    // was the whole point of this fixture when it granted eleven by hand, and
-    // it stays the point now that the number comes from the game.
-    TestEqual(TEXT("Committing pays no points by itself"),
-        Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
+    // THE GRANT SITS ON FOUR BENCHMARKS, not on commitment or on levels, so
+    // the walk levels to the cap and settles a completed journal to hold the
+    // pool it is about to spend. Still exactly the grant and not one point
+    // more -- that was the whole point of this fixture when it granted eleven
+    // by hand, and it stays the point now that the number comes from the game.
     // Level fifty is the final device prerequisite; XP alone grants no Doctrine.
     const FBreakerExperienceCurve BenchmarkCurve;
     Progression->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(
@@ -427,40 +406,53 @@ bool FBreakerBuiltClassTreesKeystoneBudgetTest::RunTest(const FString& Parameter
         UBreakerProgressionLibrary::DoctrinePointGrant);
 
     FText Failure;
+    // Machinist hangs from Chambered (O272: the keystone is the impactful
+    // half of its own pair). The travel buys first, and one invested is not
+    // the gate.
+    TestTrue(TEXT("Chambered purchases"), Progression->PurchaseNode(Armory, TEXT("Gunsmith.Armory.Chambered"), Failure));
+    TestFalse(TEXT("Machinist refuses at one invested"), Progression->CanPurchaseNode(Armory, TEXT("Gunsmith.Armory.Machinist"), Failure));
+    // Two whole pairs, one point each half, no gate below the keystone.
+    TestTrue(TEXT("Field Stripping purchases"), Progression->PurchaseNode(Armory, TEXT("Gunsmith.Armory.FieldStripping"), Failure));
+    TestTrue(TEXT("No Reserve purchases behind its travel"), Progression->PurchaseNode(Armory, TEXT("Gunsmith.Armory.NoReserve"), Failure));
+    TestTrue(TEXT("Working Stock purchases"), Progression->PurchaseNode(Armory, TEXT("Gunsmith.Armory.WorkingStock"), Failure));
+    TestTrue(TEXT("Overpressure purchases behind its travel"), Progression->PurchaseNode(Armory, TEXT("Gunsmith.Armory.Overpressure"), Failure));
+    TestEqual(TEXT("Five invested"), Progression->GetTreeInvestment(Armory), 5);
+    TestFalse(TEXT("Machinist refuses at five invested"), Progression->CanPurchaseNode(Armory, TEXT("Gunsmith.Armory.Machinist"), Failure));
+    // A third travel opens the gate. Its impactful is deliberately NOT
+    // bought: the point it would cost is the remainder asserted below.
+    TestTrue(TEXT("Cold Barrel purchases"), Progression->PurchaseNode(Armory, TEXT("Gunsmith.Armory.ColdBarrel"), Failure));
+    TestEqual(TEXT("Armory investment reaches the keystone's six-invested gate"), Progression->GetTreeInvestment(Armory), 6);
+    TestEqual(TEXT("...with two points left"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 2);
+    // O86: the gate is open and the keystone still wants the commitment.
+    TestFalse(TEXT("Machinist refuses uncommitted at six invested"),
+        Progression->CanPurchaseNode(Armory, TEXT("Gunsmith.Armory.Machinist"), Failure));
+    TestFalse(TEXT("The uncommitted refusal carries a reason"), Failure.IsEmpty());
+
+    TestTrue(TEXT("Committing to Armory succeeds"), Progression->CommitToBranch(TEXT("Doctrine.Gunsmith.Armory"), Failure));
+    TestEqual(TEXT("Committing pays no points by itself"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 2);
     // O37, on the tree it can still fire for: committed to Armory, refused
     // Tinkerer's keystone. The points are in hand, so this is the commitment
     // check answering and not the wallet.
+    Failure = FText::GetEmpty();
     TestFalse(TEXT("A keystone in an uncommitted doctrine refuses"),
         Progression->CanPurchaseNode(Tinkerer, TEXT("Gunsmith.Tinkerer.Minefield"), Failure));
     TestFalse(TEXT("The refusal carries a reason"), Failure.IsEmpty());
-    // Machinist's prerequisite chain: Chambered (T1) -> Cold Barrel (T2).
-    // ORDER MATTERS: each purchase clears its own tier's investment gate at
-    // the moment it is bought (tier 2 needs 2 points already in the tree).
-    TestTrue(TEXT("Chambered rank 1 purchases"), Progression->PurchaseNode(Armory, TEXT("Gunsmith.Armory.Chambered"), Failure));
-    TestTrue(TEXT("Chambered rank 2 purchases"), Progression->PurchaseNode(Armory, TEXT("Gunsmith.Armory.Chambered"), Failure));
-    TestTrue(TEXT("Cold Barrel rank 1 purchases"), Progression->PurchaseNode(Armory, TEXT("Gunsmith.Armory.ColdBarrel"), Failure));
-    TestTrue(TEXT("Cold Barrel rank 2 purchases"), Progression->PurchaseNode(Armory, TEXT("Gunsmith.Armory.ColdBarrel"), Failure));
-    TestTrue(TEXT("Field Stripping rank 1 purchases"), Progression->PurchaseNode(Armory, TEXT("Gunsmith.Armory.FieldStripping"), Failure));
-    TestTrue(TEXT("Field Stripping rank 2 purchases"), Progression->PurchaseNode(Armory, TEXT("Gunsmith.Armory.FieldStripping"), Failure));
-    // Six invested is the tier-4 gate, and Working Stock is deliberately NOT
-    // bought: the walk that used to end here spent eight to open an 8-point
-    // cornerstone gate and then needed three more. Six and two is the whole
-    // wallet, which is the point — four 2-point picks, the last one the
-    // keystone.
-    TestEqual(TEXT("Armory investment reaches the tier-4 gate"), Progression->GetTreeInvestment(Armory), 6);
-    TestEqual(TEXT("...with exactly the keystone's cost left"),
-        Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 2);
 
-    TestTrue(TEXT("Machinist purchases on the last two points of the grant"),
+    TestTrue(TEXT("Machinist purchases for one point at six invested and committed"),
         Progression->PurchaseNode(Armory, TEXT("Gunsmith.Armory.Machinist"), Failure));
     // THE LIVE WALLET. This read ClassPoints_Retired, which has no storage and
-    // answers zero to everything — so the assertion that the budget was "spent
-    // to exactly zero" was true before the walk started and would have stayed
-    // true if every purchase above had failed.
-    TestEqual(TEXT("The doctrine grant is spent to exactly zero"),
-        Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
-    TestEqual(TEXT("...and all of it went into this one tree"),
-        Progression->GetTreeInvestment(Armory), UBreakerProgressionLibrary::DoctrinePointGrant);
+    // answers zero to everything — so an assertion on the wallet was true
+    // before the walk started and would have stayed true if every purchase
+    // above had failed. Seven of the eight are spent; the eighth is the
+    // remainder, and it is asserted as one rather than spent to make a zero.
+    TestEqual(TEXT("Seven nodes leave one point of the eight"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), UBreakerProgressionLibrary::DoctrinePointGrant - 7);
+    TestEqual(TEXT("...and every spent point went into this one tree"),
+        Progression->GetTreeInvestment(Armory), 7);
+    TestEqual(TEXT("Machinist is owned at rank one"),
+        Progression->GetNodeRank(TEXT("Gunsmith.Armory.Machinist"), EBreakerPointCurrency::DoctrinePoints), 1);
 
     // The purchase is not decorative: the branch identity tag and the
     // ultimate's keystone tag both reach the aggregate, so Field Assembly's

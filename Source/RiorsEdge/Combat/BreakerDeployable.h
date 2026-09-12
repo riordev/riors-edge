@@ -160,19 +160,20 @@ public:
     static bool CountsAgainstDensityCap(EBreakerDeployableType Type, bool bOwnerHasLogistics);
     // FT9 Redundancy: total cap 4 -> 5 (per-type stays 2, invariantly).
     static int32 BaseTotalCapFor(bool bHasRedundancy);
-    // FT5 Requisition: the replacement discount, 10 at rank 1, 18 at rank 2.
+    // Gunsmith doctrine nodes are single-rank (O272): rank >= 1 is the rule.
+    // FT5 Requisition: the replacement discount, 18 with the node.
     static float RequisitionDiscountFor(int32 Rank);
-    // FT3 Second Shift: remaining lifetime after a qualifying reload — +8s
-    // (R2: +14s), never past double the BASE lifetime. The 2x-base ceiling is
-    // the anti-farm rule and applies to the remaining clock, so reload-cycling
-    // in a corner cannot bank a permanent field.
+    // FT3 Second Shift: remaining lifetime after a qualifying reload — +14s,
+    // never past double the BASE lifetime. The 2x-base ceiling is the
+    // anti-farm rule and applies to the remaining clock, so reload-cycling in
+    // a corner cannot bank a permanent field.
     static float SecondShiftLifetime(int32 Rank, float BaseLifetime, float CurrentRemaining);
-    // TK2 Quick Set: arm delay halved (R2: removed)...
+    // TK2 Quick Set: the arm delay is removed...
     static float QuickSetArmDelay(int32 Rank, float BaseDelay);
-    // ...and at R2 a no-delay charge triggers on a radius 1 m smaller until a
+    // ...and a no-delay charge triggers on a radius 1 m smaller until a
     // second has passed since it armed.
     static float QuickSetTriggerRadius(int32 Rank, float SecondsSinceArmed, float BaseRadiusCm);
-    // TK4 Rearm: one charge every 6s (R2: 4s); 0 = the node is not owned.
+    // TK4 Rearm: one charge every 4s; 0 = the node is not owned.
     static float RearmInterval(int32 Rank);
     // TK7 Ordnance: 4 charges instead of 3.
     static int32 OrdnanceMineCount(bool bHasOrdnance, int32 BaseCount);
@@ -247,8 +248,8 @@ public:
     // --- Node-rule tuning (all O2 PLACEHOLDER unless doc-cited) ------------
     // FT3: "within their radius" — the doc authors no number; near = this.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Deployable|Nodes", meta=(ClampMin="0")) float SecondShiftRadiusCm = 900.0f;   // O2 PLACEHOLDER
-    // FT6: the health a crate charge restores at rank 1 (rank 2 doubles it).
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Deployable|Nodes", meta=(ClampMin="0")) float ForemanHealPerCharge = 15.0f;   // O2 PLACEHOLDER
+    // FT6: the health a crate charge restores with the node (single-rank, O272).
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Deployable|Nodes", meta=(ClampMin="0")) float ForemanHealPerCharge = 30.0f;   // O2 PLACEHOLDER
     // FT7: LOS grace, doc-seeded ("seed 1.2s of grace").
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Deployable|Nodes", meta=(ClampMin="0")) float TurretLOSGraceSeconds = 1.2f;   // §FT7 seed
     // FT11: the Deadman detonation, as a fraction of the owner's scaled weapon
@@ -353,10 +354,10 @@ private:
     // slightly sticky. The alternative (a per-source split on OnHitDealt) is
     // combat-owner territory.
     TWeakObjectPtr<ABreakerEnemy> LastOwnerDamagedEnemy;
-    // FT7/FT2-R2/FT10: current turret target and its LOS-grace clock.
+    // FT7/FT2/FT10: current turret target and its LOS-grace clock.
     TWeakObjectPtr<ABreakerEnemy> CurrentTurretTarget;
     double TurretLOSLostTime = -1000.0;
-    // FT10 (and FT2 R2): the next turret shot skips the cadence gate.
+    // FT10 (and FT2 Overwatch): the next turret shot skips the cadence gate.
     bool bTurretFreeShotPending = false;
     // FT6: half-rate consumption toggle while the interactor's reserve is full.
     bool bForemanSkipCharge = false;

@@ -126,8 +126,8 @@ void ABreakerDeployable::InitializeDeployable(EBreakerDeployableType InType, AAc
         LifetimeRemaining = 60.0f;   // §2.2: 60s or all charges triggered
         Health = MineClusterHealth;
         // TK7 Ordnance: 4 charges instead of 3. TK2 Quick Set: the arm delay
-        // halves (R2: goes to zero, trading a smaller trigger radius for 1s —
-        // the radius half lives in the trigger check).
+        // goes to zero, trading a smaller trigger radius for 1s — the radius
+        // half lives in the trigger check.
         const int32 EffectiveCount = OrdnanceMineCount(OwnerHasNodeTag(BreakerNodeTags::Node_TK_Ordnance.GetTag()), MineCount);
         const float EffectiveArmDelay = QuickSetArmDelay(OwnerNodeRank(TEXT("Gunsmith.Tinkerer.QuickSet")), MineArmDelay);
         for (int32 Index = 0; Index < EffectiveCount; ++Index)
@@ -395,23 +395,23 @@ void ABreakerDeployable::TickTurret(float DeltaSeconds)
     if (!World) return;
     const double Now = World->GetTimeSeconds();
 
-    // FT2 R2 / FT10: the tracked target dying opens the reacquire rules. R2
-    // Overwatch skips the reacquire wait; Automation additionally makes the
-    // immediate shot FREE (it does not advance the cadence clock).
-    const bool bHasOverwatchR2 = OwnerNodeRank(TEXT("Gunsmith.FieldTech.Overwatch")) >= 2;
+    // FT2 / FT10: the tracked target dying opens the reacquire rules. Overwatch
+    // (single-rank, O272) skips the reacquire wait; Automation additionally
+    // makes the immediate shot FREE (it does not advance the cadence clock).
+    const bool bHasOverwatch = OwnerNodeRank(TEXT("Gunsmith.FieldTech.Overwatch")) >= 1;
     const bool bHasAutomation = OwnerHasNodeTag(BreakerNodeTags::Node_FT_Automation.GetTag());
     if (CurrentTurretTarget.IsValid())
     {
         const UBreakerCombatComponent* TrackedCombat = CurrentTurretTarget->FindComponentByClass<UBreakerCombatComponent>();
         if (TrackedCombat && TrackedCombat->IsDead())
         {
-            if (bHasOverwatchR2 || bHasAutomation) bTurretFreeShotPending = true;
+            if (bHasOverwatch || bHasAutomation) bTurretFreeShotPending = true;
             CurrentTurretTarget.Reset();
         }
     }
     else if (CurrentTurretTarget.IsStale())
     {
-        if (bHasOverwatchR2 || bHasAutomation) bTurretFreeShotPending = true;
+        if (bHasOverwatch || bHasAutomation) bTurretFreeShotPending = true;
         CurrentTurretTarget.Reset();
     }
 
@@ -425,7 +425,6 @@ void ABreakerDeployable::TickTurret(float DeltaSeconds)
     // it: FT2 Overwatch prefers the target the owner last damaged; FT7
     // Emplacement acquires through the owner's crosshair priority and holds a
     // target through brief LOS breaks.
-    const bool bHasOverwatch = OwnerHasNodeTag(BreakerNodeTags::Node_FT_Overwatch.GetTag());
     const bool bHasEmplacement = OwnerHasNodeTag(BreakerNodeTags::Node_FT_Emplacement.GetTag());
     const FVector MuzzleLocation = GetActorLocation() + FVector(0.0f, 0.0f, 60.0f);
 
@@ -524,7 +523,7 @@ void ABreakerDeployable::TickTurret(float DeltaSeconds)
     CurrentTurretTarget = Target;
 
     // FT10: the free burst does not advance the cadence clock — the turret's
-    // next ordinary shot still lands on time. FT2 R2 merely skipped the wait.
+    // next ordinary shot still lands on time. FT2 Overwatch merely skips the wait.
     const bool bFreeShot = bTurretFreeShotPending;
     bTurretFreeShotPending = false;
     if (!bFreeShot || !bHasAutomation)
@@ -618,12 +617,12 @@ void ABreakerDeployable::TickAmmoCrate(float DeltaSeconds)
     Weapon->AddReserveAmmoFraction(CrateReserveFraction);
 
     // FT6's heal half, through the ONE healing path so overheal rules and
-    // listeners all see it (rank 2 doubles the portion, per the row).
+    // listeners all see it. Single-rank (O272): the portion is the tunable.
     if (ForemanRank > 0)
     {
         if (UBreakerCombatComponent* OwnerCombat = OwnerActor->FindComponentByClass<UBreakerCombatComponent>())
         {
-            OwnerCombat->ApplyHealingAmount(ForemanHealPerCharge * (ForemanRank >= 2 ? 2.0f : 1.0f), OwnerActor, FGameplayTag());
+            OwnerCombat->ApplyHealingAmount(ForemanHealPerCharge, OwnerActor, FGameplayTag());
         }
     }
 
@@ -656,11 +655,12 @@ void ABreakerDeployable::TickMineCluster(float DeltaSeconds)
         }
         Mine.SecondsSinceArmed += DeltaSeconds;
 
-        // TK2 R2's trade: a no-delay charge triggers on a smaller radius for
-        // its first armed second. TK3 Tripwire swaps the condition entirely:
-        // line of sight within the tripwire range instead of proximity. (TK3
-        // R2's per-placement choice still waits — there is no placement-time
-        // input seam to hang a cycling choice on.)
+        // TK2 Quick Set's trade: a no-delay charge triggers on a smaller radius
+        // for its first armed second. TK3 Tripwire swaps the condition entirely:
+        // line of sight within the tripwire range instead of proximity. GAP,
+        // recorded: the treatment's per-placement choice between tripwire and
+        // proximity is not authored (no placement-time input seam to hang a
+        // cycling choice on) — owning the node is tripwire, always.
         const float TriggerRadius = QuickSetTriggerRadius(QuickSetRank, Mine.SecondsSinceArmed, MineTriggerRadiusCm);
         for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
         {
@@ -712,7 +712,7 @@ void ABreakerDeployable::TickMineCluster(float DeltaSeconds)
 
     if (!bAnyLive)
     {
-        // TK4 Rearm: an emptied cluster rearms one charge every 6s (R2: 4s)
+        // TK4 Rearm: an emptied cluster rearms one charge every 4s
         // for the rest of its lifetime, up to its original count — so the
         // exhausted-cluster destruction only fires for a build without it.
         const float Interval = RearmInterval(OwnerNodeRank(TEXT("Gunsmith.Tinkerer.Rearm")));
@@ -1110,15 +1110,15 @@ int32 ABreakerDeployable::BaseTotalCapFor(bool bHasRedundancy)
 
 float ABreakerDeployable::RequisitionDiscountFor(int32 Rank)
 {
-    if (Rank >= 2) return 18.0f;   // §FT5 R2, transcribed
-    if (Rank == 1) return 10.0f;   // §FT5, transcribed
+    // Single-rank (O272): owning the node is the full discount.
+    if (Rank >= 1) return 18.0f;   // §FT5, transcribed   // O2 PLACEHOLDER
     return 0.0f;
 }
 
 float ABreakerDeployable::SecondShiftLifetime(int32 Rank, float InBaseLifetime, float CurrentRemaining)
 {
     if (Rank <= 0) return CurrentRemaining;
-    const float Extension = Rank >= 2 ? 14.0f : 8.0f;   // §FT3, transcribed
+    const float Extension = 14.0f;   // §FT3, transcribed; single-rank (O272)   // O2 PLACEHOLDER
     // The 2x-base ceiling is the anti-farm rule; a remainder already above it
     // (impossible without this node) is left alone rather than clipped down.
     return FMath::Max(CurrentRemaining, FMath::Min(CurrentRemaining + Extension, InBaseLifetime * 2.0f));
@@ -1126,27 +1126,26 @@ float ABreakerDeployable::SecondShiftLifetime(int32 Rank, float InBaseLifetime, 
 
 float ABreakerDeployable::QuickSetArmDelay(int32 Rank, float BaseDelay)
 {
-    if (Rank >= 2) return 0.0f;              // §TK2 R2: removed
-    if (Rank == 1) return BaseDelay * 0.5f;  // §TK2: halved
+    if (Rank >= 1) return 0.0f;   // §TK2: the arm delay is removed; single-rank (O272)
     return FMath::Max(0.0f, BaseDelay);
 }
 
 float ABreakerDeployable::QuickSetTriggerRadius(int32 Rank, float SecondsSinceArmed, float BaseRadiusCm)
 {
-    // §TK2 R2's explicit trade: no delay, but 1 m less trigger radius until a
-    // second has passed. Rank 1 keeps the full radius (its delay is merely
-    // halved, not removed).
-    if (Rank >= 2 && SecondsSinceArmed < 1.0f)
+    // §TK2's explicit trade: no delay, but 1 m less trigger radius until a
+    // second has passed since the charge armed. Single-rank (O272): the trade
+    // comes with the node.
+    if (Rank >= 1 && SecondsSinceArmed < 1.0f)   // O2 PLACEHOLDER (the 1 s window)
     {
-        return FMath::Max(0.0f, BaseRadiusCm - 100.0f);
+        return FMath::Max(0.0f, BaseRadiusCm - 100.0f);   // O2 PLACEHOLDER (the 1 m step)
     }
     return FMath::Max(0.0f, BaseRadiusCm);
 }
 
 float ABreakerDeployable::RearmInterval(int32 Rank)
 {
-    if (Rank >= 2) return 4.0f;   // §TK4 R2, transcribed
-    if (Rank == 1) return 6.0f;   // §TK4, transcribed
+    // Single-rank (O272): owning the node is the full cadence.
+    if (Rank >= 1) return 4.0f;   // §TK4, transcribed   // O2 PLACEHOLDER
     return 0.0f;
 }
 
