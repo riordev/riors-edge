@@ -44,7 +44,10 @@
 // THIS FIGURE MOVES WITH THE COMPOSER'S ROSTER — the count printed at the
 // foot of Scripts/compose_fernhall.py is the same number, and a pass that
 // adds pieces (O278's stair treads, for one) moves both in the same commit.
-static constexpr int32 BreakerFernhallExpectedPieceCount = 721;
+// 721 -> 793 with the APRONS (O285): two raised aprons across the lane in
+// each of the four yards, each a top and four two-tread runs — nine pieces
+// an apron, seventy-two in all. Not one cover box moved.
+static constexpr int32 BreakerFernhallExpectedPieceCount = 793;
 // THE OPENINGS (O274), by the same discipline: one figure, set from the
 // export, moved only when the composer deliberately authors another mouth.
 // Fourteen across four yards — entry 4, substation 4, depot 3, siding 3.
@@ -897,6 +900,45 @@ namespace
     {
         return Piece.Origin.Z + Piece.Extent.Z;
     }
+
+    // THE TREADS OF ONE RUN: the pieces named for the slab with a bare index
+    // after the prefix — `..._step0`, never `..._stepladder` — sorted by their
+    // top face, which is the order a foot meets them.
+    void BreakerFernhallCollectTreads(const TArray<FBreakerZonePiece>& Pieces, const FString& TreadPrefix,
+        TArray<const FBreakerZonePiece*>& OutTreads)
+    {
+        OutTreads.Reset();
+        for (const FBreakerZonePiece& Piece : Pieces)
+        {
+            if (Piece.Name.StartsWith(TreadPrefix) && Piece.Name.Mid(TreadPrefix.Len()).IsNumeric()) OutTreads.Add(&Piece);
+        }
+        OutTreads.Sort([](const FBreakerZonePiece& A, const FBreakerZonePiece& B)
+        {
+            return BreakerFernhallTopZ(A) < BreakerFernhallTopZ(B);
+        });
+    }
+
+    // THE GROUND A FIRST TREAD STANDS ON, found rather than assumed at zero:
+    // the highest flr_ piece under the tread's top whose footprint holds the
+    // tread's centre, skipping whatever the caller names as the stair's own
+    // (its slab, its treads). Every yard sits on one plane today, and the day
+    // one does not this still measures the step a foot actually takes.
+    const FBreakerZonePiece* BreakerFernhallGroundUnder(const TArray<FBreakerZonePiece>& Pieces,
+        const FBreakerZonePiece& First, float SamePlaneCm, TFunctionRef<bool(const FBreakerZonePiece&)> IsOwn)
+    {
+        const FBreakerZonePiece* Ground = nullptr;
+        const float FirstTop = BreakerFernhallTopZ(First);
+        for (const FBreakerZonePiece& Floor : Pieces)
+        {
+            if (!Floor.Name.StartsWith(TEXT("flr_")) || IsOwn(Floor)) continue;
+            const float FloorTop = BreakerFernhallTopZ(Floor);
+            if (FloorTop > FirstTop - SamePlaneCm) continue;
+            if (FMath::Abs(First.Origin.X - Floor.Origin.X) > Floor.Extent.X
+                || FMath::Abs(First.Origin.Y - Floor.Origin.Y) > Floor.Extent.Y) continue;
+            if (!Ground || FloorTop > BreakerFernhallTopZ(*Ground)) Ground = &Floor;
+        }
+        return Ground;
+    }
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -938,44 +980,27 @@ bool FBreakerFernhallDecksClimbableTest::RunTest(const FString& Parameters)
             const FString Where = FString::Printf(TEXT("%s: %s"), *Folder, *Slab.Name);
             const float SlabTop = BreakerFernhallTopZ(Slab);
 
-            // (d) The stair exists. Its treads are the pieces named for this
-            // slab with a bare index after the prefix — `..._step0`, never
-            // `..._stepladder` — sorted by their top face, which is the order
-            // a foot meets them.
+            // (d) The stair exists: at least one tread named for this slab,
+            // in the order a foot meets them.
             TArray<const FBreakerZonePiece*> Treads;
-            for (const FBreakerZonePiece& Piece : Pieces)
-            {
-                if (Piece.Name.StartsWith(TreadPrefix) && Piece.Name.Mid(TreadPrefix.Len()).IsNumeric()) Treads.Add(&Piece);
-            }
+            BreakerFernhallCollectTreads(Pieces, TreadPrefix, Treads);
             if (!TestTrue(FString::Printf(TEXT("%s has at least one tread named %s<i> (slab top Z %.1f)"),
                 *Where, *TreadPrefix, SlabTop), Treads.Num() > 0))
             {
                 continue;
             }
-            Treads.Sort([](const FBreakerZonePiece& A, const FBreakerZonePiece& B)
-            {
-                return BreakerFernhallTopZ(A) < BreakerFernhallTopZ(B);
-            });
             const FBreakerZonePiece& First = *Treads[0];
             const FBreakerZonePiece& Last = *Treads.Last();
 
             // (a) THE FIRST RISE IS FROM THE GROUND THE TREAD STANDS ON, found
-            // rather than assumed at zero: the highest floor under the first
-            // tread's top whose footprint holds the tread's centre. Every yard
-            // sits on one plane today, and the day one does not this still
-            // measures the step a foot actually takes.
-            const FBreakerZonePiece* Ground = nullptr;
+            // rather than assumed at zero.
             const float FirstTop = BreakerFernhallTopZ(First);
-            for (const FBreakerZonePiece& Floor : Pieces)
-            {
-                if (!Floor.Name.StartsWith(TEXT("flr_")) || &Floor == &Slab) continue;
-                if (Floor.Name.StartsWith(TreadPrefix) && Floor.Name.Mid(TreadPrefix.Len()).IsNumeric()) continue;
-                const float FloorTop = BreakerFernhallTopZ(Floor);
-                if (FloorTop > FirstTop - BreakerFloorSamePlaneCm) continue;
-                if (FMath::Abs(First.Origin.X - Floor.Origin.X) > Floor.Extent.X
-                    || FMath::Abs(First.Origin.Y - Floor.Origin.Y) > Floor.Extent.Y) continue;
-                if (!Ground || FloorTop > BreakerFernhallTopZ(*Ground)) Ground = &Floor;
-            }
+            const FBreakerZonePiece* Ground = BreakerFernhallGroundUnder(Pieces, First, BreakerFloorSamePlaneCm,
+                [&](const FBreakerZonePiece& Floor)
+                {
+                    return &Floor == &Slab
+                        || (Floor.Name.StartsWith(TreadPrefix) && Floor.Name.Mid(TreadPrefix.Len()).IsNumeric());
+                });
             if (TestNotNull(FString::Printf(TEXT("%s: a floor lies under the first tread %s (top Z %.1f at X %.0f Y %.0f)"),
                 *Where, *First.Name, FirstTop, First.Origin.X, First.Origin.Y), Ground))
             {
@@ -1042,6 +1067,293 @@ bool FBreakerFernhallDecksClimbableTest::RunTest(const FString& Parameters)
         // every yard, so a folder in which none matched is a folder this test
         // has stopped reading, not a folder with nothing to climb.
         TestTrue(FString::Printf(TEXT("%s has raised slabs to measure (%d)"), *Folder, Slabs), Slabs > 0);
+    }
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// TWO APRONS ACROSS THE LANE, CLIMBED FROM ALL FOUR SIDES (O285). A raised
+// apron is a third of a storey up, 8 m along the lane and 18 m across it,
+// with a two-tread run on each of its four sides — so there is no side a body
+// has to walk round to get up, and no side it cannot drop off and come back
+// up. It is sited OFF every chest pair: an apron that straddles a cover pair
+// turns two measured chest-high boxes into one mound, and the grammar the
+// yard was validated under no longer describes the yard.
+//
+// THE NAME CONTRACT with compose_fernhall.py: `flr_<tag>_apron<i>` is the
+// top, climbed by `flr_<tag>_apron<i>_nstep<j>` and `_fstep<j>` along the
+// lane and `_lstep<j>` and `_rstep<j>` across it. The yard's lane axis is
+// read off the top itself — 18 m across, 8 m along, so the shorter
+// horizontal extent IS the lane — rather than off a marker, because the
+// apron's shape is the same fact and this file need not agree with a second
+// source about it. The entry yard's tag is `entry` on its slabs and absent
+// on its chests (`blk_chest_n00`, `blk_chest_sub_n00`), which is the
+// composer's own naming; both spell one yard here.
+//
+// The rises answer to the movement default, the abutments and the solids to
+// the same centimetre DecksClimbable measures by, both folders.
+// ---------------------------------------------------------------------------
+namespace
+{
+    // `flr_<tag>_apron<i>` or `flr_apron<i>`: true for a top, never a tread
+    // (`_apron0_nstep1` has no bare index after `apron`). OutTag is the yard's
+    // tag, empty for a tagless name.
+    bool BreakerFernhallIsApronTop(const FString& Name, FString& OutTag)
+    {
+        if (!Name.StartsWith(TEXT("flr_"))) return false;
+        const FString Rest = Name.Mid(4);
+        const int32 At = Rest.Find(TEXT("apron"), ESearchCase::CaseSensitive, ESearchDir::FromEnd);
+        if (At == INDEX_NONE) return false;
+        const FString Index = Rest.Mid(At + 5);
+        if (Index.IsEmpty() || !Index.IsNumeric()) return false;
+        const FString Prefix = Rest.Left(At);
+        if (Prefix.IsEmpty()) { OutTag.Reset(); return true; }
+        if (!Prefix.EndsWith(TEXT("_"))) return false;
+        OutTag = Prefix.LeftChop(1);
+        return true;
+    }
+
+    // `blk_chest_[<tag>_](n|s)<NN>`: the yard tag, empty for the entry yard.
+    bool BreakerFernhallIsChest(const FString& Name, FString& OutTag)
+    {
+        static const FString ChestPrefix = TEXT("blk_chest_");
+        if (!Name.StartsWith(ChestPrefix)) return false;
+        const FString Rest = Name.Mid(ChestPrefix.Len());
+        const int32 Cut = Rest.Find(TEXT("_"), ESearchCase::CaseSensitive, ESearchDir::FromEnd);
+        OutTag = Cut == INDEX_NONE ? FString() : Rest.Left(Cut);
+        return true;
+    }
+
+    // One key per yard across both spellings: the composer's shape pass names
+    // the entry yard `entry`, its cover pass names it nothing.
+    FString BreakerFernhallYardKey(const FString& Tag)
+    {
+        return Tag == TEXT("entry") ? FString() : Tag;
+    }
+
+    const TCHAR* BreakerFernhallYardLabel(const FString& Key)
+    {
+        return Key.IsEmpty() ? TEXT("<entry>") : *Key;
+    }
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerFernhallApronsClimbableTest,
+    "RiorsEdge.Zone.Fernhall.ApronsClimbable",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerFernhallApronsClimbableTest::RunTest(const FString& Parameters)
+{
+    // Read, never typed: the character's own ceiling on a step.
+    const UBreakerCharacterMovementComponent* Movement = GetDefault<UBreakerCharacterMovementComponent>();
+    if (!TestNotNull(TEXT("the movement component has a default object"), Movement)) return false;
+    const float MaxStepCm = Movement->MaxStepHeight;
+    TestTrue(FString::Printf(TEXT("the movement default's MaxStepHeight is a positive figure (%.1f)"), MaxStepCm),
+        MaxStepCm > 0.0f);
+
+    constexpr float BreakerFloorAbutCm = 1.0f;
+    constexpr float BreakerFloorSamePlaneCm = 0.5f;
+    // O285: two aprons a yard, each 18 m across the lane.
+    constexpr int32 BreakerApronsPerYard = 2;
+    constexpr float BreakerApronMaxLatHalfCm = 900.0f;
+
+    // The four runs, with the axis each climbs along: n/f along the lane,
+    // l/r across it.
+    struct FRun { const TCHAR* Suffix; bool bAlongFwd; };
+    static const FRun Runs[] = {
+        { TEXT("_nstep"), true },
+        { TEXT("_fstep"), true },
+        { TEXT("_lstep"), false },
+        { TEXT("_rstep"), false },
+    };
+
+    for (const FString& Folder : { UBreakerZoneBuilder::FernhallMeshFolder(), UBreakerZoneBuilder::FernhallRiftMeshFolder() })
+    {
+        TArray<FBreakerZonePiece> Pieces;
+        if (!TestTrue(FString::Printf(TEXT("%s collects"), *Folder), UBreakerZoneBuilder::CollectZonePieces(Folder, Pieces))) return false;
+
+        TArray<const FBreakerZonePiece*> Solids;
+        TMap<FString, TArray<const FBreakerZonePiece*>> ChestsByYard;
+        for (const FBreakerZonePiece& Piece : Pieces)
+        {
+            if (Piece.Name.StartsWith(TEXT("wall_")) || Piece.Name.StartsWith(TEXT("blk_"))) Solids.Add(&Piece);
+            FString ChestTag;
+            if (BreakerFernhallIsChest(Piece.Name, ChestTag)) ChestsByYard.FindOrAdd(BreakerFernhallYardKey(ChestTag)).Add(&Piece);
+        }
+
+        TMap<FString, int32> ApronsByYard;
+        int32 Aprons = 0;
+        for (const FBreakerZonePiece& Top : Pieces)
+        {
+            FString Tag;
+            if (!BreakerFernhallIsApronTop(Top.Name, Tag)) continue;
+            ++Aprons;
+            const FString Yard = BreakerFernhallYardKey(Tag);
+            ++ApronsByYard.FindOrAdd(Yard);
+            const FString Where = FString::Printf(TEXT("%s: %s"), *Folder, *Top.Name);
+            const float TopZ = BreakerFernhallTopZ(Top);
+
+            // THE LANE AXIS, off the top's own shape: 8 m along the lane, 18 m
+            // across it, so the shorter horizontal extent is fwd. Equal
+            // extents would be a square nobody authored, and no axis to read.
+            if (!TestTrue(FString::Printf(TEXT("%s: the top is longer across the lane than along it (extent X %.0f, Y %.0f)"),
+                *Where, Top.Extent.X, Top.Extent.Y), Top.Extent.X != Top.Extent.Y))
+            {
+                continue;
+            }
+            const int32 Fwd = Top.Extent.X < Top.Extent.Y ? 0 : 1;
+            const int32 Lat = 1 - Fwd;
+
+            // (d) Shipped shape: the apron never reaches wider across the lane
+            // than the ruling gives it.
+            TestTrue(FString::Printf(TEXT("%s: lat half-extent %.1f cm is within %.0f"), *Where, Top.Extent[Lat], BreakerApronMaxLatHalfCm),
+                Top.Extent[Lat] <= BreakerApronMaxLatHalfCm);
+
+            // The apron's span along the lane, grown by its fwd-axis runs as
+            // they are found: the interval a chest pair must lie clear of.
+            float FwdMin = Top.Origin[Fwd] - Top.Extent[Fwd];
+            float FwdMax = Top.Origin[Fwd] + Top.Extent[Fwd];
+
+            TArray<const FBreakerZonePiece*> AllTreads;
+            for (const FRun& Run : Runs)
+            {
+                const FString TreadPrefix = Top.Name + Run.Suffix;
+                TArray<const FBreakerZonePiece*> Treads;
+                BreakerFernhallCollectTreads(Pieces, TreadPrefix, Treads);
+                // (a) THE RUN EXISTS — one of exactly four, each found by its
+                // own suffix.
+                if (!TestTrue(FString::Printf(TEXT("%s has a run named %s<j> (top Z %.1f)"), *Where, *TreadPrefix, TopZ), Treads.Num() > 0))
+                {
+                    continue;
+                }
+                AllTreads.Append(Treads);
+                const FBreakerZonePiece& First = *Treads[0];
+                const FBreakerZonePiece& Last = *Treads.Last();
+                const float FirstTop = BreakerFernhallTopZ(First);
+
+                // (a) Every rise within the movement default: off the ground
+                // the first tread stands on, tread to tread, and onto the top.
+                const FBreakerZonePiece* Ground = BreakerFernhallGroundUnder(Pieces, First, BreakerFloorSamePlaneCm,
+                    [&](const FBreakerZonePiece& Floor)
+                    {
+                        return &Floor == &Top || Floor.Name.StartsWith(Top.Name + TEXT("_"));
+                    });
+                if (TestNotNull(FString::Printf(TEXT("%s: a floor lies under the first tread %s (top Z %.1f at X %.0f Y %.0f)"),
+                    *Where, *First.Name, FirstTop, First.Origin.X, First.Origin.Y), Ground))
+                {
+                    const float FirstRise = FirstTop - BreakerFernhallTopZ(*Ground);
+                    TestTrue(FString::Printf(TEXT("%s: first tread %s rises %.1f cm off %s (top %.1f), within MaxStepHeight %.1f"),
+                        *Where, *First.Name, FirstRise, *Ground->Name, BreakerFernhallTopZ(*Ground), MaxStepCm),
+                        FirstRise <= MaxStepCm);
+                }
+                for (int32 i = 1; i < Treads.Num(); ++i)
+                {
+                    const float Rise = BreakerFernhallTopZ(*Treads[i]) - BreakerFernhallTopZ(*Treads[i - 1]);
+                    TestTrue(FString::Printf(TEXT("%s: %s -> %s rises %.1f cm (%.1f -> %.1f), within MaxStepHeight %.1f"),
+                        *Where, *Treads[i - 1]->Name, *Treads[i]->Name, Rise,
+                        BreakerFernhallTopZ(*Treads[i - 1]), BreakerFernhallTopZ(*Treads[i]), MaxStepCm),
+                        Rise <= MaxStepCm);
+                }
+                const float LastRise = TopZ - BreakerFernhallTopZ(Last);
+                TestTrue(FString::Printf(TEXT("%s: last tread %s -> top rises %.1f cm (%.1f -> %.1f), within MaxStepHeight %.1f"),
+                    *Where, *Last.Name, LastRise, BreakerFernhallTopZ(Last), TopZ, MaxStepCm),
+                    LastRise <= MaxStepCm);
+                TestTrue(FString::Printf(TEXT("%s: last tread %s is not above the top it climbs to (%.1f -> %.1f)"),
+                    *Where, *Last.Name, BreakerFernhallTopZ(Last), TopZ),
+                    LastRise >= -BreakerFloorSamePlaneCm);
+
+                // (b) THE LAST TREAD MEETS THE TOP'S EDGE ON THE RUN'S OWN
+                // AXIS: an abutment within a centimetre along the axis it
+                // climbs, a shared span across it. Inside the footprint is
+                // under the apron, not at it; a hand's width off is a gap.
+                const int32 Axis = Run.bAlongFwd ? Fwd : Lat;
+                const int32 Across = 1 - Axis;
+                const float Along = BreakerFernhallAxisOverlap(Last, Top, Axis);
+                const float Shared = BreakerFernhallAxisOverlap(Last, Top, Across);
+                TestTrue(FString::Printf(TEXT("%s: last tread %s touches the top's edge within %.0f cm on its axis (along %.1f, across %.1f)"),
+                    *Where, *Last.Name, BreakerFloorAbutCm, Along, Shared),
+                    Along >= -BreakerFloorAbutCm && Shared > 0.0f);
+                TestTrue(FString::Printf(TEXT("%s: last tread %s does not lie inside the top's footprint (along %.1f, across %.1f)"),
+                    *Where, *Last.Name, Along, Shared),
+                    Along <= BreakerFloorAbutCm);
+
+                if (Run.bAlongFwd)
+                {
+                    for (const FBreakerZonePiece* Tread : Treads)
+                    {
+                        FwdMin = FMath::Min(FwdMin, static_cast<float>(Tread->Origin[Fwd] - Tread->Extent[Fwd]));
+                        FwdMax = FMath::Max(FwdMax, static_cast<float>(Tread->Origin[Fwd] + Tread->Extent[Fwd]));
+                    }
+                }
+                AddInfo(FString::Printf(TEXT("%s%s: %d treads, first top %.1f, last top %.1f, top %.1f, ceiling %.1f"),
+                    *Where, Run.Suffix, Treads.Num(), FirstTop, BreakerFernhallTopZ(Last), TopZ, MaxStepCm));
+            }
+
+            // (a) EXACTLY four: every piece named under this top is a tread of
+            // one of the four runs. A fifth run, or a tread with a suffix the
+            // contract does not name, is a stair nobody measured.
+            int32 NamedUnderTop = 0;
+            for (const FBreakerZonePiece& Piece : Pieces)
+            {
+                if (Piece.Name.StartsWith(Top.Name + TEXT("_"))) ++NamedUnderTop;
+            }
+            TestEqual(FString::Printf(TEXT("%s: every piece named under the top is a tread of its four runs (%d named, %d matched)"),
+                *Where, NamedUnderTop, AllTreads.Num()), NamedUnderTop, AllTreads.Num());
+
+            // (c) NEITHER THE TOP NOR A TREAD IS INSIDE A WALL OR A COVER
+            // BLOCK: more than a centimetre shared on all three axes is a
+            // piece the character cannot stand on.
+            AllTreads.Add(&Top);
+            for (const FBreakerZonePiece* Piece : AllTreads)
+            {
+                for (const FBreakerZonePiece* Solid : Solids)
+                {
+                    const float X = BreakerFernhallAxisOverlap(*Piece, *Solid, 0);
+                    const float Y = BreakerFernhallAxisOverlap(*Piece, *Solid, 1);
+                    const float Z = BreakerFernhallAxisOverlap(*Piece, *Solid, 2);
+                    if (X > BreakerFloorAbutCm && Y > BreakerFloorAbutCm && Z > BreakerFloorAbutCm)
+                    {
+                        AddError(FString::Printf(TEXT("%s: %s intersects %s (overlap X %.1f, Y %.1f, Z %.1f cm)"),
+                            *Where, *Piece->Name, *Solid->Name, X, Y, Z));
+                    }
+                }
+            }
+
+            // (d) SITED OFF EVERY CHEST PAIR: the apron's span along the lane,
+            // treads included, shares nothing past an abutment with any chest
+            // box in its yard. Measured against the yard's chests by name, and
+            // a yard with no chests to measure is a yard this test cannot see.
+            const TArray<const FBreakerZonePiece*>* Chests = ChestsByYard.Find(Yard);
+            if (TestTrue(FString::Printf(TEXT("%s: yard '%s' has chest boxes to site against"), *Where, BreakerFernhallYardLabel(Yard)),
+                Chests && Chests->Num() > 0))
+            {
+                for (const FBreakerZonePiece* Chest : *Chests)
+                {
+                    const float Overlap = FMath::Min(FwdMax, static_cast<float>(Chest->Origin[Fwd] + Chest->Extent[Fwd]))
+                        - FMath::Max(FwdMin, static_cast<float>(Chest->Origin[Fwd] - Chest->Extent[Fwd]));
+                    TestTrue(FString::Printf(TEXT("%s: lane span %.0f..%.0f is clear of %s (%.0f..%.0f), overlap %.1f cm"),
+                        *Where, FwdMin, FwdMax, *Chest->Name,
+                        Chest->Origin[Fwd] - Chest->Extent[Fwd], Chest->Origin[Fwd] + Chest->Extent[Fwd], Overlap),
+                        Overlap <= BreakerFloorAbutCm);
+                }
+            }
+        }
+
+        // (d) EXACTLY TWO A YARD, in every yard the cover pass authored — a
+        // yard with chests and no aprons is the ruling unmet, not a yard
+        // outside it.
+        TSet<FString> Yards;
+        for (const auto& Pair : ChestsByYard) Yards.Add(Pair.Key);
+        for (const auto& Pair : ApronsByYard) Yards.Add(Pair.Key);
+        for (const FString& Yard : Yards)
+        {
+            const int32* Count = ApronsByYard.Find(Yard);
+            TestEqual(FString::Printf(TEXT("%s: yard '%s' has exactly %d aprons"), *Folder, BreakerFernhallYardLabel(Yard), BreakerApronsPerYard),
+                Count ? *Count : 0, BreakerApronsPerYard);
+        }
+        // Not vacuous: a folder in which no apron matched is a folder this
+        // test has stopped reading, not a yard with nothing to climb.
+        TestTrue(FString::Printf(TEXT("%s has aprons to measure (%d)"), *Folder, Aprons), Aprons > 0);
     }
     return true;
 }

@@ -140,6 +140,9 @@ namespace
         if (Name == TEXT("flr_yard")) return FLinearColor(.36f,.36f,.31f);   // O2 PLACEHOLDER
         if (Name == TEXT("flr_yard_sub")) return FLinearColor(.17f,.20f,.19f);   // O2 PLACEHOLDER
         if (Name.StartsWith(TEXT("flr_seam"))) return FLinearColor(.43f,.42f,.35f);   // O2 PLACEHOLDER
+        // An apron and its treads are poured with the lane (O285): a raised
+        // level of the same ground, a shade lighter so its edge reads.
+        if (Name.Contains(TEXT("_apron"))) return FLinearColor(.42f,.41f,.36f);   // O2 PLACEHOLDER
         if (BreakerZoneNameHasPrefix(Name, TEXT("wall_"))) return BreakerZoneConcrete;
         if (BreakerZoneNameHasPrefix(Name, TEXT("blk_full_"))) return BreakerZoneStone;
         if (BreakerZoneNameHasPrefix(Name, TEXT("blk_chest_"))) return BreakerZoneRust;

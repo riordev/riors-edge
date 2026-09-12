@@ -198,7 +198,7 @@ COLUMN_HEIGHT = 3.4   # O2 PLACEHOLDER — the canopy posts and the roof stack
 # stub) is the bare box, not a cut tile.
 #
 # ONE NAME PER BUILDING: the box and its tiles are concatenated under the
-# building's existing wall_ name, so the roster (721 / 805), the readers that
+# building's existing wall_ name, so the roster (793 / 877), the readers that
 # find a building by name, and the importer's collision (complex-as-simple,
 # tiles included) see what they saw.
 TILE_WIDTH = 4.0   # the megakit's authored tile pitch, asserted against the mesh below
@@ -634,25 +634,36 @@ STAIR_WIDTH = 4.0     # O2 PLACEHOLDER
 # a tenth of a metre clear of the face.
 STAIR_LAT = 21.4      # O2 PLACEHOLDER
 
-def stair(tag, name, at, edge, lat, top, climb=1.0):
+def stair(tag, name, at, edge, across, top, climb=1.0, axis="fwd"):
     """A run of solid treads up to a slab whose top is `top` metres, ending
-    flush at the slab's edge at fwd `edge`. Each tread is a box grounded at 0,
-    so its top IS its height and the collision is the box — a tread cannot be
-    walked up wrong, and nothing here is a kit mesh whose collision is
-    whatever it shipped with.
+    flush at the slab's edge at `edge` on the climbing axis. Each tread is a
+    box grounded at 0, so its top IS its height and the collision is the box —
+    a tread cannot be walked up wrong, and nothing here is a kit mesh whose
+    collision is whatever it shipped with.
 
     rises = ceil(top / STEP_RISE), so every rise is under STEP_RISE and every
     rise is the same; rises-1 treads, the slab is the last rise. climb is +1
-    when the run lies at fwd < edge and climbs toward +fwd, -1 when it lies
-    past the slab's far edge and climbs back toward it. The last tread abuts
-    the edge (RiorsEdge.Zone.Fernhall.DecksClimbable measures the abutment
-    within a centimetre and the rises against the movement default)."""
+    when the run lies below `edge` on its axis and climbs toward +, -1 when it
+    lies past the slab's far edge and climbs back toward it. The last tread
+    abuts the edge (RiorsEdge.Zone.Fernhall.DecksClimbable measures the
+    abutment within a centimetre and the rises against the movement default).
+
+    axis is the axis the run climbs along. "fwd" is every deck, dock and
+    apron-end run: `edge` is a fwd, `across` is the run's lat centre, and a
+    tread is TREAD_DEPTH deep along fwd by STAIR_WIDTH wide across lat. "lat"
+    is the aprons' side runs: `edge` is a lat, `across` is the run's fwd
+    centre, and the tread is STAIR_WIDTH along fwd by TREAD_DEPTH across lat.
+    The same rises, the same treads, the same abutment, turned a quarter."""
     rises = math.ceil(top / STEP_RISE - 1e-9)
     rise = top / rises
     for i in range(rises - 1):
-        fwd = edge - climb * TREAD_DEPTH * (rises - 1.5 - i)
-        place("flr_%s_%s%d" % (tag, name, i), "pavement", at(fwd, lat, 0.0),
-              (TREAD_DEPTH, rise * (i + 1), STAIR_WIDTH))
+        along = edge - climb * TREAD_DEPTH * (rises - 1.5 - i)
+        if axis == "lat":
+            place("flr_%s_%s%d" % (tag, name, i), "pavement", at(across, along, 0.0),
+                  (STAIR_WIDTH, rise * (i + 1), TREAD_DEPTH))
+        else:
+            place("flr_%s_%s%d" % (tag, name, i), "pavement", at(along, across, 0.0),
+                  (TREAD_DEPTH, rise * (i + 1), STAIR_WIDTH))
 
 def work_pass(tag, anchor_x, centre_z, bay_fwd, bay_side, dock_fwd, dock_side, dock_climb=1.0, forward=1.0):
     """A place where the yard's work happened: one enterable bay and one loading
@@ -731,6 +742,89 @@ def work_pass(tag, anchor_x, centre_z, bay_fwd, bay_side, dock_fwd, dock_side, d
     # the dock's end where the stair lands and a body walks.
     place("dress_%s_dockcable" % tag, "cable",
           at(dock_fwd, dock_side * 22.6, dh), yaw=90.0)
+
+
+# ---- THE APRONS: A YARD HAS LEVELS DOWN ITS MIDDLE (O285) --------------------
+# Every raised thing so far stands at the flanks — deck, catwalk, dock, mass —
+# and the lane between them, where the fight actually is, stays one plane. An
+# apron is a storey's third of height ACROSS the lane: 8 m of it along fwd,
+# the whole 18 m dash corridor wide, climbed by a two-tread run on all four
+# sides so it is never a wall and never a dead end. Two per yard. A body on
+# one looks down into the lane either side; a body below it has a lip to
+# fight over rather than a floor to cross.
+#
+# SITED OFF EVERY POCKET, TEAR AND CHEST PAIR, and never straddling a cover
+# pair: the chest pairs stand at fwd 17.5..20.5, 32.5..35.5, 47.5..50.5,
+# 62.5..65.5 and 77.5..80.5 in every yard, so a top and its two fwd runs
+# (0.7 m beyond each end) land in the gaps between those, and the pockets and
+# tears each yard's structure list records (below) fall clear of them or off
+# the lane. The gantry legs at |lat| 12..14 and the chest faces at |lat| 9.9
+# bound it laterally: the top is the corridor's own ±9, and a side run's
+# outer tread reaches 9.7. Both are asserted at the site, off the baked
+# bounds, and the probe below measures every apron piece against every wall,
+# block and floor like any other slab.
+#
+# flr_ throughout: the top and the treads carry collision and are ground, so
+# the cover grammar is untouched by construction. All O2 PLACEHOLDER.
+# An overlap of a centimetre or less on an axis is an abutment, not a hit:
+# the same centimetre the C++ tests measure by. The aprons' site assertions
+# and the structure probe below both read it.
+PROBE_ABUT = 0.01   # metres
+
+APRON_HEIGHT = 0.9        # O2 PLACEHOLDER — three rises of 0.30 under STEP_RISE
+APRON_LENGTH = 8.0        # O2 PLACEHOLDER — along fwd
+APRON_WIDTH = 18.0        # O2 PLACEHOLDER — across lat: the dash corridor, ±9
+APRON_SIDE_EDGE = 9.0     # O2 PLACEHOLDER — where the side runs meet the top
+APRON_SIDE_REACH = 9.7    # O2 PLACEHOLDER — the side runs' outer tread, inside the chest face at 9.9
+
+def apron_pass(tag, anchor_x, centre_z, fwd_spans, forward=1.0):
+    """Two aprons across one yard's lane, in the yard's frame. fwd_spans is
+    the pair of (near, far) fwd intervals the tops span; the yard's own mirror
+    (forward) applies as it does in the other passes, and a box is its own
+    mirror. Per apron i: flr_<tag>_apron<i> is the top, and four runs climb
+    it — _nstep<j> up its near end toward +fwd, _fstep<j> up its far end back
+    toward it, _lstep<j> in from the -lat side and _rstep<j> in from the +lat
+    side (the frame's sides, not a body's: the siding is mirrored). The end
+    runs are STAIR_WIDTH centred on lat 0, the side runs STAIR_WIDTH centred
+    on the top's fwd centre."""
+    def at(fwd, lat, height=0.0):
+        return (anchor_x + forward * fwd, height, centre_z + lat)
+
+    chest_prefix = "blk_chest_" if tag == "entry" else "blk_chest_%s_" % tag
+    chests = [SCENE[n].bounds for n in SCENE
+              if n.startswith(chest_prefix) and n[len(chest_prefix):].lstrip("ns").isdigit()]
+    assert len(chests) == 10, (tag, len(chests))
+    for i, (near, far) in enumerate(fwd_spans):
+        assert abs((far - near) - APRON_LENGTH) < 1e-6, (tag, i, near, far)
+        top = "flr_%s_apron%d" % (tag, i)
+        place(top, "pavement", at((near + far) * 0.5, 0.0), (APRON_LENGTH, APRON_HEIGHT, APRON_WIDTH))
+        stair(tag, "apron%d_nstep" % i, at, near, 0.0, APRON_HEIGHT, 1.0)
+        stair(tag, "apron%d_fstep" % i, at, far, 0.0, APRON_HEIGHT, -1.0)
+        stair(tag, "apron%d_lstep" % i, at, -APRON_SIDE_EDGE, (near + far) * 0.5, APRON_HEIGHT, 1.0, axis="lat")
+        stair(tag, "apron%d_rstep" % i, at, APRON_SIDE_EDGE, (near + far) * 0.5, APRON_HEIGHT, -1.0, axis="lat")
+
+        # NEVER OVER A COVER PAIR, measured off the baked boxes rather than
+        # off the numbers typed above: the top and its two fwd runs together,
+        # against every chest pair in this yard, along world x (an interval is
+        # the same interval mirrored).
+        pieces = [SCENE[n].bounds for n in SCENE
+                  if n == top or n.startswith(top + "_nstep") or n.startswith(top + "_fstep")]
+        assert len(pieces) == 5, (top, len(pieces))
+        lo = min(b[0][0] for b in pieces)
+        hi = max(b[1][0] for b in pieces)
+        for chest in chests:
+            assert hi <= chest[0][0] + PROBE_ABUT or lo >= chest[1][0] - PROBE_ABUT, \
+                "%s straddles a chest pair: apron x %.2f..%.2f, chest x %.2f..%.2f" % (top, lo, hi, chest[0][0], chest[1][0])
+        # THE TOP IS THE CORRIDOR'S WIDTH AND NO MORE, and the side runs stop
+        # short of the chest face at |lat| 9.9.
+        tb = SCENE[top].bounds
+        half = (tb[1][2] - tb[0][2]) * 0.5
+        assert half <= APRON_SIDE_EDGE + PROBE_ABUT, (top, half)
+        for n in SCENE:
+            if n.startswith(top + "_lstep") or n.startswith(top + "_rstep"):
+                b = SCENE[n].bounds
+                reach = max(abs(b[0][2] - centre_z), abs(b[1][2] - centre_z))
+                assert reach <= APRON_SIDE_REACH + PROBE_ABUT, (n, reach)
 
 
 def shape_pass(tag, anchor_x, centre_z, gantries, masses, near_fwd, far_fwd, near_climb=1.0, far_climb=1.0, forward=1.0):
@@ -874,6 +968,20 @@ def shape_pass(tag, anchor_x, centre_z, gantries, masses, near_fwd, far_fwd, nea
 #           -lat  mass 42.5..58         far deck 22..38 (stair 17.1..22)  dock 60..76 (stair 76..77.75)
 #   siding  the entry yard's list, mirrored
 #
+# THE APRONS (O285) take the lane itself, lat ±9, in the gaps the chest pairs
+# and the on-lane pockets leave (top span, then the span with its fwd runs):
+#
+#   entry   21.7..29.7 (21.0..30.4)   52.6..60.6 (51.9..61.3)
+#   sub     37.75..45.75 (37.05..46.45)   67.5..75.5 (66.8..76.2)
+#   depot   21.7..29.7 (21.0..30.4)   66.9..74.9 (66.2..75.6)
+#   siding  the entry yard's pair, mirrored
+#
+# The entry yard's second apron and the substation's hold the fwd of an
+# off-lane tear (55.25 at lat +14 in the entry yard and -14 in the siding;
+# 74.0 at lat -14 in the substation) — off the lane by 14, which is past the
+# top's 9 and the side runs' 9.7, so a tear opens beside an apron and never
+# on it. Every on-lane pocket and tear is clear in fwd.
+#
 # A far deck at y 4.6 stands OVER break05 (4.0 tall) in the entry yard and the
 # siding: the slab clears the block, and the stair takes the far end because
 # the mass's shoulder holds the near one. The dock leaves the end wall in the
@@ -886,15 +994,19 @@ shape_pass("entry", 6.0, 0.0, gantries=(20.0, 82.0), masses=((60.0, -19.0),),
            near_fwd=64.0, far_fwd=79.0, far_climb=-1.0)
 # The bay and the dock go in the gaps the pockets and their tears leave.
 work_pass("entry", 6.0, 0.0, bay_fwd=44.0, bay_side=1.0, dock_fwd=41.0, dock_side=-1.0)
+apron_pass("entry", 6.0, 0.0, fwd_spans=((21.7, 29.7), (52.6, 60.6)))
 shape_pass("sub", SUB_ANCHOR, SUB_Z, gantries=(20.0, 66.0), masses=((40.0, 19.0),),
            near_fwd=20.0, far_fwd=62.0, near_climb=-1.0)
 work_pass("sub", SUB_ANCHOR, SUB_Z, bay_fwd=34.0, bay_side=-1.0, dock_fwd=14.0, dock_side=-1.0, dock_climb=-1.0)
+apron_pass("sub", SUB_ANCHOR, SUB_Z, fwd_spans=((37.75, 45.75), (67.5, 75.5)))
 shape_pass("dep", DEP_ANCHOR, DEP_Z, gantries=(20.0, 70.0), masses=((48.0, -19.0),),
            near_fwd=35.0, far_fwd=30.0)
 work_pass("dep", DEP_ANCHOR, DEP_Z, bay_fwd=15.0, bay_side=1.0, dock_fwd=68.0, dock_side=-1.0, dock_climb=-1.0)
+apron_pass("dep", DEP_ANCHOR, DEP_Z, fwd_spans=((21.7, 29.7), (66.9, 74.9)))
 shape_pass("siding", SID_ANCHOR, SID_Z, gantries=(20.0, 82.0), masses=((60.0, -19.0),),
            near_fwd=64.0, far_fwd=79.0, far_climb=-1.0, forward=-1.0)
 work_pass("siding", SID_ANCHOR, SID_Z, bay_fwd=44.0, bay_side=1.0, dock_fwd=41.0, dock_side=-1.0, forward=-1.0)
+apron_pass("siding", SID_ANCHOR, SID_Z, fwd_spans=((21.7, 29.7), (52.6, 60.6)), forward=-1.0)
 
 # ---- THE PROBE: every raised slab and every tread is clear of solid geometry -
 # Read off the baked bounds, the same boxes the importer and the runtime
@@ -903,9 +1015,8 @@ work_pass("siding", SID_ANCHOR, SID_Z, bay_fwd=44.0, bay_side=1.0, dock_fwd=41.0
 # treads; solids are every wall_, blk_ and flr_ box. An overlap of a centimetre
 # or less on any axis is an abutment — a tread against its slab, a catwalk
 # against its deck, a tread standing on the yard slab, a deck against the
-# flank's inner face — and is not a hit. Every slab is measured against every
-# wall, the flank buildings included.
-PROBE_ABUT = 0.01   # metres; the same centimetre the C++ tests measure by
+# flank's inner face — and is not a hit (PROBE_ABUT, above the aprons). Every
+# slab is measured against every wall, the flank buildings included.
 
 def probe_structures():
     def box(name):
@@ -914,14 +1025,20 @@ def probe_structures():
     def overlap(a, b, axis):
         return min(a[1][axis], b[1][axis]) - max(a[0][axis], b[0][axis])
     slab_suffixes = ("_deck", "_fardeck", "_catwalk", "_dock")
-    tread_names = ("_step", "_fstep", "_dockstep")
+    # An apron top is `flr_<tag>_apron<i>`: indexed, so matched by an index
+    # after the suffix rather than by the suffix alone. Its side runs are
+    # `_lstep` and `_rstep`, its end runs `_nstep` and `_fstep` (the second
+    # shared with the far decks, which the C++ climbability test keys on).
+    tread_names = ("_step", "_fstep", "_dockstep", "_nstep", "_lstep", "_rstep")
+    def indexed(name, key):
+        return key in name and name[name.rfind(key) + len(key):].isdigit()
     subjects = []
     for name in SCENE:
         if not name.startswith("flr_"):
             continue
-        if any(name.endswith(s) for s in slab_suffixes):
+        if any(name.endswith(s) for s in slab_suffixes) or indexed(name, "_apron"):
             subjects.append((name, False))
-        elif any(t in name and name[name.rfind(t) + len(t):].isdigit() for t in tread_names):
+        elif any(indexed(name, t) for t in tread_names):
             subjects.append((name, True))
     solids = [n for n in SCENE if n.startswith(("wall_", "blk_", "flr_"))]
     hits = []
@@ -936,7 +1053,10 @@ def probe_structures():
                 hits.append("%s intersects %s (overlap x %.2f y %.2f z %.2f m)" % (name, other, o[0], o[1], o[2]))
     slabs = sum(1 for _, t in subjects if not t)
     treads = sum(1 for _, t in subjects if t)
-    assert slabs == 16 and treads == 4 * (10 + 14 + 5), (slabs, treads)
+    # Four yards: deck, catwalk, far deck, dock and two apron tops each; ten
+    # treads to the deck, fourteen to the far deck, five to the dock, and
+    # sixteen to the aprons (four runs of two, twice).
+    assert slabs == 4 * 6 and treads == 4 * (10 + 14 + 5 + 4 * 2 * 2), (slabs, treads)
     for hit in hits:
         print("PROBE:", hit)
     assert not hits, "%d structure intersections" % len(hits)
@@ -1188,12 +1308,13 @@ if RUINED:
 
     print("ruin dressing:", Ruins, "chunks")
 
-# THE ROSTER THIS WRITES: 721 meshes intact, 805 ruined — the 84 ruin chunks
-# are dressing over the same 721. Four yards (entry 57 with its south mouth
+# THE ROSTER THIS WRITES: 793 meshes intact, 877 ruined — the 84 ruin chunks
+# are dressing over the same 793. Four yards (entry 57 with its south mouth
 # open, substation 56, depot 60, siding 64), three seams (6, 7, 5), four times
-# the 111 a shape, work and grow pass add (29 of them treads: 10 to the deck,
-# 14 to the far deck, 5 to the dock), and 22 markers (8 frame and door markers
-# plus 14 spawn points: entry 4, substation 4, depot 3, siding 3).
+# the 129 a shape, work, grow and apron pass add (45 of them treads: 10 to the
+# deck, 14 to the far deck, 5 to the dock, 16 to the two aprons, whose tops
+# are the other 2), and 22 markers (8 frame and door markers plus 14 spawn
+# points: entry 4, substation 4, depot 3, siding 3).
 # BreakerFernhallExpectedPieceCount (BreakerFernhallZoneTests.cpp) and
 # EXPECTED_TOTAL (breaker_import_fernhall.py) are kept by hand to these.
 scene = trimesh.Scene(SCENE)

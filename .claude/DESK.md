@@ -95,19 +95,27 @@ walk on the correct axis."
   the hand light ends at 0.2 s while the shards fly to 0.35. FOUND:
   Fracture's cast still draws nothing (KIT).
 
-## Cycle — O285 LEVELS
+## O285 LEVELS — LANDED
 
-- [ ] compose_fernhall: apron_pass — per yard two 8 x 0.9 x 18 m
-      pavement tops with stair() runs on all four sides (0.30 m rises,
-      two treads; stair() gains a lateral axis), at the probed clear
-      positions: entry/siding 21.7-29.7 and 52.6-60.6, substation
-      37.75-45.75 and 67.5-75.5, depot 21.7-29.7 and 66.9-74.9; never
-      straddling a chest pair; probe_structures covers them.
-      EXPECTED_TOTAL 721/805 -> 793/877; PieceContract 793;
-      ApronsClimbable pins rises, abutment, clearance, two per yard,
-      half-width <= the corridor, disjoint from every chest pair.
-      OutdoorEncounterRuntime must stay at 35 bodies. Photograph the
-      lane from the entry and from an apron.
+- "the tileset is still just a square with stuff on the edges" — every
+  yard has two raised aprons across its lane: 8 x 0.9 x 18 m tops (the
+  dash corridor's width, 0.9 m short of the chest faces) with two-tread
+  0.30 m stairs on all four sides, at entry/siding 21.7-29.7 and
+  52.6-60.6, substation 37.75-45.75 and 67.5-75.5, depot 21.7-29.7 and
+  66.9-74.9 — probed clear of every pocket formation, tear, chest pair
+  and gantry leg; an apron never straddles a cover pair (a body on top
+  would read chest cover as a curb). stair() climbs a lateral axis now.
+  Pieces 721 -> 793 (ruined 877); the compose-time probe pins 24 slabs
+  and 180 treads clean; ApronsClimbable pins four runs per top, rises
+  under the movement step, abutment, wall/blk clearance, two per yard,
+  corridor width and chest disjointness over both twins;
+  OutdoorEncounterRuntime still seats 35 bodies. Aprons wear the lane's
+  tint a shade lighter. PHOTOGRAPHED: the entry lane — the first apron
+  reads as a raised level with bodies on it. FOUND: the entry/siding
+  first apron's near tread ends 2.3 m before the 0.25 pocket's centre;
+  a body may arrive on its top tread — yours to feel. FOUND: seam steps
+  and a sunken level are a separate item (the slab is one box).
+  QUESTION (standing): terrain later?
 
 ## EIGHTH — LANDED, THE FLOATING GEAR
 
@@ -121,10 +129,6 @@ walk on the correct axis."
 
 ## EIGHTH — OPEN
 
-- [ ] "the ground is still flat … no curve or hill" — a ruling first.
-      QUESTION asked: terrain (the ground rolls) or levels (flat ground,
-      stepped aprons/sunken docks/ramps)? Default if unanswered: levels
-      now, terrain later.
 - [ ] "points you actively don't want to take" — seventeen nodes carry a
       self-inflicted downside by design (No Ground, Spend To Live, No
       Safety, Overreach, No Distance, Long Debt, Long Dark, Conductor's
