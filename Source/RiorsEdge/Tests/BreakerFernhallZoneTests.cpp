@@ -38,8 +38,17 @@
 // count means the composer and this file disagree about what the zone IS.
 // One line to change, so the pin cannot be half-moved.
 //
-// 472 is the THREE-yard figure; the siding's re-import sets the four-yard one.
-static constexpr int32 BreakerFernhallExpectedPieceCount = 631;
+// 631 is the four-yard figure before O274's openings; 645 carries the
+// fourteen `marker_spawn_*` cubes the composer authors as patrol returns.
+static constexpr int32 BreakerFernhallExpectedPieceCount = 645;
+// THE OPENINGS (O274), by the same discipline: one figure, set from the
+// export, moved only when the composer deliberately authors another mouth.
+// Fourteen across four yards — entry 4, substation 4, depot 3, siding 3.
+static constexpr int32 BreakerFernhallExpectedSpawnSiteCount = 14;
+// And no yard has fewer than a bay mouth and a dock: the two openings every
+// yard's work pass built, so every yard has at least two places a patrol can
+// come back from before any tear is placed.
+static constexpr int32 BreakerFernhallMinSpawnSitesPerYard = 2;
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerFernhallGrammarTest,
@@ -156,6 +165,9 @@ bool FBreakerFernhallPieceContractTest::RunTest(const FString& Parameters)
     // 472 -> the SIDING (O276): a fourth yard off the entry plaza's west
     // flank, authored from the validated frame like the depot was, so the
     // per-yard figures below hold for it unchanged.
+    // 631 -> 645 with the OPENINGS (O274): fourteen marker cubes, consumed as
+    // transforms and never spawned, at the bay mouths, dock faces and seam
+    // mouths a patrol returns through. Not one cover box moved.
     TestEqual(TEXT("imported piece count"), Pieces.Num(), BreakerFernhallExpectedPieceCount);
 
     const TArray<FBreakerZoneField> Zone = UBreakerZoneBuilder::BuildZoneFields(Pieces, Markers);
@@ -201,11 +213,28 @@ bool FBreakerFernhallPieceContractTest::RunTest(const FString& Parameters)
     // THE SHIPPED ZONE SAYS HOW MANY YARDS IT IS rather than leaving it
     // implied. The entry yard's markers carry no suffix, which is what keeps
     // the pre-yards export valid unchanged — and these assertions are what
-    // move, deliberately, on the day a yard is authored. Eight markers: the
+    // move, deliberately, on the day a yard is authored. Eight FIXTURES: the
     // entry yard's player start, rift and contract giver; an anchor and a door
     // for the substation; an anchor alone for the depot; an anchor and a door
-    // for the siding.
-    TestEqual(TEXT("the zone authors eight markers"), Markers.All.Num(), 8);
+    // for the siding. Twenty-two markers overall, and the other fourteen are
+    // the OPENINGS (O274), which the extractor keeps apart from All because
+    // they are many per yard by design — so this pin stays a pin on the
+    // one-per-yard roles and the openings are pinned on their own list.
+    TestEqual(TEXT("the zone authors eight fixture markers"), Markers.All.Num(), 8);
+    TestEqual(TEXT("and fourteen openings a patrol can return through"),
+        Markers.SpawnSites.Num(), BreakerFernhallExpectedSpawnSiteCount);
+    for (const FName& Yard : Markers.Yards())
+    {
+        const TArray<FBreakerZoneMarker> Sites = UBreakerZoneBuilder::SpawnSitesForYard(Markers, Yard);
+        TestTrue(FString::Printf(TEXT("yard '%s' authors at least a bay mouth and a dock (%d sites)"),
+            Yard.IsNone() ? TEXT("<entry>") : *Yard.ToString(), Sites.Num()),
+            Sites.Num() >= BreakerFernhallMinSpawnSitesPerYard);
+        // NOT asserted: that each site's location falls in its yard's band.
+        // A seam mouth is authored AT the band's edge and YardForPoint's
+        // out-of-band fallback is nearest-centre, which can hand a mouth to
+        // the neighbour it opens onto; the yard tag in the name is the
+        // composer's statement of which pocket uses it and is read as such.
+    }
     TestEqual(TEXT("four yards, three rift doors"),
         Markers.OfRole(EBreakerZoneMarkerRole::Rift).Num(), 3);
     TestEqual(TEXT("and an anchor for each yard that is not the entry"),
@@ -372,6 +401,44 @@ bool FBreakerZoneMarkerNameTest::RunTest(const FString& Parameters)
         static_cast<int32>(EBreakerZoneMarkerRole::Yard));
     TestEqual(TEXT("...for the north yard"), Yard, FName(TEXT("north")));
 
+    // --- THE SPAWN ROLE (O274): yard, then index, many per yard -----------
+    int32 Index = INDEX_NONE;
+    TestTrue(TEXT("marker_spawn_sub_0 parses"),
+        UBreakerZoneBuilder::ParseMarkerName(TEXT("marker_spawn_sub_0"), Role, Yard, Index));
+    TestEqual(TEXT("...as a spawn site"), static_cast<int32>(Role),
+        static_cast<int32>(EBreakerZoneMarkerRole::SpawnSite));
+    TestEqual(TEXT("...in the sub yard"), Yard, FName(TEXT("sub")));
+    TestEqual(TEXT("...at index 0"), Index, 0);
+    TestTrue(TEXT("marker_spawn_sub_1 parses"),
+        UBreakerZoneBuilder::ParseMarkerName(TEXT("marker_spawn_sub_1"), Role, Yard, Index));
+    TestEqual(TEXT("...in the same yard"), Yard, FName(TEXT("sub")));
+    TestEqual(TEXT("...at index 1"), Index, 1);
+    // THE ENTRY YARD HAS NO TAG, so its sites are `marker_spawn_<n>` — and
+    // the index has to come off BEFORE the yard is read, or this is a yard
+    // called "0" that no anchor will ever frame.
+    TestTrue(TEXT("marker_spawn_0 parses"),
+        UBreakerZoneBuilder::ParseMarkerName(TEXT("marker_spawn_0"), Role, Yard, Index));
+    TestEqual(TEXT("...as a spawn site"), static_cast<int32>(Role),
+        static_cast<int32>(EBreakerZoneMarkerRole::SpawnSite));
+    TestTrue(TEXT("...in the ENTRY yard, not a yard called '0'"), Yard.IsNone());
+    TestEqual(TEXT("...at index 0"), Index, 0);
+    TestTrue(TEXT("marker_spawn_substation_12 parses with a two-digit index"),
+        UBreakerZoneBuilder::ParseMarkerName(TEXT("marker_spawn_substation_12"), Role, Yard, Index));
+    TestEqual(TEXT("...in the substation"), Yard, FName(TEXT("substation")));
+    TestEqual(TEXT("...at index 12"), Index, 12);
+    // No index is refused, loudly: without one, two openings in a yard would
+    // be the (role, yard) collision the index exists to avoid.
+    TestFalse(TEXT("marker_spawn_sub without an index is refused"),
+        UBreakerZoneBuilder::ParseMarkerName(TEXT("marker_spawn_sub"), Role, Yard, Index));
+    TestFalse(TEXT("marker_spawn alone is refused"),
+        UBreakerZoneBuilder::ParseMarkerName(TEXT("marker_spawn"), Role, Yard, Index));
+    TestFalse(TEXT("marker_spawnpad is not a spawn marker"),
+        UBreakerZoneBuilder::ParseMarkerName(TEXT("marker_spawnpad"), Role, Yard, Index));
+    // The other roles never carry an index, and say so.
+    TestTrue(TEXT("marker_rift still parses through the indexed overload"),
+        UBreakerZoneBuilder::ParseMarkerName(TEXT("marker_rift"), Role, Yard, Index));
+    TestEqual(TEXT("...with no index"), Index, static_cast<int32>(INDEX_NONE));
+
     // --- The completeness rule ------------------------------------------
     FString Reason;
     FBreakerZoneMarkers Empty;
@@ -429,6 +496,43 @@ bool FBreakerZoneMarkerNameTest::RunTest(const FString& Parameters)
     Dup.All.Add({ EBreakerZoneMarkerRole::Rift, NAME_None, FVector(50.0f, 0.0f, 0.0f) });
     TestFalse(TEXT("two rift doors in ONE yard is a naming mistake, not two doors"),
         Dup.IsComplete(Reason));
+
+    // MANY OPENINGS IN ONE YARD ARE MANY OPENINGS (O274). The (role, yard)
+    // rule is unchanged and never sees them; the (yard, index) rule is what
+    // holds them distinct, and a repeated index is the same naming mistake.
+    FBreakerZoneMarkers Open;
+    Open.All.Add({ EBreakerZoneMarkerRole::PlayerStart, NAME_None, FVector::ZeroVector });
+    Open.All.Add({ EBreakerZoneMarkerRole::Yard, FName(TEXT("sub")), FVector(80.0f, 0.0f, 0.0f) });
+    Open.SpawnSites.Add({ EBreakerZoneMarkerRole::SpawnSite, FName(TEXT("sub")), FVector(90.0f, 0.0f, 0.0f), 0 });
+    Open.SpawnSites.Add({ EBreakerZoneMarkerRole::SpawnSite, FName(TEXT("sub")), FVector(90.0f, 40.0f, 0.0f), 1 });
+    Open.SpawnSites.Add({ EBreakerZoneMarkerRole::SpawnSite, NAME_None, FVector(10.0f, 0.0f, 0.0f), 0 });
+    TestTrue(FString::Printf(TEXT("two spawn sites in one yard are both accepted: %s"), *Reason),
+        Open.IsComplete(Reason));
+    TestEqual(TEXT("and both are found by their yard"),
+        UBreakerZoneBuilder::SpawnSitesForYard(Open, FName(TEXT("sub"))).Num(), 2);
+    TestEqual(TEXT("while the entry yard's is found alone"),
+        UBreakerZoneBuilder::SpawnSitesForYard(Open, NAME_None).Num(), 1);
+    TestEqual(TEXT("and none are fixtures"), Open.All.Num(), 2);
+    // Nearest within reach, on the ground plane, and nothing when out of it.
+    const FBreakerZoneMarker* Near = UBreakerZoneBuilder::NearestSpawnSite(
+        Open, FName(TEXT("sub")), FVector(95.0f, 30.0f, 500.0f), 100.0f);
+    TestTrue(TEXT("the nearest site of the yard is found, ignoring height"), Near && Near->Index == 1);
+    TestNull(TEXT("and none is found beyond reach"),
+        UBreakerZoneBuilder::NearestSpawnSite(Open, FName(TEXT("sub")), FVector(500.0f, 0.0f, 0.0f), 100.0f));
+    TestNull(TEXT("nor in a yard that authored none"),
+        UBreakerZoneBuilder::NearestSpawnSite(Open, FName(TEXT("north")), FVector(90.0f, 0.0f, 0.0f), 1000.0f));
+
+    Open.SpawnSites.Add({ EBreakerZoneMarkerRole::SpawnSite, FName(TEXT("sub")), FVector(200.0f, 0.0f, 0.0f), 1 });
+    TestFalse(TEXT("two spawn sites with ONE index in one yard is a naming mistake"), Open.IsComplete(Reason));
+    TestTrue(FString::Printf(TEXT("and the reason names the index: %s"), *Reason), Reason.Contains(TEXT("1")));
+
+    // A spawn site names a yard the way a door does; an unanchored one is
+    // refused for the same reason.
+    FBreakerZoneMarkers Unframed;
+    Unframed.All.Add({ EBreakerZoneMarkerRole::PlayerStart, NAME_None, FVector::ZeroVector });
+    Unframed.SpawnSites.Add({ EBreakerZoneMarkerRole::SpawnSite, FName(TEXT("north")), FVector(90.0f, 0.0f, 0.0f), 0 });
+    TestFalse(TEXT("a spawn site in a yard nothing anchors is refused"), Unframed.IsComplete(Reason));
+    TestTrue(FString::Printf(TEXT("and the reason names the yard: %s"), *Reason), Reason.Contains(TEXT("north")));
     return true;
 }
 

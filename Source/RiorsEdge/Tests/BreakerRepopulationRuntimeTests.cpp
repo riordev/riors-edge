@@ -139,14 +139,17 @@ bool FBreakerRepopulationRuntimeTest::RunTest(const FString& Parameters)
     // arriving, which is the rift's verb and not the world's.
     TestTrue(TEXT("and comes back one body at a time"), Returned < Authored || Authored == 1);
 
-    // IT COMES BACK AS WHAT STOOD THERE, at its authored home. This is the half
+    // IT COMES BACK AS WHAT STOOD THERE, to its authored home. This is the half
     // the Pattern quest needs: its objective is elite-gated, so a pocket that
     // refilled with generic trash would leave the quest just as unfinishable.
+    // Under O274 the body ARRIVES at a spawn marker or a tear and walks to
+    // the post, so two seconds after the delay it may still be on its way:
+    // the post it was given is the authored home, not where its feet are.
     for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
     {
         if (!It->ActorHasTag(TEXT("Fernhall.Outdoor.0")) || It->IsDeadEnemy()) continue;
-        TestTrue(TEXT("a returned patrol stands at an authored home"),
-            FVector::DistSquared(It->GetActorLocation(), PocketAt) < 1000000.0);
+        TestTrue(TEXT("a returned patrol is posted at an authored home"),
+            FVector::DistSquared(It->GetLeashOrigin(), PocketAt) < 1000000.0);
         break;
     }
 

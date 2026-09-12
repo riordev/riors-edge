@@ -577,12 +577,11 @@ private:
         // consumer that reads the tag.
         FName PocketTag;
         bool bElite = false;
-        // WHERE A RETURNING BODY COMES FROM, when the pocket has somewhere for
-        // one to come from. Unset for the five yard pockets: there is nothing
-        // to arrive out of there, so a body still appears at its post, which is
-        // what O268 already ships. The courtyard has an authored doorway, so a
-        // patrol returning to it walks OUT of the bay and to its post instead
-        // of resolving into existence standing on it.
+        // WHERE A RETURNING BODY COMES FROM (O274): authored ground first —
+        // the nearest spawn marker in the yard within reach (a bay mouth, a
+        // dock face, a seam mouth) — and a tear only where the composer
+        // authored nothing. Either way the body walks OUT to its post
+        // instead of resolving into existence standing on it.
         FVector Arrival = FVector::ZeroVector;
         bool bHasArrival = false;
         // Where the body will actually APPEAR. The clearance gate reads this

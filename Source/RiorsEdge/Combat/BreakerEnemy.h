@@ -237,6 +237,9 @@ public:
     // acquires no threat target, fires nothing, and prints EMERGING.
     UFUNCTION(BlueprintPure, Category="Enemy") float GetEmergingSeconds() const { return EmergenceProtectedSeconds; }
     UFUNCTION(BlueprintPure, Category="Enemy") bool IsEmerging() const { return bEmerging; }
+    // The post a patrol was authored to (its leash origin) — where it stands
+    // once its walk out of an arrival is done. Read, never written, from here.
+    UFUNCTION(BlueprintPure, Category="Enemy") FVector GetLeashOrigin() const { return LeashOrigin; }
     // Read-only views of the authored tuning. Public so tools, the playtest
     // report and the automation suite can assert against what an archetype
     // SHIPS with, without opening the tuning itself for writing.

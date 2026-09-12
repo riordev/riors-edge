@@ -55,6 +55,16 @@ enum class EBreakerZoneMarkerRole : uint8
     // into vertices and markers are placed axis-aligned), so a yard's forward
     // is derived the same way the entry yard's is: from what it points at.
     Yard,
+    // WHERE A PATROL COMES BACK FROM (O274): a bay mouth, a dock face, a seam
+    // mouth — ground the composer authored as an opening, so a returning body
+    // walks out of somewhere rather than tearing out of nowhere. MANY PER
+    // YARD, which is what the other roles are forbidden: the name carries a
+    // 0-based index (`marker_spawn_<yard>_<n>`, `marker_spawn_<n>` for the
+    // entry yard) and the index is what keeps each one distinct. Appended
+    // last; the enum is compared by name at parse and never serialized, but
+    // append-only costs nothing and a reorder would cost a re-read of every
+    // switch below.
+    SpawnSite,
 };
 
 // One authored marker. Yard is NAME_None for the ENTRY yard, which is what
@@ -65,11 +75,23 @@ struct FBreakerZoneMarker
     EBreakerZoneMarkerRole Role = EBreakerZoneMarkerRole::PlayerStart;
     FName Yard = NAME_None;
     FVector Location = FVector::ZeroVector;
+    // The trailing `_<n>` of a SpawnSite name; INDEX_NONE for every other
+    // role, whose names carry no index. Two spawn sites in one yard with one
+    // index is the naming mistake the (role, yard) rule catches for the rest.
+    int32 Index = INDEX_NONE;
 };
 
 struct FBreakerZoneMarkers
 {
+    // Every marker that is ONE PER (ROLE, YARD): starts, doors, givers,
+    // anchors. Spawn sites live apart, below, because they are many per yard
+    // by design and every reader of All — the tour cameras, the yard frames,
+    // the eight-marker pin — means "the zone's fixtures", not its openings.
     TArray<FBreakerZoneMarker> All;
+    // THE OPENINGS (O274). Ordered as extracted; find them by yard through
+    // UBreakerZoneBuilder::SpawnSitesForYard rather than by index, because
+    // the index is a name-uniqueness device and not a priority.
+    TArray<FBreakerZoneMarker> SpawnSites;
 
     // Nullptr when absent, which is the point: a yard with no rift door is now
     // a legal yard rather than a broken export, so every caller has to say what
@@ -93,9 +115,15 @@ struct FBreakerZoneMarkers
     // the entry yard's — which is the failure the anchor exists to prevent,
     // arriving as a passing test rather than a missing one. The ENTRY yard is
     // exempt: the player start anchors it.
+    //
+    // SPAWN SITES ANSWER THE SAME SHAPE OF RULE ON A DIFFERENT KEY: no
+    // (yard, index) pair may repeat among them. The (role, yard) rule is not
+    // relaxed for them — they are simply not in All, so it never sees them —
+    // and a yard a spawn site names must be anchored like any other.
     bool IsComplete(FString& OutReason) const;
 
-    // Every yard named by any marker, entry included (as NAME_None).
+    // Every yard named by any marker, spawn sites included, entry included
+    // (as NAME_None).
     TArray<FName> Yards() const;
 };
 
@@ -154,8 +182,41 @@ public:
     // or whose role is unknown — an unknown role is refused rather than
     // guessed, so a typo in the composer is a loud failure and not a marker
     // that silently does not exist.
-    static bool ParseMarkerName(const FString& Name, EBreakerZoneMarkerRole& OutRole, FName& OutYard);
+    //
+    // THE SPAWN ROLE CARRIES ONE MORE TOKEN (O274):
+    //   marker_spawn_<n>         — the entry yard, site n
+    //   marker_spawn_<yard>_<n>  — that yard, site n
+    // The trailing `_<n>` is stripped FIRST and must be all digits, and only
+    // then is what remains read as the yard — so `marker_spawn_0` is the
+    // entry yard's site 0 and not a yard called "0". A spawn name with no
+    // index is refused: without one, two openings in a yard would collide on
+    // the (role, yard) rule, which is the rule that makes the index necessary.
+    // OutIndex is INDEX_NONE for every other role.
+    static bool ParseMarkerName(const FString& Name, EBreakerZoneMarkerRole& OutRole, FName& OutYard,
+        int32& OutIndex);
+    static bool ParseMarkerName(const FString& Name, EBreakerZoneMarkerRole& OutRole, FName& OutYard)
+    {
+        int32 Index = INDEX_NONE;
+        return ParseMarkerName(Name, OutRole, OutYard, Index);
+    }
     static const TCHAR* MarkerRoleName(EBreakerZoneMarkerRole Role);
+
+    // THE OPENINGS OF ONE YARD (O274), in extraction order. Empty for a yard
+    // the composer gave none, which is a legal yard: its patrols come back
+    // through a tear instead, and the caller decides that rather than this.
+    static TArray<FBreakerZoneMarker> SpawnSitesForYard(const FBreakerZoneMarkers& Markers, FName Yard);
+    // The nearest opening of a yard to a point, or nullptr when the nearest
+    // is farther than ReachCm on the ground plane. Reach is the caller's
+    // number: a pocket whose nearest authored mouth is across the yard would
+    // have its patrols walk in from somewhere that reads as unrelated to the
+    // fight, and a tear beside the formation says more than that walk does.
+    static const FBreakerZoneMarker* NearestSpawnSite(const FBreakerZoneMarkers& Markers, FName Yard,
+        const FVector& Point, float ReachCm);
+    // How far a pocket's formation centre may be from an authored opening
+    // before the composer is taken to have authored nothing there and a tear
+    // is placed instead. Held here beside the sites it measures, so the mode
+    // and the suite read one number. O2 PLACEHOLDER.
+    static constexpr float FernhallSpawnSiteReachCm = 2500.0f;
 
     // The yard's cover, in the field frame the grammar speaks: origin at the
     // player-start marker, forward toward the rift marker. Pure math over the

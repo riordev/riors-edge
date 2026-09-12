@@ -401,16 +401,71 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
             Player->SetActorLocation(Post + FVector(0.0f, 0.0f, 40000.0f));
             Mode->OutdoorRepopulationDelaySeconds = 0.1f;
 
-            // ---- O274: THE WORLD AT REST SHOWS NO TEARS. Every yard pocket
-            // placed one, and every one of them is closed until a return.
+            // ---- O274: THE WORLD AT REST SHOWS NO TEARS, and a tear stands
+            // only where the composer authored no opening. Every yard pocket
+            // returns through EITHER an authored spawn site within reach of
+            // its formation (a bay mouth, a dock face, a seam mouth) OR a
+            // tear, never both and never neither — and every tear is closed
+            // until a return.
             TArray<ABreakerPocketRift*> Tears;
             for (TActorIterator<ABreakerPocketRift> It(World); It; ++It) Tears.Add(*It);
-            TestEqual(TEXT("Every yard pocket placed a tear"), Tears.Num(), 11);
             for (const ABreakerPocketRift* Tear : Tears)
             {
                 TestFalse(TEXT("A tear is not open before anything returns"), Tear->IsOpen());
                 TestTrue(TEXT("and draws nothing at rest"), Tear->IsClosed());
             }
+            // WHICH POCKETS TEAR, read off the world rather than off a list:
+            // a tear stands 750 cm past its pocket's centre, so each one is
+            // handed to the pocket whose body mean is nearest. The tightest
+            // pair in the zone (siding 8 and 10) puts a neighbour's tear at
+            // ~1500 cm against ~900 for the pocket's own, so nearest is
+            // unambiguous; a tear nearer no pocket than that is a stray.
+            const FName PocketYards[] = { NAME_None, NAME_None, FName(TEXT("substation")),
+                                          NAME_None, FName(TEXT("substation")),
+                                          FName(TEXT("depot")), FName(TEXT("depot")), FName(TEXT("depot")),
+                                          FName(TEXT("siding")), FName(TEXT("siding")), FName(TEXT("siding")) };
+            bool bPocketTears[11] = {};
+            for (const ABreakerPocketRift* Tear : Tears)
+            {
+                int32 Nearest = INDEX_NONE;
+                float NearestCm = TNumericLimits<float>::Max();
+                for (int32 Index = 0; Index < 11; ++Index)
+                {
+                    const float Cm = FVector::Dist2D(Tear->GetActorLocation(), PocketCenters[Index]);
+                    if (Cm < NearestCm) { NearestCm = Cm; Nearest = Index; }
+                }
+                TestTrue(*FString::Printf(TEXT("A tear stands beside a pocket (%.0f cm from pocket %d)"), NearestCm, Nearest),
+                    Nearest != INDEX_NONE && NearestCm < 1500.0f);
+                if (Nearest == INDEX_NONE) continue;
+                TestFalse(*FString::Printf(TEXT("Pocket %d placed at most one tear"), Nearest), bPocketTears[Nearest]);
+                bPocketTears[Nearest] = true;
+            }
+            int32 TearPockets = 0, SitePockets = 0;
+            for (int32 Index = 0; Index < 11; ++Index)
+            {
+                if (bPocketTears[Index]) ++TearPockets; else ++SitePockets;
+                // The rule the mode reads, read again here: a pocket tears
+                // exactly when no site of its yard is within reach of its
+                // formation centre. The body mean is up to a few hundred cm
+                // off that centre (the Warden formations more than the plain
+                // ones), so each side of the rule is checked with that slack
+                // rather than at the boundary itself.
+                constexpr float CentreSlackCm = 500.0f;
+                const bool bSiteNear = UBreakerZoneBuilder::NearestSpawnSite(Markers, PocketYards[Index],
+                    PocketCenters[Index], UBreakerZoneBuilder::FernhallSpawnSiteReachCm - CentreSlackCm) != nullptr;
+                const bool bSiteFar = UBreakerZoneBuilder::NearestSpawnSite(Markers, PocketYards[Index],
+                    PocketCenters[Index], UBreakerZoneBuilder::FernhallSpawnSiteReachCm + CentreSlackCm) == nullptr;
+                if (bSiteNear)
+                    TestFalse(*FString::Printf(TEXT("Pocket %d has an opening well in reach and placed no tear"), Index), bPocketTears[Index]);
+                if (bSiteFar)
+                    TestTrue(*FString::Printf(TEXT("Pocket %d has no opening near reach and placed a tear"), Index), bPocketTears[Index]);
+            }
+            AddInfo(FString::Printf(TEXT("FERNHALL RETURNS  %d pockets through authored openings, %d through tears, %d tears standing"),
+                SitePockets, TearPockets, Tears.Num()));
+            TestEqual(TEXT("Tears stand exactly where no opening was in reach"), Tears.Num(), TearPockets);
+            TestEqual(TEXT("and every pocket returns through one or the other"), TearPockets + SitePockets, 11);
+            TestTrue(TEXT("At least one pocket returns through an authored opening (O274: authored ground first)"), SitePockets >= 1);
+            TestTrue(TEXT("and at least one still tears, where the composer authored nothing"), TearPockets >= 1);
 
             Standing->DispatchBeginPlay();
             FBreakerDamageRequest Kill;
@@ -419,9 +474,56 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
             if (!TestTrue(TEXT("The courtyard body dies to combat damage"),
                 Standing->FindComponentByClass<UBreakerCombatComponent>()->ReceiveDamage(Kill).bKilled)) return false;
 
+            // EVERY RETURN IS READ ON ITS FIRST FRAME, because where a body
+            // APPEARS is the whole claim and a body walks off that point at
+            // once. A yard body that was not standing before the probe is
+            // caught the tick it exists: if its pocket tears, it stands at an
+            // open tear; if its pocket has an opening, it stands ON the
+            // authored site with no tear anywhere near it. Either way it is
+            // emerging — the window is the same clock on both paths.
+            TSet<ABreakerEnemy*> Seen = PreExisting;
+            Seen.Add(Standing);
+            int32 SiteArrivals = 0, TearArrivals = 0;
             auto Tick = [&](int32 Steps)
             {
-                for (int32 Step = 0; Step < Steps; ++Step) { ++GFrameCounter; World->Tick(LEVELTICK_All, 0.05f); }
+                for (int32 Step = 0; Step < Steps; ++Step)
+                {
+                    ++GFrameCounter;
+                    World->Tick(LEVELTICK_All, 0.05f);
+                    for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
+                    {
+                        if (Seen.Contains(*It)) continue;
+                        Seen.Add(*It);
+                        int32 Pocket = INDEX_NONE;
+                        for (int32 Index = 0; Index < 11; ++Index)
+                            if (It->Tags.Contains(FName(*FString::Printf(TEXT("Fernhall.Outdoor.%d"), Index)))) Pocket = Index;
+                        if (Pocket == INDEX_NONE) continue;   // the courtyard's is read below
+                        const FVector At = It->GetActorLocation();
+                        TestTrue(*FString::Printf(TEXT("A pocket %d body emerges on arrival"), Pocket), It->IsEmerging());
+                        float NearestTearCm = TNumericLimits<float>::Max();
+                        const ABreakerPocketRift* NearestTear = nullptr;
+                        for (const ABreakerPocketRift* Tear : Tears)
+                        {
+                            const float Cm = FVector::Dist2D(At, Tear->GetActorLocation());
+                            if (Cm < NearestTearCm) { NearestTearCm = Cm; NearestTear = Tear; }
+                        }
+                        if (bPocketTears[Pocket])
+                        {
+                            ++TearArrivals;
+                            TestTrue(*FString::Printf(TEXT("A pocket %d body comes out of its tear (%.0f cm)"), Pocket, NearestTearCm),
+                                NearestTear && NearestTearCm < 400.0f && NearestTear->IsOpen());
+                        }
+                        else
+                        {
+                            ++SiteArrivals;
+                            const FBreakerZoneMarker* Site = UBreakerZoneBuilder::NearestSpawnSite(
+                                Markers, PocketYards[Pocket], At, 50.0f);
+                            TestNotNull(*FString::Printf(TEXT("A pocket %d body appears on an authored opening of its yard"), Pocket), Site);
+                            TestTrue(*FString::Printf(TEXT("and no tear stands near that opening (%.0f cm)"), NearestTearCm),
+                                NearestTearCm >= 300.0f);
+                        }
+                    }
+                }
             };
             // A body that was not standing before the probe and is alive now.
             auto FindNew = [&](const TCHAR* Tag) -> ABreakerEnemy*
@@ -441,14 +543,25 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
             // and the probe reads it rather than steering it.
             //
             // A TEAR OPENS BEFORE ITS BODY EXISTS (O274). Two ticks is the
-            // first claim: the tear is open, and NOTHING has come through.
+            // first claim, pocket 0's. Where pocket 0 tears: the tear is open,
+            // and NOTHING has come through. Where pocket 0 has an authored
+            // opening: no tear opens, and its body is already standing on the
+            // site — the claim IS the arrival, as it is for the courtyard.
             Tick(2);
             ABreakerPocketRift* Torn = nullptr;
             int32 OpenTears = 0;
             for (ABreakerPocketRift* Tear : Tears)
                 if (Tear->IsOpen()) { ++OpenTears; Torn = Tear; }
-            TestEqual(TEXT("The first claim opens exactly one tear"), OpenTears, 1);
-            TestNull(TEXT("and no body has come through it yet: the tear opens first"), FindNew(nullptr));
+            if (bPocketTears[0])
+            {
+                TestEqual(TEXT("The first claim opens exactly one tear"), OpenTears, 1);
+                TestNull(TEXT("and no body has come through it yet: the tear opens first"), FindNew(nullptr));
+            }
+            else
+            {
+                TestEqual(TEXT("The first claim opens no tear: pocket 0 returns through authored ground"), OpenTears, 0);
+                TestNotNull(TEXT("and its body already stands on the opening"), FindNew(TEXT("Fernhall.Outdoor.0")));
+            }
 
             // THE BODY COMES THROUGH ONCE THE TEAR HAS OPENED. The claim was
             // at 0.10 s and the arrival is AppearSeconds (0.8) after it, so by
@@ -456,7 +569,7 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
             // at the tear that opened for it.
             Tick(20);
             ABreakerEnemy* Emerged = FindNew(TEXT("Fernhall.Outdoor.0"));
-            if (TestNotNull(TEXT("A pocket body returns once its tear has opened"), Emerged) && Torn)
+            if (TestNotNull(TEXT("A pocket body returns once its claim has resolved"), Emerged) && Torn && bPocketTears[0])
             {
                 TestTrue(TEXT("and it came out of the tear that opened"),
                     FVector::Dist2D(Emerged->GetActorLocation(), Torn->GetActorLocation()) < 400.0f);
@@ -505,6 +618,13 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
             }
             for (const ABreakerPocketRift* Tear : Tears)
                 TestTrue(TEXT("The world at rest shows no tears"), Tear->IsClosed());
+            // The ten killed entry-yard bodies (pockets 0, 1, 3) have all had
+            // time to come back by now; each was read on its first frame
+            // above. Logged rather than pinned per path, because which of the
+            // three pockets has an opening in reach is the composer's call.
+            AddInfo(FString::Printf(TEXT("FERNHALL RETURNS PROBED  %d through authored openings, %d through tears"),
+                SiteArrivals, TearArrivals));
+            TestTrue(TEXT("The killed entry-yard pockets came back at all"), SiteArrivals + TearArrivals >= 1);
         }
         TestEqual(TEXT("Repeated startup preserves the outdoor population"), AfterRepeat - CourtyardAfterRepeat, 35);
         TestEqual(TEXT("Repeated startup preserves thirty-five outdoor plus courtyard four"), AfterRepeat, 39);

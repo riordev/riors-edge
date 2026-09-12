@@ -42,7 +42,10 @@ MAP_PACKAGE = "/Game/Breaker/Maps/Lvl_Fernhall"
 # 113 -> 167 when the DEPOT yard landed: a third place, its own seam, its own
 # lattice. The ruin's own chunk count follows the cover it leans on, so it grew
 # with it rather than being re-authored.
-EXPECTED_TOTAL = 715 if RUINED else 631
+#
+# 631 -> 645 (and 715 -> 729) when the patrol return points landed (O274):
+# fourteen marker_spawn_* cubes, consumed as transforms like every marker.
+EXPECTED_TOTAL = 729 if RUINED else 645
 SOLID_PREFIXES = ("blk_full_", "blk_chest_", "wall_", "flr_")
 
 # THE MARKER CONTRACT, PARSED — not a fixed list of three names. This used to
@@ -54,10 +57,17 @@ SOLID_PREFIXES = ("blk_full_", "blk_chest_", "wall_", "flr_")
 #   marker_<role>          the entry yard
 #   marker_<role>_<yard>   that yard
 #
+# The spawn role carries a 0-based index after the yard (marker_spawn_<n> for
+# the entry yard, marker_spawn_<yard>_<n> otherwise — O274). This parser does
+# not split the index off: it rides in the yard field, so the (role, yard) key
+# below is (spawn, "<yard>_<n>") and the no-repeat rule keeps its shape — two
+# spawn markers in one yard with one index are the duplicate, two with
+# different indices are not.
+#
 # LONGEST ROLE FIRST, for the same reason the C++ does it: npc_contract
 # contains an underscore, so a shortest-match parse reads marker_npc_contract
 # as role "npc" in a yard called "contract".
-MARKER_ROLES = ("npc_contract", "playerstart", "rift", "yard")
+MARKER_ROLES = ("npc_contract", "playerstart", "rift", "spawn", "yard")
 
 
 def parse_marker(name):

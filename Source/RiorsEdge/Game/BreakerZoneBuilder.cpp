@@ -308,6 +308,10 @@ TArray<FName> FBreakerZoneMarkers::Yards() const
 {
     TArray<FName> Out;
     for (const FBreakerZoneMarker& Marker : All) Out.AddUnique(Marker.Yard);
+    // A spawn site names a yard as much as a door does, and for the same
+    // reason it must be an anchored one: an opening in a yard nobody framed
+    // is an opening whose pocket can never be measured against it.
+    for (const FBreakerZoneMarker& Site : SpawnSites) Out.AddUnique(Site.Yard);
     return Out;
 }
 
@@ -332,6 +336,30 @@ bool FBreakerZoneMarkers::IsComplete(FString& OutReason) const
                 OutReason = FString::Printf(TEXT("two '%s' markers in yard '%s'"),
                     UBreakerZoneBuilder::MarkerRoleName(All[A].Role),
                     All[A].Yard.IsNone() ? TEXT("<entry>") : *All[A].Yard.ToString());
+                return false;
+            }
+        }
+    }
+    // THE SAME RULE, ON THE KEY THAT MAKES A SPAWN SITE DISTINCT (O274). The
+    // loop above never sees the sites — they are not in All — so it stays
+    // exactly the pairwise (role, yard) walk it was. This one is the same
+    // walk over (yard, index): two `marker_spawn_depot_1` is the mistake the
+    // index exists to prevent, and a site with no index never parses.
+    for (int32 A = 0; A < SpawnSites.Num(); ++A)
+    {
+        if (SpawnSites[A].Index < 0)
+        {
+            OutReason = FString::Printf(TEXT("a 'spawn' marker in yard '%s' carries no index"),
+                SpawnSites[A].Yard.IsNone() ? TEXT("<entry>") : *SpawnSites[A].Yard.ToString());
+            return false;
+        }
+        for (int32 B = A + 1; B < SpawnSites.Num(); ++B)
+        {
+            if (SpawnSites[A].Yard == SpawnSites[B].Yard && SpawnSites[A].Index == SpawnSites[B].Index)
+            {
+                OutReason = FString::Printf(TEXT("two 'spawn' markers with index %d in yard '%s'"),
+                    SpawnSites[A].Index,
+                    SpawnSites[A].Yard.IsNone() ? TEXT("<entry>") : *SpawnSites[A].Yard.ToString());
                 return false;
             }
         }
@@ -364,12 +392,15 @@ const TCHAR* UBreakerZoneBuilder::MarkerRoleName(EBreakerZoneMarkerRole Role)
     case EBreakerZoneMarkerRole::Rift:        return TEXT("rift");
     case EBreakerZoneMarkerRole::NPCContract: return TEXT("npc_contract");
     case EBreakerZoneMarkerRole::Yard:        return TEXT("yard");
+    case EBreakerZoneMarkerRole::SpawnSite:   return TEXT("spawn");
     }
     return TEXT("<unknown>");
 }
 
-bool UBreakerZoneBuilder::ParseMarkerName(const FString& Name, EBreakerZoneMarkerRole& OutRole, FName& OutYard)
+bool UBreakerZoneBuilder::ParseMarkerName(const FString& Name, EBreakerZoneMarkerRole& OutRole, FName& OutYard,
+    int32& OutIndex)
 {
+    OutIndex = INDEX_NONE;
     static const TCHAR* Prefix = TEXT("marker_");
     if (!Name.StartsWith(Prefix, ESearchCase::CaseSensitive)) return false;
     const FString Rest = Name.RightChop(FCString::Strlen(Prefix));
@@ -383,6 +414,7 @@ bool UBreakerZoneBuilder::ParseMarkerName(const FString& Name, EBreakerZoneMarke
         EBreakerZoneMarkerRole::PlayerStart,
         EBreakerZoneMarkerRole::Rift,
         EBreakerZoneMarkerRole::Yard,
+        EBreakerZoneMarkerRole::SpawnSite,
     };
     const EBreakerZoneMarkerRole* Best = nullptr;
     int32 BestLength = 0;
@@ -401,8 +433,62 @@ bool UBreakerZoneBuilder::ParseMarkerName(const FString& Name, EBreakerZoneMarke
     OutRole = *Best;
     // No suffix means the ENTRY yard, which is what keeps every name authored
     // before yards existed valid with no re-export.
-    OutYard = Rest.Len() == BestLength ? NAME_None : FName(*Rest.RightChop(BestLength + 1));
+    const FString Suffix = Rest.Len() == BestLength ? FString() : Rest.RightChop(BestLength + 1);
+    if (*Best != EBreakerZoneMarkerRole::SpawnSite)
+    {
+        OutYard = Suffix.IsEmpty() ? NAME_None : FName(*Suffix);
+        return true;
+    }
+
+    // THE INDEX COMES OFF FIRST (O274). `marker_spawn_0` is the entry yard's
+    // site 0; read yard-then-index it would be a yard called "0" with no
+    // index, and a yard nothing anchors is refused downstream with a message
+    // about anchors rather than about this name. So: the last `_` token must
+    // be all digits, and whatever precedes it — possibly nothing — is the
+    // yard. A spawn name with no digits at all is refused here, loudly, for
+    // the reason the header gives.
+    int32 Cut = INDEX_NONE;
+    const FString IndexText = Suffix.FindLastChar(TEXT('_'), Cut) ? Suffix.RightChop(Cut + 1) : Suffix;
+    if (IndexText.IsEmpty() || !IndexText.IsNumeric() || IndexText.Contains(TEXT("."))
+        || IndexText.Contains(TEXT("-")) || IndexText.Contains(TEXT("+")))
+    {
+        return false;
+    }
+    OutIndex = FCString::Atoi(*IndexText);
+    const FString YardText = Cut == INDEX_NONE ? FString() : Suffix.Left(Cut);
+    OutYard = YardText.IsEmpty() ? NAME_None : FName(*YardText);
     return true;
+}
+
+TArray<FBreakerZoneMarker> UBreakerZoneBuilder::SpawnSitesForYard(const FBreakerZoneMarkers& Markers, FName Yard)
+{
+    TArray<FBreakerZoneMarker> Out;
+    for (const FBreakerZoneMarker& Site : Markers.SpawnSites)
+    {
+        if (Site.Yard == Yard) Out.Add(Site);
+    }
+    return Out;
+}
+
+const FBreakerZoneMarker* UBreakerZoneBuilder::NearestSpawnSite(const FBreakerZoneMarkers& Markers, FName Yard,
+    const FVector& Point, float ReachCm)
+{
+    // On the ground plane, because a marker's Z is the floor under it and a
+    // formation centre is authored at Z=0: a vertical difference between the
+    // two is a fact about the trace, not about how far a body has to walk.
+    const FBreakerZoneMarker* Best = nullptr;
+    double BestDistanceSq = FMath::Square(static_cast<double>(FMath::Max(ReachCm, 0.0f)));
+    for (const FBreakerZoneMarker& Site : Markers.SpawnSites)
+    {
+        if (Site.Yard != Yard) continue;
+        const double DistanceSq = FVector::DistSquared2D(Site.Location, Point);
+        if (DistanceSq <= BestDistanceSq)
+        {
+            Best = &Site;
+            BestDistanceSq = DistanceSq;
+        }
+    }
+    return Best;
 }
 
 bool UBreakerZoneBuilder::ExtractMarkers(const TArray<FBreakerZonePiece>& Pieces, FBreakerZoneMarkers& OutMarkers)
@@ -415,7 +501,8 @@ bool UBreakerZoneBuilder::ExtractMarkers(const TArray<FBreakerZonePiece>& Pieces
         // surface the marked thing stands on.
         EBreakerZoneMarkerRole Role;
         FName Yard;
-        if (!ParseMarkerName(Piece.Name, Role, Yard))
+        int32 Index = INDEX_NONE;
+        if (!ParseMarkerName(Piece.Name, Role, Yard, Index))
         {
             // A `marker_`-prefixed name that does not parse is a TYPO, not a
             // piece of scenery: the prefix is the contract and nothing else
@@ -431,9 +518,15 @@ bool UBreakerZoneBuilder::ExtractMarkers(const TArray<FBreakerZonePiece>& Pieces
             }
             continue;
         }
-        FBreakerZoneMarker& Marker = OutMarkers.All.AddDefaulted_GetRef();
+        // Openings go to their own list (O274); everything one-per-yard goes
+        // to All. The split is what lets the (role, yard) rule stay exactly
+        // as it was while a yard authors as many openings as it has.
+        FBreakerZoneMarker& Marker = Role == EBreakerZoneMarkerRole::SpawnSite
+            ? OutMarkers.SpawnSites.AddDefaulted_GetRef()
+            : OutMarkers.All.AddDefaulted_GetRef();
         Marker.Role = Role;
         Marker.Yard = Yard;
+        Marker.Index = Index;
         Marker.Location = FVector(Piece.Origin.X, Piece.Origin.Y, Piece.Origin.Z - Piece.Extent.Z);
     }
 

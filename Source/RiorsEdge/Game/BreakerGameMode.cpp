@@ -4772,11 +4772,12 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
 
         // ---- WHERE THIS POCKET'S PATROLS COME BACK FROM --------------------
         // O268 gave the world a return and left it ILLEGIBLE: a body resolved
-        // into existence standing on its post. The desk's answer was authored
-        // mouths — doors, gaps, building openings — and its own finding is that
-        // the composed yard has none, and that authoring five is a composer job
-        // rather than a code one. A tear needs no geometry, works on any
-        // ground, and is a better sentence about Fernhall than a door would be.
+        // into existence standing on its post. O274 answers it twice: the
+        // composer authors openings (`marker_spawn_*` — bay mouths, dock
+        // faces, seam mouths) and a pocket within reach of one returns through
+        // it; a pocket the composer gave no opening returns through a TEAR,
+        // which needs no geometry, works on any ground, and is a better
+        // sentence about Fernhall than a door nobody drew would be.
         //
         // SPAWNED CLOSED (O274). A tear is an event, not a fixture: the actor
         // placed here draws nothing until the repopulation clock opens it for a
@@ -4798,14 +4799,76 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
         // the body appears at its post at once. An arrival point with nothing
         // opening at it would be strictly WORSE than that — a body popping into
         // open ground away from its post — so the two are coupled.
+        //
+        // AUTHORED GROUND FIRST (O274). Where the composer put an opening
+        // within reach of this pocket — a bay mouth, a dock face, a seam
+        // mouth, as a `marker_spawn_*` — the patrols come back through THAT,
+        // exactly as the courtyard's come back through its bay, and no tear
+        // is placed for the pocket. A tear is for ground the composer left
+        // blank, not a second door beside an authored one. The nearest site
+        // wins and the reach is the builder's one number, so a re-export that
+        // moves a mouth moves the pocket's return with it and the suite reads
+        // the same rule the mode does.
+        //
+        // THE CLOCK IS THE SAME EITHER WAY. A slot with no tear claims and
+        // arrives in one step (RefillOutdoorSlot's zero wait), the body is
+        // granted its emergence window on arrival, and it walks to its post
+        // from wherever it appeared: only WHERE differs, and where is the
+        // authored thing.
         if (OutdoorSlots.Num() > SlotFirst)
         {
+            const FBreakerZoneMarker* Site = UBreakerZoneBuilder::NearestSpawnSite(
+                Markers, Yards[Pocket], Center, UBreakerZoneBuilder::FernhallSpawnSiteReachCm);
+            bool bArrivesAtSite = false;
+            if (Site)
+            {
+                // From just above the marker's own floor, not from the sky: a
+                // bay mouth has a roof over it, and a trace dropped through
+                // the roof would stand the arrival on top of the bay. Same
+                // reach the courtyard mouth uses.
+                FHitResult SiteFloor;
+                FCollisionQueryParams SiteQuery(SCENE_QUERY_STAT(FernhallSpawnSiteFloor), false);
+                const FVector SiteAbove = Site->Location + FVector(0.0f, 0.0f, 400.0f);
+                if (World->LineTraceSingleByObjectType(SiteFloor, SiteAbove,
+                        SiteAbove - FVector(0.0f, 0.0f, 900.0f), FCollisionObjectQueryParams(ECC_WorldStatic), SiteQuery)
+                    && SiteFloor.ImpactNormal.Z >= 0.7f)
+                {
+                    for (int32 Index = SlotFirst; Index < OutdoorSlots.Num(); ++Index)
+                    {
+                        FBreakerOutdoorSlot& Slot = OutdoorSlots[Index];
+                        const ABreakerEnemy* Template = Slot.Class ? GetDefault<ABreakerEnemy>(Slot.Class) : nullptr;
+                        const UCapsuleComponent* Capsule = Template
+                            ? Template->FindComponentByClass<UCapsuleComponent>() : nullptr;
+                        if (!Capsule) continue;
+                        // A capsule centre, for the same reason the tear's is.
+                        Slot.Arrival = SiteFloor.ImpactPoint
+                            + FVector(0.0f, 0.0f, Capsule->GetScaledCapsuleHalfHeight() + 2.0f);
+                        Slot.bHasArrival = true;
+                        bArrivesAtSite = true;
+                    }
+                    UE_LOG(LogTemp, Display,
+                        TEXT("[Fernhall] pocket %d returns through authored site %d of yard '%s' (%.0f cm from its centre); no tear."),
+                        Pocket, Site->Index, Site->Yard.IsNone() ? TEXT("<entry>") : *Site->Yard.ToString(),
+                        FVector::Dist2D(Site->Location, Center));
+                }
+                else
+                {
+                    // An authored opening with no floor under it is a broken
+                    // export, not a blank one — said so, then treated as blank
+                    // so the pocket still has a return rather than none.
+                    UE_LOG(LogTemp, Error,
+                        TEXT("[Fernhall] spawn site %d of yard '%s' has no walkable floor at %s; pocket %d falls back to a tear."),
+                        Site->Index, Site->Yard.IsNone() ? TEXT("<entry>") : *Site->Yard.ToString(),
+                        *Site->Location.ToString(), Pocket);
+                }
+            }
             constexpr float PocketRiftOffsetCm = 750.0f;   // O2 PLACEHOLDER
             const FVector Desired = Center + Forward * PocketRiftOffsetCm;
             FHitResult Ground;
             FCollisionQueryParams RiftQuery(SCENE_QUERY_STAT(FernhallPocketRiftFloor), false);
             ABreakerPocketRift* Tear = nullptr;
-            if (World->LineTraceSingleByObjectType(Ground, Desired + FVector(0, 0, 3000),
+            if (!bArrivesAtSite
+                && World->LineTraceSingleByObjectType(Ground, Desired + FVector(0, 0, 3000),
                     Desired - FVector(0, 0, 3000), FCollisionObjectQueryParams(ECC_WorldStatic), RiftQuery)
                 && Ground.ImpactNormal.Z >= 0.7f)
             {
@@ -4834,7 +4897,7 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
                     Slot.Rift = Tear;
                 }
             }
-            else
+            else if (!bArrivesAtSite)
             {
                 UE_LOG(LogTemp, Display,
                     TEXT("[Fernhall] pocket %d has no ground for a tear; its patrols return to their posts."), Pocket);

@@ -668,14 +668,27 @@ work_pass("siding", SID_ANCHOR, SID_Z, bay_fwd=44.0, bay_side=1.0, dock_fwd=88.0
 #   marker_<role>          this marker belongs to the ENTRY yard
 #   marker_<role>_<yard>   it belongs to <yard>
 #
-# Roles: playerstart, rift, npc_contract, yard. An unknown role is REFUSED, not
-# skipped, so a typo here is a loud failure rather than a marker that silently
-# does not exist.
+# Roles: playerstart, rift, npc_contract, yard, spawn. An unknown role is
+# REFUSED, not skipped, so a typo here is a loud failure rather than a marker
+# that silently does not exist.
 #
 # EXACTLY ONE playerstart per zone. Rift doors and contract givers are
 # per-yard and OPTIONAL — a yard with no door is a legal yard — but no
 # (role, yard) pair may repeat: two rift markers in one yard would spawn two
 # doors on the same spot.
+#
+# THE spawn ROLE CARRIES AN INDEX, because a yard has several of them (O274):
+#
+#   marker_spawn_<n>          the ENTRY yard's n-th patrol return point
+#   marker_spawn_<yard>_<n>   yard <yard>'s n-th
+#
+# <n> is 0-based and the index is what keeps the no-repeat rule its shape: the
+# pair that may not repeat is (spawn, <yard>, <n>). A spawn marker is where a
+# patrol returns FROM — a bay mouth, a dock face, a seam mouth — authored
+# ground first, so a tear is used only where the composer authored nothing.
+# The yard tag is the one that yard's other markers use (substation, depot,
+# siding; the entry yard carries no tag), and the entry yard's index form
+# has no yard segment for the same reason its other markers have none.
 #
 # EVERY NAMED YARD NEEDS A `yard` ANCHOR. A yard's grammar is measured in its
 # OWN frame, and a zone has exactly one playerstart, so the rule that anchors
@@ -709,6 +722,49 @@ place("marker_yard_depot", None, (DEP_ANCHOR, 0.0, DEP_Z), marker=True)
 # other way.
 place("marker_yard_siding", None, (SID_ANCHOR, 0.0, SID_Z), marker=True)
 place("marker_rift_siding", None, (SID_X - 41.0, 0.0, SID_Z), marker=True)
+
+# ---- Patrol return points (O274) -------------------------------------------
+# Where a patrol comes back from is authored ground first: the bay's doorway,
+# the dock's face, and every seam mouth on the yard's flank. Each is pushed
+# 1.5 m from the opening into the yard — the walk-out point, not the threshold
+# — so an arrival stands on the yard slab and not in a wall. Floor height;
+# facing is NOT authored, the game faces the arrival toward its post.
+#
+# The bay and dock points are read off work_pass's own numbers: the doorway
+# is the cheek line at |lat| 21 - bd/2 = 16, the dock face is the dockfront at
+# |lat| 20.5 - 3.5 = 17. Seam mouths are absolute glTF (x, z), each 1.5 m
+# inside the perimeter's INNER face (the wall line +- 1.5) on the mouth's
+# centre line.
+SPAWN_STANDOFF = 1.5   # O2 PLACEHOLDER
+
+def spawn_pass(yard, anchor_x, centre_z, bay_fwd, bay_side, dock_fwd, dock_side, mouths, forward=1.0):
+    """Index 0 is the bay walk-out, 1 the dock face, 2.. the seam mouths in
+    the order given. yard is the marker tag ('' for the entry yard), matching
+    the yard's other markers."""
+    def at(fwd, lat):
+        return (anchor_x + forward * fwd, 0.0, centre_z + lat)
+    def name(n):
+        return "marker_spawn_%s%d" % (yard + "_" if yard else "", n)
+    place(name(0), None, at(bay_fwd, bay_side * (16.0 - SPAWN_STANDOFF)), marker=True)
+    place(name(1), None, at(dock_fwd, dock_side * (17.0 - SPAWN_STANDOFF)), marker=True)
+    for i, (x, z) in enumerate(mouths):
+        place(name(2 + i), None, (x, 0.0, z), marker=True)
+
+# Entry: the east mouth to the substation (z 9..19, wall_e inner face x 100)
+# and the plaza's south mouth to the siding (x 0..10, inner face z -23.5).
+spawn_pass("", 6.0, 0.0, bay_fwd=44.0, bay_side=1.0, dock_fwd=88.0, dock_side=-1.0,
+           mouths=((100.0 - SPAWN_STANDOFF, 14.0), (5.0, -23.5 + SPAWN_STANDOFF)))
+# Substation: the south mouth where the first seam arrives (x 106..116, inner
+# face z 37.5) and the north mouth the second leaves by (x 130..140, inner
+# face z 84.5).
+spawn_pass("substation", SUB_ANCHOR, SUB_Z, bay_fwd=34.0, bay_side=-1.0, dock_fwd=88.0, dock_side=1.0,
+           mouths=((SUB_X, SUB_Z - 23.5 + SPAWN_STANDOFF), (135.0, SUB_Z + 23.5 - SPAWN_STANDOFF)))
+# Depot: one mouth, in the west end wall (z 95..105, inner face x 154.5).
+spawn_pass("depot", DEP_ANCHOR, DEP_Z, bay_fwd=15.0, bay_side=1.0, dock_fwd=68.0, dock_side=-1.0,
+           mouths=((DEP_X - 52.0 + SPAWN_STANDOFF, 100.0),))
+# Siding: one mouth, in the east end wall (z -53..-43, inner face x -5).
+spawn_pass("siding", SID_ANCHOR, SID_Z, bay_fwd=44.0, bay_side=1.0, dock_fwd=88.0, dock_side=-1.0,
+           mouths=((SID_X + 52.0 - SPAWN_STANDOFF, -48.0),), forward=-1.0)
 
 # ---- Dressing (O24: vegetation over ruins) ---------------------------------
 # WHERE PLANTS GROW. Owner: "some graphical assets that are imported that are
@@ -844,10 +900,11 @@ if RUINED:
 
     print("ruin dressing:", Ruins, "chunks")
 
-# THE ROSTER THIS WRITES: 631 meshes intact, 715 ruined — the 84 ruin chunks
-# are dressing over the same 631. Four yards (entry 57 with its south mouth
+# THE ROSTER THIS WRITES: 645 meshes intact, 729 ruined — the 84 ruin chunks
+# are dressing over the same 645. Four yards (entry 57 with its south mouth
 # open, substation 56, depot 60, siding 64), three seams (6, 7, 5), four times
-# the 92 a shape, work and grow pass add, and 8 markers.
+# the 92 a shape, work and grow pass add, and 22 markers (8 frame and door
+# markers plus 14 spawn points: entry 4, substation 4, depot 3, siding 3).
 # BreakerFernhallExpectedPieceCount (BreakerFernhallZoneTests.cpp) and
 # EXPECTED_TOTAL (breaker_import_fernhall.py) are kept by hand to these.
 scene = trimesh.Scene(SCENE)

@@ -102,16 +102,16 @@
   HoldRingRuntime pin it. A player at 650-900 cannot be punished until
   the volley (B) — by design of the split.
 
-## Cycle — O274 TEARS, B: AUTHORED MOUTHS
+## O274 TEARS, B — LANDED
 
-- [ ] Composer: marker_spawn_<yard>_<n> at each bay mouth, dock face and
-      seam mouth; roles comment. Importer MARKER_ROLES gains spawn.
-      BreakerZoneBuilder: SpawnSite appended to the role enum; parse; the
-      no-repeat rule keeps its index. Re-export, re-import, commit.
-- [ ] GameMode: before placing a tear, the nearest SpawnSite marker within
-      an O2 radius of the pocket is the arrival (no tear); else the tear.
-- [ ] Pins: Markers.NameContract round-trips spawn; OutdoorEncounterRuntime
-      gains a pocket that arrives at a marker and never at a tear.
+- Fourteen `spawn` markers authored at every bay walk-out, dock face and
+  seam mouth (entry 4, substation 4, depot 3, siding 3); the role parses
+  with a trailing index (`marker_spawn_0` is the entry yard's). A pocket
+  with a marker within 25 m of its formation arrives THROUGH THE MARKER
+  and spawns no tear; the rest keep theirs. A returned patrol is asserted
+  at its POST (leash origin), not its feet, because it walks there now.
+  645 / 729 pieces, 22 markers. FOUND: a seam-mouth marker sits at the
+  band edge and YardForPoint can hand it to the neighbour; not pinned.
 
 ## Cycle — O273 BOSSES, B: THE VOLLEY
 
