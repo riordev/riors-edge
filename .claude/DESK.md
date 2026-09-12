@@ -105,13 +105,33 @@
   stretches a facade now. QUESTION: the lifted sheets read light grey —
   a value you may want lower; the walls' first frame decides.
 
-## Cycle — O280 PROPS
+## O280 PROPS — LANDED
 
-- [ ] Import Prop_Crate4 (and a lid-bearing crate if the kit has one)
-      into Content/Breaker/Meshes/props through the scripted importer;
-      BreakerSupplyChest wears it with the gold band; the composer's
-      crates/barrels/rails read at player scale. CaptureChest
-      photographed.
+- The supply chest is the kit's own chest: Scripts/compose_props.py loads
+  Prop_Chest through the shared kit loader (Scripts/breaker_kit.py, lifted
+  from the composer), splits the lid at the kit's hinge so the lid mesh's
+  origin IS the hinge, scales the body to 1.10 m wide (O2), exports
+  Assets/zones/props.glb (body, lid, Prop_Crate4), and
+  breaker_import_props.py imports it fresh each run (deleting the folder
+  first — the fernhall importer's lesson). The chest actor wears the body
+  on its hidden BodyMesh at the capsule's foot, yawed so the lip faces
+  the approach, the lid hung at the hinge (0.302 of the body's height,
+  read from the export), swinging 70 degrees of roll over 0.35 s on
+  open; the gold band wraps the body at the hinge line and its Gold
+  write moved into BeginPlay so it survives the NPC sash overwrite — the
+  band had shipped amber, not gold, since the sash landed. The composer's
+  barrels are uniform 1.1 m, crates and cable native, canopy posts and
+  the roof stack are Column_Simple at 3.4 m; the dead rails load is
+  gone. Pins: CrateWithALid (the default object carries the two props,
+  the body is wider than tall, the lid closes flush with the body's top
+  and hinges in its upper half, the one band sits at the seam);
+  FernhallCacheRuntime asserts the band's Color is BreakerUI::Gold after
+  BeginPlay. PHOTOGRAPHED: CaptureChest — a lidded crate with a latch
+  and a gold band, in a bay. FOUND: the capsule stays 34 cm (site
+  collection reads it), so the crate's ends do not block — recorded at
+  the site. FOUND: deck piers and gantry legs are still a stretched city
+  miniature. FOUND: the chest capture frames whichever chest the session
+  seed picks; one in three frames looked at a wall.
 
 ## Cycle — O281 ENEMY LIFE
 

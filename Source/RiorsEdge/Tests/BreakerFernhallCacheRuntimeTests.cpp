@@ -27,14 +27,41 @@
 #include "Items/BreakerLootPickup.h"
 #include "Items/BreakerDropTable.h"
 #include "Items/BreakerEquipmentComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Save/BreakerAccountSave.h"
 #include "Save/BreakerQuestJournal.h"
+#include "UI/BreakerUIStyle.h"
 #include "UObject/Package.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerFernhallCacheRuntimeTest,
     "RiorsEdge.Campaign.FernhallCacheRuntime", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+namespace
+{
+    // The chest's band, by elimination: its parts are protected on the NPC
+    // base, so the band is the one engine cube with any size still showing
+    // on the actor — the crate and lid are named props, the mote is a sphere,
+    // and the console's cube is hidden, unmeshed or collapsed. Two matches is
+    // the console's cube still standing inside the crate.
+    const UStaticMeshComponent* BreakerFernhallCacheFindChestBand(const ABreakerSupplyChest* Chest, int32& OutCandidates)
+    {
+        OutCandidates = 0;
+        const UStaticMeshComponent* Band = nullptr;
+        TArray<UStaticMeshComponent*> Meshes;
+        Chest->GetComponents<UStaticMeshComponent>(Meshes);
+        for (const UStaticMeshComponent* Mesh : Meshes)
+        {
+            if (!Mesh || !Mesh->GetStaticMesh()) continue;
+            if (Mesh->GetStaticMesh()->GetPathName() != TEXT("/Engine/BasicShapes/Cube.Cube")) continue;
+            if (Mesh->GetRelativeScale3D().IsNearlyZero() || !Mesh->GetVisibleFlag()) continue;
+            ++OutCandidates;
+            Band = Mesh;
+        }
+        return OutCandidates == 1 ? Band : nullptr;
+    }
+}
 
 bool FBreakerFernhallCacheRuntimeTest::RunTest(const FString& Parameters)
 {
@@ -203,6 +230,32 @@ bool FBreakerFernhallCacheRuntimeTest::RunTest(const FString& Parameters)
                 for (const ABreakerSupplyChest* Chest : Chests)
                     TestFalse(TEXT("A chest is found by walking, not by a map pin"),
                         Marker.Location.Equals(Chest->GetActorLocation()));
+
+        // ---- THE BAND IS GOLD AFTER BEGINPLAY (O179, O280) ----------------
+        // The constructor wrote BreakerUI::Gold onto the band's material and
+        // ABreakerNPC::BeginPlay then painted the person's amber sash over it,
+        // so every chest in the yard wore the sash colour and nothing said so.
+        // The gold has to survive the actor's own BeginPlay, which is the only
+        // place this can be read. This world never began play as a whole (see
+        // the Kill lambda above), so the chest is begun here, as the game
+        // begins it.
+        for (ABreakerSupplyChest* Chest : Chests)
+        {
+            if (!Chest->HasActorBegunPlay()) Chest->DispatchBeginPlay();
+            int32 Candidates = 0;
+            const UStaticMeshComponent* Band = BreakerFernhallCacheFindChestBand(Chest, Candidates);
+            if (!TestEqual(TEXT("A begun chest shows exactly one cube band"), Candidates, 1) || !Band) return false;
+            const UMaterialInstanceDynamic* BandMaterial = Cast<UMaterialInstanceDynamic>(Band->GetMaterial(0));
+            if (!TestNotNull(TEXT("The band wears a dynamic material after BeginPlay"), BandMaterial)) return false;
+            FLinearColor BandColor = FLinearColor::Black;
+            if (!TestTrue(TEXT("The band's material carries a Color parameter"),
+                BandMaterial->GetVectorParameterValue(FMaterialParameterInfo(TEXT("Color")), BandColor))) return false;
+            const bool bGold = FMath::IsNearlyEqual(BandColor.R, BreakerUI::Gold.R, 0.01f)
+                && FMath::IsNearlyEqual(BandColor.G, BreakerUI::Gold.G, 0.01f)
+                && FMath::IsNearlyEqual(BandColor.B, BreakerUI::Gold.B, 0.01f);
+            if (!TestTrue(*FString::Printf(TEXT("The band is BreakerUI::Gold after BeginPlay, not the NPC sash (got %.3f %.3f %.3f, want %.3f %.3f %.3f)"),
+                BandColor.R, BandColor.G, BandColor.B, BreakerUI::Gold.R, BreakerUI::Gold.G, BreakerUI::Gold.B), bGold)) return false;
+        }
 
         // ONE OF EACH KIND is no longer a thing: under O275 every chest pays
         // the currency floor AND one item at the completion floor. Open the

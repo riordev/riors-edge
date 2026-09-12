@@ -3,6 +3,8 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Components/CapsuleComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "Game/BreakerZoneBuilder.h"
 #include "HAL/FileManager.h"
 #include "Interaction/BreakerSupplyChest.h"
@@ -92,6 +94,129 @@ namespace
             if (Piece.Name == Name.ToString()) return &Piece;
         return nullptr;
     }
+
+    // The chest's parts are protected members of the NPC it derives from, so
+    // they are found the way a capture would find them: by what mesh each
+    // component carries. Bounds are brought into the ACTOR'S frame by walking
+    // the attachment chain the constructor set up (the lid hangs off the
+    // body, the body off the capsule), so "the lid sits on the body" is a
+    // statement about where they are, not about which is parented to which.
+    const UStaticMeshComponent* BreakerSupplyChestFindByMeshPath(
+        const TArray<UStaticMeshComponent*>& Meshes, const TCHAR* PathPrefix)
+    {
+        for (const UStaticMeshComponent* Mesh : Meshes)
+            if (Mesh && Mesh->GetStaticMesh() && Mesh->GetStaticMesh()->GetPathName().StartsWith(PathPrefix)) return Mesh;
+        return nullptr;
+    }
+
+    FTransform BreakerSupplyChestActorSpace(const USceneComponent* Component)
+    {
+        FTransform ToActor = Component->GetRelativeTransform();
+        for (const USceneComponent* Parent = Component->GetAttachParent(); Parent; Parent = Parent->GetAttachParent())
+            ToActor = ToActor * Parent->GetRelativeTransform();
+        return ToActor;
+    }
+
+    FBox BreakerSupplyChestActorBounds(const UStaticMeshComponent* Component)
+    {
+        return Component->GetStaticMesh()->GetBounds().GetBox().TransformBy(BreakerSupplyChestActorSpace(Component));
+    }
+
+    // The band is the ONE engine cube left on the chest with any size to it:
+    // the console body's cube is gone (hidden, unmeshed or collapsed), the
+    // mote is a sphere, the crate and its lid are named props.
+    void BreakerSupplyChestCollectBands(const TArray<UStaticMeshComponent*>& Meshes, TArray<const UStaticMeshComponent*>& OutBands)
+    {
+        for (const UStaticMeshComponent* Mesh : Meshes)
+        {
+            if (!Mesh || !Mesh->GetStaticMesh()) continue;
+            if (Mesh->GetStaticMesh()->GetPathName() != TEXT("/Engine/BasicShapes/Cube.Cube")) continue;
+            if (Mesh->GetRelativeScale3D().IsNearlyZero() || !Mesh->GetVisibleFlag()) continue;
+            OutBands.Add(Mesh);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// A CRATE WITH A LID, NOT A CUBE (O280). What the default object ships, read
+// off its own components: a crate body, a lid resting on the crate's top, and
+// the gold band (O179) at the seam between them rather than floating in the
+// air where the console's trim used to be. Reachable without a world because
+// the parts are wired in the constructor.
+//
+// What is NOT assertable here is whether the crate reads as a chest from the
+// lane, and whether the band is gold ONCE THE NPC'S SASH PAINT HAS RUN — that
+// needs BeginPlay and lives in RiorsEdge.Campaign.FernhallCacheRuntime.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerSupplyChestCrateWithALidTest,
+    "RiorsEdge.Items.SupplyChest.CrateWithALid",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerSupplyChestCrateWithALidTest::RunTest(const FString& Parameters)
+{
+    const ABreakerSupplyChest* Chest = GetDefault<ABreakerSupplyChest>();
+    if (!TestNotNull(TEXT("the chest has a default object"), Chest)) return false;
+    TArray<UStaticMeshComponent*> Meshes;
+    Chest->GetComponents<UStaticMeshComponent>(Meshes);
+
+    // ---- THE PARTS ----------------------------------------------------------
+    const UStaticMeshComponent* Body = BreakerSupplyChestFindByMeshPath(Meshes, TEXT("/Game/Breaker/Meshes/props/props/StaticMeshes/prop_chest_body"));
+    const UStaticMeshComponent* Lid = BreakerSupplyChestFindByMeshPath(Meshes, TEXT("/Game/Breaker/Meshes/props/props/StaticMeshes/prop_chest_lid"));
+    if (!TestNotNull(TEXT("the chest carries the crate body prop (O280)"), Body)) return false;
+    if (!TestNotNull(TEXT("and the crate lid prop (O280)"), Lid)) return false;
+    TestTrue(TEXT("the body and the lid are two components, not one"), Body != Lid);
+
+    // ---- A CRATE: WIDER THAN TALL ------------------------------------------
+    const FBox BodyBounds = BreakerSupplyChestActorBounds(Body);
+    const FBox LidBounds = BreakerSupplyChestActorBounds(Lid);
+    const FVector BodySize = BodyBounds.GetSize();
+    const FVector LidSize = LidBounds.GetSize();
+    AddInfo(FString::Printf(TEXT("CHEST CRATE  body %.1f x %.1f x %.1f cm, top at %.1f; lid %.1f x %.1f x %.1f cm, bottom at %.1f, top at %.1f"),
+        BodySize.X, BodySize.Y, BodySize.Z, BodyBounds.Max.Z, LidSize.X, LidSize.Y, LidSize.Z, LidBounds.Min.Z, LidBounds.Max.Z));
+    TestTrue(TEXT("the body has size"), BodySize.GetMin() > KINDA_SMALL_NUMBER);
+    TestTrue(TEXT("the lid has size"), LidSize.GetMin() > KINDA_SMALL_NUMBER);
+    TestTrue(TEXT("the body is wider than it is tall: a crate, not a console"),
+        FMath::Max(BodySize.X, BodySize.Y) > BodySize.Z);
+
+    // ---- WITH A LID: SEATED ON THE BODY --------------------------------------
+    // The kit's chest is a box whose back and rim reach the lid's top, and a
+    // lid that hinges partway down the back and closes flush with that rim:
+    // the lid's top meets the body's top within 2 cm and its hinge sits in
+    // the body's upper half. A lid floating above the crate or sunk into it
+    // is the defect this pins; the hinge being the lid mesh's origin is what
+    // lets it swing without the seam moving.
+    TestTrue(*FString::Printf(TEXT("the lid closes flush with the body's top (gap %.2f cm)"),
+        LidBounds.Max.Z - BodyBounds.Max.Z),
+        FMath::Abs(LidBounds.Max.Z - BodyBounds.Max.Z) <= 2.0f);
+    TestTrue(TEXT("the lid's hinge sits in the body's upper half"),
+        LidBounds.Min.Z > BodyBounds.Min.Z + 0.5f * (BodyBounds.Max.Z - BodyBounds.Min.Z) && LidBounds.Min.Z < BodyBounds.Max.Z);
+
+    // ---- THE BAND, AT THE SEAM ----------------------------------------------
+    // If the cube band is still the band. Zero of them is a chest whose band
+    // is part of the props and is fine; two is the console's cube still
+    // standing inside the crate.
+    TArray<const UStaticMeshComponent*> Bands;
+    BreakerSupplyChestCollectBands(Meshes, Bands);
+    if (Bands.Num() == 0)
+    {
+        AddInfo(TEXT("CHEST CRATE  no cube band on the default object; the band is a prop or gone"));
+    }
+    else if (TestEqual(TEXT("exactly one cube band remains: the console's cube is gone"), Bands.Num(), 1))
+    {
+        const FBox BandBounds = BreakerSupplyChestActorBounds(Bands[0]);
+        const float BandCentreZ = BandBounds.GetCenter().Z;
+        AddInfo(FString::Printf(TEXT("CHEST CRATE  band centre at %.1f between body top %.1f and lid top %.1f"),
+            BandCentreZ, BodyBounds.Max.Z, LidBounds.Max.Z));
+        // The seam is the hinge line, the lid's bottom; a band centred there is
+        // the honest case, so the lower edge carries float slop of 1 cm; the
+        // upper edge is the lid's top.
+        TestTrue(TEXT("the band's centre is no lower than the lid's bottom: at the seam, not around the belly"),
+            BandCentreZ >= LidBounds.Min.Z - 1.0f);
+        TestTrue(TEXT("and no higher than the lid's top: not floating above the chest"),
+            BandCentreZ <= LidBounds.Max.Z);
+    }
+    return true;
 }
 
 bool FBreakerSupplyChestTest::RunTest(const FString& Parameters)

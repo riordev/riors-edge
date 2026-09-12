@@ -59,117 +59,17 @@ import os
 import sys
 import numpy as np
 import trimesh
-from PIL import Image
+
+# The kit loader is shared with compose_props.py: one resolver, one atlas
+# cap, one sheet lift, so a prop the runtime spawns wears the surface the
+# yard's copies of it wear.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from breaker_kit import load_piece, load_group, concat_shared
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-KIT = os.path.join(ROOT, "Assets", "zones", "kit")
 RUINED = "--ruined" in sys.argv
 OUT = os.path.join(ROOT, "Assets", "zones",
                    "fernhall_rift.glb" if RUINED else "fernhall_yard.glb")
-
-# THE KIT'S TEXTURES LIVE TWO FOLDERS UP. A megakit glTF names its images by
-# bare file name and the images sit in <kit>/Textures, so a plain load finds
-# nothing, packs five empty materials into a 32 x 8 black atlas, and every
-# kit piece imports black the moment the builder stops painting over it
-# (O279). The resolver looks beside the glTF first, then in Textures.
-MEGAKIT_TEXTURES = os.path.join(KIT, "modular-sci-fi-megakit", "Textures")
-
-class KitResolver(trimesh.resolvers.FilePathResolver):
-    def get(self, name):
-        try:
-            return super().get(name)
-        except Exception:
-            with open(os.path.join(MEGAKIT_TEXTURES, os.path.basename(str(name))), "rb") as handle:
-                return handle.read()
-
-# One atlas per piece KIND, capped: the kit's sheets are 2048 squared and
-# five of them fused is a 16k x 4k image per piece. 512 a sheet, 1024 fused,
-# is a placeholder resolution at 4 m tiles. O2 PLACEHOLDER.
-ATLAS_SHEET_PX = 512
-ATLAS_FUSED_PX = 2048
-
-def _kit_parts(name):
-    path = os.path.join(KIT, name)
-    scene = trimesh.load(path, force="scene", resolver=KitResolver(os.path.dirname(path)))
-    parts = []
-    for node in scene.graph.nodes_geometry:
-        transform, geometry = scene.graph[node]
-        part = scene.geometry[geometry].copy()
-        part.apply_transform(transform)
-        parts.append(part)
-    return parts
-
-# THE KIT IS PAINTED METAL, NOT MIRROR. Its ORM sheets mark every trim panel
-# fully metallic, and a metal that reflects an empty Lumen scene reads black
-# under one sun and a sky. The sheets are dropped and the surface is a rough
-# dielectric, so the base colour is what shows. O2 PLACEHOLDER, judged by
-# photograph; the kit's normal maps stay.
-KIT_ROUGHNESS = 0.85
-# The trim sheets average 46% grey and read as soot beside the concrete the
-# builder paints; lifted so a kit wall in shadow still separates from the
-# ground. O2 PLACEHOLDER.
-KIT_SHEET_LIFT = 1.6
-_LIFTED = {}
-
-def _lift_sheet(image):
-    key = id(image)
-    if key not in _LIFTED:
-        rgba = np.asarray(image.convert("RGBA")).astype(np.float32)
-        rgba[..., :3] = np.clip(rgba[..., :3] * KIT_SHEET_LIFT, 0, 255)
-        _LIFTED[key] = Image.fromarray(rgba.astype(np.uint8), "RGBA")
-    return _LIFTED[key]
-
-def _pack_parts(parts):
-    for part in parts:
-        material = part.visual.material
-        material.metallicRoughnessTexture = None
-        material.metallicFactor = 0.0
-        material.roughnessFactor = KIT_ROUGHNESS
-        if material.baseColorTexture is not None:
-            material.baseColorTexture = _lift_sheet(material.baseColorTexture)
-    material, uvs = trimesh.visual.material.pack(
-        [part.visual.material for part in parts],
-        [part.visual.uv if part.visual.uv is not None else np.zeros((len(part.vertices), 2)) + 0.5 for part in parts],
-        max_tex_size_individual=ATLAS_SHEET_PX, max_tex_size_fused=ATLAS_FUSED_PX)
-    # pack() hands back ONE stacked UV array over every vertex it was given;
-    # split it back by vertex count.
-    uvs = np.asarray(uvs)
-    offset = 0
-    for part in parts:
-        part.visual = trimesh.visual.TextureVisuals(uv=uvs[offset:offset + len(part.vertices)], material=material)
-        offset += len(part.vertices)
-    assert offset == len(uvs), (offset, len(uvs))
-    return material
-
-def load_piece(name):
-    path = os.path.join(KIT, name)
-    if not name.endswith(".gltf"):
-        return trimesh.load(path, force="mesh")
-    parts = _kit_parts(name)
-    return concat_shared(parts, _pack_parts(parts))
-
-def load_group(names):
-    """Several kit pieces packed into ONE atlas, so copies of any of them
-    concatenate without a second pack: the facade tiles share their trim
-    sheets, and the pack deduplicates them."""
-    groups = [_kit_parts(name) for name in names]
-    material = _pack_parts([part for parts in groups for part in parts])
-    return [concat_shared(parts, material) for parts in groups]
-
-def concat_shared(meshes, material):
-    """Concatenate meshes that already share one material, without trimesh's
-    concatenate: that call re-packs an atlas per result, and two hundred
-    facades would carry two hundred atlases. Here the UVs stack and the one
-    material is kept, so the GLB holds it once."""
-    vertices = np.vstack([mesh.vertices for mesh in meshes])
-    faces, offset, uvs = [], 0, []
-    for mesh in meshes:
-        faces.append(mesh.faces + offset)
-        offset += len(mesh.vertices)
-        uvs.append(mesh.visual.uv)
-    return trimesh.Trimesh(vertices=vertices, faces=np.vstack(faces),
-                           visual=trimesh.visual.TextureVisuals(uv=np.vstack(uvs), material=material),
-                           process=False)
 
 # The broken twins, from the sci-fi megakit that was materialised for exactly
 # this and used by nothing until now. Two of them, so chest and full-height
@@ -196,15 +96,21 @@ PIECES = {
     # randomly, like trees, but then everything else is just grey box". A yard
     # made of scaled city blocks and two wall prototypes has nothing in it that
     # says what the place DOES; these are the pieces that do.
+    #
+    # EVERY PROP IS PLACED AT ITS OWN PROPORTIONS (O280): the crate and the
+    # cable at the kit's native size, the barrel and the column scaled
+    # uniformly to a height, never stretched per axis. A prop is a thing the
+    # player stands beside, so its size is the size of a thing, not of a slot.
     "crate": load_piece("modular-sci-fi-megakit/glTF/Props/Prop_Crate4.gltf"),
     "barrel": load_piece("modular-sci-fi-megakit/glTF/Props/Prop_Barrel_Large.gltf"),
     "cable": load_piece("modular-sci-fi-megakit/glTF/Props/Prop_Cable_3.gltf"),
+    # The canopy posts and the roof stack: a plain column (native
+    # 0.507 x 5.0 x 0.975), scaled to a height below.
+    "column": load_piece("modular-sci-fi-megakit/glTF/Columns/Column_Simple.gltf"),
     # THE FACADE TILES (O278) are loaded as a group below: the Straight is
     # every building's ground floor; the Window is its upper storeys; the
     # Flat is loaded for one number — where the kit's base plane is — so a
     # tile's relief is measured off the meshes rather than typed.
-    "rails": load_piece("modular-sci-fi-megakit/glTF/Platforms/Platform_Rails_4Wide.gltf"),
-    "column": load_piece("modular-sci-fi-megakit/glTF/Columns/Column_MetalSupport.gltf"),
 }
 
 # THE FACADE KIT shares one atlas: the three tiles are packed together once,
@@ -259,6 +165,17 @@ def place(out_name, piece_key, at, target_size=None, marker=False, yaw=0.0, lean
         mesh.apply_transform(trimesh.transformations.rotation_matrix(np.radians(lean), (1, 0, 0)))
     assert out_name not in SCENE, out_name
     SCENE[out_name] = bake(mesh, at, target_size)
+
+def uniform_size(piece_key, height):
+    """The target_size that scales a piece to `height` metres on every axis
+    alike (O280): its native extents times one factor, so bake()'s per-axis
+    scale comes out the same number three times and nothing is stretched."""
+    size = PIECES[piece_key].bounds[1] - PIECES[piece_key].bounds[0]
+    return tuple(size * (height / size[1]))
+
+# Prop heights, sized to the player (O280). O2 PLACEHOLDER, every one.
+BARREL_HEIGHT = 1.1   # O2 PLACEHOLDER
+COLUMN_HEIGHT = 3.4   # O2 PLACEHOLDER — the canopy posts and the roof stack
 
 # ---- Facades: a wall is stacked and tiled, not scaled (O278) ---------------
 # A storey is 3 m, a door 2.2 m, and a tile is never stretched past its own
@@ -436,12 +353,15 @@ def perimeter(tag, x, z, index, facing):
               (size, 0.35, 5.0))
         for side, dx in enumerate((-2.6, 2.6)):
             place("dress_%s%02dcol%d" % (tag, index, side), "column",
-                  (x + dx, 0.0, inner + facing * 3.4), (0.5, 3.4, 0.5))
+                  (x + dx, 0.0, inner + facing * 3.4), uniform_size("column", COLUMN_HEIGHT))
     elif kind == "stack":
         # A vent stack on the roof: no footprint of its own, all silhouette.
-        # It stands on the roof the facade built, storeys x STOREY up.
+        # It stands on the roof the facade built, storeys x STOREY up, the
+        # same column at the same height as the canopy posts. The stack's
+        # size and rise in SKYLINE are not read: a kit column has its own
+        # proportions, and the table keeps its shape for the other profiles.
         place("dress_%s%02ds" % (tag, index), "column", (x - 2.5, storeys * STOREY, line),
-              (size * 0.5, rise, size * 0.5))
+              uniform_size("column", COLUMN_HEIGHT))
 
 for i, x in enumerate(range(5, 100, 10)):
     perimeter("n", float(x), 25.0, i, -1.0)
@@ -776,13 +696,14 @@ def work_pass(tag, anchor_x, centre_z, bay_fwd, bay_side, dock_fwd, dock_side, d
     for side, dx in enumerate((-bw * 0.5, bw * 0.5)):
         place("wall_%s_bayside%d" % (tag, side), "panel",
               at(bay_fwd + dx, bay_side * 21.0), (wall, bh, bd))
-    # What is inside it: stock, and a reason to look.
+    # What is inside it: stock, and a reason to look. The crate is the kit's
+    # own 1.121 m cube and the barrel is scaled to a height (O280).
     for i, (dx, dz) in enumerate(((-4.4, 2.6), (-3.0, 2.6), (-3.7, 1.4), (4.6, -2.2), (4.6, 3.0))):
         place("dress_%s_baycrate%d" % (tag, i), "crate",
-              at(bay_fwd + dx, bay_side * 21.0 + dz), (1.3, 1.3, 1.3))
+              at(bay_fwd + dx, bay_side * 21.0 + dz))
     for i, dx in enumerate((-1.0, 1.6)):
         place("dress_%s_baybarrel%d" % (tag, i), "barrel",
-              at(bay_fwd + dx, bay_side * 21.0 - face + bay_side * 1.6), (0.7, 1.2, 0.7))
+              at(bay_fwd + dx, bay_side * 21.0 - face + bay_side * 1.6), uniform_size("barrel", BARREL_HEIGHT))
 
     # --- THE DOCK: a metre and a half of ground, with stairs ---------------
     # Verticality you can stand on that is not nine metres up a gantry: high
@@ -803,11 +724,12 @@ def work_pass(tag, anchor_x, centre_z, bay_fwd, bay_side, dock_fwd, dock_side, d
     # lane face is the dockfront, so the run takes whichever end the flank
     # leaves clear, and that is per yard.
     stair(tag, "dockstep", at, dock_fwd - dock_climb * 8.0, dock_side * 20.5, dh + 0.4, dock_climb)
+    # Crates and the cable at the kit's native size (O280).
     for i, (dx, dz) in enumerate(((-5.0, 1.0), (-3.6, 1.0), (-4.3, -0.4), (5.2, 1.2))):
         place("dress_%s_dockcrate%d" % (tag, i), "crate",
-              at(dock_fwd + dx, dock_side * 20.5 + dz, dh + 0.2), (1.3, 1.3, 1.3))
+              at(dock_fwd + dx, dock_side * 20.5 + dz, dh + 0.2))
     place("dress_%s_dockcable" % tag, "cable",
-          at(dock_fwd - 8.5, dock_side * 20.5, dh), (1.6, 0.2, 5.5))
+          at(dock_fwd - 8.5, dock_side * 20.5, dh))
 
 
 def shape_pass(tag, anchor_x, centre_z, gantries, masses, near_fwd, far_fwd, near_climb=1.0, far_climb=1.0, forward=1.0):
