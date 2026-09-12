@@ -54,6 +54,7 @@
 #
 # PERIMETER BUILDINGS ARE NOT TOUCHED EITHER. wall_* pieces BOUND the field,
 # and a broken perimeter is a hole a player walks out of.
+import math
 import os
 import sys
 import numpy as np
@@ -98,12 +99,13 @@ PIECES = {
     "barrel": load_piece("modular-sci-fi-megakit/glTF/Props/Prop_Barrel_Large.gltf"),
     "cable": load_piece("modular-sci-fi-megakit/glTF/Props/Prop_Cable_3.gltf"),
     "panel": load_piece("modular-sci-fi-megakit/glTF/Walls/WallAstra_Straight.gltf"),
-    "stairs": load_piece("modular-sci-fi-megakit/glTF/Platforms/Platform_Stairs_4Wide.gltf"),
     "rails": load_piece("modular-sci-fi-megakit/glTF/Platforms/Platform_Rails_4Wide.gltf"),
     "column": load_piece("modular-sci-fi-megakit/glTF/Columns/Column_MetalSupport.gltf"),
 }
 
 SCENE = {}
+# The perimeter's flank buildings, by name: the probe below reads this set.
+FLANK = set()
 
 def place(out_name, piece_key, at, target_size=None, marker=False, yaw=0.0, lean=0.0):
     """Bake one instance: scale the piece to target_size metres (if given),
@@ -178,6 +180,7 @@ def perimeter(tag, x, z, index, facing):
     inner = z + facing * 1.5
     line = inner - facing * (depth * 0.5 + max(0.0, setback))
     place("wall_%s%02d" % (tag, index), BLDG[index % 4], (x, 0.0, line), (10.0, height, depth))
+    FLANK.add("wall_%s%02d" % (tag, index))
     if second is None:
         return
     kind, size, rise = second
@@ -186,6 +189,7 @@ def perimeter(tag, x, z, index, facing):
         # to one side so the parent's roofline breaks rather than steps.
         place("wall_%s%02dt" % (tag, index), "bldg_c", (x + 3.0, 0.0, line + facing * 0.6),
               (size, height + rise, depth * 0.7))
+        FLANK.add("wall_%s%02dt" % (tag, index))
     elif kind == "canopy":
         # A loading canopy over the ground in front of the building, on two
         # columns. This is the piece that makes a wall read as somewhere goods
@@ -460,16 +464,49 @@ DECK_HEIGHT = 3.4
 CATWALK_HEIGHT = 3.4
 FAR_DECK_HEIGHT = 4.6
 GANTRY_HEIGHT = 9.0
-STEP_RISE = 0.85
 
-def work_pass(tag, anchor_x, centre_z, bay_fwd, bay_side, dock_fwd, dock_side, forward=1.0):
+# EVERY DECK AND DOCK IS REACHED ON FOOT (O278): a step is under 45 cm, and the
+# movement component's MaxStepHeight is 45. A tread at 35 keeps a ten-centimetre
+# margin under that ceiling so a stair reads as a stair rather than as the
+# tallest step the character can take. The nav agent's step matches the
+# movement component (AgentMaxStepHeight in DefaultEngine.ini), so what the
+# player climbs the enemy climbs.
+STEP_RISE = 0.35      # O2 PLACEHOLDER
+TREAD_DEPTH = 0.35    # O2 PLACEHOLDER
+STAIR_WIDTH = 4.0     # O2 PLACEHOLDER
+# A stair stands INBOARD of the flank's inner face. The decks lie at lat 23 with
+# their outer 3.5 m inside the perimeter buildings (inner face 23.5, deck 19..27);
+# a tread there would be a stair inside a wall, so the run is centred at 21.4,
+# spanning 19.4..23.4 — inside the deck's span and clear of the face.
+STAIR_LAT = 21.4      # O2 PLACEHOLDER
+
+def stair(tag, name, at, edge, lat, top, climb=1.0):
+    """A run of solid treads up to a slab whose top is `top` metres, ending
+    flush at the slab's edge at fwd `edge`. Each tread is a box grounded at 0,
+    so its top IS its height and the collision is the box — a tread cannot be
+    walked up wrong, and nothing here is a kit mesh whose collision is
+    whatever it shipped with.
+
+    rises = ceil(top / STEP_RISE), so every rise is under STEP_RISE and every
+    rise is the same; rises-1 treads, the slab is the last rise. climb is +1
+    when the run lies at fwd < edge and climbs toward +fwd, -1 when it lies
+    past the slab's far edge and climbs back toward it. The last tread abuts
+    the edge (RiorsEdge.Zone.Fernhall.DecksClimbable measures the abutment
+    within a centimetre and the rises against the movement default)."""
+    rises = math.ceil(top / STEP_RISE - 1e-9)
+    rise = top / rises
+    for i in range(rises - 1):
+        fwd = edge - climb * TREAD_DEPTH * (rises - 1.5 - i)
+        place("flr_%s_%s%d" % (tag, name, i), "pavement", at(fwd, lat, 0.0),
+              (TREAD_DEPTH, rise * (i + 1), STAIR_WIDTH))
+
+def work_pass(tag, anchor_x, centre_z, bay_fwd, bay_side, dock_fwd, dock_side, dock_climb=1.0, forward=1.0):
     """A place where the yard's work happened: one enterable bay and one loading
     dock, per yard. forward is +1 for a yard that faces +x and -1 for one that
     faces -x; every piece here is a box scaled to a size, so the mirrored yard
-    gets the same box at the mirrored place. The dock stair is the one piece
-    with a run of its own, and it is placed by position alone for either sign
-    exactly as it is for +x: which way its treads climb has not been
-    photographed for either, and a yaw guessed here would be a fake.
+    gets the same box at the mirrored place. The dock's stair is a run of box
+    treads off one end of the slab (dock_climb: +1 the near end, -1 the far),
+    the same run in either yard sign because a box is its own mirror.
 
     Owner: "the whole level itself doesn't feel good ... the goal is to have a
     decent starting area". What the yards had was cover, decks, gantries and a
@@ -524,8 +561,10 @@ def work_pass(tag, anchor_x, centre_z, bay_fwd, bay_side, dock_fwd, dock_side, f
               at(dock_fwd + dx, dock_side * 20.5), (1.2, dh, 7.0))
     place("wall_%s_dockfront" % tag, "panel",
           at(dock_fwd, dock_side * 20.5 - dock_side * 3.5), (16.0, dh, 0.8))
-    place("flr_%s_dockstair" % tag, "stairs",
-          at(dock_fwd + 10.5, dock_side * 20.5), (4.0, dh, 5.0))
+    # The stair climbs one END of the dock, the run lying along the flank: the
+    # lane face is the dockfront, so the run takes whichever end the flank
+    # leaves clear, and that is per yard.
+    stair(tag, "dockstep", at, dock_fwd - dock_climb * 8.0, dock_side * 20.5, dh + 0.4, dock_climb)
     for i, (dx, dz) in enumerate(((-5.0, 1.0), (-3.6, 1.0), (-4.3, -0.4), (5.2, 1.2))):
         place("dress_%s_dockcrate%d" % (tag, i), "crate",
               at(dock_fwd + dx, dock_side * 20.5 + dz, dh + 0.2), (1.3, 1.3, 1.3))
@@ -533,50 +572,52 @@ def work_pass(tag, anchor_x, centre_z, bay_fwd, bay_side, dock_fwd, dock_side, f
           at(dock_fwd - 8.5, dock_side * 20.5, dh), (1.6, 0.2, 5.5))
 
 
-def shape_pass(tag, anchor_x, centre_z, gantries, masses, forward=1.0):
+def shape_pass(tag, anchor_x, centre_z, gantries, masses, near_fwd, far_fwd, near_climb=1.0, far_climb=1.0, forward=1.0):
     """One yard's verticality, authored once in the yard's own frame and
     instanced once per yard. fwd runs down the lane from the yard's anchor; lat
     is across it, positive toward +z. The entry yard, the substation and the
     depot face +x, so their frame is a translation; the siding faces -x, so
     forward = -1 and its frame is the translation mirrored. Every piece is a
-    box scaled to a size, and a mirrored box is the same box."""
+    box scaled to a size, and a mirrored box is the same box.
+
+    near_fwd and far_fwd are the two decks' centres, PER YARD: the bay, the
+    mass and the dock take different ground in each yard, and a deck is a slab
+    that has to land between them, not on them. near_climb and far_climb pick
+    which end of each deck its stair climbs (+1 the near end, -1 the far). The
+    catwalk runs on from the near deck's OTHER end, away from the stair, so it
+    follows near_fwd and near_climb together."""
     def at(fwd, lat, height=0.0):
         return (anchor_x + forward * fwd, height, centre_z + lat)
 
     # --- The near deck, on the +lat flank -----------------------------------
-    place("flr_%s_deck" % tag, "pavement", at(35.0, 23.0, DECK_HEIGHT), (18.0, 0.4, 8.0))
+    place("flr_%s_deck" % tag, "pavement", at(near_fwd, 23.0, DECK_HEIGHT), (18.0, 0.4, 8.0))
     # Piers, so the deck is a structure rather than a slab hanging in the air.
-    for i, fwd in enumerate((27.5, 35.0, 42.5)):
+    for i, dx in enumerate((-7.5, 0.0, 7.5)):
         for j, lat in enumerate((19.8, 26.2)):
-            place("dress_%s_pier%d%d" % (tag, i, j), "bldg_c", at(fwd, lat), (0.7, DECK_HEIGHT, 0.7))
-    # The stair up: four flat treads rather than a ramp. A leaned slab would
-    # have to survive place()'s bounding-box rescale, and a tread cannot be
-    # walked up wrong.
-    for i in range(4):
-        place("flr_%s_step%d" % (tag, i), "pavement",
-              at(23.0 + i * 2.6, 23.0, STEP_RISE * (i + 1)), (2.6, 0.35, 5.0))
+            place("dress_%s_pier%d%d" % (tag, i, j), "bldg_c", at(near_fwd + dx, lat), (0.7, DECK_HEIGHT, 0.7))
+    # The stair up, off one end of the deck.
+    stair(tag, "step", at, near_fwd - near_climb * 9.0, STAIR_LAT, DECK_HEIGHT + 0.4, near_climb)
     # A rail along the open edge, so the drop reads before it is stepped off.
-    for i, fwd in enumerate((28.0, 34.0, 40.0)):
-        place("dress_%s_rail%d" % (tag, i), "chest", at(fwd, 19.2, DECK_HEIGHT + 0.4), (5.6, 0.9, 0.2))
+    for i, dx in enumerate((-7.0, -1.0, 5.0)):
+        place("dress_%s_rail%d" % (tag, i), "chest", at(near_fwd + dx, 19.2, DECK_HEIGHT + 0.4), (5.6, 0.9, 0.2))
 
-    # --- The catwalk, running on down the flank -----------------------------
-    place("flr_%s_catwalk" % tag, "pavement", at(54.0, 23.0, CATWALK_HEIGHT), (20.0, 0.4, 4.0))
-    for i, fwd in enumerate((48.0, 54.0, 60.0)):
-        place("dress_%s_cwpier%d" % (tag, i), "bldg_c", at(fwd, 23.0), (0.6, CATWALK_HEIGHT, 0.6))
-        place("dress_%s_cwrail%d" % (tag, i), "chest", at(fwd, 21.2, CATWALK_HEIGHT + 0.4), (5.6, 0.9, 0.2))
+    # --- The catwalk, running on along the flank from the deck's other end ---
+    catwalk_fwd = near_fwd + near_climb * 19.0
+    place("flr_%s_catwalk" % tag, "pavement", at(catwalk_fwd, 23.0, CATWALK_HEIGHT), (20.0, 0.4, 4.0))
+    for i, dx in enumerate((-6.0, 0.0, 6.0)):
+        place("dress_%s_cwpier%d" % (tag, i), "bldg_c", at(catwalk_fwd + dx, 23.0), (0.6, CATWALK_HEIGHT, 0.6))
+        place("dress_%s_cwrail%d" % (tag, i), "chest", at(catwalk_fwd + dx, 21.2, CATWALK_HEIGHT + 0.4), (5.6, 0.9, 0.2))
 
     # --- The far deck, higher and on the opposite flank ---------------------
     # Higher on purpose: two identical platforms are one platform twice, and
     # the yard should have a best position rather than a mirrored pair.
-    place("flr_%s_fardeck" % tag, "pavement", at(62.0, -23.0, FAR_DECK_HEIGHT), (16.0, 0.4, 8.0))
-    for i, fwd in enumerate((55.5, 62.0, 68.5)):
+    place("flr_%s_fardeck" % tag, "pavement", at(far_fwd, -23.0, FAR_DECK_HEIGHT), (16.0, 0.4, 8.0))
+    for i, dx in enumerate((-6.5, 0.0, 6.5)):
         for j, lat in enumerate((-19.8, -26.2)):
-            place("dress_%s_fpier%d%d" % (tag, i, j), "bldg_c", at(fwd, lat), (0.7, FAR_DECK_HEIGHT, 0.7))
-    for i in range(5):
-        place("flr_%s_fstep%d" % (tag, i), "pavement",
-              at(50.0 + i * 2.6, -23.0, STEP_RISE * (i + 1)), (2.6, 0.35, 5.0))
-    for i, fwd in enumerate((56.0, 62.0, 68.0)):
-        place("dress_%s_frail%d" % (tag, i), "chest", at(fwd, -19.2, FAR_DECK_HEIGHT + 0.4), (5.6, 0.9, 0.2))
+            place("dress_%s_fpier%d%d" % (tag, i, j), "bldg_c", at(far_fwd + dx, lat), (0.7, FAR_DECK_HEIGHT, 0.7))
+    stair(tag, "fstep", at, far_fwd - far_climb * 8.0, -STAIR_LAT, FAR_DECK_HEIGHT + 0.4, far_climb)
+    for i, dx in enumerate((-6.0, 0.0, 6.0)):
+        place("dress_%s_frail%d" % (tag, i), "chest", at(far_fwd + dx, -19.2, FAR_DECK_HEIGHT + 0.4), (5.6, 0.9, 0.2))
 
     # --- GANTRIES OVER THE LANE ---------------------------------------------
     # "theres absolutely no shape to fernhall at all" was said AGAIN after the
@@ -642,22 +683,99 @@ def shape_pass(tag, anchor_x, centre_z, gantries, masses, forward=1.0):
 # outdoor pocket table: 0.25 and 0.70 on the lane, 0.45 off it), so it takes
 # the entry yard's structure list and not the substation's — the substation's
 # gantry at 66 would stand over the siding's pocket at 66.5.
-shape_pass("entry", 6.0, 0.0, gantries=(20.0, 82.0), masses=((60.0, -19.0),))
-# The bay and the dock go in the gaps the pockets and their tears leave, on the
-# flank the yard's building mass is NOT on, so one side of each yard is a place
-# to work and the other is a place to climb.
-work_pass("entry", 6.0, 0.0, bay_fwd=44.0, bay_side=1.0, dock_fwd=88.0, dock_side=-1.0)
-shape_pass("sub", SUB_ANCHOR, SUB_Z, gantries=(20.0, 66.0), masses=((40.0, 19.0),))
-work_pass("sub", SUB_ANCHOR, SUB_Z, bay_fwd=34.0, bay_side=-1.0, dock_fwd=88.0, dock_side=1.0)
-shape_pass("dep", DEP_ANCHOR, DEP_Z, gantries=(20.0, 70.0), masses=((48.0, -19.0),))
-work_pass("dep", DEP_ANCHOR, DEP_Z, bay_fwd=15.0, bay_side=1.0, dock_fwd=68.0, dock_side=-1.0)
-# The dock at fwd 88 puts its stair at fwd 98.5..102.5, past the siding slab's
-# far edge at fwd 94 and outside its end wall — as the same dock already does
-# in the entry yard (stair x 102.5..106.5, slab to 104) and the substation
-# (x 166.5..170.5, slab to 164). Copied, not corrected: the list is the entry
-# yard's, and moving the dock is its own item.
-shape_pass("siding", SID_ANCHOR, SID_Z, gantries=(20.0, 82.0), masses=((60.0, -19.0),), forward=-1.0)
-work_pass("siding", SID_ANCHOR, SID_Z, bay_fwd=44.0, bay_side=1.0, dock_fwd=88.0, dock_side=-1.0, forward=-1.0)
+#
+# WHERE THE DECKS AND THE DOCK GO IS ALSO PER YARD, and the probe below is what
+# decides it: a deck, a catwalk, a dock or a tread that shares more than a
+# centimetre on all three axes with any wall_, blk_ or flr_ box is refused at
+# compose time. The flank in fwd, per yard, with the ground each structure
+# takes (a deck is 18 m plus a 3.5 m stair, a far deck 16 plus 4.9, a dock 16
+# plus 1.75, a catwalk 20 running on from the deck):
+#
+#   entry   +lat  bay 37..51            stair 51.5..55  deck 55..73  catwalk 73..93
+#           -lat  mass 54.5..70  break05 81.5..84.5   dock 33..49 (stair 31.25..33)
+#                 far deck 71..87 over break05, stair off its far end 87..91.9
+#   sub     +lat  mass 34.5..50  seam2 walls 57..60, 70..73 (z 85+)
+#                 catwalk -8..12  deck 11..29  stair off its far end 29..32.5
+#           -lat  bay 27..41            dock 6..22 (stair 22..23.75)  far deck 54..70 (stair 49.1..54)
+#   depot   +lat  bay 8..22             stair 22.5..26  deck 26..44  catwalk 44..64
+#           -lat  mass 42.5..58         far deck 22..38 (stair 17.1..22)  dock 60..76 (stair 76..77.75)
+#   siding  the entry yard's list, mirrored
+#
+# A far deck at y 4.6 stands OVER break05 (4.0 tall) in the entry yard and the
+# siding: the slab clears the block, and the stair takes the far end because
+# the mass's shoulder holds the near one. The dock leaves the end wall in the
+# three yards where it stood inside it (entry, substation, siding), and in the
+# substation it crosses to the bay's flank — the only 16 m of that yard's
+# ground with nothing in it. The substation's deck runs the other way: the
+# second seam's walls stand on its +lat flank line past fwd 57, so the deck
+# sits before the mass and the catwalk runs back toward the anchor.
+shape_pass("entry", 6.0, 0.0, gantries=(20.0, 82.0), masses=((60.0, -19.0),),
+           near_fwd=64.0, far_fwd=79.0, far_climb=-1.0)
+# The bay and the dock go in the gaps the pockets and their tears leave.
+work_pass("entry", 6.0, 0.0, bay_fwd=44.0, bay_side=1.0, dock_fwd=41.0, dock_side=-1.0)
+shape_pass("sub", SUB_ANCHOR, SUB_Z, gantries=(20.0, 66.0), masses=((40.0, 19.0),),
+           near_fwd=20.0, far_fwd=62.0, near_climb=-1.0)
+work_pass("sub", SUB_ANCHOR, SUB_Z, bay_fwd=34.0, bay_side=-1.0, dock_fwd=14.0, dock_side=-1.0, dock_climb=-1.0)
+shape_pass("dep", DEP_ANCHOR, DEP_Z, gantries=(20.0, 70.0), masses=((48.0, -19.0),),
+           near_fwd=35.0, far_fwd=30.0)
+work_pass("dep", DEP_ANCHOR, DEP_Z, bay_fwd=15.0, bay_side=1.0, dock_fwd=68.0, dock_side=-1.0, dock_climb=-1.0)
+shape_pass("siding", SID_ANCHOR, SID_Z, gantries=(20.0, 82.0), masses=((60.0, -19.0),),
+           near_fwd=64.0, far_fwd=79.0, far_climb=-1.0, forward=-1.0)
+work_pass("siding", SID_ANCHOR, SID_Z, bay_fwd=44.0, bay_side=1.0, dock_fwd=41.0, dock_side=-1.0, forward=-1.0)
+
+# ---- THE PROBE: every raised slab and every tread is clear of solid geometry -
+# Read off the baked bounds, the same boxes the importer and the runtime
+# spawner read, so a slab authored into a wall is refused here and never
+# reaches the yard. Subjects are the decks, the catwalks, the docks and their
+# treads; solids are every wall_, blk_ and flr_ box. An overlap of a centimetre
+# or less on any axis is an abutment — a tread against its slab, a catwalk
+# against its deck, a tread standing on the yard slab — and is not a hit.
+#
+# ONE EXEMPTION, RECORDED RATHER THAN MEASURED AWAY: the decks are pressed
+# against the flank and lie at lat 19..27 against a flank inner face at 23.5,
+# so every deck, catwalk and dock runs into its flank building by 0.5 to 3.5 m
+# and has since the shape pass was authored. That is the deck's width and the
+# flank's line, not a placement, and it is not decided here; the slabs are not
+# measured against FLANK. The treads ARE, because a tread is where the
+# character walks and DecksClimbable measures them against every wall.
+PROBE_ABUT = 0.01   # metres; the same centimetre the C++ tests measure by
+
+def probe_structures():
+    def box(name):
+        b = SCENE[name].bounds
+        return b[0], b[1]
+    def overlap(a, b, axis):
+        return min(a[1][axis], b[1][axis]) - max(a[0][axis], b[0][axis])
+    slab_suffixes = ("_deck", "_fardeck", "_catwalk", "_dock")
+    tread_names = ("_step", "_fstep", "_dockstep")
+    subjects = []
+    for name in SCENE:
+        if not name.startswith("flr_"):
+            continue
+        if any(name.endswith(s) for s in slab_suffixes):
+            subjects.append((name, False))
+        elif any(t in name and name[name.rfind(t) + len(t):].isdigit() for t in tread_names):
+            subjects.append((name, True))
+    solids = [n for n in SCENE if n.startswith(("wall_", "blk_", "flr_"))]
+    hits = []
+    for name, is_tread in subjects:
+        a = box(name)
+        for other in solids:
+            if other == name or (not is_tread and other in FLANK):
+                continue
+            b = box(other)
+            o = [overlap(a, b, axis) for axis in range(3)]
+            if all(v > PROBE_ABUT for v in o):
+                hits.append("%s intersects %s (overlap x %.2f y %.2f z %.2f m)" % (name, other, o[0], o[1], o[2]))
+    slabs = sum(1 for _, t in subjects if not t)
+    treads = sum(1 for _, t in subjects if t)
+    assert slabs == 16 and treads == 4 * (10 + 14 + 5), (slabs, treads)
+    for hit in hits:
+        print("PROBE:", hit)
+    assert not hits, "%d structure intersections" % len(hits)
+    print("structure probe: %d slabs, %d treads, clean" % (slabs, treads))
+
+probe_structures()
 
 # ---- Markers ----------------------------------------------------------------
 # THE NAME CARRIES A ROLE AND A YARD, and this is the authoring side of a
@@ -752,18 +870,18 @@ def spawn_pass(yard, anchor_x, centre_z, bay_fwd, bay_side, dock_fwd, dock_side,
 
 # Entry: the east mouth to the substation (z 9..19, wall_e inner face x 100)
 # and the plaza's south mouth to the siding (x 0..10, inner face z -23.5).
-spawn_pass("", 6.0, 0.0, bay_fwd=44.0, bay_side=1.0, dock_fwd=88.0, dock_side=-1.0,
+spawn_pass("", 6.0, 0.0, bay_fwd=44.0, bay_side=1.0, dock_fwd=41.0, dock_side=-1.0,
            mouths=((100.0 - SPAWN_STANDOFF, 14.0), (5.0, -23.5 + SPAWN_STANDOFF)))
 # Substation: the south mouth where the first seam arrives (x 106..116, inner
 # face z 37.5) and the north mouth the second leaves by (x 130..140, inner
 # face z 84.5).
-spawn_pass("substation", SUB_ANCHOR, SUB_Z, bay_fwd=34.0, bay_side=-1.0, dock_fwd=88.0, dock_side=1.0,
+spawn_pass("substation", SUB_ANCHOR, SUB_Z, bay_fwd=34.0, bay_side=-1.0, dock_fwd=14.0, dock_side=-1.0,
            mouths=((SUB_X, SUB_Z - 23.5 + SPAWN_STANDOFF), (135.0, SUB_Z + 23.5 - SPAWN_STANDOFF)))
 # Depot: one mouth, in the west end wall (z 95..105, inner face x 154.5).
 spawn_pass("depot", DEP_ANCHOR, DEP_Z, bay_fwd=15.0, bay_side=1.0, dock_fwd=68.0, dock_side=-1.0,
            mouths=((DEP_X - 52.0 + SPAWN_STANDOFF, 100.0),))
 # Siding: one mouth, in the east end wall (z -53..-43, inner face x -5).
-spawn_pass("siding", SID_ANCHOR, SID_Z, bay_fwd=44.0, bay_side=1.0, dock_fwd=88.0, dock_side=-1.0,
+spawn_pass("siding", SID_ANCHOR, SID_Z, bay_fwd=44.0, bay_side=1.0, dock_fwd=41.0, dock_side=-1.0,
            mouths=((SID_X + 52.0 - SPAWN_STANDOFF, -48.0),), forward=-1.0)
 
 # ---- Dressing (O24: vegetation over ruins) ---------------------------------
@@ -783,8 +901,11 @@ def grow(tag, anchor_x, centre_z, corners=((2.5, 23.0), (2.5, -23.0)), forward=1
     def at(fwd, lat, height=0.0):
         return (anchor_x + forward * fwd, height, centre_z + lat)
     # Against the north and south flanks, pressed to the boundary face at
-    # 23.5 m, at forward positions that avoid every dock, bay, gantry leg and
-    # deck pier the yard has.
+    # 23.5 m, at one set of forward positions for every yard. The decks and
+    # docks sit per yard, so a clump can stand under a deck (fwd 73 under the
+    # entry and siding decks, 9 under the substation's catwalk, 26 under the
+    # depot's far deck): dressing, no collision, and the deck reads as built
+    # over what grew there.
     for i, (fwd, lat) in enumerate(((9.0, 22.5), (57.0, -22.6), (73.0, 22.4), (26.0, -22.3))):
         place("dress_%s_tree%d" % (tag, i), "trees", at(fwd, lat), (5.0, 4.2, 3.4))
         place("dress_%s_treegrass%d" % (tag, i), "grass", at(fwd + 1.5, lat - (1.8 if lat > 0 else -1.8)))
@@ -900,11 +1021,12 @@ if RUINED:
 
     print("ruin dressing:", Ruins, "chunks")
 
-# THE ROSTER THIS WRITES: 645 meshes intact, 729 ruined — the 84 ruin chunks
-# are dressing over the same 645. Four yards (entry 57 with its south mouth
+# THE ROSTER THIS WRITES: 721 meshes intact, 805 ruined — the 84 ruin chunks
+# are dressing over the same 721. Four yards (entry 57 with its south mouth
 # open, substation 56, depot 60, siding 64), three seams (6, 7, 5), four times
-# the 92 a shape, work and grow pass add, and 22 markers (8 frame and door
-# markers plus 14 spawn points: entry 4, substation 4, depot 3, siding 3).
+# the 111 a shape, work and grow pass add (29 of them treads: 10 to the deck,
+# 14 to the far deck, 5 to the dock), and 22 markers (8 frame and door markers
+# plus 14 spawn points: entry 4, substation 4, depot 3, siding 3).
 # BreakerFernhallExpectedPieceCount (BreakerFernhallZoneTests.cpp) and
 # EXPECTED_TOTAL (breaker_import_fernhall.py) are kept by hand to these.
 scene = trimesh.Scene(SCENE)

@@ -29,6 +29,7 @@
 #include "Game/BreakerZoneBuilder.h"
 #include "Interaction/BreakerRiftDoor.h"
 #include "Interaction/BreakerTravelPoint.h"
+#include "Movement/BreakerCharacterMovementComponent.h"
 #include "Save/BreakerMissionContent.h"
 #include "Save/BreakerQuestJournal.h"
 
@@ -40,7 +41,10 @@
 //
 // 631 is the four-yard figure before O274's openings; 645 carries the
 // fourteen `marker_spawn_*` cubes the composer authors as patrol returns.
-static constexpr int32 BreakerFernhallExpectedPieceCount = 645;
+// THIS FIGURE MOVES WITH THE COMPOSER'S ROSTER — the count printed at the
+// foot of Scripts/compose_fernhall.py is the same number, and a pass that
+// adds pieces (O278's stair treads, for one) moves both in the same commit.
+static constexpr int32 BreakerFernhallExpectedPieceCount = 721;
 // THE OPENINGS (O274), by the same discipline: one figure, set from the
 // export, moved only when the composer deliberately authors another mouth.
 // Fourteen across four yards — entry 4, substation 4, depot 3, siding 3.
@@ -830,6 +834,214 @@ bool FBreakerFernhallFloorsDisjointTest::RunTest(const FString& Parameters)
                     OverlapX <= BreakerFloorAbutCm || OverlapY <= BreakerFloorAbutCm);
             }
         }
+    }
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// EVERY DECK AND DOCK IS REACHED ON FOOT (O278). A step is under 45 cm, and a
+// raised slab the composer places is reachable by a stair the movement
+// component can climb — not a ramp mesh whose collision is whatever the kit
+// shipped, and not four treads at 85 cm that the character walks into like a
+// wall. The stair is measured as the composer authors it: a run of solid box
+// treads named after the slab they climb to, read through the same
+// CollectZonePieces bounds the runtime spawner uses.
+//
+// THE CEILING IS THE MOVEMENT DEFAULT, READ FROM THE DEFAULT OBJECT. If the
+// character's MaxStepHeight is 45 the assertion is 45; a tread the composer
+// authors at 46 goes red here, and the fix is the tread, never this file. The
+// composer's own rise (35 cm) is deliberately under the ceiling so the stair
+// reads as a stair, and that margin is the composer's to keep, not this test's
+// to enforce.
+//
+// Measured over both folders, like FloorsDisjoint, because the ruin is the
+// same yard with dressing over it and a dock nobody can climb in the rift is
+// the same defect as one nobody can climb in the world.
+// ---------------------------------------------------------------------------
+namespace
+{
+    // Signed overlap of two pieces' boxes along one axis: positive is shared
+    // span, negative is the gap between them.
+    float BreakerFernhallAxisOverlap(const FBreakerZonePiece& P, const FBreakerZonePiece& Q, int32 Axis)
+    {
+        return FMath::Min(P.Origin[Axis] + P.Extent[Axis], Q.Origin[Axis] + Q.Extent[Axis])
+            - FMath::Max(P.Origin[Axis] - P.Extent[Axis], Q.Origin[Axis] - Q.Extent[Axis]);
+    }
+
+    // THE NAME CONTRACT with compose_fernhall.py: `flr_<tag>_deck` is climbed
+    // by `flr_<tag>_step<i>`, `flr_<tag>_fardeck` by `flr_<tag>_fstep<i>`,
+    // `flr_<tag>_dock` by `flr_<tag>_dockstep<i>`. Returns the tread prefix
+    // for a slab of one of those three kinds, or empty for any other piece.
+    // `_fardeck` is tried before `_deck` because the second is not a suffix
+    // of the first only by the underscore, and that is too thin to lean on.
+    FString BreakerFernhallTreadPrefixFor(const FString& SlabName)
+    {
+        if (!SlabName.StartsWith(TEXT("flr_"))) return FString();
+        struct FKind { const TCHAR* Suffix; const TCHAR* Treads; };
+        static const FKind Kinds[] = {
+            { TEXT("_fardeck"), TEXT("_fstep") },
+            { TEXT("_deck"), TEXT("_step") },
+            { TEXT("_dock"), TEXT("_dockstep") },
+        };
+        for (const FKind& Kind : Kinds)
+        {
+            if (SlabName.EndsWith(Kind.Suffix))
+            {
+                return SlabName.LeftChop(FCString::Strlen(Kind.Suffix)) + Kind.Treads;
+            }
+        }
+        return FString();
+    }
+
+    float BreakerFernhallTopZ(const FBreakerZonePiece& Piece)
+    {
+        return Piece.Origin.Z + Piece.Extent.Z;
+    }
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerFernhallDecksClimbableTest,
+    "RiorsEdge.Zone.Fernhall.DecksClimbable",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerFernhallDecksClimbableTest::RunTest(const FString& Parameters)
+{
+    // Read, never typed: the character's own ceiling on a step.
+    const UBreakerCharacterMovementComponent* Movement = GetDefault<UBreakerCharacterMovementComponent>();
+    if (!TestNotNull(TEXT("the movement component has a default object"), Movement)) return false;
+    const float MaxStepCm = Movement->MaxStepHeight;
+    TestTrue(FString::Printf(TEXT("the movement default's MaxStepHeight is a positive figure (%.1f)"), MaxStepCm),
+        MaxStepCm > 0.0f);
+
+    // The same tolerances FloorsDisjoint measures by: an overlap or a gap
+    // under a centimetre is an abutment, not a fight and not a hole.
+    constexpr float BreakerFloorAbutCm = 1.0f;
+    constexpr float BreakerFloorSamePlaneCm = 0.5f;
+
+    for (const FString& Folder : { UBreakerZoneBuilder::FernhallMeshFolder(), UBreakerZoneBuilder::FernhallRiftMeshFolder() })
+    {
+        TArray<FBreakerZonePiece> Pieces;
+        if (!TestTrue(FString::Printf(TEXT("%s collects"), *Folder), UBreakerZoneBuilder::CollectZonePieces(Folder, Pieces))) return false;
+
+        TArray<const FBreakerZonePiece*> Solids;
+        for (const FBreakerZonePiece& Piece : Pieces)
+        {
+            if (Piece.Name.StartsWith(TEXT("wall_")) || Piece.Name.StartsWith(TEXT("blk_"))) Solids.Add(&Piece);
+        }
+
+        int32 Slabs = 0;
+        for (const FBreakerZonePiece& Slab : Pieces)
+        {
+            const FString TreadPrefix = BreakerFernhallTreadPrefixFor(Slab.Name);
+            if (TreadPrefix.IsEmpty()) continue;
+            ++Slabs;
+            const FString Where = FString::Printf(TEXT("%s: %s"), *Folder, *Slab.Name);
+            const float SlabTop = BreakerFernhallTopZ(Slab);
+
+            // (d) The stair exists. Its treads are the pieces named for this
+            // slab with a bare index after the prefix — `..._step0`, never
+            // `..._stepladder` — sorted by their top face, which is the order
+            // a foot meets them.
+            TArray<const FBreakerZonePiece*> Treads;
+            for (const FBreakerZonePiece& Piece : Pieces)
+            {
+                if (Piece.Name.StartsWith(TreadPrefix) && Piece.Name.Mid(TreadPrefix.Len()).IsNumeric()) Treads.Add(&Piece);
+            }
+            if (!TestTrue(FString::Printf(TEXT("%s has at least one tread named %s<i> (slab top Z %.1f)"),
+                *Where, *TreadPrefix, SlabTop), Treads.Num() > 0))
+            {
+                continue;
+            }
+            Treads.Sort([](const FBreakerZonePiece& A, const FBreakerZonePiece& B)
+            {
+                return BreakerFernhallTopZ(A) < BreakerFernhallTopZ(B);
+            });
+            const FBreakerZonePiece& First = *Treads[0];
+            const FBreakerZonePiece& Last = *Treads.Last();
+
+            // (a) THE FIRST RISE IS FROM THE GROUND THE TREAD STANDS ON, found
+            // rather than assumed at zero: the highest floor under the first
+            // tread's top whose footprint holds the tread's centre. Every yard
+            // sits on one plane today, and the day one does not this still
+            // measures the step a foot actually takes.
+            const FBreakerZonePiece* Ground = nullptr;
+            const float FirstTop = BreakerFernhallTopZ(First);
+            for (const FBreakerZonePiece& Floor : Pieces)
+            {
+                if (!Floor.Name.StartsWith(TEXT("flr_")) || &Floor == &Slab) continue;
+                if (Floor.Name.StartsWith(TreadPrefix) && Floor.Name.Mid(TreadPrefix.Len()).IsNumeric()) continue;
+                const float FloorTop = BreakerFernhallTopZ(Floor);
+                if (FloorTop > FirstTop - BreakerFloorSamePlaneCm) continue;
+                if (FMath::Abs(First.Origin.X - Floor.Origin.X) > Floor.Extent.X
+                    || FMath::Abs(First.Origin.Y - Floor.Origin.Y) > Floor.Extent.Y) continue;
+                if (!Ground || FloorTop > BreakerFernhallTopZ(*Ground)) Ground = &Floor;
+            }
+            if (TestNotNull(FString::Printf(TEXT("%s: a floor lies under the first tread %s (top Z %.1f at X %.0f Y %.0f)"),
+                *Where, *First.Name, FirstTop, First.Origin.X, First.Origin.Y), Ground))
+            {
+                const float FirstRise = FirstTop - BreakerFernhallTopZ(*Ground);
+                TestTrue(FString::Printf(TEXT("%s: first tread %s rises %.1f cm off %s (top %.1f), within MaxStepHeight %.1f"),
+                    *Where, *First.Name, FirstRise, *Ground->Name, BreakerFernhallTopZ(*Ground), MaxStepCm),
+                    FirstRise <= MaxStepCm);
+            }
+            for (int32 i = 1; i < Treads.Num(); ++i)
+            {
+                const float Rise = BreakerFernhallTopZ(*Treads[i]) - BreakerFernhallTopZ(*Treads[i - 1]);
+                TestTrue(FString::Printf(TEXT("%s: %s -> %s rises %.1f cm (%.1f -> %.1f), within MaxStepHeight %.1f"),
+                    *Where, *Treads[i - 1]->Name, *Treads[i]->Name, Rise,
+                    BreakerFernhallTopZ(*Treads[i - 1]), BreakerFernhallTopZ(*Treads[i]), MaxStepCm),
+                    Rise <= MaxStepCm);
+            }
+            const float LastRise = SlabTop - BreakerFernhallTopZ(Last);
+            TestTrue(FString::Printf(TEXT("%s: last tread %s -> slab rises %.1f cm (%.1f -> %.1f), within MaxStepHeight %.1f"),
+                *Where, *Last.Name, LastRise, BreakerFernhallTopZ(Last), SlabTop, MaxStepCm),
+                LastRise <= MaxStepCm);
+            TestTrue(FString::Printf(TEXT("%s: last tread %s is not above the slab it climbs to (%.1f -> %.1f)"),
+                *Where, *Last.Name, BreakerFernhallTopZ(Last), SlabTop),
+                LastRise >= -BreakerFloorSamePlaneCm);
+
+            // (b) THE LAST TREAD MEETS THE SLAB'S EDGE: a shared span on one
+            // axis and an abutment on the other, within a centimetre either
+            // way. A tread inside the footprint is under the slab, not at it;
+            // a tread a hand's width off is a gap the foot finds first.
+            const float OverlapX = BreakerFernhallAxisOverlap(Last, Slab, 0);
+            const float OverlapY = BreakerFernhallAxisOverlap(Last, Slab, 1);
+            const float Abut = FMath::Min(OverlapX, OverlapY);
+            const float Shared = FMath::Max(OverlapX, OverlapY);
+            TestTrue(FString::Printf(TEXT("%s: last tread %s touches the slab's near edge within %.0f cm (overlap X %.1f, Y %.1f)"),
+                *Where, *Last.Name, BreakerFloorAbutCm, OverlapX, OverlapY),
+                Abut >= -BreakerFloorAbutCm && Shared > 0.0f);
+            TestTrue(FString::Printf(TEXT("%s: last tread %s does not lie inside the slab footprint (overlap X %.1f, Y %.1f)"),
+                *Where, *Last.Name, OverlapX, OverlapY),
+                Abut <= BreakerFloorAbutCm);
+
+            // (c) NO TREAD IS INSIDE A WALL OR A COVER BLOCK. The dock's
+            // cheeks and front are wall_ and the lattice is blk_; a tread that
+            // shares more than a centimetre with either on all three axes is a
+            // stair the character cannot stand on.
+            for (const FBreakerZonePiece* Tread : Treads)
+            {
+                for (const FBreakerZonePiece* Solid : Solids)
+                {
+                    const float X = BreakerFernhallAxisOverlap(*Tread, *Solid, 0);
+                    const float Y = BreakerFernhallAxisOverlap(*Tread, *Solid, 1);
+                    const float Z = BreakerFernhallAxisOverlap(*Tread, *Solid, 2);
+                    const bool bIntersects = X > BreakerFloorAbutCm && Y > BreakerFloorAbutCm && Z > BreakerFloorAbutCm;
+                    if (bIntersects)
+                    {
+                        AddError(FString::Printf(TEXT("%s: tread %s intersects %s (overlap X %.1f, Y %.1f, Z %.1f cm)"),
+                            *Where, *Tread->Name, *Solid->Name, X, Y, Z));
+                    }
+                }
+            }
+
+            AddInfo(FString::Printf(TEXT("%s: %d treads, first top %.1f, last top %.1f, slab top %.1f, ceiling %.1f"),
+                *Where, Treads.Num(), FirstTop, BreakerFernhallTopZ(Last), SlabTop, MaxStepCm));
+        }
+        // Not vacuous: the composer authors a deck, a far deck and a dock in
+        // every yard, so a folder in which none matched is a folder this test
+        // has stopped reading, not a folder with nothing to climb.
+        TestTrue(FString::Printf(TEXT("%s has raised slabs to measure (%d)"), *Folder, Slabs), Slabs > 0);
     }
     return true;
 }

@@ -45,7 +45,7 @@ MAP_PACKAGE = "/Game/Breaker/Maps/Lvl_Fernhall"
 #
 # 631 -> 645 (and 715 -> 729) when the patrol return points landed (O274):
 # fourteen marker_spawn_* cubes, consumed as transforms like every marker.
-EXPECTED_TOTAL = 729 if RUINED else 645
+EXPECTED_TOTAL = 805 if RUINED else 721
 SOLID_PREFIXES = ("blk_full_", "blk_chest_", "wall_", "flr_")
 
 # THE MARKER CONTRACT, PARSED — not a fixed list of three names. This used to

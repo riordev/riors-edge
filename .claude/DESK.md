@@ -17,14 +17,27 @@
   of cool air, edges are clean. The ground is still one flat value; that
   is O279's.
 
-## Cycle — O278 SCALE, A: VERTICALITY
+## O278 SCALE, A: VERTICALITY — LANDED
 
-- [ ] compose_fernhall: STEP_RISE under the movement component's
-      MaxStepHeight with the treads to match; the deck, far deck and
-      dock get floor pieces and a stair each so a body walks up; nav on
-      them. EXPECTED_TOTAL and BreakerFernhallExpectedPieceCount move
-      together; FloorsDisjoint holds. Re-export both GLBs, re-import.
-      Photograph the tour and the deck from the lane.
+- Every deck, far deck and dock in all four yards has a stair of solid
+  treads a body walks up: rise 35 cm (ten under MaxStepHeight, the D4
+  kerb precedent), tread 35 cm, 4 m wide — 10 treads to the deck (3.8
+  m), 14 to the far deck (5.0 m), 5 to the dock (1.9 m); the megakit
+  lateral "stair" is gone. The nav agent's step is 45 (it sat on the
+  engine's 35 default). FOUND and fixed on the way: the old treads rose
+  85 cm with a 1.2 m first step; every dock slab stood inside its end
+  wall and through a cover block; the entry deck ran through the bay
+  walls; entry/siding far decks stood inside the masses. Decks and docks
+  are re-sited per yard and a compose-time probe asserts every
+  slab and tread clear of every wall/blk/flr box; DecksClimbable pins
+  the rises against the movement default, the abutment, and tread vs
+  wall/blk in 3D over both twins. Pieces 645 -> 721 (ruined 805).
+  FOUND, not fixed: every deck still runs 3.5 m into its flank building
+  (deck lat 19..27 vs the flank's inner face 23.5) — a deck-width
+  decision for STOREYS. FOUND: the tour's second vantage photographs
+  under the world now that the docks moved; re-aim it. FOUND: the local
+  map draws 116 tread boxes as ground. PHOTOGRAPHED: the overhead —
+  the stair runs read on the decks; not walked.
 
 ## Cycle — O278 SCALE, B: STOREYS
 
