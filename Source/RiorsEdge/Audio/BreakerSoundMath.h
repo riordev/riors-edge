@@ -464,4 +464,36 @@ namespace BreakerSound
         return .34f * Body * Envelope(NoteT, NoteLength, bSecond ? 3.0f : 6.0f);   // O2 PLACEHOLDER
     }
     inline void RenderLevelUp(TArray<int16>& Out) { RenderPcm16(Out, LevelUpDurationSeconds, &LevelUpSample); }
+
+    // CHEST OPEN (O275): a supply chest opened, and that is a director verb.
+    // A two-tap latch — the catch releasing and the lid meeting its stop —
+    // two dry clicks 60 ms apart under one shared exponential tail, so the
+    // pair reads as a single mechanism rather than as two hits. Each tap is
+    // differenced noise (the click) over a short low knock (the body); the
+    // second sits a little lower than the first, the way a lid lands heavier
+    // than a catch lets go. No sweep in either direction and no sustained
+    // tone, which is what keeps it apart from everything else in the bank:
+    // the level-up is stepped tones, the ability cue rises, the combat verbs
+    // fall. This one is struck, not played. All O2 PLACEHOLDER.
+    inline constexpr float ChestOpenDurationSeconds = 0.18f;    // O2 PLACEHOLDER
+    inline constexpr float ChestOpenSecondTapSeconds = 0.06f;   // O2 PLACEHOLDER
+    inline float ChestOpenTap(float TapT, uint32 Index, float BodyHz)
+    {
+        if (TapT < 0.0f) return 0.0f;
+        // The click dies inside ~10 ms; the knock under it inside ~40 ms.
+        const float Click = BrightNoise(Index) * FMath::Exp(-TapT * 140.0f);          // O2 PLACEHOLDER
+        const float Body = FMath::Sin(2 * PI * BodyHz * TapT) * FMath::Exp(-TapT * 45.0f); // O2 PLACEHOLDER
+        return .6f * Click + .4f * Body;
+    }
+    inline float ChestOpenSample(int32 Index)
+    {
+        const float T = static_cast<float>(Index) / SampleRate;
+        const uint32 Sample = static_cast<uint32>(Index);
+        // The second tap's noise is the same stream OFFSET, not xor'd: a
+        // first difference only high-passes when its two hashes are adjacent.
+        const float First = ChestOpenTap(T, Sample, 520.0f);                                          // O2 PLACEHOLDER
+        const float Second = ChestOpenTap(T - ChestOpenSecondTapSeconds, Sample + 0x8000u, 410.0f);   // O2 PLACEHOLDER
+        return .55f * (First + Second) * Envelope(T, ChestOpenDurationSeconds, 9.0f);                // O2 PLACEHOLDER
+    }
+    inline void RenderChestOpen(TArray<int16>& Out) { RenderPcm16(Out, ChestOpenDurationSeconds, &ChestOpenSample); }
 }

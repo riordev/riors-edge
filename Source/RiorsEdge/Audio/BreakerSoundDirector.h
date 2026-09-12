@@ -14,8 +14,9 @@ class USoundWaveProcedural;
 //
 // Weapon fire, hit confirm, kill, taking a hit — which
 // matters more than the other three — the ability cast (ORDERS ruling 2) and,
-// since O193, the player's own death. Earned Rot has a separate activation
-// cue, never a per-tick cue. There is no generic PlaySound(AnyWave) surface.
+// since O193, the player's own death; since O275, opening a supply chest.
+// Earned Rot has a separate activation cue, never a per-tick cue. There is
+// no generic PlaySound(AnyWave) surface.
 //
 // THE FIFTH VERB TAKES AN ABILITY ID, and that is the whole of the override
 // mechanism. The owner will author per-ability sounds "eventually", so the cue
@@ -112,6 +113,12 @@ public:
     // when several land at once: the banner states the count, and a stacked
     // arpeggio would read as a bug. Overridable with level_up.wav.
     void PlayLevelUp();
+    // The local player opened a supply chest (O275: opening a chest is a
+    // director verb, not a sound the chest actor owns). One two-tap latch per
+    // open; retrigger cuts like every other one-shot. Overridable with
+    // chest_open.wav. Reached through BreakerChestFeedback::PlayOpen, which
+    // owns the local-pawn check — this verb plays for whoever calls it.
+    void PlayChestOpen();
     // An ability was cast. AbilityId selects a per-ability override if one has
     // been authored; NAME_None, or an id with no file, plays the shared
     // default. Resolved on first use per id and cached, so the miss costs one
@@ -155,6 +162,7 @@ private:
     UPROPERTY() TObjectPtr<UAudioComponent> AbilityVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> PlayerDeathVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> LevelUpVoice;
+    UPROPERTY() TObjectPtr<UAudioComponent> ChestVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> EntropyVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> VoidMarkVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> RiftVoice;
@@ -177,6 +185,7 @@ private:
     UPROPERTY() TObjectPtr<USoundWaveProcedural> AbilityDefaultWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> PlayerDeathWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> LevelUpWave;
+    UPROPERTY() TObjectPtr<USoundWaveProcedural> ChestWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> EntropyWave;
     // Per-ability overrides, resolved lazily. A key present with a NULL value
     // means "probed, no override authored" — the sentinel is what stops a
@@ -200,6 +209,7 @@ private:
     TArray<int16> AbilityDefaultPcm;
     TArray<int16> PlayerDeathPcm;
     TArray<int16> LevelUpPcm;
+    TArray<int16> ChestPcm;
     TArray<int16> EntropyPcm;
     double LastEntropyCueTime = -1000;
     int32 EntropyCueCount = 0;

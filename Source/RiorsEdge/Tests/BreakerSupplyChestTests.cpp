@@ -2,19 +2,25 @@
 
 #if WITH_DEV_AUTOMATION_TESTS
 
+#include "Components/CapsuleComponent.h"
+#include "Game/BreakerZoneBuilder.h"
+#include "HAL/FileManager.h"
+#include "Interaction/BreakerSupplyChest.h"
 #include "Interaction/BreakerSupplyChestMath.h"
+#include "Items/BreakerDropTable.h"
 #include "Items/BreakerItemTypes.h"
+#include "Misc/PackageName.h"
+#include "Progression/BreakerRiftRewardMath.h"
 
 // ---------------------------------------------------------------------------
-// WHAT IS IN A CHEST. The owner's sentence was "either currency or an item in
-// there weighted more towards lower value stuff", and both halves are
-// assertable without a world:
+// WHAT IS IN A CHEST, AND WHERE IT STANDS. O275, assertable without a world:
 //
-//   EITHER/OR      one chest pays one thing
-//   WEIGHTED       currency outweighs items, over the whole seed space
-//   LOWER VALUE    an item a chest hands over is never BETTER than the roll
+//   THE FLOOR       a chest never pays nothing, and the floor climbs with the yard
+//   THE ITEM        rolled at the completion floor, gated by the yard's level
+//   THE SITE        behind full-height cover or inside a bay, never on the lane
+//   THE SEED PICKS  which sites, distinct, and a yard offers enough of them
 //
-// What is NOT assertable here is whether opening one feels worth the walk.
+// What is NOT assertable here is whether finding one feels worth the walk.
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerSupplyChestTest,
@@ -23,92 +29,74 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 namespace
 {
-    // The rarity ladder, low to high, held once so the two sweeps below cannot
-    // disagree about which direction "down" is. Deliberately NOT the
-    // enumerator's numeric order: that enum is serialized and append-only, so
-    // its integers are a storage detail.
-    int32 BreakerSupplyChestRank(EBreakerItemRarity Rarity)
+    // A yard as the composer writes one, in metres from the yard's anchor:
+    // (along, lateral). The entry yard's six full-height breaks and its bay,
+    // read off compose_fernhall.py so the synthetic sweep below measures the
+    // same shapes the shipped yard offers.
+    struct FBreakerSupplyChestYard
     {
-        switch (Rarity)
+        FVector Origin;
+        FVector Forward;
+        TArray<FBreakerZonePiece> Pieces;
+
+        FVector Right() const { return BreakerSupplyChest::LateralAxis(Forward); }
+
+        void Place(const TCHAR* Name, float AlongM, float LateralM, const FVector& ExtentCm)
         {
-            case EBreakerItemRarity::Uncommon:    return 1;
-            case EBreakerItemRarity::Exceptional: return 2;
-            case EBreakerItemRarity::Aberrant:    return 3;
-            case EBreakerItemRarity::Unwritten:   return 4;
-            default:                              return 0;   // Standard
+            FBreakerZonePiece& Piece = Pieces.AddDefaulted_GetRef();
+            Piece.Name = Name;
+            Piece.Extent = ExtentCm;
+            // Grounded, the way the composer grounds every piece: the base sits
+            // on the yard floor and the origin is half the height above it.
+            Piece.Origin = Origin + Forward * (AlongM * 100.0f) + Right() * (LateralM * 100.0f)
+                + FVector(0.0f, 0.0f, ExtentCm.Z);
         }
+    };
+
+    FBreakerSupplyChestYard BreakerSupplyChestEntryYard(const FVector& Origin, const FVector& Forward)
+    {
+        FBreakerSupplyChestYard Yard;
+        Yard.Origin = Origin;
+        Yard.Forward = Forward;
+        // Six 3 x 4 x 3 m full-height breaks, at the composer's positions.
+        const float Breaks[][2] = { {32, 17}, {32, -17}, {62, 17}, {62, -17}, {86, 17}, {89, -18} };
+        for (int32 Index = 0; Index < UE_ARRAY_COUNT(Breaks); ++Index)
+        {
+            Yard.Place(*FString::Printf(TEXT("blk_full_break%02d"), Index), Breaks[Index][0], Breaks[Index][1],
+                FVector(150.0f, 150.0f, 200.0f));
+        }
+        // The bay: fourteen along, ten deep, its slab 0.3 m thick, at 21 m off
+        // the lane. Its extent is world-aligned, so it is expressed along the
+        // frame the yard is built in.
+        {
+            const FVector Right = Yard.Right();
+            const FVector Extent(
+                FMath::Abs(Forward.X) * 700.0f + FMath::Abs(Right.X) * 500.0f,
+                FMath::Abs(Forward.Y) * 700.0f + FMath::Abs(Right.Y) * 500.0f, 15.0f);
+            Yard.Place(TEXT("flr_entry_bay"), 44, 21, Extent);
+        }
+        // Things that are NOT sites: chest-high cover, the bay's own walls and
+        // roof, dressing, the yard floor. A site pick that read any of these
+        // would put a chest on open ground or on a roof.
+        Yard.Place(TEXT("blk_chest_n00"), 20, 10.5f, FVector(150.0f, 60.0f, 60.0f));
+        Yard.Place(TEXT("wall_entry_bayback"), 44, 26, FVector(700.0f, 30.0f, 300.0f));
+        Yard.Place(TEXT("flr_entry_bayroof"), 44, 21, FVector(700.0f, 500.0f, 20.0f));
+        Yard.Place(TEXT("dress_entry_baycrate0"), 39.6f, 23.6f, FVector(65.0f, 65.0f, 65.0f));
+        Yard.Place(TEXT("flr_yard"), 50, 0, FVector(5000.0f, 2500.0f, 10.0f));
+        return Yard;
+    }
+
+    const FBreakerZonePiece* BreakerSupplyChestFindPiece(const TArray<FBreakerZonePiece>& Pieces, FName Name)
+    {
+        for (const FBreakerZonePiece& Piece : Pieces)
+            if (Piece.Name == Name.ToString()) return &Piece;
+        return nullptr;
     }
 }
 
 bool FBreakerSupplyChestTest::RunTest(const FString& Parameters)
 {
     using namespace BreakerSupplyChest;
-    constexpr int32 Samples = 20000;
-
-    // ---- THE SPLIT, over the seed space rather than at three samples -------
-    int32 Currency = 0;
-    for (int32 Seed = 0; Seed < Samples; ++Seed) Currency += PaysCurrency(Seed) ? 1 : 0;
-    const float Share = 100.0f * Currency / Samples;
-    const float Authored = 100.0f * CurrencyWeight / (CurrencyWeight + ItemWeight);
-    AddInfo(FString::Printf(TEXT("CHEST CONTENTS  currency %.1f%% of %d seeds, authored %.1f%%"),
-        Share, Samples, Authored));
-    TestTrue(*FString::Printf(TEXT("the split matches its own weights (%.1f%% vs %.1f%%)"), Share, Authored),
-        FMath::Abs(Share - Authored) < 2.0f);
-    // AND IT IS ACTUALLY WEIGHTED TOWARD CURRENCY. A hash that drifted to an
-    // even split would still pass the tolerance above if the weights were ever
-    // edited to 50/50; this is the owner's sentence, asserted directly.
-    TestTrue(TEXT("currency outweighs items, which is what 'lower value' means here"),
-        CurrencyWeight > ItemWeight);
-
-    // ---- DETERMINISM ------------------------------------------------------
-    // A chest's contents are a pure function of its seed. Without that, a
-    // capture cannot be compared with the one before it and a bug report
-    // cannot be reproduced from the seed the log printed.
-    for (int32 Seed = -50; Seed < 50; ++Seed)
-    {
-        TestEqual(*FString::Printf(TEXT("seed %d always pays the same kind"), Seed),
-            PaysCurrency(Seed), PaysCurrency(Seed));
-        TestEqual(*FString::Printf(TEXT("and tempers the same way at seed %d"), Seed),
-            static_cast<int32>(Temper(EBreakerItemRarity::Aberrant, Seed)),
-            static_cast<int32>(Temper(EBreakerItemRarity::Aberrant, Seed)));
-    }
-
-    // ---- NEVER UPWARD -----------------------------------------------------
-    // The one property that must hold for every rarity at every seed: a chest
-    // cannot improve a roll. Swept rather than sampled, because a StepDown
-    // that skipped a case would still pass at any single rarity.
-    const EBreakerItemRarity Ladder[] = { EBreakerItemRarity::Standard, EBreakerItemRarity::Uncommon,
-        EBreakerItemRarity::Exceptional, EBreakerItemRarity::Aberrant, EBreakerItemRarity::Unwritten };
-    for (const EBreakerItemRarity Rarity : Ladder)
-    {
-        TestTrue(TEXT("stepping down never goes up"),
-            BreakerSupplyChestRank(StepDown(Rarity)) <= BreakerSupplyChestRank(Rarity));
-        // Standard is the floor: a chest cannot pay less than the least thing.
-        if (Rarity != EBreakerItemRarity::Standard)
-        {
-            TestEqual(TEXT("and it moves exactly one tier"),
-                BreakerSupplyChestRank(StepDown(Rarity)), BreakerSupplyChestRank(Rarity) - 1);
-        }
-        int32 Stepped = 0;
-        for (int32 Seed = 0; Seed < Samples; ++Seed)
-        {
-            const EBreakerItemRarity Out = Temper(Rarity, Seed);
-            if (!TestTrue(TEXT("tempering never improves a roll"),
-                BreakerSupplyChestRank(Out) <= BreakerSupplyChestRank(Rarity))) return false;
-            Stepped += BreakerSupplyChestRank(Out) < BreakerSupplyChestRank(Rarity) ? 1 : 0;
-        }
-        if (Rarity != EBreakerItemRarity::Standard)
-        {
-            const float Rate = 100.0f * Stepped / Samples;
-            TestTrue(*FString::Printf(TEXT("and does so at its authored rate (%.1f%% vs %d%%)"),
-                    Rate, TemperPercent),
-                FMath::Abs(Rate - TemperPercent) < 2.0f);
-        }
-        else
-        {
-            TestEqual(TEXT("Standard has nowhere lower to go"), Stepped, 0);
-        }
-    }
 
     // ---- A CHEST NEVER PAYS NOTHING ---------------------------------------
     // The defect this pins actually shipped for one suite run: the chest paid
@@ -140,37 +128,172 @@ bool FBreakerSupplyChestTest::RunTest(const FString& Parameters)
     AddInfo(FString::Printf(TEXT("CHEST CURRENCY  level 5 pays %d-%d, level 13 pays %d-%d"),
         CurrencyPayout(0, 5), CurrencyPayout(1, 5), CurrencyPayout(0, 13), CurrencyPayout(1, 13)));
 
-    // ---- WHERE ONE STANDS -------------------------------------------------
-    // The placement must land inside the yard's own band on every seed, or a
-    // chest rolls into a wall and simply is not there — a silent absence the
-    // player reads as "chests are rare" rather than as a bug.
-    constexpr float HalfWidth = 2000.0f;
+    // ---- THE ITEM IS AT THE COMPLETION FLOOR --------------------------------
+    // O275: one item, at the codebase's one "decent" floor, gated by the
+    // chest's own level exactly as a rift's offer is. Below the Exceptional
+    // unlock the floor is Uncommon; the entry yard is level five and the
+    // depot is past the unlock, so both rungs are exercised by shipped yards.
+    // The default table, because that is the table the chest passes.
+    TestEqual(TEXT("an AL5 chest's item is Uncommon"),
+        static_cast<int32>(BreakerRiftReward::CompletionRarity(ChestItemLevel(5), FBreakerDropTableParams{})),
+        static_cast<int32>(EBreakerItemRarity::Uncommon));
+    TestEqual(TEXT("an AL9 chest's item is Exceptional"),
+        static_cast<int32>(BreakerRiftReward::CompletionRarity(ChestItemLevel(9), FBreakerDropTableParams{})),
+        static_cast<int32>(EBreakerItemRarity::Exceptional));
+    TestEqual(TEXT("a chest never rolls below the ladder's first rung"), ChestItemLevel(0), 1);
+    TestEqual(TEXT("and otherwise rolls at the yard's own level"), ChestItemLevel(7), 7);
+
+    // ---- WHERE ONE STANDS: THE SITES ----------------------------------------
+    // The rule, on a yard that is not axis-aligned: the sites must follow the
+    // frame, not the world's X. The chest radius is what the game grants —
+    // the chest's own capsule, read from its default object.
+    const UCapsuleComponent* ChestBody = GetDefault<ABreakerSupplyChest>()->FindComponentByClass<UCapsuleComponent>();
+    if (!TestNotNull(TEXT("the chest has a body to measure from"), ChestBody)) return false;
+    const float Radius = ChestBody->GetScaledCapsuleRadius();
+
+    // Every site is on the far side of its cover, or inside its bay, and
+    // never nearer the lane than the piece it stands with.
+    auto CheckSites = [&](const TCHAR* Label, const TArray<FBreakerZonePiece>& Pieces, const FVector& Origin,
+        const FVector& Forward, const TArray<FBreakerChestSite>& Sites) -> bool
+    {
+        const FVector Right = LateralAxis(Forward);
+        for (const FBreakerChestSite& Site : Sites)
+        {
+            const FBreakerZonePiece* Piece = BreakerSupplyChestFindPiece(Pieces, Site.Cover);
+            if (!TestNotNull(*FString::Printf(TEXT("%s: site names a piece the yard has (%s)"), Label,
+                *Site.Cover.ToString()), Piece)) return false;
+            const float Sign = LateralSign(Piece->Origin, Origin, Forward);
+            const FVector Offset = Site.Location - Piece->Origin;
+            const float Away = FVector::DotProduct(Offset, Right) * Sign;
+            const float Along = FVector::DotProduct(Offset, Forward);
+            const float SiteLateral = FVector::DotProduct(Site.Location - Origin, Right);
+            const float PieceLateral = FVector::DotProduct(Piece->Origin - Origin, Right);
+            if (!TestTrue(*FString::Printf(TEXT("%s: %s stands further from the lane than its piece"), Label,
+                *Site.Cover.ToString()), FMath::Abs(SiteLateral) > FMath::Abs(PieceLateral))) return false;
+            if (IsFullCover(Piece->Name))
+            {
+                if (!TestTrue(*FString::Printf(TEXT("%s: %s is behind its cover by at least half-depth plus radius (%.0f)"),
+                    Label, *Site.Cover.ToString(), Away),
+                    Away >= HalfExtentAlong(Piece->Extent, Right) + Radius - KINDA_SMALL_NUMBER)) return false;
+                if (!TestTrue(*FString::Printf(TEXT("%s: %s is squarely behind, not diagonal"), Label, *Site.Cover.ToString()),
+                    FMath::IsNearlyZero(Along, 1.0f))) return false;
+            }
+            else if (!TestTrue(*FString::Printf(TEXT("%s: %s is a bay"), Label, *Site.Cover.ToString()), IsBay(Piece->Name)))
+            {
+                return false;
+            }
+            else
+            {
+                // Inside the footprint with the whole capsule, and pulled back
+                // from the mouth rather than standing in it.
+                if (!TestTrue(*FString::Printf(TEXT("%s: %s site is inside the bay's footprint"), Label, *Site.Cover.ToString()),
+                    FMath::Abs(Along) <= HalfExtentAlong(Piece->Extent, Forward) - Radius
+                    && FMath::Abs(FVector::DotProduct(Offset, Right)) <= HalfExtentAlong(Piece->Extent, Right) - Radius))
+                    return false;
+                if (!TestTrue(*FString::Printf(TEXT("%s: %s site is pulled back from the mouth"), Label, *Site.Cover.ToString()),
+                    Away > 0.0f)) return false;
+            }
+            if (!TestTrue(*FString::Printf(TEXT("%s: %s site sits on its piece's ground"), Label, *Site.Cover.ToString()),
+                FMath::IsNearlyEqual(Site.Location.Z, Piece->Origin.Z - Piece->Extent.Z, 1.0))) return false;
+        }
+        return true;
+    };
+
+    const FBreakerSupplyChestYard Synthetic = BreakerSupplyChestEntryYard(
+        FVector(12000.0f, -3000.0f, 0.0f), FVector(0.0f, 1.0f, 0.0f));
+    TArray<FBreakerChestSite> Sites;
+    CollectChestSites(Synthetic.Pieces, Synthetic.Origin, Synthetic.Forward, Radius, Sites);
+    // Six breaks and one bay; nothing else in the yard is a site.
+    TestEqual(TEXT("the composed entry yard offers a site per break plus its bay"), Sites.Num(), 7);
+    if (!CheckSites(TEXT("synthetic"), Synthetic.Pieces, Synthetic.Origin, Synthetic.Forward, Sites)) return false;
+    for (const FBreakerChestSite& Site : Sites)
+    {
+        const FString Name = Site.Cover.ToString();
+        TestFalse(TEXT("chest-high cover is not full-height cover"), Name.StartsWith(TEXT("blk_chest_")));
+        TestFalse(TEXT("a bay's roof is not its floor"), Name.EndsWith(TEXT("_bayroof")));
+        TestFalse(TEXT("the yard floor is the lane, not a site"), Name == TEXT("flr_yard"));
+        TestFalse(TEXT("walls and dressing are not sites"),
+            Name.StartsWith(TEXT("wall_")) || Name.StartsWith(TEXT("dress_")));
+    }
+    TestTrue(TEXT("the trace starts under a bay's roof"), SiteTraceHeightCm < 600.0f - 20.0f);
+    TestTrue(TEXT("and above the bay's stock"), SiteTraceHeightCm > 130.0f);
+
+    // ---- THE SEED PICKS -----------------------------------------------------
+    // Distinct sites, every seed; and the seed genuinely decides, so a route
+    // walked twice is not identical the third time.
+    TArray<int32> TimesPicked;
+    TimesPicked.SetNumZeroed(Sites.Num());
     for (int32 Seed = 0; Seed < 4000; ++Seed)
     {
-        for (int32 Index = 0; Index < ChestsPerYard; ++Index)
+        const TArray<FBreakerChestSite> Picked = PickChestSites(Sites, Seed, ChestsPerYard);
+        if (!TestEqual(*FString::Printf(TEXT("seed %d picks a full complement"), Seed), Picked.Num(), ChestsPerYard))
+            return false;
+        for (int32 A = 0; A < Picked.Num(); ++A)
         {
-            const float Fraction = PlacementFraction(Seed, Index);
-            if (!TestTrue(*FString::Printf(TEXT("chest %d of seed %d lands inside the band"), Index, Seed),
-                Fraction >= BandInset - KINDA_SMALL_NUMBER
-                && Fraction <= 1.0f - BandInset + KINDA_SMALL_NUMBER)) return false;
-            const float Lateral = PlacementLateral(Seed, Index, HalfWidth);
-            if (!TestTrue(*FString::Printf(TEXT("and inside its half-width (%.0f)"), Lateral),
-                FMath::Abs(Lateral) <= HalfWidth + KINDA_SMALL_NUMBER)) return false;
+            const int32 Which = Sites.IndexOfByPredicate([&](const FBreakerChestSite& Site)
+            {
+                return Site.Cover == Picked[A].Cover && Site.Location.Equals(Picked[A].Location);
+            });
+            if (!TestTrue(*FString::Printf(TEXT("seed %d picks only offered sites"), Seed), Which != INDEX_NONE)) return false;
+            ++TimesPicked[Which];
+            for (int32 B = A + 1; B < Picked.Num(); ++B)
+            {
+                if (!TestFalse(*FString::Printf(TEXT("seed %d never picks the same site twice"), Seed),
+                    Picked[A].Cover == Picked[B].Cover || Picked[A].Location.Equals(Picked[B].Location))) return false;
+            }
         }
+        // Determinism: the same seed always stands its chests in the same places.
+        const TArray<FBreakerChestSite> Again = PickChestSites(Sites, Seed, ChestsPerYard);
+        for (int32 Index = 0; Index < Picked.Num(); ++Index)
+            if (!TestTrue(TEXT("a seed always picks the same sites"), Again[Index].Cover == Picked[Index].Cover)) return false;
     }
-    // A zero half-width puts every chest on the centreline rather than
-    // anywhere: a dial turned to nothing must do nothing, not misbehave.
-    TestEqual(TEXT("a zero half-width places on the lane"), PlacementLateral(7, 0, 0.0f), 0.0f);
-    TestEqual(TEXT("and a negative one does not mirror"), PlacementLateral(7, 0, -900.0f), 0.0f);
-
-    // THE TWO CHESTS IN A YARD ARE NOT IN THE SAME PLACE. They take different
-    // salts, and a salt collision would stack them inside one another.
+    for (int32 Index = 0; Index < Sites.Num(); ++Index)
     {
-        int32 Apart = 0;
-        for (int32 Seed = 0; Seed < 2000; ++Seed)
-            if (FMath::Abs(PlacementFraction(Seed, 0) - PlacementFraction(Seed, 1)) > 0.05f) ++Apart;
-        TestTrue(*FString::Printf(TEXT("the two chests in a yard land apart (%d of 2000)"), Apart),
-            Apart > 1600);
+        TestTrue(*FString::Printf(TEXT("site %s is picked by some seed (%d of 4000)"),
+            *Sites[Index].Cover.ToString(), TimesPicked[Index]), TimesPicked[Index] > 0);
+    }
+    // A yard offering fewer sites than asked places what it has; a yard
+    // offering none places none; asking for none gets none.
+    TestEqual(TEXT("a short yard places what it has"), PickChestSites(Sites, 3, 99).Num(), Sites.Num());
+    TestEqual(TEXT("an empty yard places nothing"), PickChestSites(TArray<FBreakerChestSite>(), 3, ChestsPerYard).Num(), 0);
+    TestEqual(TEXT("asking for no chests places none"), PickChestSites(Sites, 3, 0).Num(), 0);
+    TestEqual(TEXT("and a negative ask is no ask"), PickChestSites(Sites, 3, -2).Num(), 0);
+
+    // ---- SHIPPED CONFIGURATION ----------------------------------------------
+    // The shipped yards, through the SAME collection and the SAME yard
+    // membership the spawner uses. The mesh folder ships in the repo, so it
+    // is required here as every other Fernhall test requires it: the
+    // shipped world has to offer every yard at least ChestsPerYard sites,
+    // or the spawner's "placing what it has" log is the norm rather than
+    // the exception.
+    const FString Folder = UBreakerZoneBuilder::FernhallMeshFolder();
+    TArray<FBreakerZonePiece> Pieces;
+    if (!TestTrue(TEXT("the shipped yard's mesh folder collects"), UBreakerZoneBuilder::CollectZonePieces(Folder, Pieces)))
+        return false;
+    FBreakerZoneMarkers Markers;
+    if (!TestTrue(TEXT("the shipped marker set is complete"), UBreakerZoneBuilder::ExtractMarkers(Pieces, Markers)))
+        return false;
+    const FName ChestYards[] = { NAME_None, FName(TEXT("substation")), FName(TEXT("depot")) };
+    for (const FName Yard : ChestYards)
+    {
+        FVector2D Origin2D, Forward2D;
+        if (!TestTrue(*FString::Printf(TEXT("yard '%s' has a frame"), *Yard.ToString()),
+            UBreakerZoneBuilder::YardFrame(Markers, Yard, Origin2D, Forward2D))) return false;
+        const FVector Forward(Forward2D.X, Forward2D.Y, 0.0f);
+        const FVector Origin(Origin2D.X, Origin2D.Y, 0.0f);
+        TArray<FBreakerZonePiece> Own;
+        for (const FBreakerZonePiece& Piece : Pieces)
+            if (UBreakerZoneBuilder::YardForPoint(Markers, Piece.Origin) == Yard) Own.Add(Piece);
+        TArray<FBreakerChestSite> Offered;
+        CollectChestSites(Own, Origin, Forward, Radius, Offered);
+        int32 Bays = 0;
+        for (const FBreakerChestSite& Site : Offered) Bays += IsBay(Site.Cover.ToString()) ? 1 : 0;
+        AddInfo(FString::Printf(TEXT("CHEST SITES  yard '%s' offers %d (%d behind cover, %d in a bay) for %d chests"),
+            *Yard.ToString(), Offered.Num(), Offered.Num() - Bays, Bays, ChestsPerYard));
+        TestTrue(*FString::Printf(TEXT("shipped yard '%s' offers at least ChestsPerYard sites"), *Yard.ToString()),
+            Offered.Num() >= ChestsPerYard);
+        TestTrue(*FString::Printf(TEXT("shipped yard '%s' offers its bay"), *Yard.ToString()), Bays >= 1);
+        if (!CheckSites(*Yard.ToString(), Own, Origin, Forward, Offered)) return false;
     }
     return true;
 }

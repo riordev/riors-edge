@@ -204,14 +204,13 @@ bool FBreakerFernhallCacheRuntimeTest::RunTest(const FString& Parameters)
                     TestFalse(TEXT("A chest is found by walking, not by a map pin"),
                         Marker.Location.Equals(Chest->GetActorLocation()));
 
-        // BOTH PAYOUTS, and the world is what decides which chests exist — so
-        // take one of each KIND if the session rolled one, and say so if it
-        // did not rather than asserting against a coin flip.
-        int32 PaidCurrency = 0, PaidItem = 0;
+        // ONE OF EACH KIND is no longer a thing: under O275 every chest pays
+        // the currency floor AND one item at the completion floor. Open the
+        // first chest the probe reaches and assert both.
+        int32 Opened = 0;
         for (ABreakerSupplyChest* Chest : Chests)
         {
-            const bool bCurrency = Chest->PaysCurrency();
-            if ((bCurrency && PaidCurrency) || (!bCurrency && PaidItem)) continue;
+            if (Opened) break;
             Player->SetActorLocation(Chest->GetActorLocation() + Chest->GetActorForwardVector() * 180.0f);
             // THE SEARCH RETURNS THE NEAREST INTERACTABLE, and where a chest
             // lands is rolled per session: two of them can come down within a
@@ -239,26 +238,16 @@ bool FBreakerFernhallCacheRuntimeTest::RunTest(const FString& Parameters)
             const int32 WalletAfter = Player->GetEquipment()->GetForgeWallet().Get();
             int32 PickupsAfter = 0;
             for (TActorIterator<ABreakerLootPickup> It(World); It; ++It) ++PickupsAfter;
-            if (bCurrency)
-            {
-                ++PaidCurrency;
-                TestTrue(TEXT("A currency chest credits Riftglass"), WalletAfter > WalletBefore);
-                TestEqual(TEXT("and drops nothing physical"), PickupsAfter, PickupsBefore);
-            }
-            else
-            {
-                ++PaidItem;
-                TestEqual(TEXT("An item chest drops exactly one thing"), PickupsAfter, PickupsBefore + 1);
-                TestEqual(TEXT("and credits no currency"), WalletAfter, WalletBefore);
-            }
-            // ONE PAYOUT PER CHEST, whichever it was.
+            ++Opened;
+            TestTrue(TEXT("A chest credits Riftglass (O275)"), WalletAfter > WalletBefore);
+            TestEqual(TEXT("and drops exactly one item (O275)"), PickupsAfter, PickupsBefore + 1);
+            // ONE PAYOUT PER CHEST.
             TestFalse(TEXT("A chest cannot pay twice"), Chest->TryOpen(Player));
             TestTrue(TEXT("An opened chest drops its prompt"), Chest->GetChestPrompt().IsEmpty());
             TestFalse(TEXT("and stops capturing the F key"), Player->FindNearbyNPC() == Chest);
         }
-        AddInfo(FString::Printf(TEXT("SUPPLY CHESTS  opened %d currency, %d item"), PaidCurrency, PaidItem));
-        TestTrue(TEXT("Shipping NPC search reaches a chest"), PaidCurrency + PaidItem > 0);
-        TestTrue(TEXT("At least one chest paid something"), PaidCurrency + PaidItem > 0);
+        AddInfo(FString::Printf(TEXT("SUPPLY CHESTS  opened %d"), Opened));
+        TestTrue(TEXT("Shipping NPC search reaches a chest"), Opened > 0);
     }
     return true;
 }

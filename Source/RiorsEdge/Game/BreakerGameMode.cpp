@@ -4739,17 +4739,19 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
     }
     UE_LOG(LogTemp, Display, TEXT("[Fernhall] %d finite outdoor enemies placed across %d pockets; no wave controller."), Spawned, PocketCount);
     // ---- SUPPLY CHESTS, ONE ROLL PER SESSION --------------------------------
-    // Owner-asked: "randomly spawning chests the player can open with either
-    // currency or an item in there weighted more towards lower value stuff".
+    // O275: a chest stands behind full-height cover or inside a bay, never on
+    // open lane ground. The yard's own pieces offer the SITES — every
+    // blk_full_* far face, every bay interior — and the seed picks which of
+    // them carry a chest this session. The seed never invents a coordinate.
     //
     // RANDOM PER SESSION, NOT PER AUTHORED PLACEMENT. What the owner asked for
     // is a route that is not identical the third time it is walked, and one
-    // seed drawn here gives every chest in the world a position and a content
-    // that a test can reproduce from that seed alone.
+    // seed drawn here gives every chest in the world a site and a content that
+    // a test can reproduce from that seed alone.
     //
     // NOT GATED ON A FIGHT, which is the whole difference from the cache
-    // standing at pocket 3 — and it is why they pay less. The arithmetic for
-    // "less" is in BreakerSupplyChestMath.h where a bare test can read it.
+    // standing at pocket 3. What one pays is in BreakerSupplyChestMath.h and
+    // the chest's own TryOpen, where a bare test can read it.
     {
         // NOT FMath::Rand, AND THE REASON IS THE SUITE. That function advances
         // a PROCESS-GLOBAL stream which every test in the run shares, so a
@@ -4776,24 +4778,45 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
             FVector2D Origin2D, Forward2D;
             if (!UBreakerZoneBuilder::YardFrame(Markers, ChestYards[YardIndex], Origin2D, Forward2D)) continue;
             const FVector Forward(Forward2D.X, Forward2D.Y, 0);
-            const FVector Right = FVector::CrossProduct(FVector::UpVector, Forward);
-            const FBreakerCoverFieldParams Field = UBreakerZoneBuilder::FernhallFieldParams(ChestYards[YardIndex]);
+            const FVector YardOrigin(Origin2D.X, Origin2D.Y, 0);
             const int32 AreaLevel = UBreakerZoneBuilder::FernhallYardAreaLevel(ChestYards[YardIndex]);
-            for (int32 Index = 0; Index < BreakerSupplyChest::ChestsPerYard; ++Index)
+            // THE YARD'S OWN PIECES, answered the way the Skirmisher's cover
+            // is: by which anchor each piece stands nearest.
+            TArray<FBreakerZonePiece> OwnPieces;
+            for (const FBreakerZonePiece& Piece : YardPieces)
+            {
+                if (UBreakerZoneBuilder::YardForPoint(Markers, Piece.Origin) == ChestYards[YardIndex])
+                    OwnPieces.Add(Piece);
+            }
+            TArray<BreakerSupplyChest::FBreakerChestSite> Sites;
+            BreakerSupplyChest::CollectChestSites(OwnPieces, YardOrigin, Forward,
+                ChestBody->GetScaledCapsuleRadius(), Sites);
+            if (Sites.Num() < BreakerSupplyChest::ChestsPerYard)
+            {
+                UE_LOG(LogTemp, Display,
+                    TEXT("[Fernhall] yard '%s' offers %d chest sites for %d chests; placing what it has."),
+                    *ChestYards[YardIndex].ToString(), Sites.Num(), BreakerSupplyChest::ChestsPerYard);
+            }
+            const TArray<BreakerSupplyChest::FBreakerChestSite> Picked = BreakerSupplyChest::PickChestSites(
+                Sites, static_cast<int32>(BreakerSupplyChest::Mix(ChestSeed, YardIndex)),
+                BreakerSupplyChest::ChestsPerYard);
+            for (int32 Index = 0; Index < Picked.Num(); ++Index)
             {
                 const int32 Salt = YardIndex * 16 + Index;
-                const float Fraction = BreakerSupplyChest::PlacementFraction(ChestSeed, Salt);
-                const float Lateral = BreakerSupplyChest::PlacementLateral(ChestSeed, Salt, Field.BandHalfWidthCm);
-                const FVector Desired = FVector(Origin2D.X, Origin2D.Y, 0)
-                    + Forward * FMath::Lerp(Field.BandNearCm, Field.BandFarCm, Fraction)
-                    + Right * Lateral;
+                const FVector Desired = Picked[Index].Location;
                 FHitResult Floor;
                 FCollisionQueryParams Query(SCENE_QUERY_STAT(FernhallChestFloor), false);
-                if (!World->LineTraceSingleByObjectType(Floor, Desired + FVector(0, 0, 3000),
+                // From just above the site's ground, not from the sky: a bay
+                // has a roof, and a trace dropped through it would stand the
+                // chest on top of the bay.
+                if (!World->LineTraceSingleByObjectType(Floor,
+                        Desired + FVector(0, 0, BreakerSupplyChest::SiteTraceHeightCm),
                         Desired - FVector(0, 0, 3000), FCollisionObjectQueryParams(ECC_WorldStatic), Query)
                     || Floor.ImpactNormal.Z < 0.7f)
                 {
-                    continue;   // rolled onto nothing walkable; that chest is simply not there
+                    UE_LOG(LogTemp, Display, TEXT("[Fernhall] chest site behind '%s' has no walkable floor at %s."),
+                        *Picked[Index].Cover.ToString(), *Desired.ToString());
+                    continue;   // that chest is simply not there
                 }
                 const float Height = ChestBody->GetScaledCapsuleHalfHeight();
                 const FVector At = Floor.ImpactPoint + FVector(0, 0, Height + 2.0f);

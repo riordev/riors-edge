@@ -21,6 +21,12 @@ synth default's one design rule — the ability cue is the set's only
 rising sweep while all four combat verbs sweep down. The owner A/Bs the
 actual sound.
 
+chest_open.wav is kenney/interface-sounds/open_001.wav verbatim
+(Kenney Interface Sounds, CC0, converted set — see kenney/SOURCES.txt).
+O275: the supply chest's latch, played by the director for the local
+opener. Chosen by name, not by ear; the synth floor under it is a two-tap
+latch and the owner A/Bs the two.
+
 candidates/ holds auditioning copies consumed by NOTHING — no code
 reads this folder and the shipped-samples test names exact files, so
 these are inert until one is renamed over a verb. Kill-confirm

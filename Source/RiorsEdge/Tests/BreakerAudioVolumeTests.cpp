@@ -27,17 +27,17 @@ bool FBreakerAudioVolumeRoutingTest::RunTest(const FString& Parameters)
     if (!TestNotNull(TEXT("Sound director"), Director)) return false;
     TArray<UAudioComponent*> Voices;
     Director->GetComponents(Voices);
-    // THIRTEEN: ten single voices plus the weapon-fire pool of three. The
+    // FOURTEEN: eleven single voices plus the weapon-fire pool of three. The
     // footstep and take-hit voices are gone with the cues they carried
     // (owner, playtest 2026-09-10: "i dont need audio of my character groaning
     // when i take damage (its so fucking annoying same thing with
-    // footsteps)"), and weapon fire went from one voice to a round-robin of
-    // three so a shot stops cutting the previous shot's tail ("ticky"). This
-    // count is not a range being widened to go green — it is the roster, and
-    // the roster moved by decision both times. The ASSERTION it exists for is
-    // the one below: every voice, pool slots included, is routed through the
-    // settings pool.
-    if (!TestEqual(TEXT("All thirteen player cue voices exist"), Voices.Num(), 13)) return false;
+    // footsteps)"), weapon fire went from one voice to a round-robin of
+    // three so a shot stops cutting the previous shot's tail ("ticky"), and
+    // the chest latch joined under O275. This count is not a range being
+    // widened to go green — it is the roster, and the roster moved by
+    // decision each time. The ASSERTION it exists for is the one below: every
+    // voice, pool slots included, is routed through the settings pool.
+    if (!TestEqual(TEXT("All fourteen player cue voices exist"), Voices.Num(), 14)) return false;
     TestFalse(TEXT("Footsteps are gone, not merely silenced"), Voices.ContainsByPredicate([](const UAudioComponent* Voice) { return Voice->GetFName() == TEXT("FootstepVoice"); }));
     TestFalse(TEXT("The take-hit vocal is gone with them"), Voices.ContainsByPredicate([](const UAudioComponent* Voice) { return Voice->GetFName() == TEXT("TakeHitVoice"); }));
     TestFalse(TEXT("The single fire voice is gone, replaced by the pool"), Voices.ContainsByPredicate([](const UAudioComponent* Voice) { return Voice->GetFName() == TEXT("FireVoice"); }));
@@ -52,6 +52,8 @@ bool FBreakerAudioVolumeRoutingTest::RunTest(const FString& Parameters)
     // A level was gained. It routes through the same settings pool as every
     // other cue, which is the whole point of counting them here.
     TestTrue(TEXT("Level-up has its own voice"), Voices.ContainsByPredicate([](const UAudioComponent* Voice) { return Voice->GetFName() == TEXT("LevelUpVoice"); }));
+    // O275: opening a supply chest is a director verb, so it is a routed voice.
+    TestTrue(TEXT("Chest open has its own voice"), Voices.ContainsByPredicate([](const UAudioComponent* Voice) { return Voice->GetFName() == TEXT("ChestVoice"); }));
     UBreakerGameSettings* Settings = NewObject<UBreakerGameSettings>();
     Settings->MasterVolume = 0.5f;
     Settings->EffectsVolume = 0.4f;

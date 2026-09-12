@@ -269,9 +269,8 @@ void BreakerScheduleChestCapture(UWorld* World)
         Controller->SetControlRotation(
             (Nearest->GetActorLocation() - FVector(0.0f, 0.0f, 45.0f) - EyeAt).Rotation());
         if (Controller->PlayerCameraManager) Controller->PlayerCameraManager->UpdateCamera(0.05f);
-        UE_LOG(LogTemp, Display, TEXT("[ChestCapture] %d chests; nearest at %s pays %s"),
-            Found, *Nearest->GetActorLocation().ToString(),
-            Nearest->PaysCurrency() ? TEXT("currency") : TEXT("an item"));
+        UE_LOG(LogTemp, Display, TEXT("[ChestCapture] %d chests; nearest at %s (pays the currency floor and one item, O275)"),
+            Found, *Nearest->GetActorLocation().ToString());
     }), 1.0f, false);
 }
 

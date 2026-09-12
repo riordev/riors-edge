@@ -10,6 +10,8 @@
 #include "Items/BreakerLootPickup.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
+#include "Progression/BreakerRiftRewardMath.h"
+#include "UI/BreakerChestFeedback.h"
 #include "UI/BreakerGlowMaterial.h"
 #include "UI/BreakerUIStyle.h"
 
@@ -102,13 +104,8 @@ void ABreakerSupplyChest::Configure(int32 AreaLevel, int32 Seed)
 {
     if (!HasAuthority() || bConfigured) return;
     bConfigured = true;
-    ItemLevel = FMath::Max(1, AreaLevel);
+    ItemLevel = BreakerSupplyChest::ChestItemLevel(AreaLevel);
     ContentSeed = Seed;
-}
-
-bool ABreakerSupplyChest::PaysCurrency() const
-{
-    return BreakerSupplyChest::PaysCurrency(ContentSeed);
 }
 
 FText ABreakerSupplyChest::GetChestPrompt() const
@@ -139,28 +136,26 @@ bool ABreakerSupplyChest::TryOpen(ABreakerCharacter* Player)
     // Claim before anything can fail: a chest that pays nothing because a spawn
     // failed must not be re-openable for another attempt at the same reward.
     bOpened = true;
+    // O275: opening one is a director verb. GLASS owns the sound; this is the
+    // declared Interaction->UI crossing, on BreakerRift.cpp's precedent.
+    BreakerChestFeedback::PlayOpen(this, Player);
 
-    if (BreakerSupplyChest::PaysCurrency(ContentSeed))
-    {
-        // The shipped currency roll at trash odds. Riftglass is credited
-        // straight to the wallet rather than dropped, because there is no
-        // physical currency pickup in this project and inventing one here
-        // would be a nearest-fit primitive for a thing nobody has ruled on.
-        const FBreakerForgeWallet PerKill = UBreakerDropTableLibrary::RollCurrencyDrop(
-            ContentSeed, ItemLevel, EBreakerMonsterRank::Trash, FBreakerCurrencyDropParams());
-        FBreakerForgeWallet Yield;
-        Yield.Riftglass = BreakerSupplyChest::CurrencyPayout(PerKill.Get(), ItemLevel);
-        Player->GetEquipment()->CreditForgeCurrency(Yield);
-        return true;
-    }
+    // O275: BOTH, always. The currency floor first — credited straight to the
+    // wallet rather than dropped, because there is no physical currency pickup
+    // in this project and inventing one here would be a nearest-fit primitive
+    // for a thing nobody has ruled on. The shipped trash roll is the base the
+    // floor sits under, so a retuned kill number carries the chest with it.
+    const FBreakerForgeWallet PerKill = UBreakerDropTableLibrary::RollCurrencyDrop(
+        ContentSeed, ItemLevel, EBreakerMonsterRank::Trash, FBreakerCurrencyDropParams());
+    FBreakerForgeWallet Yield;
+    Yield.Riftglass = BreakerSupplyChest::CurrencyPayout(PerKill.Get(), ItemLevel);
+    Player->GetEquipment()->CreditForgeCurrency(Yield);
 
-    // AN ITEM, ROLLED AT THE LEAST GENEROUS ODDS THE TABLE OFFERS and then
-    // tempered down. Trash rank, and the player's own Drop Chance is NOT
-    // passed in: a chest is not a kill, and letting gear improve a free reward
-    // is how a stat meant to pay for fighting starts paying for walking.
-    const EBreakerItemRarity Rolled = UBreakerDropTableLibrary::RollGatedRarity(
-        ContentSeed, ItemLevel, EBreakerMonsterRank::Trash, 0.0f, FBreakerDropTableParams());
-    const EBreakerItemRarity Rarity = BreakerSupplyChest::Temper(Rolled, ContentSeed);
+    // AND ONE ITEM AT THE COMPLETION FLOOR — the codebase's one "decent"
+    // rarity, gated by the chest's own item level exactly as a rift's offer
+    // is. Not a roll: the seed picks the slot and the affixes, never whether
+    // the item is worth bending down for.
+    const EBreakerItemRarity Rarity = BreakerRiftReward::CompletionRarity(ItemLevel, FBreakerDropTableParams{});
     const FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(TEXT("SupplyChest"),
         UBreakerLootLibrary::RollDropSlot(ContentSeed), Rarity, ItemLevel, ContentSeed);
     // On the approach side, the same offset the cache uses.

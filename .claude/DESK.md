@@ -52,24 +52,17 @@
   QUESTION: the boss's own floor drop — is the offer the answer, or does a
   rift terminator's loot go to the pack (FIELD)? He said "leave open".
 
-## Cycle — O275 CHESTS
+## O275 CHESTS — LANDED
 
-- [ ] Placement: a site pick off the pieces the yard already has — the far
-      side of each blk_full_* piece (away from the centreline) and the
-      interior of each flr_<tag>_bay slab; the seed picks WHICH sites;
-      floor trace and body clearance stay. No marker vocabulary change.
-      (Game/BreakerGameMode.cpp :4782-4835, Interaction/BreakerSupplyChestMath.h)
-- [ ] Loot: delete Temper/StepDown and the 62/38 split; always one item at
-      BreakerRiftReward::CompletionRarity(ItemLevel) plus CurrencyPayout.
-      (Interaction/BreakerSupplyChest.cpp :149-172, Math.h)
-- [ ] Sound: GLASS PlayChestOpen on the director (chest_open.wav from the
-      Kenney pack copied verbatim + SOURCES line; synth fallback), a
-      UI/BreakerChestFeedback free function on the BreakerRiftFeedback
-      pattern; GROUND makes one call from TryOpen after bOpened. Crossing:
-      Interaction -> UI feedback.
-- [ ] Pins: SupplyChest.Contents re-pinned to the site pick and the floor;
-      shipped-config: an AL5 chest rolls Uncommon, AL9 Exceptional; the
-      synth render and the shipped sample in the audio tests.
+- Chests stand at sites the yard already has — the far face of a
+  full-height break, the interior of a bay — and the seed picks which;
+  the floor trace starts under the bay's roof. Every chest pays the
+  currency floor and one item at the completion floor (Uncommon at AL5,
+  Exceptional from AL8); Temper and the 62/38 split are gone. Opening one
+  plays chest_open.wav (Kenney open_001, synth fallback) through a
+  UI feedback seam. PHOTOGRAPHED: a chest between a planter and a
+  building's shoulder. FOUND: chest items sit outside the drops-per-hour
+  band's count; the chest still faces back down the yard.
 
 ## Cycle — O274 TEARS, A: THE TEAR IS AN EVENT
 

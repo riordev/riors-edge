@@ -43,9 +43,10 @@ bool FBreakerSoundSynthShapeTest::RunTest(const FString& Parameters)
         {TEXT("ReactionCollapse"), .28f, &BreakerSound::RenderReactionCollapse},
         {TEXT("ReactionWither"), .30f, &BreakerSound::RenderReactionWither},
         {TEXT("ReactionTear"), .20f, &BreakerSound::RenderReactionTear},
+        {TEXT("ChestOpen"), BreakerSound::ChestOpenDurationSeconds, &BreakerSound::RenderChestOpen},
     };
     // Every shipped fallback renderer participates in the waveform checks.
-    TestEqual(TEXT("all thirteen authored fallback cues are rendered"), static_cast<int32>(UE_ARRAY_COUNT(Cases)), 13);
+    TestEqual(TEXT("all fourteen authored fallback cues are rendered"), static_cast<int32>(UE_ARRAY_COUNT(Cases)), 14);
 
     for (const FCase& Case : Cases)
     {
@@ -100,6 +101,33 @@ bool FBreakerSoundSynthShapeTest::RunTest(const FString& Parameters)
         TestTrue(FString::Printf(TEXT("PlayerDeath's implied fundamental (%.1f Hz) stays below 200 Hz"), ImpliedHz),
             ImpliedHz < 200.0f);
         TestTrue(TEXT("PlayerDeath is a tone, not a click"), Crossings >= 20);
+    }
+
+    // --- The chest latch (O275): two taps, not one ----------------------------
+    // Shipped figures, and the one structural fact a headless run can prove
+    // about "two clicks 60 ms apart": the second tap is a second ONSET. The
+    // peak inside the 10 ms after the second tap's instant must be louder
+    // than the quietest 10 ms window between the two taps — a single decaying
+    // click would only ever fall across that span.
+    {
+        TestEqual(TEXT("ChestOpen ships at 0.18 s"), BreakerSound::ChestOpenDurationSeconds, 0.18f);
+        TestEqual(TEXT("ChestOpen's second tap lands at 60 ms"), BreakerSound::ChestOpenSecondTapSeconds, 0.06f);
+
+        TArray<int16> Pcm;
+        BreakerSound::RenderChestOpen(Pcm);
+        const int32 Window = BreakerSound::SampleCount(0.010f);
+        const int32 SecondTap = BreakerSound::SampleCount(BreakerSound::ChestOpenSecondTapSeconds);
+        const auto PeakIn = [&Pcm](int32 From, int32 Count)
+        {
+            int32 Peak = 0;
+            for (int32 I = From; I < FMath::Min(From + Count, Pcm.Num()); ++I)
+                Peak = FMath::Max(Peak, FMath::Abs(static_cast<int32>(Pcm[I])));
+            return Peak;
+        };
+        const int32 Lull = PeakIn(SecondTap - Window, Window);
+        const int32 Second = PeakIn(SecondTap, Window);
+        TestTrue(FString::Printf(TEXT("ChestOpen's second tap is an onset (lull %d, tap %d)"), Lull, Second),
+            Second > Lull * 2);
     }
 
     // --- The WAV reader: the sample path's pure half -------------------------
@@ -175,9 +203,10 @@ bool FBreakerSoundSynthShapeTest::RunTest(const FString& Parameters)
     // a format the reader speaks, or the fallback would engage silently over
     // a broken commit.
     //
-    // FOUR: the files the director names eagerly at BeginPlay and that ship.
+    // FIVE: the files the director names eagerly at BeginPlay and that ship.
     // ability_cast.wav joined the day it was authored (a cut from the
-    // converted Kenney set — provenance in SOURCES.txt). take_hit.wav left
+    // converted Kenney set — provenance in SOURCES.txt), and chest_open.wav
+    // (O275) the same way. take_hit.wav left
     // when the take-hit verb was retired (owner, playtest 2026-09-10; the
     // volume routing test records the voice is gone): the file may still sit
     // on disk, but nothing names it, so pinning it asserts nothing about the
@@ -189,13 +218,13 @@ bool FBreakerSoundSynthShapeTest::RunTest(const FString& Parameters)
     // the day one is, under the same condition ability_cast.wav met.
     //
     // weapon_fire.wav is the one on this list that is now actually HEARD: it
-    // is the Rifle's report. The other three are heard on their verbs.
+    // is the Rifle's report. The other four are heard on their verbs.
     {
         const FString AudioDir = FPaths::ProjectContentDir() / TEXT("Breaker/Audio");
         if (IFileManager::Get().DirectoryExists(*AudioDir))
         {
             for (const TCHAR* Name : {TEXT("weapon_fire.wav"), TEXT("hit_confirm.wav"),
-                TEXT("kill_confirm.wav"), TEXT("ability_cast.wav")})
+                TEXT("kill_confirm.wav"), TEXT("ability_cast.wav"), TEXT("chest_open.wav")})
             {
                 TArray<uint8> Bytes;
                 TestTrue(FString::Printf(TEXT("%s ships"), Name),

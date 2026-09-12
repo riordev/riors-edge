@@ -42,6 +42,7 @@ ABreakerSoundDirector::ABreakerSoundDirector()
     AbilityVoice = MakeVoice(TEXT("AbilityVoice"));
     PlayerDeathVoice = MakeVoice(TEXT("PlayerDeathVoice"));
     LevelUpVoice = MakeVoice(TEXT("LevelUpVoice"));
+    ChestVoice = MakeVoice(TEXT("ChestVoice"));
     EntropyVoice = MakeVoice(TEXT("EntropyVoice"));
     VoidMarkVoice = MakeVoice(TEXT("VoidMarkVoice"));
     RiftVoice = MakeVoice(TEXT("RiftVoice"));
@@ -114,6 +115,9 @@ void ABreakerSoundDirector::BeginPlay()
     // The sixth verb (O193): one low cue at the death beat's cut to black.
     const int32 PlayerDeathRate = LoadOrSynth(TEXT("player_death.wav"), &BreakerSound::RenderPlayerDeath, PlayerDeathPcm);
     const int32 LevelUpRate = LoadOrSynth(TEXT("level_up.wav"), &BreakerSound::RenderLevelUp, LevelUpPcm);
+    // O275: the supply chest's latch. Ships as a Kenney cut; the synth's
+    // two-tap render is its floor.
+    const int32 ChestRate = LoadOrSynth(TEXT("chest_open.wav"), &BreakerSound::RenderChestOpen, ChestPcm);
     const int32 EntropyRate = LoadOrSynth(TEXT("entropy_activate.wav"), &BreakerSound::RenderEntropyActivation, EntropyPcm);
 
     // One wave per pool slot, seeded at the shared clip's rate; PlayWeaponFire
@@ -135,6 +139,8 @@ void ABreakerSoundDirector::BeginPlay()
     PlayerDeathVoice->SetSound(PlayerDeathWave);
     LevelUpWave = MakeWave(LevelUpRate);
     LevelUpVoice->SetSound(LevelUpWave);
+    ChestWave = MakeWave(ChestRate);
+    ChestVoice->SetSound(ChestWave);
     EntropyWave = MakeWave(EntropyRate);
     EntropyVoice->SetSound(EntropyWave);
     VoidMarkWave = MakeWave(LoadOrSynth(TEXT("void_activate.wav"), &BreakerSound::RenderVoidActivation, VoidMarkPcm));
@@ -154,8 +160,8 @@ void ABreakerSoundDirector::ApplyVolumeSettings(float Master, float Effects)
     // EVERY voice this actor owns, not a hand-kept list of twelve. The list
     // was the drift: adding the level-up cue left it silent-but-full-volume
     // — routed nowhere, ignoring the settings the player set — and only the
-    // volume assertion in the routing test caught it. A thirteenth verb is
-    // now correct by construction, and the test still pins the roster by name
+    // volume assertion in the routing test caught it. The next verb is
+    // correct by construction, and the test still pins the roster by name
     // and by count so a MISSING voice is still a red.
     TArray<UAudioComponent*> Voices;
     GetComponents(Voices);
@@ -409,3 +415,4 @@ void ABreakerSoundDirector::PlayHitConfirm() { Trigger(HitVoice, HitWave, HitPcm
 void ABreakerSoundDirector::PlayKill()       { Trigger(KillVoice, KillWave, KillPcm); }
 void ABreakerSoundDirector::PlayPlayerDeath() { Trigger(PlayerDeathVoice, PlayerDeathWave, PlayerDeathPcm); }
 void ABreakerSoundDirector::PlayLevelUp() { Trigger(LevelUpVoice, LevelUpWave, LevelUpPcm); }
+void ABreakerSoundDirector::PlayChestOpen() { Trigger(ChestVoice, ChestWave, ChestPcm); }

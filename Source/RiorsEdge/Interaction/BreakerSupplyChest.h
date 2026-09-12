@@ -40,10 +40,6 @@ public:
     bool IsOpened() const { return bOpened; }
     FText GetChestPrompt() const;
 
-    // Whether this chest will pay currency rather than an item. Answerable
-    // before it is opened because the contents are a pure function of the seed
-    // — which is what lets a test walk the distribution without a world.
-    bool PaysCurrency() const;
 
     // HOW A CHEST IS FOUND. Measured, not guessed: replaying the owner's own
     // session seed put four of six chests 14 to 19 metres off a lane he walks
