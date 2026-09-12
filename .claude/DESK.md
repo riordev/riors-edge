@@ -90,17 +90,17 @@
   siding's nine level-6 kills are reachable before the first turn-in;
   what that does to the contract's worth is his to feel.
 
-## Cycle — O273 BOSSES, A: THE RING
+## O273 BOSSES, A — LANDED
 
-- [ ] BreakerBossEnemy: HoldRingCm (~900, under the Lattice's 900 floor)
-      + hysteresis, classified with the shipped band classifier before
-      Super::TickEngagedBehaviour: Hold = stand, face, HOLDING; Advance =
-      Super walks; Retreat (inside SweepRange) = Super sweeps/slams. No
-      lunge. BreakerBossPhases: GetPhaseHoldRing, identity.
-- [ ] Pins: Combat.Boss.HoldRing (Hold at 600, Advance at 1200, Retreat at
-      300; HoldRingCm > SlamRadiusCm; HoldRingCm < the Lattice's
-      MinEngagementDistance); a runtime stand-still on the ArrivalRing
-      pattern.
+- A boss holds a ring at 800 cm (+100 hysteresis, reaching exactly the
+  Lattice's 900 floor), faces, and says HOLDING; beyond it it walks as a
+  Warden; inside sweep range it fights as one; the slam's own 650 gate
+  still fires from the hold, so a player at 400 is slammed and a player at
+  700 is stared at. Hold routes through the Warden's tick and cancels the
+  walk after it (the slam/sweep wind-ups own their frames). The phase
+  library owns the ring (identity until C). HoldRing (pure) and
+  HoldRingRuntime pin it. A player at 650-900 cannot be punished until
+  the volley (B) — by design of the split.
 
 ## Cycle — O274 TEARS, B: AUTHORED MOUTHS
 

@@ -236,6 +236,14 @@ public:
     UFUNCTION(BlueprintPure, Category="Boss|Phases")
     static float GetPhaseSlamCooldown(EBreakerBossPhase Phase, float BaseCooldown, const FBreakerBossPhaseParams& Params);
 
+    // The standoff ring this phase holds (O273). Identity in every phase for
+    // now: O273 says phases tighten the ring, and that is cycle C's rewrite,
+    // which lands here as a params term rather than on the actor. The actor
+    // reads its ring through this and nowhere else, so the day it varies is
+    // one edit and one test.
+    UFUNCTION(BlueprintPure, Category="Boss|Phases")
+    static float GetPhaseHoldRing(EBreakerBossPhase Phase, float BaseRingCm, const FBreakerBossPhaseParams& Params);
+
     // The rear weak point is exposed during an order raise in phases 1 and 2,
     // and PERMANENTLY in phase 3 — because it has stopped commanding. §3.4's
     // unstated narrative beat: "it fights hardest when it stops being a

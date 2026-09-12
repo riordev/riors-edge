@@ -74,6 +74,40 @@ public:
     UFUNCTION(BlueprintPure, Category="Boss") bool IsApparatusExposed() const;
     UFUNCTION(BlueprintPure, Category="Boss") int32 GetOrdersGiven() const { return OrdersGiven; }
 
+    // --- The standoff ring (O273) -----------------------------------------
+    // A boss holds a ring and faces the player; it closes only to punish, and
+    // the slam is its only closer. The Warden it inherits walks at the player
+    // whenever it is outside sweep range; the boss does not. Between the
+    // sweep's reach and this ring it stands, faces, and lets the slam's own
+    // distance gate decide whether it is punished. Beyond the ring it walks
+    // as a Warden walks; inside sweep range it fights as a Warden fights.
+    //
+    // 800 plus the hysteresis reaches exactly the Lattice's
+    // MinEngagementDistance (900), so the phase-2 gallery Lattices keep their
+    // band outside the boss's ring even at its widest, and it sits ABOVE
+    // SlamRadiusCm (650), so the boss never holds a
+    // station its own slam cannot reach — a ring wider than the slam would be a
+    // boss that neither closes nor punishes. Both are pinned by
+    // RiorsEdge.Combat.Boss.HoldRing. Cycle C varies this by phase through
+    // UBreakerBossPhaseLibrary::GetPhaseHoldRing; the actor reads it only
+    // through GetHoldRingCm.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Boss|Ring", meta=(ClampMin="0"))
+    float HoldRingCm = 800.0f;   // O2 PLACEHOLDER (O273)
+    // The band's deadband, the same purpose as the Lattice's BandHysteresis: a
+    // player strafing on the ring's edge must not flip the boss between
+    // walking and standing every frame. Clamped by ClassifyBand to half the
+    // band, so it can never swallow either edge.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Boss|Ring", meta=(ClampMin="0"))
+    float HoldRingHysteresisCm = 100.0f;   // O2 PLACEHOLDER (O273)
+
+    // This phase's ring, read through the pure library so a phase that
+    // tightens it (cycle C) is one rewrite in one place.
+    UFUNCTION(BlueprintPure, Category="Boss") float GetHoldRingCm() const;
+    // Which band the ring put this body in on its last engaged frame. Written
+    // in exactly one statement in TickEngagedBehaviour, so a band that is not
+    // the default after an engaged frame is proof the ring ran.
+    UFUNCTION(BlueprintPure, Category="Boss") EBreakerRangedBand GetHoldBand() const { return HoldBand; }
+
     // The boss vocabulary Data/missions.json's "boss" field and the gym's
     // -BreakerBossOnStart=<name> / Breaker.Boss <name> speak: one line per
     // shipped boss class, null for a name nothing ships. The mission loader
@@ -199,6 +233,10 @@ private:
 
     EBreakerBossPhase Phase = EBreakerBossPhase::Deployment;
     EBreakerBossOrder ActiveOrder = EBreakerBossOrder::None;
+    // The ring's band with hysteresis (O273). Advance is the default for the
+    // same reason it is the Lattice's: a body that has not yet measured the
+    // player is walking, not standing.
+    EBreakerRangedBand HoldBand = EBreakerRangedBand::Advance;
     FVector ApparatusRestLocation = FVector::ZeroVector;
     FVector PendingOrderOffset = FVector::ZeroVector;
     float TimeSinceLastOrder = 0.0f;

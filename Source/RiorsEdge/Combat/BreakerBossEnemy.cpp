@@ -502,15 +502,64 @@ void ABreakerBossEnemy::TickEngagedBehaviour(AActor* Player, float Distance, flo
         return;
     }
 
+    // THE STANDOFF RING (O273). The inner edge is the SWEEP's reach, not the
+    // slam's: a player at 400 is inside the slam (650) and outside the sweep
+    // (320), and O273 wants that player stood at and punished, not walked at.
+    // So Hold spans sweep range to the ring, and the slam's own distance gate
+    // inside the Warden's tick decides the punish. The band is written here
+    // and nowhere else; the ring is read through the phase library.
+    const FVector ToPlayer = (Player->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+    HoldBand = UBreakerRangedBehaviorLibrary::ClassifyBand(Distance,
+        SweepRangeCm, GetHoldRingCm(), HoldRingHysteresisCm, HoldBand);
+
     // Otherwise it is a Warden. Same sweep, same slam, same facing armour, same
     // telegraphs — the player is not asked to learn a second melee vocabulary.
+    //
+    // Super runs in EVERY band, Hold included, because the slam's arm check
+    // and both wind-ups live inside it and nowhere else: a Hold that skipped
+    // Super would be a boss that never slams a player at 400, which is the
+    // one closer O273 grants it. Advance walks as today; Retreat (inside
+    // sweep range) sweeps and slams as today.
     Super::TickEngagedBehaviour(Player, Distance, DeltaSeconds, OutDirection, OutSpeedScale);
+
+    // HOLD: the walk Super wrote is cancelled unless an attack owns the frame.
+    // The Warden's arrival ring classified Advance (Distance is beyond its
+    // AttackRange = SweepRangeCm) and handed the mover a goal on the sweep
+    // ring; both are taken back. A slam or sweep wind-up already planted the
+    // body and set its own label, and a committed attack is never overwritten
+    // — the ring governs the walk, not a tell the player has been shown. The
+    // Warden's slam arm (Distance <= SlamRadiusCm, off cooldown) therefore
+    // still fires from Hold at 400 on its own cadence, and that is the whole
+    // sentence: it closes only to punish, and the slam is its only closer.
+    //
+    // The predicate is "inside the ring, the Warden's ring said walk in", not
+    // "the band is Hold": the Retreat band carries its own deadband above
+    // sweep range (320 to 420 with the shipped hysteresis), and a player who
+    // stepped back out through it would otherwise be followed one deadband's
+    // width by a boss whose only closer is the slam. The Warden's own Hold
+    // (ATTACK at the sweep ring) and Retreat (BACK OFF inside its inner edge)
+    // are left standing: neither is a closing walk.
+    const bool bAttackOwnsFrame = bSlamWindup || bSweepWindup;
+    const bool bInsideRing = HoldBand != EBreakerRangedBand::Advance;
+    const bool bWardenWalksIn = GetArrivalBand() == EBreakerRangedBand::Advance;
+    if (!bAttackOwnsFrame && bInsideRing && bWardenWalksIn)
+    {
+        OutDirection = FVector::ZeroVector;
+        bHasPathGoal = false;
+        DesiredFacing = ToPlayer;
+        StateLabel = TEXT("HOLDING");
+    }
     // §3.4 phase 2: "the boss also begins rotating to face the player
     // continuously", so the rear weak point must be earned by out-turning it.
     // The Warden already always faces; what changes is that in phase 1 it is
     // slow enough to walk around and in phase 3 it is not.
     StateLabel = FString::Printf(TEXT("%s / %s"),
         *UBreakerBossPhaseLibrary::GetPhaseName(Phase), *StateLabel);
+}
+
+float ABreakerBossEnemy::GetHoldRingCm() const
+{
+    return UBreakerBossPhaseLibrary::GetPhaseHoldRing(Phase, HoldRingCm, PhaseParams);
 }
 
 void ABreakerBossEnemy::BeginOrder()

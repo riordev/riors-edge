@@ -118,6 +118,13 @@ float UBreakerBossPhaseLibrary::GetPhaseSlamCooldown(EBreakerBossPhase Phase, fl
         ? FMath::Max(0.0f, Params.CommitmentSlamCooldownSeconds) : BaseCooldown;
 }
 
+float UBreakerBossPhaseLibrary::GetPhaseHoldRing(EBreakerBossPhase Phase, float BaseRingCm, const FBreakerBossPhaseParams& Params)
+{
+    // Cycle A of O273: the ring only. Every phase holds the authored ring;
+    // cycle C tightens it per phase and that rewrite replaces this line.
+    return BaseRingCm;
+}
+
 bool UBreakerBossPhaseLibrary::IsApparatusExposed(EBreakerBossPhase Phase, bool bOrderRaiseActive)
 {
     if (Phase == EBreakerBossPhase::Commitment) return true;
