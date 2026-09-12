@@ -73,35 +73,32 @@ bool FBreakerCasterContinuationRuntimeTest::RunTest(const FString& Parameters)
     Shot.ImpactPoint = FVector(500, 0, 0);
     auto Fire = [&] { const float Before = Mana->GetMana(); Player->GetWeapon()->OnShot.Broadcast(Shot); Mana->AdvanceLoop(1); return Mana->GetMana() - Before; };
     TestEqual(TEXT("No Close node uses baseline weapon income"), Fire(), 1.5f);
+    // O272: Close is a single rank carrying the former rank-two reach.
     if (!Buy(Blade, TEXT("Caster.Spellblade.Close"))) return false;
-    TestEqual(TEXT("Close doubles income inside six metres"), Fire(), 3.0f);
+    TestEqual(TEXT("Close doubles income inside five metres"), Fire(), 3.0f);
     Shot.ImpactPoint.X = 800;
-    TestEqual(TEXT("Rank one excludes distant hit"), Fire(), 1.5f);
-    if (!Buy(Blade, TEXT("Caster.Spellblade.Close"))) return false;
-    TestEqual(TEXT("Rank two reaches nine metres"), Fire(), 3.0f);
+    TestEqual(TEXT("single rank reaches nine metres"), Fire(), 3.0f);
     Shot.DamageResult.bDodged = true;
     TestEqual(TEXT("Dodge pays no baseline or Close income"), Fire(), 0.0f);
     Shot.DamageResult.bDodged = false;
     TestEqual(TEXT("Default Overcast floor"), Mana->GetOvercastFloor(), -20.0f);
     if (!Buy(Blade, TEXT("Caster.Spellblade.ContactCharge"))) return false;
-    for (int32 Rank = 1; Rank <= 2; ++Rank)
-    {
-        if (!Buy(Blade, TEXT("Caster.Spellblade.Debt"))) return false;
-        Mana->AdvanceLoop(0.01f);
-        TestEqual(TEXT("Purchased Debt reaches published ability-cost floor"), Player->GetAttributes()->GetClassResourceFloor(), -20.0f - Rank * 10.0f);
-    }
+    // O272: Debt is a single rank carrying the former rank-two floor.
+    if (!Buy(Blade, TEXT("Caster.Spellblade.Debt"))) return false;
+    Mana->AdvanceLoop(0.01f);
+    TestEqual(TEXT("Purchased Debt reaches published ability-cost floor"), Player->GetAttributes()->GetClassResourceFloor(), -40.0f);
     FBreakerDamageRequest Melee;
     Melee.BaseDamage = 20; Melee.bCanCritical = false; Melee.bBypassShield = true;
     Melee.SetInstigator(Player); Melee.SourceTags.AddTag(BreakerAbilityTags::Damage_Melee.GetTag());
     Player->GetAttributes()->ApplyHealth(50); Player->GetAttributes()->ApplyClassResource(-10);
     Target->FindComponentByClass<UBreakerCombatComponent>()->ReceiveDamage(Melee);
     TestEqual(TEXT("Negative Mana alone does not heal"), Player->GetAttributes()->GetHealth(), 50.0f);
-    for (int32 Rank = 1; Rank <= 2; ++Rank)
+    // O272: Bloodprice is a single rank carrying the former rank-two fraction.
+    if (!Buy(Blade, TEXT("Caster.Spellblade.Bloodprice"))) return false;
     {
-        if (!Buy(Blade, TEXT("Caster.Spellblade.Bloodprice"))) return false;
         const float Before = Player->GetAttributes()->GetHealth();
         const FBreakerDamageResult Hit = Target->FindComponentByClass<UBreakerCombatComponent>()->ReceiveDamage(Melee);
-        TestEqual(TEXT("Bloodprice heals fraction of actual melee damage"), Player->GetAttributes()->GetHealth() - Before, Hit.HealthDamage * Rank * 0.1f, 0.001f);
+        TestEqual(TEXT("Bloodprice heals a fifth of actual melee damage"), Player->GetAttributes()->GetHealth() - Before, Hit.HealthDamage * 0.2f, 0.001f);
     }
     const float BeforeExclusions = Player->GetAttributes()->GetHealth();
     Melee.bIsDamageOverTime = true;
@@ -122,31 +119,35 @@ bool FBreakerCasterContinuationRuntimeTest::RunTest(const FString& Parameters)
     Player->GetAttributes()->ApplyClassResource(0);
     FBreakerShotResult Miss; Miss.bFired = true;
     Player->GetWeapon()->OnShot.Broadcast(Miss);
-    Mana->AdvanceLoop(3.5f); Mana->AdvanceLoop(1);
-    TestEqual(TEXT("Miss resets Patience and crossing frame grants only eligible half-second additive bonus"), Mana->GetMana(), 4.5f * 6.0f + .5f * 1.0f);
-    if (!Buy(Void, TEXT("Caster.VoidWhisperer.Patience"))) return false;
+    // O272: the single rank's idle delay is two seconds, so the crossing
+    // frame is the one that runs 1.5 s to 2.5 s after the miss.
+    Mana->AdvanceLoop(1.5f); Mana->AdvanceLoop(1);
+    TestEqual(TEXT("Miss resets Patience and crossing frame grants only eligible half-second additive bonus"), Mana->GetMana(), 2.5f * 6.0f + .5f * 1.0f);
     Player->GetAttributes()->ApplyClassResource(0); Player->GetWeapon()->OnShot.Broadcast(Miss); Mana->AdvanceLoop(3);
-    TestEqual(TEXT("Rank two idle threshold is two seconds"), Mana->GetMana(), 3.0f * 6.0f + 1.0f);
+    TestEqual(TEXT("single-rank idle threshold is two seconds"), Mana->GetMana(), 3.0f * 6.0f + 1.0f);
     Mana->PassiveRegenPerSecond = 0;
     UAbilitySystemComponent* ASC = Player->GetAbilitySystemComponent();
     const FGameplayAbilitySpecHandle Siphon = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Siphon::StaticClass(), 1));
-    for (int32 Rank = 0; Rank <= 2; ++Rank)
+    // O272: Drain is a single rank at the former rank-two threshold (0.15),
+    // so twelve damage on a hundred health interrupts unowned and passes owned.
+    for (int32 Rank = 0; Rank <= 1; ++Rank)
     {
         if (Rank && !Buy(Void, TEXT("Caster.VoidWhisperer.Drain"))) return false;
         Player->GetAttributes()->ApplyClassResource(100); Player->GetAttributes()->ApplyHealth(100);
         if (!TestTrue(TEXT("Actual Siphon channel activates"), ASC->TryActivateAbility(Siphon))) return false;
         BreakerResolvePendingCast(World, Player);
-        FBreakerDamageRequest Incoming; Incoming.BaseDamage = Rank == 2 ? 12 : 8;
+        FBreakerDamageRequest Incoming; Incoming.BaseDamage = 12;
         Incoming.bCanCritical = false; Incoming.bBypassShield = true;
         Player->GetCombat()->ReceiveDamage(Incoming);
         TestEqual(TEXT("Purchased Drain changes live channel interruption"), ASC->FindAbilitySpecFromHandle(Siphon)->IsActive(), Rank > 0);
         Incoming.BaseDamage = 30; Player->GetCombat()->ReceiveDamage(Incoming);
-        TestFalse(TEXT("Large damage still interrupts every Drain rank"), ASC->FindAbilitySpecFromHandle(Siphon)->IsActive());
+        TestFalse(TEXT("Large damage still interrupts with Drain"), ASC->FindAbilitySpecFromHandle(Siphon)->IsActive());
     }
     Player->Destroy(); Player = BreakerCasterContinuation::Caster(World); Mana = Player->GetMana();
     UBreakerStatusComponent* Status = Target->FindComponentByClass<UBreakerStatusComponent>();
     const UBreakerProgressionTree* Multi = UBreakerProgressionLibrary::GetCasterMultispellTree();
-    for (int32 Rank = 0; Rank <= 2; ++Rank)
+    // O272: Variance is a single rank carrying the former rank-two income.
+    for (int32 Rank = 0; Rank <= 1; ++Rank)
     {
         if (Rank && !Buy(Multi, TEXT("Caster.Multispell.Variance"))) return false;
         Status->ConsumeAllStatuses();
@@ -154,7 +155,7 @@ bool FBreakerCasterContinuationRuntimeTest::RunTest(const FString& Parameters)
         Spec.Duration = 4; Spec.TickInterval = 1; Spec.BaseDamagePerTick = 1;
         const float Before = Mana->GetMana();
         Status->ApplyStatus(Spec, EBreakerDamageFamily::Physical, Player); Mana->AdvanceLoop(1);
-        TestEqual(TEXT("Variance ranks scale only a new type"), Mana->GetMana() - Before, 2.0f * (Rank + 1));
+        TestEqual(TEXT("Variance scales only a new type"), Mana->GetMana() - Before, Rank ? 6.0f : 2.0f);
         const float After = Mana->GetMana(); Status->ApplyStatus(Spec, EBreakerDamageFamily::Physical, Player); Mana->AdvanceLoop(1);
         TestEqual(TEXT("Variance never pays a refresh"), Mana->GetMana(), After);
     }
@@ -162,7 +163,7 @@ bool FBreakerCasterContinuationRuntimeTest::RunTest(const FString& Parameters)
     Status->ConsumeAllStatuses();
     FBreakerStatusApplicationSpec Spec; Spec.StatusTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Poison")); Spec.Duration = 4; Spec.TickInterval = 1;
     const float BeforeStack = Mana->GetMana(); Status->ApplyStatus(Spec, EBreakerDamageFamily::Physical, Player); Mana->AdvanceLoop(2);
-    TestEqual(TEXT("Seep and Variance share one baseline plus bonuses"), Mana->GetMana() - BeforeStack, 7.0f);
+    TestEqual(TEXT("Seep and Variance share one baseline plus bonuses"), Mana->GetMana() - BeforeStack, 8.0f);
     return true;
 }
 #endif

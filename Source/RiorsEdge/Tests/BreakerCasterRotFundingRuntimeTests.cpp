@@ -72,11 +72,11 @@ bool FBreakerCasterRotFundingRuntimeTest::RunTest(const FString& Parameters)
         for(const auto& Flag:UBreakerMissionLibrary::BeatCompletionFlags(Beat))Flags.Add(Flag);
     Progression->SettleDoctrineEntitlement(Flags);
     const auto* Tree=UBreakerProgressionLibrary::GetCasterVoidWhispererTree();
-    for(const TCHAR* Id:{TEXT("Caster.VoidWhisperer.Seep"),TEXT("Caster.VoidWhisperer.StandingWater"),TEXT("Caster.VoidWhisperer.Patience"),TEXT("Caster.VoidWhisperer.Lingering"),TEXT("Caster.VoidWhisperer.Attrition"),TEXT("Caster.VoidWhisperer.Drain")})
-        if(!TestTrue(TEXT("Real six-point path"),Progression->PurchaseNode(Tree,Id,Reason)))return false;
+    // O272: Long Debt is a one-point single gated only on its pair, Drain.
+    if(!TestTrue(TEXT("Real Drain purchase"),Progression->PurchaseNode(Tree,TEXT("Caster.VoidWhisperer.Drain"),Reason)))return false;
     TestEqual(TEXT("Before purchase existing penalty"),Combat->GetComposedIncomingDamageMultiplier(),1.15f,.001f);
     if(!Progression->PurchaseNode(Tree,TEXT("Caster.VoidWhisperer.LongDebt"),Reason))return false;
-    TestEqual(TEXT("Real eight-point route spends wallet"),Progression->GetUnspentPoints(Tree->Currency),0);
+    TestEqual(TEXT("Real two-point route leaves six of eight"),Progression->GetUnspentPoints(Tree->Currency),6);
     TestEqual(TEXT("Live negative acquisition replaces penalty"),Combat->GetComposedIncomingDamageMultiplier(),1.25f,.001f);
     FBreakerDamageRequest Incoming;Incoming.BaseDamage=1;Incoming.bCanCritical=false;Incoming.bCanBeAvoided=false;Incoming.DamageFamily=EBreakerDamageFamily::TrueDamage;
     TestEqual(TEXT("Actual native incoming hit"),Combat->ReceiveDamage(Incoming).HealthDamage,1.25f,.001f);
@@ -104,7 +104,8 @@ bool FBreakerCasterRotFundingRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Respec removes lifetime rule for future hits"),BreakerCasterStatusRules::RotLifetimeMultiplier(Player),1.f);
     TestEqual(TEXT("Existing duration snapshot survives respec"),Status->GetActiveStatuses()[0].Spec.Duration,Duration);
     TestEqual(TEXT("Existing funding survives source changes"),Status->GetActiveStatuses()[0].InitialDamageBudget,Budget);
-    for(const TCHAR* Id:{TEXT("Caster.VoidWhisperer.Seep"),TEXT("Caster.VoidWhisperer.StandingWater"),TEXT("Caster.VoidWhisperer.Patience"),TEXT("Caster.VoidWhisperer.Attrition"),TEXT("Caster.VoidWhisperer.Zonework"),TEXT("Caster.VoidWhisperer.SnapshotDiscipline")})
+    // O272: Snapshot Discipline is a one-point single gated only on its pair, Seep.
+    for(const TCHAR* Id:{TEXT("Caster.VoidWhisperer.Seep"),TEXT("Caster.VoidWhisperer.SnapshotDiscipline")})
         if(!Progression->PurchaseNode(Tree,Id,Reason))return false;
     bool Found=false;Status->ConsumeStatus(Rot,Found);Target->GetCombat()->RestoreVitals();
     Hit.CriticalChance=.1f; // O2 PLACEHOLDER, deterministic kernel critical boundary.

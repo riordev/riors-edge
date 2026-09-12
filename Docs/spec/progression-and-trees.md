@@ -60,7 +60,7 @@ changed only at the Forge. There are no mutually exclusive tiers anywhere.
 ever.** This is the structural decision the point budgets exist to produce. On
 the Core side it is arithmetic on the pool: a third keystone costs more than the
 pool holds. On the doctrine side it is the shape of the wallet — eight points,
-four picks of two, and the keystone is one of them.
+four pairs of two, and the keystone pair is one of them.
 
 **Tree More multipliers belong to Core convergences.** The strongest three
 applicable gear/tree Mores share one ceiling; no slot is reserved for either
@@ -206,31 +206,26 @@ the first lane — the only way to build a two-notable splash with no keystone.
 
 Three doctrines per class, one committed to per character, changed only at the
 Forge. A doctrine is the subclass: committing grants a visible identity as well
-as mechanics. A doctrine offers **12 nodes** with tier gates at
-0 / 2 / 4 / 6 invested. The keystone is an ordinary tier-4 node: gated at 6
-invested, costing 2, with no cornerstone gate of its own.
+as mechanics. **A doctrine offers 12 nodes as six pairs.** A travel node —
+single rank, one point, one scaling magnitude — unlocks its impactful node —
+single rank, one point, a rule. No node has a second rank. No pair is gated,
+so any pair may be bought first and each benchmark's two points land one whole
+pair. The keystone is the impactful half of its own pair and the one gated
+node: six invested, then one point.
 
-**Every doctrine node costs two points to reach its last rank**, so eight
-divides into exactly four picks and nothing is stranded. That is the shape the
-budget is for, and it is why the keystone costs what every other pick costs: it
-competes with the tier-4 rewrites for the last of the four rather than sitting
-above them.
+**A doctrine's budget is eight points, earned two at each of four campaign
+benchmarks.** Commitment selects the branch and pays nothing. Eight against
+twelve buys four pairs and declines two; the keystone pair is the fourth by
+arithmetic, since its gate is the six points the first three pairs cost.
 
-**A doctrine's budget is eight points, earned two at each of four campaign benchmarks.**
-Commitment selects the branch and pays nothing. Eight against roughly twenty-four
-offered leaves most of a doctrine declined.
-
-Spellblade's No Distance costs two points after six invested and Momentum Transfer.
-It raises Closequarter's authored cost to50 before ordinary cost modifiers and permits
-the existing arrival refund against any target health; it grants no damage More.
-Reprisal costs two after six invested and Bloodprice: a surviving passive block
-grants one free Cleave within two seconds. A refused cast keeps the opportunity;
-committing consumes it before callbacks. Death, expiry and respec clear it.
-Multispell's Interference costs two after six invested and Resonance; it selects
-Resonance's authored fixed-per-status curve with its three-status threshold bonus.
-
-The eight-point budget leaves one two-point tier-four choice after six earlier
-points. It does not buy a complete doctrine; prerequisites still gate each choice.
+Spellblade's No Distance is Close's impactful: it raises Closequarter's authored
+cost to 50 before ordinary cost modifiers and permits the existing arrival
+refund against any target health; it grants no damage More. Reprisal is
+Bloodprice's: a surviving passive block grants one free Cleave within two
+seconds. A refused cast keeps the opportunity; committing consumes it before
+callbacks. Death, expiry and respec clear it. Multispell's Interference is
+Variance's; it selects Resonance's authored fixed-per-status curve with its
+three-status threshold bonus. A pair costs two, one per node.
 
 **A doctrine authors no More multiplier.** Core and eligible gear rewrites compete
 for the three slots. A doctrine pays in conversion, conditions and rule rewrites.
@@ -292,8 +287,6 @@ It does not own:
 
 ## Open
 
-- The class branch tier shape: the shipped four-tier gating, or the 26-point
-  five-tier target. Decided together with density.
 - Where the Core tree's hub sits, or whether it keeps one — a hub that is one
   of the axes privileges that axis.
 - Whether the conditional-payout ratio differs by condition count. The stated

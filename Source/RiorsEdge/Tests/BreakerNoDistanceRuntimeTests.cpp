@@ -78,7 +78,9 @@ bool FBreakerNoDistanceRuntimeTest::RunTest(const FString& Parameters)
     const FName NodeId(TEXT("Caster.Spellblade.NoDistance"));
     const auto* Node=Tree->FindNode(NodeId);
     if (!TestNotNull(TEXT("Shipped No Distance exists"),Node)) return false;
-    TestEqual(TEXT("Tier four"),Node->Tier,4); TestEqual(TEXT("Two points"),Node->CostPerRank,2); TestEqual(TEXT("One rank"),Node->MaxRank,1);
+    // O272: No Distance is the impactful half of Close's pair.
+    TestEqual(TEXT("Tier one"),Node->Tier,1); TestEqual(TEXT("One point"),Node->CostPerRank,1); TestEqual(TEXT("One rank"),Node->MaxRank,1);
+    TestEqual(TEXT("No investment gate"),Node->RequiredTreeInvestment,0);
     TestFalse(TEXT("Does not replace cornerstone"),Node->bCornerstone);
     TestFalse(TEXT("Cannot buy before campaign entitlement"),Progression->PurchaseNode(Tree,NodeId,Reason));
     FBreakerQuestFlagSet Flags;
@@ -87,11 +89,10 @@ bool FBreakerNoDistanceRuntimeTest::RunTest(const FString& Parameters)
             for (const auto& Flag : UBreakerMissionLibrary::BeatCompletionFlags(Beat)) Flags.Add(Flag);
     Progression->SettleDoctrineEntitlement(Flags);
     TestEqual(TEXT("Authored campaign grants eight points"),Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),8);
-    TestFalse(TEXT("Wallet alone cannot bypass prerequisite and investment"),Progression->PurchaseNode(Tree,NodeId,Reason));
-    for (const TCHAR* Id : {TEXT("Caster.Spellblade.ContactCharge"),TEXT("Caster.Spellblade.FollowThrough"),TEXT("Caster.Spellblade.Close"),TEXT("Caster.Spellblade.Debt"),TEXT("Caster.Spellblade.MomentumTransfer"),TEXT("Caster.Spellblade.Bloodprice")})
-        if (!TestTrue(TEXT("Campaign-funded prerequisite purchase"),Progression->PurchaseNode(Tree,Id,Reason))) return false;
-    if (!TestTrue(TEXT("Tier four fits actual eight-point entitlement"),Progression->PurchaseNode(Tree,NodeId,Reason))) return false;
-    TestEqual(TEXT("Purchase spends actual full entitlement"),Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),0);
+    TestFalse(TEXT("Wallet alone cannot bypass the travel prerequisite"),Progression->PurchaseNode(Tree,NodeId,Reason));
+    if (!TestTrue(TEXT("Campaign-funded travel purchase"),Progression->PurchaseNode(Tree,TEXT("Caster.Spellblade.Close"),Reason))) return false;
+    if (!TestTrue(TEXT("The pair fits one benchmark's two points"),Progression->PurchaseNode(Tree,NodeId,Reason))) return false;
+    TestEqual(TEXT("The pair spends two of the eight"),Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),6);
     if (!CastClosequarter(50,15)) return false;
     Caster->SetActorLocation(Origin,false);
     const float Floor=Caster->GetAttributes()->GetClassResourceFloor();

@@ -86,13 +86,20 @@ bool FBreakerCascadeRuntimeTest::RunTest(const FString& Parameters)
             TestEqual(TEXT("Fracture acquisition spends one earned token"), Progression->GetUnspentAbilityTokens(), Tokens - 1);
         }
         if (!TestTrue(TEXT("Unmake is an unlocked class ultimate"), Progression->IsAbilityUnlocked(TEXT("Caster.Unmake")))) return false;
-        for (const TCHAR* Node : { TEXT("Caster.Multispell.Reservoir"), TEXT("Caster.Multispell.Reservoir"),
-            TEXT("Caster.Multispell.Variance"), TEXT("Caster.Multispell.Variance"),
-            TEXT("Caster.Multispell.Chain"), TEXT("Caster.Multispell.Sequence") })
+        // O272: six single-rank, one-point nodes reach the keystone's
+        // six-invested gate. Cycle, Fracture and ConductorRule are deliberately
+        // NOT among them: Cycle moves the cursor on hit rather than on cast,
+        // Fracture carries two positions per projectile, and ConductorRule
+        // throttles reactions — each would change what this fixture measures
+        // (cursor position after two casts, one Poison per impact, echo timing).
+        // Chain stays so the zero-proc neighbour assertion below is live.
+        for (const TCHAR* Node : { TEXT("Caster.Multispell.Variance"), TEXT("Caster.Multispell.Reservoir"),
+            TEXT("Caster.Multispell.Chain"), TEXT("Caster.Multispell.Payment"),
+            TEXT("Caster.Multispell.Sequence"), TEXT("Caster.Multispell.Prepared") })
             if (!TestTrue(Node, Progression->PurchaseNode(Tree, Node, Reason))) return false;
         if (!TestTrue(TEXT("actual branch commitment"), Progression->CommitToBranch(Tree->TreeId, Reason))) return false;
         if (!TestTrue(TEXT("actual Cascade purchase"), Progression->PurchaseNode(Tree, TEXT("Caster.Multispell.Cascade"), Reason))) return false;
-        TestEqual(TEXT("Cascade path spends exactly eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
+        TestEqual(TEXT("Cascade path spends seven of eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 1);
         if (!TestTrue(TEXT("purchased keystone reaches GAS"), ASC->HasMatchingGameplayTag(BreakerAbilityTags::Keystone_Caster_Cascade.GetTag()))) return false;
         auto* Mana = Caster->GetMana();
         Mana->BindAttributes(Caster->GetAttributes());

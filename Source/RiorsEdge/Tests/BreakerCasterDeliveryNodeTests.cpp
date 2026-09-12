@@ -79,8 +79,7 @@ bool FBreakerChainDeliveryRuntimeTest::RunTest(const FString& Parameters)
             UBreakerProgressionLibrary::GetCoreSliceTree(), Entry, Error))) return false;
     if (!TestTrue(TEXT("Actual Linger purchase supplies nonunit duration scaling"), Player->GetProgression()->PurchaseNode(
         UBreakerProgressionLibrary::GetCoreSliceTree(), TEXT("Core.Affliction.Linger"), Error))) return false;
-    for (int32 Rank = 0; Rank < 2; ++Rank)
-        if (!TestTrue(TEXT("Actual Variance prerequisite purchase"), Player->GetProgression()->PurchaseNode(Tree, TEXT("Caster.Multispell.Variance"), Error))) return false;
+    // O272: Chain is a travel node with no prerequisite; it is bought alone below.
     AActor* First = Target(World, FVector(500, 0, 0));
     AActor* Second = Target(World, FVector(500, 300, 0));
     AActor* Third = Target(World, FVector(500, 500, 0));
@@ -114,10 +113,10 @@ bool FBreakerChainDeliveryRuntimeTest::RunTest(const FString& Parameters)
     B->ConsumeAllStatuses(); C->ConsumeAllStatuses();
     Second->SetActorLocation(FVector(500, 750, 0)); Third->SetActorLocation(FVector(500, 1500, 0));
     A->ApplyStatus(Bleed, EBreakerDamageFamily::Physical, Player);
-    TestFalse(TEXT("Rank one cannot reach 7.5 m"), B->HasStatus(Bleed.StatusTag));
-    if (!TestTrue(TEXT("Actual second Chain rank"), Player->GetProgression()->PurchaseNode(Tree, TEXT("Caster.Multispell.Chain"), Error))) return false;
-    A->ApplyStatus(Bleed, EBreakerDamageFamily::Physical, Player);
-    TestTrue(TEXT("Rank two extends actual spread reach"), B->HasStatus(Bleed.StatusTag));
+    // O272: Chain has one rank and its reach is 900 cm from that purchase.
+    // The former "rank one cannot reach 7.5 m, rank two can" pair is gone
+    // with the second rank.
+    TestTrue(TEXT("Single-rank Chain reaches 7.5 m"), B->HasStatus(Bleed.StatusTag));
     B->ConsumeAllStatuses();
     AActor* Wall = Target(World, FVector(500, 350, 0));
     Wall->FindComponentByClass<UBreakerStatusComponent>()->DestroyComponent();
@@ -150,8 +149,8 @@ bool FBreakerMomentumTransferRuntimeTest::RunTest(const FString& Parameters)
     Combat->DodgeChance = 1; Combat->BlockChance = 1;
     const UBreakerProgressionTree* Tree = UBreakerProgressionLibrary::GetCasterSpellbladeTree();
     FText Error;
-    for (int32 Rank = 0; Rank < 2; ++Rank)
-        if (!TestTrue(TEXT("Actual Follow Through prerequisite purchase"), Player->GetProgression()->PurchaseNode(Tree, TEXT("Caster.Spellblade.FollowThrough"), Error))) return false;
+    // O272: Momentum Transfer is a travel node with no prerequisite and one
+    // rank; its 3 s window is what the single purchase grants.
     if (!TestTrue(TEXT("Actual Momentum Transfer purchase"), Player->GetProgression()->PurchaseNode(Tree, TEXT("Caster.Spellblade.MomentumTransfer"), Error))) return false;
     UAbilitySystemComponent* ASC = Player->GetAbilitySystemComponent();
     const FGameplayAbilitySpecHandle Ability = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Closequarter::StaticClass(), 1));

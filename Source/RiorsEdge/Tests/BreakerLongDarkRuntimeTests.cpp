@@ -77,13 +77,17 @@ bool FBreakerLongDarkRuntimeTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("authored entitlement is eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 8);
         FText Reason;
         const auto* Tree = UBreakerProgressionLibrary::GetCasterVoidWhispererTree();
-        for (const TCHAR* Node : { TEXT("Caster.VoidWhisperer.Seep"), TEXT("Caster.VoidWhisperer.Seep"),
-            TEXT("Caster.VoidWhisperer.StandingWater"), TEXT("Caster.VoidWhisperer.StandingWater"),
-            TEXT("Caster.VoidWhisperer.Attrition"), TEXT("Caster.VoidWhisperer.Attrition") })
+        // O272: the keystone gates on six invested points, and every other
+        // node is a one-point single, so six distinct singles reach it. Every
+        // lifetime read below is relative to a value read live, so Lingering's
+        // longer puddle changes none of them.
+        for (const TCHAR* Node : { TEXT("Caster.VoidWhisperer.Patience"), TEXT("Caster.VoidWhisperer.Seep"),
+            TEXT("Caster.VoidWhisperer.StandingWater"), TEXT("Caster.VoidWhisperer.Lingering"),
+            TEXT("Caster.VoidWhisperer.Attrition"), TEXT("Caster.VoidWhisperer.Drain") })
             if (!TestTrue(Node, Progression->PurchaseNode(Tree, Node, Reason))) return false;
         if (!TestTrue(TEXT("actual Void Whisperer commitment"), Progression->CommitToBranch(Tree->TreeId, Reason))) return false;
         if (!TestTrue(TEXT("actual Long Dark purchase"), Progression->PurchaseNode(Tree, TEXT("Caster.VoidWhisperer.LongDark"), Reason))) return false;
-        TestEqual(TEXT("Long Dark spends all eight points"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
+        TestEqual(TEXT("six singles and the one-point keystone leave one of eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 1);
         if (!Progression->IsAbilityUnlocked(TEXT("Caster.Rot")))
             if (!TestTrue(TEXT("level-earned token unlocks Rot"), Progression->SpendAbilityToken(TEXT("Caster.Rot"), Reason))) return false;
         if (!TestTrue(TEXT("class ultimate is actually unlocked"), Progression->IsAbilityUnlocked(TEXT("Caster.Unmake")))) return false;

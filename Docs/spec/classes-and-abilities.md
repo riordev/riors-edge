@@ -57,7 +57,7 @@ it does not restate it.
 
 ## The model
 
-Each Caster doctrine offers twelve nodes, twenty-four points and four final-tier choices against eight spendable points. Overreach makes Caster abilities, including Unmake, free while Mana is negative and replaces the incoming penalty with30%. Prepared lowers the existing Overcast floor to at most-35; ordinary capped income and recovery remain. Both magnitudes are O2 placeholders in `Data/caster-resource.json`. Death ends every Unmake variant's window and generation suspension before respawn.
+Each Caster doctrine offers twelve nodes in six pairs, twelve points, against eight spendable; four pairs are bought. Overreach makes Caster abilities, including Unmake, free while Mana is negative and replaces the incoming penalty with30%. Prepared lowers the existing Overcast floor to at most-35; ordinary capped income and recovery remain. Both magnitudes are O2 placeholders in `Data/caster-resource.json`. Death ends every Unmake variant's window and generation suspension before respawn.
 
 Cascade echoes the next physical status in Fracture's shared cycle, skipping elemental buildup entries. Echoes have zero proc and cannot echo again. The
 ultimate includes targets spawned during its window; closing that window, death or loss of Cascade cancels queued echoes.
@@ -65,8 +65,8 @@ ultimate includes targets spawned during its window; closing that window, death 
 Long Dark pauses the lifetime of owned zones placed during its Unmake window. Damage and membership continue. That window ending, owner death or loss of
 the keystone releases the pause; later ultimates cannot rearm an old zone. Refreshing a zone placed before the window does not acquire this pause.
 
-Lingering rank two expands a refreshed overlapping Rot by one metre once per zone. New zones start at their ordinary radius; further refreshes do not grow
-them again. The footprint and affected enemies use the expanded radius.
+Lingering: a Rot cast over a live one lands one metre wider; Wellspring's following puddle grows the same metre once on renewal. Further renewals do not
+grow it again. The footprint and affected enemies use the expanded radius.
 
 Resonance deals an untyped Elemental detonation based on status count. It does not apply elemental buildup or reactions. Its preservation node halves status
 durations instead of consuming them; this also reduces unpaid Rot damage.

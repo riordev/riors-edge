@@ -48,9 +48,10 @@ bool FBreakerSnapshotDisciplineRuntimeTest::RunTest(const FString& Parameters)
         for(const auto& Flag:UBreakerMissionLibrary::BeatCompletionFlags(Beat))Flags.Add(Flag);
     Progression->SettleDoctrineEntitlement(Flags);FText Reason;
     const auto* Tree=UBreakerProgressionLibrary::GetCasterVoidWhispererTree();
-    for(const TCHAR* Id:{TEXT("Caster.VoidWhisperer.Seep"),TEXT("Caster.VoidWhisperer.StandingWater"),TEXT("Caster.VoidWhisperer.Patience"),TEXT("Caster.VoidWhisperer.Attrition"),TEXT("Caster.VoidWhisperer.Zonework"),TEXT("Caster.VoidWhisperer.SnapshotDiscipline")})
-        if(!TestTrue(TEXT("Actual eight-point Snapshot Discipline route"),Progression->PurchaseNode(Tree,Id,Reason)))return false;
-    TestEqual(TEXT("No free doctrine entitlement"),Progression->GetUnspentPoints(Tree->Currency),0);
+    // O272: Snapshot Discipline is a one-point single gated only on its pair, Seep.
+    for(const TCHAR* Id:{TEXT("Caster.VoidWhisperer.Seep"),TEXT("Caster.VoidWhisperer.SnapshotDiscipline")})
+        if(!TestTrue(TEXT("Actual two-point Snapshot Discipline route"),Progression->PurchaseNode(Tree,Id,Reason)))return false;
+    TestEqual(TEXT("No free doctrine entitlement: two of eight spent"),Progression->GetUnspentPoints(Tree->Currency),6);
     auto* Zone=World->SpawnActor<ABreakerZoneActor>();if(!Zone)return false;
     FBreakerZoneSpec ZoneSpec;ZoneSpec.RadiusCm=200;ZoneSpec.Duration=10; // O2 PLACEHOLDER, geometry fixture.
     Zone->SetActorLocation(Player->GetActorLocation());Zone->ConfigureZone(ZoneSpec,Player);

@@ -52,7 +52,7 @@ bool FBreakerCasterBurstRuntimeTest::RunTest(const FString& Parameters)
         const bool bPatience = Mode >= 4;
         const bool bFracture = (Mode % 2) == 1 || bPatience;
         const bool bRot = Mode == 2 || Mode == 3 || Mode == 5;
-        const FString Label = FString::Printf(TEXT("ilvl%d area%d %s%s%s"), Depth, Depth, bFracture ? TEXT("Fracture") : TEXT("Rifle"), bRot ? TEXT("+Rot") : TEXT(""), bPatience ? TEXT("+Patience2") : TEXT(""));
+        const FString Label = FString::Printf(TEXT("ilvl%d area%d %s%s%s"), Depth, Depth, bFracture ? TEXT("Fracture") : TEXT("Rifle"), bRot ? TEXT("+Rot") : TEXT(""), bPatience ? TEXT("+Patience") : TEXT(""));
         const FVector Origin(Scenario++ * 10000.0f, 0, 100);
         FActorSpawnParameters Spawn;
         Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -81,9 +81,9 @@ bool FBreakerCasterBurstRuntimeTest::RunTest(const FString& Parameters)
             Player->GetProgression()->SettleDoctrineEntitlement(Flags);
             TestEqual(TEXT("first benchmark supplies exactly two Doctrine points"), Player->GetProgression()->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 2);
             FText Reason;
-            for (int32 Rank = 0; Rank < 2; ++Rank)
-                if (!TestTrue(TEXT("purchases authored Patience rank through normal gates"), Player->GetProgression()->PurchaseNode(
-                    UBreakerProgressionLibrary::GetCasterVoidWhispererTree(), TEXT("Caster.VoidWhisperer.Patience"), Reason))) return false;
+            // O272: Patience is a single rank; one of the two points buys it.
+            if (!TestTrue(TEXT("purchases authored Patience through normal gates"), Player->GetProgression()->PurchaseNode(
+                UBreakerProgressionLibrary::GetCasterVoidWhispererTree(), TEXT("Caster.VoidWhisperer.Patience"), Reason))) return false;
         }
         FBreakerItemInstance Rifle;
         for (int32 Seed = 1; Seed <= 4096; ++Seed)
@@ -233,7 +233,7 @@ bool FBreakerCasterBurstRuntimeTest::RunTest(const FString& Parameters)
             else
             {
                 // Identical level/gear/input and optional opening Rot. The
-                // existing fixture buys only Patience with two earned Doctrine;
+                // existing fixture buys only Patience with one of two earned Doctrine;
                 // compare resource-paid casts after the initial bank, not DPS
                 // parity, a damage multiplier, or a claimed human clear time.
                 const int32* Baseline = BaselineSustainedCasts.Find(SustainKey);

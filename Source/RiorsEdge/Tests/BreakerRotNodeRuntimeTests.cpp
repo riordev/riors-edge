@@ -90,26 +90,24 @@ bool FBreakerRotNodesRuntimeTest::RunTest(const FString& Parameters)
     ABreakerZoneActor* Other = Zone(Plain);
     Mana->AdvanceLoop(1);
     TestEqual(TEXT("unowned Standing Water pays nothing"), Mana->GetMana(), 0.0f);
+    // O272: Standing Water is a single rank paying four Mana a second.
     if (!Buy(TEXT("Caster.VoidWhisperer.StandingWater"))) return false;
     Mana->AdvanceLoop(1);
-    TestEqual(TEXT("two bodies and overlapping zones pay one rank-one stream"), Mana->GetMana(), 2.0f);
-    if (!Buy(TEXT("Caster.VoidWhisperer.StandingWater"))) return false;
-    Mana->AdvanceLoop(1);
-    TestEqual(TEXT("rank two stream"), Mana->GetMana(), 6.0f);
+    TestEqual(TEXT("two bodies and overlapping zones pay one single-rank stream"), Mana->GetMana(), 4.0f);
     First->ReleaseAllOccupants(); Other->ReleaseAllOccupants();
     Plain.Duration = 0.25f;
     ABreakerZoneActor* Short = Zone(Plain);
     Mana->AdvanceLoop(1);
-    TestEqual(TEXT("income is clipped to remaining zone lifetime"), Mana->GetMana(), 7.0f);
+    TestEqual(TEXT("income is clipped to remaining zone lifetime"), Mana->GetMana(), 5.0f);
     Short->AdvanceZone(1); Mana->AdvanceLoop(1);
-    TestEqual(TEXT("expired zone pays nothing"), Mana->GetMana(), 7.0f);
+    TestEqual(TEXT("expired zone pays nothing"), Mana->GetMana(), 5.0f);
     Plain.Duration = 10;
     ABreakerZoneActor* Live = Zone(Plain);
     FBreakerDamageRequest Kill; Kill.BaseDamage = 2000; Kill.bCanCritical = false;
     Enemy->FindComponentByClass<UBreakerCombatComponent>()->ReceiveDamage(Kill);
     Second->FindComponentByClass<UBreakerCombatComponent>()->ReceiveDamage(Kill);
     Mana->AdvanceLoop(1);
-    TestEqual(TEXT("corpses never occupy income stream"), Mana->GetMana(), 7.0f);
+    TestEqual(TEXT("corpses never occupy income stream"), Mana->GetMana(), 5.0f);
     Live->ReleaseAllOccupants();
     FText RespecReason;
     if (!TestTrue(TEXT("real respec reuses the same eight-point fixture budget"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, true, RespecReason))
@@ -161,10 +159,11 @@ bool FBreakerRotNodesRuntimeTest::RunTest(const FString& Parameters)
     TestNull(TEXT("unowned self aim stays ground zone"), Baseline->GetFollowActor());
     TestEqual(TEXT("unowned Zonework adds nothing"), Baseline->GetSpec().AfflictedArmorReduction, 0.0f);
     Baseline->ReleaseAllOccupants(); Baseline->Destroy();
-    // Two tier-one investments unlock tier two; four total unlock tier three.
-    // Both tier-three nodes cost two, using exactly the same eight-point pool.
-    if (!Buy(TEXT("Caster.VoidWhisperer.Seep")) || !Buy(TEXT("Caster.VoidWhisperer.Lingering"))
-        || !Buy(TEXT("Caster.VoidWhisperer.Attrition")) || !Buy(TEXT("Caster.VoidWhisperer.Wellspring"))
+    // O272: every non-keystone node is a one-point single with no tree gate;
+    // each pair's second node needs only its first. Standing Water is already
+    // owned from the respec above, so Wellspring, Lingering and Zonework make
+    // four of the eight-point pool.
+    if (!Buy(TEXT("Caster.VoidWhisperer.Wellspring")) || !Buy(TEXT("Caster.VoidWhisperer.Lingering"))
         || !Buy(TEXT("Caster.VoidWhisperer.Zonework"))) return false;
     ABreakerZoneActor* Mobile = CastRot();
     if (!TestNotNull(TEXT("purchased cast zone"), Mobile)) return false;
@@ -197,28 +196,26 @@ bool FBreakerRotNodesRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("leaving strong zone retains only weaker overlap"), EnemyCombat->GetComposedArmorReduction(), 40.0f);
     Weak->ReleaseAllOccupants();
     TestEqual(TEXT("final zone exit releases strip"), EnemyCombat->GetComposedArmorReduction(), 0.0f);
-    // Lingering R2's metre. O271 made a recast spawn rather than merge, so
-    // the following puddle's renewal is the one refresh a zone still gets
-    // and the one place R2 pays. The eight-point pool is the game's whole
-    // doctrine grant (O111), so the rank is bought after a respec on the
-    // nodes the follow path needs: Seep, Standing Water (Lingering's
-    // prerequisite), Lingering x2, Attrition, Wellspring — seven of eight.
-    FText R2Reason;
-    if (!TestTrue(TEXT("respec for the Lingering rank-two proof"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, true, R2Reason))
-        || !Buy(TEXT("Caster.VoidWhisperer.Seep")) || !Buy(TEXT("Caster.VoidWhisperer.StandingWater"))
-        || !Buy(TEXT("Caster.VoidWhisperer.Lingering"))
-        || !Buy(TEXT("Caster.VoidWhisperer.Lingering")) || !Buy(TEXT("Caster.VoidWhisperer.Attrition"))
-        || !Buy(TEXT("Caster.VoidWhisperer.Wellspring"))) return false;
-    TestEqual(TEXT("Lingering is rank two"), Progression->GetNodeRank(TEXT("Caster.VoidWhisperer.Lingering"), EBreakerPointCurrency::DoctrinePoints), 2);
+    // Lingering's metre. O271 made a recast spawn rather than merge, so the
+    // following puddle's renewal is the one refresh a zone still gets and
+    // the one place Lingering pays; O272 makes it a single rank, so the rule
+    // fires at rank one. Bought after a respec on the nodes the follow path
+    // needs: Standing Water (Lingering's pair), Wellspring, Lingering —
+    // three of eight.
+    FText LingeringReason;
+    if (!TestTrue(TEXT("respec for the Lingering proof"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, true, LingeringReason))
+        || !Buy(TEXT("Caster.VoidWhisperer.StandingWater")) || !Buy(TEXT("Caster.VoidWhisperer.Wellspring"))
+        || !Buy(TEXT("Caster.VoidWhisperer.Lingering"))) return false;
+    TestEqual(TEXT("Lingering is rank one"), Progression->GetNodeRank(TEXT("Caster.VoidWhisperer.Lingering"), EBreakerPointCurrency::DoctrinePoints), 1);
     Mobile->ReleaseAllOccupants(); Mobile->Destroy();
     Player->SetActorLocation(FVector(0, 0, 0));
     ABreakerZoneActor* Grown = CastRot();
-    if (!TestNotNull(TEXT("rank-two following zone"), Grown)) return false;
+    if (!TestNotNull(TEXT("single-rank following zone"), Grown)) return false;
     TestEqual(TEXT("it follows the caster"), Grown->GetFollowActor(), static_cast<AActor*>(Player));
     const float FollowRadius = Grown->GetSpec().RadiusCm;
     Grown->AdvanceZone(1);
     TestEqual(TEXT("a recast renews the following zone"), CastRot(), Grown);
-    TestEqual(TEXT("rank two grows it by the authored metre"),
+    TestEqual(TEXT("rank one grows it by the authored metre"),
         Grown->GetSpec().RadiusCm, FollowRadius + GetDefault<UBreakerAbility_Rot>()->LingeringRefreshGrowthCm, 0.01f);
     Grown->AdvanceZone(1);
     TestEqual(TEXT("a further renewal still renews it"), CastRot(), Grown);

@@ -103,46 +103,41 @@ bool FBreakerSequenceRuntimeTest::RunTest(const FString& Parameters)
     Triple(Baseline);
     SettleOrdinaryIncome();
     TestEqual(TEXT("three real types without Sequence pay only ordinary capped income"), Mana->GetMana(), 6.0f);
-    if (!Buy(TEXT("Caster.Multispell.Reservoir")) || !Buy(TEXT("Caster.Multispell.Reservoir"))
-        || !Buy(TEXT("Caster.Multispell.Sequence"))) return false;
+    // O272: Sequence is a single-rank travel node with no prerequisite; its
+    // 15 Mana lump is what the one purchase grants. The former rank-two block
+    // (a second purchase lifting the lump from 10 to 15) is folded into these
+    // single-rank figures.
+    if (!Buy(TEXT("Caster.Multispell.Sequence"))) return false;
     ResetIncome();
     UBreakerStatusComponent* First = Target();
-    if (!TestNotNull(TEXT("rank one real target"), First)) return false;
+    if (!TestNotNull(TEXT("purchased Sequence real target"), First)) return false;
     Apply(First, 0); Apply(First, 0);
     // The same production event also announces unrelated XP/loadout changes;
-    // an unchanged Sequence rank must preserve an in-progress rotation.
+    // an unchanged Sequence purchase must preserve an in-progress rotation.
     Progression->OnProgressionChanged.Broadcast();
     Apply(First, 1);
     SettleOrdinaryIncome();
     TestEqual(TEXT("repeated type cannot masquerade as third distinct application"), Mana->GetMana(), 4.0f);
     Apply(First, 2);
-    TestEqual(TEXT("third real type pays rank-one lump immediately"), Mana->GetMana(), 14.0f);
+    TestEqual(TEXT("third real type pays the fifteen lump immediately, before ordinary queued income"), Mana->GetMana(), 19.0f);
     SettleOrdinaryIncome();
-    TestEqual(TEXT("rank one lump sum is visible beyond ordinary six-per-second cap"), Mana->GetMana(), 16.0f);
+    TestEqual(TEXT("lump sum is visible beyond ordinary six-per-second cap"), Mana->GetMana(), 21.0f);
     Triple(First);
     SettleOrdinaryIncome();
-    TestEqual(TEXT("same-target immediate repeat cannot pay twice"), Mana->GetMana(), 16.0f);
+    TestEqual(TEXT("same-target immediate repeat cannot pay twice"), Mana->GetMana(), 21.0f);
     UBreakerStatusComponent* Independent = Target();
     if (!TestNotNull(TEXT("independent target"), Independent)) return false;
     Triple(Independent);
-    TestEqual(TEXT("another target owns an independent immediate Sequence cooldown"), Mana->GetMana(), 26.0f);
+    TestEqual(TEXT("another target owns an independent immediate Sequence cooldown"), Mana->GetMana(), 36.0f);
     SettleOrdinaryIncome();
-    TestEqual(TEXT("second target ordinary applications retain their own metered income"), Mana->GetMana(), 32.0f);
+    TestEqual(TEXT("second target ordinary applications retain their own metered income"), Mana->GetMana(), 42.0f);
     Advance(202);
     First->AdvanceStatuses(4.0f); // Real Rot expires before another threshold application.
     SettleOrdinaryIncome(); // Drain real tick income before measuring the new rotation.
     Player->GetAttributes()->ApplyClassResource(0);
     Triple(First);
     SettleOrdinaryIncome();
-    TestEqual(TEXT("physical refresh plus newly earned Rot pays after cooldown"), Mana->GetMana(), 12.0f);
-    if (!Buy(TEXT("Caster.Multispell.Sequence"))) return false;
-    ResetIncome();
-    UBreakerStatusComponent* RankTwo = Target();
-    if (!TestNotNull(TEXT("rank two target"), RankTwo)) return false;
-    Triple(RankTwo);
-    TestEqual(TEXT("rank two lump pays before ordinary queued income"), Mana->GetMana(), 15.0f);
-    SettleOrdinaryIncome();
-    TestEqual(TEXT("purchased rank two upgrades only lump sum to fifteen"), Mana->GetMana(), 21.0f);
+    TestEqual(TEXT("physical refresh plus newly earned Rot pays after cooldown"), Mana->GetMana(), 17.0f);
     ResetIncome();
     UBreakerStatusComponent* SplitA = Target(); UBreakerStatusComponent* SplitB = Target();
     if (!TestNotNull(TEXT("split A"), SplitA) || !TestNotNull(TEXT("split B"), SplitB)) return false;
@@ -194,8 +189,7 @@ bool FBreakerSequenceRuntimeTest::RunTest(const FString& Parameters)
     Triple(Respecced);
     SettleOrdinaryIncome();
     TestEqual(TEXT("removed node leaves baseline income only"), Mana->GetMana(), 6.0f);
-    if (!Buy(TEXT("Caster.Multispell.Reservoir")) || !Buy(TEXT("Caster.Multispell.Reservoir"))
-        || !Buy(TEXT("Caster.Multispell.Sequence"))) return false;
+    if (!Buy(TEXT("Caster.Multispell.Sequence"))) return false;
     ResetIncome();
     UBreakerStatusComponent* CorpseSource = Target();
     if (!TestNotNull(TEXT("dead applier target"), CorpseSource)) return false;

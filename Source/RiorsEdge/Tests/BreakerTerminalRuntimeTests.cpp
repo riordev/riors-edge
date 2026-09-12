@@ -39,10 +39,10 @@ bool FBreakerTerminalRuntimeTest::RunTest(const FString& Parameters)
     Progression->SettleDoctrineEntitlement(Flags);
     FText Reason;
     const auto* Tree=UBreakerProgressionLibrary::GetCasterVoidWhispererTree();
-    for(const TCHAR* Id:{TEXT("Caster.VoidWhisperer.Seep"),TEXT("Caster.VoidWhisperer.StandingWater"),TEXT("Caster.VoidWhisperer.Patience"),TEXT("Caster.VoidWhisperer.Lingering"),TEXT("Caster.VoidWhisperer.Attrition"),TEXT("Caster.VoidWhisperer.Drain")})
-        if(!TestTrue(TEXT("Real six-point path"),Progression->PurchaseNode(Tree,Id,Reason)))return false;
+    // O272: Terminal is a one-point single gated only on its pair, Attrition.
+    if(!TestTrue(TEXT("Real Attrition purchase"),Progression->PurchaseNode(Tree,TEXT("Caster.VoidWhisperer.Attrition"),Reason)))return false;
     if(!TestTrue(TEXT("Paid Terminal purchase"),Progression->PurchaseNode(Tree,TEXT("Caster.VoidWhisperer.Terminal"),Reason)))return false;
-    TestEqual(TEXT("Eight Doctrine points spent"),Progression->GetUnspentPoints(Tree->Currency),0);
+    TestEqual(TEXT("Two of eight Doctrine points spent"),Progression->GetUnspentPoints(Tree->Currency),6);
     auto MakeTarget=[&]() {
         auto* T=World->SpawnActor<ABreakerCharacter>();
         if(!T)return T;

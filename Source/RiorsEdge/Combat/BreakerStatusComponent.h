@@ -75,8 +75,10 @@ class RIORSEDGE_API UBreakerStatusComponent : public UActorComponent
 
 public:
     static void SnapshotAilmentRules(FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator);
-    // O2 PLACEHOLDER: Chain's rank buys reach, never extra generations.
-    UPROPERTY(EditDefaultsOnly, Category="Status|Chain") float ChainRankOneRangeCm = 600.0f;
+    // O2 PLACEHOLDER: Chain buys reach, never extra generations. Under
+    // O272 the node is single-rank and rank one carries the old rank-two
+    // reach; the rank-two field stays for the reader's shape.
+    UPROPERTY(EditDefaultsOnly, Category="Status|Chain") float ChainRankOneRangeCm = 900.0f;
     UPROPERTY(EditDefaultsOnly, Category="Status|Chain") float ChainRankTwoRangeCm = 900.0f;
     // O2 PLACEHOLDER: authored Terminal low-health threshold.
     UPROPERTY(EditDefaultsOnly, Category="Status|Terminal", meta=(ClampMin="0", ClampMax="1")) float TerminalHealthFraction = .25f;

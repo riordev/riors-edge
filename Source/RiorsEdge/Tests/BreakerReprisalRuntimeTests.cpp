@@ -86,8 +86,10 @@ bool FBreakerReprisalRuntimeTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Unowned Reprisal does not arm from block"),Combat->HasReprisalCharge());
     const auto* Tree=UBreakerProgressionLibrary::GetCasterSpellbladeTree(); const FName Reprisal(TEXT("Caster.Spellblade.Reprisal"));
     const auto* Node=Tree->FindNode(Reprisal); if(!TestNotNull(TEXT("Authored Reprisal node"),Node)) return false;
-    TestEqual(TEXT("Tier four"),Node->Tier,4);TestEqual(TEXT("One rank"),Node->MaxRank,1);TestEqual(TEXT("Two points"),Node->CostPerRank,2);
-    TestEqual(TEXT("Recovered tier-four path has one prerequisite"),Node->Prerequisites.Num(),1);
+    // O272: Reprisal is the impactful half of Bloodprice's pair.
+    TestEqual(TEXT("Tier one"),Node->Tier,1);TestEqual(TEXT("One rank"),Node->MaxRank,1);TestEqual(TEXT("One point"),Node->CostPerRank,1);
+    TestEqual(TEXT("No investment gate"),Node->RequiredTreeInvestment,0);
+    TestEqual(TEXT("The pair has one prerequisite"),Node->Prerequisites.Num(),1);
     if(Node->Prerequisites.Num()!=1)return false;
     TestEqual(TEXT("Historical Reprisal follows Bloodprice"),Node->Prerequisites[0].NodeId,FName(TEXT("Caster.Spellblade.Bloodprice")));
     TestEqual(TEXT("One Bloodprice rank opens the path"),Node->Prerequisites[0].RequiredRank,1);
@@ -99,13 +101,12 @@ bool FBreakerReprisalRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Shipped campaign pays eight"),Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),8);
     auto BuyReprisal=[&]()
     {
-        for(const TCHAR* Id:{TEXT("Caster.Spellblade.ContactCharge"),TEXT("Caster.Spellblade.FollowThrough"),TEXT("Caster.Spellblade.Close"),TEXT("Caster.Spellblade.Debt"),TEXT("Caster.Spellblade.MomentumTransfer"),TEXT("Caster.Spellblade.Bloodprice")})
-            if(!Progression->PurchaseNode(Tree,Id,Reason))return false;
+        if(!Progression->PurchaseNode(Tree,TEXT("Caster.Spellblade.Bloodprice"),Reason))return false;
         return Progression->PurchaseNode(Tree,Reprisal,Reason);
     };
-    TestFalse(TEXT("Eight-point wallet cannot bypass investment"),Progression->PurchaseNode(Tree,Reprisal,Reason));
+    TestFalse(TEXT("Eight-point wallet cannot bypass the travel prerequisite"),Progression->PurchaseNode(Tree,Reprisal,Reason));
     if(!BuyReprisal())return false;
-    TestEqual(TEXT("Legitimate route spends eight"),Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),0);
+    TestEqual(TEXT("The pair spends two of the eight"),Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),6);
     if(!EarnPassiveBlock())return false;
     TestTrue(TEXT("Actual passive block arms one free Cleave"),Combat->HasReprisalCharge());
     if(!Mana->TrySpendMana(Mana->GetMana()-Player->GetAttributes()->GetClassResourceFloor()))return false;

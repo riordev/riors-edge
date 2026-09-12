@@ -135,33 +135,28 @@
   slam-armed at once — the ruling as read; his to feel. No runtime pin of
   the three-round fan (no rig drives the boss to 33% without a grant).
 
-## Cycle — O272 DOCTRINE, CASTER
+## O272 DOCTRINE, CASTER — LANDED
 
-- [ ] Progression/BreakerProgressionLibrary.cpp, the three Caster trees:
-      every node MaxRank 1 / cost 1 / tier 1 except the keystone (tier 4,
-      gate 6, cost 1 -> lands at exactly 8); prerequisites become pairs
-      (impactful requires its travel). Void Whisperer pairs: Standing
-      Water->Wellspring, Lingering->Zonework, Attrition->Terminal,
-      Seep->Snapshot Discipline, Drain->Long Debt, Patience->Long Dark.
-      Spellblade and the third tree paired the same way (travel = the
-      collapsed T1/T2 rule nodes, impactful = the T3/T4 nodes, keystone
-      last), every id kept.
-- [ ] Rank-two magnitudes become rank one: Data/caster-resource.json and
-      Data/abilities.json RankOne keys take the RankTwo values; Lingering's
-      +30% duration; the R2 "1 m wider" rule reads rank >= 1
-      (Abilities/BreakerAbility_Rot.cpp, declared KIT crossing). Where a
-      rank-two value is a compiled constant (BreakerManaComponent's
-      Rank >= 2 ? RankTwo : RankOne sites), the reader takes RankTwo at
-      rank one — one declared crossing per file.
-- [ ] Census re-export; status-pins offered-to-spendable floor 3.0 -> 1.5
-      on O272 (a re-pin on a ruling); spec progression-and-trees.md
-      :209-221 and classes-and-abilities.md :60 rewritten present tense.
-- [ ] Tests: the Caster shape/route pins re-pointed (CasterCompleteDoctrine
-      Authoring, CasterTree, CasterRotFunding, RotNode, Lingering,
-      LoopValve NodeContent, every Caster runtime test that buys a second
-      rank); new Progression.Doctrine.FirstBenchmarkReachesAnImpactful for
-      every doctrine tree (asserted for the Caster this cycle, all classes
-      once they land) and Wellspring purchasable with the second point.
+- The three Caster doctrines are six pairs each, twelve single-rank nodes,
+  travel then impactful in the board's order, keystone pair last:
+  VW StandingWater->Wellspring, Lingering->Zonework, Attrition->Terminal,
+  Seep->Snapshot Discipline, Drain->Long Debt, Patience->Long Dark;
+  Spellblade Debt->Overreach, Bloodprice->Reprisal, Momentum Transfer->
+  Blink, Follow Through->Edge, Close->No Distance, Contact Charge->
+  Edgework; Multispell Payment->Resonance, Reservoir->Prepared, Chain->
+  Conductor's Rule, Cycle->Fracture, Variance->Interference, Sequence->
+  Cascade. No gate below the keystone (six invested + commitment, then
+  one point). Rank one carries the old rank-two magnitude: thirteen Data
+  keys, Lingering +30%, Reservoir +24%, Chain reach 900, Cycle's preview
+  at rank one, the metre at rank one. The first benchmark's two points
+  buy Wellspring (FirstBenchmarkReachesAnImpactful, settled through the
+  journal, not granted). 27 test files re-pointed. Census re-exported;
+  offered-to-spendable 1.5 on the ruling; the spec reads as pairs.
+  NOT PHOTOGRAPHED: the menu capture pawn is a Swift; the Caster wheel is
+  his to open. QUESTION: Multispell's Variance->Interference /
+  Sequence->Cascade is the least-change pairing; Sequence->Interference
+  and Variance->Cascade reads as well. FOUND: the keystone's O86 "plus
+  its own two" line now says "plus its own point".
 
 ## Cycle — O272 DOCTRINE, SWIFT
 ## Cycle — O272 DOCTRINE, GUNSMITH

@@ -63,7 +63,9 @@ bool FBreakerInterferenceRuntimeTest::RunTest(const FString& Parameters)
     const FName Interference(TEXT("Caster.Multispell.Interference"));
     const auto* Node=Tree->FindNode(Interference);
     if (!TestNotNull(TEXT("Shipped Interference node"),Node)) return false;
-    TestEqual(TEXT("Tier four"),Node->Tier,4); TestEqual(TEXT("Two points"),Node->CostPerRank,2); TestEqual(TEXT("One rank"),Node->MaxRank,1);
+    // O272: Interference is the impactful half of Variance's pair.
+    TestEqual(TEXT("Tier one"),Node->Tier,1); TestEqual(TEXT("One point"),Node->CostPerRank,1); TestEqual(TEXT("One rank"),Node->MaxRank,1);
+    TestEqual(TEXT("No investment gate"),Node->RequiredTreeInvestment,0);
     TestFalse(TEXT("Ultimate cornerstone preserved"),Node->bCornerstone);
     auto CastCount=[&](int32 Count,bool bFixed,bool bPreserve)
     {
@@ -131,11 +133,14 @@ bool FBreakerInterferenceRuntimeTest::RunTest(const FString& Parameters)
         for(const auto& Flag:UBreakerMissionLibrary::BeatCompletionFlags(Beat)) Flags.Add(Flag);
     Progression->SettleDoctrineEntitlement(Flags);
     TestEqual(TEXT("Actual campaign entitlement is eight"),Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),8);
-    TestFalse(TEXT("Investment and prerequisites still required"),Progression->PurchaseNode(Tree,Interference,Reason));
-    for(const TCHAR* Id:{TEXT("Caster.Multispell.Variance"),TEXT("Caster.Multispell.Cycle"),TEXT("Caster.Multispell.Reservoir"),TEXT("Caster.Multispell.Payment"),TEXT("Caster.Multispell.Resonance")})
+    TestFalse(TEXT("The travel prerequisite is still required"),Progression->PurchaseNode(Tree,Interference,Reason));
+    // Two pairs (O272): Payment -> Resonance is what the preservation and
+    // refund assertions below compose with; Variance -> Interference is the
+    // node under test. Four points of the eight.
+    for(const TCHAR* Id:{TEXT("Caster.Multispell.Payment"),TEXT("Caster.Multispell.Resonance"),TEXT("Caster.Multispell.Variance")})
         if(!Progression->PurchaseNode(Tree,Id,Reason)) return false;
     if(!Progression->PurchaseNode(Tree,Interference,Reason)) return false;
-    TestEqual(TEXT("Complete route costs eight earned points"),Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),0);
+    TestEqual(TEXT("Two pairs cost four earned points"),Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),4);
     if(!CastCount(2,true,true)||!CastCount(3,true,true)) return false;
     // Six distinct live statuses are not currently reachable: five registered
     // types include immediately-paid Unstable. Keep the authored future cap

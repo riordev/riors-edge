@@ -140,9 +140,10 @@ bool FBreakerLoopValveLaneMathTest::RunTest(const FString& Parameters)
     const FBreakerNodeStats RedirectAir = UBreakerProgressionComponent::AggregateStats(Nodes, Redirect, nullptr, Airborne);
     TestEqual(TEXT("Redirect composes the cooldown divisor airborne"), RedirectAir.AbilityCooldownReduction, 1.40f, 0.0001f);
 
-    // Lingering: the AbilityDuration lane, two ranks at +15%/rank.
+    // Lingering: the AbilityDuration lane, one rank at +30 (O272: a travel
+    // node is single-rank and carries what its two ranks used to total).
     TArray<FBreakerNodeRank> Lingering;
-    Lingering.Add({TEXT("Caster.VoidWhisperer.Lingering"), 2});
+    Lingering.Add({TEXT("Caster.VoidWhisperer.Lingering"), 1});
     const FBreakerNodeStats LingeringStats = UBreakerProgressionComponent::AggregateStats(Nodes, Lingering);
     TestEqual(TEXT("Lingering composes the duration multiplier"), LingeringStats.AbilityDurationMultiplier, 1.30f, 0.0001f);
     TestEqual(TEXT("Lingering leaves area alone"), LingeringStats.AbilityAreaMultiplier, 1.0f, 0.0001f);
@@ -303,18 +304,18 @@ bool FBreakerAbilityGeometrySeamTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Cleave's authored arc with no ranks"), Cleave->ComputeEffectiveArcDegrees(Owner), 135.0f, 0.0001f);
     TestEqual(TEXT("Cleave's authored range with no ranks"), Cleave->ComputeEffectiveRangeCm(Owner), 700.0f, 0.0001f);
 
-    // Lingering (VW tree): two ranks of +15% duration reach Rot's zone.
+    // Lingering (VW tree): one rank of +30% duration reaches Rot's zone.
+    // O272: Lingering is a travel root with no prerequisite.
     UBreakerProgressionTree* VoidWhisperer = UBreakerProgressionLibrary::GetCasterVoidWhispererTree();
-    TestTrue(TEXT("Standing Water buys"), BreakerBuyToMax(*this, Progression, VoidWhisperer, TEXT("Caster.VoidWhisperer.StandingWater")));
     TestTrue(TEXT("Lingering buys"), BreakerBuyToMax(*this, Progression, VoidWhisperer, TEXT("Caster.VoidWhisperer.Lingering")));
     TestEqual(TEXT("Lingering lengthens Rot's zone (6s -> 7.8s)"), Rot->ComputeEffectiveDurationSeconds(Owner), 7.8f, 0.0001f);
     TestEqual(TEXT("Lingering does not widen Rot's radius"), Rot->ComputeEffectiveRadiusCm(Owner), 440.0f, 0.0001f);
 
     // Edge (Spellblade tree): the tag consumer — Cleave's arc becomes SB8's
-    // 180 the moment the node is owned, and narrows back on respec.
+    // 180 the moment the node is owned, and narrows back on respec. O272:
+    // Edge is the impactful half of Follow Through's pair.
     UBreakerProgressionTree* Spellblade = UBreakerProgressionLibrary::GetCasterSpellbladeTree();
-    TestTrue(TEXT("Close buys"), BreakerBuyToMax(*this, Progression, Spellblade, TEXT("Caster.Spellblade.Close")));
-    TestTrue(TEXT("Bloodprice buys"), BreakerBuyToMax(*this, Progression, Spellblade, TEXT("Caster.Spellblade.Bloodprice")));
+    TestTrue(TEXT("Follow Through buys"), BreakerBuyToMax(*this, Progression, Spellblade, TEXT("Caster.Spellblade.FollowThrough")));
     TestTrue(TEXT("Edge buys"), BreakerBuyToMax(*this, Progression, Spellblade, TEXT("Caster.Spellblade.Edge")));
     TestEqual(TEXT("Edge widens Cleave's swing to the full sweep"), Cleave->ComputeEffectiveArcDegrees(Owner), 180.0f, 0.0001f);
 
@@ -416,9 +417,10 @@ bool FBreakerLoopValveNodeContentTest::RunTest(const FString& Parameters)
         // Redirect: the cooldown lane while airborne (O2 PLACEHOLDER value).
         { UBreakerProgressionLibrary::GetSwiftKineticTree(), TEXT("Swift.Kinetic.Redirect"),
             {{EBreakerNodeStatTarget::AbilityCooldown, 20.0f, EBreakerBuildCondition::Airborne}} },
-        // VW4 Lingering: the duration lane (O2 PLACEHOLDER value).
+        // VW4 Lingering: the duration lane, single rank at the old two-rank
+        // total (O272; O2 PLACEHOLDER value).
         { UBreakerProgressionLibrary::GetCasterVoidWhispererTree(), TEXT("Caster.VoidWhisperer.Lingering"),
-            {{EBreakerNodeStatTarget::AbilityDuration, 15.0f, EBreakerBuildCondition::Always}} },
+            {{EBreakerNodeStatTarget::AbilityDuration, 30.0f, EBreakerBuildCondition::Always}} },
     };
 
     for (const FBreakerExpectedNode& Row : Expected)

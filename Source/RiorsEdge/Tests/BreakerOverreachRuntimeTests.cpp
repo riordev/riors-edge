@@ -63,18 +63,19 @@ bool FBreakerOverreachRuntimeTest::RunTest(const FString& Parameters)
     Abilities->RefreshGrants();
     const auto* Tree=UBreakerProgressionLibrary::GetCasterSpellbladeTree();const FName Overreach(TEXT("Caster.Spellblade.Overreach"));
     const auto* Node=Tree->FindNode(Overreach);if(!TestNotNull(TEXT("Real authored Overreach"),Node))return false;
-    TestEqual(TEXT("Tier four"),Node->Tier,4);TestEqual(TEXT("Two points"),Node->CostPerRank,2);TestEqual(TEXT("One rank"),Node->MaxRank,1);
-    TestEqual(TEXT("Six investment gate"),Node->RequiredTreeInvestment,6);
+    // O272: Overreach is the impactful half of Debt's pair — tier one, one
+    // point, one rank, no gate; Debt alone is the route.
+    TestEqual(TEXT("Tier one"),Node->Tier,1);TestEqual(TEXT("One point"),Node->CostPerRank,1);TestEqual(TEXT("One rank"),Node->MaxRank,1);
+    TestEqual(TEXT("No investment gate"),Node->RequiredTreeInvestment,0);
     if(!TestEqual(TEXT("One historical prerequisite"),Node->Prerequisites.Num(),1))return false;
     TestEqual(TEXT("Historical Debt prerequisite"),Node->Prerequisites[0].NodeId,FName(TEXT("Caster.Spellblade.Debt")));
     FBreakerQuestFlagSet Flags;for(const auto& Mission:UBreakerMissionLibrary::GetMissions())for(const auto& Beat:Mission.Beats)
         for(const auto& Flag:UBreakerMissionLibrary::BeatCompletionFlags(Beat))Flags.Add(Flag);
     Progression->SettleDoctrineEntitlement(Flags);
     TestEqual(TEXT("Real campaign entitlement is eight"),Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),8);
-    TestFalse(TEXT("Wallet alone does not bypass investment"),Progression->PurchaseNode(Tree,Overreach,Reason));
-    auto BuySix=[&](){for(const TCHAR* Id:{TEXT("Caster.Spellblade.ContactCharge"),TEXT("Caster.Spellblade.FollowThrough"),TEXT("Caster.Spellblade.Close"),TEXT("Caster.Spellblade.Debt"),TEXT("Caster.Spellblade.MomentumTransfer"),TEXT("Caster.Spellblade.Bloodprice")})
-        if(!Progression->PurchaseNode(Tree,Id,Reason))return false;return true;};
-    if(!BuySix())return false;
+    TestFalse(TEXT("Wallet alone does not bypass the travel prerequisite"),Progression->PurchaseNode(Tree,Overreach,Reason));
+    auto BuyDebt=[&](){return Progression->PurchaseNode(Tree,TEXT("Caster.Spellblade.Debt"),Reason);};
+    if(!BuyDebt())return false;
     auto CastSlot=[&](EBreakerAbilitySlot Slot,float ExpectedCost)
     {
         const float Before=Mana->GetMana();TestEqual(TEXT("Live quote"),Abilities->GetResourceCostForSlot(Slot),ExpectedCost,.001f);
@@ -107,7 +108,7 @@ bool FBreakerOverreachRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Unowned debt has base penalty"),Mana->GetOvercastIncomingDamageTaken(),.15f,.001f);
     TestEqual(TEXT("Base penalty uses existing incoming lane"),Combat->GetComposedIncomingDamageMultiplier(),1.15f,.001f);
     if(!Progression->PurchaseNode(Tree,Overreach,Reason))return false;
-    TestEqual(TEXT("Eight-point route spends exact entitlement"),Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),0);
+    TestEqual(TEXT("The pair costs two of the eight"),Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),6);
     TestEqual(TEXT("Authored tuning exposes thirty-percent penalty"),UBreakerManaComponent::GetResourceTuning().OverreachIncomingDamageTaken,.30f,.001f);
     TestEqual(TEXT("Acquiring while already negative updates HUD penalty"),Mana->GetOvercastIncomingDamageTaken(),.30f,.001f);
     TestEqual(TEXT("Acquiring while already negative replaces existing lane"),Combat->GetComposedIncomingDamageMultiplier(),1.30f,.001f);
@@ -162,7 +163,7 @@ bool FBreakerOverreachRuntimeTest::RunTest(const FString& Parameters)
     if(!Abilities->TryEquipAbility(Melee,TEXT("Caster.Cleave"),Reason))return false;Abilities->RefreshGrants();
     TestEqual(TEXT("Respec restores ordinary quote"),Abilities->GetResourceCostForSlot(Melee),15.f,.001f);
     TestFalse(TEXT("Positive-cost casting is again refused in debt"),Abilities->TryActivateSlot(Melee));
-    if(!BuySix()||!Progression->PurchaseNode(Tree,Overreach,Reason))return false;
+    if(!BuyDebt()||!Progression->PurchaseNode(Tree,Overreach,Reason))return false;
     if(!Abilities->TryEquipAbility(Ultimate,TEXT("Caster.Unmake"),Reason))return false;Abilities->RefreshGrants();
     if(!CastSlot(Ultimate,0))return false;
     TestTrue(TEXT("Death probe begins with owned Overreach and live suspension"),Mana->IsOverreachActive()&&Mana->IsGenerationSuspended());

@@ -55,11 +55,10 @@ bool FBreakerConductorRuleRuntimeTest::RunTest(const FString&)
     auto* Tree = UBreakerProgressionLibrary::GetCasterMultispellTree();
     FText Reason;
     if (!TestTrue(TEXT("Commit actual Multispell branch"), Progression->CommitToBranch(Tree->TreeId, Reason))) return false;
-    for (const TCHAR* Id : {TEXT("Caster.Multispell.Variance"), TEXT("Caster.Multispell.Variance"),
-        TEXT("Caster.Multispell.Reservoir"), TEXT("Caster.Multispell.Reservoir"),
-        TEXT("Caster.Multispell.Chain"), TEXT("Caster.Multispell.Chain"), TEXT("Caster.Multispell.ConductorRule")})
+    // O272: Conductor's Rule is the impactful half of Chain's pair; one point each.
+    for (const TCHAR* Id : {TEXT("Caster.Multispell.Chain"), TEXT("Caster.Multispell.ConductorRule")})
         if (!TestTrue(FString::Printf(TEXT("Paid %s: %s"), Id, *Reason.ToString()), Progression->PurchaseNode(Tree, Id, Reason))) return false;
-    TestEqual(TEXT("Six setup points plus two-point rule exhaust budget"), Progression->GetProgressionState().UnspentDoctrinePoints, 0);
+    TestEqual(TEXT("Chain pair spends two of eight"), Progression->GetProgressionState().UnspentDoctrinePoints, 6);
     auto* Mana = Player->GetMana(); Mana->BindAttributes(Attr); Mana->SetComponentTickEnabled(false);
     Mana->PassiveRegenPerSecond = 0; // Isolate the conditional-income cap, not tune gameplay.
     if (!TestTrue(TEXT("Native resource spend leaves positive-bank headroom"), Mana->TrySpendMana(60))) return false;

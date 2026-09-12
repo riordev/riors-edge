@@ -52,7 +52,9 @@ bool FBreakerLingeringRuntimeTest::RunTest(const FString& Parameters)
     auto* Progression = Player->GetProgression(); Progression->BindAttributes(Attributes);
     if (!TestTrue(TEXT("actual Caster"), Progression->ChoosePermanentClassById(EBreakerClassId::Caster))) return false;
     Progression->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(50, Progression->ExperienceCurve));
-    // Explicit restored benchmark fixture; spend only the four-point reachable path.
+    // Explicit restored benchmark fixture. O272: Lingering is a one-point
+    // single with no gate, so nothing is bought before the unowned
+    // observation and the whole path spends one Doctrine.
     FBreakerQuestFlagSet Flags;
     for (const auto& Mission : UBreakerMissionLibrary::GetMissions())
         for (const auto& Beat : Mission.Beats)
@@ -60,8 +62,6 @@ bool FBreakerLingeringRuntimeTest::RunTest(const FString& Parameters)
     Flags.Add(TEXT("Quest.Finale.Seal")); Progression->SettleDoctrineEntitlement(Flags);
     const int32 Wallet = Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints);
     const auto* Tree = UBreakerProgressionLibrary::GetCasterVoidWhispererTree(); FText Reason;
-    for (const TCHAR* Node : {TEXT("Caster.VoidWhisperer.StandingWater"), TEXT("Caster.VoidWhisperer.StandingWater"), TEXT("Caster.VoidWhisperer.Lingering")})
-        if (!TestTrue(Node, Progression->PurchaseNode(Tree, Node, Reason))) return false;
     if (!Progression->IsAbilityUnlocked(TEXT("Caster.Rot")))
         if (!TestTrue(TEXT("earned token unlocks Rot"), Progression->SpendAbilityToken(TEXT("Caster.Rot"), Reason))) return false;
     auto* Mana = Player->GetMana(); Mana->BindAttributes(Attributes); Mana->SetComponentTickEnabled(false); Mana->AdvanceLoop(30);
@@ -102,21 +102,21 @@ bool FBreakerLingeringRuntimeTest::RunTest(const FString& Parameters)
     // second zone now, and the first is untouched by it.
     auto* Second = Cast(Aim);
     if (!Second) return false;
-    TestTrue(TEXT("rank one overlap is a second zone, not a refresh"), Second != Zone);
+    TestTrue(TEXT("unowned overlap is a second zone, not a refresh"), Second != Zone);
     TestEqual(TEXT("the first zone keeps its radius"), Zone->GetSpec().RadiusCm, InitialRadius);
     TestEqual(TEXT("the second starts at the authored radius"), Second->GetSpec().RadiusCm, InitialRadius);
-    if (!TestTrue(TEXT("actual rank two purchase"), Progression->PurchaseNode(Tree, TEXT("Caster.VoidWhisperer.Lingering"), Reason))) return false;
-    TestEqual(TEXT("path spends exactly four Doctrine"), Wallet - Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 4);
-    Mana->AdvanceLoop(30); // Ordinary recovery between the rank-one and rank-two observations.
-    // R2 is a rule about the NEW puddle: cast over a live one it lands a
-    // metre wider, and the live ones are not touched. A fresh zone is grown
-    // once by construction.
+    if (!TestTrue(TEXT("actual Lingering purchase"), Progression->PurchaseNode(Tree, TEXT("Caster.VoidWhisperer.Lingering"), Reason))) return false;
+    TestEqual(TEXT("path spends exactly one Doctrine"), Wallet - Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 1);
+    Mana->AdvanceLoop(30); // Ordinary recovery between the unowned and owned observations.
+    // Lingering is a rule about the NEW puddle: cast over a live one it lands
+    // a metre wider, and the live ones are not touched. A fresh zone is grown
+    // once by construction. O272: a single rank, so this fires at rank one.
     const float Growth = GetDefault<UBreakerAbility_Rot>()->LingeringRefreshGrowthCm;
     auto* Third = Cast(Aim);
     if (!Third) return false;
-    TestTrue(TEXT("rank two recast is still a new zone"), Third != Zone && Third != Second);
-    TestEqual(TEXT("rank two recast does not grow the live zones"), Zone->GetSpec().RadiusCm, InitialRadius);
-    TestEqual(TEXT("rank two recast lands a metre wider"), Third->GetSpec().RadiusCm, InitialRadius + Growth, 0.01f);
+    TestTrue(TEXT("rank one recast is still a new zone"), Third != Zone && Third != Second);
+    TestEqual(TEXT("rank one recast does not grow the live zones"), Zone->GetSpec().RadiusCm, InitialRadius);
+    TestEqual(TEXT("rank one recast lands a metre wider"), Third->GetSpec().RadiusCm, InitialRadius + Growth, 0.01f);
     auto* Enemy = World->SpawnActor<ABreakerEnemy>(FVector(800, InitialRadius + 50, 100), FRotator::ZeroRotator);
     if (!Enemy) return false;
     Enemy->SetActorTickEnabled(false);

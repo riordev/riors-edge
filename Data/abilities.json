@@ -121,7 +121,7 @@
 				"BleedDamagePerTick": 6,
 				"BleedDuration": 4,
 				"BleedTickInterval": 1,
-				"FollowThroughRankOneKillRefund": 3,
+				"FollowThroughRankOneKillRefund": 6,
 				"FollowThroughRankTwoKillRefund": 6,
 				"ReprisalWindowSeconds": 2
 			},
@@ -141,7 +141,7 @@
 				"StandoffCm": 200,
 				"RefundHealthFraction": 0.4,
 				"RefundMana": 15,
-				"MomentumTransferRankOneSeconds": 2,
+				"MomentumTransferRankOneSeconds": 3,
 				"MomentumTransferRankTwoSeconds": 3,
 				"UnrestrictedRangeCm": 100000
 			},
@@ -163,7 +163,7 @@
 				"FlatArmorReduction": 40,
 				"MaximumRangeCm": 2500,
 				"HalfHeightCm": 250,
-				"StandingWaterRankOneManaPerSecond": 2,
+				"StandingWaterRankOneManaPerSecond": 4,
 				"StandingWaterRankTwoManaPerSecond": 4,
 				"ZoneworkAdditionalArmorReduction": 20,
 				"LingeringRefreshGrowthCm": 100,
@@ -188,7 +188,7 @@
 				"BreakThresholdFraction": 0.05,
 				"MaximumRangeCm": 3000,
 				"BreakDistanceCm": 3600,
-				"DrainRankOneThreshold": 0.1,
+				"DrainRankOneThreshold": 0.15,
 				"DrainRankTwoThreshold": 0.15
 			},
 			"variants": []
@@ -222,7 +222,7 @@
 				"DurationScalarWhenNotConsuming": 0.5,
 				"RefundManaPerStatus": 0,
 				"MaximumRangeCm": 4000,
-				"PaymentRankOneManaPerStatus": 2,
+				"PaymentRankOneManaPerStatus": 4,
 				"PaymentRankTwoManaPerStatus": 4
 			},
 			"variants": []

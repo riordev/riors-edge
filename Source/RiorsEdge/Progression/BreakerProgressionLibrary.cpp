@@ -1188,19 +1188,19 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftFrenzyTree()
 
 // ---------------------------------------------------------------------------
 // CASTER. Class-Kits §2 names three branches — Spellblade, Void Whisperer,
-// Multispell — and until now none of them existed: Caster played through its
-// seven abilities (all granted as starters, per the O39 comment on
-// GetFallbackClassDefinition below) and the class-agnostic Core tree only.
-// This is the same content gap Frenzy was for Swift, and it is closed the
-// same way: tiers 1-3 only, each branch's tier-4 rewrite trio dropped rather
-// than authored, one keystone per branch, and every magnitude an O2
-// PLACEHOLDER.
-//
-// UPDATED: "the slice cut every Swift branch already uses" was true when this
-// was written and is not any more — Swift's nine Tier-4 rewrites (F9-F11,
-// K9-K11, M9-M11) have since been authored, so SB9-SB11 / VW9-VW11 /
-// MS9-MS11 are now the only branch content Class-Kits specifies and the
-// library omits. Recorded here rather than silently left reading as parity.
+// Multispell — and each ships as O272's wheel of PAIRS: six travel nodes,
+// each a single rank costing one point and carrying one scaling magnitude
+// (the total its ranks used to add up to), each unlocking exactly one
+// impactful node — single rank, one point, a rule tag. No node has a second
+// rank. No pair is gated below the keystone (every non-keystone node is tier
+// 1, gate 0), so any pair may be bought first and a benchmark's two points
+// always land one whole pair. The keystone is the impactful half of its own
+// pair and the one gated node: tier 4, so GateForTier prices it at six
+// invested, and it costs one, landing as the seventh or eighth point. Eight
+// points buy four of the six pairs. Pairs are authored travel-then-impactful
+// in Tree->Nodes order with the keystone pair last; CasterTrees.MoreCeiling
+// walks the array in that order. Every magnitude is an O2 PLACEHOLDER, and
+// every node id, tag and consumer stands from before the pairing.
 //
 // THE ENUM GAP THIS BRANCH SET EXPOSES, STATED ONCE RATHER THAN PER NODE.
 // Swift's nodes are legible against EBreakerNodeStatTarget because Momentum
@@ -1238,66 +1238,66 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterSpellbladeTree()
 
     Tree = MakeTree(TEXT("Doctrine.Caster.Spellblade"), TEXT("Caster — Spellblade"), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster);
 
-    // --- Tier 1 (SB1-SB3) ---------------------------------------------------
-    UBreakerProgressionNode* Node = MakeNode(TEXT("Caster.Spellblade.ContactCharge"), TEXT("Contact Charge"),
-        TEXT("Melee hits generate Mana at the weak-point rate instead of the weapon-hit rate."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_ContactCharge.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // Spellblade's answer to Cleave's own Bleed jamming the branch's income:
-    // the branch is built on melee uptime, and a status already present must
-    // not stop paying for the swing that reapplied it.
-    // WAITING ON: the Mana component's status-application generation skipping
-    // its already-present suppression for this tag, and the kill refund.
-    Node = MakeNode(TEXT("Caster.Spellblade.FollowThrough"), TEXT("Follow Through"),
-        TEXT("Cleave's Bleed generates its status-application Mana even when Bleed is already present, and refunds Mana on kill."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_FollowThrough.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // The node that decides where Spellblade stands. Doubling weapon income at
-    // close range is the branch's whole positional argument — without it a
-    // Spellblade is a Caster who happens to own a melee ability.
-    // WAITING ON: the weapon-hit generation path reading a range band.
-    Node = MakeNode(TEXT("Caster.Spellblade.Close"), TEXT("Close"),
-        TEXT("Weapon hits at close range generate double Mana. Defines the branch's play distance."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Close.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 2 (SB4-SB6) ---------------------------------------------------
-    Node = MakeNode(TEXT("Caster.Spellblade.Debt"), TEXT("Debt"),
-        TEXT("Overcast's negative Mana floor extends further below zero. More rope to Overcast on."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Caster.Spellblade.ContactCharge"));
+    // --- Pair: Debt (travel) -> Overreach (impactful) -------------------------
+    // Debt's magnitude is DebtRankOneExtension in Data/caster-resource.json,
+    // which carries the old rank-two figure under O272.
+    UBreakerProgressionNode* Node = MakeNode(TEXT("Caster.Spellblade.Debt"), TEXT("Debt"),
+        TEXT("Overcast's negative Mana floor extends further below zero. More rope to Overcast on."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Debt.GetTag());
     Tree->Nodes.Add(Node);
 
+    Node = MakeNode(TEXT("Caster.Spellblade.Overreach"), TEXT("Overreach"),
+        TEXT("While Mana is negative, all Caster abilities are free. Your Overcast incoming-damage penalty rises to 30%."),
+        EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Caster.Spellblade.Debt"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Overreach.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Bloodprice (travel) -> Reprisal (impactful) --------------------
+    // The branch's only sustain, and the reason Overcast is survivable here:
+    // debt is paid in melee range, where the branch already wants to be.
+    // WAITING ON: the Lifesteal stat target's aggregation lane, plus a melee
+    // damage-dealt hook that can read the negative-Mana state.
+    Node = MakeNode(TEXT("Caster.Spellblade.Bloodprice"), TEXT("Bloodprice"),
+        TEXT("While Mana is negative, melee hits restore health equal to a portion of damage dealt."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Bloodprice.GetTag());
+    Tree->Nodes.Add(Node);
+
+    Node = MakeNode(TEXT("Caster.Spellblade.Reprisal"), TEXT("Reprisal"),
+        TEXT("After a passive Block proc, your next Cleave within two seconds costs no Mana."),
+        EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Caster.Spellblade.Bloodprice"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Reprisal.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Momentum Transfer (travel) -> Blink (impactful) ----------------
     // RESOLVED [O1] pattern: Closequarter's follow-up cancels the TARGET's
     // passive block/evade ROLL, not the player's own — re-expressed against
     // the passive chance layer exactly as Kinetic's Evade Conversion is,
     // except here it is the enemy's roll being suppressed, which has no
     // authorable stat on the caster's own sheet.
     Node = MakeNode(TEXT("Caster.Spellblade.MomentumTransfer"), TEXT("Momentum Transfer"),
-        TEXT("Closequarter's arrival briefly suppresses the target's passive block and evade rolls on the next melee hit."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Caster.Spellblade.FollowThrough"));
+        TEXT("Closequarter's arrival briefly suppresses the target's passive block and evade rolls on the next melee hit."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_MomentumTransfer.GetTag());
     Tree->Nodes.Add(Node);
 
-    // The branch's only sustain, and the reason Overcast is survivable here:
-    // debt is paid in melee range, where the branch already wants to be.
-    // WAITING ON: the Lifesteal stat target's aggregation lane, plus a melee
-    // damage-dealt hook that can read the negative-Mana state.
-    Node = MakeNode(TEXT("Caster.Spellblade.Bloodprice"), TEXT("Bloodprice"),
-        TEXT("While Mana is negative, melee hits restore health equal to a portion of damage dealt."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Caster.Spellblade.Close"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Bloodprice.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 3 (SB7-SB8) ---------------------------------------------------
     // "Grants C2 Closequarter" is not authored (see the block comment above);
     // the no-target blink rewrite is the real content of this node.
     Node = MakeNode(TEXT("Caster.Spellblade.Blink"), TEXT("Blink"),
-        TEXT("Closequarter may be cast with no target to blink in the aim direction."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 3, 1, 2);
+        TEXT("Closequarter may be cast with no target to blink in the aim direction."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
     AddPrerequisite(Node, TEXT("Caster.Spellblade.MomentumTransfer"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Blink.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Follow Through (travel) -> Edge (impactful) --------------------
+    // Spellblade's answer to Cleave's own Bleed jamming the branch's income:
+    // the branch is built on melee uptime, and a status already present must
+    // not stop paying for the swing that reapplied it.
+    // WAITING ON: the Mana component's status-application generation skipping
+    // its already-present suppression for this tag, and the kill refund.
+    Node = MakeNode(TEXT("Caster.Spellblade.FollowThrough"), TEXT("Follow Through"),
+        TEXT("Cleave's Bleed generates its status-application Mana even when Bleed is already present, and refunds Mana on kill."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_FollowThrough.GetTag());
     Tree->Nodes.Add(Node);
 
     // LIVE 2026-08-16: the tag found its consumer. UBreakerAbility_Cleave::
@@ -1309,30 +1309,34 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterSpellbladeTree()
     // target half is Cleave's base behaviour already (every swept target takes
     // the 100%-chance Bleed).
     Node = MakeNode(TEXT("Caster.Spellblade.Edge"), TEXT("Edge"),
-        TEXT("Cleave's arc widens to a full sweep and its Bleed applies to every target hit."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 3, 1, 2);
-    AddPrerequisite(Node, TEXT("Caster.Spellblade.Bloodprice"));
+        TEXT("Cleave's arc widens to a full sweep and its Bleed applies to every target hit."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Caster.Spellblade.FollowThrough"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Edge.GetTag());
     Tree->Nodes.Add(Node);
 
-    Node = MakeNode(TEXT("Caster.Spellblade.Overreach"), TEXT("Overreach"),
-        TEXT("While Mana is negative, all Caster abilities are free. Your Overcast incoming-damage penalty rises to 30%."),
-        EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Caster.Spellblade.Debt"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Overreach.GetTag());
+    // --- Pair: Close (travel) -> No Distance (impactful) ----------------------
+    // The node that decides where Spellblade stands. Doubling weapon income at
+    // close range is the branch's whole positional argument — without it a
+    // Spellblade is a Caster who happens to own a melee ability.
+    // WAITING ON: the weapon-hit generation path reading a range band.
+    Node = MakeNode(TEXT("Caster.Spellblade.Close"), TEXT("Close"),
+        TEXT("Weapon hits at close range generate double Mana. Defines the branch's play distance."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Close.GetTag());
     Tree->Nodes.Add(Node);
 
-    Node = MakeNode(TEXT("Caster.Spellblade.Reprisal"), TEXT("Reprisal"),
-        TEXT("After a passive Block proc, your next Cleave within two seconds costs no Mana."),
-        EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Caster.Spellblade.Bloodprice"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Reprisal.GetTag());
-    Tree->Nodes.Add(Node);
     Node = MakeNode(TEXT("Caster.Spellblade.NoDistance"), TEXT("No Distance"),
         TEXT("Closequarter refunds Mana on arrival at any target health. Its base Mana cost rises to 50."),
-        EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Caster.Spellblade.MomentumTransfer"));
+        EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Caster.Spellblade.Close"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_NoDistance.GetTag());
     Tree->Nodes.Add(Node);
+
+    // --- Pair: Contact Charge (travel) -> Edgework (keystone) -----------------
+    Node = MakeNode(TEXT("Caster.Spellblade.ContactCharge"), TEXT("Contact Charge"),
+        TEXT("Melee hits generate Mana at the weak-point rate instead of the weapon-hit rate."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_ContactCharge.GetTag());
+    Tree->Nodes.Add(Node);
+
     // The branch keystone, and THE FIRST TAG RIDER IN THE CONTENT.
     //
     // This comment used to say there was "no way to key an effect to 'this hit
@@ -1354,8 +1358,8 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterSpellbladeTree()
     // says it IS melee, exactly the delivery tax Class-Kits SB12 prices, and
     // never on the generic pools Progression.AxisOverlap reserves for Core.
     Node = MakeNode(TEXT("Caster.Spellblade.Edgework"), TEXT("Edgework"),
-        TEXT("Branch keystone. Your melee strikes land considerably harder. Rewrites Unmake: during it, Cleave has no animation lock and Closequarter loses its range limit."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Caster.Spellblade.Debt"));
+        TEXT("Branch keystone. Your melee strikes land considerably harder. Rewrites Unmake: during it, Cleave has no animation lock and Closequarter loses its range limit."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 1);
+    AddPrerequisite(Node, TEXT("Caster.Spellblade.ContactCharge"));
     AddEffect(Node, EBreakerNodeStatTarget::MeleeDamage, EBreakerNodeStatBucket::IncreasedPercent, 25.0f); // O2 PLACEHOLDER -- melee-only is the tax, so it prices above the unconditional lanes
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Edgework.GetTag());
@@ -1372,72 +1376,16 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterVoidWhispererTree(
 
     Tree = MakeTree(TEXT("Doctrine.Caster.VoidWhisperer"), TEXT("Caster — Void Whisperer"), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster);
 
-    // --- Tier 1 (VW1-VW3) ----------------------------------------------------
-    UBreakerProgressionNode* Node = MakeNode(TEXT("Caster.VoidWhisperer.Seep"), TEXT("Seep"),
-        TEXT("Status applications generate more Mana than the base rate."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Seep.GetTag());
-    Tree->Nodes.Add(Node);
-
+    // --- Pair: Standing Water (travel) -> Wellspring (impactful) --------------
     // Zone income deliberately INDEPENDENT of enemy count, so Void Whisperer
     // still pays in a one-enemy fight. Scaling it per-enemy would make the
-    // branch's income a crowd-size stat and its worst case unplayable.
+    // branch's income a crowd-size stat and its worst case unplayable. The
+    // per-second figure is StandingWaterRankOneManaPerSecond in
+    // Data/abilities.json, carrying the old rank-two value under O272.
     // WAITING ON: the zone actor crediting Mana per second while occupied.
-    Node = MakeNode(TEXT("Caster.VoidWhisperer.StandingWater"), TEXT("Standing Water"),
-        TEXT("Zones generate Mana per second while at least one enemy is inside, independent of enemy count."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 2, 1);
+    UBreakerProgressionNode* Node = MakeNode(TEXT("Caster.VoidWhisperer.StandingWater"), TEXT("Standing Water"),
+        TEXT("Zones generate Mana per second while at least one enemy is inside, independent of enemy count."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_StandingWater.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // The not-shooting income — the branch's argument for putting the gun down.
-    // Adds recovery to the competitive starter rate after the live no-fire delay.
-    Node = MakeNode(TEXT("Caster.VoidWhisperer.Patience"), TEXT("Patience"),
-        TEXT("Adds Mana regeneration while you have not fired a weapon for 4s (R2: 2s)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Patience.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 2 (VW4-VW6) ----------------------------------------------------
-    // The AbilityDuration lane is the node's perceptible half: zones linger
-    // longer per rank (O2 PLACEHOLDER, consumed by Rot's
-    // ComputeEffectiveDurationSeconds on the spawn and refresh paths). O271:
-    // a recast spawns a new puddle and nothing merges. R2's metre is a rule
-    // about the NEW puddle: cast over a live one, it lands 1 m bigger
-    // (RiorsEdge.Abilities.LingeringPaidRadius); Wellspring's following
-    // puddle, renewed by a recast, grows the same metre once
-    // (RiorsEdge.Abilities.RotPurchasedZones).
-    Node = MakeNode(TEXT("Caster.VoidWhisperer.Lingering"), TEXT("Lingering"),
-        TEXT("Zones linger longer. R2: a zone cast over a live one lands 1 m wider."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.StandingWater"));
-    AddEffect(Node, EBreakerNodeStatTarget::AbilityDuration, EBreakerNodeStatBucket::IncreasedPercent, 15.0f); // O2 PLACEHOLDER
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Lingering.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // Keeps the branch's slow damage from also being its slow income: a DoT
-    // kill pays, so committing to attrition is not a resource penalty.
-    // WAITING ON: the kill path asking whether a Caster DoT was on the victim.
-    Node = MakeNode(TEXT("Caster.VoidWhisperer.Attrition"), TEXT("Attrition"),
-        TEXT("Enemies killed while affected by a Caster damage-over-time effect refund Mana."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Seep"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Attrition.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // Makes Siphon castable DURING a fight rather than only after one. As
-    // shipped the channel breaks on any damage, which means the branch's
-    // sustain is only available when it is not needed.
-    // WAITING ON: Siphon's channel-break check reading a damage threshold.
-    Node = MakeNode(TEXT("Caster.VoidWhisperer.Drain"), TEXT("Drain"),
-        TEXT("Siphon's channel no longer breaks on damage below a fraction of the caster's max health."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Patience"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Drain.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 3 (VW7-VW8) -----------------------------------------------------
-    // "Grants C3 Rot upgrade path / grants C4 Siphon" is not authored (see the
-    // block comment above); Rot's flat armour-reduction rewrite is the real
-    // content, and it stays flat rather than percentage to protect the boss
-    // cap (Class-Kits VW7, Master 7.10.5).
-    Node = MakeNode(TEXT("Caster.VoidWhisperer.Zonework"), TEXT("Zonework"),
-        TEXT("Rot's Armour reduction gains an additional flat amount against targets already affected by a damage-over-time effect."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 3, 1, 2);
-    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Attrition"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Zonework.GetTag());
     Tree->Nodes.Add(Node);
 
     // The branch's only mobile play — every other Void Whisperer node rewards
@@ -1446,9 +1394,100 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterVoidWhispererTree(
     // WAITING ON: a zone actor that can attach to the caster, and a
     // one-at-a-time registry to enforce the limit.
     Node = MakeNode(TEXT("Caster.VoidWhisperer.Wellspring"), TEXT("Wellspring"),
-        TEXT("A zone may be placed on the caster's own position and move with them for its duration. One at a time."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 3, 1, 2);
-    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Lingering"));
+        TEXT("A zone may be placed on the caster's own position and move with them for its duration. One at a time."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.StandingWater"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Wellspring.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Lingering (travel) -> Zonework (impactful) ---------------------
+    // The AbilityDuration lane is the node's scaling half: zones linger 30%
+    // longer, the total its two ranks used to add up to (O2 PLACEHOLDER,
+    // consumed by Rot's ComputeEffectiveDurationSeconds on the spawn and
+    // refresh paths). O271: a recast spawns a new puddle and nothing merges.
+    // The metre is a rule about the NEW puddle: cast over a live one, it lands
+    // 1 m bigger (RiorsEdge.Abilities.LingeringPaidRadius); Wellspring's
+    // following puddle, renewed by a recast, grows the same metre once
+    // (RiorsEdge.Abilities.RotPurchasedZones). Single rank under O272, so the
+    // metre lands with the duration.
+    Node = MakeNode(TEXT("Caster.VoidWhisperer.Lingering"), TEXT("Lingering"),
+        TEXT("Zones linger longer. A zone cast over a live one lands 1 m wider."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    AddEffect(Node, EBreakerNodeStatTarget::AbilityDuration, EBreakerNodeStatBucket::IncreasedPercent, 30.0f); // O2 PLACEHOLDER -- O272: one rank carrying what 15/rank x 2 totalled
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Lingering.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // "Grants C3 Rot upgrade path / grants C4 Siphon" is not authored (see the
+    // block comment above); Rot's flat armour-reduction rewrite is the real
+    // content, and it stays flat rather than percentage to protect the boss
+    // cap (Class-Kits VW7, Master 7.10.5).
+    Node = MakeNode(TEXT("Caster.VoidWhisperer.Zonework"), TEXT("Zonework"),
+        TEXT("Rot's Armour reduction gains an additional flat amount against targets already affected by a damage-over-time effect."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Lingering"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Zonework.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Attrition (travel) -> Terminal (impactful) ---------------------
+    // Keeps the branch's slow damage from also being its slow income: a DoT
+    // kill pays, so committing to attrition is not a resource penalty. The
+    // refund is AttritionRankOneRefund in Data/caster-resource.json.
+    // WAITING ON: the kill path asking whether a Caster DoT was on the victim.
+    Node = MakeNode(TEXT("Caster.VoidWhisperer.Attrition"), TEXT("Attrition"),
+        TEXT("Enemies killed while affected by a Caster damage-over-time effect refund Mana."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Attrition.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // Historical Class-Kits VW10. O2 PLACEHOLDER: target below 25% health.
+    // Terminal latches on low target health and spends finite remaining tick funding.
+    // It does not reserve Core Long Dark's single-target lease.
+    Node = MakeNode(TEXT("Caster.VoidWhisperer.Terminal"), TEXT("Terminal"),
+        TEXT("Your DoTs persist on targets below 25% health until death or cleanse. Ticks stop when their remaining funded damage is exhausted."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Attrition"));
+    Node->GrantedTags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Caster.VoidWhisperer.Terminal")));
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Seep (travel) -> Snapshot Discipline (impactful) ---------------
+    // Seep's multiplier is SeepRankOneMultiplier in Data/caster-resource.json.
+    Node = MakeNode(TEXT("Caster.VoidWhisperer.Seep"), TEXT("Seep"),
+        TEXT("Status applications generate more Mana than the base rate."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Seep.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // Historical Class-Kits VW9. O2 PLACEHOLDER: +25 critical-chance points.
+    // Physical applications retain the original critical sample and check own-zone geometry.
+    // Rot retains the applying hit sample and replaces its critical factor at most once.
+    Node = MakeNode(TEXT("Caster.VoidWhisperer.SnapshotDiscipline"), TEXT("Snapshot Discipline"),
+        TEXT("Your periodic statuses applied inside your own zone gain 25 percentage points Critical Chance using the applying sample. An already-critical hit is never multiplied twice."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Seep"));
+    Node->GrantedTags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Caster.VoidWhisperer.SnapshotDiscipline")));
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Drain (travel) -> Long Debt (impactful) ------------------------
+    // Makes Siphon castable DURING a fight rather than only after one. As
+    // shipped the channel breaks on any damage, which means the branch's
+    // sustain is only available when it is not needed. The fraction is
+    // DrainRankOneThreshold in Data/abilities.json.
+    // WAITING ON: Siphon's channel-break check reading a damage threshold.
+    Node = MakeNode(TEXT("Caster.VoidWhisperer.Drain"), TEXT("Drain"),
+        TEXT("Siphon's channel no longer breaks on damage below a fraction of the caster's max health."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Drain.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // Historical Class-Kits VW11/O10. O2 PLACEHOLDER: double tick frequency,
+    // 25% incoming penalty instead of the historical 15% Overcast penalty.
+    // Physical cadence snapshots at application; the existing incoming modifier is replaced.
+    // Rot doubles its lifetime and redistributes the same finite damage budget.
+    Node = MakeNode(TEXT("Caster.VoidWhisperer.LongDebt"), TEXT("Long Debt"),
+        TEXT("While Mana is negative, Bleed and Poison snapshot double tick frequency; Rot lasts twice as long with the same total funded damage. You take 25% increased damage instead of 15%."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Drain"));
+    Node->GrantedTags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Caster.VoidWhisperer.LongDebt")));
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Patience (travel) -> Long Dark (keystone) ----------------------
+    // The not-shooting income — the branch's argument for putting the gun down.
+    // Adds recovery to the competitive starter rate after the live no-fire
+    // delay, PatienceRankOneDelay in Data/caster-resource.json.
+    Node = MakeNode(TEXT("Caster.VoidWhisperer.Patience"), TEXT("Patience"),
+        TEXT("Adds Mana regeneration while you have not fired a weapon for 2s."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Patience.GetTag());
     Tree->Nodes.Add(Node);
 
     // The branch keystone. It carried Class-Kits VW12's canon text verbatim —
@@ -1457,37 +1496,9 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterVoidWhispererTree(
     // from the A4 ruling that built the lane for it. O95 supersedes it: a
     // doctrine authors no multiplier, so the argument goes with the number.
     // What that leaves behind is recorded at the lane it leaves behind.
-    // Historical Class-Kits VW9. O2 PLACEHOLDER: +25 critical-chance points.
-    // Physical applications retain the original critical sample and check own-zone geometry.
-    // Rot retains the applying hit sample and replaces its critical factor at most once.
-    Node = MakeNode(TEXT("Caster.VoidWhisperer.SnapshotDiscipline"), TEXT("Snapshot Discipline"),
-        TEXT("Your periodic statuses applied inside your own zone gain 25 percentage points Critical Chance using the applying sample. An already-critical hit is never multiplied twice."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Zonework"));
-    Node->GrantedTags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Caster.VoidWhisperer.SnapshotDiscipline")));
-    Tree->Nodes.Add(Node);
-
-    // Historical Class-Kits VW10. O2 PLACEHOLDER: target below 25% health.
-    // Terminal latches on low target health and spends finite remaining tick funding.
-    // It does not reserve Core Long Dark's single-target lease.
-    Node = MakeNode(TEXT("Caster.VoidWhisperer.Terminal"), TEXT("Terminal"),
-        TEXT("Your DoTs persist on targets below 25% health until death or cleanse. Ticks stop when their remaining funded damage is exhausted."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Attrition"));
-    Node->GrantedTags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Caster.VoidWhisperer.Terminal")));
-    Tree->Nodes.Add(Node);
-
-    // Historical Class-Kits VW11/O10. O2 PLACEHOLDER: double tick frequency,
-    // 25% incoming penalty instead of the historical 15% Overcast penalty.
-    // Physical cadence snapshots at application; the existing incoming modifier is replaced.
-    // Rot doubles its lifetime and redistributes the same finite damage budget.
-    Node = MakeNode(TEXT("Caster.VoidWhisperer.LongDebt"), TEXT("Long Debt"),
-        TEXT("While Mana is negative, Bleed and Poison snapshot double tick frequency; Rot lasts twice as long with the same total funded damage. You take 25% increased damage instead of 15%."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Drain"));
-    Node->GrantedTags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Caster.VoidWhisperer.LongDebt")));
-    Tree->Nodes.Add(Node);
-
     Node = MakeNode(TEXT("Caster.VoidWhisperer.LongDark"), TEXT("Long Dark"),
-        TEXT("Branch keystone. Rewrites Unmake: duration extends to 12s at 50% cost instead of free, and zones placed during it stop aging until that Unmake ends. Their damage continues."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Attrition"));
+        TEXT("Branch keystone. Rewrites Unmake: duration extends to 12s at 50% cost instead of free, and zones placed during it stop aging until that Unmake ends. Their damage continues."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 1);
+    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Patience"));
     // THE MORE IS GONE (O95), and it was the largest of the four at x1.30 as
     // well as the only one that never went through AddDamageMore -- it targeted
     // the DamageOverTime pool directly, which is why a search for the helper
@@ -1514,23 +1525,34 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
 
     Tree = MakeTree(TEXT("Doctrine.Caster.Multispell"), TEXT("Caster — Multispell"), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster);
 
-    // --- Tier 1 (MS1-MS3) ----------------------------------------------------
-    UBreakerProgressionNode* Node = MakeNode(TEXT("Caster.Multispell.Variance"), TEXT("Variance"),
-        TEXT("Applying a status type the target does not already have generates a multiple of the base Mana rate. The core sequencing incentive stated as a resource rule."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Variance.GetTag());
+    // --- Pair: Payment (travel) -> Resonance (impactful) ----------------------
+    // Makes BREADTH the income: paying per distinct status consumed is what
+    // separates Multispell's rotation from Void Whisperer's mastery of one
+    // element (O19's stated split between the two branches). The per-status
+    // figure is PaymentRankOneManaPerStatus in Data/abilities.json.
+    // WAITING ON: Resonance's consumption path counting distinct types and
+    // refunding per type.
+    UBreakerProgressionNode* Node = MakeNode(TEXT("Caster.Multispell.Payment"), TEXT("Payment"),
+        TEXT("Resonance refunds Mana per distinct status consumed."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Payment.GetTag());
     Tree->Nodes.Add(Node);
 
-    // The rotation is the branch, so a missed cast must not cost a position in
-    // it. Advancing on hit rather than on cast is what makes the fantasy
-    // survivable at the skill floor O33 asks for.
-    // WAITING ON: Fracture advancing its status cycle on hit, not on cast.
-    Node = MakeNode(TEXT("Caster.Multispell.Cycle"), TEXT("Cycle"),
-        TEXT("Fracture's status cycle advances on hit rather than on cast, so a missed cast does not waste a position."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Cycle.GetTag());
+    // Detonating must not reset the rotation. Halving remaining duration
+    // instead of consuming is what lets the branch detonate and keep cycling,
+    // which is the difference between a rotation and a reload. "Grants C6
+    // Resonance" is not authored (see the block comment above); the rewrite
+    // half is the real content.
+    // WAITING ON: Resonance's consumption path learning to halve rather than
+    // consume.
+    Node = MakeNode(TEXT("Caster.Multispell.Resonance"), TEXT("Resonance"),
+        TEXT("Resonance no longer consumes the statuses it detonates; it halves their remaining duration instead."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Caster.Multispell.Payment"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Resonance.GetTag());
     Tree->Nodes.Add(Node);
 
-    // "The one intentional stat node" per Class-Kits MS3, AND IT NOW AUTHORS
-    // ONE. This comment used to say the node "genuinely cannot author even a
+    // --- Pair: Reservoir (travel) -> Prepared (impactful) ---------------------
+    // "The one intentional stat node" per Class-Kits MS3, AND IT AUTHORS ONE.
+    // This comment used to say the node "genuinely cannot author even a
     // placeholder number, because EBreakerNodeStatTarget has no
     // Maximum-Resource counterpart to gear's Maximum Resource affix". That
     // stopped being true when MaxClassResource landed: the target exists, the
@@ -1543,78 +1565,83 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
     // finished end to end. It is also the first node anywhere to author
     // MaxClassResource, which had a live lane and zero authors.
     Node = MakeNode(TEXT("Caster.Multispell.Reservoir"), TEXT("Reservoir"),
-        TEXT("Your Mana pool deepens."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 2, 1);
-    AddEffect(Node, EBreakerNodeStatTarget::MaxClassResource, EBreakerNodeStatBucket::IncreasedPercent, 12.0f); // O2 PLACEHOLDER -- Class-Kits MS3 gives +15/+25 flat; the lane is Increased, so this is the shape not the number
+        TEXT("Your Mana pool deepens."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    AddEffect(Node, EBreakerNodeStatTarget::MaxClassResource, EBreakerNodeStatBucket::IncreasedPercent, 24.0f); // O2 PLACEHOLDER -- O272: one rank carrying what 12/rank x 2 totalled; Class-Kits MS3 gives +15/+25 flat, the lane is Increased, so this is the shape not the number
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Reservoir.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 2 (MS4-MS6) ----------------------------------------------------
-    Node = MakeNode(TEXT("Caster.Multispell.Chain"), TEXT("Chain"),
-        TEXT("A target carrying two distinct status types spreads the newest one to the nearest enemy on application. Proc coefficient 0 on the spread; the spread cannot itself spread."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Caster.Multispell.Variance"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Chain.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // Makes BREADTH the income: paying per distinct status consumed is what
-    // separates Multispell's rotation from Void Whisperer's mastery of one
-    // element (O19's stated split between the two branches).
-    // WAITING ON: Resonance's consumption path counting distinct types and
-    // refunding per type.
-    Node = MakeNode(TEXT("Caster.Multispell.Payment"), TEXT("Payment"),
-        TEXT("Resonance refunds Mana per distinct status consumed."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Caster.Multispell.Cycle"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Payment.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // The three-status lump sum — the explicit reward for rotating all three
-    // rather than mastering one. Once per target on a cooldown because the
-    // uncapped version is a Mana engine, not a rotation.
-    const FBreakerCasterResourceTuning& SequenceTuning = UBreakerManaComponent::GetResourceTuning();
-    const FString SequenceDescription = FString::Printf(
-        TEXT("Apply three distinct status types to one target within %.0fs to gain %.0f/%.0f Mana at ranks 1/2. Each target can pay once every %.0fs. Secondary applications scale the payout."),
-        SequenceTuning.SequenceWindowSeconds, SequenceTuning.SequenceRankOneMana,
-        SequenceTuning.SequenceRankTwoMana, SequenceTuning.SequenceCooldownSeconds);
-    Node = MakeNode(TEXT("Caster.Multispell.Sequence"), TEXT("Sequence"),
-        *SequenceDescription, EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Caster.Multispell.Reservoir"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Sequence.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 3 (MS7-MS8) ----------------------------------------------------
-    // "Grants C5 Fracture / grants C6 Resonance" is not authored (see the
-    // block comment above); each node's rewrite half is the real content.
-    Node = MakeNode(TEXT("Caster.Multispell.Fracture"), TEXT("Fracture"),
-        TEXT("Fracture applies two cycle positions at once instead of one."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 3, 1, 2);
-    AddPrerequisite(Node, TEXT("Caster.Multispell.Chain"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Fracture.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // Detonating must not reset the rotation. Halving remaining duration
-    // instead of consuming is what lets the branch detonate and keep cycling,
-    // which is the difference between a rotation and a reload.
-    // WAITING ON: Resonance's consumption path learning to halve rather than
-    // consume.
-    Node = MakeNode(TEXT("Caster.Multispell.Resonance"), TEXT("Resonance"),
-        TEXT("Resonance no longer consumes the statuses it detonates; it halves their remaining duration instead."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 3, 1, 2);
-    AddPrerequisite(Node, TEXT("Caster.Multispell.Payment"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Resonance.GetTag());
     Tree->Nodes.Add(Node);
 
     // Status income already shares baseline Overcast doubling. Prepared adds
     // deeper debt allowance, never a second doubling of that same income.
     Node = MakeNode(TEXT("Caster.Multispell.Prepared"), TEXT("Prepared"),
         TEXT("Your Mana can run to -35 before a cast is refused."),
-        EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+        EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
     AddPrerequisite(Node, TEXT("Caster.Multispell.Reservoir"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Prepared.GetTag());
     Tree->Nodes.Add(Node);
 
+    // --- Pair: Chain (travel) -> Conductor's Rule (impactful) -----------------
+    Node = MakeNode(TEXT("Caster.Multispell.Chain"), TEXT("Chain"),
+        TEXT("A target carrying two distinct status types spreads the newest one to the nearest enemy on application. Proc coefficient 0 on the spread; the spread cannot itself spread."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Chain.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // Historical Class-Kits MS11. O2 PLACEHOLDER: one reaction per target per
+    // 0.5s; each refused reaction queues 10 Mana through conditional income.
+    // The original status creditor owns the per-target throttle and capped
+    // refusal income; a refused transaction retains fuel without new buildup.
+    Node = MakeNode(TEXT("Caster.Multispell.ConductorRule"), TEXT("Conductor's Rule"),
+        TEXT("Only one reaction may trigger per target per 0.5s. Reactions that would have triggered instead grant 10 Mana through the conditional income cap."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Caster.Multispell.Chain"));
+    Node->GrantedTags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Caster.Multispell.ConductorRule")));
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Cycle (travel) -> Fracture (impactful) -------------------------
+    // The rotation is the branch, so a missed cast must not cost a position in
+    // it. Advancing on hit rather than on cast is what makes the fantasy
+    // survivable at the skill floor O33 asks for.
+    // WAITING ON: Fracture advancing its status cycle on hit, not on cast.
+    Node = MakeNode(TEXT("Caster.Multispell.Cycle"), TEXT("Cycle"),
+        TEXT("Fracture's status cycle advances on hit rather than on cast, so a missed cast does not waste a position."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Cycle.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // "Grants C5 Fracture" is not authored (see the block comment above); the
+    // rewrite half is the real content.
+    Node = MakeNode(TEXT("Caster.Multispell.Fracture"), TEXT("Fracture"),
+        TEXT("Fracture applies two cycle positions at once instead of one."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Caster.Multispell.Cycle"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Fracture.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Variance (travel) -> Interference (impactful) ------------------
+    // The multiplier is VarianceRankOneMultiplier in Data/caster-resource.json.
+    Node = MakeNode(TEXT("Caster.Multispell.Variance"), TEXT("Variance"),
+        TEXT("Applying a status type the target does not already have generates a multiple of the base Mana rate. The core sequencing incentive stated as a resource rule."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Variance.GetTag());
+    Tree->Nodes.Add(Node);
+
     Node = MakeNode(TEXT("Caster.Multispell.Interference"), TEXT("Interference"),
         TEXT("Resonance uses a lower fixed damage amount per distinct status and adds a flat bonus at three or more statuses."),
-        EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Caster.Multispell.Resonance"));
+        EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Caster.Multispell.Variance"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Interference.GetTag());
     Tree->Nodes.Add(Node);
+
+    // --- Pair: Sequence (travel) -> Cascade (keystone) ------------------------
+    // The three-status lump sum — the explicit reward for rotating all three
+    // rather than mastering one. Once per target on a cooldown because the
+    // uncapped version is a Mana engine, not a rotation. One rank, one figure:
+    // SequenceRankOneMana in Data/caster-resource.json.
+    const FBreakerCasterResourceTuning& SequenceTuning = UBreakerManaComponent::GetResourceTuning();
+    const FString SequenceDescription = FString::Printf(
+        TEXT("Apply three distinct status types to one target within %.0fs to gain %.0f Mana. Each target can pay once every %.0fs. Secondary applications scale the payout."),
+        SequenceTuning.SequenceWindowSeconds, SequenceTuning.SequenceRankOneMana,
+        SequenceTuning.SequenceCooldownSeconds);
+    Node = MakeNode(TEXT("Caster.Multispell.Sequence"), TEXT("Sequence"),
+        *SequenceDescription, EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Sequence.GetTag());
+    Tree->Nodes.Add(Node);
+
     // The branch keystone O3 permits (3 of 3 for Caster; Caster's budget is
     // now fully allocated across its three branches, same shape as Swift's).
     // Class-Kits MS12's designed line was "1.25x More vs targets carrying 3+
@@ -1629,18 +1656,8 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
     // BuildTargetConditionRiders and resolved in ReceiveDamage, joining the
     // one additive bucket while it holds. Same trigger, same magnitude
     // number, honest bucket. Caster's third More SLOT stays unspent.
-    // Historical Class-Kits MS11. O2 PLACEHOLDER: one reaction per target per
-    // 0.5s; each refused reaction queues 10 Mana through conditional income.
-    // The original status creditor owns the per-target throttle and capped
-    // refusal income; a refused transaction retains fuel without new buildup.
-    Node = MakeNode(TEXT("Caster.Multispell.ConductorRule"), TEXT("Conductor's Rule"),
-        TEXT("Only one reaction may trigger per target per 0.5s. Reactions that would have triggered instead grant 10 Mana through the conditional income cap."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Caster.Multispell.Chain"));
-    Node->GrantedTags.AddTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Caster.Multispell.ConductorRule")));
-    Tree->Nodes.Add(Node);
-
     Node = MakeNode(TEXT("Caster.Multispell.Cascade"), TEXT("Cascade"),
-        TEXT("Branch keystone. Rewrites Unmake: your status applications during it echo the next physical status in Fracture's cycle. Echoes cannot trigger further echoes. Damage is Increased by 25% against targets carrying 3 or more distinct status types."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+        TEXT("Branch keystone. Rewrites Unmake: your status applications during it echo the next physical status in Fracture's cycle. Echoes cannot trigger further echoes. Damage is Increased by 25% against targets carrying 3 or more distinct status types."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 1);
     AddPrerequisite(Node, TEXT("Caster.Multispell.Sequence"));
     AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 25.0f, EBreakerBuildCondition::TargetMultiStatus); // O2 PLACEHOLDER — owner ruling 2026-08-16: MS12's 1.25x More re-authored as a target-rider Increased line
     Node->bCornerstone = true;

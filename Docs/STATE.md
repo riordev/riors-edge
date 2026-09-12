@@ -20,8 +20,8 @@ measurement without judging it.
 | Conditions no content authors | ceiling | 12 of 28 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 3 of 21 | ceiling 0 | **OUT** |
 | Asserted invariants with no test | ceiling | 35 of 137 asserted across 8 specs | ceiling 42, target 20 | ok |
-| Offered-to-spendable ratio, per tree | floor | 3.0 worst tree | floor 3.0 | ok |
-| Trees sitting exactly on the offered-to-spendable floor | ceiling | 13 of 16 | no pin — measurement only | — |
+| Offered-to-spendable ratio, per tree | floor | 1.5 worst tree | floor 1.5 | ok |
+| Trees sitting exactly on the offered-to-spendable floor | ceiling | 3 of 16 | no pin — measurement only | — |
 | Node-shape composition, per tree | band | 39 % ranked minors, all trees | no pin — measurement only | — |
 | Scaffolding nodes | ceiling | 0 of 370 authored | ceiling 50 | ok |
 | Conditions that can never be true | ceiling | 5.0 | ceiling 5, target 1 | ok |
@@ -36,7 +36,7 @@ measurement without judging it.
 
 ## Tests
 
-- passing: 918
+- passing: 919
 - expected red: 3
 - **unexpected red: 0**
 - asserted invariants with no test: 35
@@ -193,14 +193,14 @@ A named test that was never written looks asserted and is not. This is worse tha
 
 ## Offered-to-spendable ratio, per tree
 
-**floor** · 3.0 worst tree · floor 3.0
+**floor** · 1.5 worst tree · floor 1.5
 
 Most of a build should be refusal. A CEILING here would lock the trees at their current size and report green while doing it. READ IT BESIDE the no-margin count below: for a doctrine built to the standard shape this ratio is fixed by construction and reports nothing about authoring.
 
 - Core.Slice: 187 nodes, 429 points offered, 6.6x budget
-- Doctrine.Caster.Multispell: 12 nodes, 24 points offered, 3.0x budget
-- Doctrine.Caster.Spellblade: 12 nodes, 24 points offered, 3.0x budget
-- Doctrine.Caster.VoidWhisperer: 12 nodes, 24 points offered, 3.0x budget
+- Doctrine.Caster.Multispell: 12 nodes, 12 points offered, 1.5x budget
+- Doctrine.Caster.Spellblade: 12 nodes, 12 points offered, 1.5x budget
+- Doctrine.Caster.VoidWhisperer: 12 nodes, 12 points offered, 1.5x budget
 - Doctrine.Gunsmith.Armory: 12 nodes, 24 points offered, 3.0x budget
 - Doctrine.Gunsmith.FieldTech: 12 nodes, 24 points offered, 3.0x budget
 - Doctrine.Gunsmith.Tinkerer: 12 nodes, 24 points offered, 3.0x budget
@@ -216,23 +216,13 @@ Most of a build should be refusal. A CEILING here would lock the trees at their 
 
 ## Trees sitting exactly on the offered-to-spendable floor
 
-**ceiling** · 13 of 16 · no pin — measurement only
+**ceiling** · 3 of 16 · no pin — measurement only
 
 A tree here is one node-price change away from red, and the floor section reports ok until the run it fails on. This falls when a tree is authored above its shape's arithmetic, never by moving a pin.
 
-- Doctrine.Caster.Multispell: 3.0x, exactly the floor
-- Doctrine.Caster.Spellblade: 3.0x, exactly the floor
-- Doctrine.Caster.VoidWhisperer: 3.0x, exactly the floor
-- Doctrine.Gunsmith.Armory: 3.0x, exactly the floor
-- Doctrine.Gunsmith.FieldTech: 3.0x, exactly the floor
-- Doctrine.Gunsmith.Tinkerer: 3.0x, exactly the floor
-- Doctrine.Support.Conductor: 3.0x, exactly the floor
-- Doctrine.Support.Medic: 3.0x, exactly the floor
-- Doctrine.Support.Warden: 3.0x, exactly the floor
-- Doctrine.Swift.Kinetic: 3.0x, exactly the floor
-- Doctrine.Tank.Bastion: 3.0x, exactly the floor
-- Doctrine.Tank.Demolitionist: 3.0x, exactly the floor
-- Doctrine.Tank.Leech: 3.0x, exactly the floor
+- Doctrine.Caster.Multispell: 1.5x, exactly the floor
+- Doctrine.Caster.Spellblade: 1.5x, exactly the floor
+- Doctrine.Caster.VoidWhisperer: 1.5x, exactly the floor
 
 ## Node-shape composition, per tree
 

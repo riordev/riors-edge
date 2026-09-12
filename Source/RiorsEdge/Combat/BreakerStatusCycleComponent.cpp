@@ -80,7 +80,7 @@ void UBreakerStatusCycleComponent::SyncProgression()
     if (!GetOwner() || !GetOwner()->HasAuthority()) return;
     const UBreakerProgressionComponent* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
     const bool bCaster = Progression && Progression->GetProgressionState().PermanentClass == EBreakerClassId::Caster;
-    const bool bNewPreview = bCaster && Progression->GetNodeRank(TEXT("Caster.Multispell.Cycle"), EBreakerPointCurrency::DoctrinePoints) >= 2;
+    const bool bNewPreview = bCaster && Progression->GetNodeRank(TEXT("Caster.Multispell.Cycle"), EBreakerPointCurrency::DoctrinePoints) >= 1;   // O272: the preview arrives with the node
     bool bChanged = bPreviewAhead != bNewPreview;
     bPreviewAhead = bNewPreview;
     const FGameplayTag Erased = FGameplayTag::RequestGameplayTag(TEXT("Status.Erased"));

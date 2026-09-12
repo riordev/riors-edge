@@ -270,7 +270,7 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     auto RefreshExisting = [&](ABreakerZoneActor* Existing)
     {
         Existing->RefreshPaidPayload(Spec);
-        if (Character->GetProgression()->GetNodeRank(TEXT("Caster.VoidWhisperer.Lingering"), EBreakerPointCurrency::DoctrinePoints) >= 2)
+        if (Character->GetProgression()->GetNodeRank(TEXT("Caster.VoidWhisperer.Lingering"), EBreakerPointCurrency::DoctrinePoints) >= 1   /* O272: single rank */)
             Existing->GrowRadiusOnce(LingeringRefreshGrowthCm);
     };
     if (bFollowCaster)
@@ -300,7 +300,7 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     // construction; the old one is not touched. (Owner, on the desk's
     // question; the following puddle keeps its renew-and-grow.)
     if (!bFollowCaster
-        && Character->GetProgression()->GetNodeRank(TEXT("Caster.VoidWhisperer.Lingering"), EBreakerPointCurrency::DoctrinePoints) >= 2
+        && Character->GetProgression()->GetNodeRank(TEXT("Caster.VoidWhisperer.Lingering"), EBreakerPointCurrency::DoctrinePoints) >= 1   /* O272: single rank */
         && ABreakerZoneActor::FindRefreshableZone(World, Spec.ZoneTag, Character, Center, EffectiveRadiusCm, 0.5f))
     {
         Spec.RadiusCm += LingeringRefreshGrowthCm;

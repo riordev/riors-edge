@@ -534,13 +534,13 @@ bool FBreakerAbilitiesNumbersTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Fracture cast duration is authored"), Fracture->Number(TEXT("BaseCastSeconds"), -1), 0.35f);
     if (TestNotNull(TEXT("Siphon Drain tuning row is reachable"), Siphon))
     {
-        TestEqual(TEXT("Drain rank-one threshold is authored"), Siphon->Number(TEXT("DrainRankOneThreshold"), -1), 0.10f);
+        TestEqual(TEXT("Drain rank-one threshold is authored"), Siphon->Number(TEXT("DrainRankOneThreshold"), -1), 0.15f);   // O272: rank one carries the old rank two
         TestEqual(TEXT("Drain rank-two threshold is authored"), Siphon->Number(TEXT("DrainRankTwoThreshold"), -1), 0.15f);
     }
     const UBreakerAbilityDefinition* Rot = UBreakerAbilityDefinition::FindFallback(FName(TEXT("Caster.Rot")));
     if (TestNotNull(TEXT("Rot node tuning row is reachable"), Rot))
     {
-        TestEqual(TEXT("Standing Water first rank is authored"), Rot->Number(TEXT("StandingWaterRankOneManaPerSecond"), -1), 2.0f);
+        TestEqual(TEXT("Standing Water first rank is authored"), Rot->Number(TEXT("StandingWaterRankOneManaPerSecond"), -1), 4.0f);   // O272
         TestEqual(TEXT("Standing Water second rank is authored"), Rot->Number(TEXT("StandingWaterRankTwoManaPerSecond"), -1), 4.0f);
         TestEqual(TEXT("Zonework flat strip is authored"), Rot->Number(TEXT("ZoneworkAdditionalArmorReduction"), -1), 20.0f);
         TestEqual(TEXT("Lingering one-time growth is authored"), Rot->Number(TEXT("LingeringRefreshGrowthCm"), -1), 100.0f);
@@ -550,18 +550,18 @@ bool FBreakerAbilitiesNumbersTest::RunTest(const FString& Parameters)
     const UBreakerAbilityDefinition* Closequarter = UBreakerAbilityDefinition::FindFallback(FName(TEXT("Caster.Closequarter")));
     if (TestNotNull(TEXT("Closequarter node tuning row is reachable"), Closequarter))
     {
-        TestEqual(TEXT("Momentum Transfer first rank is authored"), Closequarter->Number(TEXT("MomentumTransferRankOneSeconds"), -1), 2.0f);
+        TestEqual(TEXT("Momentum Transfer first rank is authored"), Closequarter->Number(TEXT("MomentumTransferRankOneSeconds"), -1), 3.0f);   // O272
         TestEqual(TEXT("Momentum Transfer second rank is authored"), Closequarter->Number(TEXT("MomentumTransferRankTwoSeconds"), -1), 3.0f);
     }
     const UBreakerAbilityDefinition* Resonance = UBreakerAbilityDefinition::FindFallback(FName(TEXT("Caster.Resonance")));
     if (TestNotNull(TEXT("Resonance resource tuning row is reachable"), Resonance))
     {
-        TestEqual(TEXT("Payment rank-one knob is authored"), Resonance->Number(TEXT("PaymentRankOneManaPerStatus"), -1), 2.0f);
+        TestEqual(TEXT("Payment rank-one knob is authored"), Resonance->Number(TEXT("PaymentRankOneManaPerStatus"), -1), 4.0f);   // O272
         TestEqual(TEXT("Payment rank-two knob is authored"), Resonance->Number(TEXT("PaymentRankTwoManaPerStatus"), -1), 4.0f);
     }
     if (Turret && Cleave)
     {
-        TestEqual(TEXT("Follow Through rank-one knob is authored"), Cleave->Number(TEXT("FollowThroughRankOneKillRefund"), -1), 3.0f);
+        TestEqual(TEXT("Follow Through rank-one knob is authored"), Cleave->Number(TEXT("FollowThroughRankOneKillRefund"), -1), 6.0f);   // O272
         TestEqual(TEXT("Follow Through rank-two knob is authored"), Cleave->Number(TEXT("FollowThroughRankTwoKillRefund"), -1), 6.0f);
         const TArray<FNumericProperty*> TurretNumbers = BreakerAbilityData::NumberProperties(Turret->AbilityClass.Get());
         const TArray<FNumericProperty*> CleaveNumbers = BreakerAbilityData::NumberProperties(Cleave->AbilityClass.Get());

@@ -113,15 +113,17 @@ bool FBreakerCasterStatusResourceRuntimeTest::RunTest(const FString& Parameters)
     ApplyPoison();
     Mana->AdvanceLoop(1);
     TestEqual(TEXT("Ordinary refresh pays nothing"), Mana->GetMana(), 2.0f);
-    for (int32 Rank = 1; Rank <= 2; ++Rank)
+    // O272: Seep is a single rank at the former rank-two multiplier (2).
+    if (!Buy(Void, TEXT("Caster.VoidWhisperer.Seep"))) return false;
+    Victim.Status->ConsumeAllStatuses();
     {
-        if (!Buy(Void, TEXT("Caster.VoidWhisperer.Seep"))) return false;
-        Victim.Status->ConsumeAllStatuses();
         const float Before = Mana->GetMana();
         ApplyPoison();
         Mana->AdvanceLoop(1);
-        TestEqual(TEXT("Purchased Seep rank scales real status income"), Mana->GetMana() - Before, Rank == 1 ? 3.0f : 4.0f);
+        TestEqual(TEXT("Purchased Seep doubles real status income"), Mana->GetMana() - Before, 4.0f);
     }
+    // O272: Follow Through is a single rank; this one purchase serves the
+    // refresh cap below and the kill refund at the end.
     if (!Buy(Blade, TEXT("Caster.Spellblade.FollowThrough"))) return false;
     FBreakerStatusApplicationSpec Bleed = Poison;
     Bleed.StatusTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Bleed"));
@@ -153,17 +155,17 @@ bool FBreakerCasterStatusResourceRuntimeTest::RunTest(const FString& Parameters)
     Kill.BaseDamage = 1000000;
     Kill.bCanCritical = false;
     Kill.SetInstigator(OtherKiller);
-    for (int32 Rank = 1; Rank <= 2; ++Rank)
+    // O272: Attrition is a single rank at the former rank-two refund (8).
+    if (!Buy(Void, TEXT("Caster.VoidWhisperer.Attrition"))) return false;
     {
-        if (!Buy(Void, TEXT("Caster.VoidWhisperer.Attrition"))) return false;
-        FVictim Afflicted = MakeVictim(World, FVector(1000 + Rank * 100, 0, 0));
+        FVictim Afflicted = MakeVictim(World, FVector(1100, 0, 0));
         Afflicted.Status->ApplyStatus(Poison, EBreakerDamageFamily::Physical, Caster);
         Afflicted.Status->ApplyStatus(Bleed, EBreakerDamageFamily::Physical, Caster);
         Mana->AdvanceLoop(2);
         const float Before = Mana->GetMana();
         TestTrue(TEXT("Another attacker really kills afflicted victim"), Afflicted.Combat->ReceiveDamage(Kill).bKilled);
         Afflicted.Combat->ReceiveDamage(Kill);
-        TestEqual(TEXT("Attrition pays once per victim, not per status or corpse hit"), Mana->GetMana() - Before, Rank == 1 ? 4.0f : 8.0f);
+        TestEqual(TEXT("Attrition pays once per victim, not per status or corpse hit"), Mana->GetMana() - Before, 8.0f);
     }
     FVictim ProcVictim = MakeVictim(World, FVector(1500, 0, 0));
     ProcVictim.Status->ApplyStatus(Secondary, EBreakerDamageFamily::Physical, Caster);
@@ -192,13 +194,12 @@ bool FBreakerCasterStatusResourceRuntimeTest::RunTest(const FString& Parameters)
 
     Kill.SetInstigator(Caster);
     Kill.SourceTags.AddTag(BreakerAbilityTags::Ability_Class_Caster_Cleave.GetTag());
-    for (int32 Rank = 1; Rank <= 2; ++Rank)
     {
-        if (Rank == 2 && !Buy(Blade, TEXT("Caster.Spellblade.FollowThrough"))) return false;
-        FVictim Cleaved = MakeVictim(World, FVector(1700 + Rank * 100, 0, 0));
+        // O272: the single Follow Through bought above pays the former rank-two refund.
+        FVictim Cleaved = MakeVictim(World, FVector(1800, 0, 0));
         const float Before = Mana->GetMana();
         TestTrue(TEXT("Real direct Cleave kill"), Cleaved.Combat->ReceiveDamage(Kill).bKilled);
-        TestEqual(TEXT("Follow Through rank kill refund"), Mana->GetMana() - Before, Rank == 1 ? 3.0f : 6.0f);
+        TestEqual(TEXT("Follow Through kill refund"), Mana->GetMana() - Before, 6.0f);
     }
     return true;
 }
@@ -227,18 +228,16 @@ bool FBreakerCasterSeepCurrentBudgetTest::RunTest(const FString& Parameters)
     Poison.Duration = 4;
     Poison.TickInterval = 1;
     FText Error;
-    for (int32 Rank = 1; Rank <= 2; ++Rank)
-    {
-        if (!TestTrue(TEXT("Seep rank fits today's two-point entitlement"), Caster->GetProgression()->PurchaseNode(
-            UBreakerProgressionLibrary::GetCasterVoidWhispererTree(), TEXT("Caster.VoidWhisperer.Seep"), Error))) return false;
-        Victim.Status->ConsumeAllStatuses();
-        const float Before = Caster->GetMana()->GetMana();
-        Victim.Status->ApplyStatus(Poison, EBreakerDamageFamily::Physical, Caster);
-        Caster->GetMana()->AdvanceLoop(1);
-        TestEqual(TEXT("Current-budget Seep purchase changes real application income"),
-            Caster->GetMana()->GetMana() - Before, Rank == 1 ? 3.0f : 4.0f);
-    }
-    TestEqual(TEXT("Both earned points were spent"), Caster->GetProgression()->GetProgressionState().UnspentDoctrinePoints, 0);
+    // O272: Seep is a one-point single at the former rank-two multiplier.
+    if (!TestTrue(TEXT("Seep fits today's two-point entitlement"), Caster->GetProgression()->PurchaseNode(
+        UBreakerProgressionLibrary::GetCasterVoidWhispererTree(), TEXT("Caster.VoidWhisperer.Seep"), Error))) return false;
+    Victim.Status->ConsumeAllStatuses();
+    const float Before = Caster->GetMana()->GetMana();
+    Victim.Status->ApplyStatus(Poison, EBreakerDamageFamily::Physical, Caster);
+    Caster->GetMana()->AdvanceLoop(1);
+    TestEqual(TEXT("Current-budget Seep purchase changes real application income"),
+        Caster->GetMana()->GetMana() - Before, 4.0f);
+    TestEqual(TEXT("One of the two earned points was spent"), Caster->GetProgression()->GetProgressionState().UnspentDoctrinePoints, 1);
     return true;
 }
 
@@ -258,18 +257,17 @@ bool FBreakerCasterPaymentRuntimeTest::RunTest(const FString& Parameters)
     World->InitializeActorsForPlay(FURL());
     const uint64 EntryFrame = GFrameCounter;
     ON_SCOPE_EXIT { GEngine->DestroyWorldContext(World); World->DestroyWorld(false); GFrameCounter = EntryFrame; };
-    // Payment rank two requires four doctrine points including prerequisites.
-    // This tests its authored purchase/cast wiring, not campaign reachability;
-    // the current campaign still grants only two and that gap remains pinned.
+    // O272: Payment is a one-point single with no Cycle prerequisite, paying
+    // the former rank-two refund. This tests its authored purchase/cast
+    // wiring; the fixture's four-point wallet is unchanged and the one point
+    // it spends fits the current two-point campaign grant.
     ABreakerCharacter* Caster = MakeCaster(World, 4);
     UAbilitySystemComponent* ASC = Caster->GetAbilitySystemComponent();
     const FGameplayAbilitySpecHandle Ability = ASC->GiveAbility(FGameplayAbilitySpec(UBreakerAbility_Resonance::StaticClass(), 1));
     FVictim Victim = MakeVictim(World);
     const UBreakerProgressionTree* Tree = UBreakerProgressionLibrary::GetCasterMultispellTree();
     FText Error;
-    if (!TestTrue(TEXT("Cycle prerequisite rank1"), Caster->GetProgression()->PurchaseNode(Tree, TEXT("Caster.Multispell.Cycle"), Error))
-        || !TestTrue(TEXT("Cycle investment rank2"), Caster->GetProgression()->PurchaseNode(Tree, TEXT("Caster.Multispell.Cycle"), Error))) return false;
-    for (int32 Rank = 0; Rank <= 2; ++Rank)
+    for (int32 Rank = 0; Rank <= 1; ++Rank)
     {
         if (Rank && !TestTrue(TEXT("Real Payment purchase"), Caster->GetProgression()->PurchaseNode(Tree, TEXT("Caster.Multispell.Payment"), Error))) return false;
         for (const TCHAR* Tag : {TEXT("Status.Bleed"), TEXT("Status.Poison")})
@@ -288,7 +286,7 @@ bool FBreakerCasterPaymentRuntimeTest::RunTest(const FString& Parameters)
         Caster->GetAttributes()->ApplyClassResource(80);
         TestTrue(TEXT("Real Resonance GAS cast"), ASC->TryActivateAbility(Ability));
         BreakerResolvePendingCast(World, Caster);
-        TestEqual(TEXT("Payment pays only eligible distinct type after forty-Mana cost"), Caster->GetMana()->GetMana(), 40.0f + Rank * 2.0f);
+        TestEqual(TEXT("Payment pays four per eligible distinct type after forty-Mana cost"), Caster->GetMana()->GetMana(), Rank ? 44.0f : 40.0f);
         TestEqual(TEXT("Baseline consumption still removes all statuses"), Victim.Status->GetDistinctStatusTypeCount(), 0);
     }
     return true;

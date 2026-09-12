@@ -151,15 +151,15 @@ bool FBreakerCoreElementBudgetRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("native reaction pays bounded funded amount"), Capped->Result.RawDamage, 150.125f * Ceiling, .001f);
     Reset();
     // Settle the actual authored campaign entitlement, then buy the real
-    // Variance prerequisite and Chain. This isolates propagation, not quest play.
+    // single-rank Chain (O272: no prerequisite). This isolates propagation,
+    // not quest play.
     FBreakerQuestFlagSet Completed;
     for (const auto& Mission : UBreakerMissionLibrary::GetMissions())
         for (const auto& Beat : Mission.Beats)
             for (FName Flag : UBreakerMissionLibrary::BeatCompletionFlags(Beat)) Completed.Add(Flag);
     Player->GetProgression()->SettleDoctrineEntitlement(Completed);
     const auto* Multispell = UBreakerProgressionLibrary::GetCasterMultispellTree();
-    for (const TCHAR* Id : { TEXT("Caster.Multispell.Variance"), TEXT("Caster.Multispell.Variance"), TEXT("Caster.Multispell.Chain") })
-        if (!TestTrue(TEXT("actual doctrine path to Chain"), Player->GetProgression()->PurchaseNode(Multispell, Id, Reason))) return false;
+    if (!TestTrue(TEXT("actual doctrine Chain purchase"), Player->GetProgression()->PurchaseNode(Multispell, TEXT("Caster.Multispell.Chain"), Reason))) return false;
     AActor* Recipient = World->SpawnActor<AActor>();
     if (!TestNotNull(TEXT("nearby Chain recipient"), Recipient)) return false;
     auto* Body = NewObject<USphereComponent>(Recipient); Recipient->AddInstanceComponent(Body); Recipient->SetRootComponent(Body);

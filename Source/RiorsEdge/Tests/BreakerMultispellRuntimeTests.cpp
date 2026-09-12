@@ -145,7 +145,8 @@ bool FBreakerMultispellPurchasedRuntimeTest::RunTest(const FString& Parameters)
     HitProjectile(Baseline, nullptr);
 
     if (!Buy(TEXT("Caster.Multispell.Cycle"))) return false;
-    TestFalse(TEXT("First Cycle rank changes timing without granting preview"), Cycle->CanPreviewAhead());
+    // O272: Cycle has one rank; the preview arrives with that purchase.
+    TestTrue(TEXT("Purchased Cycle immediately enables next-status preview"), Cycle->CanPreviewAhead());
     const int32 BeforeMiss = Cycle->GetCursor();
     ABreakerProjectileBase* Miss = CastFracture(Caster, Fracture);
     if (!TestNotNull(TEXT("cycle miss cast"), Miss)) return false;
@@ -171,9 +172,8 @@ bool FBreakerMultispellPurchasedRuntimeTest::RunTest(const FString& Parameters)
     HitProjectile(Entropy, Target);
     TestEqual(TEXT("duplicate impact cannot add Entropy twice"), Status->GetEntropyBuildup(), AfterEntropy);
     TestEqual(TEXT("actual third-position hit returns to physical pair"), Cycle->GetCursor(), 0);
-    if (!Buy(TEXT("Caster.Multispell.Variance")) || !Buy(TEXT("Caster.Multispell.Variance"))
-        || !Buy(TEXT("Caster.Multispell.Chain"))
-        || !Buy(TEXT("Caster.Multispell.Fracture"))) return false;
+    // O272: Fracture is the impactful half of Cycle's pair; Cycle is already owned.
+    if (!Buy(TEXT("Caster.Multispell.Fracture"))) return false;
     Status->ConsumeAllStatuses();
     ABreakerProjectileBase* Double = CastFracture(Caster, Fracture);
     if (!TestNotNull(TEXT("two-position cast"), Double)) return false;
@@ -238,8 +238,7 @@ bool FBreakerMultispellPurchasedRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("earned Rot keeps only half its scheduled budget"), RotAfter->UnpaidDamageBudget, RotBudgetBefore * .5f);
     TestEqual(TEXT("untyped detonation adds no Void buildup"), Status->GetVoidBuildup(), 0.0f);
     TestFalse(TEXT("untyped detonation cannot fabricate Erased"), Status->HasStatus(FGameplayTag::RequestGameplayTag(TEXT("Status.Erased"))));
-    if (!Buy(TEXT("Caster.Multispell.Cycle"))) return false;
-    TestTrue(TEXT("Second purchased Cycle rank immediately enables next-status preview"), Cycle->CanPreviewAhead());
+    // O272: there is no second Cycle rank; the preview was proven at the single purchase above.
     const FGameplayTag Predicted = Cycle->PeekNext(1);
     Cycle->AdvanceCycle();
     TestEqual(TEXT("Preview predicts the next real cursor position"), Cycle->PeekNext(), Predicted);

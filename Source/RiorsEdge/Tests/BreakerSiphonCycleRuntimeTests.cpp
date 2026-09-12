@@ -78,14 +78,13 @@ bool FBreakerSiphonCycleRuntimeTest::RunTest(const FString& Parameters)
     Flags.Add(TEXT("Quest.Finale.Seal")); Progression->SettleDoctrineEntitlement(Flags);
     TestEqual(TEXT("benchmark entitlement is eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 8);
     const auto* Tree = UBreakerProgressionLibrary::GetCasterMultispellTree();
-    for (const TCHAR* Node : { TEXT("Caster.Multispell.Variance"), TEXT("Caster.Multispell.Variance"),
-        TEXT("Caster.Multispell.Cycle"), TEXT("Caster.Multispell.Cycle"), TEXT("Caster.Multispell.Chain"),
-        TEXT("Caster.Multispell.Chain"), TEXT("Caster.Multispell.Fracture") })
+    // O272: Fracture is the impactful half of Cycle's pair; one point each.
+    for (const TCHAR* Node : { TEXT("Caster.Multispell.Cycle"), TEXT("Caster.Multispell.Fracture") })
     {
         const bool bBought = Progression->PurchaseNode(Tree, Node, Reason);
         if (!TestTrue(FString::Printf(TEXT("purchase %s: %s"), Node, *Reason.ToString()), bBought)) return false;
     }
-    TestEqual(TEXT("MS7 path spends exactly eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
+    TestEqual(TEXT("Cycle pair spends two of eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 6);
     if (!Progression->IsAbilityUnlocked(TEXT("Caster.Fracture")))
         if (!TestTrue(TEXT("earned token unlocks Fracture"), Progression->SpendAbilityToken(TEXT("Caster.Fracture"), Reason))) return false;
     auto* Mana = Player->GetMana(); Mana->BindAttributes(Player->GetAttributes()); Mana->SetComponentTickEnabled(false); Mana->AdvanceLoop(30);

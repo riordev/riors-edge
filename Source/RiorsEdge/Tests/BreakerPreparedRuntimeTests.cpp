@@ -40,18 +40,18 @@ bool FBreakerPreparedRuntimeTest::RunTest(const FString& Parameters)
         auto* Mana=Player->GetMana();Mana->BindAttributes(Attr);Mana->SetComponentTickEnabled(false);
         const auto* Tree=UBreakerProgressionLibrary::GetCasterMultispellTree();const FName Prepared(TEXT("Caster.Multispell.Prepared"));
         const auto* Node=Tree->FindNode(Prepared);if(!TestNotNull(TEXT("Authored Prepared exists"),Node))return false;
-        TestEqual(TEXT("Tier four"),Node->Tier,4);TestEqual(TEXT("One rank"),Node->MaxRank,1);TestEqual(TEXT("Two points"),Node->CostPerRank,2);TestEqual(TEXT("Six invested"),Node->RequiredTreeInvestment,6);
+        // O272: Prepared is the impactful half of Reservoir's pair.
+        TestEqual(TEXT("Tier one"),Node->Tier,1);TestEqual(TEXT("One rank"),Node->MaxRank,1);TestEqual(TEXT("One point"),Node->CostPerRank,1);TestEqual(TEXT("No investment gate"),Node->RequiredTreeInvestment,0);
         if(!TestEqual(TEXT("One historical prerequisite"),Node->Prerequisites.Num(),1))return false;
         TestEqual(TEXT("Prepared follows Reservoir"),Node->Prerequisites[0].NodeId,FName(TEXT("Caster.Multispell.Reservoir")));
         FBreakerQuestFlagSet Flags;for(const auto& Mission:UBreakerMissionLibrary::GetMissions())for(const auto& Beat:Mission.Beats)
             for(const auto& Flag:UBreakerMissionLibrary::BeatCompletionFlags(Beat))Flags.Add(Flag);
         Progression->SettleDoctrineEntitlement(Flags);FText Reason;
         TestEqual(TEXT("Campaign pays eight doctrine points"),Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),8);
-        TestFalse(TEXT("Wallet does not bypass investment gate"),Progression->PurchaseNode(Tree,Prepared,Reason));
-        for(const TCHAR* Id:{TEXT("Caster.Multispell.Variance"),TEXT("Caster.Multispell.Cycle"),TEXT("Caster.Multispell.Reservoir"),TEXT("Caster.Multispell.Chain"),TEXT("Caster.Multispell.Payment"),TEXT("Caster.Multispell.Sequence")})
-            if(!Progression->PurchaseNode(Tree,Id,Reason))return false;
+        TestFalse(TEXT("Wallet does not bypass the travel prerequisite"),Progression->PurchaseNode(Tree,Prepared,Reason));
+        if(!Progression->PurchaseNode(Tree,TEXT("Caster.Multispell.Reservoir"),Reason))return false;
         if(bBuyPrepared&&!Progression->PurchaseNode(Tree,Prepared,Reason))return false;
-        TestEqual(TEXT("Exact optional two-point purchase"),Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),bBuyPrepared?0:2);
+        TestEqual(TEXT("Exact optional one-point purchase"),Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),bBuyPrepared?6:7);
         const float ExpectedFloor=bBuyPrepared?-35.f:-20.f;
         TestEqual(TEXT("Published resource floor follows ownership"),Mana->GetPublishedFloor(),ExpectedFloor,.001f);
         TestEqual(TEXT("Authoritative attribute carries the same floor"),Attr->GetClassResourceFloor(),ExpectedFloor,.001f);
@@ -81,12 +81,15 @@ bool FBreakerPreparedRuntimeTest::RunTest(const FString& Parameters)
         Status->ApplyStatusFromHit(Poison,EBreakerDamageFamily::Physical,ApplyingHit);
         if(!TestEqual(TEXT("Actual first status application accepted"),Status->GetDistinctStatusTypeCount(),1))return false;
         // This source-isolated interval preserves actual passive regeneration.
-        // Variance rank1 queues4; .75s budget admits all4. Passive16.5 leaves
-        // the bank negative before queue payment, so exactly8 status Mana pays.
+        // Only Reservoir's pair is owned (O272), so one new status queues the
+        // base StatusApplicationMana; the .75s budget admits it all. Passive
+        // 16.5 leaves the bank negative before queue payment, so the status
+        // Mana pays exactly doubled.
         const float Before=Mana->GetMana();const float Seconds=.75f;
         const float Passive=Mana->PassiveRegenPerSecond*Seconds*Mana->OvercastGenerationMultiplier;
+        const float StatusIncome=UBreakerManaComponent::GetResourceTuning().StatusApplicationMana*Mana->OvercastGenerationMultiplier;
         Mana->AdvanceLoop(Seconds);
-        TestEqual(TEXT("Overcast status income doubles exactly once with or without Prepared"),Mana->GetMana()-Before-Passive,8.f,.001f);
+        TestEqual(TEXT("Overcast status income doubles exactly once with or without Prepared"),Mana->GetMana()-Before-Passive,StatusIncome,.001f);
         Mana->AdvanceLoop(20);if(!Mana->TrySpendMana(Mana->GetMana()-4))return false;
         TestEqual(TEXT("Prepared never discounts the actual spell quote"),Abilities->GetResourceCostForSlot(Spell),30.f,.001f);
         TestEqual(TEXT("HUD affordability uses authored deeper floor"),Abilities->CanAffordSlot(Spell),bBuyPrepared);

@@ -36,7 +36,7 @@ bool FBreakerPatienceRecoveryRuntimeTest::RunTest(const FString& Parameters)
     auto* Progression = Player->GetProgression(); Progression->BindAttributes(Attributes);
     if (!Progression->ChoosePermanentClassById(EBreakerClassId::Caster)) return false;
     Progression->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(50, Progression->ExperienceCurve));
-    // Restored entitlement fixture; only the two legal entry ranks are spent.
+    // Restored entitlement fixture; only Patience's single rank is spent (O272).
     FBreakerQuestFlagSet Flags;
     for (const auto& Mission : UBreakerMissionLibrary::GetMissions())
         for (const auto& Beat : Mission.Beats)
@@ -44,10 +44,10 @@ bool FBreakerPatienceRecoveryRuntimeTest::RunTest(const FString& Parameters)
     Flags.Add(TEXT("Quest.Finale.Seal")); Progression->SettleDoctrineEntitlement(Flags);
     auto* Mana = Player->GetMana(); Mana->BindAttributes(Attributes); Mana->SetComponentTickEnabled(false);
     auto* Weapon = Player->GetWeapon(); Weapon->BeginPlay(); Weapon->SetComponentTickEnabled(false);
-    for (int32 Rank = 0; Rank <= 2; ++Rank)
+    for (int32 Rank = 0; Rank <= 1; ++Rank)
     {
         FText Reason;
-        if (Rank > 0 && !TestTrue(TEXT("actual Patience entry rank purchase"), Progression->PurchaseNode(
+        if (Rank > 0 && !TestTrue(TEXT("actual Patience purchase"), Progression->PurchaseNode(
             UBreakerProgressionLibrary::GetCasterVoidWhispererTree(), TEXT("Caster.VoidWhisperer.Patience"), Reason))) return false;
         Mana->AdvanceLoop(30);
         for (int32 Step = 0; Step < 20; ++Step) { ++GFrameCounter; World->Tick(LEVELTICK_All, .05f); }
@@ -57,7 +57,9 @@ bool FBreakerPatienceRecoveryRuntimeTest::RunTest(const FString& Parameters)
         if (!TestTrue(TEXT("real weapon shot resets the no-fire clock"), Weapon->GetLastShot().bFired)) return false;
         if (!TestTrue(TEXT("ordinary spend leaves recovery headroom"), Mana->TrySpendMana(90))) return false;
         const float Before = Mana->GetMana();
-        const float Delay = Rank == 2 ? 2.0f : 4.0f;
+        // O272: the single rank's idle delay is two seconds. The unowned pass
+        // reads the same window and pays only starter regeneration through it.
+        const float Delay = 2.0f;
         Mana->AdvanceLoop(Delay - .25f);
         TestEqual(TEXT("before delay only starter regeneration pays"), Mana->GetMana() - Before, 11.0f * (Delay - .25f), .001f);
         const float AtBoundary = Mana->GetMana(); Mana->AdvanceLoop(.5f);

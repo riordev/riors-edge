@@ -12,7 +12,7 @@
 		"Source/RiorsEdge/Progression/BreakerCoreRosterWeapon.cpp": "668dc0b08541588e995afe28301d8ae2bacb2106",
 		"Source/RiorsEdge/Progression/BreakerCoreTree.cpp": "0d1c3252ee7f95d02fea3445e83f7e71b05e15c2",
 		"Source/RiorsEdge/Progression/BreakerCoreTree.h": "d5cbc90580dd4568eeb1ee21d00f5159dc56bbae",
-		"Source/RiorsEdge/Progression/BreakerProgressionLibrary.cpp": "5c43a151217b91d607ff2bbefcad85d8621f83f4",
+		"Source/RiorsEdge/Progression/BreakerProgressionLibrary.cpp": "5b1638ccd1c9746d205dd6f6d3cde63c6b7fd417",
 		"Source/RiorsEdge/Progression/BreakerProgressionNode.h": "b18436bdeeeef00075344254bd538c6fb1e3140e",
 		"Source/RiorsEdge/Progression/BreakerProgressionTree.h": "9dfcbac0af583d1da7c0e6ed117e8c94231d1395",
 		"Source/RiorsEdge/Progression/BreakerProgressionTypes.h": "d1f683b84a26b912db1ef42a87f87eeff96d02e8"
@@ -8040,51 +8040,9 @@
 			"adjacencyEdges": [],
 			"nodes": [
 				{
-					"id": "Caster.Spellblade.ContactCharge",
-					"tier": 1,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Caster.Spellblade.ContactCharge"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Caster.Spellblade.FollowThrough",
-					"tier": 1,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Caster.Spellblade.FollowThrough"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Caster.Spellblade.Close",
-					"tier": 1,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Caster.Spellblade.Close"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
 					"id": "Caster.Spellblade.Debt",
-					"tier": 2,
-					"ranks": 2,
+					"tier": 1,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -8093,99 +8051,13 @@
 						"Progression.Node.Caster.Spellblade.Debt"
 					],
 					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Caster.Spellblade.ContactCharge",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Caster.Spellblade.MomentumTransfer",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Caster.Spellblade.MomentumTransfer"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Caster.Spellblade.FollowThrough",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Caster.Spellblade.Bloodprice",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Caster.Spellblade.Bloodprice"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Caster.Spellblade.Close",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Caster.Spellblade.Blink",
-					"tier": 3,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Caster.Spellblade.Blink"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Caster.Spellblade.MomentumTransfer",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
-				},
-				{
-					"id": "Caster.Spellblade.Edge",
-					"tier": 3,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Caster.Spellblade.Edge"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Caster.Spellblade.Bloodprice",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
+					"prerequisites": []
 				},
 				{
 					"id": "Caster.Spellblade.Overreach",
-					"tier": 4,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
@@ -8198,14 +8070,27 @@
 							"id": "Caster.Spellblade.Debt",
 							"rank": 1
 						}
+					]
+				},
+				{
+					"id": "Caster.Spellblade.Bloodprice",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.Spellblade.Bloodprice"
 					],
-					"requiredTreeInvestment": 6
+					"exclusive": [],
+					"prerequisites": []
 				},
 				{
 					"id": "Caster.Spellblade.Reprisal",
-					"tier": 4,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
@@ -8218,14 +8103,93 @@
 							"id": "Caster.Spellblade.Bloodprice",
 							"rank": 1
 						}
+					]
+				},
+				{
+					"id": "Caster.Spellblade.MomentumTransfer",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.Spellblade.MomentumTransfer"
 					],
-					"requiredTreeInvestment": 6
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Caster.Spellblade.Blink",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.Spellblade.Blink"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Caster.Spellblade.MomentumTransfer",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Caster.Spellblade.FollowThrough",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.Spellblade.FollowThrough"
+					],
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Caster.Spellblade.Edge",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.Spellblade.Edge"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Caster.Spellblade.FollowThrough",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Caster.Spellblade.Close",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.Spellblade.Close"
+					],
+					"exclusive": [],
+					"prerequisites": []
 				},
 				{
 					"id": "Caster.Spellblade.NoDistance",
-					"tier": 4,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
@@ -8235,17 +8199,30 @@
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Caster.Spellblade.MomentumTransfer",
+							"id": "Caster.Spellblade.Close",
 							"rank": 1
 						}
+					]
+				},
+				{
+					"id": "Caster.Spellblade.ContactCharge",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.Spellblade.ContactCharge"
 					],
-					"requiredTreeInvestment": 6
+					"exclusive": [],
+					"prerequisites": []
 				},
 				{
 					"id": "Caster.Spellblade.Edgework",
 					"tier": 4,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": true,
 					"constellation": "None",
 					"effects": [
@@ -8264,7 +8241,7 @@
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Caster.Spellblade.Debt",
+							"id": "Caster.Spellblade.ContactCharge",
 							"rank": 1
 						}
 					],
@@ -8282,23 +8259,9 @@
 			"adjacencyEdges": [],
 			"nodes": [
 				{
-					"id": "Caster.VoidWhisperer.Seep",
-					"tier": 1,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Caster.VoidWhisperer.Seep"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
 					"id": "Caster.VoidWhisperer.StandingWater",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -8310,112 +8273,10 @@
 					"prerequisites": []
 				},
 				{
-					"id": "Caster.VoidWhisperer.Patience",
-					"tier": 1,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Caster.VoidWhisperer.Patience"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Caster.VoidWhisperer.Lingering",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [
-						{
-							"target": "AbilityDuration",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 15,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Caster.VoidWhisperer.Lingering"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Caster.VoidWhisperer.StandingWater",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Caster.VoidWhisperer.Attrition",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Caster.VoidWhisperer.Attrition"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Caster.VoidWhisperer.Seep",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Caster.VoidWhisperer.Drain",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Caster.VoidWhisperer.Drain"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Caster.VoidWhisperer.Patience",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Caster.VoidWhisperer.Zonework",
-					"tier": 3,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Caster.VoidWhisperer.Zonework"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Caster.VoidWhisperer.Attrition",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
-				},
-				{
 					"id": "Caster.VoidWhisperer.Wellspring",
-					"tier": 3,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
@@ -8425,37 +8286,71 @@
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Caster.VoidWhisperer.Lingering",
+							"id": "Caster.VoidWhisperer.StandingWater",
 							"rank": 1
 						}
-					],
-					"requiredTreeInvestment": 4
+					]
 				},
 				{
-					"id": "Caster.VoidWhisperer.SnapshotDiscipline",
-					"tier": 4,
+					"id": "Caster.VoidWhisperer.Lingering",
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [
+						{
+							"target": "AbilityDuration",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 30,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [
+						"Progression.Node.Caster.VoidWhisperer.Lingering"
+					],
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Caster.VoidWhisperer.Zonework",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
 					"tags": [
-						"Progression.Node.Caster.VoidWhisperer.SnapshotDiscipline"
+						"Progression.Node.Caster.VoidWhisperer.Zonework"
 					],
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Caster.VoidWhisperer.Zonework",
+							"id": "Caster.VoidWhisperer.Lingering",
 							"rank": 1
 						}
+					]
+				},
+				{
+					"id": "Caster.VoidWhisperer.Attrition",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.VoidWhisperer.Attrition"
 					],
-					"requiredTreeInvestment": 6
+					"exclusive": [],
+					"prerequisites": []
 				},
 				{
 					"id": "Caster.VoidWhisperer.Terminal",
-					"tier": 4,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
@@ -8468,14 +8363,60 @@
 							"id": "Caster.VoidWhisperer.Attrition",
 							"rank": 1
 						}
+					]
+				},
+				{
+					"id": "Caster.VoidWhisperer.Seep",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.VoidWhisperer.Seep"
 					],
-					"requiredTreeInvestment": 6
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Caster.VoidWhisperer.SnapshotDiscipline",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.VoidWhisperer.SnapshotDiscipline"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Caster.VoidWhisperer.Seep",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Caster.VoidWhisperer.Drain",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.VoidWhisperer.Drain"
+					],
+					"exclusive": [],
+					"prerequisites": []
 				},
 				{
 					"id": "Caster.VoidWhisperer.LongDebt",
-					"tier": 4,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
@@ -8488,14 +8429,27 @@
 							"id": "Caster.VoidWhisperer.Drain",
 							"rank": 1
 						}
+					]
+				},
+				{
+					"id": "Caster.VoidWhisperer.Patience",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.VoidWhisperer.Patience"
 					],
-					"requiredTreeInvestment": 6
+					"exclusive": [],
+					"prerequisites": []
 				},
 				{
 					"id": "Caster.VoidWhisperer.LongDark",
 					"tier": 4,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": true,
 					"constellation": "None",
 					"effects": [
@@ -8514,7 +8468,7 @@
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Caster.VoidWhisperer.Attrition",
+							"id": "Caster.VoidWhisperer.Patience",
 							"rank": 1
 						}
 					],
@@ -8532,79 +8486,9 @@
 			"adjacencyEdges": [],
 			"nodes": [
 				{
-					"id": "Caster.Multispell.Variance",
-					"tier": 1,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Caster.Multispell.Variance"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Caster.Multispell.Cycle",
-					"tier": 1,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Caster.Multispell.Cycle"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Caster.Multispell.Reservoir",
-					"tier": 1,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [
-						{
-							"target": "MaxClassResource",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 12,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Caster.Multispell.Reservoir"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Caster.Multispell.Chain",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Caster.Multispell.Chain"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Caster.Multispell.Variance",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
 					"id": "Caster.Multispell.Payment",
-					"tier": 2,
-					"ranks": 2,
+					"tier": 1,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -8613,59 +8497,13 @@
 						"Progression.Node.Caster.Multispell.Payment"
 					],
 					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Caster.Multispell.Cycle",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Caster.Multispell.Sequence",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Caster.Multispell.Sequence"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Caster.Multispell.Reservoir",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Caster.Multispell.Fracture",
-					"tier": 3,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Caster.Multispell.Fracture"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Caster.Multispell.Chain",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
+					"prerequisites": []
 				},
 				{
 					"id": "Caster.Multispell.Resonance",
-					"tier": 3,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
@@ -8678,14 +8516,35 @@
 							"id": "Caster.Multispell.Payment",
 							"rank": 1
 						}
+					]
+				},
+				{
+					"id": "Caster.Multispell.Reservoir",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [
+						{
+							"target": "MaxClassResource",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 24,
+							"condition": "Always",
+							"alsoRequires": []
+						}
 					],
-					"requiredTreeInvestment": 4
+					"tags": [
+						"Progression.Node.Caster.Multispell.Reservoir"
+					],
+					"exclusive": [],
+					"prerequisites": []
 				},
 				{
 					"id": "Caster.Multispell.Prepared",
-					"tier": 4,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
@@ -8698,34 +8557,27 @@
 							"id": "Caster.Multispell.Reservoir",
 							"rank": 1
 						}
-					],
-					"requiredTreeInvestment": 6
+					]
 				},
 				{
-					"id": "Caster.Multispell.Interference",
-					"tier": 4,
+					"id": "Caster.Multispell.Chain",
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
 					"tags": [
-						"Progression.Node.Caster.Multispell.Interference"
+						"Progression.Node.Caster.Multispell.Chain"
 					],
 					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Caster.Multispell.Resonance",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 6
+					"prerequisites": []
 				},
 				{
 					"id": "Caster.Multispell.ConductorRule",
-					"tier": 4,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
@@ -8738,14 +8590,93 @@
 							"id": "Caster.Multispell.Chain",
 							"rank": 1
 						}
+					]
+				},
+				{
+					"id": "Caster.Multispell.Cycle",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.Multispell.Cycle"
 					],
-					"requiredTreeInvestment": 6
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Caster.Multispell.Fracture",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.Multispell.Fracture"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Caster.Multispell.Cycle",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Caster.Multispell.Variance",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.Multispell.Variance"
+					],
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Caster.Multispell.Interference",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.Multispell.Interference"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Caster.Multispell.Variance",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Caster.Multispell.Sequence",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Caster.Multispell.Sequence"
+					],
+					"exclusive": [],
+					"prerequisites": []
 				},
 				{
 					"id": "Caster.Multispell.Cascade",
 					"tier": 4,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": true,
 					"constellation": "None",
 					"effects": [

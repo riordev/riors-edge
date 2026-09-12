@@ -145,16 +145,16 @@ bool FBreakerCoreLongDarkRuntimeTest::RunTest(const FString& Parameters)
     Player->GetCombat()->ReceiveDamage(Kill); TestFalse(TEXT("actual source death revokes target lease immediately"), A.Status->HasStatus(Rot));
     Player->GetCombat()->RestoreVitals(); A.Status->AdvanceStatuses(4); TestFalse(TEXT("revival does not restart old lease"), A.Status->HasStatus(Rot));
 
-    // Purchase the actual Chain path from authored campaign entitlement. Its
-    // physical propagation remains allowed, but persistent Rot cannot spread.
+    // Purchase the actual single-rank Chain (O272: no prerequisite) from
+    // authored campaign entitlement. Its physical propagation remains allowed,
+    // but persistent Rot cannot spread.
     FBreakerQuestFlagSet Completed;
     for (const auto& Mission : UBreakerMissionLibrary::GetMissions())
         for (const auto& Beat : Mission.Beats)
             for (FName Flag : UBreakerMissionLibrary::BeatCompletionFlags(Beat)) Completed.Add(Flag);
     Progression->SettleDoctrineEntitlement(Completed);
     const auto* Multispell = UBreakerProgressionLibrary::GetCasterMultispellTree();
-    for (const TCHAR* Id : { TEXT("Caster.Multispell.Variance"), TEXT("Caster.Multispell.Variance"), TEXT("Caster.Multispell.Chain") })
-        if (!TestTrue(TEXT("actual Chain doctrine purchase"), Progression->PurchaseNode(Multispell, Id, Reason))) return false;
+    if (!TestTrue(TEXT("actual Chain doctrine purchase"), Progression->PurchaseNode(Multispell, TEXT("Caster.Multispell.Chain"), Reason))) return false;
     B.Combat->RestoreVitals(); A.Combat->RestoreVitals();
     FBreakerStatusApplicationSpec Poison; Poison.StatusTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Poison")); Poison.BaseDamagePerTick = 1; Poison.Duration = 10; Poison.TickInterval = 1;
     A.Status->ApplyStatus(Poison, EBreakerDamageFamily::Physical, Player); A.Combat->ReceiveDamage(Hit);
