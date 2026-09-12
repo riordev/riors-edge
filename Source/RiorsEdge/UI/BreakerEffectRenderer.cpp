@@ -17,6 +17,10 @@ namespace
     constexpr float EffectUnitMeshCm = 100.0f;
     const TCHAR* EffectShapeCube = TEXT("/Engine/BasicShapes/Cube.Cube");
     const TCHAR* EffectShapeSphere = TEXT("/Engine/BasicShapes/Sphere.Sphere");
+    // The stock cone is 100 cm tall on its local Z with its pivot at the
+    // centre of that height: base at -50, apex at +50. A flare is placed at
+    // its base plus half its length along the direction.
+    const TCHAR* EffectShapeCone = TEXT("/Engine/BasicShapes/Cone.Cone");
 
     UStaticMeshComponent* EffectMakePooledMesh(AActor* Owner, USceneComponent* Parent,
         const FString& Name, const TCHAR* MeshPath)
@@ -78,6 +82,18 @@ ABreakerEffectRenderer::ABreakerEffectRenderer()
     {
         StrokeMeshes.Add(EffectMakePooledMesh(this, Root,
             FString::Printf(TEXT("EffectStroke%d"), Index), EffectShapeCube));
+    }
+    FlareMeshes.Reserve(FlareSlots);
+    for (int32 Index = 0; Index < FlareSlots; ++Index)
+    {
+        FlareMeshes.Add(EffectMakePooledMesh(this, Root,
+            FString::Printf(TEXT("EffectFlare%d"), Index), EffectShapeCone));
+    }
+    ShardMeshes.Reserve(ShardSlots);
+    for (int32 Index = 0; Index < ShardSlots; ++Index)
+    {
+        ShardMeshes.Add(EffectMakePooledMesh(this, Root,
+            FString::Printf(TEXT("EffectShard%d"), Index), EffectShapeCube));
     }
 
     EffectLights.Reserve(EffectLightSlots);
@@ -142,13 +158,14 @@ UNiagaraSystem* ABreakerEffectRenderer::ResolveMomentSystem(EBreakerEffectMoment
 }
 
 int32 ABreakerEffectRenderer::PlayMoment(EBreakerEffectMoment Moment, const FVector& Location,
-    const FVector& Direction, const FLinearColor& Color, float DelaySeconds)
+    const FVector& Direction, const FLinearColor& Color, float DelaySeconds, float Scale)
 {
-    if (DelaySeconds <= KINDA_SMALL_NUMBER) return PlayMomentNow(Moment, Location, Direction, Color);
+    if (DelaySeconds <= KINDA_SMALL_NUMBER) return PlayMomentNow(Moment, Location, Direction, Color, Scale);
 
-    // A moment that would draw nothing (unauthored, and its fallback is
-    // somebody else's primitive) must not occupy a pending slot: a shotgun's
-    // landed pellets would otherwise evict the death scheduled beside them.
+    // A moment that would draw nothing (unauthored, and no primitive stand-in)
+    // must not occupy a pending slot: a shotgun's landed pellets would
+    // otherwise evict the death scheduled beside them. Every shipped moment
+    // draws today (O282); the guard stays for the day one does not.
     if (!ResolveMomentSystem(Moment) && !BreakerFX::MomentFallback(Moment).bDrawn) return 0;
 
     // A Niagara component cannot be told "start in 0.18 s", so a scheduled
@@ -161,14 +178,16 @@ int32 ABreakerEffectRenderer::PlayMoment(EBreakerEffectMoment Moment, const FVec
     Pending.Direction = Direction;
     Pending.Color = Color;
     Pending.FireTime = (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0) + DelaySeconds;
+    Pending.Scale = Scale;
     Pending.bActive = true;
     NextPendingMoment = (NextPendingMoment + 1) % PendingMomentSlots;
     return 0;
 }
 
 int32 ABreakerEffectRenderer::PlayMomentNow(EBreakerEffectMoment Moment, const FVector& Location,
-    const FVector& Direction, const FLinearColor& Color)
+    const FVector& Direction, const FLinearColor& Color, float Scale)
 {
+    const FVector Facing = Direction.IsNearlyZero() ? FVector::UpVector : Direction.GetSafeNormal();
     if (UNiagaraSystem* System = ResolveMomentSystem(Moment))
     {
         UNiagaraComponent* Niagara = MomentComponents.IsValidIndex(NextMomentSlot)
@@ -176,12 +195,15 @@ int32 ABreakerEffectRenderer::PlayMomentNow(EBreakerEffectMoment Moment, const F
         NextMomentSlot = (NextMomentSlot + 1) % MomentSlots;
         if (Niagara)
         {
-            const FVector Facing = Direction.IsNearlyZero() ? FVector::UpVector : Direction.GetSafeNormal();
             if (Niagara->GetAsset() != System) Niagara->SetAsset(System);
             Niagara->SetWorldLocationAndRotation(Location, FRotationMatrix::MakeFromX(Facing).Rotator());
             // The one parameter every moment system is asked to expose. A
             // system without it simply ignores the write and plays its
             // authored colour — the O179 law is then the author's to keep.
+            // GAP: Scale is not handed to the authored system. The README's
+            // contract names one parameter, Color; a second is a contract
+            // change for the ASSETS-5 author, not a write this side can
+            // make and hope an emitter reads.
             Niagara->SetVariableLinearColor(TEXT("Color"), Color);
             Niagara->Activate(/*bReset*/ true);
             return 0;
@@ -191,6 +213,7 @@ int32 ABreakerEffectRenderer::PlayMomentNow(EBreakerEffectMoment Moment, const F
     // Not authored yet: the pooled primitives stand in.
     const BreakerFX::FMomentFallback Fallback = BreakerFX::MomentFallback(Moment);
     if (!Fallback.bDrawn) return 0;
+    const float Size = FMath::Max(Scale, 0.0f);
     int32 Handle = 0;
     if (Fallback.RadiusCm > 0.0f)
     {
@@ -198,16 +221,73 @@ int32 ABreakerEffectRenderer::PlayMomentNow(EBreakerEffectMoment Moment, const F
     }
     if (Fallback.TongueCm > 0.0f)
     {
-        const FVector Facing = Direction.IsNearlyZero() ? FVector::UpVector : Direction.GetSafeNormal();
-        const int32 Tongue = AddStroke(Location, Location + Facing * Fallback.TongueCm,
+        // Scale lengthens the tongue, never thickens it: the thickness is the
+        // part the reticle law measures at the muzzle offset.
+        const int32 Tongue = AddStroke(Location, Location + Facing * (Fallback.TongueCm * Size),
             Fallback.TongueThicknessCm, Color, Fallback.Intensity, Fallback.Timing);
         if (Handle == 0) Handle = Tongue;
+    }
+    if (Fallback.FlareBaseRadiusCm > 0.0f && Fallback.FlareLengthCm > 0.0f)
+    {
+        AddFlare(Location, Facing, Fallback.FlareBaseRadiusCm * Size, Fallback.FlareLengthCm * Size,
+            Color, Fallback.Intensity, Fallback.Timing);
+    }
+    if (Fallback.ShardCount > 0)
+    {
+        SpawnShards(Location, Facing, Color, Fallback);
     }
     if (Fallback.LightRadiusCm > 0.0f)
     {
         AddBlinkLight(Location, Fallback.LightRadiusCm, Color, Fallback.LightIntensity, Fallback.Timing);
     }
     return Handle;
+}
+
+int32 ABreakerEffectRenderer::AddFlare(const FVector& Base, const FVector& Direction, float BaseRadiusCm,
+    float LengthCm, const FLinearColor& Color, float Intensity, const BreakerFX::FEffectTiming& Timing)
+{
+    FEffectSlot& Slot = FlareState[NextFlareSlot];
+    Slot = FEffectSlot();
+    Slot.A = Base;
+    Slot.B = Base + Direction * LengthCm;
+    Slot.StartTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    Slot.Timing = Timing;
+    Slot.Color = Color;
+    Slot.SizeCm = BaseRadiusCm;
+    Slot.Intensity = Intensity;
+    Slot.bActive = true;
+    Slot.Serial = NextSerial++;
+    NextFlareSlot = (NextFlareSlot + 1) % FlareSlots;
+    return Slot.Serial;
+}
+
+void ABreakerEffectRenderer::SpawnShards(const FVector& Origin, const FVector& Normal, const FLinearColor& Color,
+    const BreakerFX::FMomentFallback& Fallback)
+{
+    const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    // Round-robin like every pool here. A burst never asks for more than the
+    // pool holds, so one impact cannot evict its own shards.
+    const int32 Count = FMath::Min(Fallback.ShardCount, ShardSlots);
+    for (int32 Index = 0; Index < Count; ++Index)
+    {
+        FShardSlot& Slot = ShardState[NextShardSlot];
+        Slot = FShardSlot();
+        Slot.Origin = Origin;
+        Slot.Normal = Normal;
+        Slot.StartTime = Now;
+        Slot.Index = Index;
+        Slot.Count = Count;
+        Slot.Color = Color;
+        Slot.Intensity = Fallback.Intensity;
+        Slot.Seconds = Fallback.ShardSeconds;
+        Slot.SpeedCms = Fallback.ShardSpeedCms;
+        Slot.GravityCms2 = Fallback.ShardGravityCms2;
+        Slot.ConeDegrees = Fallback.ShardConeDegrees;
+        Slot.LengthCm = Fallback.ShardLengthCm;
+        Slot.ThicknessCm = Fallback.ShardThicknessCm;
+        Slot.bActive = true;
+        NextShardSlot = (NextShardSlot + 1) % ShardSlots;
+    }
 }
 
 void ABreakerEffectRenderer::BeginPlay()
@@ -228,6 +308,8 @@ void ABreakerEffectRenderer::BeginPlay()
     };
     BuildMaterials(GlowMeshes, GlowMaterials);
     BuildMaterials(StrokeMeshes, StrokeMaterials);
+    BuildMaterials(FlareMeshes, FlareMaterials);
+    BuildMaterials(ShardMeshes, ShardMaterials);
 }
 
 int32 ABreakerEffectRenderer::AddGlow(const FVector& Center, float RadiusCm, const FLinearColor& Color,
@@ -325,6 +407,7 @@ void ABreakerEffectRenderer::EndEffect(int32 Handle, float FadeOutSeconds)
     };
     for (FEffectSlot& Slot : GlowState) { if (EndSlot(Slot)) return; }
     for (FEffectSlot& Slot : StrokeState) { if (EndSlot(Slot)) return; }
+    for (FEffectSlot& Slot : FlareState) { if (EndSlot(Slot)) return; }
     for (FEffectLightSlot& Slot : LightState) { if (EndSlot(Slot)) return; }
 }
 
@@ -341,7 +424,24 @@ void ABreakerEffectRenderer::SetEffectRemaining(int32 Handle, float RemainingSec
     };
     for (auto& Slot : GlowState) if (Update(Slot)) return;
     for (auto& Slot : StrokeState) if (Update(Slot)) return;
+    for (auto& Slot : FlareState) if (Update(Slot)) return;
     for (auto& Slot : LightState) if (Update(Slot)) return;
+}
+
+void ABreakerEffectRenderer::SetStrokeEndpoints(int32 Handle, const FVector& A, const FVector& B)
+{
+    if (Handle <= 0) return;
+    for (FEffectSlot& Slot : StrokeState)
+    {
+        if (!Slot.bActive || Slot.Serial != Handle) continue;
+        // An anchored beam's endpoints belong to its anchors; the tick would
+        // overwrite this before anyone saw it, so it is refused rather than
+        // drawn for a frame that never comes.
+        if (Slot.bAnchored) return;
+        Slot.A = A;
+        Slot.B = B;
+        return;
+    }
 }
 
 void ABreakerEffectRenderer::Hide(UStaticMeshComponent* Mesh)
@@ -363,7 +463,7 @@ void ABreakerEffectRenderer::Tick(float DeltaSeconds)
     {
         if (!Pending.bActive || Now < Pending.FireTime) continue;
         Pending.bActive = false;
-        PlayMomentNow(Pending.Moment, Pending.Location, Pending.Direction, Pending.Color);
+        PlayMomentNow(Pending.Moment, Pending.Location, Pending.Direction, Pending.Color, Pending.Scale);
     }
 
     for (int32 Index = 0; Index < GlowSlots; ++Index)
@@ -441,6 +541,82 @@ void ABreakerEffectRenderer::Tick(float DeltaSeconds)
             Slot.SizeCm / EffectUnitMeshCm, Slot.SizeCm / EffectUnitMeshCm));
         BreakerUI::SetGlowColor(StrokeMaterials.IsValidIndex(Index) ? StrokeMaterials[Index].Get() : nullptr,
             Slot.Color, Slot.Intensity * Sample.Alpha);
+        if (Mesh->bHiddenInGame) Mesh->SetHiddenInGame(false);
+    }
+
+    // The muzzle flares: a cone on the moment's clock, base at A, apex at B.
+    // The stock cone's Z runs base to apex through its centre, so the mesh
+    // sits at the midpoint of A-B with Z along the flare.
+    for (int32 Index = 0; Index < FlareSlots; ++Index)
+    {
+        FEffectSlot& Slot = FlareState[Index];
+        UStaticMeshComponent* Mesh = FlareMeshes.IsValidIndex(Index) ? FlareMeshes[Index].Get() : nullptr;
+        if (!Slot.bActive)
+        {
+            Hide(Mesh);
+            continue;
+        }
+        const BreakerFX::FEffectSample Sample = BreakerFX::SampleEffect(
+            Slot.Timing, static_cast<float>(Now - Slot.StartTime));
+        if (Sample.bFinished)
+        {
+            Slot.bActive = false;
+            Hide(Mesh);
+            continue;
+        }
+        const FVector Delta = Slot.B - Slot.A;
+        const float Length = static_cast<float>(Delta.Size());
+        if (!Sample.bVisible || !Mesh || Length < 1.0f || Slot.SizeCm < 0.25f)
+        {
+            Hide(Mesh);
+            continue;
+        }
+        Mesh->SetWorldLocationAndRotation((Slot.A + Slot.B) * 0.5,
+            FRotationMatrix::MakeFromZ(Delta / Length).Rotator());
+        Mesh->SetWorldScale3D(FVector(Slot.SizeCm * 2.0f / EffectUnitMeshCm,
+            Slot.SizeCm * 2.0f / EffectUnitMeshCm, Length / EffectUnitMeshCm));
+        BreakerUI::SetGlowColor(FlareMaterials.IsValidIndex(Index) ? FlareMaterials[Index].Get() : nullptr,
+            Slot.Color, Slot.Intensity * Sample.Alpha);
+        if (Mesh->bHiddenInGame) Mesh->SetHiddenInGame(false);
+    }
+
+    // The impact shards: each frame is ShardPose from the origin at the
+    // shard's age; a shard past its life frees its slot this frame.
+    for (int32 Index = 0; Index < ShardSlots; ++Index)
+    {
+        FShardSlot& Slot = ShardState[Index];
+        UStaticMeshComponent* Mesh = ShardMeshes.IsValidIndex(Index) ? ShardMeshes[Index].Get() : nullptr;
+        if (!Slot.bActive)
+        {
+            Hide(Mesh);
+            continue;
+        }
+        const float Age = static_cast<float>(Now - Slot.StartTime);
+        if (Age < 0.0f)
+        {
+            Hide(Mesh);
+            continue;
+        }
+        if (Age >= Slot.Seconds || Slot.Seconds <= 0.0f)
+        {
+            Slot.bActive = false;
+            Hide(Mesh);
+            continue;
+        }
+        if (!Mesh || Slot.LengthCm < 1.0f || Slot.ThicknessCm < 0.25f)
+        {
+            Hide(Mesh);
+            continue;
+        }
+        FVector Offset;
+        FVector Travel;
+        BreakerFX::ShardPose(Slot.Normal, Slot.Index, Slot.Count, Age,
+            Slot.SpeedCms, Slot.GravityCms2, Slot.ConeDegrees, Offset, Travel);
+        Mesh->SetWorldLocationAndRotation(Slot.Origin + Offset, FRotationMatrix::MakeFromX(Travel).Rotator());
+        Mesh->SetWorldScale3D(FVector(Slot.LengthCm / EffectUnitMeshCm,
+            Slot.ThicknessCm / EffectUnitMeshCm, Slot.ThicknessCm / EffectUnitMeshCm));
+        BreakerUI::SetGlowColor(ShardMaterials.IsValidIndex(Index) ? ShardMaterials[Index].Get() : nullptr,
+            Slot.Color, Slot.Intensity * BreakerFX::ShardAlpha(Age, Slot.Seconds));
         if (Mesh->bHiddenInGame) Mesh->SetHiddenInGame(false);
     }
 

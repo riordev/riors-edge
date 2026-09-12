@@ -2585,12 +2585,17 @@ void ABreakerPlaytestHUD::HandlePlayerShot(const FBreakerShotResult& Shot)
     // the visual muzzle and down the barrel, in the weapon/heat role. The
     // character's own point light (KIT's) keeps flashing underneath; this is
     // the world flash that becomes NS_Muzzle the day the owner authors it.
+    // Sized by the gun's kick (O282): the archetype that shoves the viewmodel
+    // hardest flashes biggest, from the same profile the viewmodel reads.
     const FVector AimDirection = (Shot.TraceEnd - Shot.TraceStart).GetSafeNormal();
     if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(GetWorld()))
     {
+        const float FlashScale = BreakerFX::MuzzleFlashScale(
+            (BoundWeapon ? BoundWeapon->GetRecoilProfile() : FBreakerRecoilProfile()).ViewmodelKickUnits);
         Effects->PlayMoment(EBreakerEffectMoment::Muzzle,
             BoundWeapon ? BoundWeapon->GetVisualMuzzleLocation() : Shot.TraceStart,
-            AimDirection, BreakerFX::MomentColor(EBreakerEffectMoment::Muzzle, false));
+            AimDirection, BreakerFX::MomentColor(EBreakerEffectMoment::Muzzle, false),
+            /*DelaySeconds*/ 0.0f, FlashScale);
     }
 
     // A launcher already puts a real actor in the world; a hitscan streak on

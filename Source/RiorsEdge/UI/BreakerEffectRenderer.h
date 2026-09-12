@@ -52,7 +52,9 @@ class UStaticMeshComponent;
 //
 // The VOCABULARY is deliberately primitive: a glow (sphere) and a stroke
 // (segment), each living on a BreakerFX::FEffectTiming clock, plus a blink
-// light. Ability shapes — Rot's ground ring, Siphon's beam, Unmake's chain —
+// light, and two shapes the moment fallbacks alone draw (O282): a flare
+// (cone) on the same clock and a shard (cube on a ballistic arc) on its own.
+// Ability shapes — Rot's ground ring, Siphon's beam, Unmake's chain —
 // are Phase C compositions OF these calls, with their geometry read from the
 // ability's own header, never invented here. Siphon's channel-break is a
 // duration rewrite on its slots (see BreakerEffectMath.h), which will need
@@ -123,22 +125,33 @@ public:
     // Live owning effects can refresh or pause their expiry without restarting
     // their fade-in. Recycled/inactive handles never affect another clip.
     void SetEffectRemaining(int32 Handle, float RemainingSeconds);
+    // Moves a live stroke's endpoints without touching its clock: FIELD's rim
+    // animation (a zone ring that turns or dashes) re-poses the strokes it
+    // owns each frame through this rather than re-claiming slots. DECLARED
+    // CROSSING: GLASS publishes, FIELD (Combat/) consumes. An anchored beam
+    // ignores it — its anchors re-resolve the endpoints every frame and would
+    // win anyway. A stale or recycled handle is a silent no-op.
+    void SetStrokeEndpoints(int32 Handle, const FVector& A, const FVector& B);
 
     // THE FOUR MOMENTS (GLASS-1). Plays the moment's Niagara system if the
     // owner has authored `/Game/Breaker/FX/NS_<Moment>` — resolved once per
     // moment, cached, "none authored" cached too — through a pooled
     // UNiagaraComponent with Color handed in as the `Color` user parameter.
     // Until the asset exists it draws BreakerFX::MomentFallback through the
-    // glow and light pools, so nothing is silent now and nothing re-plumbs
+    // glow, stroke, flare, shard and light pools (O282: every moment has a
+    // visible fallback), so nothing is silent now and nothing re-plumbs
     // later. Direction orients the system (a muzzle flash points down the
-    // barrel); zero is treated as up. DelaySeconds schedules the birth, so a
-    // death can land with the round that caused it.
+    // barrel, an impact's sparks leave along the surface normal); zero is
+    // treated as up. DelaySeconds schedules the birth, so a death can land
+    // with the round that caused it. Scale multiplies the fallback's tongue
+    // length and flare (a harder-kicking gun flashes bigger:
+    // BreakerFX::MuzzleFlashScale); 1 is the authored size.
     //
-    // Returns the fallback glow's handle when the fallback drew, 0 otherwise:
-    // a Niagara play is fire-and-forget and an undrawn fallback (Impact —
-    // the tracer spark already is that fallback) has nothing to end.
+    // Returns the fallback's first owning handle (glow, else tongue) when the
+    // fallback drew one, 0 otherwise: a Niagara play is fire-and-forget, and
+    // shards are fire-and-forget too — they free themselves on age.
     int32 PlayMoment(EBreakerEffectMoment Moment, const FVector& Location, const FVector& Direction,
-        const FLinearColor& Color, float DelaySeconds = 0.0f);
+        const FLinearColor& Color, float DelaySeconds = 0.0f, float Scale = 1.0f);
 
 protected:
     virtual void BeginPlay() override;
@@ -152,13 +165,22 @@ private:
     static constexpr int32 GlowSlots = 16;
     static constexpr int32 StrokeSlots = 48;
     static constexpr int32 EffectLightSlots = 4;
+    // Muzzle flare cones (O282). One per flash and a flash lives 0.06 s, so
+    // four covers the fastest shipped cadence with the last three still
+    // fading; a fifth in flight is a bug this makes graceful. O2 PLACEHOLDER.
+    static constexpr int32 FlareSlots = 4;
+    // Impact shard cubes (O282). Five shards per impact; a full spread's
+    // eight landed pellets plus the kill's round in one frame is nine
+    // impacts, forty-five shards, and the pool rounds up to the stroke
+    // pool's depth. O2 PLACEHOLDER.
+    static constexpr int32 ShardSlots = 48;
     // Niagara components for the four moments. A component is reused, never
     // respawned: SetAsset + Activate(reset) on the oldest slot. Sized for a
     // shotgun's landed pellets plus a kill in the same frame.
     static constexpr int32 MomentSlots = 12;
     // Moments scheduled into the future (a death arriving with its round).
-    // A full spread's landed pellets plus the kill they made, once NS_Impact
-    // exists and impacts start queueing.
+    // A full spread's landed pellets plus the kill they made; the impact
+    // fallback draws now, so every scheduled pellet hit occupies one.
     static constexpr int32 PendingMomentSlots = 16;
 
 public:
@@ -166,6 +188,8 @@ public:
     static constexpr int32 GetGlowSlots() { return GlowSlots; }
     static constexpr int32 GetStrokeSlots() { return StrokeSlots; }
     static constexpr int32 GetEffectLightSlots() { return EffectLightSlots; }
+    static constexpr int32 GetFlareSlots() { return FlareSlots; }
+    static constexpr int32 GetShardSlots() { return ShardSlots; }
     static constexpr int32 GetMomentSlots() { return MomentSlots; }
     static constexpr int32 GetPendingMomentSlots() { return PendingMomentSlots; }
 
@@ -177,6 +201,7 @@ private:
         FVector Direction = FVector::UpVector;
         FLinearColor Color = FLinearColor::White;
         double FireTime = 0.0;
+        float Scale = 1.0f;
         bool bActive = false;
     };
 
@@ -193,16 +218,17 @@ private:
 
     UNiagaraSystem* ResolveMomentSystem(EBreakerEffectMoment Moment);
     int32 PlayMomentNow(EBreakerEffectMoment Moment, const FVector& Location, const FVector& Direction,
-        const FLinearColor& Color);
+        const FLinearColor& Color, float Scale);
     struct FEffectSlot
     {
-        // Glow: A is the centre, B unused. Stroke: A to B.
+        // Glow: A is the centre, B unused. Stroke: A to B. Flare: A is the
+        // cone's base, B its apex.
         FVector A = FVector::ZeroVector;
         FVector B = FVector::ZeroVector;
         double StartTime = 0.0;   // Delay already folded in; may be future.
         BreakerFX::FEffectTiming Timing;
         FLinearColor Color = FLinearColor::White;
-        // Glow: radius. Stroke: thickness.
+        // Glow: radius. Stroke: thickness. Flare: base radius.
         float SizeCm = 0.0f;
         float Intensity = 0.0f;
         bool bActive = false;
@@ -229,20 +255,60 @@ private:
         int32 Serial = 0;
     };
 
+    // One impact shard. Its pose is never stored: every frame is
+    // BreakerFX::ShardPose(Normal, Index, Count, Age, ...) from the origin,
+    // so the slot holds the launch and the parameters, not a position. The
+    // parameters are copied from the moment's fallback at spawn so a shard
+    // in flight is unaffected by anything that happens to the fallback table.
+    struct FShardSlot
+    {
+        FVector Origin = FVector::ZeroVector;
+        FVector Normal = FVector::UpVector;
+        double StartTime = 0.0;
+        int32 Index = 0;
+        int32 Count = 1;
+        FLinearColor Color = FLinearColor::White;
+        float Intensity = 0.0f;
+        float Seconds = 0.0f;
+        float SpeedCms = 0.0f;
+        float GravityCms2 = 0.0f;
+        float ConeDegrees = 0.0f;
+        float LengthCm = 0.0f;
+        float ThicknessCm = 0.0f;
+        bool bActive = false;
+    };
+
     UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> GlowMeshes;
     UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> StrokeMeshes;
+    UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> FlareMeshes;
+    UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> ShardMeshes;
     UPROPERTY() TArray<TObjectPtr<UMaterialInstanceDynamic>> GlowMaterials;
     UPROPERTY() TArray<TObjectPtr<UMaterialInstanceDynamic>> StrokeMaterials;
+    UPROPERTY() TArray<TObjectPtr<UMaterialInstanceDynamic>> FlareMaterials;
+    UPROPERTY() TArray<TObjectPtr<UMaterialInstanceDynamic>> ShardMaterials;
     UPROPERTY() TArray<TObjectPtr<UPointLightComponent>> EffectLights;
 
     FEffectSlot GlowState[GlowSlots];
     FEffectSlot StrokeState[StrokeSlots];
+    FEffectSlot FlareState[FlareSlots];
+    FShardSlot ShardState[ShardSlots];
     FEffectLightSlot LightState[EffectLightSlots];
     int32 NextGlowSlot = 0;
     int32 NextStrokeSlot = 0;
+    int32 NextFlareSlot = 0;
+    int32 NextShardSlot = 0;
     int32 NextLightSlot = 0;
     // Handles start at 1 so 0 can mean "no effect" in caller members.
     int32 NextSerial = 1;
+
+    // The muzzle flare: a cone, base at Base, apex at Base + Direction *
+    // LengthCm, on the moment's clock. Internal to the fallback — no public
+    // Add*, because nothing but PlayMomentNow draws one.
+    int32 AddFlare(const FVector& Base, const FVector& Direction, float BaseRadiusCm, float LengthCm,
+        const FLinearColor& Color, float Intensity, const BreakerFX::FEffectTiming& Timing);
+    // The impact's shards, spawned all at once, freed by the tick on age.
+    void SpawnShards(const FVector& Origin, const FVector& Normal, const FLinearColor& Color,
+        const BreakerFX::FMomentFallback& Fallback);
 
     static void Hide(UStaticMeshComponent* Mesh);
 };

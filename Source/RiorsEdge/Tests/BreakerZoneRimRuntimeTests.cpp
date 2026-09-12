@@ -49,10 +49,35 @@ bool FBreakerZoneRimRuntimeTest::RunTest(const FString& Parameters)
         Zone->ConfigureZone(Spec,nullptr);
         return Zone;
     };
+    auto Centres = [&]()
+    {
+        TArray<FVector> Out;
+        TInlineComponentArray<UStaticMeshComponent*> Meshes(Renderer);
+        for (auto* Mesh : Meshes)
+            if (Mesh->GetName().StartsWith(TEXT("EffectStroke")) && Mesh->IsVisible() && !Mesh->bHiddenInGame) Out.Add(Mesh->GetComponentLocation());
+        return Out;
+    };
     auto* Zone=Spawn();
     if (!TestNotNull(TEXT("static configured zone"),Zone)) return false;
     Advance(.4f);
     TestEqual(TEXT("actual pooled ring meshes visible"),Visible(),BreakerFX::GroundRingStrokes);
+    // O282: the rim turns each tick. Same sixteen strokes, and at least one of
+    // them is somewhere it was not 0.3 s ago. Compared as a set, not by slot,
+    // so a renderer that re-submits into fresh slots still counts as moving.
+    const TArray<FVector> Before=Centres();
+    Advance(.3f);
+    TestEqual(TEXT("the turning rim is still one ring"),Visible(),BreakerFX::GroundRingStrokes);
+    {
+        bool bMoved=false;
+        for (const FVector& After : Centres())
+        {
+            bool bNear=false;
+            for (const FVector& Was : Before)
+                if (FVector::Dist(After,Was)<=1.0) { bNear=true; break; }
+            if (!bNear) { bMoved=true; break; }
+        }
+        TestTrue(TEXT("a rim stroke moved more than a centimetre in 0.3 s"),bMoved);
+    }
     Zone->RefreshDuration(3);
     Advance(2);
     TestTrue(TEXT("refreshed zone survives original deadline"),IsValid(Zone) && !Zone->IsActorBeingDestroyed());

@@ -10,8 +10,8 @@ authored", and draws the pooled primitive fallback until the file exists.
 
 | Moment | Asset path | Colour (O179) | Fallback while unauthored |
 |---|---|---|---|
-| Muzzle | `/Game/Breaker/FX/NS_Muzzle` | Orange | none — nothing is drawn |
-| Impact | `/Game/Breaker/FX/NS_Impact` | Orange; Gold on a weak point | none — the tracer renderer's spark stands alone |
+| Muzzle | `/Game/Breaker/FX/NS_Muzzle` | Orange | tongue 34 cm x 3.2 cm down the barrel + flare cone (base 1.6 cm at the muzzle, 22 cm to the apex) + blink light, 0.06 s; all scaled by the gun's kick |
+| Impact | `/Game/Breaker/FX/NS_Impact` | Orange; Gold on a weak point | 5 shards (9 x 1.6 cm) thrown out of the surface in a 55-degree cone at 420 cm/s, falling under gravity for 0.35 s; the tracer renderer's spark stays |
 | Cast | `/Game/Breaker/FX/NS_Cast` | Cyan by default; the casting verb passes its own | glow 40 cm + blink light |
 | Death | `/Game/Breaker/FX/NS_Death` | Harm red; Gold on a weak-point kill | glow 55 cm + blink light |
 
@@ -55,17 +55,27 @@ The fallbacks in `BreakerFX::MomentFallback` (`UI/BreakerEffectMomentMath.h`)
 are the placeholder sizes the authored systems replace. Every figure is
 O2 PLACEHOLDER until the owner has felt it.
 
-**NS_Muzzle** — no fallback; the flash draws only from this asset. One-shot,
-0.05–0.08 s. The muzzle sits at a fixed camera-space offset, so its size is
-a screen size: **the flash must clear the reticle**. The rule is
+**NS_Muzzle** — replaces a tongue (a 34 cm stroke, 3.2 cm thick, down the
+barrel), a flare (a cone with its 1.6 cm-radius base at the muzzle tapering
+to an apex 22 cm forward) and a blink light of radius 360 cm at intensity
+2600, all at intensity 4.0 for 0.06 s fading over the last 0.04 s. The
+tongue's length and the flare's radius and length are multiplied by
+`BreakerFX::MuzzleFlashScale(kick)` = 0.75 + 0.08 x the archetype's
+viewmodel kick units, so a pistol flashes at 0.91 and a sniper at 1.55. The
+muzzle sits at a fixed camera-space offset, so its size is a screen size:
+**the flash must clear the reticle**. The rule is
 `MuzzleReticleClearanceRadians` = 1.5 degrees off the view axis, angle
 against angle so it holds at any field of view including the aim narrow;
 `MuzzleFallbackRadiusCeilingCm` gives the largest radius that clears at a
-given muzzle offset. Nothing in the system reaches the centre of the screen.
+given muzzle offset, and the flare's scaled base radius stays under it at the
+largest shipped kick. Nothing in the system reaches the centre of the screen.
 
-**NS_Impact** — no fallback (the tracer spark already marks the point).
-One-shot sparks, a short burst leaving the surface along +X, no lingering
-glow: the damage number carries the read.
+**NS_Impact** — replaces five shards: 9 cm x 1.6 cm cubes leaving the
+surface inside a 55-degree cone about the normal at 420 cm/s, falling under
+980 cm/s^2 for 0.35 s, brightness dropping straight from 3.4 to zero over
+that life (`BreakerFX::ShardPose`, `ShardAlpha`). The tracer renderer's spark
+still marks the point underneath. One-shot sparks, a short burst leaving the
+surface along +X, no lingering glow: the damage number carries the read.
 
 **NS_Cast** — replaces a 40 cm glow at intensity 3.2, 0.2 s total, fading
 out over the last 0.12 s, with a blink light of radius 380 cm at

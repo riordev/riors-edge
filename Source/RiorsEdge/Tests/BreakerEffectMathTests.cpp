@@ -132,6 +132,54 @@ bool FBreakerEffectScheduleTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("The ring closes"), PreviousB.Equals(FirstA, 0.01));
     }
 
+    // --- The ring turns and dashes (O282) ------------------------------------
+    // A phase rotates the whole polygon about its centre: one full turn is
+    // the same ring, and a half-side turn puts vertex 0 where side 0's
+    // midpoint was. A dash keeps a stroke on its own chord, shortened about
+    // the chord's middle, so a dashed rim is still the true footprint.
+    {
+        const FVector Center(1200.0f, -300.0f, 40.0f);
+        const float Radius = 400.0f;
+        const int32 Count = BreakerFX::GroundRingStrokes;
+        const float HalfSide = PI / static_cast<float>(Count);
+        for (int32 Index = 0; Index < Count; ++Index)
+        {
+            const FVector Plain = BreakerFX::RingVertex(Center, Radius, Index, Count);
+            const FVector FullTurn = BreakerFX::RingVertex(Center, Radius, Index, Count, 2.0f * PI);
+            TestTrue(TEXT("A full turn is the same vertex"), FullTurn.Equals(Plain, 0.01));
+
+            FVector A0, B0, A, B;
+            BreakerFX::RingStroke(Center, Radius, Index, Count, A0, B0);
+            BreakerFX::RingStroke(Center, Radius, Index, Count, A, B, 0.0f, 0.72f);
+            const FVector Chord = B0 - A0;
+            const float ChordLength = static_cast<float>(Chord.Size());
+            const FVector Along = Chord / ChordLength;
+            // On the chord: no distance off the line, and both ends inside it.
+            const float OffA = static_cast<float>(FVector::CrossProduct(A - A0, Along).Size());
+            const float OffB = static_cast<float>(FVector::CrossProduct(B - A0, Along).Size());
+            TestTrue(TEXT("A dashed stroke lies on its chord"), OffA <= 0.01f && OffB <= 0.01f);
+            const float TA = static_cast<float>(FVector::DotProduct(A - A0, Along)) / ChordLength;
+            const float TB = static_cast<float>(FVector::DotProduct(B - A0, Along)) / ChordLength;
+            TestTrue(TEXT("A dashed stroke stays inside its chord"),
+                TA >= -1.0e-3f && TA <= 1.0f + 1.0e-3f && TB >= -1.0e-3f && TB <= 1.0f + 1.0e-3f);
+            TestTrue(TEXT("A dash is its fraction of the chord"),
+                FMath::IsNearlyEqual(static_cast<float>(FVector::Dist(A, B)), 0.72f * ChordLength, 0.01f));
+            // A full dash is the undashed stroke.
+            FVector FullA, FullB;
+            BreakerFX::RingStroke(Center, Radius, Index, Count, FullA, FullB, 0.0f, 1.0f);
+            TestTrue(TEXT("A dash of one is the whole side"), FullA.Equals(A0, 0.01) && FullB.Equals(B0, 0.01));
+        }
+        // Half a side of phase: vertex 0 sits at the angle of side 0's old
+        // midpoint, at the true radius.
+        const FVector OldMid = (BreakerFX::RingVertex(Center, Radius, 0, Count)
+            + BreakerFX::RingVertex(Center, Radius, 1, Count)) * 0.5f;
+        const FVector Expected = Center + (OldMid - Center).GetSafeNormal() * Radius;
+        const FVector Turned = BreakerFX::RingVertex(Center, Radius, 0, Count, HalfSide);
+        TestTrue(TEXT("A half-side phase puts vertex 0 at the old midpoint angle"), Turned.Equals(Expected, 0.01));
+        TestTrue(TEXT("and the turned vertex is still on the true radius"),
+            FMath::IsNearlyEqual(static_cast<float>(FVector::Dist(Turned, Center)), Radius, 0.01f));
+    }
+
     // --- The swept arc covers exactly its included angle ---------------------
     // Vertex 0 sits at -half off Forward (the LEFT edge, so index-staggered
     // strokes sweep left to right), the last vertex at +half, every vertex at

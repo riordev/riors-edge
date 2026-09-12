@@ -238,6 +238,31 @@ bool FBreakerPocketRiftTest::RunTest(const FString& Parameters)
     }
     TestEqual(TEXT("the inverse of a zero dial is now"), AppearAgeForScale(0.5f, 0.0f), 0.0f);
 
+    // ---- THE FRACTURE TURNS (O282) ---------------------------------------
+    // A tear that stands still is a decal. The turn is a clock, not a state:
+    // zero at birth, rising with age, and wrapped so the dial never reaches
+    // a full circle the segments would have to unwind.
+    TestEqual(TEXT("the fracture has not turned at birth"), FractureTurnDegrees(0.0f, 34.0f), 0.0f);
+    {
+        float Before = FractureTurnDegrees(0.0f, 34.0f);
+        for (int32 Step = 1; Step <= 100; ++Step)
+        {
+            const float Age = static_cast<float>(Step) * 0.1f;   // 0.1 .. 10.0 s, before the first wrap at 34 deg/s
+            const float Here = FractureTurnDegrees(Age, 34.0f);
+            TestTrue(*FString::Printf(TEXT("the fracture only turns one way, at %.1fs"), Age), Here > Before);
+            Before = Here;
+        }
+        // Ten seconds at 34 deg/s is 340 degrees, and the clock says so.
+        TestEqual(TEXT("ten seconds is 340 degrees"), FractureTurnDegrees(10.0f, 34.0f), 340.0f, 0.01f);
+    }
+    for (int32 Step = 0; Step < 400; ++Step)
+    {
+        const float Age = static_cast<float>(Step) * 0.37f;   // past several wraps
+        const float Turn = FractureTurnDegrees(Age, ABreakerPocketRift::TurnDegreesPerSecond);
+        TestTrue(*FString::Printf(TEXT("the turn stays in [0, 360) at %.2fs"), Age), Turn >= 0.0f && Turn < 360.0f);
+    }
+    TestEqual(TEXT("a zero rate never turns"), FractureTurnDegrees(7.0f, 0.0f), 0.0f);
+
     // ---- THE SHIPPED CONFIGURATION ---------------------------------------
     // A tear a body cannot walk out of is not an arrival point. An enemy
     // capsule stands about 176 cm; the authored height must clear that, and the
@@ -267,6 +292,12 @@ bool FBreakerPocketRiftTest::RunTest(const FString& Parameters)
     // vanish in one frame, which is the pop-in this actor exists to remove.
     TestTrue(TEXT("the tear takes time to open"), ABreakerPocketRift::AppearSeconds > 0.0f);
     TestTrue(TEXT("and time to close"), ABreakerPocketRift::CloseSeconds > 0.0f);
+    // THE TURN IS SLOW (O282): a tear that completes a revolution inside its
+    // own opening is a spinner, not a fracture. The dial must move, and a full
+    // circle must take longer than the tear takes to open.
+    TestTrue(TEXT("the fracture turns"), ABreakerPocketRift::TurnDegreesPerSecond > 0.0f);
+    TestTrue(TEXT("and a full turn outlasts the opening"),
+        360.0f / ABreakerPocketRift::TurnDegreesPerSecond > ABreakerPocketRift::AppearSeconds);
     return true;
 }
 

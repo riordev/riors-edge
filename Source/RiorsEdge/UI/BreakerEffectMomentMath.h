@@ -105,15 +105,17 @@ namespace BreakerFX
     constexpr float MuzzleReticleClearanceRadians = 1.5f * (PI / 180.0f);
 
     // What the pooled renderer draws for a moment whose system is not
-    // authored yet. bDrawn false means the moment has no primitive stand-in:
-    // the impact's fallback is the tracer renderer's spark, and a second glow
-    // on the same point would double-draw; the muzzle draws only from an
-    // authored NS_Muzzle. All magnitudes O2 PLACEHOLDER.
+    // authored yet. O282: EVERY combat moment has a visible fallback that
+    // reads at play distance, built from primitives until the ASSETS-5
+    // systems land (O190). bDrawn false is reserved for a moment with no
+    // primitive stand-in; none of the four is that today. All magnitudes
+    // O2 PLACEHOLDER.
     struct FMomentFallback
     {
         bool bDrawn = true;
-        // 0: no glow disc at all (the muzzle — see below).
+        // 0: no glow disc at all (the muzzle and the impact — see below).
         float RadiusCm = 30.0f;
+        // Emissive intensity shared by every primitive of the fallback.
         float Intensity = 3.0f;
         float LightRadiusCm = 0.0f;   // 0: no blink light
         float LightIntensity = 0.0f;
@@ -124,8 +126,91 @@ namespace BreakerFX
         // where a disc of any useful size at the aimed muzzle offset does.
         float TongueCm = 0.0f;
         float TongueThicknessCm = 0.0f;
+        // A FLARE beside the tongue: a cone with its base at the location and
+        // its apex FlareLengthCm along Direction, so the flash has a body at
+        // the barrel that tapers into the tongue. The base radius is the part
+        // that sits at the muzzle offset, so it is the part the reticle law
+        // measures: it stays under MuzzleFallbackRadiusCeilingCm at the aimed
+        // offset, scaled by the largest shipped MuzzleFlashScale. 0: none.
+        float FlareBaseRadiusCm = 0.0f;
+        float FlareLengthCm = 0.0f;
+        // SHARDS: ShardCount short bright cubes thrown from the location
+        // inside a cone of ShardConeDegrees (full included angle) about
+        // Direction, each on its own ballistic arc for ShardSeconds
+        // (ShardPose below). The impact's shape: sparks leaving the surface.
+        // 0: none. Shards live on their own clock, not on Timing.
+        int32 ShardCount = 0;
+        float ShardSeconds = 0.0f;
+        float ShardSpeedCms = 0.0f;
+        float ShardGravityCms2 = 0.0f;
+        float ShardConeDegrees = 0.0f;
+        float ShardLengthCm = 0.0f;
+        float ShardThicknessCm = 0.0f;
         FEffectTiming Timing;
     };
+
+    // How big a muzzle flash is, from how hard the gun kicks. The viewmodel
+    // kick is the one per-archetype number that already says "this gun is
+    // violent": a pistol at 2 kick units draws a flash at 0.91 of authored
+    // size, a rifle at 3.2 draws it at 1.0, a sniper at 10 at 1.55. Linear,
+    // floored at zero kick so a profile that kicks nothing still flashes.
+    // Slope and base O2 PLACEHOLDER.
+    inline float MuzzleFlashScale(float KickUnits)
+    {
+        return 0.75f + 0.08f * FMath::Max(KickUnits, 0.0f);   // O2 PLACEHOLDER
+    }
+
+    // One shard's pose at Age seconds after the impact. OutPos is the OFFSET
+    // from the impact point (p = v t + g t^2 / 2 with gravity straight down),
+    // OutDir the shard's travel direction at that instant, so a cube aligned
+    // to it draws as a streak along the arc. The launch direction comes from
+    // a deterministic per-index hash inside the cone about Normal — the same
+    // shard always flies the same way, so a scheduled impact looks the same
+    // as an immediate one — and is NEVER into the surface: the polar angle
+    // is bounded by half the cone, which is bounded below ninety degrees.
+    inline void ShardPose(const FVector& Normal, int32 Index, int32 Count, float Age,
+        float Speed, float Gravity, float ConeDeg, FVector& OutPos, FVector& OutDir)
+    {
+        const FVector N = Normal.IsNearlyZero() ? FVector::UpVector : Normal.GetSafeNormal();
+        // A basis about the normal. The helper axis is whichever world axis
+        // the normal is furthest from, so the cross product never degenerates.
+        const FVector Helper = FMath::Abs(N.Z) < 0.9f ? FVector::UpVector : FVector::ForwardVector;
+        const FVector T = FVector::CrossProduct(N, Helper).GetSafeNormal();
+        const FVector B = FVector::CrossProduct(N, T);
+
+        // Two unit hashes from the index (a Wang-style integer mix): one for
+        // how far off the normal, one to jitter the azimuth off the even fan.
+        uint32 Hash = static_cast<uint32>(Index) * 2654435761u;
+        Hash ^= Hash >> 13;
+        Hash *= 0x5bd1e995u;
+        Hash ^= Hash >> 15;
+        const float Polar01 = static_cast<float>(Hash & 0xffffu) / 65535.0f;
+        const float Jitter01 = static_cast<float>((Hash >> 16) & 0xffffu) / 65535.0f;
+
+        const int32 SafeCount = FMath::Max(Count, 1);
+        const float HalfCone = FMath::Clamp(ConeDeg * 0.5f, 0.0f, 89.0f) * (PI / 180.0f);
+        // sqrt spreads the shards evenly over the cone's cap rather than
+        // bunching them on the axis.
+        const float Polar = HalfCone * FMath::Sqrt(Polar01);
+        const float Azimuth = 2.0f * PI * (static_cast<float>(Index) + Jitter01) / static_cast<float>(SafeCount);
+        const FVector Launch = N * FMath::Cos(Polar)
+            + (T * FMath::Cos(Azimuth) + B * FMath::Sin(Azimuth)) * FMath::Sin(Polar);
+
+        const float t = FMath::Max(Age, 0.0f);
+        const FVector Velocity0 = Launch * Speed;
+        const FVector G(0.0f, 0.0f, -Gravity);
+        OutPos = Velocity0 * t + G * (0.5f * t * t);
+        const FVector Velocity = Velocity0 + G * t;
+        OutDir = Velocity.IsNearlyZero() ? Launch : Velocity.GetSafeNormal();
+    }
+
+    // A shard's brightness: full at birth, gone at ShardSeconds, straight
+    // between. Zero for a shard with no life at all.
+    inline float ShardAlpha(float Age, float ShardSeconds)
+    {
+        if (ShardSeconds <= KINDA_SMALL_NUMBER) return 0.0f;
+        return FMath::Clamp(1.0f - Age / ShardSeconds, 0.0f, 1.0f);
+    }
 
     inline FMomentFallback MomentFallback(EBreakerEffectMoment Moment)
     {
@@ -148,9 +233,19 @@ namespace BreakerFX
             // light at the muzzle lights the gun and the nearest wall, which
             // is most of what a muzzle flash IS. Both are one frame's worth
             // of life: a flash that lingers is a lamp.
+            //
+            // THE FLARE (O282). A tongue alone is a line; the flash needs a
+            // body at the barrel to read as a flash at play distance. A cone
+            // with its base at the muzzle, tapering forward into the tongue,
+            // is that body. Its base radius is the tongue's half-thickness,
+            // already proven under the aimed-offset ceiling; the renderer
+            // scales it by MuzzleFlashScale, and the largest shipped kick
+            // (10 units, 1.55x) keeps it under that ceiling too.
             F.RadiusCm = 0.0f;
             F.TongueCm = 34.0f;               // O2 PLACEHOLDER
             F.TongueThicknessCm = 3.2f;       // O2 PLACEHOLDER
+            F.FlareBaseRadiusCm = 1.6f;       // O2 PLACEHOLDER
+            F.FlareLengthCm = 22.0f;          // O2 PLACEHOLDER
             F.Intensity = 4.0f;               // O2 PLACEHOLDER
             F.LightRadiusCm = 360.0f;         // O2 PLACEHOLDER
             F.LightIntensity = 2600.0f;       // O2 PLACEHOLDER
@@ -158,7 +253,24 @@ namespace BreakerFX
             F.Timing.FadeOutSeconds = 0.04f;  // O2 PLACEHOLDER
             break;
         case EBreakerEffectMoment::Impact:
-            F.bDrawn = false;
+            // SPARKS LEAVE THE SURFACE (O282). The tracer renderer's spark
+            // marks the point and stays; it is a dot, and a dot at twenty
+            // metres is not a hit. Five short bright shards thrown out of
+            // the surface along the normal, falling under gravity for a third
+            // of a second, are. No disc (a glow on the point would
+            // double-draw the spark), no light: the damage number carries
+            // the read. Timing mirrors the shard life so the moment's clock
+            // and the shards' agree about when the impact is over.
+            F.RadiusCm = 0.0f;
+            F.Intensity = 3.4f;               // O2 PLACEHOLDER
+            F.ShardCount = 5;                 // O2 PLACEHOLDER
+            F.ShardSeconds = 0.35f;           // O2 PLACEHOLDER
+            F.ShardSpeedCms = 420.0f;         // O2 PLACEHOLDER
+            F.ShardGravityCms2 = 980.0f;      // O2 PLACEHOLDER
+            F.ShardConeDegrees = 55.0f;       // O2 PLACEHOLDER
+            F.ShardLengthCm = 9.0f;           // O2 PLACEHOLDER
+            F.ShardThicknessCm = 1.6f;        // O2 PLACEHOLDER
+            F.Timing.DurationSeconds = 0.35f; // O2 PLACEHOLDER — equals ShardSeconds
             break;
         case EBreakerEffectMoment::Cast:
             F.RadiusCm = 40.0f;            // O2 PLACEHOLDER

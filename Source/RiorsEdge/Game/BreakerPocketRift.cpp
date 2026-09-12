@@ -29,6 +29,11 @@ ABreakerPocketRift::ABreakerPocketRift()
     // The actor is dropped ON the floor, so the tear's own centre lifts to half
     // its height: the bottom point touches the ground it is torn in.
     TearRoot->SetRelativeLocation(FVector(0.0f, 0.0f, TearHeightCm * 0.5f));
+    // The fractures turn on their own pivot (O282), which sits at TearRoot's
+    // origin — the tear's centre — so they spin about the middle of the split
+    // and inherit the breath and the gate from the parent scale.
+    FractureRoot = CreateDefaultSubobject<USceneComponent>(TEXT("FractureRoot"));
+    FractureRoot->SetupAttachment(TearRoot);
 
     Bloom = CreateDefaultSubobject<UPointLightComponent>(TEXT("Bloom"));
     Bloom->SetupAttachment(Pivot);
@@ -57,11 +62,14 @@ void ABreakerPocketRift::BeginPlay()
         return;
     }
 
-    // THE OUTLINE, laid once. The shape never changes; the SCALE and the glow
-    // are what move, so rebuilding these per frame would be work for an
-    // identical answer.
-    auto AddSegment = [&](const FVector& From, const FVector& To)
+    // THE OUTLINE, laid once. The shape never changes; the SCALE, the glow and
+    // the fractures' ROOT are what move, so rebuilding these per frame would
+    // be work for an identical answer. Root is which pivot the segment hangs
+    // off: the outline on TearRoot, which only breathes, and the cross-
+    // fractures on FractureRoot, which turns (O282).
+    auto AddSegment = [&](USceneComponent* Root, const FVector& From, const FVector& To)
     {
+        if (!Root) return;
         const FVector Delta = To - From;
         const float Length = static_cast<float>(Delta.Size());
         if (Length <= KINDA_SMALL_NUMBER) return;
@@ -75,7 +83,7 @@ void ABreakerPocketRift::BeginPlay()
         // REGISTER THEN ATTACH, in that order — SetupAttachment does nothing at
         // runtime and says nothing about it.
         Mesh->RegisterComponent();
-        Mesh->AttachToComponent(TearRoot, FAttachmentTransformRules::KeepRelativeTransform);
+        Mesh->AttachToComponent(Root, FAttachmentTransformRules::KeepRelativeTransform);
         Mesh->SetRelativeRotation(FRotationMatrix::MakeFromX(Delta).Rotator());
         Mesh->SetRelativeLocation(From + Delta * 0.5f);
         // The engine cube is 100 cm on a side, so every extent is cm/100. The
@@ -97,7 +105,7 @@ void ABreakerPocketRift::BeginPlay()
     {
         for (const bool bRight : { false, true })
         {
-            AddSegment(
+            AddSegment(TearRoot,
                 BreakerPocketRift::RaggedEdgePoint(Step, TearSteps, TearWidthCm, TearHeightCm, bRight, EdgeWander),
                 BreakerPocketRift::RaggedEdgePoint(Step + 1, TearSteps, TearWidthCm, TearHeightCm, bRight, EdgeWander));
         }
@@ -109,6 +117,12 @@ void ABreakerPocketRift::BeginPlay()
     // SLANTED AND LOPSIDED, from the same hash. Three level bars across a
     // symmetric outline is an ICON — the first capture drew exactly that and
     // read as a logo painted on the air rather than as a split in the world.
+    //
+    // AND THEY TURN (O282): these hang off FractureRoot, which the tick
+    // rotates in the tear's plane, while the outline above stays still on
+    // TearRoot. They are laid for the level pose; a turned pose can carry a
+    // lower fracture's far tip briefly across the ragged edge, and whether
+    // that reads as torn or as wrong is the owner's call from the frames.
     constexpr float Heights[] = { 0.28f, 0.47f, 0.71f };
     for (int32 Index = 0; Index < UE_ARRAY_COUNT(Heights); ++Index)
     {
@@ -118,7 +132,7 @@ void ABreakerPocketRift::BeginPlay()
         const float Left = -Reach * (0.30f + 0.70f * BreakerPocketRift::EdgeNoise(Index * 31 + 5));
         const float Right = Reach * (0.30f + 0.70f * BreakerPocketRift::EdgeNoise(Index * 31 + 17));
         const float Tilt = (BreakerPocketRift::EdgeNoise(Index * 31 + 23) * 2.0f - 1.0f) * 22.0f;
-        AddSegment(FVector(0.0f, Left, Z - Tilt), FVector(0.0f, Right, Z + Tilt));
+        AddSegment(FractureRoot, FVector(0.0f, Left, Z - Tilt), FVector(0.0f, Right, Z + Tilt));
     }
 
     if (!TearMaterial)
@@ -164,6 +178,14 @@ void ABreakerPocketRift::Tick(float DeltaSeconds)
     // shears them, and every segment on this shape is rotated.
     const float Scale = (BreakerPocketRift::IdleScale(Age, IdleHz, IdleAmplitude) + FlareWiden * Boost) * Gate;
     if (TearRoot) TearRoot->SetRelativeScale3D(FVector(Scale));
+    // THE TURN (O282). Roll is rotation about X, and the tear is flat in the
+    // YZ plane, so a roll spins the fractures in the plane of the split. Only
+    // FractureRoot turns: TearRoot's bottom point is on the ground.
+    if (FractureRoot)
+    {
+        FractureRoot->SetRelativeRotation(FRotator(0.0f, 0.0f,
+            BreakerPocketRift::FractureTurnDegrees(Age, TurnDegreesPerSecond)));
+    }
     if (TearMaterial)
     {
         BreakerUI::SetGlowColor(TearMaterial, BreakerUI::TealUnwritten, (IdleGlow + FlareGlow * Boost) * Gate);

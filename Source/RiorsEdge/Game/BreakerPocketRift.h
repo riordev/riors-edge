@@ -117,6 +117,12 @@ public:
     static constexpr float EdgeWander = 0.30f;
     static constexpr float IdleHz = 0.35f;
     static constexpr float IdleAmplitude = 0.035f;
+    // THE TURN (O282): how fast the three cross-fractures rotate inside the
+    // still outline, in degrees per second. At 34 one full turn takes about
+    // 10.6 s, LONGER THAN THE APPEAR FLARE (FlareSeconds), so an arrival is
+    // never seen against the same fracture pose twice and the turn reads as
+    // slow weather rather than a spinner. O2 PLACEHOLDER.
+    static constexpr float TurnDegreesPerSecond = 34.0f;
     static constexpr float IdleGlow = 1.6f;
     static constexpr float IdleLightIntensity = 900.0f;
     static constexpr float FlareSeconds = 1.6f;
@@ -130,6 +136,11 @@ private:
     // The thing that BREATHES. Every segment hangs off it, so the pulse is one
     // transform rather than twenty-seven.
     UPROPERTY() TObjectPtr<USceneComponent> TearRoot;
+    // The thing that TURNS (O282). A child of TearRoot at the tear's centre,
+    // carrying only the three cross-fractures: they rotate inside an outline
+    // that stays still, and TearRoot itself is never rotated because its
+    // bottom point is on the ground.
+    UPROPERTY() TObjectPtr<USceneComponent> FractureRoot;
     UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> Segments;
     UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> TearMaterial;
     UPROPERTY() TObjectPtr<UPointLightComponent> Bloom;

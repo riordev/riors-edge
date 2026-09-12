@@ -38,6 +38,17 @@ namespace BreakerZoneActorLocal
     static constexpr float BreakerZoneFillIntensity = 0.22f;
     static constexpr float BreakerZoneFillBreath = 0.10f;
     static constexpr float BreakerZoneBreathHz = 0.7f;
+    // A CAST HAS A SHAPE (O282). The rim is sixteen dashes that TURN about the
+    // zone's centre, not a still polygon: a ring that rotates is a field the
+    // caster is holding open, a ring that sits is a decal. The phase advances
+    // at RimTurn radians per second (0.6 is one turn in ~10.5 s, slow enough
+    // to be weather rather than a spinner) and each stroke is shortened about
+    // its chord midpoint to RimDash of the chord, so the gaps are what make
+    // the turn visible at all. The rim is lifted RimLift off the floor so it
+    // never z-fights the disc. All three O2 PLACEHOLDER.
+    static constexpr float BreakerZoneRimTurnRadPerSec = 0.6f;
+    static constexpr float BreakerZoneRimDashFraction = 0.72f;
+    static constexpr float BreakerZoneRimLiftCm = 6.0f;
 
     // Live server-side zones. A weak list rather than a world iterator so an
     // exit can ask "is this actor still standing in another zone of the same
@@ -380,6 +391,39 @@ void ABreakerZoneActor::Tick(float DeltaSeconds)
         BreakerUI::SetGlowColor(FootprintGlow, Spec.ZoneColor,
             BreakerZoneActorLocal::BreakerZoneFillIntensity + BreakerZoneActorLocal::BreakerZoneFillBreath * Pulse);
     }
+    // THE RIM TURNS (O282). Same rule as the breath: every machine runs it,
+    // it writes only where sixteen strokes sit, and where a stroke sits is not
+    // state. The clock is the actor's own age, not the fill's breath, which
+    // stops when the fill is hidden; the rim keeps turning through a paused
+    // expiry as the breath does. The pooled rim re-aims its clips in place,
+    // the mobile rim re-lays its attached cubes; the same phase and dash feed
+    // both, so a Rot that starts following its caster does not change shape.
+    const float RimPhase = BreakerZoneActorLocal::BreakerZoneRimTurnRadPerSec * GetGameTimeSinceCreation();
+    if (!RimHandles.IsEmpty())
+    {
+        if (ABreakerEffectRenderer* Renderer = RimRenderer.Get())
+        {
+            const FVector Center = GetActorLocation() + FVector(0.0f, 0.0f, BreakerZoneActorLocal::BreakerZoneRimLiftCm);
+            for (int32 Index = 0; Index < RimHandles.Num(); ++Index)
+            {
+                FVector A, B;
+                BreakerFX::RingStroke(Center, Spec.RadiusCm, Index, BreakerFX::GroundRingStrokes, A, B,
+                    RimPhase, BreakerZoneActorLocal::BreakerZoneRimDashFraction);
+                Renderer->SetStrokeEndpoints(RimHandles[Index], A, B);
+            }
+        }
+    }
+    for (int32 Index = 0; Index < MobileRim.Num(); ++Index)
+    {
+        UStaticMeshComponent* Stroke = MobileRim[Index];
+        if (!Stroke || !Stroke->IsVisible()) continue;
+        FVector A, B;
+        BreakerFX::RingStroke(FVector(0.0f, 0.0f, BreakerZoneActorLocal::BreakerZoneRimLiftCm), Spec.RadiusCm, Index,
+            BreakerFX::GroundRingStrokes, A, B, RimPhase, BreakerZoneActorLocal::BreakerZoneRimDashFraction);
+        Stroke->SetRelativeLocation((A + B) * 0.5f);
+        Stroke->SetRelativeRotation((B - A).Rotation());
+        Stroke->SetRelativeScale3D(FVector(FVector::Distance(A, B) / 100.0f, 0.07f, 0.07f)); // O2 PLACEHOLDER, existing rim 7 cm.
+    }
     if (HasAuthority()) AdvanceZone(DeltaSeconds);
 }
 
@@ -701,15 +745,18 @@ void ABreakerZoneActor::SubmitRimEffect()
     Timing.FadeInSeconds = 0.2f;    // O2 PLACEHOLDER
     Timing.FadeOutSeconds = 1.0f;   // O2 PLACEHOLDER
 
-    // Lifted a hand off the floor so the strokes never z-fight the disc, and
-    // thick enough to read at placement range. Both O2 PLACEHOLDER.
-    const FVector Center = GetActorLocation() + FVector(0.0f, 0.0f, 6.0f);
+    // Thick enough to read at placement range. O2 PLACEHOLDER. Submitted at
+    // the phase and dash the tick will carry on from (O282), so the first
+    // frame is not a solid ring that breaks into dashes on the second.
+    const FVector Center = GetActorLocation() + FVector(0.0f, 0.0f, BreakerZoneActorLocal::BreakerZoneRimLiftCm);
     constexpr float RimThicknessCm = 7.0f;
     constexpr float RimIntensity = 2.8f;
+    const float RimPhase = BreakerZoneActorLocal::BreakerZoneRimTurnRadPerSec * GetGameTimeSinceCreation();
     for (int32 Index = 0; Index < BreakerFX::GroundRingStrokes; ++Index)
     {
         FVector A, B;
-        BreakerFX::RingStroke(Center, Spec.RadiusCm, Index, BreakerFX::GroundRingStrokes, A, B);
+        BreakerFX::RingStroke(Center, Spec.RadiusCm, Index, BreakerFX::GroundRingStrokes, A, B,
+            RimPhase, BreakerZoneActorLocal::BreakerZoneRimDashFraction);
         RimHandles.Add(Renderer->AddStroke(A, B, RimThicknessCm, Spec.ZoneColor, RimIntensity, Timing));
     }
 }
@@ -759,15 +806,20 @@ void ABreakerZoneActor::RefreshPresentation()
                 Stroke->SetStaticMesh(Mesh); Stroke->SetCollisionEnabled(ECollisionEnabled::NoCollision);
                 Stroke->SetCastShadow(false); Stroke->RegisterComponent(); MobileRim.Add(Stroke);
             }
+    // Laid here at the phase and dash the tick carries on from (O282); the
+    // tick re-lays every visible cube each frame, so this is the first pose
+    // rather than the only one.
+    const float RimPhase = BreakerZoneActorLocal::BreakerZoneRimTurnRadPerSec * GetGameTimeSinceCreation();
     for (int32 Index = 0; Index < MobileRim.Num(); ++Index)
     {
         UStaticMeshComponent* Stroke = MobileRim[Index];
         Stroke->SetVisibility(Spec.bMobileFootprint);
         FVector A, B;
-        BreakerFX::RingStroke(FVector(0, 0, 6), Spec.RadiusCm, Index, BreakerFX::GroundRingStrokes, A, B);
+        BreakerFX::RingStroke(FVector(0.0f, 0.0f, BreakerZoneActorLocal::BreakerZoneRimLiftCm), Spec.RadiusCm, Index,
+            BreakerFX::GroundRingStrokes, A, B, RimPhase, BreakerZoneActorLocal::BreakerZoneRimDashFraction);
         Stroke->SetRelativeLocation((A + B) * 0.5f);
         Stroke->SetRelativeRotation((B - A).Rotation());
-        Stroke->SetRelativeScale3D(FVector(FVector::Distance(A, B) / 100.0f, 0.07f, 0.07f)); // O2 PLACEHOLDER, existing rim7cm.
+        Stroke->SetRelativeScale3D(FVector(FVector::Distance(A, B) / 100.0f, 0.07f, 0.07f)); // O2 PLACEHOLDER, existing rim 7 cm.
         if (Footprint) Stroke->SetMaterial(0, Footprint->GetMaterial(0));
     }
     if (Glow)

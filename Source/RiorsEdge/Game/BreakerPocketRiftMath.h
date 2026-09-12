@@ -97,6 +97,26 @@ namespace BreakerPocketRift
         return 1.0f + Amplitude * FMath::Sin(Seconds * Hz * 2.0f * PI);
     }
 
+    // THE TURN (O282). A tear turns: the three cross-fractures rotate inside
+    // an outline that stays still, so the split reads as something happening
+    // in the world rather than a shape breathing in place. Only the INNER
+    // fractures turn — the outline's bottom point is on the ground it is torn
+    // in, and rotating that would lift it. Wrapped to [0, 360) so a tear open
+    // for an hour hands the component a small angle rather than a large one.
+    // constexpr, so the wrap is done by hand: FMath::Fmod is not.
+    constexpr float FractureTurnDegrees(float Age, float DegPerSec)
+    {
+        const float Raw = Age * DegPerSec;
+        // NaN never compares equal to itself; a tear with a poisoned clock
+        // stands still rather than handing the transform a NaN.
+        if (Raw != Raw) return 0.0f;
+        float Wrapped = Raw - 360.0f * static_cast<float>(static_cast<int64>(Raw / 360.0f));
+        if (Wrapped < 0.0f) Wrapped += 360.0f;
+        // Single-precision rounding can land the subtraction exactly on 360.
+        if (Wrapped >= 360.0f) Wrapped -= 360.0f;
+        return Wrapped;
+    }
+
     // THE ARRIVAL. Remaining counts DOWN from Total, so the boost is 1 at the
     // instant the body comes through and falls away after it.
     //

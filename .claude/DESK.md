@@ -155,13 +155,32 @@
   cannot show a cycle playing and neither gym capture framed a body;
   yours to see standing still.
 
-## Cycle — O282 VFX FALLBACKS
+## O282 VFX FALLBACKS — LANDED
 
-- [ ] BreakerEffectRenderer / BreakerCharacter: a muzzle flash mesh
-      fallback (emissive cone, ~0.06 s) at the bounds front; impact
-      sparks as a short burst of emissive shards; the tear's dashes
-      rotate; the Rot puddle's rim animates. Photograph AbilityProbe at
-      0.2 s cadence and CycleWeapons.
+- A muzzle has a flash: a pooled emissive cone (base 1.6 cm, 22 cm long,
+  four slots) at the mesh's bounds front beside the tongue, scaled by
+  the weapon's kick (MuzzleFlashScale 0.75 + 0.08 x kick: SMG 0.91,
+  sniper 1.55; the heaviest still clears the reticle ceiling, pinned).
+  An impact throws sparks: five pooled emissive shards (48 slots — eight
+  pellets and a death) launched inside a 55-degree cone about the
+  surface normal at 420 cm/s under gravity for 0.35 s, alpha fading;
+  ShardPose is pure and per-index deterministic (ShardBurst pins launch
+  at the origin, never into the wall, the ballistic drop, the cone,
+  determinism, the pool arithmetic). A tear turns: the three cross-
+  fractures sit on a FractureRoot inside the still outline and turn at
+  34 degrees a second (one turn longer than the flare; pinned) — the
+  outline never rotates, so the ground point holds. A cast has a shape:
+  the Rot rim's sixteen strokes turn at 0.6 rad/s as 0.72 dashes through
+  SetStrokeEndpoints (GLASS -> FIELD crossing), the mobile rim with
+  them; ZoneRimLifetime pins sixteen strokes that move. RingVertex/
+  RingStroke take a phase and a dash, defaulted. The FX README tells the
+  truth about Muzzle and Impact. FOUND, not built: Fracture's cast
+  draws nothing (KIT lane, one PlayMoment). FOUND: the authored Niagara
+  branch gets no Scale (README contract names one parameter). FOUND:
+  a turned lower fracture can sweep past a narrow outline (~77 vs 53 cm)
+  — yours from the frames. NOT PHOTOGRAPHED: a 0.06 s flash and a turn
+  are not a still's to show; the HUD capture and the pocket-rift frame
+  were taken and show the world, not the verb.
 
 ## OWNER PLAYTEST, 2026-09-11 (SEVENTH) — LANDED, LIVING
 

@@ -86,20 +86,36 @@ namespace BreakerFX
     // vertices, never outward past it).
     constexpr int32 GroundRingStrokes = 16;   // O2 PLACEHOLDER
 
-    inline FVector RingVertex(const FVector& Center, float RadiusCm, int32 Index, int32 Count)
+    // PhaseRadians rotates the whole polygon about its centre (FIELD's rim
+    // animation turns a ring by advancing the phase per frame); every vertex
+    // stays exactly on the circle whatever the phase.
+    inline FVector RingVertex(const FVector& Center, float RadiusCm, int32 Index, int32 Count,
+        float PhaseRadians = 0.0f)
     {
         const int32 Wrapped = Count > 0 ? ((Index % Count) + Count) % Count : 0;
-        const float Angle = Count > 0 ? 2.0f * PI * static_cast<float>(Wrapped) / static_cast<float>(Count) : 0.0f;
+        const float Angle = (Count > 0 ? 2.0f * PI * static_cast<float>(Wrapped) / static_cast<float>(Count) : 0.0f)
+            + PhaseRadians;
         return Center + FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.0f) * RadiusCm;
     }
 
     // Endpoints of the Index'th side. Side i runs vertex i -> vertex i+1, so
     // consecutive sides share their endpoints exactly and the loop closes.
+    // DashFraction (0..1) shortens each side about its own chord midpoint, so
+    // a ring at 0.5 is a dashed ring with gaps as long as its dashes; at 1 the
+    // loop is closed and the vertices are shared. A dash never leaves its
+    // chord, so the drawn rim still never bows outward past the true circle.
     inline void RingStroke(const FVector& Center, float RadiusCm, int32 Index, int32 Count,
-        FVector& OutA, FVector& OutB)
+        FVector& OutA, FVector& OutB, float PhaseRadians = 0.0f, float DashFraction = 1.0f)
     {
-        OutA = RingVertex(Center, RadiusCm, Index, Count);
-        OutB = RingVertex(Center, RadiusCm, Index + 1, Count);
+        OutA = RingVertex(Center, RadiusCm, Index, Count, PhaseRadians);
+        OutB = RingVertex(Center, RadiusCm, Index + 1, Count, PhaseRadians);
+        const float Dash = FMath::Clamp(DashFraction, 0.0f, 1.0f);
+        if (Dash < 1.0f)
+        {
+            const FVector Mid = (OutA + OutB) * 0.5;
+            OutA = Mid + (OutA - Mid) * Dash;
+            OutB = Mid + (OutB - Mid) * Dash;
+        }
     }
 
     // --- Swept arc geometry -------------------------------------------------
