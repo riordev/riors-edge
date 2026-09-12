@@ -88,8 +88,8 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
         TArray<ABreakerEnemy*> Enemies;
         int32 CourtyardCount = 0, CourtyardMelee = 0, CourtyardLattices = 0;
         TArray<FVector> PocketCenters;
-        PocketCenters.Init(FVector::ZeroVector, 8);
-        int32 PocketCounts[] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+        PocketCenters.Init(FVector::ZeroVector, 11);
+        int32 PocketCounts[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
         int32 Elites = 0;
         int32 SubstationMelee = 0, SubstationWardens = 0, SubstationSkirmishers = 0, EntryLattices = 0;
         int32 DepotWardens = 0, DepotElites = 0, DepotBodies = 0;
@@ -110,7 +110,7 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
             TestFalse(TEXT("Outdoor enemy cannot complete a rift"), Enemy->IsRiftTerminator());
             Elites += Enemy->GetMonsterRank() != EBreakerMonsterRank::Trash ? 1 : 0;
             int32 Pocket = INDEX_NONE;
-            for (int32 Index = 0; Index < 8; ++Index)
+            for (int32 Index = 0; Index < 11; ++Index)
                 if (Enemy->Tags.Contains(FName(*FString::Printf(TEXT("Fernhall.Outdoor.%d"), Index)))) Pocket = Index;
             if (!TestTrue(TEXT("Every body belongs to an authored pocket or courtyard"), Pocket != INDEX_NONE || bCourtyard)) return false;
             if (bCourtyard)
@@ -134,12 +134,17 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
                 if (Enemy->IsA<ABreakerWardenEnemy>()) { ++SubstationWardens; SubstationWarden = Enemy; }
                 if (Enemy->IsA<ABreakerSkirmisherEnemy>()) { ++SubstationSkirmishers; SubstationSkirmisher = Enemy; }
             }
-            if (Pocket >= 5)
+            if (Pocket >= 5 && Pocket < 8)
             {
                 ++DepotBodies;
                 if (Enemy->IsA<ABreakerWardenEnemy>()) ++DepotWardens;
                 if (Enemy->GetMonsterRank() != EBreakerMonsterRank::Trash) ++DepotElites;
                 TestEqual(TEXT("The depot is the deepest yard and says so"), Enemy->GetAreaLevel(), 13);
+            }
+            if (Pocket >= 8)
+            {
+                // The siding is beside the entry yard, not above it (O276).
+                TestEqual(TEXT("The siding sits one rung over the entry yard"), Enemy->GetAreaLevel(), 6);
             }
             const UCapsuleComponent* Capsule = Enemy->FindComponentByClass<UCapsuleComponent>();
             if (!TestNotNull(TEXT("Enemy capsule"), Capsule)) return false;
@@ -174,7 +179,11 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
         // bodies cannot reach the entry yard's XP and cannot change what the
         // first contract is worth; that is why the expansion went there rather
         // than into the yards the player already crosses.
-        if (!TestEqual(TEXT("Twenty-six outdoor enemies populate each fresh visit"), Enemies.Num(), 26)) return false;
+        // 26 -> 35 WITH THE SIDING (O276): nine level-6 Skitters one seam off
+        // the plaza. They CAN be reached before the first turn-in; what that
+        // does to the contract's worth is the owner's to feel, recorded at the
+        // pocket table.
+        if (!TestEqual(TEXT("Thirty-five outdoor enemies populate each fresh visit"), Enemies.Num(), 35)) return false;
         TestEqual(TEXT("Four additional courtyard enemies"), CourtyardCount, 4);
         TestEqual(TEXT("Three ordinary courtyard melee"), CourtyardMelee, 3);
         TestEqual(TEXT("One courtyard Lattice"), CourtyardLattices, 1);
@@ -195,8 +204,8 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("The depot carries exactly one of them"), DepotElites, 1);
         TestEqual(TEXT("and a Warden to anchor its set piece"), DepotWardens, 1);
         TestEqual(TEXT("Nine bodies stand in the third yard"), DepotBodies, 9);
-        const int32 ExpectedCounts[] = { 4, 3, 4, 3, 3, 3, 3, 3 };
-        for (int32 Index = 0; Index < 8; ++Index)
+        const int32 ExpectedCounts[] = { 4, 3, 4, 3, 3, 3, 3, 3, 3, 3, 3 };
+        for (int32 Index = 0; Index < 11; ++Index)
         {
             if (!TestEqual(TEXT("Distinct pocket roster"), PocketCounts[Index], ExpectedCounts[Index])) return false;
             PocketCenters[Index] /= PocketCounts[Index];
@@ -220,9 +229,15 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
             FVector::Dist2D(PocketCenters[4], PocketCenters[2]) > 1800);
         // The depot's three are their own ground too, by the same measure.
         for (int32 Index = 5; Index < 8; ++Index)
-            for (int32 Other = 0; Other < 8; ++Other)
+            for (int32 Other = 0; Other < 11; ++Other)
                 if (Other != Index)
                     TestTrue(*FString::Printf(TEXT("Depot pocket %d is its own ground against %d"), Index, Other),
+                        FVector::Dist2D(PocketCenters[Index], PocketCenters[Other]) > 1800);
+        // And the siding's three (O276), by the same measure.
+        for (int32 Index = 8; Index < 11; ++Index)
+            for (int32 Other = 0; Other < 11; ++Other)
+                if (Other != Index)
+                    TestTrue(*FString::Printf(TEXT("Siding pocket %d is its own ground against %d"), Index, Other),
                         FVector::Dist2D(PocketCenters[Index], PocketCenters[Other]) > 1800);
         // And the third yard is a YARD away, not a corner of the second.
         TestTrue(TEXT("The depot occupies its own yard"),
@@ -390,7 +405,7 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
             // placed one, and every one of them is closed until a return.
             TArray<ABreakerPocketRift*> Tears;
             for (TActorIterator<ABreakerPocketRift> It(World); It; ++It) Tears.Add(*It);
-            TestEqual(TEXT("Every yard pocket placed a tear"), Tears.Num(), 8);
+            TestEqual(TEXT("Every yard pocket placed a tear"), Tears.Num(), 11);
             for (const ABreakerPocketRift* Tear : Tears)
             {
                 TestFalse(TEXT("A tear is not open before anything returns"), Tear->IsOpen());
@@ -491,8 +506,8 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
             for (const ABreakerPocketRift* Tear : Tears)
                 TestTrue(TEXT("The world at rest shows no tears"), Tear->IsClosed());
         }
-        TestEqual(TEXT("Repeated startup preserves the outdoor population"), AfterRepeat - CourtyardAfterRepeat, 26);
-        TestEqual(TEXT("Repeated startup preserves twenty-six outdoor plus courtyard four"), AfterRepeat, 30);
+        TestEqual(TEXT("Repeated startup preserves the outdoor population"), AfterRepeat - CourtyardAfterRepeat, 35);
+        TestEqual(TEXT("Repeated startup preserves thirty-five outdoor plus courtyard four"), AfterRepeat, 39);
         TestFalse(TEXT("Clearing outdoor encounters never starts waves"), Mode->IsWaveActive());
     }
     return true;

@@ -205,6 +205,15 @@ def perimeter(tag, x, z, index, facing):
 
 for i, x in enumerate(range(5, 100, 10)):
     perimeter("n", float(x), 25.0, i, -1.0)
+    # THE SOUTH FLANK HAS A MOUTH IN IT TOO (O276): the piece at x 5 is left
+    # out, opening x 0..10 on the plaza's west flank as the third seam's near
+    # end. A perimeter piece is 10 m wide centred on the loop's x, so the mouth
+    # a skip opens is 0..10 or 10..20, never 5..15; 0..10 is the one that lies
+    # wholly inside the plaza (x < 14, outside the 20..95 combat band) and
+    # shares wall_w's line, so the seam's west wall simply carries it south.
+    # 10 m sits under the 12 m mouth ceiling like the east mouth does.
+    if x == 5:
+        continue
     perimeter("s", float(x), -25.0, i + 2, 1.0)
 place("wall_w", "bldg_b", (-1.5, 0.0, 0.0), (3.0, 7.0, 56.0))
 # THE EAST WALL HAS A MOUTH IN IT. Two stubs rather than one slab, leaving a
@@ -351,6 +360,73 @@ for i, fwd in enumerate((19.0, 34.0, 49.0, 64.0, 79.0)):
 for i, (fwd, dz) in enumerate(((26.0, 17.0), (26.0, -17.0), (56.0, 17.0), (56.0, -17.0), (80.0, 17.0), (83.0, -18.0))):
     place("blk_full_dep_break%02d" % i, "full", (DEP_ANCHOR + fwd, 0.0, DEP_Z + dz), (3.0, 4.0, 3.0))
 
+# ---- THE THIRD SEAM: entry plaza -> siding (O276) ---------------------------
+# Out of the plaza's WEST flank (glTF -Z: the survey draws UE +X as north) and
+# the same shape as the first two, read off the rule rather than copied by eye:
+# a 10 m mouth under the 12 m ceiling, and it TURNS. South 15 m from the plaza
+# slab's edge, then west 14 m to the siding's end wall: 29 m walked, under 30,
+# and the same 29 the zone builder's connection table honours.
+#
+# Seam slabs ABUT: leg a's north edge is the entry slab's edge at z -28, leg b's
+# north edge is leg a's south edge, and leg b's west end is the siding slab's
+# east edge at x -4 — FloorsDisjoint measures every pair.
+place("flr_seam3_a", "pavement", (5.0, -0.06, -35.5), (10.0, 0.06, 15.0))    # x 0..10, z -43..-28
+place("flr_seam3_b", "pavement", (3.0, -0.06, -48.0), (14.0, 0.06, 10.0))    # x -4..10, z -53..-43
+# Seam walls, on the OUTSIDE of the corner. The west wall carries wall_w's line
+# south to the siding's north-east stub; the east wall runs from behind the
+# plaza's next perimeter piece (overlapping it, so the metre between that
+# building's back and the slab edge is not a pocket a body can slip into) down
+# to the south wall, and the south wall closes the corner from the siding's
+# south-east stub across to the east wall. Looking south from the plaza mouth
+# ends at the south wall; looking east from the siding mouth ends at the east
+# wall. The corner-to-corner diagonal is the same sliver the first two seams
+# leave, and no wider.
+place("wall_seam3_w", "garage", (-1.5, 0.0, -35.5), (3.0, 7.0, 15.0))        # x -3..0, z -43..-28
+place("wall_seam3_e", "garage", (11.5, 0.0, -40.0), (3.0, 7.0, 32.0))        # x 10..13, z -56..-24
+place("wall_seam3_s", "garage", (5.5, 0.0, -54.5), (15.0, 7.0, 3.0))         # x -2..13, z -56..-53
+
+# ---- The SIDING yard, the fourth place in the world (O276) -------------------
+# Off the entry plaza's west flank, one seam from the player start, with its
+# own door and its own level beside the entry yard's. Same 106 x 56 footprint
+# and the same frame-relative lattice, for the reason the substation's note
+# records.
+#
+# IT FACES -X, AND THAT IS THE ONLY THING NEW ABOUT ITS FRAME. The seam's west
+# leg ends at a constant-x line, so the yard it enters presents an END WALL
+# there, the way the depot does at its west end; the mouth is at the yard's
+# anchor end so the walk in runs down the lane toward the rift, not out of it.
+# The anchor is therefore the EAST end (centre + 41) and the rift the west
+# (centre - 41): rift = anchor + forward x 82, forward = -X, and YardFrame reads
+# that from the two markers the same way it reads +X off the others. Every
+# frame-relative number below is the substation's mirrored: fwd is subtracted
+# from the anchor instead of added, and lat stays absolute glTF z. Measured in
+# the yard's own frame that is the substation's lattice reflected across the
+# lane, and every rule the grammar applies is symmetric across it.
+SID_X, SID_Z = -57.0, -66.0   # centre; slab x -110..-4, z -94..-38
+SID_ANCHOR = SID_X + 41.0     # x -16; the rift at SID_X - 41 = x -98
+place("flr_yard_siding", "pavement", (SID_X, -0.06, SID_Z), (106.0, 0.06, 56.0))
+place("flr_riftpad_siding", "pavement", (SID_X - 41.0, 0.0, SID_Z), (10.0, 0.08, 10.0))
+
+# Perimeter. Both flanks are solid; the mouth is in the EAST end wall, where
+# the seam arrives, so the east wall is two stubs about the z -53..-43 band
+# (lat +13..+23) and the west wall is one slab. Eleven flank pieces rather than
+# ten, so the row reaches the end walls' outer faces and leaves no open corner
+# at the slab's edge.
+for i, x in enumerate(range(int(SID_X) - 50, int(SID_X) + 51, 10)):
+    perimeter("siding_n", float(x), SID_Z + 25.0, i, -1.0)
+    perimeter("siding_s", float(x), SID_Z - 25.0, i + 3, 1.0)
+place("wall_siding_w", "bldg_b", (SID_X - 53.5, 0.0, SID_Z), (3.0, 7.0, 56.0))
+place("wall_siding_e_n", "bldg_c", (SID_X + 53.5, 0.0, SID_Z + 25.5), (3.0, 7.0, 5.0))    # z -43..-38
+place("wall_siding_e_s", "bldg_c", (SID_X + 53.5, 0.0, SID_Z - 7.5), (3.0, 7.0, 41.0))    # z -94..-53
+
+# The lattice, frame-relative and unchanged: the same offsets from the anchor,
+# walked toward -X.
+for i, fwd in enumerate((19.0, 34.0, 49.0, 64.0, 79.0)):
+    place("blk_chest_siding_n%02d" % i, "chest", (SID_ANCHOR - fwd, 0.0, SID_Z + 10.5), (3.0, 1.2, 1.2))
+    place("blk_chest_siding_s%02d" % i, "chest", (SID_ANCHOR - fwd, 0.0, SID_Z - 10.5), (3.0, 1.2, 1.2))
+for i, (fwd, dz) in enumerate(((26.0, 17.0), (26.0, -17.0), (56.0, 17.0), (56.0, -17.0), (80.0, 17.0), (83.0, -18.0))):
+    place("blk_full_siding_break%02d" % i, "full", (SID_ANCHOR - fwd, 0.0, SID_Z + dz), (3.0, 4.0, 3.0))
+
 # ---- SHAPE: THE YARDS STOP BEING FLAT ---------------------------------------
 # Owner: "theres absolutely no shape to fernhall at all just the main opened
 # portion". He is right, and the reason is structural rather than decorative:
@@ -386,9 +462,14 @@ FAR_DECK_HEIGHT = 4.6
 GANTRY_HEIGHT = 9.0
 STEP_RISE = 0.85
 
-def work_pass(tag, anchor_x, centre_z, bay_fwd, bay_side, dock_fwd, dock_side):
+def work_pass(tag, anchor_x, centre_z, bay_fwd, bay_side, dock_fwd, dock_side, forward=1.0):
     """A place where the yard's work happened: one enterable bay and one loading
-    dock, per yard.
+    dock, per yard. forward is +1 for a yard that faces +x and -1 for one that
+    faces -x; every piece here is a box scaled to a size, so the mirrored yard
+    gets the same box at the mirrored place. The dock stair is the one piece
+    with a run of its own, and it is placed by position alone for either sign
+    exactly as it is for +x: which way its treads climb has not been
+    photographed for either, and a yaw guessed here would be a fake.
 
     Owner: "the whole level itself doesn't feel good ... the goal is to have a
     decent starting area". What the yards had was cover, decks, gantries and a
@@ -406,7 +487,7 @@ def work_pass(tag, anchor_x, centre_z, bay_fwd, bay_side, dock_fwd, dock_side):
     Both stand outboard of 18 m from the lane, clear of the gantry legs at 13 m
     and of the pocket positions down the middle."""
     def at(fwd, lat, height=0.0):
-        return (anchor_x + fwd, height, centre_z + lat)
+        return (anchor_x + forward * fwd, height, centre_z + lat)
 
     # --- THE BAY: fourteen metres by ten, six tall, one mouth ---------------
     # The mouth faces the lane, so it is somewhere you can be driven into or
@@ -452,13 +533,15 @@ def work_pass(tag, anchor_x, centre_z, bay_fwd, bay_side, dock_fwd, dock_side):
           at(dock_fwd - 8.5, dock_side * 20.5, dh), (1.6, 0.2, 5.5))
 
 
-def shape_pass(tag, anchor_x, centre_z, gantries, masses):
+def shape_pass(tag, anchor_x, centre_z, gantries, masses, forward=1.0):
     """One yard's verticality, authored once in the yard's own frame and
-    instanced three times. fwd runs down the lane from the yard's anchor; lat
+    instanced once per yard. fwd runs down the lane from the yard's anchor; lat
     is across it, positive toward +z. The entry yard, the substation and the
-    depot all face +x, so the frame is a translation."""
+    depot face +x, so their frame is a translation; the siding faces -x, so
+    forward = -1 and its frame is the translation mirrored. Every piece is a
+    box scaled to a size, and a mirrored box is the same box."""
     def at(fwd, lat, height=0.0):
-        return (anchor_x + fwd, height, centre_z + lat)
+        return (anchor_x + forward * fwd, height, centre_z + lat)
 
     # --- The near deck, on the +lat flank -----------------------------------
     place("flr_%s_deck" % tag, "pavement", at(35.0, 23.0, DECK_HEIGHT), (18.0, 0.4, 8.0))
@@ -548,11 +631,17 @@ def shape_pass(tag, anchor_x, centre_z, gantries, masses):
 # A pocket sits every 14 + 75*fraction metres down the lane and its arrival tear
 # sits 7.5 m behind it; a leg or a mass landing on either would spawn a fight
 # inside a building. These are the gaps left between them in each yard, which is
-# why the three lists differ instead of being one shared set.
+# why the lists differ instead of being one shared set.
 #
-#   entry pockets  32.75  47.75  66.5   (+ tears at 40.25  55.25  74.0)
-#   sub   pockets  51.5   74.0          (+ tears at 59.0   81.5)
-#   depot pockets  32.75  55.25  77.75  (+ tears at 40.25  62.75  85.25)
+#   entry  pockets  32.75  47.75  66.5   (+ tears at 40.25  55.25  74.0)
+#   sub    pockets  51.5   74.0          (+ tears at 59.0   81.5)
+#   depot  pockets  32.75  55.25  77.75  (+ tears at 40.25  62.75  85.25)
+#   siding pockets  32.75  47.75  66.5   (+ tears at 40.25  55.25  74.0)
+#
+# The siding opens on the ENTRY yard's pocket pattern (BreakerGameMode's
+# outdoor pocket table: 0.25 and 0.70 on the lane, 0.45 off it), so it takes
+# the entry yard's structure list and not the substation's — the substation's
+# gantry at 66 would stand over the siding's pocket at 66.5.
 shape_pass("entry", 6.0, 0.0, gantries=(20.0, 82.0), masses=((60.0, -19.0),))
 # The bay and the dock go in the gaps the pockets and their tears leave, on the
 # flank the yard's building mass is NOT on, so one side of each yard is a place
@@ -562,6 +651,13 @@ shape_pass("sub", SUB_ANCHOR, SUB_Z, gantries=(20.0, 66.0), masses=((40.0, 19.0)
 work_pass("sub", SUB_ANCHOR, SUB_Z, bay_fwd=34.0, bay_side=-1.0, dock_fwd=88.0, dock_side=1.0)
 shape_pass("dep", DEP_ANCHOR, DEP_Z, gantries=(20.0, 70.0), masses=((48.0, -19.0),))
 work_pass("dep", DEP_ANCHOR, DEP_Z, bay_fwd=15.0, bay_side=1.0, dock_fwd=68.0, dock_side=-1.0)
+# The dock at fwd 88 puts its stair at fwd 98.5..102.5, past the siding slab's
+# far edge at fwd 94 and outside its end wall — as the same dock already does
+# in the entry yard (stair x 102.5..106.5, slab to 104) and the substation
+# (x 166.5..170.5, slab to 164). Copied, not corrected: the list is the entry
+# yard's, and moving the dock is its own item.
+shape_pass("siding", SID_ANCHOR, SID_Z, gantries=(20.0, 82.0), masses=((60.0, -19.0),), forward=-1.0)
+work_pass("siding", SID_ANCHOR, SID_Z, bay_fwd=44.0, bay_side=1.0, dock_fwd=88.0, dock_side=-1.0, forward=-1.0)
 
 # ---- Markers ----------------------------------------------------------------
 # THE NAME CARRIES A ROLE AND A YARD, and this is the authoring side of a
@@ -586,9 +682,10 @@ work_pass("dep", DEP_ANCHOR, DEP_Z, bay_fwd=15.0, bay_side=1.0, dock_fwd=68.0, d
 # the entry yard cannot anchor a second: marker_yard_<name> is what gives yard
 # <name> a frame. The ENTRY yard is exempt because the playerstart anchors it.
 #
-# The three below carry no yard suffix because Fernhall is one yard today.
-# Growing it means adding marker_yard_<name> plus that yard's own markers, not
-# changing any of this.
+# The three below carry no yard suffix because they are the entry yard's.
+# Growing the zone means adding marker_yard_<name> plus that yard's own
+# markers, not changing any of this — the substation, the depot and the siding
+# below are each exactly that.
 place("marker_playerstart", None, (6.0, 0.0, 0.0), marker=True)
 place("marker_rift", None, (92.0, 0.0, 0.0), marker=True)
 place("marker_npc_contract", None, (13.0, 0.0, -14.0), marker=True)
@@ -605,6 +702,14 @@ place("marker_rift_substation", None, (SUB_X + 41.0, 0.0, SUB_Z), marker=True)
 # direction this yard runs anyway.
 place("marker_yard_depot", None, (DEP_ANCHOR, 0.0, DEP_Z), marker=True)
 
+# The SIDING's anchor and its own rift door (O276). No playerstart: a zone has
+# exactly one, and it is the entry yard's. The anchor is the yard's east end
+# and the rift its west, so the forward YardFrame derives from the pair is -X;
+# nothing else about the marker contract changes for a yard that faces the
+# other way.
+place("marker_yard_siding", None, (SID_ANCHOR, 0.0, SID_Z), marker=True)
+place("marker_rift_siding", None, (SID_X - 41.0, 0.0, SID_Z), marker=True)
+
 # ---- Dressing (O24: vegetation over ruins) ---------------------------------
 # WHERE PLANTS GROW. Owner: "some graphical assets that are imported that are
 # placed randomly, like trees". They were: six clumps per yard at coordinates
@@ -614,32 +719,39 @@ place("marker_yard_depot", None, (DEP_ANCHOR, 0.0, DEP_Z), marker=True)
 # through, and stands where a building's shadow kept the concrete damp. So
 # every clump stands against a boundary or in a corner, with grass at its
 # foot, and the open lane stays open because that is where the traffic was.
-def grow(tag, anchor_x, centre_z, corners=True):
+def grow(tag, anchor_x, centre_z, corners=((2.5, 23.0), (2.5, -23.0)), forward=1.0):
     """Clumps against the flanks and in the corners of one yard, frame-
     relative like everything else that was authored from the validated first
-    yard rather than by eye."""
+    yard rather than by eye. forward is the yard's sign along x, as in
+    shape_pass."""
     def at(fwd, lat, height=0.0):
-        return (anchor_x + fwd, height, centre_z + lat)
+        return (anchor_x + forward * fwd, height, centre_z + lat)
     # Against the north and south flanks, pressed to the boundary face at
     # 23.5 m, at forward positions that avoid every dock, bay, gantry leg and
     # deck pier the yard has.
     for i, (fwd, lat) in enumerate(((9.0, 22.5), (57.0, -22.6), (73.0, 22.4), (26.0, -22.3))):
         place("dress_%s_tree%d" % (tag, i), "trees", at(fwd, lat), (5.0, 4.2, 3.4))
         place("dress_%s_treegrass%d" % (tag, i), "grass", at(fwd + 1.5, lat - (1.8 if lat > 0 else -1.8)))
-    if corners:
-        # The corners: one bigger clump in each of the two the entrance does
-        # not use, with a grass mound under it where the slab has heaved.
-        for i, (fwd, lat) in enumerate(((2.5, 23.0), (2.5, -23.0))):
-            place("dress_%s_corner%d" % (tag, i), "trees", at(fwd, lat), (6.5, 5.0, 4.5))
-            place("dress_%s_cornermound%d" % (tag, i), "mound", at(fwd + 1.0, lat), (7.0, 0.5, 5.0))
+    # The corners: one bigger clump in each of the two the entrance does not
+    # use, with a grass mound under it where the slab has heaved. A yard whose
+    # mouth is at a corner passes that corner's clump a place further down the
+    # same flank, so the clump stands beside the door and not in it.
+    for i, (fwd, lat) in enumerate(corners):
+        place("dress_%s_corner%d" % (tag, i), "trees", at(fwd, lat), (6.5, 5.0, 4.5))
+        place("dress_%s_cornermound%d" % (tag, i), "mound", at(fwd + 1.0, lat), (7.0, 0.5, 5.0))
     # Grass in the seams of the slab: along the boundary foot, never in the
     # lane.
     for i, fwd in enumerate((18.0, 41.0, 66.0, 90.0)):
         place("dress_%s_seamgrass%d" % (tag, i), "grass", at(fwd, 22.0 if i % 2 else -22.0))
 
-grow("entry", 6.0, 0.0)
+# The entry yard's south-west corner is the third seam's mouth (x 0..10), so
+# its clump moves from x 8.5 to x 20, against the same flank; the siding's
+# mouth is its north-east corner, and its clump moves the same 11.5 m down its
+# own flank.
+grow("entry", 6.0, 0.0, corners=((2.5, 23.0), (14.0, -23.0)))
 grow("sub", SUB_ANCHOR, SUB_Z)
 grow("dep", DEP_ANCHOR, DEP_Z)
+grow("siding", SID_ANCHOR, SID_Z, corners=((14.0, 23.0), (2.5, -23.0)), forward=-1.0)
 
 # ---- THE RUIN, dressing only (--ruined) ------------------------------------
 # Placed against the cover the yard already has rather than instead of it, so
@@ -708,7 +820,8 @@ if RUINED:
     # carry a canopy, a bay or a dock — those are the profiles that stayed up.
     for tag, (n, s_) in (("", ("wall_n03", "wall_s06")),
                          ("sub", ("wall_sub_n02", "wall_sub_s07")),
-                         ("dep", ("wall_dep_n05", "wall_dep_s01"))):
+                         ("dep", ("wall_dep_n05", "wall_dep_s01")),
+                         ("siding", ("wall_siding_n09", "wall_siding_s10"))):
         collapse(tag, n, -1, 1)
         collapse(tag, s_, 1, 4)
 
@@ -716,7 +829,13 @@ if RUINED:
     # close to upright: the pieces that carry the skyline at distance. Fewer
     # than before, and only at the breaks, so the lane reads as a place things
     # fell INTO from the sides rather than as a field of props.
-    Full = sorted(n for n in SCENE if n.startswith("blk_full_"))
+    #
+    # Walked yard by yard in the order the first three sorted to — entry, depot,
+    # substation — with the siding after them, so a fourth yard's breaks take
+    # new rows of the plan instead of shifting which side of a substation break
+    # its chunk leans on.
+    BREAK_ORDER = ("blk_full_break", "blk_full_dep_break", "blk_full_sub_break", "blk_full_siding_break")
+    Full = [n for prefix in BREAK_ORDER for n in sorted(SCENE) if n.startswith(prefix)]
     for i, name in enumerate(Full):
         if i % 2:
             continue
@@ -725,6 +844,12 @@ if RUINED:
 
     print("ruin dressing:", Ruins, "chunks")
 
+# THE ROSTER THIS WRITES: 631 meshes intact, 715 ruined — the 84 ruin chunks
+# are dressing over the same 631. Four yards (entry 57 with its south mouth
+# open, substation 56, depot 60, siding 64), three seams (6, 7, 5), four times
+# the 92 a shape, work and grow pass add, and 8 markers.
+# BreakerFernhallExpectedPieceCount (BreakerFernhallZoneTests.cpp) and
+# EXPECTED_TOTAL (breaker_import_fernhall.py) are kept by hand to these.
 scene = trimesh.Scene(SCENE)
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 scene.export(OUT)

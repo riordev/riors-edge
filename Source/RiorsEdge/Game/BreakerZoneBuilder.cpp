@@ -544,23 +544,30 @@ int32 UBreakerZoneBuilder::FernhallYardAreaLevel(FName Yard)
 {
     // HOW FAR THE PLAYER HAS WALKED, expressed as a number. A yard reached
     // through another yard is content they earned their way to, and the GAP
-    // between the three is the thing being authored rather than any one
+    // between the four is the thing being authored rather than any one
     // magnitude. All O2 PLACEHOLDER.
     //
-    // THIS IS SEPARATE FROM FernhallRiftFor ON PURPOSE. Two of the three yards
+    // THIS IS SEPARATE FROM FernhallRiftFor ON PURPOSE. Three of the four yards
     // have a rift door and carry a definition; the DEPOT has none, and giving
     // it a rift definition purely to read one field off it would be authoring
     // an encounter the player can never reach.
+    //
+    // THE SIDING IS BESIDE THE ENTRY YARD'S, NOT ABOVE IT (O276). It hangs off
+    // the entry plaza's west flank — one seam from the door the player arrives
+    // at, the same distance the substation is — but it is the side room, not
+    // the road onward, so it sits one step over the entry rather than on the
+    // substation's rung. O2 PLACEHOLDER.
     if (Yard == FName(TEXT("breach"))) return 20;
     if (Yard == FName(TEXT("depot"))) return 13;
     if (Yard == FName(TEXT("substation"))) return 9;
+    if (Yard == FName(TEXT("siding"))) return 6;
     return 5;
 }
 
 FBreakerRiftDefinition UBreakerZoneBuilder::FernhallRiftFor(FName Yard)
 {
     FBreakerRiftDefinition Rift;
-    // Campaign, both of them: O122 makes a campaign rift free to enter and O82
+    // Campaign, all of them: O122 makes a campaign rift free to enter and O82
     // makes respawn unlimited inside it. Consumable endgame rifts arrive with
     // their own entry cost and are not authored here.
     Rift.Tier = EBreakerRiftTier::Campaign;
@@ -584,6 +591,20 @@ FBreakerRiftDefinition UBreakerZoneBuilder::FernhallRiftFor(FName Yard)
         // player arrives at — a yard reached through another yard is content
         // they have walked to. The GAP between the two is the thing being
         // authored; both magnitudes are O2 PLACEHOLDER.
+        Rift.AreaLevel = FernhallYardAreaLevel(Yard);
+        return Rift;
+    }
+
+    if (Yard == FName(TEXT("siding")))
+    {
+        // THE SIDE RIFT (O276). No mission beat names it: it completes on its
+        // generic terminator, BossForRift answers NAME_None for it, and the
+        // door's gate asks nothing of the journal. It exists so the player
+        // has a rift to run that the story is not standing in front of.
+        Rift.EncounterId = TEXT("fernhall.siding");
+        Rift.AreaName = FText::FromString(TEXT("Fernhall Siding"));
+        Rift.AreaLine = FText::FromString(
+            TEXT("A spur off the plaza where the rolling stock was left, and something else arrived."));
         Rift.AreaLevel = FernhallYardAreaLevel(Yard);
         return Rift;
     }
@@ -629,6 +650,21 @@ TArray<FBreakerZoneConnection> UBreakerZoneBuilder::FernhallConnections()
     Second.MouthWidthCm = 1000.0f;   // O2 PLACEHOLDER
     Second.LengthCm = 2800.0f;   // O2 PLACEHOLDER
     Second.bThroughSight = false;
+
+    // THE THIRD SEAM (O276), off the entry plaza's WEST flank into the siding.
+    // The plaza now has two seams leaving it, and this one turns so that a
+    // body in the siding cannot hold the plaza — the same no-through-sight
+    // term as the other two, for the same reason. 10 m mouth under the 12 m
+    // ceiling, 29 m walked under the 30 m one. THE WALKED FIGURES ARE THE
+    // COMPOSER'S: they are what the DATA hand built in compose_fernhall.py,
+    // honoured here and not derived from the geometry. O2 PLACEHOLDER.
+    FBreakerZoneConnection& Third = Out.AddDefaulted_GetRef();
+    Third.Name = FName(TEXT("plaza-siding"));
+    Third.FromYard = NAME_None;
+    Third.ToYard = FName(TEXT("siding"));
+    Third.MouthWidthCm = 1000.0f;   // O2 PLACEHOLDER
+    Third.LengthCm = 2900.0f;   // O2 PLACEHOLDER
+    Third.bThroughSight = false;
     return Out;
 }
 

@@ -16,11 +16,30 @@
 
 #include "Misc/AutomationTest.h"
 #include "Misc/PackageName.h"
+#include "Misc/ScopeExit.h"
 
+#include "AbilitySystemComponent.h"
+#include "Attributes/BreakerAttributeSet.h"
+#include "Characters/BreakerCharacter.h"
+#include "Combat/BreakerCombatComponent.h"
+#include "Engine/Engine.h"
+#include "Engine/World.h"
 #include "Game/BreakerCoverRegistry.h"
 #include "Game/BreakerGameInstance.h"
 #include "Game/BreakerZoneBuilder.h"
+#include "Interaction/BreakerRiftDoor.h"
 #include "Interaction/BreakerTravelPoint.h"
+#include "Save/BreakerMissionContent.h"
+#include "Save/BreakerQuestJournal.h"
+
+// THE COMPOSER'S ROSTER, in one place. The count is set from the export
+// (breaker_import_fernhall.py's EXPECTED_TOTAL is the same figure, kept by
+// hand) and moves only when the zone is deliberately re-authored; a drifted
+// count means the composer and this file disagree about what the zone IS.
+// One line to change, so the pin cannot be half-moved.
+//
+// 472 is the THREE-yard figure; the siding's re-import sets the four-yard one.
+static constexpr int32 BreakerFernhallExpectedPieceCount = 631;
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerFernhallGrammarTest,
@@ -56,6 +75,11 @@ bool FBreakerFernhallGrammarTest::RunTest(const FString& Parameters)
     {
         return false;
     }
+    // THREE SEAMS FOR FOUR YARDS (O276): plaza-substation, substation-depot,
+    // and plaza-siding off the entry plaza's west flank. Pinned so a fourth
+    // yard cannot arrive without its seam, or a seam without its yard — the
+    // zone rule below refuses a seam to a yard nobody authored.
+    TestEqual(TEXT("three seams join the four yards"), Seams.Num(), 3);
 
     // THE READOUT IS LOGGED PER YARD, whether or not it passes. A zone-level
     // verdict with no per-yard numbers sends the reader to search a world for a
@@ -108,11 +132,12 @@ bool FBreakerFernhallPieceContractTest::RunTest(const FString& Parameters)
         return false;
     }
 
-    // The composer's roster: 167 meshes across THREE yards and the two seams
-    // between them, of which 48 are measured cover — 16 per yard, the same
-    // lattice in each yard's own frame. A drifted count means the composer and
-    // this file disagree about what the zone IS, and re-authoring both is the
-    // deliberate act rather than the accident.
+    // The composer's roster: BreakerFernhallExpectedPieceCount meshes across
+    // FOUR yards and the three seams between them, of which 64 are measured
+    // cover — 16 per yard, the same lattice in each yard's own frame. A
+    // drifted count means the composer and this file disagree about what the
+    // zone IS, and re-authoring both is the deliberate act rather than the
+    // accident.
     //
     // 113 -> 167 with the DEPOT, 167 -> 275 with the shape pass (two raised
     // decks, a catwalk, their stairs and their dressing, in each of the three). The per-yard figures did not move by
@@ -128,10 +153,13 @@ bool FBreakerFernhallPieceContractTest::RunTest(const FString& Parameters)
     // 453 -> 472 with the vegetation pass: the six random clumps a yard became
     // trees against the flanks and in the corners with grass at their feet,
     // and the lane stays open because that is where the traffic was.
-    TestEqual(TEXT("imported piece count"), Pieces.Num(), 472);
+    // 472 -> the SIDING (O276): a fourth yard off the entry plaza's west
+    // flank, authored from the validated frame like the depot was, so the
+    // per-yard figures below hold for it unchanged.
+    TestEqual(TEXT("imported piece count"), Pieces.Num(), BreakerFernhallExpectedPieceCount);
 
     const TArray<FBreakerZoneField> Zone = UBreakerZoneBuilder::BuildZoneFields(Pieces, Markers);
-    TestEqual(TEXT("the zone has three yards"), Zone.Num(), 3);
+    TestEqual(TEXT("the zone has four yards"), Zone.Num(), 4);
 
     int32 TotalCover = 0;
     for (const FBreakerZoneField& Yard : Zone)
@@ -144,7 +172,7 @@ bool FBreakerFernhallPieceContractTest::RunTest(const FString& Parameters)
         TestEqual(FString::Printf(TEXT("yard '%s' full-height pieces"), *YardName),
             UBreakerCoverLayoutLibrary::CountOfClass(Yard.Pieces, EBreakerCoverClass::FullHeight), 6);
     }
-    TestEqual(TEXT("measured cover across the zone"), TotalCover, 48);
+    TestEqual(TEXT("measured cover across the zone"), TotalCover, 64);
     const TArray<FBreakerCoverPiece> Cover = Zone[0].Pieces;
 
     // The name prefix claims a class; the imported geometry must actually BE
@@ -170,36 +198,119 @@ bool FBreakerFernhallPieceContractTest::RunTest(const FString& Parameters)
             FVector::Dist2D(Rift->Location, Start->Location) > 8000.0f);
     }
 
-    // THE SHIPPED YARD IS A ONE-YARD ZONE, and it says so rather than leaving
-    // it implied. Every marker belongs to the entry yard (no name suffix),
-    // which is what keeps the pre-yards export valid unchanged — and this
-    // assertion is what will move, deliberately, on the day a second yard is
-    // authored.
-    TestEqual(TEXT("the zone authors six markers"), Markers.All.Num(), 6);
-    TestEqual(TEXT("three yards, two rift doors"),
-        Markers.OfRole(EBreakerZoneMarkerRole::Rift).Num(), 2);
+    // THE SHIPPED ZONE SAYS HOW MANY YARDS IT IS rather than leaving it
+    // implied. The entry yard's markers carry no suffix, which is what keeps
+    // the pre-yards export valid unchanged — and these assertions are what
+    // move, deliberately, on the day a yard is authored. Eight markers: the
+    // entry yard's player start, rift and contract giver; an anchor and a door
+    // for the substation; an anchor alone for the depot; an anchor and a door
+    // for the siding.
+    TestEqual(TEXT("the zone authors eight markers"), Markers.All.Num(), 8);
+    TestEqual(TEXT("four yards, three rift doors"),
+        Markers.OfRole(EBreakerZoneMarkerRole::Rift).Num(), 3);
     TestEqual(TEXT("and an anchor for each yard that is not the entry"),
-        Markers.OfRole(EBreakerZoneMarkerRole::Yard).Num(), 2);
+        Markers.OfRole(EBreakerZoneMarkerRole::Yard).Num(), 3);
     TestTrue(TEXT("the substation yard has both an anchor and a door"),
         Markers.Has(EBreakerZoneMarkerRole::Yard, FName(TEXT("substation")))
         && Markers.Has(EBreakerZoneMarkerRole::Rift, FName(TEXT("substation"))));
-    // THREE YARDS, AND ONLY TWO DOORS. A yard with no rift is a legal yard and
-    // the depot is the first one: a second door into the substation undercroft
-    // would be two ways into one place, and a third rift definition would be an
-    // encounter nobody can reach. Its anchor alone gives it a frame, and
-    // YardFrame keeps +X when a yard points at no rift — the direction the
-    // player is already walking when they leave the second seam.
+    // FOUR YARDS, AND ONLY THREE DOORS. A yard with no rift is a legal yard and
+    // the depot is the one: a second door into the substation undercroft
+    // would be two ways into one place, and a rift definition for the depot
+    // would be an encounter nobody can reach. Its anchor alone gives it a
+    // frame, and YardFrame keeps +X when a yard points at no rift — the
+    // direction the player is already walking when they leave the second seam.
     TestTrue(TEXT("the depot has an anchor"),
         Markers.Has(EBreakerZoneMarkerRole::Yard, FName(TEXT("depot"))));
     TestFalse(TEXT("and deliberately no door"),
         Markers.Has(EBreakerZoneMarkerRole::Rift, FName(TEXT("depot"))));
-    // Each yard is DEEPER than the one before it. The ORDERING is asserted, not
-    // the three magnitudes: the gap is what is authored and every one is O2.
+    // THE SIDING (O276) is the other kind: a yard WITH a door, off the entry
+    // plaza's west flank, so the third door in the world is one seam from the
+    // player start rather than three.
+    TestTrue(TEXT("the siding has both an anchor and a door"),
+        Markers.Has(EBreakerZoneMarkerRole::Yard, FName(TEXT("siding")))
+        && Markers.Has(EBreakerZoneMarkerRole::Rift, FName(TEXT("siding"))));
+    // Each yard along the road is DEEPER than the one before it, and the
+    // siding sits BESIDE the entry yard's rung rather than on the road's: one
+    // step over the entry, under the substation. The ORDERING is asserted,
+    // not the four magnitudes: the gap is what is authored and every one is O2.
     TestTrue(TEXT("each yard is deeper than the one before it"),
         UBreakerZoneBuilder::FernhallYardAreaLevel(NAME_None)
             < UBreakerZoneBuilder::FernhallYardAreaLevel(FName(TEXT("substation")))
         && UBreakerZoneBuilder::FernhallYardAreaLevel(FName(TEXT("substation")))
             < UBreakerZoneBuilder::FernhallYardAreaLevel(FName(TEXT("depot"))));
+    TestTrue(TEXT("the siding is beside the entry yard's level, not above the substation's"),
+        UBreakerZoneBuilder::FernhallYardAreaLevel(NAME_None)
+            < UBreakerZoneBuilder::FernhallYardAreaLevel(FName(TEXT("siding")))
+        && UBreakerZoneBuilder::FernhallYardAreaLevel(FName(TEXT("siding")))
+            < UBreakerZoneBuilder::FernhallYardAreaLevel(FName(TEXT("substation"))));
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// THE SIDE RIFT (O276), as a definition and as a door. The siding is the first
+// rift in the world that no mission beat stands in front of: it is authored
+// like the others, it is campaign like the others, and it completes on its
+// generic terminator because no boss is authored for it. Every one of those
+// is asserted, because every one is the kind of thing that is easy to get by
+// copying the substation's branch and forgetting to change one line — the
+// SAME EncounterId would make the side door a second way into the
+// undercroft, and a boss resolving for it would make its terminator wait on a
+// fight that never spawns.
+//
+// The door's gate is exercised against a LIVING CHARACTER WITH AN EMPTY
+// JOURNAL, the way the eligibility suite exercises the entry door, because
+// the gate is a runtime rule and a world-free read of CanEnterRift's source
+// would prove only that nobody typed "siding" into it.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerFernhallSideRiftDefinitionTest,
+    "RiorsEdge.World.Fernhall.SideRiftDefinition",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerFernhallSideRiftDefinitionTest::RunTest(const FString& Parameters)
+{
+    const FBreakerRiftDefinition Siding = UBreakerZoneBuilder::FernhallRiftFor(FName(TEXT("siding")));
+    const FBreakerRiftDefinition Entry = UBreakerZoneBuilder::FernhallRiftFor(NAME_None);
+    const FBreakerRiftDefinition Substation = UBreakerZoneBuilder::FernhallRiftFor(FName(TEXT("substation")));
+
+    TestTrue(TEXT("the siding's rift is set"), Siding.IsSet());
+    TestEqual(TEXT("and campaign, like every rift in the world today"),
+        static_cast<int32>(Siding.Tier), static_cast<int32>(EBreakerRiftTier::Campaign));
+    TestEqual(TEXT("under its own stable encounter id"), Siding.EncounterId, FName(TEXT("fernhall.siding")));
+    TestNotEqual(TEXT("which is not the entry's"), Siding.EncounterId, Entry.EncounterId);
+    TestNotEqual(TEXT("nor the substation's"), Siding.EncounterId, Substation.EncounterId);
+    TestEqual(TEXT("at the siding's own level, not a copied yard's"),
+        Siding.AreaLevel, UBreakerZoneBuilder::FernhallYardAreaLevel(FName(TEXT("siding"))));
+    TestFalse(TEXT("it has a name"), Siding.AreaName.IsEmpty());
+    TestFalse(TEXT("and an area line"), Siding.AreaLine.IsEmpty());
+
+    // NO MISSION BEAT, NO BOSS. The shipped Data/quests.json is what answers
+    // here, so a beat authored against the siding later would turn this red
+    // and say so — at which point the rift stops completing on its terminator
+    // and this pin moves with the ruling that moved it.
+    TestTrue(TEXT("no authored boss resolves for the side rift"),
+        UBreakerMissionLibrary::BossForRift(Siding).IsNone());
+
+    // THE DOOR, with nothing in the journal.
+    UWorld::InitializationValues Init;
+    Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+    if (!TestNotNull(TEXT("a bare world"), World)) return false;
+    GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+    ON_SCOPE_EXIT { World->DestroyWorld(false); GEngine->DestroyWorldContext(World); };
+    ABreakerCharacter* Player = World->SpawnActor<ABreakerCharacter>();
+    if (!TestNotNull(TEXT("a living character"), Player)) return false;
+    UAbilitySystemComponent* ASC = Player->GetAbilitySystemComponent();
+    ASC->InitAbilityActorInfo(Player, Player);
+    ASC->AddAttributeSetSubobject(Player->GetAttributes());
+    Player->GetCombat()->BindAttributes(Player->GetAttributes());
+    if (!TestNotNull(TEXT("with a journal"), Player->GetQuestJournal())) return false;
+    TestEqual(TEXT("that holds no flags"), Player->GetQuestJournal()->GetFlags().Num(), 0);
+
+    FText Reason = FText::FromString(TEXT("stale"));
+    TestTrue(TEXT("the side door opens to a character who has done nothing yet"),
+        ABreakerRiftDoor::CanEnterRift(Siding, Player, Reason));
+    TestTrue(TEXT("and gives no reason, because there is none"), Reason.IsEmpty());
     return true;
 }
 

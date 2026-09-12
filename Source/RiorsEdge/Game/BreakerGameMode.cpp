@@ -4502,6 +4502,13 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
     // fights that carry a rank stay pockets 1 and 2.
     const FBreakerWaveComposition Second = UBreakerWaveBudgetLibrary::SolveWave(
         1, 1, UBreakerWaveBudgetLibrary::MakeRiftWaveBudget(3));
+    // A THIRD SOLVED WAVE FOR THE SIDING (O276), because the second is spent:
+    // its twelve stand in the four quiet pockets already. Wave one again —
+    // trash only, no rank, no Lattice — for the same reason the quiet pockets
+    // took it: the fourth yard is ground between the plaza and its own door,
+    // and a set piece there is the owner's to ask for once he has walked it.
+    const FBreakerWaveComposition Siding = UBreakerWaveBudgetLibrary::SolveWave(
+        1, 1, UBreakerWaveBudgetLibrary::MakeRiftWaveBudget(3));
     // FIVE POCKETS, THREE IN THE ENTRY YARD AND TWO IN THE SUBSTATION. Before
     // this the whole persistent world held fifteen bodies and a player crossed
     // two 106 m yards meeting three fights; the far half of each yard was
@@ -4522,10 +4529,24 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
     // level two, or the first contract's turn-in stops being what levels the
     // player. The depot is two seams away and the player arrives there long
     // past that moment.
+    //
+    // ELEVEN WITH THE SIDING (O276). The fourth yard hangs off the entry
+    // plaza's west flank and opens with three pockets on the ENTRY yard's
+    // pattern — two on the lane at 0.25 and 0.70, one off it at 0.45 — each a
+    // quarter of the siding's own solved wave: nine plain Skitters at level 6,
+    // no rank among them. WHAT THIS ADDS TO THE 279 LINE IS NOT NOTHING, and
+    // it is recorded here rather than hidden: the entry yard itself is
+    // unchanged and still clears under the line, but the siding is ONE seam
+    // from the plaza, not two, so a player who clears it before turning in
+    // the first contract carries nine level-6 kills into that moment. Whether
+    // that is the side room paying for itself or the contract arriving late
+    // is the owner's to feel; the numbers are not tuned here. O2 PLACEHOLDER.
     const FName Yards[] = { NAME_None, NAME_None, FName(TEXT("substation")),
                             NAME_None, FName(TEXT("substation")),
-                            FName(TEXT("depot")), FName(TEXT("depot")), FName(TEXT("depot")) };
-    const float Fractions[] = { 0.25f, 0.70f, 0.50f, 0.45f, 0.80f, 0.25f, 0.55f, 0.85f };
+                            FName(TEXT("depot")), FName(TEXT("depot")), FName(TEXT("depot")),
+                            FName(TEXT("siding")), FName(TEXT("siding")), FName(TEXT("siding")) };
+    const float Fractions[] = { 0.25f, 0.70f, 0.50f, 0.45f, 0.80f, 0.25f, 0.55f, 0.85f,
+                                0.25f, 0.70f, 0.45f };
     // OFF THE LANE, and that is the point of the two new ones. The original
     // three sit on the yard's centreline, so the whole fight of Fernhall
     // happened in a strip down the middle and the flanks were scenery you ran
@@ -4537,8 +4558,14 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
     // is 7500 cm with fights already at 0.25 and 0.70, so a third between
     // them can never be more than ~1690 cm from both. Lateral offset makes
     // that distance two-dimensional. All O2 PLACEHOLDER.
-    const float Laterals[] = { 0.0f, 0.0f, 0.0f, 1400.0f, -1400.0f, 1400.0f, -1500.0f, 900.0f };
-    constexpr int32 PocketCount = 8;
+    // The siding's off-lane pocket takes the OTHER flank from the entry yard's
+    // (pocket 3 at +1400), so the two side rooms a player meets first do not
+    // read as one layout mirrored. O2 PLACEHOLDER.
+    const float Laterals[] = { 0.0f, 0.0f, 0.0f, 1400.0f, -1400.0f, 1400.0f, -1500.0f, 900.0f,
+                               0.0f, 0.0f, -1400.0f };
+    constexpr int32 PocketCount = 11;
+    static_assert(UE_ARRAY_COUNT(Yards) == PocketCount && UE_ARRAY_COUNT(Fractions) == PocketCount
+        && UE_ARRAY_COUNT(Laterals) == PocketCount, "every pocket has a yard, a fraction and a lateral");
     TArray<FBreakerZonePiece> YardPieces;
     UBreakerZoneBuilder::CollectZonePieces(UBreakerZoneBuilder::FernhallMeshFolder(), YardPieces);
     int32 Spawned = 0;
@@ -4713,6 +4740,13 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
             for (int32 Index = 0; Index < 2; ++Index)
                 Spawn(ABreakerEnemy::StaticClass(), Index == 0);
         }
+        // THE SIDING'S THREE (O276): a quarter of its own solved wave in each,
+        // the same share the quiet pockets take of theirs. Plain melee and no
+        // rank — see the note above the yard table for what that adds to the
+        // first contract's XP line and why it is recorded rather than tuned.
+        if (Pocket >= 8)
+            for (int32 Index = 0; Index < Siding.Skitters / 4; ++Index)
+                Spawn(ABreakerEnemy::StaticClass(), false);
         if (Pocket == 3)
         {
             // Existing yard-frame fraction; no marker or existing site moves.
@@ -4830,7 +4864,8 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
         // several runtime tests do. A GUID gives per-session variation without
         // touching anything else's arithmetic.
         const int32 ChestSeed = static_cast<int32>(GetTypeHash(FGuid::NewGuid()));
-        const FName ChestYards[] = { NAME_None, FName(TEXT("substation")), FName(TEXT("depot")) };
+        const FName ChestYards[] = { NAME_None, FName(TEXT("substation")), FName(TEXT("depot")),
+                                     FName(TEXT("siding")) };
         const ABreakerSupplyChest* ChestTemplate = GetDefault<ABreakerSupplyChest>();
         const UCapsuleComponent* ChestBody = ChestTemplate
             ? ChestTemplate->FindComponentByClass<UCapsuleComponent>() : nullptr;

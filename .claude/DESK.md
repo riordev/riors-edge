@@ -77,22 +77,18 @@
   here" refusal has never fired; the crowd probe counts an emerging body
   as engaged.
 
-## Cycle — O276 THE SIDE RIFT
+## O276 THE SIDE RIFT — LANDED
 
-- [ ] Composer: a 10 m mouth in the entry plaza's -Z (west) flank (drop
-      wall_s02 or wall_s03; move the corner dressing), a third dog-leg seam
-      (mouth <= 12 m, walk <= 30 m, no through-sight), a fourth 106x56 yard
-      `siding` with marker_yard_siding + marker_rift_siding, shape/work/
-      grow passes and a collapse pair. Re-export both GLBs, re-import both
-      targets, commit the generated meshes.
-- [ ] BreakerZoneBuilder: `siding` in FernhallYardAreaLevel (6) and
-      FernhallRiftFor (fernhall.siding, campaign, no boss beat); a third
-      FernhallConnection. GameMode: ChestYards[] and a pocket for the yard.
-      Importer EXPECTED_TOTAL. Crossing: Scripts/ (DATA) + Game/ (GROUND).
-- [ ] Pins: Fernhall zone tests move to 4 yards / 8 markers / 3 doors /
-      3 seams deliberately; the 16-cover rule holds for the new yard; new
-      World.Fernhall.SideRiftDefinition (set, campaign, own EncounterId,
-      BossForRift none, CanEnterRift with an empty journal). Photograph.
+- A fourth yard, the siding, hangs off the entry plaza's west flank
+  through a 10 m mouth and a 29 m dog-leg seam: a full 106x56 lattice
+  yard, its own door (marker_rift_siding) and definition
+  (fernhall.siding, campaign, AL6, no mission beat, completes on its
+  generic terminator), three pockets of plain Skitters, chests. 631 / 715
+  pieces. PHOTOGRAPHED from the tour's plan vantage. FOUND: a stale
+  index.lock let git-lfs re-materialise four deleted assets once — the
+  importer never deletes, so a removed piece is a manual git rm. The
+  siding's nine level-6 kills are reachable before the first turn-in;
+  what that does to the contract's worth is his to feel.
 
 ## Cycle — O273 BOSSES, A: THE RING
 

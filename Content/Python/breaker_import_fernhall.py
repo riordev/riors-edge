@@ -42,7 +42,7 @@ MAP_PACKAGE = "/Game/Breaker/Maps/Lvl_Fernhall"
 # 113 -> 167 when the DEPOT yard landed: a third place, its own seam, its own
 # lattice. The ruin's own chunk count follows the cover it leans on, so it grew
 # with it rather than being re-authored.
-EXPECTED_TOTAL = 371 if RUINED else 323
+EXPECTED_TOTAL = 715 if RUINED else 631
 SOLID_PREFIXES = ("blk_full_", "blk_chest_", "wall_", "flr_")
 
 # THE MARKER CONTRACT, PARSED — not a fixed list of three names. This used to
