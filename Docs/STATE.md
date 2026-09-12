@@ -26,8 +26,8 @@ measurement without judging it.
 | Scaffolding nodes | ceiling | 0 of 370 authored | ceiling 50 | ok |
 | Conditions that can never be true | ceiling | 5.0 | ceiling 5, target 1 | ok |
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
-| Build variance band, at cap | band | 4.55 | band 8.0–10.0 | **OUT** |
-| Build variance band, endgame | band | 12.89 | band 12.0–20.0 | ok |
+| Build variance band, at cap | band | 4.84 | band 8.0–10.0 | **OUT** |
+| Build variance band, endgame | band | 13.37 | band 12.0–20.0 | ok |
 | Ability lane throughput against weapon lane, at cap | band | 0.93 | band 0.85–1.15 | ok |
 | Ability lane throughput against weapon lane, endgame | band | 0.86 | no pin — measurement only | — |
 | Monster damage growth against gear defence growth | ceiling | 0.63 | ceiling 1.0 | ok |

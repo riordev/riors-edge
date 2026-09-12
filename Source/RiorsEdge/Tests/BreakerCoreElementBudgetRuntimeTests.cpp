@@ -80,16 +80,16 @@ bool FBreakerCoreElementBudgetRuntimeTest::RunTest(const FString& Parameters)
     };
     const FGameplayTag Rot = FGameplayTag::RequestGameplayTag(TEXT("Status.Rot"));
     const FGameplayTag Erased = FGameplayTag::RequestGameplayTag(TEXT("Status.Erased"));
-    // One legally spent Core point also earns the existing +0.25% baseline.
+    // One legally spent Core point buys only its node (O27): no per-point damage.
     for (const auto Element : { EBreakerElement::Entropy, EBreakerElement::Void, EBreakerElement::Rift })
     {
         Reset();
         const auto Result = Combat->ReceiveDamage(Request(Element));
-        TestEqual(TEXT("direct elemental damage shares the delivery Increased bucket"), Result.RawDamage, 250.25f, .001f);
-        const float ExpectedBudget = Element == EBreakerElement::Entropy ? 140.125f : Element == EBreakerElement::Void ? 145.125f : 155.125f;
+        TestEqual(TEXT("direct elemental damage shares the delivery Increased bucket"), Result.RawDamage, 250.0f, .001f);
+        const float ExpectedBudget = Element == EBreakerElement::Entropy ? 140.0f : Element == EBreakerElement::Void ? 145.0f : 155.0f;
         if (Element == EBreakerElement::Rift)
         {
-            TestEqual(TEXT("Rift pays only its specifically composed burst"), Health->GetHealth(), 1000 - 250.25f - ExpectedBudget, .001f);
+            TestEqual(TEXT("Rift pays only its specifically composed burst"), Health->GetHealth(), 1000 - 250.0f - ExpectedBudget, .001f);
             continue;
         }
         if (!TestEqual(TEXT("one status earned from actual damage"), Status->GetActiveStatuses().Num(), 1)) return false;
@@ -98,7 +98,7 @@ bool FBreakerCoreElementBudgetRuntimeTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("reaction credit funded at application"), Active.bHasReactionCreditSnapshot);
         TestEqual(TEXT("reaction Increased joins same original bucket"), Active.InitialReactionBudget, ExpectedBudget + 10, .001f);
         Status->AdvanceStatuses(Element == EBreakerElement::Entropy ? 4.0f : 2.0f);
-        TestEqual(TEXT("native periodic or delayed delivery consumes its own budget once"), Health->GetHealth(), 1000 - 250.25f - ExpectedBudget, .001f);
+        TestEqual(TEXT("native periodic or delayed delivery consumes its own budget once"), Health->GetHealth(), 1000 - 250.0f - ExpectedBudget, .001f);
     }
     Reset();
     const FBreakerDamageRequest Emitted = Request(EBreakerElement::Entropy);
@@ -111,7 +111,7 @@ bool FBreakerCoreElementBudgetRuntimeTest::RunTest(const FString& Parameters)
     const auto* Reaction = Observer->Hits.FindByPredicate([](const FBreakerHitContext& Hit)
     { return Hit.DamageTypeTag == FGameplayTag::RequestGameplayTag(TEXT("Reaction.Collapse")); });
     if (!TestNotNull(TEXT("foreign source triggers one Collapse"), Reaction)) return false;
-    TestEqual(TEXT("partial reaction inherits original credit across respec"), Reaction->Result.RawDamage, 112.59375f, .001f);
+    TestEqual(TEXT("partial reaction inherits original credit across respec"), Reaction->Result.RawDamage, 112.5f, .001f);
     TestEqual(TEXT("reaction retains original applier"), Reaction->Instigator.Get(), static_cast<AActor*>(Player));
     TestFalse(TEXT("consumed Rot absent"), Status->HasStatus(Rot));
     const float Settled = Health->GetHealth(); Status->AdvanceStatuses(10);
@@ -122,7 +122,7 @@ bool FBreakerCoreElementBudgetRuntimeTest::RunTest(const FString& Parameters)
     const auto* Wither = Observer->Hits.FindByPredicate([](const FBreakerHitContext& Hit)
     { return Hit.DamageTypeTag == FGameplayTag::RequestGameplayTag(TEXT("Reaction.Wither")); });
     if (!TestNotNull(TEXT("shortened Rot produces Wither"), Wither)) return false;
-    TestEqual(TEXT("shortened lifetime reduces reaction credit to scheduled half"), Wither->Result.RawDamage, 75.0625f, .001f);
+    TestEqual(TEXT("shortened lifetime reduces reaction credit to scheduled half"), Wither->Result.RawDamage, 75.0f, .001f);
     Reset();
     const auto Fresh = Request(EBreakerElement::Void); Combat->ReceiveDamage(Fresh);
     if (!TestTrue(TEXT("fresh baseline Void earns Erased"), Status->HasStatus(Erased))) return false;
@@ -142,13 +142,13 @@ bool FBreakerCoreElementBudgetRuntimeTest::RunTest(const FString& Parameters)
     Window.ElementSource.ReactionMoreProduct = 1.20f;
     Combat->ReceiveDamage(Window);
     if (!TestEqual(TEXT("ceiling diagnostic earns one Rot"), Status->GetActiveStatuses().Num(), 1)) return false;
-    TestEqual(TEXT("element scope cannot exceed already spent delivery ceiling"), Status->GetActiveStatuses()[0].UnpaidDamageBudget, 140.125f * Ceiling, .001f);
-    TestEqual(TEXT("reaction scope also cannot exceed shared ceiling"), Status->GetActiveStatuses()[0].InitialReactionBudget, 150.125f * Ceiling, .001f);
+    TestEqual(TEXT("element scope cannot exceed already spent delivery ceiling"), Status->GetActiveStatuses()[0].UnpaidDamageBudget, 140.0f * Ceiling, .001f);
+    TestEqual(TEXT("reaction scope also cannot exceed shared ceiling"), Status->GetActiveStatuses()[0].InitialReactionBudget, 150.0f * Ceiling, .001f);
     Observer->Hits.Reset(); Trigger(EBreakerElement::Rift);
     const auto* Capped = Observer->Hits.FindByPredicate([](const FBreakerHitContext& Hit)
     { return Hit.DamageTypeTag == FGameplayTag::RequestGameplayTag(TEXT("Reaction.Collapse")); });
     if (!TestNotNull(TEXT("capped diagnostic reaction settles"), Capped)) return false;
-    TestEqual(TEXT("native reaction pays bounded funded amount"), Capped->Result.RawDamage, 150.125f * Ceiling, .001f);
+    TestEqual(TEXT("native reaction pays bounded funded amount"), Capped->Result.RawDamage, 150.0f * Ceiling, .001f);
     Reset();
     // Settle the actual authored campaign entitlement, then buy the real
     // single-rank Chain (O272: no prerequisite). This isolates propagation,
@@ -177,8 +177,8 @@ bool FBreakerCoreElementBudgetRuntimeTest::RunTest(const FString& Parameters)
     Combat->ReceiveDamage(Emitted);
     if (!TestEqual(TEXT("purchased Chain propagates the earned Rot"), RecipientStatus->GetActiveStatuses().Num(), 1)) return false;
     const FBreakerActiveStatus& Copy = RecipientStatus->GetActiveStatuses()[0];
-    TestEqual(TEXT("Chain carries only the funded normal budget"), Copy.UnpaidDamageBudget, 140.125f, .001f);
-    TestEqual(TEXT("Chain carries original reaction credit without amplification"), Copy.InitialReactionBudget, 150.125f, .001f);
+    TestEqual(TEXT("Chain carries only the funded normal budget"), Copy.UnpaidDamageBudget, 140.0f, .001f);
+    TestEqual(TEXT("Chain carries original reaction credit without amplification"), Copy.InitialReactionBudget, 150.0f, .001f);
     TestEqual(TEXT("Chain copy cannot spread again"), Copy.Spec.ProcCoefficient, 0.0f);
     RecipientStatus->AdvanceStatuses(1);
     FBreakerDamageRequest CopyTrigger; CopyTrigger.BaseDamage = 1; CopyTrigger.Element = EBreakerElement::Void;
@@ -187,7 +187,7 @@ bool FBreakerCoreElementBudgetRuntimeTest::RunTest(const FString& Parameters)
     const auto* CopyReaction = RecipientObserver->Hits.FindByPredicate([](const FBreakerHitContext& Hit)
     { return Hit.DamageTypeTag == FGameplayTag::RequestGameplayTag(TEXT("Reaction.Wither")); });
     if (!TestNotNull(TEXT("actual Chain copy settles its remaining credit"), CopyReaction)) return false;
-    TestEqual(TEXT("Chain copy pays only its six unpaid ticks"), CopyReaction->Result.RawDamage, 112.59375f, .001f);
+    TestEqual(TEXT("Chain copy pays only its six unpaid ticks"), CopyReaction->Result.RawDamage, 112.5f, .001f);
     return true;
 }
 #endif

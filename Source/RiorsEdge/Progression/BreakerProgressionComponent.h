@@ -210,21 +210,14 @@ public:
     // The point-spend baseline in whole percent, before node effects.
     UFUNCTION(BlueprintPure, Category="Progression") float GetPointSpendDamagePercent() const;
 
-    // O2 PLACEHOLDER, retuned under O27: 0.25% increased damage per committed
-    // point, down from 1.0%.
-    //
-    // At 1.0% this contributed roughly +69% at a full point budget against
-    // roughly +19% from every damage node combined, so HOW MANY points you had
-    // spent mattered about 3.5x more than WHERE you spent them. O27 rules that
-    // choices must beat accumulation, so the power moved into the nodes and this
-    // dropped to a floor: it exists only so that a point committed to a purely
-    // defensive or utility node is not literally zero offence. It cannot
-    // differentiate two builds, because both of them spend every point.
-    //
-    // Still EditAnywhere on BP_BreakerCharacter, and still safe to set to 0,
-    // which leaves node choices as the entire tree contribution.
+    // Zero under O27: a point buys only its node. Any non-zero value here is
+    // damage paid for spending, not for choosing — it lands on every lane for
+    // every node, so the projection panel shows a damage gain on a reload
+    // node, and it cannot differentiate two builds because both spend every
+    // point. The dial stays so a test can prove the aggregation composes it
+    // and the owner can retune without a content change. O2 PLACEHOLDER.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Progression|Tuning", meta=(ClampMin="0.0", UIMax="5.0"))
-    float IncreasedDamagePerSpentPoint = 0.25f;
+    float IncreasedDamagePerSpentPoint = 0.0f;
 
     // O3's hard cap and Damage-Pipeline §4's per-multiplier ceiling, enforced
     // in AggregateStats. Public so the skill screen and the band test read the

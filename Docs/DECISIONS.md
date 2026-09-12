@@ -41,7 +41,7 @@ Numbers are permanent and never reused.
 
 **O25** — Two jumps are base kit for every class. Parry is the only tree-granted verb.
 
-**O27** — Monsters are content-scaled to area level, never player-scaled. Trash exists to be trivialized by an optimized build, and difficulty lives in rank and modifiers. Choices beat accumulation: per-point accumulation is cut back and the power moves into node choices.
+**O27** — Monsters are content-scaled to area level, never player-scaled. Trash exists to be trivialized by an optimized build, and difficulty lives in rank and modifiers. Choices beat accumulation: there is no per-point accumulation — a point buys only its node, and the power lives in node choices.
 
 **O29** — The endgame power source is gear depth. Item level runs past the character cap and the area ceiling, the affix tier ladder widens and back-loads, and a post-cap character-power tree is rejected outright.
 

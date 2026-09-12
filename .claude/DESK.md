@@ -29,21 +29,46 @@ walk on the correct axis."
   shipped; the swap matches now. PHOTOGRAPHED: the entry — no panels in
   the sky, no cones.
 
+## EIGHTH — LANDED, THE AXIS AND THE POINTS
+
+- "enemies still don't walk on the correct axis" — the Stan rig's rest
+  pose is a POSE: its shoulders sit 32.1 degrees twisted, and the body's
+  forward was read off the shoulder pair, so every Stan (the base body,
+  the Skitter, the Marshal, the Holdfast) faced 32 degrees right of the
+  way it walked in every playtest — the crab. The sixth and seventh
+  fixes were upstream of it and right. The pin that said "0.0 degrees on
+  all four rigs" compared the derived axis to itself. The feet pair is
+  read first now (planted, symmetric in every shipped rest); Stan's
+  feet read 0.0, George/Mike/Leela every pair 0.0. NamedBodyFacesActor-
+  Forward now checks an INDEPENDENT axis (knee poles minus feet) and
+  logs every pair's reading by name. NOT PHOTOGRAPHED: the weak-point
+  capture rig did not put a body in frame; you will see it standing.
+- "the menu shows damage increases on all nodes" — it was telling the
+  truth: every point spent paid a hidden +0.25% Increased damage on both
+  lanes (IncreasedDamagePerSpentPoint), so a reload node raised weapon
+  damage. Zero now; O27 reads "there is no per-point accumulation — a
+  point buys only its node". NodeWithoutDamageProjectsNoDamage pins the
+  panel; five element runtime rigs that baked the floor into their
+  numbers re-derived without it (140.125 -> 140 and its kin, never
+  widened). FOUND: the dial is EditAnywhere on BP_BreakerCharacter — if
+  the blueprint overrides it the shipped value is not the C++ default;
+  the runtime pins read the live component, not the CDO.
+
 ## EIGHTH — OPEN
 
-- [ ] "enemies still don't walk on the correct axis" — the sixth cycle's
-      walk-where-facing and the seventh's zig-zag did not close it. Scout
-      with the nav probe's `slide` column on a live crowd before any edit.
-- [ ] "the ground is still flat … no curve or hill" — a ruling: the yard
-      slab as a gentle heightfield. FloorsDisjoint and every floor pin
-      assume planes; a cycle of its own after the ruling.
-- [ ] "points you actively don't want to take" — the trade nodes
-      (Detached Baton "declined solo" and its kind). QUESTION: which ones
-      did you hit? Otherwise every node whose text is a trade is listed
-      for you.
-- [ ] "the menu shows damage increases on all nodes" — the projection
-      panel (UI/BreakerSkillProjection) claims a damage gain for every
-      node; scout the before/after read.
+- [ ] "the ground is still flat … no curve or hill" — a ruling first.
+      QUESTION asked: terrain (the ground rolls) or levels (flat ground,
+      stepped aprons/sunken docks/ramps)? Default if unanswered: levels
+      now, terrain later.
+- [ ] "points you actively don't want to take" — seventeen nodes carry a
+      self-inflicted downside by design (No Ground, Spend To Live, No
+      Safety, Overreach, No Distance, Long Debt, Long Dark, Conductor's
+      Rule, No Reserve, Dead Ground, Quick Set, Ordnance, Immovable
+      Object, Braced for Impact, Triage Priority, Triage, Hunter's
+      Economy); one declines itself solo in its own text (Detached Baton,
+      "a party trade, declined solo") under a solo slice (O185). QUESTION:
+      which did you hit? Detached Baton is the one that authors nothing
+      to cut.
 - [ ] "awkward and clunky" — unnamed; ask.
 
 ## O277 LIGHT & AIR — LANDED

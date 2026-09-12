@@ -109,19 +109,19 @@ bool FBreakerSkillProjectionPurchaseTest::RunTest(const FString& Parameters)
     const auto Snapshot = BreakerSkillProjection::MakeSnapshot(Rig.Progression, Rig.Attributes);
     const auto Gateway = BreakerSkillProjection::ProjectPurchase(Snapshot, TEXT("Core.Precision.Sightline"), 1);
     TestEqual(TEXT("Projection begins at live damage"), Gateway[0].Before, Rig.Attributes->GetDamageMultiplier(), .0001f);
-    TestEqual(TEXT("Crit-damage gateway pays the one-point damage floor"), Gateway[0].After - Gateway[0].Before, .0025f, .0001f);
+    TestEqual(TEXT("Crit-damage gateway adds no damage for its point"), Gateway[0].After - Gateway[0].Before, 0.0f, .0001f);
     if (!TestTrue(TEXT("Gateway purchased"), Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Precision.Sightline"), Reason))) return false;
     TestEqual(TEXT("Gateway lands at its projection"), Rig.Attributes->GetDamageMultiplier(), Gateway[0].After, .0001f);
     if (!TestTrue(TEXT("Rank-one lane opens notable"), Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Precision.Angle"), Reason))) return false;
     const auto BeforeNotable = BreakerSkillProjection::MakeSnapshot(Rig.Progression, Rig.Attributes);
     const auto Notable = BreakerSkillProjection::ProjectPurchase(BeforeNotable, TEXT("Core.Precision.CalledShot"), 1);
-    TestEqual(TEXT("Two-point notable adds twenty percent plus its point floor"), Notable[0].After - Notable[0].Before, .205f, .0001f);
+    TestEqual(TEXT("Two-point notable adds twenty percent and nothing for its points"), Notable[0].After - Notable[0].Before, .20f, .0001f);
     if (!TestTrue(TEXT("Called Shot purchased"), Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Precision.CalledShot"), Reason))) return false;
     TestEqual(TEXT("Notable lands at its projection"), Rig.Attributes->GetDamageMultiplier(), Notable[0].After, .0001f);
     if (!TestTrue(TEXT("Cadence lane purchased"), Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Precision.Cadence"), Reason))) return false;
     const auto BeforeCrit = BreakerSkillProjection::MakeSnapshot(Rig.Progression, Rig.Attributes);
     const auto Crit = BreakerSkillProjection::ProjectPurchase(BeforeCrit, TEXT("Core.Precision.TriggerDiscipline"), 1);
-    TestEqual(TEXT("Crit notable still pays two-point damage floor"), Crit[0].After - Crit[0].Before, .005f, .0001f);
+    TestEqual(TEXT("Crit notable adds no damage for its points"), Crit[0].After - Crit[0].Before, 0.0f, .0001f);
     if (!TestTrue(TEXT("Trigger Discipline purchased"), Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Precision.TriggerDiscipline"), Reason))) return false;
     TestEqual(TEXT("Non-Increased damage notable lands at projection"), Rig.Attributes->GetDamageMultiplier(), Crit[0].After, .0001f);
     return true;
@@ -316,7 +316,7 @@ bool FBreakerEquipDeltaTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerRankedProjectionFloorTest,
-    "RiorsEdge.UI.SkillProjection.RankedComposedSpendFloor",
+    "RiorsEdge.UI.SkillProjection.NodeWithoutDamageProjectsNoDamage",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FBreakerRankedProjectionFloorTest::RunTest(const FString& Parameters)
@@ -334,16 +334,17 @@ bool FBreakerRankedProjectionFloorTest::RunTest(const FString& Parameters)
     FBreakerAttributeContribution Gear;
     Gear.AddSharedIncreasedDamage(300.0f);
     Snapshot.Aggregator.SetContribution(EBreakerAttributeContributor::Equipment, Gear);
-    // Pin the existing authored baseline, without exaggerating the displayed
-    // relative gain once gear has filled the additive bucket.
-    TestEqual(TEXT("Authored spend floor remains 0.25 percentage points"), Snapshot.IncreasedDamagePerSpentPoint, 0.25f);
+    // O27: a node with no damage effect projects no damage on either lane, at
+    // any rank, against composed gear — the panel shows a gain only where the
+    // node is the gain.
+    TestEqual(TEXT("The spend dial ships at zero"), Snapshot.IncreasedDamagePerSpentPoint, 0.0f);
     for (int32 Rank = 0; Rank < 3; ++Rank)
     {
         const TArray<FBreakerStatLine> Lines = BreakerSkillProjection::ProjectPurchase(Snapshot, Minor->NodeId, 1);
         for (int32 Lane = 0; Lane < 2; ++Lane)
         {
-            TestFalse(TEXT("Floor is tested against composed gear, not tree-only"), Lines[Lane].bTreeOnly);
-            TestEqual(TEXT("Each purchased rank pays the real composed floor"), Lines[Lane].After - Lines[Lane].Before, 0.0025f, 0.000001f);
+            TestFalse(TEXT("Projected against composed gear, not tree-only"), Lines[Lane].bTreeOnly);
+            TestFalse(TEXT("A damage-less node projects no damage on this lane"), Lines[Lane].Changed());
         }
         Snapshot.Ranks = BreakerSkillProjection::WithRankDelta(Snapshot.Ranks, Minor->NodeId, 1);
     }

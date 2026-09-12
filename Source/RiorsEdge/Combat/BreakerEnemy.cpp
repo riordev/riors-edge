@@ -596,10 +596,15 @@ FVector ABreakerEnemy::ReadBodyMeshForwardAxis(const USkeletalMesh* Mesh)
         }
         return Composed.GetLocation();
     };
-    // Ordered: the widest, most reliably horizontal pair first. Leela ships
-    // no arms, so the legs are a real leg of the search, not a formality.
+    // Ordered: the feet first. A rest pose is a POSE — Stan's shoulders sit
+    // 32 degrees twisted in his, and a forward read off them walked every
+    // Stan sideways for seven playtests — but feet are planted on the
+    // ground plane and symmetric in every shipped rest, so the foot pair is
+    // the one a pose cannot lie about. Shoulders, arms, then legs behind it
+    // for a rig that ships no feet bone.
     static const FName BreakerBilateralPairs[][2] =
     {
+        { FName(TEXT("Foot_L")), FName(TEXT("Foot_R")) },
         { FName(TEXT("Shoulder_L")), FName(TEXT("Shoulder_R")) },
         { FName(TEXT("UpperArm_L")), FName(TEXT("UpperArm_R")) },
         { FName(TEXT("UpperLeg_L")), FName(TEXT("UpperLeg_R")) },

@@ -400,32 +400,31 @@ bool FBreakerPointSpendDamageBaselineTest::RunTest(const FString& Parameters)
     AActor* Owner = MakeOwner();
     UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>(Owner);
     Progression->BindAttributes(Attributes);
-    // Cut from 1.0% to 0.25% under O27: at 1.0% this out-earned every damage
-    // node in the game by about 3.5x, so how MANY points had been spent
-    // mattered more than where. It is a floor now, not a power source.
-    TestEqual(TEXT("The baseline defaults to 0.25% per point"), Progression->IncreasedDamagePerSpentPoint, 0.25f, 0.0001f);
+    // Zero under O27: a point buys only its node. The dial is proved below
+    // by setting it, never by shipping it.
+    TestEqual(TEXT("The baseline ships at zero per point"), Progression->IncreasedDamagePerSpentPoint, 0.0f, 0.0001f);
     TestEqual(TEXT("Nothing spent pays nothing"), Progression->GetPointSpendDamagePercent(), 0.0f, 0.0001f);
 
     UBreakerProgressionTree* Core = UBreakerProgressionLibrary::GetCoreSliceTree();
     Progression->ApplySliceDefaultsIfFresh();
     FText Failure;
 
-    // Read grants block only; each paid point still contributes the baseline.
+    // Read grants block only; a paid point adds no damage of its own.
     TestTrue(TEXT("A node with no damage effect purchases"), Progression->PurchaseNode(Core, TEXT("Core.Bulwark.Read"), Failure));
     TestEqual(TEXT("One committed point is one point"), Progression->GetSpentPoints(), 1.0f, 0.0001f);
-    TestEqual(TEXT("A damage-less purchase still raises damage"), Attributes->GetDamageMultiplier(), 1.0025f, 0.0001f);
+    TestEqual(TEXT("A damage-less purchase leaves damage alone"), Attributes->GetDamageMultiplier(), 1.0f, 0.0001f);
 
     // Actual two-point notables prove the floor counts price, not node count.
     for (const TCHAR* Id : {TEXT("Core.Bulwark.Guard"), TEXT("Core.Bulwark.Parry"), TEXT("Core.Bulwark.Evade"), TEXT("Core.Bulwark.Counterweight")})
         if (!TestTrue(TEXT("Legal priced Bulwark route"), Progression->PurchaseNode(Core, Id, Failure))) return false;
     TestEqual(TEXT("Five nodes cost seven committed points"), Progression->GetSpentPoints(), 7.0f, 0.0001f);
-    TestEqual(TEXT("Defensive purchases contribute only the per-point floor"), Attributes->GetDamageMultiplier(), 1.0175f, 0.0001f);
-    // Turning the baseline off must leave exactly the node content behind, so
-    // the owner can retune or disable it without touching content.
+    TestEqual(TEXT("Defensive purchases contribute no damage"), Attributes->GetDamageMultiplier(), 1.0f, 0.0001f);
+    // The dial still composes when set, cost-weighted, so a retune needs no
+    // content change.
     const FBreakerProgressionState Allocated = Progression->GetProgressionState();
-    Progression->IncreasedDamagePerSpentPoint = 0.0f;
+    Progression->IncreasedDamagePerSpentPoint = 0.25f;
     Progression->LoadProgressionState(Allocated);
-    TestEqual(TEXT("A zeroed baseline leaves defensive nodes without damage"), Attributes->GetDamageMultiplier(), 1.0f, 0.0001f);
+    TestEqual(TEXT("A quarter-point dial pays seven points of it"), Attributes->GetDamageMultiplier(), 1.0175f, 0.0001f);
 
     Progression->IncreasedDamagePerSpentPoint = 2.5f;
     Progression->LoadProgressionState(Allocated);

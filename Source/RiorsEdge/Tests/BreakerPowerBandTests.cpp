@@ -333,7 +333,7 @@ namespace BreakerPowerBandTest
         // Shared, matching RecalculateStats: the floor lands in both lanes.
         ProgressionOffer.AddSharedIncreasedDamage(
             (AllocatedCost(Ranks, EBreakerPointCurrency::CorePoints)
-                + AllocatedCost(Ranks, EBreakerPointCurrency::DoctrinePoints)) * 0.25f); // native cost-weighted floor
+                + AllocatedCost(Ranks, EBreakerPointCurrency::DoctrinePoints)) * GetDefault<UBreakerProgressionComponent>()->IncreasedDamagePerSpentPoint); // the shipped dial, zero under O27
 
         // The real aggregator, seeded with UBreakerAttributeSet's authored bases.
         FBreakerAttributeAggregator Aggregator;
@@ -1262,7 +1262,7 @@ bool FBreakerPowerBandAtCapTest::RunTest(const FString& Parameters)
     // accumulation term is identical on both sides; strip it from both and the
     // band must barely move. If someone raises IncreasedDamagePerSpentPoint back
     // toward 1.0 this is the assertion that notices.
-    const float AccumulationPercent = PowerBandFullPointBudget * 0.25f;
+    const float AccumulationPercent = PowerBandFullPointBudget * GetDefault<UBreakerProgressionComponent>()->IncreasedDamagePerSpentPoint;
     const float BaselineWithout = Baseline.Total * (Baseline.IncreasedLayer - AccumulationPercent / 100.0f) / Baseline.IncreasedLayer;
     const float OptimizedWithout = Optimized.Total * (Optimized.IncreasedLayer - AccumulationPercent / 100.0f) / Optimized.IncreasedLayer;
     const float RatioWithoutAccumulation = OptimizedWithout / BaselineWithout;
@@ -1481,7 +1481,7 @@ bool FBreakerPowerBandEndgameTest::RunTest(const FString& Parameters)
     // accumulation term is identical on both sides; strip it from both and the
     // band must barely move. If someone raises IncreasedDamagePerSpentPoint back
     // toward 1.0 this is the assertion that notices.
-    const float AccumulationPercent = PowerBandFullPointBudget * 0.25f;
+    const float AccumulationPercent = PowerBandFullPointBudget * GetDefault<UBreakerProgressionComponent>()->IncreasedDamagePerSpentPoint;
     const float BaselineWithout = Baseline.Total * (Baseline.IncreasedLayer - AccumulationPercent / 100.0f) / Baseline.IncreasedLayer;
     const float OptimizedWithout = Optimized.Total * (Optimized.IncreasedLayer - AccumulationPercent / 100.0f) / Optimized.IncreasedLayer;
     const float RatioWithoutAccumulation = OptimizedWithout / BaselineWithout;

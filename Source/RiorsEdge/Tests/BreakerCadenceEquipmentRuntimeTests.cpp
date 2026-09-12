@@ -71,14 +71,14 @@ bool FBreakerCadenceEquipmentRuntimeTest::RunTest(const FString& Parameters)
         UBreakerProgressionLibrary::GetCoreSliceTree(), TEXT("Core.Precision.Cadence"), Reason))) return false;
     Equipment->TickComponent(0, LEVELTICK_All, nullptr);
     TestTrue(TEXT("Purchased rate reaches actual weapon cadence consumer"), Weapon->GetFireRateMultiplier() > BeforeRate);
-    // O27 pays 0.25% shared Increased Damage per spent point. Cadence costs
-    // one point: preserve that real floor, while refusing any extra conversion.
+    // O27: a point buys only its node. Cadence costs one point and that point
+    // adds no shared Increased Damage; the rank must also refuse any extra conversion.
     const float SpendDelta = Progression->GetPointSpendDamagePercent() - BeforeSpendPercent;
-    TestEqual(TEXT("One-point purchase pays its authored shared floor"), SpendDelta, .25f, .0001f);
+    TestEqual(TEXT("A purchase pays no per-point damage"), SpendDelta, 0.0f, .0001f);
     const float ExpectedWeapon = BeforeDamage * (1 + SpendDelta / (100 + BeforeWeaponIncreased));
     const float ExpectedAbility = BeforeAbility * (1 + SpendDelta / (100 + BeforeAbilityIncreased));
     TestEqual(TEXT("Tree fire rate is not converted again by Cadence"), Attributes->GetDamageMultiplier(), ExpectedWeapon, .001f);
-    TestEqual(TEXT("Ability lane receives only the normal point-spend floor"), Attributes->GetAbilityDamageMultiplier(), ExpectedAbility, .001f);
+    TestEqual(TEXT("Ability lane receives no per-point damage either"), Attributes->GetAbilityDamageMultiplier(), ExpectedAbility, .001f);
     TestTrue(TEXT("Equipping secondary remains reversible"), Equipment->EquipItem(Secondary));
     TestFalse(TEXT("Secondary ejects Cadence symmetrically"), Equipment->GetEquippedItem(EBreakerEquipSlot::Primary, Found));
     return true;

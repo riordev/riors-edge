@@ -384,6 +384,38 @@ bool FBreakerEnemyBodyFacingTest::RunTest(const FString& Parameters)
             TestTrue(FString::Printf(TEXT("%s's fitted forward is within %.0f deg of its front-minus-back shoulder axis (was %.1f)"),
                 *Name, FacingToleranceDeg, SecondAxisOffDeg), SecondAxisOffDeg <= FacingToleranceDeg);
         }
+        // The biped's independent axis: the knee pole targets stand in FRONT
+        // of the feet in every shipped rig, so pole-mid minus foot-mid points
+        // the way the body faces without any left/right pair. Comparing the
+        // fitted forward to the axis it was read from is a tautology (it was
+        // 0.0 on a rig walking 32 degrees sideways); this is not.
+        const int32 PoleL = Ref.FindBoneIndex(FName(TEXT("PoleTarget_L")));
+        const int32 PoleR = Ref.FindBoneIndex(FName(TEXT("PoleTarget_R")));
+        const int32 FootL = Ref.FindBoneIndex(FName(TEXT("Foot_L")));
+        const int32 FootR = Ref.FindBoneIndex(FName(TEXT("Foot_R")));
+        if (PoleL != INDEX_NONE && PoleR != INDEX_NONE && FootL != INDEX_NONE && FootR != INDEX_NONE)
+        {
+            ++SecondAxesChecked;
+            const FVector PoleMid = (ComponentSpaceRefPosition(Ref, PoleL) + ComponentSpaceRefPosition(Ref, PoleR)) * 0.5f;
+            const FVector FootMid = (ComponentSpaceRefPosition(Ref, FootL) + ComponentSpaceRefPosition(Ref, FootR)) * 0.5f;
+            const float PoleAxisOffDeg = DegreesBetween2D(Fit.RelativeRotation.RotateVector(PoleMid - FootMid), FVector::ForwardVector);
+            TestTrue(FString::Printf(TEXT("%s's fitted forward puts the knee poles within %.0f deg of +X (was %.1f)"),
+                *Name, FacingToleranceDeg, PoleAxisOffDeg), PoleAxisOffDeg <= FacingToleranceDeg);
+        }
+        // Every pair the rig offers agrees with the chosen forward within the
+        // tolerance, so a twisted rest pose is named by the log, never passed.
+        for (const TCHAR* Left : { TEXT("Foot_L"), TEXT("Shoulder_L"), TEXT("UpperArm_L"), TEXT("UpperLeg_L") })
+        {
+            const FString RightName = FString(Left).Replace(TEXT("_L"), TEXT("_R"));
+            const int32 L = Ref.FindBoneIndex(FName(Left));
+            const int32 Rr = Ref.FindBoneIndex(FName(*RightName));
+            if (L == INDEX_NONE || Rr == INDEX_NONE) continue;
+            const FVector PairAxis = BreakerEnemyBody::BodyForwardAxisFromBilateralBones(
+                ComponentSpaceRefPosition(Ref, L), ComponentSpaceRefPosition(Ref, Rr));
+            if (PairAxis.IsNearlyZero()) continue;
+            const float PairOffDeg = DegreesBetween2D(PairAxis, MeshForward);
+            AddInfo(FString::Printf(TEXT("%s pair %s reads %.1f deg off the chosen forward"), *Name, Left, PairOffDeg));
+        }
 
         // The wired half: a built enemy's body forward agrees with its actor.
         ABreakerEnemy* Enemy = NewObject<ABreakerEnemy>(GetTransientPackage(), *It);

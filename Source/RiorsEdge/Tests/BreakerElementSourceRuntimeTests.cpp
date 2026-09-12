@@ -173,7 +173,7 @@ bool FBreakerElementSourceRuntimeTest::RunTest(const FString& Parameters)
     for (int32 Step = 0; Step < 20 && Health->GetHealth() == DamageBefore; ++Step) Advance(1);
     TestTrue(TEXT("Scoped cast pays actual Mana"), Caster->GetAttributes()->GetClassResource() < CostBefore);
     TestEqual(TEXT("Native Void delivery adds Increased once then pays selected Void More"),
-        DamageBefore - Health->GetHealth(), ScaledBase * 2.5025f * 1.18f, .02f); // Includes the existing 0.25% spent-point floor.
+        DamageBefore - Health->GetHealth(), ScaledBase * 2.5f * 1.18f, .02f); // 100% + 50% Increased from the node alone; the point buys only its node (O27).
     ASC->CancelAbilityHandle(Handle);
     return true;
 }
