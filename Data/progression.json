@@ -12,7 +12,7 @@
 		"Source/RiorsEdge/Progression/BreakerCoreRosterWeapon.cpp": "668dc0b08541588e995afe28301d8ae2bacb2106",
 		"Source/RiorsEdge/Progression/BreakerCoreTree.cpp": "0d1c3252ee7f95d02fea3445e83f7e71b05e15c2",
 		"Source/RiorsEdge/Progression/BreakerCoreTree.h": "d5cbc90580dd4568eeb1ee21d00f5159dc56bbae",
-		"Source/RiorsEdge/Progression/BreakerProgressionLibrary.cpp": "2259c0d25b106d60ccc56741200067273698dde1",
+		"Source/RiorsEdge/Progression/BreakerProgressionLibrary.cpp": "2ebcdbad4cdc3f26c6d3f52b164a5eddb44c0045",
 		"Source/RiorsEdge/Progression/BreakerProgressionNode.h": "b18436bdeeeef00075344254bd538c6fb1e3140e",
 		"Source/RiorsEdge/Progression/BreakerProgressionTree.h": "9dfcbac0af583d1da7c0e6ed117e8c94231d1395",
 		"Source/RiorsEdge/Progression/BreakerProgressionTypes.h": "d1f683b84a26b912db1ef42a87f87eeff96d02e8"
@@ -9905,7 +9905,7 @@
 				{
 					"id": "Support.Medic.FieldDressing",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -9917,9 +9917,28 @@
 					"prerequisites": []
 				},
 				{
+					"id": "Support.Medic.SustainedCare",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Support.Medic.SustainedCare"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Support.Medic.FieldDressing",
+							"rank": 1
+						}
+					]
+				},
+				{
 					"id": "Support.Medic.TriagePriority",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -9931,9 +9950,28 @@
 					"prerequisites": []
 				},
 				{
+					"id": "Support.Medic.FieldKit",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Support.Medic.FieldKit"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Support.Medic.TriagePriority",
+							"rank": 1
+						}
+					]
+				},
+				{
 					"id": "Support.Medic.CleanHands",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -9945,29 +9983,28 @@
 					"prerequisites": []
 				},
 				{
-					"id": "Support.Medic.SteadyHands",
-					"tier": 2,
-					"ranks": 2,
+					"id": "Support.Medic.NoTriage",
+					"tier": 1,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
 					"tags": [
-						"Progression.Node.Support.Medic.SteadyHands"
+						"Progression.Node.Support.Medic.NoTriage"
 					],
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Support.Medic.FieldDressing",
+							"id": "Support.Medic.CleanHands",
 							"rank": 1
 						}
-					],
-					"requiredTreeInvestment": 2
+					]
 				},
 				{
 					"id": "Support.Medic.SecondOpinion",
-					"tier": 2,
-					"ranks": 2,
+					"tier": 1,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -9976,79 +10013,13 @@
 						"Progression.Node.Support.Medic.SecondOpinion"
 					],
 					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Support.Medic.TriagePriority",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Support.Medic.Attending",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Support.Medic.Attending"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Support.Medic.FieldDressing",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Support.Medic.FieldKit",
-					"tier": 3,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Support.Medic.FieldKit"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Support.Medic.SteadyHands",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
-				},
-				{
-					"id": "Support.Medic.SustainedCare",
-					"tier": 3,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Support.Medic.SustainedCare"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Support.Medic.SecondOpinion",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
+					"prerequisites": []
 				},
 				{
 					"id": "Support.Medic.Overflow",
-					"tier": 4,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
@@ -10061,14 +10032,27 @@
 							"id": "Support.Medic.SecondOpinion",
 							"rank": 1
 						}
+					]
+				},
+				{
+					"id": "Support.Medic.Attending",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Support.Medic.Attending"
 					],
-					"requiredTreeInvestment": 6
+					"exclusive": [],
+					"prerequisites": []
 				},
 				{
 					"id": "Support.Medic.BloodDebt",
-					"tier": 4,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
@@ -10081,34 +10065,27 @@
 							"id": "Support.Medic.Attending",
 							"rank": 1
 						}
-					],
-					"requiredTreeInvestment": 6
+					]
 				},
 				{
-					"id": "Support.Medic.NoTriage",
-					"tier": 4,
+					"id": "Support.Medic.SteadyHands",
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
 					"tags": [
-						"Progression.Node.Support.Medic.NoTriage"
+						"Progression.Node.Support.Medic.SteadyHands"
 					],
 					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Support.Medic.SustainedCare",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 6
+					"prerequisites": []
 				},
 				{
 					"id": "Support.Medic.Triage",
 					"tier": 4,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": true,
 					"constellation": "None",
 					"effects": [],
@@ -10139,7 +10116,7 @@
 				{
 					"id": "Support.Conductor.DownbeatDiscipline",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -10151,9 +10128,28 @@
 					"prerequisites": []
 				},
 				{
+					"id": "Support.Conductor.Conducting",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Support.Conductor.Conducting"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Support.Conductor.DownbeatDiscipline",
+							"rank": 1
+						}
+					]
+				},
+				{
 					"id": "Support.Conductor.Section",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -10165,9 +10161,28 @@
 					"prerequisites": []
 				},
 				{
+					"id": "Support.Conductor.DetachedBaton",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Support.Conductor.DetachedBaton"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Support.Conductor.Section",
+							"rank": 1
+						}
+					]
+				},
+				{
 					"id": "Support.Conductor.Sustain",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -10179,29 +10194,28 @@
 					"prerequisites": []
 				},
 				{
-					"id": "Support.Conductor.Rehearsal",
-					"tier": 2,
-					"ranks": 2,
+					"id": "Support.Conductor.StandingOvation",
+					"tier": 1,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
 					"tags": [
-						"Progression.Node.Support.Conductor.Rehearsal"
+						"Progression.Node.Support.Conductor.StandingOvation"
 					],
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Support.Conductor.DownbeatDiscipline",
+							"id": "Support.Conductor.Sustain",
 							"rank": 1
 						}
-					],
-					"requiredTreeInvestment": 2
+					]
 				},
 				{
 					"id": "Support.Conductor.Tempo",
-					"tier": 2,
-					"ranks": 2,
+					"tier": 1,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -10210,59 +10224,13 @@
 						"Progression.Node.Support.Conductor.Tempo"
 					],
 					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Support.Conductor.Sustain",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Support.Conductor.Attunement",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Support.Conductor.Attunement"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Support.Conductor.Section",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Support.Conductor.Conducting",
-					"tier": 3,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Support.Conductor.Conducting"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Support.Conductor.Rehearsal",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
+					"prerequisites": []
 				},
 				{
 					"id": "Support.Conductor.Counterpoint",
-					"tier": 3,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
@@ -10275,34 +10243,27 @@
 							"id": "Support.Conductor.Tempo",
 							"rank": 1
 						}
-					],
-					"requiredTreeInvestment": 4
+					]
 				},
 				{
-					"id": "Support.Conductor.StandingOvation",
-					"tier": 4,
+					"id": "Support.Conductor.Attunement",
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
 					"tags": [
-						"Progression.Node.Support.Conductor.StandingOvation"
+						"Progression.Node.Support.Conductor.Attunement"
 					],
 					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Support.Conductor.Rehearsal",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 6
+					"prerequisites": []
 				},
 				{
 					"id": "Support.Conductor.SympatheticResonance",
-					"tier": 4,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
@@ -10315,34 +10276,27 @@
 							"id": "Support.Conductor.Attunement",
 							"rank": 1
 						}
-					],
-					"requiredTreeInvestment": 6
+					]
 				},
 				{
-					"id": "Support.Conductor.DetachedBaton",
-					"tier": 4,
+					"id": "Support.Conductor.Rehearsal",
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
 					"tags": [
-						"Progression.Node.Support.Conductor.DetachedBaton"
+						"Progression.Node.Support.Conductor.Rehearsal"
 					],
 					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Support.Conductor.Conducting",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 6
+					"prerequisites": []
 				},
 				{
 					"id": "Support.Conductor.Downbeat",
 					"tier": 4,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": true,
 					"constellation": "None",
 					"effects": [],
@@ -10373,7 +10327,7 @@
 				{
 					"id": "Support.Warden.Painted",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -10385,9 +10339,28 @@
 					"prerequisites": []
 				},
 				{
+					"id": "Support.Warden.DeepMark",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Support.Warden.DeepMark"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Support.Warden.Painted",
+							"rank": 1
+						}
+					]
+				},
+				{
 					"id": "Support.Warden.LongWatch",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -10399,164 +10372,10 @@
 					"prerequisites": []
 				},
 				{
-					"id": "Support.Warden.FieldOfView",
-					"tier": 1,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Support.Warden.FieldOfView"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Support.Warden.Handoff",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Support.Warden.Handoff"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Support.Warden.LongWatch",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Support.Warden.Pressure",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Support.Warden.Pressure"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Support.Warden.FieldOfView",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Support.Warden.Tell",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Support.Warden.Tell"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Support.Warden.Painted",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Support.Warden.Suppression",
-					"tier": 3,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Support.Warden.Suppression"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Support.Warden.Pressure",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
-				},
-				{
-					"id": "Support.Warden.DeepMark",
-					"tier": 3,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Support.Warden.DeepMark"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Support.Warden.Handoff",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
-				},
-				{
-					"id": "Support.Warden.ExecutionersLedger",
-					"tier": 4,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Support.Warden.ExecutionersLedger"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Support.Warden.Handoff",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 6
-				},
-				{
-					"id": "Support.Warden.BlackoutProtocol",
-					"tier": 4,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Support.Warden.BlackoutProtocol"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Support.Warden.Suppression",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 6
-				},
-				{
 					"id": "Support.Warden.HuntersEconomy",
-					"tier": 4,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
@@ -10569,14 +10388,126 @@
 							"id": "Support.Warden.LongWatch",
 							"rank": 1
 						}
+					]
+				},
+				{
+					"id": "Support.Warden.FieldOfView",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Support.Warden.FieldOfView"
 					],
-					"requiredTreeInvestment": 6
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Support.Warden.BlackoutProtocol",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Support.Warden.BlackoutProtocol"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Support.Warden.FieldOfView",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Support.Warden.Pressure",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Support.Warden.Pressure"
+					],
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Support.Warden.Suppression",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Support.Warden.Suppression"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Support.Warden.Pressure",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Support.Warden.Tell",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Support.Warden.Tell"
+					],
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Support.Warden.ExecutionersLedger",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Support.Warden.ExecutionersLedger"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Support.Warden.Tell",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Support.Warden.Handoff",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Support.Warden.Handoff"
+					],
+					"exclusive": [],
+					"prerequisites": []
 				},
 				{
 					"id": "Support.Warden.Blackout",
 					"tier": 4,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": true,
 					"constellation": "None",
 					"effects": [],

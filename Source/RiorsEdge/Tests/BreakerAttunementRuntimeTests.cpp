@@ -73,7 +73,7 @@ bool FBreakerAttunementRuntimeTest::RunTest(const FString& Parameters)
             if (!World->GetTimerManager().HasBeenTickedThisFrame()) World->GetTimerManager().Tick(.05f);
         }
     };
-    auto Purchase = [&](ABreakerCharacter* Player, int32 Rank)
+    auto Purchase = [&](ABreakerCharacter* Player)
     {
         auto* Progression = Player->GetProgression();
         // Restored authored campaign completion, never extra Doctrine points.
@@ -84,11 +84,9 @@ bool FBreakerAttunementRuntimeTest::RunTest(const FString& Parameters)
                 for (FName Flag : UBreakerMissionLibrary::BeatCompletionFlags(Beat)) Flags.Add(Flag);
         Flags.Add(TEXT("Quest.Finale.Seal")); Progression->SettleDoctrineEntitlement(Flags);
         FText Failure;
+        // Attunement is a single-rank travel root (O272): one buy, no prerequisite.
         auto* Tree = UBreakerProgressionLibrary::GetSupportConductorTree();
-        for (int32 I = 0; I < 2; ++I)
-            if (!TestTrue(TEXT("purchase real Section prerequisite and tier investment"), Progression->PurchaseNode(Tree, TEXT("Support.Conductor.Section"), Failure))) return false;
-        for (int32 I = 0; I < Rank; ++I)
-            if (!TestTrue(TEXT("purchase actual Attunement rank"), Progression->PurchaseNode(Tree, TEXT("Support.Conductor.Attunement"), Failure))) return false;
+        if (!TestTrue(TEXT("purchase actual Attunement"), Progression->PurchaseNode(Tree, TEXT("Support.Conductor.Attunement"), Failure))) return false;
         Player->FindComponentByClass<UBreakerChargeComponent>()->BindAttributes(Player->GetAttributes());
         return true;
     };
@@ -114,13 +112,10 @@ bool FBreakerAttunementRuntimeTest::RunTest(const FString& Parameters)
     const auto PlainBuff = CastBuff(Source, UBreakerAbility_Cadence::StaticClass());
     TestEqual(TEXT("unpurchased buff cannot convert"), Conversion(Ally), 0.0f);
     Source->GetAbilitySystemComponent()->CancelAbilityHandle(PlainBuff);
-    if (!Purchase(Source, 1) || !Purchase(Other, 2)) return false;
+    if (!Purchase(Source) || !Purchase(Other)) return false;
     const auto FirstBuff = CastBuff(Source, UBreakerAbility_Cadence::StaticClass());
     TestEqual(TEXT("Conductor attunes self first"), Conversion(Source), 1.0f);
     TestEqual(TEXT("actual nearby ally receives conversion"), Conversion(Ally), 1.0f);
-    Ally->SetActorLocation(FVector(0, 3000, 100)); Advance(2);
-    TestEqual(TEXT("rank one aura exit has no tail"), Conversion(Ally), 0.0f);
-    Ally->SetActorLocation(FVector(0, 0, 100)); Advance(2);
 
     auto* Target = World->SpawnActor<AActor>();
     if (!Target) return false;
@@ -151,16 +146,16 @@ bool FBreakerAttunementRuntimeTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("attuned hitscan damages actual collision target"), ConvertedDamage > 0);
     TestTrue(TEXT("attuned hitscan produces real Entropy buildup"), Status->GetEntropyBuildup() > 0);
     Source->GetAbilitySystemComponent()->CancelAbilityHandle(FirstBuff);
-    TestEqual(TEXT("rank one cancellation removes conversion immediately"), Conversion(Ally), 0.0f);
+    TestEqual(TEXT("cancellation removes conversion immediately"), Conversion(Ally), 0.0f);
     const float BeforePlain = Health->GetHealth(), BeforePlainBuildup = Status->GetEntropyBuildup(); Fire();
     TestEqual(TEXT("conversion adds no base damage"), BeforePlain - Health->GetHealth(), ConvertedDamage);
     TestEqual(TEXT("unbuffed actual shot adds no buildup"), Status->GetEntropyBuildup(), BeforePlainBuildup);
 
     const auto TailBuff = CastBuff(Other, UBreakerAbility_Cadence::StaticClass());
     Ally->SetActorLocation(FVector(0, 3000, 100)); Advance(2);
-    TestEqual(TEXT("rank two lingers after actual aura exit"), Conversion(Ally), 1.0f);
+    TestEqual(TEXT("Attunement lingers after actual aura exit"), Conversion(Ally), 1.0f);
     Advance(50);
-    TestEqual(TEXT("rank two tail expires"), Conversion(Ally), 0.0f);
+    TestEqual(TEXT("Attunement tail expires"), Conversion(Ally), 0.0f);
     Ally->SetActorLocation(FVector(0, 0, 100)); Advance(2);
     TestEqual(TEXT("actual aura reentry restores conversion"), Conversion(Ally), 1.0f);
     const auto Overlap = CastBuff(Source, UBreakerAbility_Metronome::StaticClass());
@@ -189,7 +184,7 @@ bool FBreakerAttunementRuntimeTest::RunTest(const FString& Parameters)
     if (auto* Movement = Rocket->FindComponentByClass<UProjectileMovementComponent>()) { Movement->StopMovementImmediately(); Movement->Deactivate(); }
     Rocket->SetActorEnableCollision(false);
     Other->GetAbilitySystemComponent()->CancelAbilityHandle(Metro);
-    TestEqual(TEXT("rank two cancellation refuses a tail"), Conversion(Ally), 0.0f);
+    TestEqual(TEXT("cancellation refuses a tail"), Conversion(Ally), 0.0f);
     const float BeforeRocket = Status->GetEntropyBuildup(); Rocket->Explode(Target->GetActorLocation());
     TestTrue(TEXT("projectile keeps fire-time attunement after cancellation"), Status->GetEntropyBuildup() > BeforeRocket);
 
@@ -201,7 +196,7 @@ bool FBreakerAttunementRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("extended real buff retains attunement beyond original expiry"), Conversion(Ally), 1.0f);
     Advance(15);
     TestFalse(TEXT("actual extended Metronome has expired"), AllyState->IsWindowActive(UBreakerAbility_Metronome::WindowKey()));
-    TestEqual(TEXT("natural expiry starts rank two tail"), Conversion(Ally), 1.0f);
+    TestEqual(TEXT("natural expiry starts the Attunement tail"), Conversion(Ally), 1.0f);
     Advance(45);
     TestEqual(TEXT("natural expiry tail ends without a new cast"), Conversion(Ally), 0.0f);
 
@@ -209,7 +204,7 @@ bool FBreakerAttunementRuntimeTest::RunTest(const FString& Parameters)
     FText Failure;
     TestTrue(TEXT("real Forge respec"), Other->GetProgression()->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, true, Failure));
     TestEqual(TEXT("respec immediately refuses stale conversion"), Conversion(Ally), 0.0f);
-    if (!Purchase(Other, 2)) return false;
+    if (!Purchase(Other)) return false;
     CastBuff(Other, UBreakerAbility_Metronome::StaticClass());
     FBreakerDamageRequest Lethal; Lethal.BaseDamage = 100000; Lethal.bCanCritical = false;
     Other->GetCombat()->ReceiveDamage(Lethal);

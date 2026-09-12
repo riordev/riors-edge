@@ -58,9 +58,8 @@ bool FBreakerTellRuntimeTest::RunTest(const FString& Parameters)
     Flags.Add(TEXT("Quest.Finale.Seal")); Progression->SettleDoctrineEntitlement(Flags);
     FText Reason;
     if (!TestTrue(TEXT("paid Field Dressing supports ordinary self-heal income"),Progression->PurchaseNode(UBreakerProgressionLibrary::GetSupportMedicTree(),TEXT("Support.Medic.FieldDressing"),Reason))) return false;
+    // Tell is a single-rank travel root (O272): no prerequisite, one buy below.
     auto* Tree = UBreakerProgressionLibrary::GetSupportWardenTree();
-    for (int32 I=0; I<2; ++I)
-        if (!TestTrue(TEXT("paid Painted prerequisite"),Progression->PurchaseNode(Tree,TEXT("Support.Warden.Painted"),Reason))) return false;
     auto* Charge = Player->GetCharge(); Charge->BindAttributes(Attr); Charge->BeginPlay(); Charge->SetComponentTickEnabled(false); Charge->SetInCombat(true);
     for (int32 I=0; I<12; ++I)
     {
@@ -83,7 +82,7 @@ bool FBreakerTellRuntimeTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Mark pays resource"),Charge->GetCharge()<Before);
     if (!TestTrue(TEXT("real cast owns target mark"),UBreakerAbilityStateComponent::FindOrAdd(Player)->IsMarked(Target))) return false;
     TestFalse(TEXT("unbought Tell does not advertise attack"),UBreakerAbility_Mark::ShouldShowTell(Player,Target));
-    if (!TestTrue(TEXT("Tell legal fourth point"),Progression->PurchaseNode(Tree,TEXT("Support.Warden.Tell"),Reason))) return false;
+    if (!TestTrue(TEXT("Tell buys with one point"),Progression->PurchaseNode(Tree,TEXT("Support.Warden.Tell"),Reason))) return false;
     TestFalse(TEXT("idle marked enemy is not a danger flash"),UBreakerAbility_Mark::ShouldShowTell(Player,Target));
     bool SawWindup=false;
     for (int32 I=0; I<80; ++I)

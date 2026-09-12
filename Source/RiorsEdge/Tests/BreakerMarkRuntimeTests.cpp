@@ -157,13 +157,13 @@ bool FBreakerMarkRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("unowned Painted ally route pays nothing"), Measure(Ally, EBreakerDamageDelivery::Weapon).Value, 0.0f);
     Settle(Owner); FText Reason;
     const auto* Warden = UBreakerProgressionLibrary::GetSupportWardenTree();
-    if (!TestTrue(TEXT("actual Painted rank one purchase"), Owner->GetProgression()->PurchaseNode(Warden, TEXT("Support.Warden.Painted"), Reason))) return false;
+    // Painted is single rank (O272): one buy carries the ability and DoT
+    // routes and the allied half yield together.
+    if (!TestTrue(TEXT("actual Painted purchase"), Owner->GetProgression()->PurchaseNode(Warden, TEXT("Support.Warden.Painted"), Reason))) return false;
     const auto Ability = Measure(Owner, EBreakerDamageDelivery::Ability);
-    TestEqual(TEXT("Painted one own ability pays same health-fraction rate"), Ability.Value, Base.Value);
-    TestEqual(TEXT("Painted one DoT preserves fractional proc"), Measure(Owner, EBreakerDamageDelivery::Ability, .25f, true).Value, Base.Value * .25f);
-    TestEqual(TEXT("Painted one still refuses allied payout"), Measure(Ally, EBreakerDamageDelivery::Weapon).Value, 0.0f);
-    if (!TestTrue(TEXT("actual Painted rank two purchase"), Owner->GetProgression()->PurchaseNode(Warden, TEXT("Support.Warden.Painted"), Reason))) return false;
-    TestEqual(TEXT("Painted two allies pay authored half yield"), Measure(Ally, EBreakerDamageDelivery::Weapon).Value, Base.Value * .5f);
+    TestEqual(TEXT("Painted own ability pays same health-fraction rate"), Ability.Value, Base.Value);
+    TestEqual(TEXT("Painted DoT preserves fractional proc"), Measure(Owner, EBreakerDamageDelivery::Ability, .25f, true).Value, Base.Value * .25f);
+    TestEqual(TEXT("Painted allies pay authored half yield"), Measure(Ally, EBreakerDamageDelivery::Weapon).Value, Base.Value * .5f);
     TestEqual(TEXT("zero proc cannot pay marked Charge"), Measure(Owner, EBreakerDamageDelivery::Weapon, 0).Value, 0.0f);
     TestEqual(TEXT("zero damage cannot pay marked Charge"), Measure(Owner, EBreakerDamageDelivery::Weapon, 1, false, 0).Value, 0.0f);
     TargetCombat->DodgeChance = 1;
@@ -190,8 +190,10 @@ bool FBreakerMarkRuntimeTest::RunTest(const FString& Parameters)
         return TPair<FBreakerDamageResult, float>(Result, DebtOwner->GetAttributes()->GetClassResource());
     };
     const auto* Medic = UBreakerProgressionLibrary::GetSupportMedicTree();
-    for (const TCHAR* Node : { TEXT("Support.Medic.FieldDressing"), TEXT("Support.Medic.FieldDressing"),
-        TEXT("Support.Medic.Attending"), TEXT("Support.Medic.Attending"), TEXT("Support.Medic.CleanHands"), TEXT("Support.Medic.CleanHands"), TEXT("Support.Medic.BloodDebt") })
+    // Single-rank nodes (O272): Blood Debt is Attending's impactful and
+    // nothing else gates it.
+    for (const TCHAR* Node : { TEXT("Support.Medic.FieldDressing"),
+        TEXT("Support.Medic.Attending"), TEXT("Support.Medic.CleanHands"), TEXT("Support.Medic.BloodDebt") })
         if (!TestTrue(Node, DebtOwner->GetProgression()->PurchaseNode(Medic, Node, Reason))) return false;
     // Character BeginPlay is intentionally omitted to avoid owner saves; refresh
     // the real Charge node cache after purchases before the actual heal event.
@@ -221,7 +223,8 @@ bool FBreakerMarkRuntimeTest::RunTest(const FString& Parameters)
     CastMark(Target); Advance(450);
     TestEqual(TEXT("expired Mark detaches actual payout"), Measure(Owner, EBreakerDamageDelivery::Weapon).Value, 0.0f);
     Settle(Ally);
-    for (const TCHAR* Node : { TEXT("Support.Warden.LongWatch"), TEXT("Support.Warden.LongWatch"), TEXT("Support.Warden.Handoff") })
+    // Single-rank travel roots (O272): Handoff has no prerequisite.
+    for (const TCHAR* Node : { TEXT("Support.Warden.LongWatch"), TEXT("Support.Warden.Handoff") })
         if (!TestTrue(Node, Ally->GetProgression()->PurchaseNode(Warden, Node, Reason))) return false;
     AimAt(Ally, Target);
     Ally->GetAttributes()->ApplyClassResource(100);

@@ -147,9 +147,10 @@ bool FBreakerCadenceAuraRuntimeTest::RunTest(const FString& Parameters)
     if (!BatonCaster || !ReceivingSupport) return false;
     auto* BatonProgression = BatonCaster->GetProgression();
     SettleCampaignFixture(BatonProgression);
-    for (const TCHAR* Id : {TEXT("Support.Conductor.DownbeatDiscipline"), TEXT("Support.Conductor.DownbeatDiscipline"),
-        TEXT("Support.Conductor.Rehearsal"), TEXT("Support.Conductor.Rehearsal"),
-        TEXT("Support.Conductor.Conducting"), TEXT("Support.Conductor.DetachedBaton")})
+    // Two whole pairs (O272): Downbeat Discipline -> Conducting, Section ->
+    // Detached Baton. Single rank each, no gate below the keystone.
+    for (const TCHAR* Id : {TEXT("Support.Conductor.DownbeatDiscipline"), TEXT("Support.Conductor.Conducting"),
+        TEXT("Support.Conductor.Section"), TEXT("Support.Conductor.DetachedBaton")})
         if (!TestTrue(Id, BatonProgression->PurchaseNode(UBreakerProgressionLibrary::GetSupportConductorTree(), Id, Failure))) return false;
     const auto BatonCast = CastAura(BatonCaster);
     auto* OutsideSwift = MakePlayer(FVector(4000, 400, 100), EBreakerClassId::Swift);

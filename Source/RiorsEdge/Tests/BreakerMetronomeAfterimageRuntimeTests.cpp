@@ -184,7 +184,7 @@ bool FBreakerMetronomeAfterimageTest::RunTest(const FString&)
         auto* State = UBreakerAbilityStateComponent::FindOrAdd(Player); auto* AllyState = UBreakerAbilityStateComponent::FindOrAdd(Ally);
         const float AllyDuration = AllyState->GetWindowRemaining(UBreakerAbility_Metronome::WindowKey());
         const float SourceDuration = State->GetWindowRemaining(UBreakerAbility_Metronome::WindowKey());
-        TestEqual(TEXT("Actual purchased self extension remains two seconds"), SourceDuration - AllyDuration, 2.0f, .001f);
+        TestEqual(TEXT("Purchased self extension is Downbeat Discipline's four seconds"), SourceDuration - AllyDuration, 4.0f, .001f);
         auto AdvanceTo = [&](double Offset) { F.Tick(FMath::Max(0.0f, static_cast<float>(Start + Offset - F.World->GetTimeSeconds()))); };
         const float PerStack = GetDefault<UBreakerAbility_Metronome>()->FlatDamagePerStack;
         const float AllyFlat = PerStack * Ally->GetAttributes()->GetDamageMultiplier();

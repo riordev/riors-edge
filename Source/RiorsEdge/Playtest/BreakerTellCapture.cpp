@@ -53,7 +53,7 @@ void BreakerScheduleTellCapture(UWorld* World)
             return true;
         };
         if (!Buy(UBreakerProgressionLibrary::GetSupportMedicTree(),TEXT("Support.Medic.FieldDressing"),1)
-            || !Buy(UBreakerProgressionLibrary::GetSupportWardenTree(),TEXT("Support.Warden.Painted"),2)
+            || !Buy(UBreakerProgressionLibrary::GetSupportWardenTree(),TEXT("Support.Warden.Painted"),1)
             || !Buy(UBreakerProgressionLibrary::GetSupportWardenTree(),TEXT("Support.Warden.Tell"),1)) return;
         auto* Charge=Player->GetCharge(); Charge->SetInCombat(true);
         for (int32 I=0;I<12;++I)

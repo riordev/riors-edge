@@ -45,8 +45,10 @@ bool FBreakerBlackoutProtocolRuntimeTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("actual Support selection"), Progression->ChoosePermanentClassById(EBreakerClassId::Support))) return false;
     Progression->GrantPlaytestPoints(8, 0); // Full authored budget wiring, not current campaign entitlement.
     const UBreakerProgressionTree* Tree = UBreakerProgressionLibrary::GetSupportWardenTree();
-    for (const TCHAR* Node : { TEXT("Support.Warden.FieldOfView"), TEXT("Support.Warden.FieldOfView"),
-        TEXT("Support.Warden.Pressure"), TEXT("Support.Warden.Pressure"), TEXT("Support.Warden.Suppression") })
+    // Single-rank nodes (O272): Field of View is Blackout Protocol's travel,
+    // Pressure -> Suppression is a whole pair.
+    for (const TCHAR* Node : { TEXT("Support.Warden.FieldOfView"),
+        TEXT("Support.Warden.Pressure"), TEXT("Support.Warden.Suppression") })
     { FText Reason; if (!TestTrue(Node, Progression->PurchaseNode(Tree, Node, Reason))) return false; }
     UBreakerChargeComponent* Charge = Player->FindComponentByClass<UBreakerChargeComponent>();
     Charge->BindAttributes(Player->GetAttributes());

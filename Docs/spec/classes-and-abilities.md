@@ -267,7 +267,7 @@ buff duration; later movement does not change this cast's membership.
 Successful weapon shots advance the ramp by proc coefficient. Ability and
 melee hits require Counterpoint, which also accepts damaging status ticks.
 Zero damage and zero proc do not advance or sustain a streak. Tempo improves
-the caster's cap and reset gap at rank one and all recipients at rank two.
+the cap and reset gap of every recipient, the caster included.
 Rehearsal refreshes surviving holders without discarding their ramps.
 
 Metronome and Downbeat flat bonuses add before weapon Increased and More,
@@ -276,9 +276,9 @@ requests, even when those requests use the weapon damage pool. Conduit's
 Downbeat counts unique living recipients of the caster's active Conductor
 buffs, and doubles Cadence's tempo bonus and Metronome's flat bonus while live.
 
-Mark generates Charge from the caster's successful weapon shots. Painted adds
-own ability and DoT damage at rank one, then allied player damage at half yield
-at rank two (O2). Actual proc coefficient scales all yields; zero proc pays
+Mark generates Charge from the caster's successful weapon shots. Painted, one
+rank, adds own ability and DoT damage and allied player damage at half yield
+(O2). Actual proc coefficient scales all yields; zero proc pays
 nothing. Blood Debt cashes out only on the caster's weapon hit. Overlapping
 Marks use the strongest vulnerability and Tell reduction without multiplying
 identical effects; ending one cast preserves the others.

@@ -87,7 +87,7 @@ bool FBreakerSympatheticFractureRuntimeTest::RunTest(const FString& Parameters)
             if (!World->GetTimerManager().HasBeenTickedThisFrame()) World->GetTimerManager().Tick(.05f);
         }
     };
-    auto Purchase = [&](ABreakerCharacter* Player, int32 Rank)
+    auto Purchase = [&](ABreakerCharacter* Player)
     {
         auto* Progression = Player->GetProgression();
         // Restored authored campaign completion, never extra Doctrine points.
@@ -98,11 +98,9 @@ bool FBreakerSympatheticFractureRuntimeTest::RunTest(const FString& Parameters)
                 for (FName Flag : UBreakerMissionLibrary::BeatCompletionFlags(Beat)) Flags.Add(Flag);
         Flags.Add(TEXT("Quest.Finale.Seal")); Progression->SettleDoctrineEntitlement(Flags);
         FText Failure;
+        // Attunement is a single-rank travel root (O272): one buy, no prerequisite.
         auto* Tree = UBreakerProgressionLibrary::GetSupportConductorTree();
-        for (int32 I = 0; I < 2; ++I)
-            if (!TestTrue(TEXT("purchase real Section prerequisite and tier investment"), Progression->PurchaseNode(Tree, TEXT("Support.Conductor.Section"), Failure))) return false;
-        for (int32 I = 0; I < Rank; ++I)
-            if (!TestTrue(TEXT("purchase actual Attunement rank"), Progression->PurchaseNode(Tree, TEXT("Support.Conductor.Attunement"), Failure))) return false;
+        if (!TestTrue(TEXT("purchase actual Attunement"), Progression->PurchaseNode(Tree, TEXT("Support.Conductor.Attunement"), Failure))) return false;
         Player->FindComponentByClass<UBreakerChargeComponent>()->BindAttributes(Player->GetAttributes());
         return true;
     };
@@ -125,13 +123,13 @@ bool FBreakerSympatheticFractureRuntimeTest::RunTest(const FString& Parameters)
         FText Failure;
         auto* P = Player->GetProgression();
         auto* Tree = UBreakerProgressionLibrary::GetSupportConductorTree();
-        for (int32 I = 0; I < 2; ++I)
-            if (!TestTrue(TEXT("real tier-four investment"), P->PurchaseNode(Tree, TEXT("Support.Conductor.Sustain"), Failure))) return false;
+        // Sympathetic Resonance is the impactful half of Attunement's pair
+        // (O272): it follows its travel and nothing else gates it.
         if (!TestTrue(TEXT("real Sympathetic purchase"), P->PurchaseNode(Tree, TEXT("Support.Conductor.SympatheticResonance"), Failure))) return false;
-        TestEqual(TEXT("complete build spends exactly eight earned Doctrine"), P->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
+        TestEqual(TEXT("the pair spends two of the eight earned Doctrine"), P->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), UBreakerProgressionLibrary::DoctrinePointGrant - 2);
         return true;
     };
-    if (!Purchase(Source, 2)) return false;
+    if (!Purchase(Source)) return false;
     Advance(1);
     auto FirstCast = CastBuff(Source, UBreakerAbility_Cadence::StaticClass());
     auto* AllyState = Ally->FindComponentByClass<UBreakerAbilityStateComponent>();

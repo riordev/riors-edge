@@ -89,7 +89,7 @@ public:
 
 // U2 Purge (§3 U2, Medic): strips every status from the target (self with no
 // target) and generates per status actually removed. Field Kit grants the
-// existing new-status immunity window; Triage Priority R2 scales its duration
+// existing new-status immunity window; Triage Priority scales its duration
 // using Patch's target-health curve. Base immunity/buff-strip remain separate.
 UCLASS()
 class RIORSEDGE_API UBreakerAbility_Purge : public UBreakerSupportAbility
@@ -127,8 +127,10 @@ public:
     // O2 presentation and tempo tuning, exported to abilities.json.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cadence", meta=(ClampMin="0")) float DetachedBatonRadiusCm {}; // O246: authored in Data/abilities.json.
     UPROPERTY(EditDefaultsOnly, Category="Cadence") float AuraRadiusCm {}; // O246: authored in Data/abilities.json.
+    // CO Section is single-rank (O272): the RankOne key carries the whole
+    // bonus. The RankTwo key stays declared for the Data schema and is unread.
     UPROPERTY(EditDefaultsOnly, Category="Cadence") float SectionRankOneRadiusBonusCm {}; // O246: authored in Data/abilities.json.
-    UPROPERTY(EditDefaultsOnly, Category="Cadence") float SectionRankTwoRadiusBonusCm {}; // O246: authored in Data/abilities.json.
+    UPROPERTY(EditDefaultsOnly, Category="Cadence") float SectionRankTwoRadiusBonusCm {}; // O246: authored in Data/abilities.json. Unread (O272).
     UPROPERTY(EditDefaultsOnly, Category="Cadence") float ReloadTempoMultiplier {}; // O246: authored in Data/abilities.json.
     UPROPERTY(EditDefaultsOnly, Category="Cadence") float SwapTempoMultiplier {}; // O246: authored in Data/abilities.json.
     UPROPERTY(EditDefaultsOnly, Category="Cadence") float ConductingTailSeconds {}; // O246: authored in Data/abilities.json.
@@ -270,9 +272,9 @@ private:
 // Enemies inside are slowed; it deals no damage at all. The accuracy half was
 // RECORDED ABSENT until the enemy aim-error seam existed; it pays now as a
 // keyed aim-error multiplier on enemies inside — landing after the doc's
-// application delay at base, and INSTANTLY with WA3 Field of View R2 ("the
-// accuracy cut lands instantly too"), the same instant/delayed split the
-// node's slow clause describes.
+// application delay at base, and INSTANTLY with WA3 Field of View ("the
+// accuracy cut lands instantly too"; single-rank, O272), the same
+// instant/delayed split the node's slow clause describes.
 UCLASS()
 class RIORSEDGE_API UBreakerAbility_Suppress : public UBreakerSupportAbility
 {
@@ -295,15 +297,17 @@ public:
     // percentage, the boss-cap protection. O2 PLACEHOLDER magnitude.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0")) float SuppressionArmorCut {}; // O246: authored in Data/abilities.json.
     // WA5 PRESSURE: the slow, count-independent occupancy trickle (per second).
+    // Single-rank (O272): PressureChargePerSecond carries the whole rate; the
+    // Rank2 key stays declared for the Data schema and is unread.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0")) float PressureChargePerSecond {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0")) float PressureChargePerSecondRank2 {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0")) float PressureChargePerSecondRank2 {}; // O246: authored in Data/abilities.json. Unread (O272).
     // The accuracy cut, through the enemy's keyed aim-error seam. Above 1 by
     // clamp: the seam reads excess-over-one as degradation, so 1.0 would be a
     // cut that cuts nothing.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="1")) float SuppressAccuracyMultiplier {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
-    // §U6's application delay on the cut. WA3 R2 removes it ("the accuracy cut
-    // lands instantly too"); at base the enemy shoots straight for this long
-    // after entering, so there is something for R2 to buy.
+    // §U6's application delay on the cut. WA3 Field of View removes it ("the
+    // accuracy cut lands instantly too"); at base the enemy shoots straight
+    // for this long after entering, so there is something for the node to buy.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0")) float AccuracyApplyDelaySeconds {}; // O246: authored in Data/abilities.json.   // O2 PLACEHOLDER
 
     static FName AccuracyModifierKey();

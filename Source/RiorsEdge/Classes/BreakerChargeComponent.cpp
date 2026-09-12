@@ -326,10 +326,10 @@ void UBreakerChargeComponent::NotifyHealingDone(float EffectiveHeal, float Overh
     {
         BloodDebtPool = FMath::Min(BloodDebtPoolCap, BloodDebtPool + EffectiveHeal);
     }
-    // MD4 Steady Hands: at Attuned or better, self-heal Charge credits shave
-    // Support cooldowns (R2: ally-heal credits too), at most once a second.
+    // MD4 Steady Hands: at Attuned or better, heal Charge credits — self and
+    // ally alike (single-rank, O272) — shave Support cooldowns, at most once
+    // a second.
     if (RankSteadyHands > 0 && EffectiveHeal > 0.0f && IsActiveForOwner()
-        && (bSelfTargeted || RankSteadyHands >= 2)
         && CachedBand != EBreakerChargeBand::Cold)
     {
         const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
@@ -419,9 +419,9 @@ void UBreakerChargeComponent::HandleOwnerHealed(const FBreakerHealResult& Result
     // ability healed arrives inside a crediting scope and is skipped here, so
     // this listener covers exactly the sources the node names. The RATE is the
     // ordinary one and the self-heal sub-cap still meters it — metering is not
-    // a rate change, per this component's own top comment. R2's ally-received
-    // clause rides the same event (an ally's heal lands here too) and is
-    // vacuous solo. KNOWN LIMIT, recorded: OnHealed carries no source tag, so
+    // a rate change, per this component's own top comment. The node's
+    // ally-received clause rides the same event (an ally's heal lands here
+    // too) and is vacuous solo. KNOWN LIMIT, recorded: OnHealed carries no source tag, so
     // Support-vs-non-Support is told apart by the scope, not the source.
     if (!IsActiveForOwner() || SupportHealScopeDepth > 0 || RankFieldDressing <= 0) return;
     if (!Attributes) return;
@@ -557,10 +557,11 @@ void UBreakerChargeComponent::AdvanceLoop(float DeltaTime)
     // for a short grace after the last buff expires the source keeps paying —
     // still combat-gated, still count-independent.
     bool bEffectiveUptime = bAnyBuffActive;
-    if (!bEffectiveUptime && RankSustain > 0)
+    if (!bEffectiveUptime && RankSustain >= 1)
     {
-        const float Grace = RankSustain >= 2 ? SustainGraceSecondsRank2 : SustainGraceSeconds;
-        bEffectiveUptime = SecondsSinceBuffExpire <= Grace;
+        // Single-rank (O272): SustainGraceSeconds carries the whole grace;
+        // SustainGraceSecondsRank2 stays declared, unread.
+        bEffectiveUptime = SecondsSinceBuffExpire <= SustainGraceSeconds;
     }
     if (!bAnyBuffActive) SecondsSinceBuffExpire += DeltaTime;
     const float Rate = BuffUptimeGeneration(bEffectiveUptime, bInCombat, BuffUptimeRate) * GenerationMultiplier;

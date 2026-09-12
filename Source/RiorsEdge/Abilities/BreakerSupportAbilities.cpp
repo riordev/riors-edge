@@ -159,10 +159,10 @@ namespace BreakerSupportAbilityLocal
                 if (AActor* Marked = State->GetMarkedTarget(); Rank > 0 && Marked)
                 {
                     Charge->NotifyMarkedTargetDamage(Result.HealthHealed * FMath::Clamp(ProcCoefficient, 0.0f, 1.0f), BreakerSupportTargetMaxHealth(Marked));
-                    if (Rank >= 2)
+                    if (Rank >= 1)
                         if (auto* ASC = Healer->GetAbilitySystemComponent())
                             for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
-                                if (auto* Mark = Cast<UBreakerAbility_Mark>(Spec.GetPrimaryInstance())) Mark->RefreshDuration(10.0f);
+                                if (auto* Mark = Cast<UBreakerAbility_Mark>(Spec.GetPrimaryInstance())) Mark->RefreshDuration(10.0f);   // O2 PLACEHOLDER
                 }
         }
         return Result;
@@ -314,7 +314,8 @@ void UBreakerAbility_Patch::ActivateAbility(const FGameplayAbilitySpecHandle Han
 
         // MD2 TRIAGE PRIORITY: harder the further below full the target is,
         // less on the healthy, at equal total throughput across the band.
-        // R2 applies the same health curve to Purge immunity duration.
+        // The same health curve scales Field Kit's Purge immunity duration
+        // (single-rank node, O272).
         if (SupportNodeRank(Character, TEXT("Support.Medic.TriagePriority")) > 0)
         {
             const float Missing = 1.0f - BreakerSupportTargetHealthFraction(Target);
@@ -332,9 +333,10 @@ void UBreakerAbility_Patch::ActivateAbility(const FGameplayAbilitySpecHandle Han
             // routes wholly to shield; the credit seam pays shield as shield).
             const float ShieldAmount = Amount * 0.5f;   // O2 PLACEHOLDER
             BreakerSupportHealAndCredit(Character, Target, ShieldAmount, 1.0f, /*bOverflow=*/false, /*bOverhealToShield=*/true);
-            // R2: half of it echoes onto you. Solo (target == self) the echo is
-            // vacuous by construction, exactly as the treatment guards.
-            if (SecondOpinionRank >= 2 && Target != Character)
+            // Half of it echoes onto you (single-rank node, O272). Solo
+            // (target == self) the echo is vacuous by construction, exactly
+            // as the treatment guards.
+            if (SecondOpinionRank >= 1 && Target != Character)
             {
                 BreakerSupportHealAndCredit(Character, Character, ShieldAmount * 0.5f, 1.0f, false, true);
             }
@@ -457,13 +459,14 @@ void UBreakerAbility_Purge::ActivateAbility(const FGameplayAbilitySpecHandle Han
             {
                 Charge->NotifyStatusCleansed(DistinctRemoved);
             }
-            // MD3 CLEAN HANDS: cooldown refunds per status ACTUALLY removed
-            // (R2: doubled), bounded by the cleanse source's own 0.5s ICD —
-            // which the Charge component's cleanse interval already enforces.
+            // MD3 CLEAN HANDS: cooldown refunds per status ACTUALLY removed,
+            // bounded by the cleanse source's own 0.5s ICD — which the Charge
+            // component's cleanse interval already enforces. Single-rank
+            // node (O272): rank one carries the full refund.
             const int32 CleanHandsRank = SupportNodeRank(Character, TEXT("Support.Medic.CleanHands"));
-            if (CleanHandsRank > 0)
+            if (CleanHandsRank >= 1)
             {
-                const float RefundPerStatus = CleanHandsRank >= 2 ? 2.0f : 1.0f;   // O2 PLACEHOLDER
+                const float RefundPerStatus = 2.0f;   // O2 PLACEHOLDER
                 ShaveOwnCooldownSeconds(RefundPerStatus * DistinctRemoved);
             }
         }
@@ -476,8 +479,8 @@ void UBreakerAbility_Purge::ActivateAbility(const FGameplayAbilitySpecHandle Han
         {
             const UBreakerAbilityDefinition* Definition = GetAbilityDefinition();
             float Duration = Definition && Definition->WindowDuration > 0.0f ? Definition->WindowDuration : 3.0f;
-            if (SupportNodeRank(Character, TEXT("Support.Medic.TriagePriority")) >= 2)
-                Duration *= FMath::Lerp(0.6f, 1.4f, 1.0f - BreakerSupportTargetHealthFraction(Target));
+            if (SupportNodeRank(Character, TEXT("Support.Medic.TriagePriority")) >= 1)
+                Duration *= FMath::Lerp(0.6f, 1.4f, 1.0f - BreakerSupportTargetHealthFraction(Target));   // O2 PLACEHOLDER
             Status->GrantStatusImmunity(Duration);
         }
 
@@ -545,14 +548,14 @@ void UBreakerAbility_Cadence::ActivateAbility(const FGameplayAbilitySpecHandle H
     bAfterimageAtCast = SupportHasNode(Character, FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage")));
     Character->GetProgression()->OnProgressionChanged.AddUniqueDynamic(this, &ThisClass::HandleCadenceProgressionChanged);
     const int32 Rehearsal = SupportNodeRank(Character, TEXT("Support.Conductor.Rehearsal"));
-    if (Rehearsal > 0 && bReappliedWhileLive)
+    if (Rehearsal >= 1 && bReappliedWhileLive)
         if (auto* Charge = Character->FindComponentByClass<UBreakerChargeComponent>())
-            Charge->GrantCharge(GetLastPaidResourceCost() * (Rehearsal >= 2 ? .5f : .25f));
+            Charge->GrantCharge(GetLastPaidResourceCost() * 0.5f);   // O2 PLACEHOLDER, single-rank (O272)
     bReappliedWhileLive = false;
     const UBreakerAbilityDefinition* Definition = GetAbilityDefinition();
     float Duration = Definition ? Definition->WindowDuration : 8.0f;
     const int32 Discipline = SupportNodeRank(Character, TEXT("Support.Conductor.DownbeatDiscipline"));
-    SelfTailSeconds = Discipline > 0 ? (Discipline >= 2 ? 4.0f : 2.0f) : 0;
+    SelfTailSeconds = Discipline >= 1 ? 4.0f : 0.0f;   // O2 PLACEHOLDER, single-rank (O272)
     auto* Charge = Character->FindComponentByClass<UBreakerChargeComponent>();
     if (SupportHasNode(Character, BreakerNodeTags::Node_CO_StandingOvation.GetTag()) && Charge
         && Charge->GetChargeBand() == EBreakerChargeBand::Resonant)
@@ -562,7 +565,9 @@ void UBreakerAbility_Cadence::ActivateAbility(const FGameplayAbilitySpecHandle H
     const int32 Section = SupportNodeRank(Character, TEXT("Support.Conductor.Section"));
     bSection = Section > 0;
     ActiveAuraRadius = bDetached ? DetachedBatonRadiusCm : AuraRadiusCm;
-    ActiveAuraRadius += Section >= 2 ? SectionRankTwoRadiusBonusCm : Section == 1 ? SectionRankOneRadiusBonusCm : 0;
+    // Single-rank node (O272): the RankOne key carries the whole bonus; the
+    // RankTwo member stays declared and unread.
+    ActiveAuraRadius += Section >= 1 ? SectionRankOneRadiusBonusCm : 0.0f;
     AuraEndTime = World->GetTimeSeconds() + Duration;
     LastAuraUpdateTime = World->GetTimeSeconds();
     TempoOwnerKey = FName(*FString::Printf(TEXT("Cadence.%u"), GetUniqueID()));
@@ -795,13 +800,13 @@ void UBreakerAbility_Metronome::ActivateAbility(const FGameplayAbilitySpecHandle
     ClearRampTails();
     const int32 RehearsalRank = SupportNodeRank(Character, TEXT("Support.Conductor.Rehearsal"));
     const bool bRefresh = RehearsalRank > 0 && bReappliedWhileLive && World->GetTimeSeconds() < RehearsalUntil;
-    if (bRefresh && Charge) Charge->GrantCharge(PaidCost * (RehearsalRank >= 2 ? .5f : .25f)); // O2 PLACEHOLDER
+    if (bRefresh && Charge) Charge->GrantCharge(PaidCost * 0.5f); // O2 PLACEHOLDER, single-rank (O272)
     bReappliedWhileLive = false;
     const UBreakerAbilityDefinition* Definition = GetAbilityDefinition();
     float Duration = Definition ? Definition->WindowDuration : 8.0f;
     if (bResonantAtCast && SupportHasNode(Character, BreakerNodeTags::Node_CO_StandingOvation.GetTag())) Duration *= 1.5f; // O2 PLACEHOLDER
     const int32 Discipline = SupportNodeRank(Character, TEXT("Support.Conductor.DownbeatDiscipline"));
-    float SelfTail = Discipline >= 2 ? 4.0f : Discipline == 1 ? 2.0f : 0.0f; // O2 PLACEHOLDER
+    float SelfTail = Discipline >= 1 ? 4.0f : 0.0f; // O2 PLACEHOLDER, single-rank (O272)
     if (bResonantAtCast && SupportHasNode(Character, BreakerNodeTags::Node_CO_StandingOvation.GetTag())) SelfTail *= 1.5f;
     RampOwnerKey = FName(*FString::Printf(TEXT("Metronome.%u"), GetUniqueID()));
     bMetronomeActive = true;
@@ -879,7 +884,7 @@ void UBreakerAbility_Metronome::RefreshHolders()
             continue;
         }
         FHolderRamp* Ramp = Holders.Find(Weak);
-        const bool bTempo = Tempo >= 2 || (Tempo == 1 && Holder == Character);
+        const bool bTempo = Tempo > 0;   // single-rank (O272): every holder
         const float Gap = StreakGapSeconds * (bTempo ? 1.5f : 1.0f); // O2 PLACEHOLDER
         if (Now - Ramp->LastHitTime >= Gap) Ramp->Stacks = 0;
         Ramp->Stacks = FMath::Min(Ramp->Stacks, static_cast<float>(MaximumStacks + (bTempo ? 3 : 0))); // O2 PLACEHOLDER
@@ -908,7 +913,7 @@ void UBreakerAbility_Metronome::HandleHitDealt(const FBreakerHitContext& Hit)
     FHolderRamp* Ramp = Holders.Find(Holder);
     if (!Ramp) return;
     const int32 Tempo = SupportNodeRank(Character, TEXT("Support.Conductor.Tempo"));
-    const bool bTempo = Tempo >= 2 || (Tempo == 1 && Holder == Character);
+    const bool bTempo = Tempo > 0;   // single-rank (O272): every holder
     Ramp->LastHitTime = GetWorld()->GetTimeSeconds();
     Ramp->Stacks = FMath::Min(Ramp->Stacks + FMath::Clamp(Hit.ProcCoefficient, 0.0f, 1.0f), static_cast<float>(MaximumStacks + (bTempo ? 3 : 0)));
     RefreshHolders();
@@ -1056,11 +1061,11 @@ void UBreakerAbility_Mark::ActivateAbility(const FGameplayAbilitySpecHandle Hand
         return;
     }
 
-    // WA2 LONG WATCH: marks last longer (+4s, R2: +8s — O2 PLACEHOLDER), and
-    // re-marking a still-marked target spends no cooldown. The duration seam
-    // (AbilityDurationMultiplierFor) is adopted at the same site.
+    // WA2 LONG WATCH: marks last longer (+8s — O2 PLACEHOLDER; single-rank,
+    // O272), and re-marking a still-marked target spends no cooldown. The
+    // duration seam (AbilityDurationMultiplierFor) is adopted at the same site.
     const int32 LongWatchRank = SupportNodeRank(Character, TEXT("Support.Warden.LongWatch"));
-    float Duration = (Definition ? Definition->WindowDuration : 10.0f) + (LongWatchRank >= 2 ? 8.0f : (LongWatchRank == 1 ? 4.0f : 0.0f));
+    float Duration = (Definition ? Definition->WindowDuration : 10.0f) + (LongWatchRank >= 1 ? 8.0f : 0.0f);
     Duration *= GetAbilityDurationMultiplier();
     if (LongWatchRank > 0 && bReMarkSame)
     {
@@ -1167,7 +1172,9 @@ void UBreakerAbility_Mark::HandleHitDealt(const FBreakerHitContext& Hit)
     const int32 PaintedRank = SupportNodeRank(Character, TEXT("Support.Warden.Painted"));
     if (UBreakerChargeComponent* Charge = Character->FindComponentByClass<UBreakerChargeComponent>())
     {
-        if (bPayingHit && (bOwner ? (bWeaponShot || PaintedRank >= 1) : PaintedRank >= 2))
+        // WA5 PAINTED, single-rank (O272): the owner's ability hits pay, and
+        // an ally's hits pay at PaintedAllyYieldMultiplier.
+        if (bPayingHit && (bOwner ? (bWeaponShot || PaintedRank >= 1) : PaintedRank >= 1))
         {
             const float YieldScale = (1.0f + DeepMarkYieldPerDepth * MarkDepth)
                 * FMath::Clamp(Hit.ProcCoefficient, 0.0f, 1.0f)
@@ -1222,11 +1229,11 @@ void UBreakerAbility_Mark::HandleHitDealt(const FBreakerHitContext& Hit)
         }
 
         // WA4 HANDOFF: the mark survives its target's death and jumps to the
-        // nearest unmarked enemy (R2: further). The jump pays nothing.
+        // nearest unmarked enemy. The jump pays nothing.
         const int32 HandoffRank = SupportNodeRank(Character, TEXT("Support.Warden.Handoff"));
-        if (HandoffRank > 0 && Remaining > 0.0f)
+        if (HandoffRank >= 1 && Remaining > 0.0f)
         {
-            const float JumpRange = HandoffRank >= 2 ? 2500.0f : 1500.0f;   // O2 PLACEHOLDER ("nearest", R2 "further")
+            const float JumpRange = 2500.0f;   // O2 PLACEHOLDER, single-rank (O272)
             ABreakerEnemy* Nearest = nullptr;
             float BestDistSq = JumpRange * JumpRange;
             if (UWorld* World = GetWorld())
@@ -1383,9 +1390,10 @@ void UBreakerAbility_Suppress::ActivateAbility(const FGameplayAbilitySpecHandle 
     Spec.ZoneTag = FGameplayTag::RequestGameplayTag(TEXT("Zone.Support.Suppress"), false);
     // WA3 FIELD OF VIEW: Suppress reaches further (6 m -> 8 m, O2 PLACEHOLDER).
     // Its instant-slow clause is already structural — the slow lands on the
-    // occupant-entered edge, frame one. The accuracy cut (formerly recorded
-    // absent) pays through the enemy aim-error seam in HandleOccupantEntered:
-    // delayed at base, INSTANT at R2 — the rank captured here decides.
+    // occupant-entered edge, frame one. The accuracy cut pays through the
+    // enemy aim-error seam in HandleOccupantEntered: delayed without the
+    // node, INSTANT with it (single-rank, O272) — the rank captured here
+    // decides.
     FieldOfViewRank = SupportNodeRank(Character, TEXT("Support.Warden.FieldOfView"));
     const bool bFieldOfView = FieldOfViewRank > 0;
     Spec.RadiusCm = bFieldOfView ? 800.0f : RadiusCm;
@@ -1472,7 +1480,9 @@ void UBreakerAbility_Suppress::PressureTick()
     {
         if (UBreakerChargeComponent* Charge = Character->FindComponentByClass<UBreakerChargeComponent>())
         {
-            Charge->GrantCharge(PressureRank >= 2 ? PressureChargePerSecondRank2 : PressureChargePerSecond);
+            // Single-rank node (O272): PressureChargePerSecond carries the
+            // whole rate; PressureChargePerSecondRank2 stays declared, unread.
+            Charge->GrantCharge(PressureChargePerSecond);
         }
     }
 }
@@ -1488,11 +1498,12 @@ void UBreakerAbility_Suppress::HandleOccupantEntered(AActor* Occupant)
 
         // §U6's accuracy half, through the enemy aim-error seam. Base: the cut
         // lands after the application delay (and only if the enemy is STILL
-        // inside when it elapses). WA3 R2: it lands on this edge, frame one —
-        // the same instant/delayed split as the node's slow clause. One shared
-        // key: the 10s cooldown against the 6s zone means two Suppress fields
-        // never coexist, and keyed replace would merely refresh if they did.
-        if (FieldOfViewRank >= 2 || AccuracyApplyDelaySeconds <= 0.0f)
+        // inside when it elapses). With WA3 FIELD OF VIEW (single-rank, O272)
+        // it lands on this edge, frame one — the same instant/delayed split as
+        // the node's slow clause. One shared key: the 10s cooldown against the
+        // 6s zone means two Suppress fields never coexist, and keyed replace
+        // would merely refresh if they did.
+        if (FieldOfViewRank >= 1 || AccuracyApplyDelaySeconds <= 0.0f)
         {
             ApplyAccuracyCut(Enemy);
         }

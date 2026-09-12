@@ -24,7 +24,10 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerPurgePriorityRuntimeTest,
 
 bool FBreakerPurgePriorityRuntimeTest::RunTest(const FString& Parameters)
 {
-    for (int32 Scenario = 0; Scenario < 4; ++Scenario)
+    // Three cast-time target health fractions. Triage Priority is single rank
+    // (O272) and Field Kit follows it, so every paid immunity window is the
+    // scaled one; there is no unscaled Field Kit to walk.
+    for (int32 Scenario = 0; Scenario < 3; ++Scenario)
     {
     UWorld::InitializationValues Init;
     Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
@@ -61,16 +64,15 @@ bool FBreakerPurgePriorityRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("actual entitlement is eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 8);
     const auto* Tree = UBreakerProgressionLibrary::GetSupportMedicTree();
     FText Reason;
-    for (const TCHAR* Node : { TEXT("Support.Medic.FieldDressing"), TEXT("Support.Medic.FieldDressing"),
-        TEXT("Support.Medic.SteadyHands"), TEXT("Support.Medic.SteadyHands"), TEXT("Support.Medic.FieldKit"),
-        TEXT("Support.Medic.TriagePriority") })
+    // Single-rank nodes (O272): Field Dressing and Steady Hands are travel
+    // roots; Field Kit is Triage Priority's impactful and buys behind it.
+    for (const TCHAR* Node : { TEXT("Support.Medic.FieldDressing"), TEXT("Support.Medic.SteadyHands"),
+        TEXT("Support.Medic.TriagePriority"), TEXT("Support.Medic.FieldKit") })
     {
         const bool bBought = Progression->PurchaseNode(Tree, Node, Reason);
         if (!TestTrue(FString::Printf(TEXT("purchase %s: %s"), Node, *Reason.ToString()), bBought)) return false;
     }
-    if (Scenario > 0)
-        if (!TestTrue(TEXT("Priority rank two fits actual eighth point"), Progression->PurchaseNode(Tree, TEXT("Support.Medic.TriagePriority"), Reason))) return false;
-    TestEqual(TEXT("legal path stays within eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), Scenario == 0 ? 1 : 0);
+    TestEqual(TEXT("four nodes leave four of the eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), UBreakerProgressionLibrary::DoctrinePointGrant - 4);
     if (!Progression->IsAbilityUnlocked(TEXT("Support.Purge")))
         if (!TestTrue(TEXT("earned ability token buys Purge"), Progression->SpendAbilityToken(TEXT("Support.Purge"), Reason))) return false;
     auto* Charge = Support->GetCharge(); Charge->BindAttributes(Attributes); Charge->BeginPlay(); Charge->SetComponentTickEnabled(false);
@@ -87,7 +89,7 @@ bool FBreakerPurgePriorityRuntimeTest::RunTest(const FString& Parameters)
         Combat->ApplyHealingAmount(Hurt.BaseDamage, Support, FGameplayTag());
         Charge->AdvanceLoop(1);
     }
-    const float Fraction = Scenario == 1 ? 1.0f : Scenario == 2 ? .5f : .2f;
+    const float Fraction = Scenario == 0 ? 1.0f : Scenario == 1 ? .5f : .2f;
     if (Fraction < 1)
     {
         FBreakerDamageRequest Hurt; Hurt.BaseDamage = Attributes->GetMaxHealth() * (1 - Fraction);
@@ -101,14 +103,14 @@ bool FBreakerPurgePriorityRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Purge pays authored thirty Charge"), Attributes->GetClassResource(), BeforeCharge - 30, .001f);
     auto* Status = Support->FindComponentByClass<UBreakerStatusComponent>();
     if (!TestNotNull(TEXT("native target status component"), Status)) return false;
-    const float Duration = 3.0f * (Scenario == 0 ? 1.0f : FMath::Lerp(.6f, 1.4f, 1 - Fraction));
+    const float Duration = 3.0f * FMath::Lerp(.6f, 1.4f, 1 - Fraction);
     TestTrue(TEXT("paid Field Kit grants actual immunity"), Status->IsStatusImmune());
     FBreakerDamageRequest Entropy; Entropy.BaseDamage = 1; Entropy.DamageFamily = EBreakerDamageFamily::Elemental;
     Entropy.Element = EBreakerElement::Entropy; Entropy.ElementalFraction = 1; Entropy.bCanCritical = false; Entropy.bCanBeAvoided = false;
     Combat->ReceiveDamage(Entropy);
     TestEqual(TEXT("new elemental buildup refused during immunity"), Status->GetEntropyBuildup(), 0.0f);
     Status->AdvanceStatuses(Duration - .01f);
-    TestTrue(TEXT("rank and cast-time target health determine duration"), Status->IsStatusImmune());
+    TestTrue(TEXT("cast-time target health determines duration"), Status->IsStatusImmune());
     Status->AdvanceStatuses(.02f);
     TestFalse(TEXT("same window expires at scaled deadline"), Status->IsStatusImmune());
     Combat->ReceiveDamage(Entropy);

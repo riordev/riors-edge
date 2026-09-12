@@ -1685,13 +1685,11 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
 // treatment's rewrite tier (AR9-AR11 / FT9-FT11 / TK9-TK11) supplied a rule
 // with no figure, it is an impactful here, at tier 1, unlocked by its travel.
 //
-// TANK BELOW is the same wheel of pairs, in the same shape, with the same
-// travel-then-impactful array order; its three keystones are the impactful
-// halves of their own pairs. SUPPORT BELOW authors tiers 1-4 through
-// GateForTier (gates 0/2/4/6) with the keystone an ordinary tier-4 node at
-// cost 2, flagged bCornerstone because that flag is what makes it the
-// ultimate's rewrite site and what O37 gates on commitment. The paragraphs
-// that follow apply to all three classes.
+// TANK AND SUPPORT BELOW are the same wheel of pairs, in the same shape, with
+// the same travel-then-impactful array order; each of their six keystones is
+// the impactful half of its own pair, flagged bCornerstone because that flag
+// is what makes it the ultimate's rewrite site and what O37 gates on
+// commitment. The paragraphs that follow apply to all three classes.
 //
 // EVERY NON-KEYSTONE NODE SHIPS AS ITS TREATMENT RULE, VERBATIM, AS A TAG
 // WITH NO STAT EFFECT — the Caster posture (see the block comment above
@@ -2538,95 +2536,53 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSupportMedicTree()
     // — healing with overheal reporting — named once here rather than per
     // node.
 
-    // --- Tier 1 (MD1-MD3) ----------------------------------------------------
+    // --- Pair: Field Dressing (travel) -> Sustained Care (impactful) ----------
     // MD1. The 6 Charge/s self-heal cap is what keeps this from becoming a
-    // gear engine, and it is untouched. WAITING ON: UBreakerChargeComponent
-    // crediting non-Support self-heal sources under this tag.
+    // gear engine, and it is untouched. The ally-received event is the
+    // node's figure: UBreakerChargeComponent's OnHealed credit rides one
+    // event for own-source and ally-landed heals alike, so the whole rule is
+    // live at rank one (vacuous solo).
     UBreakerProgressionNode* Node = MakeNode(TEXT("Support.Medic.FieldDressing"), TEXT("Field Dressing"),
-        TEXT("Healing yourself pays Charge at the ally rate even from non-Support sources — leech, regen, pickups (R2: and heals received from allies)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 2, 1);
+        TEXT("Healing yourself pays Charge at the ally rate from every source — leech, regen, pickups, and heals you receive from allies."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MD_FieldDressing.GetTag());
     Tree->Nodes.Add(Node);
 
-    // MD2. Redistributes the heal's value; total throughput unchanged.
-    // WAITING ON: UBreakerAbility_Patch's heal computation.
-    Node = MakeNode(TEXT("Support.Medic.TriagePriority"), TEXT("Triage Priority"),
-        TEXT("Patch heals harder the further below full its target is, and less on the healthy, at equal Charge yield (R2: Purge's immunity scales too)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MD_TriagePriority.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // MD3. Explicitly bounded by the cleanse source's 0.5s ICD. WAITING ON:
-    // UBreakerAbility_Purge's cleanse accounting.
-    Node = MakeNode(TEXT("Support.Medic.CleanHands"), TEXT("Clean Hands"),
-        TEXT("Purge pays Charge and refunds cooldown per status removed (R2: doubled refund), bounded by the cleanse's own cooldown."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MD_CleanHands.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 2 (MD4-MD6) ----------------------------------------------------
-    // MD4. The loop-closing node: sustain buys tempo. Band-gated (Attuned)
-    // and event-driven, neither of which the cooldown lane can say. WAITING
-    // ON: the Attuned band and a per-Charge-credit cooldown tick.
-    Node = MakeNode(TEXT("Support.Medic.SteadyHands"), TEXT("Steady Hands"),
-        TEXT("At Attuned or better, self-heal Charge credits shave Support cooldowns (R2: ally-heal credits too). At most once a second."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Support.Medic.FieldDressing"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MD_SteadyHands.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // MD5. Turns overheal-generates-nothing from a dead end into a decision.
-    // WAITING ON: UBreakerAbility_Patch's full-health cast path and the
-    // shielding Charge source.
-    Node = MakeNode(TEXT("Support.Medic.SecondOpinion"), TEXT("Second Opinion"),
-        TEXT("Patch cast on a full-health target grants a shield instead, paying from the shielding source (R2: half of it echoes onto you)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Support.Medic.TriagePriority"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MD_SecondOpinion.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // MD6. Actual restored health pays the marked source at proc weight;
-    // rank two refreshes both the mark's payload clock and its display.
-    Node = MakeNode(TEXT("Support.Medic.Attending"), TEXT("Attending"),
-        TEXT("Healing while your mark is live also pays the marked-target source at the damage rate (R2: and refreshes the mark)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Support.Medic.FieldDressing"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MD_Attending.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 3 (MD7-MD8) ----------------------------------------------------
-    // MD7. "Grants U2 Purge" is not authored (block comment above); the
-    // buff-strip and application-suppression rewrite is the node. WAITING ON:
-    // UBreakerAbility_Purge's target rules and immunity window.
-    Node = MakeNode(TEXT("Support.Medic.FieldKit"), TEXT("Field Kit"),
-        TEXT("Purge cast on an enemy strips one buff, and its immunity window also blocks NEW statuses from landing."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 3, 1, 2);
-    AddPrerequisite(Node, TEXT("Support.Medic.SteadyHands"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MD_FieldKit.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // MD8. Medic's second tier-3 node is a REWRITE, mirroring Swift F8/K8 —
-    // and its ticks generate at the heal source's proc coefficient, not 1.0,
-    // so it must not out-generate the instant it replaces. WAITING ON:
-    // UBreakerAbility_Patch's heal delivery.
+    // MD8. A REWRITE, mirroring Swift F8/K8 — and its ticks generate at the
+    // heal source's proc coefficient, not 1.0, so it must not out-generate
+    // the instant it replaces. WAITING ON: UBreakerAbility_Patch's heal
+    // delivery.
     Node = MakeNode(TEXT("Support.Medic.SustainedCare"), TEXT("Sustained Care"),
-        TEXT("Patch splits into an instant portion and a heal-over-time. The ticks pay Charge at proc coefficient, never at full rate."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 3, 1, 2);
-    AddPrerequisite(Node, TEXT("Support.Medic.SecondOpinion"));
+        TEXT("Patch splits into an instant portion and a heal-over-time. The ticks pay Charge at proc coefficient, never at full rate."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Support.Medic.FieldDressing"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MD_SustainedCare.GetTag());
     Tree->Nodes.Add(Node);
 
-    // --- Tier 4 (MD9-MD11), the rewrite tier ---------------------------------
-    // MD9. The distinction is exact and must be exact in code (§4.1's own
-    // words): the overheal still generates NOTHING; the shield it becomes
-    // generates through the shield door and its over-shield cap. WAITING ON:
-    // the §5.1 overheal report.
-    Node = MakeNode(TEXT("Support.Medic.Overflow"), TEXT("Overflow"),
-        TEXT("Overheal is no longer discarded: it becomes a shield at a fraction of its value. The overheal pays nothing; the shield pays as shield."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Support.Medic.SecondOpinion"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MD_Overflow.GetTag());
+    // --- Pair: Triage Priority (travel) -> Field Kit (impactful) --------------
+    // MD2. Redistributes the heal's value; total throughput unchanged, and
+    // Field Kit's immunity window scales by the same curve.
+    // UBreakerAbility_Patch's heal computation and UBreakerAbility_Purge's
+    // immunity scale read this node.
+    Node = MakeNode(TEXT("Support.Medic.TriagePriority"), TEXT("Triage Priority"),
+        TEXT("Patch heals harder the further below full its target is, and less on the healthy, at equal Charge yield. Field Kit's immunity window scales the same way."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MD_TriagePriority.GetTag());
     Tree->Nodes.Add(Node);
 
-    // MD10. The Medic's damage-conversion path — flat bucket, before the
-    // Increased bucket, per Item-Foundation — but the magnitude is an
-    // accumulated POOL, not a per-rank constant, so no static line can carry
-    // it. WAITING ON: the debt pool and the marked-hit consumption read.
-    Node = MakeNode(TEXT("Support.Medic.BloodDebt"), TEXT("Blood Debt"),
-        TEXT("Healing — self-healing included, at full rate — banks into a pool. Your next weapon hit on a marked target spends it as flat damage."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Support.Medic.Attending"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MD_BloodDebt.GetTag());
+    // MD7. "Grants U2 Purge" is not authored (block comment above); the
+    // buff-strip and application-suppression rewrite is the node. WAITING ON:
+    // the enemy buff-strip — enemies carry no buff a Purge could strip.
+    Node = MakeNode(TEXT("Support.Medic.FieldKit"), TEXT("Field Kit"),
+        TEXT("Purge cast on an enemy strips one buff, and its immunity window also blocks NEW statuses from landing."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Support.Medic.TriagePriority"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MD_FieldKit.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Clean Hands (travel) -> No Triage (impactful) ------------------
+    // MD3. Explicitly bounded by the cleanse source's 0.5s ICD. The refund is
+    // 2 s per status (O2 PLACEHOLDER). UBreakerAbility_Purge's cleanse
+    // accounting reads this node.
+    Node = MakeNode(TEXT("Support.Medic.CleanHands"), TEXT("Clean Hands"),
+        TEXT("Purge pays Charge and refunds 2s of its cooldown per status removed, bounded by the cleanse's own cooldown."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MD_CleanHands.GetTag());
     Tree->Nodes.Add(Node);
 
     // MD11. The deliberate solo-specialist rewrite — a downgrade in a party,
@@ -2635,14 +2591,67 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSupportMedicTree()
     // AbilityCost/AbilityCooldown lanes cannot scope. WAITING ON:
     // UBreakerAbility_Patch and UBreakerAbility_Purge's target gates.
     Node = MakeNode(TEXT("Support.Medic.NoTriage"), TEXT("No Triage"),
-        TEXT("Patch and Purge become self-only — and far cheaper, on shorter cooldowns. Worse in a party, better alone, chosen on purpose."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Support.Medic.SustainedCare"));
+        TEXT("Patch and Purge become self-only — and far cheaper, on shorter cooldowns. Worse in a party, better alone, chosen on purpose."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Support.Medic.CleanHands"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MD_NoTriage.GetTag());
     Tree->Nodes.Add(Node);
 
-    // MD12. Conduit's healing field owns one lethal rescue per target/cast.
+    // --- Pair: Second Opinion (travel) -> Overflow (impactful) ----------------
+    // MD5. Turns overheal-generates-nothing from a dead end into a decision.
+    // The half-echo onto self is the node's figure (O2 PLACEHOLDER); solo,
+    // target == self, the echo is vacuous by construction.
+    // UBreakerAbility_Patch's full-health cast path reads this node.
+    Node = MakeNode(TEXT("Support.Medic.SecondOpinion"), TEXT("Second Opinion"),
+        TEXT("Patch cast on a full-health target grants a shield instead, paying from the shielding source, and half of that shield echoes onto you."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MD_SecondOpinion.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // MD9. The distinction is exact and must be exact in code (§4.1's own
+    // words): the overheal still generates NOTHING; the shield it becomes
+    // generates through the shield door and its over-shield cap. WAITING ON:
+    // the §5.1 overheal report.
+    Node = MakeNode(TEXT("Support.Medic.Overflow"), TEXT("Overflow"),
+        TEXT("Overheal is not discarded: it becomes a shield at a fraction of its value. The overheal pays nothing; the shield pays as shield."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Support.Medic.SecondOpinion"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MD_Overflow.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Attending (travel) -> Blood Debt (impactful) -------------------
+    // MD6. Actual restored health pays the marked source at proc weight, and
+    // the heal refreshes both the mark's payload clock and its display to
+    // 10 s (O2 PLACEHOLDER). The heal-credit path in
+    // Abilities/BreakerSupportAbilities.cpp reads this node.
+    Node = MakeNode(TEXT("Support.Medic.Attending"), TEXT("Attending"),
+        TEXT("Healing while your mark is live also pays the marked-target source at the damage rate, and refreshes the mark to 10s."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MD_Attending.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // MD10. The Medic's damage-conversion path — flat bucket, before the
+    // Increased bucket, per Item-Foundation — but the magnitude is an
+    // accumulated POOL, not a per-rank constant, so no static line can carry
+    // it. WAITING ON: the debt pool and the marked-hit consumption read.
+    Node = MakeNode(TEXT("Support.Medic.BloodDebt"), TEXT("Blood Debt"),
+        TEXT("Healing — self-healing included, at full rate — banks into a pool. Your next weapon hit on a marked target spends it as flat damage."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Support.Medic.Attending"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MD_BloodDebt.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Steady Hands (travel) -> Triage (keystone) ---------------------
+    // MD4. The loop-closing node: sustain buys tempo. Band-gated (Attuned)
+    // and event-driven, neither of which the cooldown lane can say; ally-heal
+    // credits count alongside self-heal credits. UBreakerChargeComponent's
+    // credit tick reads this node.
+    Node = MakeNode(TEXT("Support.Medic.SteadyHands"), TEXT("Steady Hands"),
+        TEXT("At Attuned or better, self-heal and ally-heal Charge credits shave Support cooldowns. At most once a second."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MD_SteadyHands.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // MD12 TRIAGE — the branch keystone, the impactful half of its pair and
+    // the one gated node (tier 4, cost 1; block comment above). Conduit's
+    // healing field owns one lethal rescue per target/cast; Conduit's Triage
+    // row resolves off the tag below.
     Node = MakeNode(TEXT("Support.Medic.Triage"), TEXT("Triage"),
-        TEXT("Branch keystone. Rewrites Conduit: a continuous healing field with one lethal-hit save per target, and no free casts."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 4, 1, 2);
+        TEXT("Branch keystone. Rewrites Conduit: a continuous healing field with one lethal-hit save per target, and no free casts."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 4, 1, 1);
     AddPrerequisite(Node, TEXT("Support.Medic.SteadyHands"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MD_Triage.GetTag());
@@ -2665,103 +2674,113 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSupportConductorTree()
     // Sympathetic adds independent buildup and protects the recipient's
     // contributions with a gradual fade while the cast is actually buffed.
 
-    // --- Tier 1 (CO1-CO3) ----------------------------------------------------
-    // CO1. The self-first rule expressed as duration. WAITING ON: the
-    // Conductor buff layer (§5.4's count-independent uptime system).
+    // --- Pair: Downbeat Discipline (travel) -> Conducting (impactful) ---------
+    // CO1. The self-first rule expressed as duration: the self tail is 4 s
+    // (O2 PLACEHOLDER). Cadence and Metronome in
+    // Abilities/BreakerSupportAbilities.cpp read this node.
     UBreakerProgressionNode* Node = MakeNode(TEXT("Support.Conductor.DownbeatDiscipline"), TEXT("Downbeat Discipline"),
-        TEXT("Your own copy of every Conductor buff outlasts the copies you hand out (R2: longer still)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 2, 1);
+        TEXT("Your own copy of every Conductor buff outlasts the copies you hand out by a 4s self tail."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_DownbeatDiscipline.GetTag());
     Tree->Nodes.Add(Node);
 
-    // CO2. Cadence enlarges its actual footprint and follows at sprint speed.
-    Node = MakeNode(TEXT("Support.Conductor.Section"), TEXT("Section"),
-        TEXT("Cadence's aura reaches further and keeps pace at sprint speed (R2: further again)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_Section.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // CO3. Smooths the +2/s uptime source's sawtooth; still combat-gated,
-    // still count-independent. WAITING ON: UBreakerChargeComponent's
-    // buff-uptime source.
-    Node = MakeNode(TEXT("Support.Conductor.Sustain"), TEXT("Sustain"),
-        TEXT("Buff-uptime Charge keeps paying for a short grace after the last buff expires (R2: longer grace)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_Sustain.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 2 (CO4-CO6) ----------------------------------------------------
-    // CO4. Explicit anti-stack, the treatment's own VW4-Lingering citation.
-    // WAITING ON: the buff re-application path.
-    Node = MakeNode(TEXT("Support.Conductor.Rehearsal"), TEXT("Rehearsal"),
-        TEXT("Re-applying a live Conductor buff refreshes it — stacks intact — and refunds part of its cost (R2: a larger refund)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Support.Conductor.DownbeatDiscipline"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_Rehearsal.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // CO5. Rank one improves the caster's ramp; rank two improves every holder.
-    Node = MakeNode(TEXT("Support.Conductor.Tempo"), TEXT("Tempo"),
-        TEXT("Metronome stacks higher and resets slower for you specifically (R2: for everyone you buffed)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Support.Conductor.Sustain"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_Tempo.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // CO6 converts weapon type without adding damage. Entropy is the first
-    // available element; Void and Rift choices follow their complete pipelines.
-    Node = MakeNode(TEXT("Support.Conductor.Attunement"), TEXT("Attunement"),
-        TEXT("Your Conductor buffs convert the recipient's weapon damage to Entropy, the currently available element. Adds no damage. R2: conversion lingers briefly after the buff ends."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Support.Conductor.Section"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_Attunement.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 3 (CO7-CO8) ----------------------------------------------------
     // CO7. Cadence shortens each actual recipient's cooldowns and retains a
     // brief caster-owned effect after leaving a detached footprint.
     Node = MakeNode(TEXT("Support.Conductor.Conducting"), TEXT("Conducting"),
-        TEXT("Cadence also speeds ability cooldown recovery for the buffed, and clings to you briefly if its aura ever leaves you."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 3, 1, 2);
-    AddPrerequisite(Node, TEXT("Support.Conductor.Rehearsal"));
+        TEXT("Cadence also speeds ability cooldown recovery for the buffed, and clings to you briefly if its aura ever leaves you."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Support.Conductor.DownbeatDiscipline"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_Conducting.GetTag());
     Tree->Nodes.Add(Node);
 
-    // CO8. Actual damaging ability hits and ticks advance each holder's ramp
-    // at their proc coefficient; this node does not grant the ability itself.
-    Node = MakeNode(TEXT("Support.Conductor.Counterpoint"), TEXT("Counterpoint"),
-        TEXT("Metronome stacks from ANY damage the buffed target deals — abilities, ticks at proc coefficient, deployables — not weapon hits alone."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 3, 1, 2);
-    AddPrerequisite(Node, TEXT("Support.Conductor.Tempo"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_Counterpoint.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 4 (CO9-CO11), the rewrite tier ---------------------------------
-    // CO9. Band-gated (Resonant); reads the state, adds no percentage.
-    // WAITING ON: the Resonant band and buff application path.
-    Node = MakeNode(TEXT("Support.Conductor.StandingOvation"), TEXT("Standing Ovation"),
-        TEXT("At Resonant, your Conductor buffs land extended and cannot be stripped by enemies."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Support.Conductor.Rehearsal"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_StandingOvation.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // CO10 feeds the buildup track without adding damage to the applying hit
-    // or to its Rot snapshot. A maintained buff is required; R2 tails do not pay.
-    Node = MakeNode(TEXT("Support.Conductor.SympatheticResonance"), TEXT("Sympathetic Resonance"),
-        TEXT("While your Conductor buff is maintained, the recipient's Entropy hits add buildup independent of damage dealt. Their buildup fades gradually after its grace period. Adds no hit or Rot damage and triggers no reaction."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Support.Conductor.Attunement"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_SympatheticResonance.GetTag());
+    // --- Pair: Section (travel) -> Detached Baton (impactful) -----------------
+    // CO2. Cadence enlarges its actual footprint and follows at sprint speed.
+    // The reach is +400 cm, Data/abilities.json's SectionRankOneRadiusBonusCm
+    // (O2 PLACEHOLDER), which UBreakerAbility_Cadence reads at rank one.
+    Node = MakeNode(TEXT("Support.Conductor.Section"), TEXT("Section"),
+        TEXT("Cadence's aura reaches 400 cm further and keeps pace at sprint speed."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_Section.GetTag());
     Tree->Nodes.Add(Node);
 
     // CO11. The ONE node in the branch that suspends the self-first rule, and
     // the treatment flags it exactly so: a deliberate party-play trade the
     // solo player declines, optional, with nothing depending on it.
     Node = MakeNode(TEXT("Support.Conductor.DetachedBaton"), TEXT("Detached Baton"),
-        TEXT("Cadence may be planted as a much larger stationary zone — which no longer applies to you first. A party trade, declined solo."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Support.Conductor.Conducting"));
+        TEXT("Cadence may be planted as a much larger stationary zone — which does not apply to you first. A party trade, declined solo."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Support.Conductor.Section"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_DetachedBaton.GetTag());
     Tree->Nodes.Add(Node);
 
-    // CO12 DOWNBEAT — keystone, tier-3/cost-3 compression. Its 1.25x WEAPON
-    // More while a self-authored Conductor buff is live on YOU is NOT OWED (O95):
-    // no buff-state condition exists and WeaponDamage has no composed More
-    // lane. "On yourself" is the deliberate solo-satisfiable condition, and
-    // dropping it would change the node's meaning, not its number. Conduit's
-    // Downbeat row resolves off the tag below.
+    // --- Pair: Sustain (travel) -> Standing Ovation (impactful) ---------------
+    // CO3. Smooths the +2/s uptime source's sawtooth; still combat-gated,
+    // still count-independent. The grace is 4 s, UBreakerChargeComponent's
+    // SustainGraceSeconds (O2 PLACEHOLDER), which its buff-uptime source
+    // reads at rank one.
+    Node = MakeNode(TEXT("Support.Conductor.Sustain"), TEXT("Sustain"),
+        TEXT("Buff-uptime Charge keeps paying for a 4s grace after the last buff expires."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_Sustain.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // CO9. Band-gated (Resonant); reads the state, adds no percentage.
+    // WAITING ON: the Resonant band and buff application path.
+    Node = MakeNode(TEXT("Support.Conductor.StandingOvation"), TEXT("Standing Ovation"),
+        TEXT("At Resonant, your Conductor buffs land extended and cannot be stripped by enemies."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Support.Conductor.Sustain"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_StandingOvation.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Tempo (travel) -> Counterpoint (impactful) ---------------------
+    // CO5. Every holder's ramp improves, the caster included.
+    // UBreakerAbility_Metronome's ramp reads this node.
+    Node = MakeNode(TEXT("Support.Conductor.Tempo"), TEXT("Tempo"),
+        TEXT("Metronome stacks higher and resets slower for every holder of your buff."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_Tempo.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // CO8. Actual damaging ability hits and ticks advance each holder's ramp
+    // at their proc coefficient; this node does not grant the ability itself.
+    Node = MakeNode(TEXT("Support.Conductor.Counterpoint"), TEXT("Counterpoint"),
+        TEXT("Metronome stacks from ANY damage the buffed target deals — abilities, ticks at proc coefficient, deployables — not weapon hits alone."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Support.Conductor.Tempo"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_Counterpoint.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Attunement (travel) -> Sympathetic Resonance (impactful) -------
+    // CO6 converts weapon type without adding damage. Entropy is the first
+    // available element; Void and Rift choices follow their complete
+    // pipelines. The lingering tail is the node's figure at rank one.
+    // UBreakerAbilityStateComponent's lease reads this node.
+    Node = MakeNode(TEXT("Support.Conductor.Attunement"), TEXT("Attunement"),
+        TEXT("Your Conductor buffs convert the recipient's weapon damage to Entropy, the currently available element, and the conversion lingers briefly after the buff ends. Adds no damage."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_Attunement.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // CO10 feeds the buildup track without adding damage to the applying hit
+    // or to its Rot snapshot. A maintained buff is required; Attunement's
+    // lingering tail does not pay.
+    Node = MakeNode(TEXT("Support.Conductor.SympatheticResonance"), TEXT("Sympathetic Resonance"),
+        TEXT("While your Conductor buff is maintained, the recipient's Entropy hits add buildup independent of damage dealt. Their buildup fades gradually after its grace period. Adds no hit or Rot damage and triggers no reaction."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Support.Conductor.Attunement"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_SympatheticResonance.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Rehearsal (travel) -> Downbeat (keystone) ----------------------
+    // CO4. Explicit anti-stack, the treatment's own VW4-Lingering citation.
+    // The refund is half the paid cost (O2 PLACEHOLDER). The buff
+    // re-application path in Abilities/BreakerSupportAbilities.cpp reads this
+    // node.
+    Node = MakeNode(TEXT("Support.Conductor.Rehearsal"), TEXT("Rehearsal"),
+        TEXT("Re-applying a live Conductor buff refreshes it — stacks intact — and refunds half its cost."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_Rehearsal.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // CO12 DOWNBEAT — the branch keystone, the impactful half of its pair and
+    // the one gated node (tier 4, cost 1; block comment above). Its 1.25x
+    // WEAPON More while a self-authored Conductor buff is live on YOU is NOT
+    // OWED (O95): no buff-state condition exists and WeaponDamage has no
+    // composed More lane. "On yourself" is the deliberate solo-satisfiable
+    // condition, and dropping it would change the node's meaning, not its
+    // number. Conduit's Downbeat row resolves off the tag below.
     Node = MakeNode(TEXT("Support.Conductor.Downbeat"), TEXT("Downbeat"),
-        TEXT("Branch keystone. Rewrites Conduit for the Support whose first instrument is themselves."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 4, 1, 2);
+        TEXT("Branch keystone. Rewrites Conduit for the Support whose first instrument is themselves."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 4, 1, 1);
     AddPrerequisite(Node, TEXT("Support.Conductor.Rehearsal"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_Downbeat.GetTag());
@@ -2782,118 +2801,124 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSupportWardenTree()
     // convert identically at any party size, which is why Class-Kits §5
     // points the solo player here first.
 
-    // --- Tier 1 (WA1-WA3) ----------------------------------------------------
-    // WA1. Own weapon hits generate by default; purchased ranks admit own
-    // abilities/ticks, then allied damage at a reduced proc-weighted rate.
+    // --- Pair: Painted (travel) -> Deep Mark (impactful) ----------------------
+    // WA1. Own weapon hits generate by default; the node admits own
+    // abilities/ticks and allied damage at half yield
+    // (Data/abilities.json's PaintedAllyYieldMultiplier, O2 PLACEHOLDER),
+    // proc-weighted. UBreakerAbility_Mark's paying-hit gate reads this node.
     UBreakerProgressionNode* Node = MakeNode(TEXT("Support.Warden.Painted"), TEXT("Painted"),
-        TEXT("Marked-target Charge pays on your ability and DoT damage, not weapon hits alone (R2: allied damage too, at a reduced rate)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 2, 1);
+        TEXT("Marked-target Charge pays on your ability and DoT damage, not weapon hits alone, and on allied damage at half yield."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_WA_Painted.GetTag());
     Tree->Nodes.Add(Node);
 
-    // WA2. Warden's whole tempo is mark uptime. Mark's duration is an
-    // ability-owned number and UBreakerAbility_Mark does not read the
-    // AbilityDuration seam — same posture as Tank B1. WAITING ON:
-    // UBreakerAbility_Mark adopting AbilityDurationMultiplierFor and the
-    // re-mark cooldown exemption.
-    Node = MakeNode(TEXT("Support.Warden.LongWatch"), TEXT("Long Watch"),
-        TEXT("Marks last longer, and re-marking a still-marked target spends no cooldown (R2: longer again)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_WA_LongWatch.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // WA3. Handling rewrite. WAITING ON: UBreakerAbility_Suppress's radius
-    // and slow-application delay.
-    Node = MakeNode(TEXT("Support.Warden.FieldOfView"), TEXT("Field of View"),
-        TEXT("Suppress reaches further and its slow lands the instant an enemy enters (R2: the accuracy cut lands instantly too)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_WA_FieldOfView.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 2 (WA4-WA6) ----------------------------------------------------
-    // WA4. Proc coefficient 0 on the jump — the anti-chain-generation guard —
-    // and DELIBERATELY the same rule as Swift M5 Mark Economy, so one shared
-    // mark implementation carries one rule, not two. WAITING ON: the shared
-    // mark-death handoff (the seam Node_MarkEconomy already waits on).
-    Node = MakeNode(TEXT("Support.Warden.Handoff"), TEXT("Handoff"),
-        TEXT("A mark survives its target's death and jumps to the nearest unmarked enemy (R2: further). The jump itself pays nothing."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Support.Warden.LongWatch"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_WA_Handoff.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // WA5. Count-independence applied to an enemy-facing source: pack density
-    // must not be a resource multiplier. WAITING ON: UBreakerChargeComponent
-    // and Suppress's occupancy check.
-    Node = MakeNode(TEXT("Support.Warden.Pressure"), TEXT("Pressure"),
-        TEXT("Enemies inside Suppress pay you Charge at a slow, count-independent rate — one pays the same as six (R2: faster)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Support.Warden.FieldOfView"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_WA_Pressure.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // WA6. A defensive node in an offensive branch — Warden's answer to being
-    // alone in the room it aggravated. The damage-taken reduction is
-    // mark-scoped, which IncomingDamageReduction (no lane anyway) could not
-    // scope. WAITING ON: the mark's telegraph and damage-out read.
-    Node = MakeNode(TEXT("Support.Warden.Tell"), TEXT("Tell"),
-        TEXT("Marked targets telegraph their next attack to you, and hit you softer while the mark lives (R2: your allies too)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Support.Warden.Painted"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_WA_Tell.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 3 (WA7-WA8) ----------------------------------------------------
-    // WA7. "Grants U6 Suppress" is not authored (block comment above). FLAT
-    // armour cut, never a percentage — the boss-cap protection, matching
-    // Caster VW7 Zonework's precedent by the treatment's own citation.
-    // WAITING ON: UBreakerAbility_Suppress's field effect list.
-    Node = MakeNode(TEXT("Support.Warden.Suppression"), TEXT("Suppression"),
-        TEXT("Suppress also cuts the Armour of enemies inside it by a flat amount. Flat, never a percentage."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 3, 1, 2);
-    AddPrerequisite(Node, TEXT("Support.Warden.Pressure"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_WA_Suppression.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // WA8. Warden's second tier-3 node is a rewrite, no grant. Anti-farm rule
-    // 7 still applies — deepening does not refresh generation eligibility.
-    // WAITING ON: the mark's stacking state.
+    // WA8. A rewrite, no grant. Anti-farm rule 7 still applies — deepening
+    // does not refresh generation eligibility. WAITING ON: the mark's
+    // stacking state.
     Node = MakeNode(TEXT("Support.Warden.DeepMark"), TEXT("Deep Mark"),
-        TEXT("Marking a marked target deepens it: more damage taken, richer Charge yield. Deepening never resets the anti-farm window."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 3, 1, 2);
-    AddPrerequisite(Node, TEXT("Support.Warden.Handoff"));
+        TEXT("Marking a marked target deepens it: more damage taken, richer Charge yield. Deepening never resets the anti-farm window."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Support.Warden.Painted"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_WA_DeepMark.GetTag());
     Tree->Nodes.Add(Node);
 
-    // --- Tier 4 (WA9-WA11), the rewrite tier ---------------------------------
-    // WA9. Rewards marking what you can kill, not marking everything. WAITING
-    // ON: the marked-kill event and Mark's cost/cooldown refund.
-    Node = MakeNode(TEXT("Support.Warden.ExecutionersLedger"), TEXT("Executioner's Ledger"),
-        TEXT("Killing a marked target refunds Mark's cost and cooldown in proportion to the mark's unspent duration."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Support.Warden.Handoff"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_WA_ExecutionersLedger.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // WA10. Band-gated (Resonant) rule rewrite; no percentage. The
-    // prerequisite is the node whose ability it rewrites — load-bearing, the
-    // SpendToLive pattern. WAITING ON: the Resonant band and enemy
-    // buff/heal-suppression inside Suppress.
-    Node = MakeNode(TEXT("Support.Warden.BlackoutProtocol"), TEXT("Blackout Protocol"),
-        TEXT("At Resonant, marked enemies inside Suppress can be neither buffed nor healed."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Support.Warden.Suppression"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_WA_BlackoutProtocol.GetTag());
+    // --- Pair: Long Watch (travel) -> Hunter's Economy (impactful) ------------
+    // WA2. Warden's whole tempo is mark uptime. The extension is +8 s (O2
+    // PLACEHOLDER). UBreakerAbility_Mark reads this node for the extension
+    // and the re-mark cooldown exemption, through the AbilityDuration seam.
+    Node = MakeNode(TEXT("Support.Warden.LongWatch"), TEXT("Long Watch"),
+        TEXT("Marks last 8s longer, and re-marking a still-marked target spends no cooldown."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_WA_LongWatch.GetTag());
     Tree->Nodes.Add(Node);
 
     // WA11. The class's floor-recovery answer: a Support at zero Charge is
     // never soft-locked, because the ignition source becomes free. WAITING
     // ON: UBreakerAbility_Mark's cost, duration and single-target gates.
     Node = MakeNode(TEXT("Support.Warden.HuntersEconomy"), TEXT("Hunter's Economy"),
-        TEXT("Mark costs nothing — but runs much shorter and holds one target only. A free, constantly-cycling ignition source."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 4, 1, 2);
+        TEXT("Mark costs nothing — but runs much shorter and holds one target only. A free, constantly-cycling ignition source."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1);
     AddPrerequisite(Node, TEXT("Support.Warden.LongWatch"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_WA_HuntersEconomy.GetTag());
     Tree->Nodes.Add(Node);
 
-    // WA12 BLACKOUT — keystone, tier-3/cost-3 compression. Its 1.30x More
-    // against targets marked by you is NOT OWED (O95): no target-marked condition
-    // exists (a mark is ability state, not a Status.* tag, so TargetAiling
-    // cannot stand in). The condition being self-supplied at level 1 by a
-    // starter is exactly why unconditional would be wrong — it would delete
-    // the one requirement the solo loop is built around. Conduit's Blackout
-    // row resolves off the tag below. Support's three Mores stay reserved.
+    // --- Pair: Field of View (travel) -> Blackout Protocol (impactful) --------
+    // WA3. Handling rewrite: the slow and the accuracy cut both land on
+    // entry. UBreakerAbility_Suppress's radius and application delays read
+    // this node.
+    Node = MakeNode(TEXT("Support.Warden.FieldOfView"), TEXT("Field of View"),
+        TEXT("Suppress reaches further, and both its slow and its accuracy cut land the instant an enemy enters."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_WA_FieldOfView.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // WA10. Band-gated (Resonant) rule rewrite; no percentage. Its travel is
+    // a node on the ability it rewrites — load-bearing, the SpendToLive
+    // pattern. WAITING ON: the Resonant band and enemy buff/heal-suppression
+    // inside Suppress.
+    Node = MakeNode(TEXT("Support.Warden.BlackoutProtocol"), TEXT("Blackout Protocol"),
+        TEXT("At Resonant, marked enemies inside Suppress can be neither buffed nor healed."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Support.Warden.FieldOfView"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_WA_BlackoutProtocol.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Pressure (travel) -> Suppression (impactful) -------------------
+    // WA5. Count-independence applied to an enemy-facing source: pack density
+    // must not be a resource multiplier. The rate is 2 Charge/s,
+    // Data/abilities.json's PressureChargePerSecond (O2 PLACEHOLDER), which
+    // UBreakerAbility_Suppress's occupancy tick reads at rank one.
+    Node = MakeNode(TEXT("Support.Warden.Pressure"), TEXT("Pressure"),
+        TEXT("Enemies inside Suppress pay you 2 Charge a second, count-independent — one pays the same as six."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_WA_Pressure.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // WA7. "Grants U6 Suppress" is not authored (block comment above). FLAT
+    // armour cut, never a percentage — the boss-cap protection, matching
+    // Caster VW7 Zonework's precedent by the treatment's own citation.
+    // UBreakerAbility_Suppress's field effect list reads this tag.
+    Node = MakeNode(TEXT("Support.Warden.Suppression"), TEXT("Suppression"),
+        TEXT("Suppress also cuts the Armour of enemies inside it by a flat amount. Flat, never a percentage."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Support.Warden.Pressure"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_WA_Suppression.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Tell (travel) -> Executioner's Ledger (impactful) --------------
+    // WA6. A defensive node in an offensive branch — Warden's answer to being
+    // alone in the room it aggravated. The damage-taken reduction is
+    // mark-scoped, which IncomingDamageReduction (no lane anyway) could not
+    // scope. The rule is caster-only: no reader exists for an allied
+    // reduction, so none is promised. The mark's telegraph and damage-out
+    // read carry it.
+    Node = MakeNode(TEXT("Support.Warden.Tell"), TEXT("Tell"),
+        TEXT("Marked targets telegraph their next attack to you, and hit you softer while the mark lives."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_WA_Tell.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // WA9. Rewards marking what you can kill, not marking everything. WAITING
+    // ON: the marked-kill event and Mark's cost/cooldown refund.
+    Node = MakeNode(TEXT("Support.Warden.ExecutionersLedger"), TEXT("Executioner's Ledger"),
+        TEXT("Killing a marked target refunds Mark's cost and cooldown in proportion to the mark's unspent duration."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Support.Warden.Tell"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_WA_ExecutionersLedger.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Handoff (travel) -> Blackout (keystone) ------------------------
+    // WA4. Proc coefficient 0 on the jump — the anti-chain-generation guard —
+    // and DELIBERATELY the same rule as Swift M5 Mark Economy, so one shared
+    // mark implementation carries one rule, not two. The jump range is
+    // 2500 cm (O2 PLACEHOLDER). UBreakerAbility_Mark's death handoff reads
+    // this node.
+    Node = MakeNode(TEXT("Support.Warden.Handoff"), TEXT("Handoff"),
+        TEXT("A mark survives its target's death and jumps to the nearest unmarked enemy within 2500 cm. The jump itself pays nothing."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 1, 1, 1); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_WA_Handoff.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // WA12 BLACKOUT — the branch keystone, the impactful half of its pair and
+    // the one gated node (tier 4, cost 1; block comment above). Its 1.30x
+    // More against targets marked by you is NOT OWED (O95): no target-marked
+    // condition exists (a mark is ability state, not a Status.* tag, so
+    // TargetAiling cannot stand in). The condition being self-supplied at
+    // level 1 by a starter is exactly why unconditional would be wrong — it
+    // would delete the one requirement the solo loop is built around.
+    // Conduit's Blackout row resolves off the tag below. Support's three
+    // Mores stay reserved.
     Node = MakeNode(TEXT("Support.Warden.Blackout"), TEXT("Blackout"),
-        TEXT("Branch keystone. Rewrites Conduit for the Support who plays the enemy, not the ally."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 4, 1, 2);
+        TEXT("Branch keystone. Rewrites Conduit for the Support who plays the enemy, not the ally."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 4, 1, 1);
     AddPrerequisite(Node, TEXT("Support.Warden.Handoff"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_WA_Blackout.GetTag());

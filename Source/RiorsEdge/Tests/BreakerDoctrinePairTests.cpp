@@ -6,6 +6,8 @@
 #include "Abilities/BreakerAbility_Resonance.h"
 #include "Abilities/BreakerAbility_Rot.h"
 #include "Abilities/BreakerAbility_Siphon.h"
+#include "Abilities/BreakerSupportAbilities.h"
+#include "Classes/BreakerChargeComponent.h"
 #include "Classes/BreakerManaComponent.h"
 #include "Classes/BreakerMomentumComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
@@ -32,7 +34,7 @@
 // choice, never purchasable). An unpaired root has no dependents and buys
 // with one point, or is already owned.
 //
-// This test states that shape for all twelve trees, buys every pair with
+// This test states that shape for all fifteen trees, buys every pair with
 // exactly one benchmark's points settled the way the game settles them, and
 // pins the data the travel magnitudes moved to.
 // ---------------------------------------------------------------------------
@@ -145,6 +147,27 @@ namespace
                 { TEXT("Tank.Demolitionist.Concussion"), TEXT("Tank.Demolitionist.TerminalDescent") },
                 { TEXT("Tank.Demolitionist.Overpressure"), TEXT("Tank.Demolitionist.Demolition") },
                 { TEXT("Tank.Demolitionist.Fragmentation"), TEXT("Tank.Demolitionist.Detonation") } }, {} },
+            { TEXT("Medic"), EBreakerClassId::Support, UBreakerProgressionLibrary::GetSupportMedicTree(), {
+                { TEXT("Support.Medic.FieldDressing"), TEXT("Support.Medic.SustainedCare") },
+                { TEXT("Support.Medic.TriagePriority"), TEXT("Support.Medic.FieldKit") },
+                { TEXT("Support.Medic.CleanHands"), TEXT("Support.Medic.NoTriage") },
+                { TEXT("Support.Medic.SecondOpinion"), TEXT("Support.Medic.Overflow") },
+                { TEXT("Support.Medic.Attending"), TEXT("Support.Medic.BloodDebt") },
+                { TEXT("Support.Medic.SteadyHands"), TEXT("Support.Medic.Triage") } }, {} },
+            { TEXT("Conductor"), EBreakerClassId::Support, UBreakerProgressionLibrary::GetSupportConductorTree(), {
+                { TEXT("Support.Conductor.DownbeatDiscipline"), TEXT("Support.Conductor.Conducting") },
+                { TEXT("Support.Conductor.Section"), TEXT("Support.Conductor.DetachedBaton") },
+                { TEXT("Support.Conductor.Sustain"), TEXT("Support.Conductor.StandingOvation") },
+                { TEXT("Support.Conductor.Tempo"), TEXT("Support.Conductor.Counterpoint") },
+                { TEXT("Support.Conductor.Attunement"), TEXT("Support.Conductor.SympatheticResonance") },
+                { TEXT("Support.Conductor.Rehearsal"), TEXT("Support.Conductor.Downbeat") } }, {} },
+            { TEXT("Warden"), EBreakerClassId::Support, UBreakerProgressionLibrary::GetSupportWardenTree(), {
+                { TEXT("Support.Warden.Painted"), TEXT("Support.Warden.DeepMark") },
+                { TEXT("Support.Warden.LongWatch"), TEXT("Support.Warden.HuntersEconomy") },
+                { TEXT("Support.Warden.FieldOfView"), TEXT("Support.Warden.BlackoutProtocol") },
+                { TEXT("Support.Warden.Pressure"), TEXT("Support.Warden.Suppression") },
+                { TEXT("Support.Warden.Tell"), TEXT("Support.Warden.ExecutionersLedger") },
+                { TEXT("Support.Warden.Handoff"), TEXT("Support.Warden.Blackout") } }, {} },
         };
     }
 
@@ -500,6 +523,17 @@ bool FBreakerDoctrinePairFirstBenchmarkTest::RunTest(const FString&)
         [](const UBreakerAbility_Siphon& Ability) { return Ability.DrainRankOneThreshold; });
     BreakerDoctrinePairAuthoredNumber<UBreakerAbility_Resonance>(*this, TEXT("Caster.Resonance"), TEXT("PaymentRankOneManaPerStatus"), 4.0f,
         [](const UBreakerAbility_Resonance& Ability) { return Ability.PaymentRankOneManaPerStatus; });
+    // Support's single-rank travels read the rank-one key, the whole
+    // magnitude (O272). O2 PLACEHOLDER values, pinned as shipped.
+    BreakerDoctrinePairAuthoredNumber<UBreakerAbility_Cadence>(*this, TEXT("Support.Cadence"), TEXT("SectionRankOneRadiusBonusCm"), 400.0f,
+        [](const UBreakerAbility_Cadence& Ability) { return Ability.SectionRankOneRadiusBonusCm; });
+    BreakerDoctrinePairAuthoredNumber<UBreakerAbility_Suppress>(*this, TEXT("Support.Suppress"), TEXT("PressureChargePerSecond"), 2.0f,
+        [](const UBreakerAbility_Suppress& Ability) { return Ability.PressureChargePerSecond; });
+
+    // --- Travel magnitudes that live on the Charge component ---------------
+    // Sustain has no Data key: the single-rank member on the default-
+    // constructed component is what the travel node reads.
+    TestEqual(TEXT("Sustain rank one grace"), GetDefault<UBreakerChargeComponent>()->SustainGraceSeconds, 4.0f, 0.0001f);
     return true;
 }
 

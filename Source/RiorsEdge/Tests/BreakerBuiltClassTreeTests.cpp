@@ -14,30 +14,20 @@
 #include "Save/BreakerQuestJournal.h"
 
 // ---------------------------------------------------------------------------
-// SUPPORT BRANCH TREES — authored 2026-08-16 (owner authorization:
-// "feel free to do all 5 classes" + "keep building").
+// DOCTRINE TREES — the branch layer of every class.
 // ---------------------------------------------------------------------------
-// The branch-layer coverage for the one class still on the compressed tier
-// grammar, in the mold of Tests/BreakerCasterTreeTests.cpp: registration
-// through the same catalogue the built classes use, exact per-branch content
-// pins (twelve named nodes, the Swift-shaped tier compression), and the
-// keystone-on-cornerstone guarantee's branch-local half. Gunsmith's and
-// Tank's six trees are six-pair doctrines (O272) and their shape is stated
-// in BreakerDoctrinePairTests.cpp with Caster's and Swift's; the
-// shipped-budget walk at the bottom of this file still runs on Armory.
+// Fifteen doctrines, three per class. Their pair shape (six travel->impactful
+// pairs, the keystone the impactful half of the last pair behind the
+// six-invested gate and the commitment) is stated once in
+// BreakerDoctrinePairTests.cpp. This file covers what that file does not:
+// registration through the exact path the class screen walks, the
+// keystone-tag guarantee the ultimates' variant rows key off, prerequisite
+// integrity, and the shipped-budget keystone walk on Armory.
 //
-// Every non-keystone node in these three trees ships as its treatment rule
-// verbatim, as a tag with NO stat effect, and every keystone More is RESERVED
-// rather than spent (the Edgework/Cascade posture) — see the block comments
-// above the Support tree getters in BreakerProgressionLibrary.cpp. Both
-// facts are pinned below as assertions, because a stat line or a More
-// quietly appearing in this content would be a content decision nobody made.
-//
-// Keystone tags are requested by STRING deliberately: the three
-// Keystone.Support.* tags are file-static natives of
-// Abilities/BreakerAbilityDefinition.cpp, and the string is what a granted
-// GameplayEffect and the ultimate's ResolveVariant actually key off —
-// the posture BreakerBuiltClassKitTests already takes.
+// Keystone tags are requested by STRING deliberately: the Keystone.* tags are
+// file-static natives of the ability layer, and the string is what a granted
+// GameplayEffect and the ultimate's ResolveVariant actually key off — the
+// posture BreakerBuiltClassKitTests already takes.
 //
 // Helpers are prefixed because the module builds in unity mode.
 namespace BreakerBuiltClassTreeTestHelpers
@@ -47,42 +37,35 @@ namespace BreakerBuiltClassTreeTestHelpers
         UBreakerProgressionTree* Tree;
         EBreakerClassId ClassId;
         const TCHAR* KeystoneTag;
-        // The twelve node ids the treatment authors, in authored order.
-        TArray<FName> NodeIds;
     };
 
     TArray<FBuiltBranch> BuiltBranches()
     {
         return {
-            { UBreakerProgressionLibrary::GetSupportMedicTree(), EBreakerClassId::Support, TEXT("Keystone.Support.Triage"), {
-                TEXT("Support.Medic.FieldDressing"), TEXT("Support.Medic.TriagePriority"), TEXT("Support.Medic.CleanHands"),
-                TEXT("Support.Medic.SteadyHands"), TEXT("Support.Medic.SecondOpinion"), TEXT("Support.Medic.Attending"),
-                TEXT("Support.Medic.FieldKit"), TEXT("Support.Medic.SustainedCare"),
-                TEXT("Support.Medic.Overflow"), TEXT("Support.Medic.BloodDebt"), TEXT("Support.Medic.NoTriage"),
-                TEXT("Support.Medic.Triage") } },
-            { UBreakerProgressionLibrary::GetSupportConductorTree(), EBreakerClassId::Support, TEXT("Keystone.Support.Downbeat"), {
-                TEXT("Support.Conductor.DownbeatDiscipline"), TEXT("Support.Conductor.Section"), TEXT("Support.Conductor.Sustain"),
-                TEXT("Support.Conductor.Rehearsal"), TEXT("Support.Conductor.Tempo"), TEXT("Support.Conductor.Attunement"),
-                TEXT("Support.Conductor.Conducting"), TEXT("Support.Conductor.Counterpoint"),
-                TEXT("Support.Conductor.StandingOvation"), TEXT("Support.Conductor.SympatheticResonance"), TEXT("Support.Conductor.DetachedBaton"),
-                TEXT("Support.Conductor.Downbeat") } },
-            { UBreakerProgressionLibrary::GetSupportWardenTree(), EBreakerClassId::Support, TEXT("Keystone.Support.Blackout"), {
-                TEXT("Support.Warden.Painted"), TEXT("Support.Warden.LongWatch"), TEXT("Support.Warden.FieldOfView"),
-                TEXT("Support.Warden.Handoff"), TEXT("Support.Warden.Pressure"), TEXT("Support.Warden.Tell"),
-                TEXT("Support.Warden.Suppression"), TEXT("Support.Warden.DeepMark"),
-                TEXT("Support.Warden.ExecutionersLedger"), TEXT("Support.Warden.BlackoutProtocol"), TEXT("Support.Warden.HuntersEconomy"),
-                TEXT("Support.Warden.Blackout") } }
+            { UBreakerProgressionLibrary::GetCasterVoidWhispererTree(), EBreakerClassId::Caster, TEXT("Keystone.Caster.LongDark") },
+            { UBreakerProgressionLibrary::GetCasterSpellbladeTree(), EBreakerClassId::Caster, TEXT("Keystone.Caster.Edgework") },
+            { UBreakerProgressionLibrary::GetCasterMultispellTree(), EBreakerClassId::Caster, TEXT("Keystone.Caster.Cascade") },
+            { UBreakerProgressionLibrary::GetSwiftKineticTree(), EBreakerClassId::Swift, TEXT("Keystone.Swift.TerminalVelocity") },
+            { UBreakerProgressionLibrary::GetSwiftMarksmanTree(), EBreakerClassId::Swift, TEXT("Keystone.Swift.StandingWave") },
+            { UBreakerProgressionLibrary::GetSwiftFrenzyTree(), EBreakerClassId::Swift, TEXT("Keystone.Swift.Bloodrhythm") },
+            { UBreakerProgressionLibrary::GetGunsmithArmoryTree(), EBreakerClassId::Gunsmith, TEXT("Keystone.Gunsmith.Machinist") },
+            { UBreakerProgressionLibrary::GetGunsmithFieldTechTree(), EBreakerClassId::Gunsmith, TEXT("Keystone.Gunsmith.Foundry") },
+            { UBreakerProgressionLibrary::GetGunsmithTinkererTree(), EBreakerClassId::Gunsmith, TEXT("Keystone.Gunsmith.Minefield") },
+            { UBreakerProgressionLibrary::GetTankLeechTree(), EBreakerClassId::Tank, TEXT("Keystone.Tank.Vein") },
+            { UBreakerProgressionLibrary::GetTankBastionTree(), EBreakerClassId::Tank, TEXT("Keystone.Tank.Wall") },
+            { UBreakerProgressionLibrary::GetTankDemolitionistTree(), EBreakerClassId::Tank, TEXT("Keystone.Tank.Detonation") },
+            { UBreakerProgressionLibrary::GetSupportMedicTree(), EBreakerClassId::Support, TEXT("Keystone.Support.Triage") },
+            { UBreakerProgressionLibrary::GetSupportConductorTree(), EBreakerClassId::Support, TEXT("Keystone.Support.Downbeat") },
+            { UBreakerProgressionLibrary::GetSupportWardenTree(), EBreakerClassId::Support, TEXT("Keystone.Support.Blackout") },
         };
     }
 }
 
 // ---------------------------------------------------------------------------
-// Registration: three Support trees, found through the exact path
+// Registration: fifteen doctrine trees, found through the exact path
 // GetAvailableTrees walks — GetAllFallbackTrees, GetTreesForClass, and the
-// class definition's BranchTrees. A Support character SEES its trees or this
-// fails by name. The class-definition loop below still covers Gunsmith and
-// Tank: each definition lists three doctrines plus Core like every other
-// class.
+// class definition's BranchTrees. A character SEES its doctrines or this
+// fails by name. Every class definition lists three doctrines plus Core.
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerBuiltClassTreesRegisteredTest,
@@ -100,7 +83,7 @@ bool FBreakerBuiltClassTreesRegisteredTest::RunTest(const FString& Parameters)
         const FString TreeName = Branch.Tree->TreeId.ToString();
         TestTrue(*(TreeName + TEXT(" is in GetAllFallbackTrees()")), AllTrees.Contains(Branch.Tree));
         TestEqual(*(TreeName + TEXT(" is required by its class")), Branch.Tree->RequiredClass, Branch.ClassId);
-        TestEqual(*(TreeName + TEXT(" spends class points")), Branch.Tree->Currency, EBreakerPointCurrency::DoctrinePoints);
+        TestEqual(*(TreeName + TEXT(" spends doctrine points")), Branch.Tree->Currency, EBreakerPointCurrency::DoctrinePoints);
 
         const TArray<UBreakerProgressionTree*> ForClass = UBreakerProgressionLibrary::GetTreesForClass(Branch.ClassId);
         TestTrue(*(TreeName + TEXT(" is offered to its class")), ForClass.Contains(Branch.Tree));
@@ -112,9 +95,9 @@ bool FBreakerBuiltClassTreesRegisteredTest::RunTest(const FString& Parameters)
         }
     }
 
-    // The class definitions carry three branches plus Core, the Swift/Caster
-    // shape, so the branch strip shows the three chips each treatment names.
-    for (const EBreakerClassId ClassId : { EBreakerClassId::Gunsmith, EBreakerClassId::Tank, EBreakerClassId::Support })
+    // Every class definition carries three doctrines plus Core, so the branch
+    // strip shows the three chips each class names.
+    for (const EBreakerClassId ClassId : { EBreakerClassId::Caster, EBreakerClassId::Swift, EBreakerClassId::Gunsmith, EBreakerClassId::Tank, EBreakerClassId::Support })
     {
         const UBreakerClassDefinition* Definition = UBreakerProgressionLibrary::GetFallbackClassDefinition(ClassId);
         if (!TestNotNull(TEXT("Class has a definition"), Definition)) continue;
@@ -125,108 +108,10 @@ bool FBreakerBuiltClassTreesRegisteredTest::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// Content shape: exactly the treatment's twelve nodes per branch, on the
-// Swift-shaped compression (doc tiers 1-4 keep their numbers; the doc's
-// tier-5 keystone sits at tier 3, cost 3, as a cornerstone), every node a
-// tag-carrying rule with NO stat effect and NO ability grant, and NO More
-// multiplier anywhere — all three keystone Mores are reserved, the
-// Edgework/Cascade posture. Pinned by name so content cannot drift without a
-// diff saying so.
-// ---------------------------------------------------------------------------
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-    FBreakerBuiltClassTreesShapeTest,
-    "RiorsEdge.Progression.BuiltClassTrees.Shape",
-    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
-
-bool FBreakerBuiltClassTreesShapeTest::RunTest(const FString& Parameters)
-{
-    using namespace BreakerBuiltClassTreeTestHelpers;
-
-    for (const FBuiltBranch& Branch : BuiltBranches())
-    {
-        if (!TestNotNull(TEXT("Branch tree exists"), Branch.Tree)) continue;
-        const FString TreeName = Branch.Tree->TreeId.ToString();
-
-        TestEqual(*(TreeName + TEXT(" ships the treatment's twelve nodes")), Branch.Tree->Nodes.Num(), 12);
-        for (const FName NodeId : Branch.NodeIds)
-        {
-            TestNotNull(*(NodeId.ToString() + TEXT(" exists in its tree")), Branch.Tree->FindNode(NodeId));
-        }
-
-        int32 TierCounts[5] = {};
-        int32 CornerstoneCount = 0;
-        for (const UBreakerProgressionNode* Node : Branch.Tree->Nodes)
-        {
-            const FString Context = Node->NodeId.ToString();
-            if (!TestTrue(*(Context + TEXT(" tier is 1-4 (keystone compressed to 3)")), Node->Tier >= 1 && Node->Tier <= 4)) continue;
-            ++TierCounts[Node->Tier];
-
-            // The compressed grammar, one rule set for all three branches:
-            // entry/loop nodes are two ranks at 1; tier 3 is single rank at 2
-            // (rewrites) or 3 (the cornerstone keystone); tier 4 rewrites are
-            // single rank at 2.
-            if (Node->Tier <= 2)
-            {
-                TestEqual(*(Context + TEXT(" entry/loop node costs 1")), Node->CostPerRank, 1);
-                TestEqual(*(Context + TEXT(" entry/loop node has two ranks")), Node->MaxRank, 2);
-            }
-            else
-            {
-                TestEqual(*(Context + TEXT(" tier-3/4 node is single rank")), Node->MaxRank, 1);
-                TestTrue(*(Context + TEXT(" tier-3/4 node costs 2 or 3")), Node->CostPerRank == 2 || Node->CostPerRank == 3);
-            }
-            if (Node->Tier == 4)
-            {
-                TestEqual(*(Context + TEXT(" tier-4 rewrite costs 2")), Node->CostPerRank, 2);
-                TestTrue(*(Context + TEXT(" tier-4 rewrite builds on an earlier node")), Node->Prerequisites.Num() > 0);
-            }
-
-            if (Node->bCornerstone)
-            {
-                ++CornerstoneCount;
-                // TIER 4, COST 2 -- and it used to be tier 3, cost 3, behind
-                // an 8-point CornerstoneInvestmentGate. That arithmetic was
-                // written against a per-level class budget where 8 + 3 = 11 was
-                // affordable; against O111's 8-point doctrine wallet it was
-                // not, and every keystone in the game was unbuyable. The gate
-                // is gone and the cost is 2, which makes EVERY doctrine node
-                // cost two points to max -- so the wallet divides into exactly
-                // four picks with nothing stranded, where 3 left a point that
-                // could buy nothing.
-                TestEqual(*(Context + TEXT(" cornerstone sits at the rewrite tier")), Node->Tier, 4);
-                TestEqual(*(Context + TEXT(" cornerstone costs 2, like every other doctrine pick")), Node->CostPerRank, 2);
-            }
-
-            // THE WHOLE LAYER IS RULES-AS-TAGS. A stat effect appearing here
-            // would be an invented magnitude under the O2 freeze (the
-            // treatments author no percentages), and an ability grant would
-            // re-grant an id the class definition already catalogues as a
-            // starter. Both are content decisions, not refactors.
-            TestTrue(*(Context + TEXT(" carries its rule as a granted tag")), Node->GrantedTags.Num() > 0);
-            TestEqual(*(Context + TEXT(" authors no stat effect (rules-as-tags layer)")), Node->Effects.Num(), 0);
-            TestEqual(*(Context + TEXT(" re-grants no ability (starters are catalogued on the class definition)")), Node->GrantedAbilityIds.Num(), 0);
-        }
-
-        TestEqual(*(TreeName + TEXT(" has three tier-1 entry nodes")), TierCounts[1], 3);
-        TestEqual(*(TreeName + TEXT(" has three tier-2 loop nodes")), TierCounts[2], 3);
-        // The keystone moved from tier 3 to tier 4, so one node crossed
-        // between these two counts. Their SUM is unchanged at six, which is the
-        // part that matters: no node was added or lost, one was repriced.
-        TestEqual(*(TreeName + TEXT(" has two tier-3 ability nodes")), TierCounts[3], 2);
-        TestEqual(*(TreeName + TEXT(" has four tier-4 nodes: three rewrites and the keystone")), TierCounts[4], 4);
-        TestEqual(*(TreeName + TEXT(" has exactly one cornerstone")), CornerstoneCount, 1);
-    }
-    return true;
-}
-
-// ---------------------------------------------------------------------------
-// Keystones: each of the three Keystone.Support.* tags the shipped ultimate
-// variant rows key off is granted by exactly one node across all fallback
-// trees, and
-// that node is its branch's cornerstone. This is the branch-local half of the
-// guarantee whose global half is BreakerKeystoneReachabilityTests — whose
-// honest-emptiness arm stopped applying to these classes the moment these
-// trees registered, exactly as that file promises.
+// Keystones: each of the fifteen Keystone.* tags the shipped ultimate variant
+// rows key off is granted by exactly one node across all fallback trees, and
+// that node is its own doctrine's cornerstone. This is the branch-local half
+// of the guarantee whose global half is BreakerKeystoneReachabilityTests.
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerBuiltClassTreesKeystonesTest,
@@ -247,7 +132,7 @@ bool FBreakerBuiltClassTreesKeystonesTest::RunTest(const FString& Parameters)
         }
 
         // Granted exactly once across ALL fallback trees, and by this
-        // branch's cornerstone — no orphan, no double-authoring, no keystone
+        // doctrine's cornerstone — no orphan, no double-authoring, no keystone
         // rewrite hanging off an ordinary node (O37).
         int32 GrantCount = 0;
         const UBreakerProgressionNode* GrantingNode = nullptr;

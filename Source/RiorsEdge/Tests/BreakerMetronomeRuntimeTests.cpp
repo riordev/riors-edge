@@ -166,30 +166,31 @@ bool FBreakerMetronomeRuntimeTest::RunTest(const FString& Parameters)
     SettleCampaignFixture(Second->GetProgression());
     const auto* Tree = UBreakerProgressionLibrary::GetSupportConductorTree();
     FText Reason;
-    for (const TCHAR* Node : { TEXT("Support.Conductor.Sustain"), TEXT("Support.Conductor.Sustain"),
-        TEXT("Support.Conductor.Tempo") })
+    // Single-rank nodes (O272): Sustain and Tempo are travel roots, one buy each.
+    for (const TCHAR* Node : { TEXT("Support.Conductor.Sustain"), TEXT("Support.Conductor.Tempo") })
         if (!TestTrue(Node, Second->GetProgression()->PurchaseNode(Tree, Node, Reason))) return false;
     Ally->SetActorLocation(FVector(300, 0, 100));
     const auto SelfTempo = GrantCast(Second, UBreakerAbility_Metronome::StaticClass());
     for (int32 I = 0; I < 7; ++I) { Hit(Second); Hit(Ally); }
-    TestEqual(TEXT("Tempo rank one extends only caster cap"), PeekDamage(Second), 24.0f);
-    TestEqual(TEXT("Tempo rank one leaves ally baseline cap"), PeekDamage(Ally), 20.0f);
+    // Tempo reaches every holder at its single rank: caster and ally alike.
+    TestEqual(TEXT("Tempo extends caster cap"), PeekDamage(Second), 24.0f);
+    TestEqual(TEXT("Tempo extends ally cap"), PeekDamage(Ally), 24.0f);
     Advance(23);
-    TestEqual(TEXT("Tempo rank one extends only caster gap"), PeekDamage(Second), 24.0f);
-    TestEqual(TEXT("Tempo rank one leaves ally baseline gap"), PeekDamage(Ally), 10.0f);
+    TestEqual(TEXT("Tempo extends caster gap"), PeekDamage(Second), 24.0f);
+    TestEqual(TEXT("Tempo extends ally gap"), PeekDamage(Ally), 24.0f);
     Second->GetAbilitySystemComponent()->CancelAbilityHandle(SelfTempo);
     FGameplayTagContainer MetroCooldown;
     MetroCooldown.AddTag(GetDefault<UBreakerAbility_Metronome>()->GetAbilityDefinition()->CooldownTag);
     Second->GetAbilitySystemComponent()->RemoveActiveEffectsWithGrantedTags(MetroCooldown);
-    for (const TCHAR* Node : { TEXT("Support.Conductor.Tempo"), TEXT("Support.Conductor.Counterpoint") })
-        if (!TestTrue(Node, Second->GetProgression()->PurchaseNode(Tree, Node, Reason))) return false;
+    // Counterpoint is Tempo's impactful: one buy behind the travel already held.
+    if (!TestTrue(TEXT("Support.Conductor.Counterpoint"), Second->GetProgression()->PurchaseNode(Tree, TEXT("Support.Conductor.Counterpoint"), Reason))) return false;
     const auto CounterMetro = GrantCast(Second, UBreakerAbility_Metronome::StaticClass());
     Hit(Ally, EBreakerDamageDelivery::Ability, .25f, true);
     TestEqual(TEXT("Counterpoint preserves fractional tick credit"), PeekDamage(Ally), 10.5f);
     Hit(Ally, EBreakerDamageDelivery::Ability, 0, true);
     TestEqual(TEXT("zero proc cannot climb ramp"), PeekDamage(Ally), 10.5f);
     for (int32 I = 0; I < 12; ++I) Hit(Ally);
-    TestEqual(TEXT("Tempo rank two applies higher cap to ally"), PeekDamage(Ally), 26.0f);
+    TestEqual(TEXT("Tempo applies higher cap to ally under Counterpoint"), PeekDamage(Ally), 26.0f);
     Advance(23);
     TestEqual(TEXT("Tempo ally gap lasts beyond baseline second"), PeekDamage(Ally), 26.0f);
     Advance(10);
@@ -239,12 +240,21 @@ bool FBreakerMetronomeRuntimeTest::RunTest(const FString& Parameters)
     auto* Solo = MakePlayer(FVector(10000, 0, 100), EBreakerClassId::Support);
     if (!TestNotNull(TEXT("isolated Conduit owner"), Solo)) return false;
     SettleCampaignFixture(Solo->GetProgression());
-    for (const TCHAR* Node : { TEXT("Support.Conductor.DownbeatDiscipline"), TEXT("Support.Conductor.DownbeatDiscipline"),
-        TEXT("Support.Conductor.Rehearsal"), TEXT("Support.Conductor.Rehearsal"),
-        TEXT("Support.Conductor.Sustain"), TEXT("Support.Conductor.Sustain") })
+    // The keystone walk (O272): Rehearsal is Downbeat's travel; two whole
+    // pairs and a third travel open the six-invested gate. Tempo ->
+    // Counterpoint changes nothing on a single weapon hit, and Attunement ->
+    // Sympathetic Resonance is read only by the weapon component and the
+    // status seam, neither of which this fixture's ApplyOutgoingModifiers
+    // probes touch; Downbeat Discipline is the travel Solo always held.
+    for (const TCHAR* Node : { TEXT("Support.Conductor.Rehearsal"),
+        TEXT("Support.Conductor.Tempo"), TEXT("Support.Conductor.Counterpoint"),
+        TEXT("Support.Conductor.Attunement"), TEXT("Support.Conductor.SympatheticResonance"),
+        TEXT("Support.Conductor.DownbeatDiscipline") })
         if (!TestTrue(Node, Solo->GetProgression()->PurchaseNode(Tree, Node, Reason))) return false;
+    TestEqual(TEXT("six invested opens the keystone gate"), Solo->GetProgression()->GetTreeInvestment(Tree), 6);
     if (!TestTrue(TEXT("actual Conductor branch commitment"), Solo->GetProgression()->CommitToBranch(Tree->TreeId, Reason))) return false;
     if (!TestTrue(TEXT("actual Downbeat keystone purchase"), Solo->GetProgression()->PurchaseNode(Tree, TEXT("Support.Conductor.Downbeat"), Reason))) return false;
+    TestEqual(TEXT("seven nodes leave one point of the eight"), Solo->GetProgression()->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), UBreakerProgressionLibrary::DoctrinePointGrant - 7);
     auto ResetCooldown = [&](TSubclassOf<UBreakerGameplayAbility> Ability)
     {
         FGameplayTagContainer Tags; Tags.AddTag(Ability->GetDefaultObject<UBreakerGameplayAbility>()->GetAbilityDefinition()->CooldownTag);

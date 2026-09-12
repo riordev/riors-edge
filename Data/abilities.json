@@ -589,7 +589,7 @@
 			{
 				"DetachedBatonRadiusCm": 800,
 				"AuraRadiusCm": 500,
-				"SectionRankOneRadiusBonusCm": 200,
+				"SectionRankOneRadiusBonusCm": 400,
 				"SectionRankTwoRadiusBonusCm": 400,
 				"ReloadTempoMultiplier": 1.25,
 				"SwapTempoMultiplier": 1.25,
@@ -646,7 +646,7 @@
 				"RadiusCm": 600,
 				"SlowMultiplier": 0.55,
 				"SuppressionArmorCut": 30,
-				"PressureChargePerSecond": 1,
+				"PressureChargePerSecond": 2,
 				"PressureChargePerSecondRank2": 2,
 				"SuppressAccuracyMultiplier": 1.75,
 				"AccuracyApplyDelaySeconds": 1

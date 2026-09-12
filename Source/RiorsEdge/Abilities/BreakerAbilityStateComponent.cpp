@@ -79,13 +79,13 @@ void UBreakerAbilityStateComponent::UpdateAttunementRecipients(FName OwnerKey, c
                 if (Lease.Source == this && Lease.OwnerKey == OwnerKey && Lease.bMaintained && !Recipients.Contains(Target->GetOwner()))
                 {
                     Lease.bMaintained = false;
-                    Lease.EndTime = FMath::Min(Lease.EndTime, Target->Clock) + (Rank >= 2 ? BreakerEntropy::AttunementTailSeconds() : 0); // O2 PLACEHOLDER, data-authored tail.
+                    Lease.EndTime = FMath::Min(Lease.EndTime, Target->Clock) + (Rank >= 1 ? BreakerEntropy::AttunementTailSeconds() : 0); // O2 PLACEHOLDER, data-authored tail; single-rank (O272).
                 }
             Target->AttunementLeases.RemoveAll([&](const FAttunementLease& Lease)
             {
                 return Lease.Source == this && Lease.OwnerKey == OwnerKey
                     && (bCancel || !bSourceAlive || Rank == 0 || !BreakerAttunementAlive(Target->GetOwner())
-                        || (!Lease.bMaintained && (Rank < 2 || Lease.EndTime <= Target->Clock)));
+                        || (!Lease.bMaintained && (Rank < 1 || Lease.EndTime <= Target->Clock)));
             });
         }
     Tracked.RemoveAll([&](const TWeakObjectPtr<UBreakerAbilityStateComponent>& Weak)
@@ -104,15 +104,16 @@ float UBreakerAbilityStateComponent::GetWeaponEntropyConversionFraction() const
         {
             const int32 Rank = BreakerAttunementRank(Source->GetOwner());
             // Read the owned payload's expiry at fire time too: a shot between
-            // expiry and the aura's next membership refresh cannot extend R1.
+            // expiry and the aura's next membership refresh extends only by
+            // the node's tail (single-rank, O272), never the live window.
             float End = Lease.EndTime;
             if (Lease.bMaintained)
             {
                 for (const auto& Window : OwnedWindows)
                     if (const float* CurrentEnd = Window.Value.Find(Lease.OwnerKey)) End = *CurrentEnd;
-                if (Rank >= 2) End += BreakerEntropy::AttunementTailSeconds();
+                if (Rank >= 1) End += BreakerEntropy::AttunementTailSeconds();
             }
-            if (Rank > 0 && (Lease.bMaintained || Rank >= 2) && End > Clock) return 1.0f;
+            if (Rank >= 1 && End > Clock) return 1.0f;
         }
     return 0;
 }
@@ -129,7 +130,7 @@ void UBreakerAbilityStateComponent::RefreshAttunementWindowEnds()
         const auto* Source = Lease.Source.Get();
         const int32 Rank = Source ? BreakerAttunementRank(Source->GetOwner()) : 0;
         Lease.bMaintained = false;
-        Lease.EndTime = FMath::Min(Lease.EndTime, Clock) + (Rank >= 2 ? BreakerEntropy::AttunementTailSeconds() : 0);
+        Lease.EndTime = FMath::Min(Lease.EndTime, Clock) + (Rank >= 1 ? BreakerEntropy::AttunementTailSeconds() : 0);   // single-rank (O272)
     }
 }
 
@@ -138,7 +139,7 @@ bool UBreakerAbilityStateComponent::HasActiveSympatheticAttunement() const
     if (!BreakerAttunementAlive(GetOwner())) return false;
     for (const auto& Lease : AttunementLeases)
     {
-        if (!Lease.bMaintained) continue; // Attunement's R2 tail is not a maintained buff.
+        if (!Lease.bMaintained) continue; // Attunement's tail is not a maintained buff.
         const auto* Source = Lease.Source.Get();
         if (!Source || !BreakerAttunementAlive(Source->GetOwner()) || BreakerAttunementRank(Source->GetOwner()) <= 0) continue;
         const auto* Progression = Source->GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
@@ -174,7 +175,9 @@ void UBreakerAbilityStateComponent::HandleAttunementDeath()
 void UBreakerAbilityStateComponent::HandleAttunementProgressionChanged()
 {
     const int32 Rank = BreakerAttunementRank(GetOwner());
-    if (Rank >= 2) return;
+    // Single-rank (O272): with the node held nothing changes; rank 0 (a
+    // respec) clears every lease this source holds.
+    if (Rank >= 1) return;
     TArray<FName> Keys;
     AttunementRecipients.GetKeys(Keys);
     for (FName Key : Keys)

@@ -1368,9 +1368,11 @@ void ABreakerCharacter::StartViewmodelCaptureCycle()
                 Progression->GrantPlaytestPoints(8, 0);
                 const auto* Tree = UBreakerProgressionLibrary::GetSupportMedicTree();
                 FText Reason;
-                for (const TCHAR* Node : { TEXT("Support.Medic.FieldDressing"), TEXT("Support.Medic.FieldDressing"),
-                    TEXT("Support.Medic.SteadyHands"), TEXT("Support.Medic.SteadyHands"),
-                    TEXT("Support.Medic.CleanHands"), TEXT("Support.Medic.CleanHands") })
+                // Support doctrine nodes are single-rank (O272): six single
+                // points walk the Medic tree to the keystone's investment gate.
+                for (const TCHAR* Node : { TEXT("Support.Medic.SteadyHands"), TEXT("Support.Medic.Attending"),
+                    TEXT("Support.Medic.BloodDebt"), TEXT("Support.Medic.SecondOpinion"),
+                    TEXT("Support.Medic.Overflow"), TEXT("Support.Medic.CleanHands") })
                     if (!Progression->PurchaseNode(Tree, Node, Reason)) return;
                 if (!Progression->CommitToBranch(Tree->TreeId, Reason)
                     || !Progression->PurchaseNode(Tree, TEXT("Support.Medic.Triage"), Reason)) return;

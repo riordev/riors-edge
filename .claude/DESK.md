@@ -242,15 +242,39 @@
   rigs with a 30-point wallet (pre-existing; a "never grant more than
   the game grants" item).
 
-## Cycle — O272 DOCTRINE, SUPPORT
+## O272 DOCTRINE, SUPPORT — LANDED
 
-- [ ] One class per build, the Caster's shape: six pairs, single ranks,
-      travel magnitudes at the old max-rank totals through Data where the
-      value is data and a declared crossing where it is a compiled
-      constant; that class's test re-pins; census; the FirstBenchmark test
-      asserts the class. Swift's Frenzy/Marksman fourth T2 becomes a
-      seventh travel or merges; Kinetic's free Longstride stays outside
-      the pairs.
+- The three Support doctrines are six pairs of single-rank nodes, none
+  unpaired; every class is on the wheel now. Medic: Field Dressing->
+  Sustained Care, Triage Priority->Field Kit, Clean Hands->No Triage,
+  Second Opinion->Overflow, Attending->Blood Debt, Steady Hands->Triage.
+  Conductor: Downbeat Discipline->Conducting, Section->Detached Baton,
+  Sustain->Standing Ovation, Tempo->Counterpoint, Attunement->Sympathetic
+  Resonance, Rehearsal->Downbeat. Warden: Painted->Deep Mark, Long Watch->
+  Hunter's Economy, Field of View->Blackout Protocol, Pressure->
+  Suppression, Tell->Executioner's Ledger, Handoff->Blackout. Rank one
+  carries the old rank-two figure: Section +400 cm and Pressure 2/s
+  through Data (the RankOne keys), Sustain 4 s grace (the component
+  default), and the KIT readers by declared crossing — Attending refresh
+  10 s, Second Opinion half-echo, Clean Hands 2 s, Steady Hands allies,
+  Rehearsal 0.5, Discipline 4 s tail, Tempo every holder, Attunement
+  tail, Long Watch +8 s, Painted allied at half yield, Handoff 25 m,
+  Field of View instant cut, Triage Priority scaling Field Kit. The
+  -BreakerCaptureTriage and -BreakerCaptureTell fixtures walk the pair
+  shape. BuiltClassTrees keeps a fifteen-row table (registered, keystone
+  exactly once, prerequisites resolve, the Armory budget walk); the old
+  Shape test is retired — the pair test is the shape. Fourteen rigs
+  re-pointed; one more found red in the suite (AfterimageMetronomeDamage
+  pinned the 2 s tail at rank one; now 4 s). Census re-exported.
+  PHOTOGRAPHED: the Medic wheel, six spokes, Triage at the crown's left.
+  QUESTION: seven pairings are by theme — Field Dressing->Sustained Care,
+  Clean Hands->No Triage, Downbeat Discipline->Conducting, Section->
+  Detached Baton, Sustain->Standing Ovation, Painted->Deep Mark, Field of
+  View->Blackout Protocol, Tell->Executioner's Ledger; yours to re-pair.
+  FOUND: Tell's "allies too" half never had a reader; the node states the
+  rank-one rule. FOUND: a save carrying rank 2 on a single-rank node
+  (CoreLayoutMigration seeds Painted 2) loads through the O180 refund
+  path; whether that path covers over-rank is not pinned.
 
 ## LINGERING R2 — LANDED
 

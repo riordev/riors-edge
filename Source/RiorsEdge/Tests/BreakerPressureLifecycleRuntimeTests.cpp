@@ -60,9 +60,8 @@ bool FBreakerPressureLifecycleTest::RunTest(const FString& Parameters)
     Flags.Add(TEXT("Quest.Finale.Seal")); Progression->SettleDoctrineEntitlement(Flags);
     FText Reason;
     if (!TestTrue(TEXT("paid Field Dressing supports ordinary self-heal income"),Progression->PurchaseNode(UBreakerProgressionLibrary::GetSupportMedicTree(),TEXT("Support.Medic.FieldDressing"),Reason))) return false;
+    // Pressure is a single-rank travel root (O272): no prerequisite, one buy.
     auto* Tree = UBreakerProgressionLibrary::GetSupportWardenTree();
-    for (int32 I=0; I<2; ++I)
-        if (!TestTrue(TEXT("paid Field of View prerequisite"),Progression->PurchaseNode(Tree,TEXT("Support.Warden.FieldOfView"),Reason))) return false;
     auto* Charge = Player->GetCharge(); Charge->BindAttributes(Attr); Charge->BeginPlay(); Charge->SetComponentTickEnabled(false); Charge->SetInCombat(true);
     // Fund both forty-Charge casts through ordinary capped self-heal income.
     // Twelve heals fund only the first cast; they do not guarantee eighty.
@@ -73,8 +72,7 @@ bool FBreakerPressureLifecycleTest::RunTest(const FString& Parameters)
         Combat->ReceiveDamage(Hurt); Combat->ApplyHealingAmount(Hurt.BaseDamage,Player,FGameplayTag()); Charge->AdvanceLoop(1);
     }
     if (!TestTrue(TEXT("ordinary healing funds both paid casts with headroom"),Charge->GetCharge()>=90.0f)) return false;
-    if (!TestTrue(TEXT("legal Pressure rank two within five total points"),Progression->PurchaseNode(Tree,TEXT("Support.Warden.Pressure"),Reason)
-        && Progression->PurchaseNode(Tree,TEXT("Support.Warden.Pressure"),Reason))) return false;
+    if (!TestTrue(TEXT("legal Pressure within two total points"),Progression->PurchaseNode(Tree,TEXT("Support.Warden.Pressure"),Reason))) return false;
     auto* Target=World->SpawnActor<ABreakerRangedEnemy>(FVector(1500,0,100),FRotator::ZeroRotator);
     if (!Target) return false;
     Target->ConfigureCrowdProbe(); Target->DispatchBeginPlay(); Target->SetActorTickEnabled(false);
@@ -107,8 +105,8 @@ bool FBreakerPressureLifecycleTest::RunTest(const FString& Parameters)
     Zone->AdvanceZone(.01f);
     TestTrue(TEXT("actual enemy occupies zone"),Zone->GetOccupantCount()>0);
     const float Paid=Charge->GetCharge(); Advance(1.05f);
-    const float Rate=GetDefault<UBreakerAbility_Suppress>()->PressureChargePerSecondRank2;
-    TestEqual(TEXT("one live occupant pays authored rank-two rate"),Charge->GetCharge()-Paid,Rate,.001f);
+    const float Rate=GetDefault<UBreakerAbility_Suppress>()->PressureChargePerSecond;
+    TestEqual(TEXT("one live occupant pays the authored rate"),Charge->GetCharge()-Paid,Rate,.001f);
     auto* Second=World->SpawnActor<ABreakerRangedEnemy>(Zone->GetActorLocation()+FVector(-200,0,100),FRotator::ZeroRotator);
     if (!Second) return false;
     Second->ConfigureCrowdProbe(); Second->DispatchBeginPlay(); Second->SetActorTickEnabled(false); Zone->AdvanceZone(.01f);
@@ -116,11 +114,9 @@ bool FBreakerPressureLifecycleTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("two occupants still pay once"),Charge->GetCharge()-WithTwo,Rate,.001f);
     // Lose the node and buy it back before another timer tick: old zone cannot rearm.
     if (!TestTrue(TEXT("actual respec"),Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints,true,Reason))) return false;
-    for (int32 I=0;I<2;++I)
-        if (!Progression->PurchaseNode(Tree,TEXT("Support.Warden.FieldOfView"),Reason)) return false;
     if (!Progression->PurchaseNode(Tree,TEXT("Support.Warden.Pressure"),Reason)) return false;
     const float AfterRespec=Charge->GetCharge(); Advance(1);
-    TestEqual(TEXT("rebuy rank one cannot revive old rank-two lease"),Charge->GetCharge(),AfterRespec,.001f);
+    TestEqual(TEXT("rebuy cannot revive the old lease"),Charge->GetCharge(),AfterRespec,.001f);
     // Start a new paid cast after its normal cooldown, with remaining real resources.
     Advance(10);
     if (!TestTrue(TEXT("second paid Suppress after ordinary cooldown"),ASC->TryActivateAbility(Handle))) return false;
@@ -129,7 +125,7 @@ bool FBreakerPressureLifecycleTest::RunTest(const FString& Parameters)
     if (!Zone) return false;
     Target->SetActorLocation(Zone->GetActorLocation()+FVector(200,0,100)); Zone->AdvanceZone(.01f);
     const float RankOne=Charge->GetCharge(); Advance(1.05f);
-    TestEqual(TEXT("new rank-one cast pays only current authored rank"),Charge->GetCharge()-RankOne,GetDefault<UBreakerAbility_Suppress>()->PressureChargePerSecond,.001f);
+    TestEqual(TEXT("new cast pays the authored rate again"),Charge->GetCharge()-RankOne,Rate,.001f);
     FBreakerDamageRequest Lethal; Lethal.BaseDamage=Attr->GetHealth()+Attr->GetShield()+1;
     Lethal.DamageFamily=EBreakerDamageFamily::TrueDamage; Lethal.bCanCritical=false; Lethal.bCanBeAvoided=false;
     Combat->ReceiveDamage(Lethal);

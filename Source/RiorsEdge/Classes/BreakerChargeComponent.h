@@ -154,8 +154,10 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Charge|Nodes", meta=(ClampMin="0.1")) float SteadyHandsIntervalSeconds = 1.0f;   // node text: at most once a second
 
     // CO3 Sustain: the buff-uptime grace after the last buff expires.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Charge|Nodes", meta=(ClampMin="0")) float SustainGraceSeconds = 2.0f;        // O2 PLACEHOLDER (R1)
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Charge|Nodes", meta=(ClampMin="0")) float SustainGraceSecondsRank2 = 4.0f;   // O2 PLACEHOLDER (R2)
+    // Single-rank (O272): SustainGraceSeconds carries the whole grace; the
+    // Rank2 member stays declared and is unread.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Charge|Nodes", meta=(ClampMin="0")) float SustainGraceSeconds = 4.0f;        // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Charge|Nodes", meta=(ClampMin="0")) float SustainGraceSecondsRank2 = 4.0f;   // O2 PLACEHOLDER, unread (O272)
 
     // Loop overrides, the Momentum push/pop shape. CONDUIT does NOT push one:
     // its rewrite is that abilities cost nothing, which is an ABILITY-LAYER
@@ -262,7 +264,8 @@ private:
     double LastAssistTime = -1000.0;
     double LastCleanseTime = -1000.0;
 
-    // Node-rank cache, refreshed on progression change.
+    // Node-rank cache, refreshed on progression change. Support doctrine
+    // nodes are single-rank (O272): each rank reads as held (> 0) or not.
     int32 RankFieldDressing = 0;   // MD1
     int32 RankSteadyHands = 0;     // MD4
     bool bBloodDebt = false;       // MD10

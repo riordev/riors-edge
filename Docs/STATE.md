@@ -21,7 +21,7 @@ measurement without judging it.
 | Resource generation entry points with no caller | ceiling | 3 of 21 | ceiling 0 | **OUT** |
 | Asserted invariants with no test | ceiling | 35 of 137 asserted across 8 specs | ceiling 42, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 1.5 worst tree | floor 1.5 | ok |
-| Trees sitting exactly on the offered-to-spendable floor | ceiling | 10 of 16 | no pin — measurement only | — |
+| Trees sitting exactly on the offered-to-spendable floor | ceiling | 13 of 16 | no pin — measurement only | — |
 | Node-shape composition, per tree | band | 39 % ranked minors, all trees | no pin — measurement only | — |
 | Scaffolding nodes | ceiling | 0 of 370 authored | ceiling 50 | ok |
 | Conditions that can never be true | ceiling | 5.0 | ceiling 5, target 1 | ok |
@@ -36,7 +36,7 @@ measurement without judging it.
 
 ## Tests
 
-- passing: 919
+- passing: 918
 - expected red: 3
 - **unexpected red: 0**
 - asserted invariants with no test: 35
@@ -204,9 +204,9 @@ Most of a build should be refusal. A CEILING here would lock the trees at their 
 - Doctrine.Gunsmith.Armory: 12 nodes, 12 points offered, 1.5x budget
 - Doctrine.Gunsmith.FieldTech: 12 nodes, 12 points offered, 1.5x budget
 - Doctrine.Gunsmith.Tinkerer: 12 nodes, 12 points offered, 1.5x budget
-- Doctrine.Support.Conductor: 12 nodes, 24 points offered, 3.0x budget
-- Doctrine.Support.Medic: 12 nodes, 24 points offered, 3.0x budget
-- Doctrine.Support.Warden: 12 nodes, 24 points offered, 3.0x budget
+- Doctrine.Support.Conductor: 12 nodes, 12 points offered, 1.5x budget
+- Doctrine.Support.Medic: 12 nodes, 12 points offered, 1.5x budget
+- Doctrine.Support.Warden: 12 nodes, 12 points offered, 1.5x budget
 - Doctrine.Swift.Frenzy: 13 nodes, 13 points offered, 1.62x budget
 - Doctrine.Swift.Kinetic: 13 nodes, 12 points offered, 1.5x budget
 - Doctrine.Swift.Marksman: 13 nodes, 13 points offered, 1.62x budget
@@ -216,7 +216,7 @@ Most of a build should be refusal. A CEILING here would lock the trees at their 
 
 ## Trees sitting exactly on the offered-to-spendable floor
 
-**ceiling** · 10 of 16 · no pin — measurement only
+**ceiling** · 13 of 16 · no pin — measurement only
 
 A tree here is one node-price change away from red, and the floor section reports ok until the run it fails on. This falls when a tree is authored above its shape's arithmetic, never by moving a pin.
 
@@ -226,6 +226,9 @@ A tree here is one node-price change away from red, and the floor section report
 - Doctrine.Gunsmith.Armory: 1.5x, exactly the floor
 - Doctrine.Gunsmith.FieldTech: 1.5x, exactly the floor
 - Doctrine.Gunsmith.Tinkerer: 1.5x, exactly the floor
+- Doctrine.Support.Conductor: 1.5x, exactly the floor
+- Doctrine.Support.Medic: 1.5x, exactly the floor
+- Doctrine.Support.Warden: 1.5x, exactly the floor
 - Doctrine.Swift.Kinetic: 1.5x, exactly the floor
 - Doctrine.Tank.Bastion: 1.5x, exactly the floor
 - Doctrine.Tank.Demolitionist: 1.5x, exactly the floor

@@ -124,10 +124,17 @@ bool FBreakerDownbeatAfterimageTest::RunTest(const FString&)
         FText Reason;
         auto* Tree = UBreakerProgressionLibrary::GetSupportConductorTree();
         if (!TestTrue(TEXT("Real Conductor commitment"), Progression->CommitToBranch(Tree->TreeId, Reason))) return false;
-        for (const TCHAR* Id : { TEXT("Support.Conductor.DownbeatDiscipline"), TEXT("Support.Conductor.DownbeatDiscipline"),
-            TEXT("Support.Conductor.Rehearsal"), TEXT("Support.Conductor.Rehearsal"),
-            TEXT("Support.Conductor.Sustain"), TEXT("Support.Conductor.Sustain"), TEXT("Support.Conductor.Downbeat") })
+        // The keystone walk (O272): Rehearsal is Downbeat's travel; two whole
+        // pairs and a third travel open the six-invested gate. Tempo ->
+        // Counterpoint touches only Metronome and Sustain -> Standing
+        // Ovation only a Resonant cast's duration, neither of which this
+        // fixture measures; Downbeat Discipline is the travel it always held.
+        for (const TCHAR* Id : { TEXT("Support.Conductor.Rehearsal"),
+            TEXT("Support.Conductor.Tempo"), TEXT("Support.Conductor.Counterpoint"),
+            TEXT("Support.Conductor.Sustain"), TEXT("Support.Conductor.StandingOvation"),
+            TEXT("Support.Conductor.DownbeatDiscipline"), TEXT("Support.Conductor.Downbeat") })
             if (!TestTrue(FString::Printf(TEXT("Paid %s: %s"), Id, *Reason.ToString()), Progression->PurchaseNode(Tree, Id, Reason))) return false;
+        TestEqual(TEXT("Seven nodes leave one point of the eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), UBreakerProgressionLibrary::DoctrinePointGrant - 7);
         if (!TestTrue(TEXT("Afterimage purchased with earned point"), Progression->HasNodeTag(
             FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Afterimage"))))) return false;
         // Class selection registered Conduit as the base ultimate; Cadence is

@@ -64,11 +64,20 @@ bool FBreakerTriageRuntimeTest::RunTest(const FString& Parameters)
         Flags.Add(TEXT("Quest.Finale.Seal")); Progression->SettleDoctrineEntitlement(Flags);
         TestEqual(TEXT("real authored eight-point entitlement"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 8);
         const auto* Tree = UBreakerProgressionLibrary::GetSupportMedicTree(); FText Reason;
-        for (const TCHAR* Node : { TEXT("Support.Medic.FieldDressing"), TEXT("Support.Medic.FieldDressing"),
-            TEXT("Support.Medic.SteadyHands"), TEXT("Support.Medic.SteadyHands"), TEXT("Support.Medic.CleanHands"), TEXT("Support.Medic.CleanHands") })
+        // The keystone walk (O272): Steady Hands is Triage's travel; two whole
+        // pairs and a third travel open the six-invested gate. Sustained
+        // Care, No Triage and Triage Priority are read only by Patch and
+        // Purge, which no Triage caster in this fixture casts; Field Dressing
+        // and Clean Hands are the travels it always held.
+        for (const TCHAR* Node : { TEXT("Support.Medic.SteadyHands"),
+            TEXT("Support.Medic.FieldDressing"), TEXT("Support.Medic.SustainedCare"),
+            TEXT("Support.Medic.CleanHands"), TEXT("Support.Medic.NoTriage"),
+            TEXT("Support.Medic.TriagePriority") })
             if (!TestTrue(Node, Progression->PurchaseNode(Tree, Node, Reason))) return false;
+        TestEqual(TEXT("six invested opens the keystone gate"), Progression->GetTreeInvestment(Tree), 6);
         if (!TestTrue(TEXT("actual Medic commitment"), Progression->CommitToBranch(Tree->TreeId, Reason))) return false;
         if (!TestTrue(TEXT("actual Triage keystone purchase"), Progression->PurchaseNode(Tree, TEXT("Support.Medic.Triage"), Reason))) return false;
+        TestEqual(TEXT("seven nodes leave one point of the eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), UBreakerProgressionLibrary::DoctrinePointGrant - 7);
         Player->FindComponentByClass<UBreakerChargeComponent>()->BindAttributes(Player->GetAttributes());
         return true;
     };
@@ -176,7 +185,8 @@ bool FBreakerTriageRuntimeTest::RunTest(const FString& Parameters)
             for (FName Flag : UBreakerMissionLibrary::BeatCompletionFlags(Beat)) Completed.Add(Flag);
     Completed.Add(TEXT("Quest.Finale.Seal")); Progression->SettleDoctrineEntitlement(Completed);
     const auto* Medic = UBreakerProgressionLibrary::GetSupportMedicTree(); FText Failure;
-    for (const TCHAR* Node : { TEXT("Support.Medic.FieldDressing"), TEXT("Support.Medic.FieldDressing"), TEXT("Support.Medic.Attending") })
+    // Single-rank travel roots (O272): one buy each.
+    for (const TCHAR* Node : { TEXT("Support.Medic.FieldDressing"), TEXT("Support.Medic.Attending") })
         if (!TestTrue(Node, Progression->PurchaseNode(Medic, Node, Failure))) return false;
     auto* Charge = Healer->FindComponentByClass<UBreakerChargeComponent>();
     Charge->BindAttributes(Healer->GetAttributes()); Charge->SetInCombat(true);
@@ -224,13 +234,9 @@ bool FBreakerTriageRuntimeTest::RunTest(const FString& Parameters)
     auto* MarkState = Healer->FindComponentByClass<UBreakerAbilityStateComponent>();
     if (!TestTrue(TEXT("real Mark selected intended enemy"), MarkState && MarkState->GetMarkedTarget() == Enemy)) return false;
     Advance(40);
-    const float RankOneBefore = MarkState->GetMarkRemaining();
-    TestEqual(TEXT("Attending one pays actual healed amount at marked health-fraction rate"), Heal() - OrdinaryHealCharge, .1f, .001f);
-    TestEqual(TEXT("Attending one does not refresh duration"), MarkState->GetMarkRemaining(), RankOneBefore, .001f);
-    if (!TestTrue(TEXT("actual Attending rank two"), Progression->PurchaseNode(Medic, TEXT("Support.Medic.Attending"), Failure))) return false;
-    Charge->BindAttributes(Healer->GetAttributes());
+    TestEqual(TEXT("Attending pays actual healed amount at marked health-fraction rate"), Heal() - OrdinaryHealCharge, .1f, .001f);
     Advance(80); Heal();
-    TestTrue(TEXT("Attending two refreshes live mark to ten seconds"), MarkState->GetMarkRemaining() >= 9.99f);
+    TestTrue(TEXT("Attending refreshes live mark to ten seconds"), MarkState->GetMarkRemaining() >= 9.99f);
     Advance(100);
     TestTrue(TEXT("actual Mark survives original expiry after real heal"), ASC->FindAbilitySpecFromHandle(Mark)->IsActive());
     FBreakerDamageRequest Probe; Probe.BaseDamage = 100; Probe.bCanCritical = false; Probe.DamageFamily = EBreakerDamageFamily::TrueDamage;
