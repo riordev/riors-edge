@@ -24,6 +24,9 @@ class RIORSEDGE_API ABreakerGameMode : public AGameModeBase
 
 public:
     ABreakerGameMode();
+    // The first thing the mode runs, before any player exists: the session
+    // salt is drawn here so every spawner that rolls a modifier finds it set.
+    virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
     virtual void Tick(float DeltaSeconds) override;
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
     virtual void HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer) override;
@@ -427,9 +430,17 @@ public:
     // because the TTK baseline every earlier session recorded was measured
     // without them.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Modifiers") bool bGrantModifiers = true;
-    // Deterministic in the seed, so two runs of the same wave meet the same
-    // Champions and a screenshot of wave 4 is comparable with the last one.
+    // The authored half of every modifier seed. A roll's seed is
+    // BreakerModifierSeed::Mix(ModifierSeedBase, SessionModifierSalt, Site):
+    // the base is this knob, the salt is the session, the site is the body
+    // (O281). Within a session a site repeats its roll; across sessions the
+    // same body wears a different set.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Modifiers") int32 ModifierSeedBase = 20260814;   // O2 PLACEHOLDER
+    // The session half. Drawn once in InitGame from a fresh GUID, and left at
+    // BreakerModifierSeed::ReproducibleSalt under automation and under the
+    // capture harness so a suite assertion and a photograph read the same
+    // roll every run. Transient on purpose: a session is not a setting.
+    int32 SessionModifierSalt = 0;
     // NON-elite modifier carriers in the standing gym encounter (O27's
     // kill-bucket producer — see Playtest/BreakerKillBuckets.h). Elites keep
     // their current behaviour (GrantModifiers restores rank Elite); these

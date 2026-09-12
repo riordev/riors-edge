@@ -40,6 +40,8 @@
 #include "Data/BreakerStrings.h"
 #include "Combat/BreakerEnemyModifiers.h"
 #include "Combat/BreakerModifierComponent.h"
+#include "Combat/BreakerModifierSeedMath.h"
+#include "Playtest/BreakerHarnessMath.h"
 #include "Combat/BreakerSkirmisherEnemy.h"
 #include "Combat/BreakerAlteredEnemy.h"
 #include "Combat/BreakerWardenEnemy.h"
@@ -97,6 +99,22 @@ ABreakerGameMode::ABreakerGameMode()
     // The supply-crate dwell check runs on the game mode tick.
     PrimaryActorTick.bCanEverTick = true;
     PrimaryActorTick.bStartWithTickEnabled = true;
+}
+
+void ABreakerGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
+{
+    Super::InitGame(MapName, Options, ErrorMessage);
+    // THE SESSION SALT (O281). Drawn once, here, because InitGame is the first
+    // thing a mode runs and every spawner below rolls against it. A suite run
+    // and a harness capture keep the reproducible salt: an assertion that
+    // reads a roll and a photograph that shows one both have to say the same
+    // thing tomorrow. Everything else is a session, and a session that met
+    // the same Champion wearing the same set last time is what this ends.
+    const bool bReproducible = GIsAutomationTesting
+        || BreakerHarness::IsHarnessCommandLine(FCommandLine::Get());
+    SessionModifierSalt = bReproducible
+        ? BreakerModifierSeed::ReproducibleSalt
+        : static_cast<int32>(GetTypeHash(FGuid::NewGuid()));
 }
 
 void ABreakerGameMode::Tick(float DeltaSeconds)
@@ -2406,6 +2424,17 @@ void ABreakerGameMode::LogGymSummary() const
 
 namespace
 {
+    // THE SITE OF A FERNHALL OUTDOOR SLOT in a modifier seed (O281). The slot
+    // index is the body: a patrol returning to slot 4 rolls the same set the
+    // body it replaces rolled, in this session. Offset past every wave site
+    // (CurrentWave * 7919 + Index) and gym site (0, 500 + Index * 97) so a
+    // pocket elite and a wave Champion never share a site in one session.
+    constexpr int32 BreakerOutdoorSlotSiteBase = 1000000;   // O2 PLACEHOLDER
+    constexpr int32 BreakerOutdoorSlotSite(int32 SlotIndex)
+    {
+        return BreakerOutdoorSlotSiteBase + SlotIndex;
+    }
+
     // --- Overgrown-Earth palette (O24) -------------------------------------
     // Ground/course blocks: mossy greens and desaturated earth.
     // Ruins/walls: weathered concrete grey-greens.
@@ -2968,9 +2997,9 @@ void ABreakerGameMode::SpawnCombatEncounter()
         {
             Carrier->ConfigureEncounter(SpawnLocation, 2.1f + Index * 0.6f);
             Carrier->SetAreaLevel(GymAreaLevel);
-            // Offset well clear of the elite's own ModifierSeedBase draw so
-            // the two rolls never share a stream position.
-            GrantModifierCarrier(Carrier, ModifierSeedBase + 500 + Index * 97);
+            // The site sits well clear of the elite's own (site 0) so the two
+            // rolls never share a seed; the salt is the session's.
+            GrantModifierCarrier(Carrier, BreakerModifierSeed::Mix(ModifierSeedBase, SessionModifierSalt, 500 + Index * 97));   // O2 PLACEHOLDER
             UBreakerKillTelemetryComponent::AttachTo(Carrier);
         }
     }
@@ -2988,7 +3017,7 @@ void ABreakerGameMode::SpawnCombatEncounter()
         Elite->ConfigureEncounter(EliteLocation, 0.9f);
         Elite->SetAreaLevel(GymAreaLevel);
         Elite->ConfigureElite();
-        GrantModifiers(Elite, ModifierSeedBase);
+        GrantModifiers(Elite, BreakerModifierSeed::Mix(ModifierSeedBase, SessionModifierSalt, 0));   // O2 PLACEHOLDER
         UBreakerKillTelemetryComponent::AttachTo(Elite);
     }
 
@@ -4448,7 +4477,15 @@ ABreakerEnemy* ABreakerGameMode::ArriveAtOutdoorSlot(int32 SlotIndex)
     // that a quest's elite-gated objective counts. ConfigureWave keeps the
     // per-body self-respawn off: this clock owns the return, not the corpse.
     Patrol->ConfigureWave(Slot.AreaLevel);
-    if (Slot.bElite) Patrol->ConfigureElite();
+    if (Slot.bElite)
+    {
+        Patrol->ConfigureElite();
+        // A pocket elite rolls modifiers like everyone else (O281). The site is
+        // the slot, so this session's returning elite wears what the first one
+        // wore; GrantModifiers restores rank Elite afterwards, so the quest's
+        // elite-gated objective still counts it.
+        GrantModifiers(Patrol, BreakerModifierSeed::Mix(ModifierSeedBase, SessionModifierSalt, BreakerOutdoorSlotSite(SlotIndex)));
+    }
     // THE POST IS THE LEASH, AND THAT IS WHAT MAKES THE BODY WALK. The patrol
     // target is derived from the leash origin, so a body that appeared at the
     // doorway with its post as its origin walks to the post on the shipped
@@ -4664,6 +4701,15 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
             Enemy->SetActorLocation(At);
             Enemy->ConfigureEncounter(At, Index * 1.3f);
             Enemy->Tags.Add(FName(*FString::Printf(TEXT("Fernhall.Outdoor.%d"), Pocket)));
+            // A pocket elite rolls modifiers like everyone else (O281), once
+            // the placement is known good rather than beside ConfigureElite
+            // above, where an obstructed capsule can still destroy the body.
+            // The site is the slot this body is recorded into below, so the
+            // patrol that returns to it rolls the same set this session.
+            if (bElite)
+            {
+                GrantModifiers(Enemy, BreakerModifierSeed::Mix(ModifierSeedBase, SessionModifierSalt, BreakerOutdoorSlotSite(OutdoorSlots.Num())));
+            }
             // THE SLOT, recorded at the moment the placement is known good:
             // floor traced, capsule clear, formation resolved. A patrol that
             // returns takes this back rather than having its position derived a
@@ -5337,20 +5383,21 @@ void ABreakerGameMode::StartNextWave()
         if (Index < Composition.Elites)
         {
             Enemy->ConfigureElite();
-            // Seeded on the WAVE and the index, so wave 8 meets the same
-            // Champion every run and a TTK sample taken across two sessions
-            // compares. The solver decided HOW MANY modifiers it could afford;
-            // the roll decides which, subject to §1.3's composition rules.
-            GrantModifiers(Enemy, ModifierSeedBase + CurrentWave * 7919 + Index);
+            // The salt is the session and the site is the wave and index
+            // (O281): a retry of wave 8 in this session meets the same
+            // Champion, and the next session's wave 8 meets a different one.
+            // The solver decided HOW MANY modifiers it could afford; the roll
+            // decides which, subject to §1.3's composition rules.
+            GrantModifiers(Enemy, BreakerModifierSeed::Mix(ModifierSeedBase, SessionModifierSalt, CurrentWave * 7919 + Index));   // O2 PLACEHOLDER
         }
         else if (Index < Composition.Elites + Composition.ModifierCarriers)
         {
             // Non-elite modifier carriers (O27's kill-bucket producer): KEEP
             // rank ModifierBearing rather than restoring an authored rank, the
             // same distinction GrantModifierCarrier draws against GrantModifiers
-            // above. Seeded the same way, offset past the elite slots so the
-            // two draws never collide.
-            GrantModifierCarrier(Enemy, ModifierSeedBase + CurrentWave * 7919 + Index);
+            // above. Seeded the same way; the index is past the elite slots so
+            // the two draws never share a site.
+            GrantModifierCarrier(Enemy, BreakerModifierSeed::Mix(ModifierSeedBase, SessionModifierSalt, CurrentWave * 7919 + Index));   // O2 PLACEHOLDER
         }
         SetEnemyDropsLoot(Enemy, Composition.bDropsLoot);
         UBreakerKillTelemetryComponent::AttachTo(Enemy);

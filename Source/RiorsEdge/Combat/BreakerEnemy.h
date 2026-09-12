@@ -567,12 +567,11 @@ public:
     // Optional one-shot on death — without it a named body keeps its gait
     // loop through the corpse beat, which reads as a glitch, not a kill.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy") FSoftObjectPath BodyDeathAnimation;
-    // Optional: a one-shot on a hit that cost health or shield, and a looped
-    // gait for when the body is moving. Owner, 2026-09-11: "monsters have no
-    // indication that they're taking damage, and they all kind of just walk in
-    // a straight line". The mech pack ships neither (Walk and Death only); the
-    // QuadShell rig ships both, and it was in the repo unused. A body with no
-    // hit animation still flashes and flinches — this is on top, not instead.
+    // A one-shot on a hit that cost health or shield, and a looped gait for
+    // when the body is moving (O281: a body at rest idles, a body moving
+    // walks, a body struck flinches). Every rig ships all three; a body with
+    // no hit animation still flashes and flinches — this is on top, not
+    // instead.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy") FSoftObjectPath BodyHitAnimation;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy") FSoftObjectPath BodyRunAnimation;
 protected:

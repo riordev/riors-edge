@@ -41,8 +41,12 @@ ABreakerWardenEnemy::ABreakerWardenEnemy()
     // The heavy wears George (owner's mech-cast ruling, O2 mapping); the boss
     // inherits it, which reads correctly at boss scale until it earns its own
     // body. The shield stays the puzzle — it never depended on the torso.
+    // O281: idle at rest, walk when moving, HitRecieve_1 when struck — the
+    // same four slots as the base body, George's clips. O2 PLACEHOLDER.
     BodyMeshAsset = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/George/George.George"));
-    BodyIdleAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/George/GeorgeRobotArmature_Walk.GeorgeRobotArmature_Walk"));
+    BodyIdleAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/George/GeorgeRobotArmature_Idle.GeorgeRobotArmature_Idle"));
+    BodyRunAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/George/GeorgeRobotArmature_Walk.GeorgeRobotArmature_Walk"));
+    BodyHitAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/George/GeorgeRobotArmature_HitRecieve_1.GeorgeRobotArmature_HitRecieve_1"));
     BodyDeathAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/George/GeorgeRobotArmature_Death.GeorgeRobotArmature_Death"));
     // §2.3's stat block, expressed as chassis inputs rather than as literals:
     // health 320 against the Skitter's 100 is 3.2x, damage 26 against the melee

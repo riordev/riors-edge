@@ -50,8 +50,12 @@ ABreakerAlteredEnemy::ABreakerAlteredEnemy()
 {
     // Late severance wears Mike at a walk (owner's mech-cast ruling, O2
     // mapping) — "nothing is left but the shape", and now the shape is a hull.
+    // O281: idle at rest, walk when moving, HitRecieve_1 when struck — the
+    // same four slots as the base body, Mike's clips. O2 PLACEHOLDER.
     BodyMeshAsset = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Mike/Mike.Mike"));
-    BodyIdleAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Mike/MikeRobotArmature_Walk.MikeRobotArmature_Walk"));
+    BodyIdleAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Mike/MikeRobotArmature_Idle.MikeRobotArmature_Idle"));
+    BodyRunAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Mike/MikeRobotArmature_Walk.MikeRobotArmature_Walk"));
+    BodyHitAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Mike/MikeRobotArmature_HitRecieve_1.MikeRobotArmature_HitRecieve_1"));
     BodyDeathAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Mike/MikeRobotArmature_Death.MikeRobotArmature_Death"));
     // --- FAMILY (Assets/story-source.md §1.5) ----------------------------------------
     // LATE severance: "nothing is left but the shape." No equipment, no

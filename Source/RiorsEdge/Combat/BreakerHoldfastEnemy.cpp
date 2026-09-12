@@ -13,19 +13,23 @@ ABreakerHoldfastEnemy::ABreakerHoldfastEnemy()
     SeveranceStage = EBreakerSeveranceStage::NotApplicable;
 
     // THE BODY (O190: slot, fallback, recipe). The slot is BodyMeshAsset; the
-    // fallback is the Vestige cast body Stan, the same three paths every base
+    // fallback is the Vestige cast body Stan, the same five paths every base
     // melee body wears (Combat/BreakerEnemy.cpp), at the boss's 1.75x scale;
     // the George the Warden and the Marshal wear is an Altered heavy and
     // reads wrong on a Vestige. The recipe for the mass this stands in for:
     //   - one skeletal mesh, /Game/Breaker/Meshes/enemies/vestige/Holdfast,
     //     fitted to the boss capsule by BreakerEnemyBodyMath like any body;
-    //   - a Walk and a Death clip under the same armature naming as Stan's,
-    //     so BodyIdleAnimation / BodyDeathAnimation swap by path alone;
+    //   - an Idle, a Walk, a HitRecieve and a Death clip under the same
+    //     armature naming as Stan's (O281: rest, move, struck, dead), so the
+    //     four animation slots swap by path alone;
     //   - no separate shield mesh: the Warden's slab component stays, painted
     //     the family colour below, until the mass has a front of its own.
     // Swapping it is a content change with no C++ diff (enemies.md).
+    // O2 PLACEHOLDER.
     BodyMeshAsset = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Stan/Stan.Stan"));
-    BodyIdleAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Stan/StanRobotArmature_Walk.StanRobotArmature_Walk"));
+    BodyIdleAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Stan/StanRobotArmature_Idle.StanRobotArmature_Idle"));
+    BodyRunAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Stan/StanRobotArmature_Walk.StanRobotArmature_Walk"));
+    BodyHitAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Stan/StanRobotArmature_HitRecieve_1.StanRobotArmature_HitRecieve_1"));
     BodyDeathAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Stan/StanRobotArmature_Death.StanRobotArmature_Death"));
 
     // THE FRONT. O198 says the boss's shield follows the Warden's rule, and it

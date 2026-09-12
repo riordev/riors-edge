@@ -133,14 +133,27 @@
   miniature. FOUND: the chest capture frames whichever chest the session
   seed picks; one in three frames looked at a wall.
 
-## Cycle — O281 ENEMY LIFE
+## O281 ENEMY LIFE — LANDED
 
-- [ ] BreakerEnemy and the four subclass constructors set Idle, Walk
-      (run) and HitRecieve cycles per rig so UpdateBodyGait drives them;
-      a body at rest idles. ShippedGaitSet pin. ModifierSeedBase mixed
-      with the session seed for elites, carriers and waves;
-      SeedVariesBySession pin; Fernhall pocket elites roll modifiers.
-      Photograph CaptureWeakPoint and a crowd probe.
+- Every mech rig ships its three cycles: Stan (base, Skitter, Marshal,
+  Holdfast), George (Warden, boss), Leela (Skirmisher, Run as its
+  gait), Mike (Altered) — Idle at rest at rate 1, Walk/Run when moving
+  rated by speed, HitRecieve_1 once on a hit then back to the gait. A
+  body at rest was its walk cycle frozen at rate 0 in every playtest
+  so far; the QuadShell's idle was speed-rated to zero the same way.
+  ShippedGaitSet pins the five classes' paths valid, distinct, in the
+  rig's folder and resolving. Modifier rolls mix the session into the
+  seed (BreakerModifierSeedMath::Mix — bijective, so two salts or two
+  sites never collide; static_asserts prove it; SeedVariesBySession
+  pins it): the salt is drawn once per InitGame from a fresh GUID and
+  stays 0 under automation and the capture harness, so suites and
+  frames reproduce. Fernhall's pocket elites roll modifiers now (the
+  repopulation slot and the fresh-visit pocket both), on sites disjoint
+  from the wave and gym sites. FOUND: a body strafing across its facing
+  holds a walk frame while it slides — no strafe clip ships (the
+  Skitter question already on the desk). NOT PHOTOGRAPHED: a still
+  cannot show a cycle playing and neither gym capture framed a body;
+  yours to see standing still.
 
 ## Cycle — O282 VFX FALLBACKS
 

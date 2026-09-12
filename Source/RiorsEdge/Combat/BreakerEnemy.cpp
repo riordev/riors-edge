@@ -330,8 +330,16 @@ ABreakerEnemy::ABreakerEnemy()
     // BreakerBodyPaint::ResolveOverlayStrength is the rule). Still open and
     // FIELD's: a skeletal crowd is dearer than a primitive one (8.35 vs 5.48
     // ms at 100 patrol, measured pre-cast) — re-measure, not a reason to hide.
+    // O281: a body at rest idles, a body moving walks, a body struck flinches.
+    // Every mech rig ships Idle, Walk, Run, HitRecieve_1/2 and Death under the
+    // same armature naming, so the four slots swap by path alone. The Walk is
+    // the moving gait (BodyRunAnimation is the slot's name, not the clip's);
+    // HitRecieve_1 is the flinch. O2 PLACEHOLDER: which HitRecieve, and
+    // whether a rig walks or runs, is felt per class, not measured.
     BodyMeshAsset = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Stan/Stan.Stan"));
-    BodyIdleAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Stan/StanRobotArmature_Walk.StanRobotArmature_Walk"));
+    BodyIdleAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Stan/StanRobotArmature_Idle.StanRobotArmature_Idle"));
+    BodyRunAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Stan/StanRobotArmature_Walk.StanRobotArmature_Walk"));
+    BodyHitAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Stan/StanRobotArmature_HitRecieve_1.StanRobotArmature_HitRecieve_1"));
     BodyDeathAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Stan/StanRobotArmature_Death.StanRobotArmature_Death"));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
     if (SphereMesh.Succeeded()) WeakPointVisual->SetStaticMesh(SphereMesh.Object);
@@ -454,10 +462,15 @@ void ABreakerEnemy::ApplyBodyMesh()
     NamedBody->SetRelativeScale3D(FVector(Fit.Scale));
     NamedBody->SetRelativeLocation(Fit.RelativeLocation);
     NamedBody->SetRelativeRotation(Fit.RelativeRotation);
+    // The body arrives at rest: the Idle loops at rate 1 and the gait flag
+    // agrees, so a revive after a running death does not spend a frame
+    // driving the idle at the ground speed before UpdateBodyGait catches up.
+    bBodyRunning = false;
     if (UAnimSequence* Idle = Cast<UAnimSequence>(BodyIdleAnimation.TryLoad()))
     {
         NamedBody->SetAnimationMode(EAnimationMode::AnimationSingleNode);
         NamedBody->PlayAnimation(Idle, /*bLooping=*/true);
+        NamedBody->SetPlayRate(1.0f);
     }
     NamedBody->SetVisibility(true);
     for (UStaticMeshComponent* Part : { BodyVisual.Get(), HeadVisual.Get(), LeftArmVisual.Get(),
@@ -1106,13 +1119,17 @@ void ABreakerEnemy::RestoreBodyGait()
     if (!Gait) return;
     NamedBody->SetAnimationMode(EAnimationMode::AnimationSingleNode);
     NamedBody->PlayAnimation(Gait, /*bLooping=*/true);
+    // The loop starts at rate 1 whichever clip it is: an idle stays there,
+    // and the moving gait is re-rated from the ground speed on the next tick.
+    NamedBody->SetPlayRate(1.0f);
 }
 
 void ABreakerEnemy::UpdateBodyGait()
 {
-    // A rig with no Run has one gait and nothing to switch; the mechs' "idle"
-    // IS their walk, which is why they never looked wrong standing still and
-    // never looked right doing it either.
+    // O281: a body at rest idles, a body moving walks. Every shipped rig
+    // carries both clips; a rig authored with the idle slot only (an
+    // editor-placed body, the Breaker.EnemyBody preview) has one loop and
+    // nothing to switch, so it stays on the idle and returns here.
     if (!NamedBody || !NamedBody->IsVisible() || !BodyRunAnimation.IsValid()) return;
     if (bBodyHitPlaying || bDead || (Combat && Combat->IsDead())) return;
     constexpr float MovingSpeed = 40.0f;   // O2 PLACEHOLDER: under this the body is standing
@@ -1249,25 +1266,29 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
             bHasPathGoal, PathGoal);
     }
 
-    // THE GAIT FOLLOWS THE GROUND SPEED, AND ITS SIGN. The named body's walk
-    // plays as a single-node loop; its rate is the body's velocity along its
-    // own forward over MoveSpeed, so a held body stands still instead of
-    // treadmilling, a closing body strides faster instead of sliding, and a
-    // body backing off with its face on the player (the Retreat band) plays
-    // its Walk in reverse instead of moonwalking — the rate used to be the
-    // unsigned planar speed, so a body walking backwards at 0.6 strode
-    // forward at 0.6. A single-node sequence advances by rate x time and
-    // wraps when looping, so a negative rate is a legal reverse. The hit
+    // THE MOVING GAIT FOLLOWS THE GROUND SPEED, AND ITS SIGN. The named
+    // body's walk plays as a single-node loop; its rate is the body's
+    // velocity along its own forward over MoveSpeed, so a closing body
+    // strides faster instead of sliding, and a body backing off with its
+    // face on the player (the Retreat band) plays its Walk in reverse
+    // instead of moonwalking — the rate used to be the unsigned planar
+    // speed, so a body walking backwards at 0.6 strode forward at 0.6. A
+    // single-node sequence advances by rate x time and wraps when looping,
+    // so a negative rate is a legal reverse. Only the moving gait is rated
+    // (O281): a body at rest is on its Idle, which loops at 1 — the walk at
+    // rate 0 used to be the standing pose, a body frozen mid-stride. The hit
     // one-shot is left at the rate it was started with: it is not a gait,
     // and reversing a flinch would be a new wrong.
     // O2 PLACEHOLDER: the reference speed is MoveSpeed until each sequence's
     // stride is measured; a sequence whose authored stride does not cover
     // MoveSpeed per cycle still slides by the ratio.
-    // The Ranged archetype ships no sequence, so it has no gait to drive.
+    // Recorded, not fixed: a body moving ACROSS its facing (the Skirmisher's
+    // strafe band) has near-zero forward speed and holds a walk frame while
+    // it slides; a strafe clip is a rig the pack does not ship.
     // STEER adds input to the integrating mover. StopChase aborts only an
     // active path; repeated steering frames retain velocity. A path-to-steer
     // transition may stop the path follower once before steering resumes.
-    if (Mover && NamedBody && MoveSpeed > 0.0f && NamedBody->IsPlaying() && !bBodyHitPlaying)
+    if (Mover && NamedBody && MoveSpeed > 0.0f && NamedBody->IsPlaying() && bBodyRunning && !bBodyHitPlaying)
     {
         constexpr float MaxRate = 2.0f;   // O2 PLACEHOLDER
         const FVector PlanarVelocity(Mover->Velocity.X, Mover->Velocity.Y, 0.0);
