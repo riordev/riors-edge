@@ -67,18 +67,43 @@
   PHOTOGRAPHED: the plaza from the entry — window bands read on the
   flanks under the flat concrete.
 
-## Cycle — O279 GROUND
+## O279 GROUND — LANDED
 
-- [ ] Scripts/make_ground_texture.py writes a tiling concrete/earth
-      grain PNG to Assets/textures; breaker_import_fernhall.py imports
-      it and builds M_BreakerGround (world-aligned UVs, a Tint
-      parameter) through the editor python API; BreakerZoneBuilder
-      applies the flat colour only to pieces carrying the engine default
-      material, applies M_BreakerGround with the role tint to flr_ and
-      the plaza slab, and leaves kit pieces' imported materials alone
-      (dress_ stops being moss). Dilapidation tints through the
-      parameter. Palette pin re-pointed. Photograph the lane at eye
-      height.
+- A surface shows what it is made of. Every flr_ slab, the surface strips
+  and the Anchor plaza wear M_BreakerGround: a script-built material
+  (breaker_import_fernhall.py through the editor API) sampling a
+  generated seamless concrete grain (Scripts/make_ground_texture.py ->
+  Assets/textures/ground_concrete.png, T_BreakerGround) at 4 m and 14.8
+  m world-aligned tiles, modulated +-40% about the role tint's `Color`
+  parameter; dilapidation tints through the same parameter. A kit piece
+  keeps its imported material; the flat BasicShape colour is the
+  fallback for a slot with no texture (the Kenney colormap and
+  MI_Trim_02 instances), with rows for piers/rails/braces (concrete,
+  stone) and crates/barrels/cables (rust) before the moss fallback.
+  FOUND on the way and fixed, three deep: (1) every megakit piece was
+  BLACK once the paint came off — the kit's textures live in
+  <kit>/Textures and trimesh never found them, so it packed empty
+  materials into a 32x8 black atlas; the composer resolves them now and
+  packs one capped atlas per piece kind (512 a sheet, 2048 fused) and one
+  shared atlas for the three facade tiles, concatenating facades by hand
+  so the GLB carries one image, not one per building (13 MB, was 9.5);
+  (2) the kit's ORM sheets mark every panel fully metallic and metal
+  reflecting an empty Lumen scene is black — the kit is a rough
+  dielectric now, sheets lifted x1.6 (O2); (3) the importer never
+  replaces an existing texture or material asset, so a re-import kept
+  the black atlases — both twins' Materials/ and Textures/ folders were
+  removed and imported fresh (a `git rm` step the pipeline note must
+  carry). Pins: SurfacesShowTheirMaterial (a facade keeps its instance,
+  flr_yard wears M_BreakerGround tinted .36/.36/.31, a bare block wears
+  the flat fallback; the material references T_BreakerGround through
+  the graph, not the nullrhi-less used-texture list),
+  PlazaWearsGroundMaterial. PHOTOGRAPHED: Fernhall from the entry — lit
+  panel facades with window bands, grain underfoot, haze beyond; the
+  Anchor plaza's earth carries the grain, its paving grid is still flat
+  (untouched by ruling). FOUND: the courtyard floor slabs and the gym
+  floor are walked ground still on flat paint; the Roofline dressing
+  stretches a facade now. QUESTION: the lifted sheets read light grey —
+  a value you may want lower; the walls' first frame decides.
 
 ## Cycle — O280 PROPS
 

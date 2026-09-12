@@ -13,6 +13,8 @@
 #include "Engine/World.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInterface.h"
+#include "Materials/Material.h"
+#include "Materials/MaterialInstance.h"
 #include "Materials/MaterialInstanceDynamic.h"
 
 namespace
@@ -26,26 +28,66 @@ namespace
     // BreakerHubBuilder.cpp's file-local palettes so the yard reads as the
     // same world — re-declared rather than shared because those palettes are
     // deliberately file-local (see the unity-build note in the hub builder;
-    // the Breaker prefix on everything here is the same rule). The zone
-    // NEEDS a painted colour at all because the GLB route strips the kit's
-    // palette texture — trimesh drops materials in the world-transform bake —
-    // so an unpainted piece renders default-surface near-black. No teal:
-    // teal is canon-reserved for rift objects, and none of this is one.
-    const FLinearColor BreakerZoneConcrete (0.33f, 0.35f, 0.30f);
-    const FLinearColor BreakerZoneStone    (0.24f, 0.26f, 0.23f);
-    const FLinearColor BreakerZoneRust     (0.34f, 0.20f, 0.09f);
-    const FLinearColor BreakerZoneEarth    (0.20f, 0.16f, 0.11f);
-    const FLinearColor BreakerZoneOffWhite (0.58f, 0.57f, 0.51f);
-    const FLinearColor BreakerZoneMoss     (0.14f, 0.26f, 0.11f);
+    // the Breaker prefix on everything here is the same rule). A SURFACE
+    // SHOWS WHAT IT IS MADE OF (O279): the interchange import keeps each kit
+    // piece's own material, so a megakit tile arrives with its textures bound
+    // and keeps them. These colours are the FALLBACK for the slots that arrive
+    // without one — the Kenney colormap and MI_Trim_02 instances bind no
+    // texture, and the engine's basic shapes are nobody's authoring — never
+    // the default. No teal: teal is canon-reserved for rift objects, and none
+    // of this is one.
+    const FLinearColor BreakerZoneConcrete (0.33f, 0.35f, 0.30f);   // O2 PLACEHOLDER
+    const FLinearColor BreakerZoneStone    (0.24f, 0.26f, 0.23f);   // O2 PLACEHOLDER
+    const FLinearColor BreakerZoneRust     (0.34f, 0.20f, 0.09f);   // O2 PLACEHOLDER
+    const FLinearColor BreakerZoneEarth    (0.20f, 0.16f, 0.11f);   // O2 PLACEHOLDER
+    const FLinearColor BreakerZoneOffWhite (0.58f, 0.57f, 0.51f);   // O2 PLACEHOLDER
+    const FLinearColor BreakerZoneMoss     (0.14f, 0.26f, 0.11f);   // O2 PLACEHOLDER
+
+    // The composer slab's ground material: a tiled grain with world-aligned
+    // UVs and the same Color parameter the basic shape exposes, so the role
+    // tint and the ruin write through one name. O2 PLACEHOLDER path.
+    const TCHAR* BreakerZoneGroundMaterialPath =
+        TEXT("/Game/Breaker/Materials/M_BreakerGround.M_BreakerGround");
+    const TCHAR* BreakerZoneShapeMaterialPath =
+        TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial");
+
+    // TRUE WHEN THE IMPORT GAVE THE SLOT SOMETHING TO SHOW (O279): an instance
+    // with at least one texture bound, or a plain material authored under
+    // /Game/. Null, the engine's own materials, and a texture-less instance
+    // (Kenney colormap, MI_Trim_02) carry nothing and are the flat colour's to
+    // paint. The instance's own parameter list is the question, not the
+    // material graph beneath it: an instance that binds no texture shows its
+    // parent's defaults, and the megakit's defaults are the grey the owner saw.
+    bool BreakerZoneSlotCarriesMaterial(const UMaterialInterface* Material)
+    {
+        if (!Material) return false;
+        if (const UMaterialInstance* Instance = Cast<UMaterialInstance>(Material))
+        {
+            return Instance->TextureParameterValues.Num() > 0;
+        }
+        return Material->IsA<UMaterial>() && Material->GetPathName().StartsWith(TEXT("/Game/"));
+    }
 
     // Stock-material-plus-dynamic-instance, the project's zero-content
-    // colour idiom. Applied to every slot: kit meshes ship one slot but that
-    // is the exporter's business, not a contract.
-    void BreakerZoneApplyColor(UStaticMeshComponent* Mesh, const FLinearColor& Color)
+    // colour idiom, on every slot that carries no material of its own. A slot
+    // that does keeps what it was imported with. bGround parents the paint to
+    // the tiled ground material instead of the flat shape: the composer's
+    // floors and the surface strips over them are ground, the skyline and the
+    // pieces above the floor are not.
+    void BreakerZoneApplyColor(UStaticMeshComponent* Mesh, const FLinearColor& Color, bool bGround)
     {
         if (!Mesh) return;
-        UMaterialInterface* BaseMaterial = LoadObject<UMaterialInterface>(
-            nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+        // Lazily loaded, with the flat shape material as the fallback: the
+        // ground asset ships with the imported content, and a checkout that has
+        // not built it keeps a flat (but complete) floor — the floor-still-works
+        // shape BreakerHitReactionComponent uses for its overlay.
+        UMaterialInterface* BaseMaterial = bGround
+            ? LoadObject<UMaterialInterface>(nullptr, BreakerZoneGroundMaterialPath, nullptr, LOAD_NoWarn | LOAD_Quiet)
+            : nullptr;
+        if (!BaseMaterial)
+        {
+            BaseMaterial = LoadObject<UMaterialInterface>(nullptr, BreakerZoneShapeMaterialPath);
+        }
         if (!BaseMaterial) return;
         // SAME MAP, DIFFERENT RULES, SO IT MUST NOT LOOK THE SAME. A rift
         // interior is this yard's own geometry with PendingRift set, and under
@@ -71,6 +113,9 @@ namespace
             ? BreakerZonePalette::Dilapidate(Color) : Color;
         for (int32 Slot = 0; Slot < Mesh->GetNumMaterials(); ++Slot)
         {
+            // A kit piece keeps the material it was imported with (O279). The
+            // paint is for the slot that has nothing of its own to show.
+            if (BreakerZoneSlotCarriesMaterial(Mesh->GetMaterial(Slot))) continue;
             if (UMaterialInstanceDynamic* Dynamic = UMaterialInstanceDynamic::Create(BaseMaterial, Mesh))
             {
                 Dynamic->SetVectorParameterValue(TEXT("Color"), Painted);
@@ -79,20 +124,38 @@ namespace
         }
     }
 
-    // The prefix decides the read: boundary buildings in concrete, line
-    // breaks in stone, chest cover as weathered tech (rust), ground in
-    // earth, the rift pad off-white so the far end of the lane is visibly
-    // SOMEWHERE before the rift actor exists, dressing in moss.
+    // The prefix decides the read for a slot the paint reaches: boundary
+    // buildings in concrete, line breaks in stone, chest cover as weathered
+    // tech (rust), ground in earth, the rift pad off-white so the far end of
+    // the lane is visibly SOMEWHERE before the rift actor exists. Dressing is
+    // read by what the composer made it of: deck and catwalk piers are
+    // columns (concrete), rails and gantry braces are stretched cover (stone),
+    // crates, barrels and the dock cable are the megakit's props (rust), and
+    // the moss at the end is the fallback for what is left — trees, grass,
+    // mounds, and the corner clumps, which are trees. A dressing piece that
+    // carries its own material never reaches this table.
     FLinearColor BreakerZoneColorFor(const FString& Name)
     {
         if (Name.StartsWith(TEXT("flr_riftpad"))) return BreakerZoneOffWhite;
-        if (Name == TEXT("flr_yard")) return FLinearColor(.36f,.36f,.31f);
-        if (Name == TEXT("flr_yard_sub")) return FLinearColor(.17f,.20f,.19f);
-        if (Name.StartsWith(TEXT("flr_seam"))) return FLinearColor(.43f,.42f,.35f);
+        if (Name == TEXT("flr_yard")) return FLinearColor(.36f,.36f,.31f);   // O2 PLACEHOLDER
+        if (Name == TEXT("flr_yard_sub")) return FLinearColor(.17f,.20f,.19f);   // O2 PLACEHOLDER
+        if (Name.StartsWith(TEXT("flr_seam"))) return FLinearColor(.43f,.42f,.35f);   // O2 PLACEHOLDER
         if (BreakerZoneNameHasPrefix(Name, TEXT("wall_"))) return BreakerZoneConcrete;
         if (BreakerZoneNameHasPrefix(Name, TEXT("blk_full_"))) return BreakerZoneStone;
         if (BreakerZoneNameHasPrefix(Name, TEXT("blk_chest_"))) return BreakerZoneRust;
         if (BreakerZoneNameHasPrefix(Name, TEXT("flr_"))) return BreakerZoneEarth;
+        if (BreakerZoneNameHasPrefix(Name, TEXT("dress_")))
+        {
+            // Substrings, because the composer keys every dressing piece by
+            // yard and index (dress_entry_pier01, dress_sub_cwrail2,
+            // dress_dep_gbrace10, dress_siding_dockcrate3).
+            if (Name.Contains(TEXT("pier"))) return BreakerZoneConcrete;
+            if (Name.Contains(TEXT("rail")) || Name.Contains(TEXT("brace"))) return BreakerZoneStone;
+            if (Name.Contains(TEXT("crate")) || Name.Contains(TEXT("barrel")) || Name.Contains(TEXT("cable")))
+            {
+                return BreakerZoneRust;
+            }
+        }
         return BreakerZoneMoss;
     }
 
@@ -109,7 +172,8 @@ namespace
             Mesh->SetStaticMesh(Cube); Mesh->SetWorldScale3D(Size / 100.0f);
             Mesh->SetCollisionProfileName(TEXT("NoCollision"));
             Mesh->SetCanEverAffectNavigation(false); Mesh->SetCastShadow(false);
-            BreakerZoneApplyColor(Mesh, Color);
+            // A strip lies on the floor and is ground: the same grain, its own tint.
+            BreakerZoneApplyColor(Mesh, Color, /*bGround=*/true);
             Mesh->SetMobility(EComponentMobility::Static);
             Actor->SetActorEnableCollision(false);
             Actor->Tags.Add(TEXT("FernhallSurfaceDetail"));
@@ -173,7 +237,8 @@ namespace
             Component->SetCollisionProfileName(TEXT("NoCollision"));
             Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
             Component->SetCanEverAffectNavigation(false);
-            BreakerZoneApplyColor(Component, Color);
+            // Skyline is silhouette, not ground: flat paint on whatever carries none.
+            BreakerZoneApplyColor(Component, Color, /*bGround=*/false);
             Component->SetMobility(EComponentMobility::Static);
             Actor->SetActorEnableCollision(false); Actor->SetActorTickEnabled(false);
             Actor->Tags.Add(TEXT("FernhallSkylineDressing"));
@@ -907,7 +972,10 @@ bool UBreakerZoneBuilder::BuildFernhallYard(UWorld* World, FBreakerZoneMarkers& 
         UStaticMeshComponent* Component = Actor->GetStaticMeshComponent();
         Component->SetMobility(EComponentMobility::Movable);
         Component->SetStaticMesh(Mesh);
-        BreakerZoneApplyColor(Component, BreakerZoneColorFor(Piece.Name));
+        // The composer's flr_ pieces are the ground the player walks on; they
+        // wear the tiled grain under their role tint (O279).
+        BreakerZoneApplyColor(Component, BreakerZoneColorFor(Piece.Name),
+            /*bGround=*/BreakerZoneNameHasPrefix(Piece.Name, TEXT("flr_")));
         const bool bDressing = BreakerZoneNameHasPrefix(Piece.Name, TEXT("dress_"));
         if (bDressing) Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         Component->SetMobility(EComponentMobility::Static);

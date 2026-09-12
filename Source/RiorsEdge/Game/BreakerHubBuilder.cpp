@@ -78,14 +78,31 @@ namespace
     const TCHAR* HubShapeCube     = TEXT("/Engine/BasicShapes/Cube.Cube");
     const TCHAR* HubShapeCylinder = TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
 
+    // The composer slab's ground material (O279): a tiled grain with
+    // world-aligned UVs and the same "Color" parameter the basic shape
+    // exposes, so one write serves both parents. O2 PLACEHOLDER path.
+    const TCHAR* HubGroundMaterialPath = TEXT("/Game/Breaker/Materials/M_BreakerGround.M_BreakerGround");
+    const TCHAR* HubShapeMaterialPath  = TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial");
+
     // Same stock-material-plus-dynamic-instance trick as
     // BreakerGameMode.cpp's HubApplyShapeColor: the basic shape material exposes
     // one "Color" vector param, so no content assets are needed for palette.
-    void HubApplyShapeColor(UStaticMeshComponent* Mesh, const FLinearColor& Color)
+    // bGround parents the instance to the tiled ground material instead — the
+    // plaza slab is ground and wears the grain under its earth tint (O279).
+    void HubApplyShapeColor(UStaticMeshComponent* Mesh, const FLinearColor& Color, bool bGround = false)
     {
         if (!Mesh) return;
-        UMaterialInterface* BaseMaterial = LoadObject<UMaterialInterface>(
-            nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+        // Lazily loaded, with the flat shape material as the fallback: the
+        // ground asset ships with the imported content, and a checkout that has
+        // not built it keeps a flat (but complete) plaza — the floor-still-works
+        // shape BreakerHitReactionComponent uses for its overlay.
+        UMaterialInterface* BaseMaterial = bGround
+            ? LoadObject<UMaterialInterface>(nullptr, HubGroundMaterialPath, nullptr, LOAD_NoWarn | LOAD_Quiet)
+            : nullptr;
+        if (!BaseMaterial)
+        {
+            BaseMaterial = LoadObject<UMaterialInterface>(nullptr, HubShapeMaterialPath);
+        }
         if (!BaseMaterial) return;
         if (UMaterialInstanceDynamic* Dynamic = UMaterialInstanceDynamic::Create(BaseMaterial, Mesh))
         {
@@ -94,8 +111,10 @@ namespace
         }
     }
 
+    // bGround reaches only the plaza slab; the paving grid, drains and every
+    // other shape keep the flat paint.
     AStaticMeshActor* HubSpawnShape(UWorld* World, const TCHAR* ShapePath, const FVector& Location, const FVector& Scale,
-        const FRotator& Rotation, const FLinearColor& Color, bool bCollides, const TCHAR* Label)
+        const FRotator& Rotation, const FLinearColor& Color, bool bCollides, const TCHAR* Label, bool bGround = false)
     {
         if (!World) return nullptr;
         AStaticMeshActor* Actor = World->SpawnActor<AStaticMeshActor>(Location, Rotation);
@@ -104,7 +123,7 @@ namespace
         Mesh->SetMobility(EComponentMobility::Movable);
         Mesh->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, ShapePath));
         Mesh->SetWorldScale3D(Scale);
-        HubApplyShapeColor(Mesh, Color);
+        HubApplyShapeColor(Mesh, Color, bGround);
         if (!bCollides)
         {
             Mesh->SetCollisionProfileName(TEXT("NoCollision"));
@@ -359,9 +378,11 @@ void UBreakerHubBuilder::BuildPlazaAndBoundary(UWorld* World, const FBreakerHubF
     // The bounded social space itself: a wide flat plaza (the "everyone
     // hangs out here" read) with a ring of pillars marking its edge rather
     // than walls, so it stays legible as open ground from any approach.
+    // The slab is ground (O279): the tiled grain under the earth tint, so the
+    // plaza reads as a surface with a material rather than a painted box.
     HubSpawnShape(World, HubShapeCube, Frame.At(0.0f, 0.0f, -16.0f),
         FVector(PlazaHalfExtent * 2.0f / 100.0f, PlazaHalfExtent * 2.0f / 100.0f, 0.32f),
-        Frame.Forward.Rotation(), HubPaletteEarth, true, TEXT("Runtime_HubPlaza"));
+        Frame.Forward.Rotation(), HubPaletteEarth, true, TEXT("Runtime_HubPlaza"), /*bGround=*/true);
 
     for (int32 Pillar = 0; Pillar < BoundaryPillarCount; ++Pillar)
     {

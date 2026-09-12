@@ -1,17 +1,23 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Misc/ScopeExit.h"
 #include "Interaction/BreakerTravelPoint.h"
+#include "Game/BreakerHubBuilder.h"
+#include "Engine/StaticMeshActor.h"
+#include "Engine/World.h"
+#include "EngineUtils.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
-// World-free: everything here exercises ABreakerTravelPoint's static
-// registry and id lookup, none of it needs a UWorld. What this suite does
-// NOT cover: BuildHub's actual spawning (UBreakerHubBuilder::BuildHub,
-// BuildPlazaAndBoundary, BuildVendors, BuildTravelPoint all require a
-// UWorld to spawn actors into and are untested here), the NPC dialogue the
-// hub reuses (already covered by RiorsEdge.Interaction.DialogueIntegrity in
-// BreakerDialogueTests.cpp), and the OnDestinationSelected delegate's actual
-// wiring to gym travel (that binding lives in ABreakerGameMode, outside this
-// file's territory, and is unwritten as of this test).
+// The registry tests are world-free: they exercise ABreakerTravelPoint's
+// static registry and id lookup. The plaza test at the end builds the hub
+// into a fixture world for one surface assertion; station clearance and
+// vendor routes are BreakerHubStationTests.cpp's. What this suite does NOT
+// cover: the NPC dialogue the hub reuses (already covered by
+// RiorsEdge.Interaction.DialogueIntegrity in BreakerDialogueTests.cpp), and
+// the OnDestinationSelected delegate's actual wiring to gym travel (that
+// binding lives in ABreakerGameMode, outside this file's territory, and is
+// unwritten as of this test).
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerHubTravelRegistryTest,
@@ -139,6 +145,40 @@ bool FBreakerHubUnknownDestinationRefusedTest::RunTest(const FString& Parameters
     TestTrue(TEXT("SelectDestination accepts the gym id"), bSelectedGym);
     TestTrue(TEXT("SelectDestination broadcasts on acceptance"), bBroadcast);
 
+    return true;
+}
+
+// THE PLAZA IS GROUND (O279). The hub's floor is a composer-less slab — an
+// engine cube scaled flat — and under O279 a slab wears the tiled ground
+// material tinted by role rather than the flat shape colour. Found by the
+// label the builder gives it, the way the outliner would.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerHubPlazaGroundMaterialTest,
+    "RiorsEdge.Game.Hub.PlazaWearsGroundMaterial",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerHubPlazaGroundMaterialTest::RunTest(const FString& Parameters)
+{
+    UMaterialInterface* Ground = LoadObject<UMaterialInterface>(nullptr,
+        TEXT("/Game/Breaker/Materials/M_BreakerGround.M_BreakerGround"));
+    if (!TestNotNull(TEXT("Shipped ground material M_BreakerGround exists"), Ground)) return false;
+
+    UWorld::InitializationValues Initialization;
+    Initialization.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true,
+        ERHIFeatureLevel::Num, &Initialization);
+    if (!TestNotNull(TEXT("Hub fixture world"), World)) return false;
+    ON_SCOPE_EXIT { World->DestroyWorld(false); };
+    if (!TestNotNull(TEXT("Hub keeps its travel point"),
+        UBreakerHubBuilder::BuildHub(World, FTransform(FVector(100, 200, 40))))) return false;
+
+    const AStaticMeshActor* Plaza = nullptr;
+    for (TActorIterator<AStaticMeshActor> It(World); It; ++It)
+        if (IsValid(*It) && It->GetActorLabel() == TEXT("Runtime_HubPlaza")) { Plaza = *It; break; }
+    if (!TestNotNull(TEXT("Built hub has its plaza"), Plaza)) return false;
+    const UMaterialInstanceDynamic* Slab = Cast<UMaterialInstanceDynamic>(Plaza->GetStaticMeshComponent()->GetMaterial(0));
+    if (!TestNotNull(TEXT("Plaza slot 0 is a dynamic instance"), Slab)) return false;
+    TestTrue(TEXT("Plaza is parented to M_BreakerGround"), Slab->Parent == Ground);
     return true;
 }
 

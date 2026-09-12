@@ -5,6 +5,9 @@
 #include "EngineUtils.h"
 #include "Game/BreakerZoneBuilder.h"
 #include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstance.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Engine/Texture.h"
 #include "NaniteSceneProxy.h"
 #include "StaticMeshResources.h"
 
@@ -106,6 +109,129 @@ bool FBreakerEnvironmentDressingTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Both distinct pocket silhouettes survive courtyard clearance"),Landmarks.Num(),2);
     TestTrue(TEXT("First authored yard has surface treatment"), YardCounts[0] > 0);
     TestTrue(TEXT("Second authored yard has surface treatment"), YardCounts[1] > 0);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// A SURFACE SHOWS WHAT IT IS MADE OF (O279). Three kinds of slot leave the
+// builder three ways: a kit piece that was imported with a textured material
+// keeps it, untouched; a composer slab (flr_) wears the tiled ground material
+// tinted by role; a piece that carries nothing gets the flat shape colour it
+// always had. Asserted on the assembled yard, by mesh name, the way the
+// builder itself decides — not on a fixture that would pass with any paint.
+// ---------------------------------------------------------------------------
+namespace
+{
+    // The finding's own definition of "carries a material": an instance with
+    // at least one texture bound. A texture-less instance (the kit's colormap,
+    // MI_Trim_02) shows its parent's grey and is the flat colour's to paint.
+    bool BreakerSurfaceSlotIsTexturedImport(const UStaticMesh* Mesh)
+    {
+        if (!Mesh || Mesh->GetStaticMaterials().Num() == 0) return false;
+        const UMaterialInstance* Instance = Cast<UMaterialInstance>(Mesh->GetStaticMaterials()[0].MaterialInterface);
+        return Instance && Instance->TextureParameterValues.Num() > 0;
+    }
+
+    // A slot the paint is FOR: nothing at all, or an instance binding no
+    // texture. A plain authored UMaterial is neither and is deliberately not
+    // matched here, so the witness picked for the fallback is one the builder
+    // has no reason to leave alone.
+    bool BreakerSurfaceSlotIsBare(const UStaticMesh* Mesh)
+    {
+        if (!Mesh || Mesh->GetStaticMaterials().Num() == 0) return true;
+        const UMaterialInterface* Material = Mesh->GetStaticMaterials()[0].MaterialInterface;
+        if (!Material) return true;
+        const UMaterialInstance* Instance = Cast<UMaterialInstance>(Material);
+        return Instance && Instance->TextureParameterValues.Num() == 0;
+    }
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerFernhallSurfacesShowTheirMaterialTest,
+    "RiorsEdge.World.Fernhall.SurfacesShowTheirMaterial", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FBreakerFernhallSurfacesShowTheirMaterialTest::RunTest(const FString& Parameters)
+{
+    // SHIPPED CONFIGURATION FIRST. The ground material is content, not code:
+    // a checkout that has not built it falls back to the flat floor, and the
+    // slab assertions below would then be asserting the fallback rather than
+    // the rule. Refuse before the yard is built so the red names the asset.
+    UMaterialInterface* Ground = LoadObject<UMaterialInterface>(nullptr,
+        TEXT("/Game/Breaker/Materials/M_BreakerGround.M_BreakerGround"));
+    if (!TestNotNull(TEXT("Shipped ground material M_BreakerGround exists"), Ground)) return false;
+    // The expression graph's references, not the compiled shader's used
+    // list: the suite runs under nullrhi, where no shader map is built.
+    bool bSamplesGrain = false;
+    for (const UObject* Referenced : Ground->GetReferencedTextures())
+        if (Referenced && Referenced->GetName() == TEXT("T_BreakerGround")) bSamplesGrain = true;
+    TestTrue(TEXT("M_BreakerGround samples the tiled grain T_BreakerGround"), bSamplesGrain);
+    UMaterialInterface* Shape = LoadObject<UMaterialInterface>(nullptr,
+        TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+    if (!TestNotNull(TEXT("Engine flat shape material exists"), Shape)) return false;
+
+    UWorld::InitializationValues Init;
+    Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+    if (!TestNotNull(TEXT("surface world"), World)) return false;
+    GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+    ON_SCOPE_EXIT { World->DestroyWorld(false); GEngine->DestroyWorldContext(World); };
+    FBreakerZoneMarkers Markers;
+    if (!TestTrue(TEXT("Actual district assembles"), UBreakerZoneBuilder::BuildFernhallYard(World, Markers))) return false;
+
+    // Witnesses, by mesh name, among the pieces the composer placed. The
+    // skyline re-spawns kit walls with its own paint and is not the facade;
+    // the courtyard's replaced bay may be any one wall, so the facade witness
+    // prefers wall_n03 but accepts any textured wall_ piece that survived.
+    const UStaticMeshComponent* Facade = nullptr;
+    const UStaticMeshComponent* Yard = nullptr;
+    const UStaticMeshComponent* Block = nullptr;
+    for (TActorIterator<AStaticMeshActor> It(World); It; ++It)
+    {
+        if (!IsValid(*It) || It->Tags.Contains(TEXT("FernhallSkylineDressing"))) continue;
+        const UStaticMeshComponent* Component = It->GetStaticMeshComponent();
+        const UStaticMesh* Mesh = Component ? Component->GetStaticMesh() : nullptr;
+        if (!Mesh || !Mesh->GetPathName().StartsWith(UBreakerZoneBuilder::FernhallMeshFolder())) continue;
+        const FString Name = Mesh->GetName();
+        if (Name == TEXT("flr_yard")) Yard = Component;
+        else if (Name.StartsWith(TEXT("wall_")) && BreakerSurfaceSlotIsTexturedImport(Mesh)
+            && (!Facade || Name == TEXT("wall_n03"))) Facade = Component;
+        else if (Name.StartsWith(TEXT("blk_full_")) && BreakerSurfaceSlotIsBare(Mesh) && !Block) Block = Component;
+    }
+
+    // (a) A KIT PIECE KEEPS THE MATERIAL IT WAS IMPORTED WITH. Pointer-equal
+    // to the static mesh's own slot: not a copy, not an instance over it.
+    if (TestNotNull(TEXT("A facade piece imported with a textured material was spawned"), Facade))
+    {
+        AddInfo(FString::Printf(TEXT("Facade witness %s"), *Facade->GetStaticMesh()->GetName()));
+        TestTrue(TEXT("Facade piece keeps its imported material slot untouched"),
+            Facade->GetMaterial(0) == Facade->GetStaticMesh()->GetStaticMaterials()[0].MaterialInterface);
+    }
+
+    // (b) A COMPOSER SLAB WEARS THE GROUND MATERIAL, TINTED BY ROLE. The yard
+    // floor's shipped tint is the value the palette test holds as "yard floor".
+    if (TestNotNull(TEXT("flr_yard was spawned"), Yard))
+    {
+        const UMaterialInstanceDynamic* Slab = Cast<UMaterialInstanceDynamic>(Yard->GetMaterial(0));
+        if (TestNotNull(TEXT("flr_yard slot 0 is a dynamic instance"), Slab))
+        {
+            TestTrue(TEXT("flr_yard is parented to M_BreakerGround"), Slab->Parent == Ground);
+            FLinearColor Tint = FLinearColor::Black;
+            TestTrue(TEXT("flr_yard exposes its Color tint"),
+                Slab->GetVectorParameterValue(FHashedMaterialParameterInfo(TEXT("Color")), Tint));
+            const FLinearColor Expected(.36f, .36f, .31f);   // O2 PLACEHOLDER
+            TestEqual(TEXT("flr_yard tint R"), Tint.R, Expected.R, .01f);
+            TestEqual(TEXT("flr_yard tint G"), Tint.G, Expected.G, .01f);
+            TestEqual(TEXT("flr_yard tint B"), Tint.B, Expected.B, .01f);
+        }
+    }
+
+    // (c) A PIECE THAT CARRIES NOTHING GETS THE FLAT COLOUR. The fallback is
+    // still the engine shape material, not the ground: cover is not floor.
+    if (TestNotNull(TEXT("A blk_full_ piece carrying no material was spawned"), Block))
+    {
+        AddInfo(FString::Printf(TEXT("Fallback witness %s"), *Block->GetStaticMesh()->GetName()));
+        const UMaterialInstanceDynamic* Paint = Cast<UMaterialInstanceDynamic>(Block->GetMaterial(0));
+        if (TestNotNull(TEXT("blk_full_ slot 0 is a dynamic instance"), Paint))
+            TestTrue(TEXT("blk_full_ fallback is parented to the flat shape material"), Paint->Parent == Shape);
+    }
     return true;
 }
 #endif

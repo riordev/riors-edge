@@ -12,6 +12,10 @@ CHECKED here rather than assumed — UBreakerZoneBuilder spawns everything at
 identity, so if these bounds are not at the authored world positions the
 whole route is broken and this output is where that shows first.
 
+It also builds the ground material the composer's slabs wear (O279):
+Assets/textures/ground_concrete.png -> T_BreakerGround, sampled by world
+position and tinted by a Color parameter, as M_BreakerGround.
+
 Run:
   UnrealEditor-Cmd.exe <project> -run=pythonscript -script="breaker_import_fernhall.py"
 """
@@ -127,6 +131,139 @@ task.automated = True
 task.replace_existing = True
 task.save = False  # saved below, after collision settings are applied
 unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])
+
+
+# ---- THE GROUND MATERIAL (O279) --------------------------------------------
+# A composer slab wears a tiled ground material with a world-aligned grain,
+# tinted by role. The grain is Assets/textures/ground_concrete.png, written by
+# Scripts/make_ground_texture.py (grey around 0.5, seamless); the material
+# samples it by WORLD position, not by the slab's UVs, so two slabs that meet
+# share one continuous surface and a slab's scale never stretches the grain.
+# Two samples at different scales are blended so the tile period does not
+# read as a grid. The role tint is the Color vector parameter — THE SAME NAME
+# every paint write uses, so the composer sets it the way it sets any other
+# body colour.
+#
+# Built on every run and rebuilt from empty, like the overlay: idempotent.
+# Fenced in try/except because a broken texture import must not block the
+# mesh import this script exists for — the yard with a flat ground is still
+# a yard; the yard without walls is not.
+MATERIALS_DEST = "/Game/Breaker/Materials"
+GROUND_TEXTURE_FILE = os.path.normpath(os.path.join(PROJECT_DIR, "Assets", "textures", "ground_concrete.png"))
+GROUND_TEXTURE_NAME = "T_BreakerGround"
+GROUND_MATERIAL_NAME = "M_BreakerGround"
+GROUND_TILE_NEAR_CM = 400.0    # O2 PLACEHOLDER — one texture period in world cm, the fine tile
+GROUND_TILE_FAR_CM = 1480.0    # O2 PLACEHOLDER — the coarse tile; non-integer ratio so the two never beat
+GROUND_TILE_BLEND = 0.5        # O2 PLACEHOLDER — lerp toward the coarse sample
+GROUND_GRAIN_SPREAD = 1.6      # O2 PLACEHOLDER — grey 0..1 maps to this much modulation
+GROUND_GRAIN_FLOOR = 0.2       # O2 PLACEHOLDER — ... added to this, so 0.5 grey is 1.0
+GROUND_ROUGHNESS = 0.9         # O2 PLACEHOLDER — dry ground, no sheen under the sky
+
+
+def build_ground_material():
+    tools = unreal.AssetToolsHelpers.get_asset_tools()
+    matlib = unreal.MaterialEditingLibrary
+
+    if not os.path.isfile(GROUND_TEXTURE_FILE):
+        raise RuntimeError("source texture missing: %s (run Scripts/make_ground_texture.py)"
+                           % GROUND_TEXTURE_FILE)
+
+    # The texture, reimported in place each run so the PNG is the authority.
+    tex_task = unreal.AssetImportTask()
+    tex_task.filename = GROUND_TEXTURE_FILE
+    tex_task.destination_path = MATERIALS_DEST
+    tex_task.destination_name = GROUND_TEXTURE_NAME
+    tex_task.automated = True
+    tex_task.replace_existing = True
+    tex_task.save = True
+    tools.import_asset_tasks([tex_task])
+    texture_path = "%s/%s" % (MATERIALS_DEST, GROUND_TEXTURE_NAME)
+    texture = unreal.load_asset(texture_path)
+    if not texture:
+        raise RuntimeError("texture import produced nothing at %s" % texture_path)
+    # Linear grey, not colour: the sample is a modulation factor, and an sRGB
+    # read would bend 0.5 grey to ~0.21 and darken every slab.
+    texture.set_editor_property("srgb", False)
+    try:
+        texture.set_editor_property("compression_settings",
+                                    unreal.TextureCompressionSettings.TC_GRAYSCALE)
+    except Exception as err:  # the enum member is version-dependent; default compression still reads
+        unreal.log_warning("[Fernhall] ground texture kept default compression: %s" % err)
+    unreal.EditorAssetLibrary.save_asset(texture_path, only_if_is_dirty=False)
+
+    # The material. Load or create, then rebuild the graph from empty.
+    material_path = "%s/%s" % (MATERIALS_DEST, GROUND_MATERIAL_NAME)
+    material = unreal.load_asset(material_path)
+    if not material:
+        material = tools.create_asset(GROUND_MATERIAL_NAME, MATERIALS_DEST, unreal.Material,
+                                      unreal.MaterialFactoryNew())
+    if not material:
+        raise RuntimeError("could not create %s" % material_path)
+    matlib.delete_all_material_expressions(material)
+
+    def expr(cls, x, y):
+        return matlib.create_material_expression(material, cls, x, y)
+
+    # WorldPosition.xy / period -> UV. Two periods, blended.
+    world = expr(unreal.MaterialExpressionWorldPosition, -1400, 0)
+    mask = expr(unreal.MaterialExpressionComponentMask, -1200, 0)
+    mask.set_editor_property("r", True)
+    mask.set_editor_property("g", True)
+    mask.set_editor_property("b", False)
+    mask.set_editor_property("a", False)
+    matlib.connect_material_expressions(world, "", mask, "")
+
+    def sample_at(period_cm, y):
+        divide = expr(unreal.MaterialExpressionDivide, -1000, y)
+        divide.set_editor_property("const_b", period_cm)
+        matlib.connect_material_expressions(mask, "", divide, "A")
+        sample = expr(unreal.MaterialExpressionTextureSample, -800, y)
+        sample.set_editor_property("texture", texture)
+        matlib.connect_material_expressions(divide, "", sample, "UVs")
+        return sample
+
+    near = sample_at(GROUND_TILE_NEAR_CM, -100)
+    far = sample_at(GROUND_TILE_FAR_CM, 200)
+    blend = expr(unreal.MaterialExpressionLinearInterpolate, -600, 0)
+    blend.set_editor_property("const_alpha", GROUND_TILE_BLEND)
+    matlib.connect_material_expressions(near, "R", blend, "A")
+    matlib.connect_material_expressions(far, "R", blend, "B")
+
+    # grain = grey * spread + floor: mid-grey is exactly 1.0, so the tint is
+    # the slab's colour and the texture only breaks it up.
+    spread = expr(unreal.MaterialExpressionConstant, -600, 150)
+    spread.set_editor_property("r", GROUND_GRAIN_SPREAD)
+    scaled = expr(unreal.MaterialExpressionMultiply, -450, 0)
+    matlib.connect_material_expressions(blend, "", scaled, "A")
+    matlib.connect_material_expressions(spread, "", scaled, "B")
+    floor = expr(unreal.MaterialExpressionConstant, -450, 150)
+    floor.set_editor_property("r", GROUND_GRAIN_FLOOR)
+    grain = expr(unreal.MaterialExpressionAdd, -300, 0)
+    matlib.connect_material_expressions(scaled, "", grain, "A")
+    matlib.connect_material_expressions(floor, "", grain, "B")
+
+    color = expr(unreal.MaterialExpressionVectorParameter, -300, 200)
+    color.set_editor_property("parameter_name", "Color")
+    color.set_editor_property("default_value", unreal.LinearColor(1.0, 1.0, 1.0, 1.0))
+    tinted = expr(unreal.MaterialExpressionMultiply, -150, 0)
+    matlib.connect_material_expressions(grain, "", tinted, "A")
+    matlib.connect_material_expressions(color, "", tinted, "B")
+    matlib.connect_material_property(tinted, "", unreal.MaterialProperty.MP_BASE_COLOR)
+
+    rough = expr(unreal.MaterialExpressionConstant, -150, 300)
+    rough.set_editor_property("r", GROUND_ROUGHNESS)
+    matlib.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
+
+    matlib.recompile_material(material)
+    if not unreal.EditorAssetLibrary.save_asset(material_path, only_if_is_dirty=False):
+        raise RuntimeError("could not save %s" % material_path)
+    unreal.log("[Fernhall] ground material: %s samples %s" % (material_path, texture_path))
+
+
+try:
+    build_ground_material()
+except Exception as err:
+    unreal.log_warning("[Fernhall] ground material NOT built, mesh import continues: %s" % err)
 
 registry = unreal.AssetRegistryHelpers.get_asset_registry()
 assets = registry.get_assets_by_path(DEST, recursive=True)
