@@ -39,12 +39,33 @@
   map draws 116 tread boxes as ground. PHOTOGRAPHED: the overhead —
   the stair runs read on the decks; not walked.
 
-## Cycle — O278 SCALE, B: STOREYS
+## O278 SCALE, B: STOREYS — LANDED
 
-- [ ] compose_fernhall: perimeter buildings, end walls, tower and masses
-      become stacked, tiled city tiles at uniform scale (a 3 m storey), no
-      non-uniform stretch; footprint and height targets kept by count.
-      Piece pins move together. Photograph the plaza from the entry.
+- RE-SCOPED on measurement: the Kenney city tiles are miniatures (a
+  0.4 m storey, so no scale gives a 3 m storey that stacks); the storey
+  tile is the megakit's own WallAstra wall, 4 x 3.03 m at scale 1, which
+  the composer already loaded. Every perimeter bay, tower, end wall,
+  mass and shoulder is now a collision box exactly storeys x 3.03 m tall
+  with native wall tiles (Straight on the ground floor, Window above)
+  concatenated into the same mesh — names and the 721/805 roster are
+  unchanged; the 56 m end wall is the heaviest mesh at 11.8k faces.
+  Decks, catwalks and docks are narrowed to the flank's inner face
+  (19..23.5) and the probe's flank exemption is gone; SlabsClearWalls
+  and WallsAreStoreys pin both over both twins. FOUND and fixed: the
+  depot's set piece (pocket 6) stood inside the mass on the -flank — the
+  hollow kit tile let the capsule check pass, the solid wall does not
+  (this is the "enemies come from buildings" the owner saw); it stands
+  on the +flank at +1300 now. FOUND: rounding to whole storeys flattens
+  the skyline — 7, 5.5 and 6.5 m profiles all read 6.06 m; the tower is
+  narrower than a tile. FOUND: seam walls, bay cheeks, dock faces,
+  gantry legs and piers are still stretched kit pieces. FOUND: the
+  skyline "Roofline" dressing in BreakerZoneBuilder stretches wall_n00
+  to 17 x 8.5 m — that mesh now carries a facade, so the dressing is
+  the O278 violation again; GROUND lane. QUESTION: the perimeter reads
+  as panel facades, not brick — the plaza photograph is yours to judge;
+  the flat paint hides the tiles' own material until O279.
+  PHOTOGRAPHED: the plaza from the entry — window bands read on the
+  flanks under the flat concrete.
 
 ## Cycle — O279 GROUND
 

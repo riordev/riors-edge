@@ -82,8 +82,9 @@ PIECES = {
     "full": load_piece("fps_wall-high.glb"),
     "ruin_chunk": load_piece(BROKEN_CHEST),
     "ruin_slab": load_piece(BROKEN_FULL),
-    "bldg_a": load_piece("city_building-small-a.glb"),
-    "bldg_b": load_piece("city_building-small-b.glb"),
+    # bldg_c is a POST now, not a building: the deck piers, the catwalk piers
+    # and the gantry legs are a miniature stretched to a 0.6 to 2 m column,
+    # which reads as a column. Every building is a facade() below.
     "bldg_c": load_piece("city_building-small-c.glb"),
     "garage": load_piece("city_building-garage.glb"),
     "pavement": load_piece("city_pavement.glb"),
@@ -99,13 +100,32 @@ PIECES = {
     "barrel": load_piece("modular-sci-fi-megakit/glTF/Props/Prop_Barrel_Large.gltf"),
     "cable": load_piece("modular-sci-fi-megakit/glTF/Props/Prop_Cable_3.gltf"),
     "panel": load_piece("modular-sci-fi-megakit/glTF/Walls/WallAstra_Straight.gltf"),
+    # THE FACADE TILES (O278). The Straight above is every building's ground
+    # floor; the Window is its upper storeys; the Flat is loaded for one
+    # number — where the kit's base plane is — so a tile's relief is measured
+    # off the meshes rather than typed.
+    "facade_window": load_piece("modular-sci-fi-megakit/glTF/Walls/WallAstra_Straight_Window.gltf"),
+    "facade_flat": load_piece("modular-sci-fi-megakit/glTF/Walls/WallAstra_Straight_Flat.gltf"),
     "rails": load_piece("modular-sci-fi-megakit/glTF/Platforms/Platform_Rails_4Wide.gltf"),
     "column": load_piece("modular-sci-fi-megakit/glTF/Columns/Column_MetalSupport.gltf"),
 }
 
 SCENE = {}
-# The perimeter's flank buildings, by name: the probe below reads this set.
-FLANK = set()
+
+def bake(mesh, at, target_size=None):
+    """Scale `mesh` to target_size metres (if given), ground it (min-Y to 0),
+    centre it on X/Z and translate to `at` (x, [y,] z lateral)."""
+    bounds = mesh.bounds
+    size = bounds[1] - bounds[0]
+    if target_size is not None:
+        scale = np.array([target_size[0] / size[0], target_size[1] / size[1], target_size[2] / size[2]])
+        mesh.apply_scale(scale)
+        bounds = mesh.bounds
+    # Centre on X/Z, floor to Y=0, then translate.
+    centre = (bounds[0] + bounds[1]) * 0.5
+    mesh.apply_translation((-centre[0], -bounds[0][1], -centre[2]))
+    mesh.apply_translation((at[0], at[1] if len(at) > 2 else 0.0, at[-1]))
+    return mesh
 
 def place(out_name, piece_key, at, target_size=None, marker=False, yaw=0.0, lean=0.0):
     """Bake one instance: scale the piece to target_size metres (if given),
@@ -124,26 +144,121 @@ def place(out_name, piece_key, at, target_size=None, marker=False, yaw=0.0, lean
     if yaw or lean:
         mesh.apply_transform(trimesh.transformations.rotation_matrix(np.radians(yaw), (0, 1, 0)))
         mesh.apply_transform(trimesh.transformations.rotation_matrix(np.radians(lean), (1, 0, 0)))
-    bounds = mesh.bounds
-    size = bounds[1] - bounds[0]
-    if target_size is not None:
-        scale = np.array([target_size[0] / size[0], target_size[1] / size[1], target_size[2] / size[2]])
-        mesh.apply_scale(scale)
-        bounds = mesh.bounds
-    # Centre on X/Z, floor to Y=0, then translate.
-    centre = (bounds[0] + bounds[1]) * 0.5
-    mesh.apply_translation((-centre[0], -bounds[0][1], -centre[2]))
-    mesh.apply_translation((at[0], at[1] if len(at) > 2 else 0.0, at[-1]))
     assert out_name not in SCENE, out_name
-    SCENE[out_name] = mesh
+    SCENE[out_name] = bake(mesh, at, target_size)
+
+# ---- Facades: a wall is stacked and tiled, not scaled (O278) ---------------
+# A storey is 3 m, a door 2.2 m, and a tile is never stretched past its own
+# proportions. A building here is a backstop box at the building's size
+# carrying copies of the megakit's wall tile at the tile's OWN size: `columns`
+# across and `storeys` up, stepping TILE_WIDTH along the face and STOREY up,
+# centred in the bay — a 10 m bay holds 8 m of tile and a metre of reveal each
+# side. The ground floor is WallAstra_Straight (the "panel" the bay walls use),
+# every floor above it the _Window sibling. The box is EXACTLY storeys x
+# STOREY tall: no parapet, so a roofline is a whole number of storeys.
+#
+# THE INNER FACE DOES NOT MOVE, AND NO TILE CROSSES IT. The kit authors a tile's
+# relief — the Straight's pipes and trim, the Window's bay — in front of the
+# plane its Flat sibling is; that base plane sits on the box, and the box's
+# tiled face is recessed by the Straight's relief so the ground floor's relief
+# reaches the inner face exactly and the Window's stops 0.28 m short of it.
+# Nothing protrudes inboard (the treads stand 19.4..23.4 against the flank's
+# 23.5), a face with a tile keeps the bounds it had, and the box's untiled
+# faces are where the miniature's were. A face too short for one tile (a 3 m
+# stub) is the bare box, not a cut tile.
+#
+# ONE NAME PER BUILDING: the box and its tiles are concatenated under the
+# building's existing wall_ name, so the roster (721 / 805), the readers that
+# find a building by name, and the importer's collision (complex-as-simple,
+# tiles included) see what they saw.
+TILE_WIDTH = 4.0   # the megakit's authored tile pitch, asserted against the mesh below
+STOREY = 3.03      # its authored storey height; a facade box is storeys x this, exactly
+
+def tile_relief(key):
+    """How far a tile's relief stands in front of the kit's base plane, read
+    off the meshes: the base plane is the Flat sibling's front, native -X on
+    every tile in the folder."""
+    return PIECES["facade_flat"].bounds[0][0] - PIECES[key].bounds[0][0]
+
+RELIEF = tile_relief("panel")
+
+def check_tiles():
+    for key in ("panel", "facade_window"):
+        size = PIECES[key].bounds[1] - PIECES[key].bounds[0]
+        assert abs(size[2] - TILE_WIDTH) < 0.01, (key, size)
+        assert STOREY - 0.05 < size[1] <= STOREY + 1e-6, (key, size)
+        assert 0.0 < tile_relief(key) <= RELIEF, (key, tile_relief(key))
+
+check_tiles()
+
+def storeys_for(height):
+    """Whole storeys nearest a profile's height, never fewer than one."""
+    return max(1, int(round(height / STOREY)))
+
+def facade(name, at, size, facing, storeys, columns, ends=False, skip=0):
+    """One building under one wall_ name. size is (width along the face, depth
+    behind it) metres; facing is the unit (x, z) direction from the building
+    to the yard, the way its tiled face looks; the box is grounded at at[1]
+    like place(). ends tiles the end faces too, with as many columns as their
+    length holds: True for both, or the signs of the ends that stand free.
+    skip leaves that many storeys bare from the ground: a tower whose parent
+    already carries the face below its roofline tiles only what stands above
+    it, so two tiles never share one plane."""
+    x, y, z = at
+    width, depth = size
+    fx, fz = facing
+    axis = 0 if fx else 2                       # the axis the face looks along
+    sign = fx if fx else fz
+    height = storeys * STOREY
+    centre = np.array([x, y + height * 0.5, z])
+    half = np.zeros(3)
+    half[axis], half[1], half[2 - axis] = depth * 0.5, height * 0.5, width * 0.5
+    faces = [(axis, sign, columns)]
+    if ends:
+        faces += [(2 - axis, s, int(depth // TILE_WIDTH)) for s in ((-1.0, 1.0) if ends is True else ends)]
+    lo, hi = centre - half, centre + half
+    tiles = []
+    for f_axis, f_sign, cols in faces:
+        if cols < 1 or skip >= storeys:
+            continue
+        run = 2 - f_axis                        # the axis the face runs along
+        dx, dz = (f_sign, 0.0) if f_axis == 0 else (0.0, f_sign)
+        # A tile's front is native -X; yaw it to look along (dx, dz).
+        turn = trimesh.transformations.rotation_matrix(math.atan2(dz, -dx), (0, 1, 0))
+        plane = centre[f_axis] + f_sign * half[f_axis]
+        for storey in range(skip, storeys):
+            key = "panel" if storey == 0 else "facade_window"
+            for c in range(cols):
+                tile = PIECES[key].copy()
+                tile.apply_transform(turn)
+                b = tile.bounds
+                front = b[1][f_axis] if f_sign > 0 else b[0][f_axis]
+                shift = np.zeros(3)
+                # Base plane on the box, relief forward of it, never past the face.
+                shift[f_axis] = plane - f_sign * (RELIEF - tile_relief(key)) - front
+                shift[run] = centre[run] + (c - (cols - 1) * 0.5) * TILE_WIDTH - (b[0][run] + b[1][run]) * 0.5
+                shift[1] = y + storey * STOREY - b[0][1]
+                tile.apply_translation(shift)
+                tiles.append(tile)
+        # The box stands RELIEF behind a tiled face.
+        if f_sign > 0:
+            hi[f_axis] -= RELIEF
+        else:
+            lo[f_axis] += RELIEF
+    box = bake(PIECES["pavement"].copy(), ((lo[0] + hi[0]) * 0.5, lo[1], (lo[2] + hi[2]) * 0.5), hi - lo)
+    assert name not in SCENE, name
+    SCENE[name] = trimesh.util.concatenate([box] + tiles)
+
+def end_wall(name, at, length, fx, height=7.0):
+    """An end wall on a constant-x line, 3 m deep, looking at the yard along
+    fx, tiled with as many columns as its length holds."""
+    facade(name, at, (length, 3.0), (fx, 0.0), storeys_for(height), int(length // TILE_WIDTH))
 
 # ---- Ground: the yard slab and the rift pad --------------------------------
 place("flr_yard", "pavement", (51.0, -0.06, 0.0), (106.0, 0.06, 56.0))
 place("flr_riftpad", "pavement", (92.0, 0.0, 0.0), (10.0, 0.08, 10.0))
 
 # ---- Perimeter: building slabs on both flanks and both ends ----------------
-BLDG = ["bldg_a", "bldg_b", "bldg_c", "garage"]
-
 # EVERY PERIMETER PIECE WAS THE SAME BOX. Ten of them a side, 10 x 7 x 3 m each,
 # at one distance, in one line: owner, "awkwardly generated not really buildings
 # on the left right front and back". A boundary made of one repeated box is a
@@ -154,7 +269,9 @@ BLDG = ["bldg_a", "bldg_b", "bldg_c", "garage"]
 # height, in depth, and in how far back from the line they stand, with a smaller
 # second mass on some of them. Nothing here is measured by the cover grammar
 # (wall_ bounds the field, it does not stand in it), so this is silhouette work
-# and cannot move a single cover number.
+# and cannot move a single cover number. A height is rounded to whole storeys
+# by facade(), so 7, 5.5 and 6.5 are all two storeys and the profiles differ
+# in depth, setback and second mass.
 #
 #   height, depth, setback (+ is away from the yard), second mass or None
 SKYLINE = (
@@ -168,8 +285,11 @@ SKYLINE = (
 def perimeter(tag, x, z, index, facing):
     """One perimeter building on the line z, facing the yard (facing = -1 when
     the yard is at lower z). The profile is chosen by index so the two flanks of
-    one yard never step in time with each other."""
+    one yard never step in time with each other. Every building is a facade:
+    two columns of tile in its 10 m bay, as many storeys as its height rounds
+    to."""
     height, depth, setback, second = SKYLINE[index % len(SKYLINE)]
+    storeys = storeys_for(height)
     # THE INNER FACE DOES NOT MOVE. Depth and setback grow AWAY from the yard,
     # never into it: the old slab was 3 m deep on this line, so its inner face
     # stood 1.5 m in from the centre, and that face is the boundary every other
@@ -179,17 +299,19 @@ def perimeter(tag, x, z, index, facing):
     # caught it, which is exactly the measurement that route probe is for.
     inner = z + facing * 1.5
     line = inner - facing * (depth * 0.5 + max(0.0, setback))
-    place("wall_%s%02d" % (tag, index), BLDG[index % 4], (x, 0.0, line), (10.0, height, depth))
-    FLANK.add("wall_%s%02d" % (tag, index))
+    facade("wall_%s%02d" % (tag, index), (x, 0.0, line), (10.0, depth), (0.0, facing), storeys, 2)
     if second is None:
         return
     kind, size, rise = second
     if kind == "tower":
         # A stair tower or a lift head: narrow, taller than its parent, and set
-        # to one side so the parent's roofline breaks rather than steps.
-        place("wall_%s%02dt" % (tag, index), "bldg_c", (x + 3.0, 0.0, line + facing * 0.6),
-              (size, height + rise, depth * 0.7))
-        FLANK.add("wall_%s%02dt" % (tag, index))
+        # to one side so the parent's roofline breaks rather than steps. Its
+        # inner face is the parent's (0.6 + 0.35 x depth is depth / 2 at the
+        # profile's depth 4), so it carries one column of tile on the storeys
+        # above the parent's roof only; the parent's tiles hold the face below.
+        # The tile is 4 m on a 3.2 m tower and hangs 0.4 m past each side.
+        facade("wall_%s%02dt" % (tag, index), (x + 3.0, 0.0, line + facing * 0.6), (size, depth * 0.7),
+               (0.0, facing), storeys_for(height + rise), 1, skip=storeys)
     elif kind == "canopy":
         # A loading canopy over the ground in front of the building, on two
         # columns. This is the piece that makes a wall read as somewhere goods
@@ -204,7 +326,8 @@ def perimeter(tag, x, z, index, facing):
                   (x + dx, 0.0, inner + facing * 3.4), (0.5, 3.4, 0.5))
     elif kind == "stack":
         # A vent stack on the roof: no footprint of its own, all silhouette.
-        place("dress_%s%02ds" % (tag, index), "column", (x - 2.5, height, line),
+        # It stands on the roof the facade built, storeys x STOREY up.
+        place("dress_%s%02ds" % (tag, index), "column", (x - 2.5, storeys * STOREY, line),
               (size * 0.5, rise, size * 0.5))
 
 for i, x in enumerate(range(5, 100, 10)):
@@ -219,14 +342,14 @@ for i, x in enumerate(range(5, 100, 10)):
     if x == 5:
         continue
     perimeter("s", float(x), -25.0, i + 2, 1.0)
-place("wall_w", "bldg_b", (-1.5, 0.0, 0.0), (3.0, 7.0, 56.0))
+end_wall("wall_w", (-1.5, 0.0, 0.0), 56.0, 1.0)
 # THE EAST WALL HAS A MOUTH IN IT. Two stubs rather than one slab, leaving a
 # 10 m gap on the z 9..19 band: that gap is the entry yard's end of the seam to
 # the SUBSTATION yard. Mouth width is a CEILING in the connection rule (a seam
 # is recognisable because it narrows), so 10 m sits under the 12 m cap with room
 # for the cap to come down after someone walks it.
-place("wall_e_s", "bldg_c", (101.5, 0.0, -9.5), (3.0, 7.0, 37.0))
-place("wall_e_n", "bldg_c", (101.5, 0.0, 23.5), (3.0, 7.0, 9.0))
+end_wall("wall_e_s", (101.5, 0.0, -9.5), 37.0, -1.0)
+end_wall("wall_e_n", (101.5, 0.0, 23.5), 9.0, -1.0)
 
 # ---- The cover lattice ------------------------------------------------------
 # TWO DIFFERENT LANES LIVE HERE AND THEY ARE GUARDED BY DIFFERENT RULES.
@@ -293,8 +416,8 @@ for i, x in enumerate(range(int(SUB_X) - 46, int(SUB_X) + 50, 10)):
     if 106.0 <= float(x) <= 116.0:
         continue   # the seam's far mouth
     perimeter("sub_s", float(x), SUB_Z - 25.0, i + 3, 1.0)
-place("wall_sub_w", "bldg_b", (SUB_X - 53.5, 0.0, SUB_Z), (3.0, 7.0, 56.0))
-place("wall_sub_e", "bldg_c", (SUB_X + 53.5, 0.0, SUB_Z), (3.0, 7.0, 56.0))
+end_wall("wall_sub_w", (SUB_X - 53.5, 0.0, SUB_Z), 56.0, 1.0)
+end_wall("wall_sub_e", (SUB_X + 53.5, 0.0, SUB_Z), 56.0, -1.0)
 
 # The same lattice, in this yard's own frame. Chest pairs on the corridor
 # shoulder, full-height line breaks off-lane, spacing unchanged from the yard
@@ -350,9 +473,9 @@ place("flr_yard_dep", "pavement", (DEP_X, -0.06, DEP_Z), (106.0, 0.06, 56.0))
 
 # Perimeter. The mouth is in the WEST flank, where the seam arrives, so the
 # west wall is two stubs and the other three sides are solid.
-place("wall_dep_w_s", "bldg_b", (DEP_X - 53.5, 0.0, DEP_Z - 26.5), (3.0, 7.0, 3.0))
-place("wall_dep_w_n", "bldg_b", (DEP_X - 53.5, 0.0, DEP_Z + 6.5), (3.0, 7.0, 43.0))
-place("wall_dep_e", "bldg_c", (DEP_X + 53.5, 0.0, DEP_Z), (3.0, 7.0, 56.0))
+end_wall("wall_dep_w_s", (DEP_X - 53.5, 0.0, DEP_Z - 26.5), 3.0, 1.0)   # 3 m holds no tile: bare box
+end_wall("wall_dep_w_n", (DEP_X - 53.5, 0.0, DEP_Z + 6.5), 43.0, 1.0)
+end_wall("wall_dep_e", (DEP_X + 53.5, 0.0, DEP_Z), 56.0, -1.0)
 for i, x in enumerate(range(int(DEP_X) - 46, int(DEP_X) + 50, 10)):
     perimeter("dep_n", float(x), DEP_Z + 25.0, i + 4, -1.0)
     perimeter("dep_s", float(x), DEP_Z - 25.0, i, 1.0)
@@ -419,9 +542,9 @@ place("flr_riftpad_siding", "pavement", (SID_X - 41.0, 0.0, SID_Z), (10.0, 0.08,
 for i, x in enumerate(range(int(SID_X) - 50, int(SID_X) + 51, 10)):
     perimeter("siding_n", float(x), SID_Z + 25.0, i, -1.0)
     perimeter("siding_s", float(x), SID_Z - 25.0, i + 3, 1.0)
-place("wall_siding_w", "bldg_b", (SID_X - 53.5, 0.0, SID_Z), (3.0, 7.0, 56.0))
-place("wall_siding_e_n", "bldg_c", (SID_X + 53.5, 0.0, SID_Z + 25.5), (3.0, 7.0, 5.0))    # z -43..-38
-place("wall_siding_e_s", "bldg_c", (SID_X + 53.5, 0.0, SID_Z - 7.5), (3.0, 7.0, 41.0))    # z -94..-53
+end_wall("wall_siding_w", (SID_X - 53.5, 0.0, SID_Z), 56.0, 1.0)
+end_wall("wall_siding_e_n", (SID_X + 53.5, 0.0, SID_Z + 25.5), 5.0, -1.0)    # z -43..-38
+end_wall("wall_siding_e_s", (SID_X + 53.5, 0.0, SID_Z - 7.5), 41.0, -1.0)    # z -94..-53
 
 # The lattice, frame-relative and unchanged: the same offsets from the anchor,
 # walked toward -X.
@@ -474,10 +597,9 @@ GANTRY_HEIGHT = 9.0
 STEP_RISE = 0.35      # O2 PLACEHOLDER
 TREAD_DEPTH = 0.35    # O2 PLACEHOLDER
 STAIR_WIDTH = 4.0     # O2 PLACEHOLDER
-# A stair stands INBOARD of the flank's inner face. The decks lie at lat 23 with
-# their outer 3.5 m inside the perimeter buildings (inner face 23.5, deck 19..27);
-# a tread there would be a stair inside a wall, so the run is centred at 21.4,
-# spanning 19.4..23.4 — inside the deck's span and clear of the face.
+# The decks lie against the flank's inner face at 23.5, spanning lat 19..23.5;
+# the run is centred at 21.4, spanning 19.4..23.4 — inside the deck's span and
+# a tenth of a metre clear of the face.
 STAIR_LAT = 21.4      # O2 PLACEHOLDER
 
 def stair(tag, name, at, edge, lat, top, climb=1.0):
@@ -554,11 +676,14 @@ def work_pass(tag, anchor_x, centre_z, bay_fwd, bay_side, dock_fwd, dock_side, d
     # enough to shoot down off, low enough to vault back from, and pressed
     # against the boundary so it reads as loading rather than as a platform
     # somebody put in a field.
+    # The slab and its end faces run to the flank's inner face at |lat| 23.5
+    # and stop there; the front stays at 17, where the stair's run and the
+    # spawn point read it.
     dh = 1.5
-    place("flr_%s_dock" % tag, "pavement", at(dock_fwd, dock_side * 20.5, dh), (16.0, 0.4, 7.0))
+    place("flr_%s_dock" % tag, "pavement", at(dock_fwd, dock_side * 20.25, dh), (16.0, 0.4, 6.5))
     for side, dx in enumerate((-7.4, 7.4)):
         place("wall_%s_dockface%d" % (tag, side), "panel",
-              at(dock_fwd + dx, dock_side * 20.5), (1.2, dh, 7.0))
+              at(dock_fwd + dx, dock_side * 20.25), (1.2, dh, 6.5))
     place("wall_%s_dockfront" % tag, "panel",
           at(dock_fwd, dock_side * 20.5 - dock_side * 3.5), (16.0, dh, 0.8))
     # The stair climbs one END of the dock, the run lying along the flank: the
@@ -590,10 +715,14 @@ def shape_pass(tag, anchor_x, centre_z, gantries, masses, near_fwd, far_fwd, nea
         return (anchor_x + forward * fwd, height, centre_z + lat)
 
     # --- The near deck, on the +lat flank -----------------------------------
-    place("flr_%s_deck" % tag, "pavement", at(near_fwd, 23.0, DECK_HEIGHT), (18.0, 0.4, 8.0))
+    # Every deck, catwalk and dock runs to the flank's inner face at |lat| 23.5
+    # and stops there: the probe below measures each against every wall.
+    place("flr_%s_deck" % tag, "pavement", at(near_fwd, 21.25, DECK_HEIGHT), (18.0, 0.4, 4.5))
     # Piers, so the deck is a structure rather than a slab hanging in the air.
+    # These posts, the catwalk's and the gantry legs stay bldg_c miniatures
+    # stretched to a column: a column is what a stretched miniature reads as.
     for i, dx in enumerate((-7.5, 0.0, 7.5)):
-        for j, lat in enumerate((19.8, 26.2)):
+        for j, lat in enumerate((19.8, 22.7)):
             place("dress_%s_pier%d%d" % (tag, i, j), "bldg_c", at(near_fwd + dx, lat), (0.7, DECK_HEIGHT, 0.7))
     # The stair up, off one end of the deck.
     stair(tag, "step", at, near_fwd - near_climb * 9.0, STAIR_LAT, DECK_HEIGHT + 0.4, near_climb)
@@ -603,17 +732,17 @@ def shape_pass(tag, anchor_x, centre_z, gantries, masses, near_fwd, far_fwd, nea
 
     # --- The catwalk, running on along the flank from the deck's other end ---
     catwalk_fwd = near_fwd + near_climb * 19.0
-    place("flr_%s_catwalk" % tag, "pavement", at(catwalk_fwd, 23.0, CATWALK_HEIGHT), (20.0, 0.4, 4.0))
+    place("flr_%s_catwalk" % tag, "pavement", at(catwalk_fwd, 22.0, CATWALK_HEIGHT), (20.0, 0.4, 3.0))
     for i, dx in enumerate((-6.0, 0.0, 6.0)):
-        place("dress_%s_cwpier%d" % (tag, i), "bldg_c", at(catwalk_fwd + dx, 23.0), (0.6, CATWALK_HEIGHT, 0.6))
-        place("dress_%s_cwrail%d" % (tag, i), "chest", at(catwalk_fwd + dx, 21.2, CATWALK_HEIGHT + 0.4), (5.6, 0.9, 0.2))
+        place("dress_%s_cwpier%d" % (tag, i), "bldg_c", at(catwalk_fwd + dx, 22.0), (0.6, CATWALK_HEIGHT, 0.6))
+        place("dress_%s_cwrail%d" % (tag, i), "chest", at(catwalk_fwd + dx, 20.7, CATWALK_HEIGHT + 0.4), (5.6, 0.9, 0.2))
 
     # --- The far deck, higher and on the opposite flank ---------------------
     # Higher on purpose: two identical platforms are one platform twice, and
     # the yard should have a best position rather than a mirrored pair.
-    place("flr_%s_fardeck" % tag, "pavement", at(far_fwd, -23.0, FAR_DECK_HEIGHT), (16.0, 0.4, 8.0))
+    place("flr_%s_fardeck" % tag, "pavement", at(far_fwd, -21.25, FAR_DECK_HEIGHT), (16.0, 0.4, 4.5))
     for i, dx in enumerate((-6.5, 0.0, 6.5)):
-        for j, lat in enumerate((-19.8, -26.2)):
+        for j, lat in enumerate((-19.8, -22.7)):
             place("dress_%s_fpier%d%d" % (tag, i, j), "bldg_c", at(far_fwd + dx, lat), (0.7, FAR_DECK_HEIGHT, 0.7))
     stair(tag, "fstep", at, far_fwd - far_climb * 8.0, -STAIR_LAT, FAR_DECK_HEIGHT + 0.4, far_climb)
     for i, dx in enumerate((-6.0, 0.0, 6.0)):
@@ -661,12 +790,20 @@ def shape_pass(tag, anchor_x, centre_z, gantries, masses, near_fwd, far_fwd, nea
     # vocabulary at the same scale, standing inside instead of around. As
     # blk_full_ it would enter the cover footprint band (0.5-5% of the yard)
     # and one of these is 2% on its own.
+    #
+    # Both are facades, tiled on the face toward the lane and on their ends:
+    # the mass two columns by four storeys on its 11 m front and two by four
+    # on each 9 m end; the shoulder one column by two storeys on its front and
+    # on its free end. Its other end stands 1.5 m inside the mass and carries
+    # no tile, and the last half-metre of its front tile lies inside the
+    # mass's end, where the two boxes already meet.
     for i, (fwd, lat) in enumerate(masses):
-        place("wall_%s_mass%d" % (tag, i), "bldg_a", at(fwd, lat), (11.0, 12.0, 9.0))
+        toward = (0.0, -1.0 if lat > 0 else 1.0)
+        facade("wall_%s_mass%d" % (tag, i), at(fwd, lat), (11.0, 9.0), toward, storeys_for(12.0), 2, ends=True)
         # A lower shoulder against it, so the mass has a silhouette rather than
         # being one box.
-        place("wall_%s_massb%d" % (tag, i), "garage",
-              at(fwd + 7.0, lat + (2.5 if lat > 0 else -2.5)), (6.0, 6.5, 7.0))
+        facade("wall_%s_massb%d" % (tag, i), at(fwd + 7.0, lat + (2.5 if lat > 0 else -2.5)),
+               (6.0, 7.0), toward, storeys_for(6.5), 1, ends=(forward,))
 
 # WHERE THE STRUCTURE GOES, PER YARD, and the positions are not free choices.
 # A pocket sits every 14 + 75*fraction metres down the lane and its arrival tear
@@ -729,15 +866,9 @@ work_pass("siding", SID_ANCHOR, SID_Z, bay_fwd=44.0, bay_side=1.0, dock_fwd=41.0
 # reaches the yard. Subjects are the decks, the catwalks, the docks and their
 # treads; solids are every wall_, blk_ and flr_ box. An overlap of a centimetre
 # or less on any axis is an abutment — a tread against its slab, a catwalk
-# against its deck, a tread standing on the yard slab — and is not a hit.
-#
-# ONE EXEMPTION, RECORDED RATHER THAN MEASURED AWAY: the decks are pressed
-# against the flank and lie at lat 19..27 against a flank inner face at 23.5,
-# so every deck, catwalk and dock runs into its flank building by 0.5 to 3.5 m
-# and has since the shape pass was authored. That is the deck's width and the
-# flank's line, not a placement, and it is not decided here; the slabs are not
-# measured against FLANK. The treads ARE, because a tread is where the
-# character walks and DecksClimbable measures them against every wall.
+# against its deck, a tread standing on the yard slab, a deck against the
+# flank's inner face — and is not a hit. Every slab is measured against every
+# wall, the flank buildings included.
 PROBE_ABUT = 0.01   # metres; the same centimetre the C++ tests measure by
 
 def probe_structures():
@@ -758,10 +889,10 @@ def probe_structures():
             subjects.append((name, True))
     solids = [n for n in SCENE if n.startswith(("wall_", "blk_", "flr_"))]
     hits = []
-    for name, is_tread in subjects:
+    for name, _ in subjects:
         a = box(name)
         for other in solids:
-            if other == name or (not is_tread and other in FLANK):
+            if other == name:
                 continue
             b = box(other)
             o = [overlap(a, b, axis) for axis in range(3)]
@@ -1032,4 +1163,6 @@ if RUINED:
 scene = trimesh.Scene(SCENE)
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 scene.export(OUT)
+heaviest = max((n for n in SCENE if n.startswith("wall_")), key=lambda n: len(SCENE[n].faces))
+print("heaviest wall: %s, %d faces" % (heaviest, len(SCENE[heaviest].faces)))
 print("wrote", OUT, "meshes:", len(SCENE), "ruined" if RUINED else "intact")

@@ -1045,3 +1045,233 @@ bool FBreakerFernhallDecksClimbableTest::RunTest(const FString& Parameters)
     }
     return true;
 }
+
+// ---------------------------------------------------------------------------
+// NO SLAB STANDS INSIDE A WALL (O278). The composer's probe measured every
+// deck, catwalk and dock against every wall_ box EXCEPT the flank buildings,
+// and recorded why: the decks lie at lat 19..27 against a flank inner face at
+// 23.5, so every one of them ran into its building by up to 3.5 m since the
+// shape pass was authored. O278 ends the exemption — every deck is reachable,
+// and a slab whose outer metres are inside a wall is a slab whose outer
+// metres nobody can stand on. So this measures what the probe declined to:
+// every raised slab against EVERY wall_ box, both folders, no FLANK set.
+//
+// The same centimetre DecksClimbable and FloorsDisjoint measure by: an
+// overlap of a centimetre or less on any one axis is an abutment, not a
+// slab in a wall.
+// ---------------------------------------------------------------------------
+namespace
+{
+    // THE SLABS, by the composer's own suffixes: `flr_<tag>_deck`,
+    // `flr_<tag>_fardeck`, `flr_<tag>_catwalk`, `flr_<tag>_dock`. A tread is
+    // not a slab (`_dockstep0` does not end in `_dock`), and DecksClimbable
+    // already measures every tread against every wall.
+    bool BreakerFernhallIsRaisedSlab(const FString& Name)
+    {
+        if (!Name.StartsWith(TEXT("flr_"))) return false;
+        static const TCHAR* Suffixes[] = { TEXT("_deck"), TEXT("_fardeck"), TEXT("_catwalk"), TEXT("_dock") };
+        for (const TCHAR* Suffix : Suffixes)
+        {
+            if (Name.EndsWith(Suffix)) return true;
+        }
+        return false;
+    }
+
+    // WHICH wall_ PIECES ARE STOREYED (O278): the ones the composer builds as a
+    // building — stacked and tiled, never scaled — as opposed to the ones that
+    // are a face, a leg or a seam's blind. Read off compose_fernhall.py's
+    // place() names:
+    //
+    //   Perimeter  wall_<flank><NN>     perimeter(): wall_n03, wall_sub_s07,
+    //                                   wall_dep_n05, wall_siding_n09 ...
+    //   Tower      wall_<flank><NN>t    perimeter()'s "tower" second mass
+    //   EndWall    wall_[<yard>_](w|e)[_(n|s)]
+    //                                   wall_w, wall_e_s, wall_sub_e,
+    //                                   wall_dep_w_n, wall_siding_e_s ...
+    //   Mass       wall_<tag>_mass<i>, wall_<tag>_massb<i>   shape_pass()
+    //
+    // EXCLUDED, explicitly, by prefix or by the segment they carry:
+    //   wall_seam*      seam walls (wall_seam_*, wall_seam2_*, wall_seam3_*)
+    //   *_gleg<i><j>    gantry legs (shape_pass)
+    //   *_baycheek<n>, *_bayback, *_bayside<n>   bay faces and cheeks (work_pass)
+    //   *_dockface<n>, *_dockfront               dock faces (work_pass)
+    // Piers are dress_ pieces and never reach this classifier.
+    //
+    // A wall_ name that is none of the above is REFUSED (Unknown), not
+    // skipped: a new wall family arrives here as a red with its name on it,
+    // and the author decides which list it joins.
+    enum class EBreakerFernhallWallFamily : uint8
+    {
+        NotStoreyed,
+        Perimeter,
+        Tower,
+        EndWall,
+        Mass,
+        Unknown,
+    };
+
+    EBreakerFernhallWallFamily BreakerFernhallWallFamilyOf(const FString& Name)
+    {
+        if (!Name.StartsWith(TEXT("wall_"))) return EBreakerFernhallWallFamily::NotStoreyed;
+        if (Name.StartsWith(TEXT("wall_seam"))) return EBreakerFernhallWallFamily::NotStoreyed;
+        if (Name.Contains(TEXT("_gleg"))) return EBreakerFernhallWallFamily::NotStoreyed;
+        if (Name.Contains(TEXT("_bay"))) return EBreakerFernhallWallFamily::NotStoreyed;
+        if (Name.Contains(TEXT("_dock"))) return EBreakerFernhallWallFamily::NotStoreyed;
+
+        TArray<FString> Segments;
+        Name.Mid(5).ParseIntoArray(Segments, TEXT("_"), true);
+        if (Segments.Num() == 0) return EBreakerFernhallWallFamily::Unknown;
+        const FString& Last = Segments.Last();
+
+        // wall_<tag>_mass<i> / wall_<tag>_massb<i>: exactly a yard tag and a mass.
+        if (Segments.Num() == 2 && Last.StartsWith(TEXT("mass")))
+        {
+            return EBreakerFernhallWallFamily::Mass;
+        }
+
+        // wall_<flank><NN> / wall_<flank><NN>t: the last segment is a flank
+        // letter and two digits, with or without the tower's trailing t, and
+        // at most one yard tag before it (wall_n03, wall_sub_n02, wall_siding_s10t).
+        {
+            FString Bay = Last;
+            const bool bTower = Bay.EndsWith(TEXT("t"));
+            if (bTower) Bay.LeftChopInline(1);
+            const bool bFlank = Bay.Len() == 3
+                && (Bay[0] == TEXT('n') || Bay[0] == TEXT('s'))
+                && Bay.Mid(1).IsNumeric();
+            if (bFlank && Segments.Num() <= 2)
+            {
+                return bTower ? EBreakerFernhallWallFamily::Tower : EBreakerFernhallWallFamily::Perimeter;
+            }
+        }
+
+        // wall_[<yard>_](w|e)[_(n|s)]: an end wall or one of its stubs.
+        {
+            const auto IsEnd = [](const FString& S) { return S == TEXT("w") || S == TEXT("e"); };
+            const auto IsStub = [](const FString& S) { return S == TEXT("n") || S == TEXT("s"); };
+            const int32 EndIndex = IsEnd(Last) ? Segments.Num() - 1
+                : (Segments.Num() >= 2 && IsStub(Last) && IsEnd(Segments[Segments.Num() - 2])) ? Segments.Num() - 2
+                : INDEX_NONE;
+            if (EndIndex != INDEX_NONE && EndIndex <= 1)
+            {
+                return EBreakerFernhallWallFamily::EndWall;
+            }
+        }
+        return EBreakerFernhallWallFamily::Unknown;
+    }
+
+    const TCHAR* BreakerFernhallWallFamilyName(EBreakerFernhallWallFamily Family)
+    {
+        switch (Family)
+        {
+        case EBreakerFernhallWallFamily::Perimeter: return TEXT("perimeter");
+        case EBreakerFernhallWallFamily::Tower: return TEXT("tower");
+        case EBreakerFernhallWallFamily::EndWall: return TEXT("end wall");
+        case EBreakerFernhallWallFamily::Mass: return TEXT("mass");
+        case EBreakerFernhallWallFamily::Unknown: return TEXT("unknown");
+        default: return TEXT("not storeyed");
+        }
+    }
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerFernhallSlabsClearWallsTest,
+    "RiorsEdge.Zone.Fernhall.SlabsClearWalls",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerFernhallSlabsClearWallsTest::RunTest(const FString& Parameters)
+{
+    constexpr float BreakerFloorAbutCm = 1.0f;
+    for (const FString& Folder : { UBreakerZoneBuilder::FernhallMeshFolder(), UBreakerZoneBuilder::FernhallRiftMeshFolder() })
+    {
+        TArray<FBreakerZonePiece> Pieces;
+        if (!TestTrue(FString::Printf(TEXT("%s collects"), *Folder), UBreakerZoneBuilder::CollectZonePieces(Folder, Pieces))) return false;
+
+        // EVERY wall_ box. Not the composer's FLANK-less set: the flank
+        // buildings are the walls the slabs were authored into.
+        TArray<const FBreakerZonePiece*> Walls;
+        for (const FBreakerZonePiece& Piece : Pieces)
+        {
+            if (Piece.Name.StartsWith(TEXT("wall_"))) Walls.Add(&Piece);
+        }
+        TestTrue(FString::Printf(TEXT("%s has walls to measure against (%d)"), *Folder, Walls.Num()), Walls.Num() > 0);
+
+        int32 Slabs = 0;
+        int32 Hits = 0;
+        for (const FBreakerZonePiece& Slab : Pieces)
+        {
+            if (!BreakerFernhallIsRaisedSlab(Slab.Name)) continue;
+            ++Slabs;
+            for (const FBreakerZonePiece* Wall : Walls)
+            {
+                const float X = BreakerFernhallAxisOverlap(Slab, *Wall, 0);
+                const float Y = BreakerFernhallAxisOverlap(Slab, *Wall, 1);
+                const float Z = BreakerFernhallAxisOverlap(Slab, *Wall, 2);
+                const bool bIntersects = X > BreakerFloorAbutCm && Y > BreakerFloorAbutCm && Z > BreakerFloorAbutCm;
+                if (bIntersects)
+                {
+                    ++Hits;
+                    AddError(FString::Printf(TEXT("%s: slab %s intersects %s (overlap X %.1f, Y %.1f, Z %.1f cm)"),
+                        *Folder, *Slab.Name, *Wall->Name, X, Y, Z));
+                }
+            }
+        }
+        // Not vacuous: a deck, a catwalk, a far deck and a dock in every yard.
+        TestTrue(FString::Printf(TEXT("%s has raised slabs to measure (%d)"), *Folder, Slabs), Slabs > 0);
+        AddInfo(FString::Printf(TEXT("%s: %d slabs against %d walls, %d intersections"), *Folder, Slabs, Walls.Num(), Hits));
+    }
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// A WALL IS STOREYS (O278). A storey is 3 m and a tile is never stretched past
+// its own proportions: a building is a stack of native wall tiles, so its
+// collision box is exactly storeys x one tile tall. The tile the composer
+// stacks is 3.03 m high, so 7 m, 11.5 m and 6.5 m — the skyline's old
+// scaled-box heights — are each a wall that was scaled, and each goes red
+// here by name. The seam walls, bay and dock faces and gantry legs are not
+// buildings and are not measured; the classifier above says which is which.
+//
+// Five centimetres is the same tolerance PieceContract grants a cover box
+// against its authored height.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerFernhallWallsAreStoreysTest,
+    "RiorsEdge.Zone.Fernhall.WallsAreStoreys",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerFernhallWallsAreStoreysTest::RunTest(const FString& Parameters)
+{
+    // The native height of the kit's wall tile (O278): a storey, as built.
+    constexpr float BreakerFernhallStoreyCm = 303.0f;
+    constexpr float BreakerFernhallStoreyToleranceCm = 5.0f;
+    for (const FString& Folder : { UBreakerZoneBuilder::FernhallMeshFolder(), UBreakerZoneBuilder::FernhallRiftMeshFolder() })
+    {
+        TArray<FBreakerZonePiece> Pieces;
+        if (!TestTrue(FString::Printf(TEXT("%s collects"), *Folder), UBreakerZoneBuilder::CollectZonePieces(Folder, Pieces))) return false;
+
+        int32 Matched = 0;
+        for (const FBreakerZonePiece& Piece : Pieces)
+        {
+            const EBreakerFernhallWallFamily Family = BreakerFernhallWallFamilyOf(Piece.Name);
+            if (Family == EBreakerFernhallWallFamily::NotStoreyed) continue;
+            if (Family == EBreakerFernhallWallFamily::Unknown)
+            {
+                AddError(FString::Printf(TEXT("%s: %s is a wall_ piece of no known family; name it storeyed or excluded"),
+                    *Folder, *Piece.Name));
+                continue;
+            }
+            ++Matched;
+            const float HeightCm = 2.0f * Piece.Extent.Z;
+            const int32 Storeys = FMath::RoundToInt(HeightCm / BreakerFernhallStoreyCm);
+            const float OffCm = HeightCm - static_cast<float>(Storeys) * BreakerFernhallStoreyCm;
+            TestTrue(FString::Printf(TEXT("%s: %s (%s) is %.1f cm tall: %d storeys of %.0f, off by %.1f cm, within %.0f"),
+                *Folder, *Piece.Name, BreakerFernhallWallFamilyName(Family), HeightCm, Storeys,
+                BreakerFernhallStoreyCm, OffCm, BreakerFernhallStoreyToleranceCm),
+                Storeys >= 1 && FMath::Abs(OffCm) <= BreakerFernhallStoreyToleranceCm);
+        }
+        // Not vacuous: every yard has flanks, end walls and a mass.
+        TestTrue(FString::Printf(TEXT("%s has storeyed walls to measure (%d)"), *Folder, Matched), Matched > 0);
+    }
+    return true;
+}

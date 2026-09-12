@@ -4561,7 +4561,12 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
     // The siding's off-lane pocket takes the OTHER flank from the entry yard's
     // (pocket 3 at +1400), so the two side rooms a player meets first do not
     // read as one layout mirrored. O2 PLACEHOLDER.
-    const float Laterals[] = { 0.0f, 0.0f, 0.0f, 1400.0f, -1400.0f, 1400.0f, -1500.0f, 900.0f,
+    // The depot's set piece (pocket 6) stands on the +flank at +1300: the
+    // -flank at 42..58 m is the mass and its shoulder, and a formation
+    // centred there puts the Warden and a melee body inside the building
+    // (the hollow kit tile let the capsule check pass; a solid wall does
+    // not). O2 PLACEHOLDER.
+    const float Laterals[] = { 0.0f, 0.0f, 0.0f, 1400.0f, -1400.0f, 1400.0f, 1300.0f, 900.0f,
                                0.0f, 0.0f, -1400.0f };
     constexpr int32 PocketCount = 11;
     static_assert(UE_ARRAY_COUNT(Yards) == PocketCount && UE_ARRAY_COUNT(Fractions) == PocketCount
