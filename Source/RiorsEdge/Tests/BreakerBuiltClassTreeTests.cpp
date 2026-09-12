@@ -14,27 +14,27 @@
 #include "Save/BreakerQuestJournal.h"
 
 // ---------------------------------------------------------------------------
-// TANK / SUPPORT BRANCH TREES — authored 2026-08-16 (owner authorization:
+// SUPPORT BRANCH TREES — authored 2026-08-16 (owner authorization:
 // "feel free to do all 5 classes" + "keep building").
 // ---------------------------------------------------------------------------
-// The branch-layer coverage for the two classes still on the compressed
-// tier grammar, in the mold of Tests/BreakerCasterTreeTests.cpp:
-// registration through the same catalogue the built classes use, exact
-// per-branch content pins (twelve named nodes, the Swift-shaped tier
-// compression), and the keystone-on-cornerstone guarantee's branch-local
-// half. Gunsmith's three trees are six-pair doctrines (O272) and their shape
-// is stated in BreakerDoctrinePairTests.cpp with Caster's and Swift's; the
+// The branch-layer coverage for the one class still on the compressed tier
+// grammar, in the mold of Tests/BreakerCasterTreeTests.cpp: registration
+// through the same catalogue the built classes use, exact per-branch content
+// pins (twelve named nodes, the Swift-shaped tier compression), and the
+// keystone-on-cornerstone guarantee's branch-local half. Gunsmith's and
+// Tank's six trees are six-pair doctrines (O272) and their shape is stated
+// in BreakerDoctrinePairTests.cpp with Caster's and Swift's; the
 // shipped-budget walk at the bottom of this file still runs on Armory.
 //
-// Every non-keystone node in these six trees ships as its treatment rule
+// Every non-keystone node in these three trees ships as its treatment rule
 // verbatim, as a tag with NO stat effect, and every keystone More is RESERVED
 // rather than spent (the Edgework/Cascade posture) — see the block comments
-// above the Tank and Support tree getters in BreakerProgressionLibrary.cpp.
-// Both facts are pinned below as assertions, because a stat line or a More
+// above the Support tree getters in BreakerProgressionLibrary.cpp. Both
+// facts are pinned below as assertions, because a stat line or a More
 // quietly appearing in this content would be a content decision nobody made.
 //
-// Keystone tags are requested by STRING deliberately: the six
-// Keystone.Tank/Support.* tags are file-static natives of
+// Keystone tags are requested by STRING deliberately: the three
+// Keystone.Support.* tags are file-static natives of
 // Abilities/BreakerAbilityDefinition.cpp, and the string is what a granted
 // GameplayEffect and the ultimate's ResolveVariant actually key off —
 // the posture BreakerBuiltClassKitTests already takes.
@@ -54,24 +54,6 @@ namespace BreakerBuiltClassTreeTestHelpers
     TArray<FBuiltBranch> BuiltBranches()
     {
         return {
-            { UBreakerProgressionLibrary::GetTankLeechTree(), EBreakerClassId::Tank, TEXT("Keystone.Tank.Vein"), {
-                TEXT("Tank.Leech.Clot"), TEXT("Tank.Leech.SlowBleed"), TEXT("Tank.Leech.OpenWound"),
-                TEXT("Tank.Leech.FeedTheWound"), TEXT("Tank.Leech.Bloodlet"), TEXT("Tank.Leech.Transfusion"),
-                TEXT("Tank.Leech.RendMastery"), TEXT("Tank.Leech.SecondHeart"),
-                TEXT("Tank.Leech.NothingWasted"), TEXT("Tank.Leech.Reciprocity"), TEXT("Tank.Leech.Exsanguinate"),
-                TEXT("Tank.Leech.Vein") } },
-            { UBreakerProgressionLibrary::GetTankBastionTree(), EBreakerClassId::Tank, TEXT("Keystone.Tank.Wall"), {
-                TEXT("Tank.Bastion.LineOfSight"), TEXT("Tank.Bastion.Footing"), TEXT("Tank.Bastion.Loud"),
-                TEXT("Tank.Bastion.HeldGround"), TEXT("Tank.Bastion.AnsweringFire"), TEXT("Tank.Bastion.Bulk"),
-                TEXT("Tank.Bastion.Emplacement"), TEXT("Tank.Bastion.Interposition"),
-                TEXT("Tank.Bastion.Conversion"), TEXT("Tank.Bastion.StandingOrder"), TEXT("Tank.Bastion.ImmovableObject"),
-                TEXT("Tank.Bastion.Wall") } },
-            { UBreakerProgressionLibrary::GetTankDemolitionistTree(), EBreakerClassId::Tank, TEXT("Keystone.Tank.Detonation"), {
-                TEXT("Tank.Demolitionist.ShapedCharge"), TEXT("Tank.Demolitionist.Bootstraps"), TEXT("Tank.Demolitionist.BracedForImpact"),
-                TEXT("Tank.Demolitionist.Fragmentation"), TEXT("Tank.Demolitionist.Concussion"), TEXT("Tank.Demolitionist.Overpressure"),
-                TEXT("Tank.Demolitionist.Demolition"), TEXT("Tank.Demolitionist.TerminalDescent"),
-                TEXT("Tank.Demolitionist.BlastRadius"), TEXT("Tank.Demolitionist.KineticRecovery"), TEXT("Tank.Demolitionist.ChainReaction"),
-                TEXT("Tank.Demolitionist.Detonation") } },
             { UBreakerProgressionLibrary::GetSupportMedicTree(), EBreakerClassId::Support, TEXT("Keystone.Support.Triage"), {
                 TEXT("Support.Medic.FieldDressing"), TEXT("Support.Medic.TriagePriority"), TEXT("Support.Medic.CleanHands"),
                 TEXT("Support.Medic.SteadyHands"), TEXT("Support.Medic.SecondOpinion"), TEXT("Support.Medic.Attending"),
@@ -95,11 +77,12 @@ namespace BreakerBuiltClassTreeTestHelpers
 }
 
 // ---------------------------------------------------------------------------
-// Registration: six trees, three per class, found through the exact path
-// GetAvailableTrees walks — GetAllFallbackTrees, GetTreesForClass, and each
-// class definition's BranchTrees. A Tank character SEES its trees or this
-// fails by name. The class-definition loop below still covers Gunsmith: its
-// definition lists three doctrines plus Core like every other class.
+// Registration: three Support trees, found through the exact path
+// GetAvailableTrees walks — GetAllFallbackTrees, GetTreesForClass, and the
+// class definition's BranchTrees. A Support character SEES its trees or this
+// fails by name. The class-definition loop below still covers Gunsmith and
+// Tank: each definition lists three doctrines plus Core like every other
+// class.
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerBuiltClassTreesRegisteredTest,
@@ -146,7 +129,7 @@ bool FBreakerBuiltClassTreesRegisteredTest::RunTest(const FString& Parameters)
 // Swift-shaped compression (doc tiers 1-4 keep their numbers; the doc's
 // tier-5 keystone sits at tier 3, cost 3, as a cornerstone), every node a
 // tag-carrying rule with NO stat effect and NO ability grant, and NO More
-// multiplier anywhere — all six keystone Mores are reserved, the
+// multiplier anywhere — all three keystone Mores are reserved, the
 // Edgework/Cascade posture. Pinned by name so content cannot drift without a
 // diff saying so.
 // ---------------------------------------------------------------------------
@@ -178,7 +161,7 @@ bool FBreakerBuiltClassTreesShapeTest::RunTest(const FString& Parameters)
             if (!TestTrue(*(Context + TEXT(" tier is 1-4 (keystone compressed to 3)")), Node->Tier >= 1 && Node->Tier <= 4)) continue;
             ++TierCounts[Node->Tier];
 
-            // The compressed grammar, one rule set for all six branches:
+            // The compressed grammar, one rule set for all three branches:
             // entry/loop nodes are two ranks at 1; tier 3 is single rank at 2
             // (rewrites) or 3 (the cornerstone keystone); tier 4 rewrites are
             // single rank at 2.
@@ -237,8 +220,9 @@ bool FBreakerBuiltClassTreesShapeTest::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// Keystones: each of the six Keystone.* tags the shipped ultimate variant
-// rows key off is granted by exactly one node across all fallback trees, and
+// Keystones: each of the three Keystone.Support.* tags the shipped ultimate
+// variant rows key off is granted by exactly one node across all fallback
+// trees, and
 // that node is its branch's cornerstone. This is the branch-local half of the
 // guarantee whose global half is BreakerKeystoneReachabilityTests — whose
 // honest-emptiness arm stopped applying to these classes the moment these

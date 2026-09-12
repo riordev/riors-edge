@@ -226,10 +226,10 @@ gate; aborted traversal, teleport, death and class changes cancel it.
 ## Implemented node behavior (2026-09-07)
 
 Tank Overpressure uses the existing Breach Charge input again to detonate a
-live charge without a second cost or cooldown. Rank two follows the first
-living enemy hit. The ordinary fuse remains active; Demolition permits its
-two sequential placements under one shared cooldown. Death and unequipping
-remove pending charges.
+live charge without a second cost or cooldown, and the charge sticks to the
+first living enemy it touches. The ordinary fuse remains active; Demolition
+permits its two sequential placements under one shared cooldown. Death and
+unequipping remove pending charges.
 
 Gunsmith Dead Ground now modifies a real deployment cast. Pending placements
 can be cancelled and must pass the ground/range/sight/cost checks again at

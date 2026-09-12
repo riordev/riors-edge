@@ -199,10 +199,9 @@ bool FBreakerAbilityInterruptRuntimeTest::RunTest(const FString& Parameters)
         Player->GetProgression()->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 8)) return false;
     const auto* Demolition = UBreakerProgressionLibrary::GetTankDemolitionistTree();
     FText Reason;
-    for (const TCHAR* Node : { TEXT("Tank.Demolitionist.ShapedCharge"), TEXT("Tank.Demolitionist.ShapedCharge"),
-        TEXT("Tank.Demolitionist.Bootstraps"), TEXT("Tank.Demolitionist.Bootstraps"),
-        TEXT("Tank.Demolitionist.BracedForImpact"), TEXT("Tank.Demolitionist.BracedForImpact"),
-        TEXT("Tank.Demolitionist.KineticRecovery") })
+    // O272: Kinetic Recovery is the impactful half of Bootstraps' pair; the
+    // travel buys first and the pair costs two of the eight.
+    for (const TCHAR* Node : { TEXT("Tank.Demolitionist.Bootstraps"), TEXT("Tank.Demolitionist.KineticRecovery") })
         if (!TestTrue(Node, Player->GetProgression()->PurchaseNode(Demolition, Node, Reason))) return false;
     APlayerController* Controller = World->SpawnActor<APlayerController>();
     if (!TestNotNull(TEXT("real downward aim controller"), Controller)) return false;

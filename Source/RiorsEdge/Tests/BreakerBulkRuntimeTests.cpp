@@ -28,7 +28,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerBulkRuntimeTest,
 
 bool FBreakerBulkRuntimeTest::RunTest(const FString& Parameters)
 {
-    for (int32 Rank = 0; Rank <= 2; ++Rank)
+    // O272: Bulk is a single-rank travel root; rank one carries the old
+    // rank-two magnitude (2x panel health).
+    for (int32 Rank = 0; Rank <= 1; ++Rank)
     {
     UWorld::InitializationValues Init;
     Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
@@ -65,11 +67,9 @@ bool FBreakerBulkRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("actual entitlement is eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 8);
     const auto* Tree = UBreakerProgressionLibrary::GetTankBastionTree();
     FText Reason;
-    for (int32 N = 0; N < 2; ++N)
-        if (!TestTrue(TEXT("legal Line of Sight entry"), Progression->PurchaseNode(Tree, TEXT("Tank.Bastion.LineOfSight"), Reason))) return false;
-    for (int32 N = 0; N < Rank; ++N)
+    if (Rank > 0)
         if (!TestTrue(TEXT("legal Bulk purchase"), Progression->PurchaseNode(Tree, TEXT("Tank.Bastion.Bulk"), Reason))) return false;
-    TestEqual(TEXT("Bulk stays within actual budget"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 6 - Rank);
+    TestEqual(TEXT("Bulk stays within actual budget"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 8 - Rank);
     if (!Progression->IsAbilityUnlocked(TEXT("Tank.AnchorPoint")))
         if (!TestTrue(TEXT("earned token unlocks Anchor"), Progression->SpendAbilityToken(TEXT("Tank.AnchorPoint"), Reason))) return false;
     auto* Grit = Tank->GetGrit(); Grit->BindAttributes(Attributes); Grit->SetComponentTickEnabled(false);
@@ -90,7 +90,7 @@ bool FBreakerBulkRuntimeTest::RunTest(const FString& Parameters)
     auto* PanelCombat = Anchor->FindComponentByClass<UBreakerCombatComponent>();
     auto* PanelHealth = FindObject<UBreakerAttributeSet>(Anchor, TEXT("Attributes"));
     if (!TestNotNull(TEXT("panel combat"), PanelCombat) || !TestNotNull(TEXT("panel attributes"), PanelHealth)) return false;
-    const float ExpectedFraction = .2f * (Rank == 2 ? 2.0f : Rank == 1 ? 1.5f : 1.0f);
+    const float ExpectedFraction = .2f * (Rank == 1 ? 2.0f : 1.0f);
     TestEqual(TEXT("existing paid Bulk health scaling remains"), PanelHealth->GetMaxHealth(), Attributes->GetMaxHealth() * ExpectedFraction, .01f);
     auto Rocket = [&](bool bDirect)
     {

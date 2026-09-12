@@ -74,12 +74,12 @@ bool FBreakerProvokeThreatRuntimeTest::RunTest(const FString&)
  TestEqual(TEXT("Actual campaign supplies eight Doctrine points"),P->GetProgressionState().UnspentDoctrinePoints,8);
  auto* Bastion=UBreakerProgressionLibrary::GetTankBastionTree();
  if(!TestTrue(TEXT("Commit Bastion"),P->CommitToBranch(Bastion->TreeId,Reason)))return false;
- for(const TCHAR* Id:{TEXT("Tank.Bastion.Loud"),TEXT("Tank.Bastion.Loud"),TEXT("Tank.Bastion.AnsweringFire"),TEXT("Tank.Bastion.AnsweringFire")})
-   if(!TestTrue(TEXT("Pay actual Standing Order prerequisite"),P->PurchaseNode(Bastion,Id,Reason)))return false;
- TestFalse(TEXT("Standing Order refuses before six-point tier investment"),P->PurchaseNode(Bastion,TEXT("Tank.Bastion.StandingOrder"),Reason));
- for(const TCHAR* Id:{TEXT("Tank.Bastion.Footing"),TEXT("Tank.Bastion.Footing"),TEXT("Tank.Bastion.StandingOrder")})
-   if(!TestTrue(TEXT("Pay remaining actual Doctrine route"),P->PurchaseNode(Bastion,Id,Reason)))return false;
- TestEqual(TEXT("Standing Order route spends exactly eight Doctrine points"),P->GetProgressionState().UnspentDoctrinePoints,0);
+ // O272: Standing Order is the impactful half of Loud's pair — refused before
+ // its travel, one point behind it, no investment gate.
+ TestFalse(TEXT("Standing Order refuses before its travel"),P->PurchaseNode(Bastion,TEXT("Tank.Bastion.StandingOrder"),Reason));
+ for(const TCHAR* Id:{TEXT("Tank.Bastion.Loud"),TEXT("Tank.Bastion.StandingOrder")})
+   if(!TestTrue(TEXT("Pay actual Standing Order pair"),P->PurchaseNode(Bastion,Id,Reason)))return false;
+ TestEqual(TEXT("Standing Order pair leaves six of eight Doctrine points"),P->GetProgressionState().UnspentDoctrinePoints,6);
  const auto* Provoke=UBreakerAbilityDefinition::FindFallback(TEXT("Tank.Provoke"));
  if(!Provoke)return false;
  for(float T=0;T<Provoke->GetCooldownSeconds()+.05f;T+=.01f){++GFrameCounter;World->Tick(LEVELTICK_All,.01f);}

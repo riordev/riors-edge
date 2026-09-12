@@ -59,8 +59,9 @@ namespace BreakerTankAbilityLocal
 
     // Prefixed for the unity build, per house rule.
 
-    // Node reads, the Cleave's Edge pattern: rank for the R1/R2 nodes, tag for
-    // the pure rewrites. Null-safe: no progression component is rank 0.
+    // Node reads, the Cleave's Edge pattern: rank for the magnitude nodes
+    // (single-rank, O272), tag for the pure rewrites. Null-safe: no
+    // progression component is rank 0.
     int32 BreakerTankNodeRank(const ABreakerCharacter* Character, const TCHAR* NodeId)
     {
         const UBreakerProgressionComponent* Progression = Character ? Character->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
@@ -279,18 +280,18 @@ void UBreakerAbility_Rend::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 
     // L1 CLOT: the overheal-to-shield ratio rises above 1:1.
     const int32 ClotRank = BreakerTankNodeRank(Character, TEXT("Tank.Leech.Clot"));
-    const float ClotRatio = ClotRank >= 2 ? 1.5f : (ClotRank == 1 ? 1.25f : 1.0f);   // node text
-    // L3 OPEN WOUND: Life on Hit fires on the first target of a sweep (R2:
-    // every target). SAME RECORDED SUBSTITUTION AS BLOODLINE: no Life on Hit
-    // stat exists anywhere, so the gear's LifeOnKill magnitude stands in —
-    // still reads gear, still grants nothing without it.
+    const float ClotRatio = ClotRank > 0 ? 1.5f : 1.0f;   // O2 PLACEHOLDER, node text
+    // L3 OPEN WOUND: Life on Hit fires on every accepted target of a sweep.
+    // SAME RECORDED SUBSTITUTION AS BLOODLINE: no Life on Hit stat exists
+    // anywhere, so the gear's LifeOnKill magnitude stands in — still reads
+    // gear, still grants nothing without it.
     const int32 OpenWoundRank = BreakerTankNodeRank(Character, TEXT("Tank.Leech.OpenWound"));
     const UBreakerEquipmentComponent* Equipment = Character->GetEquipment();
     const float OpenWoundLeech = (OpenWoundRank > 0 && Equipment) ? Equipment->GetStats().LifeOnKill : 0.0f;
     // L5 BLOODLET: melee kills heal a fraction of maximum health, overheal
     // routed through the normal, capped path.
     const int32 BloodletRank = BreakerTankNodeRank(Character, TEXT("Tank.Leech.Bloodlet"));
-    const float BloodletFraction = BloodletRank >= 2 ? 0.14f : (BloodletRank == 1 ? 0.08f : 0.0f);   // node text
+    const float BloodletFraction = BloodletRank > 0 ? 0.14f : 0.0f;   // O2 PLACEHOLDER, node text
     const float OwnMaxHealth = SourceAttributes ? SourceAttributes->GetMaxHealth() : 0.0f;
 
     // THE SWING, VISIBLE -- Cleave's own composition at Rend's geometry: the
@@ -319,7 +320,6 @@ void UBreakerAbility_Rend::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 
     float TotalPostMitigation = 0.0f;
     int32 TargetIndex = 0;
-    int32 AcceptedTargetCount = 0;
     for (AActor* Target : UBreakerMeleeSweep::SweepTargets(World, Character, Params))
     {
         UBreakerCombatComponent* TargetCombat = Target ? Target->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
@@ -363,14 +363,13 @@ void UBreakerAbility_Rend::ActivateAbility(const FGameplayAbilitySpecHandle Hand
             }
         }
 
-        // L3 pays on the first accepted damaging hit (R2: every such hit).
-        // Avoidance or full mitigation cannot consume R1's one payout.
+        // L3 pays on every accepted damaging hit. Avoidance or full
+        // mitigation is not a payout.
         const bool bAcceptedHit = !Result.bDodged && !Result.bParried && TargetPostMitigation > 0.0f;
-        if (bAcceptedHit && OpenWoundLeech > 0.0f && OwnerCombat && (AcceptedTargetCount == 0 || OpenWoundRank >= 2))
+        if (bAcceptedHit && OpenWoundLeech > 0.0f && OwnerCombat && OpenWoundRank > 0)
         {
             OwnerCombat->ApplyHealingAmount(OpenWoundLeech, Character, FGameplayTag());
         }
-        if (bAcceptedHit) ++AcceptedTargetCount;
 
         // §1.1's aggression source: a melee kill pays Grit, and Rend is the
         // Tank's melee verb — the one honest caller NotifyMeleeKill has.
@@ -413,9 +412,9 @@ void UBreakerAbility_Rend::ActivateAbility(const FGameplayAbilitySpecHandle Hand
         Heal.SourceTag = FGameplayTag();   // no heal-source vocabulary exists yet; empty is the honest tag
         Heal.SetHealer(Character);
         const FBreakerHealResult HealResult = OwnerCombat->ApplyHealing(Heal);
-        // L1 Clot: overheal converts at 1.25:1 (R2 1.5:1) instead of 1:1 — the
-        // extra quarter rides on what the 1:1 path actually granted, so the
-        // shield cap keeps its authority.
+        // L1 Clot: overheal converts at 1.5:1 instead of 1:1 — the extra half
+        // rides on what the 1:1 path actually granted, so the shield cap keeps
+        // its authority.
         if (ClotRatio > 1.0f && HealResult.ShieldGranted > 0.0f && SourceAttributes)
         {
             GetBreakerAttributes()->ApplyShield(FMath::Min(SourceAttributes->GetMaxShield(),
@@ -646,28 +645,28 @@ void UBreakerAbility_AnchorPoint::ActivateAbility(const FGameplayAbilitySpecHand
     const FRotator PanelFacing = FRotator(0.0f, Forward.Rotation().Yaw, 0.0f);
     if (ABreakerDeployable* Panel = World->SpawnActor<ABreakerDeployable>(ABreakerDeployable::StaticClass(), PlaceLocation, PanelFacing, SpawnParams))
     {
-        // B6 BULK: half again the health (R2: double), applied to the fraction
-        // BEFORE the deployable computes its pool from it. Incidental radial
-        // damage is rejected at the live panel's receiver; direct impacts remain valid.
+        // B6 BULK: double the health, applied to the fraction BEFORE the
+        // deployable computes its pool from it. Incidental radial damage is
+        // rejected at the live panel's receiver; direct impacts remain valid.
         const int32 BulkRank = BreakerTankNodeRank(Character, TEXT("Tank.Bastion.Bulk"));
         if (BulkRank > 0)
         {
-            Panel->AnchorHealthFraction *= (BulkRank >= 2 ? 2.0f : 1.5f);   // node text
+            Panel->AnchorHealthFraction *= 2.0f;   // O2 PLACEHOLDER, node text
         }
         // Cost 0 into the deployable: Grit was already spent through the GAS
         // cost effect, and Anchor Point refunds nothing ("this is not a Scrap
         // economy", §T3).
         Panel->InitializeDeployable(EBreakerDeployableType::AnchorPoint, Character, 0.0f);
 
-        // B1 LINE OF SIGHT: the panel stands 16s (R2: 20s) instead of 12 — and
-        // the ability-duration seam the tree's AbilityDuration lane composes
-        // into is adopted at the same site, so the library's first authored
-        // line against Anchor Point pays the day it lands.
+        // B1 LINE OF SIGHT: the panel stands 20s instead of 12 — and the
+        // ability-duration seam the tree's AbilityDuration lane composes into
+        // is adopted at the same site, so the library's first authored line
+        // against Anchor Point pays the day it lands.
         float Lifetime = Panel->GetRemainingLifetime() * GetAbilityDurationMultiplier();
         const int32 SightRank = BreakerTankNodeRank(Character, TEXT("Tank.Bastion.LineOfSight"));
         if (SightRank > 0)
         {
-            Lifetime = (SightRank >= 2 ? 20.0f : 16.0f) * GetAbilityDurationMultiplier();   // node text
+            Lifetime = 20.0f * GetAbilityDurationMultiplier();   // O2 PLACEHOLDER, node text
         }
         // B11 IMMOVABLE OBJECT: indestructible for its first 4s — and its total
         // lifetime is halved. Cost-for-power with the downside in the same line.
@@ -693,7 +692,7 @@ void UBreakerAbility_AnchorPoint::ActivateAbility(const FGameplayAbilitySpecHand
         }
         Panel->LifetimeRemaining = Lifetime;
 
-        // B4 Held Ground R2: placing an Anchor Point re-triggers the entry
+        // B4 Held Ground: placing an Anchor Point re-triggers the entry
         // grant, once per combat state — the Grit component owns the gate.
         if (UBreakerGritComponent* Grit = Character->FindComponentByClass<UBreakerGritComponent>())
         {
@@ -728,9 +727,9 @@ void UBreakerAbility_Provoke::ActivateAbility(const FGameplayAbilitySpecHandle H
 
     using namespace BreakerTankAbilityLocal;
 
-    // B3 LOUD: Provoke reaches 13 m (R2: 16 m) instead of 10.
+    // B3 LOUD: Provoke reaches 16 m instead of 10.
     const int32 LoudRank = BreakerTankNodeRank(Character, TEXT("Tank.Bastion.Loud"));
-    const float EffectiveRadius = LoudRank >= 2 ? 1600.0f : (LoudRank == 1 ? 1300.0f : RadiusCm);   // node text
+    const float EffectiveRadius = LoudRank > 0 ? 1600.0f : RadiusCm;   // O2 PLACEHOLDER, node text
     // B10 STANDING ORDER: forced focus lasts ten seconds unless a foreign source damages the enemy.
     const bool bStandingOrder = BreakerTankHasNode(Character, BreakerNodeTags::Node_B_StandingOrder.GetTag());
     const float EffectiveDuration = bStandingOrder ? 10.0f : BonusDurationSeconds;   // node text
@@ -792,7 +791,7 @@ void UBreakerAbility_Provoke::ActivateAbility(const FGameplayAbilitySpecHandle H
         }
 
         // B5 ANSWERING FIRE: enemies you have Provoked pay proximity Grit at
-        // 1.5x (R2: 2x). RECORDED SUBSTITUTION: no threat list exists to ask
+        // 2x. RECORDED SUBSTITUTION: no threat list exists to ask
         // whether the near enemy is a provoked one, so the boost rides
         // Provoke's own window — still count-independent, still capped, and it
         // exists only while something was actually provoked.
@@ -801,7 +800,7 @@ void UBreakerAbility_Provoke::ActivateAbility(const FGameplayAbilitySpecHandle H
         {
             if (UBreakerGritComponent* Grit = Character->FindComponentByClass<UBreakerGritComponent>())
             {
-                Grit->PushWindowProximityRateBoost(OutgoingModifierKey(), AnsweringRank >= 2 ? 2.0f : 1.5f, EffectiveDuration);   // node text
+                Grit->PushWindowProximityRateBoost(OutgoingModifierKey(), 2.0f, EffectiveDuration);   // O2 PLACEHOLDER, node text
             }
         }
     }
@@ -844,7 +843,8 @@ void UBreakerAbility_BreachCharge::ActivateAbility(const FGameplayAbilitySpecHan
     const bool bHit = World->LineTraceSingleByChannel(Hit, ViewLocation, TraceEnd, ECC_GameTraceChannel2, QueryParams);
     const FVector Location = bHit ? Hit.ImpactPoint : TraceEnd;
     AActor* StickyTarget = nullptr;
-    if (bHit && BreakerTankAbilityLocal::BreakerTankNodeRank(Character, TEXT("Tank.Demolitionist.Overpressure")) >= 2)
+    // D-branch OVERPRESSURE: a charge thrown onto a living enemy sticks to it.
+    if (bHit && BreakerTankAbilityLocal::BreakerTankNodeRank(Character, TEXT("Tank.Demolitionist.Overpressure")) > 0)
     {
         ABreakerEnemy* Enemy = Cast<ABreakerEnemy>(Hit.GetActor());
         if (Enemy && !Enemy->IsDeadEnemy()) StickyTarget = Enemy;
@@ -937,12 +937,12 @@ void UBreakerAbility_BreachCharge::Detonate(FVector BlastLocation)
     FBreakerTankBlastMods Mods;
     Mods.bRiftDelivery = true;
     const int32 ShapedRank = BreakerTankNodeRank(Character, TEXT("Tank.Demolitionist.ShapedCharge"));
-    if (ShapedRank > 0) Mods.PlateauFraction = ShapedRank >= 2 ? 0.6f : 0.4f;   // D1
+    if (ShapedRank > 0) Mods.PlateauFraction = 0.6f;   // O2 PLACEHOLDER, D1
     const int32 FragRank = BreakerTankNodeRank(Character, TEXT("Tank.Demolitionist.Fragmentation"));
     if (FragRank > 0)
     {
         Mods.FragmentationFraction = 0.25f;   // O2 PLACEHOLDER ("a portion of their health")
-        Mods.FragmentationRadiusCm = FragRank >= 2 ? 400.0f : 300.0f;   // D4
+        Mods.FragmentationRadiusCm = 400.0f;   // O2 PLACEHOLDER, D4
     }
     if (BreakerTankHasNode(Character, BreakerNodeTags::Node_D_ChainReaction.GetTag()))
     {
@@ -967,7 +967,7 @@ void UBreakerAbility_BreachCharge::Detonate(FVector BlastLocation)
         // D2 BOOTSTRAPS: the launch follows the AIM, not the blast normal —
         // the Tank flies away from where they were looking, whatever angle the
         // charge actually sat at. The launch never reads the self-damage
-        // numbers on either branch, which is R2's clause standing structurally.
+        // numbers on either branch, which is the node's clause standing structurally.
         if (BreakerTankNodeRank(Character, TEXT("Tank.Demolitionist.Bootstraps")) > 0)
         {
             FVector Aim = Character->GetControlRotation().Vector();
@@ -980,11 +980,11 @@ void UBreakerAbility_BreachCharge::Detonate(FVector BlastLocation)
         Character->LaunchCharacter(Away * KnockbackImpulse * FMath::Max(0.4f, Proximity), true, true);
         if (UBreakerCharacterMovementComponent* Movement = Character->GetBreakerMovement()) Movement->NotifyOwnBlastLaunch();
 
-        // D3 BRACED FOR IMPACT: self-damage reduction 50% -> 65% (R2: 80%, the
-        // branch ceiling — NEVER 100). Lowering the self-hit LOWERS the Grit it
+        // D3 BRACED FOR IMPACT: self-damage reduction 50% -> 80% (the branch
+        // ceiling — NEVER 100). Lowering the self-hit LOWERS the Grit it
         // pays, automatically, through the post-mitigation rule.
         const int32 BracedRank = BreakerTankNodeRank(Character, TEXT("Tank.Demolitionist.BracedForImpact"));
-        const float EffectiveSelfFraction = BracedRank >= 2 ? 0.2f : (BracedRank == 1 ? 0.35f : SelfDamageFraction);   // node text
+        const float EffectiveSelfFraction = BracedRank > 0 ? 0.2f : SelfDamageFraction;   // O2 PLACEHOLDER, node text
         const float Falloff = FMath::Lerp(1.0f, EdgeDamageFraction, FMath::Clamp(SelfDistance / BlastRadiusCm, 0.0f, 1.0f));
         FBreakerDamageRequest SelfDamage;
         SelfDamage.BaseDamage = FMath::Max(1.0f, BaseDamage * Falloff * EffectiveSelfFraction);
@@ -1062,12 +1062,12 @@ void UBreakerAbility_GroundZero::HandlePlungeLanded(const FHitResult& Hit)
     const float EnemyRadius = BlastRadiusCm * (bBlastRadius ? 1.5f : 1.0f);   // D9
     FBreakerTankBlastMods Mods;
     const int32 ShapedRank = BreakerTankNodeRank(Character, TEXT("Tank.Demolitionist.ShapedCharge"));
-    if (ShapedRank > 0) Mods.PlateauFraction = ShapedRank >= 2 ? 0.6f : 0.4f;   // D1
+    if (ShapedRank > 0) Mods.PlateauFraction = 0.6f;   // O2 PLACEHOLDER, D1
     const int32 FragRank = BreakerTankNodeRank(Character, TEXT("Tank.Demolitionist.Fragmentation"));
     if (FragRank > 0)
     {
         Mods.FragmentationFraction = 0.25f;   // O2 PLACEHOLDER
-        Mods.FragmentationRadiusCm = FragRank >= 2 ? 400.0f : 300.0f;   // D4
+        Mods.FragmentationRadiusCm = 400.0f;   // O2 PLACEHOLDER, D4
     }
     if (BreakerTankHasNode(Character, BreakerNodeTags::Node_D_ChainReaction.GetTag()))
     {
@@ -1083,11 +1083,11 @@ void UBreakerAbility_GroundZero::HandlePlungeLanded(const FHitResult& Hit)
     // not scale with it.
     BreakerTankAbilityLocal::BreakerTankBlastFlash(World, Center, EnemyRadius);
 
-    // D5 CONCUSSION: the stagger runs 2.0s (R2: 2.5s) instead of 1.5. Its
-    // mid-air clause is already structural — the stop below never asked
-    // whether the enemy stood on the floor.
+    // D5 CONCUSSION: the stagger runs 2.5s instead of 1.5. Its mid-air
+    // clause is already structural — the stop below never asked whether the
+    // enemy stood on the floor.
     const int32 ConcussionRank = BreakerTankNodeRank(Character, TEXT("Tank.Demolitionist.Concussion"));
-    const float EffectiveStagger = ConcussionRank >= 2 ? 2.5f : (ConcussionRank == 1 ? 2.0f : StaggerSeconds);   // node text
+    const float EffectiveStagger = ConcussionRank > 0 ? 2.5f : StaggerSeconds;   // O2 PLACEHOLDER, node text
 
     // Shared O80 interrupt state preserves unrelated movement modifiers.
     for (const TWeakObjectPtr<UBreakerCombatComponent>& Target : DamagedTargets)

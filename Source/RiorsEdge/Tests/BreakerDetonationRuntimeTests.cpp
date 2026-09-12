@@ -57,16 +57,22 @@ bool FBreakerDetonationRuntimeTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("real entitlement eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 8);
         const auto* Tree = UBreakerProgressionLibrary::GetTankDemolitionistTree();
         FText Reason;
-        for (const TCHAR* Node : { TEXT("Tank.Demolitionist.ShapedCharge"), TEXT("Tank.Demolitionist.ShapedCharge"),
-            TEXT("Tank.Demolitionist.Bootstraps"), TEXT("Tank.Demolitionist.Bootstraps"),
-            TEXT("Tank.Demolitionist.Fragmentation"), TEXT("Tank.Demolitionist.Fragmentation") })
+        // O272: six single points open the keystone's gate — its own travel
+        // first, two whole pairs, a third travel — then the commitment and
+        // Detonation for one. Seven of the eight are spent; the eighth is the
+        // honest remainder.
+        for (const TCHAR* Node : { TEXT("Tank.Demolitionist.Fragmentation"),
+            TEXT("Tank.Demolitionist.ShapedCharge"), TEXT("Tank.Demolitionist.BlastRadius"),
+            TEXT("Tank.Demolitionist.Bootstraps"), TEXT("Tank.Demolitionist.KineticRecovery"),
+            TEXT("Tank.Demolitionist.BracedForImpact") })
         {
             const bool bBought = Progression->PurchaseNode(Tree, Node, Reason);
             if (!TestTrue(FString::Printf(TEXT("purchase %s: %s"), Node, *Reason.ToString()), bBought)) return false;
         }
+        TestEqual(TEXT("six invested opens the keystone gate"), Progression->GetTreeInvestment(Tree), 6);
         if (!TestTrue(TEXT("actual branch commitment"), Progression->CommitToBranch(Tree->TreeId, Reason))) return false;
         if (!TestTrue(TEXT("actual Detonation purchase"), Progression->PurchaseNode(Tree, TEXT("Tank.Demolitionist.Detonation"), Reason))) return false;
-        TestEqual(TEXT("Detonation spends eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
+        TestEqual(TEXT("Detonation walk leaves one of eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 1);
         auto* Grit = Tank->GetGrit(); Grit->BindAttributes(Attributes); Grit->SetComponentTickEnabled(false);
         Grit->SetInCombat(true);
         for (int32 Second = 0; Second < 70; ++Second) { Grit->SetEnemyInProximity(true); Grit->AdvanceLoop(1); }

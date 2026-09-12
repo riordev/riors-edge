@@ -130,9 +130,9 @@ public:
     // that live at the resource loop rather than on an ability. Every one of
     // them is gated on a node tag or rank and is bit-identical when unowned.
 
-    // Bastion B4 R2 (Held Ground): placing an Anchor Point re-triggers the
+    // Bastion B4 (Held Ground): placing an Anchor Point re-triggers the
     // combat-entry grant, once per combat state. The ability calls this after a
-    // successful placement; without the node's second rank it does nothing.
+    // successful placement; without the node it does nothing.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Grit|Nodes") void NotifyAnchorPlaced();
 
     // Bastion B5 (Answering Fire): a keyed, expiring multiplier on the
@@ -309,6 +309,8 @@ private:
 
     // Node-rank cache, refreshed on every progression change so the per-frame
     // loop never walks the tree. All zero/false for a non-Tank or a bare rig.
+    // Tank doctrine nodes are single-rank (O272): a Rank* member above zero
+    // means the node is taken; no reader distinguishes ranks.
     int32 RankSlowBleed = 0;        // L2
     int32 RankFeedTheWound = 0;     // L4
     int32 RankTransfusion = 0;      // L6

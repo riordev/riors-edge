@@ -66,8 +66,9 @@ namespace BreakerBranchNodeTest
 }
 
 // ---------------------------------------------------------------------------
-// L4 Feed the Wound: shield absorption pays at two-thirds rate (R2: full),
-// against the unowned half-rate baseline.
+// L4 Feed the Wound: shield absorption pays at full rate (O272: the single
+// rank carries what rank two used to), against the unowned half-rate
+// baseline.
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerNodeFeedTheWoundTest,
@@ -92,8 +93,7 @@ bool FBreakerNodeFeedTheWoundTest::RunTest(const FString& Parameters)
 
     // 200 shield damage on 1000 health at 1-per-2%: 10 units before the rate.
     TestEqual(TEXT("Unowned, shield absorption pays at half rate"), RunShieldAbsorb(0), 5.0f, 0.01f);
-    TestEqual(TEXT("R1 pays at two-thirds rate"), RunShieldAbsorb(1), 10.0f * (2.0f / 3.0f), 0.01f);
-    TestEqual(TEXT("R2 pays at full rate"), RunShieldAbsorb(2), 10.0f, 0.01f);
+    TestEqual(TEXT("Owned, shield absorption pays at full rate"), RunShieldAbsorb(1), 10.0f, 0.01f);
     return true;
 }
 
@@ -125,8 +125,8 @@ bool FBreakerNodeTransfusionTest::RunTest(const FString& Parameters)
 
     TestEqual(TEXT("Unowned, a block proc pays the base grant"), RunBlockProc(0, true), 6.0f, 0.01f);
     // +9 requested against the 8/s block budget: the per-source cap binds.
-    TestEqual(TEXT("Owned and shielded, the proc pays more (budget-bounded)"), RunBlockProc(2, true), 8.0f, 0.01f);
-    TestEqual(TEXT("Owned but UNSHIELDED, the proc pays the base grant"), RunBlockProc(2, false), 6.0f, 0.01f);
+    TestEqual(TEXT("Owned and shielded, the proc pays more (budget-bounded)"), RunBlockProc(1, true), 8.0f, 0.01f);
+    TestEqual(TEXT("Owned but UNSHIELDED, the proc pays the base grant"), RunBlockProc(1, false), 6.0f, 0.01f);
     return true;
 }
 
@@ -165,13 +165,10 @@ bool FBreakerNodeLeechShieldClockTest::RunTest(const FString& Parameters)
     const float BaseShield = ShieldAfter({}, 0.0f);
     TestTrue(TEXT("Unowned, the shield bleeds after the 3s hold"), BaseShield < 100.0f - KINDA_SMALL_NUMBER);
 
-    // L2 R1: the hold is 5s — at 4.1s of clock, part of the last step decays;
-    // strictly MORE shield must remain than the base run kept.
-    const float SlowBleedShield = ShieldAfter({{TEXT("Tank.Leech.SlowBleed"), 1}}, 0.0f);
-    TestTrue(TEXT("Slow Bleed holds longer than base"), SlowBleedShield > BaseShield);
-    // L2 R2: 8s hold — the whole run sits inside it, no decay at all.
-    TestEqual(TEXT("Slow Bleed R2 holds the whole window"),
-        ShieldAfter({{TEXT("Tank.Leech.SlowBleed"), 2}}, 0.0f), 100.0f, 0.01f);
+    // L2: the single rank holds 8s (O272) — the whole 4.1s run sits inside
+    // it, no decay at all.
+    TestEqual(TEXT("Slow Bleed holds the whole window"),
+        ShieldAfter({{TEXT("Tank.Leech.SlowBleed"), 1}}, 0.0f), 100.0f, 0.01f);
 
     // L8: at IRONCLAD (>= 2/3 of the bar), no decay at all.
     TestEqual(TEXT("Second Heart at IRONCLAD never decays"),

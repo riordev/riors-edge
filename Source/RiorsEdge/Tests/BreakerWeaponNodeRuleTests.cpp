@@ -221,9 +221,9 @@ bool FBreakerEmplacementStationarySpreadTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Without the node the weapon never reads stationary"), Rig.Weapon->IsSpreadReadingStationary());
 
     UBreakerProgressionTree* Bastion = UBreakerProgressionLibrary::GetTankBastionTree();
-    TestTrue(TEXT("Loud purchases to rank 2"), BreakerBuyNode(Rig.Progression, Bastion, TEXT("Tank.Bastion.Loud"), 2));
-    TestTrue(TEXT("Answering Fire purchases to rank 2"), BreakerBuyNode(Rig.Progression, Bastion, TEXT("Tank.Bastion.AnsweringFire"), 2));
-    TestTrue(TEXT("Emplacement purchases"), BreakerBuyNode(Rig.Progression, Bastion, TEXT("Tank.Bastion.Emplacement")));
+    // O272: Emplacement is the impactful half of Answering Fire's pair.
+    TestTrue(TEXT("Answering Fire purchases"), BreakerBuyNode(Rig.Progression, Bastion, TEXT("Tank.Bastion.AnsweringFire")));
+    TestTrue(TEXT("Emplacement purchases behind its travel"), BreakerBuyNode(Rig.Progression, Bastion, TEXT("Tank.Bastion.Emplacement")));
     TestTrue(TEXT("The bought tag is the one the weapon reads"),
         Rig.Progression->HasNodeTag(BreakerNodeTags::Node_B_Emplacement.GetTag()));
 

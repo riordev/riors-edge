@@ -1685,11 +1685,13 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
 // treatment's rewrite tier (AR9-AR11 / FT9-FT11 / TK9-TK11) supplied a rule
 // with no figure, it is an impactful here, at tier 1, unlocked by its travel.
 //
-// TANK AND SUPPORT BELOW author tiers 1-4 through GateForTier (gates
-// 0/2/4/6) with the keystone an ordinary tier-4 node at cost 2, flagged
-// bCornerstone because that flag is what makes it the ultimate's rewrite site
-// and what O37 gates on commitment. The paragraphs that follow apply to all
-// three classes.
+// TANK BELOW is the same wheel of pairs, in the same shape, with the same
+// travel-then-impactful array order; its three keystones are the impactful
+// halves of their own pairs. SUPPORT BELOW authors tiers 1-4 through
+// GateForTier (gates 0/2/4/6) with the keystone an ordinary tier-4 node at
+// cost 2, flagged bCornerstone because that flag is what makes it the
+// ultimate's rewrite site and what O37 gates on commitment. The paragraphs
+// that follow apply to all three classes.
 //
 // EVERY NON-KEYSTONE NODE SHIPS AS ITS TREATMENT RULE, VERBATIM, AS A TAG
 // WITH NO STAT EFFECT — the Caster posture (see the block comment above
@@ -2128,113 +2130,116 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetTankLeechTree()
 
     Tree = MakeTree(TEXT("Doctrine.Tank.Leech"), TEXT("Tank — Leech"), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank);
 
-    // --- Tier 1 (L1-L3) ------------------------------------------------------
+    // --- Pair: Clot (travel) -> Second Heart (impactful) ----------------------
     // L1. Rewrites the routing ratio; grants no shield capacity — Leech owns
-    // where healing GOES, never how much there is (§3's territory rule).
-    // WAITING ON: the Rend overheal-to-shield path in
-    // Abilities/BreakerTankAbilities.cpp reading this node's rank.
+    // where healing GOES, never how much there is (§3's territory rule). The
+    // ratio is 1.5:1 (O2 PLACEHOLDER). WAITING ON: the Rend overheal-to-shield
+    // path in Abilities/BreakerTankAbilities.cpp reading this tag.
     UBreakerProgressionNode* Node = MakeNode(TEXT("Tank.Leech.Clot"), TEXT("Clot"),
-        TEXT("Rend's overheal converts to shield at 1.25:1 instead of 1:1 (R2: 1.5:1)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 2, 1);
+        TEXT("Rend's overheal converts to shield at 1.5:1 instead of 1:1."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_L_Clot.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // L2. A duration rewrite, not a capacity one. WAITING ON: the Leech
-    // shield decay timer.
-    Node = MakeNode(TEXT("Tank.Leech.SlowBleed"), TEXT("Slow Bleed"),
-        TEXT("Leech shield holds for 5s before decaying instead of 3s (R2: 8s). The decay rate itself is untouched."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_L_SlowBleed.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // L3. Explicit affix-to-class bridge: Life on Hit read, not duplicated.
-    // WAITING ON: the multi-hit sweep path crediting Life on Hit per target
-    // at proc coefficient.
-    Node = MakeNode(TEXT("Tank.Leech.OpenWound"), TEXT("Open Wound"),
-        TEXT("Life on Hit also triggers on the first target of a sweep (R2: on every target, at proc coefficient). Reads your gear; adds none."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_L_OpenWound.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 2 (L4-L6) ------------------------------------------------------
-    // L4. Still bound by the shared G1+G2 10/s cap — the cap is what keeps
-    // this from being a shield-farming engine. WAITING ON:
-    // UBreakerGritComponent's G2 source rate reading this node's rank.
-    Node = MakeNode(TEXT("Tank.Leech.FeedTheWound"), TEXT("Feed the Wound"),
-        TEXT("Damage taken on shield pays Grit at two-thirds rate instead of half (R2: full rate). The shared cap still binds."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Tank.Leech.Clot"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_L_FeedTheWound.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // L5. Overheal from this routes through the normal path and its cap.
-    // WAITING ON: the melee-kill heal event (no healing stat target exists).
-    Node = MakeNode(TEXT("Tank.Leech.Bloodlet"), TEXT("Bloodlet"),
-        TEXT("Melee kills heal 8% of maximum health (R2: 14%). Overheal routes to shield through the normal, capped path."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Tank.Leech.OpenWound"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_L_Bloodlet.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // L6. Authored against the O1 passive layer exactly as Swift K5 is: it
-    // raises an RNG proc's YIELD, and scales with gear Block Chance, not
-    // play. G4's per-source cap is why the shorter ICD is not a back door.
-    // WAITING ON: UBreakerGritComponent's block-proc source.
-    Node = MakeNode(TEXT("Tank.Leech.Transfusion"), TEXT("Transfusion"),
-        TEXT("While shielded, block procs pay +9 Grit instead of +6 (R2: +12) on a slightly faster internal cooldown."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Tank.Leech.SlowBleed"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_L_Transfusion.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 3 (L7-L8) ------------------------------------------------------
-    // L7. "Grants T2 Bloodline" is not authored (block comment above); the
-    // arc and per-target heal rewrite is the node. WAITING ON:
-    // UBreakerAbility_Rend's sweep geometry and heal accounting.
-    Node = MakeNode(TEXT("Tank.Leech.RendMastery"), TEXT("Rend Mastery"),
-        TEXT("Rend's arc widens to 180 degrees and its heal pays per target hit, at proc coefficient, rather than once per cast."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 3, 1, 2);
-    AddPrerequisite(Node, TEXT("Tank.Leech.Bloodlet"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_L_RendMastery.GetTag());
     Tree->Nodes.Add(Node);
 
     // L8. Band-gated: changes WHEN shield persists, never how much there is.
     // WAITING ON: the IRONCLAD Grit band and the shield decay timer.
     Node = MakeNode(TEXT("Tank.Leech.SecondHeart"), TEXT("Second Heart"),
-        TEXT("Leech shield does not decay at all while you are at IRONCLAD."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 3, 1, 2);
-    AddPrerequisite(Node, TEXT("Tank.Leech.FeedTheWound"));
+        TEXT("Leech shield does not decay at all while you are at IRONCLAD."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Tank.Leech.Clot"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_L_SecondHeart.GetTag());
     Tree->Nodes.Add(Node);
 
-    // --- Tier 4 (L9-L11), the rewrite tier -----------------------------------
-    // L9. The branch's thesis node: ALL healing routes its overheal, from any
-    // source. Cap unchanged (§7.1). WAITING ON: a class-wide overheal report
-    // — the same missing healing seam Support §5.1 names.
-    Node = MakeNode(TEXT("Tank.Leech.NothingWasted"), TEXT("Nothing Wasted"),
-        TEXT("Every heal you receive — any source — routes its overheal into Leech shield, not just Rend's."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Tank.Leech.FeedTheWound"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_L_NothingWasted.GetTag());
+    // --- Pair: Slow Bleed (travel) -> Reciprocity (impactful) -----------------
+    // L2. A duration rewrite, not a capacity one. The hold is 8 s (O2
+    // PLACEHOLDER). WAITING ON: the Leech shield decay timer.
+    Node = MakeNode(TEXT("Tank.Leech.SlowBleed"), TEXT("Slow Bleed"),
+        TEXT("Leech shield holds for 8s before decaying instead of 3s. The decay rate itself is untouched."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_L_SlowBleed.GetTag());
     Tree->Nodes.Add(Node);
 
     // L10. Deliberately post-break, so it cannot join an absorb-heal-reabsorb
     // cycle inside one shield's lifetime (§7.4's composition audit). WAITING
     // ON: the shield-break event.
     Node = MakeNode(TEXT("Tank.Leech.Reciprocity"), TEXT("Reciprocity"),
-        TEXT("When Leech shield breaks, 20% of what it absorbed returns as healing over 2s. After the break, never during."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Tank.Leech.Transfusion"));
+        TEXT("When Leech shield breaks, 20% of what it absorbed returns as healing over 2s. After the break, never during."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Tank.Leech.SlowBleed"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_L_Reciprocity.GetTag());
     Tree->Nodes.Add(Node);
 
-    // L11. Rewrites Bloodline, which Rend Mastery's design row grants — the
-    // prerequisite is load-bearing, the SpendToLive pattern. A real downside:
-    // forced off the target, the window ends immediately. WAITING ON:
-    // UBreakerAbility_Bloodline's window timer.
+    // --- Pair: Open Wound (travel) -> Exsanguinate (impactful) ----------------
+    // L3. Explicit affix-to-class bridge: Life on Hit read, not duplicated.
+    // Pays on every accepted target of a sweep, at proc coefficient, through
+    // the multi-hit sweep path.
+    Node = MakeNode(TEXT("Tank.Leech.OpenWound"), TEXT("Open Wound"),
+        TEXT("Life on Hit also triggers on every target of a sweep, at proc coefficient. Reads your gear; adds none."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_L_OpenWound.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // L11. Rewrites Bloodline. A real downside: forced off the target, the
+    // window ends immediately. WAITING ON: UBreakerAbility_Bloodline's window
+    // timer.
     Node = MakeNode(TEXT("Tank.Leech.Exsanguinate"), TEXT("Exsanguinate"),
-        TEXT("Bloodline's window no longer expires on time — it expires 2 seconds after your last melee hit lands."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Tank.Leech.RendMastery"));
+        TEXT("Bloodline's window no longer expires on time — it expires 2 seconds after your last melee hit lands."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Tank.Leech.OpenWound"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_L_Exsanguinate.GetTag());
     Tree->Nodes.Add(Node);
 
-    // L12 VEIN — keystone, tier-3/cost-3 compression. Its 1.25x MELEE More
-    // while Leech shield is active is NOT OWED (O95), and was blocked twice over: MeleeDamage has no
-    // composed More lane, and no shield-state condition exists — and the
-    // treatment says the double tax IS the design, so an unconditional
-    // stand-in would be strictly wrong. Hold's Vein row resolves off the tag.
+    // --- Pair: Feed the Wound (travel) -> Nothing Wasted (impactful) ----------
+    // L4. Still bound by the shared G1+G2 10/s cap — the cap is what keeps
+    // this from being a shield-farming engine. The rate is full (O2
+    // PLACEHOLDER). WAITING ON: UBreakerGritComponent's G2 source rate reading
+    // this tag.
+    Node = MakeNode(TEXT("Tank.Leech.FeedTheWound"), TEXT("Feed the Wound"),
+        TEXT("Damage taken on shield pays Grit at full rate instead of half. The shared cap still binds."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_L_FeedTheWound.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // L9. The branch's thesis node: ALL healing routes its overheal, from any
+    // source. Cap unchanged (§7.1). WAITING ON: a class-wide overheal report
+    // — the same missing healing seam Support §5.1 names.
+    Node = MakeNode(TEXT("Tank.Leech.NothingWasted"), TEXT("Nothing Wasted"),
+        TEXT("Every heal you receive — any source — routes its overheal into Leech shield, not just Rend's."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Tank.Leech.FeedTheWound"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_L_NothingWasted.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Bloodlet (travel) -> Rend Mastery (impactful) ------------------
+    // L5. Overheal from this routes through the normal path and its cap. The
+    // heal is 14% of maximum health (O2 PLACEHOLDER). WAITING ON: the
+    // melee-kill heal event (no healing stat target exists).
+    Node = MakeNode(TEXT("Tank.Leech.Bloodlet"), TEXT("Bloodlet"),
+        TEXT("Melee kills heal 14% of maximum health. Overheal routes to shield through the normal, capped path."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_L_Bloodlet.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // L7. "Grants T2 Bloodline" is not authored (block comment above); the
+    // arc and per-target heal rewrite is the node. WAITING ON:
+    // UBreakerAbility_Rend's sweep geometry and heal accounting.
+    Node = MakeNode(TEXT("Tank.Leech.RendMastery"), TEXT("Rend Mastery"),
+        TEXT("Rend's arc widens to 180 degrees and its heal pays per target hit, at proc coefficient, rather than once per cast."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Tank.Leech.Bloodlet"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_L_RendMastery.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Transfusion (travel) -> Vein (keystone) ------------------------
+    // L6. Authored against the O1 passive layer exactly as Swift K5 is: it
+    // raises an RNG proc's YIELD, and scales with gear Block Chance, not
+    // play. G4's per-source cap is why the shorter ICD is not a back door.
+    // The yield is +12 (O2 PLACEHOLDER). WAITING ON: UBreakerGritComponent's
+    // block-proc source.
+    Node = MakeNode(TEXT("Tank.Leech.Transfusion"), TEXT("Transfusion"),
+        TEXT("While shielded, block procs pay +12 Grit instead of +6, on a slightly faster internal cooldown."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_L_Transfusion.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // L12 VEIN — the branch keystone, the impactful half of its pair and the
+    // one gated node (tier 4, cost 1; block comment above). Its 1.25x MELEE
+    // More while Leech shield is active is NOT OWED (O95), blocked twice over:
+    // MeleeDamage has no composed More lane, and no shield-state condition
+    // exists — and the treatment says the double tax IS the design, so an
+    // unconditional stand-in would be strictly wrong. Hold's Vein row resolves
+    // off the tag.
     Node = MakeNode(TEXT("Tank.Leech.Vein"), TEXT("Vein"),
-        TEXT("Branch keystone. Rewrites Hold: the cap comes off and incoming damage converts to healing at a damped rate — attrition, not immunity."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 4, 1, 2);
+        TEXT("Branch keystone. Rewrites Hold: the cap comes off and incoming damage converts to healing at a damped rate — attrition, not immunity."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 4, 1, 1);
     AddPrerequisite(Node, TEXT("Tank.Leech.Transfusion"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_L_Vein.GetTag());
@@ -2256,119 +2261,124 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetTankBastionTree()
     // quantities, or Dodge, in any direction. Threat, cover-as-an-object, and
     // shield conversion are Bastion's; nothing else is.
 
-    // --- Tier 1 (B1-B3) ------------------------------------------------------
+    // --- Pair: Line of Sight (travel) -> Immovable Object (impactful) ---------
     // B1. Anchor Point's lifetime is a differently-named UPROPERTY on its own
     // ability, and UBreakerAbility_AnchorPoint does not read the
     // AbilityDuration accessor seam yet — an AbilityDuration line here would
-    // compose into the aggregate and change nothing in play. WAITING ON:
-    // UBreakerAbility_AnchorPoint adopting AbilityDurationMultiplierFor, at
-    // which point this becomes the library's first authored line against it.
+    // compose into the aggregate and change nothing in play. The stand is
+    // 20 s (O2 PLACEHOLDER). WAITING ON: UBreakerAbility_AnchorPoint adopting
+    // AbilityDurationMultiplierFor, at which point this becomes the library's
+    // first authored line against it.
     UBreakerProgressionNode* Node = MakeNode(TEXT("Tank.Bastion.LineOfSight"), TEXT("Line of Sight"),
-        TEXT("Anchor Point stands for 16s instead of 12s (R2: 20s)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 2, 1);
+        TEXT("Anchor Point stands for 20s instead of 12s."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_B_LineOfSight.GetTag());
     Tree->Nodes.Add(Node);
 
-    // B2. Ties the branch's geometry to the branch's resource; still
-    // count-independent. WAITING ON: UBreakerGritComponent's proximity source
-    // and an own-Anchor-Point distance check.
-    Node = MakeNode(TEXT("Tank.Bastion.Footing"), TEXT("Footing"),
-        TEXT("Near your own Anchor Point, the proximity Grit source reaches 7 m instead of 5 (R2: 9 m)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_B_Footing.GetTag());
+    // B11. Straight cost-for-power with a real downside. WAITING ON: the
+    // Anchor Point actor's damage gate and lifetime.
+    Node = MakeNode(TEXT("Tank.Bastion.ImmovableObject"), TEXT("Immovable Object"),
+        TEXT("Anchor Point is indestructible for its first 4s — and its total lifetime is halved."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Tank.Bastion.LineOfSight"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_B_ImmovableObject.GetTag());
     Tree->Nodes.Add(Node);
 
-    // B3. WAITING ON: UBreakerAbility_Provoke's radius (same missing
-    // area-seam adoption as B1's duration).
+    // --- Pair: Loud (travel) -> Standing Order (impactful) --------------------
+    // B3. The reach is 16 m / 1600 cm (O2 PLACEHOLDER). WAITING ON:
+    // UBreakerAbility_Provoke's radius (same missing area-seam adoption as
+    // B1's duration).
     Node = MakeNode(TEXT("Tank.Bastion.Loud"), TEXT("Loud"),
-        TEXT("Provoke reaches 13 m instead of 10 (R2: 16 m)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 2, 1);
+        TEXT("Provoke reaches 16 m instead of 10."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_B_Loud.GetTag());
     Tree->Nodes.Add(Node);
 
-    // --- Tier 2 (B4-B6) ------------------------------------------------------
-    // B4. A banking rewrite bounded by the deployable's own lifetime and
-    // cooldown. The Grit decay valve exists (ClassResourceDecay), but the
-    // condition — within 3 m of your own Anchor Point — does not, so the rule
-    // rides the tag rather than a mis-conditioned line. WAITING ON: an
-    // anchor-proximity predicate feeding the loop valve.
-    Node = MakeNode(TEXT("Tank.Bastion.HeldGround"), TEXT("Held Ground"),
-        TEXT("Grit does not decay while you stand within 3 m of your own Anchor Point (R2: and placing one re-triggers the entry grant, once)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Tank.Bastion.LineOfSight"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_B_HeldGround.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // B5. Count-independent and bound by the 20/s global cap. WAITING ON:
-    // UBreakerGritComponent's proximity source reading Provoke's threat list.
-    Node = MakeNode(TEXT("Tank.Bastion.AnsweringFire"), TEXT("Answering Fire"),
-        TEXT("Enemies you have Provoked pay proximity Grit at 1.5x rate (R2: 2x). Still count-independent, still capped."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 2, 2, 1);
+    // B10. Rewrite of the threat RULE. WAITING ON: UBreakerAbility_Provoke's
+    // forced-target duration.
+    Node = MakeNode(TEXT("Tank.Bastion.StandingOrder"), TEXT("Standing Order"),
+        TEXT("Provoke holds until the enemy is damaged by someone who is not you, or 10s pass — whichever comes first."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1);
     AddPrerequisite(Node, TEXT("Tank.Bastion.Loud"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_B_AnsweringFire.GetTag());
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_B_StandingOrder.GetTag());
     Tree->Nodes.Add(Node);
 
+    // --- Pair: Footing (travel) -> Conversion (impactful) ---------------------
+    // B2. Ties the branch's geometry to the branch's resource; still
+    // count-independent. The reach is 9 m / 900 cm (O2 PLACEHOLDER). WAITING
+    // ON: UBreakerGritComponent's proximity source and an own-Anchor-Point
+    // distance check.
+    Node = MakeNode(TEXT("Tank.Bastion.Footing"), TEXT("Footing"),
+        TEXT("Near your own Anchor Point, the proximity Grit source reaches 9 m instead of 5."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_B_Footing.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // B9. The solo-conversion thesis node. FLAT bucket by design (before the
+    // Increased bucket, so it cannot double-dip) — but the magnitude is a
+    // FUNCTION of current shield value, which no static line can say; a
+    // fixed flat-damage line would pay with no shield at all, the exact
+    // inversion of "hold it or use it". WAITING ON: the damage path reading
+    // current shield through this tag.
+    Node = MakeNode(TEXT("Tank.Bastion.Conversion"), TEXT("Conversion"),
+        TEXT("While you hold shield, your hits gain flat damage scaled to its CURRENT value. Spend the shield and the bonus falls with it."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Tank.Bastion.Footing"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_B_Conversion.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Bulk (travel) -> Interposition (impactful) ---------------------
     // B6. Durability on an OBJECT, not the player — explicitly outside
-    // Bulwark's armour territory. WAITING ON: the Anchor Point actor's health
-    // pool and AoE-attribution rule.
+    // Bulwark's armour territory. The pool is 2x (O2 PLACEHOLDER). WAITING
+    // ON: the Anchor Point actor's health pool and AoE-attribution rule.
     Node = MakeNode(TEXT("Tank.Bastion.Bulk"), TEXT("Bulk"),
-        TEXT("Anchor Point carries 50% more health (R2: double) and shrugs off AoE that was not aimed at it."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Tank.Bastion.LineOfSight"));
+        TEXT("Anchor Point carries double health and shrugs off AoE that was not aimed at it."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_B_Bulk.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 3 (B7-B8) ------------------------------------------------------
-    // B7. "Grants T4 Provoke" is not authored (block comment above). The
-    // stationary-spread clause reads a posture the weapon layer already has.
-    // WAITING ON: UBreakerAbility_AnchorPoint's placement surface rules and
-    // the behind-cover spread read.
-    Node = MakeNode(TEXT("Tank.Bastion.Emplacement"), TEXT("Emplacement"),
-        TEXT("Anchor Point may be placed on walls and ceilings, and behind your own Anchor Point your spread reads as stationary."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 3, 1, 2);
-    AddPrerequisite(Node, TEXT("Tank.Bastion.AnsweringFire"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_B_Emplacement.GetTag());
     Tree->Nodes.Add(Node);
 
     // B8. The self-facing twin is AUTHORED, not assumed — solo, the sharing
     // field pays the Tank itself (§4's solo-conversion requirement). WAITING
     // ON: the shield-sharing field on the Anchor Point actor.
     Node = MakeNode(TEXT("Tank.Bastion.Interposition"), TEXT("Interposition"),
-        TEXT("Anchor Point projects a 4 m field behind it: allies inside share your Leech shield — alone, the share pays you as headroom instead."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 3, 1, 2);
+        TEXT("Anchor Point projects a 4 m field behind it: allies inside share your Leech shield — alone, the share pays you as headroom instead."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1);
     AddPrerequisite(Node, TEXT("Tank.Bastion.Bulk"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_B_Interposition.GetTag());
     Tree->Nodes.Add(Node);
 
-    // --- Tier 4 (B9-B11), the rewrite tier -----------------------------------
-    // B9. The solo-conversion thesis node. FLAT bucket by design (before the
-    // Increased bucket, so it cannot double-dip) — but the magnitude is a
-    // FUNCTION of current shield value, which no static per-rank line can
-    // say; a fixed flat-damage line would pay with no shield at all, the
-    // exact inversion of "hold it or use it". WAITING ON: the damage path
-    // reading current shield through this tag.
-    Node = MakeNode(TEXT("Tank.Bastion.Conversion"), TEXT("Conversion"),
-        TEXT("While you hold shield, your hits gain flat damage scaled to its CURRENT value. Spend the shield and the bonus falls with it."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Tank.Bastion.Interposition"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_B_Conversion.GetTag());
+    // --- Pair: Answering Fire (travel) -> Emplacement (impactful) -------------
+    // B5. Count-independent and bound by the 20/s global cap. The rate is 2x
+    // (O2 PLACEHOLDER). WAITING ON: UBreakerGritComponent's proximity source
+    // reading Provoke's threat list.
+    Node = MakeNode(TEXT("Tank.Bastion.AnsweringFire"), TEXT("Answering Fire"),
+        TEXT("Enemies you have Provoked pay proximity Grit at 2x rate. Still count-independent, still capped."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_B_AnsweringFire.GetTag());
     Tree->Nodes.Add(Node);
 
-    // B10. Rewrite of the threat RULE. WAITING ON: UBreakerAbility_Provoke's
-    // forced-target duration.
-    Node = MakeNode(TEXT("Tank.Bastion.StandingOrder"), TEXT("Standing Order"),
-        TEXT("Provoke holds until the enemy is damaged by someone who is not you, or 10s pass — whichever comes first."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 4, 1, 2);
+    // B7. "Grants T4 Provoke" is not authored (block comment above). The
+    // stationary-spread clause reads a posture the weapon layer already has.
+    // WAITING ON: UBreakerAbility_AnchorPoint's placement surface rules and
+    // the behind-cover spread read.
+    Node = MakeNode(TEXT("Tank.Bastion.Emplacement"), TEXT("Emplacement"),
+        TEXT("Anchor Point may be placed on walls and ceilings, and behind your own Anchor Point your spread reads as stationary."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1);
     AddPrerequisite(Node, TEXT("Tank.Bastion.AnsweringFire"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_B_StandingOrder.GetTag());
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_B_Emplacement.GetTag());
     Tree->Nodes.Add(Node);
 
-    // B11. Straight cost-for-power with a real downside. WAITING ON: the
-    // Anchor Point actor's damage gate and lifetime.
-    Node = MakeNode(TEXT("Tank.Bastion.ImmovableObject"), TEXT("Immovable Object"),
-        TEXT("Anchor Point is indestructible for its first 4s — and its total lifetime is halved."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Tank.Bastion.Bulk"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_B_ImmovableObject.GetTag());
+    // --- Pair: Held Ground (travel) -> Wall (keystone) ------------------------
+    // B4. A banking rewrite bounded by the deployable's own lifetime and
+    // cooldown. The Grit decay valve exists (ClassResourceDecay), but the
+    // condition — within 3 m of your own Anchor Point — does not, so the rule
+    // rides the tag rather than a mis-conditioned line. The node carries both
+    // halves: no decay at the anchor, and the entry grant on placement, once.
+    // WAITING ON: an anchor-proximity predicate feeding the loop valve.
+    Node = MakeNode(TEXT("Tank.Bastion.HeldGround"), TEXT("Held Ground"),
+        TEXT("Grit does not decay while you stand within 3 m of your own Anchor Point, and placing one re-triggers the entry grant, once."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_B_HeldGround.GetTag());
     Tree->Nodes.Add(Node);
 
-    // B12 WALL — keystone, tier-3/cost-3 compression. Its 1.20x all-damage
-    // More within 4 m of your own Anchor Point is NOT OWED (O95): the tax is
-    // positional and no anchor-proximity condition exists. Deliberately NOT
-    // authored unconditional — the ability's cooldown and lifetime bound its
-    // uptime, and stripping the position strips the tax. Hold's Wall row
-    // resolves off the tag below.
+    // B12 WALL — the branch keystone, the impactful half of its pair and the
+    // one gated node (tier 4, cost 1; block comment above). Its 1.20x
+    // all-damage More within 4 m of your own Anchor Point is NOT OWED (O95):
+    // the tax is positional and no anchor-proximity condition exists.
+    // Deliberately NOT authored unconditional — the ability's cooldown and
+    // lifetime bound its uptime, and stripping the position strips the tax.
+    // Hold's Wall row resolves off the tag below.
     Node = MakeNode(TEXT("Tank.Bastion.Wall"), TEXT("Wall"),
-        TEXT("Branch keystone. Rewrites Hold: your per-hit cap extends to allies, and doubles when you are alone."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 4, 1, 2);
+        TEXT("Branch keystone. Rewrites Hold: your per-hit cap extends to allies, and doubles when you are alone."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 4, 1, 1);
     AddPrerequisite(Node, TEXT("Tank.Bastion.HeldGround"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_B_Wall.GetTag());
@@ -2390,93 +2400,35 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetTankDemolitionistTree()
     // is total and granted at tier 1; rocket-jumping is never required. Every
     // node below carries those bounds in its rule text.
 
-    // --- Tier 1 (D1-D3) ------------------------------------------------------
-    // D1. A falloff SHAPE rewrite; peak damage unchanged. WAITING ON: the
-    // explosive falloff curve in Abilities/BreakerTankAbilities.cpp.
+    // --- Pair: Shaped Charge (travel) -> Blast Radius (impactful) -------------
+    // D1. A falloff SHAPE rewrite; peak damage unchanged. The plateau is the
+    // inner 0.6 of the radius (O2 PLACEHOLDER). WAITING ON: the explosive
+    // falloff curve in Abilities/BreakerTankAbilities.cpp.
     UBreakerProgressionNode* Node = MakeNode(TEXT("Tank.Demolitionist.ShapedCharge"), TEXT("Shaped Charge"),
-        TEXT("Explosive falloff flattens into a full-damage plateau over the inner 40% of the radius (R2: 60%), then falls off normally."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 2, 1);
+        TEXT("Explosive falloff flattens into a full-damage plateau over the inner 60% of the radius, then falls off normally."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_ShapedCharge.GetTag());
     Tree->Nodes.Add(Node);
 
-    // D2. THE O13 "full self-knockback control" clause, granted at tier 1 and
-    // free of any self-damage requirement. WAITING ON: the self-impulse
-    // vector on the explosive abilities.
-    Node = MakeNode(TEXT("Tank.Demolitionist.Bootstraps"), TEXT("Bootstraps"),
-        TEXT("Your own blasts launch you along your aim vector, not the blast normal (R2: reducing the self-damage never weakens the launch)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_Bootstraps.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // D3. The node's own text carries the §1.3 interaction: better bracing is
-    // WORSE Grit generation from self-damage, by rule. IncomingDamageReduction
-    // has no aggregation lane, and this is self-damage-only besides. WAITING
-    // ON: the self-damage computation on the explosive abilities.
-    Node = MakeNode(TEXT("Tank.Demolitionist.BracedForImpact"), TEXT("Braced for Impact"),
-        TEXT("Self-damage reduction rises from 50% to 65% (R2: 80%, the branch ceiling — never 100%). This LOWERS your Grit from self-damage, by rule."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_BracedForImpact.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 2 (D4-D6) ------------------------------------------------------
-    // D4. Proc coefficient 0 on the secondary blast and it cannot chain — the
-    // anti-recursion guard, mirroring Caster MS4's normalization. WAITING ON:
-    // the kill-by-explosive event.
-    Node = MakeNode(TEXT("Tank.Demolitionist.Fragmentation"), TEXT("Fragmentation"),
-        TEXT("Enemies your explosives kill detonate for a portion of their health in 3 m (R2: 4 m). The echo procs nothing and never chains."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Tank.Demolitionist.ShapedCharge"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_Fragmentation.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // D5. The accepted landing blast applies the shared interrupt state.
-    Node = MakeNode(TEXT("Tank.Demolitionist.Concussion"), TEXT("Concussion"),
-        TEXT("Ground Zero staggers for 2.0s instead of 1.5 (R2: 2.5s), and now staggers enemies caught mid-air."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Tank.Demolitionist.Bootstraps"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_Concussion.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // D6. A trigger-condition rewrite; no damage change. WAITING ON:
-    // UBreakerAbility_BreachCharge's fuse and re-press input.
-    Node = MakeNode(TEXT("Tank.Demolitionist.Overpressure"), TEXT("Overpressure"),
-        TEXT("Breach Charge's fuse may be popped early by re-pressing the input (R2: and it sticks to the first enemy it touches)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Tank.Demolitionist.ShapedCharge"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_Overpressure.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 3 (D7-D8) ------------------------------------------------------
-    // D7. "Grants T5 Breach Charge" is not authored (block comment above).
-    // WAITING ON: UBreakerAbility_BreachCharge holding two charges on one
-    // cooldown.
-    Node = MakeNode(TEXT("Tank.Demolitionist.Demolition"), TEXT("Demolition"),
-        TEXT("Breach Charge holds two charges, sharing one cooldown."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 3, 1, 2);
-    AddPrerequisite(Node, TEXT("Tank.Demolitionist.Overpressure"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_Demolition.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // D8. "Grants T6 Ground Zero" is not authored. The from-any-jump clause
-    // is restated ON the node so the O13 "never required" rule is visible
-    // where a player reads it. Ground Zero reads actual landed fall distance.
-    Node = MakeNode(TEXT("Tank.Demolitionist.TerminalDescent"), TEXT("Terminal Descent"),
-        TEXT("Ground Zero's fall scaling caps at 25 m instead of 12 — and it casts from ANY airborne state, a plain jump included."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 3, 1, 2);
-    AddPrerequisite(Node, TEXT("Tank.Demolitionist.Concussion"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_TerminalDescent.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 4 (D9-D11), the rewrite tier -----------------------------------
     // D9. Widening the blast must not widen the self-hit: each side of the
     // explosion reads a DIFFERENT geometry, which is exactly why this is not
     // an AbilityArea line (the lane could only scale both). WAITING ON: the
     // explosive radius reads splitting enemy-facing from self-facing.
     Node = MakeNode(TEXT("Tank.Demolitionist.BlastRadius"), TEXT("Blast Radius"),
-        TEXT("Your explosive radii grow by half — and your self-damage is still computed at the old, smaller radius."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Tank.Demolitionist.Fragmentation"));
+        TEXT("Your explosive radii grow by half — and your self-damage is still computed at the old, smaller radius."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Tank.Demolitionist.ShapedCharge"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_BlastRadius.GetTag());
     Tree->Nodes.Add(Node);
 
-    // D10. Makes the rocket-jump LAND cleanly without making it free: takeoff
-    // damage untouched, O13 floor intact. The movement component consumes
-    // an owned launch only at its authoritative landing.
-    Node = MakeNode(TEXT("Tank.Demolitionist.KineticRecovery"), TEXT("Kinetic Recovery"),
-        TEXT("Landing within 3s of your own blast launch cancels fall damage and grants 1.5s of stagger immunity. The takeoff still costs."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Tank.Demolitionist.Bootstraps"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_KineticRecovery.GetTag());
+    // --- Pair: Braced for Impact (travel) -> Chain Reaction (impactful) -------
+    // D3. The node's own text carries the §1.3 interaction: better bracing is
+    // WORSE Grit generation from self-damage, by rule. IncomingDamageReduction
+    // has no aggregation lane, and this is self-damage-only besides. The self
+    // fraction is 0.2 — an 80% reduction, the branch ceiling, never 100% (O2
+    // PLACEHOLDER). WAITING ON: the self-damage computation on the explosive
+    // abilities.
+    Node = MakeNode(TEXT("Tank.Demolitionist.BracedForImpact"), TEXT("Braced for Impact"),
+        TEXT("Self-damage reduction rises from 50% to 80%, the branch ceiling — never 100%. This LOWERS your Grit from self-damage, by rule."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_BracedForImpact.GetTag());
     Tree->Nodes.Add(Node);
 
     // D11. Explicitly FLAT, explicitly capped at 3 stacks — the
@@ -2485,19 +2437,85 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetTankDemolitionistTree()
     // to 3", so the rule rides the tag. WAITING ON: the explosive damage path
     // stamping blast timestamps per target.
     Node = MakeNode(TEXT("Tank.Demolitionist.ChainReaction"), TEXT("Chain Reaction"),
-        TEXT("Explosives landing within 1.5s on one target add damage to the later blast, stacking three times."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Tank.Demolitionist.Demolition"));
+        TEXT("Explosives landing within 1.5s on one target add damage to the later blast, stacking three times."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Tank.Demolitionist.BracedForImpact"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_ChainReaction.GetTag());
     Tree->Nodes.Add(Node);
 
-    // D12 DETONATION — keystone, tier-3/cost-3 compression. Its 1.30x More on
-    // EXPLOSIVE damage inside D1's inner plateau is NOT OWED (O95): no explosive
-    // partition target and no blast-geometry condition exist, and the
-    // treatment's point — a point-blank multiplier on a class that must be
-    // point-blank — dies if authored unconditional. Hold's Detonation row
-    // resolves off the tag below. Tank's three Mores stay reserved, not spent.
+    // --- Pair: Bootstraps (travel) -> Kinetic Recovery (impactful) ------------
+    // D2. THE O13 "full self-knockback control" clause, ungated and free of
+    // any self-damage requirement. The node is the aim-vector launch and
+    // nothing else. WAITING ON: the self-impulse vector on the explosive
+    // abilities.
+    Node = MakeNode(TEXT("Tank.Demolitionist.Bootstraps"), TEXT("Bootstraps"),
+        TEXT("Your own blasts launch you along your aim vector, not the blast normal."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_Bootstraps.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // D10. Makes the rocket-jump LAND cleanly without making it free: takeoff
+    // damage untouched, O13 floor intact. The movement component consumes
+    // an owned launch only at its authoritative landing.
+    Node = MakeNode(TEXT("Tank.Demolitionist.KineticRecovery"), TEXT("Kinetic Recovery"),
+        TEXT("Landing within 3s of your own blast launch cancels fall damage and grants 1.5s of stagger immunity. The takeoff still costs."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Tank.Demolitionist.Bootstraps"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_KineticRecovery.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Concussion (travel) -> Terminal Descent (impactful) ------------
+    // D5. The accepted landing blast applies the shared interrupt state. The
+    // stagger is 2.5 s (O2 PLACEHOLDER).
+    Node = MakeNode(TEXT("Tank.Demolitionist.Concussion"), TEXT("Concussion"),
+        TEXT("Ground Zero staggers for 2.5s instead of 1.5, and staggers enemies caught mid-air."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_Concussion.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // D8. "Grants T6 Ground Zero" is not authored. The from-any-jump clause
+    // is restated ON the node so the O13 "never required" rule is visible
+    // where a player reads it. Ground Zero reads actual landed fall distance.
+    Node = MakeNode(TEXT("Tank.Demolitionist.TerminalDescent"), TEXT("Terminal Descent"),
+        TEXT("Ground Zero's fall scaling caps at 25 m instead of 12 — and it casts from ANY airborne state, a plain jump included."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Tank.Demolitionist.Concussion"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_TerminalDescent.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Overpressure (travel) -> Demolition (impactful) ----------------
+    // D6. A trigger-condition rewrite; no damage change. The node carries
+    // both halves: the re-press pop and the sticky charge, read by
+    // UBreakerAbility_BreachCharge's fuse, re-press input and contact path.
+    Node = MakeNode(TEXT("Tank.Demolitionist.Overpressure"), TEXT("Overpressure"),
+        TEXT("Breach Charge's fuse may be popped early by re-pressing the input, and the charge sticks to the first enemy it touches."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_Overpressure.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // D7. "Grants T5 Breach Charge" is not authored (block comment above).
+    // UBreakerAbility_BreachCharge holds two charges on one cooldown off this
+    // tag.
+    Node = MakeNode(TEXT("Tank.Demolitionist.Demolition"), TEXT("Demolition"),
+        TEXT("Breach Charge holds two charges, sharing one cooldown."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Tank.Demolitionist.Overpressure"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_Demolition.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Fragmentation (travel) -> Detonation (keystone) ----------------
+    // D4. Proc coefficient 0 on the secondary blast and it cannot chain — the
+    // anti-recursion guard, mirroring Caster MS4's normalization. The echo
+    // radius is 4 m / 400 cm (O2 PLACEHOLDER). WAITING ON: the
+    // kill-by-explosive event.
+    Node = MakeNode(TEXT("Tank.Demolitionist.Fragmentation"), TEXT("Fragmentation"),
+        TEXT("Enemies your explosives kill detonate for a portion of their health in 4 m. The echo procs nothing and never chains."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 1, 1, 1); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_Fragmentation.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // D12 DETONATION — the branch keystone, the impactful half of its pair
+    // and the one gated node (tier 4, cost 1; block comment above). Its 1.30x
+    // More on EXPLOSIVE damage inside D1's inner plateau is NOT OWED (O95):
+    // no explosive partition target and no blast-geometry condition exist,
+    // and the treatment's point — a point-blank multiplier on a class that
+    // must be point-blank — dies if authored unconditional. Hold's Detonation
+    // row resolves off the tag below. Tank's three Mores stay reserved, not
+    // spent.
     Node = MakeNode(TEXT("Tank.Demolitionist.Detonation"), TEXT("Detonation"),
-        TEXT("Branch keystone. Hold stores damage taken. Press the ultimate again to release 70% in an 8 m blast, without self-damage; expiry also releases it."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 4, 1, 2);
+        TEXT("Branch keystone. Hold stores damage taken. Press the ultimate again to release 70% in an 8 m blast, without self-damage; expiry also releases it."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 4, 1, 1);
     AddPrerequisite(Node, TEXT("Tank.Demolitionist.Fragmentation"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_Detonation.GetTag());

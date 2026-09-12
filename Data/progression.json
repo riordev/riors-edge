@@ -12,7 +12,7 @@
 		"Source/RiorsEdge/Progression/BreakerCoreRosterWeapon.cpp": "668dc0b08541588e995afe28301d8ae2bacb2106",
 		"Source/RiorsEdge/Progression/BreakerCoreTree.cpp": "0d1c3252ee7f95d02fea3445e83f7e71b05e15c2",
 		"Source/RiorsEdge/Progression/BreakerCoreTree.h": "d5cbc90580dd4568eeb1ee21d00f5159dc56bbae",
-		"Source/RiorsEdge/Progression/BreakerProgressionLibrary.cpp": "110d75b02d094287bc6cb1aff832b374a30b6a83",
+		"Source/RiorsEdge/Progression/BreakerProgressionLibrary.cpp": "2259c0d25b106d60ccc56741200067273698dde1",
 		"Source/RiorsEdge/Progression/BreakerProgressionNode.h": "b18436bdeeeef00075344254bd538c6fb1e3140e",
 		"Source/RiorsEdge/Progression/BreakerProgressionTree.h": "9dfcbac0af583d1da7c0e6ed117e8c94231d1395",
 		"Source/RiorsEdge/Progression/BreakerProgressionTypes.h": "d1f683b84a26b912db1ef42a87f87eeff96d02e8"
@@ -9272,7 +9272,7 @@
 				{
 					"id": "Tank.Leech.Clot",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -9284,9 +9284,28 @@
 					"prerequisites": []
 				},
 				{
+					"id": "Tank.Leech.SecondHeart",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Tank.Leech.SecondHeart"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Tank.Leech.Clot",
+							"rank": 1
+						}
+					]
+				},
+				{
 					"id": "Tank.Leech.SlowBleed",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -9298,9 +9317,28 @@
 					"prerequisites": []
 				},
 				{
+					"id": "Tank.Leech.Reciprocity",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Tank.Leech.Reciprocity"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Tank.Leech.SlowBleed",
+							"rank": 1
+						}
+					]
+				},
+				{
 					"id": "Tank.Leech.OpenWound",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -9312,9 +9350,28 @@
 					"prerequisites": []
 				},
 				{
+					"id": "Tank.Leech.Exsanguinate",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Tank.Leech.Exsanguinate"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Tank.Leech.OpenWound",
+							"rank": 1
+						}
+					]
+				},
+				{
 					"id": "Tank.Leech.FeedTheWound",
-					"tier": 2,
-					"ranks": 2,
+					"tier": 1,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -9323,99 +9380,13 @@
 						"Progression.Node.Tank.Leech.FeedTheWound"
 					],
 					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Tank.Leech.Clot",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Tank.Leech.Bloodlet",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Tank.Leech.Bloodlet"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Tank.Leech.OpenWound",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Tank.Leech.Transfusion",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Tank.Leech.Transfusion"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Tank.Leech.SlowBleed",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Tank.Leech.RendMastery",
-					"tier": 3,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Tank.Leech.RendMastery"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Tank.Leech.Bloodlet",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
-				},
-				{
-					"id": "Tank.Leech.SecondHeart",
-					"tier": 3,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Tank.Leech.SecondHeart"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Tank.Leech.FeedTheWound",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
+					"prerequisites": []
 				},
 				{
 					"id": "Tank.Leech.NothingWasted",
-					"tier": 4,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
@@ -9428,54 +9399,60 @@
 							"id": "Tank.Leech.FeedTheWound",
 							"rank": 1
 						}
-					],
-					"requiredTreeInvestment": 6
+					]
 				},
 				{
-					"id": "Tank.Leech.Reciprocity",
-					"tier": 4,
+					"id": "Tank.Leech.Bloodlet",
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
 					"tags": [
-						"Progression.Node.Tank.Leech.Reciprocity"
+						"Progression.Node.Tank.Leech.Bloodlet"
 					],
 					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Tank.Leech.Transfusion",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 6
+					"prerequisites": []
 				},
 				{
-					"id": "Tank.Leech.Exsanguinate",
-					"tier": 4,
+					"id": "Tank.Leech.RendMastery",
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
 					"tags": [
-						"Progression.Node.Tank.Leech.Exsanguinate"
+						"Progression.Node.Tank.Leech.RendMastery"
 					],
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Tank.Leech.RendMastery",
+							"id": "Tank.Leech.Bloodlet",
 							"rank": 1
 						}
+					]
+				},
+				{
+					"id": "Tank.Leech.Transfusion",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Tank.Leech.Transfusion"
 					],
-					"requiredTreeInvestment": 6
+					"exclusive": [],
+					"prerequisites": []
 				},
 				{
 					"id": "Tank.Leech.Vein",
 					"tier": 4,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": true,
 					"constellation": "None",
 					"effects": [],
@@ -9506,7 +9483,7 @@
 				{
 					"id": "Tank.Bastion.LineOfSight",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -9518,23 +9495,28 @@
 					"prerequisites": []
 				},
 				{
-					"id": "Tank.Bastion.Footing",
+					"id": "Tank.Bastion.ImmovableObject",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
 					"tags": [
-						"Progression.Node.Tank.Bastion.Footing"
+						"Progression.Node.Tank.Bastion.ImmovableObject"
 					],
 					"exclusive": [],
-					"prerequisites": []
+					"prerequisites": [
+						{
+							"id": "Tank.Bastion.LineOfSight",
+							"rank": 1
+						}
+					]
 				},
 				{
 					"id": "Tank.Bastion.Loud",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -9546,35 +9528,15 @@
 					"prerequisites": []
 				},
 				{
-					"id": "Tank.Bastion.HeldGround",
-					"tier": 2,
-					"ranks": 2,
+					"id": "Tank.Bastion.StandingOrder",
+					"tier": 1,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
 					"tags": [
-						"Progression.Node.Tank.Bastion.HeldGround"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Tank.Bastion.LineOfSight",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Tank.Bastion.AnsweringFire",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Tank.Bastion.AnsweringFire"
+						"Progression.Node.Tank.Bastion.StandingOrder"
 					],
 					"exclusive": [],
 					"prerequisites": [
@@ -9582,13 +9544,45 @@
 							"id": "Tank.Bastion.Loud",
 							"rank": 1
 						}
+					]
+				},
+				{
+					"id": "Tank.Bastion.Footing",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Tank.Bastion.Footing"
 					],
-					"requiredTreeInvestment": 2
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Tank.Bastion.Conversion",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Tank.Bastion.Conversion"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Tank.Bastion.Footing",
+							"rank": 1
+						}
+					]
 				},
 				{
 					"id": "Tank.Bastion.Bulk",
-					"tier": 2,
-					"ranks": 2,
+					"tier": 1,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -9597,39 +9591,13 @@
 						"Progression.Node.Tank.Bastion.Bulk"
 					],
 					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Tank.Bastion.LineOfSight",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Tank.Bastion.Emplacement",
-					"tier": 3,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Tank.Bastion.Emplacement"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Tank.Bastion.AnsweringFire",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
+					"prerequisites": []
 				},
 				{
 					"id": "Tank.Bastion.Interposition",
-					"tier": 3,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
@@ -9642,39 +9610,32 @@
 							"id": "Tank.Bastion.Bulk",
 							"rank": 1
 						}
-					],
-					"requiredTreeInvestment": 4
+					]
 				},
 				{
-					"id": "Tank.Bastion.Conversion",
-					"tier": 4,
+					"id": "Tank.Bastion.AnsweringFire",
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
 					"tags": [
-						"Progression.Node.Tank.Bastion.Conversion"
+						"Progression.Node.Tank.Bastion.AnsweringFire"
 					],
 					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Tank.Bastion.Interposition",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 6
+					"prerequisites": []
 				},
 				{
-					"id": "Tank.Bastion.StandingOrder",
-					"tier": 4,
+					"id": "Tank.Bastion.Emplacement",
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
 					"tags": [
-						"Progression.Node.Tank.Bastion.StandingOrder"
+						"Progression.Node.Tank.Bastion.Emplacement"
 					],
 					"exclusive": [],
 					"prerequisites": [
@@ -9682,34 +9643,27 @@
 							"id": "Tank.Bastion.AnsweringFire",
 							"rank": 1
 						}
-					],
-					"requiredTreeInvestment": 6
+					]
 				},
 				{
-					"id": "Tank.Bastion.ImmovableObject",
-					"tier": 4,
+					"id": "Tank.Bastion.HeldGround",
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
 					"tags": [
-						"Progression.Node.Tank.Bastion.ImmovableObject"
+						"Progression.Node.Tank.Bastion.HeldGround"
 					],
 					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Tank.Bastion.Bulk",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 6
+					"prerequisites": []
 				},
 				{
 					"id": "Tank.Bastion.Wall",
 					"tier": 4,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": true,
 					"constellation": "None",
 					"effects": [],
@@ -9740,7 +9694,7 @@
 				{
 					"id": "Tank.Demolitionist.ShapedCharge",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -9752,23 +9706,28 @@
 					"prerequisites": []
 				},
 				{
-					"id": "Tank.Demolitionist.Bootstraps",
+					"id": "Tank.Demolitionist.BlastRadius",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
 					"tags": [
-						"Progression.Node.Tank.Demolitionist.Bootstraps"
+						"Progression.Node.Tank.Demolitionist.BlastRadius"
 					],
 					"exclusive": [],
-					"prerequisites": []
+					"prerequisites": [
+						{
+							"id": "Tank.Demolitionist.ShapedCharge",
+							"rank": 1
+						}
+					]
 				},
 				{
 					"id": "Tank.Demolitionist.BracedForImpact",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -9780,130 +9739,43 @@
 					"prerequisites": []
 				},
 				{
-					"id": "Tank.Demolitionist.Fragmentation",
-					"tier": 2,
-					"ranks": 2,
+					"id": "Tank.Demolitionist.ChainReaction",
+					"tier": 1,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
 					"tags": [
-						"Progression.Node.Tank.Demolitionist.Fragmentation"
+						"Progression.Node.Tank.Demolitionist.ChainReaction"
 					],
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Tank.Demolitionist.ShapedCharge",
+							"id": "Tank.Demolitionist.BracedForImpact",
 							"rank": 1
 						}
-					],
-					"requiredTreeInvestment": 2
+					]
 				},
 				{
-					"id": "Tank.Demolitionist.Concussion",
-					"tier": 2,
-					"ranks": 2,
+					"id": "Tank.Demolitionist.Bootstraps",
+					"tier": 1,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
 					"tags": [
-						"Progression.Node.Tank.Demolitionist.Concussion"
+						"Progression.Node.Tank.Demolitionist.Bootstraps"
 					],
 					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Tank.Demolitionist.Bootstraps",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Tank.Demolitionist.Overpressure",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Tank.Demolitionist.Overpressure"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Tank.Demolitionist.ShapedCharge",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Tank.Demolitionist.Demolition",
-					"tier": 3,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Tank.Demolitionist.Demolition"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Tank.Demolitionist.Overpressure",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
-				},
-				{
-					"id": "Tank.Demolitionist.TerminalDescent",
-					"tier": 3,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Tank.Demolitionist.TerminalDescent"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Tank.Demolitionist.Concussion",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
-				},
-				{
-					"id": "Tank.Demolitionist.BlastRadius",
-					"tier": 4,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Tank.Demolitionist.BlastRadius"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Tank.Demolitionist.Fragmentation",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 6
+					"prerequisites": []
 				},
 				{
 					"id": "Tank.Demolitionist.KineticRecovery",
-					"tier": 4,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
@@ -9916,34 +9788,93 @@
 							"id": "Tank.Demolitionist.Bootstraps",
 							"rank": 1
 						}
-					],
-					"requiredTreeInvestment": 6
+					]
 				},
 				{
-					"id": "Tank.Demolitionist.ChainReaction",
-					"tier": 4,
+					"id": "Tank.Demolitionist.Concussion",
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
 					"tags": [
-						"Progression.Node.Tank.Demolitionist.ChainReaction"
+						"Progression.Node.Tank.Demolitionist.Concussion"
+					],
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Tank.Demolitionist.TerminalDescent",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Tank.Demolitionist.TerminalDescent"
 					],
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Tank.Demolitionist.Demolition",
+							"id": "Tank.Demolitionist.Concussion",
 							"rank": 1
 						}
+					]
+				},
+				{
+					"id": "Tank.Demolitionist.Overpressure",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Tank.Demolitionist.Overpressure"
 					],
-					"requiredTreeInvestment": 6
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Tank.Demolitionist.Demolition",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Tank.Demolitionist.Demolition"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Tank.Demolitionist.Overpressure",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Tank.Demolitionist.Fragmentation",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Tank.Demolitionist.Fragmentation"
+					],
+					"exclusive": [],
+					"prerequisites": []
 				},
 				{
 					"id": "Tank.Demolitionist.Detonation",
 					"tier": 4,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": true,
 					"constellation": "None",
 					"effects": [],

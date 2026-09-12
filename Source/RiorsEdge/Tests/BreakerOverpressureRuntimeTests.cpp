@@ -85,6 +85,14 @@ bool FBreakerOverpressureRuntimeTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("Baseline cast uses actual slot input"), CastSlot())) return false;
     TestEqual(TEXT("Placement pays authored thirty resource"), Player->GetAttributes()->GetClassResource(), 70.0f);
     if (!TestEqual(TEXT("One persistent charge exists"), Charges().Num(), 1)) return false;
+    {
+        // The unowned charge is the non-sticky baseline: it stays where it hit.
+        const FVector Fixed = Charges()[0]->GetActorLocation();
+        Enemy->SetActorLocation(FVector(650, 100, 0));
+        Charges()[0]->Tick(0);
+        TestTrue(TEXT("Unowned charge stays at its fixed impact"), Charges()[0]->GetActorLocation().Equals(Fixed));
+        Enemy->SetActorLocation(FVector(650, 0, 0));
+    }
     TestFalse(TEXT("No Overpressure cannot re-press through cooldown"), CastSlot());
     Advance(0.5f);
     TestEqual(TEXT("Baseline fuse does not detonate early"), Charges().Num(), 1);
@@ -94,16 +102,19 @@ bool FBreakerOverpressureRuntimeTest::RunTest(const FString& Parameters)
     Advance(8.0f);
     TestEqual(TEXT("Baseline cooldown genuinely expired"), Abilities->GetCooldownRemaining(EBreakerAbilitySlot::ClassAbilityTwo), 0.0f);
     const UBreakerProgressionTree* Tree = UBreakerProgressionLibrary::GetTankDemolitionistTree();
-    for (int32 Rank = 0; Rank < 2; ++Rank)
-        if (!TestTrue(TEXT("Actual Shaped Charge prerequisite purchase"), Player->GetProgression()->PurchaseNode(Tree, TEXT("Tank.Demolitionist.ShapedCharge"), Error))) return false;
-    if (!TestTrue(TEXT("Actual rank one Overpressure purchase"), Player->GetProgression()->PurchaseNode(Tree, TEXT("Tank.Demolitionist.Overpressure"), Error))) return false;
+    // O272: Overpressure is a travel root with no prerequisite, and its single
+    // rank is the sticky charge (what rank two used to be).
+    if (!TestTrue(TEXT("Actual Overpressure purchase"), Player->GetProgression()->PurchaseNode(Tree, TEXT("Tank.Demolitionist.Overpressure"), Error))) return false;
     Fund();
-    if (!TestTrue(TEXT("Rank one places charge"), CastSlot())) return false;
-    if (!TestEqual(TEXT("Rank one has one live charge"), Charges().Num(), 1)) return false;
-    const FVector Fixed = Charges()[0]->GetActorLocation();
-    Enemy->SetActorLocation(Enemy->GetActorLocation() + FVector(0, 100, 0));
-    Charges()[0]->Tick(0);
-    TestTrue(TEXT("Rank one charge stays at its fixed impact"), Charges()[0]->GetActorLocation().Equals(Fixed));
+    if (!TestTrue(TEXT("Owned Overpressure places charge"), CastSlot())) return false;
+    if (!TestEqual(TEXT("Owned Overpressure has one live charge"), Charges().Num(), 1)) return false;
+    {
+        const FVector BeforeMove = Charges()[0]->GetActorLocation();
+        const FVector Shift(0, 800, 0);
+        Enemy->SetActorLocation(Enemy->GetActorLocation() + Shift);
+        Charges()[0]->Tick(0);
+        TestTrue(TEXT("Rank one charge follows actual enemy impact offset"), Charges()[0]->GetActorLocation().Equals(BeforeMove + Shift, 0.1));
+    }
     ASC->SetNumericAttributeBase(UBreakerAttributeSet::GetClassResourceAttribute(), 0);
     const float Cooldown = Abilities->GetCooldownRemaining(EBreakerAbilitySlot::ClassAbilityTwo);
     const float BeforeBlast = EnemyAttributes->GetHealth();
@@ -113,8 +124,9 @@ bool FBreakerOverpressureRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Re-press does not restart cooldown"), Abilities->GetCooldownRemaining(EBreakerAbilitySlot::ClassAbilityTwo), Cooldown);
     TestTrue(TEXT("Re-press causes actual blast damage"), EnemyAttributes->GetHealth() < BeforeBlast);
     Advance(8.0f);
-    if (!TestTrue(TEXT("Actual rank two Overpressure purchase"), Player->GetProgression()->PurchaseNode(Tree, TEXT("Tank.Demolitionist.Overpressure"), Error))) return false;
+    // Demolition is the impactful half of Overpressure's pair and buys behind it.
     if (!TestTrue(TEXT("Actual Demolition purchase"), Player->GetProgression()->PurchaseNode(Tree, TEXT("Tank.Demolitionist.Demolition"), Error))) return false;
+    TestEqual(TEXT("Overpressure pair leaves six of eight"), Player->GetProgression()->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 6);
     Enemy->SetActorLocation(FVector(650, 0, 0));
     Fund();
     if (!TestTrue(TEXT("Sticky first placement"), CastSlot()) || !TestEqual(TEXT("Sticky body exists"), Charges().Num(), 1)) return false;
@@ -122,7 +134,7 @@ bool FBreakerOverpressureRuntimeTest::RunTest(const FString& Parameters)
     const FVector Shift(0, 800, 0);
     Enemy->SetActorLocation(Enemy->GetActorLocation() + Shift);
     Charges()[0]->Tick(0);
-    TestTrue(TEXT("Rank two follows actual enemy impact offset"), Charges()[0]->GetActorLocation().Equals(BeforeMove + Shift, 0.1));
+    TestTrue(TEXT("Charge behind Demolition still follows actual enemy impact offset"), Charges()[0]->GetActorLocation().Equals(BeforeMove + Shift, 0.1));
     const float StickyBefore = EnemyAttributes->GetHealth();
     const float SharedCooldown = Abilities->GetCooldownRemaining(EBreakerAbilitySlot::ClassAbilityTwo);
     TestTrue(TEXT("First sticky detonation"), CastSlot());

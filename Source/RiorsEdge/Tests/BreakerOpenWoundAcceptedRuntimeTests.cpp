@@ -36,7 +36,10 @@ bool FBreakerOpenWoundAcceptedTest::RunTest(const FString& Parameters)
         if (Gear.Affixes.ContainsByPredicate([](const auto& Line){return Line.AffixId==FName(TEXT("Core.LifeOnKill"));})) break;
     }
     if (!TestTrue(TEXT("ordinary complete rolled gloves contain existing sustain stat"),Gear.IsValid() && Gear.Affixes.ContainsByPredicate([](const auto& Line){return Line.AffixId==FName(TEXT("Core.LifeOnKill"));}))) return false;
-    for (int32 Scenario=0;Scenario<7;++Scenario)
+    // O272: Open Wound is a single-rank travel that pays every accepted
+    // target. Scenarios: 0 avoided, 1 immune, 2 first avoided / second
+    // accepted, 3 two accepted, 4 shield-only hit, 5 lethal hit.
+    for (int32 Scenario=0;Scenario<6;++Scenario)
     {
         UWorld::InitializationValues Init; Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
         auto* World=UWorld::CreateWorld(EWorldType::Game,false,NAME_None,nullptr,true,ERHIFeatureLevel::Num,&Init);
@@ -63,10 +66,8 @@ bool FBreakerOpenWoundAcceptedTest::RunTest(const FString& Parameters)
             for (const auto& Beat:Mission.Beats)
                 for (FName Flag:UBreakerMissionLibrary::BeatCompletionFlags(Beat)) Flags.Add(Flag);
         Flags.Add(TEXT("Quest.Finale.Seal")); Progression->SettleDoctrineEntitlement(Flags);
-        const int32 Rank=Scenario==4 ? 2 : 1;
         FText Reason;
-        for (int32 N=0;N<Rank;++N)
-            if (!TestTrue(TEXT("paid entry Open Wound within actual two points"),Progression->PurchaseNode(UBreakerProgressionLibrary::GetTankLeechTree(),TEXT("Tank.Leech.OpenWound"),Reason))) return false;
+        if (!TestTrue(TEXT("paid Open Wound travel with one point"),Progression->PurchaseNode(UBreakerProgressionLibrary::GetTankLeechTree(),TEXT("Tank.Leech.OpenWound"),Reason))) return false;
         Tank->GetEquipment()->BindAttributes(Tank->GetAttributes());
         if (!TestTrue(TEXT("complete rolled sustain gloves actually equip"),Tank->GetEquipment()->EquipItem(Gear))) return false;
         const float LifeOnKill=Tank->GetEquipment()->GetStats().LifeOnKill;
@@ -80,9 +81,9 @@ bool FBreakerOpenWoundAcceptedTest::RunTest(const FString& Parameters)
         Tank->GetCombat()->ReceiveDamage(Hurt);
         if (Scenario==0 || Scenario==2) Front->GetCombat()->DodgeChance=1;
         if (Scenario==1) Front->GetCombat()->PushIncomingDamageModifier(TEXT("Fixture.Immunity"),0);
-        if (Scenario<2 || Scenario>=5) Rear->SetActorLocation(FVector(2000,0,200));
-        if (Scenario==5) { Front->GetAttributes()->ApplyMaxShield(1000); Front->GetAttributes()->ApplyShield(1000); } // Explicit target shield fixture.
-        if (Scenario==6) Front->GetAttributes()->ApplyHealth(1); // Explicit lethal target fixture.
+        if (Scenario<2 || Scenario>=4) Rear->SetActorLocation(FVector(2000,0,200));
+        if (Scenario==4) { Front->GetAttributes()->ApplyMaxShield(1000); Front->GetAttributes()->ApplyShield(1000); } // Explicit target shield fixture.
+        if (Scenario==5) Front->GetAttributes()->ApplyHealth(1); // Explicit lethal target fixture.
         const float Before=Tank->GetAttributes()->GetHealth();
         const float FrontHealth=Front->GetAttributes()->GetHealth(), RearHealth=Rear->GetAttributes()->GetHealth();
         const float Shield=Front->GetAttributes()->GetShield();
@@ -92,8 +93,8 @@ bool FBreakerOpenWoundAcceptedTest::RunTest(const FString& Parameters)
         if (!TestTrue(TEXT("actual paid Rend"),ASC->TryActivateAbility(Handle))) return false;
         TestTrue(TEXT("Rend spends ordinary funded Grit"),Tank->GetAttributes()->GetClassResource()<Resource);
         const float Dealt=FrontHealth-Front->GetAttributes()->GetHealth()+RearHealth-Rear->GetAttributes()->GetHealth()+Shield-Front->GetAttributes()->GetShield();
-        const int32 Accepted=Scenario<2 ? 0 : (Scenario==3 || Scenario==4 ? 2 : 1);
-        const float NodeHeal=LifeOnKill*(Rank==2 ? Accepted : FMath::Min(Accepted,1));
+        const int32 Accepted=Scenario<2 ? 0 : (Scenario==3 ? 2 : 1);
+        const float NodeHeal=LifeOnKill*Accepted;   // rank one pays every accepted target
         // Equipment BeginPlay is deliberately absent in this isolated fixture;
         // its separate OnKillDealt sustain listener is therefore not bound.
         // The lethal row proves Rend's accepted-hit payout, not gear kill income.
@@ -101,9 +102,9 @@ bool FBreakerOpenWoundAcceptedTest::RunTest(const FString& Parameters)
         TestEqual(FString::Printf(TEXT("scenario%d pays accepted hit heal only"),Scenario),Tank->GetAttributes()->GetHealth()-Before,Expected,.01f);
         if (Scenario<2) TestEqual(TEXT("refused target takes no damage"),Dealt,0.0f);
         else TestTrue(TEXT("accepted target takes actual damage"),Dealt>0);
-        if (Scenario==2) TestEqual(TEXT("avoided first target stays intact; R1 pays later hit"),Front->GetAttributes()->GetHealth(),FrontHealth);
-        if (Scenario==5) TestEqual(TEXT("shield-only hit counts without health damage"),Front->GetAttributes()->GetHealth(),FrontHealth);
-        if (Scenario==6) TestTrue(TEXT("lethal hit still counts"),Front->GetCombat()->IsDead());
+        if (Scenario==2) TestEqual(TEXT("avoided first target stays intact; the later accepted hit pays"),Front->GetAttributes()->GetHealth(),FrontHealth);
+        if (Scenario==4) TestEqual(TEXT("shield-only hit counts without health damage"),Front->GetAttributes()->GetHealth(),FrontHealth);
+        if (Scenario==5) TestTrue(TEXT("lethal hit still counts"),Front->GetCombat()->IsDead());
     }
     return true;
 }

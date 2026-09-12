@@ -63,14 +63,14 @@ bool FBreakerInterpositionRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("actual entitlement is eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 8);
     const auto* Tree = UBreakerProgressionLibrary::GetTankBastionTree();
     FText Reason;
-    for (const TCHAR* Node : { TEXT("Tank.Bastion.LineOfSight"), TEXT("Tank.Bastion.LineOfSight"),
-        TEXT("Tank.Bastion.Footing"), TEXT("Tank.Bastion.Footing"), TEXT("Tank.Bastion.Bulk"),
-        TEXT("Tank.Bastion.Bulk"), TEXT("Tank.Bastion.Interposition") })
+    // O272: Interposition is the impactful half of Bulk's pair; the travel
+    // buys first and the pair costs two of the eight.
+    for (const TCHAR* Node : { TEXT("Tank.Bastion.Bulk"), TEXT("Tank.Bastion.Interposition") })
     {
         const bool bPurchased = Progression->PurchaseNode(Tree, Node, Reason);
         if (!TestTrue(FString::Printf(TEXT("purchase %s: %s"), Node, *Reason.ToString()), bPurchased)) return false;
     }
-    TestEqual(TEXT("Interposition spends exactly eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
+    TestEqual(TEXT("Interposition pair leaves six of eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 6);
     if (!Progression->IsAbilityUnlocked(TEXT("Tank.AnchorPoint")))
         if (!TestTrue(TEXT("level-earned token unlocks Anchor Point"), Progression->SpendAbilityToken(TEXT("Tank.AnchorPoint"), Reason))) return false;
     auto* Grit = Tank->GetGrit(); Grit->BindAttributes(Attributes); Grit->BeginPlay(); Grit->SetComponentTickEnabled(false);

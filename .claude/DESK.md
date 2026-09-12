@@ -213,7 +213,35 @@
   FOUND: Tithe's shorter per-deployable ICD and Tripwire's per-placement
   choice remain recorded gaps at their sites.
 
-## Cycle — O272 DOCTRINE, TANK
+## O272 DOCTRINE, TANK — LANDED
+
+- The three Tank doctrines are six pairs of single-rank nodes, none
+  unpaired. Leech: Clot->Second Heart, Slow Bleed->Reciprocity, Open
+  Wound->Exsanguinate, Feed the Wound->Nothing Wasted, Bloodlet->Rend
+  Mastery, Transfusion->Vein. Bastion: Line of Sight->Immovable Object,
+  Loud->Standing Order, Footing->Conversion, Bulk->Interposition,
+  Answering Fire->Emplacement, Held Ground->Wall. Demolitionist: Shaped
+  Charge->Blast Radius, Braced for Impact->Chain Reaction, Bootstraps->
+  Kinetic Recovery, Concussion->Terminal Descent, Overpressure->
+  Demolition, Fragmentation->Detonation. Every Tank magnitude is a KIT
+  reader, moved to rank one by declared crossing: Clot 1.5:1, Slow Bleed
+  8 s, Open Wound pays every accepted target, Feed the Wound full rate,
+  Bloodlet 14%, Transfusion +12, Line of Sight 20 s, Footing 9 m, Loud
+  16 m, Held Ground no decay and the regrant, Answering Fire 2x, Bulk 2x,
+  Shaped Charge 0.6, Braced 0.2, Fragmentation 4 m, Concussion 2.5 s,
+  Overpressure sticky. Fifteen test rigs re-pointed; every keystone walk
+  spends seven of eight and pins the one left. Spec Overpressure reads
+  as one rule at 300 lines. Census re-exported. PHOTOGRAPHED: the
+  Bastion wheel through the doctrine fixture, six spokes, Wall at the
+  crown's left. QUESTION: three pairings are by theme, not the old chain
+  — Footing->Conversion, Braced for Impact->Chain Reaction, and the
+  Leech trio (Clot->Second Heart, Slow Bleed->Reciprocity, Open Wound->
+  Exsanguinate; swapping the first two reads as well). FOUND: Conversion
+  has no reader anywhere outside the library — a node with no consumer;
+  recorded here, not faked. FOUND: BreakerWeaponNodeRuleTests builds its
+  rigs with a 30-point wallet (pre-existing; a "never grant more than
+  the game grants" item).
+
 ## Cycle — O272 DOCTRINE, SUPPORT
 
 - [ ] One class per build, the Caster's shape: six pairs, single ranks,

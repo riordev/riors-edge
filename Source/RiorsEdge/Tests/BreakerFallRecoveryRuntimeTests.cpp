@@ -53,9 +53,8 @@ bool FBreakerFallRecoveryRuntimeTest::RunTest(const FString& Parameters)
         if (Case != ECase::Unpurchased)
         {
             FText Failure;
-            for (const TCHAR* Id : {TEXT("Tank.Demolitionist.Bootstraps"), TEXT("Tank.Demolitionist.Bootstraps"),
-                TEXT("Tank.Demolitionist.BracedForImpact"), TEXT("Tank.Demolitionist.BracedForImpact"),
-                TEXT("Tank.Demolitionist.ShapedCharge"), TEXT("Tank.Demolitionist.ShapedCharge"), TEXT("Tank.Demolitionist.KineticRecovery")})
+            // O272: Kinetic Recovery hangs from Bootstraps alone; the pair is two points.
+            for (const TCHAR* Id : {TEXT("Tank.Demolitionist.Bootstraps"), TEXT("Tank.Demolitionist.KineticRecovery")})
                 if (!TestTrue(Id, Progression->PurchaseNode(UBreakerProgressionLibrary::GetTankDemolitionistTree(), Id, Failure))) return false;
         }
         auto* Movement = Player->GetBreakerMovement();

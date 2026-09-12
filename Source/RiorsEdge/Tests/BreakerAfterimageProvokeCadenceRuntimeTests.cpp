@@ -99,8 +99,8 @@ bool FBreakerAfterimageProvokeTest::RunTest(const FString&)
         for (FName Flag:UBreakerMissionLibrary::BeatCompletionFlags(Beat)) Flags.Add(Flag);
     Progression->SettleDoctrineEntitlement(Flags);
     FText Reason;
-    for (const TCHAR* Id:{TEXT("Tank.Bastion.Loud"),TEXT("Tank.Bastion.Loud"),TEXT("Tank.Bastion.AnsweringFire"),TEXT("Tank.Bastion.AnsweringFire")})
-        if (!TestTrue(TEXT("Legal Answering Fire path"),Progression->PurchaseNode(UBreakerProgressionLibrary::GetTankBastionTree(),Id,Reason))) return false;
+    // O272: Answering Fire is a travel root, single rank at the old rank-two magnitude (2x).
+    if (!TestTrue(TEXT("Legal Answering Fire path"),Progression->PurchaseNode(UBreakerProgressionLibrary::GetTankBastionTree(),TEXT("Tank.Bastion.AnsweringFire"),Reason))) return false;
     auto* Enemy=F.World->SpawnActor<ABreakerEnemy>(FVector(0,300,0),FRotator::ZeroRotator);
     Enemy->ConfigureWave(5); Enemy->DispatchBeginPlay();
     // BeginPlay registers/enables the enemy's ticks. Freeze the observation
@@ -127,12 +127,12 @@ bool FBreakerAfterimageProvokeTest::RunTest(const FString&)
     TestTrue(TEXT("Provoke spent funded Grit"),Grit->GetGrit()<100);
     const float Full=F.Shot(); TestTrue(TEXT("Actual Provoke flat rider increases rifle hit"),Full>BaseDamage);
     auto Income=[&]() { Contact(); const float Before=Grit->GetGrit(); Grit->AdvanceLoop(.1f); return Grit->GetGrit()-Before; };
-    TestEqual(TEXT("Full rank-two proximity income"),Income(),Grit->ProximityRate*2*.1f,.002f);
+    TestEqual(TEXT("Full Answering Fire proximity income"),Income(),Grit->ProximityRate*2*.1f,.002f);
     F.Tick(Defaults->BonusDurationSeconds+.03f);
     if (!TestFalse(TEXT("Player survives until the numerical tail is measured"),Player->GetCombat()->IsDead())) return false;
     TestTrue(TEXT("Observation enemy stays at its actual proximity site"),Enemy->GetActorLocation().Equals(FVector(0,300,0),.01f));
     TestEqual(TEXT("Flat damage tail halves captured contribution"),F.Shot(),BaseDamage+(Full-BaseDamage)*.5f,.03f);
-    TestEqual(TEXT("Tail rank-two proximity income"),Income(),Grit->ProximityRate*1.5f*.1f,.002f);
+    TestEqual(TEXT("Tail Answering Fire proximity income"),Income(),Grit->ProximityRate*1.5f*.1f,.002f);
     Enemy->SetActorLocation(FVector(0,2000,0)); Contact(); const float BeforeAbsent=Grit->GetGrit(); Grit->AdvanceLoop(.1f);
     TestEqual(TEXT("Tail cannot generate without a nearby enemy"),Grit->GetGrit(),BeforeAbsent,.002f);
     Enemy->SetActorLocation(FVector(0,300,0));

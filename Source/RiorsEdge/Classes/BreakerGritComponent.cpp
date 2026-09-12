@@ -397,8 +397,8 @@ void UBreakerGritComponent::HandleProgressionChanged()
     if (!bIsTank) PendingGrants = 0.0f;
 
     // Node-rank cache: read once per progression change, never per frame.
-    // Ranked nodes read GetNodeRank (their R2 clause is a magnitude); pure
-    // rule-rewrite nodes read their tag.
+    // Magnitude nodes read GetNodeRank (single-rank, O272: any rank above
+    // zero is the node); pure rule-rewrite nodes read their tag.
     RankSlowBleed = 0; RankFeedTheWound = 0; RankTransfusion = 0;
     bSecondHeart = false; bNothingWasted = false; bReciprocity = false;
     RankFooting = 0; RankHeldGround = 0; bInterposition = false; bConversion = false;
@@ -492,11 +492,10 @@ void UBreakerGritComponent::NotifyDamageTaken(float HealthDamage, float ShieldDa
     // L10 Reciprocity's ledger: what the shield absorbed since it last stood.
     if (ShieldDamage > 0.0f) ShieldAbsorbedSinceGain += ShieldDamage;
 
-    // L4 Feed the Wound rewrites the shield-absorption rate: half -> two-thirds
-    // (R2: full rate). The shared damage cap still binds below, exactly as the
-    // node text promises.
-    const float EffectiveShieldRate = RankFeedTheWound >= 2 ? 1.0f
-        : (RankFeedTheWound == 1 ? (2.0f / 3.0f) : ShieldRateFraction);
+    // L4 Feed the Wound rewrites the shield-absorption rate: half -> full
+    // rate. The shared damage cap still binds below, exactly as the node
+    // text promises.
+    const float EffectiveShieldRate = RankFeedTheWound > 0 ? 1.0f : ShieldRateFraction;   // O2 PLACEHOLDER, node text
     const float Raw = DamageTakenGeneration(HealthDamage, ShieldDamage, Attributes->GetMaxHealth(),
         GritPerHealthFraction, HealthFractionPerGrit, EffectiveShieldRate, ProcCoefficient);
     const float Scaled = Raw * SelfDamageScalar(SelfDamageRate, bSelfInflicted);
@@ -514,12 +513,12 @@ void UBreakerGritComponent::NotifyBlockProc()
 {
     if (!GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || !bInCombat || IsInSafeZone()) return;
     // L6 Transfusion: WHILE SHIELDED, the proc pays more on a slightly faster
-    // internal cooldown (+9, R2 +12, ICD 0.4 -> 0.3). G4's per-source cap below
-    // is exactly why the shorter ICD is not a back door — the node comment says
+    // internal cooldown (+12, ICD 0.4 -> 0.3). G4's per-source cap below is
+    // exactly why the shorter ICD is not a back door — the node comment says
     // so and the budget draw enforces it.
     const bool bTransfusion = RankTransfusion > 0 && Attributes && Attributes->GetShield() > 0.0f;
     const float EffectiveInterval = bTransfusion ? 0.3f : BlockProcInterval;   // O2 PLACEHOLDER
-    const float EffectiveGrant = bTransfusion ? (RankTransfusion >= 2 ? 12.0f : 9.0f) : BlockProcGrant;   // node text
+    const float EffectiveGrant = bTransfusion ? 12.0f : BlockProcGrant;   // O2 PLACEHOLDER, node text
     const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
     if (Now - LastBlockGrantTime < EffectiveInterval) return;
     LastBlockGrantTime = Now;
@@ -560,7 +559,7 @@ void UBreakerGritComponent::SetInCombat(bool bNowInCombat)
     if (bInCombat && !bWasInCombat)
     {
         GrantGrit(CombatEntryGrant);
-        // B4 Held Ground R2's once-per-combat re-grant re-arms on the same edge
+        // B4 Held Ground's once-per-combat re-grant re-arms on the same edge
         // the entry grant fires on.
         bAnchorRegrantUsed = false;
     }
@@ -605,10 +604,10 @@ bool UBreakerGritComponent::TrySpendGrit(float Cost)
 
 void UBreakerGritComponent::NotifyAnchorPlaced()
 {
-    // B4 Held Ground, second rank only: placing an Anchor Point re-triggers the
-    // combat-entry grant, ONCE per combat state — same edge-triggered shape as
-    // the entry grant itself, so it can never be farmed by re-placing.
-    if (RankHeldGround < 2 || !bInCombat || bAnchorRegrantUsed) return;
+    // B4 Held Ground: placing an Anchor Point re-triggers the combat-entry
+    // grant, ONCE per combat state — same edge-triggered shape as the entry
+    // grant itself, so it can never be farmed by re-placing.
+    if (RankHeldGround < 1 || !bInCombat || bAnchorRegrantUsed) return;
     if (!GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || IsInSafeZone()) return;
     bAnchorRegrantUsed = true;
     GrantGrit(CombatEntryGrant);
@@ -777,13 +776,13 @@ void UBreakerGritComponent::AdvanceLoop(float DeltaTime)
     const float AnchorDistance = bAnyAnchorNode ? GetOwnAnchorDistanceCm() : TNumericLimits<float>::Max();
     const bool bNearOwnAnchor = AnchorDistance <= AnchorNearRadiusCm;
 
-    // B2 Footing: near your own Anchor Point the proximity source reaches 7 m
-    // (R2: 9 m) instead of 5. The 5 m scan lives with the character; this is
-    // the EXTENSION only, so a build without the node is bit-identical.
+    // B2 Footing: near your own Anchor Point the proximity source reaches 9 m
+    // instead of 5. The 5 m scan lives with the character; this is the
+    // EXTENSION only, so a build without the node is bit-identical.
     bool bExtendedNear = false;
     if (RankFooting > 0 && bNearOwnAnchor && !bEnemyNear && bInCombat)
     {
-        const float ExtendedRadius = RankFooting >= 2 ? 900.0f : 700.0f;   // node text
+        const float ExtendedRadius = 900.0f;   // O2 PLACEHOLDER, node text
         if (UWorld* World = GetWorld())
         {
             for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
@@ -834,8 +833,8 @@ void UBreakerGritComponent::AdvanceLoop(float DeltaTime)
     float ShieldAfterDecay = ShieldNow;
     if (ShieldNow > 0.0f)
     {
-        // L2 Slow Bleed rewrites the HOLD, never the rate: 3s -> 5s (R2: 8s).
-        const float EffectiveDelay = RankSlowBleed >= 2 ? 8.0f : (RankSlowBleed == 1 ? 5.0f : LeechShieldDecayDelaySeconds);   // node text
+        // L2 Slow Bleed rewrites the HOLD, never the rate: 3s -> 8s.
+        const float EffectiveDelay = RankSlowBleed > 0 ? 8.0f : LeechShieldDecayDelaySeconds;   // O2 PLACEHOLDER, node text
         // L8 Second Heart: no decay at all while IRONCLAD.
         const bool bDecayHeld = bSecondHeart && CachedBand == EBreakerGritBand::Ironclad;
         if (!bDecayHeld && SecondsSinceShieldGain >= EffectiveDelay && LeechShieldDecayFractionPerSecond > 0.0f)

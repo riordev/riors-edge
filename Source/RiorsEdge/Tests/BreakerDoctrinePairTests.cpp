@@ -32,7 +32,7 @@
 // choice, never purchasable). An unpaired root has no dependents and buys
 // with one point, or is already owned.
 //
-// This test states that shape for all nine trees, buys every pair with
+// This test states that shape for all twelve trees, buys every pair with
 // exactly one benchmark's points settled the way the game settles them, and
 // pins the data the travel magnitudes moved to.
 // ---------------------------------------------------------------------------
@@ -124,6 +124,27 @@ namespace
                 { TEXT("Gunsmith.Tinkerer.Rearm"), TEXT("Gunsmith.Tinkerer.CommandDetonation") },
                 { TEXT("Gunsmith.Tinkerer.Overlap"), TEXT("Gunsmith.Tinkerer.Interdiction") },
                 { TEXT("Gunsmith.Tinkerer.AttritionField"), TEXT("Gunsmith.Tinkerer.Minefield") } }, {} },
+            { TEXT("Leech"), EBreakerClassId::Tank, UBreakerProgressionLibrary::GetTankLeechTree(), {
+                { TEXT("Tank.Leech.Clot"), TEXT("Tank.Leech.SecondHeart") },
+                { TEXT("Tank.Leech.SlowBleed"), TEXT("Tank.Leech.Reciprocity") },
+                { TEXT("Tank.Leech.OpenWound"), TEXT("Tank.Leech.Exsanguinate") },
+                { TEXT("Tank.Leech.FeedTheWound"), TEXT("Tank.Leech.NothingWasted") },
+                { TEXT("Tank.Leech.Bloodlet"), TEXT("Tank.Leech.RendMastery") },
+                { TEXT("Tank.Leech.Transfusion"), TEXT("Tank.Leech.Vein") } }, {} },
+            { TEXT("Bastion"), EBreakerClassId::Tank, UBreakerProgressionLibrary::GetTankBastionTree(), {
+                { TEXT("Tank.Bastion.LineOfSight"), TEXT("Tank.Bastion.ImmovableObject") },
+                { TEXT("Tank.Bastion.Loud"), TEXT("Tank.Bastion.StandingOrder") },
+                { TEXT("Tank.Bastion.Footing"), TEXT("Tank.Bastion.Conversion") },
+                { TEXT("Tank.Bastion.Bulk"), TEXT("Tank.Bastion.Interposition") },
+                { TEXT("Tank.Bastion.AnsweringFire"), TEXT("Tank.Bastion.Emplacement") },
+                { TEXT("Tank.Bastion.HeldGround"), TEXT("Tank.Bastion.Wall") } }, {} },
+            { TEXT("Demolitionist"), EBreakerClassId::Tank, UBreakerProgressionLibrary::GetTankDemolitionistTree(), {
+                { TEXT("Tank.Demolitionist.ShapedCharge"), TEXT("Tank.Demolitionist.BlastRadius") },
+                { TEXT("Tank.Demolitionist.BracedForImpact"), TEXT("Tank.Demolitionist.ChainReaction") },
+                { TEXT("Tank.Demolitionist.Bootstraps"), TEXT("Tank.Demolitionist.KineticRecovery") },
+                { TEXT("Tank.Demolitionist.Concussion"), TEXT("Tank.Demolitionist.TerminalDescent") },
+                { TEXT("Tank.Demolitionist.Overpressure"), TEXT("Tank.Demolitionist.Demolition") },
+                { TEXT("Tank.Demolitionist.Fragmentation"), TEXT("Tank.Demolitionist.Detonation") } }, {} },
         };
     }
 

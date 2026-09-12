@@ -58,13 +58,19 @@ bool FBreakerHoldHitCapRuntimeTest::RunTest(const FString& Parameters)
             TestEqual(TEXT("earned fixture wallet is eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 8);
             const auto* Tree = UBreakerProgressionLibrary::GetTankBastionTree();
             FText Reason;
-            for (const TCHAR* Node : { TEXT("Tank.Bastion.LineOfSight"), TEXT("Tank.Bastion.LineOfSight"),
-                TEXT("Tank.Bastion.Footing"), TEXT("Tank.Bastion.Footing"),
-                TEXT("Tank.Bastion.HeldGround"), TEXT("Tank.Bastion.HeldGround") })
+            // O272: six single points open the keystone's gate — Held Ground
+            // (Wall's own travel) first, two whole pairs, a third travel —
+            // then the commitment and Wall for one. Seven of the eight are
+            // spent; the eighth is the honest remainder.
+            for (const TCHAR* Node : { TEXT("Tank.Bastion.HeldGround"),
+                TEXT("Tank.Bastion.LineOfSight"), TEXT("Tank.Bastion.ImmovableObject"),
+                TEXT("Tank.Bastion.Footing"), TEXT("Tank.Bastion.Conversion"),
+                TEXT("Tank.Bastion.Loud") })
                 if (!TestTrue(FString::Printf(TEXT("purchase %s: %s"), Node, *Reason.ToString()), Progression->PurchaseNode(Tree, Node, Reason))) return false;
+            TestEqual(TEXT("six invested opens the keystone gate"), Progression->GetTreeInvestment(Tree), 6);
             if (!TestTrue(TEXT("actual Bastion commitment"), Progression->CommitToBranch(Tree->TreeId, Reason))) return false;
             if (!TestTrue(TEXT("actual Wall purchase"), Progression->PurchaseNode(Tree, TEXT("Tank.Bastion.Wall"), Reason))) return false;
-            TestEqual(TEXT("Wall spends exactly eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
+            TestEqual(TEXT("Wall walk leaves one of eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 1);
         }
         auto* Grit = Tank->GetGrit();
         Grit->BindAttributes(Attributes);

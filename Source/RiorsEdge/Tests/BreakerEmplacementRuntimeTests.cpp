@@ -62,11 +62,11 @@ bool FBreakerEmplacementRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("actual entitlement is eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 8);
     const auto* Tree = UBreakerProgressionLibrary::GetTankBastionTree();
     FText Reason;
-    for (const TCHAR* Node : { TEXT("Tank.Bastion.Loud"), TEXT("Tank.Bastion.Loud"),
-        TEXT("Tank.Bastion.AnsweringFire"), TEXT("Tank.Bastion.AnsweringFire") })
+    // O272: Emplacement is the impactful half of Answering Fire's pair; the
+    // travel buys first, alone.
     {
-        const bool bPurchased = Progression->PurchaseNode(Tree, Node, Reason);
-        if (!TestTrue(FString::Printf(TEXT("purchase %s: %s"), Node, *Reason.ToString()), bPurchased)) return false;
+        const bool bPurchased = Progression->PurchaseNode(Tree, TEXT("Tank.Bastion.AnsweringFire"), Reason);
+        if (!TestTrue(FString::Printf(TEXT("purchase Answering Fire: %s"), *Reason.ToString()), bPurchased)) return false;
     }
     if (!Progression->IsAbilityUnlocked(TEXT("Tank.AnchorPoint")))
         if (!TestTrue(TEXT("earned token unlocks Anchor"), Progression->SpendAbilityToken(TEXT("Tank.AnchorPoint"), Reason))) return false;
@@ -97,7 +97,7 @@ bool FBreakerEmplacementRuntimeTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("paid own panel alone cannot grant an unowned node"), Weapon->IsSpreadReadingStationary());
     const bool bPurchased = Progression->PurchaseNode(Tree, TEXT("Tank.Bastion.Emplacement"), Reason);
     if (!TestTrue(FString::Printf(TEXT("purchase Emplacement: %s"), *Reason.ToString()), bPurchased)) return false;
-    TestEqual(TEXT("legal six-point path leaves two of eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 2);
+    TestEqual(TEXT("legal two-point pair leaves six of eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 6);
     Movement->Velocity = FVector::ZeroVector;
     const float ActualStationarySpread = Weapon->GetNextShotSpreadDegrees();
     TestTrue(TEXT("fixture distinguishes moving from stationary spread"), OrdinaryMovingSpread > ActualStationarySpread);
