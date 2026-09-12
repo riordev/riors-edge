@@ -528,3 +528,15 @@ Maximum wedges reached with65, including ring transit; cells show **wedges / min
 **O275** — A supply chest stands behind full-height cover or inside a bay, never on open lane ground; the session seed picks the sites, not the coordinates. It always pays one item at the completion floor (Exceptional where the item level allows it, Uncommon below) plus the currency floor. Opening one is a director verb.
 
 **O276** — Fernhall carries a fourth yard off the entry plaza's west flank with its own door and its own rift definition, level beside the entry yard's, referenced by no mission beat, completing on its generic terminator; it carries its own pocket. A yard's rift definition is authored beside the yard, never derived from another's.
+
+**O277** — The world is lit by one low warm sun and a cool sky, and the air has depth: haze begins inside play range, not beyond it, and the frame is anti-aliased. The runtime rig in BreakerWorldBasics is the lighting authority until a map authors a light (O42); its numbers are O2 and judged by photograph.
+
+**O278** — Buildings are built to the player: a storey is 3 m, a door 2.2 m, a step under 45 cm, and a tile is never stretched past its own proportions — a wall is stacked and tiled, not scaled. Every deck and dock the composer places is reachable on foot by a stair the movement component can climb.
+
+**O279** — A surface shows what it is made of: a kit piece keeps the material it was imported with, and a composer slab wears a tiled ground material with a world-aligned grain, tinted by role. The builder's flat colour is the fallback for a piece that carries no material, never the default.
+
+**O280** — Every prop the composer places is a real mesh from the committed kit, sized to the player; the supply chest is a crate with a lid, not a cube, and keeps its gold band (O179).
+
+**O281** — A body at rest idles, a body moving walks, a body struck flinches: every enemy rig ships its idle, walk and hit cycles. Modifier rolls mix the session into the seed, so the same body never wears the same set two runs running; Fernhall's pocket elites roll modifiers like everyone else.
+
+**O282** — Every combat moment has a visible fallback that reads at play distance: a muzzle has a flash, an impact throws sparks, a tear turns, a cast has a shape — built from primitives in code until the ASSETS-5 Niagara systems land (O190).

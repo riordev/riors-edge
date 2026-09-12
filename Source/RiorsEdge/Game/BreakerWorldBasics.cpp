@@ -1,4 +1,5 @@
 #include "Game/BreakerWorldBasics.h"
+#include "Game/BreakerWorldLightingMath.h"
 
 #include "Components/DirectionalLightComponent.h"
 #include "Components/ExponentialHeightFogComponent.h"
@@ -25,19 +26,23 @@ void UBreakerWorldBasics::EnsureWorldLighting(UWorld* World)
     // into a map later retires this code for that map automatically.
     for (TActorIterator<ADirectionalLight> It(World); It; ++It) return;
 
-    // The sun. Pitch -50 gives readable long shadows without the low-sun
-    // orange wash; yaw 40 keeps the gym field's forward axis lit from the
-    // side so cover reads as volumes rather than silhouettes.
-    // O2 PLACEHOLDER: angle and intensity are first-guess values, tuned only
-    // to "the owner can see the world"; nobody has judged them as lighting.
+    // The sun: one low warm sun (O277). Every number is in
+    // BreakerWorldLightingMath.h, where the ShippedRig pin reads it; this
+    // actor only applies them.
     ADirectionalLight* Sun = World->SpawnActor<ADirectionalLight>(
-        FVector::ZeroVector, FRotator(-50.0f, 40.0f, 0.0f));
+        FVector::ZeroVector, FRotator(BreakerWorldLighting::SunPitchDegrees, BreakerWorldLighting::SunYawDegrees, 0.0f));
     if (Sun)
     {
+        // The light component ships a default pitch of its own, and a spawn
+        // rotation composes with it; the world rotation is set explicitly so
+        // the pitch the pin reads is the pitch the sky gets.
+        Sun->SetActorRotation(FRotator(BreakerWorldLighting::SunPitchDegrees, BreakerWorldLighting::SunYawDegrees, 0.0f));
         if (UDirectionalLightComponent* SunLight = Cast<UDirectionalLightComponent>(Sun->GetLightComponent()))
         {
             SunLight->SetMobility(EComponentMobility::Movable);
-            SunLight->SetIntensity(8.0f);   // lux; O2 PLACEHOLDER
+            SunLight->SetIntensity(BreakerWorldLighting::SunIntensityLux);
+            SunLight->SetUseTemperature(true);
+            SunLight->SetTemperature(BreakerWorldLighting::SunTemperatureKelvin);
             SunLight->SetCastShadows(true);
             // Drives the atmosphere below, which is what turns "a light" into
             // "a sky": sun disc, horizon gradient, blue ambient.
@@ -61,6 +66,11 @@ void UBreakerWorldBasics::EnsureWorldLighting(UWorld* World)
         {
             SkyComp->SetMobility(EComponentMobility::Movable);
             SkyComp->bRealTimeCapture = true;
+            // The cool fill against the warm sun (O277); the lower hemisphere
+            // is earth so bounce under overhangs is not blue.
+            SkyComp->SetIntensity(BreakerWorldLighting::SkyIntensity);
+            SkyComp->bLowerHemisphereIsBlack = false;
+            SkyComp->SetLowerHemisphereColor(BreakerWorldLighting::SkyLowerHemisphereColor());
             SkyComp->MarkRenderStateDirty();
         }
         // The atmosphere component rides on the sky light actor rather than
@@ -72,22 +82,18 @@ void UBreakerWorldBasics::EnsureWorldLighting(UWorld* World)
             Atmosphere->SetupAttachment(Sky->GetRootComponent());
             Atmosphere->RegisterComponent();
         }
-        // Distance haze in the game's steel-blue (owner: "everything just
-        // looks so stale"). A bare atmosphere renders every far surface at
-        // full local contrast, which is exactly the flat videogame-void read;
-        // a thin height fog gives the world aerial perspective — far things
-        // recede into the palette instead of just getting smaller. Start
-        // distance keeps the near field (the whole gym arena, the plaza
-        // centre) untouched, so nothing in combat range loses contrast.
-        // O2 PLACEHOLDER values, judged only by screenshot.
+        // The air has depth (O277): haze begins inside play range, so the
+        // far end of the yard recedes into a cool band instead of sitting at
+        // full local contrast. A bare atmosphere is the flat videogame-void
+        // read the owner named. Numbers in BreakerWorldLightingMath.h.
         if (UExponentialHeightFogComponent* Fog = NewObject<UExponentialHeightFogComponent>(Sky))
         {
             Fog->SetupAttachment(Sky->GetRootComponent());
-            Fog->SetFogDensity(0.010f);
-            Fog->SetFogHeightFalloff(0.35f);
-            Fog->SetFogInscatteringColor(FLinearColor(0.33f, 0.44f, 0.58f)); // steel-blue
-            Fog->SetStartDistance(2200.0f);
-            Fog->SetFogMaxOpacity(0.82f);
+            Fog->SetFogDensity(BreakerWorldLighting::FogDensity);
+            Fog->SetFogHeightFalloff(BreakerWorldLighting::FogHeightFalloff);
+            Fog->SetFogInscatteringColor(BreakerWorldLighting::FogInscatteringColor());
+            Fog->SetStartDistance(BreakerWorldLighting::FogStartDistanceCm);
+            Fog->SetFogMaxOpacity(BreakerWorldLighting::FogMaxOpacity);
             Fog->RegisterComponent();
         }
         // The rig had no post-process control at all, so the fixed-exposure
@@ -104,14 +110,23 @@ void UBreakerWorldBasics::EnsureWorldLighting(UWorld* World)
         // volume to size or move. Manual exposure compensation is used
         // (not min/max EV clamps) because auto-exposure is off project-wide;
         // clamps on a disabled feature would do nothing.
-        // O2 PLACEHOLDER: exposure bias judged only by screenshot.
+        // Exposure and grade numbers in BreakerWorldLightingMath.h (O277).
         if (UPostProcessComponent* PostProcess = NewObject<UPostProcessComponent>(Sky))
         {
             PostProcess->SetupAttachment(Sky->GetRootComponent());
             PostProcess->bUnbound = true;
             PostProcess->Priority = 0.0f;
             PostProcess->Settings.bOverride_AutoExposureBias = true;
-            PostProcess->Settings.AutoExposureBias = -0.7f; // EV; O2 PLACEHOLDER
+            PostProcess->Settings.AutoExposureBias = BreakerWorldLighting::ExposureBiasEV;
+            // The grade: a touch of contrast, a slight pull on saturation,
+            // and shadows gained toward the sky's blue so shadow is cool,
+            // never black.
+            PostProcess->Settings.bOverride_ColorContrast = true;
+            PostProcess->Settings.ColorContrast = FVector4(BreakerWorldLighting::GradeContrast, BreakerWorldLighting::GradeContrast, BreakerWorldLighting::GradeContrast, 1.0f);
+            PostProcess->Settings.bOverride_ColorSaturation = true;
+            PostProcess->Settings.ColorSaturation = FVector4(BreakerWorldLighting::GradeSaturation, BreakerWorldLighting::GradeSaturation, BreakerWorldLighting::GradeSaturation, 1.0f);
+            PostProcess->Settings.bOverride_ColorGainShadows = true;
+            PostProcess->Settings.ColorGainShadows = BreakerWorldLighting::GradeShadowsGain();
             // Belt-and-suspenders for the day auto-exposure gets switched
             // back on for this project: keep the adapted range from ever
             // reaching the blown-white end that flagged this fix.

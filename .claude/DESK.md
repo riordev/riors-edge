@@ -1,5 +1,76 @@
 # Desk — next playtest
 
+## O277 LIGHT & AIR — LANDED
+
+- One low warm sun (pitch -28, yaw 40, 5.5 lux, 5200 K), a cool sky fill
+  (intensity 1.0, earth under the horizon), haze from 6 m at density
+  0.022 with a lighter, cooler inscatter, exposure -0.4 EV, a grade of
+  contrast 1.06 / saturation 0.92 / shadows gained toward blue; TSR on
+  (r.AntiAliasingMethod 4 — the frame shipped unantialiased). Numbers
+  in BreakerWorldLightingMath.h; ShippedRig pins the low-warm-sun and
+  haze-inside-play-range relations on bare floats and reads the spawned
+  rig back. FOUND: a spawn rotation composes with the light component's
+  own default pitch, so the old rig's -50 was -96 in the world and the
+  first pass of this one -74 — the pin caught it; the rotation is set
+  on the actor now. PHOTOGRAPHED: Fernhall from the entry, before and
+  after — lit and shaded faces read apart, the far yard sits in a band
+  of cool air, edges are clean. The ground is still one flat value; that
+  is O279's.
+
+## Cycle — O278 SCALE, A: VERTICALITY
+
+- [ ] compose_fernhall: STEP_RISE under the movement component's
+      MaxStepHeight with the treads to match; the deck, far deck and
+      dock get floor pieces and a stair each so a body walks up; nav on
+      them. EXPECTED_TOTAL and BreakerFernhallExpectedPieceCount move
+      together; FloorsDisjoint holds. Re-export both GLBs, re-import.
+      Photograph the tour and the deck from the lane.
+
+## Cycle — O278 SCALE, B: STOREYS
+
+- [ ] compose_fernhall: perimeter buildings, end walls, tower and masses
+      become stacked, tiled city tiles at uniform scale (a 3 m storey), no
+      non-uniform stretch; footprint and height targets kept by count.
+      Piece pins move together. Photograph the plaza from the entry.
+
+## Cycle — O279 GROUND
+
+- [ ] Scripts/make_ground_texture.py writes a tiling concrete/earth
+      grain PNG to Assets/textures; breaker_import_fernhall.py imports
+      it and builds M_BreakerGround (world-aligned UVs, a Tint
+      parameter) through the editor python API; BreakerZoneBuilder
+      applies the flat colour only to pieces carrying the engine default
+      material, applies M_BreakerGround with the role tint to flr_ and
+      the plaza slab, and leaves kit pieces' imported materials alone
+      (dress_ stops being moss). Dilapidation tints through the
+      parameter. Palette pin re-pointed. Photograph the lane at eye
+      height.
+
+## Cycle — O280 PROPS
+
+- [ ] Import Prop_Crate4 (and a lid-bearing crate if the kit has one)
+      into Content/Breaker/Meshes/props through the scripted importer;
+      BreakerSupplyChest wears it with the gold band; the composer's
+      crates/barrels/rails read at player scale. CaptureChest
+      photographed.
+
+## Cycle — O281 ENEMY LIFE
+
+- [ ] BreakerEnemy and the four subclass constructors set Idle, Walk
+      (run) and HitRecieve cycles per rig so UpdateBodyGait drives them;
+      a body at rest idles. ShippedGaitSet pin. ModifierSeedBase mixed
+      with the session seed for elites, carriers and waves;
+      SeedVariesBySession pin; Fernhall pocket elites roll modifiers.
+      Photograph CaptureWeakPoint and a crowd probe.
+
+## Cycle — O282 VFX FALLBACKS
+
+- [ ] BreakerEffectRenderer / BreakerCharacter: a muzzle flash mesh
+      fallback (emissive cone, ~0.06 s) at the bounds front; impact
+      sparks as a short burst of emissive shards; the tear's dashes
+      rotate; the Rot puddle's rim animates. Photograph AbilityProbe at
+      0.2 s cadence and CycleWeapons.
+
 ## OWNER PLAYTEST, 2026-09-11 (SEVENTH) — LANDED, LIVING
 
 - "damage is super high … one-shot my character" — MEASURED: player
