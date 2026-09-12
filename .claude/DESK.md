@@ -52,26 +52,140 @@
   QUESTION: the boss's own floor drop — is the offer the answer, or does a
   rift terminator's loot go to the pack (FIELD)? He said "leave open".
 
-## DESIGN SEAT — OWNER PLAYTEST, 2026-09-11 (SEVENTH). NOT ONE BUILD EACH.
+## Cycle — O275 CHESTS
 
-His words, for ORDERS.md and rulings before any hand touches them:
+- [ ] Placement: a site pick off the pieces the yard already has — the far
+      side of each blk_full_* piece (away from the centreline) and the
+      interior of each flr_<tag>_bay slab; the seed picks WHICH sites;
+      floor trace and body clearance stay. No marker vocabulary change.
+      (Game/BreakerGameMode.cpp :4782-4835, Interaction/BreakerSupplyChestMath.h)
+- [ ] Loot: delete Temper/StepDown and the 62/38 split; always one item at
+      BreakerRiftReward::CompletionRarity(ItemLevel) plus CurrencyPayout.
+      (Interaction/BreakerSupplyChest.cpp :149-172, Math.h)
+- [ ] Sound: GLASS PlayChestOpen on the director (chest_open.wav from the
+      Kenney pack copied verbatim + SOURCES line; synth fallback), a
+      UI/BreakerChestFeedback free function on the BreakerRiftFeedback
+      pattern; GROUND makes one call from TryOpen after bOpened. Crossing:
+      Interaction -> UI feedback.
+- [ ] Pins: SupplyChest.Contents re-pinned to the site pick and the floor;
+      shipped-config: an AL5 chest rolls Uncommon, AL9 Exceptional; the
+      synth render and the shipped sample in the audio tests.
 
-- "rifts are just everywhere … the cosmetic ones enemies spawn out of
-  should have an animation of them appearing and then the enemies slowly
-  come out of them. Enemies also don't always have to come out of rifts —
-  buildings, side doors, little areas next to the player they can see."
-- "all the bosses have bad routing — they should stand and hold positions,
-  or have a ranged attack, a giant projectile. Right now they awkwardly
-  walk at you. Boring."
-- "the doctrine points are wrong. Path of Exile's ascendancy: a big wheel,
-  you get two points, one travel node that scales you and then one cool
-  impactful node that changes how you play. You don't stack ranks. I
-  wanted the Rot-around-you node in my first two points and couldn't reach
-  it. For all the classes."
-- "another area to the west of where you spawn into the rift — a side-quest
-  rift instead of being forced into the quest."
-- "the chests are randomly on the floor in the most obvious places; no
-  sound; the loot is never good."
+## Cycle — O274 TEARS, A: THE TEAR IS AN EVENT
+
+- [ ] BreakerPocketRiftMath.h: AppearScale / CloseScale (pure).
+      BreakerPocketRift: Open()/Close(), spawn hidden, open on first use,
+      hide segments + light at 0. All dials O2.
+- [ ] BreakerGameMode RefillOutdoorSlot: Open the tear, defer the body's
+      spawn by AppearSeconds (the overlap refusal moves inside the timer),
+      close the tear CloseAfterSeconds after its last arrival. Initial
+      placement stays instant. OutdoorEncounterRuntime's 2 s window is a
+      ceiling on AppearSeconds.
+- [ ] Combat/BreakerEnemy (declared FIELD crossing): an EMERGING state —
+      while the emergence clock runs the body takes the patrol branch
+      regardless of distance and hunts nothing; the walk out is the leash.
+- [ ] Pins: PocketRift.Shape curves; Combat.Emergence.NoThreat;
+      OutdoorEncounterRuntime green.
+
+## Cycle — O276 THE SIDE RIFT
+
+- [ ] Composer: a 10 m mouth in the entry plaza's -Z (west) flank (drop
+      wall_s02 or wall_s03; move the corner dressing), a third dog-leg seam
+      (mouth <= 12 m, walk <= 30 m, no through-sight), a fourth 106x56 yard
+      `siding` with marker_yard_siding + marker_rift_siding, shape/work/
+      grow passes and a collapse pair. Re-export both GLBs, re-import both
+      targets, commit the generated meshes.
+- [ ] BreakerZoneBuilder: `siding` in FernhallYardAreaLevel (6) and
+      FernhallRiftFor (fernhall.siding, campaign, no boss beat); a third
+      FernhallConnection. GameMode: ChestYards[] and a pocket for the yard.
+      Importer EXPECTED_TOTAL. Crossing: Scripts/ (DATA) + Game/ (GROUND).
+- [ ] Pins: Fernhall zone tests move to 4 yards / 8 markers / 3 doors /
+      3 seams deliberately; the 16-cover rule holds for the new yard; new
+      World.Fernhall.SideRiftDefinition (set, campaign, own EncounterId,
+      BossForRift none, CanEnterRift with an empty journal). Photograph.
+
+## Cycle — O273 BOSSES, A: THE RING
+
+- [ ] BreakerBossEnemy: HoldRingCm (~900, under the Lattice's 900 floor)
+      + hysteresis, classified with the shipped band classifier before
+      Super::TickEngagedBehaviour: Hold = stand, face, HOLDING; Advance =
+      Super walks; Retreat (inside SweepRange) = Super sweeps/slams. No
+      lunge. BreakerBossPhases: GetPhaseHoldRing, identity.
+- [ ] Pins: Combat.Boss.HoldRing (Hold at 600, Advance at 1200, Retreat at
+      300; HoldRingCm > SlamRadiusCm; HoldRingCm < the Lattice's
+      MinEngagementDistance); a runtime stand-still on the ArrivalRing
+      pattern.
+
+## Cycle — O274 TEARS, B: AUTHORED MOUTHS
+
+- [ ] Composer: marker_spawn_<yard>_<n> at each bay mouth, dock face and
+      seam mouth; roles comment. Importer MARKER_ROLES gains spawn.
+      BreakerZoneBuilder: SpawnSite appended to the role enum; parse; the
+      no-repeat rule keeps its index. Re-export, re-import, commit.
+- [ ] GameMode: before placing a tear, the nearest SpawnSite marker within
+      an O2 radius of the pocket is the arrival (no tear); else the tear.
+- [ ] Pins: Markers.NameContract round-trips spawn; OutdoorEncounterRuntime
+      gains a pocket that arrives at a marker and never at a tear.
+
+## Cycle — O273 BOSSES, B: THE VOLLEY
+
+- [ ] ABreakerBossProjectile (subclass: VisualScale 3.0, radius 90, O2);
+      BreakerBossEnemy: VolleyWindup 1.0, Cooldown 5.0, Speed 1200; in
+      Hold, arm on cooldown, tell = apparatus raise at the player, fire one
+      round at the aim solve with Shot.BaseDamage = GetSweepDamage(), world
+      direction as FireVolley does. InterruptCombatAction clears it.
+      Grammar gains a Telegraph beat tagged Volley.
+- [ ] Pins: Boss.VolleyShipsDodgeable (flight time over the ring vs the
+      sidestep at sprint; windup >= slam windup; damage == sweep so
+      BossHitsToDie stands); Boss.Grammar sees the beat.
+
+## Cycle — O273 BOSSES, C: PHASES
+
+- [ ] PhaseParams gain SuppressionHoldRingScale / CommitmentHoldRingScale
+      (1.0) and CommitmentVolleyCount (1 -> 3 with the existing fan);
+      EnterPhase reads them. Pins: CommitmentRewrites extended; identity in
+      Deployment.
+
+## Cycle — O272 DOCTRINE, CASTER
+
+- [ ] Progression/BreakerProgressionLibrary.cpp, the three Caster trees:
+      every node MaxRank 1 / cost 1 / tier 1 except the keystone (tier 4,
+      gate 6, cost 1 -> lands at exactly 8); prerequisites become pairs
+      (impactful requires its travel). Void Whisperer pairs: Standing
+      Water->Wellspring, Lingering->Zonework, Attrition->Terminal,
+      Seep->Snapshot Discipline, Drain->Long Debt, Patience->Long Dark.
+      Spellblade and the third tree paired the same way (travel = the
+      collapsed T1/T2 rule nodes, impactful = the T3/T4 nodes, keystone
+      last), every id kept.
+- [ ] Rank-two magnitudes become rank one: Data/caster-resource.json and
+      Data/abilities.json RankOne keys take the RankTwo values; Lingering's
+      +30% duration; the R2 "1 m wider" rule reads rank >= 1
+      (Abilities/BreakerAbility_Rot.cpp, declared KIT crossing). Where a
+      rank-two value is a compiled constant (BreakerManaComponent's
+      Rank >= 2 ? RankTwo : RankOne sites), the reader takes RankTwo at
+      rank one — one declared crossing per file.
+- [ ] Census re-export; status-pins offered-to-spendable floor 3.0 -> 1.5
+      on O272 (a re-pin on a ruling); spec progression-and-trees.md
+      :209-221 and classes-and-abilities.md :60 rewritten present tense.
+- [ ] Tests: the Caster shape/route pins re-pointed (CasterCompleteDoctrine
+      Authoring, CasterTree, CasterRotFunding, RotNode, Lingering,
+      LoopValve NodeContent, every Caster runtime test that buys a second
+      rank); new Progression.Doctrine.FirstBenchmarkReachesAnImpactful for
+      every doctrine tree (asserted for the Caster this cycle, all classes
+      once they land) and Wellspring purchasable with the second point.
+
+## Cycle — O272 DOCTRINE, SWIFT
+## Cycle — O272 DOCTRINE, GUNSMITH
+## Cycle — O272 DOCTRINE, TANK
+## Cycle — O272 DOCTRINE, SUPPORT
+
+- [ ] One class per build, the Caster's shape: six pairs, single ranks,
+      travel magnitudes at the old max-rank totals through Data where the
+      value is data and a declared crossing where it is a compiled
+      constant; that class's test re-pins; census; the FirstBenchmark test
+      asserts the class. Swift's Frenzy/Marksman fourth T2 becomes a
+      seventh travel or merges; Kinetic's free Longstride stays outside
+      the pairs.
 
 ## LINGERING R2 — LANDED
 
