@@ -5,6 +5,7 @@
 #include "Engine/StaticMesh.h"
 #include "Game/BreakerPocketRiftMath.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "TimerManager.h"
 #include "UI/BreakerGlowMaterial.h"
 #include "UI/BreakerUIStyle.h"
 
@@ -35,10 +36,13 @@ ABreakerPocketRift::ABreakerPocketRift()
     Bloom->SetLightColor(BreakerUI::TealUnwritten);
     Bloom->SetAttenuationRadius(LightAttenuationCm);
     Bloom->SetIntensity(IdleLightIntensity);
-    // Five of these stand in the yard permanently. A shadow-casting dynamic
-    // light each is the expensive primitive, and the tear is meant to be
-    // noticed rather than to relight the level.
+    // Several of these can be open across a yard at once. A shadow-casting
+    // dynamic light each is the expensive primitive, and the tear is meant to
+    // be noticed rather than to relight the level.
     Bloom->SetCastShadows(false);
+    // CLOSED AT BIRTH (O274). Nothing draws until the clock opens it.
+    Bloom->SetVisibility(false);
+    TearRoot->SetRelativeScale3D(FVector(0.0f));
 }
 
 void ABreakerPocketRift::BeginPlay()
@@ -66,6 +70,8 @@ void ABreakerPocketRift::BeginPlay()
         Mesh->SetStaticMesh(Segment);
         Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         Mesh->SetCastShadow(false);
+        // Born hidden; the tick shows it on the frame the tear opens.
+        Mesh->SetVisibility(false);
         // REGISTER THEN ATTACH, in that order — SetupAttachment does nothing at
         // runtime and says nothing about it.
         Mesh->RegisterComponent();
@@ -132,22 +138,99 @@ void ABreakerPocketRift::Tick(float DeltaSeconds)
     Super::Tick(DeltaSeconds);
     Age += DeltaSeconds;
     FlareRemaining = FMath::Max(0.0f, FlareRemaining - DeltaSeconds);
+    // Clamped at the dial: past it the curve is flat, and a tear that stands
+    // closed for an hour should not be carrying an hour in a float.
+    if (bOpen) OpenAge = FMath::Min(OpenAge + DeltaSeconds, AppearSeconds);
+    else ClosingAge = FMath::Min(ClosingAge + DeltaSeconds, CloseSeconds);
+
+    // THE GATE (O274): 0 while closed, rising while opening, 1 held open,
+    // falling while closing. Everything the tear does at rest or on an arrival
+    // is multiplied by it, so a closed tear is nothing rather than a dim one.
+    const float Gate = bOpen
+        ? BreakerPocketRift::AppearScale(OpenAge, AppearSeconds)
+        : BreakerPocketRift::CloseScale(ClosingAge, CloseSeconds);
+    if (Gate <= 0.0f)
+    {
+        // Hidden, and the components are left alone until the next open: a
+        // closed tear costs the level one scene component and a tick.
+        SetDrawn(false);
+        if (TearRoot) TearRoot->SetRelativeScale3D(FVector(0.0f));
+        return;
+    }
+    SetDrawn(true);
 
     const float Boost = BreakerPocketRift::FlareBoost(FlareRemaining, FlareSeconds);
     // UNIFORM. A non-uniform scale on a parent whose children are rotated
     // shears them, and every segment on this shape is rotated.
-    const float Scale = BreakerPocketRift::IdleScale(Age, IdleHz, IdleAmplitude) + FlareWiden * Boost;
+    const float Scale = (BreakerPocketRift::IdleScale(Age, IdleHz, IdleAmplitude) + FlareWiden * Boost) * Gate;
     if (TearRoot) TearRoot->SetRelativeScale3D(FVector(Scale));
     if (TearMaterial)
     {
-        BreakerUI::SetGlowColor(TearMaterial, BreakerUI::TealUnwritten, IdleGlow + FlareGlow * Boost);
+        BreakerUI::SetGlowColor(TearMaterial, BreakerUI::TealUnwritten, (IdleGlow + FlareGlow * Boost) * Gate);
     }
-    if (Bloom) Bloom->SetIntensity(IdleLightIntensity + FlareLightIntensity * Boost);
+    if (Bloom) Bloom->SetIntensity((IdleLightIntensity + FlareLightIntensity * Boost) * Gate);
+}
+
+void ABreakerPocketRift::Open()
+{
+    if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(CloseTimer);
+    if (bOpen) return;
+    // Resume from where the close had got to, so a tear reopened mid-close
+    // grows back from a thread rather than blinking out and starting over.
+    const float At = BreakerPocketRift::CloseScale(ClosingAge, CloseSeconds);
+    OpenAge = BreakerPocketRift::AppearAgeForScale(At, AppearSeconds);
+    bOpen = true;
+}
+
+void ABreakerPocketRift::Close()
+{
+    if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(CloseTimer);
+    if (!bOpen) return;
+    // The mirror of Open: a tear closed while still opening shrinks from the
+    // size it reached. CloseScale(x) == 1 - AppearScale(x), so the age on the
+    // close curve that matches scale s is the appear age for 1 - s.
+    const float At = BreakerPocketRift::AppearScale(OpenAge, AppearSeconds);
+    ClosingAge = BreakerPocketRift::AppearAgeForScale(1.0f - At, CloseSeconds);
+    bOpen = false;
+    FlareRemaining = 0.0f;
+}
+
+void ABreakerPocketRift::CloseAfter(float Seconds)
+{
+    UWorld* World = GetWorld();
+    if (!World || Seconds <= 0.0f)
+    {
+        Close();
+        return;
+    }
+    // ONE TIMER, RE-ARMED. Every arrival pushes the same close back, so the
+    // tear closes CloseAfter the LAST body rather than once per body.
+    World->GetTimerManager().SetTimer(CloseTimer, FTimerDelegate::CreateWeakLambda(this, [this]()
+    {
+        Close();
+    }), Seconds, false);
+}
+
+bool ABreakerPocketRift::IsClosed() const
+{
+    return !bOpen && BreakerPocketRift::CloseScale(ClosingAge, CloseSeconds) <= 0.0f;
 }
 
 void ABreakerPocketRift::Flare()
 {
+    Open();
     FlareRemaining = FlareSeconds;
+}
+
+void ABreakerPocketRift::SetDrawn(bool bDrawn)
+{
+    if (bDrawnNow == bDrawn) return;
+    bDrawnNow = bDrawn;
+    for (UStaticMeshComponent* Segment : Segments)
+    {
+        if (Segment) Segment->SetVisibility(bDrawn);
+    }
+    if (Bloom) Bloom->SetVisibility(bDrawn);
 }
 
 int32 ABreakerPocketRift::SegmentCount() const

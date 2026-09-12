@@ -1139,7 +1139,16 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
     }
 
     if (Combat && Combat->IsStaggered()) { StateLabel = TEXT("STAGGERED"); return; }
-    AActor* NearestPlayer = SelectThreatTarget();
+    // O274: A BODY EMERGES BEFORE IT HUNTS. While the emergence clock runs
+    // the threat selector is not consulted at all — not "consulted and
+    // ignored" — so a player standing on the tear is not a target on frame
+    // one, no attack target is committed and nothing below can fire. With no
+    // player the distance test fails and the tick takes the patrol branch,
+    // which is the walk to the post on the shipped leash. The clock ends in
+    // EndEmergenceWindow and the next tick engages as it always did.
+    const bool bEmergingNow = IsEmerging();
+    if (bEmergingNow) { CurrentThreatTarget.Reset(); CommittedAttackTarget.Reset(); }
+    AActor* NearestPlayer = bEmergingNow ? nullptr : SelectThreatTarget();
     const float NearestDistanceSq = NearestPlayer
         ? FVector::DistSquared2D(GetActorLocation(), NearestPlayer->GetActorLocation())
         : TNumericLimits<float>::Max();
@@ -1178,7 +1187,9 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
         DesiredDirection = ToTarget.Size2D() <= BodyCollision->GetScaledCapsuleRadius()
             ? FVector::ZeroVector
             : ToTarget.GetSafeNormal2D();
-        StateLabel = TEXT("PATROL");
+        // The same walk under two names: EMERGING is the leash walk out of the
+        // tear (O274), PATROL is the leash walk once the body may hunt.
+        StateLabel = bEmergingNow ? TEXT("EMERGING") : TEXT("PATROL");
     }
 
     // Facing is decided before movement so an archetype that strafes sideways
@@ -1776,6 +1787,10 @@ void ABreakerEnemy::GrantEmergenceWindow()
     // second cast inside the first window. A pooled body arrives many times.
     World->GetTimerManager().ClearTimer(EmergenceTimer);
     Emerging->PushIncomingDamageModifier(EmergenceModifierKey(), 0.0f);
+    // O274: the same clock that keeps the body undeletable keeps it from
+    // hunting. Tick reads this and takes the patrol branch — the walk to the
+    // post on the shipped leash — until EndEmergenceWindow clears it.
+    bEmerging = true;
     Emerging->OnDeath.AddUniqueDynamic(this, &ABreakerEnemy::EndEmergenceWindow);
     World->GetTimerManager().SetTimer(EmergenceTimer, FTimerDelegate::CreateWeakLambda(this, [this]()
     {
@@ -1785,6 +1800,8 @@ void ABreakerEnemy::GrantEmergenceWindow()
 
 void ABreakerEnemy::EndEmergenceWindow()
 {
+    // Both halves of O274 end here and nowhere else: the next tick hunts.
+    bEmerging = false;
     if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(EmergenceTimer);
     if (UBreakerCombatComponent* Emerged = FindComponentByClass<UBreakerCombatComponent>())
     {

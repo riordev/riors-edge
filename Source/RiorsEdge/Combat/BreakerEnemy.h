@@ -225,6 +225,18 @@ public:
     // first frame, short enough that it is never a shield to fight behind.
     UPROPERTY(EditDefaultsOnly, Category="Combat|Emergence", meta=(ClampMin="0"))
     float EmergenceProtectedSeconds = 0.8f;
+    // O274: A BODY EMERGES BEFORE IT HUNTS. It appears inside the tear, walks
+    // to its post on the shipped leash, and takes no target and no damage
+    // until its emergence clock ends. The emerging clock IS the protected
+    // clock — ONE dial, not two properties defaulted equal, because two dials
+    // can drift and a body that is hunting while still undeletable (or
+    // deletable while still not hunting) is a shape nobody asked for. Both
+    // halves are armed by GrantEmergenceWindow and ended by
+    // EndEmergenceWindow, so they end together by construction. While
+    // IsEmerging() the tick takes the patrol branch regardless of distance,
+    // acquires no threat target, fires nothing, and prints EMERGING.
+    UFUNCTION(BlueprintPure, Category="Enemy") float GetEmergingSeconds() const { return EmergenceProtectedSeconds; }
+    UFUNCTION(BlueprintPure, Category="Enemy") bool IsEmerging() const { return bEmerging; }
     // Read-only views of the authored tuning. Public so tools, the playtest
     // report and the automation suite can assert against what an archetype
     // SHIPS with, without opening the tuning itself for writing.
@@ -836,6 +848,10 @@ private:
     FVector PooledBaseScale = FVector::OneVector;
     FTimerHandle PoolParkTimer;
     FTimerHandle EmergenceTimer;
+    // Written in exactly two places: set by GrantEmergenceWindow, cleared by
+    // EndEmergenceWindow (O274). Not a timer query, so a body whose world is
+    // gone still reads as not emerging.
+    bool bEmerging = false;
 
     // The three seam lanes. Plain maps, not UPROPERTYs: entries are pushed and
     // popped by live effects that also own the teardown (the armour lane's

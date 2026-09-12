@@ -64,21 +64,18 @@
   building's shoulder. FOUND: chest items sit outside the drops-per-hour
   band's count; the chest still faces back down the yard.
 
-## Cycle — O274 TEARS, A: THE TEAR IS AN EVENT
+## O274 TEARS, A — LANDED
 
-- [ ] BreakerPocketRiftMath.h: AppearScale / CloseScale (pure).
-      BreakerPocketRift: Open()/Close(), spawn hidden, open on first use,
-      hide segments + light at 0. All dials O2.
-- [ ] BreakerGameMode RefillOutdoorSlot: Open the tear, defer the body's
-      spawn by AppearSeconds (the overlap refusal moves inside the timer),
-      close the tear CloseAfterSeconds after its last arrival. Initial
-      placement stays instant. OutdoorEncounterRuntime's 2 s window is a
-      ceiling on AppearSeconds.
-- [ ] Combat/BreakerEnemy (declared FIELD crossing): an EMERGING state —
-      while the emergence clock runs the body takes the patrol branch
-      regardless of distance and hunts nothing; the walk out is the leash.
-- [ ] Pins: PocketRift.Shape curves; Combat.Emergence.NoThreat;
-      OutdoorEncounterRuntime green.
+- A tear spawns closed and invisible; a return opens it (0.8 s ease), the
+  body arrives through it when it is open, and it closes 2.0 s after its
+  last arrival (0.6 s). The world at rest shows no tears. A body arriving
+  through a tear is EMERGING for its window (one dial with the damage
+  immunity): it walks its leash to its post, hunts nothing, takes nothing.
+  The nav probe's gates know the label. PHOTOGRAPHED: one flaring tear at
+  the yard's mouth, none standing. FOUND: enemy capsules never blocked the
+  arrival overlap test (OverlapAllDynamic) — the "another body stands
+  here" refusal has never fired; the crowd probe counts an emerging body
+  as engaged.
 
 ## Cycle — O276 THE SIDE RIFT
 

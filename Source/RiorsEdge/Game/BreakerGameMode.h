@@ -548,6 +548,13 @@ public:
     // still sits inside a yard band. O2 PLACEHOLDER.
     UPROPERTY(EditDefaultsOnly, Category="World|Repopulation", meta=(ClampMin="0"))
     float OutdoorRepopulationClearanceCm = 3000.0f;
+    // HOW LONG A TEAR HOLDS AFTER ITS LAST ARRIVAL (O274). A tear is an event:
+    // it opens for a return, the body comes through, and it closes this long
+    // after the last body did — long enough to be found by an eye that turned
+    // toward the flare, short enough that the world at rest shows no tears.
+    // Every arrival through the same tear pushes the close back. O2 PLACEHOLDER.
+    UPROPERTY(EditDefaultsOnly, Category="World|Repopulation", meta=(ClampMin="0"))
+    float OutdoorTearCloseAfterSeconds = 2.0f;
 
 private:
     // ONE AUTHORED STANDING PLACE. Recorded when the area is built, so a
@@ -595,6 +602,12 @@ private:
         // already stopped being a fight.
         TWeakObjectPtr<class ABreakerEnemy> Occupant;
         float EmptySeconds = 0.0f;
+        // A BODY IS ON ITS WAY (O274). Armed when the clock claims this slot
+        // and its tear opens; the body spawns when it fires. While it is
+        // active the slot is neither held nor a candidate — claimed twice
+        // would be two bodies through one opening. Transient by nature: this
+        // struct is runtime state rebuilt with the area, never serialized.
+        FTimerHandle ArrivalTimer;
     };
     // WHETHER THIS MAP IS THE GYM. F1 RESET is gym tooling — it destroys every
     // enemy in the world and rebuilds the gym's target dummies and standing
@@ -615,7 +628,14 @@ private:
     // waits again.
     float OutdoorRepopulationCountdown = 0.0f;
     void TickOutdoorRepopulation(float DeltaSeconds);
-    class ABreakerEnemy* RefillOutdoorSlot(FBreakerOutdoorSlot& Slot);
+    // CLAIMS the slot: opens its tear and arms the arrival. True means a body
+    // is coming and the shared clock should wait; the body itself does not
+    // exist until ArriveAtOutdoorSlot runs.
+    bool RefillOutdoorSlot(int32 SlotIndex);
+    // THE BODY COMES THROUGH. Runs when the slot's arrival timer fires (at
+    // once for a slot with no tear): the overlap refusal, the spawn, the
+    // emergence window, the flare, and the tear's close-after clock.
+    class ABreakerEnemy* ArriveAtOutdoorSlot(int32 SlotIndex);
     void SpawnFernhallEncounters(const FBreakerZoneMarkers& Markers);
     void BuildSurvivorMission(APawn* Player);
     void TickSurvivorMission();

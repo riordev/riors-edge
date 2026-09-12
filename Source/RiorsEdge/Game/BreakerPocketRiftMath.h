@@ -110,4 +110,44 @@ namespace BreakerPocketRift
         const float Fraction = FMath::Clamp(Remaining / Total, 0.0f, 1.0f);
         return Fraction * Fraction;
     }
+
+    // ---- THE OPENING AND THE CLOSING (O274) --------------------------------
+    // A tear is an EVENT, not a fixture. It opens where a patrol is about to
+    // return, holds while bodies come through, and closes after the last one;
+    // the world at rest shows no tears. These two are the gate the idle breath
+    // and the flare are multiplied by — 0 is nothing drawn, 1 is the resting
+    // tear — so the whole lifetime is one factor and the shape never learns
+    // which state it is in.
+    //
+    // EASE-OUT ON THE WAY OPEN: most of the growth happens in the first half,
+    // so the split is readable early and settles rather than lurching to full
+    // size on its last frame. A body is about to come through; the eye should
+    // already have somewhere to look.
+    inline float AppearScale(float Age, float AppearSeconds)
+    {
+        if (AppearSeconds <= 0.0f || Age >= AppearSeconds) return 1.0f;
+        if (Age <= 0.0f) return 0.0f;
+        const float Remaining = 1.0f - Age / AppearSeconds;
+        return 1.0f - Remaining * Remaining;
+    }
+
+    // THE MIRROR, exactly: CloseScale(t, C) == 1 - AppearScale(t, C). Fast at
+    // first and slow at the end, so a closing tear pinches shut and lingers as
+    // a thread before it goes — the opposite read from an opening one, off the
+    // same curve, so the two cannot drift apart when one is tuned.
+    inline float CloseScale(float SinceClose, float CloseSeconds)
+    {
+        return 1.0f - AppearScale(SinceClose, CloseSeconds);
+    }
+
+    // THE INVERSE, for a tear interrupted mid-motion. A closing tear that a new
+    // arrival reopens (or an opening one that is refused and closes) resumes
+    // from the scale it is AT rather than snapping to the start of the other
+    // curve. Returns the Age at which AppearScale(Age, AppearSeconds) == Scale.
+    inline float AppearAgeForScale(float Scale, float AppearSeconds)
+    {
+        if (AppearSeconds <= 0.0f) return 0.0f;
+        const float Clamped = FMath::Clamp(Scale, 0.0f, 1.0f);
+        return AppearSeconds * (1.0f - FMath::Sqrt(1.0f - Clamped));
+    }
 }

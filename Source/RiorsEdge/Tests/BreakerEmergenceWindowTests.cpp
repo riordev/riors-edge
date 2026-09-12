@@ -4,11 +4,14 @@
 
 #include "AbilitySystemComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
+#include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerEnemy.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Misc/ScopeExit.h"
+#include "Movement/BreakerCharacterMovementComponent.h"
+#include "Progression/BreakerProgressionComponent.h"
 
 // ---------------------------------------------------------------------------
 // THE EMERGENCE WINDOW. A body that has just arrived cannot be deleted in the
@@ -115,6 +118,128 @@ bool FBreakerEmergenceWindowTest::RunTest(const FString& Parameters)
     Second.Enemy->EndEmergenceWindow();
     Second.Combat->ReceiveDamage(Hit(1000000.0f));
     TestEqual(TEXT("a window ended early stops protecting immediately"), Second.Health->GetHealth(), 0.0f, 0.0001f);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// O274: A BODY EMERGES BEFORE IT HUNTS. The window above kept an arriving body
+// alive; it did not keep it from hunting, so a body stepping out of a tear
+// acquired the player standing on the tear on frame one. While the emergence
+// clock runs the tick takes the patrol branch regardless of distance: it
+// prints EMERGING, holds no threat target, and fires nothing. When the clock
+// ends the next tick engages as it always did.
+//
+// The emerging clock and the damage-immune clock are ONE dial, so the test
+// asserts the relationship as shipped and that both halves end on the same
+// tick: the hit that lands is the tick that hunts.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerEmergenceNoThreatTest,
+    "RiorsEdge.Combat.Emergence.NoThreat",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerEmergenceNoThreatTest::RunTest(const FString& Parameters)
+{
+    // Shipped configuration against the default-constructed body. One dial:
+    // the emerging window IS the protected window, and both are non-zero.
+    const ABreakerEnemy* Shipped = GetDefault<ABreakerEnemy>();
+    if (!TestNotNull(TEXT("the enemy class default exists"), Shipped)) return false;
+    TestEqual(TEXT("the emerging window is the protected window (one dial)"),
+        Shipped->GetEmergingSeconds(), Shipped->EmergenceProtectedSeconds, 0.0001f);
+    TestTrue(TEXT("the shipped emerging window is longer than a frame"), Shipped->GetEmergingSeconds() > 0.0f);
+    TestTrue(TEXT("the shipped protected window is longer than a frame"), Shipped->EmergenceProtectedSeconds > 0.0f);
+    TestFalse(TEXT("a default body is not emerging"), Shipped->IsEmerging());
+    // The player stands this close to the tear. It must be INSIDE the shipped
+    // detection range or the patrol branch below proves nothing.
+    const float PlayerDistance = 500.0f;
+    if (!TestTrue(TEXT("the player stands inside the shipped detection range"),
+        Shipped->GetDetectionRange() > PlayerDistance)) return false;
+
+    UWorld::InitializationValues Init;
+    Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+    if (!TestNotNull(TEXT("emergence world"), World)) return false;
+    GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+    World->InitializeActorsForPlay(FURL());
+    const uint64 EntryFrame = GFrameCounter;
+    ON_SCOPE_EXIT { GEngine->DestroyWorldContext(World); World->DestroyWorld(false); GFrameCounter = EntryFrame; };
+    // The world clock runs the window's timer; the body's own tick is driven
+    // by hand so every step can be inspected.
+    auto Clock = [&](float Seconds) { for (float T = 0; T < Seconds; T += .02f) { ++GFrameCounter; World->Tick(LEVELTICK_All, .02f); } };
+
+    FActorSpawnParameters SpawnParams;
+    SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+    // A live player: the threat selector's nearest-combatant fallback needs a
+    // character with a living combat component, nothing more.
+    ABreakerCharacter* Player = World->SpawnActor<ABreakerCharacter>(ABreakerCharacter::StaticClass(),
+        FVector(PlayerDistance, 0, 100), FRotator::ZeroRotator, SpawnParams);
+    if (!TestNotNull(TEXT("a player on the tear"), Player)) return false;
+    Player->SetActorTickEnabled(false); Player->GetBreakerMovement()->SetComponentTickEnabled(false);
+    Player->GetAbilitySystemComponent()->InitAbilityActorInfo(Player, Player);
+    Player->GetAbilitySystemComponent()->AddAttributeSetSubobject(Player->GetAttributes());
+    Player->GetCombat()->BindAttributes(Player->GetAttributes());
+    Player->GetProgression()->BindAttributes(Player->GetAttributes());
+
+    // A body wired through its own BeginPlay, so Tick has the chassis, the
+    // leash origin and the bound combat component it runs on in the game.
+    ABreakerEnemy* Enemy = World->SpawnActor<ABreakerEnemy>(ABreakerEnemy::StaticClass(),
+        FVector(0, 0, 100), FRotator::ZeroRotator, SpawnParams);
+    if (!TestNotNull(TEXT("an arriving body"), Enemy)) return false;
+    UBreakerAttributeSet* Health = Cast<UBreakerAttributeSet>(Enemy->GetDefaultSubobjectByName(TEXT("Attributes")));
+    UBreakerCombatComponent* Combat = Enemy->FindComponentByClass<UBreakerCombatComponent>();
+    if (!TestNotNull(TEXT("the body's attributes"), Health) || !TestNotNull(TEXT("the body's combat"), Combat)) return false;
+    Enemy->GetAbilitySystemComponent()->AddAttributeSetSubobject(Health);
+    Enemy->ConfigureCrowdProbe(); Enemy->DispatchBeginPlay(); Enemy->SetActorTickEnabled(false);
+    Health->ApplyMaxHealth(1000.0f); Health->ApplyHealth(1000.0f);
+    auto Hit = []()
+    {
+        FBreakerDamageRequest Request;
+        Request.BaseDamage = 100.0f;
+        Request.bCanCritical = false;
+        Request.bBypassShield = true;
+        return Request;
+    };
+
+    // CONTROL. Before anything is claimed about emerging, prove this fixture
+    // engages at all: no window, player in range, one tick, a target.
+    Enemy->Tick(0.0f);
+    if (!TestTrue(TEXT("without a window the body hunts the player in range"), Enemy->GetThreatTarget() == Player)) return false;
+    if (!TestNotEqual(TEXT("and its label is not the leash walk"), Enemy->GetEnemyStateLabel(), FString(TEXT("PATROL")))) return false;
+
+    // ARMED. The window is one grant; the tick after it is the emergence.
+    Enemy->GrantEmergenceWindow();
+    TestTrue(TEXT("a granted window is an emerging body"), Enemy->IsEmerging());
+    Enemy->Tick(0.0f);
+    TestEqual(TEXT("an emerging body prints EMERGING"), Enemy->GetEnemyStateLabel(), FString(TEXT("EMERGING")));
+    TestNull(TEXT("and holds no threat target, even the one it held a tick ago"), Enemy->GetThreatTarget());
+    TestNull(TEXT("and has committed no attack target"), Enemy->GetCommittedAttackTarget());
+
+    // THROUGH THE CLOCK. Every tick of the window, the same three facts; and
+    // the damage half runs on the same clock, so a hit does nothing here.
+    const float Window = Shipped->GetEmergingSeconds();
+    bool bHeldThrough = true;
+    for (float T = 0.0f; T < Window - 0.05f; T += 0.02f)
+    {
+        Clock(0.02f);
+        Enemy->Tick(0.0f);
+        bHeldThrough &= Enemy->IsEmerging() && Enemy->GetThreatTarget() == nullptr
+            && Enemy->GetEnemyStateLabel() == TEXT("EMERGING");
+    }
+    TestTrue(TEXT("the body hunts nothing for the whole clock"), bHeldThrough);
+    const float BeforeHit = Health->GetHealth();
+    Combat->ReceiveDamage(Hit());
+    TestEqual(TEXT("and the hit on the same clock does nothing"), Health->GetHealth(), BeforeHit, 0.0001f);
+
+    // AFTER THE CLOCK. One clock, two halves: the tick that hunts is the tick
+    // that can be hit.
+    Clock(0.1f + 0.05f);
+    TestFalse(TEXT("when the clock ends the body is no longer emerging"), Enemy->IsEmerging());
+    Enemy->Tick(0.0f);
+    TestTrue(TEXT("the next tick engages the player"), Enemy->GetThreatTarget() == Player);
+    TestNotEqual(TEXT("and the label is no longer EMERGING"), Enemy->GetEnemyStateLabel(), FString(TEXT("EMERGING")));
+    Combat->ReceiveDamage(Hit());
+    TestTrue(TEXT("and the same hit now lands"), Health->GetHealth() < BeforeHit);
     return true;
 }
 

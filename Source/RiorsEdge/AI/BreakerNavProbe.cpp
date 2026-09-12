@@ -391,7 +391,7 @@ namespace
                     }
                 }
             }
-            if (Facing > BreakerNavProbeFacingToleranceDeg && StateLabel != TEXT("PATROL"))
+            if (Facing > BreakerNavProbeFacingToleranceDeg && StateLabel != TEXT("PATROL") && StateLabel != TEXT("EMERGING"))
             {
                 UE_LOG(LogTemp, Display, TEXT("[BreakerNavProbe] FACING FAIL body forward is %.0f deg off the actor's forward (tolerance %.0f)"),
                     Facing, BreakerNavProbeFacingToleranceDeg);
@@ -402,7 +402,7 @@ namespace
             // FALLING BACK is a reverse walk and its HOLDING / AIMING strafe is
             // the muzzle held on the target). Only a body that is supposed to
             // walk where it looks can fail this.
-            if (Slide > BreakerNavProbeFacingToleranceDeg && StateLabel != TEXT("PATROL") && StateLabel != TEXT("HELD")
+            if (Slide > BreakerNavProbeFacingToleranceDeg && StateLabel != TEXT("PATROL") && StateLabel != TEXT("EMERGING") && StateLabel != TEXT("HELD")
                 && StateLabel != TEXT("ATTACK") && StateLabel != TEXT("BACK OFF")
                 && StateLabel != TEXT("FALLING BACK") && StateLabel != TEXT("HOLDING") && StateLabel != TEXT("AIMING"))
             {
@@ -613,7 +613,7 @@ namespace
                 const FString StateLabel = Enemy->GetEnemyStateLabel();
                 UE_LOG(LogTemp, Display, TEXT("[BreakerNavProbe] t=%.1f %s bearing=%.0f dist=%.0f state=%s mode=%s facing=%.0f toplayer=%.0f"),
                     Elapsed, Role, Bearing, Distance, *StateLabel, Mode, Facing, ToPlayer);
-                if (Facing > BreakerNavProbeFacingToleranceDeg && StateLabel != TEXT("PATROL"))
+                if (Facing > BreakerNavProbeFacingToleranceDeg && StateLabel != TEXT("PATROL") && StateLabel != TEXT("EMERGING"))
                 {
                     UE_LOG(LogTemp, Display, TEXT("[BreakerNavProbe] FACING FAIL %s body forward is %.0f deg off the actor's forward (tolerance %.0f)"),
                         Role, Facing, BreakerNavProbeFacingToleranceDeg);
@@ -674,7 +674,7 @@ namespace
                 const float ToPlayer = BreakerNavProbeDegreesBetween2D(Warden->GetNamedBodyWorldForward(),
                     Pawn - Warden->GetActorLocation());
                 UE_LOG(LogTemp, Display, TEXT("[BreakerNavProbe] SQUAD warden toplayer=%.0f"), ToPlayer);
-                if (Elapsed > BreakerNavProbeSquadSettleSeconds && Warden->GetEnemyStateLabel() != TEXT("PATROL")
+                if (Elapsed > BreakerNavProbeSquadSettleSeconds && Warden->GetEnemyStateLabel() != TEXT("PATROL") && Warden->GetEnemyStateLabel() != TEXT("EMERGING")
                     && ToPlayer > BreakerNavProbeSquadFrontSlackDeg)
                 {
                     UE_LOG(LogTemp, Display, TEXT("[BreakerNavProbe] FRONT FAIL warden body forward is %.0f deg off the line to the pawn (slack %.0f, cap %.0f deg/s)"),

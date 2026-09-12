@@ -1,6 +1,7 @@
 #include "Game/BreakerGameMode.h"
 #include "Game/BreakerRepopulationMath.h"
 #include "Game/BreakerPocketRift.h"
+#include "TimerManager.h"
 #include "Interaction/BreakerSupplyChest.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "UI/BreakerRiftDebriefMath.h"
@@ -4335,38 +4336,77 @@ void ABreakerGameMode::TickOutdoorRepopulation(float DeltaSeconds)
 
     // A slot is empty when its occupant is gone OR dead: a corpse lying in the
     // pocket has already stopped being a fight.
+    FTimerManager& Timers = World->GetTimerManager();
     TArray<float, TInlineAllocator<32>> Candidates;
     Candidates.Reserve(OutdoorSlots.Num());
     for (FBreakerOutdoorSlot& Slot : OutdoorSlots)
     {
         const ABreakerEnemy* Standing = Slot.Occupant.Get();
         const bool bHeld = Standing && !Standing->IsDeadEnemy();
+        // A slot whose body is still coming through its tear is not held and
+        // not a candidate: the wait it has accrued stands, so a refused arrival
+        // returns it to the queue at the head rather than the tail.
+        const bool bArriving = Timers.IsTimerActive(Slot.ArrivalTimer);
         Slot.EmptySeconds = bHeld ? 0.0f : Slot.EmptySeconds + DeltaSeconds;
         // A slot the player is standing near is no candidate this frame, but it
         // KEEPS the wait it has accrued — walking away must not restart a clock
         // that has already run, or a patrolled route could never recover.
         const bool bClear = BreakerRepopulation::IsClearOfPlayer(
             FVector::DistSquared(Slot.AppearsAt(), PlayerAt), OutdoorRepopulationClearanceCm);
-        Candidates.Add(bHeld || !bClear ? 0.0f : Slot.EmptySeconds);
+        Candidates.Add(bHeld || bArriving || !bClear ? 0.0f : Slot.EmptySeconds);
     }
 
     if (OutdoorRepopulationCountdown > 0.0f) return;
     const int32 Due = BreakerRepopulation::NextDueSlot(Candidates, OutdoorRepopulationDelaySeconds);
     if (Due == INDEX_NONE) return;
-    if (RefillOutdoorSlot(OutdoorSlots[Due]))
+    if (RefillOutdoorSlot(Due))
     {
         OutdoorRepopulationCountdown = OutdoorRepopulationDelaySeconds;
     }
 }
 
-ABreakerEnemy* ABreakerGameMode::RefillOutdoorSlot(FBreakerOutdoorSlot& Slot)
+bool ABreakerGameMode::RefillOutdoorSlot(int32 SlotIndex)
 {
     UWorld* World = GetWorld();
-    if (!World || !Slot.Class) return nullptr;
+    if (!World || !OutdoorSlots.IsValidIndex(SlotIndex)) return false;
+    FBreakerOutdoorSlot& Slot = OutdoorSlots[SlotIndex];
+    if (!Slot.Class) return false;
+    // A TEAR IS AN EVENT (O274): it opens where a patrol is about to return,
+    // and the body comes through once it has opened. So the claim is two
+    // steps — open now, arrive AppearSeconds later — and an open tear is a
+    // promise the arrival keeps or, if the ground has been taken in the
+    // meantime, closes again without a body. A pocket with no tear keeps the
+    // O268 arrival exactly: the body appears at once.
+    ABreakerPocketRift* Tear = Slot.Rift.Get();
+    const float Wait = Tear ? ABreakerPocketRift::AppearSeconds : 0.0f;
+    if (Tear) Tear->Open();
+    if (Wait <= 0.0f)
+    {
+        // No timer for a zero wait: the body exists before this returns, so a
+        // caller reading the slot sees the same thing a timer would have left.
+        return ArriveAtOutdoorSlot(SlotIndex) != nullptr;
+    }
+    World->GetTimerManager().SetTimer(Slot.ArrivalTimer,
+        FTimerDelegate::CreateWeakLambda(this, [this, SlotIndex]()
+        {
+            ArriveAtOutdoorSlot(SlotIndex);
+        }), Wait, false);
+    return true;
+}
+
+ABreakerEnemy* ABreakerGameMode::ArriveAtOutdoorSlot(int32 SlotIndex)
+{
+    UWorld* World = GetWorld();
+    if (!World || !OutdoorSlots.IsValidIndex(SlotIndex)) return nullptr;
+    FBreakerOutdoorSlot& Slot = OutdoorSlots[SlotIndex];
+    ABreakerPocketRift* Tear = Slot.Rift.Get();
+    if (!Slot.Class) return nullptr;
     // The floor under this slot was traced when the area was built and has not
     // moved, but the world has had a fight in it since: a corpse, a deployable
     // or another body can be standing here now. Refuse and try again rather
-    // than pushing a patrol into something.
+    // than pushing a patrol into something. Tested HERE, at the moment of the
+    // spawn rather than at the claim, because the world had AppearSeconds to
+    // change in between and the body is placed into the world as it is now.
     FCollisionQueryParams Query(SCENE_QUERY_STAT(FernhallRepopulation), false);
     if (ABreakerEnemy* Fallen = Slot.Occupant.Get()) Query.AddIgnoredActor(Fallen);
     const ABreakerEnemy* Template = GetDefault<ABreakerEnemy>(Slot.Class);
@@ -4375,6 +4415,20 @@ ABreakerEnemy* ABreakerGameMode::RefillOutdoorSlot(FBreakerOutdoorSlot& Slot)
     if (Body && World->OverlapBlockingTestByChannel(Appears, FQuat::Identity, ECC_Pawn,
         FCollisionShape::MakeCapsule(Body->GetScaledCapsuleRadius(), Body->GetScaledCapsuleHalfHeight()), Query))
     {
+        // THE PROMISE IS NOT KEPT, SO THE TEAR SAYS SO. Unless another body is
+        // still on its way through the same tear, in which case it stays open
+        // for that one; a tear that shut in front of a pending arrival would
+        // have to tear open again a moment later.
+        if (Tear)
+        {
+            bool bOthersArriving = false;
+            for (int32 Other = 0; Other < OutdoorSlots.Num() && !bOthersArriving; ++Other)
+            {
+                bOthersArriving = Other != SlotIndex && OutdoorSlots[Other].Rift.Get() == Tear
+                    && World->GetTimerManager().IsTimerActive(OutdoorSlots[Other].ArrivalTimer);
+            }
+            if (!bOthersArriving) Tear->Close();
+        }
         return nullptr;
     }
     // A body that walks in through a door FACES ITS ROUTE, not the facing its
@@ -4385,7 +4439,11 @@ ABreakerEnemy* ABreakerGameMode::RefillOutdoorSlot(FBreakerOutdoorSlot& Slot)
     FActorSpawnParameters Parameters;
     Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     ABreakerEnemy* Patrol = World->SpawnActor<ABreakerEnemy>(Slot.Class, Appears, Facing, Parameters);
-    if (!Patrol) return nullptr;
+    if (!Patrol)
+    {
+        if (Tear) Tear->CloseAfter(OutdoorTearCloseAfterSeconds);
+        return nullptr;
+    }
     // Exactly what the authored placement gave this slot, including the elite
     // that a quest's elite-gated objective counts. ConfigureWave keeps the
     // per-body self-respawn off: this clock owns the return, not the corpse.
@@ -4402,15 +4460,19 @@ ABreakerEnemy* ABreakerGameMode::RefillOutdoorSlot(FBreakerOutdoorSlot& Slot)
         Patrol->Tags.Add(Slot.PocketTag);
     }
     UBreakerKillTelemetryComponent::AttachTo(Patrol);
-    // The same protection every other arrival gets.
+    // The same protection every other arrival gets: undeletable and not yet
+    // hunting for EmergenceProtectedSeconds — the body emerges before it hunts.
     Patrol->GrantEmergenceWindow();
-    // AND THE TEAR ANSWERS. The flare is fired here rather than on the tick
-    // that decided the slot was due, because this is the first line at which a
-    // body definitely exists: the overlap test above refuses and returns, and a
-    // rift that flashed for a refusal would be lying about what came through.
-    if (ABreakerPocketRift* Tear = Slot.Rift.Get())
+    // AND THE TEAR ANSWERS. The flare is fired here rather than at the claim,
+    // because this is the first line at which a body definitely exists: the
+    // overlap test above refuses and returns, and a rift that flashed for a
+    // refusal would be lying about what came through. Then the close is armed
+    // — or pushed back, if another body came through a moment ago — so the
+    // tear closes after the LAST arrival and the world at rest shows no tears.
+    if (Tear)
     {
         Tear->Flare();
+        Tear->CloseAfter(OutdoorTearCloseAfterSeconds);
     }
     Slot.Occupant = Patrol;
     Slot.EmptySeconds = 0.0f;
@@ -4682,6 +4744,14 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
         // rather than a code one. A tear needs no geometry, works on any
         // ground, and is a better sentence about Fernhall than a door would be.
         //
+        // SPAWNED CLOSED (O274). A tear is an event, not a fixture: the actor
+        // placed here draws nothing until the repopulation clock opens it for a
+        // return, the pocket's body comes through once it has opened, and it
+        // closes after the last arrival. A player crossing a yard at rest sees
+        // no tears; one that is open is a promise that something is coming out
+        // of it. The initial population below never uses it — those bodies are
+        // the world as found, placed on their posts, and only a RETURN tears.
+        //
         // BEHIND THE FORMATION, not beside it. The bodies are placed facing
         // -Forward because that is where the player comes from, so +Forward is
         // the far side of the fight: a patrol steps out of the tear with its
@@ -4691,9 +4761,9 @@ void ABreakerGameMode::SpawnFernhallEncounters(const FBreakerZoneMarkers& Marker
         //
         // NO TEAR, NO ARRIVAL, DELIBERATELY. If the ground fails its trace or
         // the actor cannot spawn, the slots keep the shipped O268 behaviour and
-        // the body appears at its post. An arrival point with nothing standing
-        // at it would be strictly WORSE than that — a body popping into open
-        // ground away from its post — so the two are coupled.
+        // the body appears at its post at once. An arrival point with nothing
+        // opening at it would be strictly WORSE than that — a body popping into
+        // open ground away from its post — so the two are coupled.
         if (OutdoorSlots.Num() > SlotFirst)
         {
             constexpr float PocketRiftOffsetCm = 750.0f;   // O2 PLACEHOLDER

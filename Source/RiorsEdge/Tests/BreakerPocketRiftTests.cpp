@@ -174,6 +174,70 @@ bool FBreakerPocketRiftTest::RunTest(const FString& Parameters)
     // is the failure a designer wants from a zeroed dial.
     TestEqual(TEXT("a zero flare length draws nothing"), FlareBoost(5.0f, 0.0f), 0.0f);
 
+    // ---- THE OPENING AND THE CLOSING (O274) ------------------------------
+    // A tear is an event: nothing before it opens, the whole tear once it has,
+    // and only ever growing in between. A dip on the way open would read as a
+    // tear that changed its mind.
+    constexpr float Appear = ABreakerPocketRift::AppearSeconds;
+    constexpr float Shut = ABreakerPocketRift::CloseSeconds;
+    TestEqual(TEXT("a tear that has just opened is nothing"), AppearScale(0.0f, Appear), 0.0f);
+    TestEqual(TEXT("and before that is still nothing"), AppearScale(-1.0f, Appear), 0.0f);
+    TestEqual(TEXT("and is whole once its clock has run"), AppearScale(Appear, Appear), 1.0f);
+    TestEqual(TEXT("and stays whole after"), AppearScale(Appear * 3.0f, Appear), 1.0f);
+    {
+        float Before = AppearScale(0.0f, Appear);
+        for (int32 Step = 1; Step <= 40; ++Step)
+        {
+            const float Age = Appear * static_cast<float>(Step) / 40.0f;
+            const float Here = AppearScale(Age, Appear);
+            TestTrue(*FString::Printf(TEXT("the tear only grows while opening, at %.3fs"), Age), Here >= Before);
+            TestTrue(*FString::Printf(TEXT("and stays in the unit range at %.3fs"), Age), Here >= 0.0f && Here <= 1.0f);
+            Before = Here;
+        }
+    }
+    // EASE-OUT, so the split is readable before the body is due: more than
+    // half the size by half the clock.
+    TestTrue(TEXT("the tear opens fast and settles"), AppearScale(Appear * 0.5f, Appear) > 0.5f);
+    // A ZEROED DIAL IS INSTANT, not permanent-closed: a designer who turns the
+    // opening off gets the O268 tear standing at once, not a tear that never
+    // draws.
+    TestEqual(TEXT("a zero appear dial is instantly whole"), AppearScale(0.0f, 0.0f), 1.0f);
+    TestEqual(TEXT("and so is a negative one"), AppearScale(0.0f, -1.0f), 1.0f);
+
+    // THE MIRROR. Whole at the moment it is told to close, nothing once the
+    // clock has run, only ever shrinking in between — and EXACTLY one minus
+    // the open curve, so tuning one cannot leave the other behind.
+    TestEqual(TEXT("a tear that has just been closed is still whole"), CloseScale(0.0f, Shut), 1.0f);
+    TestEqual(TEXT("and is nothing once its clock has run"), CloseScale(Shut, Shut), 0.0f);
+    TestEqual(TEXT("and stays nothing after"), CloseScale(Shut * 3.0f, Shut), 0.0f);
+    {
+        float Before = CloseScale(0.0f, Shut);
+        for (int32 Step = 1; Step <= 40; ++Step)
+        {
+            const float Since = Shut * static_cast<float>(Step) / 40.0f;
+            const float Here = CloseScale(Since, Shut);
+            TestTrue(*FString::Printf(TEXT("the tear only shrinks while closing, at %.3fs"), Since), Here <= Before);
+            TestEqual(*FString::Printf(TEXT("and mirrors the opening at %.3fs"), Since),
+                Here, 1.0f - AppearScale(Since, Shut), 0.0001f);
+            Before = Here;
+        }
+    }
+    TestEqual(TEXT("a zero close dial shuts at once"), CloseScale(0.0f, 0.0f), 0.0f);
+
+    // THE INVERSE, which is what lets a tear interrupted mid-motion resume
+    // from where it is: the age the inverse returns must land the curve back
+    // on the scale it was given.
+    for (int32 Step = 0; Step <= 10; ++Step)
+    {
+        const float Scale = static_cast<float>(Step) / 10.0f;
+        const float Age = AppearAgeForScale(Scale, Appear);
+        TestTrue(*FString::Printf(TEXT("the inverse stays on the clock for scale %.1f"), Scale),
+            Age >= 0.0f && Age <= Appear);
+        TestEqual(*FString::Printf(TEXT("and lands back on the curve for scale %.1f"), Scale),
+            AppearScale(Age, Appear), Scale, 0.001f);
+    }
+    TestEqual(TEXT("the inverse of a zero dial is now"), AppearAgeForScale(0.5f, 0.0f), 0.0f);
+
     // ---- THE SHIPPED CONFIGURATION ---------------------------------------
     // A tear a body cannot walk out of is not an arrival point. An enemy
     // capsule stands about 176 cm; the authored height must clear that, and the
@@ -191,6 +255,18 @@ bool FBreakerPocketRiftTest::RunTest(const FString& Parameters)
     // can find, rather than by a percent.
     TestTrue(TEXT("an arrival is far brighter than a resting tear"),
         ABreakerPocketRift::FlareGlow > ABreakerPocketRift::IdleGlow * 2.0f);
+    // THE OPENING IS A DELAY ON THE BODY (O274): the repopulation clock spawns
+    // the patrol AppearSeconds after it opens the tear, and
+    // RiorsEdge.Zone.Fernhall.OutdoorEncounterRuntime reads pocket 0's body
+    // at 1.10 s after a claim at 0.10 s. The dial's real ceiling is that
+    // second, asserted here so it cannot be turned past the test that
+    // depends on it without this line saying why.
+    TestTrue(TEXT("the opening lands before the runtime test reads the body"),
+        ABreakerPocketRift::AppearSeconds < 1.0f);
+    // Both clocks must actually run: a zero would make the tear appear or
+    // vanish in one frame, which is the pop-in this actor exists to remove.
+    TestTrue(TEXT("the tear takes time to open"), ABreakerPocketRift::AppearSeconds > 0.0f);
+    TestTrue(TEXT("and time to close"), ABreakerPocketRift::CloseSeconds > 0.0f);
     return true;
 }
 

@@ -16,6 +16,7 @@
 #include "EngineUtils.h"
 #include "Game/BreakerGameInstance.h"
 #include "Game/BreakerGameMode.h"
+#include "Game/BreakerPocketRift.h"
 #include "Game/BreakerZoneBuilder.h"
 #include "Save/BreakerQuestContent.h"
 #include "Interaction/BreakerNPC.h"
@@ -385,6 +386,17 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
             Player->SetActorLocation(Post + FVector(0.0f, 0.0f, 40000.0f));
             Mode->OutdoorRepopulationDelaySeconds = 0.1f;
 
+            // ---- O274: THE WORLD AT REST SHOWS NO TEARS. Every yard pocket
+            // placed one, and every one of them is closed until a return.
+            TArray<ABreakerPocketRift*> Tears;
+            for (TActorIterator<ABreakerPocketRift> It(World); It; ++It) Tears.Add(*It);
+            TestEqual(TEXT("Every yard pocket placed a tear"), Tears.Num(), 8);
+            for (const ABreakerPocketRift* Tear : Tears)
+            {
+                TestFalse(TEXT("A tear is not open before anything returns"), Tear->IsOpen());
+                TestTrue(TEXT("and draws nothing at rest"), Tear->IsClosed());
+            }
+
             Standing->DispatchBeginPlay();
             FBreakerDamageRequest Kill;
             Kill.BaseDamage = 1000000; Kill.bCanCritical = false; Kill.bBypassShield = true;
@@ -392,7 +404,54 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
             if (!TestTrue(TEXT("The courtyard body dies to combat damage"),
                 Standing->FindComponentByClass<UBreakerCombatComponent>()->ReceiveDamage(Kill).bKilled)) return false;
 
-            for (int32 Step = 0; Step < 40; ++Step) { ++GFrameCounter; World->Tick(LEVELTICK_All, 0.05f); }
+            auto Tick = [&](int32 Steps)
+            {
+                for (int32 Step = 0; Step < Steps; ++Step) { ++GFrameCounter; World->Tick(LEVELTICK_All, 0.05f); }
+            };
+            // A body that was not standing before the probe and is alive now.
+            auto FindNew = [&](const TCHAR* Tag) -> ABreakerEnemy*
+            {
+                for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
+                    if (*It != Standing && !It->IsDeadEnemy() && !PreExisting.Contains(*It)
+                        && (!Tag || It->Tags.Contains(FName(Tag)))) return *It;
+                return nullptr;
+            };
+
+            // ---- THE CLOCKS, IN ORDER. The ten entry-yard bodies killed for
+            // the XP figure above (pockets 0, 1 and 3) hold LOWER slot indices
+            // than the courtyard's and have stood empty exactly as long, so
+            // the shared clock claims them first, pocket 0's first slot at
+            // 0.10 s, then one more every 0.10 s; the courtyard's is the
+            // eleventh, at 1.10 s. That is the order the shipped rule produces
+            // and the probe reads it rather than steering it.
+            //
+            // A TEAR OPENS BEFORE ITS BODY EXISTS (O274). Two ticks is the
+            // first claim: the tear is open, and NOTHING has come through.
+            Tick(2);
+            ABreakerPocketRift* Torn = nullptr;
+            int32 OpenTears = 0;
+            for (ABreakerPocketRift* Tear : Tears)
+                if (Tear->IsOpen()) { ++OpenTears; Torn = Tear; }
+            TestEqual(TEXT("The first claim opens exactly one tear"), OpenTears, 1);
+            TestNull(TEXT("and no body has come through it yet: the tear opens first"), FindNew(nullptr));
+
+            // THE BODY COMES THROUGH ONCE THE TEAR HAS OPENED. The claim was
+            // at 0.10 s and the arrival is AppearSeconds (0.8) after it, so by
+            // 1.10 s — one claim's worth of margin — a new pocket-0 body stands
+            // at the tear that opened for it.
+            Tick(20);
+            ABreakerEnemy* Emerged = FindNew(TEXT("Fernhall.Outdoor.0"));
+            if (TestNotNull(TEXT("A pocket body returns once its tear has opened"), Emerged) && Torn)
+            {
+                TestTrue(TEXT("and it came out of the tear that opened"),
+                    FVector::Dist2D(Emerged->GetActorLocation(), Torn->GetActorLocation()) < 400.0f);
+                TestTrue(TEXT("which is still open while it walks out"), Torn->IsOpen());
+            }
+
+            // THE COURTYARD, INSIDE THE ORIGINAL 2 s BUDGET. Its slot has no
+            // tear (it arrives through the authored bay doorway), so its claim
+            // at 1.10 s is its arrival — the O268 behaviour, untouched.
+            Tick(18);
 
             ABreakerEnemy* Returned = nullptr;
             for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
@@ -414,6 +473,23 @@ bool FBreakerFernhallEncounterRuntimeTest::RunTest(const FString& Parameters)
             const FVector ToPost = (Post - Returned->GetActorLocation()).GetSafeNormal2D();
             TestTrue(TEXT("and faces the post it is walking to"),
                 FVector::DotProduct(Returned->GetActorForwardVector().GetSafeNormal2D(), ToPost) > 0.5f);
+
+            // ---- AND THEN IT CLOSES (O274). Pocket 0's four slots are claimed
+            // at 0.10-0.40 s and arrive at 0.90-1.20 s; the close is armed
+            // CloseAfterSeconds (2.0) after the LAST of them, at 3.20 s, and
+            // the tear is shut CloseSeconds (0.6) later, at 3.80 s. The last
+            // entry-yard arrival of all is pocket 3's third, claimed at 1.00 s,
+            // through at 1.80 s, closing at 3.80 s and shut at 4.40 s. Ticked
+            // to 5.00 s: 0.60 s of slack for the timer manager's own accounting
+            // and forty ticks of float accumulation, and not a second more.
+            Tick(60);
+            if (Torn)
+            {
+                TestFalse(TEXT("The tear closes after its last arrival"), Torn->IsOpen());
+                TestTrue(TEXT("and draws nothing once it has"), Torn->IsClosed());
+            }
+            for (const ABreakerPocketRift* Tear : Tears)
+                TestTrue(TEXT("The world at rest shows no tears"), Tear->IsClosed());
         }
         TestEqual(TEXT("Repeated startup preserves the outdoor population"), AfterRepeat - CourtyardAfterRepeat, 26);
         TestEqual(TEXT("Repeated startup preserves twenty-six outdoor plus courtyard four"), AfterRepeat, 30);
