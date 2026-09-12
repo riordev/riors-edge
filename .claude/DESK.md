@@ -77,16 +77,23 @@ walk on the correct axis."
   landing at walking pace with crouch held no longer slides. NOT
   PHOTOGRAPHED: motion.
 
-## Cycle — O284 FEEL, CAST
+## O284 FEEL, CAST — LANDED
 
-- [ ] The character binds Abilities->OnAbilityActivated: pitch kick -1.5
-      deg over 0.12 s (net-zero control delta), FOV pulse +3 deg / 0.2
-      s, a viewmodel kick, and the Cast moment at the rig root in the
-      verb's rail colour; Cleave's and Rot's own Cast moments removed so
-      nothing double-flashes. GLASS crossing: the Cast fallback gains
-      five shards and drops its 40 cm disc (a full-frame wash at 35 cm).
-      ShardBurst/FallbackSchedule assert Cast shards; RotCueOnLanding
-      stays green.
+- "casting feels clunky — no visual feedback other than the VFX and the
+  spell itself, no particles" — no ability touched the body: nothing in
+  Abilities/ kicked the camera, the hands or the FOV, and the Cast
+  moment was a 40 cm disc at 35 cm from the lens. The character binds
+  OnAbilityActivated (the hook every landing already fires, O178): the
+  camera pitches -1.5 deg over 0.06/0.12 s as a net-zero control delta,
+  the FOV pulses +3 deg over 0.2 s, the hands kick two units, and the
+  Cast moment plays at the rig root along the aim in the verb's rail
+  colour — no disc now, the blink light and five shards in a 30-degree
+  fan off the hand. Cleave's and Rot's own Cast moments are gone (no
+  double flash). FeelPulse pins the six dials; FallbackSchedule and
+  ShardBurst cover Cast. PHOTOGRAPHED: the Caster probe at 0.2 s — the
+  Cleave frame shows the arc, a shard off the hand and the kick. FOUND:
+  the hand light ends at 0.2 s while the shards fly to 0.35. FOUND:
+  Fracture's cast still draws nothing (KIT).
 
 ## Cycle — O285 LEVELS
 

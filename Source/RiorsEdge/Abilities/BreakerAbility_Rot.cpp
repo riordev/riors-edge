@@ -200,21 +200,16 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     const bool bFollowCaster = Aimed.bFollowCaster;
     const FVector Center = Aimed.Center;
 
-    // AND THE CAST IS VISIBLE AT THE CASTER. Rot drew NOTHING at the character
-    // — this file did not even include the renderer — so the whole ability was
-    // a disc that appeared somewhere ahead of you with no act that produced it.
-    // The moment slot, its colour law and its primitive fallback have been
-    // built since the renderer was written and nothing in the project had ever
-    // called one (O190: the Niagara asset is an ASSETS item; this ships the
-    // slot and the fallback, never the frame).
+    // AND THE CAST IS VISIBLE AT THE CASTER. The burst at the hand is the
+    // character's (O284, HandleAbilityCast on OnAbilityActivated), one for
+    // every ability; this composition draws the throw from the chest to the
+    // disc, so the disc has a cause and a direction.
     if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World))
     {
         const FVector Chest = Character->GetActorLocation() + FVector(0.0f, 0.0f, 20.0f);
-        const FVector Aim = (Center - Chest).GetSafeNormal();
         const FLinearColor Paint = GetPresentationColor();
-        Effects->PlayMoment(EBreakerEffectMoment::Cast, Chest + Aim * 60.0f, Aim, Paint);
         // A short fall of light from the caster's hand to the ground it lands
-        // on, so the disc has a cause and a direction.
+        // on.
         BreakerFX::FEffectTiming Throw;
         Throw.DurationSeconds = 0.26f;
         Throw.FadeInSeconds = 0.02f;

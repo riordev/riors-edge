@@ -282,6 +282,8 @@ void ABreakerCharacter::Tick(float DeltaSeconds)
     ApplyWeaponPresentation();
     UpdateViewmodelKick();
     UpdateDashCameraFeedback(DeltaSeconds);
+    // Before the FOV writer, which reads this frame's cast pulse (O284).
+    UpdateCastFeel(DeltaSeconds);
     UpdateCameraFieldOfView();
     UpdateCameraShake(DeltaSeconds);
     ReconcileClientDeathPresentation();
@@ -447,6 +449,13 @@ void ABreakerCharacter::BeginPlay()
     if (UBreakerCharacterMovementComponent* Movement = GetBreakerMovement())
     {
         Movement->OnDashStarted.AddDynamic(this, &ThisClass::HandleDashStarted);
+    }
+    // The same split for a cast (O284): the component broadcasts that a slot
+    // landed and this class decides what the camera, the hands and the world
+    // do about it (Characters/BreakerCharacterFeel.cpp).
+    if (Abilities)
+    {
+        Abilities->OnAbilityActivated.AddDynamic(this, &ThisClass::HandleAbilityCast);
     }
     // R10: the mapping context this pawn registers carries the player's saved
     // keybind overrides, not the untouched default — the settings screen's
@@ -2406,11 +2415,14 @@ void ABreakerCharacter::UpdateCameraFieldOfView()
     // GaitEaseSeconds by UpdateViewmodelKick — so the field widens with the
     // stride and settles with it, never on the toggle's edge.
     const float SprintPush = SprintFOVPushDegrees * ViewmodelSprintFraction;
+    // The cast pulse (O284): a short push on the frame a slot lands, on the
+    // same envelope as the cast's camera kick. Composed like the others.
+    const float CastPulse = GetCastFOVPulseDegrees();
     const bool bOffsetLive = DashOffset > UE_KINDA_SMALL_NUMBER || AimNarrow > UE_KINDA_SMALL_NUMBER
-        || SprintPush > UE_KINDA_SMALL_NUMBER;
+        || SprintPush > UE_KINDA_SMALL_NUMBER || CastPulse > UE_KINDA_SMALL_NUMBER;
     if (bOffsetLive)
     {
-        FirstPersonCamera->SetFieldOfView(FMath::Clamp(BaseFieldOfView + DashOffset + SprintPush - AimNarrow, 5.0f, 170.0f));
+        FirstPersonCamera->SetFieldOfView(FMath::Clamp(BaseFieldOfView + DashOffset + SprintPush + CastPulse - AimNarrow, 5.0f, 170.0f));
     }
     else if (bCameraFOVOffsetApplied)
     {

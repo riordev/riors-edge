@@ -113,7 +113,7 @@ namespace BreakerFX
     struct FMomentFallback
     {
         bool bDrawn = true;
-        // 0: no glow disc at all (the muzzle and the impact — see below).
+        // 0: no glow disc at all (the muzzle, the impact and the cast — see below).
         float RadiusCm = 30.0f;
         // Emissive intensity shared by every primitive of the fallback.
         float Intensity = 3.0f;
@@ -137,7 +137,8 @@ namespace BreakerFX
         // SHARDS: ShardCount short bright cubes thrown from the location
         // inside a cone of ShardConeDegrees (full included angle) about
         // Direction, each on its own ballistic arc for ShardSeconds
-        // (ShardPose below). The impact's shape: sparks leaving the surface.
+        // (ShardPose below). The impact's shape (sparks leaving the surface)
+        // and the cast's (a burst leaving the hand along the aim, O284).
         // 0: none. Shards live on their own clock, not on Timing.
         int32 ShardCount = 0;
         float ShardSeconds = 0.0f;
@@ -273,10 +274,28 @@ namespace BreakerFX
             F.Timing.DurationSeconds = 0.35f; // O2 PLACEHOLDER — equals ShardSeconds
             break;
         case EBreakerEffectMoment::Cast:
-            F.RadiusCm = 40.0f;            // O2 PLACEHOLDER
+            // A BURST OF THE VERB'S COLOUR LEAVES THE HAND (O284). The cast
+            // moment is played at the caster's hand, thirty-odd centimetres
+            // from the lens; a forty-centimetre disc there is not a flash, it
+            // is a full-frame wash of the verb's colour. NO DISC. The blink
+            // light stays — it IS the hand light, the wall and the gun catch
+            // the verb's colour for a fifth of a second — and the impact's
+            // shard block is borrowed for the body: five short bright shards
+            // thrown from the hand along the aim, in a tighter fan than the
+            // impact's (an impact sprays off a surface; a cast leaves in the
+            // direction it was cast), falling under the same gravity for the
+            // same third of a second.
+            F.RadiusCm = 0.0f;
             F.Intensity = 3.2f;            // O2 PLACEHOLDER
             F.LightRadiusCm = 380.0f;      // O2 PLACEHOLDER
             F.LightIntensity = 2200.0f;    // O2 PLACEHOLDER
+            F.ShardCount = 5;                 // O2 PLACEHOLDER
+            F.ShardSeconds = 0.35f;           // O2 PLACEHOLDER
+            F.ShardSpeedCms = 420.0f;         // O2 PLACEHOLDER
+            F.ShardGravityCms2 = 980.0f;      // O2 PLACEHOLDER
+            F.ShardConeDegrees = 30.0f;       // O2 PLACEHOLDER — tighter than Impact's 55: along the aim
+            F.ShardLengthCm = 9.0f;           // O2 PLACEHOLDER
+            F.ShardThicknessCm = 1.6f;        // O2 PLACEHOLDER
             F.Timing.DurationSeconds = 0.2f;    // O2 PLACEHOLDER
             F.Timing.FadeOutSeconds = 0.12f;    // O2 PLACEHOLDER
             break;

@@ -87,6 +87,22 @@ bool FBreakerEffectMomentFallbackTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Impact draws a shard burst"), MomentFallback(EBreakerEffectMoment::Impact).bDrawn);
     TestTrue(TEXT("Death draws a fallback"), MomentFallback(EBreakerEffectMoment::Death).bDrawn);
 
+    // O284: the cast is played at the hand, centimetres from the lens, so a
+    // disc there is a full-frame wash. It draws a burst of the verb's colour
+    // leaving the hand and the hand light, and no disc.
+    {
+        const FMomentFallback CastFallback = MomentFallback(EBreakerEffectMoment::Cast);
+        TestTrue(TEXT("Cast draws a fallback"), CastFallback.bDrawn);
+        TestEqual(TEXT("Cast draws no disc"), CastFallback.RadiusCm, 0.0f);
+        TestTrue(TEXT("Cast draws a shard burst"), CastFallback.ShardCount > 0);
+        TestTrue(TEXT("Cast keeps the hand light"), CastFallback.LightRadiusCm > 0.0f);
+        // A cast leaves along the aim: its fan is tighter than the impact's
+        // spray off a surface.
+        TestTrue(TEXT("The cast fan is tighter than the impact's"),
+            CastFallback.ShardConeDegrees > 0.0f
+            && CastFallback.ShardConeDegrees < MomentFallback(EBreakerEffectMoment::Impact).ShardConeDegrees);
+    }
+
     for (EBreakerEffectMoment Moment : BreakerMomentAll)
     {
         const FMomentFallback F = MomentFallback(Moment);
@@ -189,11 +205,12 @@ bool FBreakerEffectMomentMuzzleReticleTest::RunTest(const FString& Parameters)
     return true;
 }
 
-// O282: the impact's shard burst is a pure function of (normal, index, age),
-// so the whole flight is provable on floats: every shard leaves the hit
-// point, leaves it on the hit's side, inside the cone, and falls under the
-// same gravity from then on. Whether it READS as a hit is the capture
-// harness's job.
+// O282/O284: a shard burst is a pure function of (normal, index, age), so the
+// whole flight is provable on floats: every shard leaves the origin, leaves
+// it on the normal's side, inside the cone, and falls under the same gravity
+// from then on. The impact (sparks off a surface) and the cast (a burst
+// leaving the hand along the aim) are the two moments that burst; the same
+// rule is run over both. Whether it READS is the capture harness's job.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerEffectMomentShardBurstTest,
     "RiorsEdge.UI.EffectMoment.ShardBurst",
@@ -202,66 +219,72 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FBreakerEffectMomentShardBurstTest::RunTest(const FString& Parameters)
 {
     using namespace BreakerFX;
-    const FMomentFallback Impact = MomentFallback(EBreakerEffectMoment::Impact);
-    TestTrue(TEXT("The impact has shards"), Impact.ShardCount > 0);
-    TestTrue(TEXT("The shards fly"), Impact.ShardSpeedCms > 0.0f);
-    TestTrue(TEXT("The shards are drawn"), Impact.ShardLengthCm > 0.0f && Impact.ShardThicknessCm > 0.0f);
-    TestTrue(TEXT("The cone is a real half-space wedge"), Impact.ShardConeDegrees > 0.0f && Impact.ShardConeDegrees <= 90.0f);
-
-    // A floor hit, a wall hit, and a slanted one: the rule holds for any
-    // surface, not only the one a floor test would pick.
-    const FVector Normals[] = {
-        FVector::UpVector,
-        FVector(-1.0f, 0.0f, 0.0f),
-        FVector(0.6f, 0.0f, 0.8f).GetSafeNormal(),
-    };
-    // ShardConeDegrees is the FULL included angle, so a launch direction is
-    // within half of it of the normal.
-    const float ConeCos = FMath::Cos(FMath::DegreesToRadians(Impact.ShardConeDegrees * 0.5f));
-    // The gravity dial is a magnitude here whatever sign the header stores
-    // it with: the assertion is that the shard FALLS.
-    const float Gravity = FMath::Abs(Impact.ShardGravityCms2);
-    TestTrue(TEXT("The shards fall"), Gravity > 0.0f);
-    for (const FVector& Normal : Normals)
+    const EBreakerEffectMoment Bursting[] = { EBreakerEffectMoment::Impact, EBreakerEffectMoment::Cast };
+    for (EBreakerEffectMoment Moment : Bursting)
     {
-        for (int32 Index = 0; Index < Impact.ShardCount; ++Index)
+        const TCHAR* Name = MomentAssetName(Moment);
+        const FMomentFallback Burst = MomentFallback(Moment);
+        TestTrue(FString::Printf(TEXT("%s has shards"), Name), Burst.ShardCount > 0);
+        TestTrue(FString::Printf(TEXT("%s shards fly"), Name), Burst.ShardSpeedCms > 0.0f);
+        TestTrue(FString::Printf(TEXT("%s shards are drawn"), Name), Burst.ShardLengthCm > 0.0f && Burst.ShardThicknessCm > 0.0f);
+        TestTrue(FString::Printf(TEXT("%s cone is a real half-space wedge"), Name), Burst.ShardConeDegrees > 0.0f && Burst.ShardConeDegrees <= 90.0f);
+
+        // A floor hit, a wall hit, and a slanted one (or, for the cast, an
+        // aim up, an aim along the ground, and one between): the rule holds
+        // for any direction, not only the one a floor test would pick.
+        const FVector Normals[] = {
+            FVector::UpVector,
+            FVector(-1.0f, 0.0f, 0.0f),
+            FVector(0.6f, 0.0f, 0.8f).GetSafeNormal(),
+        };
+        // ShardConeDegrees is the FULL included angle, so a launch direction is
+        // within half of it of the normal.
+        const float ConeCos = FMath::Cos(FMath::DegreesToRadians(Burst.ShardConeDegrees * 0.5f));
+        // The gravity dial is a magnitude here whatever sign the header stores
+        // it with: the assertion is that the shard FALLS.
+        const float Gravity = FMath::Abs(Burst.ShardGravityCms2);
+        TestTrue(FString::Printf(TEXT("%s shards fall"), Name), Gravity > 0.0f);
+        for (const FVector& Normal : Normals)
         {
-            // Born at the hit.
-            FVector BirthPos, BirthDir;
-            ShardPose(Normal, Index, Impact.ShardCount, 0.0f, Impact.ShardSpeedCms, Impact.ShardGravityCms2, Impact.ShardConeDegrees, BirthPos, BirthDir);
-            TestTrue(FString::Printf(TEXT("Shard %d starts at the hit"), Index), BirthPos.IsNearlyZero(0.01));
-            TestTrue(FString::Printf(TEXT("Shard %d has a direction"), Index), BirthDir.IsNormalized());
-            // Leaves on the hit's side, inside the cone.
-            const float Dot = static_cast<float>(FVector::DotProduct(BirthDir, Normal));
-            TestTrue(FString::Printf(TEXT("Shard %d leaves the surface"), Index), Dot >= -KINDA_SMALL_NUMBER);
-            TestTrue(FString::Printf(TEXT("Shard %d stays inside the cone"), Index), Dot >= ConeCos - 1.0e-3f);
-
-            // Ballistic from then on: the straight-line flight minus half g t
-            // squared, sampled across the clip.
-            for (float Age = 0.05f; Age <= Impact.ShardSeconds + KINDA_SMALL_NUMBER; Age += 0.05f)
+            for (int32 Index = 0; Index < Burst.ShardCount; ++Index)
             {
-                FVector Pos, Dir;
-                ShardPose(Normal, Index, Impact.ShardCount, Age, Impact.ShardSpeedCms, Impact.ShardGravityCms2, Impact.ShardConeDegrees, Pos, Dir);
-                const FVector Line = BirthDir * Impact.ShardSpeedCms * Age;
-                TestTrue(FString::Printf(TEXT("Shard %d flies straight in the ground plane at %.2fs"), Index, Age),
-                    FMath::IsNearlyEqual(static_cast<float>(Pos.X), static_cast<float>(Line.X), 0.01f)
-                    && FMath::IsNearlyEqual(static_cast<float>(Pos.Y), static_cast<float>(Line.Y), 0.01f));
-                TestTrue(FString::Printf(TEXT("Shard %d falls under gravity at %.2fs"), Index, Age),
-                    FMath::IsNearlyEqual(static_cast<float>(Pos.Z), static_cast<float>(Line.Z) - 0.5f * Gravity * Age * Age, 0.01f));
+                // Born at the origin.
+                FVector BirthPos, BirthDir;
+                ShardPose(Normal, Index, Burst.ShardCount, 0.0f, Burst.ShardSpeedCms, Burst.ShardGravityCms2, Burst.ShardConeDegrees, BirthPos, BirthDir);
+                TestTrue(FString::Printf(TEXT("%s shard %d starts at the origin"), Name, Index), BirthPos.IsNearlyZero(0.01));
+                TestTrue(FString::Printf(TEXT("%s shard %d has a direction"), Name, Index), BirthDir.IsNormalized());
+                // Leaves on the normal's side, inside the cone.
+                const float Dot = static_cast<float>(FVector::DotProduct(BirthDir, Normal));
+                TestTrue(FString::Printf(TEXT("%s shard %d leaves along the normal"), Name, Index), Dot >= -KINDA_SMALL_NUMBER);
+                TestTrue(FString::Printf(TEXT("%s shard %d stays inside the cone"), Name, Index), Dot >= ConeCos - 1.0e-3f);
 
-                // Deterministic per index: the same call twice is the same shard.
-                FVector Again, AgainDir;
-                ShardPose(Normal, Index, Impact.ShardCount, Age, Impact.ShardSpeedCms, Impact.ShardGravityCms2, Impact.ShardConeDegrees, Again, AgainDir);
-                TestTrue(FString::Printf(TEXT("Shard %d repeats at %.2fs"), Index, Age), Again.Equals(Pos, 0.0) && AgainDir.Equals(Dir, 0.0));
+                // Ballistic from then on: the straight-line flight minus half g t
+                // squared, sampled across the clip.
+                for (float Age = 0.05f; Age <= Burst.ShardSeconds + KINDA_SMALL_NUMBER; Age += 0.05f)
+                {
+                    FVector Pos, Dir;
+                    ShardPose(Normal, Index, Burst.ShardCount, Age, Burst.ShardSpeedCms, Burst.ShardGravityCms2, Burst.ShardConeDegrees, Pos, Dir);
+                    const FVector Line = BirthDir * Burst.ShardSpeedCms * Age;
+                    TestTrue(FString::Printf(TEXT("%s shard %d flies straight in the ground plane at %.2fs"), Name, Index, Age),
+                        FMath::IsNearlyEqual(static_cast<float>(Pos.X), static_cast<float>(Line.X), 0.01f)
+                        && FMath::IsNearlyEqual(static_cast<float>(Pos.Y), static_cast<float>(Line.Y), 0.01f));
+                    TestTrue(FString::Printf(TEXT("%s shard %d falls under gravity at %.2fs"), Name, Index, Age),
+                        FMath::IsNearlyEqual(static_cast<float>(Pos.Z), static_cast<float>(Line.Z) - 0.5f * Gravity * Age * Age, 0.01f));
+
+                    // Deterministic per index: the same call twice is the same shard.
+                    FVector Again, AgainDir;
+                    ShardPose(Normal, Index, Burst.ShardCount, Age, Burst.ShardSpeedCms, Burst.ShardGravityCms2, Burst.ShardConeDegrees, Again, AgainDir);
+                    TestTrue(FString::Printf(TEXT("%s shard %d repeats at %.2fs"), Name, Index, Age), Again.Equals(Pos, 0.0) && AgainDir.Equals(Dir, 0.0));
+                }
             }
         }
-    }
 
-    // Shipped configuration: the pool holds a full shotgun spread's worth of
-    // bursts landing in one frame, and a burst is over before the eye has
-    // finished reading the hit.
-    TestTrue(TEXT("The shard pool holds eight bursts"), ABreakerEffectRenderer::GetShardSlots() >= 8 * Impact.ShardCount);
-    TestTrue(TEXT("A burst is brief"), Impact.ShardSeconds > 0.0f && Impact.ShardSeconds <= 0.5f);
+        // Shipped configuration: the pool holds a full shotgun spread's worth
+        // of bursts landing in one frame, and a burst is over before the eye
+        // has finished reading it.
+        TestTrue(FString::Printf(TEXT("The shard pool holds eight %s bursts"), Name), ABreakerEffectRenderer::GetShardSlots() >= 8 * Burst.ShardCount);
+        TestTrue(FString::Printf(TEXT("A %s burst is brief"), Name), Burst.ShardSeconds > 0.0f && Burst.ShardSeconds <= 0.5f);
+    }
     return true;
 }
 

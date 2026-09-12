@@ -244,13 +244,10 @@ void UBreakerAbility_Cleave::ActivateAbility(const FGameplayAbilitySpecHandle Ha
             Effects->AddStroke(Inner, Outer, 3.0f, Paint, 2.2f, SwingTiming,
                 SweepSeconds * (Spoke * 2) / BreakerFX::SweptArcStrokes);
         }
-
-        // AND THE SWING STARTS SOMEWHERE. A flash at the caster's own shoulder
-        // on the leading edge: the cast moment the renderer has carried since
-        // it was written and which nothing in the project has ever called.
-        Effects->PlayMoment(EBreakerEffectMoment::Cast,
-            Params.Origin + Params.Forward.RotateAngleAxis(-Params.ArcDegrees * 0.5f, FVector::UpVector) * 70.0f,
-            Params.Forward, Paint);
+        // The swing starts at the hand: the cast moment is the character's
+        // (O284, HandleAbilityCast on OnAbilityActivated), one burst for
+        // every ability, so this composition draws the arc and nothing at
+        // the caster.
     }
 
     int32 TargetIndex = 0;

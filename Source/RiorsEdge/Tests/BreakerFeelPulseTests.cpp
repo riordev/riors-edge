@@ -9,15 +9,17 @@
 // ---------------------------------------------------------------------------
 // THE MOVEMENT-FEEL ENVELOPES (O283): the two shapes every camera and hand
 // cue in the layer rides, proven world-free — no pawn, no camera, no clock.
-// Plus the shipped configuration: the three Feel dials on the character the
-// game actually spawns, read off the CDO the same way RiorsEdge.Playtest.
+// Plus the shipped configuration: the three movement Feel dials and the six
+// cast Feel dials (O284) on the character the game actually spawns, read off
+// the CDO the same way RiorsEdge.Playtest.
 // Assembly reads its defaults. The dials are protected UPROPERTYs, so they
 // are read through reflection rather than by widening the class for a test.
 // ---------------------------------------------------------------------------
 namespace
 {
     // Reads one float UPROPERTY off an object by name. -1 when the property is
-    // missing, which no Feel dial can legally be (all three are clamped >= 0),
+    // missing, which no Feel dial ships at (the movement dials are clamped
+    // >= 0; the one negative dial, the cast's camera pitch, ships at -1.5),
     // so a rename fails loudly instead of passing on a default.
     float BreakerFeelPulseReadDial(const UObject* Object, const TCHAR* PropertyName)
     {
@@ -156,6 +158,25 @@ bool FBreakerFeelPulseTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Crouch camera ease ships at 0.12 s"), BreakerFeelPulseReadDial(CppDefaults, TEXT("CrouchCameraEaseSeconds")), 0.12f, 0.0001f);
     TestEqual(TEXT("Brake plant threshold ships at half the walk cap"), BreakerFeelPulseReadDial(CppDefaults, TEXT("BrakePlantMinSpeedFraction")), 0.5f, 0.0001f);
 
+    // O284: the cast leaves the hand. Six dials on the same envelope shape:
+    // a nod of the camera, a short attack and a longer recovery, a widening
+    // of the field of view, and the viewmodel's kick. All O2 PLACEHOLDER on
+    // the character; this pins them so a Blueprint override is a red.
+    struct FBreakerFeelCastDial { const TCHAR* Name; float Value; };
+    const FBreakerFeelCastDial CastDials[] = {
+        { TEXT("CastCameraPitchDegrees"),   -1.5f },
+        { TEXT("CastKickAttackSeconds"),     0.06f },
+        { TEXT("CastKickRecoverySeconds"),   0.12f },
+        { TEXT("CastFOVPulseDegrees"),       3.0f },
+        { TEXT("CastFOVPulseSeconds"),       0.2f },
+        { TEXT("CastViewmodelKickUnits"),    2.0f },
+    };
+    for (const FBreakerFeelCastDial& Dial : CastDials)
+    {
+        TestEqual(FString::Printf(TEXT("%s ships at %.2f"), Dial.Name, Dial.Value),
+            BreakerFeelPulseReadDial(CppDefaults, Dial.Name), Dial.Value, 0.0001f);
+    }
+
     const ABreakerGameMode* GameMode = GetDefault<ABreakerGameMode>();
     if (TestNotNull(TEXT("Playtest game mode has a pawn class"), GameMode->DefaultPawnClass.Get()))
     {
@@ -170,6 +191,17 @@ bool FBreakerFeelPulseTest::RunTest(const FString& Parameters)
                 BreakerFeelPulseReadDial(ShippedPawn, TEXT("BrakePlantMinSpeedFraction")), 0.5f, 0.0001f);
             // The dash punch rides the same envelope shape and is idle at rest.
             TestEqual(TEXT("The dash envelope is idle at rest"), ShippedPawn->GetDashFeedbackAlpha(), 0.0f);
+            // O284: the cast dials on the pawn the game spawns.
+            for (const FBreakerFeelCastDial& Dial : CastDials)
+            {
+                TestEqual(FString::Printf(TEXT("The shipped pawn's %s is the C++ default"), Dial.Name),
+                    BreakerFeelPulseReadDial(ShippedPawn, Dial.Name), Dial.Value, 0.0001f);
+            }
+            // GAP: the cast pulse's at-rest value is not asserted here.
+            // ABreakerCharacter exposes no public GetCastFOVPulseDegrees();
+            // the pulse state is private to the actor and this test will not
+            // widen the class to read it. Land the accessor beside the dials
+            // and add `TestEqual(..., ShippedPawn->GetCastFOVPulseDegrees(), 0.0f)`.
         }
     }
     return true;

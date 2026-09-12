@@ -322,6 +322,24 @@ protected:
     // A released stick plants the hands only from at least this fraction of
     // the walk cap: a shuffle stopping is not a stop worth a dip.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel", meta=(ClampMin="0", ClampMax="2")) float BrakePlantMinSpeedFraction = 0.5f;   // O2 PLACEHOLDER
+    // --- The cast kick (O284) ---------------------------------------------
+    // A cast is felt before it is seen: on the one hook every ability's
+    // landing already fires (OnAbilityActivated, O178) the camera kicks, the
+    // field of view pulses, the hands kick, and a burst of the verb's colour
+    // leaves the hand. One pulse shape for all three (BreakerFeel::PulseAlpha),
+    // so the kick and the push cannot drift apart. Camera pitch at the peak,
+    // negative = the muzzle-dip direction (up is a recoil, down is a plant).
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel", meta=(ClampMin="-10", ClampMax="10")) float CastCameraPitchDegrees = -1.5f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel", meta=(ClampMin="0", ClampMax="1")) float CastKickAttackSeconds = 0.06f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel", meta=(ClampMin="0", ClampMax="1")) float CastKickRecoverySeconds = 0.12f;   // O2 PLACEHOLDER
+    // FOV added at the pulse's peak, composed with the dash punch, the sprint
+    // push and the ADS narrow by the one FOV writer.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel", meta=(ClampMin="0", ClampMax="30")) float CastFOVPulseDegrees = 3.0f;   // O2 PLACEHOLDER
+    // The whole FOV pulse, attack and recovery together.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel", meta=(ClampMin="0", ClampMax="1")) float CastFOVPulseSeconds = 0.2f;   // O2 PLACEHOLDER
+    // Impulse into the weapon's kick spring, through the landing converter,
+    // so the hands answer a cast with the equipped archetype's character.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Feel", meta=(ClampMin="0", ClampMax="20")) float CastViewmodelKickUnits = 2.0f;   // O2 PLACEHOLDER
 
     UFUNCTION(BlueprintImplementableEvent, Category="Combat") void OnFireInput(bool bPressed);
     UFUNCTION(BlueprintImplementableEvent, Category="Combat") void OnAimInput(bool bPressed);
@@ -405,8 +423,9 @@ private:
     UFUNCTION() void HandleDashStarted(FVector DashDirection, float DashSpeed);
     void UpdateDashCameraFeedback(float DeltaSeconds);
     // The ONE writer of the camera's live FOV during play (D5): composes the
-    // player's base FOV, the dash punch, the sprint push (O283) and the ADS
-    // narrow every frame, so two effects can never fight over SetFieldOfView. Writes only while an
+    // player's base FOV, the dash punch, the sprint push (O283), the cast
+    // pulse (O284) and the ADS narrow every frame, so two effects can never
+    // fight over SetFieldOfView. Writes only while an
     // offset is live (or on the frame it dies), so an idle camera costs one
     // comparison.
     void UpdateCameraFieldOfView();
@@ -609,6 +628,24 @@ private:
     // Blueprint child's re-seat is never overwritten at rest) and lets the
     // death beat's rest re-read subtract exactly what is on the camera.
     float AppliedCameraOffsetCm = 0.0f;
+    // --- The cast kick (O284), Characters/BreakerCharacterFeel.cpp ----------
+    // Bound to the ability component's OnAbilityActivated in BeginPlay: the
+    // instant activation and the wind-up's landing both broadcast it (O178),
+    // so a cast is felt on the same frame the HUD and the sound play it.
+    // Starts the clock, pays the hands, plays the verb-coloured burst at the
+    // rig root along the aim.
+    UFUNCTION() void HandleAbilityCast(EBreakerAbilitySlot Slot);
+    // Per frame, before the FOV writer: advances the clock and writes the
+    // camera pitch as a net-zero control-rotation delta — last frame's offset
+    // out, this frame's in, the shake's technique — so the aim ends where it
+    // began.
+    void UpdateCastFeel(float DeltaSeconds);
+    // The FOV writer's term: CastFOVPulseDegrees over the pulse, 0 at rest.
+    float GetCastFOVPulseDegrees() const;
+    // Negative = no cast pulse in flight.
+    float CastFeelElapsed = -1.0f;
+    // Last frame's pitch offset, for the net-zero delta.
+    float LastCastPitchOffset = 0.0f;
 public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Death Beat")
     FBreakerDeathBeatTimeline DeathBeat;

@@ -9,10 +9,12 @@
 // class nothing: no widened access, no exported helpers, no friend. The
 // enemy-bar TU (Combat/BreakerEnemyHealthBars.cpp) is the precedent.
 //
-// What lives here: the crouch hooks, UpdateMovementFeel, PayPlantImpulse.
-// What stays in the main TU: the FOV composer (one writer, D5) — the sprint
-// push is one term added there — the dash clock, the landing dip's Landed
-// and the slide-entry call site, each one line into this layer.
+// What lives here: the crouch hooks, UpdateMovementFeel, PayPlantImpulse,
+// and the cast kick (O284): HandleAbilityCast, UpdateCastFeel and the FOV
+// writer's cast term. What stays in the main TU: the FOV composer (one
+// writer, D5) — the sprint push and the cast pulse are each one term added
+// there — the dash clock, the landing dip's Landed and the slide-entry call
+// site, each one line into this layer.
 //
 // The shapes are Characters/BreakerFeelPulseMath.h's. This file reads the
 // body, eases, and writes the camera and the kick spring.
@@ -20,9 +22,16 @@
 
 #include "Characters/BreakerCharacter.h"
 
+#include "Abilities/BreakerAbilityComponent.h"
+#include "Abilities/BreakerAbilityDefinition.h"
 #include "Camera/CameraComponent.h"
 #include "Characters/BreakerFeelPulseMath.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/World.h"
 #include "Movement/BreakerCharacterMovementComponent.h"
+#include "UI/BreakerEffectMomentMath.h"
+#include "UI/BreakerEffectRenderer.h"
+#include "UI/BreakerHUDMath.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Weapons/BreakerWeaponFeel.h"
 
@@ -32,6 +41,10 @@ namespace
     // reaches zero on its own, and a camera write per frame for a hundredth
     // of a millimetre is a write for nothing.
     constexpr float BreakerFeelCrouchRestCm = 0.05f;   // O2 PLACEHOLDER
+    // How the cast FOV pulse's one authored length splits into attack and
+    // recovery: it arrives in the first third and settles over the rest, the
+    // same proportion as the camera kick's 0.06/0.12.
+    constexpr float BreakerFeelCastFOVAttackFraction = 0.3f;   // O2 PLACEHOLDER
 }
 
 void ABreakerCharacter::OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust)
@@ -126,4 +139,93 @@ void ABreakerCharacter::UpdateMovementFeel(float DeltaSeconds)
     }
     bWasGroundedInput = bInputLive;
     LastGroundedSpeed = bGrounded ? static_cast<float>(Move->Velocity.Size2D()) : 0.0f;
+}
+
+// ---- The cast kick (O284) --------------------------------------------------
+
+void ABreakerCharacter::HandleAbilityCast(EBreakerAbilitySlot Slot)
+{
+    // THE ONE HOOK. Instant activations and the wind-up's landing both arrive
+    // here (O178), so every ability is felt on the frame it announces itself
+    // — and never on the press of one still winding up, and never on a
+    // cancel, because the component withholds the broadcast for those.
+
+    // The burst of the verb's colour leaves the hand. Played for any pawn
+    // whose world has a renderer: on a listen server a remote caster's cast
+    // is on the host's screen too. The rig root IS the hand; the aim is the
+    // pawn's base aim (the control rotation for a controlled pawn). The
+    // renderer is client cosmetic and null where nothing can spawn.
+    if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(GetWorld()))
+    {
+        const UBreakerAbilityDefinition* Definition = Abilities ? Abilities->GetDefinitionForSlot(Slot) : nullptr;
+        // The same answer the HUD rail and the ability's own presentation
+        // give, for the same reason: colour by verb, violet for the ultimate,
+        // the resting border for an unsaid verb rather than a guess.
+        const FLinearColor Paint = BreakerHUDMath::AbilityRailColor(
+            Definition ? Definition->Verb : EBreakerAbilityVerb::None,
+            Definition && Definition->IsUltimate());
+        const FVector Aim = GetBaseAimRotation().Vector();
+        const FVector Hand = PrototypeWeaponVisual
+            ? PrototypeWeaponVisual->GetComponentLocation()
+            : GetActorLocation() + FVector(0.0, 0.0, 20.0);
+        Effects->PlayMoment(EBreakerEffectMoment::Cast, Hand, Aim, Paint);
+    }
+
+    // The camera and the hands are the viewer's own: a remote pawn's cast
+    // must not kick the host's aim.
+    if (!IsLocallyControlled()) return;
+
+    // Restart, never accumulate: a second cast inside the first's recovery
+    // reads as a second kick, not a bigger one.
+    CastFeelElapsed = 0.0f;
+
+    // The hands: the same converter and the same spring as the landing dip
+    // and the brake plant, so the cast recovers with the equipped
+    // archetype's character. Inert on a dedicated server (no viewmodel).
+    if (Weapon && CastViewmodelKickUnits > 0.0f)
+    {
+        Weapon->AddViewmodelImpulse(CastViewmodelKickUnits, -CastViewmodelKickUnits * ViewmodelMotion.LandingPitchPerKickUnit);
+    }
+}
+
+void ABreakerCharacter::UpdateCastFeel(float DeltaSeconds)
+{
+    if (CastFeelElapsed < 0.0f) return;
+    CastFeelElapsed += DeltaSeconds;
+
+    // The clock outlives the longer of the two envelopes, so the FOV writer
+    // reads a live term for the whole pulse even when the camera kick has
+    // already settled.
+    const bool bDone = CastFeelElapsed >= FMath::Max(CastKickAttackSeconds + CastKickRecoverySeconds, CastFOVPulseSeconds);
+    const float Pitch = bDone ? 0.0f
+        : CastCameraPitchDegrees * BreakerFeel::PulseAlpha(CastFeelElapsed, CastKickAttackSeconds, CastKickRecoverySeconds);
+
+    // A net-zero control-rotation delta, exactly the shake's and the death
+    // beat's technique: the camera runs bUsePawnControlRotation and would
+    // discard a relative pitch of its own, and subtracting last frame's
+    // offset before adding this one leaves the aim where the player put it
+    // once the pulse returns to zero. Written only while an offset is live
+    // or on the frame the last one dies.
+    if (Controller && (!FMath::IsNearlyZero(Pitch) || !FMath::IsNearlyZero(LastCastPitchOffset)))
+    {
+        FRotator Rotation = Controller->GetControlRotation();
+        Rotation.Pitch += Pitch - LastCastPitchOffset;
+        Controller->SetControlRotation(Rotation);
+    }
+    LastCastPitchOffset = Pitch;
+
+    if (bDone)
+    {
+        CastFeelElapsed = -1.0f;
+    }
+}
+
+float ABreakerCharacter::GetCastFOVPulseDegrees() const
+{
+    // 0 before and after the pulse: PulseAlpha is 0 for a negative elapsed
+    // and past the recovery, so the FOV writer's live test needs no second
+    // flag.
+    return CastFOVPulseDegrees * BreakerFeel::PulseAlpha(CastFeelElapsed,
+        CastFOVPulseSeconds * BreakerFeelCastFOVAttackFraction,
+        CastFOVPulseSeconds * (1.0f - BreakerFeelCastFOVAttackFraction));
 }
