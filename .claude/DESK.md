@@ -125,12 +125,15 @@
   and the damage; the grammar carries a Volley beat. FOUND: two other
   grammar call sites omit the beat (Holdfast grammar); a follow-up.
 
-## Cycle — O273 BOSSES, C: PHASES
+## O273 BOSSES, C — LANDED
 
-- [ ] PhaseParams gain SuppressionHoldRingScale / CommitmentHoldRingScale
-      (1.0) and CommitmentVolleyCount (1 -> 3 with the existing fan);
-      EnterPhase reads them. Pins: CommitmentRewrites extended; identity in
-      Deployment.
+- Commitment tightens the ring x0.85 (800 -> 680, still above the 650
+  slam) and fans the volley to three rounds at 12 degrees; Deployment and
+  Suppression are identity; the phase params carry no wind-up field (a
+  reflection pin says so). FOUND: Commitment's entry edge (580) sits
+  inside the slam, so a body crossing the gate while walking is
+  slam-armed at once — the ruling as read; his to feel. No runtime pin of
+  the three-round fan (no rig drives the boss to 33% without a grant).
 
 ## Cycle — O272 DOCTRINE, CASTER
 

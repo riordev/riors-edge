@@ -23,14 +23,16 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 // ---------------------------------------------------------------------------
-// THE STANDOFF RING (O273), cycle A: the ring only.
+// THE STANDOFF RING (O273).
 //
 // A boss holds a ring and faces the player; it closes only to punish, and the
 // slam is its only closer. The pure half below pins the shipped configuration
 // against the classifier the ring reuses: where the three bands fall, that
 // the ring sits between the slam and the Lattice's band, and that the phase
-// library hands the ring back unchanged until cycle C. The runtime half runs
-// the real engaged frame and reads the things only a running ring produces.
+// library hands the ring back unchanged in Deployment and Suppression and at
+// 0.85 in Commitment, still above the slam. The runtime half runs the real
+// engaged frame (in Deployment) and reads the things only a running ring
+// produces.
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerBossHoldRingTest,
@@ -93,18 +95,34 @@ bool FBreakerBossHoldRingTest::RunTest(const FString& Parameters)
         TestTrue(*FString::Printf(TEXT("%s: the hysteresis is not clamped by the classifier"), *Name),
             Hysteresis > 0.0f && Hysteresis <= (Ring - Inner) * 0.5f);
 
-        // Cycle A: identity in every phase, from the shipped params and from
-        // default-constructed ones.
+        // Cycle C (O273): phases tighten the ring. Deployment and Suppression
+        // hold the authored ring; Commitment holds 0.85 of it, which is 680
+        // from the shipped 800 — still above the slam's 650, so the boss
+        // never holds a station its only closer cannot reach. Read from the
+        // shipped params and from default-constructed ones, on both CDOs.
         const FBreakerBossPhaseParams Defaults;
-        for (EBreakerBossPhase Phase : { EBreakerBossPhase::Deployment, EBreakerBossPhase::Suppression, EBreakerBossPhase::Commitment })
+        for (const FBreakerBossPhaseParams* Params : { &Boss->PhaseParams, &Defaults })
         {
-            const FString PhaseName = UBreakerBossPhaseLibrary::GetPhaseName(Phase);
-            TestEqual(*FString::Printf(TEXT("%s: %s holds the authored ring (shipped params)"), *Name, *PhaseName),
-                UBreakerBossPhaseLibrary::GetPhaseHoldRing(Phase, Boss->HoldRingCm, Boss->PhaseParams), Boss->HoldRingCm, 0.0001f);
-            TestEqual(*FString::Printf(TEXT("%s: %s holds the authored ring (default params)"), *Name, *PhaseName),
-                UBreakerBossPhaseLibrary::GetPhaseHoldRing(Phase, Boss->HoldRingCm, Defaults), Boss->HoldRingCm, 0.0001f);
+            const TCHAR* Source = Params == &Defaults ? TEXT("default params") : TEXT("shipped params");
+            for (EBreakerBossPhase Phase : { EBreakerBossPhase::Deployment, EBreakerBossPhase::Suppression })
+            {
+                const FString PhaseName = UBreakerBossPhaseLibrary::GetPhaseName(Phase);
+                TestEqual(*FString::Printf(TEXT("%s: %s holds the authored ring (%s)"), *Name, *PhaseName, Source),
+                    UBreakerBossPhaseLibrary::GetPhaseHoldRing(Phase, Boss->HoldRingCm, *Params), Boss->HoldRingCm, 0.0001f);
+            }
+            const float Commitment = UBreakerBossPhaseLibrary::GetPhaseHoldRing(EBreakerBossPhase::Commitment, Boss->HoldRingCm, *Params);
+            TestEqual(*FString::Printf(TEXT("%s: Commitment tightens the ring to 0.85 (%s)"), *Name, Source),
+                Commitment, Boss->HoldRingCm * 0.85f, 0.0001f);
+            TestTrue(*FString::Printf(TEXT("%s: the tightened ring is still above the slam (%.0f > %.0f, %s)"), *Name, Commitment, Boss->SlamRadiusCm, Source),
+                Commitment > Boss->SlamRadiusCm);
+            // The tightened band still carries the authored deadband
+            // unclamped: the classifier halves the band, and 680 - 320 is
+            // 360, so a 100 cm hysteresis is honoured there too.
+            TestTrue(*FString::Printf(TEXT("%s: the tightened ring does not clamp the hysteresis (%s)"), *Name, Source),
+                Hysteresis <= (Commitment - Inner) * 0.5f);
         }
-        TestEqual(*FString::Printf(TEXT("%s: the accessor is the library's answer"), *Name),
+        // A fresh CDO is in Deployment, so the accessor is the authored ring.
+        TestEqual(*FString::Printf(TEXT("%s: the accessor is the library's answer for Deployment"), *Name),
             Ring, Boss->HoldRingCm, 0.0001f);
     }
     return true;

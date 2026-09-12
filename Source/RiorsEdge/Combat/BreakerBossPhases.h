@@ -102,6 +102,34 @@ struct RIORSEDGE_API FBreakerBossPhaseParams
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Boss|Commitment", meta=(ClampMin="0"))
     float CommitmentSlamCooldownSeconds = 4.0f;   // O2 PLACEHOLDER (7s -> 4s)
 
+    // THE RING BY PHASE (O273, cycle C): phases tighten the ring and widen the
+    // volley; nothing shortens a wind-up. Each scale multiplies the actor's
+    // authored HoldRingCm, capped at 1.0 so a phase can only ever tighten.
+    // Deployment has no scale and holds the authored ring as-is.
+    //
+    // Commitment's 0.85 is arithmetic, not taste: 800 x 0.85 = 680, which sits
+    // ABOVE the slam's 650, so the tightened ring is still a station the slam
+    // can reach from the ring's own edge. 0.75 would be 600 — inside the slam
+    // — and a boss holding inside its only closer's reach is a boss that slams
+    // on cadence from a stand, which is the wall O273 forbids. Pinned by
+    // RiorsEdge.Combat.Boss.HoldRing against both boss CDOs.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Boss|Ring", meta=(ClampMin="0.05", ClampMax="1"))
+    float SuppressionHoldRingScale = 1.0f;   // O2 PLACEHOLDER (O273)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Boss|Ring", meta=(ClampMin="0.05", ClampMax="1"))
+    float CommitmentHoldRingScale = 0.85f;   // O2 PLACEHOLDER (O273): 800 -> 680, above the 650 slam
+
+    // THE VOLLEY BY PHASE (O273, cycle C). Deployment and Suppression fire the
+    // one round cycle B shipped; Commitment fans this many about the aim line
+    // with the Lattice's fan idiom (centre round on the aim, symmetric
+    // spread, outer rounds at plus and minus the spread). The wind-up is NOT
+    // here and never will be: it lives on the actor (VolleyWindupSeconds) as
+    // one number in every phase, because O273 says nothing shortens a
+    // wind-up and a per-phase field would be the door that lets one.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Boss|Commitment", meta=(ClampMin="1"))
+    int32 CommitmentVolleyCount = 3;   // O2 PLACEHOLDER (O273)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Boss|Commitment", meta=(ClampMin="0"))
+    float CommitmentVolleySpreadDegrees = 12.0f;   // O2 PLACEHOLDER (O273)
+
     // THE ADD GATE. While the boss has live adds and is not yet in Commitment,
     // incoming damage is scaled by (1 - this) and the next phase gate holds:
     // the adds are what the player has to answer, and a build that ignores
@@ -236,13 +264,34 @@ public:
     UFUNCTION(BlueprintPure, Category="Boss|Phases")
     static float GetPhaseSlamCooldown(EBreakerBossPhase Phase, float BaseCooldown, const FBreakerBossPhaseParams& Params);
 
-    // The standoff ring this phase holds (O273). Identity in every phase for
-    // now: O273 says phases tighten the ring, and that is cycle C's rewrite,
-    // which lands here as a params term rather than on the actor. The actor
-    // reads its ring through this and nowhere else, so the day it varies is
-    // one edit and one test.
+    // The standoff ring this phase holds (O273): the authored ring in
+    // Deployment, scaled by the params' per-phase term in Suppression and
+    // Commitment, never wider than authored. The actor reads its ring through
+    // this and nowhere else, live on every engaged frame, so a gate crossed
+    // mid-hold re-classifies the band on the next frame with no EnterPhase
+    // rewrite.
     UFUNCTION(BlueprintPure, Category="Boss|Phases")
     static float GetPhaseHoldRing(EBreakerBossPhase Phase, float BaseRingCm, const FBreakerBossPhaseParams& Params);
+
+    // The ring volley this phase fires (O273): one round on the aim in
+    // Deployment and Suppression; Commitment's authored count fanned by its
+    // authored spread. Read at fire time by FireRingVolley, never cached, so
+    // the phase the round leaves in is the phase that shaped it. Neither
+    // touches the wind-up: VolleyWindupSeconds is the actor's one number in
+    // every phase, and no function here takes or returns a wind-up.
+    UFUNCTION(BlueprintPure, Category="Boss|Phases")
+    static int32 GetPhaseVolleyCount(EBreakerBossPhase Phase, const FBreakerBossPhaseParams& Params);
+    UFUNCTION(BlueprintPure, Category="Boss|Phases")
+    static float GetPhaseVolleySpread(EBreakerBossPhase Phase, const FBreakerBossPhaseParams& Params);
+
+    // The Lattice's fan (BreakerRangedEnemy.cpp FireVolley), lifted so the
+    // boss's fan is the same arithmetic and a test can read the exact
+    // offsets: round Index of Count sits at (Index / (Count - 1) - 0.5) x 2 x
+    // Spread degrees about the aim line, so a count of one is on the aim, a
+    // count of three is -Spread / 0 / +Spread, and the fan is symmetric for
+    // any count.
+    UFUNCTION(BlueprintPure, Category="Boss|Phases")
+    static float GetVolleyFanOffsetDegrees(int32 Index, int32 Count, float SpreadDegrees);
 
     // The rear weak point is exposed during an order raise in phases 1 and 2,
     // and PERMANENTLY in phase 3 — because it has stopped commanding. §3.4's

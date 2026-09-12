@@ -11,6 +11,7 @@
 #include "Combat/BreakerSkirmisherEnemy.h"
 #include "Combat/BreakerWardenEnemy.h"
 #include "Save/BreakerMissionContent.h"
+#include "UObject/UnrealType.h"
 
 // The boss's phase machine, the facing-armour geometry and the cover chooser
 // are all pure, and all three are the kind of thing that breaks silently in a
@@ -178,11 +179,91 @@ bool FBreakerBossCommitmentTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Commitment slams more often"),
         EBoss::GetPhaseSlamCooldown(EBreakerBossPhase::Commitment, 7.0f, Params) < 7.0f);
 
+    // O273, cycle C: phases tighten the ring and widen the volley. Deployment
+    // and Suppression are identity on all three terms — the one round on the
+    // aim cycle B shipped, on the authored ring — and Commitment is 0.85 on
+    // the ring, three rounds, twelve degrees.
+    for (const EBreakerBossPhase Early : { EBreakerBossPhase::Deployment, EBreakerBossPhase::Suppression })
+    {
+        const FString PhaseName = EBoss::GetPhaseName(Early);
+        TestEqual(*FString::Printf(TEXT("%s holds the authored ring (scale 1.0)"), *PhaseName),
+            EBoss::GetPhaseHoldRing(Early, 800.0f, Params), 800.0f, 0.0001f);
+        TestEqual(*FString::Printf(TEXT("%s fires one round"), *PhaseName),
+            EBoss::GetPhaseVolleyCount(Early, Params), 1);
+        TestEqual(*FString::Printf(TEXT("%s fires it on the aim (spread 0)"), *PhaseName),
+            EBoss::GetPhaseVolleySpread(Early, Params), 0.0f, 0.0001f);
+    }
+    TestEqual(TEXT("Commitment's ring scale is 0.85"), Params.CommitmentHoldRingScale, 0.85f, 0.0001f);
+    TestEqual(TEXT("Commitment tightens the ring to 0.85 of authored"),
+        EBoss::GetPhaseHoldRing(EBreakerBossPhase::Commitment, 800.0f, Params), 680.0f, 0.0001f);
+    TestEqual(TEXT("Commitment fires three rounds"),
+        EBoss::GetPhaseVolleyCount(EBreakerBossPhase::Commitment, Params), 3);
+    TestEqual(TEXT("Commitment fans them twelve degrees"),
+        EBoss::GetPhaseVolleySpread(EBreakerBossPhase::Commitment, Params), 12.0f, 0.0001f);
+    // The fan is the Lattice's: centre round on the aim, outer rounds at
+    // exactly plus and minus the spread, and a single round never spreads.
+    TestEqual(TEXT("A single round sits on the aim"), EBoss::GetVolleyFanOffsetDegrees(0, 1, 12.0f), 0.0f, 0.0001f);
+    TestEqual(TEXT("The fan's first round is minus the spread"), EBoss::GetVolleyFanOffsetDegrees(0, 3, 12.0f), -12.0f, 0.0001f);
+    TestEqual(TEXT("The fan's centre round is on the aim"), EBoss::GetVolleyFanOffsetDegrees(1, 3, 12.0f), 0.0f, 0.0001f);
+    TestEqual(TEXT("The fan's last round is plus the spread"), EBoss::GetVolleyFanOffsetDegrees(2, 3, 12.0f), 12.0f, 0.0001f);
+    // A scale above 1.0 cannot widen the ring: phases only ever tighten.
+    FBreakerBossPhaseParams Widened;
+    Widened.CommitmentHoldRingScale = 1.5f;
+    TestEqual(TEXT("A mis-authored scale above 1.0 is clamped, not obeyed"),
+        EBoss::GetPhaseHoldRing(EBreakerBossPhase::Commitment, 800.0f, Widened), 800.0f, 0.0001f);
+
+    // NOTHING SHORTENS A WIND-UP. The params struct carries no field that
+    // names one: the volley's tell is the actor's single VolleyWindupSeconds
+    // in every phase, and a per-phase field here would be the door that lets
+    // a phase shorten it. Read off the struct's reflection so a field added
+    // later fails here rather than in play.
+    for (TFieldIterator<FProperty> It(FBreakerBossPhaseParams::StaticStruct()); It; ++It)
+    {
+        const FString FieldName = It->GetName();
+        TestFalse(*FString::Printf(TEXT("No phase parameter names a wind-up: %s"), *FieldName),
+            FieldName.Contains(TEXT("Windup"), ESearchCase::IgnoreCase)
+            || FieldName.Contains(TEXT("WindUp"), ESearchCase::IgnoreCase)
+            || FieldName.Contains(TEXT("Tell"), ESearchCase::IgnoreCase));
+    }
+
     // §3.2's "deliberately slower than the player": phase 3's +40% must still
     // leave it under the 950 cm/s sprint, or the fight becomes a chase the
     // player cannot win and O1 leaves them nothing to do about it.
     const ABreakerBossEnemy* Boss = GetDefault<ABreakerBossEnemy>();
     if (!TestNotNull(TEXT("The boss has a default object"), Boss)) return false;
+
+    // The shipped configuration on both boss CDOs: the tightened ring never
+    // holds inside the slam (800 x 0.85 = 680 > 650), and the wind-up the
+    // grammar carries is the one number the actor runs in every phase.
+    for (const ABreakerBossEnemy* Shipped : { Boss, static_cast<const ABreakerBossEnemy*>(GetDefault<ABreakerHoldfastEnemy>()) })
+    {
+        if (!TestNotNull(TEXT("boss CDO"), Shipped)) return false;
+        const FString Name = Shipped->GetClass()->GetName();
+        const float Tightened = Shipped->HoldRingCm * Shipped->PhaseParams.CommitmentHoldRingScale;
+        TestTrue(*FString::Printf(TEXT("%s: the Commitment ring is above the slam (%.0f x %.2f = %.0f > %.0f)"),
+            *Name, Shipped->HoldRingCm, Shipped->PhaseParams.CommitmentHoldRingScale, Tightened, Shipped->SlamRadiusCm),
+            Tightened > Shipped->SlamRadiusCm);
+        TestTrue(*FString::Printf(TEXT("%s: the Suppression ring is above the slam"), *Name),
+            Shipped->HoldRingCm * Shipped->PhaseParams.SuppressionHoldRingScale > Shipped->SlamRadiusCm);
+        const FBreakerBossGrammar Grammar = EBoss::MakeShippedGrammar(Shipped->PhaseParams,
+            Shipped->AddsPerDeploy, Shipped->GalleryLatticeCount, Shipped->SweepWindupSeconds, Shipped->VolleyWindupSeconds);
+        const FBreakerBossBeat* VolleyBeat = Grammar.FightLevel.FindByPredicate(
+            [](const FBreakerBossBeat& B) { return B.Beat == EBreakerBossBeat::Telegraph && B.Tag == FName(TEXT("Volley")); });
+        if (TestNotNull(*FString::Printf(TEXT("%s: the grammar carries the volley tell"), *Name), VolleyBeat))
+        {
+            TestEqual(*FString::Printf(TEXT("%s: the grammar's volley tell is the actor's one wind-up"), *Name),
+                VolleyBeat->Seconds, Shipped->VolleyWindupSeconds, 0.0001f);
+        }
+        for (const EBreakerBossPhase Phase : { EBreakerBossPhase::Deployment, EBreakerBossPhase::Suppression, EBreakerBossPhase::Commitment })
+        {
+            // No phase-level beat re-tells the volley at a different length.
+            for (const FBreakerBossBeat& B : Grammar.ForPhase(Phase))
+            {
+                TestFalse(*FString::Printf(TEXT("%s: %s does not carry its own volley tell"), *Name, *EBoss::GetPhaseName(Phase)),
+                    B.Tag == FName(TEXT("Volley")));
+            }
+        }
+    }
     TestTrue(TEXT("Even at its fastest the boss is slower than a sprinting player"),
         300.0f * EBoss::GetPhaseSpeedMultiplier(EBreakerBossPhase::Commitment, Params) < 950.0f);
 

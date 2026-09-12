@@ -768,30 +768,47 @@ void ABreakerBossEnemy::FireRingVolley(AActor* Player)
     // torso, not feet, and a lead a direction change beats.
     const FVector AimPoint = UBreakerRangedBehaviorLibrary::ComputeAimPoint(
         Muzzle, Player->GetActorLocation(), Player->GetVelocity(), VolleySpeed, VolleyLeadFraction);
-    const FVector Direction = (AimPoint - Muzzle).GetSafeNormal();
-    if (Direction.IsNearlyZero()) return;
+    const FVector BaseDirection = (AimPoint - Muzzle).GetSafeNormal();
+    if (BaseDirection.IsNearlyZero()) return;
+
+    // THE FAN BY PHASE (O273, cycle C): one round on the aim until
+    // Commitment, then the authored count fanned by the authored spread with
+    // the Lattice's own idiom — centre round on the aim, symmetric spread
+    // about the up axis. Read at fire time through the phase library, never
+    // cached on the actor, so the phase the round leaves in is the phase that
+    // shaped it. The wind-up that just ran was VolleyWindupSeconds in every
+    // phase; the fan widens what lands, never when.
+    const int32 Count = UBreakerBossPhaseLibrary::GetPhaseVolleyCount(Phase, PhaseParams);
+    const float SpreadDegrees = UBreakerBossPhaseLibrary::GetPhaseVolleySpread(Phase, PhaseParams);
 
     FActorSpawnParameters Params;
     Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     Params.Owner = this;
     Params.Instigator = this;
-    ABreakerEnemyProjectile* Round = World->SpawnActor<ABreakerEnemyProjectile>(
-        ProjectileClass, Muzzle, Direction.Rotation(), Params);
-    if (!Round) return;
+    for (int32 Index = 0; Index < Count; ++Index)
+    {
+        const float Offset = UBreakerBossPhaseLibrary::GetVolleyFanOffsetDegrees(Index, Count, SpreadDegrees);
+        const FVector Direction = BaseDirection.RotateAngleAxis(Offset, FVector::UpVector);
 
-    FBreakerDamageRequest Shot;
-    // O273: at the sweep's damage. The same request the sweep builds — the
-    // family's element rides on it, no crit (Encounter-Design §0), this
-    // body as Instigator so armour, the passive layer and kill credit apply.
-    Shot.BaseDamage = GetVolleyDamage();
-    Shot.DamageFamily = EBreakerDamageFamily::Physical;
-    ApplyAuthoredAttackElement(Shot);
-    Shot.bCanCritical = false;
-    Shot.SetInstigator(this);
-    // The colour of the thing that launched it.
-    Round->SetOrbColor(ApparatusFireColor);
-    // A WORLD direction, exactly as the Lattice arms its own.
-    Round->InitializeProjectile(Shot, Direction, VolleySpeed);
+        ABreakerEnemyProjectile* Round = World->SpawnActor<ABreakerEnemyProjectile>(
+            ProjectileClass, Muzzle, Direction.Rotation(), Params);
+        if (!Round) continue;
+
+        FBreakerDamageRequest Shot;
+        // O273: at the sweep's damage, EVERY round of the fan. The same
+        // request the sweep builds — the family's element rides on it, no
+        // crit (Encounter-Design §0), this body as Instigator so armour, the
+        // passive layer and kill credit apply.
+        Shot.BaseDamage = GetVolleyDamage();
+        Shot.DamageFamily = EBreakerDamageFamily::Physical;
+        ApplyAuthoredAttackElement(Shot);
+        Shot.bCanCritical = false;
+        Shot.SetInstigator(this);
+        // The colour of the thing that launched it.
+        Round->SetOrbColor(ApparatusFireColor);
+        // A WORLD direction, exactly as the Lattice arms its own.
+        Round->InitializeProjectile(Shot, Direction, VolleySpeed);
+    }
 }
 
 void ABreakerBossEnemy::SpawnDeployAdds(const FVector& AlcoveWorldLocation)

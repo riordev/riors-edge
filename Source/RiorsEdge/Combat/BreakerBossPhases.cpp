@@ -120,9 +120,42 @@ float UBreakerBossPhaseLibrary::GetPhaseSlamCooldown(EBreakerBossPhase Phase, fl
 
 float UBreakerBossPhaseLibrary::GetPhaseHoldRing(EBreakerBossPhase Phase, float BaseRingCm, const FBreakerBossPhaseParams& Params)
 {
-    // Cycle A of O273: the ring only. Every phase holds the authored ring;
-    // cycle C tightens it per phase and that rewrite replaces this line.
-    return BaseRingCm;
+    // Cycle C of O273: phases TIGHTEN the ring. The scale is clamped at 1.0
+    // so a mis-authored block cannot widen it past the Lattice's band, and
+    // at 0.05 so it can never collapse the band to nothing (ClassifyBand
+    // wants an outer edge above the inner). The slam-reach floor (ring above
+    // SlamRadiusCm) is a property of the shipped numbers, pinned by the
+    // suite, not enforced here: the library does not know the slam.
+    auto Scaled = [BaseRingCm](float Scale) { return BaseRingCm * FMath::Clamp(Scale, 0.05f, 1.0f); };
+    switch (Phase)
+    {
+    case EBreakerBossPhase::Suppression: return Scaled(Params.SuppressionHoldRingScale);
+    case EBreakerBossPhase::Commitment:  return Scaled(Params.CommitmentHoldRingScale);
+    case EBreakerBossPhase::Deployment:
+    default:                             return BaseRingCm;
+    }
+}
+
+int32 UBreakerBossPhaseLibrary::GetPhaseVolleyCount(EBreakerBossPhase Phase, const FBreakerBossPhaseParams& Params)
+{
+    return Phase == EBreakerBossPhase::Commitment
+        ? FMath::Max(1, Params.CommitmentVolleyCount) : 1;
+}
+
+float UBreakerBossPhaseLibrary::GetPhaseVolleySpread(EBreakerBossPhase Phase, const FBreakerBossPhaseParams& Params)
+{
+    return Phase == EBreakerBossPhase::Commitment
+        ? FMath::Max(0.0f, Params.CommitmentVolleySpreadDegrees) : 0.0f;
+}
+
+float UBreakerBossPhaseLibrary::GetVolleyFanOffsetDegrees(int32 Index, int32 Count, float SpreadDegrees)
+{
+    // The Lattice's line, verbatim: a single round gets no spread at all,
+    // which is the readable default; more than one fans symmetrically about
+    // the aim with the outer rounds at exactly plus and minus the spread.
+    if (Count <= 1) return 0.0f;
+    const int32 Clamped = FMath::Clamp(Index, 0, Count - 1);
+    return (static_cast<float>(Clamped) / (Count - 1) - 0.5f) * 2.0f * FMath::Max(0.0f, SpreadDegrees);
 }
 
 bool UBreakerBossPhaseLibrary::IsApparatusExposed(EBreakerBossPhase Phase, bool bOrderRaiseActive)

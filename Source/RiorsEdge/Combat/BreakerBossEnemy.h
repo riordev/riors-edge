@@ -93,9 +93,9 @@ public:
     // SlamRadiusCm (650), so the boss never holds a
     // station its own slam cannot reach — a ring wider than the slam would be a
     // boss that neither closes nor punishes. Both are pinned by
-    // RiorsEdge.Combat.Boss.HoldRing. Cycle C varies this by phase through
-    // UBreakerBossPhaseLibrary::GetPhaseHoldRing; the actor reads it only
-    // through GetHoldRingCm.
+    // RiorsEdge.Combat.Boss.HoldRing. Commitment tightens it (x0.85, still
+    // above the slam) through UBreakerBossPhaseLibrary::GetPhaseHoldRing;
+    // the actor reads it only through GetHoldRingCm.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Boss|Ring", meta=(ClampMin="0"))
     float HoldRingCm = 800.0f;   // O2 PLACEHOLDER (O273)
     // The band's deadband, the same purpose as the Lattice's BandHysteresis: a
@@ -114,8 +114,9 @@ public:
     UFUNCTION(BlueprintPure, Category="Boss") EBreakerRangedBand GetHoldBand() const { return HoldBand; }
 
     // --- The ring volley (O273) ------------------------------------------
-    // From its ring a boss fires ONE large, slow, telegraphed projectile at
-    // the sweep's damage. The tell is the apparatus raise pointed AT the
+    // From its ring a boss fires one large, slow, telegraphed projectile at
+    // the sweep's damage — three in a fan under Commitment, the phase
+    // library's count, never a shorter tell. The tell is the apparatus raise pointed AT the
     // player: the same gesture as an order, no new visual, and the direction
     // is the whole read. It arms only from Hold — inside the ring, outside
     // the sweep, with neither melee wind-up owning the frame — and an order
