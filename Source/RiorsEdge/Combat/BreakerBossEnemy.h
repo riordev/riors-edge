@@ -5,6 +5,7 @@
 #include "Combat/BreakerBossPhases.h"
 #include "BreakerBossEnemy.generated.h"
 
+class ABreakerEnemyProjectile;
 class ABreakerRangedEnemy;
 class UPointLightComponent;
 
@@ -31,11 +32,15 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FBreakerBossDefeated);
 // TELEGRAPH VOCABULARY — three tells, and the player learns all three:
 //   1. The shield draw-back (inherited)  -> a sweep is coming to your front.
 //   2. The growing ground ring (inherited) -> a slam is coming to your feet.
-//   3. The apparatus raise (new)          -> an ORDER is coming, and WHERE it
-//      points says which. §3.4 deliberately reuses ONE animation for both
-//      orders so the player has to read the direction rather than the pose.
-// The apparatus raise is also a punish window: it lifts the rear weak point
-// above the shoulder line so it is visible and hittable FROM THE FRONT.
+//   3. The apparatus raise (new)          -> something is coming, and WHERE it
+//      points says what. Pointed at an alcove or a gallery it is an ORDER;
+//      pointed AT YOU it is the ring volley (O273). §3.4 deliberately reuses
+//      ONE animation so the player has to read the direction rather than
+//      the pose, and O273 extends the same sentence to the volley: a raise
+//      pointed anywhere else is still an order.
+// The ORDER raise is also a punish window: it lifts the rear weak point above
+// the shoulder line so it is visible and hittable FROM THE FRONT. The volley
+// raise lifts it and does not open it.
 //
 // THE FIRST PUNISH WINDOW is the one the player earns: spending the front
 // pool (O198) opens the weak point for FrontBreakPunishSeconds, once per
@@ -107,6 +112,41 @@ public:
     // in exactly one statement in TickEngagedBehaviour, so a band that is not
     // the default after an engaged frame is proof the ring ran.
     UFUNCTION(BlueprintPure, Category="Boss") EBreakerRangedBand GetHoldBand() const { return HoldBand; }
+
+    // --- The ring volley (O273) ------------------------------------------
+    // From its ring a boss fires ONE large, slow, telegraphed projectile at
+    // the sweep's damage. The tell is the apparatus raise pointed AT the
+    // player: the same gesture as an order, no new visual, and the direction
+    // is the whole read. It arms only from Hold — inside the ring, outside
+    // the sweep, with neither melee wind-up owning the frame — and an order
+    // that wants the apparatus wins it: BeginOrder clears a volley wind-up
+    // and the volley waits its cooldown behind the order.
+    //
+    // The round is the Lattice's orb with bigger numbers
+    // (Combat/BreakerBossProjectile.h); the aim is the Lattice's own partial
+    // lead. Damage is exactly GetSweepDamage(), so
+    // RiorsEdge.Combat.DefenseCurve.BossHitsToDie needs no new row: the
+    // volley is never the boss's heaviest hit. All O2 PLACEHOLDER, pinned by
+    // RiorsEdge.Combat.Boss.VolleyShipsDodgeable.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Boss|Volley")
+    TSubclassOf<ABreakerEnemyProjectile> ProjectileClass;   // ABreakerBossProjectile, set in the constructor
+    // At least the slam's wind-up (O1: no tell shorter than the ring).
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Boss|Volley", meta=(ClampMin="0"))
+    float VolleyWindupSeconds = 1.0f;   // O2 PLACEHOLDER (O273)
+    // The clock starts at BeginPlay: the first thing a player learns at the
+    // ring is the stand, and the first raise pointed at them comes one
+    // cooldown after the body exists.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Boss|Volley", meta=(ClampMin="0"))
+    float VolleyCooldownSeconds = 5.0f;   // O2 PLACEHOLDER (O273)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Boss|Volley", meta=(ClampMin="1"))
+    float VolleySpeed = 1200.0f;   // O2 PLACEHOLDER (O273)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Boss|Volley", meta=(ClampMin="0", ClampMax="1"))
+    float VolleyLeadFraction = 0.35f;   // O2 PLACEHOLDER (O273): the Lattice's partial lead
+
+    UFUNCTION(BlueprintPure, Category="Boss") bool IsVolleyWinding() const { return bVolleyWindup; }
+    // The sweep's number, exactly — the Warden's GetSweepDamage is protected
+    // and the suite pins the volley against it through this.
+    UFUNCTION(BlueprintPure, Category="Boss") float GetVolleyDamage() const;
 
     // The boss vocabulary Data/missions.json's "boss" field and the gym's
     // -BreakerBossOnStart=<name> / Breaker.Boss <name> speak: one line per
@@ -192,7 +232,13 @@ protected:
 
     void BeginOrder();
     void ResolveOrder();
+    // The one pose writer for the apparatus. The order raise and the volley
+    // raise both drive it, never on the same frame: at most one of
+    // bOrderRaiseActive / bVolleyWindup is true.
     void UpdateApparatus(float Alpha);
+    // Spawns the ring volley's one round from the apparatus at the player,
+    // as the Lattice's FireVolley spawns its own.
+    void FireRingVolley(AActor* Player);
 
     // Prunes the dead and the destroyed out of LiveAdds and GalleryLattices
     // and returns what is left of both. The one count the add gate reads and
@@ -247,6 +293,11 @@ private:
     // cleared by EnterPhase — the window is once per fight and survives a gate.
     float FrontBreakWindowRemaining = 0.0f;
     bool bOrderRaiseActive = false;
+    // The ring volley (O273). Doubles for the same reason the Warden's slam
+    // clock is: seconds of world time, compared against a cooldown.
+    bool bVolleyWindup = false;
+    double VolleyWindupStart = -1000.0;
+    double LastVolleyTime = -1000.0;
     bool bApparatusExposed = false;
     // Whether the Boss.AddGate modifier currently stands on this body's
     // combat component; the push and the remove are gated on the crossing.

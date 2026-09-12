@@ -2,6 +2,7 @@
 
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
+#include "Combat/BreakerBossProjectile.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerHoldfastEnemy.h"
 #include "Combat/BreakerRangedBehavior.h"
@@ -76,6 +77,11 @@ ABreakerBossEnemy::ABreakerBossEnemy()
     // hazards behind the Cascading MODIFIER and the boss borrows the behaviour
     // deliberately and late ("the player has already learned to read it").
     bSlamLeavesHazard = false;
+
+    // The ring volley's round (O273): the Lattice's orb with bigger numbers.
+    // Set here rather than at BeginPlay so the default object carries it and
+    // the suite can read the shipped class off the CDO.
+    ProjectileClass = ABreakerBossProjectile::StaticClass();
 
     SetActorScale3D(FVector(1.75f));
 
@@ -187,9 +193,23 @@ void ABreakerBossEnemy::BeginPlay()
     if (!GalleryLatticeClass) GalleryLatticeClass = ABreakerRangedEnemy::StaticClass();
 
     Phase = EBreakerBossPhase::Deployment;
+    // The rear volley clock starts now (O273): the first raise pointed at the
+    // player comes one cooldown after the body exists, so the first thing
+    // the player learns at the ring is the stand. The Warden's melee clocks
+    // are left as they are — a fresh boss inside the slam still slams.
+    if (const UWorld* World = GetWorld()) LastVolleyTime = World->GetTimeSeconds();
     // The rear weak point starts CLOSED. §3.2: exposed "only during Orders".
     SetApparatusExposed(false);
     StateLabel = TEXT("FIELD MARSHAL");
+}
+
+float ABreakerBossEnemy::GetVolleyDamage() const
+{
+    // Exactly the sweep (O273: "at the sweep's damage"). Not the slam, and
+    // not a ratio of its own: BossHitsToDie proves no single boss attack
+    // kills the baseline from the slam's number, and a volley below it needs
+    // no row of its own to keep that true.
+    return GetSweepDamage();
 }
 
 bool ABreakerBossEnemy::IsApparatusExposed() const
@@ -359,6 +379,11 @@ void ABreakerBossEnemy::InterruptCombatAction()
     ActiveOrder = EBreakerBossOrder::None;
     TimeSinceLastOrder = 0;
     DeploySpawnCountdown = -1;
+    // An interrupted volley is a spent volley: the wind-up clears and the
+    // clock restarts, the same way the order clock restarts above.
+    bVolleyWindup = false;
+    VolleyWindupStart = -1000.0;
+    if (const UWorld* World = GetWorld()) LastVolleyTime = World->GetTimeSeconds();
     UpdateApparatus(0);
     SetApparatusExposed(UBreakerBossPhaseLibrary::IsPunishWindowOpen(Phase, false, FrontBreakWindowRemaining));
 }
@@ -495,10 +520,55 @@ void ABreakerBossEnemy::TickEngagedBehaviour(AActor* Player, float Distance, flo
     }
 
     // Cadence. Phase 3 returns a negative interval and therefore never fires.
+    // This runs BEFORE the volley's wind-up below, which is how the two
+    // raises share one apparatus: an order that begins on this frame takes
+    // it (BeginOrder clears any volley wind-up), and a volley never arms
+    // while an order raise is in the air because the order branch above
+    // returns first. The order's raise wins; the volley waits.
     const float Interval = UBreakerBossPhaseLibrary::GetOrderIntervalSeconds(Phase, PhaseParams);
     if (UBreakerBossPhaseLibrary::AdvanceOrderClock(TimeSinceLastOrder, DeltaSeconds, Interval))
     {
         BeginOrder();
+        return;
+    }
+
+    const double Now = GetWorld()->GetTimeSeconds();
+    const FVector ToPlayer = (Player->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+
+    // THE RING VOLLEY'S WIND-UP (O273): the tell is the raise pointed at you.
+    // The same UpdateApparatus gesture as an order, driven by the same
+    // telegraph ramp; what differs is the facing, which is the player rather
+    // than an alcove, and that is the whole read. It plants like the slam and
+    // owns the frame like the order: the Warden's tick does not run under it,
+    // so a player who closes during the raise is not swept mid-tell.
+    //
+    // The weak point does NOT open here. A punish window on the volley would
+    // be a PunishWindow beat O273 does not grant; the apparatus lifts and
+    // stays closed, and IsApparatusExposed reads the order flag, not this.
+    //
+    // In Commitment the apparatus already sits at full raise, so this ramp
+    // reads as a dip-and-raise rather than a raise from rest — the pose is
+    // restored to full after the shot, as ResolveOrder restores it. Whether
+    // that reads as the same tell is the owner's to feel; automation cannot.
+    if (bVolleyWindup)
+    {
+        const float Alpha = UBreakerRangedBehaviorLibrary::GetTelegraphAlpha(
+            static_cast<float>(Now - VolleyWindupStart), VolleyWindupSeconds);
+        UpdateApparatus(Alpha);
+        OutDirection = FVector::ZeroVector;
+        bHasPathGoal = false;
+        DesiredFacing = ToPlayer;
+        StateLabel = TEXT("VOLLEY");
+        if (Alpha >= 1.0f)
+        {
+            bVolleyWindup = false;
+            VolleyWindupStart = -1000.0;
+            LastVolleyTime = Now;
+            FireRingVolley(Player);
+            UpdateApparatus(Phase == EBreakerBossPhase::Commitment ? 1.0f : 0.0f);
+        }
+        StateLabel = FString::Printf(TEXT("%s / %s"),
+            *UBreakerBossPhaseLibrary::GetPhaseName(Phase), *StateLabel);
         return;
     }
 
@@ -508,7 +578,6 @@ void ABreakerBossEnemy::TickEngagedBehaviour(AActor* Player, float Distance, flo
     // So Hold spans sweep range to the ring, and the slam's own distance gate
     // inside the Warden's tick decides the punish. The band is written here
     // and nowhere else; the ring is read through the phase library.
-    const FVector ToPlayer = (Player->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
     HoldBand = UBreakerRangedBehaviorLibrary::ClassifyBand(Distance,
         SweepRangeCm, GetHoldRingCm(), HoldRingHysteresisCm, HoldBand);
 
@@ -548,6 +617,20 @@ void ABreakerBossEnemy::TickEngagedBehaviour(AActor* Player, float Distance, flo
         bHasPathGoal = false;
         DesiredFacing = ToPlayer;
         StateLabel = TEXT("HOLDING");
+
+        // THE RING VOLLEY ARMS FROM HOLD, and only from Hold (O273: "from its
+        // ring"). This frame is by construction one with no order raise in
+        // the air, no order beginning, and neither melee wind-up owning it —
+        // so the slam keeps its priority: a frame the slam armed never gets
+        // here. The wind-up itself runs above, before the ring, on every
+        // frame until it fires.
+        if (Now - LastVolleyTime >= VolleyCooldownSeconds)
+        {
+            bVolleyWindup = true;
+            VolleyWindupStart = Now;
+            UpdateApparatus(0.0f);
+            StateLabel = TEXT("VOLLEY");
+        }
     }
     // §3.4 phase 2: "the boss also begins rotating to face the player
     // continuously", so the rear weak point must be earned by out-turning it.
@@ -566,6 +649,18 @@ void ABreakerBossEnemy::BeginOrder()
 {
     ActiveOrder = UBreakerBossPhaseLibrary::GetOrderForPhase(Phase);
     if (ActiveOrder == EBreakerBossOrder::None) return;
+
+    // The order's raise wins the apparatus. A volley wind-up in the air is
+    // cleared, not finished: the apparatus swings from the player to the
+    // alcove, and O273 says that swing is the read — a raise pointed
+    // anywhere but you is an order. The volley waits a full cooldown behind
+    // it rather than re-raising the frame the order resolves.
+    if (bVolleyWindup)
+    {
+        bVolleyWindup = false;
+        VolleyWindupStart = -1000.0;
+        if (const UWorld* World = GetWorld()) LastVolleyTime = World->GetTimeSeconds();
+    }
 
     bOrderRaiseActive = true;
     OrderRaiseElapsed = 0.0f;
@@ -639,7 +734,12 @@ void ABreakerBossEnemy::UpdateApparatus(float Alpha)
         ApparatusMastInner[Index]->SetRelativeLocation(Start + FVector(0, 0, Extension + 5.0f - InnerLength * 0.5f));
         ApparatusMastInner[Index]->SetRelativeScale3D(FVector(0.038f, 0.038f, InnerLength / 100.0f));
     }
-    const FLinearColor Hot = ActiveOrder == EBreakerBossOrder::Fire ? ApparatusFireColor : ApparatusDeployColor;
+    // The FIRE colour for both things that end in a shot: the FIRE order and
+    // the ring volley, whose round is tinted the same colour when it leaves.
+    // The direction is still the read (O273); the colour is the second
+    // channel for a player who cannot see which way it points.
+    const FLinearColor Hot = ActiveOrder == EBreakerBossOrder::Fire || bVolleyWindup
+        ? ApparatusFireColor : ApparatusDeployColor;
     if (ApparatusMaterial)
     {
         ApparatusMaterial->SetVectorParameterValue(TEXT("Color"), FMath::Lerp(ApparatusIdleColor, Hot, GlowAlpha));
@@ -652,6 +752,46 @@ void ABreakerBossEnemy::UpdateApparatus(float Alpha)
         // one vocabulary.
         ApparatusLight->SetIntensity(ApparatusLightIntensity * GlowAlpha * GlowAlpha);
     }
+}
+
+void ABreakerBossEnemy::FireRingVolley(AActor* Player)
+{
+    UWorld* World = GetWorld();
+    if (!World || !HasAuthority() || !Player || !ProjectileClass) return;
+
+    // From the apparatus: the thing that was raised at the player is the
+    // thing the round leaves. It sits behind and above the body, and the
+    // round ignores every enemy including this one, so the line through the
+    // boss's own capsule costs nothing.
+    const FVector Muzzle = ApparatusVisual ? ApparatusVisual->GetComponentLocation() : GetActorLocation();
+    // The Lattice's aim solve with the Lattice's partial lead (FireVolley):
+    // torso, not feet, and a lead a direction change beats.
+    const FVector AimPoint = UBreakerRangedBehaviorLibrary::ComputeAimPoint(
+        Muzzle, Player->GetActorLocation(), Player->GetVelocity(), VolleySpeed, VolleyLeadFraction);
+    const FVector Direction = (AimPoint - Muzzle).GetSafeNormal();
+    if (Direction.IsNearlyZero()) return;
+
+    FActorSpawnParameters Params;
+    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    Params.Owner = this;
+    Params.Instigator = this;
+    ABreakerEnemyProjectile* Round = World->SpawnActor<ABreakerEnemyProjectile>(
+        ProjectileClass, Muzzle, Direction.Rotation(), Params);
+    if (!Round) return;
+
+    FBreakerDamageRequest Shot;
+    // O273: at the sweep's damage. The same request the sweep builds — the
+    // family's element rides on it, no crit (Encounter-Design §0), this
+    // body as Instigator so armour, the passive layer and kill credit apply.
+    Shot.BaseDamage = GetVolleyDamage();
+    Shot.DamageFamily = EBreakerDamageFamily::Physical;
+    ApplyAuthoredAttackElement(Shot);
+    Shot.bCanCritical = false;
+    Shot.SetInstigator(this);
+    // The colour of the thing that launched it.
+    Round->SetOrbColor(ApparatusFireColor);
+    // A WORLD direction, exactly as the Lattice arms its own.
+    Round->InitializeProjectile(Shot, Direction, VolleySpeed);
 }
 
 void ABreakerBossEnemy::SpawnDeployAdds(const FVector& AlcoveWorldLocation)

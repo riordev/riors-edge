@@ -168,7 +168,7 @@ bool UBreakerBossPhaseLibrary::AdvanceBreakWindow(float& Remaining, float DeltaS
 }
 
 FBreakerBossGrammar UBreakerBossPhaseLibrary::MakeShippedGrammar(const FBreakerBossPhaseParams& Params,
-    int32 AddsPerDeploy, int32 GalleryLatticeCount, float SweepTellSeconds)
+    int32 AddsPerDeploy, int32 GalleryLatticeCount, float SweepTellSeconds, float VolleyTellSeconds)
 {
     auto Beat = [](EBreakerBossBeat Kind, float Seconds, const TCHAR* Tag, float Gate = -1.0f, int32 Adds = 0)
     {
@@ -198,6 +198,13 @@ FBreakerBossGrammar UBreakerBossPhaseLibrary::MakeShippedGrammar(const FBreakerB
     // at the front, and spending the front pool is the window it opens (O198).
     // The window lands once, in whichever phase the pool runs out.
     Grammar.FightLevel.Add(Beat(EBreakerBossBeat::Telegraph, FMath::Max(0.0f, SweepTellSeconds), TEXT("SweepDrawBack")));
+    // The ring volley's tell (O273): the apparatus raise pointed at the
+    // player, in every phase, from the ring. A tell and nothing more — it
+    // opens no window, so no PunishWindow follows it.
+    if (VolleyTellSeconds >= 0.0f)
+    {
+        Grammar.FightLevel.Add(Beat(EBreakerBossBeat::Telegraph, VolleyTellSeconds, TEXT("Volley")));
+    }
     Grammar.FightLevel.Add(Beat(EBreakerBossBeat::PunishWindow, FMath::Max(0.0f, Params.FrontBreakPunishSeconds), TEXT("FrontBreak")));
 
     // Deployment: the raise IS both the tell and the window; the adds come

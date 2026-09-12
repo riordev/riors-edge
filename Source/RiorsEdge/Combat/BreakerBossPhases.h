@@ -267,13 +267,16 @@ public:
     UFUNCTION(BlueprintCallable, Category="Boss|Grammar")
     static bool AdvanceBreakWindow(UPARAM(ref) float& Remaining, float DeltaSeconds);
 
-    // The shipped grammar, derived. SweepTellSeconds is the Warden's draw-back:
-    // it lives on the archetype, not in the params, and is passed in rather
-    // than authored a second time here. When the params author an add-gate
-    // reduction, an AddGate follows every AddWave in Deployment and
-    // Suppression; Commitment never has one, because it has no adds.
+    // The shipped grammar, derived. SweepTellSeconds is the Warden's draw-back
+    // and VolleyTellSeconds the ring volley's raise (O273): both live on the
+    // actor, not in the params, and are passed in rather than authored a
+    // second time here. A negative VolleyTellSeconds is a caller that did not
+    // supply it, and the Volley beat is omitted rather than emitted as a
+    // zero-second tell. When the params author an add-gate reduction, an
+    // AddGate follows every AddWave in Deployment and Suppression; Commitment
+    // never has one, because it has no adds.
     static FBreakerBossGrammar MakeShippedGrammar(const FBreakerBossPhaseParams& Params,
-        int32 AddsPerDeploy, int32 GalleryLatticeCount, float SweepTellSeconds);
+        int32 AddsPerDeploy, int32 GalleryLatticeCount, float SweepTellSeconds, float VolleyTellSeconds = -1.0f);
 
     // The first PunishWindow in the grammar: fight-level beats first, then the
     // phases in order. Null if there is none.

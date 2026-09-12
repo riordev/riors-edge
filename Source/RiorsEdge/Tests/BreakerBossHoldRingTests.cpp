@@ -5,12 +5,19 @@
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerBossEnemy.h"
 #include "Combat/BreakerBossPhases.h"
+#include "Combat/BreakerBossProjectile.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerEnemyProjectile.h"
 #include "Combat/BreakerHoldfastEnemy.h"
 #include "Combat/BreakerRangedBehavior.h"
 #include "Combat/BreakerRangedEnemy.h"
+#include "Components/CapsuleComponent.h"
+#include "Components/SphereComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
+#include "GameFramework/ProjectileMovementComponent.h"
 #include "Movement/BreakerCharacterMovementComponent.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -261,6 +268,287 @@ bool FBreakerBossHoldRingRuntimeTest::RunTest(const FString& Parameters)
         Boss->GetEnemyStateLabel().Contains(TEXT("HOLDING")));
     TestTrue(FString::Printf(TEXT("and faces the player (%.3f)"), FacingDot()), FacingDot() > 0.99f);
     TestEqual(TEXT("holding on cooldown costs the stand-in nothing more"), Player->GetAttributes()->GetHealth(), AfterSlam);
+
+    // The ring volley (cycle B, O273) arms from Hold one cooldown after
+    // BeginPlay. Every leg above ran inside that cooldown, so no raise
+    // pointed at the stand-in owned a frame of the ring's measurement. A
+    // retune that pulls the cooldown under this rig's length reads here,
+    // not as a HOLDING label that mysteriously says VOLLEY.
+    TestTrue(FString::Printf(TEXT("the ring was measured inside the volley's first cooldown (%.2f s < %.2f s)"),
+        World->GetTimeSeconds(), Boss->VolleyCooldownSeconds),
+        World->GetTimeSeconds() < Boss->VolleyCooldownSeconds);
+    TestFalse(TEXT("no volley wound during the ring's legs"), Boss->IsVolleyWinding());
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// THE RING VOLLEY (O273), cycle B, on the pattern of
+// RiorsEdge.Combat.Ranged.ShipsDodgeable.
+//
+// From its ring a boss fires one large, slow, telegraphed projectile at the
+// sweep's damage; the tell is the apparatus raise pointed at the player. The
+// pure half reads the shipped configuration off both boss CDOs and the round's
+// CDO: the round is dodgeable in flight at the player's own sprint, the tell
+// is no shorter than the slam's ring (O1), the damage is the sweep's so
+// BossHitsToDie stands, and the round is the class and size the finding named.
+// The runtime half runs the real engaged frame on a fresh Field Marshal inside
+// the ring and watches one round leave the apparatus at the stand-in.
+//
+// NOTHING IS GRANTED. The stand-in holds its shipped default health with the
+// shipped zero dodge and block; the sprint the sidestep is measured against is
+// the movement component's shipped default.
+// ---------------------------------------------------------------------------
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerBossVolleyShipsDodgeableTest,
+    "RiorsEdge.Combat.Boss.VolleyShipsDodgeable",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerBossVolleyShipsDodgeableTest::RunTest(const FString& Parameters)
+{
+    // ---- The shipped configuration ---------------------------------------
+    const UBreakerCharacterMovementComponent* Movement = GetDefault<UBreakerCharacterMovementComponent>();
+    const ABreakerCharacter* PlayerDefaults = GetDefault<ABreakerCharacter>();
+    const ABreakerBossProjectile* Round = GetDefault<ABreakerBossProjectile>();
+    const ABreakerEnemyProjectile* LatticeRound = GetDefault<ABreakerEnemyProjectile>();
+    if (!TestNotNull(TEXT("movement CDO"), Movement)) return false;
+    if (!TestNotNull(TEXT("player CDO"), PlayerDefaults)) return false;
+    if (!TestNotNull(TEXT("boss round CDO"), Round)) return false;
+    if (!TestNotNull(TEXT("Lattice round CDO"), LatticeRound)) return false;
+    if (!TestNotNull(TEXT("player capsule"), PlayerDefaults->GetCapsuleComponent())) return false;
+
+    // The round the finding named: a ~150 cm orb with a 90 cm collision
+    // radius, and strictly bigger than the Lattice's on both counts.
+    TestEqual(TEXT("the boss round is a 3.0 orb"), Round->VisualScale, 3.0f, 0.0001f);
+    TestEqual(TEXT("the boss round has a 90 cm collision radius"), Round->CollisionRadiusCm, 90.0f, 0.0001f);
+    TestTrue(TEXT("it is visibly larger than the Lattice's"), Round->VisualScale > LatticeRound->VisualScale);
+    TestTrue(TEXT("and hits larger than the Lattice's"), Round->CollisionRadiusCm > LatticeRound->CollisionRadiusCm);
+
+    // THE SIDESTEP. To clear a 90 cm round the player's own capsule has to
+    // leave the aim line by the two radii together, and the fastest they can
+    // do that is the shipped sprint. That is the reaction budget the flight
+    // alone must exceed — before the wind-up is counted at all.
+    const float CapsuleRadius = PlayerDefaults->GetCapsuleComponent()->GetScaledCapsuleRadius();
+    const float SidestepSeconds = (Round->CollisionRadiusCm + CapsuleRadius) / FMath::Max(Movement->SprintSpeed, UE_SMALL_NUMBER);
+    TestTrue(TEXT("the sidestep is measured against a real sprint"), Movement->SprintSpeed > 0.0f);
+
+    for (const ABreakerBossEnemy* Boss : { static_cast<const ABreakerBossEnemy*>(GetDefault<ABreakerBossEnemy>()),
+                                            static_cast<const ABreakerBossEnemy*>(GetDefault<ABreakerHoldfastEnemy>()) })
+    {
+        if (!TestNotNull(TEXT("boss CDO"), Boss)) return false;
+        const FString Name = Boss->GetClass()->GetName();
+
+        TestTrue(*FString::Printf(TEXT("%s: the round it ships is the boss round"), *Name),
+            Boss->ProjectileClass == ABreakerBossProjectile::StaticClass());
+        TestFalse(*FString::Printf(TEXT("%s: a fresh body is not winding a volley"), *Name), Boss->IsVolleyWinding());
+
+        // Flight over the ring, the round's whole journey at the station the
+        // boss holds. The Ranged test's arithmetic: distance over speed.
+        const float Flight = ABreakerProjectileBase::FlightTimeOver(Boss->HoldRingCm, Boss->VolleySpeed);
+        TestTrue(*FString::Printf(TEXT("%s: the flight over the ring (%.2f s) covers the sidestep (%.2f s)"), *Name, Flight, SidestepSeconds),
+            Flight >= SidestepSeconds);
+        TestTrue(*FString::Printf(TEXT("%s: the round is visible in flight for over half a second (%.2f s)"), *Name, Flight),
+            Flight > 0.5f);
+        TestTrue(*FString::Printf(TEXT("%s: the wind-up is a spatial tell, not a reaction frame"), *Name),
+            Boss->VolleyWindupSeconds >= 0.5f);
+        TestTrue(*FString::Printf(TEXT("%s: tell plus flight gives over a second of warning"), *Name),
+            Boss->VolleyWindupSeconds + Flight > 1.0f);
+        // O1: no tell shorter than the ring. The slam's ring is the boss's
+        // longest melee tell, and the volley's raise is not under it.
+        TestTrue(*FString::Printf(TEXT("%s: the volley's tell (%.2f) is no shorter than the slam's ring (%.2f)"), *Name, Boss->VolleyWindupSeconds, Boss->SlamWindupSeconds),
+            Boss->VolleyWindupSeconds >= Boss->SlamWindupSeconds);
+        TestTrue(*FString::Printf(TEXT("%s: wind-up plus cooldown leaves real gaps between rounds"), *Name),
+            Boss->VolleyCooldownSeconds >= Boss->VolleyWindupSeconds);
+        TestTrue(*FString::Printf(TEXT("%s: the lead is partial by design"), *Name),
+            Boss->VolleyLeadFraction > 0.0f && Boss->VolleyLeadFraction < 1.0f);
+        // The round outlives the ring at its widest, or the far edge of Hold
+        // is a silent dead zone.
+        TestTrue(*FString::Printf(TEXT("%s: the round lives long enough to cross the ring at its widest"), *Name),
+            ABreakerProjectileBase::MaximumTravelDistance(Boss->VolleySpeed, Round->MaximumLifetime)
+                > Boss->HoldRingCm + Boss->HoldRingHysteresisCm);
+
+        // THE DAMAGE IS THE SWEEP'S, which is the chassis AttackDamage
+        // unmodified (BreakerWardenEnemy.cpp GetSweepDamage). BossHitsToDie
+        // proves no single boss attack kills the baseline from the SLAM's
+        // number; a volley at the sweep's is under it and needs no row.
+        TestEqual(*FString::Printf(TEXT("%s: the volley deals exactly the sweep's damage"), *Name),
+            Boss->GetVolleyDamage(), Boss->GetAttackDamage(), 0.0001f);
+        TestTrue(*FString::Printf(TEXT("%s: the sweep is under the slam, so the volley is too"), *Name),
+            Boss->SlamDamageRelativeToSweep >= 1.0f);
+    }
+
+    // ---- The runtime pin -------------------------------------------------
+    // The rig of HoldRingRuntime, with the world begun so a late-spawned
+    // round gets its own BeginPlay (the base applies the collision radius and
+    // visual scale there). The stand-in is spawned BEFORE the world begins,
+    // deliberately, so its BeginPlay never runs and never loads the owner's
+    // save; the boss is spawned deferred so its attribute set is registered
+    // before its BeginPlay, exactly as the ring rig registers it by hand.
+    UWorld::InitializationValues Init;
+    Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true,
+        ERHIFeatureLevel::Num, &Init);
+    if (!TestNotNull(TEXT("isolated engagement world"), World)) return false;
+    GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+    World->InitializeActorsForPlay(FURL());
+    const uint64 Frame = GFrameCounter;
+    ON_SCOPE_EXIT { World->DestroyWorld(false); GEngine->DestroyWorldContext(World); GFrameCounter = Frame; };
+
+    ABreakerCharacter* Player = World->SpawnActor<ABreakerCharacter>();
+    if (!TestNotNull(TEXT("a real threat target"), Player)) return false;
+    Player->GetAbilitySystemComponent()->InitAbilityActorInfo(Player, Player);
+    Player->GetAbilitySystemComponent()->AddAttributeSetSubobject(Player->GetAttributes());
+    Player->GetCombat()->BindAttributes(Player->GetAttributes());
+    Player->GetCombat()->BeginPlay();
+    Player->SetActorTickEnabled(false);
+    Player->GetBreakerMovement()->SetComponentTickEnabled(false);
+    Player->SetActorLocation(FVector::ZeroVector);
+    const float StartHealth = Player->GetAttributes()->GetHealth();
+    if (!TestTrue(TEXT("the stand-in is alive, so it is eligible"), StartHealth > 0.0f)) return false;
+    World->SetBegunPlay(true);
+
+    const FTransform BossTransform(FRotator::ZeroRotator, FVector::ZeroVector);
+    ABreakerBossEnemy* Boss = World->SpawnActorDeferred<ABreakerBossEnemy>(ABreakerBossEnemy::StaticClass(), BossTransform);
+    if (!TestNotNull(TEXT("a Field Marshal"), Boss)) return false;
+    if (UBreakerAttributeSet* BossAttributes = Cast<UBreakerAttributeSet>(Boss->GetDefaultSubobjectByName(TEXT("Attributes"))))
+    {
+        Boss->GetAbilitySystemComponent()->AddAttributeSetSubobject(BossAttributes);
+    }
+    Boss->ConfigureCrowdProbe();
+    Boss->FinishSpawning(BossTransform);
+    if (!TestTrue(TEXT("the boss has begun play"), Boss->HasActorBegunPlay())) return false;
+
+    const float Ring = Boss->GetHoldRingCm();
+    const float Slam = Boss->SlamRadiusCm;
+    const float Step = 0.02f;
+    auto Place = [&](float DistanceCm)
+    {
+        const FVector At(DistanceCm, 0.0f, 0.0f);
+        Boss->SetActorLocation(At);
+        Boss->SetActorRotation((Player->GetActorLocation() - At).GetSafeNormal2D().Rotation());
+    };
+    auto TickOne = [&]()
+    {
+        ++GFrameCounter;
+        World->Tick(LEVELTICK_All, Step);
+    };
+    auto DistanceNow = [&]() { return FVector::Dist2D(Boss->GetActorLocation(), Player->GetActorLocation()); };
+    auto FacingDot = [&]()
+    {
+        const FVector ToPlayer = (Player->GetActorLocation() - Boss->GetActorLocation()).GetSafeNormal2D();
+        return static_cast<float>(FVector::DotProduct(Boss->GetActorForwardVector().GetSafeNormal2D(), ToPlayer));
+    };
+    auto CountRounds = [&]()
+    {
+        int32 Count = 0;
+        for (TActorIterator<ABreakerBossProjectile> It(World); It; ++It) if (IsValid(*It)) ++Count;
+        return Count;
+    };
+
+    // In the ring, outside the slam: the Hold the ring rig measured at 680,
+    // inside the fresh body's entry edge. The slam never arms from here, so
+    // the volley is the only attack this station can produce.
+    const float HoldEntry = Ring - Boss->HoldRingHysteresisCm;
+    if (!TestTrue(TEXT("680 is inside the ring's entry edge and outside the slam"), 680.0f < HoldEntry && 680.0f > Slam)) return false;
+    Place(680.0f);
+    const float HoldStart = DistanceNow();
+
+    // ---- THE CLOCK, then THE RAISE ---------------------------------------
+    // The volley arms one cooldown after BeginPlay. Until then the boss holds
+    // and the stand-in pays nothing; the frame it arms is read exactly.
+    const int32 CooldownFrames = FMath::CeilToInt(Boss->VolleyCooldownSeconds / Step);
+    int32 ArmedAt = -1;
+    for (int32 F = 0; F < CooldownFrames + 20 && ArmedAt < 0; ++F)
+    {
+        TickOne();
+        if (Boss->IsVolleyWinding()) ArmedAt = F;
+    }
+    if (!TestTrue(TEXT("the volley armed from Hold"), ArmedAt >= 0)) return false;
+    TestTrue(FString::Printf(TEXT("it armed one cooldown after BeginPlay, not before (frame %d, cooldown %d)"), ArmedAt, CooldownFrames),
+        ArmedAt >= CooldownFrames - 2);
+    TestEqual(TEXT("it armed from the Hold band"), Boss->GetHoldBand(), EBreakerRangedBand::Hold);
+    TestEqual(TEXT("holding for the cooldown cost the stand-in nothing"), Player->GetAttributes()->GetHealth(), StartHealth);
+    TestEqual(TEXT("no round exists before the tell has run"), CountRounds(), 0);
+
+    // The wind-up: it plants, faces the player, says VOLLEY, and does NOT
+    // open the weak point — the raise is a tell, not a punish window.
+    const int32 WindupFrames = FMath::CeilToInt(Boss->VolleyWindupSeconds / Step);
+    for (int32 F = 0; F < WindupFrames / 2; ++F) TickOne();
+    TestTrue(TEXT("mid-tell it is still winding"), Boss->IsVolleyWinding());
+    TestTrue(FString::Printf(TEXT("and says so: %s"), *Boss->GetEnemyStateLabel()),
+        Boss->GetEnemyStateLabel().Contains(TEXT("VOLLEY")));
+    TestTrue(FString::Printf(TEXT("it plants through the tell (moved %.1f cm)"), FMath::Abs(DistanceNow() - HoldStart)),
+        FMath::Abs(DistanceNow() - HoldStart) <= 5.0f);
+    TestTrue(FString::Printf(TEXT("and points at the player (%.3f)"), FacingDot()), FacingDot() > 0.99f);
+    TestFalse(TEXT("the volley's raise is not an order"), Boss->IsGivingOrder());
+    TestFalse(TEXT("and does not open the weak point"), Boss->IsApparatusExposed());
+    TestEqual(TEXT("the tell costs the stand-in nothing"), Player->GetAttributes()->GetHealth(), StartHealth);
+    TestEqual(TEXT("no round exists mid-tell"), CountRounds(), 0);
+
+    // ---- THE SHOT --------------------------------------------------------
+    // Past the wind-up, one round leaves the apparatus at the sweep's damage,
+    // aimed at the stand-in, and the wind-up is spent.
+    TWeakObjectPtr<ABreakerBossProjectile> Seen;
+    int32 MostSeenAtOnce = 0;
+    for (int32 F = 0; F < WindupFrames + 10 && !Seen.IsValid(); ++F)
+    {
+        TickOne();
+        MostSeenAtOnce = FMath::Max(MostSeenAtOnce, CountRounds());
+        for (TActorIterator<ABreakerBossProjectile> It(World); It; ++It) { Seen = *It; break; }
+    }
+    if (!TestTrue(TEXT("one boss round was spawned"), Seen.IsValid())) return false;
+    TestFalse(TEXT("the wind-up is spent"), Boss->IsVolleyWinding());
+    TestEqual(TEXT("exactly one round at a time"), MostSeenAtOnce, 1);
+    TestTrue(TEXT("the round's instigator is the boss"), Seen->GetInstigator() == Boss);
+    TestEqual(TEXT("the round carries the sweep's damage exactly"),
+        Seen->GetProjectileDamage().BaseDamage, Boss->GetAttackDamage(), 0.0001f);
+    TestTrue(TEXT("and the sweep's damage is a real number after the chassis"), Boss->GetAttackDamage() > 0.0f);
+    TestFalse(TEXT("enemies do not crit"), Seen->GetProjectileDamage().bCanCritical);
+    if (const USphereComponent* Sphere = Seen->FindComponentByClass<USphereComponent>())
+    {
+        TestEqual(TEXT("the begun round carries the boss radius"), Sphere->GetUnscaledSphereRadius(), 90.0f, 0.0001f);
+    }
+    if (const UStaticMeshComponent* Mesh = Seen->FindComponentByClass<UStaticMeshComponent>())
+    {
+        TestEqual(TEXT("the begun round carries the boss scale"), static_cast<float>(Mesh->GetRelativeScale3D().X), 3.0f, 0.0001f);
+    }
+    auto TowardPlayerDot = [&]() -> float
+    {
+        const UProjectileMovementComponent* Move = Seen.IsValid() ? Seen->FindComponentByClass<UProjectileMovementComponent>() : nullptr;
+        if (!Move) return -2.0f;
+        const FVector ToPlayer = (Player->GetActorLocation() - Seen->GetActorLocation()).GetSafeNormal();
+        return static_cast<float>(FVector::DotProduct(Move->Velocity.GetSafeNormal(), ToPlayer));
+    };
+    const float LaunchDot = TowardPlayerDot();
+    TestTrue(FString::Printf(TEXT("it leaves toward the player (%.3f)"), LaunchDot), LaunchDot > 0.9f);
+    if (const UProjectileMovementComponent* Move = Seen->FindComponentByClass<UProjectileMovementComponent>())
+    {
+        TestEqual(TEXT("at the authored speed"), static_cast<float>(Move->Velocity.Size()), Boss->VolleySpeed, 1.0f);
+    }
+
+    // ---- THE FLIGHT ------------------------------------------------------
+    // A flight time over this station, with slack. The round either lands —
+    // the stand-in has the shipped zero dodge and block, so a hit is a loss —
+    // or is still in the air on its way to the player. Either way exactly
+    // one round was ever fired: the cooldown is longer than the flight.
+    const int32 FlightFrames = FMath::CeilToInt(ABreakerProjectileBase::FlightTimeOver(680.0f, Boss->VolleySpeed) / Step) + 10;
+    for (int32 F = 0; F < FlightFrames; ++F)
+    {
+        TickOne();
+        MostSeenAtOnce = FMath::Max(MostSeenAtOnce, CountRounds());
+    }
+    const float AfterFlight = Player->GetAttributes()->GetHealth();
+    const bool bLanded = AfterFlight < StartHealth;
+    const bool bStillInbound = Seen.IsValid() && !Seen->HasImpacted() && TowardPlayerDot() > 0.9f;
+    TestTrue(FString::Printf(TEXT("the round landed (%.1f -> %.1f) or is still inbound (%s)"),
+        StartHealth, AfterFlight, bStillInbound ? TEXT("yes") : TEXT("no")),
+        bLanded || bStillInbound);
+    if (bLanded)
+    {
+        TestTrue(TEXT("a landed round took no more than the sweep's number"),
+            StartHealth - AfterFlight <= Boss->GetAttackDamage() + 0.01f);
+    }
+    TestEqual(TEXT("never more than one round in the air"), MostSeenAtOnce, 1);
+    TestFalse(TEXT("no second volley inside the cooldown"), Boss->IsVolleyWinding());
     return true;
 }
 

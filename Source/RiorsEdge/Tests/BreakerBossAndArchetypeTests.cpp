@@ -223,7 +223,16 @@ bool FBreakerBossGrammarTest::RunTest(const FString& Parameters)
     const ABreakerBossEnemy* Boss = GetDefault<ABreakerBossEnemy>();
     if (!TestNotNull(TEXT("The boss has a default object"), Boss)) return false;
     const FBreakerBossGrammar Grammar = EBoss::MakeShippedGrammar(
-        Params, Boss->AddsPerDeploy, Boss->GalleryLatticeCount, Boss->SweepWindupSeconds);
+        Params, Boss->AddsPerDeploy, Boss->GalleryLatticeCount, Boss->SweepWindupSeconds, Boss->VolleyWindupSeconds);
+
+    // The ring volley (O273) is a fight-level tell at the actor's wind-up:
+    // the raise pointed at the player, in every phase, from the ring.
+    const FBreakerBossBeat* VolleyBeat = Grammar.FightLevel.FindByPredicate(
+        [](const FBreakerBossBeat& B) { return B.Beat == EBreakerBossBeat::Telegraph && B.Tag == FName(TEXT("Volley")); });
+    if (TestNotNull(TEXT("The grammar sees the ring volley's tell"), VolleyBeat))
+    {
+        TestEqual(TEXT("The volley tell is the actor's wind-up"), VolleyBeat->Seconds, Boss->VolleyWindupSeconds, 0.0001f);
+    }
 
     // Every TIMED punish window is announced first, in its own list. The one
     // permanent window (Commitment) has no tell of its own: its tell is the

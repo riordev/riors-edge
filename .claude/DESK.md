@@ -113,17 +113,17 @@
   645 / 729 pieces, 22 markers. FOUND: a seam-mouth marker sits at the
   band edge and YardForPoint can hand it to the neighbour; not pinned.
 
-## Cycle — O273 BOSSES, B: THE VOLLEY
+## O273 BOSSES, B — LANDED
 
-- [ ] ABreakerBossProjectile (subclass: VisualScale 3.0, radius 90, O2);
-      BreakerBossEnemy: VolleyWindup 1.0, Cooldown 5.0, Speed 1200; in
-      Hold, arm on cooldown, tell = apparatus raise at the player, fire one
-      round at the aim solve with Shot.BaseDamage = GetSweepDamage(), world
-      direction as FireVolley does. InterruptCombatAction clears it.
-      Grammar gains a Telegraph beat tagged Volley.
-- [ ] Pins: Boss.VolleyShipsDodgeable (flight time over the ring vs the
-      sidestep at sprint; windup >= slam windup; damage == sweep so
-      BossHitsToDie stands); Boss.Grammar sees the beat.
+- From its ring, off a 5 s cooldown, the boss plants, raises the
+  apparatus AT you for 1.0 s (fire-coloured; an order's raise wins any
+  contested frame) and fires one 150 cm / 90 cm-radius round at 1200
+  cm/s with 0.35 lead, at the sweep's damage (<= the slam, so no single
+  boss attack kills the baseline). Stagger clears it and restarts its
+  clock. The clock starts at BeginPlay: the first raise is 5 s after the
+  boss exists. VolleyShipsDodgeable pins the sidestep, the tell length
+  and the damage; the grammar carries a Volley beat. FOUND: two other
+  grammar call sites omit the beat (Holdfast grammar); a follow-up.
 
 ## Cycle — O273 BOSSES, C: PHASES
 
