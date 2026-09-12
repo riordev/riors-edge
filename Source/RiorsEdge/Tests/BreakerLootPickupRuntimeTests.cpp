@@ -83,3 +83,41 @@ bool FBreakerLootPickupRuntimeTest::RunTest(const FString& Parameters)
     return true;
 }
 #endif
+
+// A DROP SITS ON THE GROUND. Spawned 128 cm up (an enemy's capsule centre
+// plus the drop's own lift), it settles so the cube's underside rests a
+// hair above the floor; spawned with no floor under it, it stays where it
+// was put (the settle never invents a ground).
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerLootPickupSettlesTest,"RiorsEdge.Items.LootPickup.SettlesOnFloor",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FBreakerLootPickupSettlesTest::RunTest(const FString& Parameters)
+{
+    UWorld::InitializationValues Init;
+    Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
+    auto* World=UWorld::CreateWorld(EWorldType::Game,false,NAME_None,nullptr,true,ERHIFeatureLevel::Num,&Init);
+    if (!World) return false;
+    GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+    ON_SCOPE_EXIT { World->DestroyWorld(false); GEngine->DestroyWorldContext(World); };
+    auto* Floor=World->SpawnActor<AActor>();
+    if (!Floor) return false;
+    auto* Slab=NewObject<UBoxComponent>(Floor);
+    Floor->AddInstanceComponent(Slab); Floor->SetRootComponent(Slab);
+    Slab->SetBoxExtent(FVector(1000,1000,10)); Slab->SetCollisionProfileName(TEXT("BlockAll")); Slab->RegisterComponent();
+    Floor->SetActorLocation(FVector(0,0,-10));   // floor top at z 0
+    // This fixture world never begins play, so the actor's BeginPlay — where
+    // the settle lives — is dispatched by hand, as the cache runtime rig does.
+    auto* Pickup=World->SpawnActor<ABreakerLootPickup>(FVector(100,0,128),FRotator::ZeroRotator);
+    if (!TestNotNull(TEXT("pickup spawns"),Pickup)) return false;
+    if (!Pickup->HasActorBegunPlay()) Pickup->DispatchBeginPlay();
+    const UStaticMeshComponent* Visual=Pickup->FindComponentByClass<UStaticMeshComponent>();
+    if (!TestNotNull(TEXT("pickup has a visual"),Visual)) return false;
+    const FBox Bounds=Visual->CalcBounds(Visual->GetComponentTransform()).GetBox();
+    AddInfo(FString::Printf(TEXT("LOOT SETTLE  visual bottom %.1f top %.1f actor z %.1f"),Bounds.Min.Z,Bounds.Max.Z,Pickup->GetActorLocation().Z));
+    TestTrue(TEXT("the cube's underside rests within 4 cm of the floor, not at chest height"),
+        Bounds.Min.Z>=0.0f && Bounds.Min.Z<=4.0f);
+    auto* Adrift=World->SpawnActor<ABreakerLootPickup>(FVector(5000,0,128),FRotator::ZeroRotator);
+    if (!TestNotNull(TEXT("adrift pickup spawns"),Adrift)) return false;
+    if (!Adrift->HasActorBegunPlay()) Adrift->DispatchBeginPlay();
+    TestEqual(TEXT("no floor under it: the drop stays where it was put"),static_cast<float>(Adrift->GetActorLocation().Z),128.0f,0.01f);
+    return true;
+}

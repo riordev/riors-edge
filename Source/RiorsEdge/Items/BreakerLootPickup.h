@@ -64,6 +64,23 @@ protected:
     // an Aberrant on the far side of a pillar announce itself off the walls.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UPointLightComponent> RarityLight;
 
+    // A drop SITS ON THE GROUND. It is spawned wherever its source stood —
+    // an enemy's actor location is its capsule centre, 88 cm up — so on
+    // BeginPlay it traces down and settles its root so the cube's underside
+    // rests this far above the floor; the bob rides on top of that. A drop
+    // hanging at chest height read as "floating and not going all the way
+    // down" (owner, eighth playtest). O2 PLACEHOLDER.
+    static constexpr float RestAboveFloorCm = 2.0f;
+    static constexpr float SettleTraceCm = 600.0f;
+    // World-free: where the actor's origin goes so a visual of this half
+    // height, offset this far from the origin, rests RestAboveFloorCm above
+    // a floor at FloorZ.
+    static float SettledOriginZ(float FloorZ, float VisualHalfHeightCm, float VisualOffsetZ)
+    {
+        return FloorZ + RestAboveFloorCm + VisualHalfHeightCm - VisualOffsetZ;
+    }
+    void SettleOnFloor();
+
 private:
     bool bTransferClaimed = false;
     UPROPERTY(ReplicatedUsing=OnRep_Item) FBreakerItemInstance Item;

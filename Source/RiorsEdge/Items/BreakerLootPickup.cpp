@@ -123,7 +123,21 @@ void ABreakerLootPickup::BeginPlay()
 {
     Super::BeginPlay();
     if (ItemVisual) VisualBaseLocation = ItemVisual->GetRelativeLocation();
+    SettleOnFloor();
     ApplyRarityVisuals();
+}
+
+void ABreakerLootPickup::SettleOnFloor()
+{
+    UWorld* World = GetWorld();
+    if (!World || !ItemVisual || !ItemVisual->GetStaticMesh()) return;
+    const FVector Origin = GetActorLocation();
+    FHitResult Floor;
+    FCollisionQueryParams Params(SCENE_QUERY_STAT(BreakerLootSettle), false, this);
+    if (!World->LineTraceSingleByChannel(Floor, Origin + FVector(0, 0, 50.0f), Origin - FVector(0, 0, SettleTraceCm),
+        ECC_WorldStatic, Params)) return;
+    const float HalfHeight = ItemVisual->GetStaticMesh()->GetBounds().BoxExtent.Z * ItemVisual->GetRelativeScale3D().Z;
+    SetActorLocation(FVector(Origin.X, Origin.Y, SettledOriginZ(Floor.ImpactPoint.Z, HalfHeight, VisualBaseLocation.Z)));
 }
 
 void ABreakerLootPickup::SetItem(const FBreakerItemInstance& NewItem)

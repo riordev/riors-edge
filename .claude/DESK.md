@@ -54,6 +54,16 @@ walk on the correct axis."
   the blueprint overrides it the shipped value is not the C++ default;
   the runtime pins read the live component, not the CDO.
 
+## EIGHTH — LANDED, THE FLOATING GEAR
+
+- "gear floats on the ground and doesn't go all the way down" — a drop
+  was spawned at its source's actor location plus 40 cm, and an enemy's
+  actor location is its capsule centre, 88 cm up: every drop hung at
+  chest height and bobbed there. A pickup traces down on BeginPlay and
+  settles so the cube's underside rests 2 cm above the floor; with no
+  floor under it, it stays put. SettlesOnFloor pins both. ("Feels
+  underwhelming" is the loot's own item, not this one.)
+
 ## EIGHTH — OPEN
 
 - [ ] "the ground is still flat … no curve or hill" — a ruling first.
