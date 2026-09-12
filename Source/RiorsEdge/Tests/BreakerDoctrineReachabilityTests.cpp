@@ -149,6 +149,16 @@ bool FBreakerTreeDepthIsReachableTest::RunTest(const FString& Parameters)
     Progression->LoadProgressionState(State);
 
     FText Reason;
+    // The keystone's own prerequisites first (O272: its travel, Carry). A
+    // player heading for the keystone buys the node it hangs from before
+    // filling the gate; a walk that does not can spend the whole wallet on
+    // other pairs and never see the keystone purchasable, which would report
+    // a reachable keystone as unreachable.
+    for (const FBreakerNodePrerequisite& Prereq : Keystone->Prerequisites)
+    {
+        TestTrue(*FString::Printf(TEXT("The keystone's travel %s buys from a standing start"), *Prereq.NodeId.ToString()),
+            Progression->PurchaseNode(Kinetic, Prereq.NodeId, Reason));
+    }
     int32 Guard = 0;
     while (!Progression->CanPurchaseNode(Kinetic, Keystone->NodeId, Reason) && Guard++ < 64)
     {

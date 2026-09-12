@@ -46,10 +46,10 @@ bool FBreakerPaidCooldownHUDTest::RunTest(const FString& Parameters)
             for (FName Flag:UBreakerMissionLibrary::BeatCompletionFlags(Beat)) Flags.Add(Flag);
     Flags.Add(TEXT("Quest.Finale.Seal")); Progression->SettleDoctrineEntitlement(Flags);
     FText Reason;
+    // O272: Redirect opens its pair; no prerequisite, one point.
     auto* Tree=UBreakerProgressionLibrary::GetSwiftKineticTree();
-    for (int32 Rank=0;Rank<2;++Rank)
-        if (!TestTrue(TEXT("actual Read the Room prerequisite"),Progression->PurchaseNode(Tree,TEXT("Swift.Kinetic.ReadTheRoom"),Reason))) return false;
     if (!TestTrue(TEXT("actual Redirect cooldown purchase"),Progression->PurchaseNode(Tree,TEXT("Swift.Kinetic.Redirect"),Reason))) return false;
+    TestEqual(TEXT("Redirect alone spends one of the eight-point wallet"),Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),7);
     if (!Progression->IsAbilityUnlocked(TEXT("Swift.Sightline")) && !Progression->SpendAbilityToken(TEXT("Swift.Sightline"),Reason)) return false;
     constexpr auto Slot=EBreakerAbilitySlot::ClassAbilityOne;
     if (!TestTrue(TEXT("normal Sightline slot assignment"),Progression->EquipAbility(Slot,TEXT("Swift.Sightline"),Reason))) return false;

@@ -158,7 +158,30 @@
   and Variance->Cascade reads as well. FOUND: the keystone's O86 "plus
   its own two" line now says "plus its own point".
 
-## Cycle — O272 DOCTRINE, SWIFT
+## O272 DOCTRINE, SWIFT — LANDED
+
+- The three Swift doctrines are pairs of single-rank nodes, travel then
+  impactful, keystone last; Longstride stays the free grant outside the
+  pairs. Kinetic: ReadTheRoom->No Ground, Landing->Air Work, Redirect->
+  Spend To Live, Downforce->Momentum Shield, Contact->Evade Conversion,
+  Carry->Overpressure. Marksman: Steady->Reserve, Pierce Discipline->
+  Sightline, Angle->Overpenetration, Mark Economy->Lead, Ledger->Called
+  Shot, Long Lens->Culling, Deadeye a travel with no impactful. Frenzy:
+  Rhythm->Slipcut Mastery, Dry Fire->Ammunition Economy, Short Leash->No
+  Safety, Loaded->Redline Trigger, Trigger Discipline->Second Wind,
+  Overrev->Bloodrhythm, Feed a travel with no impactful. Rank one carries
+  the old max-rank magnitude (Carry 24, Redirect 40, Downforce 22, Long
+  Lens 36/6, Pierce 2/12/6, Deadeye 8, Loaded refunds every shot, Feed
+  0.20, Rhythm stride 4, Steady airborne at rank one, Ledger 0.50, Mark
+  Economy 2500, Angle 2000) — KIT and Weapons readers crossed by
+  declaration. FirstBenchmarkReachesAnImpactful asserts every Swift tree.
+  Census re-exported. PHOTOGRAPHED: the Kinetic wheel reads as six
+  spokes, Longstride 1/1 at the crown. FOUND: Downforce and Spend To
+  Live sit adjacent at the wheel's foot and their labels touch; a
+  layout follow-up. RULING RECORDED: a doctrine with thirteen ids keeps
+  the thirteenth as a travel with no impactful (Deadeye, Feed) — O272's
+  "every id stands" forbids a merge.
+
 ## Cycle — O272 DOCTRINE, GUNSMITH
 ## Cycle — O272 DOCTRINE, TANK
 ## Cycle — O272 DOCTRINE, SUPPORT

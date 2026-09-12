@@ -124,10 +124,11 @@ bool FBreakerDamageRampRuntimeTest::RunTest(const FString& Parameters)
     Player->GetAttributes()->ApplyClassResource(Player->GetAttributes()->GetMaxClassResource()); Momentum->BindAttributes(Player->GetAttributes());
     Fire(); TestEqual(TEXT("Redline alone still grants one"), Weapon->GetDamageRampStacks(), 1);
     // Full authored eight-point wiring fixture; current Act II's four points cannot buy tier four.
+    // O272: single-rank pairs — Redline Trigger sits behind Loaded.
     Progression->GrantPlaytestPoints(8, 0);
     const UBreakerProgressionTree* Tree = UBreakerProgressionLibrary::GetSwiftFrenzyTree();
     FText Failure;
-    for (const TCHAR* Id : {TEXT("Swift.Frenzy.ShortLeash"), TEXT("Swift.Frenzy.ShortLeash"), TEXT("Swift.Frenzy.Overrev"), TEXT("Swift.Frenzy.Overrev"), TEXT("Swift.Frenzy.TriggerDiscipline"), TEXT("Swift.Frenzy.TriggerDiscipline"), TEXT("Swift.Frenzy.RedlineTrigger")})
+    for (const TCHAR* Id : {TEXT("Swift.Frenzy.Loaded"), TEXT("Swift.Frenzy.RedlineTrigger")})
         if (!TestTrue(FString::Printf(TEXT("actual purchase %s"), Id), Progression->PurchaseNode(Tree, Id, Failure))) return false;
     HeldRedlineBand = false;
     Player->GetAttributes()->ApplyClassResource(0); Momentum->BindAttributes(Player->GetAttributes());

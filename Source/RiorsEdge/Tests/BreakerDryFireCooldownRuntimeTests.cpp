@@ -21,7 +21,10 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerDryFireCooldownRuntimeTest,
     "RiorsEdge.Classes.Momentum.DryFirePaidCooldown", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FBreakerDryFireCooldownRuntimeTest::RunTest(const FString& Parameters)
 {
-    for (int32 Rank = 1; Rank <= 2; ++Rank)
+    // O272: Dry Fire is a single rank — the grant and the one-second refund
+    // land together. Without the node the cooldown is untouched; with it,
+    // one buy shaves exactly one second.
+    for (const bool bOwnsDryFire : { false, true })
     {
         UWorld::InitializationValues Init;
         Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
@@ -48,11 +51,9 @@ bool FBreakerDryFireCooldownRuntimeTest::RunTest(const FString& Parameters)
         Flags.Add(TEXT("Quest.Finale.Seal")); Progression->SettleDoctrineEntitlement(Flags);
         FText Reason;
         auto* Tree = UBreakerProgressionLibrary::GetSwiftFrenzyTree();
-        for (FName Entry : { FName(TEXT("Swift.Frenzy.Loaded")), FName(TEXT("Swift.Frenzy.TriggerDiscipline")) })
-            for (int32 N = 0; N < 2; ++N)
-                if (!TestTrue(TEXT("legal entry purchase"), Progression->PurchaseNode(Tree, Entry, Reason))) return false;
-        for (int32 N = 0; N < Rank; ++N)
-            if (!TestTrue(TEXT("legal Dry Fire rank purchase within six points"), Progression->PurchaseNode(Tree, TEXT("Swift.Frenzy.DryFire"), Reason))) return false;
+        // Dry Fire heads its own pair (O272): one legal buy, no entry purchases.
+        if (bOwnsDryFire)
+            if (!TestTrue(TEXT("legal single Dry Fire purchase"), Progression->PurchaseNode(Tree, TEXT("Swift.Frenzy.DryFire"), Reason))) return false;
         if (!Progression->IsAbilityUnlocked(TEXT("Swift.Sightline")))
             if (!TestTrue(TEXT("earned token unlocks Sightline"), Progression->SpendAbilityToken(TEXT("Swift.Sightline"), Reason))) return false;
         auto* Momentum = Player->GetMomentum(); Momentum->BindAttributes(Attributes); Momentum->BeginPlay(); Momentum->SetComponentTickEnabled(false);
@@ -84,7 +85,7 @@ bool FBreakerDryFireCooldownRuntimeTest::RunTest(const FString& Parameters)
         const float Before = Remaining();
         Weapon->StartFire(); Weapon->StopFire();
         TestEqual(TEXT("actual final round consumed"), Weapon->GetMagazineAmmo(), 0);
-        TestEqual(TEXT("only rank two shaves exactly one second"), Before - Remaining(), Rank == 2 ? 1.0f : 0.0f, .001f);
+        TestEqual(TEXT("one Dry Fire buy shaves exactly one second; none shaves nothing"), Before - Remaining(), bOwnsDryFire ? 1.0f : 0.0f, .001f);
         const float After = Remaining();
         Weapon->StartReload();
         TestEqual(TEXT("starting reload never shaves cooldown"), Remaining(), After, .001f);

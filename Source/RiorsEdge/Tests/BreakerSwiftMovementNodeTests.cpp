@@ -35,7 +35,7 @@ bool FBreakerSwiftMovementNodesRuntimeTest::RunTest(const FString& Parameters)
     Progression->BindAttributes(Player->GetAttributes());
     TestTrue(TEXT("actual Swift class selection"), Progression->ChoosePermanentClassById(EBreakerClassId::Swift));
     // Full-pool wiring fixture; the campaign's current two-point award is not
-    // claimed to unlock every rank exercised in this movement test.
+    // claimed to fund both nodes exercised in this movement test.
     Progression->GrantPlaytestPoints(8, 0);
     UBreakerMomentumComponent* Momentum = Player->FindComponentByClass<UBreakerMomentumComponent>();
     if (!TestNotNull(TEXT("real Momentum component"), Momentum)) return false;
@@ -52,14 +52,20 @@ bool FBreakerSwiftMovementNodesRuntimeTest::RunTest(const FString& Parameters)
     Movement->SetMovementMode(MOVE_Walking); Momentum->AdvanceLoop(0.01f);
     TestEqual(TEXT("unowned window is shipped three seconds"), Momentum->GetAirborneCreditRemaining(), 3.0f);
     Movement->SetMovementMode(MOVE_Falling); Momentum->AdvanceLoop(1.0f);
+    // O272: Read the Room is a single rank and its one buy reads 6.0 s.
     if (!Buy(TEXT("Swift.Kinetic.ReadTheRoom"))) return false;
+    TestEqual(TEXT("one Read the Room buy spends one of eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 7);
     Momentum->AdvanceLoop(0.5f);
-    TestEqual(TEXT("buying rank midair does not refill credit"), Momentum->GetAirborneCreditRemaining(), 1.5f);
+    TestEqual(TEXT("buying midair does not refill credit"), Momentum->GetAirborneCreditRemaining(), 1.5f);
     Movement->SetMovementMode(MOVE_Walking); Momentum->AdvanceLoop(0.01f);
-    TestEqual(TEXT("rank one refills on actual grounded mode"), Momentum->GetAirborneCreditRemaining(), 4.5f);
-    if (!Buy(TEXT("Swift.Kinetic.ReadTheRoom"))) return false;
+    TestEqual(TEXT("owned Read the Room refills six seconds on actual grounded mode"), Momentum->GetAirborneCreditRemaining(), 6.0f);
+    {
+        FText Refusal;
+        TestFalse(TEXT("owned Read the Room refuses a second purchase"), Progression->PurchaseNode(Tree, TEXT("Swift.Kinetic.ReadTheRoom"), Refusal));
+        TestEqual(TEXT("refused purchase spends nothing"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 7);
+    }
     Momentum->AdvanceLoop(0.01f);
-    TestEqual(TEXT("rank two refills six seconds"), Momentum->GetAirborneCreditRemaining(), 6.0f);
+    TestEqual(TEXT("refusal leaves the six-second window"), Momentum->GetAirborneCreditRemaining(), 6.0f);
     Player->GetAttributes()->ApplyClassResource(0);
     Movement->SetMovementMode(MOVE_Falling); Momentum->AdvanceLoop(6.5f);
     TestTrue(TEXT("last partial frame pays exactly six seconds of airborne income"), FMath::IsNearlyEqual(Momentum->GetMomentum(), 6.0f * Momentum->AirborneRate, 0.01f));
@@ -111,16 +117,24 @@ bool FBreakerSwiftMovementNodesRuntimeTest::RunTest(const FString& Parameters)
         return Momentum->GetMomentum() - 20.0f;
     };
     TestEqual(TEXT("unowned long fall earns nothing"), Fall(1000, false), 0.0f);
+    // O272: Landing is a single rank reading 3 Momentum per metre past the
+    // 6 m minimum, capped at 30 per landing. A 10 m fall is 4 credited
+    // metres, so 12; a 40 m fall is 34 credited metres, so 102 capped to 30.
     if (!Buy(TEXT("Swift.Kinetic.Landing"))) return false;
-    TestTrue(TEXT("rank one converts actual ten-metre fall"), FMath::IsNearlyEqual(Fall(1000, false), 8.0f, 0.15f));
+    TestEqual(TEXT("one Landing buy spends the second of eight"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 6);
+    TestTrue(TEXT("owned Landing converts actual ten-metre fall at three per metre"), FMath::IsNearlyEqual(Fall(1000, false), 12.0f, 0.2f));
     const float Paid = Momentum->GetMomentum();
     Movement->PerformMovement(0.02f); Movement->PerformMovement(0.02f);
     TestEqual(TEXT("remaining grounded cannot replay landing credit"), Momentum->GetMomentum(), Paid);
     TestEqual(TEXT("short jump-height fall does not qualify"), Fall(300, false), 0.0f);
     TestEqual(TEXT("direct teleport cannot counterfeit long falling distance"), Fall(1800, true), 0.0f);
-    if (!Buy(TEXT("Swift.Kinetic.Landing"))) return false;
-    TestTrue(TEXT("rank two pays larger actual fall conversion"), FMath::IsNearlyEqual(Fall(1000, false), 12.0f, 0.2f));
-    TestEqual(TEXT("very long fall respects rank-two per-landing cap"), Fall(4000, false), 30.0f);
+    {
+        FText Refusal;
+        TestFalse(TEXT("owned Landing refuses a second purchase"), Progression->PurchaseNode(Tree, TEXT("Swift.Kinetic.Landing"), Refusal));
+        TestEqual(TEXT("refused Landing purchase spends nothing"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 6);
+    }
+    TestTrue(TEXT("refusal leaves the same ten-metre conversion"), FMath::IsNearlyEqual(Fall(1000, false), 12.0f, 0.2f));
+    TestEqual(TEXT("very long fall respects the per-landing cap of thirty"), Fall(4000, false), 30.0f);
     TestFalse(TEXT("shielded cap case survives its actual landing"), Player->GetCombat()->IsDead());
     TestEqual(TEXT("very long fall consumes the real shield pool"), Player->GetAttributes()->GetShield(), 0.0f);
     FBreakerDamageRequest Kill; Kill.BaseDamage = 100000; Kill.bCanCritical = false;

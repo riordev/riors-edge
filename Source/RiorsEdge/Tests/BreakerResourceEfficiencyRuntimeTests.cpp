@@ -69,15 +69,15 @@ bool FBreakerResourceEfficiencyRuntimeTest::RunTest(const FString& Parameters)
     Abilities->RefreshGrants();
     if (!TestTrue(TEXT("Native ability is granted"), Abilities->IsSlotGranted(Slot))) return false;
     TestEqual(TEXT("Base cost before first activation"), Abilities->GetCost(Slot), 30.0f, .0001f);
+    // O272: Redirect -> SpendToLive is the whole route, one point each, no gate.
     const auto* Tree = UBreakerProgressionLibrary::GetSwiftKineticTree();
-    for (const TCHAR* Node : {TEXT("Swift.Kinetic.ReadTheRoom"), TEXT("Swift.Kinetic.ReadTheRoom"),
-        TEXT("Swift.Kinetic.Redirect"), TEXT("Swift.Kinetic.Redirect"),
-        TEXT("Swift.Kinetic.Landing"), TEXT("Swift.Kinetic.Landing"), TEXT("Swift.Kinetic.SpendToLive")})
+    TestEqual(TEXT("Fixture ships the eight-point doctrine wallet"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 8);
+    for (const TCHAR* Node : {TEXT("Swift.Kinetic.Redirect"), TEXT("Swift.Kinetic.SpendToLive")})
     {
         const bool Bought = Progression->PurchaseNode(Tree, Node, Reason);
         if (!TestTrue(FString::Printf(TEXT("Legal purchase %s: %s"), Node, *Reason.ToString()), Bought)) return false;
     }
-    TestEqual(TEXT("Legal path spends exactly eight Doctrine"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
+    TestEqual(TEXT("Legal path spends two of eight Doctrine, six unspent"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 6);
     TestEqual(TEXT("Live instance quotes doubled cost before first cast"), Abilities->GetCost(Slot), 60.0f, .0001f);
     FBreakerItemInstance Gear;
     bool bFound = false;

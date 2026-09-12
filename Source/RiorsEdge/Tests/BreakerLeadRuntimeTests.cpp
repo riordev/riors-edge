@@ -70,7 +70,9 @@ bool FBreakerLeadTwoTargetsRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Without node only latest mark survives"), State->GetMarkedTargets().Num(), 1);
     TestFalse(TEXT("Baseline replaces first target"), State->IsMarked(Targets[0]));
     const UBreakerProgressionTree* Tree = UBreakerProgressionLibrary::GetSwiftMarksmanTree();
-    for (const TCHAR* Id : { TEXT("Swift.Marksman.Steady"), TEXT("Swift.Marksman.Steady"), TEXT("Swift.Marksman.Ledger"), TEXT("Swift.Marksman.MarkEconomy"), TEXT("Swift.Marksman.Lead") })
+    // O272: single-rank pairs. Lead sits behind Mark Economy; Ledger heads its
+    // own pair and is bought so the refund below is the game's, not a fixture's.
+    for (const TCHAR* Id : { TEXT("Swift.Marksman.MarkEconomy"), TEXT("Swift.Marksman.Lead"), TEXT("Swift.Marksman.Ledger") })
     { FText Reason; if (!TestTrue(Id, Player->GetProgression()->PurchaseNode(Tree, Id, Reason))) return false; }
     if (!Mark(Targets[0]) || !Mark(Targets[1])) return false;
     TestEqual(TEXT("Purchased Lead retains two independent targets"), State->GetMarkedTargets().Num(), 2);
@@ -86,7 +88,8 @@ bool FBreakerLeadTwoTargetsRuntimeTest::RunTest(const FString& Parameters)
         const FBreakerShotResult& Shot = Player->GetWeapon()->GetLastShot();
         TestTrue(TEXT("Actual weapon hit both marked targets"), Shot.bFired && Shot.HitActor == Target && Shot.DamageResult.HealthDamage > 0);
         TestTrue(TEXT("Both marks grant range-qualified weak points"), Shot.bWeakPoint);
-        TestEqual(TEXT("Actual weapon refunds once per independent cast"), Player->GetAttributes()->GetClassResource(), PullIndex < 2 ? 30.0f : 20.0f);
+        // Ledger's single rank refunds half of Lead's authored 40 (O272).
+        TestEqual(TEXT("Actual weapon refunds once per independent cast"), Player->GetAttributes()->GetClassResource(), PullIndex < 2 ? 40.0f : 20.0f);
         ++PullIndex;
     }
     if (!Mark(Targets[2])) return false;

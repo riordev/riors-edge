@@ -130,11 +130,11 @@ bool FBreakerLoopValveLaneMathTest::RunTest(const FString& Parameters)
         Nodes, DoubleSuspend, nullptr, FBreakerBuildConditionState::All());
     TestTrue(TEXT("Stacked suspensions floor at zero, never negative"), Floored.ClassResourceDecayMultiplier >= 0.0f);
 
-    // Redirect: the AbilityCooldown lane, divisor convention. Two ranks at
-    // +20%/rank while Airborne read 1.40 — a 40%-shorter cooldown — and
-    // exactly 1.0 grounded.
+    // Redirect: the AbilityCooldown lane, divisor convention. One rank at
+    // +40 while Airborne (O272: single rank at the old two-rank total) reads
+    // 1.40 — a 40%-shorter cooldown — and exactly 1.0 grounded.
     TArray<FBreakerNodeRank> Redirect;
-    Redirect.Add({TEXT("Swift.Kinetic.Redirect"), 2});
+    Redirect.Add({TEXT("Swift.Kinetic.Redirect"), 1});
     const FBreakerNodeStats RedirectIdle = UBreakerProgressionComponent::AggregateStats(Nodes, Redirect);
     TestEqual(TEXT("Redirect pays nothing grounded"), RedirectIdle.AbilityCooldownReduction, 1.0f, 0.0001f);
     const FBreakerNodeStats RedirectAir = UBreakerProgressionComponent::AggregateStats(Nodes, Redirect, nullptr, Airborne);
@@ -219,8 +219,10 @@ bool FBreakerLoopValveBridgeTest::RunTest(const FString& Parameters)
     Progression->GrantPlaytestPoints(40, 0);
     UBreakerProgressionTree* Frenzy = UBreakerProgressionLibrary::GetSwiftFrenzyTree();
 
-    // The tier-4 gate is 6 points of branch investment plus the Short Leash
-    // prerequisite — paid the way a player would.
+    // O272: No Safety is Short Leash's impactful half — tier 1, no
+    // investment gate, its travel the only prerequisite. Trigger Discipline
+    // and Loaded are bought alongside so the valve is proven idle across
+    // owned nodes that author no decay line, not merely on an empty tree.
     TestTrue(TEXT("Trigger Discipline buys"), BreakerBuyToMax(*this, Progression, Frenzy, TEXT("Swift.Frenzy.TriggerDiscipline")));
     TestTrue(TEXT("Loaded buys"), BreakerBuyToMax(*this, Progression, Frenzy, TEXT("Swift.Frenzy.Loaded")));
     TestTrue(TEXT("Short Leash buys"), BreakerBuyToMax(*this, Progression, Frenzy, TEXT("Swift.Frenzy.ShortLeash")));
@@ -414,9 +416,10 @@ bool FBreakerLoopValveNodeContentTest::RunTest(const FString& Parameters)
         { UBreakerProgressionLibrary::GetSwiftFrenzyTree(), TEXT("Swift.Frenzy.NoSafety"),
             {{EBreakerNodeStatTarget::ClassResourceDecay, 100.0f, EBreakerBuildCondition::Always},
              {EBreakerNodeStatTarget::AbilityCost, 40.0f, EBreakerBuildCondition::Always}} },
-        // Redirect: the cooldown lane while airborne (O2 PLACEHOLDER value).
+        // Redirect: the cooldown lane while airborne, single rank at the old
+        // two-rank total (O272; O2 PLACEHOLDER value).
         { UBreakerProgressionLibrary::GetSwiftKineticTree(), TEXT("Swift.Kinetic.Redirect"),
-            {{EBreakerNodeStatTarget::AbilityCooldown, 20.0f, EBreakerBuildCondition::Airborne}} },
+            {{EBreakerNodeStatTarget::AbilityCooldown, 40.0f, EBreakerBuildCondition::Airborne}} },
         // VW4 Lingering: the duration lane, single rank at the old two-rank
         // total (O272; O2 PLACEHOLDER value).
         { UBreakerProgressionLibrary::GetCasterVoidWhispererTree(), TEXT("Caster.VoidWhisperer.Lingering"),

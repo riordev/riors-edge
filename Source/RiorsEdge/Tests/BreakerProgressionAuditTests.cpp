@@ -471,7 +471,8 @@ bool FBreakerClassSwapStopsOldRanksPayingTest::RunTest(const FString& Parameters
     // O111: doctrine nodes spend the doctrine wallet, at the shipped budget.
     Progression->GrantPlaytestPoints(UBreakerProgressionLibrary::DoctrinePointGrant, 0);
     TestTrue(TEXT("Carry purchases as Swift"), Progression->PurchaseNode(Kinetic, TEXT("Swift.Kinetic.Carry"), Failure));
-    TestEqual(TEXT("Carry's slide speed is live for Swift"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.12f, 0.0001f);
+    // O272: Carry is single rank at the old two-rank total (24).
+    TestEqual(TEXT("Carry's slide speed is live for Swift"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.24f, 0.0001f);
 
     // DevForceClass documents that it deliberately leaves a stale
     // ClassDefinition in place (still pointing at Swift's trees); the fix
@@ -483,7 +484,7 @@ bool FBreakerClassSwapStopsOldRanksPayingTest::RunTest(const FString& Parameters
     // back to Swift resumes it with no re-purchase.
     TestEqual(TEXT("The rank itself survives the swap"), Progression->GetNodeRank(TEXT("Swift.Kinetic.Carry"), EBreakerPointCurrency::DoctrinePoints), 1);
     Progression->DevForceClass(EBreakerClassId::Swift);
-    TestEqual(TEXT("Swapping back resumes the contribution"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.12f, 0.0001f);
+    TestEqual(TEXT("Swapping back resumes the contribution"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.24f, 0.0001f);
     return true;
 }
 
@@ -525,21 +526,18 @@ bool FBreakerSubclassCommitmentTest::RunTest(const FString& Parameters)
         Progression->PurchaseNode(Kinetic, TEXT("Swift.Kinetic.ReadTheRoom"), Failure));
 
     // --- THE KEYSTONE GATE: Bloodrhythm refuses before commitment ----------
-    // Reach its investment gate (CornerstoneInvestmentGate, 8) and its own
-    // prerequisite (Overrev) first, so the ONLY thing standing between the
-    // purchase and success is O37's new commitment check. ORDER MATTERS: each
-    // purchase must clear ITS OWN tier's investment gate at the moment it is
-    // bought (Tier 2 needs 2 points already in the tree), not just by the end
-    // -- Trigger Discipline rank 1 has to land before Overrev (Tier 2) for
-    // that reason, on top of Overrev's own ShortLeash prerequisite.
-    TestTrue(TEXT("Trigger Discipline rank 1 purchases"), Progression->PurchaseNode(Frenzy, TEXT("Swift.Frenzy.TriggerDiscipline"), Failure));
-    TestTrue(TEXT("Overrev purchases (Bloodrhythm's prerequisite)"), Progression->PurchaseNode(Frenzy, TEXT("Swift.Frenzy.Overrev"), Failure));
-    TestTrue(TEXT("Trigger Discipline rank 2 purchases"), Progression->PurchaseNode(Frenzy, TEXT("Swift.Frenzy.TriggerDiscipline"), Failure));
-    TestTrue(TEXT("Loaded rank 1 purchases"), Progression->PurchaseNode(Frenzy, TEXT("Swift.Frenzy.Loaded"), Failure));
-    TestTrue(TEXT("Loaded rank 2 purchases"), Progression->PurchaseNode(Frenzy, TEXT("Swift.Frenzy.Loaded"), Failure));
+    // Reach its investment gate (the tier-4 gate, six invested) and its own
+    // prerequisite (Overrev, its travel) first, so the ONLY thing standing
+    // between the purchase and success is O37's commitment check. O272: every
+    // node below the keystone is a single rank at tier 1 with no gate of its
+    // own, so the route is five travel roots on top of the Short Leash bought
+    // above, and no purchase order matters until the keystone.
+    TestTrue(TEXT("Trigger Discipline purchases"), Progression->PurchaseNode(Frenzy, TEXT("Swift.Frenzy.TriggerDiscipline"), Failure));
+    TestTrue(TEXT("Overrev purchases (Bloodrhythm's travel)"), Progression->PurchaseNode(Frenzy, TEXT("Swift.Frenzy.Overrev"), Failure));
+    TestTrue(TEXT("Loaded purchases"), Progression->PurchaseNode(Frenzy, TEXT("Swift.Frenzy.Loaded"), Failure));
     TestTrue(TEXT("Rhythm purchases"), Progression->PurchaseNode(Frenzy, TEXT("Swift.Frenzy.Rhythm"), Failure));
     TestTrue(TEXT("Dry Fire purchases"), Progression->PurchaseNode(Frenzy, TEXT("Swift.Frenzy.DryFire"), Failure));
-    TestEqual(TEXT("Frenzy investment reaches Bloodrhythm's cornerstone gate"), Progression->GetTreeInvestment(Frenzy), 8);
+    TestEqual(TEXT("Frenzy investment reaches Bloodrhythm's six-invested gate"), Progression->GetTreeInvestment(Frenzy), 6);
 
     TestFalse(TEXT("Bloodrhythm refuses with the investment gate open but no commitment"),
         Progression->CanPurchaseNode(Frenzy, TEXT("Swift.Frenzy.Bloodrhythm"), Failure));

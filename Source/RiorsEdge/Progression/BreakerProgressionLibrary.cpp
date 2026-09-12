@@ -441,56 +441,43 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
 }
 
 // ---------------------------------------------------------------------------
-// SWIFT TIER 4 — THE REWRITE TIER, AUTHORED AS ONE PASS ACROSS ALL THREE
-// BRANCHES. Stated here once rather than nine times.
+// SWIFT — THREE DOCTRINES, EACH O272's WHEEL OF PAIRS. Stated here once.
 //
-// Class-Kits §0.2 gives every branch a five-tier shape and §1.3-1.5 author the
-// Tier-4 rewrite trio for each Swift branch — F9-F11, K9-K11, M9-M11. The
-// shipped slice stopped at tier 3 and dropped all nine. They are authored here.
-// Caster's three branches were cut the same way and are NOT touched by this
-// pass; only Swift is expanded.
+// Every doctrine is pairs: one TRAVEL node (single rank, one point, one
+// scaling magnitude equal to what its ranks used to total) whose purchase
+// unlocks one IMPACTFUL node (single rank, one point, a rule or behaviour
+// tag). No node has a second rank; the compiled readers that used to split a
+// rule by rank take the rank-two figure at rank one, and every description
+// below states that figure. No pair is gated below the keystone (every
+// non-keystone node is tier 1, gate 0), so any pair may be bought first and a
+// benchmark's two points always land one whole pair. The keystone is the
+// impactful half of its own pair and the one gated node: tier 4, so
+// GateForTier prices it at six invested, and it costs one. Eight points buy
+// four pairs. Pairs are authored travel-then-impactful in Tree->Nodes order
+// with the keystone pair last; the ceiling walks read the array in that order.
 //
-// EVERY ONE OF THE NINE SHIPS AS A GRANTED TAG AND NO STAT EFFECT. That is not
-// a shortfall to fix later, it is what the tier IS. Read the nine rows in
-// §1.3-1.5: "Cadence Break's bonus no longer resets on target swap", "Hard
-// Stop's window becomes full immunity, cost rises to 60", "Momentum does not
-// decay while ADS", "shots that kill continue with full remaining damage".
-// Every one is an ABILITY rewrite, a MOMENTUM-LOOP rewrite, or an AFFIX-rule
-// rewrite. Not one is a percentage, and §0.2's own rule — "no node in this
-// document is a flat percentage" — is loudest exactly here. There is no
-// EBreakerNodeStatTarget for Momentum decay, ability cost, incoming damage
-// reduction, ADS behaviour, or Damage Ramp stack rate, and O30 keeps
-// EBreakerBuildCondition movement-only so a combat / ammunition /
-// ability-state condition cannot be authored either. The precedent is the
-// whole Caster branch set added tonight and, before it, Swift's own Cadence
-// Break rule on Slipcut Mastery: carry the rule verbatim as a tag, name the
-// consumer it is waiting on, and author no number.
+// THIRTEEN IDS, NOT TWELVE. Marksman and Frenzy each carry thirteen
+// purchasable nodes to Kinetic's twelve; O272's "every node id, tag and
+// consumer stands" forbids a merge, so the thirteenth (Deadeye, Feed) is a
+// travel with no impactful — a root with no dependents, authored immediately
+// before the keystone pair so the walk order stays travel-then-impactful for
+// every pair. Kinetic's free Longstride (cost 0, granted with the class)
+// stays first in the array and outside the pairs.
 //
-// WHY NO STAT HALF, given tiers 1-3 of Frenzy carry one. §1.3.1 authored a
-// stat half for each of TEN specific nodes and lists them in a table, because
-// a branch of pure tags is a branch a player can buy and cannot feel. A tier-3
-// branch had to pay for itself somehow. The tier-4 trio does not have that
-// problem: it sits on top of ten nodes that already pay, and inventing a
-// magnitude for it would be authoring balance under an O2 freeze on content
-// §1.3.1 does not record. Structure and identity here; numbers when the loops
-// that own them can read these tags.
+// WHICH HALF IS WHICH. The travel half of each pair is the node that already
+// carried a stat line or a scaling figure; the impactful half is the node
+// whose whole content was a rule. Where the design's rewrite tier (Class-Kits
+// §1.3-1.5, F9-F11 / K9-K11 / M9-M11) supplied a rule with no stat line, it is
+// an impactful here, at tier 1, unlocked by its travel. The rewrite tier's
+// reasoning stands: every one of those nine is an ABILITY rewrite, a
+// MOMENTUM-LOOP rewrite, or an AFFIX-rule rewrite, and the ones that pay
+// through the loop valve (No Ground, Reserve, No Safety) keep the decay/cost
+// lines that made them pay; the rest keep the tag and the consumer it names.
 //
-// NO MORE MULTIPLIER IS AUTHORED IN THIS PASS. O3 confines a class-layer More
-// to a branch KEYSTONE, and all three Swift keystones already exist and are
-// already spent (Bloodrhythm x1.20 Redline, Overpressure x1.20 sliding,
-// Culling x1.18 unconditional). Swift's budget of three is full; a tier-4 More
-// would be a fourth. The composed worst case is unchanged by this pass.
-//
-// TIER NUMBER vs. GATE, A REAL INVERSION, RECORDED NOT PAPERED OVER. These
-// nodes carry Tier == 4, so GateForTier prices them at 6 points of branch
-// investment. The three shipped keystones carry Tier == 3 (gate 4) because the
-// slice compressed §0.2's five tiers into three. The consequence is that a
-// branch's keystone is now reachable EARLIER than its rewrites, which inverts
-// §0.2's ladder. Re-tiering the keystones to 5 would move authored gates and
-// costs under an O2 freeze and would break the commitment-gate investment
-// figures pinned in BreakerProgressionAuditTests; authoring the rewrites at
-// tier 3 would flatten the ladder entirely and hide the gap. So the honest
-// shape ships and the inversion is written down. Owner's to rule.
+// NO MORE MULTIPLIER IS AUTHORED HERE (O95): every slot lives in Core. The
+// three Swift keystones pay through the loop valve, WeaponDamage-while-Aiming,
+// and FireRate-at-Redline, and each rewrites the ultimate through its
+// Keystone.Swift.* tag. Every magnitude is an O2 PLACEHOLDER.
 // ---------------------------------------------------------------------------
 UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
 {
@@ -510,72 +497,52 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
     // arrive with their own costs, never by making rank 1 purchasable.
     // DISTANCE, not cooldown — the seat's argument: a cooldown shave is
     // invisible until the player spams, distance is felt on the first dash.
+    // OUTSIDE THE PAIRS (O272): first in the array, no travel, no impactful.
     UBreakerProgressionNode* Longstride = MakeNode(TEXT("Swift.Kinetic.Longstride"), TEXT("Longstride"),
         TEXT("Your dash carries further. Granted with the class."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 0);
     AddEffect(Longstride, EBreakerNodeStatTarget::DashDistance, EBreakerNodeStatBucket::IncreasedPercent, 20.0f); // O2 PLACEHOLDER — felt on the first dash
     Tree->Nodes.Add(Longstride);
 
+    // --- Pair: Read the Room (travel) -> No Ground (impactful) ----------------
     // Kinetic's entry loop knob: lengthening the airborne credit window is what
     // lets a jump chain pay across the gap between two surfaces rather than only
-    // while a foot is on one.
-    // WAITING ON: the Momentum component's airborne credit window reading this
-    // tag. Cheap - the valve is already there, nothing turns it.
+    // while a foot is on one. The Momentum component's airborne credit window
+    // reads this node: six seconds instead of three (the old rank-two figure,
+    // at rank one under O272).
     UBreakerProgressionNode* Node = MakeNode(TEXT("Swift.Kinetic.ReadTheRoom"), TEXT("Read the Room"),
-        TEXT("Airborne Momentum generation credit lasts longer."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 2, 1);
+        TEXT("Airborne Momentum generation credit lasts six seconds instead of three. Only real ground refills it."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_ReadTheRoom.GetTag());
     Tree->Nodes.Add(Node);
 
-    // Makes SHORT walls worth riding. Without a grace period after contact is
-    // lost, a two-metre wall pays nothing and the branch quietly demands
-    // architecture the field does not always have.
-    // O144 retired wall-ride. Contact now rewards the replacement verbs.
-    Node = MakeNode(TEXT("Swift.Kinetic.Contact"), TEXT("Contact"),
-        TEXT("After completing a vault or mantle, gain 8 Momentum per second for 0.35/0.70 seconds at ranks 1/2. Shares the movement income cap and traversal interval."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Contact.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // The slide-chain node. Its SlideSpeed line is live and does the felt half;
-    // the tag is the income half, so chaining slides is a Momentum decision and
-    // not only a speed one.
-    // WAITING ON: a slide-chain generation credit in the Momentum component.
-    Node = MakeNode(TEXT("Swift.Kinetic.Carry"), TEXT("Carry"),
-        TEXT("Slide chaining pays flat Momentum and carries more speed."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 2, 1);
-    AddEffect(Node, EBreakerNodeStatTarget::SlideSpeed, EBreakerNodeStatBucket::IncreasedPercent, 12.0f); // O2 PLACEHOLDER
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Carry.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // LIVE 2026-08-16 (partially): the AbilityCooldown lane exists, so the
-    // node's cooldown half pays — cooldowns started while airborne run 20%
-    // shorter per rank (O2 PLACEHOLDER; the divisor convention, evaluated at
-    // cast, including a Slipcut cast airborne). The designed
-    // once-per-airtime EVENT ("sharp direction changes refund") is a rule the
-    // lane cannot say; the tag stays for that consumer, and the text below
-    // describes what the purchase actually does today rather than what it
-    // will do then.
-    Node = MakeNode(TEXT("Swift.Kinetic.Redirect"), TEXT("Redirect"),
-        TEXT("Abilities cast airborne start a shorter cooldown."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 2, 2, 1);
+    // K11. Pure Momentum-loop rewrite with a real downside, the Kinetic twin
+    // of Frenzy's No Safety: airborne decay is removed outright and grounded
+    // decay is increased.
+    // LIVE 2026-08-16: the loop valve — the ClassResourceDecay lane composes
+    // these lines and UBreakerProgressionComponent::PushLoopValveOverrides
+    // delivers the multiplier through the Momentum component's
+    // PushLoopOverride seam. Class-Kits §1.4 K11's number is transcribed:
+    // "grounded decay increases by 50%" (+50 while Grounded). The airborne
+    // half is authored as -100 while Airborne — the base loop already never
+    // decays airborne, so the line is belt-and-braces that survives a future
+    // loop retune rather than a new behaviour. K11's OTHER clause, "or within
+    // 0.5s of leaving the ground", stays waiting: no coyote-time condition
+    // exists and the decay grace timer is not it.
+    Node = MakeNode(TEXT("Swift.Kinetic.NoGround"), TEXT("No Ground"),
+        TEXT("Momentum stops decaying the moment your feet leave the floor, and decays faster while they are on it."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
     AddPrerequisite(Node, TEXT("Swift.Kinetic.ReadTheRoom"));
-    AddEffect(Node, EBreakerNodeStatTarget::AbilityCooldown, EBreakerNodeStatBucket::IncreasedPercent, 20.0f, EBreakerBuildCondition::Airborne); // O2 PLACEHOLDER
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Redirect.GetTag());
+    AddEffect(Node, EBreakerNodeStatTarget::ClassResourceDecay, EBreakerNodeStatBucket::IncreasedPercent, 50.0f, EBreakerBuildCondition::Grounded); // Class-Kits §1.4 K11: grounded decay +50%
+    AddEffect(Node, EBreakerNodeStatTarget::ClassResourceDecay, EBreakerNodeStatBucket::IncreasedPercent, -100.0f, EBreakerBuildCondition::Airborne); // Class-Kits §1.4 K11: no airborne decay
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_NoGround.GetTag());
     Tree->Nodes.Add(Node);
 
-    // Kinetic's identity loop - evasion IS the resource, which is the thing no
-    // other class converts. The DodgeChance line is live; the rule half (a
-    // larger yield on a shorter internal cooldown) is what makes the loop a
-    // build rather than a trickle.
-    // WAITING ON: the dodge proc's yield and ICD reading this tag.
-    Node = MakeNode(TEXT("Swift.Kinetic.EvadeConversion"), TEXT("Evade Conversion"),
-        TEXT("The passive dodge proc yields more Momentum on a shorter internal cooldown."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 2, 2, 1);
-    AddEffect(Node, EBreakerNodeStatTarget::DodgeChance, EBreakerNodeStatBucket::Flat, 4.0f); // O2 PLACEHOLDER
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_EvadeConversion.GetTag());
-    Tree->Nodes.Add(Node);
-
+    // --- Pair: Landing (travel) -> Air Work (impactful) -----------------------
     // The node that turns HEIGHT into a resource, so the vertical half of the
     // movement kit has an income and a fall is a choice rather than a cost.
-    // WAITING ON: a fall-distance credit paid on landing.
+    // The Momentum component measures the continuous fall from its peak and
+    // pays 3 per metre beyond six, capped at 30 per landing (the old rank-two
+    // figures, at rank one under O272).
     Node = MakeNode(TEXT("Swift.Kinetic.Landing"), TEXT("Landing"),
-        TEXT("Long falls convert into Momentum on landing."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Swift.Kinetic.ReadTheRoom"));
+        TEXT("Long falls convert into Momentum on landing: 3 per metre beyond six metres, up to 30."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Landing.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -591,37 +558,45 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
     // GetShotChannels, and the Airborne condition means the fraction only
     // accumulates while off the ground.
     Node = MakeNode(TEXT("Swift.Kinetic.AirWork"), TEXT("Air Work"),
-        TEXT("Airborne handling improves sharply, and airborne shots recover their full second projectile."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 3, 1, 2);
+        TEXT("Airborne handling improves sharply, and airborne shots recover their full second projectile."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
     AddPrerequisite(Node, TEXT("Swift.Kinetic.Landing"));
     AddEffect(Node, EBreakerNodeStatTarget::AirControl, EBreakerNodeStatBucket::IncreasedPercent, 12.0f); // O2 PLACEHOLDER
     AddEffect(Node, EBreakerNodeStatTarget::ProjectileCount, EBreakerNodeStatBucket::Flat, 0.5f, EBreakerBuildCondition::Airborne); // O2 PLACEHOLDER — owner ruling 2026-08-16: restores the halved airborne coupling to a full double
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_AirWork.GetTag());
     Tree->Nodes.Add(Node);
 
+    // --- Pair: Redirect (travel) -> Spend to Live (impactful) -----------------
+    // LIVE 2026-08-16 (partially): the AbilityCooldown lane exists, so the
+    // node's cooldown half pays — cooldowns started while airborne run 40%
+    // shorter (O2 PLACEHOLDER; the divisor convention, evaluated at cast,
+    // including a Slipcut cast airborne). The designed once-per-airtime EVENT
+    // ("sharp direction changes refund") is a rule the lane cannot say; the
+    // tag stays for that consumer, and the text below describes what the
+    // purchase actually does today rather than what it will do then.
+    Node = MakeNode(TEXT("Swift.Kinetic.Redirect"), TEXT("Redirect"),
+        TEXT("Abilities cast airborne start a shorter cooldown."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    AddEffect(Node, EBreakerNodeStatTarget::AbilityCooldown, EBreakerNodeStatBucket::IncreasedPercent, 40.0f, EBreakerBuildCondition::Airborne); // O2 PLACEHOLDER — the old two ranks' total
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Redirect.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // Hard Stop remains a standalone token unlock. O258 routes this rewrite
+    // through the live Redirect node; O272 makes that the pair.
+    Node = MakeNode(TEXT("Swift.Kinetic.SpendToLive"), TEXT("Spend to Live"),
+        TEXT("Hard Stop's window becomes true immunity, and it costs twice the Momentum."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Swift.Kinetic.Redirect"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SpendToLive.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Downforce (travel) -> Momentum Shield (impactful) --------------
     // Kinetic's offensive half. The branch was eight nodes of Momentum-loop
     // knobs, every one of which made movement better at generating Momentum and
     // none of which made movement worth anything offensively — so a Kinetic
     // player's damage came entirely from Core and gear.
     Node = MakeNode(TEXT("Swift.Kinetic.Downforce"), TEXT("Downforce"),
-        TEXT("Shots fired while airborne land significantly harder."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Swift.Kinetic.ReadTheRoom"));
-    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 11.0f, EBreakerBuildCondition::Airborne); // O2 PLACEHOLDER
+        TEXT("Shots fired while airborne land significantly harder."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 22.0f, EBreakerBuildCondition::Airborne); // O2 PLACEHOLDER — the old two ranks' total
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Downforce.GetTag());
     Tree->Nodes.Add(Node);
-
-    // Swift.Kinetic.Grind stood here and is DELETED, not retired-in-place
-    // (Part One-U item 20, closing O144's deferral): its whole fantasy was
-    // the wall and the wall's verb is gone. The save story that deferral
-    // owed landed FIRST, in the same push — a loaded rank on an id that no
-    // longer resolves is dropped and credited at the fallback cost
-    // (DropUnknownRanksAndCredit), so the owner's saves that bought Grind
-    // get their points back instead of paying a silent permanent tax.
-
-    // --- Tier 4 (K9-K11), the rewrite tier -----------------------------------
-    // Kinetic's rewrites all move the same idea: the branch's airborne
-    // privileges start applying on the ground, and the branch's survival tool
-    // gets more expensive and more absolute. See the block comment above this
-    // function for why all three are tags with no stat line.
 
     // K9. "Changes WHEN an existing stat applies, not its magnitude" is the
     // design's own description, and it is precisely what no node effect can
@@ -632,39 +607,50 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
     // duplicate (Class-Kits §6.4). WAITING ON: the damage-taken path learning
     // to ask for this tag before it applies the airborne-only reduction.
     Node = MakeNode(TEXT("Swift.Kinetic.MomentumShield"), TEXT("Momentum Shield"),
-        TEXT("At Redline, your Damage Reduction While Airborne applies with both feet on the ground."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Swift.Kinetic.AirWork"));
+        TEXT("At Redline, your Damage Reduction While Airborne applies with both feet on the ground."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Swift.Kinetic.Downforce"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MomentumShield.GetTag());
     Tree->Nodes.Add(Node);
 
-    // Hard Stop remains a standalone token unlock. O258 keeps the six-point
-    // tier gate and redirects this rewrite through the live Redirect node.
-    Node = MakeNode(TEXT("Swift.Kinetic.SpendToLive"), TEXT("Spend to Live"),
-        TEXT("Hard Stop's window becomes true immunity, and it costs twice the Momentum."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Swift.Kinetic.Redirect"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SpendToLive.GetTag());
+    // --- Pair: Contact (travel) -> Evade Conversion (impactful) ---------------
+    // O144 retired wall-ride. Contact rewards the replacement verbs: after a
+    // completed vault or mantle the Momentum component adds the existing
+    // 8/s movement rate for 0.70 s (the old rank-two figure, at rank one under
+    // O272), under the shared income cap and the traversal interval.
+    Node = MakeNode(TEXT("Swift.Kinetic.Contact"), TEXT("Contact"),
+        TEXT("After completing a vault or mantle, gain 8 Momentum per second for 0.70 seconds. Shares the movement income cap and traversal interval."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Contact.GetTag());
     Tree->Nodes.Add(Node);
 
-    // K11. Pure Momentum-loop rewrite with a real downside, the Kinetic twin
-    // of Frenzy's No Safety: airborne decay is removed outright and grounded
-    // decay is increased.
-    // LIVE 2026-08-16: the WAITING ON is answered by the loop valve — the
-    // ClassResourceDecay lane composes these lines and
-    // UBreakerProgressionComponent::PushLoopValveOverrides delivers the
-    // multiplier through the Momentum component's PushLoopOverride seam.
-    // Class-Kits §1.4 K11's number is transcribed: "grounded decay increases
-    // by 50%" (+50 while Grounded). The airborne half is authored as -100
-    // while Airborne — the base loop already never decays airborne, so the
-    // line is belt-and-braces that survives a future loop retune rather than
-    // a new behaviour. K11's OTHER clause, "or within 0.5s of leaving the
-    // ground", stays waiting: no coyote-time condition exists and the decay
-    // grace timer is not it.
-    Node = MakeNode(TEXT("Swift.Kinetic.NoGround"), TEXT("No Ground"),
-        TEXT("Momentum stops decaying the moment your feet leave the floor, and decays faster while they are on it."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Swift.Kinetic.ReadTheRoom"));
-    AddEffect(Node, EBreakerNodeStatTarget::ClassResourceDecay, EBreakerNodeStatBucket::IncreasedPercent, 50.0f, EBreakerBuildCondition::Grounded); // Class-Kits §1.4 K11: grounded decay +50%
-    AddEffect(Node, EBreakerNodeStatTarget::ClassResourceDecay, EBreakerNodeStatBucket::IncreasedPercent, -100.0f, EBreakerBuildCondition::Airborne); // Class-Kits §1.4 K11: no airborne decay
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_NoGround.GetTag());
+    // Kinetic's identity loop - evasion IS the resource, which is the thing no
+    // other class converts. The DodgeChance line is live; the rule half (a
+    // larger yield on a shorter internal cooldown) is what makes the loop a
+    // build rather than a trickle.
+    // WAITING ON: the dodge proc's yield and ICD reading this tag.
+    Node = MakeNode(TEXT("Swift.Kinetic.EvadeConversion"), TEXT("Evade Conversion"),
+        TEXT("The passive dodge proc yields more Momentum on a shorter internal cooldown."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Swift.Kinetic.Contact"));
+    AddEffect(Node, EBreakerNodeStatTarget::DodgeChance, EBreakerNodeStatBucket::Flat, 8.0f); // O2 PLACEHOLDER — the old two ranks' total
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_EvadeConversion.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // Swift.Kinetic.Grind stood here and is DELETED, not retired-in-place
+    // (Part One-U item 20, closing O144's deferral): its whole fantasy was
+    // the wall and the wall's verb is gone. The save story that deferral
+    // owed landed FIRST, in the same push — a loaded rank on an id that no
+    // longer resolves is dropped and credited at the fallback cost
+    // (DropUnknownRanksAndCredit), so the owner's saves that bought Grind
+    // get their points back instead of paying a silent permanent tax.
+
+    // --- Pair: Carry (travel) -> Overpressure (keystone) ----------------------
+    // The slide-chain node. Its SlideSpeed line is live and does the felt half;
+    // the tag is the income half, so chaining slides is a Momentum decision and
+    // not only a speed one.
+    // WAITING ON: a slide-chain generation credit in the Momentum component.
+    Node = MakeNode(TEXT("Swift.Kinetic.Carry"), TEXT("Carry"),
+        TEXT("Slide chaining pays flat Momentum and carries more speed."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    AddEffect(Node, EBreakerNodeStatTarget::SlideSpeed, EBreakerNodeStatBucket::IncreasedPercent, 24.0f); // O2 PLACEHOLDER — the old two ranks' total
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Carry.GetTag());
     Tree->Nodes.Add(Node);
 
     // THE MORE IS GONE (O95): a doctrine authors none, every slot lives in Core.
@@ -676,7 +662,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
     // The keystone's rewrite half was always the live part: it grants
     // Keystone.Swift.TerminalVelocity and Overdrive resolves that row.
     Node = MakeNode(TEXT("Swift.Kinetic.Overpressure"), TEXT("Overpressure"),
-        TEXT("Branch keystone. Momentum stops decaying entirely while you are sliding."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 4, 1, 2);
+        TEXT("Branch keystone. Momentum stops decaying entirely while you are sliding."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 4, 1, 1);
     AddPrerequisite(Node, TEXT("Swift.Kinetic.Carry"));
     AddEffect(Node, EBreakerNodeStatTarget::ClassResourceDecay, EBreakerNodeStatBucket::IncreasedPercent, -100.0f, EBreakerBuildCondition::Sliding); // O2 PLACEHOLDER
     // O37: every branch keystone is a cornerstone, so commitment gates all
@@ -707,97 +693,56 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftMarksmanTree()
 
     Tree = MakeTree(TEXT("Doctrine.Swift.Marksman"), TEXT("Swift — Marksman"), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift);
 
-    // Marksman's entry node. Its crit-damage and damage lines are live; the
-    // DISTANCE half of its promise - that distant weak-point hits also generate
-    // Momentum - is the part that ties the branch to the resource, and it is the
-    // half that keeps Marksman from being a pure stat branch (the duplication
-    // Core-Tree-Redesign flags: these two lines restate Precision's).
-    // WAITING ON: a range-gated weak-point generation credit.
-    UBreakerProgressionNode* Node = MakeNode(TEXT("Swift.Marksman.LongLens"), TEXT("Long Lens"),
-        TEXT("Distant weak-point hits generate Momentum, and down sights everything lands harder."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 2, 1);
-    // The crit line stays unconditional: CriticalDamage is not a generic damage
-    // pool, so it is the second half of the rule -- a stat target Core's wheels
-    // do not own outright -- rather than the conditional half.
-    AddEffect(Node, EBreakerNodeStatTarget::CriticalDamage, EBreakerNodeStatBucket::Flat, 18.0f); // O2 PLACEHOLDER
-    // AIMING, and it used to be unconditional. The node is called Long Lens and
-    // its own text has always said "distant weak-point hits"; the shared Damage
-    // line was the one part of it that paid from the hip.
-    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f, EBreakerBuildCondition::Aiming); // O2 PLACEHOLDER
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_LongLens.GetTag());
-    Tree->Nodes.Add(Node);
-
+    // --- Pair: Steady (travel) -> Reserve (impactful) -------------------------
     // LIVE 2026-08-16: §1.5 M2's spread rule is CONSUMED by the weapon's
     // spread path — FBreakerWeaponMath::SteadyMovementSpreadDegrees, applied
     // identically to the fired cone (FireOnce) and the predicted one
-    // (GetNextShotSpreadDegrees / GetMovementSpreadDegrees). R1 is the
-    // grounded rule, R2 extends it airborne, exactly the doc's rank split.
-    // A rule rewrite with no percentage, so still no stat line — correctly.
-    Node = MakeNode(TEXT("Swift.Marksman.Steady"), TEXT("Steady"),
-        TEXT("Aiming while moving no longer widens spread. A second rank keeps the sights steady in the air."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 2, 1);
+    // (GetNextShotSpreadDegrees / GetMovementSpreadDegrees). Grounded and
+    // airborne at rank one (the old rank-two rule, under O272). A rule
+    // rewrite with no percentage, so still no stat line — correctly.
+    UBreakerProgressionNode* Node = MakeNode(TEXT("Swift.Marksman.Steady"), TEXT("Steady"),
+        TEXT("Aiming while moving no longer widens spread, on the ground or in the air."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Steady.GetTag());
     Tree->Nodes.Add(Node);
 
-    // LIVE 2026-08-16: §1.5 M3 transcribed — "refunded at 25% (R2: 50%) if
-    // the ability's effect lands a hit within its window". Lead is the
-    // Marksman ability that exists; UBreakerWeaponComponent::FireOnce refunds
-    // once per mark window when a shot connects with the marked target, at
-    // the registry's own authored cost (§1.2 S6: 40 Momentum).
-    Node = MakeNode(TEXT("Swift.Marksman.Ledger"), TEXT("Ledger"),
-        TEXT("Momentum spent on Marksman abilities is partly refunded when they connect."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 2, 1);
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Ledger.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // LIVE 2026-08-16 (owner ruling: Swift = multishot/pierce/chain/ricochet).
-    // The weapon layer now has a real ricochet: a shot that hits geometry
-    // bounces toward the nearest enemy in line of sight. Class-Kits §1.5 M4
-    // authors Angle as a rewrite of the Ricochet Chance AFFIX's geometric
-    // reflection — but no such affix exists in the item layer yet, so with
-    // nothing to rewrite, this node is also the count's source: +1 bounce per
-    // rank (AUTHORED, O2 PLACEHOLDER, the §1.3.1 stat-half pattern). The two
-    // seek radii ARE transcribed doc values — 12 m at R1, 20 m at R2 — read
-    // per-rank by UBreakerWeaponComponent::ResolvePelletImpacts.
-    Node = MakeNode(TEXT("Swift.Marksman.Angle"), TEXT("Angle"),
-        TEXT("Shots that hit the world bounce toward the nearest enemy in sight. A second rank bounces again, and seeks further."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Swift.Marksman.LongLens"));
-    AddEffect(Node, EBreakerNodeStatTarget::RicochetCount, EBreakerNodeStatBucket::Flat, 1.0f); // O2 PLACEHOLDER (authored count; radii are §1.5 M4's 12 m / 20 m)
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Angle.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // LIVE 2026-08-16 (partially): §1.5 M5 transcribed — the mark persists
-    // through the target's death and jumps to the nearest enemy within 15 m
-    // (R2: 25 m), proc coefficient 0 on the jump (it moves the mark and
-    // nothing else). Consumed by UBreakerWeaponComponent::FireOnce off the
-    // shared mark surface (UBreakerAbilityStateComponent::SetMark), which is
-    // why the weapon can re-site the mark without owning it. PARTIAL because
-    // the weapon is the only killer it can see: a marked target dying to a
-    // DoT or an ally does not jump the mark until the spec's
-    // UBreakerMarkComponent owns marks and deaths in one place.
-    Node = MakeNode(TEXT("Swift.Marksman.MarkEconomy"), TEXT("Mark Economy"),
-        TEXT("Lead's mark survives its target's death and jumps to a nearby enemy."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Swift.Marksman.Ledger"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MarkEconomy.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // LIVE 2026-08-16: pierce exists on the weapon path, and BOTH halves of
-    // §1.5 M6 now pay. The rule half — "+4 Momentum per target pierced (R2:
-    // +7), capped at 3" — is consumed by UBreakerWeaponComponent::FireOnce
-    // reading this node's rank (values transcribed there). The Pierce line
-    // below is the AUTHORED half that gives the discipline something to
-    // discipline: +1 penetration per rank, the enum's own naming of this node
-    // ("Pierce... Named by Swift.Marksman.PierceDiscipline") made real. The
-    // pre-existing crit/damage stat half is kept unchanged — removing an
-    // authored value would be a retune under the O2 freeze.
-    Node = MakeNode(TEXT("Swift.Marksman.PierceDiscipline"), TEXT("Pierce Discipline"),
-        TEXT("Shots punch through one more enemy per rank, and every target pierced pays Momentum, up to three."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 2, 2, 1);
+    // M9. Marksman is the branch that makes Momentum BANKABLE, and §1.5 is
+    // explicit that it "pays for that privilege with a node rather than
+    // getting it free" — Reserve is the node the branch description points
+    // at. The deliberate half-measure — the bar HOLDS while ADS but still
+    // does not GENERATE — held exactly.
+    // LIVE 2026-08-16: the loop valve. Class-Kits §1.5 M9, "Momentum does
+    // not decay while ADS", is authored as a -100% ClassResourceDecay line
+    // conditioned on Aiming (the O30 posture predicate added by name for this
+    // node), composed to a decay multiplier of exactly 0 while ADS and
+    // delivered through the Momentum component's PushLoopOverride seam.
+    // Generation while ADS is untouched — the lane scales DECAY only, so
+    // "holds a bar, does not fill one" is structural.
+    Node = MakeNode(TEXT("Swift.Marksman.Reserve"), TEXT("Reserve"),
+        TEXT("Momentum stops decaying while you are aiming down sights. It still does not build there — this holds a bar, it does not fill one."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
     AddPrerequisite(Node, TEXT("Swift.Marksman.Steady"));
-    AddEffect(Node, EBreakerNodeStatTarget::Pierce, EBreakerNodeStatBucket::Flat, 1.0f); // O2 PLACEHOLDER (authored count)
+    AddEffect(Node, EBreakerNodeStatTarget::ClassResourceDecay, EBreakerNodeStatBucket::IncreasedPercent, -100.0f, EBreakerBuildCondition::Aiming); // Class-Kits §1.5 M9: no decay while ADS
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Reserve.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Pierce Discipline (travel) -> Sightline (impactful) ------------
+    // LIVE 2026-08-16: pierce exists on the weapon path, and BOTH halves of
+    // §1.5 M6 pay. The rule half — "+7 Momentum per target pierced, capped at
+    // 3" (the old rank-two figure, at rank one under O272) — is consumed by
+    // UBreakerWeaponComponent::FireOnce reading this node. The Pierce line
+    // below is the AUTHORED half that gives the discipline something to
+    // discipline: +2 penetrations, the enum's own naming of this node
+    // ("Pierce... Named by Swift.Marksman.PierceDiscipline") made real. The
+    // crit/damage stat half is kept at the old two ranks' total.
+    Node = MakeNode(TEXT("Swift.Marksman.PierceDiscipline"), TEXT("Pierce Discipline"),
+        TEXT("Shots punch through two more enemies, and every target pierced pays 7 Momentum, up to three."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    AddEffect(Node, EBreakerNodeStatTarget::Pierce, EBreakerNodeStatBucket::Flat, 2.0f); // O2 PLACEHOLDER (authored count; the old two ranks' total)
     // Pierce and CriticalChance stay unconditional -- neither is a generic
     // damage pool, and pierce is Marksman's alone.
-    AddEffect(Node, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 6.0f); // O2 PLACEHOLDER
+    AddEffect(Node, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 12.0f); // O2 PLACEHOLDER — the old two ranks' total
     // AIMING, and it used to be unconditional. Punching through a line of
     // targets is an aimed shot; the shared Damage line paid whether or not the
     // player was doing the thing the node is about.
-    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f, EBreakerBuildCondition::Aiming); // O2 PLACEHOLDER
+    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 6.0f, EBreakerBuildCondition::Aiming); // O2 PLACEHOLDER — the old two ranks' total
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_PierceDiscipline.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -814,59 +759,26 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftMarksmanTree()
     // double-pay the same fantasy and quietly out-value the unlockable. The
     // node is the RULE half alone now, which the ability's pierce feeds.
     Node = MakeNode(TEXT("Swift.Marksman.Sightline"), TEXT("Sightline"),
-        TEXT("Pierced targets after the first take full damage through Armour."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 3, 1, 2);
+        TEXT("Pierced targets after the first take full damage through Armour."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
     AddPrerequisite(Node, TEXT("Swift.Marksman.PierceDiscipline"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Sightline.GetTag());
     Tree->Nodes.Add(Node);
 
-    // THE ABILITY GRANT IS RETIRED (O140). This node granted Swift.Lead from
-    // the era when Lead was a starter and the grant was redundant decoration;
-    // ruling 1 made Lead a quartermaster UNLOCKABLE, which turned the grant
-    // into a free route around the token — two doctrine points buying what
-    // the token economy prices, from a node whose real payload is the
-    // two-target rule. The node keeps that rule (the tag's consumer holds
-    // marks on two targets); a save that bought this node before the
-    // retirement keeps its rank and its rule and buys Lead with a token like
-    // every other Swift. This was also the LAST GrantedAbilityIds writer in
-    // the project — the path's readers-with-no-writers question is already in
-    // DECISIONS' Open list and is the owner's.
-    Node = MakeNode(TEXT("Swift.Marksman.Lead"), TEXT("Lead"),
-        TEXT("Lead may be held on two targets at once."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 3, 1, 2);
-    AddPrerequisite(Node, TEXT("Swift.Marksman.MarkEconomy"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Lead.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // Marksman's crit-chance ladder. Long Lens gave the branch crit DAMAGE with
-    // almost no chance to apply it to, which is a stat that reads well on a card
-    // and does close to nothing.
-    Node = MakeNode(TEXT("Swift.Marksman.Deadeye"), TEXT("Deadeye"),
-        TEXT("Held aim finds the weak point. A large flat critical chance per rank."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Swift.Marksman.LongLens"));
-    AddEffect(Node, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 4.0f); // O2 PLACEHOLDER
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Deadeye.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 4 (M9-M11), the rewrite tier -----------------------------------
-    // Marksman is the branch that makes Momentum BANKABLE, and §1.5 is explicit
-    // that it "pays for that privilege with a Tier-4 node rather than getting
-    // it free" — so of the three branches, Marksman is the one whose identity
-    // was most damaged by the tier being dropped. Reserve is the node the
-    // branch description points at.
-
-    // M9. The stationary-Swift unlock, and the deliberate half-measure — the
-    // bar HOLDS while ADS but still does not GENERATE — held exactly.
-    // LIVE 2026-08-16: the WAITING ON is answered by the loop valve. Class-
-    // Kits §1.5 M9, "Momentum does not decay while ADS", is authored as a
-    // -100% ClassResourceDecay line conditioned on Aiming (the O30 posture
-    // predicate added by name for this node), composed to a decay multiplier
-    // of exactly 0 while ADS and delivered through the Momentum component's
-    // PushLoopOverride seam. Generation while ADS is untouched — the lane
-    // scales DECAY only, so "holds a bar, does not fill one" is structural.
-    Node = MakeNode(TEXT("Swift.Marksman.Reserve"), TEXT("Reserve"),
-        TEXT("Momentum stops decaying while you are aiming down sights. It still does not build there — this holds a bar, it does not fill one."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Swift.Marksman.Steady"));
-    AddEffect(Node, EBreakerNodeStatTarget::ClassResourceDecay, EBreakerNodeStatBucket::IncreasedPercent, -100.0f, EBreakerBuildCondition::Aiming); // Class-Kits §1.5 M9: no decay while ADS
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Reserve.GetTag());
+    // --- Pair: Angle (travel) -> Overpenetration (impactful) ------------------
+    // LIVE 2026-08-16 (owner ruling: Swift = multishot/pierce/chain/ricochet).
+    // The weapon layer has a real ricochet: a shot that hits geometry bounces
+    // toward the nearest enemy in line of sight. Class-Kits §1.5 M4 authors
+    // Angle as a rewrite of the Ricochet Chance AFFIX's geometric reflection —
+    // but no such affix exists in the item layer yet, so with nothing to
+    // rewrite, this node is also the count's source: +2 bounces (AUTHORED, O2
+    // PLACEHOLDER, the §1.3.1 stat-half pattern, the old two ranks' total).
+    // The seek radius IS a transcribed doc value — 20 m, the old rank-two
+    // figure at rank one under O272 — read by
+    // UBreakerWeaponComponent::ResolvePelletImpacts.
+    Node = MakeNode(TEXT("Swift.Marksman.Angle"), TEXT("Angle"),
+        TEXT("Shots that hit the world bounce toward the nearest enemy in sight within 20 m, and bounce again."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    AddEffect(Node, EBreakerNodeStatTarget::RicochetCount, EBreakerNodeStatBucket::Flat, 2.0f); // O2 PLACEHOLDER (authored count, the old two ranks' total; radius is §1.5 M4's 20 m)
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Angle.GetTag());
     Tree->Nodes.Add(Node);
 
     // M10. A projectile-behaviour rewrite: the shot keeps its FULL remaining
@@ -875,32 +787,111 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftMarksmanTree()
     // and expressing it as Increased Damage would be the affix-layer
     // duplication §6.4 forbids, not to mention unconditional where the design
     // is bounded by the Pierce cap.
-    // LIVE 2026-08-16: the WAITING ON is answered — pierce falloff exists
+    // LIVE 2026-08-16: pierce falloff exists
     // (UBreakerWeaponComponent::PierceDamageFalloff) and
     // FBreakerWeaponMath::NextPierceMultiplier skips the falloff step after a
     // killing hit exactly when this tag is owned. Still a tag with no stat
     // line, correctly: the node changes a rule, not a number.
     Node = MakeNode(TEXT("Swift.Marksman.Overpenetration"), TEXT("Overpenetration"),
-        TEXT("A shot that kills carries on at full damage instead of falling off, up to the pierce cap."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Swift.Marksman.PierceDiscipline"));
+        TEXT("A shot that kills carries on at full damage instead of falling off, up to the pierce cap."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Swift.Marksman.Angle"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Overpenetration.GetTag());
     Tree->Nodes.Add(Node);
 
-    // M11. The one tier-4 node in the class whose CONDITION is expressible —
+    // --- Pair: Mark Economy (travel) -> Lead (impactful) ----------------------
+    // LIVE 2026-08-16 (partially): §1.5 M5 transcribed — the mark persists
+    // through the target's death and jumps to the nearest enemy within 25 m
+    // (the old rank-two figure, at rank one under O272), proc coefficient 0
+    // on the jump (it moves the mark and nothing else). Consumed by
+    // UBreakerWeaponComponent::FireOnce off the shared mark surface
+    // (UBreakerAbilityStateComponent::SetMark), which is why the weapon can
+    // re-site the mark without owning it. PARTIAL because the weapon is the
+    // only killer it can see: a marked target dying to a DoT or an ally does
+    // not jump the mark until the spec's UBreakerMarkComponent owns marks and
+    // deaths in one place.
+    Node = MakeNode(TEXT("Swift.Marksman.MarkEconomy"), TEXT("Mark Economy"),
+        TEXT("Lead's mark survives its target's death and jumps to an enemy within 25 m."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MarkEconomy.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // THE ABILITY GRANT IS RETIRED (O140). This node granted Swift.Lead from
+    // the era when Lead was a starter and the grant was redundant decoration;
+    // ruling 1 made Lead a quartermaster UNLOCKABLE, which turned the grant
+    // into a free route around the token — doctrine points buying what the
+    // token economy prices, from a node whose real payload is the two-target
+    // rule. The node keeps that rule (the tag's consumer holds marks on two
+    // targets); a save that bought this node before the retirement keeps its
+    // rank and its rule and buys Lead with a token like every other Swift.
+    // This was also the LAST GrantedAbilityIds writer in the project — the
+    // path's readers-with-no-writers question is already in DECISIONS' Open
+    // list and is the owner's.
+    Node = MakeNode(TEXT("Swift.Marksman.Lead"), TEXT("Lead"),
+        TEXT("Lead may be held on two targets at once."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Swift.Marksman.MarkEconomy"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Lead.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Ledger (travel) -> Called Shot (impactful) ---------------------
+    // LIVE 2026-08-16: §1.5 M3 transcribed — refunded at 50% (the old
+    // rank-two figure, at rank one under O272) "if the ability's effect lands
+    // a hit within its window". Lead is the Marksman ability that exists;
+    // UBreakerWeaponComponent::FireOnce refunds once per mark window when a
+    // shot connects with the marked target, at the registry's own authored
+    // cost (§1.2 S6: 40 Momentum).
+    Node = MakeNode(TEXT("Swift.Marksman.Ledger"), TEXT("Ledger"),
+        TEXT("Half the Momentum spent on a Marksman ability is refunded when it connects."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Ledger.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // M11. The one rewrite in the class whose CONDITION is expressible —
     // Redline is a real EBreakerBuildCondition — and it still cannot be
     // authored as an effect, because what the condition gates is a RANGE GATE
-    // ON AN ABILITY (Lead's 25 m drops to 10 m), not a magnitude. The
-    // prerequisite is Lead itself, since a node that rewrites Lead's rule
-    // with no Lead is a purchase that does nothing.
+    // ON AN ABILITY (Lead's 25 m drops to 10 m), not a magnitude. Ledger is
+    // the travel: a node that rewrites Lead's economy sits under the node that
+    // refunds it.
     // LIVE 2026-08-16: the rule is CONSUMED by UBreakerWeaponComponent::
     // FireOnce via FBreakerWeaponMath::LeadRangeGateCm — with this tag owned
     // and the bar at Redline, the gate the weak-point treatment tests against
     // is 10 m instead of Lead's authored 25 m. Still, correctly, a tag with
     // no stat line: the node changes a rule, not a number.
     Node = MakeNode(TEXT("Swift.Marksman.CalledShot"), TEXT("Called Shot"),
-        TEXT("At Redline, Lead's range gate drops from 25 m to 10 m, so the mark pays at conversational distance."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Swift.Marksman.Lead"));
+        TEXT("At Redline, Lead's range gate drops from 25 m to 10 m, so the mark pays at conversational distance."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Swift.Marksman.Ledger"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MarksmanCalledShot.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Unpaired travel: Deadeye ---------------------------------------------
+    // Marksman's thirteenth id. O272's "every node id, tag and consumer
+    // stands" forbids a merge, so Deadeye is a travel with no impactful — a
+    // root with no dependents — authored here, before the keystone pair, so
+    // every pair still walks travel-then-impactful.
+    // Marksman's crit-chance ladder. Long Lens gave the branch crit DAMAGE with
+    // almost no chance to apply it to, which is a stat that reads well on a card
+    // and does close to nothing.
+    Node = MakeNode(TEXT("Swift.Marksman.Deadeye"), TEXT("Deadeye"),
+        TEXT("Held aim finds the weak point. A large flat critical chance."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    AddEffect(Node, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 8.0f); // O2 PLACEHOLDER — the old two ranks' total
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Deadeye.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Long Lens (travel) -> Culling (keystone) -----------------------
+    // Marksman's entry node. Its crit-damage and damage lines are live; the
+    // DISTANCE half of its promise - that distant weak-point hits also generate
+    // Momentum - is the part that ties the branch to the resource, and it is the
+    // half that keeps Marksman from being a pure stat branch (the duplication
+    // Core-Tree-Redesign flags: these two lines restate Precision's).
+    // WAITING ON: a range-gated weak-point generation credit.
+    Node = MakeNode(TEXT("Swift.Marksman.LongLens"), TEXT("Long Lens"),
+        TEXT("Distant weak-point hits generate Momentum, and down sights everything lands harder."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    // The crit line stays unconditional: CriticalDamage is not a generic damage
+    // pool, so it is the second half of the rule -- a stat target Core's wheels
+    // do not own outright -- rather than the conditional half.
+    AddEffect(Node, EBreakerNodeStatTarget::CriticalDamage, EBreakerNodeStatBucket::Flat, 36.0f); // O2 PLACEHOLDER — the old two ranks' total
+    // AIMING, and it used to be unconditional. The node is called Long Lens and
+    // its own text has always said "distant weak-point hits"; the shared Damage
+    // line was the one part of it that paid from the hip.
+    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 6.0f, EBreakerBuildCondition::Aiming); // O2 PLACEHOLDER — the old two ranks' total
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_LongLens.GetTag());
     Tree->Nodes.Add(Node);
 
     // Marksman's branch keystone, and the node that took two rulings to settle.
@@ -937,9 +928,9 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftMarksmanTree()
     // existed nothing about it culled. Increased-bucket and additive per the §4a
     // rider canon, because a target-conditional More is forbidden by rule.
     Node = MakeNode(TEXT("Swift.Marksman.Culling"), TEXT("Culling"),
-        TEXT("Branch keystone. Aiming down sights, your weapon hits considerably harder — and the cull itself: targets already near death take increased damage."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 4, 1, 2);
+        TEXT("Branch keystone. Aiming down sights, your weapon hits considerably harder — and the cull itself: targets already near death take increased damage."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 4, 1, 1);
     AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 15.0f, EBreakerBuildCondition::TargetLowHealth); // O2 PLACEHOLDER — execute window is the narrowest target condition, priced at the top of the conditional band
-    AddPrerequisite(Node, TEXT("Swift.Marksman.PierceDiscipline"));
+    AddPrerequisite(Node, TEXT("Swift.Marksman.LongLens"));
     AddEffect(Node, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::IncreasedPercent, 18.0f, EBreakerBuildCondition::Aiming); // O2 PLACEHOLDER
     Node->bCornerstone = true; // O37: keystone tier requires branch commitment
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Culling.GetTag());
@@ -970,109 +961,48 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftFrenzyTree()
 
     // Every Frenzy node in the design document is a Momentum-LOOP rewrite, and
     // the Momentum loop is not a node stat target — so transcribed verbatim the
-    // whole branch would have been ten tags and nothing else. Each node
+    // whole branch would have been ten tags and nothing else. Each travel
     // therefore carries its design-document rule as a tag AND a stat line that
     // states the same intent in a currency that reaches gameplay today. The
     // stat lines are authored, not transcribed; the doc's implementation-status
     // section names each one.
 
-    // --- Tier 1 ------------------------------------------------------------
-    // LIVE 2026-08-16: §1.3 F1's rule half, both clauses transcribed, is
-    // CONSUMED by UBreakerMomentumComponent::HandleShot — grounded weak-point
-    // hits pay Momentum with any rank owned, and R2 runs the internal
-    // cooldown at 0.15s instead of 0.25s. The crit line below stays: it is
-    // the authored stat half, not a stand-in for the rule.
-    UBreakerProgressionNode* Node = MakeNode(TEXT("Swift.Frenzy.TriggerDiscipline"), TEXT("Trigger Discipline"),
-        TEXT("Weak-point hits pay Momentum with your feet on the ground, and you find weak points more often."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 2, 1);
-    AddEffect(Node, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 3.0f); // O2 PLACEHOLDER
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_FrenzyTrigger.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // LIVE 2026-08-16: §1.3 F2's rule half, transcribed — "reloading while at
-    // Redline refunds ammunition to the magazine equal to the shots fired in
-    // the previous 2s (R1: half, R2: all). Rule rewrite; does not touch
-    // reload speed." Consumed by UBreakerWeaponComponent::StartReload/
-    // FinishReload: the Redline read and the 2s window are captured when the
-    // reload is committed, and the free rounds settle ahead of the reserve
-    // draw, so the refund is paid in reserve saved.
-    Node = MakeNode(TEXT("Swift.Frenzy.Loaded"), TEXT("Loaded"),
-        TEXT("Reloading at Redline returns the rounds you just spent, and a loaded magazine hits harder at Redline."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 2, 1);
-    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 6.0f, EBreakerBuildCondition::Redline); // O2 PLACEHOLDER
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Loaded.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // Short Leash delays decay below the walking threshold, so raising the
-    // threshold speed itself is the same node said in a stat: a faster Frenzy
-    // spends less of its time under the line it is being paid to stay above.
-    Node = MakeNode(TEXT("Swift.Frenzy.ShortLeash"), TEXT("Short Leash"),
-        TEXT("Momentum decay waits longer when you slow down, and you move quicker on the ground."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 2, 1);
-    AddEffect(Node, EBreakerNodeStatTarget::MoveSpeed, EBreakerNodeStatBucket::IncreasedPercent, 5.0f); // O2 PLACEHOLDER
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_ShortLeash.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 2 ------------------------------------------------------------
-    // LIVE 2026-08-16: §1.3 F4's rule half, transcribed — every 5th
+    // --- Pair: Rhythm (travel) -> Slipcut Mastery (impactful) -----------------
+    // LIVE 2026-08-16: §1.3 F4's rule half, transcribed — every 4th
     // consecutive hit on any target generates +8 Momentum outside the global
-    // per-second cap (R2: every 4th; missing resets). Consumed by
-    // UBreakerMomentumComponent::HandleShot off the weapon's OnShot event;
-    // "outside the cap" is GrantMomentum's direct-credit path.
-    Node = MakeNode(TEXT("Swift.Frenzy.Rhythm"), TEXT("Rhythm"),
-        TEXT("Every fifth consecutive hit pays Momentum outside the cap, and a maintained rhythm finds weak points."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Swift.Frenzy.TriggerDiscipline"));
-    AddEffect(Node, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 3.0f); // O2 PLACEHOLDER
+    // per-second cap (the old rank-two cadence, at rank one under O272;
+    // missing resets). Consumed by UBreakerMomentumComponent::HandleShot off
+    // the weapon's OnShot event; "outside the cap" is GrantMomentum's
+    // direct-credit path.
+    UBreakerProgressionNode* Node = MakeNode(TEXT("Swift.Frenzy.Rhythm"), TEXT("Rhythm"),
+        TEXT("Every fourth consecutive hit pays Momentum outside the cap, and a maintained rhythm finds weak points."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    AddEffect(Node, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 6.0f); // O2 PLACEHOLDER — the old two ranks' total
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Rhythm.GetTag());
     Tree->Nodes.Add(Node);
 
-    // LIVE 2026-08-16 (partially): §1.3 F5's first clause, transcribed —
-    // firing the last round in a magazine generates +12 Momentum. Consumed by
-    // UBreakerMomentumComponent::HandleMagazineEmptied off the weapon's
-    // OnMagazineEmptied event (which fires on the last round LEAVING, never
-    // on the reload). Rank two also refunds one second of active ability cooldown.
-    Node = MakeNode(TEXT("Swift.Frenzy.DryFire"), TEXT("Dry Fire"),
-        TEXT("Firing the last round of a magazine pays Momentum. Emptying rather than tapping is rewarded at Redline. R2: also refunds 1s of active ability cooldown."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Swift.Frenzy.Loaded"));
-    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 5.0f, EBreakerBuildCondition::Redline); // O2 PLACEHOLDER
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_DryFire.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // Frenzy is the branch that stands its ground while the other two leave it,
-    // so its loop node pays in the currency standing still actually costs.
-    // LIVE 2026-08-16: §1.3 F6's rule half, transcribed — kills refund
-    // Momentum equal to 10% of the ability cost most recently paid (R2: 20%).
-    // Consumed by UBreakerMomentumComponent::HandleKillDealt off the combat
-    // component's attacker-side OnKillDealt; "the cost most recently paid" is
-    // the loop's own spend observer (every write the component makes goes
-    // through ApplyMomentumDelta, so an external drop in the class resource
-    // is an ability cost by elimination).
-    Node = MakeNode(TEXT("Swift.Frenzy.Feed"), TEXT("Feed"),
-        TEXT("Kills refund part of the Momentum you last spent, and holding the line leaves you with more to lose."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Swift.Frenzy.ShortLeash"));
-    AddEffect(Node, EBreakerNodeStatTarget::Health, EBreakerNodeStatBucket::Flat, 45.0f); // O2 PLACEHOLDER
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Feed.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // Frenzy's offensive spine and the largest conditional ladder in the
-    // branch, the counterpart to Kinetic's Downforce and Grind. Redline is
-    // harder to hold than airborne is to enter but easier than a wall ride, and
-    // it is priced between them.
-    Node = MakeNode(TEXT("Swift.Frenzy.Overrev"), TEXT("Overrev"),
-        TEXT("Shots fired at Redline Momentum land significantly harder. Worth nothing the moment the bar drops."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Swift.Frenzy.ShortLeash"));
-    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 12.0f, EBreakerBuildCondition::Redline); // O2 PLACEHOLDER
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Overrev.GetTag());
-    Tree->Nodes.Add(Node);
-
-    // --- Tier 3 ------------------------------------------------------------
     // F7 grants S2 Cadence Break in Class-Kits §1.3. NO ability grant is
     // authored: `Swift.CadenceBreak` does not exist in the ability fallback
     // registry, and a node that unlocks a loadout entry resolving to nothing is
     // the "node that lies" failure mode. The rule half ships as a tag; the
     // grant goes in the same line the day the ability does.
     Node = MakeNode(TEXT("Swift.Frenzy.SlipcutMastery"), TEXT("Slipcut Mastery"),
-        TEXT("Slipcut's window widens for each ability cooldown running. Its cadence window bites deeper."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 3, 1, 2);
+        TEXT("Slipcut's window widens for each ability cooldown running. Its cadence window bites deeper."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
     AddPrerequisite(Node, TEXT("Swift.Frenzy.Rhythm"));
     AddEffect(Node, EBreakerNodeStatTarget::CriticalDamage, EBreakerNodeStatBucket::Flat, 20.0f); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_SlipcutMastery.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Dry Fire (travel) -> Ammunition Economy (impactful) ------------
+    // LIVE 2026-08-16 (partially): §1.3 F5, transcribed — firing the last
+    // round in a magazine generates +12 Momentum and refunds one second of
+    // active ability cooldown (the old rank-two clause, at rank one under
+    // O272). Consumed by UBreakerMomentumComponent::HandleMagazineEmptied off
+    // the weapon's OnMagazineEmptied event (which fires on the last round
+    // LEAVING, never on the reload).
+    Node = MakeNode(TEXT("Swift.Frenzy.DryFire"), TEXT("Dry Fire"),
+        TEXT("Firing the last round of a magazine pays Momentum and refunds one second of active ability cooldown. Emptying rather than tapping is rewarded at Redline."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 10.0f, EBreakerBuildCondition::Redline); // O2 PLACEHOLDER — the old two ranks' total
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_DryFire.GetTag());
     Tree->Nodes.Add(Node);
 
     // Frenzy's one unconditional damage increase, deliberately sited at the top
@@ -1081,7 +1011,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftFrenzyTree()
     // the branch's kill-to-fire-again loop.
     // WAITING ON: the on-kill ammunition return crediting Momentum.
     Node = MakeNode(TEXT("Swift.Frenzy.AmmunitionEconomy"), TEXT("Ammunition Economy"),
-        TEXT("Ammunition returned on a kill also pays Momentum, and at Redline your shots land harder."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 3, 1, 2);
+        TEXT("Ammunition returned on a kill also pays Momentum, and at Redline your shots land harder."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
     AddPrerequisite(Node, TEXT("Swift.Frenzy.DryFire"));
     // AT REDLINE, and it used to be unconditional -- the description even said
     // so: "the branch's one unconditional increase to damage". A doctrine may
@@ -1099,24 +1029,47 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftFrenzyTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_AmmunitionEconomy.GetTag());
     Tree->Nodes.Add(Node);
 
-    // --- Tier 4 (F9-F11), the rewrite tier -----------------------------------
-    // Frenzy's rewrites are the branch saying its identity out loud: hold the
-    // rhythm through a target swap, convert Redline into cadence, and pay for
-    // cheap abilities with a bar that empties twice as fast. See the block
-    // comment above GetSwiftKineticTree for why all three are tags only.
+    // --- Pair: Short Leash (travel) -> No Safety (impactful) ------------------
+    // Short Leash delays decay below the walking threshold, so raising the
+    // threshold speed itself is the same node said in a stat: a faster Frenzy
+    // spends less of its time under the line it is being paid to stay above.
+    Node = MakeNode(TEXT("Swift.Frenzy.ShortLeash"), TEXT("Short Leash"),
+        TEXT("Momentum decay waits longer when you slow down, and you move quicker on the ground."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    AddEffect(Node, EBreakerNodeStatTarget::MoveSpeed, EBreakerNodeStatBucket::IncreasedPercent, 10.0f); // O2 PLACEHOLDER — the old two ranks' total
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_ShortLeash.GetTag());
+    Tree->Nodes.Add(Node);
 
-    // F9. A rewrite of Cadence Break's stacking rule. `Swift.CadenceBreak` is
-    // STILL not in the ability fallback registry — the same gap Slipcut
-    // Mastery records above — so this node rewrites an ability that does not
-    // exist yet, and its prerequisite is the node that will grant it the day
-    // it does. Deliberately authored anyway: the design's Frenzy is unreadable
-    // without its ability rewrite, and a tag waiting on a named consumer is
-    // the project's established way to say so. NO ability grant is added here
-    // for the same reason Slipcut Mastery carries none.
-    Node = MakeNode(TEXT("Swift.Frenzy.SecondWind"), TEXT("Second Wind"),
-        TEXT("Cadence Break's stack no longer breaks when you change targets. Only a full second without a hit resets it."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Swift.Frenzy.SlipcutMastery"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SecondWind.GetTag());
+    // F11. §1.3 calls this "the node that makes Frenzy read as a CLASS choice
+    // rather than a bonus", and both of its halves are authorable.
+    // LIVE 2026-08-16: both halves at once, exactly as the old WAITING ON
+    // demanded — shipping either alone would invert the design (a pure
+    // upgrade, or a pure tax). Class-Kits §1.3 F11 transcribed: "Momentum
+    // decay is doubled" (+100% ClassResourceDecay, unconditional, through the
+    // loop valve) "and abilities cost 40% less Momentum" (+40 on the
+    // AbilityCost lane, which is authored as an Increased percentage OF THE
+    // REDUCTION — the enum's own convention — and joins gear's Resource
+    // Efficiency bucket additively).
+    Node = MakeNode(TEXT("Swift.Frenzy.NoSafety"), TEXT("No Safety"),
+        TEXT("Abilities cost far less Momentum, and the bar drains twice as fast. A real downside, taken on purpose."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Swift.Frenzy.ShortLeash"));
+    AddEffect(Node, EBreakerNodeStatTarget::ClassResourceDecay, EBreakerNodeStatBucket::IncreasedPercent, 100.0f); // Class-Kits §1.3 F11: decay doubled
+    AddEffect(Node, EBreakerNodeStatTarget::AbilityCost, EBreakerNodeStatBucket::IncreasedPercent, 40.0f); // Class-Kits §1.3 F11: abilities cost 40% less
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_NoSafety.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Loaded (travel) -> Redline Trigger (impactful) -----------------
+    // LIVE 2026-08-16: §1.3 F2's rule half, transcribed — "reloading while at
+    // Redline refunds ammunition to the magazine equal to the shots fired in
+    // the previous 2s. Rule rewrite; does not touch reload speed." Consumed
+    // by UBreakerWeaponComponent::StartReload/FinishReload: the Redline read
+    // and the 2s window are captured when the reload is committed, and the
+    // free rounds settle ahead of the reserve draw, so the refund is paid in
+    // reserve saved. All of the rounds at rank one (the old rank-two figure,
+    // under O272).
+    Node = MakeNode(TEXT("Swift.Frenzy.Loaded"), TEXT("Loaded"),
+        TEXT("Reloading at Redline returns every round you fired in the last two seconds, and a loaded magazine hits harder at Redline."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 12.0f, EBreakerBuildCondition::Redline); // O2 PLACEHOLDER — the old two ranks' total
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Loaded.GetTag());
     Tree->Nodes.Add(Node);
 
     // F10. Reads an affix and changes its RULE — Damage Ramp's stacks accrue
@@ -1127,27 +1080,65 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftFrenzyTree()
     // would be the affix duplication that same section forbids. The weapon's
     // Damage Ramp consumer doubles accrual once per successful shot at Redline.
     Node = MakeNode(TEXT("Swift.Frenzy.RedlineTrigger"), TEXT("Redline Trigger"),
-        TEXT("At Redline your weapon is treated as a cadence tier faster for Damage Ramp, so its stacks build twice as quickly."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Swift.Frenzy.Overrev"));
+        TEXT("At Redline your weapon is treated as a cadence tier faster for Damage Ramp, so its stacks build twice as quickly."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Swift.Frenzy.Loaded"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_RedlineTrigger.GetTag());
     Tree->Nodes.Add(Node);
 
-    // F11. §1.3 calls this "the node that makes Frenzy read as a CLASS choice
-    // rather than a bonus", and both of its halves are now authorable.
-    // LIVE 2026-08-16: both halves at once, exactly as the old WAITING ON
-    // demanded — shipping either alone would invert the design (a pure
-    // upgrade, or a pure tax). Class-Kits §1.3 F11 transcribed: "Momentum
-    // decay is doubled" (+100% ClassResourceDecay, unconditional, through the
-    // loop valve) "and abilities cost 40% less Momentum" (+40 on the
-    // AbilityCost lane, which is authored as an Increased percentage OF THE
-    // REDUCTION — the enum's own convention — and joins gear's Resource
-    // Efficiency bucket additively).
-    Node = MakeNode(TEXT("Swift.Frenzy.NoSafety"), TEXT("No Safety"),
-        TEXT("Abilities cost far less Momentum, and the bar drains twice as fast. A real downside, taken on purpose."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 4, 1, 2);
-    AddPrerequisite(Node, TEXT("Swift.Frenzy.ShortLeash"));
-    AddEffect(Node, EBreakerNodeStatTarget::ClassResourceDecay, EBreakerNodeStatBucket::IncreasedPercent, 100.0f); // Class-Kits §1.3 F11: decay doubled
-    AddEffect(Node, EBreakerNodeStatTarget::AbilityCost, EBreakerNodeStatBucket::IncreasedPercent, 40.0f); // Class-Kits §1.3 F11: abilities cost 40% less
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_NoSafety.GetTag());
+    // --- Pair: Trigger Discipline (travel) -> Second Wind (impactful) ---------
+    // LIVE 2026-08-16: §1.3 F1's rule half, both clauses transcribed, is
+    // CONSUMED by UBreakerMomentumComponent::HandleShot — grounded weak-point
+    // hits pay Momentum, on an internal cooldown of 0.15 s (the old rank-two
+    // figure, at rank one under O272). The crit line below stays: it is the
+    // authored stat half, not a stand-in for the rule.
+    Node = MakeNode(TEXT("Swift.Frenzy.TriggerDiscipline"), TEXT("Trigger Discipline"),
+        TEXT("Weak-point hits pay Momentum with your feet on the ground, and you find weak points more often."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    AddEffect(Node, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 6.0f); // O2 PLACEHOLDER — the old two ranks' total
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_FrenzyTrigger.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // F9. A rewrite of Cadence Break's stacking rule. `Swift.CadenceBreak` is
+    // STILL not in the ability fallback registry — the same gap Slipcut
+    // Mastery records above — so this node rewrites an ability that does not
+    // exist yet. Deliberately authored anyway: the design's Frenzy is
+    // unreadable without its ability rewrite, and a tag waiting on a named
+    // consumer is the project's established way to say so. NO ability grant
+    // is added here for the same reason Slipcut Mastery carries none.
+    Node = MakeNode(TEXT("Swift.Frenzy.SecondWind"), TEXT("Second Wind"),
+        TEXT("Cadence Break's stack no longer breaks when you change targets. Only a full second without a hit resets it."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    AddPrerequisite(Node, TEXT("Swift.Frenzy.TriggerDiscipline"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SecondWind.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Unpaired travel: Feed ------------------------------------------------
+    // Frenzy's thirteenth id. O272's "every node id, tag and consumer stands"
+    // forbids a merge, so Feed is a travel with no impactful — a root with no
+    // dependents — authored here, before the keystone pair, so every pair
+    // still walks travel-then-impactful.
+    // Frenzy is the branch that stands its ground while the other two leave it,
+    // so its loop node pays in the currency standing still actually costs.
+    // LIVE 2026-08-16: §1.3 F6's rule half, transcribed — kills refund
+    // Momentum equal to 20% of the ability cost most recently paid (the old
+    // rank-two figure, at rank one under O272). Consumed by
+    // UBreakerMomentumComponent::HandleKillDealt off the combat component's
+    // attacker-side OnKillDealt; "the cost most recently paid" is the loop's
+    // own spend observer (every write the component makes goes through
+    // ApplyMomentumDelta, so an external drop in the class resource is an
+    // ability cost by elimination).
+    Node = MakeNode(TEXT("Swift.Frenzy.Feed"), TEXT("Feed"),
+        TEXT("Kills refund a fifth of the Momentum you last spent, and holding the line leaves you with more to lose."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    AddEffect(Node, EBreakerNodeStatTarget::Health, EBreakerNodeStatBucket::Flat, 90.0f); // O2 PLACEHOLDER — the old two ranks' total
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Feed.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Pair: Overrev (travel) -> Bloodrhythm (keystone) ---------------------
+    // Frenzy's offensive spine and the largest conditional ladder in the
+    // branch, the counterpart to Kinetic's Downforce. Redline is harder to
+    // hold than airborne is to enter, and it is priced above it.
+    Node = MakeNode(TEXT("Swift.Frenzy.Overrev"), TEXT("Overrev"),
+        TEXT("Shots fired at Redline Momentum land significantly harder. Worth nothing the moment the bar drops."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 1);
+    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 24.0f, EBreakerBuildCondition::Redline); // O2 PLACEHOLDER — the old two ranks' total
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Overrev.GetTag());
     Tree->Nodes.Add(Node);
 
     // The branch keystone O3 permits, and the only one of Swift's three that
@@ -1155,10 +1146,10 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftFrenzyTree()
     // in Overdrive's variant table, and the progression component now publishes
     // node tags onto the ability system component, so owning this node really
     // does resolve Overdrive to its Bloodrhythm row. Class-Kits §1.3 prices the
-    // keystone at 4; the implemented branch grammar uses 3 (Overpressure,
-    // Culling) and the cost curve is kept internally consistent instead.
+    // keystone at 4; O272 prices every keystone at one behind its six-invested
+    // gate, the same as Overpressure and Culling.
     Node = MakeNode(TEXT("Swift.Frenzy.Bloodrhythm"), TEXT("Bloodrhythm"),
-        TEXT("Branch keystone. Your rate of fire climbs at Redline, and Overdrive refunds Momentum on every hit."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 4, 1, 2);
+        TEXT("Branch keystone. Your rate of fire climbs at Redline, and Overdrive refunds Momentum on every hit."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 4, 1, 1);
     AddPrerequisite(Node, TEXT("Swift.Frenzy.Overrev"));
     // THE MORE IS GONE (O95). Frenzy's identity is Redline uptime and sustained
     // fire, so the replacement is FireRate rather than damage: it composes into

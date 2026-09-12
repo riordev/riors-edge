@@ -535,9 +535,9 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Channels", meta=(ClampMin="0", ClampMax="1")) float ChainDamageMultiplier = 0.50f;   // O2 PLACEHOLDER
     // Ricochet seeks the nearest enemy in line of sight within this radius of
     // the geometry impact. Base value matches nothing in the kit doc — the
-    // doc's 12 m / 20 m figures belong to Swift.Marksman.Angle's two ranks
-    // (Class-Kits §1.5 M4, transcribed at the read site), which OVERRIDE this
-    // when owned.
+    // doc's 20 m figure belongs to Swift.Marksman.Angle's single rank
+    // (Class-Kits §1.5 M4, O272, transcribed at the read site), which
+    // OVERRIDES this when owned.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Channels", meta=(ClampMin="0")) float RicochetSeekRadiusCm = 800.0f;   // O2 PLACEHOLDER
     // A bounced round arrives at this fraction of the pellet's current damage.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Channels", meta=(ClampMin="0", ClampMax="1")) float RicochetDamageMultiplier = 0.65f;   // O2 PLACEHOLDER

@@ -109,12 +109,16 @@ bool FBreakerContactRuntimeTest::RunTest(const FString& Parameters)
     if (!Complete(EBreakerLedgeVerb::Vault)) return false;
     Advance(0.40f);
     TestEqual(TEXT("Unowned completed vault pays only existing traversal grant"), Momentum->GetMomentum(), Momentum->LedgeTraversalGrant, 0.01f);
+    // O272: Contact is a single rank at cost 1 and its one buy reads 0.70 s,
+    // so the window pays 8/s x 0.70 s = 5.6 on top of the traversal grant.
     if (!Buy()) return false;
-    TestEqual(TEXT("Rank one spends one of four points"), Progression->GetProgressionState().UnspentDoctrinePoints, 3);
+    TestEqual(TEXT("One Contact buy spends one of four points"), Progression->GetProgressionState().UnspentDoctrinePoints, 3);
     Prepare(80);
     if (!Complete(EBreakerLedgeVerb::Vault)) return false;
-    Advance(0.40f);
-    TestEqual(TEXT("Rank one vault pays six plus8/s for exactly .35s"), Momentum->GetMomentum(), Momentum->LedgeTraversalGrant + 2.8f, 0.02f);
+    // Exactly the window, so the anti-farm case below still lands inside the
+    // one-second traversal gate (0.70 + 0.05 + a 0.12 s vault < 1 s).
+    Advance(0.70f);
+    TestEqual(TEXT("Owned vault pays six plus 8/s for exactly .70s"), Momentum->GetMomentum(), Momentum->LedgeTraversalGrant + 5.6f, 0.02f);
     const float AfterExpired = Momentum->GetMomentum(); Advance(0.05f);
     TestEqual(TEXT("Expired Contact cannot keep paying"), Momentum->GetMomentum(), AfterExpired, 0.01f);
     // A second real traversal before one second cannot re-arm either source.
@@ -122,12 +126,15 @@ bool FBreakerContactRuntimeTest::RunTest(const FString& Parameters)
     if (!Complete(EBreakerLedgeVerb::Vault)) return false;
     Advance(0.40f);
     TestEqual(TEXT("Traversal anti-farm gate also gates Contact"), Momentum->GetMomentum(), 0.0f, 0.02f);
-    if (!Buy()) return false;
-    TestEqual(TEXT("Rank two fits current progression with two points remaining"), Progression->GetProgressionState().UnspentDoctrinePoints, 2);
+    {
+        FText Refusal;
+        TestFalse(TEXT("Owned Contact refuses a second purchase"), Progression->PurchaseNode(UBreakerProgressionLibrary::GetSwiftKineticTree(), TEXT("Swift.Kinetic.Contact"), Refusal));
+        TestEqual(TEXT("Refused purchase leaves three of four points"), Progression->GetProgressionState().UnspentDoctrinePoints, 3);
+    }
     Prepare(120);
     if (!Complete(EBreakerLedgeVerb::Mantle)) return false;
     Advance(0.75f);
-    TestEqual(TEXT("Rank two real mantle earns .70s Contact"), Momentum->GetMomentum(), Momentum->LedgeTraversalGrant + 5.6f, 0.02f);
+    TestEqual(TEXT("Owned real mantle earns the same .70s Contact"), Momentum->GetMomentum(), Momentum->LedgeTraversalGrant + 5.6f, 0.02f);
     Prepare(120);
     if (!Complete(EBreakerLedgeVerb::Mantle)) return false;
     Advance(0.8f, false); // Actual game time passes; intentionally hitch only the resource tick.
@@ -151,9 +158,9 @@ bool FBreakerContactRuntimeTest::RunTest(const FString& Parameters)
     Progression->DevForceClass(EBreakerClassId::Swift);
     const float ReturnedResource = Momentum->GetMomentum(); Advance(0.1f);
     TestEqual(TEXT("Returning to Swift cannot restore old grace"), Momentum->GetMomentum(), ReturnedResource, 0.01f);
-    // Class changes can replace doctrine state, so restore only via actual purchases when needed.
-    while (Progression->GetNodeRank(TEXT("Swift.Kinetic.Contact"), EBreakerPointCurrency::DoctrinePoints) < 2)
-        if (!Buy()) return false;
+    // Class changes can replace doctrine state, so restore only via an actual purchase when needed.
+    if (Progression->GetNodeRank(TEXT("Swift.Kinetic.Contact"), EBreakerPointCurrency::DoctrinePoints) < 1 && !Buy()) return false;
+    TestEqual(TEXT("Contact holds its single rank across the class round trip"), Progression->GetNodeRank(TEXT("Swift.Kinetic.Contact"), EBreakerPointCurrency::DoctrinePoints), 1);
     Prepare(40);
     FBreakerLedgeTraversal Refused;
     TestFalse(TEXT("Below authored minimum refuses"), Movement->ResolveLedgeTraversal(Refused));
@@ -205,7 +212,7 @@ bool FBreakerContactRuntimeTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("Actual doctrine respec"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, true, RespecFailure))) return false;
     const float AfterRespec = Momentum->GetMomentum(); Advance(0.2f);
     TestEqual(TEXT("Respec cancels active Contact grace"), Momentum->GetMomentum(), AfterRespec, 0.01f);
-    TestEqual(TEXT("Both spent points return to the four-point wallet"), Progression->GetProgressionState().UnspentDoctrinePoints, 4);
+    TestEqual(TEXT("The spent point returns to the four-point wallet"), Progression->GetProgressionState().UnspentDoctrinePoints, 4);
     return true;
 }
 #endif

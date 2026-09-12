@@ -96,8 +96,9 @@ int32 FBreakerWeaponMath::SelectNearestTarget(const FVector& Origin, const TArra
 float FBreakerWeaponMath::SteadyMovementSpreadDegrees(float MovementSpreadDegrees, float AimAlpha, int32 SteadyRank, bool bAirborne)
 {
     if (SteadyRank <= 0 || AimAlpha <= 0.0f || MovementSpreadDegrees <= 0.0f) return MovementSpreadDegrees;
-    // §1.5 M2's rank split: R1 is the grounded rule, R2 extends it airborne.
-    if (bAirborne && SteadyRank < 2) return MovementSpreadDegrees;
+    // §1.5 M2; O272: single rank — Steady steadies grounded and airborne
+    // alike, so bAirborne no longer gates the relief.
+    (void)bAirborne;
     // Relief scales with aim progress so the rule arrives at the pace every
     // other ADS benefit does — full sights, no movement penalty at all.
     return MovementSpreadDegrees * (1.0f - FMath::Clamp(AimAlpha, 0.0f, 1.0f));
@@ -128,19 +129,19 @@ float FBreakerWeaponMath::LeadRangeGateCm(float BaseGateCm, bool bCalledShotOwne
 float FBreakerWeaponMath::LedgerRefundFraction(int32 LedgerRank)
 {
     if (LedgerRank <= 0) return 0.0f;
-    return LedgerRank >= 2 ? 0.50f : 0.25f;   // Class-Kits §1.5 M3 R1/R2
+    return 0.50f;   // Class-Kits §1.5 M3; O272: rank one carries the old rank-two half. O2 PLACEHOLDER
 }
 
 float FBreakerWeaponMath::MarkJumpRadiusCm(int32 MarkEconomyRank)
 {
     if (MarkEconomyRank <= 0) return 0.0f;
-    return MarkEconomyRank >= 2 ? 2500.0f : 1500.0f;   // Class-Kits §1.5 M5: 15 m / 25 m
+    return 2500.0f;   // Class-Kits §1.5 M5; O272: rank one carries the old rank-two 25 m. O2 PLACEHOLDER
 }
 
 int32 FBreakerWeaponMath::LoadedRefundRounds(int32 ShotsInWindow, int32 LoadedRank)
 {
     if (LoadedRank <= 0 || ShotsInWindow <= 0) return 0;
-    return LoadedRank >= 2 ? ShotsInWindow : ShotsInWindow / 2;   // Class-Kits §1.3 F2 R1/R2
+    return ShotsInWindow;   // Class-Kits §1.3 F2; O272: rank one refunds every shot in the window.
 }
 
 int32 FBreakerWeaponMath::MagazineDebitRounds(bool bChamberedRoundArmed)

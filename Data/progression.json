@@ -12,7 +12,7 @@
 		"Source/RiorsEdge/Progression/BreakerCoreRosterWeapon.cpp": "668dc0b08541588e995afe28301d8ae2bacb2106",
 		"Source/RiorsEdge/Progression/BreakerCoreTree.cpp": "0d1c3252ee7f95d02fea3445e83f7e71b05e15c2",
 		"Source/RiorsEdge/Progression/BreakerCoreTree.h": "d5cbc90580dd4568eeb1ee21d00f5159dc56bbae",
-		"Source/RiorsEdge/Progression/BreakerProgressionLibrary.cpp": "5b1638ccd1c9746d205dd6f6d3cde63c6b7fd417",
+		"Source/RiorsEdge/Progression/BreakerProgressionLibrary.cpp": "14f61d45d08ca133b46579a3cf61f3c3ffde3e31",
 		"Source/RiorsEdge/Progression/BreakerProgressionNode.h": "b18436bdeeeef00075344254bd538c6fb1e3140e",
 		"Source/RiorsEdge/Progression/BreakerProgressionTree.h": "9dfcbac0af583d1da7c0e6ed117e8c94231d1395",
 		"Source/RiorsEdge/Progression/BreakerProgressionTypes.h": "d1f683b84a26b912db1ef42a87f87eeff96d02e8"
@@ -7042,75 +7042,9 @@
 			"adjacencyEdges": [],
 			"nodes": [
 				{
-					"id": "Swift.Frenzy.TriggerDiscipline",
-					"tier": 1,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [
-						{
-							"target": "CriticalChance",
-							"bucket": "Flat",
-							"valuePerRank": 3,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Swift.Frenzy.TriggerDiscipline"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Swift.Frenzy.Loaded",
-					"tier": 1,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 6,
-							"condition": "Redline",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Swift.Frenzy.Loaded"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Swift.Frenzy.ShortLeash",
-					"tier": 1,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [
-						{
-							"target": "MoveSpeed",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 5,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Swift.Frenzy.ShortLeash"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
 					"id": "Swift.Frenzy.Rhythm",
-					"tier": 2,
-					"ranks": 2,
+					"tier": 1,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -7118,7 +7052,7 @@
 						{
 							"target": "CriticalChance",
 							"bucket": "Flat",
-							"valuePerRank": 3,
+							"valuePerRank": 6,
 							"condition": "Always",
 							"alsoRequires": []
 						}
@@ -7127,103 +7061,13 @@
 						"Progression.Node.Swift.Frenzy.Rhythm"
 					],
 					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Swift.Frenzy.TriggerDiscipline",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Swift.Frenzy.DryFire",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 5,
-							"condition": "Redline",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Swift.Frenzy.DryFire"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Swift.Frenzy.Loaded",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Swift.Frenzy.Feed",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [
-						{
-							"target": "Health",
-							"bucket": "Flat",
-							"valuePerRank": 45,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Swift.Frenzy.Feed"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Swift.Frenzy.ShortLeash",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Swift.Frenzy.Overrev",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 12,
-							"condition": "Redline",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Swift.Frenzy.Overrev"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Swift.Frenzy.ShortLeash",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
+					"prerequisites": []
 				},
 				{
 					"id": "Swift.Frenzy.SlipcutMastery",
-					"tier": 3,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [
@@ -7244,14 +7088,35 @@
 							"id": "Swift.Frenzy.Rhythm",
 							"rank": 1
 						}
+					]
+				},
+				{
+					"id": "Swift.Frenzy.DryFire",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [
+						{
+							"target": "Damage",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 10,
+							"condition": "Redline",
+							"alsoRequires": []
+						}
 					],
-					"requiredTreeInvestment": 4
+					"tags": [
+						"Progression.Node.Swift.Frenzy.DryFire"
+					],
+					"exclusive": [],
+					"prerequisites": []
 				},
 				{
 					"id": "Swift.Frenzy.AmmunitionEconomy",
-					"tier": 3,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [
@@ -7272,54 +7137,35 @@
 							"id": "Swift.Frenzy.DryFire",
 							"rank": 1
 						}
-					],
-					"requiredTreeInvestment": 4
+					]
 				},
 				{
-					"id": "Swift.Frenzy.SecondWind",
-					"tier": 4,
+					"id": "Swift.Frenzy.ShortLeash",
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Swift.Frenzy.SecondWind"
-					],
-					"exclusive": [],
-					"prerequisites": [
+					"effects": [
 						{
-							"id": "Swift.Frenzy.SlipcutMastery",
-							"rank": 1
+							"target": "MoveSpeed",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 10,
+							"condition": "Always",
+							"alsoRequires": []
 						}
 					],
-					"requiredTreeInvestment": 6
-				},
-				{
-					"id": "Swift.Frenzy.RedlineTrigger",
-					"tier": 4,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
 					"tags": [
-						"Progression.Node.Swift.Frenzy.RedlineTrigger"
+						"Progression.Node.Swift.Frenzy.ShortLeash"
 					],
 					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Swift.Frenzy.Overrev",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 6
+					"prerequisites": []
 				},
 				{
 					"id": "Swift.Frenzy.NoSafety",
-					"tier": 4,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [
@@ -7347,14 +7193,139 @@
 							"id": "Swift.Frenzy.ShortLeash",
 							"rank": 1
 						}
+					]
+				},
+				{
+					"id": "Swift.Frenzy.Loaded",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [
+						{
+							"target": "Damage",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 12,
+							"condition": "Redline",
+							"alsoRequires": []
+						}
 					],
-					"requiredTreeInvestment": 6
+					"tags": [
+						"Progression.Node.Swift.Frenzy.Loaded"
+					],
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Swift.Frenzy.RedlineTrigger",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Swift.Frenzy.RedlineTrigger"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Swift.Frenzy.Loaded",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Swift.Frenzy.TriggerDiscipline",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [
+						{
+							"target": "CriticalChance",
+							"bucket": "Flat",
+							"valuePerRank": 6,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [
+						"Progression.Node.Swift.Frenzy.TriggerDiscipline"
+					],
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Swift.Frenzy.SecondWind",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Swift.Frenzy.SecondWind"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Swift.Frenzy.TriggerDiscipline",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Swift.Frenzy.Feed",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [
+						{
+							"target": "Health",
+							"bucket": "Flat",
+							"valuePerRank": 90,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [
+						"Progression.Node.Swift.Frenzy.Feed"
+					],
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Swift.Frenzy.Overrev",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [
+						{
+							"target": "Damage",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 24,
+							"condition": "Redline",
+							"alsoRequires": []
+						}
+					],
+					"tags": [
+						"Progression.Node.Swift.Frenzy.Overrev"
+					],
+					"exclusive": [],
+					"prerequisites": []
 				},
 				{
 					"id": "Swift.Frenzy.Bloodrhythm",
 					"tier": 4,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": true,
 					"constellation": "None",
 					"effects": [
@@ -7413,7 +7384,7 @@
 				{
 					"id": "Swift.Kinetic.ReadTheRoom",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -7425,220 +7396,10 @@
 					"prerequisites": []
 				},
 				{
-					"id": "Swift.Kinetic.Contact",
-					"tier": 1,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Swift.Kinetic.Contact"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Swift.Kinetic.Carry",
-					"tier": 1,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [
-						{
-							"target": "SlideSpeed",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 12,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Swift.Kinetic.Carry"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Swift.Kinetic.Redirect",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [
-						{
-							"target": "AbilityCooldown",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 20,
-							"condition": "Airborne",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Swift.Kinetic.Redirect"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Swift.Kinetic.ReadTheRoom",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Swift.Kinetic.EvadeConversion",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [
-						{
-							"target": "DodgeChance",
-							"bucket": "Flat",
-							"valuePerRank": 4,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Swift.Kinetic.EvadeConversion"
-					],
-					"exclusive": [],
-					"prerequisites": [],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Swift.Kinetic.Landing",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Swift.Kinetic.Landing"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Swift.Kinetic.ReadTheRoom",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Swift.Kinetic.AirWork",
-					"tier": 3,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [
-						{
-							"target": "AirControl",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 12,
-							"condition": "Always",
-							"alsoRequires": []
-						},
-						{
-							"target": "ProjectileCount",
-							"bucket": "Flat",
-							"valuePerRank": 0.5,
-							"condition": "Airborne",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Swift.Kinetic.AirWork"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Swift.Kinetic.Landing",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
-				},
-				{
-					"id": "Swift.Kinetic.Downforce",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 11,
-							"condition": "Airborne",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Swift.Kinetic.Downforce"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Swift.Kinetic.ReadTheRoom",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Swift.Kinetic.MomentumShield",
-					"tier": 4,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Swift.Kinetic.MomentumShield"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Swift.Kinetic.AirWork",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 6
-				},
-				{
-					"id": "Swift.Kinetic.SpendToLive",
-					"tier": 4,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Swift.Kinetic.SpendToLive"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Swift.Kinetic.Redirect",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 6
-				},
-				{
 					"id": "Swift.Kinetic.NoGround",
-					"tier": 4,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [
@@ -7666,14 +7427,206 @@
 							"id": "Swift.Kinetic.ReadTheRoom",
 							"rank": 1
 						}
+					]
+				},
+				{
+					"id": "Swift.Kinetic.Landing",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Swift.Kinetic.Landing"
 					],
-					"requiredTreeInvestment": 6
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Swift.Kinetic.AirWork",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [
+						{
+							"target": "AirControl",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 12,
+							"condition": "Always",
+							"alsoRequires": []
+						},
+						{
+							"target": "ProjectileCount",
+							"bucket": "Flat",
+							"valuePerRank": 0.5,
+							"condition": "Airborne",
+							"alsoRequires": []
+						}
+					],
+					"tags": [
+						"Progression.Node.Swift.Kinetic.AirWork"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Swift.Kinetic.Landing",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Swift.Kinetic.Redirect",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [
+						{
+							"target": "AbilityCooldown",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 40,
+							"condition": "Airborne",
+							"alsoRequires": []
+						}
+					],
+					"tags": [
+						"Progression.Node.Swift.Kinetic.Redirect"
+					],
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Swift.Kinetic.SpendToLive",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Swift.Kinetic.SpendToLive"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Swift.Kinetic.Redirect",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Swift.Kinetic.Downforce",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [
+						{
+							"target": "Damage",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 22,
+							"condition": "Airborne",
+							"alsoRequires": []
+						}
+					],
+					"tags": [
+						"Progression.Node.Swift.Kinetic.Downforce"
+					],
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Swift.Kinetic.MomentumShield",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Swift.Kinetic.MomentumShield"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Swift.Kinetic.Downforce",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Swift.Kinetic.Contact",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Swift.Kinetic.Contact"
+					],
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Swift.Kinetic.EvadeConversion",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [
+						{
+							"target": "DodgeChance",
+							"bucket": "Flat",
+							"valuePerRank": 8,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [
+						"Progression.Node.Swift.Kinetic.EvadeConversion"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Swift.Kinetic.Contact",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Swift.Kinetic.Carry",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [
+						{
+							"target": "SlideSpeed",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 24,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [
+						"Progression.Node.Swift.Kinetic.Carry"
+					],
+					"exclusive": [],
+					"prerequisites": []
 				},
 				{
 					"id": "Swift.Kinetic.Overpressure",
 					"tier": 4,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": true,
 					"constellation": "None",
 					"effects": [
@@ -7710,38 +7663,9 @@
 			"adjacencyEdges": [],
 			"nodes": [
 				{
-					"id": "Swift.Marksman.LongLens",
-					"tier": 1,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [
-						{
-							"target": "CriticalDamage",
-							"bucket": "Flat",
-							"valuePerRank": 18,
-							"condition": "Always",
-							"alsoRequires": []
-						},
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "Aiming",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Swift.Marksman.LongLens"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
 					"id": "Swift.Marksman.Steady",
 					"tier": 1,
-					"ranks": 2,
+					"ranks": 1,
 					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
@@ -7753,182 +7677,10 @@
 					"prerequisites": []
 				},
 				{
-					"id": "Swift.Marksman.Ledger",
-					"tier": 1,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Swift.Marksman.Ledger"
-					],
-					"exclusive": [],
-					"prerequisites": []
-				},
-				{
-					"id": "Swift.Marksman.Angle",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [
-						{
-							"target": "RicochetCount",
-							"bucket": "Flat",
-							"valuePerRank": 1,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Swift.Marksman.Angle"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Swift.Marksman.LongLens",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Swift.Marksman.MarkEconomy",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Swift.Marksman.MarkEconomy"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Swift.Marksman.Ledger",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Swift.Marksman.PierceDiscipline",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [
-						{
-							"target": "Pierce",
-							"bucket": "Flat",
-							"valuePerRank": 1,
-							"condition": "Always",
-							"alsoRequires": []
-						},
-						{
-							"target": "CriticalChance",
-							"bucket": "Flat",
-							"valuePerRank": 6,
-							"condition": "Always",
-							"alsoRequires": []
-						},
-						{
-							"target": "Damage",
-							"bucket": "IncreasedPercent",
-							"valuePerRank": 3,
-							"condition": "Aiming",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Swift.Marksman.PierceDiscipline"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Swift.Marksman.Steady",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
-					"id": "Swift.Marksman.Sightline",
-					"tier": 3,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Swift.Marksman.Sightline"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Swift.Marksman.PierceDiscipline",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
-				},
-				{
-					"id": "Swift.Marksman.Lead",
-					"tier": 3,
-					"ranks": 1,
-					"cost": 2,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [],
-					"tags": [
-						"Progression.Node.Swift.Marksman.Lead"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Swift.Marksman.MarkEconomy",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 4
-				},
-				{
-					"id": "Swift.Marksman.Deadeye",
-					"tier": 2,
-					"ranks": 2,
-					"cost": 1,
-					"cornerstone": false,
-					"constellation": "None",
-					"effects": [
-						{
-							"target": "CriticalChance",
-							"bucket": "Flat",
-							"valuePerRank": 4,
-							"condition": "Always",
-							"alsoRequires": []
-						}
-					],
-					"tags": [
-						"Progression.Node.Swift.Marksman.Deadeye"
-					],
-					"exclusive": [],
-					"prerequisites": [
-						{
-							"id": "Swift.Marksman.LongLens",
-							"rank": 1
-						}
-					],
-					"requiredTreeInvestment": 2
-				},
-				{
 					"id": "Swift.Marksman.Reserve",
-					"tier": 4,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [
@@ -7949,14 +7701,90 @@
 							"id": "Swift.Marksman.Steady",
 							"rank": 1
 						}
+					]
+				},
+				{
+					"id": "Swift.Marksman.PierceDiscipline",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [
+						{
+							"target": "Pierce",
+							"bucket": "Flat",
+							"valuePerRank": 2,
+							"condition": "Always",
+							"alsoRequires": []
+						},
+						{
+							"target": "CriticalChance",
+							"bucket": "Flat",
+							"valuePerRank": 12,
+							"condition": "Always",
+							"alsoRequires": []
+						},
+						{
+							"target": "Damage",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 6,
+							"condition": "Aiming",
+							"alsoRequires": []
+						}
 					],
-					"requiredTreeInvestment": 6
+					"tags": [
+						"Progression.Node.Swift.Marksman.PierceDiscipline"
+					],
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Swift.Marksman.Sightline",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Swift.Marksman.Sightline"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Swift.Marksman.PierceDiscipline",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Swift.Marksman.Angle",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [
+						{
+							"target": "RicochetCount",
+							"bucket": "Flat",
+							"valuePerRank": 2,
+							"condition": "Always",
+							"alsoRequires": []
+						}
+					],
+					"tags": [
+						"Progression.Node.Swift.Marksman.Angle"
+					],
+					"exclusive": [],
+					"prerequisites": []
 				},
 				{
 					"id": "Swift.Marksman.Overpenetration",
-					"tier": 4,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
@@ -7966,17 +7794,63 @@
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Swift.Marksman.PierceDiscipline",
+							"id": "Swift.Marksman.Angle",
 							"rank": 1
 						}
+					]
+				},
+				{
+					"id": "Swift.Marksman.MarkEconomy",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Swift.Marksman.MarkEconomy"
 					],
-					"requiredTreeInvestment": 6
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Swift.Marksman.Lead",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Swift.Marksman.Lead"
+					],
+					"exclusive": [],
+					"prerequisites": [
+						{
+							"id": "Swift.Marksman.MarkEconomy",
+							"rank": 1
+						}
+					]
+				},
+				{
+					"id": "Swift.Marksman.Ledger",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [],
+					"tags": [
+						"Progression.Node.Swift.Marksman.Ledger"
+					],
+					"exclusive": [],
+					"prerequisites": []
 				},
 				{
 					"id": "Swift.Marksman.CalledShot",
-					"tier": 4,
+					"tier": 1,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": false,
 					"constellation": "None",
 					"effects": [],
@@ -7986,17 +7860,67 @@
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Swift.Marksman.Lead",
+							"id": "Swift.Marksman.Ledger",
 							"rank": 1
 						}
+					]
+				},
+				{
+					"id": "Swift.Marksman.Deadeye",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [
+						{
+							"target": "CriticalChance",
+							"bucket": "Flat",
+							"valuePerRank": 8,
+							"condition": "Always",
+							"alsoRequires": []
+						}
 					],
-					"requiredTreeInvestment": 6
+					"tags": [
+						"Progression.Node.Swift.Marksman.Deadeye"
+					],
+					"exclusive": [],
+					"prerequisites": []
+				},
+				{
+					"id": "Swift.Marksman.LongLens",
+					"tier": 1,
+					"ranks": 1,
+					"cost": 1,
+					"cornerstone": false,
+					"constellation": "None",
+					"effects": [
+						{
+							"target": "CriticalDamage",
+							"bucket": "Flat",
+							"valuePerRank": 36,
+							"condition": "Always",
+							"alsoRequires": []
+						},
+						{
+							"target": "Damage",
+							"bucket": "IncreasedPercent",
+							"valuePerRank": 6,
+							"condition": "Aiming",
+							"alsoRequires": []
+						}
+					],
+					"tags": [
+						"Progression.Node.Swift.Marksman.LongLens"
+					],
+					"exclusive": [],
+					"prerequisites": []
 				},
 				{
 					"id": "Swift.Marksman.Culling",
 					"tier": 4,
 					"ranks": 1,
-					"cost": 2,
+					"cost": 1,
 					"cornerstone": true,
 					"constellation": "None",
 					"effects": [
@@ -8022,7 +7946,7 @@
 					"exclusive": [],
 					"prerequisites": [
 						{
-							"id": "Swift.Marksman.PierceDiscipline",
+							"id": "Swift.Marksman.LongLens",
 							"rank": 1
 						}
 					],

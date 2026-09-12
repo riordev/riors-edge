@@ -91,16 +91,16 @@ bool FBreakerMarksmanRuleHalvesTest::RunTest(const FString& Parameters)
     // Steady (§1.5 M2). Without the node — the whole non-owner population —
     // the composed movement penalty passes through untouched, to the bit.
     TestEqual(TEXT("no Steady, no relief"), FBreakerWeaponMath::SteadyMovementSpreadDegrees(2.0f, 1.0f, 0, false), 2.0f);
-    TestEqual(TEXT("Steady from the hip changes nothing"), FBreakerWeaponMath::SteadyMovementSpreadDegrees(2.0f, 0.0f, 2, false), 2.0f);
-    // R1: fully sighted, grounded movement stops widening spread entirely.
-    TestEqual(TEXT("R1 at full ADS removes the grounded movement penalty"), FBreakerWeaponMath::SteadyMovementSpreadDegrees(2.0f, 1.0f, 1, false), 0.0f);
+    TestEqual(TEXT("no Steady airborne, no relief either"), FBreakerWeaponMath::SteadyMovementSpreadDegrees(2.0f, 1.0f, 0, true), 2.0f);
+    TestEqual(TEXT("Steady from the hip changes nothing"), FBreakerWeaponMath::SteadyMovementSpreadDegrees(2.0f, 0.0f, 1, false), 2.0f);
+    // The single rank (O272): fully sighted, movement stops widening spread
+    // entirely, grounded or airborne — the old rank-two rule is rank one.
+    TestEqual(TEXT("Steady at full ADS removes the grounded movement penalty"), FBreakerWeaponMath::SteadyMovementSpreadDegrees(2.0f, 1.0f, 1, false), 0.0f);
+    TestEqual(TEXT("Steady at full ADS removes the airborne movement penalty"), FBreakerWeaponMath::SteadyMovementSpreadDegrees(2.0f, 1.0f, 1, true), 0.0f);
     // Partway into the sights is partway to the rule, the same ramp as every
     // other ADS benefit.
     TestEqual(TEXT("half ADS is half the relief"), FBreakerWeaponMath::SteadyMovementSpreadDegrees(2.0f, 0.5f, 1, false), 1.0f);
-    // The doc's rank split: airborne movement keeps its penalty at R1 and
-    // loses it at R2 ("R2: ADS while airborne likewise").
-    TestEqual(TEXT("R1 airborne keeps the penalty"), FBreakerWeaponMath::SteadyMovementSpreadDegrees(2.0f, 1.0f, 1, true), 2.0f);
-    TestEqual(TEXT("R2 airborne loses it"), FBreakerWeaponMath::SteadyMovementSpreadDegrees(2.0f, 1.0f, 2, true), 0.0f);
+    TestEqual(TEXT("half ADS airborne is half the relief"), FBreakerWeaponMath::SteadyMovementSpreadDegrees(2.0f, 0.5f, 1, true), 1.0f);
 
     // Momentum on the gun (KIT-2). An inactive bar is baseline at every
     // fill, an empty active bar is baseline, and a full active bar is the
@@ -128,23 +128,23 @@ bool FBreakerMarksmanRuleHalvesTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("node without Redline keeps Lead's gate"), FBreakerWeaponMath::LeadRangeGateCm(2500.0f, true, false), 2500.0f);
     TestEqual(TEXT("node at Redline drops the gate to 10 m"), FBreakerWeaponMath::LeadRangeGateCm(2500.0f, true, true), 1000.0f);
 
-    // Ledger (§1.5 M3): 25% at R1, 50% at R2, nothing unowned.
+    // O272: single-rank pairs. Every Marksman/Frenzy figure below is the old
+    // rank-two magnitude read at rank one; the rank-two arms are gone
+    // because the game no longer sells a second rank.
+
+    // Ledger (§1.5 M3): 50% owned, nothing unowned.
     TestEqual(TEXT("Ledger unowned refunds nothing"), FBreakerWeaponMath::LedgerRefundFraction(0), 0.0f);
-    TestEqual(TEXT("Ledger R1 refunds a quarter"), FBreakerWeaponMath::LedgerRefundFraction(1), 0.25f);
-    TestEqual(TEXT("Ledger R2 refunds half"), FBreakerWeaponMath::LedgerRefundFraction(2), 0.50f);
+    TestEqual(TEXT("Ledger refunds half"), FBreakerWeaponMath::LedgerRefundFraction(1), 0.50f);
 
-    // Mark Economy (§1.5 M5): 15 m at R1, 25 m at R2, no jump unowned.
+    // Mark Economy (§1.5 M5): 25 m owned, no jump unowned.
     TestEqual(TEXT("no node, no jump radius"), FBreakerWeaponMath::MarkJumpRadiusCm(0), 0.0f);
-    TestEqual(TEXT("R1 seeks 15 m"), FBreakerWeaponMath::MarkJumpRadiusCm(1), 1500.0f);
-    TestEqual(TEXT("R2 seeks 25 m"), FBreakerWeaponMath::MarkJumpRadiusCm(2), 2500.0f);
+    TestEqual(TEXT("Mark Economy seeks 25 m"), FBreakerWeaponMath::MarkJumpRadiusCm(1), 2500.0f);
 
-    // Loaded (§1.3 F2): R1 refunds half the window's shots (floored — half a
-    // round is not a round), R2 refunds them all.
+    // Loaded (§1.3 F2): owned, every shot in the window comes back.
     TestEqual(TEXT("Loaded unowned refunds nothing"), FBreakerWeaponMath::LoadedRefundRounds(5, 0), 0);
-    TestEqual(TEXT("R1 refunds half, rounded down"), FBreakerWeaponMath::LoadedRefundRounds(5, 1), 2);
-    TestEqual(TEXT("R1 with one shot refunds nothing"), FBreakerWeaponMath::LoadedRefundRounds(1, 1), 0);
-    TestEqual(TEXT("R2 refunds every shot in the window"), FBreakerWeaponMath::LoadedRefundRounds(5, 2), 5);
-    TestEqual(TEXT("an empty window refunds nothing at any rank"), FBreakerWeaponMath::LoadedRefundRounds(0, 2), 0);
+    TestEqual(TEXT("Loaded refunds every shot in the window"), FBreakerWeaponMath::LoadedRefundRounds(5, 1), 5);
+    TestEqual(TEXT("Loaded with one shot refunds that shot"), FBreakerWeaponMath::LoadedRefundRounds(1, 1), 1);
+    TestEqual(TEXT("an empty window refunds nothing"), FBreakerWeaponMath::LoadedRefundRounds(0, 1), 0);
     return true;
 }
 
@@ -165,20 +165,21 @@ bool FBreakerFrenzyRuleHalvesTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("the node waives it on the ground"), UBreakerMomentumComponent::WeakPointPostureSatisfied(true, false, 1));
     TestTrue(TEXT("a component that never required posture never gates"), UBreakerMomentumComponent::WeakPointPostureSatisfied(false, false, 0));
 
-    // F1 R2: internal cooldown 0.25 -> 0.15. Ranks 0-1 keep the authored knob.
+    // O272: single-rank pairs — rank one reads the old rank-two figure, and
+    // the rank-two arms are gone because the game no longer sells one.
+
+    // F1: internal cooldown 0.25 -> 0.15 when owned. Unowned keeps the
+    // authored knob.
     TestEqual(TEXT("no rank keeps the authored interval"), UBreakerMomentumComponent::WeakPointIntervalForRank(0.25f, 0), 0.25f);
-    TestEqual(TEXT("R1 keeps the authored interval"), UBreakerMomentumComponent::WeakPointIntervalForRank(0.25f, 1), 0.25f);
-    TestEqual(TEXT("R2 runs at 0.15s"), UBreakerMomentumComponent::WeakPointIntervalForRank(0.25f, 2), 0.15f);
+    TestEqual(TEXT("Trigger Discipline runs at 0.15s"), UBreakerMomentumComponent::WeakPointIntervalForRank(0.25f, 1), 0.15f);
 
-    // F4: every 5th hit at R1, every 4th at R2, nothing unowned.
+    // F4: every 4th hit owned, nothing unowned.
     TestEqual(TEXT("Rhythm unowned has no stride"), UBreakerMomentumComponent::RhythmStride(0), 0);
-    TestEqual(TEXT("R1 pays every 5th"), UBreakerMomentumComponent::RhythmStride(1), 5);
-    TestEqual(TEXT("R2 pays every 4th"), UBreakerMomentumComponent::RhythmStride(2), 4);
+    TestEqual(TEXT("Rhythm pays every 4th"), UBreakerMomentumComponent::RhythmStride(1), 4);
 
-    // F6: 10% at R1, 20% at R2.
+    // F6: 20% owned.
     TestEqual(TEXT("Feed unowned refunds nothing"), UBreakerMomentumComponent::FeedRefundFraction(0), 0.0f);
-    TestEqual(TEXT("Feed R1 refunds a tenth"), UBreakerMomentumComponent::FeedRefundFraction(1), 0.10f);
-    TestEqual(TEXT("Feed R2 refunds a fifth"), UBreakerMomentumComponent::FeedRefundFraction(2), 0.20f);
+    TestEqual(TEXT("Feed refunds a fifth"), UBreakerMomentumComponent::FeedRefundFraction(1), 0.20f);
     return true;
 }
 
@@ -215,33 +216,34 @@ bool FBreakerFrenzyRulesObservableTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("the node makes the same grounded weak point pay the grant"), With.Momentum->GetMomentum(), 10.0f + With.Momentum->WeakPointGrant);
     }
 
-    // ---- F4 Rhythm: every 5th consecutive hit, outside the cap -----------
+    // ---- F4 Rhythm: every 4th consecutive hit, outside the cap -----------
+    // O272: the single rank reads the old rank-two stride.
     {
         FBreakerSwiftRig Rig = BreakerMakeSwiftRig({ TPair<FName, int32>(TEXT("Swift.Frenzy.Rhythm"), 1) });
         Rig.Attributes->ApplyClassResource(20.0f);
-        for (int32 Hit = 0; Hit < 4; ++Hit)
+        for (int32 Hit = 0; Hit < 3; ++Hit)
         {
             Rig.Momentum->HandleShot(BreakerMakeHitscanShot(true));
         }
-        TestEqual(TEXT("four hits pay nothing"), Rig.Momentum->GetMomentum(), 20.0f);
+        TestEqual(TEXT("three hits pay nothing"), Rig.Momentum->GetMomentum(), 20.0f);
         Rig.Momentum->HandleShot(BreakerMakeHitscanShot(true));
-        TestEqual(TEXT("the fifth consecutive hit pays +8, no loop tick needed (outside the cap)"), Rig.Momentum->GetMomentum(), 28.0f);
+        TestEqual(TEXT("the fourth consecutive hit pays +8, no loop tick needed (outside the cap)"), Rig.Momentum->GetMomentum(), 28.0f);
 
         // A miss resets the counter — §1.3 F4's own clause.
         Rig.Momentum->HandleShot(BreakerMakeHitscanShot(false));
-        for (int32 Hit = 0; Hit < 4; ++Hit)
+        for (int32 Hit = 0; Hit < 3; ++Hit)
         {
             Rig.Momentum->HandleShot(BreakerMakeHitscanShot(true));
         }
-        TestEqual(TEXT("a miss resets: four hits after it pay nothing"), Rig.Momentum->GetMomentum(), 28.0f);
+        TestEqual(TEXT("a miss resets: three hits after it pay nothing"), Rig.Momentum->GetMomentum(), 28.0f);
         Rig.Momentum->HandleShot(BreakerMakeHitscanShot(true));
-        TestEqual(TEXT("the rebuilt streak pays on its own fifth hit"), Rig.Momentum->GetMomentum(), 36.0f);
+        TestEqual(TEXT("the rebuilt streak pays on its own fourth hit"), Rig.Momentum->GetMomentum(), 36.0f);
 
         // A rocket's shot record has no pellets: it is not a miss, and must
         // not break the rhythm.
         FBreakerShotResult Rocket;
         Rocket.bFired = true;
-        for (int32 Hit = 0; Hit < 4; ++Hit)
+        for (int32 Hit = 0; Hit < 3; ++Hit)
         {
             Rig.Momentum->HandleShot(BreakerMakeHitscanShot(true));
         }
@@ -268,8 +270,9 @@ bool FBreakerFrenzyRulesObservableTest::RunTest(const FString& Parameters)
     }
 
     // ---- F6 Feed: kills refund a fraction of the last observed spend ------
+    // O272: one rank, and it pays the old rank-two fifth.
     {
-        FBreakerSwiftRig Rig = BreakerMakeSwiftRig({ TPair<FName, int32>(TEXT("Swift.Frenzy.Feed"), 2) });
+        FBreakerSwiftRig Rig = BreakerMakeSwiftRig({ TPair<FName, int32>(TEXT("Swift.Frenzy.Feed"), 1) });
         Rig.Attributes->ApplyClassResource(80.0f);
         // One loop tick baselines the observer at 80 (an increase is never a
         // spend).
@@ -282,7 +285,7 @@ bool FBreakerFrenzyRulesObservableTest::RunTest(const FString& Parameters)
         Rig.Attributes->ApplyClassResource(40.0f);
         Rig.Momentum->HandleKillDealt(FBreakerHitContext());
         TestEqual(TEXT("the kill observes the 40-point spend"), Rig.Momentum->GetLastObservedSpend(), 40.0f);
-        TestEqual(TEXT("R2 refunds 20% of it"), Rig.Momentum->GetMomentum(), 48.0f);
+        TestEqual(TEXT("Feed refunds 20% of it"), Rig.Momentum->GetMomentum(), 48.0f);
         // Every kill pays against the same most-recent cost until a new spend
         // replaces it — F6 is per kill, not per cast.
         Rig.Momentum->HandleKillDealt(FBreakerHitContext());
@@ -314,7 +317,9 @@ bool FBreakerFrenzyRulesObservableTest::RunTest(const FString& Parameters)
 //     (OnShot / OnMagazineEmptied / OnKillDealt) — BeginPlay needs a world;
 //     the handlers are called directly here, the same convention
 //     HandleProgressionChanged already established.
-//  4. Dry Fire R2's cooldown-refund half: not built at all (no cooldown seam
-//     exists outside the ability system); recorded as WAITING ON at the node.
+//  4. Dry Fire's cooldown-refund half (O272: one rank, the grant and the
+//     one-second refund land together) — it walks the owner's ability system
+//     component, which this worldless rig does not have. Covered by
+//     RiorsEdge.Runtime.DryFireCooldown.
 
 #endif  // WITH_DEV_AUTOMATION_TESTS

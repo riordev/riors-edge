@@ -154,7 +154,8 @@ void UBreakerAbilityComponent::BeginPlay()
                 Progression->DevForceClass(EBreakerClassId::Swift);
                 Progression->GrantPlaytestPoints(8, 0);
                 const UBreakerProgressionTree* Tree = UBreakerProgressionLibrary::GetSwiftMarksmanTree();
-                for (const TCHAR* Id : { TEXT("Swift.Marksman.Steady"), TEXT("Swift.Marksman.Steady"), TEXT("Swift.Marksman.Ledger"), TEXT("Swift.Marksman.MarkEconomy"), TEXT("Swift.Marksman.Lead") })
+                // O272: the Marksman tree is single-rank pairs; Lead sits behind MarkEconomy.
+                for (const TCHAR* Id : { TEXT("Swift.Marksman.MarkEconomy"), TEXT("Swift.Marksman.Lead") })
                 {
                     FText Reason;
                     if (!Progression->PurchaseNode(Tree, Id, Reason))

@@ -83,15 +83,18 @@ public:
     float GetEffectiveAirborneCreditSeconds() const;
     void NotifyLongFallLanding(float DistanceCm);
     // O2 PLACEHOLDER: authored node windows and one-landing conversion caps.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float ReadTheRoomRankOneSeconds = 4.5f;
+    // O272: the Swift trees are single-rank pairs; rank one carries the old
+    // rank-two magnitude. The RankTwo fields stay so the reader keeps its
+    // shape, and hold the same figure rank one now reads.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float ReadTheRoomRankOneSeconds = 6.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float ReadTheRoomRankTwoSeconds = 6.0f;
     // O2: Contact replaces the retired wall-ride node with completed traversal income.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float ContactRankOneSeconds = 0.35f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float ContactRankOneSeconds = 0.70f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float ContactRankTwoSeconds = 0.70f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float LandingMinimumDistanceCm = 600.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float LandingRankOnePerMeter = 2.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float LandingRankOnePerMeter = 3.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float LandingRankTwoPerMeter = 3.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float LandingRankOneCap = 20.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float LandingRankOneCap = 30.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Nodes", meta=(ClampMin="0")) float LandingRankTwoCap = 30.0f;
 
     // Loop overrides (Class-Kits §1.2 ULTIMATE). A named, temporary rewrite of

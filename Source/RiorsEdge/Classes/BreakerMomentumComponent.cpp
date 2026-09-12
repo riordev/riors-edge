@@ -389,22 +389,23 @@ bool UBreakerMomentumComponent::WeakPointPostureSatisfied(bool bRequiresAirborne
 
 float UBreakerMomentumComponent::WeakPointIntervalForRank(float BaseInterval, int32 TriggerDisciplineRank)
 {
-    // §1.3 F1 R2, transcribed: internal cooldown 0.25s -> 0.15s. The base
-    // interval is the component's own authored knob, so ranks 0-1 keep
-    // whatever it says even if it is retuned away from 0.25.
-    return TriggerDisciplineRank >= 2 ? 0.15f : BaseInterval;
+    // §1.3 F1, transcribed: internal cooldown 0.25s -> 0.15s. O272: single
+    // rank, so rank one carries the old rank-two figure. The base interval is
+    // the component's own authored knob, so rank 0 keeps whatever it says
+    // even if it is retuned away from 0.25.
+    return TriggerDisciplineRank >= 1 ? 0.15f : BaseInterval;   // O2 PLACEHOLDER
 }
 
 int32 UBreakerMomentumComponent::RhythmStride(int32 RhythmRank)
 {
     if (RhythmRank <= 0) return 0;
-    return RhythmRank >= 2 ? 4 : 5;   // §1.3 F4 R1/R2
+    return 4;   // §1.3 F4; O272: rank one reads the old rank-two stride. O2 PLACEHOLDER
 }
 
 float UBreakerMomentumComponent::FeedRefundFraction(int32 FeedRank)
 {
     if (FeedRank <= 0) return 0.0f;
-    return FeedRank >= 2 ? 0.20f : 0.10f;   // §1.3 F6 R1/R2
+    return 0.20f;   // §1.3 F6; O272: rank one reads the old rank-two fraction. O2 PLACEHOLDER
 }
 
 FName UBreakerMomentumComponent::MomentumShieldModifierKey()
@@ -575,7 +576,8 @@ void UBreakerMomentumComponent::HandleMagazineEmptied(bool bStartedFull)
     const int32 Rank = GetFrenzyNodeRank(TEXT("Swift.Frenzy.DryFire"));
     if (Rank <= 0) return;
     GrantMomentum(12.0f); // Class kit F5: +12 on the actual last round.
-    if (Rank >= 2)
+    // O272: single rank — the grant and the one-second refund land together.
+    if (Rank >= 1)
     {
         const IAbilitySystemInterface* AbilityOwner = Cast<IAbilitySystemInterface>(GetOwner());
         UAbilitySystemComponent* ASC = AbilityOwner ? AbilityOwner->GetAbilitySystemComponent() : nullptr;
@@ -584,7 +586,7 @@ void UBreakerMomentumComponent::HandleMagazineEmptied(bool bStartedFull)
         Query.EffectDefinition = UBreakerAbilityCooldownEffect::StaticClass();
         for (const FActiveGameplayEffectHandle& Handle : ASC->GetActiveEffects(Query))
         {
-            ASC->ModifyActiveEffectStartTime(Handle, -1.0f); // Authored R2: refund one second.
+            ASC->ModifyActiveEffectStartTime(Handle, -1.0f); // Authored: refund one second. O2 PLACEHOLDER
         }
     }
 }

@@ -464,10 +464,16 @@ namespace BreakerPowerBandTest
             {TEXT("Core.Reservoir.DeepPockets"), 1},
             {TEXT("Core.Reservoir.Tithe"), 2},
             {TEXT("Core.Ward.Tolerance"), 1},
-            {TEXT("Swift.Kinetic.ReadTheRoom"), 2},
-            {TEXT("Swift.Kinetic.Downforce"), 2},
-            {TEXT("Swift.Kinetic.Landing"), 2},
+            // O272: four single-rank Kinetic pairs at cost 1 each. Only
+            // Downforce (22 Airborne) touches damage.
+            {TEXT("Swift.Kinetic.ReadTheRoom"), 1},
+            {TEXT("Swift.Kinetic.NoGround"), 1},
+            {TEXT("Swift.Kinetic.Downforce"), 1},
+            {TEXT("Swift.Kinetic.MomentumShield"), 1},
+            {TEXT("Swift.Kinetic.Landing"), 1},
             {TEXT("Swift.Kinetic.AirWork"), 1},
+            {TEXT("Swift.Kinetic.Redirect"), 1},
+            {TEXT("Swift.Kinetic.SpendToLive"), 1},
         };
     }
 
@@ -529,10 +535,16 @@ namespace BreakerPowerBandTest
             {TEXT("Core.Ballistics.Cull"), 1},
             {TEXT("Core.Ballistics.Loud"), 1},
             {TEXT("Core.Ballistics.Collapse"), 1},
-            {TEXT("Swift.Kinetic.ReadTheRoom"), 2},
-            {TEXT("Swift.Kinetic.Downforce"), 2},
-            {TEXT("Swift.Kinetic.Landing"), 2},
+            // O272: four single-rank Kinetic pairs at cost 1 each. Only
+            // Downforce (22 Airborne) touches damage.
+            {TEXT("Swift.Kinetic.ReadTheRoom"), 1},
+            {TEXT("Swift.Kinetic.NoGround"), 1},
+            {TEXT("Swift.Kinetic.Downforce"), 1},
+            {TEXT("Swift.Kinetic.MomentumShield"), 1},
+            {TEXT("Swift.Kinetic.Landing"), 1},
             {TEXT("Swift.Kinetic.AirWork"), 1},
+            {TEXT("Swift.Kinetic.Redirect"), 1},
+            {TEXT("Swift.Kinetic.SpendToLive"), 1},
         };
     }
 
@@ -576,10 +588,16 @@ namespace BreakerPowerBandTest
             {TEXT("Core.Velocity.Traction"), 1},
             {TEXT("Core.Velocity.Afterburn"), 1},
             {TEXT("Core.Velocity.TerminalVelocity"), 1},
-            {TEXT("Swift.Kinetic.ReadTheRoom"), 2},
-            {TEXT("Swift.Kinetic.Downforce"), 2},
-            {TEXT("Swift.Kinetic.Landing"), 2},
+            // O272: four single-rank Kinetic pairs at cost 1 each. Only
+            // Downforce (22 Airborne) touches damage.
+            {TEXT("Swift.Kinetic.ReadTheRoom"), 1},
+            {TEXT("Swift.Kinetic.NoGround"), 1},
+            {TEXT("Swift.Kinetic.Downforce"), 1},
+            {TEXT("Swift.Kinetic.MomentumShield"), 1},
+            {TEXT("Swift.Kinetic.Landing"), 1},
             {TEXT("Swift.Kinetic.AirWork"), 1},
+            {TEXT("Swift.Kinetic.Redirect"), 1},
+            {TEXT("Swift.Kinetic.SpendToLive"), 1},
         };
     }
 
@@ -625,10 +643,16 @@ namespace BreakerPowerBandTest
             {TEXT("Core.Velocity.Afterburn"), 1},
             {TEXT("Core.Velocity.TerminalVelocity"), 1},
             {TEXT("Core.Tempo.Metronome"), 1},
-            {TEXT("Swift.Kinetic.ReadTheRoom"), 2},
-            {TEXT("Swift.Kinetic.Downforce"), 2},
-            {TEXT("Swift.Kinetic.Landing"), 2},
+            // O272: four single-rank Kinetic pairs at cost 1 each. Only
+            // Downforce (22 Airborne) touches damage.
+            {TEXT("Swift.Kinetic.ReadTheRoom"), 1},
+            {TEXT("Swift.Kinetic.NoGround"), 1},
+            {TEXT("Swift.Kinetic.Downforce"), 1},
+            {TEXT("Swift.Kinetic.MomentumShield"), 1},
+            {TEXT("Swift.Kinetic.Landing"), 1},
             {TEXT("Swift.Kinetic.AirWork"), 1},
+            {TEXT("Swift.Kinetic.Redirect"), 1},
+            {TEXT("Swift.Kinetic.SpendToLive"), 1},
         };
     }
 
@@ -1813,7 +1837,7 @@ bool FBreakerConditionalDamageTest::RunTest(const FString& Parameters)
     const float GearUplift = AirborneEquipment.GetIncreasedPercent(WeaponLane) - GroundedEquipment.GetIncreasedPercent(WeaponLane);
     const float DoctrineUplift = AirborneNodes.GetIncreasedPercent(WeaponLane) - GroundedNodes.GetIncreasedPercent(WeaponLane);
     TestTrue(TEXT("Airborne gear pays positive conditional Increased"), GearUplift > 0.0f);
-    TestEqual(TEXT("Two purchased Kinetic Downforce ranks pay their authored 22 percent"), DoctrineUplift, 22.0f, .0001f);
+    TestEqual(TEXT("The single purchased Kinetic Downforce rank pays its authored 22 percent"), DoctrineUplift, 22.0f, .0001f);
     TestEqual(TEXT("Conditional gear and doctrine enter one additive bucket exactly once"),
         (InAir.IncreasedLayer - Standing.IncreasedLayer) * 100.0f, GearUplift + DoctrineUplift, .001f);
     TestEqual(TEXT("Airborne does not change the flat factor"), InAir.FlatLayer, Standing.FlatLayer, .0001f);

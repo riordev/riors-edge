@@ -1818,8 +1818,8 @@ void UBreakerWeaponComponent::StartReload()
     if (!Definition || bReloading || bSwapping || MagazineAmmo >= GetEffectiveMagazineSize() || ReserveAmmo <= 0) return;
     StopFire();
     // Loaded (Class-Kits §1.3 F2, LIVE): "Reloading while at Redline refunds
-    // ammunition to the magazine equal to the shots fired in the previous 2s
-    // (R1: half, R2: all)." Both facts — the Redline read and the 2s window —
+    // ammunition to the magazine equal to the shots fired in the previous 2s"
+    // (O272: single rank, all of them). Both facts — the Redline read and the 2s window —
     // are captured at the moment the player COMMITS to the reload; the refund
     // itself settles in FinishReload, ahead of the reserve draw, so it is
     // paid in reserve the reload no longer has to spend. A rule rewrite of
@@ -2105,16 +2105,17 @@ bool UBreakerWeaponComponent::FireOnce()
     }
 
     // Pierce Discipline (Class-Kits §1.5 M6, transcribed): each target pierced
-    // by a single shot generates +4 Momentum (R2: +7), capped at 3 targets "to
-    // bound Multishot/Pierce interaction" — the cap is per trigger pull for
-    // exactly that reason. Swift-gated twice over: the node is Swift-locked
-    // and the momentum component is inert for every other class.
+    // by a single shot generates +7 Momentum (O272: single rank, the old
+    // rank-two figure), capped at 3 targets "to bound Multishot/Pierce
+    // interaction" — the cap is per trigger pull for exactly that reason.
+    // Swift-gated twice over: the node is Swift-locked and the momentum
+    // component is inert for every other class.
     if (PiercedThisPull > 0)
     {
         const int32 DisciplineRank = Progression ? Progression->GetNodeRank(BreakerPierceDisciplineNodeId, EBreakerPointCurrency::DoctrinePoints) : 0;
         if (Momentum && Momentum->IsActiveForOwner() && DisciplineRank > 0)
         {
-            const float PerTarget = DisciplineRank >= 2 ? 7.0f : 4.0f;   // Class-Kits §1.5 M6 R1/R2
+            const float PerTarget = 7.0f;   // Class-Kits §1.5 M6; O2 PLACEHOLDER
             Momentum->GrantMomentum(static_cast<float>(FMath::Min(PiercedThisPull, 3)) * PerTarget);   // §1.5 M6 cap: 3
         }
     }
@@ -2137,7 +2138,7 @@ bool UBreakerWeaponComponent::FireOnce()
         }
 
         // Ledger (§1.5 M3, transcribed): "Momentum spent on Marksman abilities
-        // is refunded at 25% (R2: 50%) if the ability's effect lands a hit
+        // is refunded at 50% (O272: single rank) if the ability's effect lands a hit
         // within its window." Lead is the Marksman ability that exists; its
         // effect "lands a hit" when a shot connects with the marked target
         // inside the mark window, and the refund pays ONCE per cast — the
@@ -2164,8 +2165,8 @@ bool UBreakerWeaponComponent::FireOnce()
         }
 
         // Mark Economy (§1.5 M5, transcribed): "Lead's mark persists through
-        // the target's death and jumps to the nearest enemy within 15 m
-        // (R2: 25 m). Proc coefficient 0 on the jump" — the jump moves the
+        // the target's death and jumps to the nearest enemy within 25 m
+        // (O272: single rank). Proc coefficient 0 on the jump" — the jump moves the
         // mark and nothing else: no damage, no status, no Momentum, so it
         // cannot chain-generate. The weapon is the one killer this component
         // can see; a marked target dying to a DoT or an ally keeps the old
@@ -2402,8 +2403,8 @@ float UBreakerWeaponComponent::GetEffectiveRicochetSeekRadius() const
 {
     const auto* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
     float Radius = RicochetSeekRadiusCm;
-    if (const int32 Rank = Progression ? Progression->GetNodeRank(BreakerAngleNodeId, EBreakerPointCurrency::DoctrinePoints) : 0)
-        Radius = FMath::Max(Radius, Rank >= 2 ? 2000.f : 1200.f); // Existing Angle rank-two/rank-one authored reach.
+    if (Progression && Progression->GetNodeRank(BreakerAngleNodeId, EBreakerPointCurrency::DoctrinePoints) > 0)
+        Radius = FMath::Max(Radius, 2000.f); // Angle's reach; O272: single rank carries the old rank-two 20 m. O2 PLACEHOLDER
     return Radius;
 }
 
@@ -2549,8 +2550,8 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
     const bool bSightline = Progression && Progression->HasNodeTag(BreakerSightlineTag());
     // Overpenetration (§1.5 M10): a killing hit skips the pierce falloff step.
     const bool bOverpenetration = Progression && Progression->HasNodeTag(BreakerOverpenetrationTag());
-    // Angle (§1.5 M4, transcribed): ricochet seeks within 12 m at rank 1 and
-    // 20 m at rank 2, overriding the authored base radius when larger.
+    // Angle (§1.5 M4, transcribed; O272 single rank): ricochet seeks within
+    // 20 m when owned, overriding the authored base radius when larger.
     const float SeekRadiusCm = GetEffectiveRicochetSeekRadius();
 
     FCollisionQueryParams Params(SCENE_QUERY_STAT(BreakerWeaponTrace), true, GetOwner());

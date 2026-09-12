@@ -21,7 +21,7 @@ measurement without judging it.
 | Resource generation entry points with no caller | ceiling | 3 of 21 | ceiling 0 | **OUT** |
 | Asserted invariants with no test | ceiling | 35 of 137 asserted across 8 specs | ceiling 42, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 1.5 worst tree | floor 1.5 | ok |
-| Trees sitting exactly on the offered-to-spendable floor | ceiling | 3 of 16 | no pin — measurement only | — |
+| Trees sitting exactly on the offered-to-spendable floor | ceiling | 4 of 16 | no pin — measurement only | — |
 | Node-shape composition, per tree | band | 39 % ranked minors, all trees | no pin — measurement only | — |
 | Scaffolding nodes | ceiling | 0 of 370 authored | ceiling 50 | ok |
 | Conditions that can never be true | ceiling | 5.0 | ceiling 5, target 1 | ok |
@@ -207,22 +207,23 @@ Most of a build should be refusal. A CEILING here would lock the trees at their 
 - Doctrine.Support.Conductor: 12 nodes, 24 points offered, 3.0x budget
 - Doctrine.Support.Medic: 12 nodes, 24 points offered, 3.0x budget
 - Doctrine.Support.Warden: 12 nodes, 24 points offered, 3.0x budget
-- Doctrine.Swift.Frenzy: 13 nodes, 26 points offered, 3.25x budget
-- Doctrine.Swift.Kinetic: 13 nodes, 24 points offered, 3.0x budget
-- Doctrine.Swift.Marksman: 13 nodes, 26 points offered, 3.25x budget
+- Doctrine.Swift.Frenzy: 13 nodes, 13 points offered, 1.62x budget
+- Doctrine.Swift.Kinetic: 13 nodes, 12 points offered, 1.5x budget
+- Doctrine.Swift.Marksman: 13 nodes, 13 points offered, 1.62x budget
 - Doctrine.Tank.Bastion: 12 nodes, 24 points offered, 3.0x budget
 - Doctrine.Tank.Demolitionist: 12 nodes, 24 points offered, 3.0x budget
 - Doctrine.Tank.Leech: 12 nodes, 24 points offered, 3.0x budget
 
 ## Trees sitting exactly on the offered-to-spendable floor
 
-**ceiling** · 3 of 16 · no pin — measurement only
+**ceiling** · 4 of 16 · no pin — measurement only
 
 A tree here is one node-price change away from red, and the floor section reports ok until the run it fails on. This falls when a tree is authored above its shape's arithmetic, never by moving a pin.
 
 - Doctrine.Caster.Multispell: 1.5x, exactly the floor
 - Doctrine.Caster.Spellblade: 1.5x, exactly the floor
 - Doctrine.Caster.VoidWhisperer: 1.5x, exactly the floor
+- Doctrine.Swift.Kinetic: 1.5x, exactly the floor
 
 ## Node-shape composition, per tree
 

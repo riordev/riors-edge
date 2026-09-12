@@ -156,83 +156,88 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Convergence count"), Roles.FindRef(EBreakerCoreNodeRole::Convergence), 22);
     TestEqual(TEXT("Keystone count"), Roles.FindRef(EBreakerCoreNodeRole::Keystone), 11);
 
-    // SWIFT BRANCH SIZE AND CEILING, RE-PINNED DELIBERATELY (was 10 / 11 / 10,
-    // and "every Swift node is tier 1-3").
-    //
-    // The old pins described a TRUNCATED Swift: the slice authored tiers 1-3
-    // and dropped every Tier-4 rewrite node Class-Kits Â§1.3-1.5 specifies â€”
-    // F9-F11, K9-K11, M9-M11. Those nine are now authored, three per branch, so
-    // each count rises by exactly three and the tier ceiling rises from 3 to 4.
-    // Nothing was relaxed to make new content pass: the equalities are still
-    // exact, and they are still the only thing standing between authored
-    // content and silent drift. The number moved because somebody added nine
-    // nodes on purpose and said so in this diff.
-    //
-    // Tier 5 is STILL excluded, and that is not an oversight either â€” Â§0.2's
-    // fifth tier is the keystone tier, and the compressed ladder has no fifth
-    // tier at all. The keystone used to sit at tier 3, BELOW the rewrites, and
-    // now sits at tier 4 beside them: the doctrine wallet is 8 and the keystone
-    // costs 2 behind a gate of 6, so it is the last of four picks rather than a
-    // rung on the way up. See the block comment above GetSwiftKineticTree.
-    TestEqual(TEXT("Frenzy ships thirteen nodes: ten, plus F9-F11"), UBreakerProgressionLibrary::GetSwiftFrenzyTree()->Nodes.Num(), 13);
-    TestEqual(TEXT("Kinetic ships thirteen nodes after O258 removes SkimDiscipline"), UBreakerProgressionLibrary::GetSwiftKineticTree()->Nodes.Num(), 13);
-    TestEqual(TEXT("Marksman ships thirteen nodes: ten, plus M9-M11"), UBreakerProgressionLibrary::GetSwiftMarksmanTree()->Nodes.Num(), 13);
-    for (const UBreakerProgressionTree* Tree : {UBreakerProgressionLibrary::GetSwiftFrenzyTree(),
-        UBreakerProgressionLibrary::GetSwiftKineticTree(), UBreakerProgressionLibrary::GetSwiftMarksmanTree()})
+    // SWIFT BRANCH SIZE: thirteen each. O272 makes a doctrine six pairs
+    // (travel -> impactful, twelve nodes) plus one root outside the pairs —
+    // Kinetic's granted Longstride, Marksman's Deadeye, Frenzy's Feed. The
+    // counts are exact so a node added or lost announces itself here.
+    TestEqual(TEXT("Frenzy ships thirteen nodes: six pairs plus Feed"), UBreakerProgressionLibrary::GetSwiftFrenzyTree()->Nodes.Num(), 13);
+    TestEqual(TEXT("Kinetic ships thirteen nodes: six pairs plus Longstride"), UBreakerProgressionLibrary::GetSwiftKineticTree()->Nodes.Num(), 13);
+    TestEqual(TEXT("Marksman ships thirteen nodes: six pairs plus Deadeye"), UBreakerProgressionLibrary::GetSwiftMarksmanTree()->Nodes.Num(), 13);
+
+    // THE NINE REWRITES (Class-Kits F9-F11, K9-K11, M9-M11), BY ID. Under
+    // O272 each is the impactful half of a pair: tier 1, single rank, one
+    // point, unlocked by its travel and nothing else. The keystone is the
+    // only tier-4 node in a Swift branch and the only one that carries an
+    // investment gate; the tier no longer identifies a rewrite, so the
+    // rewrites are named rather than counted.
+    struct FBreakerSwiftRewriteRow
     {
-        int32 TierFourCount = 0;
-        for (const UBreakerProgressionNode* Node : Tree->Nodes)
+        const UBreakerProgressionTree* Tree;
+        TArray<const TCHAR*> Rewrites;
+    };
+    const TArray<FBreakerSwiftRewriteRow> SwiftRewrites = {
+        { UBreakerProgressionLibrary::GetSwiftFrenzyTree(),
+            { TEXT("Swift.Frenzy.SecondWind"), TEXT("Swift.Frenzy.RedlineTrigger"), TEXT("Swift.Frenzy.NoSafety") } },
+        { UBreakerProgressionLibrary::GetSwiftKineticTree(),
+            { TEXT("Swift.Kinetic.MomentumShield"), TEXT("Swift.Kinetic.SpendToLive"), TEXT("Swift.Kinetic.NoGround") } },
+        { UBreakerProgressionLibrary::GetSwiftMarksmanTree(),
+            { TEXT("Swift.Marksman.Reserve"), TEXT("Swift.Marksman.Overpenetration"), TEXT("Swift.Marksman.CalledShot") } },
+    };
+    for (const FBreakerSwiftRewriteRow& Row : SwiftRewrites)
+    {
+        int32 Keystones = 0;
+        for (const UBreakerProgressionNode* Node : Row.Tree->Nodes)
         {
             const FString Context = Node->NodeId.ToString();
-            TestTrue(TEXT("Swift branch node is tier 1-4"), Node->Tier >= 1 && Node->Tier <= 4);
-            // TIER 4 NO LONGER MEANS "REWRITE". The keystone moved up into this
-            // tier when its cornerstone gate was removed, so the tier holds two
-            // KINDS of node with different grammars: three rewrites at one rank
-            // for two points authoring only loop-economy lines, and one
-            // cornerstone whose whole job is a stat line on the doctrine's own
-            // axis. Every assertion below is about the rewrite grammar, so the
-            // cornerstone is excluded here rather than exempted individually --
-            // an exemption per assertion is how a keystone quietly acquires a
-            // rewrite's restrictions or loses its own.
-            if (Node->Tier != 4 || Node->bCornerstone) continue;
-            ++TierFourCount;
+            if (Node->bCornerstone)
+            {
+                ++Keystones;
+                TestEqual(*(Context + TEXT(" keystone alone sits at tier 4")), Node->Tier, 4);
+                TestEqual(*(Context + TEXT(" keystone costs 1")), Node->CostPerRank, 1);
+            }
+            else
+            {
+                TestEqual(*(Context + TEXT(" non-keystone sits at tier 1")), Node->Tier, 1);
+            }
+        }
+        TestEqual(TEXT("Each Swift branch ships exactly one keystone"), Keystones, 1);
 
-            // The rewrite tier's grammar, stated as an assertion rather than a
-            // comment: Â§0.2 prices tier 4 at one rank for two points.
-            TestEqual(*(Context + TEXT(" tier-4 rewrite is single rank")), Node->MaxRank, 1);
-            TestEqual(*(Context + TEXT(" tier-4 rewrite costs 2")), Node->CostPerRank, 2);
+        for (const TCHAR* RewriteId : Row.Rewrites)
+        {
+            const UBreakerProgressionNode* Node = Row.Tree->FindNode(RewriteId);
+            const FString Context(RewriteId);
+            if (!TestNotNull(*(Context + TEXT(" is authored")), Node)) continue;
+            TestFalse(*(Context + TEXT(" rewrite is not the keystone")), Node->bCornerstone);
+            TestEqual(*(Context + TEXT(" rewrite is single rank")), Node->MaxRank, 1);
+            TestEqual(*(Context + TEXT(" rewrite costs 1")), Node->CostPerRank, 1);
+            TestEqual(*(Context + TEXT(" rewrite sits at tier 1")), Node->Tier, 1);
             // O3: a class-layer More may live only on a branch keystone, and
-            // all three of Swift's are already spent. A More appearing at
-            // tier 4 would be a fourth against a budget of three.
+            // all three of Swift's are already spent (O95: none, in fact). A
+            // More on a rewrite would be a fourth against a budget of three.
             for (const FBreakerNodeEffect& Effect : Node->Effects)
             {
-                TestTrue(*(Context + TEXT(" tier-4 rewrite authors no More multiplier")),
+                TestTrue(*(Context + TEXT(" rewrite authors no More multiplier")),
                     Effect.StatBucket != EBreakerNodeStatBucket::MorePercent);
             }
-            // The old pin here was "tier-4 rewrites author NO stat effect",
-            // and it failed exactly as intended when the loop valve landed
-            // (2026-08-16): the tier-4 trio's decay downsides ARE stat lines
-            // now â€” ClassResourceDecay through the valve, AbilityCost for No
-            // Safety's discount half, both Class-Kits-transcribed. The re-set
-            // pin is the boundary that still holds: a tier-4 rewrite may
-            // author ONLY loop-economy lines (decay / cost), never a damage
-            // or combat stat â€” that would be a different node with a
-            // different fantasy, and a content decision, not a refactor.
+            // A rewrite may author ONLY loop-economy lines (decay / cost),
+            // never a damage or combat stat — that would be a different node
+            // with a different fantasy, and a content decision, not a
+            // refactor. The trio's decay downsides ARE such lines:
+            // ClassResourceDecay through the valve, AbilityCost for No
+            // Safety's discount half, both Class-Kits-transcribed.
             for (const FBreakerNodeEffect& Effect : Node->Effects)
             {
-                TestTrue(*(Context + TEXT(" tier-4 rewrite authors only loop-economy lines (ClassResourceDecay/AbilityCost)")),
+                TestTrue(*(Context + TEXT(" rewrite authors only loop-economy lines (ClassResourceDecay/AbilityCost)")),
                     Effect.StatTarget == EBreakerNodeStatTarget::ClassResourceDecay
                     || Effect.StatTarget == EBreakerNodeStatTarget::AbilityCost);
             }
-            TestTrue(*(Context + TEXT(" tier-4 rewrite carries its rule as a tag")), Node->GrantedTags.Num() > 0);
-            // A rewrite with no prerequisite is a rewrite of nothing. The
-            // generic loop above already proves prerequisites resolve inside
-            // the same tree and sit at or below this node's tier.
-            TestTrue(*(Context + TEXT(" tier-4 rewrite builds on an earlier node")), Node->Prerequisites.Num() > 0);
+            TestTrue(*(Context + TEXT(" rewrite carries its rule as a tag")), Node->GrantedTags.Num() > 0);
+            // A rewrite with no prerequisite is a rewrite of nothing: it is
+            // the impactful half of a pair and follows exactly its travel.
+            // The generic loop above already proves prerequisites resolve
+            // inside the same tree and sit at or below this node's tier.
+            TestEqual(*(Context + TEXT(" rewrite follows exactly one travel")), Node->Prerequisites.Num(), 1);
         }
-        // Three REWRITES, counted excluding the cornerstone that now shares
-        // their tier. Four tier-4 nodes, three of them rewrites.
-        TestEqual(TEXT("Each Swift branch ships exactly three tier-4 rewrites"), TierFourCount, 3);
     }
 
     // Core More placement follows explicit roles. Minor convergences cost
@@ -363,7 +368,8 @@ bool FBreakerNodePurchaseFlowTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Doctrine points are spent"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),
         UBreakerProgressionLibrary::DoctrinePointGrant - 1);
     TestEqual(TEXT("...and core points are untouched"), Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints), CoreBeforeDoctrine);
-    TestEqual(TEXT("Slide speed reflects the class node"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.12f, 0.0001f);
+    // O272: Carry is single rank at the old two-rank total (24).
+    TestEqual(TEXT("Slide speed reflects the class node"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.24f, 0.0001f);
 
     // Respec clears effects and refunds every point of that currency. The
     // Forge gate is Doctrine's (O213); the Core respec is a level rule and a
@@ -386,7 +392,7 @@ bool FBreakerNodePurchaseFlowTest::RunTest(const FString& Parameters)
         UBreakerProgressionLibrary::CorePointCapLevel);
     TestEqual(TEXT("Core ranks are cleared"), Progression->GetNodeRank(TEXT("Core.Precision.Sightline"), EBreakerPointCurrency::CorePoints), 0);
     TestEqual(TEXT("Core effects are cleared"), Progression->GetNodeStats().CriticalChanceBonus, 0.0f, 0.0001f);
-    TestEqual(TEXT("Class allocation survives a core respec"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.12f, 0.0001f);
+    TestEqual(TEXT("Class allocation survives a core respec"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.24f, 0.0001f);
 
     // A DOCTRINE RESPEC IS NOW A REFUND, AND IT USED TO ZERO THE WALLET. That
     // was right while commitment paid the eight -- they belonged to the
@@ -466,7 +472,7 @@ bool FBreakerNodeStatAggregationTest::RunTest(const FString& Parameters)
 
     // Ranks beyond the node's cap cannot inflate the aggregate.
     TArray<FBreakerNodeRank> OverRanks;
-    OverRanks.Add({TEXT("Swift.Marksman.LongLens"), 9});   // MaxRank 2, +18 crit damage per rank
+    OverRanks.Add({TEXT("Swift.Marksman.LongLens"), 9});   // MaxRank 1, +36 crit damage (O272: single rank at the old total)
     const FBreakerNodeStats ClampedStats = UBreakerProgressionComponent::AggregateStats(Nodes, OverRanks);
     TestEqual(TEXT("Rank is clamped to the node's max"), ClampedStats.CriticalMultiplierBonus, 0.36f, 0.0001f);
 
