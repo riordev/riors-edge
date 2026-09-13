@@ -54,6 +54,9 @@
 #include "GameFramework/PlayerController.h"
 #include "HAL/IConsoleManager.h"
 #include "NavigationSystem.h"
+#include "NavigationData.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Animation/AnimSingleNodeInstance.h"
 #include "TimerManager.h"
 
 namespace
@@ -176,8 +179,8 @@ namespace
     {
         FHitResult Hit;
         FCollisionQueryParams Params(SCENE_QUERY_STAT(BreakerNavProbeGround), false, Ignore);
-        if (World->LineTraceSingleByChannel(Hit, Near + FVector(0, 0, 200.0f), Near - FVector(0, 0, 4000.0f),
-            ECC_WorldStatic, Params))
+        if (World->LineTraceSingleByObjectType(Hit, Near + FVector(0, 0, 200.0f), Near - FVector(0, 0, 4000.0f),
+            FCollisionObjectQueryParams(ECC_WorldStatic), Params))
         {
             return Hit.ImpactPoint.Z;
         }
@@ -259,6 +262,8 @@ namespace
         bool bHasPreviousYaw = false;
         FVector PreviousLocation = FVector::ZeroVector;
         bool bHasPreviousLocation = false;
+        double PreviousReportTime = 0.0;
+        TArray<TWeakObjectPtr<ABreakerEnemy>> Crowd;
 
         // The Cover variant's bookkeeping. Ranged is the same body as Enemy,
         // typed so the readout can ask it about its line and its flank.
@@ -320,21 +325,42 @@ namespace
             ABreakerCharacter* Target = State->Player.Get();
             if (!Enemy || !Target) return;
             const float Elapsed = static_cast<float>(World->GetTimeSeconds() - State->StartTime);
+            const double SampleSeconds = State->PreviousReportTime > 0.0
+                ? World->GetTimeSeconds() - State->PreviousReportTime : 0.0;
+            State->PreviousReportTime = World->GetTimeSeconds();
             const float Distance = FVector::Dist2D(Enemy->GetActorLocation(), Target->GetActorLocation());
             const UBreakerEnemyMovementComponent* Mover = Enemy->GetEnemyMovement();
+            auto* BodyMesh = Enemy->GetNamedBody();
+            auto* Animation = BodyMesh ? BodyMesh->GetSingleNodeInstance() : nullptr;
+            UE_LOG(LogTemp, Display, TEXT("[BreakerNavGait] t=%.1f clip=%s rate=%.2f"), Elapsed,
+                Animation && Animation->GetCurrentAsset() ? *Animation->GetCurrentAsset()->GetName() : TEXT("none"),
+                Animation ? Animation->GetPlayRate() : 0.0f);
             const FVector Location = Enemy->GetActorLocation();
             const double Displacement = State->bHasPreviousLocation
                 ? FVector::Dist2D(Location, State->PreviousLocation) : 0.0;
             State->PreviousLocation = Location;
             State->bHasPreviousLocation = true;
-            UE_LOG(LogTemp, Display, TEXT("[BreakerNavMotion] t=%.1f displacement=%.1f speed=%.1f held=%d pathheading=%s z=%.1f"),
-                Elapsed, Displacement, Enemy->GetVelocity().Size2D(), Mover && Mover->IsBlockedHold(),
+            UE_LOG(LogTemp, Display, TEXT("[BreakerNavMotion] t=%.1f displacement=%.1f measured=%.1f commanded=%.1f held=%d pathheading=%s z=%.1f"),
+                Elapsed, Displacement, Mover ? Mover->GetMeasuredGroundVelocity().Size2D() : 0.0,
+                Enemy->GetVelocity().Size2D(), Mover && Mover->IsBlockedHold(),
                 Mover ? *Mover->GetPathHeading().ToCompactString() : TEXT("none"), Location.Z);
+            for (int32 I = 0; I < State->Crowd.Num(); ++I)
+                if (auto* Body = State->Crowd[I].Get())
+                    if (auto* Movement = Body->GetEnemyMovement())
+                        UE_LOG(LogTemp, Display, TEXT("[BreakerNavCrowd] t=%.1f body=%d dist=%.1f measured=%.1f held=%d contacts=%d z=%.1f"),
+                            Elapsed, I, FVector::Dist2D(Body->GetActorLocation(), Target->GetActorLocation()),
+                            Movement->GetMeasuredGroundVelocity().Size2D(), Movement->IsBlockedHold(),
+                            Movement->GetWorldTouchCount(), Body->GetActorLocation().Z);
             const int32 Touches = Mover ? Mover->GetWorldTouchCount() : -1;
             const TCHAR* Mode = !Mover ? TEXT("none")
                 : Mover->GetLastMode() == EBreakerLocomotionMode::Path ? TEXT("PATH")
                 : Mover->GetLastMode() == EBreakerLocomotionMode::Steer ? TEXT("STEER") : TEXT("IDLE");
             UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+            if (!State->bHasPreviousYaw && NavSys && NavSys->GetDefaultNavDataInstance())
+                UE_LOG(LogTemp, Display, TEXT("[BreakerNavAgent] meshRadius=%.1f meshHeight=%.1f pawnRadius=%.1f pawnHeight=%.1f"),
+                    NavSys->GetDefaultNavDataInstance()->GetConfig().AgentRadius,
+                    NavSys->GetDefaultNavDataInstance()->GetConfig().AgentHeight,
+                    Enemy->GetNavAgentPropertiesRef().AgentRadius, Enemy->GetNavAgentPropertiesRef().AgentHeight);
             const TCHAR* Nav = !NavSys ? TEXT("none")
                 : !NavSys->GetDefaultNavDataInstance() ? TEXT("MISSING")
                 : NavSys->IsNavigationBuildInProgress() ? TEXT("building") : TEXT("built");
@@ -353,16 +379,16 @@ namespace
             // offset" — so it is judged, outside the states that legitimately
             // stand (PATROL's arrival hold, HELD), attack in place, or back
             // off facing the player. Zero while the body stands.
-            const float Slide = Mover && Mover->Velocity.SizeSquared2D() > 0.0f
-                ? BreakerNavProbeDegreesBetween2D(BodyForward, Mover->Velocity)
+            const float Slide = Mover && Mover->GetMeasuredGroundVelocity().SizeSquared2D() > 0.0f
+                ? BreakerNavProbeDegreesBetween2D(BodyForward, Mover->GetMeasuredGroundVelocity())
                 : 0.0f;
             const FString StateLabel = Enemy->GetEnemyStateLabel();
             // turn: the actor's yaw delta across the sample interval, in
             // deg/s. The first sample has nothing to differ against and
             // prints zero.
             const float Yaw = static_cast<float>(Enemy->GetActorRotation().Yaw);
-            const float Turn = State->bHasPreviousYaw
-                ? FMath::Abs(FMath::FindDeltaAngleDegrees(State->PreviousYaw, Yaw)) / BreakerNavProbeReportSeconds
+            const float Turn = State->bHasPreviousYaw && SampleSeconds > SMALL_NUMBER
+                ? FMath::Abs(FMath::FindDeltaAngleDegrees(State->PreviousYaw, Yaw)) / SampleSeconds
                 : 0.0f;
             State->PreviousYaw = Yaw;
             State->bHasPreviousYaw = true;
@@ -434,8 +460,10 @@ namespace
         }), BreakerNavProbeReportSeconds, true);
     }
 
-    void BreakerNavProbePlaceNow(UWorld* World, ABreakerCharacter* Player, bool bLedge = false)
+    void BreakerNavProbePlaceNow(UWorld* World, ABreakerCharacter* Player, bool bLedge = false,
+        bool bCrowd = false, bool bUnreachable = false, bool bPatrol = false)
     {
+        const FVector OriginalPlayerLocation = Player->GetActorLocation();
         if (bLedge)
         {
             // Isolate this route measurement: ordinary Fernhall population
@@ -474,6 +502,19 @@ namespace
         }
         else BreakerNavProbeSpawnWall(World, WallFoot, WallGroundZ, F);
 
+        if (bUnreachable)
+        {
+            // Enclose the target beyond melee reach; no artificial AI or save state.
+            constexpr float EnclosureRadius = 400.0f; // O2 PLACEHOLDER: probe geometry
+            for (float Sign : {-1.0f, 1.0f})
+            {
+                BreakerNavProbeSpawnBlock(World, P + F * (Sign * EnclosureRadius) + FVector(0, 0, 100),
+                    FVector(40, 840, 400), F.Rotation(), TEXT("NavProbeEnclosure"));
+                BreakerNavProbeSpawnBlock(World, P + R * (Sign * EnclosureRadius) + FVector(0, 0, 100),
+                    FVector(840, 40, 400), F.Rotation(), TEXT("NavProbeEnclosure"));
+            }
+        }
+
         TSharedPtr<FBreakerNavProbeState> State = MakeShared<FBreakerNavProbeState>();
         State->Player = Player;
         State->StartTime = World->GetTimeSeconds();
@@ -495,6 +536,19 @@ namespace
             Enemy->SetAreaLevel(10);
             Enemy->ConfigureEncounter(Spot, 0.0f);
             State->Enemy = Enemy;
+            if (bPatrol)
+            {
+                Enemy->ConfigureEncounter(P, 0.0f);
+                Player->TeleportTo(OriginalPlayerLocation, Player->GetActorRotation());
+            }
+            if (bCrowd)
+                for (int32 I = 0; I < 8; ++I)
+                {
+                    FVector CrowdSpot = Spot + F * ((I / 3 + 1) * 115.0f) + R * ((I % 3 - 1) * 115.0f);
+                    CrowdSpot.Z = BreakerNavProbeGroundZ(World, CrowdSpot, EnemyGroundZ, Player) + 100.0f;
+                    if (auto* Body = BreakerNavProbeSpawnBody<ABreakerEnemy>(World, CrowdSpot, P, I * 1.3f))
+                        State->Crowd.Add(Body);
+                }
         }
 
         // Vantage A: high and to the right, on the pawn's side, looking at
@@ -781,7 +835,7 @@ namespace
         BreakerNavProbeStartSquadReport(World, State);
     }
 
-    enum class EBreakerNavProbeVariant : uint8 { Melee, Cover, Squad, Ledge };
+    enum class EBreakerNavProbeVariant : uint8 { Melee, Cover, Squad, Ledge, Crowd, Unreachable, Patrol };
 
     void BreakerNavProbeArm(EBreakerNavProbeVariant Variant)
     {
@@ -804,6 +858,9 @@ namespace
                 case EBreakerNavProbeVariant::Cover: BreakerNavProbePlaceCover(World, Player); break;
                 case EBreakerNavProbeVariant::Squad: BreakerNavProbePlaceSquad(World, Player); break;
                 case EBreakerNavProbeVariant::Ledge: BreakerNavProbePlaceNow(World, Player, true); break;
+                case EBreakerNavProbeVariant::Crowd: BreakerNavProbePlaceNow(World, Player, true, true); break;
+                case EBreakerNavProbeVariant::Unreachable: BreakerNavProbePlaceNow(World, Player, true, false, true); break;
+                case EBreakerNavProbeVariant::Patrol: BreakerNavProbePlaceNow(World, Player, true, false, false, true); break;
                 default: BreakerNavProbePlaceNow(World, Player); break;
                 }
                 return false;
@@ -822,6 +879,9 @@ namespace
             if (Args.Num() > 0 && Args[0].Equals(TEXT("Cover"), ESearchCase::IgnoreCase)) Variant = EBreakerNavProbeVariant::Cover;
             if (Args.Num() > 0 && Args[0].Equals(TEXT("Squad"), ESearchCase::IgnoreCase)) Variant = EBreakerNavProbeVariant::Squad;
             if (Args.Num() > 0 && Args[0].Equals(TEXT("Ledge"), ESearchCase::IgnoreCase)) Variant = EBreakerNavProbeVariant::Ledge;
+            if (Args.Num() > 0 && Args[0].Equals(TEXT("Crowd"), ESearchCase::IgnoreCase)) Variant = EBreakerNavProbeVariant::Crowd;
+            if (Args.Num() > 0 && Args[0].Equals(TEXT("Unreachable"), ESearchCase::IgnoreCase)) Variant = EBreakerNavProbeVariant::Unreachable;
+            if (Args.Num() > 0 && Args[0].Equals(TEXT("Patrol"), ESearchCase::IgnoreCase)) Variant = EBreakerNavProbeVariant::Patrol;
             BreakerNavProbeArm(Variant);
         }));
 }

@@ -1169,7 +1169,7 @@ void ABreakerEnemy::UpdateBodyGait()
     if (!NamedBody || !NamedBody->IsVisible() || !BodyRunAnimation.IsValid()) return;
     if (bBodyHitPlaying || bDead || (Combat && Combat->IsDead())) return;
     constexpr float MovingSpeed = 40.0f;   // O2 PLACEHOLDER: under this the body is standing
-    const bool bMoving = GetVelocity().SizeSquared2D() > MovingSpeed * MovingSpeed;
+    const bool bMoving = (Mover ? Mover->GetMeasuredGroundVelocity() : GetVelocity()).SizeSquared2D() > MovingSpeed * MovingSpeed;
     if (bMoving == bBodyRunning) return;
     bBodyRunning = bMoving;
     RestoreBodyGait();
@@ -1230,6 +1230,8 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
     {
         PatrolPhase += DeltaSeconds * 0.7f;
         const FVector PatrolTarget = LeashOrigin + FVector(0.0f, FMath::Sin(PatrolPhase) * 350.0f, 0.0f);
+        PathGoal = PatrolTarget;
+        bHasPathGoal = true;
         // Within one capsule radius of the target the body is THERE: it hands
         // the mover a zero direction and holds its facing. The target drifts
         // slower than the body walks, so a body that kept steering would sit
@@ -1274,7 +1276,8 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
     const FVector CurrentForward = GetActorForwardVector();
     const FVector WantedFacing = BreakerLocomotionMath::FacingFor(
         Mover ? Mover->GetLastMode() : EBreakerLocomotionMode::Steer,
-        DesiredFacing, Mover && Mover->IsBlockedHold() ? FVector::ZeroVector : DesiredDirection,
+        DesiredFacing, Mover && Mover->IsBlockedHold() ? FVector::ZeroVector
+            : Mover && !Mover->GetAvoidanceHeading().IsNearlyZero() ? Mover->GetAvoidanceHeading() : DesiredDirection,
         Mover ? Mover->GetPathHeading() : FVector::ZeroVector);
     SpeedScale *= BreakerLocomotionMath::AlignedSpeedScale(CurrentForward, WantedFacing);
     const FVector Facing = ComputeCappedFacing(CurrentForward, WantedFacing, MaxTurnRateDegreesPerSecond, DeltaSeconds);
@@ -1328,7 +1331,7 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
     if (Mover && NamedBody && MoveSpeed > 0.0f && NamedBody->IsPlaying() && bBodyRunning && !bBodyHitPlaying)
     {
         constexpr float MaxRate = 2.0f;   // O2 PLACEHOLDER
-        const FVector PlanarVelocity(Mover->Velocity.X, Mover->Velocity.Y, 0.0);
+        const FVector PlanarVelocity = Mover->GetMeasuredGroundVelocity();
         const float AlongForward = static_cast<float>(
             FVector::DotProduct(PlanarVelocity, GetActorForwardVector().GetSafeNormal2D()));
         NamedBody->SetPlayRate(FMath::Clamp(AlongForward / MoveSpeed, -MaxRate, MaxRate));

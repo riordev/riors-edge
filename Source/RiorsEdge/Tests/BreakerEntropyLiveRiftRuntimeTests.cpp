@@ -175,7 +175,11 @@ bool FBreakerEntropyLiveRiftRuntimeTest::RunTest(const FString& Parameters)
             // Walk the actual arrival route into detection/ability range. This
             // baseline driver neither teleports nor grants defensive evasion.
             if (Best > FMath::Square(1400.0f)) Player->AddMovementInput((Target->GetActorLocation() - Player->GetActorLocation()).GetSafeNormal2D());
-            if (Best <= FMath::Square(2000.0f) && Step >= 30)
+            // Begin delivery after a real enemy commitment. A faster rifle
+            // can kill this small wave before its first tell; that is a clear,
+            // but it does not exercise this diagnostic's live-threat contract.
+            // All rows use the same trigger and ordinary starting resources.
+            if (Best <= FMath::Square(2000.0f) && Step >= 30 && (bAttackObserved || LostPlayerHealth > 0))
             {
                 if (bAbility)
                 {
@@ -206,7 +210,7 @@ bool FBreakerEntropyLiveRiftRuntimeTest::RunTest(const FString& Parameters)
             LostPlayerHealth += FMath::Max(0.0f, BeforeHealth - Player->GetAttributes()->GetHealth());
             const bool bReloading = Weapon->IsReloading();
             if (bReloading && !bWasReloading) ++Reloads;
-            if (bWasReloading && !bReloading && !bAbility) { PressFire(); bRifleStarted = true; }
+            if (bWasReloading && !bReloading && !bAbility && bRifleStarted) PressFire();
             bWasReloading = bReloading;
             for (const auto& Held : Enemies)
                 if (auto* Enemy = Held.Get())
@@ -234,7 +238,7 @@ bool FBreakerEntropyLiveRiftRuntimeTest::RunTest(const FString& Parameters)
             else ++Killed;
         MovedEnemies = Moved.Num();
         auto StateNames = ObservedEnemyStates.Array(); StateNames.Sort();
-        AddInfo(FString::Printf(TEXT("Observed enemy states: %s"), *FString::Join(StateNames, TEXT(", "))));
+        AddInfo(FString::Printf(TEXT("Delivery begins after first enemy commitment; observed enemy states: %s"), *FString::Join(StateNames, TEXT(", "))));
         TestTrue(TEXT("shipped enemies actually move in the encounter"), MovedEnemies > 0);
         TestTrue(TEXT("real attacks or received damage demonstrate live enemy threat"), bAttackObserved || LostPlayerHealth > 0);
         TestTrue(TEXT("ordinary delivery reduces actual enemy health"), InitialEnemyHealth > RemainingEnemyHealth);

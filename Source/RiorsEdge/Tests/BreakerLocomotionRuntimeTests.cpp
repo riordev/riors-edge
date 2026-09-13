@@ -80,6 +80,52 @@ bool FBreakerLocomotionClearanceRuntimeTest::RunTest(const FString& Parameters)
     TestNotNull(TEXT("crowd body exists"), Neighbour);
     Mover->ResetForRevive();
     TestFalse(TEXT("revive clears blocked facing"), Mover->IsBlockedHold());
+    Neighbour->Destroy();
+    Enemy->SetActorLocation(FVector(0, 0, Height));
+    Mover->RequestDirectMove(FVector(98000, 0, 500), true);
+    TestTrue(TEXT("path requests cannot inflate commanded speed beyond the movement limit"), Mover->Velocity.Size() <= Mover->MaxSpeed + .01f);
+    TestEqual(TEXT("path request is planar"), Mover->Velocity.Z, 0.0);
+    TestTrue(TEXT("requesting motion does not fabricate animation displacement"), Mover->GetMeasuredGroundVelocity().IsNearlyZero());
+    Drive();
+    const FVector Before = Enemy->GetActorLocation();
+    Mover->TickComponent(.05f, LEVELTICK_All, nullptr);
+    const FVector Travel = Enemy->GetActorLocation() - Before;
+    TestTrue(TEXT("animation speed equals actual planar travel over the movement tick"),
+        Mover->GetMeasuredGroundVelocity().Equals(FVector(Travel.X, Travel.Y, 0) / .05f, .01));
+    TestTrue(TEXT("clear lane advances"), Travel.Size2D() > 1);
+    Mover->ResetForRevive(); Enemy->SetActorLocation(FVector(0, 0, Height));
+    AActor* NearWall = Box(FVector(Capsule->GetScaledCapsuleRadius() + 9, 0, Height), FVector(5, 200, Height));
+    for (int32 I = 0; I < 120; ++I)
+    {
+        // No target/goal: exercise raw steering independently of path choice.
+        Mover->Drive(FVector::ForwardVector, 1, nullptr, 0, 0, 330);
+        Mover->TickComponent(.05f, LEVELTICK_All, nullptr);
+    }
+    TestEqual(TEXT("predictive clearance prevents repeated physical wall impacts"), Mover->GetWorldTouchCount(), 0);
+    TestTrue(TEXT("blocked steering holds rather than walking in place"), Mover->IsBlockedHold() && Mover->GetMeasuredGroundVelocity().IsNearlyZero());
+    TestTrue(TEXT("body stays outside the obstacle"), Enemy->GetActorLocation().X < 3);
+    NearWall->Destroy();
+    Drive(); Mover->TickComponent(.05f, LEVELTICK_All, nullptr);
+    TestTrue(TEXT("steering resumes after close obstruction is removed"), Mover->GetMeasuredGroundVelocity().Size2D() > 1);
+    Mover->ResetForRevive(); Enemy->SetActorLocation(FVector(0, 0, Height));
+    Neighbour = World->SpawnActor<ABreakerEnemy>(ABreakerEnemy::StaticClass(),
+        FVector(2 * Capsule->GetScaledCapsuleRadius() + 4, 0, Height), FRotator::ZeroRotator, Spawn);
+    Drive(); Mover->TickComponent(.05f, LEVELTICK_All, nullptr);
+    TestTrue(TEXT("rear body yields before bumping a stationary front body"), Mover->IsBlockedHold() && Mover->GetMeasuredGroundVelocity().IsNearlyZero());
+    Neighbour->SetActorLocation(FVector(500, 200, Height));
+    Drive(); Mover->TickComponent(.05f, LEVELTICK_All, nullptr);
+    TestTrue(TEXT("yielding body resumes when the front body frees the lane"), Mover->GetMeasuredGroundVelocity().Size2D() > 1);
+    Mover->ResetForRevive(); Enemy->SetActorLocation(FVector(0, 0, Height));
+    Neighbour->SetActorLocation(FVector(2 * Capsule->GetScaledCapsuleRadius() + 4, 0, Height));
+    Neighbour->SetActorRotation(FRotator(0, 180, 0));
+    Drive(); Mover->TickComponent(.05f, LEVELTICK_All, nullptr);
+    TestTrue(TEXT("head-on bodies select a clear right-hand pass instead of mutual yielding"),
+        Mover->GetMeasuredGroundVelocity().Y > 0 && !Mover->IsBlockedHold());
+    Neighbour->Destroy();
+    Mover->ResetForRevive(); Enemy->SetActorLocation(FVector(0, 0, Height));
+    Box(FVector(-Capsule->GetScaledCapsuleRadius() + 3, 0, Height), FVector(5, 200, Height));
+    Drive(); Mover->TickComponent(.05f, LEVELTICK_All, nullptr);
+    TestTrue(TEXT("a pawn initially penetrating a wall can recover and move out"), Enemy->GetActorLocation().X > 3);
     return true;
 }
 #endif

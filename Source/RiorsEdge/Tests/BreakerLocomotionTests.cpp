@@ -8,6 +8,7 @@
 #include "NavMesh/RecastNavMesh.h"
 #include "UObject/UObjectIterator.h"
 #include "Components/PrimitiveComponent.h"
+#include "NavigationSystem.h"
 
 namespace
 {
@@ -270,6 +271,9 @@ bool FBreakerLocomotionShippedConfigurationTest::RunTest(const FString& Paramete
     TestTrue(TEXT("At least the base enemy was checked"), Checked >= 1);
 
     const ARecastNavMesh* NavDefaults = GetDefault<ARecastNavMesh>();
+    TestTrue(TEXT("runtime agent registry uses enemy dimensions instead of Unreal's smaller fallback"),
+        GetDefault<UNavigationSystemV1>()->GetSupportedAgents().ContainsByPredicate([](const FNavDataConfig& Agent)
+        { return Agent.Name == TEXT("Enemy") && Agent.AgentRadius == 45.0f && Agent.AgentHeight == 180.0f; }));
     TestNotNull(TEXT("The recast navmesh class defaults resolve"), NavDefaults);
     if (NavDefaults)
     {

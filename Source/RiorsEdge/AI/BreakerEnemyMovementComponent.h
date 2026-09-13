@@ -41,6 +41,9 @@ public:
     int32 GetWorldTouchCount() const { return WorldTouchCount; }
     EBreakerLocomotionMode GetLastMode() const { return LastMode; }
     bool IsBlockedHold() const { return bBlockedHold; }
+    FVector GetMeasuredGroundVelocity() const { return MeasuredGroundVelocity; }
+    FVector GetAvoidanceHeading() const { return AvoidanceHeading; }
+    int32 GetClearanceHoldCount() const { return ClearanceHoldCount; }
     // The leg the path follower is walking this body along, as a unit
     // direction, or zero when it holds no path. The facing rule reads this
     // and not the velocity, which the speed scale can erase.
@@ -50,11 +53,14 @@ public:
     void ResetForRevive();
 
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+    virtual void RequestDirectMove(const FVector& MoveVelocity, bool bForceMaxSpeed) override;
     virtual void HandleImpact(const FHitResult& Hit, float TimeSlice = 0.0f, const FVector& MoveDelta = FVector::ZeroVector) override;
 
 protected:
     // Sweep the capsule's clearance through static geometry, ignoring pawns.
     bool IsClosingLineBlocked(const FVector& To, const AActor* Ignore) const;
+    bool SweepStep(const FVector& Delta, FHitResult& Hit, bool bIncludePawns) const;
+    void ConstrainNextStep(float DeltaTime);
 
     // The ground snap, moved here verbatim from ABreakerEnemy::Tick: trace
     // down, plant the capsule base on whatever is below — snap down
@@ -63,6 +69,11 @@ protected:
     void SnapToGround(float DeltaTime);
 
     int32 WorldTouchCount = 0;
+    int32 ClearanceHoldCount = 0;
+    FVector MeasuredGroundVelocity = FVector::ZeroVector;
+    FVector AvoidanceHeading = FVector::ZeroVector;
+    FVector PreviousClientLocation = FVector::ZeroVector;
+    bool bHasClientLocation = false;
     bool bBlockedHold = false;
     EBreakerLocomotionMode LastMode = EBreakerLocomotionMode::Idle;
 };

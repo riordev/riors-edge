@@ -25,41 +25,7 @@ and direction, enemy movement, sound and environmental presentation were poor.
 - Gear is cluttered and hard to compare; equipping upgrades does not feel
   consequential. Owner is unsure how much is early-level tuning.
 
-### NEXT — LOCOMOTION CONTACTS AND ANIMATION
-
-- [ ] Eliminate remaining patrol/steer obstacle scraping using actual movement
-      and impact evidence. The isolated Fernhall ledge approach reaches the
-      player in 6.0 seconds with 16 contacts; after target death/respawn the
-      patrol can accumulate repeated contacts again. This is not a clean route.
-- [ ] Separate path-request velocity from measured displacement for gait and
-      facing. The probe reports transient requested speeds over 98,000 cm/s
-      while half-second displacement stays in the hundreds of centimetres.
-      Investigate tick order before changing mesh offsets or turn-rate caps.
-- [ ] Reproduce a dense moving crowd and unreachable target in Fernhall,
-      recording collision, actual displacement and animation together. The
-      isolated no-nav and overlapping-pawn tests do not prove crowd avoidance.
-- [ ] Correct nav-probe turn-rate measurement to use actual sample duration;
-      the nominal half-second divisor produces false alarms during hitches.
-
-### DONE — FIRST LOCOMOTION REPAIR
-
-- [x] Enemy blocking capsules no longer export navigation geometry and cut
-      holes beneath their own feet. Shipped enemy classes assert this setting.
-- [x] Capsule clearance detects low ledges and shoulder obstructions missed
-      by the old centre ray; static-only grounding cannot climb another pawn.
-- [x] Rejected/incomplete routes hold with cleared velocity/input and bounded
-      retries, preserving facing during a blocked hold. Clear routes resume
-      steering immediately. No partial-route pushing fallback.
-- [x] Runtime collision regression covers floor clearance, a 40 cm ledge,
-      shoulder clearance, 120 repeated failed-route frames, obstacle removal,
-      crowded grounding and revival. Live combat fixture supplies navigation
-      and recognises the actual WIND-UP tell without relaxing assertions.
-- [x] Isolated Fernhall Ledge probe and captures show route recovery and real
-      attack after 6.0 seconds. Initial unisolated footage was invalidated by
-      target death; the isolated pre-nav-fix run stayed held for the capture.
-      Remaining contacts and animation issues stay above, not marked solved.
-
-### FOLLOWING BLOCKS
+### NEXT — CASTER TIMING AND AUDIO
 
 - [ ] Caster input/timing/audio: reproduce alternating Cleave/Rot and repeated
       same-slot presses at base and increased cast speed. Compare press,
@@ -68,6 +34,40 @@ and direction, enemy movement, sound and environmental presentation were poor.
       Cast speed already divides the authored wind-up; no missing lane inferred.
       Owner intent: Caster tree investment must improve casting cadence;
       preserve cast-speed scaling and tune movement speed separately.
+### DONE — LOCOMOTION CONTACTS AND ANIMATION
+
+- [x] Patrol destinations use the same navigation-goal channel as chasing.
+      Runtime navigation explicitly registers the 45 cm radius / 180 cm height
+      enemy agent; Recast defaults alone allowed Unreal's 35 cm fallback.
+      Both class configuration and live mesh/pawn dimensions are checked.
+- [x] Next-step capsule clearance stops wall pushing, permits clear wall
+      tangents, yields to a body ahead and chooses a right-hand pass when
+      bodies meet head-on. Initial static overlaps recover even at rest.
+      Collision tests cover 120 blocked steering ticks, lane reopening,
+      head-on passing and initial-overlap recovery.
+- [x] Path commands are capped before they become movement velocity. Gait
+      selection/rate uses measured planar travel; blocked bodies play Idle.
+      Replicated travel samples are smoothed for client gait. Explicit facing
+      for ranged strafes remains; no new strafe animation assets are claimed.
+- [x] Fernhall probes cover patrol return, nine-body crowd approach and an
+      enclosed target. Patrol reaches its patrol area with zero world contacts;
+      the crowd lead reaches the target in 6.3 seconds with zero contacts,
+      and all eight additional bodies record zero world contacts. The enclosed
+      target leaves the enemy still on Idle, with zero contacts through 25s.
+      Probes are available as Breaker.Nav.Probe Patrol / Crowd / Unreachable.
+- [x] Probe turns use actual elapsed sample time, with measured/commanded
+      velocity and animation clip/rate logged together. Captures inspected.
+
+### DONE — FIRST LOCOMOTION REPAIR
+
+- [x] Enemy blocking capsules do not carve navigation under their own feet.
+      Static-only grounding cannot snap onto another pawn's capsule.
+- [x] Body clearance catches low ledges and shoulder obstructions; failed or
+      incomplete routes hold with cleared input/velocity and bounded retries.
+      Clear routes resume immediately and revival clears held movement state.
+
+### FOLLOWING BLOCKS
+
 - [ ] Movement pace and stopping: measure this recorded Caster's live speed
       modifiers and gear, then tune ground pace and momentum bleed separately.
 - [ ] Fernhall visual sweep: one player-height route with material/mesh/scale
@@ -80,13 +80,6 @@ and direction, enemy movement, sound and environmental presentation were poor.
       equipment comparisons, mana overflow geometry and ultimate readout.
 - [ ] Audio/presentation: cast cue repetition and mix, rifle fire asset,
       rounded rocket blast, weapon-bearing shadow, Caster ultimate payoff.
-
-Read-only triage: BreakerEnemyMovementComponent uses a capsule-center line
-trace to decide obstruction; a low ledge can block the capsule without blocking
-that line. Refused Chase requests revert to Steer. These are plausible causes,
-not a reproduced diagnosis. Facing already has a turn-rate cap; simply adding
-another smoothing layer is not an established fix. No rebuild or game restart
-was performed during the owner's playtest.
 
 ## OWNER PLAYTEST, 2026-09-12 (NINTH)
 
