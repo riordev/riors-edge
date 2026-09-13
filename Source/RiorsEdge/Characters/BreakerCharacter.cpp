@@ -1,4 +1,5 @@
 #include "Characters/BreakerCharacter.h"
+#include "Abilities/BreakerAbility_Rot.h"
 #include "Game/BreakerCoopCombatTest.h"
 #include "Game/BreakerPrototypeDestinations.h"
 #include "Game/BreakerCoopCombatVerification.h"
@@ -269,6 +270,9 @@ void ABreakerCharacter::UpdateCameraShake(float DeltaSeconds)
 void ABreakerCharacter::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+    if (IsLocallyControlled() && AbilitySystem)
+        for (const FGameplayAbilitySpec& Spec : AbilitySystem->GetActivatableAbilities())
+            if (auto* Rot = Cast<UBreakerAbility_Rot>(Spec.GetPrimaryInstance())) Rot->UpdateTargetPreview();
     // Cached while airborne for the landing dip: Landed fires after the
     // movement component has zeroed Velocity.Z, so the dip's input is the
     // last falling frame's speed, not the (always zero) landing frame's.
@@ -280,6 +284,9 @@ void ABreakerCharacter::Tick(float DeltaSeconds)
     // through the 1/2 keys — the loadout screen, an item equip, a dev swap.
     // Early-outs on the first line when nothing changed.
     ApplyWeaponPresentation();
+#if !UE_BUILD_SHIPPING
+    if (Weapon && FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureADS"))) Weapon->SetAiming(true);
+#endif
     UpdateViewmodelKick();
     UpdateDashCameraFeedback(DeltaSeconds);
     // Before the FOV writer, which reads this frame's cast pulse (O284).
@@ -1697,6 +1704,8 @@ void ABreakerCharacter::RebuildViewmodelParts()
             // source-axis yaw — not off the row the mesh replaced.
             ActiveSightLineCm = BreakerViewmodel::NamedSightLineRigCm(GunBounds.Origin, GunBounds.BoxExtent,
                 FitScale, ActiveLayout.NamedMeshRotation, FitLocation);
+            if (NamedGun->GetFName() == TEXT("Gun_Rifle"))
+                ActiveSightLineCm = FitLocation + ActiveLayout.NamedMeshRotation.RotateVector(BreakerViewmodel::RifleSightMeshCm * FitScale);
         }
     }
     if (NamedGun)

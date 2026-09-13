@@ -388,8 +388,30 @@ bool UBreakerLoopProbe::TickActTwo(ABreakerCharacter* Player, ABreakerGameMode* 
     for (TActorIterator<ABreakerFeedstockPickup> It(World); It; ++It)
     {
         if (It->GetOwner() != Player || It->IsActorBeingDestroyed()) continue;
-        Player->TeleportTo(It->GetActorLocation() + FVector(0,0,100), Player->GetActorRotation());
-        if (!It->TryCollect(Player)) return Finish(false, TEXT("Physical Forge feedstock collection refused"));
+        // The former probe ignored TeleportTo's result. A capsule that cannot
+        // fit directly above a drop then tried collecting from its old position.
+        // Find a legal nearby approach; keep the real range/visibility checks.
+        bool bApproached = false;
+        int32 Attempt = 0;
+        const FVector Pickup = It->GetActorLocation();
+        for (float Radius : {0.0f, 150.0f, 250.0f})
+        {
+            for (int32 Direction = 0; Direction < (Radius == 0 ? 1 : 8); ++Direction)
+            {
+                ++Attempt;
+                const float Angle = 2 * PI * Direction / 8;
+                const FVector Approach = Pickup + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 100);
+                if (Player->TeleportTo(Approach, Player->GetActorRotation()) && It->CanCollect(Player))
+                {
+                    bApproached = true;
+                    break;
+                }
+            }
+            if (bApproached) break;
+        }
+        UE_LOG(LogTemp, Display, TEXT("[LoopProbe] feedstock approach attempts=%d legal=%d pickup=%s player=%s"),
+            Attempt, bApproached, *Pickup.ToString(), *Player->GetActorLocation().ToString());
+        if (!bApproached || !It->TryCollect(Player)) return Finish(false, TEXT("Physical Forge feedstock collection refused after legal-approach search"));
         bCollectedFeedstock = true;
     }
     if (bCollectedFeedstock) return true;

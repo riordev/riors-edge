@@ -177,6 +177,10 @@ namespace BreakerViewmodel
     // Measured from Gun_Rifle LOD0's -X front cap by BreakerArms. Kept in
     // source space so packaged gameplay never reads discarded CPU vertices.
     inline const FVector RifleMuzzleMeshCm(-74.340, -0.031, 14.771);
+    // Gun_Rifle.fbx, source vertices scaled to centimetres: the optic's
+    // inner lower/upper edges at Z 22.361/27.729, centered at X -33.461.
+    // The held-ADS capture must place the reticle inside this aperture.
+    inline const FVector RifleSightMeshCm(-33.461, 0.0, (22.361 + 27.729) * 0.5);
     // ---- Palette -------------------------------------------------------
     // Militia hardware, per Art-And-Modelling-Plan.md §3.1 and Pillar 3.
     // Desaturated steel and olive polymer; hazard amber appears on exactly one

@@ -85,23 +85,11 @@ public:
 
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
-    // THE AIM IS READ AT THE PRESS. O266's wind-up delays the RESOLUTION, not
-    // the press, and Rot was reading its whole aim — view, trace, floor probe,
-    // Wellspring's follow decision — on the far side of the 0.6 s. Owner: "rot
-    // has a tendency to not go off when pressed or off at another target
-    // location"; the reticle had moved on and the puddle went where it was
-    // pointing at the landing. The solve now runs here, at cast start, in
-    // Resonance's shape: snapshot at the press, consume at the landing. Rot
-    // never refuses on aim (AimPoint's own comment: a mis-aim is a puddle in
-    // the wrong place, not a swallowed input), so this always returns true.
-    virtual bool PrepareCast() override;
-
-    // O271: a press during the wind-up queues one cast, and ITS aim is read
-    // at that press too — into a second slot, because the first still belongs
-    // to the cast winding up. Promotion moves it into the active slot at the
-    // landing that fires the queued cast.
-    virtual bool PrepareQueuedCast() override;
-    virtual void PromoteQueuedCast() override;
+    // O271: both ordinary and queued casts resolve the current aim at landing.
+    // The preview uses the very same solve and disappears when casting stops.
+    void UpdateTargetPreview();
+    virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+        const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
     // Everything the aim decides, in one value: the centre after the floor
     // probe and whether Wellspring makes the puddle ride the caster.
@@ -131,16 +119,9 @@ public:
     bool ShouldFollowCaster(const AActor* OwnerActor, bool bGroundHit, const FVector& HitPoint, const FVector& HitNormal) const;
 
 private:
-    // The whole aim question in one place, so the cast start and the
-    // no-cast-time path cannot ask it differently. Reads the world, writes
-    // nothing on the ability.
     void SolveAim(const ABreakerCharacter& Character, const UWorld& World, FAimSolve& Out) const;
-
-    FAimSolve CastAimSnapshot;
-    bool bAimSnapshotValid = false;
-    // The queued press's aim (O271), waiting behind the active snapshot.
-    FAimSolve QueuedAimSnapshot;
-    bool bQueuedAimValid = false;
+    TArray<int32> PreviewHandles;
+    TWeakObjectPtr<class ABreakerEffectRenderer> PreviewRenderer;
 
 public:
     // Class-Kits §2.2 C3 names the shape; the numbers live in Data/abilities.json.

@@ -5,6 +5,8 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerEnemy.h"
+#include "Components/CapsuleComponent.h"
 #include "Combat/BreakerDamageLibrary.h"
 #include "Combat/BreakerZoneActor.h"
 #include "Engine/World.h"
@@ -76,6 +78,15 @@ void UBreakerAbility_Rot::SolveAim(const ABreakerCharacter& Character, const UWo
     Out.bFollowCaster = ShouldFollowCaster(&Character, bHit, Hit.ImpactPoint, Hit.ImpactNormal);
     Out.Center = Out.bFollowCaster ? Hit.ImpactPoint
         : AimPoint(ViewLocation, ViewRotation.Vector(), MaximumRangeCm, bHit, Hit.ImpactPoint);
+    // An enemy hit selects its feet, not the near face of its hit box.
+    // The ground probe below still decides the surface height.
+    if (!Out.bFollowCaster && bHit)
+        if (const ABreakerEnemy* Enemy = Cast<ABreakerEnemy>(Hit.GetActor()))
+        {
+            Out.Center = Enemy->GetActorLocation();
+            if (const auto* Capsule = Enemy->FindComponentByClass<UCapsuleComponent>())
+                Out.Center.Z -= Capsule->GetScaledCapsuleHalfHeight();
+        }
     FVector& Center = Out.Center;
 
     // AND THEN IT FALLS TO THE FLOOR. Owner: "rot looks so weird casting
@@ -97,7 +108,11 @@ void UBreakerAbility_Rot::SolveAim(const ABreakerCharacter& Character, const UWo
         // EVERY SURFACE UNDER THE AIM POINT, not just the first one. The rule
         // that picks among them is BreakerRotFloor::PickFloorZ, which is pure
         // and tested; this is only the part that has to touch a world.
-        World.LineTraceMultiByObjectType(Ground, Center + FVector(0, 0, LiftCm),
+        // An enemy inside a bay selects the floor under its body, never the
+        // roof above it. The generic raised probe is only for scenery aim.
+        const ABreakerEnemy* AimedEnemy = bHit ? Cast<ABreakerEnemy>(Hit.GetActor()) : nullptr;
+        const FVector ProbeStart = AimedEnemy ? AimedEnemy->GetActorLocation() : Center + FVector(0, 0, LiftCm);
+        World.LineTraceMultiByObjectType(Ground, ProbeStart,
             Center - FVector(0, 0, ReachCm), FCollisionObjectQueryParams(ECC_WorldStatic), GroundQuery);
         TArray<BreakerRotFloor::FProbeHit> Probe;
         Probe.Reserve(Ground.Num());
@@ -124,47 +139,53 @@ void UBreakerAbility_Rot::SolveAim(const ABreakerCharacter& Character, const UWo
     }
 }
 
-bool UBreakerAbility_Rot::PrepareCast()
+void UBreakerAbility_Rot::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+    const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-    // THE PUDDLE LANDS WHERE THE PRESS POINTED, not where the reticle drifted
-    // to during the wind-up (O266: the wind-up delays the resolution, not the
-    // press). Solved here, before the price, and held until the landing.
-    // Never a refusal: a mis-aim is a puddle in the wrong place, and a key
-    // that does nothing is the worse feedback. A snapshot left over from a
-    // cast that never landed — a refused commit, an interrupt — is simply
-    // overwritten by the next press's solve.
-    const ABreakerCharacter* Character = GetBreakerCharacter();
-    const UWorld* World = Character ? Character->GetWorld() : nullptr;
-    bAimSnapshotValid = false;
-    if (!Character || !World) return true;
-    SolveAim(*Character, *World, CastAimSnapshot);
-    bAimSnapshotValid = true;
-    return true;
+    if (PreviewRenderer.IsValid())
+        for (int32 Id : PreviewHandles) PreviewRenderer->EndEffect(Id, 0.0f);
+    PreviewHandles.Reset();
+    Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
-bool UBreakerAbility_Rot::PrepareQueuedCast()
+void UBreakerAbility_Rot::UpdateTargetPreview()
 {
-    // O271: THE QUEUED PRESS IS AIMED AT THE QUEUED PRESS. The active snapshot
-    // belongs to the cast still winding up, so the second press solves into
-    // its own slot and waits. Same solve, same never-refuse rule.
-    const ABreakerCharacter* Character = GetBreakerCharacter();
-    const UWorld* World = Character ? Character->GetWorld() : nullptr;
-    bQueuedAimValid = false;
-    if (!Character || !World) return true;
-    SolveAim(*Character, *World, QueuedAimSnapshot);
-    bQueuedAimValid = true;
-    return true;
-}
-
-void UBreakerAbility_Rot::PromoteQueuedCast()
-{
-    // The first landing has consumed the active snapshot by the time this
-    // runs; the queued one takes its place and the fresh cast that follows
-    // skips PrepareCast, so this aim — not the reticle at the landing — is
-    // where the second puddle goes.
-    CastAimSnapshot = QueuedAimSnapshot;
-    bAimSnapshotValid = bQueuedAimValid;
-    bQueuedAimValid = false;
+    // Called by the locally controlled pawn, including after an interruption.
+    // Reuse effect handles instead of allocating another ring every frame.
+    ABreakerCharacter* Character = GetBreakerCharacter();
+    UWorld* World = Character ? Character->GetWorld() : nullptr;
+    if (!IsCasting() || !World || !Character->IsLocallyControlled())
+    {
+        if (PreviewRenderer.IsValid())
+            for (int32 Handle : PreviewHandles) PreviewRenderer->EndEffect(Handle, 0.0f);
+        PreviewHandles.Reset();
+        return;
+    }
+    FAimSolve Aim;
+    SolveAim(*Character, *World, Aim);
+    ABreakerEffectRenderer* Renderer = ABreakerEffectRenderer::FindOrSpawn(World);
+    if (!Renderer) return;
+    if (PreviewRenderer.Get() != Renderer) PreviewHandles.Reset();
+    PreviewRenderer = Renderer;
+    constexpr int32 Segments = 12; // O2 PLACEHOLDER: a dashed footprint keeps the target readable.
+    const float Radius = ComputeEffectiveRadiusCm(Character);
+    const FVector Center = Aim.Center + FVector(0, 0, 3); // O2 PLACEHOLDER: avoid z fighting.
+    if (PreviewHandles.Num() != Segments) PreviewHandles.SetNumZeroed(Segments);
+    for (int32 Index = 0; Index < Segments; ++Index)
+    {
+        const float A = 2 * PI * Index / Segments;
+        const float B = 2 * PI * (Index + 0.65f) / Segments;
+        const FVector Start = Center + FVector(FMath::Cos(A), FMath::Sin(A), 0) * Radius;
+        const FVector End = Center + FVector(FMath::Cos(B), FMath::Sin(B), 0) * Radius;
+        if (!Renderer->SetStrokeEndpoints(PreviewHandles[Index], Start, End))
+        {
+            BreakerFX::FEffectTiming Timing;
+            Timing.DurationSeconds = 60.0f; // O2 PLACEHOLDER; explicitly ended when cast stops.
+            Timing.FadeInSeconds = 0;
+            Timing.FadeOutSeconds = 0;
+            PreviewHandles[Index] = Renderer->AddStroke(Start, End, 1.0f, GetPresentationColor(), 0.6f, Timing);
+        }
+    }
 }
 
 void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
@@ -181,22 +202,9 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
         return;
     }
 
-    // THE AIM COMES FROM THE CAST START WHEN THERE WAS ONE. PrepareCast solved
-    // it at the press; this is the landing, and re-solving here would let the
-    // puddle follow the crosshair through the wind-up, which is the drift the
-    // owner reported. With no authored cast time there is no snapshot and the
-    // same solve runs inline, which is what keeps a zero-cast-time build
-    // identical.
+    // Payment stays on the press; targeting belongs to the completed cast.
     FAimSolve Aimed;
-    if (bAimSnapshotValid)
-    {
-        bAimSnapshotValid = false;
-        Aimed = CastAimSnapshot;
-    }
-    else
-    {
-        SolveAim(*Character, *World, Aimed);
-    }
+    SolveAim(*Character, *World, Aimed);
     const bool bFollowCaster = Aimed.bFollowCaster;
     const FVector Center = Aimed.Center;
 

@@ -428,20 +428,21 @@ void ABreakerEffectRenderer::SetEffectRemaining(int32 Handle, float RemainingSec
     for (auto& Slot : LightState) if (Update(Slot)) return;
 }
 
-void ABreakerEffectRenderer::SetStrokeEndpoints(int32 Handle, const FVector& A, const FVector& B)
+bool ABreakerEffectRenderer::SetStrokeEndpoints(int32 Handle, const FVector& A, const FVector& B)
 {
-    if (Handle <= 0) return;
+    if (Handle <= 0) return false;
     for (FEffectSlot& Slot : StrokeState)
     {
         if (!Slot.bActive || Slot.Serial != Handle) continue;
         // An anchored beam's endpoints belong to its anchors; the tick would
         // overwrite this before anyone saw it, so it is refused rather than
         // drawn for a frame that never comes.
-        if (Slot.bAnchored) return;
+        if (Slot.bAnchored) return false;
         Slot.A = A;
         Slot.B = B;
-        return;
+        return true;
     }
+    return false;
 }
 
 void ABreakerEffectRenderer::Hide(UStaticMeshComponent* Mesh)

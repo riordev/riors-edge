@@ -374,12 +374,21 @@ void UBreakerEnemyModifierComponent::TickPhasing(float DeltaSeconds)
         bPhaseTelegraphing = false;
         const FVector Destination = UBreakerEnemyModifierLibrary::GetPhaseDestination(
             Enemy->GetActorLocation(), Target->GetActorLocation(), Params);
-        if (!Destination.Equals(Enemy->GetActorLocation(), 1.0f))
+        // A blink crosses intervening walls, but its landing must fit the
+        // body's real collision shape. Never make an unsuccessful blink
+        // untargetable; the next interval may try again.
+        const UCapsuleComponent* Capsule = Enemy->FindComponentByClass<UCapsuleComponent>();
+        FCollisionQueryParams LandingQuery(SCENE_QUERY_STAT(BreakerPhaseLanding), false, Enemy);
+        const bool bFits = Capsule && GetWorld() && !GetWorld()->OverlapBlockingTestByChannel(
+            Destination, Enemy->GetActorQuat(), Capsule->GetCollisionObjectType(),
+            Capsule->GetCollisionShape(), LandingQuery,
+            FCollisionResponseParams(Capsule->GetCollisionResponseToChannels()));
+        if (bFits && !Destination.Equals(Enemy->GetActorLocation(), 1.0f))
         {
             Enemy->SetActorLocation(Destination, false);
+            BlinkRemaining = FMath::Max(0.0f, Params.PhaseBlinkSeconds);
+            Enemy->SetModifierUntargetable(BlinkRemaining > 0.0f);
         }
-        BlinkRemaining = FMath::Max(0.0f, Params.PhaseBlinkSeconds);
-        Enemy->SetModifierUntargetable(BlinkRemaining > 0.0f);
         PhaseTimer = 0.0f;
         return;
     }

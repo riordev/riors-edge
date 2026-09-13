@@ -435,6 +435,14 @@ bool FBreakerViewmodelAimPoseTest::RunTest(const FString& Parameters)
                 FitScale, FitLocation);
             FitLocation = Layout.FiringHandCm;
             SightLine = BreakerViewmodel::NamedSightLineRigCm(Bounds.Origin, Bounds.BoxExtent, FitScale, Layout.NamedMeshRotation, FitLocation);
+            if (Mesh->GetFName() == TEXT("Gun_Rifle"))
+            {
+                const FVector OpticalCenter(-33.461, 0, 25.045);
+                TestTrue(TEXT("rifle uses the measured aperture, below the outer top"),
+                    BreakerViewmodel::RifleSightMeshCm.Equals(OpticalCenter, .001)
+                    && OpticalCenter.Z < Bounds.Origin.Z + Bounds.BoxExtent.Z);
+                SightLine = FitLocation + Layout.NamedMeshRotation.RotateVector(OpticalCenter * FitScale);
+            }
             UE_LOG(LogTemp, Display, TEXT("[NamedGun] %s (%s) scale %.3f: sight line rig (%.2f, %.2f, %.2f)"),
                 *Name, *Layout.NamedMeshPath.GetAssetName(), FitScale, SightLine.X, SightLine.Y, SightLine.Z);
             TestTrue(*FString::Printf(TEXT("%s's named sight line is finite"), *Name), !SightLine.ContainsNaN());

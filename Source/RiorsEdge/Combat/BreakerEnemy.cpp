@@ -240,10 +240,7 @@ ABreakerEnemy::ABreakerEnemy()
     // blocking capsule: the pool revive and the standing respawn both
     // SetActorLocation onto a spawn point. The Phase modifier's blink
     // (BreakerModifierComponent, Enemy->SetActorLocation(Destination, false))
-    // is the one that can now land INSIDE a wall — an unswept teleport to a
-    // point picked by arithmetic, not by the NavMesh, and a body that lands
-    // in a wall stays there until the mover's next depenetration. Recorded
-    // here, not fixed here: the blink's destination is the modifier's to rule.
+    // validates the destination against this capsule before teleporting.
     BodyCollision->SetCollisionProfileName(UCollisionProfile::Pawn_ProfileName);
     BodyCollision->SetCollisionResponseToChannel(ECC_GameTraceChannel1, ECR_Ignore);
     BodyCollision->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Ignore);

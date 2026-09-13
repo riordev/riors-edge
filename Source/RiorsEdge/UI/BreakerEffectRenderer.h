@@ -131,7 +131,8 @@ public:
     // CROSSING: GLASS publishes, FIELD (Combat/) consumes. An anchored beam
     // ignores it — its anchors re-resolve the endpoints every frame and would
     // win anyway. A stale or recycled handle is a silent no-op.
-    void SetStrokeEndpoints(int32 Handle, const FVector& A, const FVector& B);
+    // Returns false for an expired/recycled handle so an owning preview can reclaim it.
+    bool SetStrokeEndpoints(int32 Handle, const FVector& A, const FVector& B);
 
     // THE FOUR MOMENTS (GLASS-1). Plays the moment's Niagara system if the
     // owner has authored `/Game/Breaker/FX/NS_<Moment>` — resolved once per

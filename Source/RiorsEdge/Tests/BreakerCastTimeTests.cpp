@@ -59,11 +59,8 @@ bool FBreakerCastTimeShippedTest::RunTest(const FString& Parameters)
     // Cleave is the owner's own report — "cleave has instant cast speed" — and
     // is the ability this rule ships on.
     TestEqual(TEXT("Cleave winds up before it swings"), Authored(TEXT("Caster.Cleave")), 0.35f, 0.0001f);
-    // Rot's wind-up is what makes its press-time aim snapshot REACHABLE: with
-    // zero authored cast time PrepareCast is never called and the puddle
-    // solves its aim inline. Pinned by value — the number the owner felt the
-    // drift across — so a silent return to zero un-proves RotAimLockedAtPress
-    // rather than passing it vacuously.
+    // A real wind-up is necessary to exercise retargeting at completion.
+    // Zero cast time would make RotAimAtCompletion pass without a window.
     TestEqual(TEXT("Rot winds up before the puddle lands"), Authored(TEXT("Caster.Rot")), 0.6f, 0.0001f);
 
     // Movement and defensive verbs stay instant, OWNER-RULED: a dodge with a

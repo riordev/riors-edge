@@ -13,6 +13,8 @@
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerCombatTypes.h"
 #include "Combat/BreakerZoneActor.h"
+#include "Combat/BreakerEnemy.h"
+#include "Components/BoxComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
@@ -23,16 +25,7 @@
 #include "Tests/BreakerCastTestHelpers.h"
 #include "Tests/BreakerRotAimRuntimeObserver.h"
 
-// ---------------------------------------------------------------------------
-// O266, the half of the rule that is a PROMISE: the wind-up delays the
-// resolution, not the press. Owner: "rot has a tendency to ... go off at
-// another target location; the cast should appear where you originally cast
-// it at the start of your cast time", and "theres a ding everytime you press
-// it but it shouldnt do that if you dont cast it". Rot read its aim at the
-// landing and the HUD heard the press. These are a real world, a real
-// controller turned a quarter turn during a real wind-up, a real hit landing
-// inside one, and the puddle and the cue asked when and where they went.
-// ---------------------------------------------------------------------------
+// O271: aim follows the reticle through the paid wind-up, including queued casts.
 namespace
 {
     // The interrupt fixture's rig: a Caster with Rot in its starter slot,
@@ -126,11 +119,11 @@ namespace
     }
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerRotAimLockedAtPressTest,
-    "RiorsEdge.Abilities.CastTime.RotAimLockedAtPress",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerRotAimAtCompletionTest,
+    "RiorsEdge.Abilities.CastTime.RotAimAtCompletion",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-bool FBreakerRotAimLockedAtPressTest::RunTest(const FString& Parameters)
+bool FBreakerRotAimAtCompletionTest::RunTest(const FString& Parameters)
 {
     UWorld::InitializationValues Init;
     Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
@@ -160,12 +153,8 @@ bool FBreakerRotAimLockedAtPressTest::RunTest(const FString& Parameters)
     if (!TestEqual(TEXT("exactly one puddle after the landing"), FirstLanding.Num(), 1)) return false;
     const FVector Feet = Rig.Caster->GetActorLocation();
     const FVector First = FirstLanding[0]->GetActorLocation();
-    // On the +X line the press pointed down: the empty world has nothing to
-    // hit, so the puddle sits at the end of the reticle line, well out along
-    // X and on the caster's own Y. A puddle that followed the turn would sit
-    // out along Y instead.
-    TestTrue(TEXT("the puddle went out along +X, where the press pointed"), First.X > Feet.X + 1000.0f);
-    TestTrue(TEXT("and stayed on the caster's Y line, not the reticle's drift"), FMath::Abs(First.Y - Feet.Y) < 5.0f);
+    TestTrue(TEXT("the puddle follows the completed aim along +Y"), First.Y > Feet.Y + 1000.0f);
+    TestTrue(TEXT("and leaves the original +X aim behind"), FMath::Abs(First.X - Feet.X) < 50.0f);
 
     // --- The control: an undisturbed +Y press lands on +Y --------------------
     // Without this the assertion above passes just as well against a rig
@@ -251,7 +240,7 @@ bool FBreakerRotCueOnLandingRuntimeTest::RunTest(const FString& Parameters)
 // VW4's anti-stack rule used to refresh a live own Rot within half a radius of
 // the new aim instead of spawning, and the owner felt the second press as a
 // press that did nothing. Two casts aimed at the SAME spot, each resolved,
-// are two live puddles. RotAimLockedAtPress already lands two on different
+// are two live puddles. RotAimAtCompletion also checks landing
 // lines; this is the case the merge caught.
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerRotRecastSpawnsNewTest,
@@ -301,17 +290,12 @@ bool FBreakerRotRecastSpawnsNewTest::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// O271 (b): a press during a wind-up queues ONE cast, fired when the wind-up
-// resolves; the aim is solved at the queued press. Aim +X and press; turn to
-// +Y and press inside the wind-up; turn to -X and press again. The first
-// lands on +X, a second wind-up is already running, and it lands on +Y — the
-// third press went nowhere.
-// ---------------------------------------------------------------------------
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerQueuedPressLandsWhereItPointedTest,
-    "RiorsEdge.Abilities.CastTime.QueuedPressLandsWhereItPointed",
+// O271: one queued cast, paid separately, each aimed at its own completion.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerQueuedRotAimsAtCompletionTest,
+    "RiorsEdge.Abilities.CastTime.QueuedRotAimsAtCompletion",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-bool FBreakerQueuedPressLandsWhereItPointedTest::RunTest(const FString& Parameters)
+bool FBreakerQueuedRotAimsAtCompletionTest::RunTest(const FString& Parameters)
 {
     UWorld::InitializationValues Init;
     Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
@@ -359,8 +343,8 @@ bool FBreakerQueuedPressLandsWhereItPointedTest::RunTest(const FString& Paramete
     const TArray<ABreakerZoneActor*> FirstLanding = BreakerRotAimZonesOf(World, Rig.Caster);
     if (!TestEqual(TEXT("one puddle after the first landing"), FirstLanding.Num(), 1)) return false;
     const FVector First = FirstLanding[0]->GetActorLocation();
-    TestTrue(TEXT("it went out along +X, where the first press pointed"), First.X > Feet.X + 1000.0f);
-    TestTrue(TEXT("and not toward +Y or -X"), FMath::Abs(First.Y - Feet.Y) < 5.0f);
+    TestTrue(TEXT("it lands on -X, where the reticle points at completion"), First.X < Feet.X - 1000.0f);
+    TestTrue(TEXT("and remains on the X axis"), FMath::Abs(First.Y - Feet.Y) < 5.0f);
     TestTrue(TEXT("a second wind-up is already pending"), BreakerAnyCastPending(Rig.Caster));
     TestFalse(TEXT("and the queue is spent"), Rot->HasQueuedCast());
     // The queued cast is a paid cast, not a free one: the bank dropped by
@@ -368,24 +352,63 @@ bool FBreakerQueuedPressLandsWhereItPointedTest::RunTest(const FString& Paramete
     // hide a whole Rot).
     TestTrue(TEXT("the queued cast paid its price"), BankBeforeLanding - Rig.Mana->GetMana() > Cost * 0.5f);
 
-    // --- The second landing: +Y, where the QUEUED press pointed ---------------
-    // The reticle sits on -X the whole way through, so a puddle that solved
-    // at the second landing would go there instead.
-    BreakerRotAimPoint(*Rig.Controller, *Rig.Caster, 180.0f);
+    // Turn again during the queued wind-up; it must use this new direction.
+    BreakerRotAimPoint(*Rig.Controller, *Rig.Caster, 90.0f);
     BreakerResolvePendingCast(World, Rig.Caster, Rig.WindUp + 0.5f);
     TestFalse(TEXT("the second wind-up has landed"), BreakerAnyCastPending(Rig.Caster));
     const TArray<ABreakerZoneActor*> SecondLanding = BreakerRotAimZonesOf(World, Rig.Caster);
     if (!TestEqual(TEXT("two puddles after the second landing"), SecondLanding.Num(), 2)) return false;
     const ABreakerZoneActor* Second = SecondLanding[0] == FirstLanding[0] ? SecondLanding[1] : SecondLanding[0];
-    TestTrue(TEXT("the second went out along +Y, where the queued press pointed"), Second->GetActorLocation().Y > Feet.Y + 1000.0f);
+    TestTrue(TEXT("the queued cast follows its own completion aim along +Y"), Second->GetActorLocation().Y > Feet.Y + 1000.0f);
     TestTrue(TEXT("and stayed on the caster's X line"), FMath::Abs(Second->GetActorLocation().X - Feet.X) < 50.0f);
-    for (const ABreakerZoneActor* Zone : SecondLanding)
-        TestTrue(TEXT("no puddle on -X: the third press was dropped"), Zone->GetActorLocation().X > Feet.X - 1000.0f);
-
     // --- And nothing else follows: the dropped press never became a cast -----
     Clock(Rig.WindUp + 0.2f);
     TestFalse(TEXT("no third wind-up"), BreakerAnyCastPending(Rig.Caster));
     TestEqual(TEXT("still two puddles"), BreakerRotAimZonesOf(World, Rig.Caster).Num(), 2);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerRotEnemyFeetRuntimeTest,
+    "RiorsEdge.Abilities.Rot.CompletionTargetsEnemyFeet",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FBreakerRotEnemyFeetRuntimeTest::RunTest(const FString& Parameters)
+{
+    UWorld::InitializationValues Init;
+    Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
+    auto* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+    if (!World) return false;
+    GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+    World->InitializeActorsForPlay(FURL());
+    const uint64 Frame = GFrameCounter;
+    ON_SCOPE_EXIT { World->DestroyWorld(false); GEngine->DestroyWorldContext(World); GFrameCounter = Frame; };
+    FBreakerRotAimRig Rig;
+    if (!BreakerRotAimBuildRig(*this, World, Rig)) return false;
+    auto* Floor = World->SpawnActor<AActor>();
+    auto* Box = NewObject<UBoxComponent>(Floor);
+    Floor->SetRootComponent(Box);
+    Box->SetBoxExtent(FVector(3000, 3000, 10));
+    Box->SetCollisionProfileName(TEXT("BlockAll"));
+    Box->RegisterComponent();
+    Floor->SetActorLocation(FVector(0, 0, -100));
+    auto* Roof = World->SpawnActor<AActor>();
+    auto* RoofBox = NewObject<UBoxComponent>(Roof);
+    Roof->SetRootComponent(RoofBox);
+    RoofBox->SetBoxExtent(FVector(600, 400, 10));
+    RoofBox->SetCollisionProfileName(TEXT("BlockAll"));
+    RoofBox->RegisterComponent();
+    Roof->SetActorLocation(FVector(1500, 0, 200));
+    auto* Enemy = World->SpawnActor<ABreakerEnemy>(FVector(1200, 0, 0), FRotator::ZeroRotator);
+    if (!TestNotNull(TEXT("real enemy hit boxes"), Enemy)) return false;
+    Enemy->SetActorTickEnabled(false);
+    BreakerRotAimPoint(*Rig.Controller, *Rig.Caster, 0);
+    if (!TestTrue(TEXT("cast starts"), Rig.Abilities->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityTwo))) return false;
+    Enemy->SetActorLocation(FVector(1500, 0, 0));
+    BreakerResolvePendingCast(World, Rig.Caster, Rig.WindUp + .5f);
+    auto Zones = BreakerRotAimZonesOf(World, Rig.Caster);
+    if (!TestEqual(TEXT("one completed zone"), Zones.Num(), 1)) return false;
+    TestTrue(TEXT("zone follows the enemy's latest position, not the hitbox face"),
+        FVector::Dist2D(Zones[0]->GetActorLocation(), Enemy->GetActorLocation()) < 1.0f);
+    TestTrue(TEXT("zone sits beneath the enemy, not on the bay roof"), FMath::Abs(Zones[0]->GetActorLocation().Z + 90.0f) < 1.0f);
     return true;
 }
 

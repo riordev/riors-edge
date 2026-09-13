@@ -1,4 +1,6 @@
 #include "Abilities/BreakerGameplayAbility.h"
+#include "Playtest/BreakerFieldTrialRecorder.h"
+#include "Engine/GameInstance.h"
 #include "UI/BreakerHUDMath.h"
 
 #include "AbilitySystemComponent.h"
@@ -583,6 +585,11 @@ void UBreakerGameplayAbility::HandleCastInterrupt(const FBreakerDamageResult& Re
     if (Result.HealthDamage + Result.ShieldDamage <= 0.0f) return;
 
     ABreakerCharacter* Character = GetBreakerCharacter();
+#if !UE_BUILD_SHIPPING
+    if (Character && Character->GetGameInstance())
+        if (auto* Recorder = Character->GetGameInstance()->GetSubsystem<UBreakerFieldTrialRecorder>())
+            Recorder->RecordInterruptedCast();
+#endif
     UWorld* World = Character ? Character->GetWorld() : nullptr;
     if (World) World->GetTimerManager().ClearTimer(CastTimer);
     const UBreakerAbilityDefinition* Definition = GetAbilityDefinition();
@@ -615,6 +622,11 @@ void UBreakerGameplayAbility::EndAbility(const FGameplayAbilitySpecHandle Handle
     if (bCastPending)
     {
         ABreakerCharacter* Character = GetBreakerCharacter();
+#if !UE_BUILD_SHIPPING
+        if (bWasCancelled && Character && Character->GetGameInstance())
+            if (auto* Recorder = Character->GetGameInstance()->GetSubsystem<UBreakerFieldTrialRecorder>())
+                Recorder->RecordInterruptedCast();
+#endif
         if (UWorld* World = Character ? Character->GetWorld() : nullptr)
         {
             World->GetTimerManager().ClearTimer(CastTimer);

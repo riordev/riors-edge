@@ -82,9 +82,49 @@ super weak and progression is awkward."
   Field Marshal at 16 is ~25,000 hp against a 339-dps starter rifle;
   yours to feel before the next step.
 
+## NINTH — LANDED, FIELD TRIAL FOUNDATION
+
+- Rot resolves the live reticle at completion, including a queued cast.
+  A hit enemy selects its current feet; the floor probe starts below its
+  roof. The same solve draws a dashed footprint during the wind-up, cleared
+  on landing/cancellation. Runtime tests turn during both casts, move a real
+  enemy beneath a roof, and retain payment, interruption and one-queue checks.
+  PHOTOGRAPHED: the preview and landing in the gym. FOUND: the preview is
+  faint at a shallow viewing angle; its usefulness in a moving pack is a
+  human playtest. This cosmetic preview is for the solo slice.
+- Rifle ADS centers the measured optic aperture (source Z 25.045 cm), not
+  the bounding box's top. PHOTOGRAPHED: held aim before/after, reticle on
+  the top rim before and inside the opening after. Every row wearing
+  Gun_Rifle shares the correction. Pistol/sniper still use their bounds;
+  they need their own measured sights. BreakerCaptureADS holds aim.
+- Phase checks its real capsule at the proposed landing. A blocked landing
+  neither moves the body nor grants untargetability. A runtime wall test
+  also proves that a valid landing can still cross an intervening wall.
+- Scripts/ue-field-trial.ps1 starts an isolated fresh save and can resume
+  the printed directory. Docs/FIELD-TRIAL.md is the ordinary-play route.
+  The opt-in recorder writes level, gear, points, objectives, waves, kills,
+  deaths and cancelled casts; field_trial_report.py summarizes intervals.
+  Verified on an isolated capture: level 1, area 5, health 100, starter
+  IssueRifle ilvl 5, twelve Core points and no doctrine points. No power
+  or quest state is changed by the recorder. A human thirty-minute run
+  remains the pacing evidence; no player-side balance changed here.
+- The earned-path probe now checks successful relocation and finds a legal
+  pickup approach; it previously ignored the return from TeleportTo before trying
+  to collect Forge feedstock. Ownership, visibility, range and objective
+  checks remain in the real collection call. Instruments changed:
+  BreakerLoopProbe plus the new recorder/report. Published renderer change:
+  SetStrokeEndpoints returns whether its handle remains live, allowing the
+  preview to recover after combat recycles its strokes; existing callers
+  can continue ignoring the return.
+- Verification: build succeeded; 940 passing, three existing expected reds,
+  zero unexpected reds. The host/client combat check passed. The Act I/II
+  earned-path probe passed through the four-wave Marshal and Anchor return,
+  paying four doctrine points. All six pickup approaches took one attempt
+  on the rerun, so the original collection refusal was not reproduced.
+  A process-restart check on the ordinary-play route remains in the guide.
+
 ## NINTH — OPEN
 
-- [ ] Rot lands under the aimed enemy at cast finish (O271 amendment).
 - [ ] Side quests with random objectives as a point source — RULING
       NEEDED: the objective vocabulary is Kill / FeedstockPickup only
       (no yard scope, chest, pocket-clear); rewards carry gear + XP, no

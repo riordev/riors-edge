@@ -19,3 +19,6 @@ from growing back.
 
 `Assets/` holds source material rather than documentation: the owner's story
 document and the design canvases the interface is transcribed from.
+
+`Docs/FIELD-TRIAL.md` describes the opening playtest route and the isolated
+launcher/recorder used to measure ordinary progression and save/resume.
