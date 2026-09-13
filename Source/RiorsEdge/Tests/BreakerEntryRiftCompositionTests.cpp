@@ -85,3 +85,44 @@ bool FBreakerEntryRiftCompositionTest::RunTest(const FString& Parameters)
     return true;
 }
 #endif
+
+// A RIFT IS ONE AREA AT ONE LEVEL (O27). Every wave inside a rift fights at
+// the door's level; the +2 a wave is the gym's escalation and it had leaked
+// into every rift (the Breach briefed 20 and fought 22/24/26/28).
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerRiftAreaLevelIsTheDoorTest,
+    "RiorsEdge.Encounters.Rift.AreaLevelIsTheDoor", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FBreakerRiftAreaLevelIsTheDoorTest::RunTest(const FString& Parameters)
+{
+    for (const TCHAR* Yard : { TEXT(""), TEXT("breach") })
+    {
+        auto* Account = NewObject<UBreakerAccountSave>(); Account->bNeverPersist = true;
+        UBreakerAccountSave::InjectForTesting(Account);
+        ON_SCOPE_EXIT { UBreakerAccountSave::ResetCacheForTesting(); };
+        UWorld::InitializationValues Init; Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
+        auto* Package = CreatePackage(*FString::Printf(TEXT("/Temp/RiftLevel_%s/Lvl_Fernhall"), *FGuid::NewGuid().ToString(EGuidFormats::Digits)));
+        Package->SetFlags(RF_Transient);
+        auto* World = UWorld::CreateWorld(EWorldType::Game, false, FName(TEXT("Lvl_Fernhall")), Package, true, ERHIFeatureLevel::Num, &Init);
+        if (!TestNotNull(TEXT("isolated world"), World)) return false;
+        auto& Context = GEngine->CreateNewWorldContext(EWorldType::Game); Context.SetCurrentWorld(World);
+        ON_SCOPE_EXIT { World->DestroyWorld(false); GEngine->DestroyWorldContext(World); };
+        auto* Session = NewObject<UBreakerGameInstance>(); World->SetGameInstance(Session); Context.OwningGameInstance = Session;
+        Session->PendingRift = UBreakerZoneBuilder::FernhallRiftFor(FName(Yard));
+        World->GetWorldSettings()->DefaultGameMode = ABreakerGameMode::StaticClass();
+        if (!TestTrue(TEXT("production game mode installed"), World->SetGameMode(FURL()))) return false;
+        World->InitializeActorsForPlay(FURL());
+        auto* Mode = World->GetAuthGameMode<ABreakerGameMode>();
+        if (!TestNotNull(TEXT("actual Rift mode"), Mode)) return false;
+        Mode->DispatchBeginPlay();
+        auto* Pawn = World->SpawnActor<ADefaultPawn>();
+        auto* Controller = World->SpawnActor<APlayerController>();
+        if (!Pawn || !Controller) return false;
+        Controller->Possess(Pawn);
+        Mode->HandleStartingNewPlayer_Implementation(Controller);
+        if (!TestTrue(TEXT("real startup entered the Rift"), Mode->IsRiftInstance())) return false;
+        const int32 Door = Session->PendingRift.EffectiveAreaLevel();
+        for (int32 Wave = 1; Wave <= 4; ++Wave)
+            TestEqual(*FString::Printf(TEXT("%s wave %d fights at the door's level"), *Session->PendingRift.EncounterId.ToString(), Wave),
+                Mode->GetAreaLevelForWave(Wave), Door);
+    }
+    return true;
+}

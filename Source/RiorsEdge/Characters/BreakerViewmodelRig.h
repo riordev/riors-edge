@@ -232,6 +232,34 @@ namespace BreakerViewmodel
         return FVector(BoundsOrigin.X - BoundsExtent.X, BoundsOrigin.Y, BoundsOrigin.Z);
     }
 
+    // Where a named gun's SIGHT LINE sits in RIG space: the top-centre of its
+    // bounds, carried through the fit the component wears — scaled, then
+    // rotated by the source-axis correction, then seated at the fit
+    // location, the order a relative transform composes in. The aimed pose
+    // negates this point's Y and Z so the sight lands on the camera axis.
+    // The layout's SightHeightCm is a primitive row's figure and five rows
+    // wear one mesh; the mesh's own top is the only line every row shares.
+    // A bounds top-centre is a rail or a scope cap, not a measured post:
+    // O2 PLACEHOLDER until the arms commandlet measures sight posts.
+    inline FVector NamedSightLineRigCm(const FVector& BoundsOrigin, const FVector& BoundsExtent,
+        const float FitScale, const FRotator& Rotation, const FVector& FitLocation)
+    {
+        const FVector TopCentreMeshCm(BoundsOrigin.X, BoundsOrigin.Y, BoundsOrigin.Z + BoundsExtent.Z);
+        return FitLocation + Rotation.RotateVector(TopCentreMeshCm * FitScale);
+    }
+
+    // The yaw that turns a hip-carried barrel LateralCm right of the camera
+    // axis onto the reticle at ConvergeDistanceCm ahead: atan(lateral /
+    // distance), in degrees, positive for a gun carried to the right. A
+    // barrel parallel to the axis 13 cm right never meets the crosshair;
+    // one converging on a point 3 m out reads as pointed where the player
+    // looks. A non-positive distance converges nowhere and returns zero.
+    inline float HipConvergenceYawDegrees(const float LateralCm, const float ConvergeDistanceCm)
+    {
+        if (ConvergeDistanceCm <= UE_KINDA_SMALL_NUMBER) return 0.0f;
+        return FMath::RadiansToDegrees(FMath::Atan(LateralCm / ConvergeDistanceCm));
+    }
+
     // The named gun's fit, pure so it is provable without a component: scale
     // the mesh's longest bound to TargetLengthCm — PackFitLengthCm above, so
     // every named gun wears the pack's one scale and the pack's proportions

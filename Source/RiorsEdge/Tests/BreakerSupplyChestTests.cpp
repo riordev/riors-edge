@@ -189,6 +189,13 @@ bool FBreakerSupplyChestCrateWithALidTest::RunTest(const FString& Parameters)
     TestTrue(*FString::Printf(TEXT("the lid closes flush with the body's top (gap %.2f cm)"),
         LidBounds.Max.Z - BodyBounds.Max.Z),
         FMath::Abs(LidBounds.Max.Z - BodyBounds.Max.Z) <= 2.0f);
+    // THE LID OPENS AWAY: the lip (the lid's +Y from its hinge, before the
+    // body's yaw) rises when the open rotation is applied. A positive roll
+    // drops it into the body — the "opens backwards" the owner saw.
+    TestTrue(TEXT("the open rotation lifts the lip, never drops it into the body"),
+        Chest->LidOpenRotation.RotateVector(FVector(0.0f, 1.0f, 0.0f)).Z > 0.5f);
+    TestTrue(TEXT("a spent chest fades after a wait and leaves"),
+        Chest->FadeDelaySeconds > 0.0f && Chest->FadeSeconds > 0.0f);
     TestTrue(TEXT("the lid's hinge sits in the body's upper half"),
         LidBounds.Min.Z > BodyBounds.Min.Z + 0.5f * (BodyBounds.Max.Z - BodyBounds.Min.Z) && LidBounds.Min.Z < BodyBounds.Max.Z);
 

@@ -4,6 +4,7 @@
 #include "Game/BreakerDeathBudgetMath.h"
 #include "Game/BreakerGameInstance.h"
 #include "Game/BreakerRiftDefinition.h"
+#include "UI/BreakerTypeRoles.h"
 
 // THE DEATH BUDGET (O82). Pure maths, no world: campaign never spends and
 // always retries; an endgame instance grants a solo character two deaths and
@@ -114,6 +115,36 @@ bool FBreakerDeathBudgetTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("The session's counter defaults to the solo budget"),
         GetDefault<UBreakerGameInstance>()->EndgameDeathsRemaining, Budget);
 
+    return true;
+}
+
+// THE HEADLINE FITS ITS COLUMN. The owner died at Breach Marshalling Yard
+// and the death screen's headline — "ERASED AT BREACH MARSHALLING YARD" at
+// the display role's 40 px — overran the 720 px column and clipped. The
+// fit (BreakerFitDisplaySize) steps the size down until the line fits, no
+// lower than the floor, and leaves a short title at the full size. Pinned
+// on the headless width estimate the fit uses when no font is measured, so
+// a suite with no content still proves the rule; a wrapped headline would
+// be the auto-wrap rule broken.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerDeathScreenHeadlineFitsColumnTest,
+    "RiorsEdge.UI.DeathScreen.HeadlineFitsColumn",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerDeathScreenHeadlineFitsColumnTest::RunTest(const FString& Parameters)
+{
+    constexpr int32 ColumnPx = 720;   // O2 PLACEHOLDER — the death screen's headline column
+    constexpr int32 HeadlinePx = 40;  // O2 PLACEHOLDER — the display role's headline size
+    constexpr int32 FloorPx = 24;     // O2 PLACEHOLDER — the smallest a headline may shrink to
+
+    const auto Long = BreakerFitDisplaySize(TEXT("ERASED AT BREACH MARSHALLING YARD"), ColumnPx, HeadlinePx, FloorPx);
+    TestTrue(FString::Printf(TEXT("the long headline steps down from %d (was %d)"), HeadlinePx, static_cast<int32>(Long)),
+        Long < HeadlinePx);
+    TestTrue(FString::Printf(TEXT("the long headline never drops under the %d floor (was %d)"), FloorPx, static_cast<int32>(Long)),
+        Long >= FloorPx);
+
+    const auto Short = BreakerFitDisplaySize(TEXT("ERASED AT DEPOT"), ColumnPx, HeadlinePx, FloorPx);
+    TestEqual(TEXT("a short headline keeps the full size"), static_cast<int32>(Short), HeadlinePx);
     return true;
 }
 

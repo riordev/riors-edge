@@ -44,6 +44,9 @@ namespace
     // H1. The rest of the geometry is O2 PLACEHOLDER until the owner has
     // died on it.
     constexpr int32 BreakerDeathHeadlinePixels = 40;      // 04-death-banners
+    // The smallest the headline steps down to before it wraps: H1, so a long
+    // Erased line is still a headline and not a body line. O2 PLACEHOLDER.
+    constexpr int32 BreakerDeathHeadlineFloorPixels = 34;
     constexpr float BreakerDeathColumnWidth = 720.0f;     // O2 PLACEHOLDER
     constexpr float BreakerDeathButtonWidth = 260.0f;     // O2 PLACEHOLDER
     constexpr float BreakerDeathTallyCellW = 24.0f;       // O2 PLACEHOLDER
@@ -210,6 +213,15 @@ TSharedRef<SWidget> SBreakerMenu::BuildDeathScreen()
         ];
     }
 
+    // The headline is one line at 40 when the column allows it, and steps
+    // down to the floor before it wraps — an Erased headline at 40 in a 720
+    // column ran past the edge, and the sheet is two LINES, not three. Both
+    // lines wrap at the column's own width (settled above, never an
+    // allotted size), so a long line degrades to a second line rather than
+    // to a clipped one. The tally and verbs sit below in AutoHeight slots
+    // and only move down.
+    const int32 HeadlinePixels = BreakerFitDisplaySize(M.Headline, BreakerDeathColumnWidth,
+        BreakerDeathHeadlinePixels, BreakerDeathHeadlineFloorPixels);
     TSharedRef<SVerticalBox> Column = SNew(SVerticalBox);
     Column->AddSlot().AutoHeight().HAlign(HAlign_Center)
     [
@@ -217,7 +229,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildDeathScreen()
             .Text(FText::FromString(M.Headline))
             .Justification(ETextJustify::Center)
             .ColorAndOpacity(BreakerUI::TextPrimary)
-            .Font(BreakerDisplayFont(BreakerDeathHeadlinePixels, true))
+            .WrapTextAt(BreakerDeathColumnWidth)
+            .Font(BreakerDisplayFont(HeadlinePixels, true))
     ];
     Column->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
     [
@@ -225,6 +238,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildDeathScreen()
             .Text(FText::FromString(M.Line2))
             .Justification(ETextJustify::Center)
             .ColorAndOpacity(BreakerUI::TextSecondary)
+            .WrapTextAt(BreakerDeathColumnWidth)
             .Font(BreakerBodyFont(BreakerUI::TypeBody))
     ];
     if (M.bShowTally)

@@ -294,9 +294,27 @@ namespace BreakerBodyPaint
         return FLinearColor(0.62f, 0.62f, 0.66f);
     }
 
+    // HOW LOUD THE OVERLAY MAY GET ON A NAMED BODY. Owner: "they all lose
+    // their colour when shot — just a red blob". The overlay is an unlit
+    // emissive plate over the livery, and at full strength it IS the body:
+    // a body flash at 1.0 re-armed every hit under a rifle is a white slab,
+    // and the wound wash running to 0.6 of a ramp that ends in flat red
+    // erased the paint job the family read depends on. One resolver still
+    // owns Color (O128) and colour still carries health (O129) — these are
+    // the strengths at which it does so while the livery stays legible.
+    // The weak-point white-out keeps its full occlusion: that flash is the
+    // reward, and it is rare enough to be allowed to blind. All O2
+    // PLACEHOLDER.
+    constexpr float OverlayFlashStrength = 0.35f;
+    constexpr float OverlayWoundStrengthMax = 0.30f;
+    constexpr float OverlayStatusStrengthMax = 0.45f;
+
     inline float ResolveOverlayStrength(const FState& State)
     {
-        if (State.Reaction == EReaction::Flash) return 1.0f;
+        if (State.Reaction == EReaction::Flash)
+        {
+            return State.bReactionWeakPoint ? 1.0f : OverlayFlashStrength;
+        }
         // The burn covers fully for its whole ride to ash — the corpse reads
         // burnt out on a mech the same as on the primitives.
         if (State.Reaction == EReaction::DeathCrumple) return 1.0f;
@@ -306,14 +324,14 @@ namespace BreakerBodyPaint
         if (State.bStatus)
         {
             Strength = FMath::Max(Strength,
-                FMath::Lerp(0.35f, 0.68f, FMath::Clamp(State.StatusPulse, 0.0f, 1.0f)));
+                FMath::Lerp(0.25f, OverlayStatusStrengthMax, FMath::Clamp(State.StatusPulse, 0.0f, 1.0f)));
         }
         if (State.bHealthRamp)
         {
-            // 0 at full health, up to 0.6 at none: the wound wash never fully
-            // hides the livery the way a reaction does. O2 PLACEHOLDER.
+            // 0 at full health, up to OverlayWoundStrengthMax at none: the
+            // wound wash never fully hides the livery the way a reaction does.
             Strength = FMath::Max(Strength,
-                0.6f * (1.0f - FMath::Clamp(State.HealthFraction, 0.0f, 1.0f)));
+                OverlayWoundStrengthMax * (1.0f - FMath::Clamp(State.HealthFraction, 0.0f, 1.0f)));
         }
         return FMath::Clamp(Strength, 0.0f, 1.0f);
     }

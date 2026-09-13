@@ -24,6 +24,8 @@
 #include "Combat/BreakerVoid.h"
 #include "Movement/BreakerCharacterMovementComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Engine/CollisionProfile.h"
+#include "Combat/BreakerFlinchMath.h"
 #include "Components/BoxComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -223,6 +225,27 @@ ABreakerEnemy::ABreakerEnemy()
     BodyCollision = CreateDefaultSubobject<UCapsuleComponent>(TEXT("BodyCollision"));
     SetRootComponent(BodyCollision);
     BodyCollision->InitCapsuleSize(45.0f, 90.0f);
+    // THE CAPSULE BLOCKS THE WORLD AND OTHER PAWNS; THE HIT BOXES KEEP THE HIT
+    // READ. Owner: "enemies phase through walls". With no profile set this
+    // shipped as a shape component's default, OverlapAllDynamic, so the
+    // mover's swept moves never met a blocking hit and a body walked through
+    // every wall_ piece. Pawn is the profile a body that walks has to wear.
+    // Both weapon channels are then taken OFF it: the WeaponTrace channel so
+    // a shot reads the hit box and the weak point (below) rather than the
+    // capsule in front of them, and the Projectile object channel because its
+    // default response is Block and a round that stopped on the capsule would
+    // never reach the weak point behind it.
+    //
+    // Two teleports still go straight to a location and are fine with a
+    // blocking capsule: the pool revive and the standing respawn both
+    // SetActorLocation onto a spawn point. The Phase modifier's blink
+    // (BreakerModifierComponent, Enemy->SetActorLocation(Destination, false))
+    // is the one that can now land INSIDE a wall — an unswept teleport to a
+    // point picked by arithmetic, not by the NavMesh, and a body that lands
+    // in a wall stays there until the mover's next depenetration. Recorded
+    // here, not fixed here: the blink's destination is the modifier's to rule.
+    BodyCollision->SetCollisionProfileName(UCollisionProfile::Pawn_ProfileName);
+    BodyCollision->SetCollisionResponseToChannel(ECC_GameTraceChannel1, ECR_Ignore);
     BodyCollision->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Ignore);
 
     // NAV-1: the body is possessed by an enemy controller the moment it is
@@ -295,8 +318,9 @@ ABreakerEnemy::ABreakerEnemy()
     BodyHitBox->SetRelativeLocation(FVector(0.0f, 0.0f, 4.0f));
     BodyHitBox->SetCollisionResponseToAllChannels(ECR_Ignore);
     BodyHitBox->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Block);
-    // Traveling rounds use the authored Projectile object channel. Keep the
-    // movement capsule overlapping and the weapon weak-point query separate.
+    // Traveling rounds use the authored Projectile object channel. The
+    // movement capsule ignores it (above), so the hit box is what a round
+    // stops on, and the weapon weak-point query stays separate.
     BodyHitBox->SetCollisionResponseToChannel(ECC_GameTraceChannel1, ECR_Block);
 
     WeakPoint = CreateDefaultSubobject<USphereComponent>(TEXT("WeakPoint"));
@@ -1016,7 +1040,12 @@ void ABreakerEnemy::HandleThreatDamage(const FBreakerHitContext& Hit)
     //
     // FlinchesWhenHit is the family's own answer and is already ruled: the
     // late-stage Altered does not flinch, and this does not overrule it.
-    if (HitReaction && FlinchesWhenHit()
+    // And only a HEAVY hit moves the body (owner: "only stagger when taking
+    // large amounts of damage") — bLastHitWasHeavy was decided by
+    // HandleDamageReceived on this same hit, which the combat component
+    // broadcasts before this one. Gunfire still never gameplay-staggers; now
+    // it does not cosmetically hitch on every round either.
+    if (HitReaction && FlinchesWhenHit() && bLastHitWasHeavy
         && Hit.Result.HealthDamage + Hit.Result.ShieldDamage > 0.0f)
     {
         const AActor* From = Hit.Instigator ? Hit.Instigator.Get() : Hit.ThreatSource.Get();
@@ -1860,6 +1889,8 @@ void ABreakerEnemy::ReviveFromPool(const FVector& SpawnLocation)
     bDead = false;
     StateLabel = TEXT("PATROL");
     bLastHitWasWeakPoint = false;
+    bLastHitWasHeavy = false;
+    RecentDamage = 0.0f;
     FirstDamageTime = -1.0;
     LastDamageEventTime = -1.0;
     EngagedSeconds = 0.0f;
@@ -1960,15 +1991,35 @@ void ABreakerEnemy::HandleDamageReceived(const FBreakerDamageResult& Result)
         // Gaps longer than 1.5s are disengagement, not fighting.
         EngagedSeconds += static_cast<float>(FMath::Min(Now - LastDamageEventTime, 1.5));
     }
+    // WAS THAT HEAVY? Owner: "they should only stagger when taking large
+    // amounts of damage". The window is the last half-second of hits: a burst
+    // that adds up to a slice of the bar is one heavy blow spread over a few
+    // frames, and it earns the one reaction a single blow that size would.
+    // The accumulator restarts when the gap since the last hit is longer than
+    // the window, and empties when a heavy fires so a sustained stream earns
+    // one hitch per slice rather than one on every round after the first.
+    // Decided here, before the threat broadcast and the Skirmisher's cover
+    // break, both of which fire later on the same hit and read the flag.
+    if (LastDamageEventTime < 0.0 || Now - LastDamageEventTime > BreakerFlinch::HeavyWindowSeconds)
+    {
+        RecentDamage = 0.0f;
+    }
     LastDamageEventTime = Now;
+    RecentDamage += Result.HealthDamage + Result.ShieldDamage;
+    bLastHitWasHeavy = BreakerFlinch::IsHeavy(Result.HealthDamage + Result.ShieldDamage, RecentDamage,
+        Attributes ? Attributes->GetMaxHealth() : 0.0f, Result.bWeakPoint);
+    if (bLastHitWasHeavy) RecentDamage = 0.0f;
 
     // The body ANSWERS the hit: a one-blink material pulse, gold when the hit
     // was a weak point. Cosmetic only — nothing above reads it. The pulse
     // lives in the shared reaction component now (see its header), so the
-    // target dummy answers exactly the same way.
+    // target dummy answers exactly the same way. Every hit blinks; only a
+    // heavy one moves the body.
     if (HitReaction) HitReaction->NotifyHit(Result.bWeakPoint);
-    // And the rig answers, when it has an answer authored.
-    PlayBodyHit();
+    // And the rig answers, when it has an answer authored and the hit was
+    // worth answering: a hit clip restarted on every round was the "stagger"
+    // the owner saw on gunfire.
+    if (bLastHitWasHeavy) PlayBodyHit();
     // O129's health ramp: the body reddens as it dies, and this is the event
     // that moves it. Pushed here rather than read on tick — a hundred enemies
     // sampling two attributes every frame to find out nothing changed is the
@@ -2145,6 +2196,8 @@ void ABreakerEnemy::RespawnEnemy()
         // the same door. Idempotent — a primitive body returns at the guard.
         ApplyBodyMesh();
         bDead = false;
+        bLastHitWasHeavy = false;
+        RecentDamage = 0.0f;
         FirstDamageTime = -1.0;
         LastDamageEventTime = -1.0;
         EngagedSeconds = 0.0f;

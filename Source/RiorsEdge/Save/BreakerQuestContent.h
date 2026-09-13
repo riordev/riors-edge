@@ -149,7 +149,8 @@ struct RIORSEDGE_API FBreakerQuestReward
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 ItemCount = 1;
     // O2 PLACEHOLDER.
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerItemRarity MinimumRarity = EBreakerItemRarity::Exceptional;
-    // O2 PLACEHOLDER. Quests are camp content at area level 1 today; when the
+    // O2 PLACEHOLDER. A quest pays gear at its yard's level (Act I at the
+    // entry yard's 5), never under the starter kit; when the
     // campaign authors real areas this should follow the area's level the way
     // GetDropItemLevel does.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 ItemLevel = 1;

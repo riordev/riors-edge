@@ -158,6 +158,22 @@ namespace
             .Font(Size >= BreakerUI::TypeH2 ? BreakerDisplayFont(Size, bBold) : BreakerBodyFont(Size, bBold));
     }
 
+    // A TITLE THAT FITS ITS COLUMN. Heavy display face, one line: the size
+    // steps down from Size toward MinSize until the measured run fits WrapAt
+    // (BreakerFitDisplaySize), and below MinSize it wraps there rather than
+    // clipping. The titles that ran past their card edge — a class card's
+    // name, a destination's, a speaker's — take this instead of MenuText.
+    // Owner: "text wrapping everywhere".
+    TSharedRef<STextBlock> MenuFittedTitle(const FString& Text, int32 Size, int32 MinSize, const FLinearColor& Color,
+        float WrapAt)
+    {
+        return SNew(STextBlock)
+            .Text(FText::FromString(Text))
+            .ColorAndOpacity(Color)
+            .WrapTextAt(WrapAt)
+            .Font(BreakerDisplayFont(BreakerFitDisplaySize(Text, WrapAt, Size, MinSize), true));
+    }
+
     // A number in a fixed-width column, right-aligned by JUSTIFICATION rather
     // than by the box's HAlign. Owner: "numbers are cut off in some fashion".
     // An SBox with HAlign_Right (or _Left, or _Center) arranges its child at
@@ -6622,7 +6638,10 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
         TSharedRef<SVerticalBox> Card = SNew(SVerticalBox);
         Card->AddSlot().AutoHeight()
         [
-            MenuText(FText::FromString(Blurb.Name), 32, Head, true)   // O2 PLACEHOLDER
+            // The name fits the card's copy width, 32 down to H2, before it
+            // wraps: five FillWidth cards at a narrow window clipped the
+            // longer class names. O2 PLACEHOLDER.
+            MenuFittedTitle(Blurb.Name, 32, BreakerUI::TypeH2, Head, CardCopyWrap)
         ];
         Card->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
         [
@@ -8143,9 +8162,30 @@ namespace
         return View;
     }
 
+    // THE WIDTH THE RAIL'S PLATES WRAP AT. The rail column is a fixed
+    // WidthOverride(RailWidth); MakePlate spends a 1px ring each side, the
+    // 3px identity rail and the plate's own Space16 padding each side; the
+    // detail card additionally sits in an SScrollBox whose bar, when the card
+    // is taller than the rail, takes its thickness and padding off the panel.
+    // All of it is arithmetic on numbers known before layout starts — the
+    // cards used AutoWrapText, which is the widget measuring its own
+    // arrangement inside a scroll box, the pattern ui.md bans. Owner: "text
+    // wrapping everywhere".
+    constexpr float BreakerMenuRailScrollBarAllowance = 13.0f;   // O2 PLACEHOLDER: SScrollBox's 9px bar + 2px pad each side
+    float BreakerMenuRailPlateWrapWidth(const FWideScreenMetrics& Metrics)
+    {
+        return Metrics.RailWidth - 2.0f * BreakerUI::BorderThin - BreakerUI::RailThickness - 2.0f * BreakerUI::Space16;
+    }
+    float BreakerMenuRailScrolledWrapWidth(const FWideScreenMetrics& Metrics)
+    {
+        return BreakerMenuRailPlateWrapWidth(Metrics) - BreakerMenuRailScrollBarAllowance;
+    }
+
     // The 420px rail's card. Fixed width comes from the host box, so this can
-    // grow vertically without ever moving the board.
-    TSharedRef<SWidget> MakeSkillDetailCard(const FSkillNodeView& View)
+    // grow vertically without ever moving the board. WrapWidth is the plate
+    // interior the host settled (BreakerMenuRailScrolledWrapWidth), passed in
+    // so the card never reads its own arrangement.
+    TSharedRef<SWidget> MakeSkillDetailCard(const FSkillNodeView& View, float WrapWidth)
     {
         // The rail is the ladder's rung: spent in the system colour (a taken
         // keystone in gold), everything else on the emphasis ring. Gold for
@@ -8157,11 +8197,7 @@ namespace
         TSharedRef<SVerticalBox> Column = SNew(SVerticalBox);
         Column->AddSlot().AutoHeight()
         [
-            SNew(STextBlock)
-            .Text(FText::FromString(View.Name))
-            .ColorAndOpacity(BreakerUI::TextPrimary)
-            .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), BreakerUI::TypeH2))
-            .AutoWrapText(true)
+            MenuWrappedText(FText::FromString(View.Name), BreakerUI::TypeH2, BreakerUI::TextPrimary, WrapWidth, true)
         ];
         Column->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, BreakerUI::Space8)
         [
@@ -8179,16 +8215,12 @@ namespace
         ];
         Column->AddSlot().AutoHeight()
         [
-            SNew(STextBlock)
-            .Text(FText::FromString(View.Description))
-            .ColorAndOpacity(BreakerUI::TextSecondary)
-            .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), BreakerUI::TypeBody))
-            .AutoWrapText(true)
+            MenuWrappedText(FText::FromString(View.Description), BreakerUI::TypeBody, BreakerUI::TextSecondary, WrapWidth)
         ];
         // The before/after block sits ABOVE the per-rank effects on purpose.
         // "+3% damage per rank" is the authoring value; "1.06x -> 1.10x" is
         // the thing the player is actually deciding about, so it reads first.
-        auto AddProjectionBlock = [&Column](const FString& Headline, const TArray<FString>& Lines, const FLinearColor& Accent)
+        auto AddProjectionBlock = [&Column, WrapWidth](const FString& Headline, const TArray<FString>& Lines, const FLinearColor& Accent)
         {
             if (Headline.IsEmpty() || Lines.Num() == 0) return;
             Column->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, BreakerUI::Space4)
@@ -8199,11 +8231,7 @@ namespace
             {
                 Column->AddSlot().AutoHeight()
                 [
-                    SNew(STextBlock)
-                    .Text(FText::FromString(Line))
-                    .ColorAndOpacity(Accent)
-                    .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), BreakerUI::TypeCaption))
-                    .AutoWrapText(true)
+                    MenuWrappedText(FText::FromString(Line), BreakerUI::TypeCaption, Accent, WrapWidth, true)
                 ];
             }
         };
@@ -8245,8 +8273,7 @@ namespace
             [
                 MenuWrappedText(FText::FromString(View.ActionLine), BreakerUI::TypeCaption,
                     View.bMaxed ? BreakerUI::System : (View.bPurchasable ? BreakerUI::Gold : BreakerUI::Harm),
-                    MeasureWideScreen().RailWidth - 2.0f * BreakerUI::Space16
-                        - BreakerUI::RailThickness - 2.0f * BreakerUI::BorderThin, true)
+                    WrapWidth, true)
             ];
         }
         return MakePlate(Column, BreakerUI::Panel10, Rail, FMargin(BreakerUI::Space16, BreakerUI::Space16));
@@ -8262,8 +8289,10 @@ namespace
     // splits its additive Increased bucket by layer, because "my tree gave me
     // +14% of this" is the sentence the owner said was missing.
     // -----------------------------------------------------------------------
+    // WrapWidth is the plate interior (BreakerMenuRailPlateWrapWidth): this
+    // plate is pinned above the scroll, so no bar comes off it.
     TSharedRef<SWidget> MakeBuildTotalsPlate(const FBreakerSkillSnapshot& Snapshot, int32 ClassSpent, int32 CoreSpent,
-        bool bExpanded, FOnClicked OnToggle)
+        bool bExpanded, FOnClicked OnToggle, float WrapWidth)
     {
         TSharedRef<SVerticalBox> Column = SNew(SVerticalBox);
         Column->AddSlot().AutoHeight()
@@ -8362,11 +8391,9 @@ namespace
         {
             Column->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
             [
-                SNew(STextBlock)
-                .Text(FText::FromString(TEXT("No attribute set is bound, so these are the tree layer alone — gear is not folded in.")))
-                .ColorAndOpacity(BreakerUI::TextMuted)
-                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), BreakerUI::TypeCaption))
-                .AutoWrapText(true)
+                MenuWrappedText(
+                    FText::FromString(TEXT("No attribute set is bound, so these are the tree layer alone — gear is not folded in.")),
+                    BreakerUI::TypeCaption, BreakerUI::TextMuted, WrapWidth)
             ];
         }
 
@@ -8375,18 +8402,15 @@ namespace
 
     // Rest state of the rail. It is the same plate geometry as a populated
     // card, so the column never changes shape when a node is hovered.
-    TSharedRef<SWidget> MakeSkillDetailPlaceholder()
+    TSharedRef<SWidget> MakeSkillDetailPlaceholder(float WrapWidth)
     {
         return MakePlate(
             SNew(SVerticalBox)
             + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(TEXT("NODE DETAIL")), BreakerUI::TypeCaption, BreakerUI::TextMuted, true)]
             + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
             [
-                SNew(STextBlock)
-                .Text(FText::FromString(TEXT("Hover a node to inspect its effect, requirements and next rank.")))
-                .ColorAndOpacity(BreakerUI::TextSecondary)
-                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), BreakerUI::TypeBody))
-                .AutoWrapText(true)
+                MenuWrappedText(FText::FromString(TEXT("Hover a node to inspect its effect, requirements and next rank.")),
+                    BreakerUI::TypeBody, BreakerUI::TextSecondary, WrapWidth)
             ],
             BreakerUI::Panel00, BreakerUI::BorderEmphasis, FMargin(BreakerUI::Space16, BreakerUI::Space16));
     }
@@ -8469,7 +8493,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
     // Previously the host was re-created empty on every rebuild and Slate does
     // not re-fire OnHovered for a stationary cursor, so buying a node blanked
     // the only surface that explained it.
-    TSharedRef<SWidget> InitialDetail = MakeSkillDetailPlaceholder();
+    // The rail's wrap widths, settled once from the metrics the column is
+    // sized by. The detail host scrolls; the totals plate does not.
+    const float RailPlateWrap = BreakerMenuRailPlateWrapWidth(Metrics);
+    const float RailScrolledWrap = BreakerMenuRailScrolledWrapWidth(Metrics);
+    TSharedRef<SWidget> InitialDetail = MakeSkillDetailPlaceholder(RailScrolledWrap);
     if (!SkillDetailNodeId.IsNone())
     {
         for (const UBreakerProgressionTree* Tree : Trees)
@@ -8487,7 +8515,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             const bool bPurchasable = SkillNodeIsPurchasable(Progression, Tree, Found, Spent, LockReason);
             InitialDetail = MakeSkillDetailCard(MakeSkillNodeView(
                 Found, ProgressionGetNodeRank(Progression, Found->NodeId, Found->Currency),
-                bPurchasable, LockReason, Spent, Snapshot));
+                bPurchasable, LockReason, Spent, Snapshot), RailScrolledWrap);
             break;
         }
     }
@@ -8538,7 +8566,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
 
     // Wires one marker. Markers are never disabled: a locked node still has to
     // explain itself on hover, and a disabled SButton fires no hover events.
-    auto WireMarker = [this](const UBreakerProgressionTree* Tree, const UBreakerProgressionNode* Node,
+    auto WireMarker = [this, RailScrolledWrap](const UBreakerProgressionTree* Tree, const UBreakerProgressionNode* Node,
         const FSkillNodeView& View, bool bPurchasable, const FString& LockReason,
         const FLinearColor& Fill, const FLinearColor& Ring, float RingThickness,
         const TSharedRef<SWidget>& Inner, float MarkerSize) -> TSharedRef<SWidget>
@@ -8561,10 +8589,10 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             // The rail went blank at the exact moment the player most wanted to
             // read what they had just bought. Owner: "I dont see any layers or
             // details to them."
-            .OnHovered(FSimpleDelegate::CreateLambda([this, View]()
+            .OnHovered(FSimpleDelegate::CreateLambda([this, View, RailScrolledWrap]()
             {
                 SkillDetailNodeId = View.NodeId;
-                if (SkillDetailHost.IsValid()) SkillDetailHost->SetContent(MakeSkillDetailCard(View));
+                if (SkillDetailHost.IsValid()) SkillDetailHost->SetContent(MakeSkillDetailCard(View, RailScrolledWrap));
             }))
             .OnClicked(FOnClicked::CreateLambda([this, Tree, Node, bPurchasable, LockReason]()
             {
@@ -9456,7 +9484,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             bSkillTotalsExpanded = !bSkillTotalsExpanded;
             Rebuild(EBreakerMenuScreen::SkillTrees);
             return FReply::Handled();
-        }));
+        }), RailPlateWrap);
     if (bCoreBoard && SkillExpandedConstellation.IsNone() && !CoreTrees.IsEmpty() && !CoreTrees[0]->CoreWedgeOrder.IsEmpty())
     {
         TSharedRef<SVerticalBox> Chooser = SNew(SVerticalBox);
@@ -11261,7 +11289,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()
     TSharedRef<SVerticalBox> SpeakerHead = SNew(SVerticalBox);
     SpeakerHead->AddSlot().AutoHeight()
     [
-        MenuText(FText::FromString(Speaker.ToUpper()), 24, Primary, true)   // O2 PLACEHOLDER
+        // The name fits the plate's line width, 24 down to H2, before it
+        // wraps. O2 PLACEHOLDER.
+        MenuFittedTitle(Speaker.ToUpper(), 24, BreakerUI::TypeH2, Primary, SpeakerLineWrap)
     ];
     if (!Role.IsEmpty())
     {
@@ -11388,6 +11418,24 @@ TSharedRef<SWidget> SBreakerMenu::BuildTravelScreen()
     // the player is already standing in.
     const TArray<FBreakerTravelDestination> Destinations = Point->GetAvailableDestinations();
 
+    // THE CARD'S COPY WIDTH, settled from the frame's own 780 before layout
+    // starts: the frame plate's 24px pad each side and its 5px of rail and
+    // ring, the card's selected-state 2px ring each side (the wider of the
+    // two, so a selection never re-wraps the copy), the button's 16px
+    // content pad each side, and the chrome SButton draws under it
+    // (MeasureChipWidth's measured allowance). A description is authored
+    // prose of unknown length, and it wrapped at its ALLOTTED width — the
+    // widget reading its own arrangement inside the frame's scroll box, which
+    // ui.md bans. O2 PLACEHOLDER.
+    constexpr float TravelPanelWidth = 780.0f;
+    constexpr float TravelButtonChromeAllowance = 32.0f;
+    // The smallest a destination title steps to before it wraps: still on
+    // the display face, still a title. O2 PLACEHOLDER.
+    constexpr int32 TravelTitleFloorPixels = 16;
+    const float DestinationCardWrap = TravelPanelWidth - 2.0f * BreakerUI::Space24
+        - (BreakerUI::RailThickness + 2.0f * BreakerUI::BorderThin)
+        - 2.0f * BreakerUI::BorderSelected - 2.0f * BreakerUI::Space16 - TravelButtonChromeAllowance;
+
     TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
 
     if (Destinations.Num() == 0)
@@ -11411,18 +11459,19 @@ TSharedRef<SWidget> SBreakerMenu::BuildTravelScreen()
         TSharedRef<SVerticalBox> Card = SNew(SVerticalBox);
         Card->AddSlot().AutoHeight()
         [
-            MenuText(Destination.DisplayName, BreakerUI::TypeH2, bSelected ? Primary : SoftText, true)
+            // The title fits the card's copy width, H2 down to the floor,
+            // before it wraps. O2 PLACEHOLDER.
+            MenuFittedTitle(Destination.DisplayName.ToString(), BreakerUI::TypeH2, TravelTitleFloorPixels,
+                bSelected ? Primary : SoftText, DestinationCardWrap)
         ];
         Card->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
         [
-            SNew(STextBlock)
-                .Text(FText::FromString(Destination.Description))
-                .ColorAndOpacity(bSelected ? SoftText : Muted)
-                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), BreakerUI::TypeCaption))
-                // Wraps rather than clips: a description is authored prose of
-                // unknown length, and this is the one place on the screen whose
-                // width the text does not get to decide.
-                .AutoWrapText(true)
+            // Wraps rather than clips, at the width the card settled: a
+            // description is authored prose of unknown length, and this is
+            // the one place on the screen whose width the text does not get
+            // to decide.
+            MenuWrappedText(FText::FromString(Destination.Description), BreakerUI::TypeCaption,
+                bSelected ? SoftText : Muted, DestinationCardWrap)
         ];
 
         Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
@@ -11506,7 +11555,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildTravelScreen()
     // location names.
     const FString Subtitle = FString::Printf(TEXT("%d DESTINATION%s"),
         Destinations.Num(), Destinations.Num() == 1 ? TEXT("") : TEXT("S"));
-    return BuildFrame(FText::FromString(TEXT("TRAVEL")), FText::FromString(Subtitle), Body, 780.0f);
+    return BuildFrame(FText::FromString(TEXT("TRAVEL")), FText::FromString(Subtitle), Body, TravelPanelWidth);
 }
 
 // ---------------------------------------------------------------------------

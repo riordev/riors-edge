@@ -17,6 +17,12 @@
 // tenth of a second, that changes nothing an enemy can do. It is what makes a
 // hit land visually; the stagger stays what makes a hit land tactically.
 //
+// And it fires only on a HEAVY hit. Owner: "they should only stagger when
+// taking large amounts of damage" — a hitch on every rifle round read as a
+// stagger, and a body that hitches four times a second is a body that never
+// stands still. IsHeavy is the whole rule: a weak point, a single blow worth a
+// slice of the bar, or a burst that adds up to one inside half a second.
+//
 // Everything here is arithmetic so the curve can be proved on bare floats:
 // what a test can hold is that the hitch is instant, that it always returns to
 // exactly zero, and that it can never accumulate into a body that drifts away
@@ -24,6 +30,25 @@
 // ---------------------------------------------------------------------------
 namespace BreakerFlinch
 {
+    // WHAT COUNTS AS HEAVY. Fractions of the victim's max health, so the same
+    // rule reads the same on a rat and on an elite: a round that is nothing to
+    // the elite is a heavy hit to the rat. All O2 PLACEHOLDER.
+    inline constexpr float HeavyHitFraction = 0.08f;     // O2 PLACEHOLDER
+    inline constexpr float HeavyWindowFraction = 0.15f;  // O2 PLACEHOLDER
+    inline constexpr float HeavyWindowSeconds = 0.5f;    // O2 PLACEHOLDER
+
+    // A weak point is always heavy: the hit was earned by aim, not by weight.
+    // Otherwise the blow, or the last half-second of blows, has to reach the
+    // fraction. A body with no health to speak of cannot be hit heavily —
+    // the guard is what keeps a zeroed target from hitching on every graze.
+    inline bool IsHeavy(float Damage, float RecentDamage, float MaxHealth, bool bWeakPoint)
+    {
+        if (bWeakPoint) return true;
+        if (!FMath::IsFinite(MaxHealth) || MaxHealth <= 0.0f) return false;
+        return Damage >= HeavyHitFraction * MaxHealth
+            || RecentDamage >= HeavyWindowFraction * MaxHealth;
+    }
+
     // All O2 PLACEHOLDER. Short on purpose: sustained fire lands four or five
     // rounds a second, so a hitch that outlives its own interval would stop
     // being a reaction and become a wobble.

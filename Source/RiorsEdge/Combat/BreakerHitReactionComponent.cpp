@@ -16,10 +16,12 @@ namespace
     // unity build as always.
     // 0.07 was four frames at sixty and one at fifteen: a flash that a frame
     // of hitching could delete entirely, which is what "no indication that
-    // they're taking damage" measures out to. Long enough to be seen, short
-    // enough that a rifle at 600 RPM still reads as ten flashes and not one.
-    // O2 PLACEHOLDER.
-    constexpr float BreakerReactionHitFlashSeconds = 0.12f;
+    // they're taking damage" measures out to. 0.12 re-armed every hit under
+    // a 600 RPM rifle (one hit per 0.10 s) never ended: the body sat at the
+    // flash colour for the whole burst and the owner read "a red blob".
+    // 0.08 is five frames at sixty, and it clears between rifle hits so the
+    // livery shows through the burst. O2 PLACEHOLDER.
+    constexpr float BreakerReactionHitFlashSeconds = 0.08f;
     constexpr float BreakerReactionDeathPopSeconds = 0.12f;
     constexpr float BreakerReactionDeathBeatSeconds = 0.45f;
     constexpr float BreakerReactionDeathBeatWeakPointSeconds = 0.60f;

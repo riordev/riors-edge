@@ -192,6 +192,13 @@ public:
     // is authored as a different stage changes behaviour without a code change.
     UFUNCTION(BlueprintPure, Category="Enemy|Family") bool UsesCoverDiscipline() const;
     UFUNCTION(BlueprintPure, Category="Enemy|Family") bool FlinchesWhenHit() const;
+    // Whether the hit HandleDamageReceived last saw was heavy by
+    // BreakerFlinch::IsHeavy. Decided on OnDamageReceived, which the combat
+    // component broadcasts before OnDamageTaken, so a listener on the latter
+    // (the flinch, the Skirmisher's cover break) reads the answer for the
+    // same hit. Cosmetic and behavioural reactions gate on it; the gameplay
+    // stagger does not read it and gunfire still never staggers.
+    UFUNCTION(BlueprintPure, Category="Enemy|Family") bool WasLastHitHeavy() const { return bLastHitWasHeavy; }
 
     UFUNCTION(BlueprintPure, Category="Enemy") float GetMonsterMaxHealth() const;
     UFUNCTION(BlueprintPure, Category="Enemy") float GetAttackDamage() const { return AttackDamage; }
@@ -812,6 +819,13 @@ protected:
     AActor* SelectThreatTarget();
     // Wakeful needs to know how the killing blow landed.
     bool bLastHitWasWeakPoint = false;
+    // Owner: "only stagger when taking large amounts of damage". The last
+    // hit's verdict and the damage summed inside BreakerFlinch's window that
+    // decides it. Health plus shield, so a warded body reacts to what it
+    // actually lost. Zeroed when a heavy fires and when the window lapses;
+    // reset with the rest of the hit ledger on every revive path.
+    bool bLastHitWasHeavy = false;
+    float RecentDamage = 0.0f;
 
     // --- Hit / death presentation (cosmetic only) --------------------------
     // EXTRACTED (ruled): the flash, the two-beat death and the revive

@@ -5,6 +5,23 @@
 #include "Engine/SkeletalMesh.h"
 #include "Weapons/BreakerWeaponComponent.h"
 
+namespace
+{
+    // The idle is a POSE, not a clip. MF_Rifle_Idle_ADS breathes, and the gun
+    // hangs off the animated hand_r, so a playing idle moved the gun every
+    // frame at rest and aimed alike — under the maths channel's own sway and
+    // bob, which is the jiggle. Held at frame 0, the frame Configure read the
+    // grip sockets at, so the fitted grip line stays exact; the gun then
+    // moves only through the rig. The reload's own idiom: seat, stop, tick.
+    void BreakerArmsHoldIdlePose(USkeletalMeshComponent& Arms)
+    {
+        Arms.SetPosition(0.0f, false);
+        if (UAnimSingleNodeInstance* Instance = Arms.GetSingleNodeInstance()) Instance->SetPlaying(false);
+        Arms.TickAnimation(0.0f, false);
+        Arms.RefreshBoneTransforms();
+    }
+}
+
 UBreakerFirstPersonArms::UBreakerFirstPersonArms()
 {
     SetOnlyOwnerSee(true);
@@ -33,9 +50,7 @@ bool UBreakerFirstPersonArms::Configure(UStaticMeshComponent* Gun,
         return false;
     SetRelativeTransform(FTransform::Identity);
     PlayAnimation(RifleIdle, true);
-    SetPosition(0.0f, false);
-    TickAnimation(0.0f, false);
-    RefreshBoneTransforms();
+    BreakerArmsHoldIdlePose(*this);
     const FName RightGrip = DoesSocketExist(TEXT("HandGrip_R")) ? FName(TEXT("HandGrip_R")) : FName(TEXT("hand_r"));
     const FName LeftGrip = DoesSocketExist(TEXT("HandGrip_L")) ? FName(TEXT("HandGrip_L")) : FName(TEXT("hand_l"));
     const FVector Right = GetSocketTransform(RightGrip, RTS_Component).GetLocation();
@@ -84,6 +99,9 @@ void UBreakerFirstPersonArms::UpdateWeaponPose(const UBreakerWeaponComponent* We
     {
         bShowingReload = bReloading;
         PlayAnimation(bReloading ? RifleReload.Get() : RifleIdle.Get(), !bReloading);
+        // Back from a reload the idle is re-seated and held, never restarted
+        // from frame 0 to breathe.
+        if (!bReloading) BreakerArmsHoldIdlePose(*this);
     }
     if (bReloading)
     {

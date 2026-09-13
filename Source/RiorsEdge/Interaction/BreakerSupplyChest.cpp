@@ -170,6 +170,18 @@ void ABreakerSupplyChest::Tick(float DeltaSeconds)
                 ? FMath::Clamp(LidOpenAge / LidOpenSeconds, 0.0f, 1.0f) : 1.0f;
             Lid->SetRelativeRotation(LidOpenRotation * Alpha);
         }
+        // THE FADE: once the pickup it paid is taken (the pickup destroys
+        // itself on transfer), the chest waits FadeDelaySeconds, shrinks to
+        // nothing over FadeSeconds and leaves. Server-authoritative — the
+        // actor's destruction replicates.
+        if (HasAuthority() && bPaid && !PaidPickup.IsValid())
+        {
+            if (FadeAge < 0.0f) { FadeAge = 0.0f; FadeScale = GetActorScale3D(); }
+            FadeAge += DeltaSeconds;
+            const float Shrink = FMath::Clamp((FadeAge - FadeDelaySeconds) / FMath::Max(FadeSeconds, KINDA_SMALL_NUMBER), 0.0f, 1.0f);
+            if (Shrink > 0.0f) SetActorScale3D(FadeScale * (1.0f - Shrink));
+            if (Shrink >= 1.0f) Destroy();
+        }
         return;
     }
     if (!Glint) return;
@@ -251,5 +263,7 @@ bool ABreakerSupplyChest::TryOpen(ABreakerCharacter* Player)
         ABreakerLootPickup::StaticClass(), At, FRotator::ZeroRotator);
     if (!Pickup) return false;
     Pickup->SetItem(Item);
+    PaidPickup = Pickup;
+    bPaid = true;
     return true;
 }

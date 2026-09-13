@@ -14,9 +14,28 @@
 //   EaseToward  — an exponential chase, for a value that follows a target it
 //                 must never snap to: the crouch camera easing down to the
 //                 lowered capsule instead of arriving there in one frame.
+//
+// One predicate decides WHEN the brake plant is owed:
+//   BrakePlantEdge — a stop is a speed crossing, not an input edge. The
+//                 body's ground speed falls through the plant threshold on
+//                 exactly one frame of a deceleration, so a stop plants once;
+//                 a strafe reversal, which passes a zero-input frame while the
+//                 speed never leaves the walk band, plants never.
 // ---------------------------------------------------------------------------
 namespace BreakerFeel
 {
+    /**
+     * True on the one frame a grounded, input-free body's horizontal speed
+     * crosses DOWN through Threshold: PrevSpeed at or above it, Speed below
+     * it. An input edge is not a stop — the stick reverses through zero
+     * every A->D at full walk speed — and a speed already under the
+     * threshold when the stick lifts was never a stop worth a dip.
+     */
+    constexpr bool BrakePlantEdge(float PrevSpeed, float Speed, float Threshold, bool bGroundedNoInput)
+    {
+        return bGroundedNoInput && PrevSpeed >= Threshold && Speed < Threshold;
+    }
+
     /**
      * 0 before the pulse begins, linear to 1 at AttackSeconds, squared
      * ease-out back to 0 at AttackSeconds + RecoverySeconds, 0 after. A

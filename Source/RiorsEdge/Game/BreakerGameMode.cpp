@@ -4441,7 +4441,12 @@ ABreakerEnemy* ABreakerGameMode::ArriveAtOutdoorSlot(int32 SlotIndex)
     const ABreakerEnemy* Template = GetDefault<ABreakerEnemy>(Slot.Class);
     const UCapsuleComponent* Body = Template ? Template->FindComponentByClass<UCapsuleComponent>() : nullptr;
     const FVector Appears = Slot.AppearsAt();
-    if (Body && World->OverlapBlockingTestByChannel(Appears, FQuat::Identity, ECC_Pawn,
+    // WORLD GEOMETRY ONLY. Bodies block bodies now (the capsule wears the Pawn
+    // profile), and a live patrol standing near a shared mouth is not a wall:
+    // it moves, and the floating mover slides the newcomer off it. A wall
+    // does not move, and a body inside one is the defect this refuses.
+    if (Body && World->OverlapAnyTestByObjectType(Appears, FQuat::Identity,
+        FCollisionObjectQueryParams(ECC_WorldStatic),
         FCollisionShape::MakeCapsule(Body->GetScaledCapsuleRadius(), Body->GetScaledCapsuleHalfHeight()), Query))
     {
         // THE PROMISE IS NOT KEPT, SO THE TEAR SAYS SO. Unless another body is
@@ -5544,8 +5549,13 @@ FBreakerWaveComposition ABreakerGameMode::GetWaveComposition(int32 WaveIndex) co
 
 int32 ABreakerGameMode::GetAreaLevelForWave(int32 WaveIndex) const
 {
-    // The gym's area level climbs with the wave. This is CONTENT escalation:
-    // wave 5 is a harder area than wave 1 regardless of who is standing in it.
+    // A RIFT IS ONE AREA AT ONE LEVEL (O27: content-scaled to area level).
+    // The door and the briefing name a level and every wave inside fights at
+    // it; escalation across waves is composition (Game/BreakerWaveBudget),
+    // never a second level. The +2 a wave below is the GYM's — an instrument
+    // whose wave 5 is a harder area than its wave 1 by design — and it had
+    // leaked into every rift: the Breach briefed 20 and fought 22/24/26/28.
+    if (bRiftInstance) return UBreakerMonsterChassisLibrary::ClampAreaLevel(GymAreaLevel);
     const int32 Level = GymAreaLevel + FMath::Max(WaveIndex, 0) * FMath::Max(AreaLevelPerWave, 0);
     return UBreakerMonsterChassisLibrary::ClampAreaLevel(Level);
 }

@@ -614,11 +614,14 @@ private:
     // Camera relative Z above (crouch) or below (stand) the rest location,
     // easing to 0. Signed centimetres.
     float CameraCrouchOffsetCm = 0.0f;
-    // Last frame: grounded with a live input vector. The brake plant fires on
-    // the frame this goes true -> false while still grounded.
-    bool bWasGroundedInput = false;
-    // Last frame's horizontal ground speed, the plant's threshold and scale.
+    // Last frame's horizontal ground speed, 0 off the ground. The brake plant
+    // fires on the one frame this falls through the threshold with no input
+    // (BreakerFeel::BrakePlantEdge) — a speed crossing, never an input edge.
     float LastGroundedSpeed = 0.0f;
+    // The ground speed on the last frame the stick was live: the speed the
+    // body gave up, and so the plant's scale. A strafe reversal re-arms it
+    // without ever crossing the threshold, so it never pays.
+    float BrakeReleaseSpeed = 0.0f;
     // The death beat's drop this frame, 0 when no beat runs. The beat writes
     // this; UpdateMovementFeel composes it onto the camera.
     float DeathBeatCameraDropCm = 0.0f;
@@ -693,6 +696,11 @@ private:
     // through EquipPrimary/EquipSecondary — which is exactly why the proxy used
     // to keep the previous gun's proportions after a loadout change.
     FBreakerViewmodelLayout ActiveLayout;
+    // The named gun's sight line in rig space, set only when the intake mesh
+    // resolved at the last rebuild (BreakerViewmodel::NamedSightLineRigCm).
+    // The aimed pose negates its Y and Z so the sight lands on the camera
+    // axis; unset, the pose falls back to the row's SightHeightCm.
+    TOptional<FVector> ActiveSightLineCm;
     FVector PosedArmRestLocation = FVector(FLT_MAX);
     FTimerHandle ViewmodelCycleTimer;
     FTimerHandle ViewmodelFireTimer;

@@ -3,7 +3,9 @@
 #include "CoreMinimal.h"
 #include "Engine/Font.h"
 #include "Engine/Texture2D.h"
+#include "Fonts/FontMeasure.h"
 #include "Fonts/SlateFontInfo.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Styling/CoreStyle.h"
 #include "Styling/SlateBrush.h"
 #include "Widgets/Images/SImage.h"
@@ -53,6 +55,38 @@ inline FSlateFontInfo BreakerDisplayFont(int32 Size, bool bHeavy = false)
 {
     return BreakerRoleFont(TEXT("/Game/Breaker/UI/Fonts/F_BreakerDisplay.F_BreakerDisplay"),
         bHeavy ? FName(TEXT("Bold")) : FName(TEXT("SemiBold")), Size, TEXT("Bold"), 0.01f);
+}
+
+// A DISPLAY SIZE THAT FITS A KNOWN WIDTH. A title is one line — a headline
+// that wraps is two headlines, and a headline that clips is none — so a
+// title that would run past its column steps its size down, one pixel at a
+// time, until the measured run fits or MinPx is reached. Below MinPx the
+// caller wraps (WrapTextAt, never AutoWrapText: ui.md forbids reading an
+// allotted width, and this measures TEXT against a FONT with a width the
+// caller settled before layout started). Measured on the heavy face, which
+// is the face every title site draws.
+//
+// Headless fallback (no renderer: a suite run, a commandlet) estimates the
+// run from the glyph count. It errs wide on purpose — a headless layout that
+// steps down too far costs nothing, one that clips would be the defect this
+// exists to close. O2 PLACEHOLDER.
+inline int32 BreakerFitDisplaySize(const FString& Text, float MaxWidth, int32 Px, int32 MinPx)
+{
+    constexpr float HeadlessEmPerGlyph = 0.62f;   // O2 PLACEHOLDER: condensed heavy at ~0.5, padded
+    const bool bMeasured = FSlateApplication::IsInitialized() && FSlateApplication::Get().GetRenderer() != nullptr;
+    int32 Size = FMath::Max(Px, MinPx);
+    while (Size > MinPx)
+    {
+        float Width = Text.Len() * Size * HeadlessEmPerGlyph;
+        if (bMeasured)
+        {
+            Width = static_cast<float>(FSlateApplication::Get().GetRenderer()->GetFontMeasureService()
+                ->Measure(Text, BreakerDisplayFont(Size, true)).X);
+        }
+        if (Width <= MaxWidth) break;
+        --Size;
+    }
+    return Size;
 }
 
 // Body: mixed-case copy, 400/500/600. The bold flag maps to SemiBold — the

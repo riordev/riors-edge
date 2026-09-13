@@ -1,11 +1,16 @@
 #include "Misc/AutomationTest.h"
+#include "Misc/ScopeExit.h"
 #include "Combat/BreakerBodyPaint.h"
 #include "Combat/BreakerEnemyBodyMath.h"
+#include "Combat/BreakerFlinchMath.h"
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerRangedEnemy.h"
 #include "Materials/MaterialInterface.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Engine/Engine.h"
 #include "Engine/SkeletalMesh.h"
+#include "Engine/World.h"
 #include "UObject/UObjectIterator.h"
 #include "HAL/FileManager.h"
 #include "Misc/Paths.h"
@@ -191,11 +196,16 @@ bool FBreakerEnemyBodyCastTest::RunTest(const FString& Parameters)
 }
 
 // The overlay STRENGTH is pure (BreakerBodyPaint::ResolveOverlayStrength), so
-// its contract is proved without a mesh: the livery is PURE at rest, the
-// reactions occlude exactly as they do on primitives, the rank badge wears
-// the same authored blend weights as the primitive blend (one table, not
-// two), and the wound wash rises with damage but never fully hides the paint
-// job outside a reaction.
+// its contract is proved without a mesh: the livery is PURE at rest, a body
+// hit flashes at OverlayFlashStrength (the livery still shows through — a
+// mech that goes flat white on every rifle round is a mech with no paint
+// job), ONLY a weak-point flash occludes fully (that is what makes the gold
+// read as gold), the death burn occludes for its whole ride, the rank badge
+// wears the same authored blend weights as the primitive blend (one table,
+// not two), and the wound wash rises with damage to OverlayWoundStrengthMax
+// and no further. Every non-weak-point state — flash, status and wound
+// stacked together — stays under 1.0: the only full occlusion on a body is
+// the weak point's and the corpse's.
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerEnemyBodyOverlayStrengthTest,
@@ -209,7 +219,12 @@ bool FBreakerEnemyBodyOverlayStrengthTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("rest is pure livery"), ResolveOverlayStrength(State), 0.0f, 1e-6f);
 
     State.Reaction = EReaction::Flash;
-    TestEqual(TEXT("flash occludes"), ResolveOverlayStrength(State), 1.0f, 1e-6f);
+    TestEqual(TEXT("a body flash is the authored flash strength"),
+        ResolveOverlayStrength(State), OverlayFlashStrength, 1e-6f);
+    TestTrue(TEXT("a body flash never occludes"), ResolveOverlayStrength(State) < 1.0f);
+    State.bReactionWeakPoint = true;
+    TestEqual(TEXT("a weak-point flash occludes"), ResolveOverlayStrength(State), 1.0f, 1e-6f);
+    State.bReactionWeakPoint = false;
     State.Reaction = EReaction::DeathCrumple;
     State.ReactionAlpha = 0.5f;
     TestEqual(TEXT("burn occludes for its whole ride"), ResolveOverlayStrength(State), 1.0f, 1e-6f);
@@ -228,7 +243,110 @@ bool FBreakerEnemyBodyOverlayStrengthTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("full health adds no wash"), ResolveOverlayStrength(State), 0.0f, 1e-6f);
     State.HealthFraction = 0.0f;
     const float Drained = ResolveOverlayStrength(State);
-    TestTrue(TEXT("drained wash is visible but never occludes"), Drained > 0.3f && Drained < 1.0f);
+    TestTrue(FString::Printf(TEXT("drained wash is visible (> 0.15) but stops at the wound ceiling (was %.3f)"), Drained),
+        Drained > 0.15f && Drained <= OverlayWoundStrengthMax + 1e-6f);
+
+    // The status wash tops out at its own ceiling, under the weak point.
+    State = FState();
+    State.bStatus = true;
+    State.StatusPulse = 1.0f;
+    const float StatusPeak = ResolveOverlayStrength(State);
+    TestTrue(FString::Printf(TEXT("a status at full pulse stops at the status ceiling (was %.3f)"), StatusPeak),
+        StatusPeak > 0.0f && StatusPeak <= OverlayStatusStrengthMax + 1e-6f);
+
+    // EVERYTHING AT ONCE, NO WEAK POINT: a rotting, drained, modifier-bearing
+    // body taking a body hit is still a body with a livery.
+    State = FState();
+    State.Rank = EBreakerMonsterRank::ModifierBearing;
+    State.bHealthRamp = true;
+    State.HealthFraction = 0.0f;
+    State.bStatus = true;
+    State.StatusPulse = 1.0f;
+    State.Reaction = EReaction::Flash;
+    State.bReactionWeakPoint = false;
+    const float Stacked = ResolveOverlayStrength(State);
+    TestTrue(FString::Printf(TEXT("flash, status, wound and rank stacked never occlude (was %.3f)"), Stacked),
+        Stacked < 1.0f);
+    // The same body between flashes: the quiet layers stacked stay under too.
+    State.Reaction = EReaction::Rest;
+    const float StackedAtRest = ResolveOverlayStrength(State);
+    TestTrue(FString::Printf(TEXT("status, wound and rank stacked at rest never occlude (was %.3f)"), StackedAtRest),
+        StackedAtRest < 1.0f);
+    // And the shipped ceilings themselves sit under the weak point's 1.0.
+    TestTrue(TEXT("shipped flash strength is under full"), OverlayFlashStrength < 1.0f);
+    TestTrue(TEXT("shipped wound ceiling is under full"), OverlayWoundStrengthMax < 1.0f);
+    TestTrue(TEXT("shipped status ceiling is under full"), OverlayStatusStrengthMax < 1.0f);
+    return true;
+}
+
+// THE HITCH IS RATIONED (BreakerFlinch::IsHeavy). Owner: every rifle round
+// rocked the body, so at four or five rounds a second the mech wobbled
+// rather than reacted. A hit is heavy when it alone is a real fraction of
+// the body's health, when it lands on the weak point, or when the last
+// half-second's fire adds up to one — so a burst that would have been three
+// small wobbles is one hitch at the end of the burst. Pure: bare floats, no
+// body. RecentDamage is the window's sum on the same side the caller keeps
+// it, so the "window alone" case is held under the threshold on either
+// reading of whether the current hit is already in it.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerFlinchOnlyHeavyHitsTest,
+    "RiorsEdge.Combat.Flinch.OnlyHeavyHitsFlinch",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerFlinchOnlyHeavyHitsTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerFlinch;
+    constexpr float MaxHealth = 100.0f;
+
+    TestFalse(TEXT("a 1% body hit is not heavy"), IsHeavy(1.0f, 0.0f, MaxHealth, false));
+    TestTrue(TEXT("a 1% weak-point hit is heavy"), IsHeavy(1.0f, 0.0f, MaxHealth, true));
+    TestTrue(TEXT("an 8% body hit is heavy"), IsHeavy(8.0f, 0.0f, MaxHealth, false));
+    TestTrue(TEXT("a 6% hit closing an 18% window is heavy"), IsHeavy(6.0f, 18.0f, MaxHealth, false));
+    TestFalse(TEXT("a small hit on a 14% window is not heavy"), IsHeavy(0.5f, 14.0f, MaxHealth, false));
+    TestFalse(TEXT("nothing recent and nothing now is not heavy"), IsHeavy(0.0f, 0.0f, MaxHealth, false));
+
+    // Shipped configuration.
+    TestEqual(TEXT("shipped HeavyHitFraction"), HeavyHitFraction, 0.08f, 1e-6f);
+    TestEqual(TEXT("shipped HeavyWindowFraction"), HeavyWindowFraction, 0.15f, 1e-6f);
+    TestEqual(TEXT("shipped HeavyWindowSeconds"), HeavyWindowSeconds, 0.5f, 1e-6f);
+    TestTrue(TEXT("the window threshold sits above the single-hit threshold"), HeavyWindowFraction > HeavyHitFraction);
+    return true;
+}
+
+// THE BODY'S CAPSULE IS A PAWN THAT WORLD GEOMETRY STOPS. Spawned in a
+// fixture world (the BlackoutProtocol idiom), the enemy's root capsule wears
+// the Pawn object type, blocks WorldStatic so a mech cannot walk through a
+// wall, and ignores the two project trace channels so a player's shot and a
+// player's interaction ray pass through to the hit boxes that answer them.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerEnemyCapsuleBlocksWorldTest,
+    "RiorsEdge.Combat.Enemy.CapsuleBlocksWorld",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerEnemyCapsuleBlocksWorldTest::RunTest(const FString& Parameters)
+{
+    UWorld::InitializationValues Init;
+    Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+    if (!TestNotNull(TEXT("isolated world"), World)) return false;
+    GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+    ON_SCOPE_EXIT { World->DestroyWorld(false); GEngine->DestroyWorldContext(World); };
+
+    ABreakerEnemy* Enemy = World->SpawnActor<ABreakerEnemy>(FVector(0.0f, 0.0f, 100.0f), FRotator::ZeroRotator);
+    if (!TestNotNull(TEXT("actual enemy"), Enemy)) return false;
+
+    UCapsuleComponent* Capsule = Enemy->FindComponentByClass<UCapsuleComponent>();
+    if (!TestNotNull(TEXT("the enemy carries a capsule"), Capsule)) return false;
+    TestTrue(TEXT("the capsule is the body's root"), Enemy->GetRootComponent() == Capsule);
+
+    TestEqual(TEXT("the capsule is a Pawn"),
+        static_cast<int32>(Capsule->GetCollisionObjectType()), static_cast<int32>(ECC_Pawn));
+    TestEqual(TEXT("the capsule blocks WorldStatic"),
+        static_cast<int32>(Capsule->GetCollisionResponseToChannel(ECC_WorldStatic)), static_cast<int32>(ECR_Block));
+    TestEqual(TEXT("the capsule ignores GameTraceChannel1"),
+        static_cast<int32>(Capsule->GetCollisionResponseToChannel(ECC_GameTraceChannel1)), static_cast<int32>(ECR_Ignore));
+    TestEqual(TEXT("the capsule ignores GameTraceChannel2"),
+        static_cast<int32>(Capsule->GetCollisionResponseToChannel(ECC_GameTraceChannel2)), static_cast<int32>(ECR_Ignore));
     return true;
 }
 

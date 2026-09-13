@@ -1,7 +1,12 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Characters/BreakerCharacter.h"
 #include "Characters/BreakerViewmodelRig.h"
+#include "Engine/StaticMesh.h"
+#include "HAL/FileManager.h"
+#include "Misc/Paths.h"
+#include "UObject/UnrealType.h"
 
 // The first-person blockout layout table. It is pure data plus two pure
 // transforms, which is exactly why it lives in its own header away from
@@ -28,6 +33,33 @@ namespace BreakerViewmodelTest
         EBreakerWeaponArchetype::Machinegun,
         EBreakerWeaponArchetype::Sidearm
     };
+
+    // Reads one float UPROPERTY off an object by name; -1 when missing, which
+    // no viewmodel dial ships at, so a rename fails loudly.
+    float BreakerViewmodelReadDial(const UObject* Object, const TCHAR* PropertyName)
+    {
+        if (!Object) return -1.0f;
+        const FFloatProperty* Property = FindFProperty<FFloatProperty>(Object->GetClass(), PropertyName);
+        if (!Property) return -1.0f;
+        return Property->GetPropertyValue_InContainer(Object);
+    }
+
+    // ABreakerCharacter::GetWeaponRestLocation's aimed pose, mirrored: the
+    // rig comes forward to AdsForwardCm and its SCALED sight line is
+    // cancelled on Y and Z, so that line lands on the camera axis. If the
+    // character's formula changes and this does not, the two have diverged
+    // and the sights have drifted.
+    FVector BreakerViewmodelAimedPose(float AdsForwardCm, const FVector& SightLineRigCm, float ViewmodelScale)
+    {
+        return FVector(AdsForwardCm, -SightLineRigCm.Y * ViewmodelScale, -SightLineRigCm.Z * ViewmodelScale);
+    }
+
+    // A rig-space point in camera space at a rest pose: the rig root sits at
+    // the pose, uniformly scaled, unrotated while the recoil spring rests.
+    FVector BreakerViewmodelRigToCamera(const FVector& RestPose, const FVector& RigCm, float ViewmodelScale)
+    {
+        return RestPose + RigCm * ViewmodelScale;
+    }
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -326,19 +358,101 @@ bool FBreakerViewmodelAimPoseTest::RunTest(const FString& Parameters)
 {
     using namespace BreakerViewmodelTest;
 
-    // ADS is DERIVED from each layout's sight height rather than authored, so
-    // every archetype puts its OWN sight on the crosshair. This mirrors
-    // ABreakerCharacter::GetWeaponRestLocation exactly; if that formula changes
-    // and this does not, the two have diverged and the sights have drifted.
+    // ADS is DERIVED, not authored: the rig comes forward and drops by the
+    // sight line of the gun it is actually holding. For a named gun that line
+    // is the fitted mesh's bounds top-centre in rig space
+    // (NamedSightLineRigCm); for the primitive fallback it is the row's
+    // SightHeightCm over the rig origin. Either way the SAME aimed pose must
+    // land it on the camera axis. The old assertion here compared
+    // -SightHeightCm + SightHeightCm with zero, which no fit could fail.
+    const float ShippedScale = BreakerViewmodelReadDial(GetDefault<ABreakerCharacter>(), TEXT("ViewmodelScale"));
+    TestEqual(TEXT("ViewmodelScale ships at 0.9"), ShippedScale, 0.9f, 0.0001f);
+    const float OnAxisToleranceCm = 0.5f;
+
+    // --- Pure sibling: a synthetic box under the shipped fit -----------------
+    // A 1 m gun (longest half-extent 50) pivoted off its bounds centre, worn
+    // the way the Rifle row wears Gun_Rifle: fitted to the row's length with
+    // itself as the pack reference, seated at the firing hand, under the
+    // pack's 180-degree yaw. The sight line is the bounds top-centre carried
+    // through that fit, hand-computed here so the function's claim is pinned
+    // to a number rather than to itself.
+    {
+        const FBreakerViewmodelLayout RifleRow = BreakerViewmodel::ArchetypeLayout(EBreakerWeaponArchetype::Rifle);
+        const FVector Origin(40.0, -8.0, 4.0);
+        const FVector Extent(50.0, 6.0, 12.0);
+        const float TargetLengthCm = BreakerViewmodel::PackFitLengthCm(
+            static_cast<float>(Extent.GetMax()), static_cast<float>(Extent.GetMax()), RifleRow.OverallLengthCm());
+        float FitScale; FVector FitLocation;
+        BreakerViewmodel::FitNamedWeapon(Origin, Extent, TargetLengthCm,
+            FVector(RifleRow.MuzzleCm.X * 0.5f, 0.0f, -4.0f), RifleRow.NamedMeshRotation.Quaternion(),
+            FitScale, FitLocation);
+        FitLocation = RifleRow.FiringHandCm;   // the character's fitted grip offset
+        TestEqual(TEXT("the synthetic box wears the row's scale"), FitScale, RifleRow.OverallLengthCm() / 100.0f, 1e-4f);
+
+        const FVector SightLine = BreakerViewmodel::NamedSightLineRigCm(Origin, Extent, FitScale, RifleRow.NamedMeshRotation, FitLocation);
+        const FVector TopCentreMesh = Origin + FVector(0.0, 0.0, Extent.Z);
+        const FVector Expected = FitLocation + RifleRow.NamedMeshRotation.RotateVector(TopCentreMesh * FitScale);
+        TestEqual(TEXT("the sight line is the bounds top-centre carried through the fit"), SightLine, Expected, 1e-3f);
+        TestTrue(TEXT("the synthetic sight line sits above the firing hand"), SightLine.Z > FitLocation.Z);
+
+        const FVector Aimed = BreakerViewmodelAimedPose(RifleRow.AdsForwardCm, SightLine, ShippedScale);
+        const FVector Camera = BreakerViewmodelRigToCamera(Aimed, SightLine, ShippedScale);
+        TestTrue(*FString::Printf(TEXT("the synthetic sight line lands on the camera axis when aimed (Y %.3f, Z %.3f)"), Camera.Y, Camera.Z),
+            FMath::Abs(Camera.Y) <= OnAxisToleranceCm && FMath::Abs(Camera.Z) <= OnAxisToleranceCm);
+    }
+
+    // --- Every archetype, as the character fits it --------------------------
+    // Gated on the imported weapons directory the way EveryAuthoredGunResolves
+    // is: without Content every row takes the primitive fallback, which is the
+    // design there, not a defect.
+    const FString WeaponsDir = FPaths::ProjectContentDir() / TEXT("Breaker/Meshes/weapons/sci-fi");
+    const bool bHaveNamedGuns = IFileManager::Get().DirectoryExists(*WeaponsDir);
+    const FBreakerViewmodelLayout RifleRow = BreakerViewmodel::ArchetypeLayout(EBreakerWeaponArchetype::Rifle);
+    const UStaticMesh* Reference = (bHaveNamedGuns && RifleRow.NamedMeshPath.IsValid())
+        ? Cast<UStaticMesh>(RifleRow.NamedMeshPath.TryLoad()) : nullptr;
+
     for (EBreakerWeaponArchetype Archetype : BreakerViewmodelAllArchetypes)
     {
         const FBreakerViewmodelLayout Layout = BreakerViewmodel::ArchetypeLayout(Archetype);
         const FString Name = BreakerWeaponArchetypeNames::Display(Archetype);
-        const FVector Aimed(Layout.AdsForwardCm, 0.0f, -Layout.SightHeightCm);
+        UStaticMesh* Mesh = (bHaveNamedGuns && Layout.NamedMeshPath.IsValid())
+            ? Cast<UStaticMesh>(Layout.NamedMeshPath.TryLoad()) : nullptr;
 
-        TestEqual(*FString::Printf(TEXT("%s aims down the centre line"), *Name), static_cast<float>(Aimed.Y), 0.0f, 0.0001f);
-        TestTrue(*FString::Printf(TEXT("%s puts its sight on the crosshair"), *Name),
-            FMath::IsNearlyZero(Aimed.Z + Layout.SightHeightCm, 0.0001f));
+        FVector SightLine;
+        if (Mesh)
+        {
+            // ABreakerCharacter::RebuildViewmodelParts, step for step.
+            const FBoxSphereBounds Bounds = Mesh->GetBounds();
+            const float TargetLengthCm = Reference
+                ? BreakerViewmodel::PackFitLengthCm(
+                    static_cast<float>(Bounds.BoxExtent.GetMax()),
+                    static_cast<float>(Reference->GetBounds().BoxExtent.GetMax()),
+                    RifleRow.OverallLengthCm())
+                : Layout.OverallLengthCm();
+            float FitScale; FVector FitLocation;
+            BreakerViewmodel::FitNamedWeapon(Bounds.Origin, Bounds.BoxExtent, TargetLengthCm,
+                FVector(Layout.MuzzleCm.X * 0.5f, 0.0f, -4.0f), Layout.NamedMeshRotation.Quaternion(),
+                FitScale, FitLocation);
+            FitLocation = Layout.FiringHandCm;
+            SightLine = BreakerViewmodel::NamedSightLineRigCm(Bounds.Origin, Bounds.BoxExtent, FitScale, Layout.NamedMeshRotation, FitLocation);
+            UE_LOG(LogTemp, Display, TEXT("[NamedGun] %s (%s) scale %.3f: sight line rig (%.2f, %.2f, %.2f)"),
+                *Name, *Layout.NamedMeshPath.GetAssetName(), FitScale, SightLine.X, SightLine.Y, SightLine.Z);
+            TestTrue(*FString::Printf(TEXT("%s's named sight line is finite"), *Name), !SightLine.ContainsNaN());
+            TestTrue(*FString::Printf(TEXT("%s's named sight line sits above the firing hand"), *Name),
+                SightLine.Z > Layout.FiringHandCm.Z);
+        }
+        else
+        {
+            // The primitive fallback: the row's own sighting line over the
+            // rig origin.
+            SightLine = FVector(0.0, 0.0, Layout.SightHeightCm);
+            TestTrue(*FString::Printf(TEXT("%s has a sighting line above the rig origin"), *Name), Layout.SightHeightCm > 0.0f);
+        }
+
+        const FVector Aimed = BreakerViewmodelAimedPose(Layout.AdsForwardCm, SightLine, ShippedScale);
+        const FVector Camera = BreakerViewmodelRigToCamera(Aimed, SightLine, ShippedScale);
+        TestTrue(*FString::Printf(TEXT("%s puts its sight on the camera axis when aimed (Y %.3f, Z %.3f)"), *Name, Camera.Y, Camera.Z),
+            FMath::Abs(Camera.Y) <= OnAxisToleranceCm && FMath::Abs(Camera.Z) <= OnAxisToleranceCm);
         // Aiming must actually MOVE the weapon, or the trade the ADS layer
         // charges the player for is invisible.
         TestTrue(*FString::Printf(TEXT("%s visibly changes pose when aimed"), *Name),
@@ -346,6 +460,11 @@ bool FBreakerViewmodelAimPoseTest::RunTest(const FString& Parameters)
         TestTrue(*FString::Printf(TEXT("%s hip fire is held off the centre line"), *Name),
             FMath::Abs(Layout.HipOffsetCm.Y) > 2.0f);
     }
+    // GAP: the character's live ActiveSightLineCm is set in
+    // RebuildViewmodelParts and is not readable off a CDO, so this test
+    // recomputes the fit rather than reading the value the pawn holds. A
+    // runtime fixture that builds the rig and reads GetWeaponRestLocation
+    // under a full aim alpha would close it; it is not faked here.
 
     return true;
 }

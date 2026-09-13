@@ -719,7 +719,10 @@ int32 UBreakerZoneBuilder::FernhallYardAreaLevel(FName Yard)
     // at, the same distance the substation is — but it is the side room, not
     // the road onward, so it sits one step over the entry rather than on the
     // substation's rung. O2 PLACEHOLDER.
-    if (Yard == FName(TEXT("breach"))) return 20;
+    // The Breach is the ladder's last rung, not a cliff: 13 -> 16 is the same
+    // step the substation and the depot take, and 16 is the level the Altered
+    // Contact already fights at and its reward already pays. O2 PLACEHOLDER.
+    if (Yard == FName(TEXT("breach"))) return 16;
     if (Yard == FName(TEXT("depot"))) return 13;
     if (Yard == FName(TEXT("substation"))) return 9;
     if (Yard == FName(TEXT("siding"))) return 6;

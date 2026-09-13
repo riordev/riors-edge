@@ -118,27 +118,33 @@ void ABreakerCharacter::UpdateMovementFeel(float DeltaSeconds)
     }
 
     // ---- The brake plant ---------------------------------------------------
-    // A stop is an edge: grounded last frame with a live input vector,
-    // grounded this frame with none. The movement component's acceleration
-    // IS the consumed input (scaled), so it is read rather than the raw
-    // stick — a stick held into a wall still counts as input, a released one
-    // never does. A slide and a traversal are postures, not strides, and a
-    // dead body's hands do not plant.
+    // A stop is a SPEED CROSSING, not an input edge: grounded, no input, and
+    // the body's ground speed falling through the plant threshold. The stick
+    // reverses through zero on every A->D at full walk speed, and the old
+    // input edge paid a plant on each one — the jiggle — while the speed
+    // never left the walk band. The crossing happens on exactly one frame of
+    // a deceleration, so a stop plants once. The movement component's
+    // acceleration IS the consumed input (scaled), so it is read rather than
+    // the raw stick — a stick held into a wall still counts as input, a
+    // released one never does. A slide and a traversal are postures, not
+    // strides, and a dead body's hands do not plant.
     const UBreakerCharacterMovementComponent* Move = GetBreakerMovement();
     const bool bGrounded = Move && Move->IsMovingOnGround() && !Move->IsSliding() && !Move->IsTraversingLedge();
     const bool bInputLive = bGrounded && !Move->GetCurrentAcceleration().IsNearlyZero();
-    if (bGrounded && bWasGroundedInput && !bInputLive && DeathBeatElapsed < 0.0f)
+    const float GroundSpeed = bGrounded ? static_cast<float>(Move->Velocity.Size2D()) : 0.0f;
+    // The threshold is a fraction of the live walk cap, so a slowed or aimed
+    // walk plants at ITS half, not the unmodified figure's.
+    const float Threshold = bGrounded ? BrakePlantMinSpeedFraction * Move->GetWalkSpeedCap() : 0.0f;
+    if (BreakerFeel::BrakePlantEdge(LastGroundedSpeed, GroundSpeed, Threshold,
+            bGrounded && !bInputLive && DeathBeatElapsed < 0.0f))
     {
-        // The threshold is a fraction of the live walk cap, so a slowed or
-        // aimed walk plants at ITS half, not the unmodified figure's.
-        const float Threshold = BrakePlantMinSpeedFraction * Move->GetWalkSpeedCap();
-        if (LastGroundedSpeed >= Threshold)
-        {
-            PayPlantImpulse(LastGroundedSpeed);
-        }
+        // Paid at the speed the body GAVE UP — the last live-input speed —
+        // not at the threshold it just fell through, so a sprint stop still
+        // plants harder than a walk stop.
+        PayPlantImpulse(BrakeReleaseSpeed);
     }
-    bWasGroundedInput = bInputLive;
-    LastGroundedSpeed = bGrounded ? static_cast<float>(Move->Velocity.Size2D()) : 0.0f;
+    if (bInputLive) BrakeReleaseSpeed = GroundSpeed;
+    LastGroundedSpeed = GroundSpeed;
 }
 
 // ---- The cast kick (O284) --------------------------------------------------

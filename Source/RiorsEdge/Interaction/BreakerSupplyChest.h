@@ -54,8 +54,16 @@ public:
     // 0.35 s, both felt by nobody yet.
     // The lid swings about the hinge line, which runs along its local X: a
     // positive roll lifts the lip. O2 PLACEHOLDER.
-    UPROPERTY(EditAnywhere, Category = "Chest") FRotator LidOpenRotation = FRotator(0.0f, 0.0f, 70.0f);
+    // Roll is left-handed in UE: a positive roll drops the lip into the
+    // body (the owner's "opens backwards"); a negative roll lifts it away.
+    UPROPERTY(EditAnywhere, Category = "Chest") FRotator LidOpenRotation = FRotator(0.0f, 0.0f, -70.0f);
     UPROPERTY(EditAnywhere, Category = "Chest") float LidOpenSeconds = 0.35f;
+    // A SPENT CHEST LEAVES. Once its pickup is taken (or the pickup is gone),
+    // the chest waits this long, then shrinks away over FadeSeconds and
+    // destroys itself, so a cleared yard does not fill with open boxes.
+    // O2 PLACEHOLDER.
+    UPROPERTY(EditAnywhere, Category = "Chest") float FadeDelaySeconds = 1.5f;
+    UPROPERTY(EditAnywhere, Category = "Chest") float FadeSeconds = 0.6f;
 
     // HOW A CHEST IS FOUND. Measured, not guessed: replaying the owner's own
     // session seed put four of six chests 14 to 19 metres off a lane he walks
@@ -107,6 +115,11 @@ private:
     float GlintAge = 0.0f;
     // Seconds since the lid began to swing; only advances once opened.
     float LidOpenAge = 0.0f;
+    // The pickup this chest paid; the fade starts once it is gone.
+    TWeakObjectPtr<class ABreakerLootPickup> PaidPickup;
+    bool bPaid = false;
+    float FadeAge = -1.0f;
+    FVector FadeScale = FVector::OneVector;
     int32 ItemLevel = 1;
     int32 ContentSeed = 0;
     bool bConfigured = false;

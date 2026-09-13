@@ -1155,6 +1155,12 @@ namespace
     constexpr float BreakerHolsterPullBackCm = 6.0f;    // O2 PLACEHOLDER
     constexpr float BreakerHolsterPitchDegrees = -22.0f; // O2 PLACEHOLDER
     constexpr float BreakerHolsterYawDegrees = 8.0f;    // O2 PLACEHOLDER
+    // Where the hip-carried barrel meets the reticle. A gun carried
+    // HipOffsetCm.Y right of the camera axis and pointed straight ahead runs
+    // parallel to the reticle forever; yawed to converge 3 m out it reads as
+    // pointed where the player looks, the way Destiny 2 and Borderlands
+    // carry a hip gun. ~2.5° at the shipped 13 cm.
+    constexpr float BreakerHipConvergenceDistanceCm = 300.0f; // O2 PLACEHOLDER
 }
 
 float ABreakerCharacter::GetDeathWeaponLowerFraction() const
@@ -1176,10 +1182,15 @@ FVector ABreakerCharacter::GetWeaponRestLocation() const
         const FVector HolsterPose = ActiveLayout.HipOffsetCm + FVector(-BreakerHolsterPullBackCm, 0.0f, -BreakerHolsterDropCm);
         return FMath::Lerp(ActiveLayout.HipOffsetCm, HolsterPose, LowerFraction);
     }
-    // ADS is DERIVED, not authored: the rig comes forward and drops by exactly
-    // this weapon's sight height, which puts its own sight on the crosshair.
-    // Authoring the aimed pose per archetype was the alternative and it rots —
-    // move one part and the sight silently stops lining up.
+    // ADS is DERIVED, not authored: the rig comes forward and moves so this
+    // weapon's own sight line lands on the camera axis. A named gun's sight
+    // line is read off its fitted mesh at the rebuild (NamedSightLineRigCm),
+    // because five rows wear one Gun_Rifle and the rows' SightHeightCm
+    // (4.4-15 cm) describe primitives the mesh replaced — which is why the
+    // aimed gun sat a row's height off the reticle. The primitives keep the
+    // row's figure. Authoring the aimed pose per archetype was the
+    // alternative and it rots — move one part and the sight silently stops
+    // lining up.
     //
     // BLENDED, not branched (D5): the pose rides the weapon's eased aim
     // alpha, so the rig GLIDES between hip and sights over the archetype's
@@ -1191,7 +1202,10 @@ FVector ABreakerCharacter::GetWeaponRestLocation() const
         const float AimAlpha = Weapon->GetAimAlpha();
         if (AimAlpha > 0.0f)
         {
-            const FVector AimedPose(ActiveLayout.AdsForwardCm, 0.0f, -ActiveLayout.SightHeightCm * ViewmodelScale);
+            const FVector AimedPose = ActiveSightLineCm.IsSet()
+                ? FVector(ActiveLayout.AdsForwardCm,
+                    -ActiveSightLineCm->Y * ViewmodelScale, -ActiveSightLineCm->Z * ViewmodelScale)
+                : FVector(ActiveLayout.AdsForwardCm, 0.0f, -ActiveLayout.SightHeightCm * ViewmodelScale);
             return FMath::Lerp(ActiveLayout.HipOffsetCm, AimedPose, AimAlpha);
         }
     }
@@ -1299,6 +1313,17 @@ void ABreakerCharacter::UpdateViewmodelKick()
     }
     Rotation.Pitch += Motion.PitchDegrees;
     Rotation.Roll += Motion.RollDegrees;
+
+    // THE HIP CONVERGENCE: the barrel turns in toward the reticle by the
+    // angle its lateral carry subtends at the convergence distance, and the
+    // turn blends OUT with the aim alpha — the aimed pose puts the sight on
+    // the axis itself, and a converged barrel there would cross it. Negative
+    // yaw turns a right-carried gun left. Pure in BreakerViewmodelRig.h.
+    // Yaw only: the carry is also HipOffsetCm.Z below the axis and the
+    // barrel still runs parallel in pitch. Not converged until felt.
+    const float HipAlpha = Weapon ? 1.0f - Weapon->GetAimAlpha() : 1.0f;
+    Rotation.Yaw -= HipAlpha * BreakerViewmodel::HipConvergenceYawDegrees(
+        static_cast<float>(ActiveLayout.HipOffsetCm.Y), BreakerHipConvergenceDistanceCm);
 
     PrototypeWeaponVisual->SetRelativeLocation(Rest + Offset
         + FVector(-Motion.BackCm, Motion.LateralCm, Motion.VerticalCm));
@@ -1621,6 +1646,10 @@ void ABreakerCharacter::RebuildViewmodelParts()
     UStaticMesh* NamedGun = ActiveLayout.NamedMeshPath.IsValid()
         ? Cast<UStaticMesh>(ActiveLayout.NamedMeshPath.TryLoad()) : nullptr;
     FBoxSphereBounds GunBounds(ForceInit);
+    // Unset until a named gun seats below: the primitives aim by their row's
+    // SightHeightCm, and a mesh that fails to load must not leave the last
+    // gun's sight line behind.
+    ActiveSightLineCm.Reset();
     if (NamedWeaponVisual)
     {
         NamedWeaponVisual->SetVisibility(NamedGun != nullptr);
@@ -1663,6 +1692,11 @@ void ABreakerCharacter::RebuildViewmodelParts()
             NamedWeaponVisual->SetRelativeScale3D(FVector(FitScale));
             NamedWeaponVisual->SetRelativeLocation(FitLocation);
             NamedWeaponVisual->SetRelativeRotation(ActiveLayout.NamedMeshRotation);
+            // The sight line the aimed pose centres on, read off the mesh as
+            // it actually sits — the grip seat above, the fitted scale, the
+            // source-axis yaw — not off the row the mesh replaced.
+            ActiveSightLineCm = BreakerViewmodel::NamedSightLineRigCm(GunBounds.Origin, GunBounds.BoxExtent,
+                FitScale, ActiveLayout.NamedMeshRotation, FitLocation);
         }
     }
     if (NamedGun)

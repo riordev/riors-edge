@@ -129,6 +129,11 @@ void ABreakerSkirmisherEnemy::HandleFlinchSource(const FBreakerHitContext& Hit)
     // status build suppress the archetype out of the fight entirely.
     if (Hit.bFromDoT) return;
     if (Hit.Result.HealthDamage <= 0.0f && Hit.Result.ShieldDamage <= 0.0f) return;
+    // And only a HEAVY hit breaks cover (owner: "only stagger when taking
+    // large amounts of damage"). A single round that made a soldier duck
+    // meant any rifle could hold the archetype out of its lane; the verdict
+    // is the base's, decided on this same hit before this broadcast.
+    if (!WasLastHitHeavy()) return;
     // Only while it is up. Flinching behind cover would be invisible and would
     // burn the cooldown for nothing.
     if (CoverState != EBreakerCoverState::Exposed) return;

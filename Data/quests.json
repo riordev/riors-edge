@@ -85,7 +85,7 @@
 			{
 				"itemCount": 1,
 				"minimumRarity": "Exceptional",
-				"itemLevel": 1,
+				"itemLevel": 5,
 				"experience": 120
 			}
 		},
@@ -111,7 +111,7 @@
 			{
 				"itemCount": 1,
 				"minimumRarity": "Exceptional",
-				"itemLevel": 1
+				"itemLevel": 5
 			}
 		},
 		{
@@ -135,7 +135,7 @@
 			{
 				"itemCount": 1,
 				"minimumRarity": "Exceptional",
-				"itemLevel": 1
+				"itemLevel": 5
 			}
 		},
 		{
@@ -159,7 +159,7 @@
 			{
 				"itemCount": 2,
 				"minimumRarity": "Exceptional",
-				"itemLevel": 1
+				"itemLevel": 5
 			}
 		},
 		{

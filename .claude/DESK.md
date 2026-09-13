@@ -1,5 +1,101 @@
 # Desk — next playtest
 
+## OWNER PLAYTEST, 2026-09-12 (NINTH)
+
+Owner, an extended run: "guns jiggle in the hands and kind of shake and
+are never centred — so off-putting; look at Destiny 2 or Borderlands for
+how weapons look and function when ADS. Chest lids open backwards, and
+chests need to fade away after you collect them. Enemies phase through
+walls, and should probably only stagger when taking large amounts of
+damage. They all lose their colour when shot — just a red blob. Visual
+clarity is rough. Rot feels better but the cast is weird: it should
+attach to the enemy you're aiming at when the cast finishes (or cast
+under that enemy) — not intuitive to use. Progression: using quest
+states there's a HUGE jump in scaling; I can't come close to beating
+the Breach Marshalling Yard (erased at wave 2 of 4). Text wrapping
+issues across the whole game — dialogue, menus. We need another set of
+side quests with random objectives, maybe that's what offers the skill
+points the campaign is supposed to give — overall the player feels
+super weak and progression is awkward."
+
+## NINTH — LANDED, THE FIRST CYCLE
+
+- "guns jiggle and shake, never centred, ADS" — three sources. The arms'
+  ADS idle animation played looping and the gun hangs off the animated
+  hand bone, so the mannequin's breathing moved the gun every frame at
+  rest and aimed alike (outside every motion dial): the idle now holds
+  its pose (the reload's own idiom) and the gun moves only through the
+  rig maths. Yesterday's brake plant fired on the INPUT edge, so every
+  strafe reversal paid a 2.7-unit kick: it plants on a speed crossing
+  now (BrakePlantEdge, pure). ADS dropped the rig by a per-archetype
+  primitive number while five rows wear one rifle mesh, so at most one
+  weapon was ever on axis: the aimed pose cancels the named mesh's
+  measured sight line (bounds top-centre, NamedSightLineRigCm) in Y and
+  Z, and the hip pose converges 2.5 deg on the reticle instead of
+  running parallel 13 cm right. ViewmodelAimPose rewritten (it asserted
+  x - x == 0); FirstPersonArmsRuntime pins zero hand drift over 2 s.
+  FOUND: the sight line is a bounds top, not a sight post; the hip is
+  still 16 cm below the axis in pitch. NOT PHOTOGRAPHED: no capture
+  holds aim.
+- "chest lids open backwards; chests should fade" — UE roll is
+  left-handed: +70 dropped the lip into the body; -70 lifts it (pinned:
+  the open rotation lifts the lip). A chest whose pickup is taken waits
+  1.5 s, shrinks over 0.6 s and leaves.
+- "enemies phase through walls" — the enemy capsule NEVER had a
+  collision profile: it shipped as the engine's OverlapAllDynamic, so
+  the mover's sweeps never met a wall in any playtest. It wears the
+  Pawn profile now (the two weapon channels ignored so the hit boxes
+  keep the read); CapsuleBlocksWorld pins it. Bodies block bodies and
+  the player too — packs jostle now; FOUND: the Phase blink can land
+  inside a wall (not nav-projected); the repopulation arrival's capsule
+  check now tests world geometry only (a live body at a shared mouth is
+  not a wall).
+- "only stagger on large damage" — gunfire never staggered; what read
+  as one was the hit clip restarting on every round plus a 14 cm lurch
+  on every hit. A hit plays the clip and the lurch only when HEAVY:
+  8% of max health in one hit, 15% inside 0.5 s, or a weak point
+  (BreakerFlinch::IsHeavy, pinned); the Skirmisher breaks cover on the
+  same rule.
+- "they lose their colour when shot — a red blob" — the unlit overlay
+  plate ran at strength 1.0 on EVERY hit flash (re-armed at 600 rpm, so
+  it never ended) and the wound wash to 0.6 of a flat red. Flash 0.35
+  for 0.08 s, the white-out reserved for a weak point; wound wash to
+  0.30; status to 0.45; livery stays legible (re-pinned, not widened).
+  FOUND: a rim/edge flash needs the overlay material rebuilt — GLASS.
+- "text wrapping everywhere" — the Erased headline was a 40 px display
+  line in a 720 px column with no wrap. BreakerFitDisplaySize steps a
+  title down to fit; the death headline, dialogue speaker name,
+  destination card title and class card name use it; every AutoWrapText
+  in BreakerMenu (the node detail card, the totals plate, the
+  destination description) is a known-width MenuWrappedText. FOUND:
+  four AutoWrapText sites remain in LocalMap and RiftDebrief. NOT
+  PHOTOGRAPHED: no capture reaches the death card.
+- "HUGE jump in scaling; Breach unbeatable" — every rift added the
+  GYM's +2 area level per wave on top of its door (the Breach briefed
+  20 and fought 22/24/26/28; the entry 7/9/11): a rift fights every
+  wave at its door's level now (AreaLevelIsTheDoor pins entry and
+  breach). The Breach was a +7 step (13 -> 20) where every other rung
+  is <= 4: it is 16, the Altered Contact's level. Act I's four quest
+  rewards paid item level 1 — under the starter rifle — and pay 5 now.
+  FOUND: "52 52" health has no shipped source (base 100, no class
+  multiplier) — a pin to write (FreshCasterMaxHealthIsBase). FOUND: the
+  Field Marshal at 16 is ~25,000 hp against a 339-dps starter rifle;
+  yours to feel before the next step.
+
+## NINTH — OPEN
+
+- [ ] Rot lands under the aimed enemy at cast finish (O271 amendment).
+- [ ] Side quests with random objectives as a point source — RULING
+      NEEDED: the objective vocabulary is Kill / FeedstockPickup only
+      (no yard scope, chest, pocket-clear); rewards carry gear + XP, no
+      point currency; doctrine points ride the mission benchmarks whose
+      arithmetic O272/O86/O111 depend on. Recommendation: side quests
+      pay yard-level gear + XP (the Watchkeeper shape) and trigger the
+      eleven untriggered O7 Core sources (fixed count); doctrine stays
+      on benchmarks; widen the objective vocabulary first.
+- [ ] "the player feels super weak" — with the leak closed and the
+      Breach at 16, play it again before any player-side change (O27).
+
 ## OWNER PLAYTEST, 2026-09-12 (EIGHTH)
 
 Owner walked the look pass and wrote: "half these assets are broken,

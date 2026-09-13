@@ -4,6 +4,7 @@
 #include "Characters/BreakerCharacter.h"
 #include "Characters/BreakerFeelPulseMath.h"
 #include "Game/BreakerGameMode.h"
+#include "Movement/BreakerCharacterMovementComponent.h"
 #include "UObject/UnrealType.h"
 
 // ---------------------------------------------------------------------------
@@ -27,6 +28,34 @@ namespace
         const FFloatProperty* Property = FindFProperty<FFloatProperty>(Object->GetClass(), PropertyName);
         if (!Property) return -1.0f;
         return Property->GetPropertyValue_InContainer(Object);
+    }
+
+    // Walks a speed trace through BrakePlantEdge one sample at a time, the
+    // way the character feeds it from consecutive frames, and counts plants.
+    // The trace is the sequence of grounded 2D speeds; the flag is the
+    // grounded-with-no-input state held for every sample.
+    int32 BreakerFeelPulseCountPlants(const TArray<float>& Trace, float Threshold, bool bGroundedNoInput)
+    {
+        int32 Plants = 0;
+        for (int32 Index = 1; Index < Trace.Num(); ++Index)
+        {
+            if (BreakerFeel::BrakePlantEdge(Trace[Index - 1], Trace[Index], Threshold, bGroundedNoInput)) ++Plants;
+        }
+        return Plants;
+    }
+
+    // A linear speed ramp from Start to End sampled every 10 ms over
+    // Seconds, ends inclusive. A stop from the walk cap takes a few frames;
+    // a 10 ms sample is finer than any frame the game ships.
+    TArray<float> BreakerFeelPulseRamp(float Start, float End, float Seconds)
+    {
+        TArray<float> Trace;
+        const int32 Steps = FMath::Max(1, FMath::RoundToInt(Seconds / 0.01f));
+        for (int32 Step = 0; Step <= Steps; ++Step)
+        {
+            Trace.Add(FMath::Lerp(Start, End, static_cast<float>(Step) / static_cast<float>(Steps)));
+        }
+        return Trace;
     }
 }
 
@@ -157,6 +186,54 @@ bool FBreakerFeelPulseTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Sprint FOV push ships at 6 degrees"), BreakerFeelPulseReadDial(CppDefaults, TEXT("SprintFOVPushDegrees")), 6.0f, 0.0001f);
     TestEqual(TEXT("Crouch camera ease ships at 0.12 s"), BreakerFeelPulseReadDial(CppDefaults, TEXT("CrouchCameraEaseSeconds")), 0.12f, 0.0001f);
     TestEqual(TEXT("Brake plant threshold ships at half the walk cap"), BreakerFeelPulseReadDial(CppDefaults, TEXT("BrakePlantMinSpeedFraction")), 0.5f, 0.0001f);
+
+    // --- BrakePlantEdge: a stop is one edge, never a level -------------------
+    // The plant fires on the sample where a grounded, input-free speed
+    // crosses from at-or-above the threshold to below it, and on no other.
+    // The threshold is the shipped one: half the shipped walk cap, read off
+    // the two CDOs rather than typed, so the trace below IS the game's stop.
+    {
+        const float WalkCap = BreakerFeelPulseReadDial(GetDefault<UBreakerCharacterMovementComponent>(), TEXT("WalkSpeed"));
+        TestEqual(TEXT("The shipped walk cap is 672"), WalkCap, 672.0f, 0.0001f);
+        const float Threshold = BreakerFeelPulseReadDial(CppDefaults, TEXT("BrakePlantMinSpeedFraction")) * WalkCap;
+        TestEqual(TEXT("The shipped plant threshold is 336"), Threshold, 336.0f, 0.0001f);
+
+        // A full stop from the walk cap, 672 -> 0 over 0.3 s at 10 ms: one plant.
+        const TArray<float> Stop = BreakerFeelPulseRamp(WalkCap, 0.0f, 0.3f);
+        TestEqual(TEXT("A 672 -> 0 stop plants exactly once"), BreakerFeelPulseCountPlants(Stop, Threshold, true), 1);
+        // The same stop sampled coarsely still plants once: the edge is a
+        // crossing, not a dwell, so the sample rate cannot double it.
+        TestEqual(TEXT("A coarse-sampled stop plants exactly once"),
+            BreakerFeelPulseCountPlants(BreakerFeelPulseRamp(WalkCap, 0.0f, 0.03f), Threshold, true), 1);
+        // The dead frames after the stop: 0 -> 0 forever plants nothing more.
+        TArray<float> Rest = Stop;
+        for (int32 Frame = 0; Frame < 100; ++Frame) Rest.Add(0.0f);
+        TestEqual(TEXT("Standing still after the stop adds no plant"), BreakerFeelPulseCountPlants(Rest, Threshold, true), 1);
+
+        // A strafe reversal, 672 -> 400 -> 672: the speed dips but never
+        // drops under 336, so no edge and no plant.
+        TArray<float> Reversal = BreakerFeelPulseRamp(WalkCap, 400.0f, 0.1f);
+        Reversal.Append(BreakerFeelPulseRamp(400.0f, WalkCap, 0.1f));
+        TestEqual(TEXT("A strafe reversal that never drops under 336 plants zero times"),
+            BreakerFeelPulseCountPlants(Reversal, Threshold, true), 0);
+
+        // A shuffle, 300 -> 0: never at the threshold, so nothing to cross.
+        TestEqual(TEXT("A 300 -> 0 shuffle plants zero times"),
+            BreakerFeelPulseCountPlants(BreakerFeelPulseRamp(300.0f, 0.0f, 0.2f), Threshold, true), 0);
+
+        // The single-sample edge, both sides of it.
+        TestTrue(TEXT("Crossing 336 from above plants"), BreakerFeel::BrakePlantEdge(336.0f, 335.9f, Threshold, true));
+        TestFalse(TEXT("Sitting at 336 does not plant"), BreakerFeel::BrakePlantEdge(336.0f, 336.0f, Threshold, true));
+        TestFalse(TEXT("Rising through 336 does not plant"), BreakerFeel::BrakePlantEdge(335.9f, 336.0f, Threshold, true));
+        TestFalse(TEXT("Already under 336 does not plant"), BreakerFeel::BrakePlantEdge(335.0f, 0.0f, Threshold, true));
+
+        // Airborne, sliding, traversing, or still pushing the stick: the
+        // caller's grounded-no-input flag is false and no trace plants.
+        TestEqual(TEXT("A 672 -> 0 stop with input still live never plants"),
+            BreakerFeelPulseCountPlants(Stop, Threshold, false), 0);
+        TestFalse(TEXT("The bare edge never plants when not grounded-no-input"),
+            BreakerFeel::BrakePlantEdge(WalkCap, 0.0f, Threshold, false));
+    }
 
     // O284: the cast leaves the hand. Six dials on the same envelope shape:
     // a nod of the camera, a short attack and a longer recovery, a widening

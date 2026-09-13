@@ -57,6 +57,25 @@ bool FBreakerFirstPersonArmsRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("arms have no query or physics collision"), Arms->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
     TestTrue(TEXT("gun attaches to firing wrist"), Gun->GetAttachParent() == Arms && Gun->GetAttachSocketName() == FName(TEXT("hand_r")));
     TestTrue(TEXT("attachment preserves inspected gun fit"), Gun->GetComponentTransform().Equals(OriginalGun, 0.01f));
+    // Shipped configuration: the idle HOLDS. Configure samples the clip at
+    // t=0 and pauses it, so the hands keep the pose the gun was fitted to; a
+    // playing idle sways the wrist and the socketed gun with it. Two seconds
+    // of animation tick must move the firing wrist by nothing.
+    {
+        const FVector WristAtZero = Arms->GetSocketTransform(TEXT("hand_r"), RTS_Component).GetLocation();
+        Arms->TickAnimation(2.0f, false);
+        Arms->RefreshBoneTransforms();
+        const FVector WristAfter = Arms->GetSocketTransform(TEXT("hand_r"), RTS_Component).GetLocation();
+        const float DriftCm = static_cast<float>((WristAfter - WristAtZero).Size());
+        UE_LOG(LogTemp, Display, TEXT("[BreakerArms] idle hold: hand_r drift over 2.0 s = %.4f cm (t=0 %s, after %s)"),
+            DriftCm, *WristAtZero.ToString(), *WristAfter.ToString());
+        TestTrue(FString::Printf(TEXT("idle holds the fitted wrist (drift %.4f cm)"), DriftCm), DriftCm <= 0.01f);
+        UAnimSingleNodeInstance* Held = Arms->GetSingleNodeInstance();
+        if (TestNotNull(TEXT("configured arms carry a single-node instance"), Held))
+        {
+            TestFalse(TEXT("configured idle is paused, not playing"), Held->IsPlaying());
+        }
+    }
     Arms->DeactivateArms(Rig);
     TestFalse(TEXT("deactivation clears configuration"), Arms->IsConfigured());
     TestFalse(TEXT("deactivation hides arms"), Arms->IsVisible());

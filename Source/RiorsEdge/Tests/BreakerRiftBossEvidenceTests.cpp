@@ -93,7 +93,7 @@ bool FBreakerRiftBossEvidenceTest::RunTest(const FString& Parameters)
     }
     const FBreakerRiftDefinition Breach = UBreakerZoneBuilder::FernhallRiftFor(TEXT("breach"));
     TestEqual(TEXT("breach stable encounter"), Breach.EncounterId, FName(TEXT("breach.marshalling")));
-    TestEqual(TEXT("breach campaign level"), Breach.AreaLevel, 20);
+    TestEqual(TEXT("breach campaign level: the last rung, one step over the depot"), Breach.AreaLevel, 16);
     TestEqual(TEXT("breach authored boss"), UBreakerMissionLibrary::BossForRift(Breach), FName(TEXT("FieldMarshal")));
     return true;
 }
