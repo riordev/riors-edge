@@ -25,15 +25,33 @@ and direction, enemy movement, sound and environmental presentation were poor.
 - Gear is cluttered and hard to compare; equipping upgrades does not feel
   consequential. Owner is unsure how much is early-level tuning.
 
-### NEXT — CASTER TIMING AND AUDIO
+### NEXT — OWNER CASTER REPLAY
 
-- [ ] Caster input/timing/audio: reproduce alternating Cleave/Rot and repeated
-      same-slot presses at base and increased cast speed. Compare press,
-      payment, accepted queue, interruption, landing and sound timestamps.
-      Clarify overlapping casts versus chaining only if reproduction needs it.
-      Cast speed already divides the authored wind-up; no missing lane inferred.
-      Owner intent: Caster tree investment must improve casting cadence;
-      preserve cast-speed scaling and tune movement speed separately.
+- [ ] Replay repeated Cleave/Rot and alternating slots with invested cast rate.
+      Judge the shorter cast cue in the full combat mix; it is still placeholder
+      audio, not an owner-approved sound. Movement speed is a separate pass.
+
+### DONE — CASTER CHAINING AND CAST CUE
+
+- [x] Cleave keeps its one buffered press through recovery and accepts a press
+      during recovery. The next wind-up begins after the ability ends and pays
+      then. Cancellation discards the queue and clears the old recovery timer.
+- [x] Cleave recovery divides by the same tree cast-rate lane as its wind-up.
+      Starter-point purchases of shipped Metronome and Quicken raise rate from
+      1.0 to 1.1. Measured chained cadence: 0.565 to 0.510 seconds at 5 ms fixture
+      ticks (authored targets 0.550 and 0.500). Both buffering timings pass.
+      Alternating slots remain independent. Existing Rot queue/aim tests pass.
+- [x] Cleave/Rot select a 0.12-second low transient when no per-ability clip is
+      authored, replacing their use of the 0.956-second shared cast clip.
+      Landing cues remain separate from input/buffering; bounded waveform,
+      cancellation, queue-payment and cue-count checks pass. Listening remains
+      an owner replay task; no claim of subjective audio approval.
+- [x] Full suite: 942 passing, three enumerated expected failures, zero new
+      failures. Sustain counts actual GAS commits including queued casts;
+      Reprisal verifies charge consumption, payment and real queued impact.
+- [ ] Remote ServerOnly input queue/cue timing remains an existing gap; this
+      pass validates the local field-trial path. Ultimate payoff is still below.
+
 ### DONE — LOCOMOTION CONTACTS AND ANIMATION
 
 - [x] Patrol destinations use the same navigation-goal channel as chasing.
@@ -78,7 +96,7 @@ and direction, enemy movement, sound and environmental presentation were poor.
       whether concurrency is blocked mechanically or only hidden in the UI.
 - [ ] Reward/gear/HUD: stable reward-card dimensions and wrapping, useful
       equipment comparisons, mana overflow geometry and ultimate readout.
-- [ ] Audio/presentation: cast cue repetition and mix, rifle fire asset,
+- [ ] Audio/presentation: owner mix check of the shorter cast cue, rifle fire asset,
       rounded rocket blast, weapon-bearing shadow, Caster ultimate payoff.
 
 ## OWNER PLAYTEST, 2026-09-12 (NINTH)

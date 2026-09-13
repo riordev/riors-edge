@@ -447,15 +447,7 @@ bool UBreakerGameplayAbility::BeginCastIfNeeded(const FGameplayAbilitySpecHandle
     const UBreakerAbilityDefinition* Definition = GetAbilityDefinition();
     ABreakerCharacter* Character = GetBreakerCharacter();
     UWorld* World = Character ? Character->GetWorld() : nullptr;
-    // CAST SPEED IS NOT AUTHORED YET, and this reads 1.0 deliberately rather
-    // than inventing a lane: O266's second half needs a canon row in
-    // power-and-scaling.md and a conformance test before any node or affix may
-    // bid into it. The seam is here so that lands as one number, not a rewrite.
-    // O266's second half: the wind-up is divided by the owner's composed cast
-    // rate. THE LANE ALREADY EXISTED — AbilityCastRate, authored by Core
-    // Tempo's Metronome, Quicken and Cascade and already dividing Fracture's
-    // own cast phase — so a generic wind-up plugs into it rather than
-    // inventing a second cast-speed concept beside it.
+    // Tree cast rate divides the wind-up through the existing AbilityCastRate lane.
     const float Seconds = Definition
         ? EffectiveCastSeconds(Definition->GetCastTimeSeconds(), AbilityCastRateMultiplierFor(Character)) : 0.0f;
     if (Seconds <= 0.0f || !World) return true;
@@ -522,7 +514,10 @@ void UBreakerGameplayAbility::ResolveCast(FGameplayAbilitySpecHandle Handle,
     EndCastBinding();
     // bCastPending is still true, so this re-entry passes the gate in
     // BeginCastIfNeeded and the ability's own body finally runs.
+    bResolvingCast = true;
     ActivateAbility(Handle, ActorInfo, ActivationInfo, nullptr);
+    bResolvingCast = false;
+    bCastRecovery = IsActive();
     bCastCommitted = false;
     // O178: THE CUE FIRES AT THE LANDING. TryActivateSlot withheld its
     // OnAbilityActivated because this ability was still casting when the
@@ -535,29 +530,20 @@ void UBreakerGameplayAbility::ResolveCast(FGameplayAbilitySpecHandle Handle,
         Abilities->NotifyCastResolved(Handle);
     }
 
-    // O271: THE QUEUED PRESS FIRES HERE, after the landing it waited behind.
-    // The body above ended the ability (every cast-timed body does), so the
-    // spec is no longer active and the same GAS gate that refused the press
-    // now admits it: CanActivateAbility — dead, staggered, cost, cooldown —
-    // then ActivateAbility, whose BeginCastIfNeeded pays and starts a second
-    // wind-up. Straight through the ASC rather than the component's
-    // TryActivateSlot: the slot funnel adds only its Hold/Deploy second-press
-    // handling and the landing-withheld cue, neither of which a queued cast
-    // needs, and this way no slot has to be looked up from the spec.
-    //
-    // GAPS, recorded: a queued press the bank cannot pay is refused at the
-    // gate exactly as a fresh press would be — dropped, not deferred until
-    // the Mana returns. And an ability whose body does NOT end itself (a
-    // window that outlives its landing) is still active here, so GAS refuses
-    // the re-activation and the queued press is dropped; no cast-timed
-    // ability does that today.
+    // Cleave remains active through recovery. Drain only after that lock ends;
+    // instant-ending bodies can start their queued wind-up after the landing cue.
+    if (!IsActive()) StartQueuedCast();
+}
+
+void UBreakerGameplayAbility::StartQueuedCast()
+{
     if (!bCastQueued) return;
     bCastQueued = false;
     PromoteQueuedCast();
     bSkipPrepareOnce = true;
     if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
     {
-        ASC->TryActivateAbility(Handle);
+        ASC->TryActivateAbility(CurrentSpecHandle);
     }
     // A refusal at the gate never reached BeginCastIfNeeded, so the flag
     // would otherwise wait for the next real press and skip ITS solve.
@@ -569,7 +555,7 @@ bool UBreakerGameplayAbility::QueuePressDuringCast()
     // ONE queued press: a third press during the wind-up is dropped rather
     // than replacing the second — replacing would let a held key re-aim the
     // queued cast on every frame, which is the drift again by another door.
-    if (!bCastPending || bCastQueued) return false;
+    if ((!bCastPending && !bCastRecovery) || bCastQueued) return false;
     if (!PrepareQueuedCast()) return false;
     bCastQueued = true;
     return true;
@@ -647,7 +633,10 @@ void UBreakerGameplayAbility::EndAbility(const FGameplayAbilitySpecHandle Handle
         // O271: a cancelled cast takes its queued press with it.
         bCastQueued = false;
     }
+    bCastRecovery = false;
+    if (bWasCancelled) bCastQueued = false;
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+    if (!bResolvingCast && !bWasCancelled) StartQueuedCast();
 }
 
 void UBreakerGameplayAbility::EndCastBinding()

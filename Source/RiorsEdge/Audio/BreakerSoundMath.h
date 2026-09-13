@@ -341,6 +341,21 @@ namespace BreakerSound
         return 0.40f * (Fundamental + Octave) / 1.33f * Envelope(T, AbilityCastDurationSeconds, 5.0f);
     }
 
+    // Rapidly repeated starter spells use a short low transient, without the
+    // shared rising tone or octave. Authored mix awaiting owner listening.
+    constexpr float CasterCastDurationSeconds = 0.12f; // O2 PLACEHOLDER
+    inline bool UsesCasterCastCue(FName Id)
+    {
+        return Id == TEXT("Caster.Cleave") || Id == TEXT("Caster.Rot");
+    }
+    inline float CasterCastSample(int32 Index)
+    {
+        const float T = static_cast<float>(Index) / SampleRate;
+        const float Body = FMath::Sin(2.0f * PI * (180.0f * T - 250.0f * T * T)); // O2 PLACEHOLDER
+        const float Air = (NoiseAt(Index) + NoiseAt(Index + 1) + NoiseAt(Index + 2) + NoiseAt(Index + 3)) * 0.25f;
+        return 0.22f * (Body + 0.18f * Air) * Envelope(T, CasterCastDurationSeconds, 22.0f); // O2 PLACEHOLDER
+    }
+
     // PLAYER DEATH: the sixth verb (O193, "one low sound"). One sine and
     // nothing else — no noise, no fifth, no octave — gliding from 110 Hz to
     // 55 Hz across the whole duration under a slow decay. EVERY PARTIAL SITS
@@ -432,6 +447,7 @@ namespace BreakerSound
     inline void RenderHitConfirm(TArray<int16>& Out) { RenderPcm16(Out, HitDurationSeconds, &HitConfirmSample); }
     inline void RenderKill(TArray<int16>& Out)       { RenderPcm16(Out, KillDurationSeconds, &KillSample); }
     inline void RenderTakeHit(TArray<int16>& Out)    { RenderPcm16(Out, TakeHitDurationSeconds, &TakeHitSample); }
+    inline void RenderCasterCast(TArray<int16>& Out) { RenderPcm16(Out, CasterCastDurationSeconds, &CasterCastSample); }
     inline void RenderAbilityCast(TArray<int16>& Out) { RenderPcm16(Out, AbilityCastDurationSeconds, &AbilityCastSample); }
     inline void RenderPlayerDeath(TArray<int16>& Out) { RenderPcm16(Out, PlayerDeathDurationSeconds, &PlayerDeathSample); }
 

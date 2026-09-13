@@ -125,20 +125,10 @@ public:
     virtual void OnCastBegan() {}
 
     // --- The queue (O271) ---------------------------------------------------
-    // A press during a wind-up queues ONE cast, fired when the wind-up
-    // resolves; the aim is solved at the queued press. GAS refuses a second
-    // activation of an active InstancedPerActor instance, so before this the
-    // second press was swallowed and the owner's next puddle needed a third
-    // press timed after a landing he could not see.
-    //
-    // PrepareQueuedCast runs AT THE QUEUED PRESS and holds whatever the press
-    // decides into a second slot — Rot solves its aim there. It may refuse,
-    // and a refusal is a dropped press, never a queued one. PromoteQueuedCast
-    // runs at the first landing, after the body has consumed its own snapshot,
-    // and moves the queued decision into the active slot; the fresh cast that
-    // follows skips PrepareCast so the promoted snapshot is used as-is.
-    // Both are no-ops by default: an ability that overrides neither still
-    // queues (the second press is not lost) and solves nothing early.
+    // One buffered press during wind-up or recovery. It starts only after
+    // the current ability ends. A third press is dropped, never another cost.
+    // Optional prepare/promote hooks retain ability-specific queued state;
+    // Rot follows the reticle at completion and needs no snapshot here.
     virtual bool PrepareQueuedCast() { return true; }
     virtual void PromoteQueuedCast() {}
     // The press that GAS refused. True when it was queued; false when nothing
@@ -167,6 +157,7 @@ public:
 
 private:
     void EndCastBinding();
+    void StartQueuedCast();
     // The wind-up timer's landing. A member rather than the lambda's own body
     // because a queued cast re-arms CastTimer from INSIDE this callback, and
     // the timer manager destroys the executing timer's delegate — the closure
@@ -271,6 +262,8 @@ private:
     // its price is already paid, so the re-entry's own CommitAbility must not
     // charge a second time.
     bool bCastPending = false;
+    bool bCastRecovery = false;
+    bool bResolvingCast = false;
     bool bCastCommitted = false;
     // O271: one press waiting behind the running wind-up. Cleared by the
     // landing that fires it and by every interrupt and cancel.

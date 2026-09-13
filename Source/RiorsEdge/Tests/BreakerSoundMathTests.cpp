@@ -23,6 +23,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerSoundSynthShapeTest::RunTest(const FString& Parameters)
 {
+    TestTrue(TEXT("Cleave selects the short caster fallback"), BreakerSound::UsesCasterCastCue(TEXT("Caster.Cleave")));
+    TestTrue(TEXT("Rot selects the short caster fallback"), BreakerSound::UsesCasterCastCue(TEXT("Caster.Rot")));
+    TestFalse(TEXT("Other abilities keep their cue"), BreakerSound::UsesCasterCastCue(TEXT("Caster.Unmake")));
     struct FCase
     {
         const TCHAR* Name;
@@ -34,6 +37,7 @@ bool FBreakerSoundSynthShapeTest::RunTest(const FString& Parameters)
         {TEXT("HitConfirm"), BreakerSound::HitDurationSeconds, &BreakerSound::RenderHitConfirm},
         {TEXT("Kill"), BreakerSound::KillDurationSeconds, &BreakerSound::RenderKill},
         {TEXT("TakeHit"), BreakerSound::TakeHitDurationSeconds, &BreakerSound::RenderTakeHit},
+        {TEXT("CasterCast"), BreakerSound::CasterCastDurationSeconds, &BreakerSound::RenderCasterCast},
         {TEXT("AbilityCast"), BreakerSound::AbilityCastDurationSeconds, &BreakerSound::RenderAbilityCast},
         {TEXT("PlayerDeath"), BreakerSound::PlayerDeathDurationSeconds, &BreakerSound::RenderPlayerDeath},
         {TEXT("EntropyActivation"), BreakerSound::EntropyActivationDurationSeconds, &BreakerSound::RenderEntropyActivation},
@@ -46,7 +50,7 @@ bool FBreakerSoundSynthShapeTest::RunTest(const FString& Parameters)
         {TEXT("ChestOpen"), BreakerSound::ChestOpenDurationSeconds, &BreakerSound::RenderChestOpen},
     };
     // Every shipped fallback renderer participates in the waveform checks.
-    TestEqual(TEXT("all fourteen authored fallback cues are rendered"), static_cast<int32>(UE_ARRAY_COUNT(Cases)), 14);
+    TestEqual(TEXT("all fifteen authored fallback cues are rendered"), static_cast<int32>(UE_ARRAY_COUNT(Cases)), 15);
 
     for (const FCase& Case : Cases)
     {

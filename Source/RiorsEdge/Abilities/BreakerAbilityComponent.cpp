@@ -777,23 +777,14 @@ bool UBreakerAbilityComponent::TryActivateSlot(EBreakerAbilitySlot Slot)
     }
     else
     {
-        // O271: A PRESS DURING A WIND-UP QUEUES ONE CAST. GAS refuses to
-        // re-activate an active InstancedPerActor instance, and before this
-        // that refusal swallowed every press made during the 0.6 s — the
-        // owner's second Rot needed a third press timed after a landing. The
-        // ability holds the press (and solves its aim now, at THIS press) and
-        // fires it from its own landing. No cue here: the cue comes at each
-        // landing, from NotifyCastResolved, exactly as the first cast's does.
-        // The press still returns false — it activated nothing.
-        //
-        // GAP, recorded: a remote client's instance never casts (ServerOnly
-        // presses are handed to the server, whose refusal comes back as an
-        // RPC), so a client's press during a wind-up is not queued; the
-        // server's own input path is the only one that reaches here.
+        // A refused repeat may buffer one cast behind its wind-up/recovery.
+        // Queueing neither pays nor broadcasts; its own wind-up pays and its
+        // impact emits the cue. Return false here because nothing activated.
+        // Remote ServerOnly input still needs an authoritative queue RPC.
         const FGameplayAbilitySpec* Refused = ASC->FindAbilitySpecFromHandle(Handle);
         UBreakerGameplayAbility* Instance = Refused
             ? Cast<UBreakerGameplayAbility>(Refused->GetPrimaryInstance()) : nullptr;
-        if (Instance && Instance->IsCasting())
+        if (Instance)
         {
             Instance->QueuePressDuringCast();
         }

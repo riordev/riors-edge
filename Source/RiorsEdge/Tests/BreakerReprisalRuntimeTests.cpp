@@ -114,9 +114,21 @@ bool FBreakerReprisalRuntimeTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Successful commit claims charge"),Combat->HasReprisalCharge());
     if(!EarnPassiveBlock())return false;
     TestFalse(TEXT("Existing swing lock refuses immediate second cast"),Abilities->TryActivateSlot(Slot));
-    TestTrue(TEXT("Refused cast preserves still-live charge"),Combat->HasReprisalCharge());
+    TestTrue(TEXT("Buffering preserves still-live charge until its wind-up"),Combat->HasReprisalCharge());
+    const auto* QueuedSpec=ASC->FindAbilitySpecFromClass(UBreakerAbility_Cleave::StaticClass());
+    const auto* QueuedCleave=QueuedSpec?Cast<UBreakerAbility_Cleave>(QueuedSpec->GetPrimaryInstance()):nullptr;
+    if(!TestNotNull(TEXT("Actual queued Cleave instance"),QueuedCleave))return false;
+    TestTrue(TEXT("Recovery press is queued"),QueuedCleave->HasQueuedCast());
+    const float QueueBank=Mana->GetMana(), QueueHealth=Target->GetAttributes()->GetHealth();
     Clock(.5f);
-    if(!CastCleave(0))return false;
+    // The queued cast starts after recovery; wait for its live wind-up,
+    // rather than treating the old fresh-press clock as a landing guarantee.
+    BreakerResolvePendingCast(World,Player);
+    TestFalse(TEXT("Queued free cast completes within the bounded wait"),QueuedCleave->IsCasting());
+    TestFalse(TEXT("Queued wind-up claims the earned free cast"),Combat->HasReprisalCharge());
+    TestEqual(TEXT("Queued commit pays the free quote"),QueuedCleave->GetLastPaidResourceCost(),0.f,.001f);
+    TestEqual(TEXT("Queued free cast preserves the bank"),Mana->GetMana(),QueueBank,.001f);
+    TestTrue(TEXT("Queued free Cleave lands real melee damage"),Target->GetAttributes()->GetHealth()<QueueHealth);
     Clock(.5f);
     TestEqual(TEXT("Spent opportunity restores ordinary quote"),Abilities->GetResourceCostForSlot(Slot),15.f,.001f);
     if(!EarnPassiveBlock())return false;

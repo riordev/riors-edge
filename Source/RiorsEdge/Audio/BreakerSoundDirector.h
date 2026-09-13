@@ -120,8 +120,8 @@ public:
     // owns the local-pawn check — this verb plays for whoever calls it.
     void PlayChestOpen();
     // An ability was cast. AbilityId selects a per-ability override if one has
-    // been authored; NAME_None, or an id with no file, plays the shared
-    // default. Resolved on first use per id and cached, so the miss costs one
+    // been authored; Cleave/Rot otherwise use a short synthesized transient.
+    // Other ids with no file play the shared default. Resolved on first use per id and cached, so the miss costs one
     // failed file open per ability per session rather than one per cast.
     void PlayAbilityCast(FName AbilityId);
     // Earned Rot activation for the local applier or recipient, never per tick.

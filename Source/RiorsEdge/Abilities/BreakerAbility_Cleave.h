@@ -32,6 +32,9 @@ public:
 
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
+    virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+        const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
+
     // Pure rule: the swing's base damage from the equipped weapon's damage.
     // "Scaled by weapon damage" means exactly that — an unarmed Caster swings
     // for the fallback, never for zero.

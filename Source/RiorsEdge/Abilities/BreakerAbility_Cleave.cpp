@@ -303,7 +303,8 @@ void UBreakerAbility_Cleave::ActivateAbility(const FGameplayAbilitySpecHandle Ha
     const bool bHasEdgework = ActorInfo && ActorInfo->AbilitySystemComponent.IsValid()
         && ActorInfo->AbilitySystemComponent->HasMatchingGameplayTag(BreakerAbilityTags::Keystone_Caster_Edgework.GetTag());
     const bool bDuringUnmake = State && State->IsWindowActive(UBreakerCasterAbility::UnmakeWindowKey());
-    const float Lock = AnimationLockFor(bHasEdgework && bDuringUnmake, AnimationLockSeconds);
+    const float Lock = EffectiveCastSeconds(AnimationLockFor(bHasEdgework && bDuringUnmake, AnimationLockSeconds),
+        AbilityCastRateMultiplierFor(Character));
 
     if (State)
     {
@@ -364,4 +365,13 @@ void UBreakerAbility_Cleave::ApplyCleaveBleed(AActor* Target, const UBreakerAttr
     Spec.Snapshot.bRolledCritical = Spec.Snapshot.CriticalRollSample < Spec.Snapshot.CriticalChance;
 
     Status->ApplyStatus(Spec, EBreakerDamageFamily::Physical, const_cast<ABreakerCharacter*>(Character));
+}
+
+void UBreakerAbility_Cleave::EndAbility(const FGameplayAbilitySpecHandle Handle,
+    const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
+    bool bReplicateEndAbility, bool bWasCancelled)
+{
+    // A cancelled recovery timer must never end a later cast on this instance.
+    if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(LockTimer);
+    Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

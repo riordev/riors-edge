@@ -134,6 +134,14 @@ bool FBreakerCasterStarterSustainRuntimeTest::RunTest(const FString& Parameters)
         const float StartingMana = Mana->GetMana();
         const int32 StartingAmmo = Weapon->GetMagazineAmmo() + Weapon->GetReserveAmmo();
         int32 PaidCasts = 0, Reloads = 0, ProjectileSpawns = 0, RotTicks = 0;
+        // Count actual commits, including queued wind-ups that start between
+        // input presses. TryActivateSlot returns false when it only buffers.
+        const FDelegateHandle CommitObserver = ASC->AbilityCommittedCallbacks.AddLambda([&](UGameplayAbility* Ability)
+        {
+            const auto* Spec = Ability ? ASC->FindAbilitySpecFromHandle(Ability->GetCurrentAbilitySpecHandle()) : nullptr;
+            if (Spec && Spec->InputID == static_cast<int32>(EBreakerAbilitySlot::ClassAbilityOne)) ++PaidCasts;
+        });
+        ON_SCOPE_EXIT { ASC->AbilityCommittedCallbacks.Remove(CommitObserver); };
         bool bRotOccupied = false;
         // Retain only the UObject's bookkeeping after actual actor destruction:
         // a weak pointer disappears in the same world tick as the final zone tick.
@@ -195,7 +203,6 @@ bool FBreakerCasterStarterSustainRuntimeTest::RunTest(const FString& Parameters)
                 const float BeforeCast = Mana->GetMana();
                 if (Abilities->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityOne))
                 {
-                    ++PaidCasts;
                     // Cleave immediately earns ordinary melee/status income;
                     // net Mana is not identical to the pre-hit debit. Record both
                     // without suppressing those legitimate native callbacks.

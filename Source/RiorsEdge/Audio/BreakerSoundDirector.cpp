@@ -298,6 +298,14 @@ void ABreakerSoundDirector::PlayAbilityCast(FName AbilityId)
                 Wave = Override;
                 Pcm = &Stored;
             }
+            else if (BreakerSound::UsesCasterCastCue(AbilityId))
+            {
+                TArray<int16>& Stored = AbilityPcm.Add(AbilityId);
+                BreakerSound::RenderCasterCast(Stored);
+                Wave = MakeWave(BreakerSound::SampleRate);
+                AbilityWaves.Add(AbilityId, Wave);
+                Pcm = &Stored;
+            }
             else
             {
                 // Sentinel: probed, nothing authored, use the default forever.

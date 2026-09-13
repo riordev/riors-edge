@@ -6,6 +6,8 @@
 #include "Abilities/BreakerAbilityComponent.h"
 #include "Abilities/BreakerAbilityStateComponent.h"
 #include "Abilities/BreakerAbility_Rot.h"
+#include "Abilities/BreakerAbility_Cleave.h"
+#include "Progression/BreakerProgressionLibrary.h"
 #include "Abilities/BreakerGameplayAbility.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
@@ -409,6 +411,109 @@ bool FBreakerRotEnemyFeetRuntimeTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("zone follows the enemy's latest position, not the hitbox face"),
         FVector::Dist2D(Zones[0]->GetActorLocation(), Enemy->GetActorLocation()) < 1.0f);
     TestTrue(TEXT("zone sits beneath the enemy, not on the bay roof"), FMath::Abs(Zones[0]->GetActorLocation().Z + 90.0f) < 1.0f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerCleaveQueueCadenceTest,
+    "RiorsEdge.Abilities.CastTime.CleaveRecoveryQueueAndTreeCadence",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FBreakerCleaveQueueCadenceTest::RunTest(const FString& Parameters)
+{
+    for (bool bInvest : {false, true}) for (bool bQueueInRecovery : {false, true})
+    {
+        UWorld::InitializationValues Init;
+        Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
+        UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+        if (!World) return false;
+        GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+        World->InitializeActorsForPlay(FURL());
+        const uint64 Frame = GFrameCounter;
+        ON_SCOPE_EXIT { World->DestroyWorld(false); GEngine->DestroyWorldContext(World); GFrameCounter = Frame; };
+        auto Clock = [&](float Seconds) { for (float T = 0; T < Seconds; T += .005f) { ++GFrameCounter; World->Tick(LEVELTICK_All, .005f); } };
+        FBreakerRotAimRig Rig;
+        if (!BreakerRotAimBuildRig(*this, World, Rig)) return false;
+        auto* Progression = Rig.Caster->GetProgression();
+        if (bInvest)
+        {
+            Progression->ApplySliceDefaultsIfFresh();
+            FText Reason;
+            for (const TCHAR* Id : {TEXT("Core.Tempo.Metronome"), TEXT("Core.Tempo.Quicken")})
+                if (!TestTrue(FString::Printf(TEXT("Buy shipped %s with starter points"), Id),
+                    Progression->PurchaseNode(UBreakerProgressionLibrary::GetCoreSliceTree(), Id, Reason))) return false;
+        }
+        const float Rate = UBreakerGameplayAbility::AbilityCastRateMultiplierFor(Rig.Caster);
+        TestTrue(TEXT("Purchased tree raises cast rate"), bInvest ? Rate > 1.0f : FMath::IsNearlyEqual(Rate, 1.0f));
+        UBreakerAbility_Cleave* Cleave = nullptr;
+        for (const auto& Spec : Rig.Caster->GetAbilitySystemComponent()->GetActivatableAbilities())
+            if (auto* Instance = Cast<UBreakerAbility_Cleave>(Spec.GetPrimaryInstance())) Cleave = Instance;
+        if (!TestNotNull(TEXT("Starter slot grants real Cleave"), Cleave)) return false;
+        auto* Observer = NewObject<UBreakerRotAimRuntimeObserver>(World);
+        Rig.Abilities->OnAbilityActivated.AddDynamic(Observer, &UBreakerRotAimRuntimeObserver::OnActivated);
+        const float Wind = BreakerAuthoredCastSeconds(TEXT("Caster.Cleave")) / Rate;
+        const float Recovery = Cleave->AnimationLockSeconds / Rate;
+        const float Start = World->GetTimeSeconds();
+        const float Before = Rig.Mana->GetMana();
+        const float Cost = Rig.Abilities->GetCost(EBreakerAbilitySlot::ClassAbilityOne);
+        TestTrue(TEXT("First Cleave activates"), Rig.Abilities->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityOne));
+        TestEqual(TEXT("First press pays once"), Before - Rig.Mana->GetMana(), Cost, .001f);
+        TestEqual(TEXT("No cue on wind-up press"), Observer->Count, 0);
+        if (bQueueInRecovery)
+        {
+            Clock(Wind + .01f);
+            TestFalse(TEXT("Impact ended wind-up"), Cleave->IsCasting());
+            TestTrue(TEXT("Recovery still active"), Cleave->IsActive());
+            TestEqual(TEXT("One impact cue"), Observer->Count, 1);
+        }
+        else Clock(Wind * .25f);
+        const float QueueBank = Rig.Mana->GetMana();
+        TestFalse(TEXT("Buffered press does not activate yet"), Rig.Abilities->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityOne));
+        TestTrue(TEXT("Queue accepts press in wind-up or recovery"), Cleave->HasQueuedCast());
+        TestEqual(TEXT("Buffering does not charge"), Rig.Mana->GetMana(), QueueBank, .001f);
+        Rig.Abilities->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityOne);
+        // Advance to the first landing, then require the queue to survive its recovery.
+        while (World->GetTimeSeconds() < Start + Wind + .015f) Clock(.005f);
+        TestEqual(TEXT("No cue for buffered/spam input"), Observer->Count, 1);
+        TestTrue(TEXT("Queue survives impact"), Cleave->HasQueuedCast());
+        const float BeforeSecond = Rig.Mana->GetMana();
+        while (!Cleave->IsCasting() && World->GetTimeSeconds() < Start + Wind + Recovery + .1f) Clock(.005f);
+        TestTrue(TEXT("Recovery starts second paid wind-up"), Cleave->IsCasting());
+        TestFalse(TEXT("Queue consumed exactly once"), Cleave->HasQueuedCast());
+        TestTrue(TEXT("Second wind-up pays its cost"), BeforeSecond - Rig.Mana->GetMana() > Cost * .5f);
+        const float SecondStart = World->GetTimeSeconds();
+        TestEqual(TEXT("Full cadence scales with tree rate"), SecondStart - Start, Wind + Recovery, .025f);
+        while (Observer->Count < 2 && World->GetTimeSeconds() < SecondStart + Wind + .1f) Clock(.005f);
+        TestEqual(TEXT("Exactly two landing cues"), Observer->Count, 2);
+        TestEqual(TEXT("Second wind-up scales with tree rate"), static_cast<float>(World->GetTimeSeconds() - SecondStart), Wind, .025f);
+        Clock(Recovery + Wind + .05f);
+        TestFalse(TEXT("Third press did not create third cast"), Cleave->IsActive());
+        TestEqual(TEXT("No extra sound after queue drains"), Observer->Count, 2);
+        AddInfo(FString::Printf(TEXT("rate=%.3f recoveryPress=%d wind=%.3f recovery=%.3f measuredCadence=%.3f cues=%d"),
+            Rate, bQueueInRecovery, Wind, Recovery, SecondStart - Start, Observer->Count));
+
+        // Alternating slots retains independent casts; it introduces no global lock.
+        TestTrue(TEXT("Alternating Cleave starts"), Rig.Abilities->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityOne));
+        TestTrue(TEXT("Rot can start during Cleave wind-up"), Rig.Abilities->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityTwo));
+        auto* Rot = BreakerRotAimInstance(Rig.Caster);
+        TestTrue(TEXT("Both spells are winding up"), Cleave->IsCasting() && Rot && Rot->IsCasting());
+        Rig.Abilities->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityOne);
+        Rig.Caster->GetAbilitySystemComponent()->CancelAllAbilities();
+        Clock(Wind + Recovery + Rig.WindUp + .1f);
+        TestFalse(TEXT("Cancellation discards queued Cleave"), Cleave->HasQueuedCast());
+        TestEqual(TEXT("Cancelled alternating casts emit no cues"), Observer->Count, 2);
+
+        TestTrue(TEXT("Recovery cancellation setup casts"), Rig.Abilities->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityOne));
+        Clock(Wind + .01f);
+        TestTrue(TEXT("Cancellation setup reached recovery"), Cleave->IsActive() && !Cleave->IsCasting());
+        Rig.Abilities->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityOne);
+        TestTrue(TEXT("Recovery holds a queued press"), Cleave->HasQueuedCast());
+        Rig.Caster->GetAbilitySystemComponent()->CancelAllAbilities();
+        TestFalse(TEXT("Cancelling recovery clears its queue"), Cleave->HasQueuedCast());
+        TestTrue(TEXT("A fresh press after cancel starts"), Rig.Abilities->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityOne));
+        Clock(Recovery + .01f);
+        TestTrue(TEXT("Old recovery timer cannot end the new wind-up"), Cleave->IsCasting());
+        Clock(Wind + Recovery + .05f);
+        TestEqual(TEXT("Only the two uncancelled casts announce impacts"), Observer->Count, 4);
+    }
     return true;
 }
 
