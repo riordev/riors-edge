@@ -204,7 +204,7 @@ bool FBreakerSprintExitBleedsRuntimeTest::RunTest(const FString& Parameters)
     float Elapsed = 0.0f;
     while (Elapsed < 0.25f - .0001f) { Rig.Frame(.01f); Elapsed += .01f; }
     TestEqual(TEXT("A quarter second in, the ceiling has bled half the gap"),
-        Move->GetBoostedSpeedCeiling(), 855.0f, 855.0f * .05f);
+        Move->GetBoostedSpeedCeiling(), (Move->SprintSpeed + Move->WalkSpeed) * .5f, (Move->SprintSpeed + Move->WalkSpeed) * .025f);
     TestTrue(TEXT("and the cap is still above the walk cap"), Move->GetMaxSpeed() > Move->GetWalkSpeedCap() + 1.0f);
 
     // Past the window the ceiling is spent and the walk cap owns the answer.
@@ -253,4 +253,36 @@ bool FBreakerRefusedSlideIsConsumedRuntimeTest::RunTest(const FString& Parameter
     TestFalse(TEXT("The slide it produced spent the press"), Move->IsSlideRequestArmed());
     return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerGroundStopRuntimeTest, "RiorsEdge.Movement.GroundStopDistance",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FBreakerGroundStopRuntimeTest::RunTest(const FString& Parameters)
+{
+    FBreakerO283GroundedRig Rig;
+    if (!Rig.Build()) { Rig.Teardown(); return false; }
+    ON_SCOPE_EXIT { Rig.Teardown(); };
+    auto* Move = Rig.Move;
+    const float AuthoredBrake = Move->BrakingDecelerationWalking;
+    TestEqual(TEXT("Ground stop ships with firmer braking"), AuthoredBrake,3200.f,.001f);
+    auto Stop = [&](float Speed,float Brake)
+    {
+        Move->BrakingDecelerationWalking = Brake;
+        Rig.Ground(Speed);
+        const FVector Start = Rig.Player->GetActorLocation();
+        float Elapsed = 0;
+        while (Move->Velocity.Size2D() > 1.f && Elapsed < 1.f) { Rig.Frame(1.f/120.f); Elapsed += 1.f/120.f; }
+        TestTrue(TEXT("Grounded release stops within a second"), Move->Velocity.Size2D() <= 1.f);
+        const float Distance = FVector::Dist2D(Start,Rig.Player->GetActorLocation());
+        AddInfo(FString::Printf(TEXT("speed=%.1f brake=%.1f stopSeconds=%.3f stopCm=%.2f"),Speed,Brake,Elapsed,Distance));
+        return Distance;
+    };
+    // Previous shipped settings are a diagnostic control, with identical live
+    // movement physics. No inventory, tree points or combat resources are granted.
+    const float OldWalk = Stop(672.f,2400.f), OldSprint = Stop(1039.f,2400.f);
+    const float Walk = Stop(Move->WalkSpeed,AuthoredBrake), Sprint = Stop(Move->SprintSpeed,AuthoredBrake);
+    TestTrue(TEXT("Walking drifts less after release"),Walk < OldWalk);
+    TestTrue(TEXT("Sprinting drifts less after release"),Sprint < OldSprint);
+    TestTrue(TEXT("Sprint still reaches the slide entry threshold"),Move->SprintSpeed > Move->SlideEntrySpeed);
+    return true;
+}
+
 #endif

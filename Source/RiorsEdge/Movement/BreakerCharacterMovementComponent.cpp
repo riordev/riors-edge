@@ -25,7 +25,7 @@ UBreakerCharacterMovementComponent::UBreakerCharacterMovementComponent()
     // both go up so a released stick plants the character instead of skating
     // it out. Acceleration is deliberately unchanged — it is already twice the
     // engine default, and raising it further reads as twitchy, not heavy.
-    BrakingDecelerationWalking = 2400.0f; // OLD: 1800.0f
+    BrakingDecelerationWalking = 3200.0f; // O2 PLACEHOLDER: owner-requested firmer ground stop.
     GroundFriction = 8.5f; // OLD: 7.5f
     // O192: air control at level 1 is restrained so the tree's air-control
     // nodes and the Move.AirControl affix are felt as a gain. The engine's

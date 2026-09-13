@@ -293,23 +293,10 @@ public:
     // O192: the base kit is slower at level 1 so the tree's movement nodes
     // have room to be felt. Momentum's speed gates are fractions of WalkSpeed
     // and follow it; the crouch cap in the constructor does too.
-    //
-    // Owner report: "i feel so clunky maybe increase base player movement
-    // speed slightly". 595 -> 640 is +7.6%, deliberately the only speed dial
-    // that moved this pass so a fifth report attributes cleanly — the same
-    // discipline the gravity comment in the constructor records. SprintSpeed
-    // stays at 990, which narrows the sprint gain from 1.66x to 1.55x; if the
-    // next report is "sprint no longer feels like anything", raise that one
-    // and nothing else.
-    // 640 -> 672 and 990 -> 1039, owner playtest 2026-09-10: "movement needs a
-    // subtle polish slighjt increase in speed". BOTH by the same 5%, so the
-    // SPRINT GAIN IS UNCHANGED at 1.55x — he is asking for the whole thing to
-    // move, not for sprint to pull away from walk, and moving one alone is how
-    // the gain narrowed to 1.55 in the first place. Deliberately small: he said
-    // subtle, and a dial that overshoots costs a whole playtest to find out.
-    // Both O2 PLACEHOLDER (O192).
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float WalkSpeed = 672.0f;   // WAS 595 -> 640 // O2 PLACEHOLDER (O192)
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float SprintSpeed = 1039.0f;   // WAS 990 // O2 PLACEHOLDER (O192)
+    // Ground pace and stopping are separate from the tree's cast-rate lane.
+    // Preserve a 1.55x sprint gain while reducing the field-trial travel pace.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float WalkSpeed = 600.0f; // O2 PLACEHOLDER (O192)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float SprintSpeed = 930.0f; // O2 PLACEHOLDER (O192)
 
     // --- Weight (owner report: "movement should be less floaty") ---------
     // Everything in this category is new; the OLD behaviour is "no curve at
@@ -448,7 +435,7 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dash", meta=(ClampMin="0")) float AboveCapDecaySeconds = 0.5f;   // O2 PLACEHOLDER
 
     // O283: a slide is a sprint's crouch, never a walk's. The entry sits ABOVE
-    // WalkSpeed (672) and under SprintSpeed (1039), so a crouch pressed at
+    // WalkSpeed (600) and under SprintSpeed (930), so a crouch pressed at
     // walking pace is refused and consumed, and only a body already carrying
     // sprint momentum drops into a slide. It was 550, under walk, which made
     // every crouch press while walking a slide (O242: the slide IS the crouch;

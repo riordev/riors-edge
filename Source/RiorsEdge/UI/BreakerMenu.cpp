@@ -21,6 +21,7 @@
 #include "Characters/BreakerCharacter.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Items/BreakerAffixLibrary.h"
+#include "Items/BreakerItemBaseStats.h"
 #include "Items/BreakerItemNaming.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Items/BreakerItemRequirements.h"
@@ -4976,8 +4977,49 @@ namespace
     // against the equipped piece. Only the SURFACE moved. A second affix
     // producer for the rail would have been the duplicate-concept mistake this
     // file has already paid for twice this week.
+    TSharedRef<SWidget> BreakerEquipChangeSummary(const FBreakerItemInstance& Item, const ABreakerCharacter* Player, float Width)
+    {
+        if (!Player || !Player->GetEquipment()) return SNew(SSpacer).Size(FVector2D::ZeroVector);
+        const auto Preview = Player->GetEquipment()->PreviewEquip(Item);
+        const auto& Old = Preview.SlotDisplaced;
+        FString Text = Preview.bSlotOccupied
+            ? (Item.ItemId == Old.ItemId ? FString(TEXT("EQUIPPED")) : TEXT("REPLACES ") + ItemDisplayName(Old))
+            : FString(TEXT("FILLS AN EMPTY SLOT"));
+        if (Item.IsWeapon() && Player->GetWeapon())
+        {
+            const auto NewHit = Player->GetWeapon()->GetItemBaseDamagePreview(Item);
+            const auto OldHit = Preview.bSlotOccupied ? Player->GetWeapon()->GetItemBaseDamagePreview(Old) : FBreakerWeaponBaseDamagePreview();
+            const float NewBase = NewHit.DamagePerProjectile * NewHit.ProjectileCount, OldBase = OldHit.DamagePerProjectile * OldHit.ProjectileCount;
+            Text += FString::Printf(TEXT("\nBASE DAMAGE / SHOT  %.1f to %.1f  (%+.1f)"),OldBase,NewBase,NewBase-OldBase);
+            Text += TEXT("\nBefore affixes and build bonuses; fire rate differs by weapon.");
+        }
+        else
+        {
+            const float Life = BreakerItemBase::BaseLifeOf(Item), Shield = BreakerItemBase::BaseShieldOf(Item);
+            const float OldLife = Preview.bSlotOccupied ? BreakerItemBase::BaseLifeOf(Old) : 0;
+            const float OldShield = Preview.bSlotOccupied ? BreakerItemBase::BaseShieldOf(Old) : 0;
+            if (Life != 0 || OldLife != 0) Text += FString::Printf(TEXT("\nBASE LIFE  %.0f to %.0f  (%+.0f)"),OldLife,Life,Life-OldLife);
+            if (Shield != 0 || OldShield != 0) Text += FString::Printf(TEXT("\nBASE SHIELD  %.0f to %.0f  (%+.0f)"),OldShield,Shield,Shield-OldShield);
+        }
+        const auto& Pool = UBreakerAffixLibrary::GetSliceAffixPool();
+        if (Preview.bSlotOccupied && Item.ItemId != Old.ItemId)
+            for (const auto& Affix : Old.Affixes)
+            {
+                const auto* Def = UBreakerAffixLibrary::FindAffix(Pool,Affix.AffixId);
+                if (!Def) continue;
+                const bool Replaced = Item.Affixes.ContainsByPredicate([&](const auto& Candidate)
+                {
+                    const auto* Other = UBreakerAffixLibrary::FindAffix(Pool,Candidate.AffixId);
+                    return Other && Other->StatTarget == Def->StatTarget && Other->StatBucket == Def->StatBucket;
+                });
+                if (!Replaced) Text += TEXT("\nLOSE: ") + DescribeAffix(Affix);
+            }
+        if (Preview.bExceedsRarityLimit) Text += TEXT("\nRARITY LIMIT ALSO REMOVES: ") + ItemDisplayName(Preview.LimitDisplaced);
+        return MenuWrappedText(FText::FromString(Text),BreakerUI::TypeCaption,Primary,Width);
+    }
+
     TSharedRef<SWidget> MakeItemDetailCard(const FBreakerItemInstance& Item,
-        const TArray<FBreakerAffixComparison>& Deltas, float RailWidth)
+        const TArray<FBreakerAffixComparison>& Deltas, float RailWidth, const ABreakerCharacter* Player)
     {
         return SNew(SVerticalBox)
             + SVerticalBox::Slot().AutoHeight()
@@ -4996,6 +5038,12 @@ namespace
             ]
             + SVerticalBox::Slot().AutoHeight()
             [
+                BreakerEquipChangeSummary(Item, Player, BreakerInventoryLayout::CardContentWidth(RailWidth))
+            ]
+            + SVerticalBox::Slot().AutoHeight().Padding(0,12,0,0)
+            [MenuText(FText::FromString(TEXT("AFFIX CHANGES VS EQUIPPED")),BreakerUI::TypeCaption,Muted,true)]
+            + SVerticalBox::Slot().AutoHeight().Padding(0,4,0,0)
+            [
                 MakeAffixLines(Item, Deltas, RailWidth)
             ];
     }
@@ -5005,9 +5053,9 @@ namespace
 // (O270, UI/BreakerRiftDebriefScreen.cpp). A wrapper and nothing more: the
 // one affix producer stays file-local, and this is the one door to it.
 TSharedRef<SWidget> SBreakerMenu::MakeItemDetail(const FBreakerItemInstance& Item,
-    const TArray<FBreakerAffixComparison>& Deltas, float RailWidth)
+    const TArray<FBreakerAffixComparison>& Deltas, float RailWidth, const ABreakerCharacter* Player)
 {
-    return MakeItemDetailCard(Item, Deltas, RailWidth);
+    return MakeItemDetailCard(Item, Deltas, RailWidth, Player);
 }
 
 namespace
@@ -5186,25 +5234,29 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                             MenuWrappedText(FText::FromString(ItemDisplayName(Item)), BreakerUI::TypeH2,
                                 RarityColor(Item.Rarity),
                                 FMath::Max(80.0f, EquipmentColumnWidth - BreakerUI::MinHitTarget
-                                    - BreakerInventoryLayout::CardChrome - BreakerUI::Space16), true)
+                                    - BreakerInventoryLayout::CardChrome - BreakerUI::Space16
+                                    - 3.0f * BreakerUI::Space16 - 2.0f * BreakerUI::BorderSelected), true)
                         ]
                         + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
                         [
                             MenuWrappedText(FText::FromString(FString::Printf(TEXT("i%d · %s"), Item.ItemLevel,
                                 *RarityName(Item.Rarity))), BreakerUI::TypeCaption, RarityTagColor(Item.Rarity),
                                 FMath::Max(80.0f, EquipmentColumnWidth - BreakerUI::MinHitTarget
-                                    - BreakerInventoryLayout::CardChrome - BreakerUI::Space16))
+                                    - BreakerInventoryLayout::CardChrome - BreakerUI::Space16
+                                    - 3.0f * BreakerUI::Space16 - 2.0f * BreakerUI::BorderSelected))
                         ]
                         + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
                         [
                             MakeWeaponBaseDamageLine(Item, Character.IsValid() ? Character->GetWeapon() : nullptr,
                                 FMath::Max(80.0f, EquipmentColumnWidth - BreakerUI::MinHitTarget
-                                    - BreakerInventoryLayout::CardChrome - BreakerUI::Space16))
+                                    - BreakerInventoryLayout::CardChrome - BreakerUI::Space16
+                                    - 3.0f * BreakerUI::Space16 - 2.0f * BreakerUI::BorderSelected))
                         ]
                         + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
                         [
                             BreakerItemRuleLines(Item, FMath::Max(80.0f, EquipmentColumnWidth - BreakerUI::MinHitTarget
-                                - BreakerInventoryLayout::CardChrome - BreakerUI::Space16))
+                                - BreakerInventoryLayout::CardChrome - BreakerUI::Space16
+                                    - 3.0f * BreakerUI::Space16 - 2.0f * BreakerUI::BorderSelected))
                         ]
                     ]
 
@@ -5550,7 +5602,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                                 if (InventoryDetailHost.IsValid())
                                 {
                                     InventoryDetailHost->SetContent(
-                                        MakeItemDetailCard(HoverItem, HoverDeltas, DetailColumnWidth));
+                                        MakeItemDetailCard(HoverItem, HoverDeltas, DetailColumnWidth, Character.Get()));
                                 }
                             }))
                             .OnUnhovered(FSimpleDelegate::CreateLambda([this, bLimitTell, DoomedSlot]()
@@ -5942,7 +5994,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                         // — that limitation is exactly why this is a host and
                         // not a tooltip.
                         DetailSeed.IsSet()
-                            ? MakeItemDetailCard(DetailSeed.GetValue().Key, DetailSeed.GetValue().Value, DetailColumnWidth)
+                            ? MakeItemDetailCard(DetailSeed.GetValue().Key, DetailSeed.GetValue().Value, DetailColumnWidth, Character.Get())
                             : StaticCastSharedRef<SWidget>(MenuWrappedText(
                                 FText::FromString(TEXT("NOTHING IN THE BACKPACK")), BreakerUI::TypeCaption,
                                 Muted, BreakerInventoryLayout::CardContentWidth(DetailColumnWidth), true))

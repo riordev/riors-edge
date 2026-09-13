@@ -194,13 +194,13 @@ bool FBreakerFeelPulseTest::RunTest(const FString& Parameters)
     // the two CDOs rather than typed, so the trace below IS the game's stop.
     {
         const float WalkCap = BreakerFeelPulseReadDial(GetDefault<UBreakerCharacterMovementComponent>(), TEXT("WalkSpeed"));
-        TestEqual(TEXT("The shipped walk cap is 672"), WalkCap, 672.0f, 0.0001f);
+        TestEqual(TEXT("The shipped walk cap is 600"), WalkCap, 600.0f, 0.0001f);
         const float Threshold = BreakerFeelPulseReadDial(CppDefaults, TEXT("BrakePlantMinSpeedFraction")) * WalkCap;
-        TestEqual(TEXT("The shipped plant threshold is 336"), Threshold, 336.0f, 0.0001f);
+        TestEqual(TEXT("The shipped plant threshold is 300"), Threshold, 300.0f, 0.0001f);
 
-        // A full stop from the walk cap, 672 -> 0 over 0.3 s at 10 ms: one plant.
+        // A full stop from the walk cap, 600 -> 0 over 0.3 s at 10 ms: one plant.
         const TArray<float> Stop = BreakerFeelPulseRamp(WalkCap, 0.0f, 0.3f);
-        TestEqual(TEXT("A 672 -> 0 stop plants exactly once"), BreakerFeelPulseCountPlants(Stop, Threshold, true), 1);
+        TestEqual(TEXT("A 600 -> 0 stop plants exactly once"), BreakerFeelPulseCountPlants(Stop, Threshold, true), 1);
         // The same stop sampled coarsely still plants once: the edge is a
         // crossing, not a dwell, so the sample rate cannot double it.
         TestEqual(TEXT("A coarse-sampled stop plants exactly once"),
@@ -210,26 +210,26 @@ bool FBreakerFeelPulseTest::RunTest(const FString& Parameters)
         for (int32 Frame = 0; Frame < 100; ++Frame) Rest.Add(0.0f);
         TestEqual(TEXT("Standing still after the stop adds no plant"), BreakerFeelPulseCountPlants(Rest, Threshold, true), 1);
 
-        // A strafe reversal, 672 -> 400 -> 672: the speed dips but never
-        // drops under 336, so no edge and no plant.
+        // A strafe reversal, 600 -> 400 -> 600: the speed dips but never
+        // drops under 300, so no edge and no plant.
         TArray<float> Reversal = BreakerFeelPulseRamp(WalkCap, 400.0f, 0.1f);
         Reversal.Append(BreakerFeelPulseRamp(400.0f, WalkCap, 0.1f));
-        TestEqual(TEXT("A strafe reversal that never drops under 336 plants zero times"),
+        TestEqual(TEXT("A strafe reversal that never drops under 300 plants zero times"),
             BreakerFeelPulseCountPlants(Reversal, Threshold, true), 0);
 
-        // A shuffle, 300 -> 0: never at the threshold, so nothing to cross.
-        TestEqual(TEXT("A 300 -> 0 shuffle plants zero times"),
-            BreakerFeelPulseCountPlants(BreakerFeelPulseRamp(300.0f, 0.0f, 0.2f), Threshold, true), 0);
+        // A shuffle, 275 -> 0: never at the threshold, so nothing to cross.
+        TestEqual(TEXT("A 275 -> 0 shuffle plants zero times"),
+            BreakerFeelPulseCountPlants(BreakerFeelPulseRamp(275.0f, 0.0f, 0.2f), Threshold, true), 0);
 
         // The single-sample edge, both sides of it.
-        TestTrue(TEXT("Crossing 336 from above plants"), BreakerFeel::BrakePlantEdge(336.0f, 335.9f, Threshold, true));
-        TestFalse(TEXT("Sitting at 336 does not plant"), BreakerFeel::BrakePlantEdge(336.0f, 336.0f, Threshold, true));
-        TestFalse(TEXT("Rising through 336 does not plant"), BreakerFeel::BrakePlantEdge(335.9f, 336.0f, Threshold, true));
-        TestFalse(TEXT("Already under 336 does not plant"), BreakerFeel::BrakePlantEdge(335.0f, 0.0f, Threshold, true));
+        TestTrue(TEXT("Crossing 300 from above plants"), BreakerFeel::BrakePlantEdge(300.0f, 299.9f, Threshold, true));
+        TestFalse(TEXT("Sitting at 300 does not plant"), BreakerFeel::BrakePlantEdge(300.0f, 300.0f, Threshold, true));
+        TestFalse(TEXT("Rising through 300 does not plant"), BreakerFeel::BrakePlantEdge(299.9f, 300.0f, Threshold, true));
+        TestFalse(TEXT("Already under 300 does not plant"), BreakerFeel::BrakePlantEdge(299.0f, 0.0f, Threshold, true));
 
         // Airborne, sliding, traversing, or still pushing the stick: the
         // caller's grounded-no-input flag is false and no trace plants.
-        TestEqual(TEXT("A 672 -> 0 stop with input still live never plants"),
+        TestEqual(TEXT("A 600 -> 0 stop with input still live never plants"),
             BreakerFeelPulseCountPlants(Stop, Threshold, false), 0);
         TestFalse(TEXT("The bare edge never plants when not grounded-no-input"),
             BreakerFeel::BrakePlantEdge(WalkCap, 0.0f, Threshold, false));

@@ -174,6 +174,9 @@ private:
     void DrawZoneLine(const ABreakerCharacter* Character);
     // Top-right: the tracked quest as one right-aligned line.
     void DrawQuestLine(const ABreakerCharacter* Character);
+    void DrawMinimap(const ABreakerCharacter* Character);
+    TArray<FBox2D> MinimapGround;
+    double NextMinimapGroundRefresh = 0;
     // The local map's markers, walked once a frame. GetMarkers is four actor
     // walks and a sort; the quest line and the world labels both read it, and
     // a draw that asked three times a frame was three walks for one answer.

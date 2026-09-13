@@ -36,8 +36,8 @@
 // COLOUR BY VERB (O179). Rarity colours the item's own rail, because rarity is
 // a noun the player already reads that way everywhere else; GOLD is the reward
 // accent and carries the haul's rail. The chosen ring is bone (the player's
-// own readouts), 2px against the 1px rest ring, so the choice is never read
-// by colour alone. Nothing here is cyan (movement) or teal (a rift object)
+// own readouts), with a raised face and a fixed 2px footprint so selection
+// never changes the card geometry. Nothing here is cyan (movement) or teal (a rift object)
 // except the top rarity's own frame — the rift is closed, and this is what
 // came out of it.
 
@@ -53,10 +53,13 @@
 #include "UI/BreakerUIStyle.h"
 
 #include "Styling/CoreStyle.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SSpacer.h"
+#include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Text/STextBlock.h"
 
@@ -176,8 +179,7 @@ namespace
     // name, the level. The rest ring follows the inventory card's rule — a
     // 1px BorderRest, or the rarity's own colour for the tiers that take a
     // full border (BreakerUI::RarityGetsFullBorder). The chosen square draws
-    // a 2px bone ring instead and the raised panel face, so the choice reads
-    // by thickness and by face, never by colour alone.
+    // a bone ring and a raised panel face, with the same geometry as rest.
     //
     // The click SELECTS: it moves the ring and nothing else. The hover paints
     // the stats detail into the host beneath. Neither is the claim.
@@ -187,7 +189,7 @@ namespace
         const FLinearColor Rail = BreakerUI::RarityColor(Row.Line.Rarity);
         const FLinearColor RestRing = BreakerUI::RarityGetsFullBorder(Row.Line.Rarity) ? Rail : BreakerUI::BorderRest;
         const FLinearColor Ring = bChosen ? BreakerUI::TextPrimary : RestRing;
-        const float RingThickness = bChosen ? BreakerUI::BorderSelected : BreakerUI::BorderThin;
+        const float RingThickness = BreakerUI::BorderSelected; // Selection changes paint, never content geometry.
 
         return SNew(SBox).WidthOverride(BreakerDebriefSquareSize).HeightOverride(BreakerDebriefSquareSize)
         [
@@ -222,7 +224,7 @@ namespace
                                 // gives it: a figure computed from the
                                 // square's parts came out wider than the
                                 // slot and "of Zenith" left the frame.
-                                .AutoWrapText(true)
+                                .WrapTextAt(BreakerDebriefSquareSize - 40.0f)
                                 .Font(BreakerBodyFont(BreakerUI::TypeBody, true))
                         ]
                         + SVerticalBox::Slot().AutoHeight()
@@ -269,6 +271,17 @@ namespace
 void SBreakerMenu::ShowRiftDebrief(const BreakerRiftDebrief::FModel& Model)
 {
     RiftDebriefModel = Model;
+#if !UE_BUILD_SHIPPING
+    // Photograph a selected card as well as the unselected state. This selects
+    // an existing offer only; it cannot grant or claim an item.
+    FString CaptureScreen;
+    int32 CaptureIndex = INDEX_NONE;
+    if (FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureMenu="),CaptureScreen)
+        && CaptureScreen.Equals(TEXT("RIFTDEBRIEF"),ESearchCase::IgnoreCase)
+        && FParse::Value(FCommandLine::Get(),TEXT("BreakerCaptureRewardIndex="),CaptureIndex)
+        && RiftDebriefModel.Offer.IsValidIndex(CaptureIndex))
+        RiftDebriefModel.ChosenIndex = CaptureIndex;
+#endif
     // Pause, for the same reason the death screen uses it: raised from
     // gameplay, and nothing backs out of it into another screen.
     RootScreen = EBreakerMenuScreen::Pause;
@@ -354,7 +367,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildRiftDebriefScreen()
                         if (RiftDebriefDetailHost.IsValid())
                         {
                             RiftDebriefDetailHost->SetContent(
-                                SBreakerMenu::MakeItemDetail(HoverItem, HoverDeltas, BreakerDebriefOfferBlockWidth));
+                                SBreakerMenu::MakeItemDetail(HoverItem, HoverDeltas, BreakerDebriefOfferBlockWidth - 20.0f, Character.Get()));
                         }
                     }))
             ];
@@ -373,10 +386,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildRiftDebriefScreen()
             ]
             + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
             [
-                SAssignNew(RiftDebriefDetailHost, SBox).WidthOverride(BreakerDebriefOfferBlockWidth)
+                SNew(SBox).WidthOverride(BreakerDebriefOfferBlockWidth).HeightOverride(240.0f) // O2 PLACEHOLDER: invariant selection footprint.
+                [SNew(SScrollBox) + SScrollBox::Slot()
+                [SAssignNew(RiftDebriefDetailHost, SBox).WidthOverride(BreakerDebriefOfferBlockWidth - 20.0f)
                 [
-                    SBreakerMenu::MakeItemDetail(M.Offer[SeedIndex].Item, SeedDeltas, BreakerDebriefOfferBlockWidth)
-                ]
+                    SBreakerMenu::MakeItemDetail(M.Offer[SeedIndex].Item, SeedDeltas, BreakerDebriefOfferBlockWidth - 20.0f, Character.Get())
+                ]]]
             ]
             + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)
             [

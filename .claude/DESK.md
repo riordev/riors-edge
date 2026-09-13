@@ -29,7 +29,39 @@ and direction, enemy movement, sound and environmental presentation were poor.
 
 - [ ] Replay repeated Cleave/Rot and alternating slots with invested cast rate.
       Judge the shorter cast cue in the full combat mix; it is still placeholder
-      audio, not an owner-approved sound. Movement speed is a separate pass.
+      audio, not an owner-approved sound. Replay the slower ground pace and firmer
+      stop; keep judging cast rate separately.
+
+### DONE — FOUR AGREED FIELD-TRIAL POLISH PASSES
+
+- [x] Fernhall facade and rail meshes have coherent structural surfaces, wall
+      grain and trim. Malformed column planes use solid supports. Pavement
+      uses its authored ground material; its Nanite usage is persisted. Low
+      instanced ferns follow route edges and wall bases, with a masked green
+      material; tall tree dressing stays on the outward banks. Facade bounds,
+      real builder material binding and courtyard route checks pass.
+- [x] The live HUD has a north-up local minimap, player facing and discovered
+      sites, with the tracked objective clamped to its edge when distant.
+      The tracker keeps one objective; the map lists active side quests and
+      counters before discovered sites. Concurrency already exists in the
+      journal. Far travel labels no longer paint paragraphs over the route.
+- [x] Ground walk/sprint caps are 600/930 cm/s, braking 3200 cm/s squared.
+      Live grounded release at 120 Hz: walk drift 20.47 to 15.62 cm and stop
+      time 0.100 to 0.083 s; sprint 36.11 to 28.69 cm and 0.117 to 0.100 s.
+      Sprint retains its 1.55x gain and reaches slide entry. Cast rate is a
+      separate lane. An isolated copy of the recorded level-4 Caster loads
+      movement multiplier 1.00 and cast multiplier 1.33; original save hash
+      remains unchanged. Field-trial samples now record both lanes and caps.
+- [x] Reward ring geometry and the scrollable detail footprint stay fixed.
+      Selected/unselected captures fit at 1080p and 720p. Gear details name
+      replacement, base life/shield or damage-per-shot changes, lost affixes
+      and rarity-limit displacement; equipped names wrap inside their column.
+- [x] Build succeeds; full suite 944 passing, three enumerated expected
+      failures, zero unexpected. Rendered route, map, inventory and reward
+      frames inspected. Final ground/understory shaders have no compile or
+      usage fallback warnings. Captures remain visual QA, not an owner playtest.
+- [ ] Owner replay: judge direction, ground pace, reward selection feel and
+      environment coherence over the next ordinary thirty minutes.
 
 ### DONE — CASTER CHAINING AND CAST CUE
 
@@ -86,16 +118,7 @@ and direction, enemy movement, sound and environmental presentation were poor.
 
 ### FOLLOWING BLOCKS
 
-- [ ] Movement pace and stopping: measure this recorded Caster's live speed
-      modifiers and gear, then tune ground pace and momentum bleed separately.
-- [ ] Fernhall visual sweep: one player-height route with material/mesh/scale
-      checks; repair fence tops, wall surfaces, banners, trees and pavement
-      before adding props. Establish deliberate ground vegetation and palette.
-- [ ] Quest guidance: find why the minimap is absent; show a concise tracked
-      objective and waypoint plus a readable active-quest list. Investigate
-      whether concurrency is blocked mechanically or only hidden in the UI.
-- [ ] Reward/gear/HUD: stable reward-card dimensions and wrapping, useful
-      equipment comparisons, mana overflow geometry and ultimate readout.
+- [ ] Remaining HUD feedback: mana overflow geometry and Caster ultimate readout.
 - [ ] Audio/presentation: owner mix check of the shorter cast cue, rifle fire asset,
       rounded rocket blast, weapon-bearing shadow, Caster ultimate payoff.
 

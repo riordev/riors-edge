@@ -715,17 +715,12 @@ bool FBreakerMovementShippedSpeedsTest::RunTest(const FString& Parameters)
     if (!TestNotNull(TEXT("Movement constructs"), Movement)) return false;
     if (!TestNotNull(TEXT("Momentum constructs"), Momentum)) return false;
 
-    // 672 / 1039, owner playtest 2026-09-10 ("slight increase in speed"). These
-    // are the SHIPPED figures restated so a silent drift is a red; they move
-    // when the owner moves them, which is what just happened.
-    TestEqual(TEXT("Walk speed ships at 672"), Movement->WalkSpeed, 672.0f, 0.0001f);
-    TestEqual(TEXT("Sprint speed ships at 1039"), Movement->SprintSpeed, 1039.0f, 0.0001f);
-    // AND THE GAIN IS THE THING THAT MUST NOT DRIFT. Both speeds rose by the
-    // same 5%, so sprint still buys the same multiple of a walk; moving one
-    // alone is how the gain narrowed to 1.55 and left sprint feeling like
-    // nothing. Asserted as a RATIO so a future single-dial nudge is a red.
+    // Pin the shipped ground pace independently of cast-rate progression.
+    TestEqual(TEXT("Walk speed ships at 600"), Movement->WalkSpeed, 600.0f, 0.0001f);
+    TestEqual(TEXT("Sprint speed ships at 930"), Movement->SprintSpeed, 930.0f, 0.0001f);
+    // Keep sprint useful when changing the overall pace.
     TestEqual(TEXT("Sprint still buys 1.55x a walk"),
-        Movement->SprintSpeed / Movement->WalkSpeed, 1.546f, 0.005f);
+        Movement->SprintSpeed / Movement->WalkSpeed, 1.55f, 0.005f);
     TestEqual(TEXT("Air control ships at 0.35"), Movement->AirControl, 0.35f, 0.0001f);
     TestEqual(TEXT("Air control boost ships at 1.15"), Movement->AirControlBoostMultiplier, 1.15f, 0.0001f);
 

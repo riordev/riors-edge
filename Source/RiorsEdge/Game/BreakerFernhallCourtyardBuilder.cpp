@@ -63,7 +63,8 @@ bool BreakerFernhallCourtyard::Build(UWorld* World, const FPlan& P)
 {
     if (!World || P.ReplacedBoundaryPiece.IsEmpty()) return false;
     auto* Cube=LoadObject<UStaticMesh>(nullptr,TEXT("/Engine/BasicShapes/Cube.Cube"));
-    auto* Material=LoadObject<UMaterialInterface>(nullptr,TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+    auto* Material=LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Breaker/Materials/M_BreakerWall.M_BreakerWall"));
+    auto* GroundMaterial=LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Breaker/Materials/M_BreakerGround.M_BreakerGround"));
     if (!Cube || !Material) return false;
     bool Success=true;
     TArray<AActor*> Created;
@@ -83,7 +84,7 @@ bool BreakerFernhallCourtyard::Build(UWorld* World, const FPlan& P)
         M->SetWorldScale3D(Size/100.f);
         M->SetCollisionProfileName(TEXT("BlockAll"));
         M->SetCanEverAffectNavigation(true);
-        auto* Tint=UMaterialInstanceDynamic::Create(Material,M);
+        auto* Tint=UMaterialInstanceDynamic::Create(Ground && GroundMaterial ? GroundMaterial : Material,M);
         Tint->SetVectorParameterValue(TEXT("Color"),Color);
         M->SetMaterial(0,Tint);
         M->SetMobility(EComponentMobility::Static);

@@ -3,6 +3,7 @@
 #include "Game/BreakerGameInstance.h"
 #include "Game/BreakerEnvironmentDressing.h"
 #include "Game/BreakerFernhallPerimeter.h"
+#include "Game/BreakerFernhallSurfaceRepair.h"
 #include "Game/BreakerFernhallCourtyardBuilder.h"
 #include "EngineUtils.h"
 
@@ -137,12 +138,12 @@ namespace
     FLinearColor BreakerZoneColorFor(const FString& Name)
     {
         if (Name.StartsWith(TEXT("flr_riftpad"))) return BreakerZoneOffWhite;
-        if (Name == TEXT("flr_yard")) return FLinearColor(.36f,.36f,.31f);   // O2 PLACEHOLDER
+        if (Name == TEXT("flr_yard")) return FLinearColor(.25f,.27f,.25f);   // O2 PLACEHOLDER
         if (Name == TEXT("flr_yard_sub")) return FLinearColor(.17f,.20f,.19f);   // O2 PLACEHOLDER
-        if (Name.StartsWith(TEXT("flr_seam"))) return FLinearColor(.43f,.42f,.35f);   // O2 PLACEHOLDER
+        if (Name.StartsWith(TEXT("flr_seam"))) return FLinearColor(.32f,.34f,.31f);   // O2 PLACEHOLDER
         // An apron and its treads are poured with the lane (O285): a raised
         // level of the same ground, a shade lighter so its edge reads.
-        if (Name.Contains(TEXT("_apron"))) return FLinearColor(.42f,.41f,.36f);   // O2 PLACEHOLDER
+        if (Name.Contains(TEXT("_apron"))) return FLinearColor(.34f,.36f,.33f);   // O2 PLACEHOLDER
         if (BreakerZoneNameHasPrefix(Name, TEXT("wall_"))) return BreakerZoneConcrete;
         if (BreakerZoneNameHasPrefix(Name, TEXT("blk_full_"))) return BreakerZoneStone;
         if (BreakerZoneNameHasPrefix(Name, TEXT("blk_chest_"))) return BreakerZoneRust;
@@ -197,7 +198,7 @@ namespace
             if (HalfLength <= 0) continue;
             for (float X = -HalfLength + 150; X < HalfLength; X += 300)
                 Strip(FVector(Centre.X+X,Centre.Y,Z), FVector(292,760,2),
-                    bIndustrial ? FLinearColor(.29f,.31f,.28f) : FLinearColor(.47f,.46f,.39f));
+                    bIndustrial ? FLinearColor(.29f,.31f,.28f) : FLinearColor(.37f,.39f,.36f));
             for (float Side : {-1.0f,1.0f})
             {
                 Strip(FVector(Centre.X,Centre.Y+Side*420,Z), FVector(HalfLength*2,34,2), BreakerZoneStone*.55f);
@@ -960,7 +961,7 @@ bool UBreakerZoneBuilder::BuildFernhallYard(UWorld* World, FBreakerZoneMarkers& 
             return false;
         }
         // Replace only the noncolliding cone-tree dressing, retaining its
-        // authored position and height. Cover/floor/boundary meshes are untouched.
+        // authored position with a low understory profile.
         // The composer names a clump dress_<yard>_tree<n> or dress_<yard>_corner<n>
         // (the corner clumps are the same Kenney cones); the grass under a
         // clump (_treegrass) is not a tree.
@@ -972,7 +973,7 @@ bool UBreakerZoneBuilder::BuildFernhallYard(UWorld* World, FBreakerZoneMarkers& 
             const FBox Bounds = Mesh->GetBoundingBox();
             const FVector Center = Bounds.GetCenter();
             const FVector Ground(Center.X, Center.Y, Bounds.Min.Z);
-            if (BreakerPlaceEnvironmentDressing(World, TEXT("CommonTree_1"), Ground, Bounds.GetSize().Z, 25))
+            if (BreakerPlaceEnvironmentDressing(World, TEXT("Fern_1"), Ground, FMath::Clamp(float(Bounds.GetSize().Z) * .2f, 70.f, 140.f), 25))
             {
                 BreakerPlaceEnvironmentDressing(World, TEXT("Bush_Common"), Ground + FVector(130, 0, 0), 110, 65);
                 ++Spawned;
@@ -989,6 +990,17 @@ bool UBreakerZoneBuilder::BuildFernhallYard(UWorld* World, FBreakerZoneMarkers& 
         // wear the tiled grain under their role tint (O279).
         BreakerZoneApplyColor(Component, BreakerZoneColorFor(Piece.Name),
             /*bGround=*/BreakerZoneNameHasPrefix(Piece.Name, TEXT("flr_")));
+        if (!bRiftInstance)
+        {
+            BreakerRepairFernhallSurface(Component, Piece);
+            if (Piece.Name.StartsWith(TEXT("flr_")))
+                if (auto* Ground=LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Breaker/Materials/M_BreakerGround.M_BreakerGround")))
+                {
+                    auto* Tint=UMaterialInstanceDynamic::Create(Ground,Component);
+                    Tint->SetVectorParameterValue(TEXT("Color"),BreakerZoneColorFor(Piece.Name));
+                    for (int32 Slot=0;Slot<Component->GetNumMaterials();++Slot) Component->SetMaterial(Slot,Tint);
+                }
+        }
         const bool bDressing = BreakerZoneNameHasPrefix(Piece.Name, TEXT("dress_"));
         if (bDressing) Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         Component->SetMobility(EComponentMobility::Static);

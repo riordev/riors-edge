@@ -727,7 +727,7 @@ private:
     // RailWidth is the host's width, the wrap figure is computed from it
     // before layout. World-free: a wrapper over the file-local card builder.
     static TSharedRef<SWidget> MakeItemDetail(const FBreakerItemInstance& Item,
-        const TArray<FBreakerAffixComparison>& Deltas, float RailWidth);
+        const TArray<FBreakerAffixComparison>& Deltas, float RailWidth, const ABreakerCharacter* Player = nullptr);
     FReply GoBack();
 
     // The title gate. The owner asked for the game to open on the main menu

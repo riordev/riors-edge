@@ -27,6 +27,9 @@
 #include "Game/BreakerCoverRegistry.h"
 #include "Game/BreakerGameInstance.h"
 #include "Game/BreakerZoneBuilder.h"
+#include "Game/BreakerFernhallSurfaceRepair.h"
+#include "Engine/StaticMeshActor.h"
+#include "Components/StaticMeshComponent.h"
 #include "Interaction/BreakerRiftDoor.h"
 #include "Interaction/BreakerTravelPoint.h"
 #include "Movement/BreakerCharacterMovementComponent.h"
@@ -1585,5 +1588,29 @@ bool FBreakerFernhallWallsAreStoreysTest::RunTest(const FString& Parameters)
         // Not vacuous: every yard has flanks, end walls and a mass.
         TestTrue(FString::Printf(TEXT("%s has storeyed walls to measure (%d)"), *Folder, Matched), Matched > 0);
     }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerFernhallSurfaceRepairTest,
+    "RiorsEdge.World.Fernhall.SurfaceRepairBounds", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FBreakerFernhallSurfaceRepairTest::RunTest(const FString& Parameters)
+{
+    TArray<FBreakerZonePiece> Pieces;
+    if (!TestTrue(TEXT("Shipped yard loads"), UBreakerZoneBuilder::CollectZonePieces(UBreakerZoneBuilder::FernhallMeshFolder(),Pieces))) return false;
+    const auto* Piece=Pieces.FindByPredicate([](const auto& P){return P.Name==TEXT("wall_n03");});
+    if (!TestNotNull(TEXT("Authored facade exists"),Piece)) return false;
+    auto* World=UWorld::CreateWorld(EWorldType::Game,false);
+    if (!World) return false;
+    ON_SCOPE_EXIT { World->DestroyWorld(false); };
+    auto* Actor=World->SpawnActor<AStaticMeshActor>();
+    auto* Component=Actor->GetStaticMeshComponent();Component->SetMobility(EComponentMobility::Movable);
+    auto* Original=Cast<UStaticMesh>(Piece->MeshPath.TryLoad());
+    if (!TestNotNull(TEXT("Original facade loads"),Original)) return false;
+    const FBox Before=Original->GetBoundingBox();Component->SetStaticMesh(Original);
+    BreakerRepairFernhallSurface(Component,*Piece);Component->UpdateBounds();
+    TestTrue(TEXT("Facade becomes a coherent structural mesh"),Component->GetStaticMesh()!=Original);
+    TestTrue(TEXT("Repair retains authored minimum boundary"),Component->Bounds.GetBox().Min.Equals(Before.Min,.5f));
+    TestTrue(TEXT("Repair retains authored maximum boundary"),Component->Bounds.GetBox().Max.Equals(Before.Max,.5f));
+    TestNotNull(TEXT("Shipped textured material binds"),Component->GetMaterial(0));
     return true;
 }

@@ -176,11 +176,10 @@ bool FBreakerFernhallSurfacesShowTheirMaterialTest::RunTest(const FString& Param
     FBreakerZoneMarkers Markers;
     if (!TestTrue(TEXT("Actual district assembles"), UBreakerZoneBuilder::BuildFernhallYard(World, Markers))) return false;
 
-    // Witnesses, by mesh name, among the pieces the composer placed. The
-    // skyline re-spawns kit walls with its own paint and is not the facade;
-    // the courtyard's replaced bay may be any one wall, so the facade witness
-    // prefers wall_n03 but accepts any textured wall_ piece that survived.
+    // The malformed facade has a structural replacement; intact imported
+    // cover keeps its own material. Verify both through the assembled world.
     const UStaticMeshComponent* Facade = nullptr;
+    const UStaticMeshComponent* Imported = nullptr;
     const UStaticMeshComponent* Yard = nullptr;
     const UStaticMeshComponent* Block = nullptr;
     for (TActorIterator<AStaticMeshActor> It(World); It; ++It)
@@ -188,22 +187,32 @@ bool FBreakerFernhallSurfacesShowTheirMaterialTest::RunTest(const FString& Param
         if (!IsValid(*It) || It->Tags.Contains(TEXT("FernhallSkylineDressing"))) continue;
         const UStaticMeshComponent* Component = It->GetStaticMeshComponent();
         const UStaticMesh* Mesh = Component ? Component->GetStaticMesh() : nullptr;
+        if (It->GetActorLabel() == TEXT("Fernhall_wall_n03")) Facade = Component;
+        if (Mesh && Mesh->GetName() == TEXT("Fern_1") && Mesh->GetPathName().Contains(TEXT("EnvironmentKit"))) Imported = Component;
         if (!Mesh || !Mesh->GetPathName().StartsWith(UBreakerZoneBuilder::FernhallMeshFolder())) continue;
         const FString Name = Mesh->GetName();
         if (Name == TEXT("flr_yard")) Yard = Component;
-        else if (Name.StartsWith(TEXT("wall_")) && BreakerSurfaceSlotIsTexturedImport(Mesh)
-            && (!Facade || Name == TEXT("wall_n03"))) Facade = Component;
-        else if (Name.StartsWith(TEXT("blk_full_")) && BreakerSurfaceSlotIsBare(Mesh) && !Block) Block = Component;
+        if (Name.StartsWith(TEXT("blk_")) && BreakerSurfaceSlotIsTexturedImport(Mesh)) Imported = Component;
+        if (Name.StartsWith(TEXT("blk_full_")) && BreakerSurfaceSlotIsBare(Mesh) && !Block) Block = Component;
     }
-
-    // (a) A KIT PIECE KEEPS THE MATERIAL IT WAS IMPORTED WITH. Pointer-equal
-    // to the static mesh's own slot: not a copy, not an instance over it.
-    if (TestNotNull(TEXT("A facade piece imported with a textured material was spawned"), Facade))
+    if (TestNotNull(TEXT("The repaired facade was spawned through the real builder"), Facade))
     {
-        AddInfo(FString::Printf(TEXT("Facade witness %s"), *Facade->GetStaticMesh()->GetName()));
-        TestTrue(TEXT("Facade piece keeps its imported material slot untouched"),
-            Facade->GetMaterial(0) == Facade->GetStaticMesh()->GetStaticMaterials()[0].MaterialInterface);
+        TestEqual(TEXT("Facade uses the coherent structural cube"),Facade->GetStaticMesh()->GetName(),FString(TEXT("Cube")));
+        const auto* Surface = Cast<UMaterialInstanceDynamic>(Facade->GetMaterial(0));
+        if (TestNotNull(TEXT("Facade binds a textured surface instance"),Surface))
+        {
+            auto* Wall = LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Breaker/Materials/M_BreakerWall.M_BreakerWall"));
+            TestNotNull(TEXT("Authored wall material exists"),Wall);
+            TestTrue(TEXT("Facade is parented to the wall material"),Surface->Parent == Wall);
+            bool Grain = false;
+            if (Wall) for (const UObject* Texture : Wall->GetReferencedTextures())
+                if (Texture && Texture->GetName() == TEXT("T_BreakerGround")) Grain = true;
+            TestTrue(TEXT("Wall material references its grain"),Grain);
+        }
     }
+    if (TestNotNull(TEXT("An intact imported foliage piece was spawned"),Imported))
+        TestTrue(TEXT("Intact foliage retains its imported material"),
+            Imported->GetMaterial(0) == Imported->GetStaticMesh()->GetStaticMaterials()[0].MaterialInterface);
 
     // (b) A COMPOSER SLAB WEARS THE GROUND MATERIAL, TINTED BY ROLE. The yard
     // floor's shipped tint is the value the palette test holds as "yard floor".
@@ -216,7 +225,7 @@ bool FBreakerFernhallSurfacesShowTheirMaterialTest::RunTest(const FString& Param
             FLinearColor Tint = FLinearColor::Black;
             TestTrue(TEXT("flr_yard exposes its Color tint"),
                 Slab->GetVectorParameterValue(FHashedMaterialParameterInfo(TEXT("Color")), Tint));
-            const FLinearColor Expected(.36f, .36f, .31f);   // O2 PLACEHOLDER
+            const FLinearColor Expected(.25f, .27f, .25f);   // O2 PLACEHOLDER
             TestEqual(TEXT("flr_yard tint R"), Tint.R, Expected.R, .01f);
             TestEqual(TEXT("flr_yard tint G"), Tint.G, Expected.G, .01f);
             TestEqual(TEXT("flr_yard tint B"), Tint.B, Expected.B, .01f);

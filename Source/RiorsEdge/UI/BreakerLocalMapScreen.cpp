@@ -2,6 +2,8 @@
 #include "Data/BreakerStrings.h"
 #include "Characters/BreakerCharacter.h"
 #include "Game/BreakerLocalMapComponent.h"
+#include "Save/BreakerQuestContent.h"
+#include "Save/BreakerMissionContent.h"
 #include "UI/BreakerTypeRoles.h"
 #include "Widgets/SLeafWidget.h"
 #include "Widgets/Input/SButton.h"
@@ -80,6 +82,37 @@ TSharedRef<SWidget> SBreakerMenu::BuildLocalMapScreen()
     auto* Map = Player->GetLocalMap();
     if (Player->HasAuthority() && Map->DiscoverNearby(Player->GetActorLocation())) Player->SaveGameState();
     TSharedRef<SVerticalBox> List = SNew(SVerticalBox);
+    // The journal can hold concurrent quests; show every accepted one and
+    // every unfinished objective rather than hiding them in the HUD sentence.
+    if (const auto* Journal = Player->GetQuestJournal())
+    {
+        List->AddSlot().AutoHeight().Padding(0,8,0,8)
+            [SNew(STextBlock).Text(FText::FromString(TEXT("ACTIVE QUESTS"))).Font(BreakerBodyFont(16,true)).ColorAndOpacity(BreakerUI::TextPrimary)];
+        int32 Count = 0;
+        for (const auto& Quest : UBreakerQuestLibrary::GetFallbackQuests())
+        {
+            const auto State = UBreakerQuestLibrary::ComputeQuestState(Quest, Journal->GetState());
+            if (State != EBreakerQuestState::Active && State != EBreakerQuestState::ReadyToTurnIn) continue;
+            ++Count;
+            FString Detail = Quest.Title;
+            if (State == EBreakerQuestState::ReadyToTurnIn) Detail += TEXT("  ·  RETURN TO ") + Quest.Giver;
+            for (const auto& Objective : Quest.Objectives)
+            {
+                const bool Complete = Journal->HasFlag(Objective.CompletionFlag);
+                Detail += FString::Printf(TEXT("\n%s %s"), Complete ? TEXT("DONE:") : TEXT("TODO:"), *Objective.Text);
+                if (Objective.RequiredCount > 0) Detail += FString::Printf(TEXT("  %d/%d"),
+                    FMath::Min(Journal->GetCounter(Objective.ProgressCounter),Objective.RequiredCount),Objective.RequiredCount);
+            }
+            List->AddSlot().AutoHeight().Padding(0,0,0,12)
+                [SNew(STextBlock).Text(FText::FromString(Detail)).Font(BreakerBodyFont(14)).WrapTextAt(236)
+                    .ColorAndOpacity(State == EBreakerQuestState::ReadyToTurnIn ? BreakerUI::Gold : BreakerUI::TextSecondary)];
+        }
+        if (!Count) List->AddSlot().AutoHeight().Padding(0,0,0,12)
+            [SNew(STextBlock).Text(FText::FromString(TEXT("No side quests accepted. Talk to the quartermaster and salvager.")))
+                .Font(BreakerBodyFont(14)).WrapTextAt(236).ColorAndOpacity(BreakerUI::TextMuted)];
+    }
+    List->AddSlot().AutoHeight().Padding(0,8)
+        [SNew(STextBlock).Text(FText::FromString(TEXT("DISCOVERED SITES"))).Font(BreakerBodyFont(16,true)).ColorAndOpacity(BreakerUI::TextPrimary)];
     int32 Index = 0;
     for (const auto& Marker : Map->GetMarkers())
     {

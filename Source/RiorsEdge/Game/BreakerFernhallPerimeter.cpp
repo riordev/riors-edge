@@ -1,6 +1,8 @@
 #include "Game/BreakerFernhallPerimeter.h"
 #include "Game/BreakerEnvironmentDressing.h"
 #include "Game/BreakerZoneBuilder.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 void BreakerBuildFernhallPerimeter(UWorld* World,const TArray<FBreakerZonePiece>& Pieces)
 {
@@ -40,4 +42,42 @@ void BreakerBuildFernhallPerimeter(UWorld* World,const TArray<FBreakerZonePiece>
         Place(TEXT("Column_MetalSupport"),FVector(X-400,SubEdge+SubSide*2200,0),1900+Stack*240,90,TEXT("Fernhall.Landmark.PipeWorks"));
         Place(TEXT("Bush_Common"),FVector(X+350,SubEdge+SubSide*1500,0),280,Stack*47,TEXT("Fernhall.Landmark.PipeWorks"));
     }
+    // Reclaimed ground stays in deliberate bands beside the route and wall
+    // bases. Instanced low ferns add ground cover without collision or
+    // hundreds of ticking actors. O2 PLACEHOLDER heights, density and palette.
+    auto* Blade = LoadObject<UStaticMesh>(nullptr,TEXT("/Game/Breaker/EnvironmentKit/Fern_1/Fern_1/StaticMeshes/Fern_1.Fern_1"));
+    if (Blade && Blade->GetBoundingBox().GetSize().Z > UE_SMALL_NUMBER)
+    {
+        auto* Grass = World->SpawnActor<AActor>();
+        if (!Grass) return;
+        auto* Mesh = NewObject<UInstancedStaticMeshComponent>(Grass);
+        Grass->AddInstanceComponent(Mesh); Grass->SetRootComponent(Mesh);
+        BreakerConfigureDressingNanite(Mesh,Blade);
+        Mesh->SetStaticMesh(Blade);Mesh->SetCollisionProfileName(TEXT("NoCollision"));
+        Mesh->SetCanEverAffectNavigation(false);Mesh->SetMobility(EComponentMobility::Static);
+        if (auto* LeafMaterial=LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Breaker/Materials/M_BreakerUnderstory.M_BreakerUnderstory")))
+            for (int32 Slot=0;Slot<Mesh->GetNumMaterials();++Slot) Mesh->SetMaterial(Slot,LeafMaterial);
+        Mesh->RegisterComponent();Grass->Tags.Add(TEXT("FernhallGroundCover"));Grass->SetActorTickEnabled(false);
+        FRandomStream Random(913);
+        for (const FBox& Floor : {Entry,Sub})
+            for (float Side : {-1.f,1.f})
+                for (float Along=Floor.Min.X+700; Along<Floor.Max.X-700; Along+=350)
+                    for (float Band : {900.f,float(Floor.GetExtent().Y-450)})
+                    {
+                        const FVector Base(Along,Floor.GetCenter().Y+Side*Band,Floor.Max.Z);
+                        for (int32 Index=0;Index<6;++Index)
+                        {
+                            const FVector Foot=Base+FVector(Random.FRandRange(-110,110),Random.FRandRange(-100,100),0);
+                            FHitResult Hit; FCollisionQueryParams Query;
+                            if (!World->LineTraceSingleByChannel(Hit,Foot+FVector(0,0,100),Foot-FVector(0,0,100),ECC_WorldStatic,Query)
+                                || FMath::Abs(Hit.ImpactPoint.Z-Floor.Max.Z)>15 || Hit.ImpactNormal.Z<.9f) continue;
+                            const float Scale=Random.FRandRange(28,48)/Blade->GetBoundingBox().GetSize().Z;
+                            const FRotator Rotation(0,Random.FRandRange(0,360),0);
+                            const FBox Oriented=Blade->GetBoundingBox().TransformBy(FTransform(Rotation));
+                            const FVector Bottom(Oriented.GetCenter().X,Oriented.GetCenter().Y,Oriented.Min.Z);
+                            Mesh->AddInstance(FTransform(Rotation,Hit.ImpactPoint-Bottom*Scale,FVector(Scale)),true);
+                        }
+                    }
+    }
+
 }

@@ -345,6 +345,7 @@ void ABreakerPlaytestHUD::DrawHUD()
         // "+N" after a salvage or a chest is not permanent and not a balance.
         DrawVitals(Character);
         DrawQuestLine(Character);
+    DrawMinimap(Character);
         DrawBanners(Center);
         // Who can be talked to and where the way out is, readable from
         // anywhere on the plaza — the Anchor's whole verb set, floating over
@@ -457,6 +458,7 @@ void ABreakerPlaytestHUD::DrawHUD()
     // --- Periphery: zone and countdown top-left, the quest line top-right --
     DrawZoneLine(Character);
     DrawQuestLine(Character);
+    DrawMinimap(Character);
 
     // --- Centre: feedback only, nothing persistent ------------------------
     // The event banners, one pass: rift complete, level up, wave clear, in
@@ -1522,15 +1524,6 @@ void ABreakerPlaytestHUD::DrawQuestLine(const ABreakerCharacter* Character)
         }
     }
 
-    float Y = S(BreakerUI::HudQuestLineTop);
-    for (const FString& Line : Lines)
-    {
-        if (Line.IsEmpty()) continue;
-        DrawSpecTextRight(Line, Right, Y, BreakerUI::TextSecondary,
-            FitSpecPixels(Line, BreakerUI::HudQuestLinePixels, Limit, 11.0f));
-        Y += S(LinePitch);
-    }
-
     FBreakerLocalMapMarker MapTarget;
     bool bHaveTarget = false;
     const UBreakerLocalMapComponent* LocalMap = Character->GetLocalMap();
@@ -1554,6 +1547,25 @@ void ABreakerPlaytestHUD::DrawQuestLine(const ABreakerCharacter* Character)
             break;
         }
     }
+    if (bHaveTarget && !LocalMap->GetTracked().IsNone()) Lines = {MapTarget.Label.ToString()};
+    const bool bEscortClock = Lines.Num() > 1 && (Lines[1].StartsWith(TEXT("LUCIDITY")) || Lines[1].StartsWith(TEXT("RETURN TO THE SHELTER")));
+    if (Lines.Num() > 1 && !bEscortClock) Lines.SetNum(1);
+    int32 ActiveQuests = 0;
+    for (const auto& Quest : UBreakerQuestLibrary::GetFallbackQuests())
+    {
+        const auto State = UBreakerQuestLibrary::ComputeQuestState(Quest, Journal->GetState());
+        if (State == EBreakerQuestState::Active || State == EBreakerQuestState::ReadyToTurnIn) ++ActiveQuests;
+    }
+    if (ActiveQuests > 0) Lines.Add(FString::Printf(TEXT("%d ACTIVE SIDE QUEST%s  ·  MAP FOR DETAILS"), ActiveQuests, ActiveQuests == 1 ? TEXT("") : TEXT("S")));
+    float Y = S(BreakerUI::HudQuestLineTop);
+    for (const FString& Line : Lines)
+    {
+        if (Line.IsEmpty()) continue;
+        DrawSpecTextRight(Line, Right, Y, BreakerUI::TextSecondary,
+            FitSpecPixels(Line, BreakerUI::HudQuestLinePixels, Limit, 11.0f));
+        Y += S(LinePitch);
+    }
+
     if (bHaveTarget)
     {
         // THE DISTANCE, NOT THE TRACKER (owner, playtest 2026-09-11: "the
@@ -1973,6 +1985,7 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
         const ABreakerTravelPoint* TravelPoint = *It;
         if (!TravelPoint || TravelPoint == Plated) continue;
         const float Distance = FVector::Distance(ViewerLocation, TravelPoint->GetActorLocation());
+        if (Distance > 2500.f) continue; // O2 PLACEHOLDER: far destinations use the minimap, not floating paragraphs.
         if (Distance > LabelMaxDistance) continue;
         // Anchored at the marker, not the beacon tip: the 14 m column already
         // owns the skyline, and a label at its top would leave the screen the

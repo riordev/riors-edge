@@ -1,5 +1,7 @@
 #include "Playtest/BreakerFieldTrialRecorder.h"
 #include "Characters/BreakerCharacter.h"
+#include "Movement/BreakerCharacterMovementComponent.h"
+#include "Abilities/BreakerGameplayAbility.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Game/BreakerGameMode.h"
@@ -89,6 +91,15 @@ bool UBreakerFieldTrialRecorder::Sample(float DeltaSeconds)
     Row->SetNumberField(TEXT("health"), Stats->GetHealth());
     Row->SetNumberField(TEXT("max_health"), Stats->GetMaxHealth());
     Row->SetNumberField(TEXT("resource"), Stats->GetClassResource());
+    if (const auto* Move = Current->GetBreakerMovement())
+    {
+        Row->SetNumberField(TEXT("ground_speed"), Move->Velocity.Size2D());
+        Row->SetNumberField(TEXT("walk_cap"), Move->GetWalkSpeedCap());
+        Row->SetNumberField(TEXT("sprint_cap"), Move->GetSprintSpeedCap());
+        Row->SetNumberField(TEXT("move_multiplier"), Move->GetComposedMoveSpeedMultiplier());
+        Row->SetNumberField(TEXT("movement_mode"), static_cast<int32>(Move->MovementMode.GetValue()));
+    }
+    Row->SetNumberField(TEXT("cast_rate"), UBreakerGameplayAbility::AbilityCastRateMultiplierFor(Current));
     Row->SetNumberField(TEXT("core_points"), Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints));
     Row->SetNumberField(TEXT("doctrine_points"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints));
     Row->SetNumberField(TEXT("deaths"), Deaths);

@@ -533,7 +533,7 @@ Maximum wedges reached with65, including ring transit; cells show **wedges / min
 
 **O278** — Buildings are built to the player: a storey is 3 m, a door 2.2 m, a step under 45 cm, and a tile is never stretched past its own proportions — a wall is stacked and tiled, not scaled. Every deck and dock the composer places is reachable on foot by a stair the movement component can climb.
 
-**O279** — A surface shows what it is made of: a kit piece keeps the material it was imported with, and a composer slab wears a tiled ground material with a world-aligned grain, tinted by role. The builder's flat colour is the fallback for a piece that carries no material, never the default.
+**O279** — A surface shows what it is made of: intact kit pieces keep their imported materials; malformed Fernhall facade, rail and column props use coherent structural meshes with textured surfaces. Facade outer bounds and separate route openings remain authored. Composer slabs wear world-aligned ground grain tinted by role. Low understory follows route edges and wall bases, leaving travel clear.
 
 **O280** — Every prop the composer places is a real mesh from the committed kit, sized to the player; the supply chest is a crate with a lid, not a cube, and keeps its gold band (O179).
 

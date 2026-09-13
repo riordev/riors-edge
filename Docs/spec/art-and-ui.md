@@ -119,6 +119,17 @@ teaches a lie about what the player did.
 **Never signal state by colour alone. Never reflow the HUD between fights.**
 Positions are fixed; only content changes.
 
+The HUD carries a north-up local map with the player's facing, discovered sites
+and the tracked destination. A destination outside the local view stays on its
+edge. The tracker gives one objective; the full map lists every active side
+quest and its progress before discovered sites. Distant gates do not float
+paragraphs over the world.
+
+Reward selection changes paint inside a fixed card and detail viewport.
+Equipment details identify the replaced item, base life/shield or damage per
+shot changes, affix differences and lost affixes. Base damage is labelled before
+build bonuses and never presented as a throughput verdict.
+
 **Disabled controls are painted, never faded.** Opacity on a subtree reveals
 the plate seams behind it. Refuse the click in the handler instead.
 
