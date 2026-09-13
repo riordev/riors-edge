@@ -40,6 +40,7 @@ public:
     // count; the ground snap owns the floor.
     int32 GetWorldTouchCount() const { return WorldTouchCount; }
     EBreakerLocomotionMode GetLastMode() const { return LastMode; }
+    bool IsBlockedHold() const { return bBlockedHold; }
     // The leg the path follower is walking this body along, as a unit
     // direction, or zero when it holds no path. The facing rule reads this
     // and not the velocity, which the speed scale can erase.
@@ -52,10 +53,7 @@ public:
     virtual void HandleImpact(const FHitResult& Hit, float TimeSlice = 0.0f, const FVector& MoveDelta = FVector::ZeroVector) override;
 
 protected:
-    // True when world-static geometry stands on the straight line from the
-    // pawn to To. One line trace per call. Ignore (the target) is stepped
-    // over by the trace so a body is never "blocked" by the thing it is
-    // closing on.
+    // Sweep the capsule's clearance through static geometry, ignoring pawns.
     bool IsClosingLineBlocked(const FVector& To, const AActor* Ignore) const;
 
     // The ground snap, moved here verbatim from ABreakerEnemy::Tick: trace
@@ -65,5 +63,6 @@ protected:
     void SnapToGround(float DeltaTime);
 
     int32 WorldTouchCount = 0;
+    bool bBlockedHold = false;
     EBreakerLocomotionMode LastMode = EBreakerLocomotionMode::Idle;
 };

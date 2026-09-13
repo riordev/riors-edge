@@ -23,15 +23,17 @@ public:
 
     // Path to Goal, re-planning only when the goal has moved
     // ReplanDistanceCm or the previous move ended. False means the request
-    // was refused (no navmesh yet, no path) and the caller steers this frame.
+    // cannot move (no route, retry delay or already arrived); the caller holds.
     bool Chase(const FVector& Goal, float AcceptanceRadius);
     void StopChase();
     bool IsChasing() const;
 
 protected:
     virtual void OnPossess(APawn* InPawn) override;
+    virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
 
 private:
     FVector LastGoal = FVector::ZeroVector;
     bool bHasGoal = false;
+    double NextPathAttemptTime = 0.0;
 };

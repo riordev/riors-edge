@@ -29,6 +29,9 @@
 #include "UI/BreakerPlaytestHUD.h"
 #include "UObject/Package.h"
 #include "Weapons/BreakerWeaponComponent.h"
+#include "AI/BreakerNavBounds.h"
+#include "NavigationSystem.h"
+#include "NavigationData.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBreakerEntropyLiveRiftRuntimeTest, "RiorsEdge.Combat.EntropyLiveRiftRuntime",
@@ -59,7 +62,7 @@ bool FBreakerEntropyLiveRiftRuntimeTest::RunTest(const FString& Parameters)
         const bool bAbility = Row == 1;
         const bool bStarter = Row == 2;
         UWorld::InitializationValues Init;
-        Init.AllowAudioPlayback(false).CreateNavigation(false).CreateAISystem(false);
+        Init.AllowAudioPlayback(false).CreateNavigation(true).CreateAISystem(true);
         UPackage* Package = CreatePackage(*FString::Printf(TEXT("/Temp/EntropyLive_%s/Lvl_Fernhall"), *FGuid::NewGuid().ToString(EGuidFormats::Digits)));
         Package->SetFlags(RF_Transient);
         UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, FName(TEXT("Lvl_Fernhall")), Package, true, ERHIFeatureLevel::Num, &Init);
@@ -118,6 +121,18 @@ bool FBreakerEntropyLiveRiftRuntimeTest::RunTest(const FString& Parameters)
             const auto* Attributes = It->GetAbilitySystemComponent()->GetSet<UBreakerAttributeSet>();
             if (Attributes) InitialEnemyHealth += Attributes->GetHealth();
         }
+        // This is a live-threat test in shipped obstructed geometry. Supply
+        // the production navigation system; failed-path wall pushing must
+        // never be what brings its enemies into attack range. Complete the
+        // initial build before advancing simulation faster than wall time.
+        auto* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+        if (!TestNotNull(TEXT("live encounter has navigation"), Nav)) return false;
+        BreakerNavBounds::EnsureCoverage(World);
+        Nav->OnWorldInitDone(FNavigationSystemRunMode::GameMode);
+        Nav->Build();
+        auto* NavData = Nav->GetDefaultNavDataInstance(FNavigationSystem::Create);
+        if (!TestNotNull(TEXT("live encounter has built navigation data"), NavData)) return false;
+        NavData->EnsureBuildCompletion();
         auto* HUD = World->SpawnActor<ABreakerPlaytestHUD>();
         if (!HUD) return false;
         FScriptDelegate Feed; Feed.BindUFunction(HUD, TEXT("HandlePlayerHitDealt"));
@@ -138,6 +153,7 @@ bool FBreakerEntropyLiveRiftRuntimeTest::RunTest(const FString& Parameters)
         float MaxBuildup = 0, PeakRotNumber = 0, Elapsed = 0, LostPlayerHealth = 0;
         bool bRotActivated = false, bAttackObserved = false, bWasReloading = false, bRifleStarted = false;
         TSet<TWeakObjectPtr<ABreakerEnemy>> Moved;
+        TSet<FString> ObservedEnemyStates;
         TSet<TWeakObjectPtr<AActor>> BegunDelivery;
         for (int32 Step = 0; Step < 1200; ++Step)
         {
@@ -197,7 +213,9 @@ bool FBreakerEntropyLiveRiftRuntimeTest::RunTest(const FString& Parameters)
                 {
                     if (FVector::Dist2D(Starts[Held], Enemy->GetActorLocation()) > 50) Moved.Add(Held);
                     const FString State = Enemy->GetEnemyStateLabel();
-                    bAttackObserved |= State.Contains(TEXT("WINDUP")) || State.Contains(TEXT("LUNGE")) || State.Contains(TEXT("FIRE")) || State.Contains(TEXT("ATTACK"));
+                    ObservedEnemyStates.Add(State);
+                    // The shipped melee tell is spelled WIND-UP.
+                    bAttackObserved |= State == TEXT("WIND-UP") || State.Contains(TEXT("LUNGE")) || State.Contains(TEXT("FIRE")) || State.Contains(TEXT("ATTACK"));
                     if (auto* Status = Enemy->FindComponentByClass<UBreakerStatusComponent>())
                     { MaxBuildup = FMath::Max(MaxBuildup, Status->GetEntropyBuildup()); bRotActivated |= Status->HasStatus(RotTag); }
                 }
@@ -215,6 +233,8 @@ bool FBreakerEntropyLiveRiftRuntimeTest::RunTest(const FString& Parameters)
             }
             else ++Killed;
         MovedEnemies = Moved.Num();
+        auto StateNames = ObservedEnemyStates.Array(); StateNames.Sort();
+        AddInfo(FString::Printf(TEXT("Observed enemy states: %s"), *FString::Join(StateNames, TEXT(", "))));
         TestTrue(TEXT("shipped enemies actually move in the encounter"), MovedEnemies > 0);
         TestTrue(TEXT("real attacks or received damage demonstrate live enemy threat"), bAttackObserved || LostPlayerHealth > 0);
         TestTrue(TEXT("ordinary delivery reduces actual enemy health"), InitialEnemyHealth > RemainingEnemyHealth);

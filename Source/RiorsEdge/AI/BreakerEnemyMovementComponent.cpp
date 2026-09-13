@@ -63,12 +63,19 @@ EBreakerLocomotionMode UBreakerEnemyMovementComponent::Drive(const FVector& Dire
 
     if (Mode == EBreakerLocomotionMode::Path)
     {
-        // A refused path (no navmesh yet, the first second of a level) is not
-        // a hold: the body steers this frame and asks again next frame.
+        // A failed route is not permission to walk through the obstruction.
+        // The controller rate-limits retries while navigation builds/changes.
         if (!Controller || !Controller->Chase(PathTo, Acceptance))
         {
-            Mode = EBreakerLocomotionMode::Steer;
+            Mode = EBreakerLocomotionMode::Idle;
         }
+    }
+
+    bBlockedHold = Mode == EBreakerLocomotionMode::Idle && !Direction.IsNearlyZero();
+    if (bBlockedHold)
+    {
+        StopMovementImmediately();
+        ConsumeInputVector();
     }
 
     if (Mode != EBreakerLocomotionMode::Path && Controller)
@@ -90,8 +97,17 @@ bool UBreakerEnemyMovementComponent::IsClosingLineBlocked(const FVector& To, con
     FCollisionQueryParams Params(SCENE_QUERY_STAT(BreakerEnemyClosingLine), false, PawnOwner);
     if (Ignore) Params.AddIgnoredActor(Ignore);
     FHitResult Hit;
-    return World->LineTraceSingleByChannel(Hit, UpdatedComponent->GetComponentLocation(),
-        To, ECC_WorldStatic, Params);
+    const FVector Start = UpdatedComponent->GetComponentLocation();
+    const UCapsuleComponent* Capsule = Cast<UCapsuleComponent>(UpdatedComponent);
+    if (!Capsule) return World->LineTraceSingleByObjectType(Hit, Start, To,
+        FCollisionObjectQueryParams(ECC_WorldStatic), Params);
+    // Slightly inset the shell to avoid counting the floor we stand on.
+    // Trace horizontally: target eye height must not lift our feet over a ledge.
+    constexpr float ClearanceInsetCm = 1.0f; // O2 PLACEHOLDER
+    const float Radius = FMath::Max(1.0f, Capsule->GetScaledCapsuleRadius() - ClearanceInsetCm);
+    const float HalfHeight = FMath::Max(Radius, Capsule->GetScaledCapsuleHalfHeight() - ClearanceInsetCm);
+    return World->SweepSingleByObjectType(Hit, Start, FVector(To.X, To.Y, Start.Z), FQuat::Identity,
+        FCollisionObjectQueryParams(ECC_WorldStatic), FCollisionShape::MakeCapsule(Radius, HalfHeight), Params);
 }
 
 void UBreakerEnemyMovementComponent::ResetForRevive()
@@ -99,6 +115,7 @@ void UBreakerEnemyMovementComponent::ResetForRevive()
     StopMovementImmediately();
     ConsumeInputVector();
     WorldTouchCount = 0;
+    bBlockedHold = false;
     LastMode = EBreakerLocomotionMode::Idle;
 }
 
@@ -133,7 +150,10 @@ void UBreakerEnemyMovementComponent::SnapToGround(float DeltaTime)
     const FVector TraceEnd = TraceStart - FVector(0, 0, 4000.0f);
     FCollisionQueryParams GroundParams(SCENE_QUERY_STAT(BreakerEnemyGround), false, PawnOwner);
     FHitResult Ground;
-    if (World->LineTraceSingleByChannel(Ground, TraceStart, TraceEnd, ECC_WorldStatic, GroundParams))
+    // Pawns block the WorldStatic trace channel too. They are not ground:
+    // snapping onto another enemy's capsule makes crowds climb and jitter.
+    if (World->LineTraceSingleByObjectType(Ground, TraceStart, TraceEnd,
+        FCollisionObjectQueryParams(ECC_WorldStatic), GroundParams))
     {
         const float TargetZ = Ground.ImpactPoint.Z + HalfHeight;
         const float CurrentZ = Location.Z;

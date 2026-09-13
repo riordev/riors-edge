@@ -242,6 +242,11 @@ ABreakerEnemy::ABreakerEnemy()
     // (BreakerModifierComponent, Enemy->SetActorLocation(Destination, false))
     // validates the destination against this capsule before teleporting.
     BodyCollision->SetCollisionProfileName(UCollisionProfile::Pawn_ProfileName);
+    // Pawns occupy the mesh; they must not carve it under their own feet.
+    // APawn's navigation-relevance hook is empty (unlike ACharacter's), and
+    // shape components default to exporting geometry. A blocking capsule
+    // otherwise makes its own start unreachable and dirties tiles as it moves.
+    BodyCollision->SetCanEverAffectNavigation(false);
     BodyCollision->SetCollisionResponseToChannel(ECC_GameTraceChannel1, ECR_Ignore);
     BodyCollision->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Ignore);
 
@@ -1269,7 +1274,8 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
     const FVector CurrentForward = GetActorForwardVector();
     const FVector WantedFacing = BreakerLocomotionMath::FacingFor(
         Mover ? Mover->GetLastMode() : EBreakerLocomotionMode::Steer,
-        DesiredFacing, DesiredDirection, Mover ? Mover->GetPathHeading() : FVector::ZeroVector);
+        DesiredFacing, Mover && Mover->IsBlockedHold() ? FVector::ZeroVector : DesiredDirection,
+        Mover ? Mover->GetPathHeading() : FVector::ZeroVector);
     SpeedScale *= BreakerLocomotionMath::AlignedSpeedScale(CurrentForward, WantedFacing);
     const FVector Facing = ComputeCappedFacing(CurrentForward, WantedFacing, MaxTurnRateDegreesPerSecond, DeltaSeconds);
     if (!Facing.IsNearlyZero()) SetActorRotation(Facing.Rotation());

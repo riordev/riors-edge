@@ -2,6 +2,12 @@
 #include "AI/BreakerLocomotionMath.h"
 #include "AI/BreakerNavBounds.h"
 #include "Navigation/PathFollowingComponent.h"
+#include "Engine/World.h"
+
+namespace
+{
+    constexpr double BreakerEnemyPathRetrySeconds = 0.75; // O2 PLACEHOLDER
+}
 
 ABreakerEnemyController::ABreakerEnemyController(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
@@ -16,6 +22,7 @@ void ABreakerEnemyController::OnPossess(APawn* InPawn)
 {
     Super::OnPossess(InPawn);
     bHasGoal = false;
+    NextPathAttemptTime = 0.0;
     BreakerNavBounds::EnsureCoverage(GetWorld());
 }
 
@@ -33,19 +40,26 @@ bool ABreakerEnemyController::Chase(const FVector& Goal, float AcceptanceRadius)
     {
         return true;
     }
+    const double Now = GetWorld()->GetTimeSeconds();
+    if (Now < NextPathAttemptTime) return !bIdle;
+    NextPathAttemptTime = Now + BreakerEnemyPathRetrySeconds;
     const EPathFollowingRequestResult::Type Result = MoveToLocation(Goal, AcceptanceRadius,
         /*bStopOnOverlap*/ true, /*bUsePathfinding*/ true, /*bProjectDestinationToNavigation*/ true,
-        /*bCanStrafe*/ true, /*FilterClass*/ nullptr, /*bAllowPartialPath*/ true);
-    if (Result == EPathFollowingRequestResult::Failed)
+        /*bCanStrafe*/ true, /*FilterClass*/ nullptr, /*bAllowPartialPath*/ false);
+    if (Result != EPathFollowingRequestResult::RequestSuccessful)
     {
         bHasGoal = false;
         return false;
     }
     LastGoal = Goal;
     bHasGoal = true;
-    // AlreadyAtGoal is a success that moves nothing; the mover's acceptance
-    // radius sits inside the arrival ring, so the behaviour takes over here.
     return true;
+}
+
+void ABreakerEnemyController::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result)
+{
+    Super::OnMoveCompleted(RequestID, Result);
+    if (GetWorld()) NextPathAttemptTime = GetWorld()->GetTimeSeconds() + BreakerEnemyPathRetrySeconds;
 }
 
 void ABreakerEnemyController::StopChase()

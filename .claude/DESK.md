@@ -1,5 +1,93 @@
 # Desk — next playtest
 
+## OWNER PLAYTEST — FIRST FIELD TRIAL, CASTER
+
+Owner actively playing: the rift clear was cool and the thirty minutes were
+fun, but the character felt too fast and slidey, progression felt rushed,
+and direction, enemy movement, sound and environmental presentation were poor.
+
+- Enemies walk against ledges indefinitely, jitter or rapidly spin; body
+  offsets and animation look awkward. Fernhall approaches particularly poor.
+- Environment: wrong fence-top meshes, untextured/uncoloured walls, floating
+  banners, random trees, no grass, inconsistent pavement and off colours.
+  The visual scene as a whole feels broken and ugly.
+- Caster: Rot/Cleave cast timing feels off; repeated casts with cast speed
+  do not stack/chain as expected. Constant buzzy cast sound is irritating.
+  Caster ultimate feels broken and lacks impact. Overfilled mana leaves a
+  tiny triangular slit in the HUD.
+- Rifle sounds weak, like a toy. Rocket explosion is a giant cube instead
+  of a circular effect; its sound is acceptable. Player shadow has no weapon.
+- Rift reward text wraps badly and selecting a reward jitters the layout.
+- Navigation/quests: no visible minimap, unclear direction, too much objective
+  marker information, poor quest organisation and apparent inability to pursue
+  multiple quests. Guidance should be intuitive. Owner suggests a third NPC
+  at spawn; determine its job before adding one.
+- Gear is cluttered and hard to compare; equipping upgrades does not feel
+  consequential. Owner is unsure how much is early-level tuning.
+
+### NEXT — LOCOMOTION CONTACTS AND ANIMATION
+
+- [ ] Eliminate remaining patrol/steer obstacle scraping using actual movement
+      and impact evidence. The isolated Fernhall ledge approach reaches the
+      player in 6.0 seconds with 16 contacts; after target death/respawn the
+      patrol can accumulate repeated contacts again. This is not a clean route.
+- [ ] Separate path-request velocity from measured displacement for gait and
+      facing. The probe reports transient requested speeds over 98,000 cm/s
+      while half-second displacement stays in the hundreds of centimetres.
+      Investigate tick order before changing mesh offsets or turn-rate caps.
+- [ ] Reproduce a dense moving crowd and unreachable target in Fernhall,
+      recording collision, actual displacement and animation together. The
+      isolated no-nav and overlapping-pawn tests do not prove crowd avoidance.
+- [ ] Correct nav-probe turn-rate measurement to use actual sample duration;
+      the nominal half-second divisor produces false alarms during hitches.
+
+### DONE — FIRST LOCOMOTION REPAIR
+
+- [x] Enemy blocking capsules no longer export navigation geometry and cut
+      holes beneath their own feet. Shipped enemy classes assert this setting.
+- [x] Capsule clearance detects low ledges and shoulder obstructions missed
+      by the old centre ray; static-only grounding cannot climb another pawn.
+- [x] Rejected/incomplete routes hold with cleared velocity/input and bounded
+      retries, preserving facing during a blocked hold. Clear routes resume
+      steering immediately. No partial-route pushing fallback.
+- [x] Runtime collision regression covers floor clearance, a 40 cm ledge,
+      shoulder clearance, 120 repeated failed-route frames, obstacle removal,
+      crowded grounding and revival. Live combat fixture supplies navigation
+      and recognises the actual WIND-UP tell without relaxing assertions.
+- [x] Isolated Fernhall Ledge probe and captures show route recovery and real
+      attack after 6.0 seconds. Initial unisolated footage was invalidated by
+      target death; the isolated pre-nav-fix run stayed held for the capture.
+      Remaining contacts and animation issues stay above, not marked solved.
+
+### FOLLOWING BLOCKS
+
+- [ ] Caster input/timing/audio: reproduce alternating Cleave/Rot and repeated
+      same-slot presses at base and increased cast speed. Compare press,
+      payment, accepted queue, interruption, landing and sound timestamps.
+      Clarify overlapping casts versus chaining only if reproduction needs it.
+      Cast speed already divides the authored wind-up; no missing lane inferred.
+      Owner intent: Caster tree investment must improve casting cadence;
+      preserve cast-speed scaling and tune movement speed separately.
+- [ ] Movement pace and stopping: measure this recorded Caster's live speed
+      modifiers and gear, then tune ground pace and momentum bleed separately.
+- [ ] Fernhall visual sweep: one player-height route with material/mesh/scale
+      checks; repair fence tops, wall surfaces, banners, trees and pavement
+      before adding props. Establish deliberate ground vegetation and palette.
+- [ ] Quest guidance: find why the minimap is absent; show a concise tracked
+      objective and waypoint plus a readable active-quest list. Investigate
+      whether concurrency is blocked mechanically or only hidden in the UI.
+- [ ] Reward/gear/HUD: stable reward-card dimensions and wrapping, useful
+      equipment comparisons, mana overflow geometry and ultimate readout.
+- [ ] Audio/presentation: cast cue repetition and mix, rifle fire asset,
+      rounded rocket blast, weapon-bearing shadow, Caster ultimate payoff.
+
+Read-only triage: BreakerEnemyMovementComponent uses a capsule-center line
+trace to decide obstruction; a low ledge can block the capsule without blocking
+that line. Refused Chase requests revert to Steer. These are plausible causes,
+not a reproduced diagnosis. Facing already has a turn-rate cap; simply adding
+another smoothing layer is not an established fix. No rebuild or game restart
+was performed during the owner's playtest.
+
 ## OWNER PLAYTEST, 2026-09-12 (NINTH)
 
 Owner, an extended run: "guns jiggle in the hands and kind of shake and

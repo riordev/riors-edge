@@ -7,6 +7,7 @@
 #include "Combat/BreakerEnemy.h"
 #include "NavMesh/RecastNavMesh.h"
 #include "UObject/UObjectIterator.h"
+#include "Components/PrimitiveComponent.h"
 
 namespace
 {
@@ -250,6 +251,9 @@ bool FBreakerLocomotionShippedConfigurationTest::RunTest(const FString& Paramete
         if (!Defaults) continue;
         ++Checked;
         const FString Name = It->GetName();
+        const auto* Body = Cast<UPrimitiveComponent>(Defaults->GetRootComponent());
+        TestTrue(FString::Printf(TEXT("%s's body never cuts its own navigation start out of the mesh"), *Name),
+            Body && !Body->CanEverAffectNavigation());
         TestTrue(FString::Printf(TEXT("%s is possessed by the enemy controller"), *Name),
             Defaults->AIControllerClass && Defaults->AIControllerClass->IsChildOf(ABreakerEnemyController::StaticClass()));
         TestEqual(FString::Printf(TEXT("%s is possessed when spawned, not only when placed"), *Name),
